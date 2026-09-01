@@ -21,6 +21,9 @@ export function readCentralDirectoryEntries(args: {
   let regularFileCount = 0;
   let totalCompressedBytes = 0;
   let totalUncompressedBytes = 0;
+  if (args.end.entryCount > args.options.maxFileCount) {
+    fail('limit-exceeded', 'ZIP archive contains too many entries.');
+  }
   for (let index = 0; index < args.end.entryCount; index += 1) {
     const parsed = readCentralDirectoryEntry({
       ...(args.options.assertPath ? { assertPath: args.options.assertPath } : {}),
@@ -34,12 +37,18 @@ export function readCentralDirectoryEntries(args: {
     });
     entries.push(parsed.entry);
     cursor = parsed.nextCursor;
-    if (parsed.entry.directory) continue;
+    if (parsed.entry.directory) {
+      if (parsed.entry.compressedSize !== 0 || parsed.entry.uncompressedSize !== 0) {
+        fail(
+          'archive-invalid',
+          'ZIP directory entries cannot contain payload data.',
+          parsed.entry.name
+        );
+      }
+      continue;
+    }
     assertCompressionRatio(parsed.entry, args.options.maxCompressionRatio);
     regularFileCount += 1;
-    if (regularFileCount > args.options.maxFileCount) {
-      fail('limit-exceeded', 'ZIP archive contains too many regular files.');
-    }
     totalCompressedBytes = checkedAdd(totalCompressedBytes, parsed.entry.compressedSize);
     totalUncompressedBytes = checkedAdd(totalUncompressedBytes, parsed.entry.uncompressedSize);
     if (totalUncompressedBytes > args.options.maxTotalInflatedBytes) {
@@ -49,7 +58,12 @@ export function readCentralDirectoryEntries(args: {
   if (cursor !== args.end.centralDirectoryOffset + args.end.centralDirectorySize) {
     fail('archive-invalid', 'Central directory size or entry count does not match its records.');
   }
-  return { entries, regularFileCount, totalCompressedBytes, totalUncompressedBytes };
+  return {
+    entries,
+    regularFileCount,
+    totalCompressedBytes,
+    totalUncompressedBytes,
+  };
 }
 
 function assertCompressionRatio(

@@ -238,9 +238,10 @@ export function collectOwnershipViolations(files) {
   );
 }
 
-export function runInstanceOwnershipCheck({ files = [] } = {}) {
+export function runInstanceOwnershipCheck({ files = [], scope = 'workspace' } = {}) {
   const targets = resolveScopedTargetFiles({
     files,
+    scope,
     collectFiles: collectCodeFiles,
   });
   const targetRelativeFiles = targets.relativeFiles;
@@ -254,8 +255,14 @@ export function runInstanceOwnershipCheck({ files = [] } = {}) {
 }
 
 if (isExecutedAsScript(import.meta.url)) {
-  const explicitFiles = parseFilesArgument(process.argv.slice(2));
-  const result = runInstanceOwnershipCheck({ files: explicitFiles });
+  const argv = process.argv.slice(2);
+  const explicitFiles = parseFilesArgument(argv);
+  const repoWide = argv.includes('--repo-wide');
+  const reportOnly = argv.includes('--report-only');
+  const result = runInstanceOwnershipCheck({
+    files: explicitFiles,
+    scope: repoWide ? 'repo-wide' : 'workspace',
+  });
 
   if (result.skipped) {
     process.stdout.write('Instance ownership check skipped: no changed code files\n');
@@ -264,7 +271,7 @@ if (isExecutedAsScript(import.meta.url)) {
 
   if (result.violations.length > 0) {
     printViolations('Interactive controller ownership violations found:', result.violations);
-    process.exit(1);
+    process.exit(reportOnly ? 0 : 1);
   }
 
   process.stdout.write('Interactive controller ownership guardrail passed\n');

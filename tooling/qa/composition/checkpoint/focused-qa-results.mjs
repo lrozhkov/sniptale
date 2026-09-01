@@ -60,10 +60,30 @@ export function createBlockedStep(label, detail = 'blocked by earlier hardfail s
 }
 
 export function createViolationStep(label, header, result) {
+  const population =
+    result.scope === 'repo-wide'
+      ? result.populationKind === 'repository-state'
+        ? { scope: 'repo-wide', populationKind: 'repository-state' }
+        : {
+            scope: 'repo-wide',
+            populationKind: 'repository-files',
+            scannedFileCount: result.files?.length ?? 0,
+          }
+      : null;
   const metadata = {
     ...(result.consoleOutput ? { consoleOutput: result.consoleOutput } : {}),
     ...(result.advisories ? { advisories: result.advisories } : {}),
+    ...(population ? { population } : {}),
   };
+  if (population?.populationKind === 'repository-files' && population.scannedFileCount === 0) {
+    return {
+      label,
+      status: 'failed',
+      summary: 'empty mandatory repository population',
+      failures: ['Repo-wide file control resolved an empty scan population.'],
+      ...metadata,
+    };
+  }
   if (result.violations.length === 0) {
     return {
       ...(result.skipped ? createSkippedStep(label) : createOkStep(label)),

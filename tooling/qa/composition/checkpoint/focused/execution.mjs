@@ -79,12 +79,14 @@ export function resolveFocusedCodeStepFiles(options, codeFiles, behavioralCodeFi
 async function runFocusedCodeSteps(codeFiles, targetFiles) {
   const behavioralCodeFiles = filterImportOrMockOnlyDiffFiles(codeFiles);
   const astGrepReceipt =
-    behavioralCodeFiles.length > 0
-      ? runUnifiedAstGrepReceipt({ files: behavioralCodeFiles })
-      : null;
+    codeFiles.length > 0 ? runUnifiedAstGrepReceipt({ files: codeFiles }) : null;
   const steps = [];
   for (const [label, header, runner, options] of FOCUSED_CODE_VIOLATION_STEPS) {
-    const stepCodeFiles = resolveFocusedCodeStepFiles(options, codeFiles, behavioralCodeFiles);
+    const stepCodeFiles = resolveFocusedCodeStepFiles(
+      { preserveImportOnly: true, ...options },
+      codeFiles,
+      behavioralCodeFiles
+    );
     steps.push(
       await timeAsyncStep(async () =>
         createViolationStep(
@@ -103,7 +105,7 @@ async function runFocusedCodeSteps(codeFiles, targetFiles) {
         createViolationStep(
           label,
           header,
-          runMessagingCheck({ astGrepReceipt, files: behavioralCodeFiles, targetFiles })
+          runMessagingCheck({ astGrepReceipt, files: codeFiles, targetFiles })
         )
       )
     );
@@ -120,12 +122,11 @@ function runConditionalViolationStep(label, shouldRun, header, runner) {
 }
 
 async function runSecurityStep(codeFiles) {
-  const behavioralCodeFiles = filterImportOrMockOnlyDiffFiles(codeFiles);
-  if (behavioralCodeFiles.length === 0) {
+  if (codeFiles.length === 0) {
     return createSkippedStep('HTML sanitizer ownership');
   }
 
-  const securityResult = runHtmlSanitizerOwnershipCheck(behavioralCodeFiles);
+  const securityResult = runHtmlSanitizerOwnershipCheck(codeFiles);
   return createViolationStep(
     'HTML sanitizer ownership',
     'HTML sanitizer ownership violations found:',
@@ -149,11 +150,10 @@ async function runSonarjsStep(codeFiles) {
 }
 
 function runChangedLineReadabilityStep(codeFiles) {
-  const behavioralCodeFiles = filterImportOrMockOnlyDiffFiles(codeFiles);
   return createViolationStep(
     'Changed-line readability',
     'Changed-line length violations found:',
-    runLineLengthCheck({ files: behavioralCodeFiles, scope: 'workspace' })
+    runLineLengthCheck({ files: codeFiles, scope: 'workspace' })
   );
 }
 

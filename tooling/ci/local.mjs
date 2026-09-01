@@ -1,11 +1,13 @@
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
 import { createCandidateControlDigest } from './control-digest.mjs';
-import { ensureLocalToolchain } from './local-toolchain.mjs';
+import {
+  ensureLocalToolchain,
+  resolveLocalExecutionEnvironmentIdentity,
+} from './local-toolchain.mjs';
 import { sealLaneArtifacts } from './seal-lane-artifacts.mjs';
 import {
   resolveQaReleaseResourceProfile,
@@ -69,20 +71,7 @@ Object.assign(environment, {
   SNIPTALE_PROOF_SHA: commit,
 });
 Object.assign(process.env, environment);
-const runtimeIdentity = {
-  kind: 'host-wsl',
-  digest: `sha256:${crypto
-    .createHash('sha256')
-    .update(
-      JSON.stringify({
-        node: process.version,
-        platform: process.platform,
-        architecture: process.arch,
-        toolchain: localToolchain.lockDigest,
-      })
-    )
-    .digest('hex')}`,
-};
+const runtimeIdentity = resolveLocalExecutionEnvironmentIdentity();
 const startedAtMs = Date.now();
 const commands = [
   ['install', 'npm', ['ci', '--ignore-scripts']],

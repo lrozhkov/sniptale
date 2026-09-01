@@ -49,7 +49,9 @@ function skipReason(step) {
 
 function stepOutcome(step) {
   if (step.status === 'ok') return 'passed';
+  if (step.status === 'inherited') return 'inherited';
   if (step.status === 'failed') return 'problems-found';
+  if (step.status === 'blocked') return 'blocked';
   return 'skipped';
 }
 
@@ -131,7 +133,7 @@ export function renderObservedStepLog(step, definition) {
 export function normalizeObservedStep(step) {
   const definition = findDefinition(step.label);
   const outcome = stepOutcome(step);
-  const failed = outcome === 'problems-found';
+  const failed = ['problems-found', 'blocked'].includes(outcome);
   return {
     definition,
     observation: {
@@ -139,9 +141,13 @@ export function normalizeObservedStep(step) {
       outcome,
       durationMs: step.durationMs ?? 0,
       controlIds: [definition.id],
-      problemIds: failed ? [`${definition.id}.${problemCategory(step)}`] : [],
+      problemIds: failed
+        ? [`${definition.id}.${outcome === 'blocked' ? 'blocked' : problemCategory(step)}`]
+        : [],
       skipReasonId: outcome === 'skipped' ? skipReason(step) : null,
       diagnostic: createStructuredDiagnostic(step, definition, failed),
+      population: step.population ?? null,
+      inheritance: step.inheritance ?? null,
       log: renderObservedStepLog(step, definition),
     },
   };

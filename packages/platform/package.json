@@ -71,6 +71,7 @@
     "./data/zip-profile/entry-filenames": "./src/data/zip-profile/entry-filenames.ts",
     "./data/zip-profile/central-directory": "./src/data/zip-profile/central-directory.ts",
     "./data/zip-profile": "./src/data/zip-profile/index.ts",
+    "./data/zip-profile/verified-loader": "./src/data/zip-profile/verified-loader.ts",
     "./data/state-manager": "./src/data/state-manager/manager.ts",
     "./data/state-manager/memory-adapter": "./src/data/state-manager/memory-adapter.ts",
     "./data/state-manager/types": "./src/data/state-manager/types.ts"

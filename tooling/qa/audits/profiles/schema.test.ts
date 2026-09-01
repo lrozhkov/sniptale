@@ -162,10 +162,10 @@ describe('audit profile schema', () => {
     }
   });
 
-  it('runs OSV but not npm vulnerability resolution in Fast and refreshes both in full profiles', () => {
+  it('runs OSV and npm vulnerability resolution in Fast and full profiles', () => {
     const pr = resolveAuditProfile('pr');
     expect(pr.controls.get('osv-scanner')?.requirement).toBe('required');
-    expect(pr.controls.get('npm-audit')?.requirement).toBe('excluded');
+    expect(pr.controls.get('npm-audit')?.requirement).toBe('required');
     expect(pr.controls.get('npm-audit-signatures')?.requirement).toBe('required');
 
     for (const profileId of ['repository', 'security', 'release']) {

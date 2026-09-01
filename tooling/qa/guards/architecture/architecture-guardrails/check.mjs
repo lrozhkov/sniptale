@@ -81,6 +81,7 @@ export function runArchitectureGuardrailCheck({
         baseline: baselineOverrides.rawStorageMutation,
       }),
       ...collectPolicyStateDescriptorViolations(repoWideProductFiles, {
+        enforceAll: scope === 'repo-wide',
         newFiles: collectNewFileSet(changedTargets),
         root,
       }),

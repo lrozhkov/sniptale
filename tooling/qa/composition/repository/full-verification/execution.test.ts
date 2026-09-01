@@ -2,16 +2,18 @@ import { expect, it, vi } from 'vitest';
 
 function createAggregateCollectors() {
   return {
+    collectFormatStep: () => ({ label: 'Format', status: 'ok' }),
     collectLineLengthStep: () => ({ label: 'Changed-line readability', status: 'ok' }),
+    collectRepositoryReadabilityStep: () => ({ label: 'Repository readability', status: 'ok' }),
     collectOxlintStep: () => ({ label: 'Oxlint', status: 'ok' }),
     collectSonarjsReleaseStep: async () => ({ label: 'SonarJS', status: 'ok' }),
     collectAiHygieneStep: () => ({ label: 'AI hygiene', status: 'ok' }),
     collectStructuralRiskStep: () => ({ label: 'Structural risk', status: 'ok' }),
     collectNamingStep: () => ({ label: 'Naming', status: 'ok' }),
+    collectMockParityStep: () => ({ label: 'Mock export parity', status: 'ok' }),
     collectViolationSteps: () => [],
     collectI18nStep: () => ({ label: 'i18n', status: 'ok' }),
     collectDesignSystemStep: () => ({ label: 'Design system', status: 'ok' }),
-    collectAuditStep: () => ({ label: 'Audit', status: 'ok' }),
     collectSecurityStep: async () => ({ label: 'HTML sanitizer ownership', status: 'ok' }),
     collectBoundaryStep: async () => ({ label: 'Dependency boundaries', status: 'ok' }),
     collectCycleStep: async () => ({ label: 'Cycles', status: 'ok' }),
@@ -76,16 +78,18 @@ it('aggregates release hardfail steps and skips build after earlier failures', a
 
   expect(result.scopeDetail).toBe('release full-suite tests without coverage');
   expect(collectFailedReleaseStatuses(result)).toEqual([
+    ['Format', 'ok'],
     ['Changed-line readability', 'ok'],
+    ['Repository readability', 'ok'],
     ['Oxlint', 'failed'],
     ['SonarJS', 'ok'],
     ['AI hygiene', 'ok'],
     ['Structural risk', 'ok'],
     ['Naming', 'failed'],
+    ['Mock export parity', 'ok'],
     ['Messaging', 'ok'],
     ['i18n', 'ok'],
     ['Design system', 'ok'],
-    ['Audit', 'ok'],
     ['HTML sanitizer ownership', 'ok'],
     ['Dependency boundaries', 'ok'],
     ['Cycles', 'ok'],
@@ -168,9 +172,8 @@ it('packages the release archive after a green release build', async () => {
   expect(archiveCollector).toHaveBeenCalledTimes(1);
 });
 
-it('runs only SonarJS and release artifact owners after verified Fast proof reuse', async () => {
+it('runs only release artifact owners after verified Fast proof admission', async () => {
   const module = await import('./execution.mjs');
-  const sonarjsCollector = vi.fn(async () => ({ label: 'SonarJS', status: 'ok' as const }));
   const buildCollector = vi.fn(async () => ({ label: 'Build', status: 'ok' as const }));
   const archiveCollector = vi.fn(async () => ({
     label: 'Release archive',
@@ -181,21 +184,18 @@ it('runs only SonarJS and release artifact owners after verified Fast proof reus
     verifyScope: createVerifyScope(),
     baseline: [],
     collectors: {
-      collectSonarjsReleaseStep: sonarjsCollector,
       collectBuildStep: buildCollector,
       collectReleaseArchiveStep: archiveCollector,
     },
   });
 
-  expect(result.steps.map(({ label }) => label)).toEqual(['SonarJS', 'Build', 'Release archive']);
-  expect(sonarjsCollector).toHaveBeenCalledWith(expect.objectContaining({ releaseMode: true }));
+  expect(result.steps.map(({ label }) => label)).toEqual(['Build', 'Release archive']);
   expect(buildCollector).toHaveBeenCalledTimes(1);
   expect(archiveCollector).toHaveBeenCalledTimes(1);
 });
 
-it('keeps the fresh Fast build and archive instead of repeating artifact owners', async () => {
+it('omits release artifact owners when their delta is explicitly excluded', async () => {
   const module = await import('./execution.mjs');
-  const sonarjsCollector = vi.fn(async () => ({ label: 'SonarJS', status: 'ok' as const }));
   const buildCollector = vi.fn();
   const archiveCollector = vi.fn();
 
@@ -204,13 +204,12 @@ it('keeps the fresh Fast build and archive instead of repeating artifact owners'
     baseline: [],
     includeArtifactSteps: false,
     collectors: {
-      collectSonarjsReleaseStep: sonarjsCollector,
       collectBuildStep: buildCollector,
       collectReleaseArchiveStep: archiveCollector,
     },
   });
 
-  expect(result.steps.map(({ label }) => label)).toEqual(['SonarJS']);
+  expect(result.steps).toEqual([]);
   expect(buildCollector).not.toHaveBeenCalled();
   expect(archiveCollector).not.toHaveBeenCalled();
 });
@@ -241,7 +240,6 @@ it('accepts one dependency graph collector while preserving release step order',
     'Naming',
     'i18n',
     'Design system',
-    'Audit',
     'HTML sanitizer ownership',
     'Dependency boundaries',
     'Cycles',

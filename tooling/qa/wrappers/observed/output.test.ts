@@ -26,14 +26,21 @@ it('normalizes a failure into stable control/problem IDs with remediation detail
   });
 });
 
-it('classifies prerequisite blocking as an aggregate skip reason', () => {
+it('classifies prerequisite blocking as a distinct blocked outcome', () => {
   expect(
     normalizeObservedStep({
       label: 'Playwright',
       status: 'blocked',
       detail: 'blocked by E2E build failure',
     }).observation
-  ).toMatchObject({ outcome: 'skipped', skipReasonId: 'blocked-by-prerequisite' });
+  ).toMatchObject({ outcome: 'blocked', skipReasonId: null });
+  expect(
+    normalizeObservedStep({
+      label: 'Playwright',
+      status: 'blocked',
+      detail: 'blocked by E2E build failure',
+    }).observation.problemIds
+  ).toEqual(['qa.rule.playwright.blocked']);
 });
 
 it('preserves a profile-authorized structured skip reason', () => {
@@ -44,7 +51,10 @@ it('preserves a profile-authorized structured skip reason', () => {
       detail: 'optional engine unavailable',
       skipReasonId: 'audit.optional-engine-unavailable',
     }).observation
-  ).toMatchObject({ outcome: 'skipped', skipReasonId: 'audit.optional-engine-unavailable' });
+  ).toMatchObject({
+    outcome: 'skipped',
+    skipReasonId: 'audit.optional-engine-unavailable',
+  });
 });
 
 it('prints both the structured run record and the wrapper diagnostic log', () => {

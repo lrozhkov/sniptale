@@ -151,6 +151,7 @@ function validateUnitReceipt(root) {
 }
 
 function validateReceiptReuse(manifest, name, receipt) {
+  if (manifest.proofReuse?.[name] === 'inherited') return;
   const observed = receipt.reusedFrom ? 'reused' : 'fresh';
   if (manifest.proofReuse?.[name] !== observed) {
     throw new Error(`Candidate proof ${name} reuse status does not match its receipt.`);
@@ -261,7 +262,7 @@ function validateRunRecord(root, manifest, lane, derived, trustedRoot) {
     throw new Error('Candidate proof must contain one top-level run record.');
   const record = JSON.parse(fs.readFileSync(path.join(root, records[0]), 'utf8'));
   if (
-    record?.schemaVersion !== 3 ||
+    record?.schemaVersion !== 4 ||
     record.wrapperId !== `ci:${lane}` ||
     record.status !== 'all-passed' ||
     record.exitCode !== 0 ||
@@ -274,7 +275,19 @@ function validateRunRecord(root, manifest, lane, derived, trustedRoot) {
   if (!derived && record.repository?.head !== manifest.commit) {
     throw new Error('Candidate proof run record is not bound to the candidate commit.');
   }
-  if (!derived) validateTrustedControlResults(record, lane, trustedRoot);
+  if (!derived) {
+    let inheritanceContext = null;
+    if (lane === 'release') {
+      const admission = JSON.parse(
+        fs.readFileSync(path.join(root, '.tmp/ci/fast-proof-admission.json'), 'utf8')
+      );
+      const sourceRecord = JSON.parse(
+        fs.readFileSync(path.join(root, 'fast-proof', admission.sourceRunRecord), 'utf8')
+      );
+      inheritanceContext = { admission, sourceRecord };
+    }
+    validateTrustedControlResults(record, lane, trustedRoot, inheritanceContext);
+  }
 }
 
 function validateDerivedReuse(root, manifest, expected) {
@@ -300,7 +313,7 @@ function validateManifestIdentity(manifest, expected) {
     manifest.artifactKind !== 'sniptale-ci-proof' ||
     manifest.lane !== expected.lane ||
     manifest.status !== 'passed' ||
-    manifest.workspaceMode !== 'committed' ||
+    manifest.workspaceMode !== expected.workspaceMode ||
     manifest.commit !== expected.commit ||
     manifest.baseSha !== expected.baseSha ||
     manifest.candidateTree !== expected.candidateTree ||
@@ -318,10 +331,16 @@ function validateManifestDigests(manifest, expected) {
     manifest.controlDigest !== expected.controlDigest ||
     manifest.trustedControlDigest !== expected.trustedControlDigest ||
     manifest.gateInputDigest !== expected.gateInputDigest ||
-    manifest.executionEnvironment?.kind !== 'locked-container' ||
-    manifest.containerDigest !== manifest.executionEnvironment.digest ||
-    !/^sha256:[a-f0-9]{64}$/u.test(manifest.containerDigest ?? '') ||
-    (expected.containerDigest !== null && manifest.containerDigest !== expected.containerDigest)
+    manifest.executionEnvironment?.kind !== expected.executionEnvironmentKind ||
+    !/^sha256:[a-f0-9]{64}$/u.test(manifest.executionEnvironment?.digest ?? '') ||
+    (expected.executionEnvironmentDigest !== null &&
+      manifest.executionEnvironment.digest !== expected.executionEnvironmentDigest) ||
+    (expected.executionEnvironmentKind === 'locked-container' &&
+      (manifest.containerDigest !== manifest.executionEnvironment.digest ||
+        !/^sha256:[a-f0-9]{64}$/u.test(manifest.containerDigest ?? '') ||
+        (expected.containerDigest !== null &&
+          manifest.containerDigest !== expected.containerDigest))) ||
+    (expected.executionEnvironmentKind === 'host-wsl' && manifest.containerDigest !== null)
   ) {
     throw new Error('Candidate proof digests do not match trusted admission inputs.');
   }
@@ -340,7 +359,7 @@ function validateManifestDigests(manifest, expected) {
   }
 }
 
-function validateMandatoryPhases(manifest, lanePolicy) {
+function validateMandatoryPhases(manifest, lanePolicy, executionEnvironmentKind) {
   const phaseIds = manifest.phases?.map(({ id, status }) => {
     if (status !== 'passed') throw new Error(`Candidate proof phase did not pass: ${String(id)}`);
     return id;
@@ -350,7 +369,9 @@ function validateMandatoryPhases(manifest, lanePolicy) {
   if (manifest.evidenceDisposition !== expectedDisposition) {
     throw new Error('Candidate proof evidence disposition is ambiguous.');
   }
-  if (!derived && JSON.stringify(phaseIds) !== JSON.stringify(lanePolicy.freshPhases)) {
+  const freshPhases =
+    executionEnvironmentKind === 'host-wsl' ? lanePolicy.hostFreshPhases : lanePolicy.freshPhases;
+  if (!derived && JSON.stringify(phaseIds) !== JSON.stringify(freshPhases)) {
     throw new Error('Candidate proof mandatory phase sequence is incomplete.');
   }
   return derived;
@@ -382,6 +403,68 @@ function validateReuseReceipts(root, manifest, lane, archives, declared, lanePol
     validateReceiptReuse(manifest, 'unit', unit);
   }
   if (lane !== 'release') return;
+  const admission = JSON.parse(
+    fs.readFileSync(path.join(root, '.tmp/ci/fast-proof-admission.json'), 'utf8')
+  );
+  const sourceManifest = JSON.parse(
+    fs.readFileSync(path.join(root, 'fast-proof/proof-manifest.json'), 'utf8')
+  );
+  const sourceManifestDigest = `sha256:${crypto
+    .createHash('sha256')
+    .update(fs.readFileSync(path.join(root, 'fast-proof/proof-manifest.json')))
+    .digest('hex')}`;
+  if (
+    admission?.artifactKind !== 'sniptale-fast-proof-admission' ||
+    admission.outcome !== 'admitted' ||
+    admission.lane !== 'proof' ||
+    admission.commit !== manifest.commit ||
+    admission.candidateTree !== manifest.candidateTree ||
+    admission.controlDigest !== manifest.controlDigest ||
+    admission.workspaceMode !== sourceManifest.workspaceMode ||
+    admission.workspaceMode !== manifest.workspaceMode ||
+    admission.executionEnvironment?.kind !== sourceManifest.executionEnvironment?.kind ||
+    admission.executionEnvironment?.kind !== manifest.executionEnvironment?.kind ||
+    admission.executionEnvironment?.digest !== sourceManifest.executionEnvironment?.digest ||
+    admission.executionEnvironment?.digest !== manifest.executionEnvironment?.digest ||
+    admission.proofSemanticDigest !== sourceManifest.proofSemanticDigest ||
+    admission.proofManifestDigest !== sourceManifestDigest ||
+    sourceManifest.lane !== 'proof' ||
+    sourceManifest.status !== 'passed'
+  ) {
+    throw new Error('Release proof is not bound to its admitted Fast proof source.');
+  }
+  const sourceFiles = new Map(
+    (sourceManifest.files ?? []).map(({ file, sha256: digest }) => [file, digest])
+  );
+  for (const relative of [admission.sourceRunRecord, admission.sourceRunLog]) {
+    if (
+      typeof relative !== 'string' ||
+      !relative.startsWith('.tmp/') ||
+      declared.get(`fast-proof/${relative}`) !== sourceFiles.get(relative)
+    ) {
+      throw new Error('Inherited Fast proof observability evidence drifted.');
+    }
+  }
+  for (const file of [
+    '.tmp/qa/unit-proof.json',
+    '.tmp/qa/coverage-proof.json',
+    '.tmp/coverage/canonical/coverage-final.json',
+    '.tmp/coverage/canonical/coverage-summary.json',
+    '.tmp/coverage/canonical/lcov.info',
+  ]) {
+    if (declared.get(file) !== sourceFiles.get(file)) {
+      throw new Error(`Inherited Fast proof evidence drifted: ${file}`);
+    }
+  }
+  const sourceCoverage = [...sourceFiles.entries()]
+    .filter(([file]) => file.startsWith('.tmp/coverage/canonical/html/'))
+    .sort();
+  const inheritedCoverage = [...declared.entries()]
+    .filter(([file]) => file.startsWith('.tmp/coverage/canonical/html/'))
+    .sort();
+  if (stableStringify(sourceCoverage) !== stableStringify(inheritedCoverage)) {
+    throw new Error('Inherited Fast proof coverage HTML inventory drifted.');
+  }
   validateCodeqlEvidence(root, manifest, declared, trustedRoot);
   validateCoverageEvidence(root, manifest, declared, trustedRoot);
 }
@@ -392,7 +475,11 @@ export function admitCandidateProof({
   candidateRoot,
   commit,
   expectedContainerDigest = null,
+  expectedCandidateTree = null,
+  expectedExecutionEnvironmentDigest = null,
+  expectedExecutionEnvironmentKind = 'locked-container',
   expectedTrustedControlSha,
+  expectedWorkspaceMode = 'committed',
   lane,
   trustedRoot = process.cwd(),
 }) {
@@ -405,7 +492,8 @@ export function admitCandidateProof({
   const policy = readPolicy(trustedRoot);
   const lanePolicy = policy.lanes[lane];
   const manifest = JSON.parse(fs.readFileSync(path.join(root, 'proof-manifest.json'), 'utf8'));
-  const candidateTree = git(resolvedCandidate, ['rev-parse', `${commit}^{tree}`]);
+  const candidateTree =
+    expectedCandidateTree ?? git(resolvedCandidate, ['rev-parse', `${commit}^{tree}`]);
   const controlDigest = createCandidateControlDigest({
     cwd: resolvedCandidate,
   });
@@ -430,10 +518,13 @@ export function admitCandidateProof({
     controlDisposition,
     gateInputDigest,
     containerDigest: expectedContainerDigest,
+    executionEnvironmentDigest: expectedExecutionEnvironmentDigest,
+    executionEnvironmentKind: expectedExecutionEnvironmentKind,
+    workspaceMode: expectedWorkspaceMode,
   };
   validateManifestIdentity(manifest, expected);
   validateManifestDigests(manifest, expected);
-  const derived = validateMandatoryPhases(manifest, lanePolicy);
+  const derived = validateMandatoryPhases(manifest, lanePolicy, expectedExecutionEnvironmentKind);
   if (derived && controlsChanged) {
     throw new Error('Derived proof cannot cross candidate control digests.');
   }
@@ -450,8 +541,8 @@ export function admitCandidateProof({
   if (derived) validateDerivedReuse(root, manifest, { baseSha, commit });
   return {
     schemaVersion: 1,
-    artifactKind: 'sniptale-trusted-proof-admission',
-    outcome: 'passed',
+    artifactKind: 'sniptale-fast-proof-admission',
+    outcome: 'admitted',
     lane,
     commit,
     trustedControlSha: expectedTrustedControlSha,
@@ -462,6 +553,14 @@ export function admitCandidateProof({
     controlDisposition,
     gateInputDigest,
     proofSemanticDigest: manifest.proofSemanticDigest,
+    proofManifestDigest: `sha256:${sha256(path.join(root, 'proof-manifest.json'))}`,
+    proofRoot: root,
+    sourceRunRecord:
+      manifest.files.find(({ file }) => file.startsWith('.tmp/qa-observability/runs/'))?.file ??
+      null,
+    sourceRunLog: manifest.files.find(({ file }) => file.startsWith('.tmp/qa-logs/'))?.file ?? null,
+    workspaceMode: expectedWorkspaceMode,
+    executionEnvironment: { ...manifest.executionEnvironment },
     derived,
     executionProfile: manifest.executionProfile,
     reuseCompatibility: manifest.reuseCompatibility,

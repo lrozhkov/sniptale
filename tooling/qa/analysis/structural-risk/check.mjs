@@ -16,15 +16,21 @@ import {
   sanitizeBoundedConsoleOutput,
 } from '../../runtime/observability/sanitize.mjs';
 import { collectChangedTargets } from '../../runtime/scope/changed-targets.helpers.mjs';
+import { applyRepositoryFindingBaseline } from '../../policy/baselines/repository-finding-baseline.mjs';
 
-function resolveStructuralFiles({ files = [] } = {}) {
+const REPOSITORY_BASELINE_PATH = 'tooling/configs/qa/structural-risk-repository-baseline.json';
+
+function resolveStructuralFiles({ files = [], scope = 'workspace' } = {}) {
   const targets = resolveScopedTargetFiles({
     files,
-    scope: 'workspace',
+    scope,
     collectFiles: collectCodeFiles,
     relativeFilter: (file) => JAVASCRIPT_FILE_PATTERN.test(file),
   });
-  const behavioral = filterImportOrMockOnlyDiffFiles(targets.relativeFiles);
+  const behavioral =
+    scope === 'repo-wide'
+      ? targets.relativeFiles
+      : filterImportOrMockOnlyDiffFiles(targets.relativeFiles);
   return [...new Set(behavioral.map(toRelativePath))].sort();
 }
 
@@ -56,8 +62,13 @@ export function runStructuralRiskCheck({
   getCurrentSource = readText,
   getPreviousSource,
 } = {}) {
-  const targetFiles = resolveStructuralFiles({ files });
-  const previous = getPreviousSource ?? createPreviousSourceResolver(targetFiles);
+  const repositoryMode = reportScope === 'repository';
+  const targetFiles = resolveStructuralFiles({
+    files,
+    scope: repositoryMode ? 'repo-wide' : 'workspace',
+  });
+  const previous =
+    getPreviousSource ?? (repositoryMode ? () => null : createPreviousSourceResolver(targetFiles));
   const report = createStructuralRiskReport({
     files: targetFiles,
     getCurrentSource,
@@ -66,11 +77,18 @@ export function runStructuralRiskCheck({
     scope: reportScope,
     enforce,
   });
+  const repositoryBaseline = repositoryMode
+    ? applyRepositoryFindingBaseline({
+        baselinePath: REPOSITORY_BASELINE_PATH,
+        controlId: 'qa.rule.structural-risk',
+        findings: report.violations,
+      })
+    : null;
   return {
     skipped: targetFiles.length === 0,
     files: targetFiles,
     report,
-    violations: report.violations,
+    violations: repositoryBaseline?.violations ?? report.violations,
     advisories: report.advisories,
     consoleOutput: formatStructuralRiskConsole(report),
   };

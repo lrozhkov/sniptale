@@ -55,7 +55,7 @@ function collectRecursiveFiles(relativeRoot, predicate, results = []) {
   return results;
 }
 
-function collectRepoTestFiles() {
+export function collectRepositoryTestFiles() {
   return SCAN_ROOTS.flatMap((root) =>
     collectRecursiveFiles(
       root,
@@ -99,7 +99,10 @@ export function collectCandidateTestFiles(targetFiles) {
     (file) => JS_LIKE_FILE_PATTERN.test(file) && !TEST_FILE_PATTERN.test(file)
   );
   return [
-    ...new Set([...changedTests, ...(changedModules.length > 0 ? collectRepoTestFiles() : [])]),
+    ...new Set([
+      ...changedTests,
+      ...(changedModules.length > 0 ? collectRepositoryTestFiles() : []),
+    ]),
   ].sort();
 }
 

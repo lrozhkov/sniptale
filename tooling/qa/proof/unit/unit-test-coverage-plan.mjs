@@ -12,7 +12,7 @@ export function resolveCoveragePlan({
       mode: 'skip',
       coverageTargetFiles: [],
       coverageCheckFiles: [],
-      detail: 'coverage handled by ci:release',
+      detail: 'coverage handled by ci:proof',
       relatedFiles: [...relatedFilesOverride],
     };
   }
@@ -22,7 +22,7 @@ export function resolveCoveragePlan({
       mode: 'full',
       coverageTargetFiles: coverageTargetResolver({ mode: 'full' }),
       coverageCheckFiles: [],
-      detail: 'release full-suite coverage',
+      detail: 'full-suite coverage proof',
       relatedFiles: [],
     };
   }
@@ -72,7 +72,7 @@ export function createPlannedCoverage({
     relatedFiles: relatedFilesOverride ?? coveragePlan.relatedFiles,
     detail:
       coverageDetailOverride ??
-      (coverageEnabled ? coveragePlan.detail : 'coverage handled by ci:release'),
+      (coverageEnabled ? coveragePlan.detail : 'coverage handled by ci:proof'),
   };
 }
 

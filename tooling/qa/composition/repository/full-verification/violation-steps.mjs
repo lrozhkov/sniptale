@@ -9,7 +9,11 @@ import { runManifestPermissionsCheck } from '../../../guards/architecture/manife
 import { runInstanceOwnershipCheck } from '../../../guards/architecture/ownership/instance-ownership/check.mjs';
 import { runRuntimeTopologyCheck } from '../../../guards/architecture/runtime-topology/check.mjs';
 import { runForwardingModuleDriftCheck } from '../../../guards/architecture/forwarding-module-drift/check.mjs';
-import { runChangedUiAutomationSeamCheck } from '../../../guards/product-contracts/ui-automation/verify-ui-automation-seams.mjs';
+import { runUiAutomationSeamCheck } from '../../../guards/product-contracts/ui-automation/verify-ui-automation-seams.mjs';
+import { runConfigPolicyCheck } from '../../../guards/product-contracts/config/config-policy/check.mjs';
+import { runExtensionBuildLayoutCheck } from '../../../guards/product-contracts/extension-build/verify-extension-build-layout.mjs';
+import { runDetachedControllerMethodCheck } from '../../../guards/quality/detached-controller-methods/check.mjs';
+import { runDomainFixtureRealismCheck } from '../../../guards/product-contracts/verify-domain-fixture-realism.mjs';
 import { runManifestIntegrityCheck } from '../../../guards/product-contracts/manifest-integrity/check.mjs';
 import { runPackageBoundaryCheck } from '../../../guards/product-contracts/package-boundaries/check.mjs';
 import { runParserSnapshotPurityCheck } from '../../../guards/product-contracts/verify-parser-snapshot-purity.mjs';
@@ -43,6 +47,16 @@ const releaseGuardrailAdapterDefinitions = [
   NETWORK_POLICY_VIOLATION_STEP,
   ...SHARED_OWNER_PROOF_VIOLATION_STEPS,
   ...SHARED_ENTRYPOINT_LOGGING_VIOLATION_STEPS,
+  [
+    'Config policy',
+    'Config policy violations found:',
+    () => ({ ...runConfigPolicyCheck(), populationKind: 'repository-state' }),
+  ],
+  [
+    'Extension build layout',
+    'Extension build layout violations found:',
+    () => ({ ...runExtensionBuildLayoutCheck(), populationKind: 'repository-state' }),
+  ],
   ['Dependency admission', 'Dependency admission violations found:', runDependencyAdmissionCheck],
   ['Secret storage', 'Secret storage violations found:', runSecretStorageCheck],
   ['Sensitive retention', 'Sensitive retention violations found:', runSensitiveRetentionCheck],
@@ -95,11 +109,21 @@ const releaseGuardrailAdapterDefinitions = [
     'Shared style ownership guardrail violations found:',
     runSharedStyleOwnershipCheck,
   ],
-  ['UI automation seams', 'UI automation seam violations found:', runChangedUiAutomationSeamCheck],
+  ['UI automation seams', 'UI automation seam violations found:', runUiAutomationSeamCheck],
   [
     'Interactive controller ownership',
     'Interactive controller ownership violations found:',
     runInstanceOwnershipCheck,
+  ],
+  [
+    'Detached controller methods',
+    'Detached controller method violations found:',
+    runDetachedControllerMethodCheck,
+  ],
+  [
+    'Domain fixture realism',
+    'Domain fixture realism violations found:',
+    runDomainFixtureRealismCheck,
   ],
 ];
 

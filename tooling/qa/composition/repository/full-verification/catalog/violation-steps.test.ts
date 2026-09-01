@@ -3,7 +3,11 @@ import { expect, it, vi } from 'vitest';
 import { collectViolationSteps } from './violation-steps.mjs';
 
 it('awaits asynchronous violation runners before creating release steps', async () => {
-  const runner = vi.fn(async () => ({ skipped: false, files: [], violations: [] }));
+  const runner = vi.fn(async () => ({
+    skipped: false,
+    files: ['src/example.ts'],
+    violations: [],
+  }));
 
   await expect(
     collectViolationSteps(

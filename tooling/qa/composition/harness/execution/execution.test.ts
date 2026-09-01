@@ -130,6 +130,7 @@ it('runs exact changed and owner-local harness tests without broad sibling or gr
   ).toEqual({
     directFiles: ['tooling/qa/policy/targets/verify-target-only-paths.test.ts'],
     maxWorkers: 4,
+    requireTests: true,
     suite: 'harness',
   });
 });
@@ -154,6 +155,7 @@ it.each([
   ).toEqual({
     directFiles: [testFile],
     maxWorkers: 4,
+    requireTests: true,
     suite: 'harness',
   });
 });

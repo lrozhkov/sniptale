@@ -82,7 +82,7 @@
     "qa:raw:knip": "knip --config tooling/configs/qa/knip.json",
     "qa:raw:codeql": "codeql",
     "ci:proof": "node tooling/ci/proof.mjs",
-    "ci:release": "node tooling/ci/local.mjs release",
+    "ci:release": "node tooling/ci/release.mjs",
     "ci:proof:container": "node tooling/ci/local-container.mjs proof",
     "ci:release:container": "node tooling/ci/local-container.mjs release",
     "ci:build": "npm run build",

@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "controlId": "qa.rule.repository-readability",
+  "findingCount": 28,
+  "findingDigest": "sha256:f8d4b9411b937cb573c3c768645720d72f0a57a196dae2eaabb8aa97b6079022"
+}

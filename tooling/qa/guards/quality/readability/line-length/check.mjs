@@ -3,6 +3,7 @@
  */
 
 import fs from 'node:fs';
+import path from 'node:path';
 
 import { collectLineLengthViolations } from './utils.mjs';
 import {
@@ -18,6 +19,10 @@ import {
 } from '../../../../policy/baselines/shared-baseline.mjs';
 import { isExecutedAsScript, printViolations } from '../../../../runtime/process/shared-cli.mjs';
 import { collectChangedTargets } from '../../../../runtime/scope/changed-targets.helpers.mjs';
+import { collectCodeFiles } from '../../../../analysis/repository/shared-files.mjs';
+import { applyRepositoryFindingBaseline } from '../../../../policy/baselines/repository-finding-baseline.mjs';
+
+const REPOSITORY_BASELINE_PATH = 'tooling/configs/qa/readability-repository-baseline.json';
 
 export function runLineLengthCheck({ scope = 'workspace', files = null } = {}) {
   const baseline = loadBaseline();
@@ -50,6 +55,28 @@ export function runLineLengthCheck({ scope = 'workspace', files = null } = {}) {
     gitLookupSkipped: targets.gitLookupSkipped ?? false,
     files: trackedFiles,
     violations: filterAllowedViolations(violations, baseline),
+  };
+}
+
+export function runRepositoryReadabilityCheck() {
+  const baseline = loadBaseline();
+  const files = collectCodeFiles().map((file) =>
+    path.isAbsolute(file) ? path.relative(process.cwd(), file).replaceAll(path.sep, '/') : file
+  );
+  const violations = files.flatMap((relativePath) =>
+    collectLineLengthViolations(relativePath, splitLines(readText(relativePath)))
+  );
+  const currentViolations = filterAllowedViolations(violations, baseline);
+  const repositoryBaseline = applyRepositoryFindingBaseline({
+    baselinePath: REPOSITORY_BASELINE_PATH,
+    controlId: 'qa.rule.repository-readability',
+    findings: currentViolations,
+  });
+  return {
+    skipped: files.length === 0,
+    files,
+    scope: 'repo-wide',
+    violations: repositoryBaseline.violations,
   };
 }
 

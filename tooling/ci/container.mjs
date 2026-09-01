@@ -19,6 +19,8 @@ import {
   resolveContainerDigest,
   resolveGithubRunIdentityEnvironment,
 } from './container-identity.mjs';
+import { admitCandidateProof } from './admit-candidate-proof.mjs';
+import { transportProofAdmission } from './proof-admission-transport.mjs';
 
 const lane = process.argv[2];
 if (!['proof', 'release'].includes(lane)) {
@@ -107,7 +109,9 @@ if (process.env.SNIPTALE_CI_SKIP_BUILD !== '1') {
     root,
   ]);
 } else {
-  const inspect = spawnSync('docker', ['image', 'inspect', image], { stdio: 'ignore' });
+  const inspect = spawnSync('docker', ['image', 'inspect', image], {
+    stdio: 'ignore',
+  });
   if (inspect.status !== 0) runDocker(['pull', image]);
 }
 const digest = resolveContainerDigest(image, () =>
@@ -150,11 +154,17 @@ const reusableFastProof =
         containerDigest: digest,
         controlDigest: candidateControlDigest,
         gateInputDigest,
+        workspaceMode: candidateIdentity.workspaceMode,
       })
     : null;
 if (reuseAllowed && process.env.SNIPTALE_FAST_PROOF_PATH && !reusableFastProof) {
-  process.stderr.write(
-    'Reusable Fast proof is incompatible; running the complete Fast prerequisite on this runner.\n'
+  process.stderr.write('Reusable Fast proof is incompatible with the exact candidate.\n');
+}
+if (lane === 'release' && !reusableFastProof) {
+  const candidateTree = candidateIdentity.tree;
+  throw new Error(
+    `CI release prerequisite failed: no exact locked-container Fast proof for candidate tree ${candidateTree}. ` +
+      'Run npm run ci:proof:container first.'
   );
 }
 const unitProofHostPath =
@@ -242,9 +252,33 @@ if (buildProofHostPaths) {
   );
 }
 if (reusableFastProof) {
+  const admittedProofRoot = path.resolve(process.env.SNIPTALE_FAST_PROOF_PATH);
+  const admission = admitCandidateProof({
+    artifactRoot: admittedProofRoot,
+    baseSha: reusableFastProof.manifest.baseSha,
+    candidateRoot: root,
+    commit: candidateIdentity.head,
+    expectedCandidateTree: candidateIdentity.tree,
+    expectedContainerDigest: digest,
+    expectedExecutionEnvironmentDigest: digest,
+    expectedExecutionEnvironmentKind: 'locked-container',
+    expectedTrustedControlSha: trustedControlSha,
+    expectedWorkspaceMode: candidateIdentity.workspaceMode,
+    lane: 'proof',
+    trustedRoot,
+  });
+  const admissionPath = path.join(root, '.tmp/ci/fast-proof-admission.json');
+  fs.mkdirSync(path.dirname(admissionPath), { recursive: true });
+  const transportedAdmission = transportProofAdmission({
+    admission,
+    admittedProofRoot,
+    mountedProofRoot: '/opt/sniptale-fast-proof',
+  });
+  fs.writeFileSync(admissionPath, `${JSON.stringify(transportedAdmission, null, 2)}\n`);
   environment.push(
     'SNIPTALE_REUSE_FAST_PROOF=1',
-    'SNIPTALE_FAST_PROOF_PATH=/opt/sniptale-fast-proof'
+    'SNIPTALE_FAST_PROOF_PATH=/opt/sniptale-fast-proof',
+    'SNIPTALE_FAST_PROOF_ADMISSION_PATH=/workspace/.tmp/ci/fast-proof-admission.json'
   );
 }
 environment.push(...resolveGithubRunIdentityEnvironment());

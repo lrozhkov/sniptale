@@ -55,7 +55,7 @@ function ciProofContract() {
 
 function ciReleaseContract(mode) {
   const proofLabels =
-    mode === 'reuse-fast-proof' ? ['Fast proof reuse', ...CI_RELEASE_LABELS] : CI_RELEASE_LABELS;
+    mode === 'admitted-fast-proof' ? ['Fast proof reuse', ...CI_RELEASE_LABELS] : CI_RELEASE_LABELS;
   return { required: [...proofLabels, ...CI_GATE_LABELS, ...AUDIT_LABELS] };
 }
 

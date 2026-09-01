@@ -2,11 +2,14 @@ import path from 'node:path';
 
 import { AUDIT_PROFILES_PATH, resolveAuditProfile } from '../qa/audits/profiles/index.mjs';
 import { createCiProductControlOccurrences } from './product-control-policy.mjs';
+import {
+  RELEASE_INHERITED_EXTRA_CONTROL_IDS,
+  releaseAuditControlOutcome,
+  releaseProductControlOutcome,
+} from './release-inheritance-policy.mjs';
+import { validateProofPopulation } from './proof-population-policy.mjs';
 
-const COMMIT_INAPPLICABLE_CONTROLS = Object.freeze({
-  'qa.rule.interactive-controller-ownership': 'no-applicable-targets',
-  'qa.rule.parser-snapshot-purity': 'no-applicable-targets',
-});
+const COMMIT_INAPPLICABLE_CONTROLS = Object.freeze({});
 
 function auditProfileForLane(lane, trustedRoot) {
   return resolveAuditProfile(lane === 'proof' ? 'pr' : 'release', {
@@ -18,7 +21,15 @@ export function createTrustedControlMatrix(lane, trustedRoot = process.cwd()) {
   if (!['proof', 'release'].includes(lane)) {
     throw new Error(`Unsupported trusted control lane: ${String(lane)}`);
   }
-  const requiredPassed = new Set(createCiProductControlOccurrences(lane).map(({ id }) => id));
+  const requiredPassed = new Set();
+  const requiredInherited = new Set();
+  for (const { id } of createCiProductControlOccurrences(lane)) {
+    const target =
+      lane === 'release' && releaseProductControlOutcome(id) === 'inherited'
+        ? requiredInherited
+        : requiredPassed;
+    target.add(id);
+  }
   const allowedSkipped = new Set();
   const allowedSkippedReasons = new Map();
   for (const [id, reason] of Object.entries(COMMIT_INAPPLICABLE_CONTROLS)) {
@@ -30,8 +41,13 @@ export function createTrustedControlMatrix(lane, trustedRoot = process.cwd()) {
   const auditProfile = auditProfileForLane(lane, trustedRoot);
   for (const [id, control] of auditProfile.controls) {
     const ruleId = `qa.rule.${id}`;
-    if (control.requirement === 'required') requiredPassed.add(ruleId);
-    else {
+    if (control.requirement === 'required') {
+      const target =
+        lane === 'release' && releaseAuditControlOutcome(ruleId) === 'inherited'
+          ? requiredInherited
+          : requiredPassed;
+      target.add(ruleId);
+    } else {
       allowedSkipped.add(ruleId);
       allowedSkippedReasons.set(ruleId, 'audit.profile-not-selected');
     }
@@ -41,15 +57,50 @@ export function createTrustedControlMatrix(lane, trustedRoot = process.cwd()) {
       throw new Error('Release coverage audit must own canonical full-product coverage.');
     }
   }
-  requiredPassed.add('qa.rule.production-build');
+  if (lane === 'release') {
+    for (const id of RELEASE_INHERITED_EXTRA_CONTROL_IDS) requiredInherited.add(id);
+  } else {
+    requiredPassed.add('qa.rule.production-build');
+  }
   return {
     requiredPassed: [...requiredPassed].sort(),
+    requiredInherited: [...requiredInherited].sort(),
     allowedSkipped: [...allowedSkipped].sort(),
     allowedSkippedReasons: Object.fromEntries([...allowedSkippedReasons].sort()),
   };
 }
 
-export function validateTrustedControlResults(record, lane, trustedRoot = process.cwd()) {
+function validateInheritedControl(step, id, inheritanceContext) {
+  const { admission, sourceRecord } = inheritanceContext ?? {};
+  const inheritance = step?.inheritance;
+  const expectedRunRecord = `fast-proof/${admission?.sourceRunRecord ?? ''}`;
+  const expectedEvidence = [
+    expectedRunRecord,
+    `fast-proof/${admission?.sourceRunLog ?? ''}`,
+  ].sort();
+  const sourceStep = (sourceRecord?.steps ?? []).find(({ stepId }) => stepId === id);
+  if (
+    step?.outcome !== 'inherited' ||
+    !inheritance ||
+    inheritance.sourceProofSemanticDigest !== admission?.proofSemanticDigest ||
+    inheritance.sourceProofManifestDigest !== admission?.proofManifestDigest ||
+    inheritance.sourceControlId !== id ||
+    inheritance.sourceRunRecord !== expectedRunRecord ||
+    JSON.stringify([...(inheritance.evidenceFiles ?? [])].sort()) !==
+      JSON.stringify(expectedEvidence) ||
+    sourceStep?.outcome !== 'passed'
+  ) {
+    throw new Error(`Candidate proof did not bind inherited trusted control: ${id}`);
+  }
+  validateProofPopulation(sourceStep, id);
+}
+
+export function validateTrustedControlResults(
+  record,
+  lane,
+  trustedRoot = process.cwd(),
+  inheritanceContext = null
+) {
   const matrix = createTrustedControlMatrix(lane, trustedRoot);
   const byId = new Map();
   for (const step of record.steps ?? []) {
@@ -59,9 +110,14 @@ export function validateTrustedControlResults(record, lane, trustedRoot = proces
     byId.set(step.stepId, step);
   }
   for (const id of matrix.requiredPassed) {
-    if (byId.get(id)?.outcome !== 'passed') {
+    const outcome = byId.get(id)?.outcome;
+    if (outcome !== 'passed') {
       throw new Error(`Candidate proof did not pass mandatory trusted control: ${id}`);
     }
+    validateProofPopulation(byId.get(id), id);
+  }
+  for (const id of matrix.requiredInherited) {
+    validateInheritedControl(byId.get(id), id, inheritanceContext);
   }
   for (const id of matrix.allowedSkipped) {
     const step = byId.get(id);

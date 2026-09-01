@@ -1,12 +1,11 @@
 import { spawnSync } from 'node:child_process';
-import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
 import { afterEach, expect, it } from 'vitest';
 
-import { copyReusableFastReport } from './artifacts.mjs';
+import { copyAdmittedReleaseInput, copyFreshLaneReport } from './artifacts.mjs';
 
 const temporaryRoots: string[] = [];
 
@@ -56,27 +55,70 @@ it('binds pull-request proof paths and manifests to the candidate rather than th
   });
 });
 
-it('copies Fast audit evidence only when the sealed manifest and bytes agree', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-fast-audit-reuse-'));
+it('keeps release signature evidence fresh instead of copying the Fast report', () => {
+  const source = fs.readFileSync('tooling/ci/artifacts.mjs', 'utf8');
+  expect(source).not.toContain('REUSABLE_FAST_REPORTS');
+  expect(source).not.toContain('copyReusableFastReport');
+  expect(source).toContain("'.tmp/npm-audit/signatures.json'");
+
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-fresh-release-signatures-'));
   temporaryRoots.push(root);
-  const proofRoot = path.join(root, 'proof');
-  const destinationRoot = path.join(root, 'release');
+  const destinationRoot = path.join(root, 'artifact');
   const relative = '.tmp/npm-audit/signatures.json';
-  const source = path.join(proofRoot, relative);
+  fs.mkdirSync(path.join(root, '.tmp/npm-audit'), { recursive: true });
+  fs.mkdirSync(destinationRoot);
+  fs.writeFileSync(path.join(root, relative), '{"authority":"release"}\n');
+  expect(
+    copyFreshLaneReport({
+      destinationRoot,
+      file: relative,
+      notBeforeMs: 0,
+      repositoryRoot: root,
+      required: true,
+    })
+  ).toBe(true);
+  expect(fs.readFileSync(path.join(destinationRoot, relative), 'utf8')).toBe(
+    '{"authority":"release"}\n'
+  );
+});
+
+it('seals an exact admitted prerequisite without misclassifying its pre-lane timestamp', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ci-admitted-release-input-'));
+  temporaryRoots.push(root);
+  const destinationRoot = path.join(root, 'artifact');
+  const relative = '.tmp/ci/fast-proof-admission.json';
+  const environment = {
+    SNIPTALE_CANDIDATE_SHA: 'candidate-sha',
+    SNIPTALE_CANDIDATE_TREE: 'candidate-tree',
+    SNIPTALE_CI_EXECUTION_ENVIRONMENT_DIGEST: `sha256:${'a'.repeat(64)}`,
+    SNIPTALE_FAST_PROOF_PATH: '/proof',
+    SNIPTALE_WORKSPACE_MODE: 'local-workspace',
+  };
+  const source = path.join(root, relative);
   fs.mkdirSync(path.dirname(source), { recursive: true });
   fs.mkdirSync(destinationRoot);
-  fs.writeFileSync(source, '{"results":[]}\n');
-  const digest = crypto.createHash('sha256').update(fs.readFileSync(source)).digest('hex');
   fs.writeFileSync(
-    path.join(proofRoot, 'proof-manifest.json'),
-    `${JSON.stringify({ files: [{ file: relative, sha256: digest }] })}\n`
+    source,
+    `${JSON.stringify({
+      artifactKind: 'sniptale-fast-proof-admission',
+      outcome: 'admitted',
+      candidateTree: environment.SNIPTALE_CANDIDATE_TREE,
+      commit: environment.SNIPTALE_CANDIDATE_SHA,
+      executionEnvironment: {
+        kind: 'host-wsl',
+        digest: environment.SNIPTALE_CI_EXECUTION_ENVIRONMENT_DIGEST,
+      },
+      proofRoot: environment.SNIPTALE_FAST_PROOF_PATH,
+      workspaceMode: environment.SNIPTALE_WORKSPACE_MODE,
+    })}\n`
   );
+  fs.utimesSync(source, new Date(0), new Date(0));
 
-  expect(copyReusableFastReport(relative, destinationRoot, proofRoot)).toBe(true);
-  expect(fs.readFileSync(path.join(destinationRoot, relative), 'utf8')).toBe('{"results":[]}\n');
-
-  fs.writeFileSync(source, '{"results":["tampered"]}\n');
-  expect(() => copyReusableFastReport(relative, destinationRoot, proofRoot)).toThrow(
-    'Reusable Fast proof report digest mismatch'
-  );
+  expect(
+    copyAdmittedReleaseInput({ destinationRoot, environment, file: relative, repositoryRoot: root })
+  ).toBe(true);
+  expect(JSON.parse(fs.readFileSync(path.join(destinationRoot, relative), 'utf8'))).toMatchObject({
+    outcome: 'admitted',
+    candidateTree: 'candidate-tree',
+  });
 });

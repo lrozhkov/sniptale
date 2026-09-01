@@ -25,7 +25,7 @@ Documentation must not restate the full catalog, file population, lane size, or 
 
 The canonical local order is `implementation → qa:checkpoint → required review → qa:closeout`. When harness/shared-control files changed, `qa:release-harness` runs before checkpoint.
 
-`ci:proof` is the fast repository proof. It includes one fresh release-mode `Production build` without archive, build proof, or reuse, and excludes ZIP, SonarJS residuals, coverage, CodeQL, mutation, and release-only audits. `ci:release` owns the separate release build/package proof and release-only assurance. Mutation, repository evidence, and topology inventories are advisory artifacts, never passed quality controls. Tooling execution coverage remains a separate maintenance proof and never expands `ci:release` or release provenance.
+`ci:proof` is the complete repository proof. It includes read-only formatting, SonarJS, full product coverage, all product and harness unit tests, and one fresh release-mode `Production build` without archive or reusable build proof. `ci:release` requires that exact admitted proof, inherits its evidence, and owns only the separate release build/package proof and release-time assurance such as CodeQL and history-scoped controls. Mutation, repository evidence, and topology inventories remain advisory artifacts.
 
 ## Guard necessity
 
@@ -75,7 +75,7 @@ The pinned jscpd 5 release audit admits only exact findings reviewed as `tool-no
 
 ## Coverage
 
-Changed-scope coverage enrolls every added or untracked eligible production TypeScript file, while unchanged legacy files outside the rollout registry remain unenrolled. Full product coverage and its proof reuse remain release concerns. Tooling coverage is invoked separately with `node tooling/qa/proof/unit/verify-unit-tests.mjs --suite harness --coverage`; it instruments executable `tooling/**/*.{mjs,cjs,js,ts,tsx}`, writes `.tmp/coverage/tooling`, and applies one global floor of 70% statements, 67% branches, 78% functions, and 70% lines. Owner-local smell fixtures remain the primary semantic proof.
+Changed-scope coverage enrolls every added or untracked eligible production TypeScript file, while unchanged legacy files outside the rollout registry remain unenrolled. Full product coverage belongs to `ci:proof` and is inherited by release only through exact admission. Tooling coverage is invoked separately with `node tooling/qa/proof/unit/verify-unit-tests.mjs --suite harness --coverage`; it instruments executable `tooling/**/*.{mjs,cjs,js,ts,tsx}`, writes `.tmp/coverage/tooling`, and applies one global floor of 70% statements, 67% branches, 78% functions, and 70% lines. Owner-local smell fixtures remain the primary semantic proof.
 
 ## Review and exceptions
 

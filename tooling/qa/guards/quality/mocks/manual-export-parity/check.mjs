@@ -15,12 +15,16 @@ import { collectChangedTargets } from '../../../../runtime/scope/changed-targets
 import { getSourceSnapshot } from '../../../../analysis/source/source-snapshot.mjs';
 import {
   collectCandidateTestFiles,
+  collectRepositoryTestFiles,
   collectMockParityTargetFiles,
   filterNetNewMissingExports,
   findPreviousMock,
   readPreviousFile,
   resolveMockedModule,
 } from './targets.mjs';
+import { applyRepositoryFindingBaseline } from '../../../../policy/baselines/repository-finding-baseline.mjs';
+
+const REPOSITORY_BASELINE_PATH = 'tooling/configs/qa/manual-mock-repository-baseline.json';
 
 function createViolation(file, modulePath, missingExports) {
   return {
@@ -262,13 +266,47 @@ export function runManualMockExportParityCheck({ targetFiles = [] } = {}) {
   };
 }
 
+export function runRepositoryManualMockExportParityCheck() {
+  const candidateTestFiles = collectRepositoryTestFiles();
+  const violations = [];
+
+  for (const testFile of candidateTestFiles) {
+    const currentMocks = collectManualMocks(testFile);
+    for (const mock of currentMocks) {
+      if (!mock.keys) continue;
+      const mockedModule = resolveMockedModule(testFile, mock.specifier);
+      if (!mockedModule) continue;
+      const missingExports = collectMissingExports(mock, mockedModule, readText(mockedModule));
+      if (missingExports.length > 0) {
+        violations.push(createViolation(testFile, mockedModule, missingExports));
+      }
+    }
+  }
+
+  const baseline = applyRepositoryFindingBaseline({
+    baselinePath: REPOSITORY_BASELINE_PATH,
+    controlId: 'qa.rule.mock-export-parity',
+    findings: violations,
+  });
+
+  return {
+    skipped: candidateTestFiles.length === 0,
+    files: candidateTestFiles,
+    scope: 'repo-wide',
+    violations: baseline.violations,
+  };
+}
+
 if (isExecutedAsScript(import.meta.url)) {
   const explicitFiles = parseFilesArgument(process.argv.slice(2));
   const targetFiles =
     explicitFiles.length > 0
       ? explicitFiles.map(toRelativePath)
       : collectChangedTargets({ scope: 'workspace' }).changedFiles;
-  const result = runManualMockExportParityCheck({ targetFiles });
+  const repoWide = process.argv.includes('--repo-wide');
+  const result = repoWide
+    ? runRepositoryManualMockExportParityCheck()
+    : runManualMockExportParityCheck({ targetFiles });
 
   if (result.violations.length > 0) {
     printViolations('Manual mock export parity violations:', result.violations);

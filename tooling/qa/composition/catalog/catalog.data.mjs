@@ -1,5 +1,7 @@
 export const RELEASE_DIRECT_STEPS = [
+  ['format', 'Format', 'verify-oxfmt.mjs'],
   ['changed-line-readability', 'Changed-line readability', 'verify-line-length.mjs'],
+  ['repository-readability', 'Repository readability', 'verify-line-length.mjs'],
   ['oxlint', 'Oxlint', 'verify-oxlint.mjs'],
   ['sonarjs', 'SonarJS', 'verify-sonarjs.mjs'],
   ['ai-hygiene', 'AI hygiene', 'verify-ai-hygiene.mjs'],
@@ -7,13 +9,14 @@ export const RELEASE_DIRECT_STEPS = [
   ['naming', 'Naming', 'verify-naming.mjs'],
   ['i18n', 'i18n', 'verify-i18n.mjs'],
   ['design-system', 'Design system', 'verify-design-system.mjs'],
-  ['audit', 'Audit', 'verify-audit.mjs'],
   ['html-sanitizer-ownership', 'HTML sanitizer ownership', 'verify-html-sanitizer-ownership.mjs'],
   ['dependency-boundaries', 'Dependency boundaries', 'verify-boundaries.mjs'],
   ['cycles', 'Cycles', 'verify-cycles.mjs'],
   ['typecheck', 'Typecheck', 'verify-typecheck.mjs'],
   ['dead-exports', 'Dead exports', 'verify-dead-exports.mjs'],
+  ['mock-export-parity', 'Mock export parity', 'verify-manual-mock-export-parity.mjs'],
   ['unit-tests', 'Unit tests', 'verify-unit-tests.mjs'],
+  ['harness-unit-tests', 'Harness unit tests', 'verify-unit-tests.mjs'],
   ['test-coverage', 'Test coverage', 'verify-test-coverage.mjs'],
   ['build', 'Build', 'build-step.mjs'],
   ['release-archive', 'Release archive', 'package-dist.mjs'],
@@ -314,6 +317,8 @@ export const FULL_VIOLATION_STEP_TOOLS = new Map([
   ['Network fetch policy', 'verify-network-fetch-policy.mjs'],
   ['Entrypoint wiring', 'verify-entrypoint-wiring.mjs'],
   ['Logging policy', 'verify-logging.mjs'],
+  ['Config policy', 'verify-config-policy.mjs'],
+  ['Extension build layout', 'verify-extension-build-layout.mjs'],
   ['Dependency admission', 'verify-dependency-admission.mjs'],
   ['Secret storage', 'verify-secret-storage.mjs'],
   ['Sensitive retention', 'verify-sensitive-retention.mjs'],
@@ -340,6 +345,8 @@ export const FULL_VIOLATION_STEP_TOOLS = new Map([
   ['Shared style ownership', 'verify-shared-style-ownership.mjs'],
   ['UI automation seams', 'verify-ui-automation-seams.mjs'],
   ['Interactive controller ownership', 'verify-instance-ownership.mjs'],
+  ['Detached controller methods', 'verify-detached-controller-methods.mjs'],
+  ['Domain fixture realism', 'verify-domain-fixture-realism.mjs'],
 ]);
 
 export const FOCUSED_VIOLATION_STEP_TOOLS = new Map([

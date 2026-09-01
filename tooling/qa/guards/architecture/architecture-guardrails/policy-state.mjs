@@ -12,10 +12,12 @@ import {
 } from '../authority/architecture-authority-state-signals.mjs';
 import { createViolation, isProductionSourceFile, readSourceFile } from './helpers.mjs';
 import { repoRoot, toRelativePath } from '../../../analysis/repository/shared-paths.mjs';
+import { applyRepositoryFindingBaseline } from '../../../policy/baselines/repository-finding-baseline.mjs';
 
 export const POLICY_STATE_REGISTRY_PATH =
   'apps/extension/src/background/routing-contracts/policy-state/registry.ts';
 const POLICY_STATE_OWNER_PATH = 'apps/extension/src/background/routing-contracts/policy-state';
+const POLICY_STATE_BASELINE_PATH = 'tooling/configs/qa/policy-state-repository-baseline.json';
 
 export function collectPolicyStateInventory({ root = repoRoot } = {}) {
   if (!architectureFileExists(root, POLICY_STATE_REGISTRY_PATH)) {
@@ -108,6 +110,23 @@ function collectPolicyStateIdReferences(sourceFile) {
   return references;
 }
 
+function hasCanonicalPolicyStateRegistration(sourceFile) {
+  let found = false;
+  function visit(node) {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      ['definePolicyStateOwner', 'registerPolicyStateOwner'].includes(node.expression.text)
+    ) {
+      found = true;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  }
+  visit(sourceFile);
+  return found;
+}
+
 export function collectPolicyStateDescriptorViolations(files, options = {}) {
   const root = options.root ?? repoRoot;
   const inventory = collectPolicyStateInventory({ root });
@@ -121,6 +140,7 @@ export function collectPolicyStateDescriptorViolations(files, options = {}) {
     ];
   }
   return collectPolicyStateDescriptorViolationsForFiles(files, {
+    enforceAll: options.enforceAll === true,
     knownPolicyStateIds: new Set(inventory.ids),
     newFiles: options.newFiles ?? new Set(),
     root,
@@ -129,20 +149,38 @@ export function collectPolicyStateDescriptorViolations(files, options = {}) {
 
 function collectPolicyStateDescriptorViolationsForFiles(
   files,
-  { knownPolicyStateIds, newFiles, root }
+  { enforceAll, knownPolicyStateIds, newFiles, root }
 ) {
-  return files
+  const violations = files
     .map(toRelativePath)
     .filter(isProductionSourceFile)
     .sort()
     .flatMap((file) =>
-      collectPolicyStateDescriptorViolationsForFile(file, { knownPolicyStateIds, newFiles, root })
+      collectPolicyStateDescriptorViolationsForFile(file, {
+        enforceAll,
+        knownPolicyStateIds,
+        newFiles,
+        root,
+      })
     );
+  if (!enforceAll) return violations;
+  const baselineCandidates = violations.filter(
+    ({ rule }) => rule === 'policy-state-descriptor-required'
+  );
+  const baseline = applyRepositoryFindingBaseline({
+    baselinePath: POLICY_STATE_BASELINE_PATH,
+    controlId: 'qa.rule.policy-state-descriptor',
+    findings: baselineCandidates,
+  });
+  return [
+    ...violations.filter(({ rule }) => rule !== 'policy-state-descriptor-required'),
+    ...baseline.violations,
+  ];
 }
 
 function collectPolicyStateDescriptorViolationsForFile(
   file,
-  { knownPolicyStateIds, newFiles, root }
+  { enforceAll, knownPolicyStateIds, newFiles, root }
 ) {
   if (shouldSkipPolicyStateDescriptorScan(root, file)) {
     return [];
@@ -154,7 +192,9 @@ function collectPolicyStateDescriptorViolationsForFile(
     ...collectUnknownPolicyStateIdViolations(file, knownPolicyStateIds, policyStateReferences),
     ...collectMissingPolicyStateIdViolations({
       file,
+      enforceAll,
       newFiles,
+      policyStateReferences,
       sourceFile,
       text,
     }),
@@ -182,12 +222,20 @@ function collectUnknownPolicyStateIdViolations(file, knownPolicyStateIds, refere
     );
 }
 
-function collectMissingPolicyStateIdViolations({ file, newFiles, sourceFile, text }) {
+function collectMissingPolicyStateIdViolations({
+  file,
+  enforceAll,
+  newFiles,
+  policyStateReferences,
+  sourceFile,
+  text,
+}) {
   const authorityStateReasons = collectAuthorityStateReasons({ file, sourceFile, text });
   if (
-    !newFiles.has(file) ||
+    (!enforceAll && !newFiles.has(file)) ||
     authorityStateReasons.length === 0 ||
-    /\bpolicy(?:State)?Id(?:s)?\b/u.test(text)
+    policyStateReferences.length > 0 ||
+    hasCanonicalPolicyStateRegistration(sourceFile)
   ) {
     return [];
   }
@@ -196,7 +244,7 @@ function collectMissingPolicyStateIdViolations({ file, newFiles, sourceFile, tex
       'policy-state-descriptor-required',
       file,
       [
-        'New authority/capability state must reference policyStateId or policyStateIds.',
+        'Authority/capability state must reference policyStateId or policyStateIds.',
         `Signals: ${authorityStateReasons.join(', ')}.`,
       ].join(' ')
     ),

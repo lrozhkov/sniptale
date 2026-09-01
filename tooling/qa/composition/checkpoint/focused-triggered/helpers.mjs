@@ -15,6 +15,7 @@ import {
 } from '../../../guards/product-contracts/verify-i18n.helpers.mjs';
 import { isSharedStyleOwnershipTrigger } from '../../../guards/product-contracts/verify-shared-style-ownership.mjs';
 import { collectQaOccurrences } from '../../catalog/catalog.mjs';
+import { isDependencyAdmissionInputPath } from '../../../guards/security/verify-dependency-admission.mjs';
 
 export const FOCUSED_TRIGGERED_STEP_DEFINITIONS = collectQaOccurrences({
   lane: 'focused-triggered',
@@ -61,6 +62,7 @@ export function shouldRunConfigPolicy(targetFiles) {
   return targetFiles.some((file) =>
     [
       '.nvmrc',
+      '.npmrc',
       'package.json',
       'package-lock.json',
       'apps/extension/manifest.json',
@@ -87,17 +89,7 @@ export function shouldRunExtensionBuildLayout(targetFiles) {
 }
 
 export function shouldRunDependencyAdmission(targetFiles) {
-  return targetFiles.some((file) =>
-    [
-      'package.json',
-      'package-lock.json',
-      'apps/extension/package.json',
-      'tooling/configs/qa/dependency-policy-rules.data.json',
-      'tooling/configs/qa/licenses.json',
-      'tooling/qa/guards/security/verify-dependency-admission.mjs',
-      'tooling/qa/policy/dependencies/dependency-policy-rules.mjs',
-    ].includes(file)
-  );
+  return targetFiles.some(isDependencyAdmissionInputPath);
 }
 
 export function collectFocusedI18nFiles(targetFiles) {

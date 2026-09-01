@@ -141,7 +141,7 @@ Use `SNIPTALE_QA_CPU_TOKENS`, `SNIPTALE_QA_MEMORY_MIB`, or `SNIPTALE_QA_VITEST_M
 
 `ci:proof` and `ci:release` run directly in WSL without Docker and use the same resource-profile owner as their GitHub container execution. The release gate deliberately saturates the visible ceiling only during exclusive full-product work. Windows still shares the physical processor and RAM, so lower the explicit CPU, memory, or worker overrides when interactive host work must remain responsive.
 
-`ci:release` owns live npm audit, supply-chain inventory, full coverage, and external engines. CI runs mutation profiles afterward in the isolated non-blocking advisory-artifact job. If a blocking control fails because the registry or a configured external binary is unavailable, repair DNS/proxy/TLS/registry/toolchain access rather than treating the result as a product defect.
+`ci:proof` owns full product coverage, product and harness unit tests, deterministic repository controls, and the Fast audit profile. `ci:release` first requires the exact proof for the unchanged workspace tree, then owns only release-time supply-chain/history/CodeQL work and the release build/archive. CI runs mutation profiles afterward in the isolated non-blocking advisory-artifact job. If a blocking control fails because the registry or a configured external binary is unavailable, repair DNS/proxy/TLS/registry/toolchain access rather than treating the result as a product defect.
 
 ## Extension Smoke
 

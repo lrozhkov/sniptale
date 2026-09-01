@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "controlId": "qa.rule.mock-export-parity",
+  "findingCount": 219,
+  "findingDigest": "sha256:6e2051322d071b0900a4bd80f4124b2f7e4ab3156bf4374221f09227a721d0a6"
+}

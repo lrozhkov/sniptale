@@ -1,0 +1,6 @@
+{
+  "schemaVersion": 1,
+  "controlId": "qa.rule.policy-state-descriptor",
+  "findingCount": 296,
+  "findingDigest": "sha256:ab060f7d8e0a50d6bdd02f4c4a6d6fb1277cfb723a3032c7375904879e420576"
+}

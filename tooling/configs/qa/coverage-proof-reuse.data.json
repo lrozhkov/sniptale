@@ -24,14 +24,15 @@
   "owners": {
     "decision": "tooling/qa/proof/coverage/coverage-proof.mjs",
     "execution": "tooling/qa/proof/coverage/audit-coverage-step.mjs",
-    "ciTransport": "tooling/ci/select-coverage-proof.mjs",
-    "ciMount": "tooling/ci/proof-host-inputs.mjs"
+    "ciTransport": "tooling/ci/admit-candidate-proof.mjs",
+    "ciMount": "tooling/ci/release-wrapper.mjs"
   },
   "consumers": [
     "tooling/qa/proof/coverage/coverage-proof.mjs",
     "tooling/qa/proof/coverage/audit-coverage-step.mjs",
     "tooling/ci/proof-host-inputs.mjs",
-    "tooling/ci/select-coverage-proof.mjs",
+    "tooling/ci/admit-candidate-proof.mjs",
+    "tooling/ci/release-wrapper.mjs",
     "tooling/ci/container.mjs",
     "tooling/ci/artifacts.mjs",
     ".github/workflows/_canonical-proof.yml",
@@ -39,9 +40,9 @@
     ".github/workflows/release.yml"
   ],
   "modes": {
-    "local": "validated local receipt and complete canonical reports or full coverage fallback",
-    "candidate": "validated read-only successful-main receipt and reports or no heavyweight PR recomputation",
-    "release": "validated receipt and reports or blocking full coverage fallback"
+    "local": "full coverage executes or reuses an exact validated receipt inside Fast proof",
+    "candidate": "full coverage executes in Fast proof and seals the complete canonical reports",
+    "release": "exact Fast proof admission and inherited report hashes; no coverage execution fallback"
   },
   "digests": [
     "canonical production source inventory and contents",
@@ -52,6 +53,6 @@
     "every canonical JSON, LCOV, and HTML report file"
   ],
   "proof": "Only successfully validated full product coverage may write the receipt; every blocking consumer recomputes all input and report digests.",
-  "rollback": "Delete the disposable receipt or omit its read-only CI mounts to force full coverage.",
+  "rollback": "Delete the disposable Fast proof and rerun ci:proof to force full coverage.",
   "collisionCheck": "Receipt and reports are materialized atomically only under canonical disposable paths."
 }

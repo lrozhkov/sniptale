@@ -12,10 +12,16 @@ import {
 import { resolveRepositoryVerifyScope } from '../qa/composition/repository/full-verification/scope.mjs';
 import { runTimelineActivitySync } from '../qa/runtime/observability/timeline-context.mjs';
 import { runNpm } from '../qa/runtime/process/shared-process.mjs';
+import { runUnitTests } from '../qa/proof/unit/verify-unit-tests.mjs';
+import { HARNESS_QA_SUITE } from '../qa/composition/scope/qa-scope.mjs';
+import { measureAsyncStep } from '../qa/runtime/observability/step-timing.helpers.mjs';
 import {
   ciExcludedControlLabels,
   createCiProductControlOccurrences,
 } from './product-control-policy.mjs';
+import { findQaStepDefinition } from '../qa/composition/catalog/definitions.mjs';
+import { RELEASE_INHERITED_AUDIT_CONTROL_IDS } from './release-inheritance-policy.mjs';
+import { attachProofPopulation } from './proof-population-policy.mjs';
 
 const semantics = JSON.parse(fs.readFileSync('tooling/configs/ci/proof-semantics.json', 'utf8'));
 
@@ -33,26 +39,61 @@ function capability(lane) {
 
 export async function collectCiProofResults({
   session,
-  productProofCollector = () =>
+  productProofCollector = (verifyScope) =>
     collectFullVerifyStepResults({
       includeArtifactSteps: false,
-      includeTests: true,
+      includeTests: false,
       releaseMode: true,
       excludedControlLabels: ciExcludedControlLabels('proof'),
-      verifyScope: resolveCiScope(),
+      verifyScope,
     }),
   auditCollector = collectAuditProfileResult,
+  harnessTestCollector = collectFullHarnessUnitTestStep,
   productionBuildCollector = collectFreshProductionBuildStep,
+  scopeResolver = resolveCiScope,
 } = {}) {
   capability('proof');
-  const product = await productProofCollector();
-  const productSteps = product.steps.filter(({ label }) => label !== 'Test coverage');
-  const audit = await auditCollector({ profileId: 'pr', session });
-  const productionBuild = productionBuildCollector();
+  const verifyScope = scopeResolver();
+  const [product, audit, harnessTests, productionBuild] = await Promise.all([
+    productProofCollector(verifyScope),
+    auditCollector({ profileId: 'pr', session }),
+    harnessTestCollector(),
+    Promise.resolve(productionBuildCollector()),
+  ]);
+  const coverageStep = audit.steps.find(({ label }) => label === 'Full product coverage');
+  if (!coverageStep) throw new Error('Fast proof did not produce full product coverage.');
+  const unitStep = {
+    ...coverageStep,
+    label: 'Unit tests',
+    detail: [coverageStep.detail, 'shared-execution=full-product-test-proof']
+      .filter(Boolean)
+      .join('; '),
+  };
   return {
     context: { mode: 'ci:proof', scope: 'commit' },
-    steps: [...productSteps, productionBuild, ...audit.steps],
+    steps: [...product.steps, unitStep, harnessTests, productionBuild, ...audit.steps].map((step) =>
+      attachProofPopulation(step, verifyScope)
+    ),
   };
+}
+
+export async function collectFullHarnessUnitTestStep() {
+  const { durationMs, value } = await measureAsyncStep(() =>
+    runUnitTests({ requireTests: true, suite: HARNESS_QA_SUITE })
+  );
+  return value.status === 0
+    ? {
+        ...createOkStep('Harness unit tests', 'full harness suite'),
+        durationMs,
+      }
+    : {
+        label: 'Harness unit tests',
+        status: 'failed',
+        summary: 'failed',
+        stdout: value.stdout ?? '',
+        stderr: value.stderr ?? '',
+        durationMs,
+      };
 }
 
 export function collectFreshProductionBuildStep({ commandRunner = runNpm } = {}) {
@@ -78,18 +119,41 @@ function resolveCiScope() {
   );
 }
 
-const RELEASE_DELTA_LABELS = new Set(['SonarJS', 'Build', 'Release archive']);
-const FRESH_RELEASE_AUDIT_REUSED_CONTROL_IDS = Object.freeze(['npm-audit']);
-const REUSED_FAST_AUDIT_CONTROL_IDS = Object.freeze([]);
+const RELEASE_DELTA_LABELS = new Set(['Build', 'Release archive']);
+const REUSED_FAST_AUDIT_CONTROL_IDS = Object.freeze(
+  RELEASE_INHERITED_AUDIT_CONTROL_IDS.map((id) => id.replace(/^qa\.rule\./u, ''))
+);
 
-function createReusedFastControlStep({ id, label }) {
+function createInheritedFastControlStep({ id, label }, admission) {
+  if (
+    !admission?.proofSemanticDigest ||
+    !admission.proofManifestDigest ||
+    !admission.sourceRunRecord ||
+    !admission.sourceRunLog
+  ) {
+    throw new Error('Fast proof admission is missing structured inheritance evidence.');
+  }
   return runTimelineActivitySync(
     { activityId: `fast-proof-reuse.${id}`, kind: 'proof-reuse', reused: true },
-    () => createOkStep(label, 'reused verified exact commit-bound Fast proof')
+    () => ({
+      label,
+      status: 'inherited',
+      detail: 'inherited from admitted exact Fast proof',
+      inheritance: {
+        sourceProofSemanticDigest: admission.proofSemanticDigest,
+        sourceProofManifestDigest: admission.proofManifestDigest,
+        sourceControlId: id,
+        sourceRunRecord: `fast-proof/${admission.sourceRunRecord}`,
+        evidenceFiles: [
+          `fast-proof/${admission.sourceRunRecord}`,
+          `fast-proof/${admission.sourceRunLog}`,
+        ],
+      },
+    })
   );
 }
 
-async function collectVerifiedFastProofReleaseSteps(releaseDeltaCollector) {
+async function collectVerifiedFastProofReleaseSteps(releaseDeltaCollector, admission) {
   const delta = await releaseDeltaCollector();
   const byLabel = new Map();
   for (const step of delta.steps ?? []) {
@@ -109,41 +173,15 @@ async function collectVerifiedFastProofReleaseSteps(releaseDeltaCollector) {
     ...createCiProductControlOccurrences('release').map((occurrence) =>
       RELEASE_DELTA_LABELS.has(occurrence.label)
         ? byLabel.get(occurrence.label)
-        : createReusedFastControlStep(occurrence)
+        : createInheritedFastControlStep(occurrence, admission)
     ),
   ];
 }
 
-async function collectFreshReleaseControlSteps(productProofCollector, releaseDeltaCollector) {
-  const prerequisite = await productProofCollector();
-  const delta = await releaseDeltaCollector();
-  const byLabel = new Map();
-  for (const step of [...prerequisite.steps, ...delta.steps]) {
-    if (byLabel.has(step.label) && !RELEASE_DELTA_LABELS.has(step.label)) {
-      throw new Error(`Fresh release prerequisite repeats a control result: ${String(step.label)}`);
-    }
-    byLabel.set(step.label, step);
-  }
-  const occurrences = createCiProductControlOccurrences('release');
-  return occurrences.map(({ label }) => {
-    const step = byLabel.get(label);
-    if (!step) throw new Error(`Missing release product control result: ${label}`);
-    return step;
-  });
-}
-
 export async function collectCiReleaseResults({
   session,
-  reuseFastProof = false,
+  fastProofAdmission,
   scopeResolver = resolveCiScope,
-  productProofCollector = (verifyScope) =>
-    collectFullVerifyStepResults({
-      includeTests: false,
-      includeArtifactSteps: false,
-      releaseMode: true,
-      excludedControlLabels: [...ciExcludedControlLabels('proof'), 'Unit tests'],
-      verifyScope,
-    }),
   releaseDeltaCollector = (verifyScope, { includeArtifactSteps }) =>
     collectReleaseDeltaStepResults({
       excludedControlLabels: ciExcludedControlLabels('release'),
@@ -151,29 +189,54 @@ export async function collectCiReleaseResults({
       verifyScope,
     }),
   auditCollector = collectAuditProfileResult,
-  productionBuildCollector = collectFreshProductionBuildStep,
 } = {}) {
   capability('release');
+  if (
+    fastProofAdmission?.artifactKind !== 'sniptale-fast-proof-admission' ||
+    fastProofAdmission.outcome !== 'admitted'
+  ) {
+    throw new Error('CI release requires an admitted exact Fast proof before release execution.');
+  }
   const verifyScope = scopeResolver();
-  const collectProductProof = () => productProofCollector(verifyScope);
   const collectReleaseDelta = (includeArtifactSteps) => () =>
     releaseDeltaCollector(verifyScope, { includeArtifactSteps });
-  const productSteps = reuseFastProof
-    ? await collectVerifiedFastProofReleaseSteps(collectReleaseDelta(true))
-    : await collectFreshReleaseControlSteps(collectProductProof, collectReleaseDelta(true));
-  const productionBuild = reuseFastProof
-    ? createReusedFastControlStep({ id: 'qa.rule.production-build', label: 'Production build' })
-    : productionBuildCollector();
+  const productSteps = await collectVerifiedFastProofReleaseSteps(
+    collectReleaseDelta(true),
+    fastProofAdmission
+  );
+  const productionBuild = createInheritedFastControlStep(
+    { id: 'qa.rule.production-build', label: 'Production build' },
+    fastProofAdmission
+  );
   const audit = await auditCollector({
     profileId: 'release',
-    reusedControlIds: reuseFastProof
-      ? REUSED_FAST_AUDIT_CONTROL_IDS
-      : FRESH_RELEASE_AUDIT_REUSED_CONTROL_IDS,
+    reusedControlIds: REUSED_FAST_AUDIT_CONTROL_IDS,
     session,
   });
+  const inheritedAuditLabels = new Set(
+    REUSED_FAST_AUDIT_CONTROL_IDS.map((controlId) => {
+      const definition = findQaStepDefinition({
+        id: `qa.rule.${controlId}`,
+        lane: 'audit',
+      });
+      if (!definition) throw new Error(`Missing inherited audit control: ${controlId}`);
+      return definition.label;
+    })
+  );
   return {
     context: { mode: 'ci:release', scope: 'commit' },
-    executionMode: reuseFastProof ? 'reuse-fast-proof' : 'fresh-release-controls',
-    steps: [...productSteps, productionBuild, ...audit.steps],
+    executionMode: 'admitted-fast-proof',
+    steps: [
+      ...productSteps,
+      productionBuild,
+      ...audit.steps.map((step) => {
+        if (!inheritedAuditLabels.has(step.label)) return step;
+        const definition = findQaStepDefinition({
+          label: step.label,
+          lane: 'audit',
+        });
+        return createInheritedFastControlStep(definition, fastProofAdmission);
+      }),
+    ].map((step) => attachProofPopulation(step, verifyScope)),
   };
 }

@@ -449,18 +449,6 @@ jobs:
               echo "SNIPTALE_CODEQL_PROOF_PATH=$codeql_proof" >> "$GITHUB_ENV"
               echo "SNIPTALE_CODEQL_SARIF_PATH=$codeql_sarif" >> "$GITHUB_ENV"
             fi
-            coverage_root="$RUNNER_TEMP/release-coverage-proof"
-            coverage_proof="$RUNNER_TEMP/coverage-proof.json"
-            coverage_reports="$RUNNER_TEMP/coverage-reports"
-            restored=$(cd trusted-control && node tooling/ci/select-coverage-proof.mjs restore-latest-release "$coverage_root" "$coverage_proof" "$coverage_reports")
-            if [ -n "$restored" ]; then
-              echo "SNIPTALE_COVERAGE_PROOF_PATH=$coverage_proof" >> "$GITHUB_ENV"
-              echo "SNIPTALE_COVERAGE_REPORTS_PATH=$coverage_reports" >> "$GITHUB_ENV"
-            fi
-            fast_root="$RUNNER_TEMP/fast-proof-${CANDIDATE_SHA}"
-            if (cd trusted-control && node tooling/ci/restore-fast-proof.mjs "$CANDIDATE_SHA" "$fast_root"); then
-              echo "SNIPTALE_FAST_PROOF_PATH=$fast_root" >> "$GITHUB_ENV"
-            fi
           fi
       - name: Run exact canonical commit gate
         timeout-minutes: 225
@@ -480,7 +468,27 @@ jobs:
           SNIPTALE_QA_VITEST_MAX_WORKERS: ${{ needs.provision.outputs.vitest-workers }}
           SNIPTALE_QA_PLAYWRIGHT_WORKERS: ${{ needs.provision.outputs.playwright-workers }}
           SNIPTALE_QA_SECURITY_WORKERS: ${{ needs.provision.outputs.security-workers }}
-        run: node ../trusted-control/tooling/ci/container.mjs "$PROOF_LANE"
+        run: |
+          if [ "$PROOF_LANE" = release ]; then
+            node ../trusted-control/tooling/ci/container.mjs proof
+            fast_root=$(find build/ci-artifacts -mindepth 1 -maxdepth 1 -type d \
+              -name "proof-${CANDIDATE_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" -print -quit)
+            if [ -z "$fast_root" ]; then
+              echo 'Exact Fast proof was not sealed before Release provenance.' >&2
+              exit 1
+            fi
+            export SNIPTALE_FAST_PROOF_PATH="$PWD/$fast_root"
+          fi
+          node ../trusted-control/tooling/ci/container.mjs "$PROOF_LANE"
+      - name: Upload admitted Fast proof used by Release provenance
+        if: success() && env.PROOF_LANE == 'release'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: fast-proof-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: candidate/build/ci-artifacts/proof-${{ env.CANDIDATE_SHA }}-${{ github.run_id }}-${{ github.run_attempt }}
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 30
       - name: Upload canonical proof before cleanup
         id: canonical-proof
         if: always()

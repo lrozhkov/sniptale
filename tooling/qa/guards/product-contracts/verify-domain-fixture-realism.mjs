@@ -17,6 +17,9 @@ import {
 } from '../../analysis/repository/src-production-targets.mjs';
 import { readHeadFileTexts } from '../../analysis/git/git-head-sources.mjs';
 import { collectTaskTopologySourceByTarget } from '../../composition/preflight/task-topology-lineage.mjs';
+import { applyRepositoryFindingBaseline } from '../../policy/baselines/repository-finding-baseline.mjs';
+
+const REPOSITORY_BASELINE_PATH = 'tooling/configs/qa/domain-fixture-repository-baseline.json';
 
 const TEST_FILE_PATTERN = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
 const DOMAIN_TYPE_PATTERN =
@@ -186,13 +189,22 @@ export function runDomainFixtureRealismCheck({ files = [], scope = 'workspace' }
       ? targets.relativeFiles
       : targets.relativeFiles.filter((file) => !isImportOrMockOnlyDiffFile(file));
   const targetFiles = relativeFiles.map((file) => path.join(process.cwd(), file));
+  const currentViolations =
+    changedTargets == null
+      ? collectDomainFixtureRealismViolations(targetFiles)
+      : filterNetNewWorkspaceViolations(targetFiles, changedTargets);
+  const baseline =
+    scope === 'repo-wide'
+      ? applyRepositoryFindingBaseline({
+          baselinePath: REPOSITORY_BASELINE_PATH,
+          controlId: 'qa.rule.domain-fixture-realism',
+          findings: currentViolations,
+        })
+      : null;
   return {
     skipped: targetFiles.length === 0,
     files: relativeFiles,
-    violations:
-      changedTargets == null
-        ? collectDomainFixtureRealismViolations(targetFiles)
-        : filterNetNewWorkspaceViolations(targetFiles, changedTargets),
+    violations: baseline?.violations ?? currentViolations,
   };
 }
 

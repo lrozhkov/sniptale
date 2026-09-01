@@ -24,6 +24,7 @@ import { hasAmbiguousSameNameFacadeSource, isThinFacadeSource } from './facades.
 import { collectChangedTargets } from '../../../runtime/scope/changed-targets.helpers.mjs';
 
 const REPEATED_CHILD_PREFIX_MIN_COUNT = 3;
+const REPOSITORY_BASELINE_PATH = 'tooling/configs/qa/naming-repository-baseline.json';
 const REPEATED_PREFIX_ENTRYPOINT_EXCEPTIONS = new Set([
   'apps/extension/src/offscreen/offscreen.ts',
 ]);
@@ -196,6 +197,31 @@ function collectWorkspaceNamingDelta() {
   };
 }
 
+function findingKey({ file, rule }) {
+  return `${rule}\u0000${file}`;
+}
+
+function loadRepositoryBaseline() {
+  const value = JSON.parse(fs.readFileSync(REPOSITORY_BASELINE_PATH, 'utf8'));
+  if (
+    value?.schemaVersion !== 1 ||
+    !Array.isArray(value.findings) ||
+    value.findings.some(
+      (finding) =>
+        typeof finding?.file !== 'string' ||
+        typeof finding?.rule !== 'string' ||
+        Object.keys(finding).sort().join(',') !== 'file,rule'
+    )
+  ) {
+    throw new Error('Repository naming baseline must contain exact file/rule findings.');
+  }
+  const keys = value.findings.map(findingKey);
+  if (new Set(keys).size !== keys.length) {
+    throw new Error('Repository naming baseline contains duplicate findings.');
+  }
+  return new Map(value.findings.map((finding) => [findingKey(finding), finding]));
+}
+
 function getLeadingToken(value) {
   return value.split('-')[0];
 }
@@ -317,16 +343,37 @@ export function runNamingCheck({ files = [], repoWide = false, scope = 'workspac
   };
 }
 
+export function runChangedNamingCheck({ files = [] } = {}) {
+  return runNamingCheck({ files, scope: 'workspace' });
+}
+
+export function runRepositoryNamingCheck() {
+  const namingFiles = collectCodeFiles();
+  const findings = collectNamingViolations(namingFiles, { includeRepeatedPrefix: true });
+  const baseline = loadRepositoryBaseline();
+  const currentKeys = new Set(findings.map(findingKey));
+  const stale = [...baseline.entries()]
+    .filter(([key]) => !currentKeys.has(key))
+    .map(([, finding]) => ({
+      ...finding,
+      message: 'Repository naming baseline entry is stale and must be removed.',
+      rule: 'stale-naming-baseline',
+    }));
+  return {
+    files: namingFiles.map(toRelativePath),
+    scope: 'repo-wide',
+    violations: [...findings.filter((finding) => !baseline.has(findingKey(finding))), ...stale],
+  };
+}
+
 if (isExecutedAsScript(import.meta.url)) {
   const argv = process.argv.slice(2);
   const files = parseFilesArgument(argv);
   const reportOnly = argv.includes('--report-only');
   const repoWide = argv.includes('--repo-wide');
-  const result = runNamingCheck({
-    files,
-    repoWide,
-    scope: files.length > 0 && !repoWide ? 'explicit' : 'workspace',
-  });
+  const result = repoWide
+    ? runRepositoryNamingCheck()
+    : runNamingCheck({ files, scope: files.length > 0 ? 'explicit' : 'workspace' });
 
   if (result.violations.length > 0) {
     printViolations('Naming violations found:', result.violations);

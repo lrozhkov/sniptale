@@ -37,14 +37,16 @@ const FULL_RESULT_SHAPES = Object.freeze({
   },
   graph: { dependencySteps: 'steps', deadExportsStep: 'step' },
   light: {
+    formatStep: 'nullable-step',
     lineLengthStep: 'nullable-step',
+    repositoryReadabilityStep: 'nullable-step',
     aiHygieneStep: 'step',
     structuralRiskStep: 'nullable-step',
     namingStep: 'step',
+    mockParityStep: 'nullable-step',
     violationSteps: 'steps',
     i18nStep: 'step',
     designSystemStep: 'step',
-    auditStep: 'step',
   },
 });
 
@@ -178,17 +180,19 @@ function assemble(results, releaseMode, includeTests) {
     indexTaskResults(results);
   const ownerSteps = [appOwners.ownerStep, targetPaths.ownerStep];
   return orderQaResultSteps([
+    ...(light.formatStep ? [light.formatStep] : []),
     ...(light.lineLengthStep ? [light.lineLengthStep] : []),
+    ...(light.repositoryReadabilityStep ? [light.repositoryReadabilityStep] : []),
     lint.oxlintStep,
     lint.loggingStep,
     ...(releaseMode && lint.sonarjsStep ? [lint.sonarjsStep] : []),
     light.aiHygieneStep,
     ...(light.structuralRiskStep ? [light.structuralRiskStep] : []),
     light.namingStep,
+    ...(light.mockParityStep ? [light.mockParityStep] : []),
     ...replaceDeferredOwnerGuardSteps(light.violationSteps, ownerSteps),
     light.i18nStep,
     light.designSystemStep,
-    light.auditStep,
     lint.securityStep,
     ...graph.dependencySteps,
     typecheck.typecheckStep,

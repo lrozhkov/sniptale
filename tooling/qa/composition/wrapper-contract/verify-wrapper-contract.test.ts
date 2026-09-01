@@ -13,6 +13,8 @@ const VERIFY_ALL_VIOLATION_STEP_ORDER = [
   'ZIP package profile',
   'Network fetch policy',
   'Entrypoint wiring',
+  'Config policy',
+  'Extension build layout',
   'Dependency admission',
   'Secret storage',
   'Sensitive retention',
@@ -21,6 +23,7 @@ const VERIFY_ALL_VIOLATION_STEP_ORDER = [
   'Suppression directives',
   'Messaging',
   'Root scatter',
+  'Forwarding module drift',
   'Read path side effects',
   'Persistence ownership',
   'Parser snapshot purity',
@@ -38,6 +41,8 @@ const VERIFY_ALL_VIOLATION_STEP_ORDER = [
   'Shared style ownership',
   'UI automation seams',
   'Interactive controller ownership',
+  'Detached controller methods',
+  'Domain fixture realism',
 ];
 
 it('keeps verify-all violation steps in the documented focused-to-broad order', async () => {
@@ -68,7 +73,9 @@ it('keeps qa:release-harness as the harness-only validation wrapper', () => {
 
 it('keeps the release wrapper direct steps in the aggregate order around tests and build', () => {
   expect(FULL_DIRECT_WRAPPER_STEPS.map(({ label }) => label)).toEqual([
+    'Format',
     'Changed-line readability',
+    'Repository readability',
     'Oxlint',
     'SonarJS',
     'AI hygiene',
@@ -76,13 +83,14 @@ it('keeps the release wrapper direct steps in the aggregate order around tests a
     'Naming',
     'i18n',
     'Design system',
-    'Audit',
     'HTML sanitizer ownership',
     'Dependency boundaries',
     'Cycles',
     'Typecheck',
     'Dead exports',
+    'Mock export parity',
     'Unit tests',
+    'Harness unit tests',
     'Test coverage',
     'Build',
     'Release archive',

@@ -107,7 +107,17 @@ function assertIsolatedCoverageProfile(profile) {
 
 function assertFastPrProfile(profile) {
   if (profile.id !== 'pr') return;
-  const required = new Set(['npm-audit-signatures', 'osv-scanner', 'gitleaks']);
+  const required = new Set([
+    'full-product-coverage',
+    'npm-audit',
+    'npm-audit-signatures',
+    'osv-scanner',
+    'gitleaks',
+    'license-inventory',
+    'ast-grep',
+    'knip',
+    'jscpd',
+  ]);
   const invalid = profile.controls
     .filter(({ id, requirement }) => requirement !== (required.has(id) ? 'required' : 'excluded'))
     .map(({ id }) => id);
