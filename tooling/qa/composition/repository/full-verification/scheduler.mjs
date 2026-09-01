@@ -15,6 +15,7 @@ import {
 } from '../../../runtime/scheduling/task-scheduler.mjs';
 import { replaceDeferredOwnerGuardSteps } from '../../shared/owner-guard-step-helpers.mjs';
 import { createSchedulerLaneTask } from '../../runtime/scheduler-lane-task.mjs';
+import { COMMON_SCHEDULER_RESULT_SHAPES } from '../../runtime/scheduler-result-shapes.mjs';
 import {
   TYPECHECK_CHECKERS,
   TYPESCRIPT_TOOL_VERSION,
@@ -25,16 +26,7 @@ import { projectQaSchedulerLanes } from '../../catalog/scheduler-profiles.mjs';
 
 const FULL_VERIFY_WORKER_URL = new URL('./worker.mjs', import.meta.url);
 const FULL_RESULT_SHAPES = Object.freeze({
-  appOwners: { ownerStep: 'step' },
-  targetPaths: { ownerStep: 'step' },
-  typecheck: { typecheckStep: 'step' },
-  tests: { testSteps: 'steps' },
-  lint: {
-    loggingStep: 'step',
-    oxlintStep: 'step',
-    securityStep: 'step',
-  },
-  graph: { dependencySteps: 'steps', deadExportsStep: 'step' },
+  ...COMMON_SCHEDULER_RESULT_SHAPES,
   light: {
     formatStep: 'nullable-step',
     lineLengthStep: 'nullable-step',

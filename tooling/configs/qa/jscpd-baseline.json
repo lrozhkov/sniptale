@@ -1030,6 +1030,24 @@
       }
     },
     {
+      "id": "7209d8ab92403b6eae5e9b586aade28c676093f0914eb17f0627f60605e3c3bc",
+      "classification": "tool-noise",
+      "owner": "tooling/qa/composition scheduler workers",
+      "reason": "The shared imports connect two scheduler implementations to the same runtime contracts; wrapping or aliasing imports would add indirection without consolidating either scheduler owner.",
+      "removalCondition": "Remove when the schedulers acquire one execution owner or when the exact import overlap disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "tooling/qa/composition/checkpoint/focused/scheduler.mjs",
+        "start": 9,
+        "end": 25
+      },
+      "secondFile": {
+        "path": "tooling/qa/composition/repository/full-verification/scheduler.mjs",
+        "start": 11,
+        "end": 27
+      }
+    },
+    {
       "id": "7365fb62b4a7db9ae4ccf21488d0d18019c41bca8a5510f7d6324648f9513fbd",
       "classification": "tool-noise",
       "owner": "apps/extension/src/content/public/preparation-surface/effects.css",
