@@ -90,6 +90,20 @@ async function finishScreenshotCommit(session: NativeTransferSessionEntry): Prom
   return markedComplete.ok;
 }
 
+async function loadCurrentScreenshotSession(
+  deps: NativeAppIngestionControllerDeps,
+  message: AppScreenshotChunkMessage | AppScreenshotCommitMessage
+): Promise<NativeTransferSessionEntry | NativeIngestionOutboundMessage[]> {
+  const loaded = await loadScreenshotSessionForMessage(message);
+  if (Array.isArray(loaded)) {
+    return loaded;
+  }
+  if (!sessionMatchesLease(loaded, message) || !isCurrentLease(deps, message.controllerLeaseId)) {
+    return [screenshotReject(message, 'stale-controller-lease')];
+  }
+  return loaded;
+}
+
 export async function handleNativeScreenshotStart(
   deps: NativeAppIngestionControllerDeps,
   message: AppScreenshotStartMessage
@@ -122,14 +136,11 @@ export async function handleNativeScreenshotChunk(
   deps: NativeAppIngestionControllerDeps,
   message: AppScreenshotChunkMessage
 ): Promise<NativeIngestionOutboundMessage[]> {
-  const loaded = await loadScreenshotSessionForMessage(message);
+  const loaded = await loadCurrentScreenshotSession(deps, message);
   if (Array.isArray(loaded)) {
     return loaded;
   }
   const session = loaded;
-  if (!sessionMatchesLease(session, message) || !isCurrentLease(deps, message.controllerLeaseId)) {
-    return [screenshotReject(message, 'stale-controller-lease')];
-  }
   const rejected = await stageNativeTransferChunk({ ...message, session });
   if (rejected) {
     await runNativeBestEffort(() => deleteNativeTransferSession(session.id));
@@ -146,14 +157,11 @@ export async function handleNativeScreenshotCommit(
   deps: NativeAppIngestionControllerDeps,
   message: AppScreenshotCommitMessage
 ): Promise<NativeIngestionOutboundMessage[]> {
-  const loaded = await loadScreenshotSessionForMessage(message);
+  const loaded = await loadCurrentScreenshotSession(deps, message);
   if (Array.isArray(loaded)) {
     return loaded;
   }
   const session = loaded;
-  if (!sessionMatchesLease(session, message) || !isCurrentLease(deps, message.controllerLeaseId)) {
-    return [screenshotReject(message, 'stale-controller-lease')];
-  }
   if (getNextMissingChunkIndex(session) !== null) {
     return [screenshotReject(message, 'malformed-message')];
   }

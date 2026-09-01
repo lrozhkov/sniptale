@@ -188,7 +188,7 @@ function createJscpdResult({ absoluteReportPath, baselinePath, detector, duplica
   const findings = normalizeJscpdClones(duplicates, { root });
   const familySummary = summarizeJscpdFamilies(findings);
   const baseline = readJscpdBaseline(baselinePath, { root });
-  const violations = collectJscpdBaselineViolations(familySummary, baseline);
+  const violations = collectJscpdBaselineViolations(findings, baseline);
   return {
     skipped: false,
     reportPath: absoluteReportPath,

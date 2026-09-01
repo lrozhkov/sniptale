@@ -8,6 +8,7 @@ import {
 } from '@sniptale/runtime-contracts/page-package';
 import {
   buildExtendedDiagnosticDomProjection,
+  elementPath,
   admitExtendedDiagnosticDomInput,
   MAX_EXTENDED_DIAGNOSTIC_ELEMENTS,
   type ExtendedDiagnosticRedaction,
@@ -50,22 +51,6 @@ function sanitizeScalar(key: string, value: string): string {
 
 function sanitizeJson(value: unknown): string {
   return `${JSON.stringify(sanitizeRawDiagnosticExportData(value), null, 2)}\n`;
-}
-
-function elementPath(element: Element): string {
-  const segments: string[] = [];
-  let current: Element | null = element;
-  while (current && segments.length < 8) {
-    let index = 1;
-    let sibling = current.previousElementSibling;
-    while (sibling) {
-      if (sibling.localName === current.localName) index += 1;
-      sibling = sibling.previousElementSibling;
-    }
-    segments.unshift(`${current.localName}:nth-of-type(${index})`);
-    current = current.parentElement;
-  }
-  return segments.join(' > ');
 }
 
 async function hashContent(

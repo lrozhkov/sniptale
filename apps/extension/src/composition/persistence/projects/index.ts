@@ -13,6 +13,7 @@ import { createProjectMutationStores } from './mutation-stores';
 import { createProjectAssetMediaId } from '../../../features/media-hub/media-id';
 import {
   collectProjectOwnedAssetIds,
+  deletePublishedProjectEntry,
   deleteProjectAssetsUnreferencedByOtherProjects,
   syncProjectAssetMirrorLifecycles,
 } from './asset-references';
@@ -320,17 +321,19 @@ export async function deleteProjectAsset(id: string): Promise<void> {
       'readwrite'
     );
     const entry = parseProjectAssetEntry(await tx.objectStore(PROJECT_ASSETS_STORE).get(id));
-    await tx.objectStore(PROJECT_ASSETS_STORE).delete(id);
-    await tx.objectStore(MEDIA_LIBRARY_STORE).delete(createProjectAssetMediaId(id));
-    if (entry) {
-      const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);
-      await ownerStore.delete([PROJECT_ASSET_OWNER_KIND, id, PROJECT_MEDIA_ASSET_ROLE]);
-      if ((await ownerStore.index('assetId').count(entry.assetId)) === 0) {
-        await tx.objectStore(ASSET_REFS_STORE).delete(entry.assetId);
-        physicalDelete.assetIds.push(entry.assetId);
-        await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
-      }
-    }
+    const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);
+    await deletePublishedProjectEntry({
+      countAssetOwners: (assetId) => ownerStore.index('assetId').count(assetId),
+      deleteAssetEntry: () => tx.objectStore(PROJECT_ASSETS_STORE).delete(id),
+      deleteAssetOwner: () =>
+        ownerStore.delete([PROJECT_ASSET_OWNER_KIND, id, PROJECT_MEDIA_ASSET_ROLE]),
+      deleteAssetRef: (assetId) => tx.objectStore(ASSET_REFS_STORE).delete(assetId),
+      deleteMediaEntry: () =>
+        tx.objectStore(MEDIA_LIBRARY_STORE).delete(createProjectAssetMediaId(id)),
+      entry,
+      operation: physicalDelete,
+      recordOperation: () => tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete),
+    });
     await tx.done;
   });
   if (physicalDelete.assetIds.length > 0) await completePhysicalDeleteOperation(physicalDelete);

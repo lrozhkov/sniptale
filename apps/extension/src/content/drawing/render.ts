@@ -41,13 +41,13 @@ function applyDrawingObjectTransform(
   context.translate(-center.x, -center.y);
 }
 
-function fillPolygon(
+function tracePointPath(
   context: CanvasRenderingContext2D,
   points: readonly DrawingPoint[],
   projection: DrawingViewportProjection
-) {
+): boolean {
   const first = points[0];
-  if (!first) return;
+  if (!first) return false;
   const start = viewportPoint(first, projection);
   context.beginPath();
   context.moveTo(start.x, start.y);
@@ -56,6 +56,15 @@ function fillPolygon(
     context.lineTo(next.x, next.y);
   });
   context.closePath();
+  return true;
+}
+
+function fillPolygon(
+  context: CanvasRenderingContext2D,
+  points: readonly DrawingPoint[],
+  projection: DrawingViewportProjection
+) {
+  if (!tracePointPath(context, points, projection)) return;
   context.fill();
 }
 
@@ -118,17 +127,7 @@ function tracePolygon(
   object: Extract<DrawingObject, { kind: 'rectangle' | 'triangle' | 'parallelogram' }>,
   projection: DrawingViewportProjection
 ) {
-  const points = getDrawingShapePoints(object);
-  const first = points[0];
-  if (!first) return;
-  const start = viewportPoint(first, projection);
-  context.beginPath();
-  context.moveTo(start.x, start.y);
-  points.slice(1).forEach((point) => {
-    const next = viewportPoint(point, projection);
-    context.lineTo(next.x, next.y);
-  });
-  context.closePath();
+  tracePointPath(context, getDrawingShapePoints(object), projection);
 }
 
 function drawFreehand(
@@ -175,9 +174,9 @@ export function renderDrawingObject(
   } else if (object.kind === 'ellipse') {
     context.strokeStyle = object.color;
     context.lineWidth = object.width;
-    context.beginPath();
     if (getDrawingObjectSkewX(object) === 0) {
       const bounds = getDrawingObjectBounds(object);
+      context.beginPath();
       context.ellipse(
         bounds.x + bounds.width / 2 - projection.x,
         bounds.y + bounds.height / 2 - projection.y,
@@ -188,17 +187,7 @@ export function renderDrawingObject(
         Math.PI * 2
       );
     } else {
-      const points = getDrawingEllipsePoints(object);
-      const first = points[0];
-      if (first) {
-        const start = viewportPoint(first, projection);
-        context.moveTo(start.x, start.y);
-        points.slice(1).forEach((point) => {
-          const next = viewportPoint(point, projection);
-          context.lineTo(next.x, next.y);
-        });
-        context.closePath();
-      }
+      tracePointPath(context, getDrawingEllipsePoints(object), projection);
     }
     if (object.fillColor) {
       context.fillStyle = object.fillColor;

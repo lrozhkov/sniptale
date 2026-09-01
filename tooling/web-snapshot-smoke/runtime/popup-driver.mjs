@@ -6,6 +6,73 @@ const packageTimeoutMs =
     ? configuredTimeoutMs
     : 90_000;
 
+async function runSnapshotJobInPopup({ id, intent, jobId, richPackage, timeoutMs }) {
+  const isExport = intent === 'export';
+  const label = isExport ? 'Package' : 'Snapshot';
+  const withFreshness = (message) => ({
+    ...message,
+    __sniptaleRuntimeFreshness: {
+      issuedAtEpochMs: Date.now(),
+      nonce: crypto.randomUUID(),
+    },
+  });
+  const started = await globalThis.chrome.runtime.sendMessage(
+    withFreshness({
+      includeWebCopy: true,
+      intent,
+      jobId,
+      captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
+      sources: [{ kind: 'tab', tabId: id, title: 'Smoke page' }],
+      options: {
+        includeBasicLogs: richPackage,
+        includeCssDiagnostics: richPackage,
+        includeFiles: isExport && richPackage,
+        includeFullPageScreenshot: true,
+        includeImages: isExport && richPackage,
+        includeJson: richPackage,
+        includeMarkdown: richPackage,
+        includePageDiagnostics: richPackage,
+      },
+      type: 'START_PAGE_PACKAGE_JOB',
+      warnings: [],
+    })
+  );
+  if (!started?.success) throw new Error(started?.error || `${label} ${intent} did not start`);
+
+  const deadline = Date.now() + timeoutMs;
+  let lastStatus = null;
+  while (Date.now() < deadline) {
+    const response = await globalThis.chrome.runtime.sendMessage(
+      withFreshness({ jobId, type: 'GET_PAGE_PACKAGE_JOB_STATUS' })
+    );
+    if (!response?.success) throw new Error(response?.error || `${label} status failed`);
+    const status = response.status;
+    lastStatus = status;
+    if (status?.phase === 'completed') {
+      const warnings = status.result?.warnings ?? status.warnings ?? [];
+      if (isExport) {
+        if (!status.result?.filename) throw new Error('Package export completed without a file');
+        return { downloadProof: { filename: status.result.filename }, success: true, warnings };
+      }
+      const assetId = status.result?.snapshotIds?.[0];
+      if (!assetId) throw new Error('Snapshot save completed without a Library asset');
+      return { assetId, success: true, warnings };
+    }
+    if (status && ['cancelled', 'failed', 'interrupted'].includes(status.phase)) {
+      throw new Error(status.result?.errors?.join('; ') || `${label} ${status.phase}`);
+    }
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 500));
+  }
+  if (!isExport) throw new Error('Snapshot save timed out');
+  throw new Error(
+    `Package export timed out: ${JSON.stringify({
+      phase: lastStatus?.phase ?? null,
+      progress: lastStatus?.progress ?? null,
+      revision: lastStatus?.revision ?? null,
+    })}`
+  );
+}
+
 export async function enableForTab(popup, target, tabId) {
   await popup.evaluate((id) => globalThis.chrome.tabs.update(id, { active: true }), tabId);
   const result = await popup.evaluate(async (id) => {
@@ -26,140 +93,23 @@ export async function enableForTab(popup, target, tabId) {
 }
 
 export async function saveSnapshot(popup, tabId, options = {}) {
-  return popup.evaluate(
-    async ({ id, jobId, richPackage, timeoutMs }) => {
-      const withFreshness = (message) => ({
-        ...message,
-        __sniptaleRuntimeFreshness: {
-          issuedAtEpochMs: Date.now(),
-          nonce: crypto.randomUUID(),
-        },
-      });
-      const started = await globalThis.chrome.runtime.sendMessage(
-        withFreshness({
-          includeWebCopy: true,
-          intent: 'save',
-          jobId,
-          captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
-          sources: [{ kind: 'tab', tabId: id, title: 'Smoke page' }],
-          options: {
-            includeBasicLogs: richPackage,
-            includeCssDiagnostics: richPackage,
-            includeFiles: false,
-            includeFullPageScreenshot: true,
-            includeImages: false,
-            includeJson: richPackage,
-            includeMarkdown: richPackage,
-            includePageDiagnostics: richPackage,
-          },
-          type: 'START_PAGE_PACKAGE_JOB',
-          warnings: [],
-        })
-      );
-      if (!started?.success) throw new Error(started?.error || 'Snapshot save did not start');
-
-      const deadline = Date.now() + timeoutMs;
-      while (Date.now() < deadline) {
-        const response = await globalThis.chrome.runtime.sendMessage(
-          withFreshness({ jobId, type: 'GET_PAGE_PACKAGE_JOB_STATUS' })
-        );
-        if (!response?.success) throw new Error(response?.error || 'Snapshot status failed');
-        const status = response.status;
-        if (status?.phase === 'completed') {
-          const assetId = status.result?.snapshotIds?.[0];
-          if (!assetId) throw new Error('Snapshot save completed without a Library asset');
-          return {
-            assetId,
-            success: true,
-            warnings: status.result?.warnings ?? status.warnings ?? [],
-          };
-        }
-        if (status && ['cancelled', 'failed', 'interrupted'].includes(status.phase)) {
-          throw new Error(status.result?.errors?.join('; ') || `Snapshot ${status.phase}`);
-        }
-        await new Promise((resolve) => globalThis.setTimeout(resolve, 500));
-      }
-      throw new Error('Snapshot save timed out');
-    },
-    {
-      id: tabId,
-      jobId: crypto.randomUUID(),
-      richPackage: options.richPackage === true,
-      timeoutMs: options.timeoutMs ?? packageTimeoutMs,
-    }
-  );
+  return popup.evaluate(runSnapshotJobInPopup, {
+    id: tabId,
+    intent: 'save',
+    jobId: crypto.randomUUID(),
+    richPackage: options.richPackage === true,
+    timeoutMs: options.timeoutMs ?? packageTimeoutMs,
+  });
 }
 
 export async function downloadSnapshotPackage(popup, tabId) {
-  return popup.evaluate(
-    async ({ id, jobId, richPackage, timeoutMs }) => {
-      const withFreshness = (message) => ({
-        ...message,
-        __sniptaleRuntimeFreshness: {
-          issuedAtEpochMs: Date.now(),
-          nonce: crypto.randomUUID(),
-        },
-      });
-      const started = await globalThis.chrome.runtime.sendMessage(
-        withFreshness({
-          includeWebCopy: true,
-          intent: 'export',
-          jobId,
-          captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
-          sources: [{ kind: 'tab', tabId: id, title: 'Smoke page' }],
-          options: {
-            includeBasicLogs: richPackage,
-            includeCssDiagnostics: richPackage,
-            includeFiles: richPackage,
-            includeFullPageScreenshot: true,
-            includeImages: richPackage,
-            includeJson: richPackage,
-            includeMarkdown: richPackage,
-            includePageDiagnostics: richPackage,
-          },
-          type: 'START_PAGE_PACKAGE_JOB',
-          warnings: [],
-        })
-      );
-      if (!started?.success) throw new Error(started?.error || 'Package export did not start');
-
-      const deadline = Date.now() + timeoutMs;
-      let lastStatus = null;
-      while (Date.now() < deadline) {
-        const response = await globalThis.chrome.runtime.sendMessage(
-          withFreshness({ jobId, type: 'GET_PAGE_PACKAGE_JOB_STATUS' })
-        );
-        if (!response?.success) throw new Error(response?.error || 'Package status failed');
-        const status = response.status;
-        lastStatus = status;
-        if (status?.phase === 'completed') {
-          if (!status.result?.filename) throw new Error('Package export completed without a file');
-          return {
-            downloadProof: { filename: status.result.filename },
-            success: true,
-            warnings: status.result?.warnings ?? status.warnings ?? [],
-          };
-        }
-        if (status && ['cancelled', 'failed', 'interrupted'].includes(status.phase)) {
-          throw new Error(status.result?.errors?.join('; ') || `Package ${status.phase}`);
-        }
-        await new Promise((resolve) => globalThis.setTimeout(resolve, 500));
-      }
-      throw new Error(
-        `Package export timed out: ${JSON.stringify({
-          phase: lastStatus?.phase ?? null,
-          progress: lastStatus?.progress ?? null,
-          revision: lastStatus?.revision ?? null,
-        })}`
-      );
-    },
-    {
-      id: tabId,
-      jobId: crypto.randomUUID(),
-      richPackage: process.env.SNAPSHOT_SMOKE_RICH_PACKAGE === '1',
-      timeoutMs: packageTimeoutMs,
-    }
-  );
+  return popup.evaluate(runSnapshotJobInPopup, {
+    id: tabId,
+    intent: 'export',
+    jobId: crypto.randomUUID(),
+    richPackage: process.env.SNAPSHOT_SMOKE_RICH_PACKAGE === '1',
+    timeoutMs: packageTimeoutMs,
+  });
 }
 
 async function selectOnlyCurrentPage(popup) {

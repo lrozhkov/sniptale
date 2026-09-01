@@ -202,12 +202,16 @@ async function cancelPopupExportCaptureAuthority(tabId: number, requestId: strin
       ? [deleteMediaLibraryAssetsBatchSafely(cancellation.committedAssetIds)]
       : [];
   const results = await Promise.allSettled(cleanup);
+  throwCleanupFailures(results, 'Page Package capture cleanup failed.');
+}
+
+function throwCleanupFailures(results: PromiseSettledResult<unknown>[], message: string): void {
   const failures = results.flatMap((result) =>
     result.status === 'rejected' ? [result.reason as unknown] : []
   );
   if (failures.length === 1) throw failures[0];
   if (failures.length > 1) {
-    throw new AggregateError(failures, 'Page Package capture cleanup failed.');
+    throw new AggregateError(failures, message);
   }
 }
 
@@ -343,11 +347,5 @@ export async function cancelPopupExportPagePackage(args: {
         : sendTabMessage(args.tabId, message)
     ),
   ]);
-  const failures = results.flatMap((result) =>
-    result.status === 'rejected' ? [result.reason as unknown] : []
-  );
-  if (failures.length === 1) throw failures[0];
-  if (failures.length > 1) {
-    throw new AggregateError(failures, 'Page Package cancellation cleanup failed.');
-  }
+  throwCleanupFailures(results, 'Page Package cancellation cleanup failed.');
 }

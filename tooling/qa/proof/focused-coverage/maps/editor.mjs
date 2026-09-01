@@ -7,6 +7,25 @@ export const EDITOR_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/content/drawing/controller.test.ts'],
   },
   {
+    owner: 'content-drawing-renderer',
+    productionFile: 'apps/extension/src/content/drawing/render.ts',
+    reason:
+      'Drawing path rendering is covered by frame rendering and freehand geometry parity suites.',
+    testFiles: [
+      'apps/extension/src/content/drawing/frame.test.ts',
+      'apps/extension/src/content/drawing/freehand-parity.test.ts',
+    ],
+  },
+  {
+    owner: 'video-annotation-builtins',
+    productionPrefix: 'apps/extension/src/features/video/project/annotation-engine/builtins/',
+    reason:
+      'Built-in template factories, key mapping, and both shipped packs are covered by the focused built-in helper suite.',
+    testFiles: [
+      'apps/extension/src/features/video/project/annotation-engine/builtins/helpers.test.ts',
+    ],
+  },
+  {
     owner: 'editor-shell-defaults',
     productionFile: 'apps/extension/src/editor/shell/page/defaults.ts',
     reason: 'Editor default hydration is covered by the page runtime suite.',

@@ -1,511 +1,2707 @@
 {
-  "$comment": "Exact current jscpd detector owner-family inventory after complete finding triage; intentional and deferred findings remain admitted.",
-  "version": 3,
-  "description": "Complete blocking ci:release jscpd baseline for the current repository tree.",
-  "families": [
-    {
-      "family": "packages/ui/src",
-      "count": 46,
-      "lines": 435,
-      "sampleFingerprint": "9f7b4a05411f4b0c97a3c669733c5ed0026c3f83c1a657b58c011fc7193cd8d4"
-    },
-    {
-      "family": "apps/extension/src/settings/sections/styles",
-      "count": 18,
-      "lines": 271,
-      "sampleFingerprint": "00c9b0f45db0cfb8e5b4bac6f73709a72fa60fe35be50fa98c17d0571d30cdf0"
-    },
-    {
-      "family": "apps/extension/src/composition/frame-annotation-controls/callout <-> apps/extension/src/composition/frame-annotation-controls/step-badge",
-      "count": 6,
-      "lines": 99,
-      "sampleFingerprint": "37dbccc26f013f67d7c4ea5293462f8472395d431092cf9e3b04c79cdbe7586f"
-    },
-    {
-      "family": "apps/extension/src/workflows/media-hub-backup/v6",
-      "count": 5,
-      "lines": 70,
-      "sampleFingerprint": "d9b2422c546164f66cade64b525f791291c3b963971c7cfe233368cfad2fd897"
-    },
-    {
-      "family": "apps/extension/src/offscreen/recording/encoding",
-      "count": 5,
-      "lines": 53,
-      "sampleFingerprint": "b98ad403a6d055b4b379bc67c13479357b00f6eff9f3301d94f5c561a70039f8"
-    },
-    {
-      "family": "apps/extension/src/composition/frame-annotation-controls/callout <-> apps/extension/src/composition/frame-annotation-controls/frame",
-      "count": 4,
-      "lines": 61,
-      "sampleFingerprint": "aa041c528a7e3bf15bfb5ac9cbff39fa375dc4775ff8663f6ba29bb783b0720d"
-    },
-    {
-      "family": "apps/extension/src/features/highlighter",
-      "count": 4,
-      "lines": 44,
-      "sampleFingerprint": "01ecdcdd88308281a5eb88c8026e3a5d0c476ed33a47ea3dc24999f5258bd471"
-    },
-    {
-      "family": "apps/extension/src/content/parser/export-manager",
-      "count": 3,
-      "lines": 47,
-      "sampleFingerprint": "3576795f7b61c4dbdc04a54ee2fb685eea82e8eba221e2383317dcec0083367b"
-    },
-    {
-      "family": "apps/extension/src/composition/frame-annotation-controls/frame",
-      "count": 3,
-      "lines": 44,
-      "sampleFingerprint": "33af2488a8d46f3cc4e4374492fa4adc23db838ddc892cf8e48d2a6467cedab8"
-    },
-    {
-      "family": "apps/extension/src/content/public/preparation-surface",
-      "count": 3,
-      "lines": 43,
-      "sampleFingerprint": "790157ef24930145618f75bd370c1d1dfbee7533da791a9eb7f724ae0a979724"
-    },
-    {
-      "family": "apps/extension/src/composition/persistence/projects <-> apps/extension/src/composition/persistence/scenario",
-      "count": 2,
-      "lines": 21,
-      "sampleFingerprint": "aea771a89ad4b6e962139c5abf0eccdec32e7485b5662d456f30199af7c33e90"
-    },
-    {
-      "family": "apps/extension/src/composition/persistence/scenario",
-      "count": 3,
-      "lines": 28,
-      "sampleFingerprint": "3621c71be0f637b5bd3f932d680580e20b5a867e3a32a904ade0bca2562fc1b3"
-    },
-    {
-      "family": "apps/extension/src/composition/persistence/gradient-presets <-> apps/extension/src/composition/persistence/surface-style-presets",
-      "count": 3,
-      "lines": 25,
-      "sampleFingerprint": "31b4bd4ba24fc9e2422a498bddf941c7eda97c707c05813840757906cda0e566"
-    },
-    {
-      "family": "apps/extension/src/ui/highlighter-preset-editor/callout <-> apps/extension/src/ui/highlighter-preset-editor/step-badge",
-      "count": 2,
-      "lines": 37,
-      "sampleFingerprint": "8fecb6e30e2055574268370aae971b2590f3607e049c1f5f3d3d6908ec659992"
-    },
-    {
-      "family": "apps/extension/src/design-system/parity",
-      "count": 2,
-      "lines": 36,
-      "sampleFingerprint": "219b55e5934d4368f80dd68a2af97dfb668a59b8293d2f661a317160c99b1dfb"
-    },
-    {
-      "family": "tooling/web-snapshot-smoke/runtime",
-      "count": 2,
-      "lines": 29,
-      "sampleFingerprint": "8d2489da48f8ea5b9fb73c920310dc1bd5aa9cfca767c68a85b30cc8fa672be8"
-    },
-    {
-      "family": "apps/extension/src/composition/persistence/callout-presets",
-      "count": 2,
-      "lines": 26,
-      "sampleFingerprint": "b273515ad5b3c4fe12d8bab876401e2051e318f7a689199b9bd7925236583312"
-    },
-    {
-      "family": "apps/extension/src/features/media-hub",
-      "count": 2,
-      "lines": 24,
-      "sampleFingerprint": "3a844eea6bbb57ac92a575602781cb9fbdd94f9da425d2f91e99875adb6bfe70"
-    },
-    {
-      "family": "apps/extension/src/features/web-snapshot <-> packages/runtime-contracts/src",
-      "count": 2,
-      "lines": 22,
-      "sampleFingerprint": "70636e36b3eb9f51d5631fcef76d7bc7df35eccbc13f14056e4692edb4db219a"
-    },
-    {
-      "family": "apps/extension/src/content/drawing",
-      "count": 2,
-      "lines": 18,
-      "sampleFingerprint": "878856cc904cd69340c08b7e08569e4ef2515b82581ba1627984ed64f9be80a0"
-    },
-    {
-      "family": "apps/extension/src/composition/persistence/library-lifecycle <-> apps/extension/src/features/highlighter/frame-annotation",
-      "count": 2,
-      "lines": 16,
-      "sampleFingerprint": "ca2defe32d4ffe96e851e5dbf534a9c651285055678415df810a20f9fb169898"
-    },
-    {
-      "family": "apps/extension/src/features/highlighter/frame-annotation",
-      "count": 2,
-      "lines": 16,
-      "sampleFingerprint": "876beceb717eee532e449f08daf85209fd3e9191c469b134ff2781e9f2a86c65"
-    },
-    {
-      "family": "apps/extension/src/editor/controller/instance",
-      "count": 2,
-      "lines": 13,
-      "sampleFingerprint": "70c48226805eba8ae39955c617f852e6b20aec3397001cfefc0bd3046bfe1331"
-    },
-    {
-      "family": "apps/extension/src/editor/workspace/floating",
-      "count": 1,
-      "lines": 21,
-      "sampleFingerprint": "e1e5adba31044f3d5f34d55f7747c36bc3ca95e202e5a93958cc8844781930c0"
-    },
-    {
-      "family": "apps/extension/src/background/capture/quick-actions",
-      "count": 1,
-      "lines": 19,
-      "sampleFingerprint": "95db4768f15f7a170c78ead212849a29df2ef36c537016c6fc1e3d642b6ccdf7"
-    },
-    {
-      "family": "apps/extension/src/contracts/messaging/contracts",
-      "count": 1,
-      "lines": 19,
-      "sampleFingerprint": "5e0cf769b80479a90ca72c65e54a20264c2dc614a6f80b7009729d63ef759fc0"
-    },
-    {
-      "family": "apps/extension/src/background/capture/page-package",
-      "count": 1,
-      "lines": 18,
-      "sampleFingerprint": "5276fd13e7baf3f3965fdd7dcb00d93b5581b4a0f2d3427b957c741cf3b6152e"
-    },
-    {
-      "family": "apps/extension/src/popup/recording/video <-> apps/extension/src/popup/shell/home",
-      "count": 1,
-      "lines": 18,
-      "sampleFingerprint": "669971f1581f6682edc39d5d697f940cf2de0e3e1688d60668d3dc46499b5e64"
-    },
-    {
-      "family": "apps/extension/src/background/runtime/tab-mode-router-screenshot",
-      "count": 1,
-      "lines": 17,
-      "sampleFingerprint": "48ab9b9ed8f8f1d35b10afe8a6f8c6630e66597975816006f6ad738f9bf207e6"
-    },
-    {
-      "family": "apps/extension/src/composition/frame-annotation-controls/voice <-> apps/extension/src/content/voice-input",
-      "count": 1,
-      "lines": 17,
-      "sampleFingerprint": "7693b63eee184d3e300e57a75e0fc7b7fbc3f50ba8f67d53dd2da22bd765ed95"
-    },
-    {
-      "family": "apps/extension/src/editor/controller/document <-> apps/extension/src/editor/drawing/object",
-      "count": 1,
-      "lines": 17,
-      "sampleFingerprint": "ea03b4a8b7ceb3932a9b52cd34623c7d44532cb31d2f5155ee53014bef436320"
-    },
-    {
-      "family": "apps/extension/src/features/video/project",
-      "count": 1,
-      "lines": 16,
-      "sampleFingerprint": "9ccff1f2f85cc8e7da3082cabd82ff73daf94e9f5800e33687b901d1f3a6dcdc"
-    },
-    {
-      "family": "apps/extension/src/composition/persistence/callout-presets <-> apps/extension/src/composition/persistence/highlighter",
-      "count": 1,
-      "lines": 15,
-      "sampleFingerprint": "13549feb0b14ed535c357a568052ec11cb3e06e29a942b9e7e6b7540f629dcaf"
-    },
-    {
-      "family": "apps/extension/src/design-system/previews/product-glass-controls",
-      "count": 1,
-      "lines": 15,
-      "sampleFingerprint": "8383ea741d5fdf0ee09caa1deff26b87d6ed4d742302410fcd0e9505b1d1ad29"
-    },
-    {
-      "family": "packages/foundation/src",
-      "count": 1,
-      "lines": 15,
-      "sampleFingerprint": "9d198a6afa62cd728183e12f42c6a5211cf3ae3539c2f1163dedf2cbd68531f8"
-    },
-    {
-      "family": "apps/extension/src/background/page-access",
-      "count": 1,
-      "lines": 14,
-      "sampleFingerprint": "93aae628d9a8ef5eb2785434c31e68cd4cfa454a49cd0240001e323674bb10a6"
-    },
-    {
-      "family": "apps/extension/src/content/parser/web-snapshot <-> apps/extension/src/editor/controller/document",
-      "count": 1,
-      "lines": 14,
-      "sampleFingerprint": "3418f5388ea01b2c64f34d33ab6e419b08ab0bb409a30ecc6b31f47cf2adfdde"
-    },
-    {
-      "family": "apps/extension/src/offscreen/recording/encoding <-> apps/extension/src/offscreen/recording/stream",
-      "count": 1,
-      "lines": 14,
-      "sampleFingerprint": "cd8f19a3476fcd9297c47149eabca3fb46ca6197198a7c9c163cac8eacf6e1bf"
-    },
-    {
-      "family": "apps/extension/src/settings/sections/capture <-> apps/extension/src/settings/sections/styles",
-      "count": 1,
-      "lines": 14,
-      "sampleFingerprint": "6dbdf80b6bc30cad798084d8ca51af675ab8d4f40f4f1c5293abf84f8b624d6a"
-    },
-    {
-      "family": "apps/extension/src/composition/persistence/document-assets",
-      "count": 1,
-      "lines": 13,
-      "sampleFingerprint": "6d2625312ff54bf02b27508aa8efc17443314e8de754a9c6e73059a433aaaa98"
-    },
-    {
-      "family": "apps/extension/src/content/parser/page-preparation <-> apps/extension/src/content/parser/web-snapshot",
-      "count": 1,
-      "lines": 13,
-      "sampleFingerprint": "e76fa0d533b0ed90b001fff7907b625cb41a948447eec4f35f47c904b79e1048"
-    },
-    {
-      "family": "apps/extension/src/features/editor/document",
-      "count": 1,
-      "lines": 13,
-      "sampleFingerprint": "c331c4d4b537aea2b43cfb1ad8abc8058c5fd2296a3f0ad1ebfe32821392a971"
-    },
-    {
-      "family": "apps/extension/src/features/video/composition",
-      "count": 1,
-      "lines": 13,
-      "sampleFingerprint": "8c12a1f8d543eb643732a6ae309bb8ea64053dde9edbddac26526ece30d853b8"
-    },
-    {
-      "family": "apps/extension/src/ui/popup-shell/inline-curtain",
-      "count": 1,
-      "lines": 13,
-      "sampleFingerprint": "71ff67ee1e4de430be5cf7990b347eaec372a51e3227674cac977ab216d0dced"
-    },
-    {
-      "family": "packages/runtime-contracts/src",
-      "count": 1,
-      "lines": 13,
-      "sampleFingerprint": "00cf332cf45c3131fa2742a05c8120d12873d86fb5981329154516c377ea3e9d"
-    },
-    {
-      "family": "apps/extension/src/background/ai/settings",
-      "count": 1,
-      "lines": 12,
-      "sampleFingerprint": "e8205b5199489dfba25eb4efbf2dfa795839c7dbc56daf2d1cbfd962b7318ece"
-    },
-    {
-      "family": "apps/extension/src/composition/persistence/annotation-template-tags",
-      "count": 1,
-      "lines": 12,
-      "sampleFingerprint": "40b1ab177da1a1f7c6615a656d887a2f4513fc43c1a3b26730f4097e97921a5f"
-    },
-    {
-      "family": "apps/extension/src/content/drawing <-> apps/extension/src/content/overlay/toolbar",
-      "count": 1,
-      "lines": 12,
-      "sampleFingerprint": "65bb61ab8424ce5da3b8634a9a6404ff21cc5e8266e8cce28c24ab780a9235ea"
-    },
-    {
-      "family": "apps/extension/src/content/selection/frame-runtime",
-      "count": 1,
-      "lines": 12,
-      "sampleFingerprint": "a8aecc935edd218370b3b23d9da63ce6207d6e35bce73568774aad6a769be5cd"
-    },
-    {
-      "family": "apps/extension/src/background/page-access <-> apps/extension/src/background/routing-contracts/runtime-messaging",
-      "count": 1,
-      "lines": 11,
-      "sampleFingerprint": "beb07016e16ddaca52c6b77564fc110c6d7dca2267a35409ebdb173218338b5b"
-    },
-    {
-      "family": "apps/extension/src/composition/persistence/projects",
-      "count": 1,
-      "lines": 11,
-      "sampleFingerprint": "0e5caf98581912b48e3bc724cc5e6e127f3bca439d164a6985fa061de8f8952b"
-    },
-    {
-      "family": "apps/extension/src/ui/highlighter-preset-editor <-> apps/extension/src/ui/surface-style-selector",
-      "count": 1,
-      "lines": 11,
-      "sampleFingerprint": "f0e723f15aabf6b34ff32474fd0bce3ea2244f4e6bc4233858956622a078560a"
-    },
-    {
-      "family": "tooling/qa/composition",
-      "count": 1,
-      "lines": 11,
-      "sampleFingerprint": "58619c0401dca8d3631caa3f3995f036ef3c14754625802ff115eff002ad2f1b"
-    },
-    {
-      "family": "apps/extension/src/composition/persistence/projects <-> apps/extension/src/composition/persistence/web-snapshots",
-      "count": 1,
-      "lines": 10,
-      "sampleFingerprint": "b0b43316f3fc853388bdff64499f522cc277615b2baebe36addd902d7d55596f"
-    },
-    {
-      "family": "apps/extension/src/content/overlay/scenario-recorder",
-      "count": 1,
-      "lines": 10,
-      "sampleFingerprint": "42a8e14a6ae84d9603229a66585c2982f497e23175846978710c2a1ed112ea40"
-    },
-    {
-      "family": "apps/extension/src/content/parser/page-preparation <-> apps/extension/src/features/highlighter/frame-annotation",
-      "count": 1,
-      "lines": 10,
-      "sampleFingerprint": "e4e5c1e14803f609b5e7358b292cd1e5abf113eb9fcfe04611c4be681d340d9a"
-    },
-    {
-      "family": "apps/extension/src/content/parser/web-snapshot <-> apps/extension/src/features/web-snapshot",
-      "count": 1,
-      "lines": 10,
-      "sampleFingerprint": "7cfaa00a1d239a816e3ace5461b3a283347d2d8b4a5a905bf7d16e2c924a352b"
-    },
-    {
-      "family": "apps/extension/src/content/selection/highlighter-hover-preview",
-      "count": 1,
-      "lines": 10,
-      "sampleFingerprint": "36ffb7157235d388604558677040ff6d4e6356fdf4474a9dcfdfad32241a56bf"
-    },
-    {
-      "family": "apps/extension/src/offscreen/recording/geometry <-> packages/runtime-contracts/src",
-      "count": 1,
-      "lines": 10,
-      "sampleFingerprint": "9966528f66d82e80dfd1e44fd5eb6d725b1ed277540f3c5c8b9a7538b7066a60"
-    },
-    {
-      "family": "apps/extension/src/popup/shell/export",
-      "count": 1,
-      "lines": 10,
-      "sampleFingerprint": "14212d998303ef4c205224c4ef04e7e4532b6d9dce7bbcee5b7760c8afac5bad"
-    },
-    {
-      "family": "apps/extension/src/video-editor/project/state",
-      "count": 1,
-      "lines": 10,
-      "sampleFingerprint": "4414b41209bb2f2bbeb99debbcde0f1665bc38269d867e950057bb546de71380"
-    },
-    {
-      "family": "apps/extension/src/video-editor/workspace/sidebar",
-      "count": 1,
-      "lines": 10,
-      "sampleFingerprint": "c0857d37ce5239fbc53636fe141ec856e4647e6bc16eef66e0aebf710081eea5"
-    },
-    {
-      "family": "apps/extension/src/background/capture/native-app",
-      "count": 1,
-      "lines": 9,
-      "sampleFingerprint": "d26fd7f0a04f51d993f5c37ebe210fdb929b8b87faad162b910a1dfaabb8d22b"
-    },
-    {
-      "family": "apps/extension/src/background/frame-annotation-raster <-> apps/extension/src/composition/frame-annotation-raster-client",
-      "count": 1,
-      "lines": 9,
-      "sampleFingerprint": "00bf41e729769acfd5bac208081927b0a3cba7037d9409ac7cc62ab6a42a461e"
-    },
-    {
-      "family": "apps/extension/src/composition/persistence/capture-settings <-> packages/runtime-contracts/src",
-      "count": 1,
-      "lines": 9,
-      "sampleFingerprint": "6f5a9cc811a3fdf921142e846001017fcd6125328dca5784dedb5b4a282939eb"
-    },
-    {
-      "family": "apps/extension/src/composition/persistence/document-assets <-> apps/extension/src/composition/persistence/scenario",
-      "count": 1,
-      "lines": 9,
-      "sampleFingerprint": "6206ce2a9782c8564cf3f6f1a45e5f77f27344819f0fda0585288d6736c155f0"
-    },
-    {
-      "family": "apps/extension/src/composition/persistence/image-workspaces <-> apps/extension/src/composition/persistence/scenario",
-      "count": 1,
-      "lines": 9,
-      "sampleFingerprint": "fc42f20ece5a038a279d617f1cff42e421b386eeda1d9c78f5f3ed3d535d6e6b"
-    },
-    {
-      "family": "apps/extension/src/content/selection/frame-runtime <-> apps/extension/src/features/highlighter/step-badge-presets",
-      "count": 1,
-      "lines": 9,
-      "sampleFingerprint": "f78c3096bdc9e68684dee383142ffc35fceaee259c56bf210da788ed94d3134b"
-    },
-    {
-      "family": "apps/extension/src/editor/inspector/compact <-> apps/extension/src/editor/inspector/environment",
-      "count": 1,
-      "lines": 9,
-      "sampleFingerprint": "62f86acde98a62c0f4154f4bc11d11c90bf48e320c6e62ccbbfef989b8adfcfb"
-    },
-    {
-      "family": "tooling/qa/runtime",
-      "count": 1,
-      "lines": 9,
-      "sampleFingerprint": "4c3aa8433d2dce7d78c40f05880a6e84f9552d863d056800f3574e54a12863cd"
-    },
-    {
-      "family": "apps/extension/src/background/capture/routing",
-      "count": 1,
-      "lines": 8,
-      "sampleFingerprint": "753a87f9cd4bcf566f5bfc7094535d80cd0c4bc7c4277c876302eabfbf4ec099"
-    },
-    {
-      "family": "apps/extension/src/content/parser/page-preparation <-> apps/extension/src/features/web-snapshot",
-      "count": 1,
-      "lines": 8,
-      "sampleFingerprint": "98354b6f2984f7c995115828845f84c1c203ebcfdf1f7363c7f160fd4f1f162e"
-    },
-    {
-      "family": "apps/extension/src/content/selection/interactive-frame",
-      "count": 1,
-      "lines": 8,
-      "sampleFingerprint": "85a688ed4566b1e12c6ce161610d7eaa0ce96d3bd7d2aa8023c68fea26dfd52f"
-    },
-    {
-      "family": "apps/extension/src/editor/drawing/object",
-      "count": 1,
-      "lines": 8,
-      "sampleFingerprint": "31e2a168148413afeb43fe107fd73a889d9e3c882ec655bc07cad79cc17c6379"
-    },
-    {
-      "family": "apps/extension/src/editor/workspace/toolbar",
-      "count": 1,
-      "lines": 8,
-      "sampleFingerprint": "0e787c2c91536b98cc6cb0a8c74bc63e3cd7eea01ab13386622bd81e0276f672"
-    },
-    {
-      "family": "apps/extension/src/popup/shell/app",
-      "count": 1,
-      "lines": 8,
-      "sampleFingerprint": "b466f1206c0a34fa99e90d641e04c459f948892d3e48e23af0f6fbb66570a630"
-    },
-    {
-      "family": "apps/extension/src/background/capture/page-package <-> apps/extension/src/content/parser/web-snapshot",
-      "count": 1,
-      "lines": 7,
-      "sampleFingerprint": "e96bc1ed6dfd6aaf9eef6c65574c576b65cae8d18be043bba58ec7b114d9ebce"
-    },
-    {
-      "family": "apps/extension/src/background/runtime/routing",
-      "count": 1,
-      "lines": 7,
-      "sampleFingerprint": "7ed58cb681a5b250d4bf5cec328d3777eb584e93d91a6261d85db6254d602775"
-    },
-    {
-      "family": "apps/extension/src/content/parser/web-snapshot",
-      "count": 1,
-      "lines": 7,
-      "sampleFingerprint": "ac63f1c7b9febf80816af71373e6a597f936224e44cc77f9533e171754bc2549"
-    },
-    {
-      "family": "apps/extension/src/composition/frame-annotation-controls/step-badge <-> apps/extension/src/ui/highlighter-preset-editor/step-badge",
-      "count": 1,
-      "lines": 6,
-      "sampleFingerprint": "9ac5372f642fbf73d885691eebd7ec8759892eeefc8c63aed1c67ec03efc9884"
-    },
-    {
-      "family": "apps/extension/src/composition/persistence/assets",
-      "count": 1,
-      "lines": 6,
-      "sampleFingerprint": "a56a4e79cc2032f882f4309b7ff2ab0b1d5a24eb8a1b7e0112afbdfac53d0a57"
-    },
-    {
-      "family": "apps/extension/src/content/selection/frame-settings-popover",
-      "count": 1,
-      "lines": 6,
-      "sampleFingerprint": "bca3231afbeca5290ff719e3f95e7d9ec61c7494b31a48140ed5cfa9167c9b3a"
-    },
-    {
-      "family": "apps/extension/src/editor/controller/instance <-> apps/extension/src/editor/controller/magnet",
-      "count": 1,
-      "lines": 6,
-      "sampleFingerprint": "2eba018f1db2797c1d3e1096b04b7647578f7122a145be3c222b83ed13170bd6"
-    },
-    {
-      "family": "apps/extension/src/gallery/library/sidebar <-> apps/extension/src/gallery/shell/app-shell",
-      "count": 1,
-      "lines": 6,
-      "sampleFingerprint": "1d0585948e68b9ba47ce6228265f59d135c8b91424b31ccb6eae1276cb26a990"
+  "$comment": "Every entry is an exact reviewed jscpd finding classified as tool noise. New, changed, stale, malformed, or expired entries fail closed.",
+  "version": 4,
+  "description": "Complete exact-finding jscpd tool-noise baseline after repository-wide triage and justified consolidation.",
+  "allowances": [
+    {
+      "id": "024c4fbd97de3f13f079d0b4b4aea38e66e53dea71e2970840b3f895f2bcc3ed",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/popup/shell/app/startup.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/popup/shell/app/startup.css",
+        "start": 14,
+        "end": 21
+      },
+      "secondFile": {
+        "path": "apps/extension/src/popup/shell/app/startup.css",
+        "start": 24,
+        "end": 31
+      }
+    },
+    {
+      "id": "07e9c86fb0e10c170f1ed23c5a5cfa9c5ef51bbe3a08aee21737a45c34503970",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/content/selection/frame-settings-popover",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/content/selection/frame-settings-popover/controller.ts",
+        "start": 37,
+        "end": 42
+      },
+      "secondFile": {
+        "path": "apps/extension/src/content/selection/frame-settings-popover/state/index.ts",
+        "start": 230,
+        "end": 235
+      }
+    },
+    {
+      "id": "0b8dc445751fbf2ba09d354640c7f133163edada2d201e8f6cb27fe87f2ff7d6",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/glass <-> packages/ui/src/styles/toolbar-shell",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/glass/toolbar-form-layout.css",
+        "start": 98,
+        "end": 109
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/toolbar-shell/button.css",
+        "start": 109,
+        "end": 120
+      }
+    },
+    {
+      "id": "0d73ba1bb2517e8e1d660e99657ee52a8245c95ca86f2d54cc3df6a097c5217f",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/design-system/previews/product-glass-controls",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/design-system/previews/product-glass-controls/preview-builders.tsx",
+        "start": 141,
+        "end": 155
+      },
+      "secondFile": {
+        "path": "apps/extension/src/design-system/previews/product-glass-controls/preview-layout-builders.tsx",
+        "start": 101,
+        "end": 115
+      }
+    },
+    {
+      "id": "13fbf2747777be21dfb44431858f89a8a1bae45a23089d7ed8632522b6e5ced2",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence/library-lifecycle <-> apps/extension/src/features/highlighter/frame-annotation",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/library-lifecycle/parser.ts",
+        "start": 3,
+        "end": 11
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/highlighter/frame-annotation/settings-parser.ts",
+        "start": 1,
+        "end": 9
+      }
+    },
+    {
+      "id": "166f212150af086ffbb9407d20d71c8ed704f17d2db71380623b3a9cd7c5d87c",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/toolbar/legacy-actions.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/toolbar/legacy-actions.css",
+        "start": 167,
+        "end": 172
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/toolbar/legacy-actions.css",
+        "start": 82,
+        "end": 87
+      }
+    },
+    {
+      "id": "18af4429a9eaffc268100aa4ff2dbb3fa6fc6b378c90b973817ead52dbfe875e",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/overlays",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/overlays/ai-modal-overrides/surface.css",
+        "start": 187,
+        "end": 193
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/overlays/menu-surfaces.css",
+        "start": 80,
+        "end": 86
+      }
+    },
+    {
+      "id": "18cb252c89fe625f8b9d57f571c84cab50516c3b90c6d09377604e849a96cbec",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/content-popover <-> packages/ui/src/styles/toolbar",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/content-popover/index.css",
+        "start": 47,
+        "end": 57
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/toolbar/legacy-actions.css",
+        "start": 108,
+        "end": 114
+      }
+    },
+    {
+      "id": "1e6bcf01ce6591cb14f7d63993ac0f1fa1820ab3a06832b30b83854bc6e38b5b",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/design-system/parity/helpers.tsx",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/design-system/parity/helpers.tsx",
+        "start": 43,
+        "end": 61
+      },
+      "secondFile": {
+        "path": "apps/extension/src/design-system/parity/helpers.tsx",
+        "start": 73,
+        "end": 91
+      }
+    },
+    {
+      "id": "1e8c9aa9296c874252f71fc8a84ba3754408a88bd7a0ba50785002339eab7b08",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/settings/sections/styles/annotations",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/callouts/panel.tsx",
+        "start": 45,
+        "end": 52
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/numbering/panel.tsx",
+        "start": 37,
+        "end": 44
+      }
+    },
+    {
+      "id": "222b2753c3b2f66379098ac0f951b16503f71eb9f7214ce6335994598204da18",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/glass/input-controls.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/glass/input-controls.css",
+        "start": 115,
+        "end": 128
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/glass/input-controls.css",
+        "start": 97,
+        "end": 110
+      }
+    },
+    {
+      "id": "22c3c1b594effa6037773fab8dab78a010895b640786cbef95652a1cad9c40e5",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/settings/sections/styles/editor-resources",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/settings/sections/styles/editor-resources/gradients/view.tsx",
+        "start": 25,
+        "end": 61
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/styles/editor-resources/surface-styles/view.tsx",
+        "start": 31,
+        "end": 67
+      }
+    },
+    {
+      "id": "25e9765d69c1f7cfd65a1a62a61275d8664b046e551ffbfd1b89b3f7e9f06e27",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/glass/popover-controls.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/glass/popover-controls.css",
+        "start": 220,
+        "end": 231
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/glass/popover-controls.css",
+        "start": 77,
+        "end": 88
+      }
+    },
+    {
+      "id": "260ff95e205cb77fddb311030ca65cb62aabc1db54c6235c4a745324d766e924",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/frame-annotation-controls",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/callout/body.tsx",
+        "start": 99,
+        "end": 112
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/frame/views.tsx",
+        "start": 136,
+        "end": 149
+      }
+    },
+    {
+      "id": "6fba6fb3ad77f82f095871eb1b1ead30f5cb277c6de6f8e6c1456e0931d8907a",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/offscreen/recording/encoding",
+      "reason": "Standard and live recording owners independently settle terminal promises; sharing the methods would require a mutable lifecycle delegate across authorities.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
+        "start": 203,
+        "end": 216
+      },
+      "secondFile": {
+        "path": "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
+        "start": 663,
+        "end": 676
+      }
+    },
+    {
+      "id": "30f155ac1e21c37a2bc521cb1383eb8878d8e3841c79fbc1082246f6058b4fbf",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/glass <-> packages/ui/src/styles/toolbar-shell",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/glass/toolbar-form-layout.css",
+        "start": 59,
+        "end": 72
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/toolbar-shell/button.css",
+        "start": 62,
+        "end": 75
+      }
+    },
+    {
+      "id": "31ecf1f838e3966d6336980f92a590533285d35a909512074c41b704fa5ac71c",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/content-popover <-> packages/ui/src/styles/toolbar",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/content-popover/index.css",
+        "start": 46,
+        "end": 57
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/toolbar/legacy-actions.css",
+        "start": 41,
+        "end": 52
+      }
+    },
+    {
+      "id": "323fe2b0ff9da3c7b8b7173b270749b773de7db29921c11cf99ffd12498f1710",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/gradient-presets/mutations.ts",
+        "start": 113,
+        "end": 121
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/surface-style-presets/catalog.ts",
+        "start": 177,
+        "end": 185
+      }
+    },
+    {
+      "id": "3352b6538a0ea8d362bc58edbb92e95e3a2ed71a8cdf129bd7c73798ed12d729",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/content/parser/page-preparation/snapshot <-> apps/extension/src/features/web-snapshot",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/content/parser/page-preparation/snapshot/styles.ts",
+        "start": 27,
+        "end": 34
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/web-snapshot/sanitize-css.ts",
+        "start": 483,
+        "end": 490
+      }
+    },
+    {
+      "id": "376caab089c049d01cd9be443e86ca38549110d467213adca90c0c54a842ce5a",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/settings/sections/styles/annotations",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/borders/presets-panel.tsx",
+        "start": 91,
+        "end": 107
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/numbering/panel.tsx",
+        "start": 113,
+        "end": 126
+      }
+    },
+    {
+      "id": "3a67daefe8aff6c92f9cef8dfde2a2196870b696efceca19e24654e713c8e282",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/gradient-presets/parser.ts",
+        "start": 21,
+        "end": 29
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/surface-style-presets/parser.ts",
+        "start": 27,
+        "end": 35
+      }
+    },
+    {
+      "id": "3c091c10f6c1a2422387129250c11ff2cc44d56874ac3c47a5f4b2fab1ab08d9",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/editor/workspace/floating",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/editor/workspace/floating/inspector.tsx",
+        "start": 116,
+        "end": 136
+      },
+      "secondFile": {
+        "path": "apps/extension/src/editor/workspace/floating/overlays.tsx",
+        "start": 20,
+        "end": 40
+      }
+    },
+    {
+      "id": "3d76991f420ea09ed07f443bd23166e24759d57aa5df1b50aa20f1bb87f2705f",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/contracts/messaging/contracts",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/contracts/messaging/contracts/runtime-message/frame-annotation-raster.types.ts",
+        "start": 12,
+        "end": 30
+      },
+      "secondFile": {
+        "path": "apps/extension/src/contracts/messaging/contracts/runtime/actions/core.ts",
+        "start": 322,
+        "end": 340
+      }
+    },
+    {
+      "id": "3febd4469c029199cfb19f8fd579b10b0c6e816581477f5c421a1886339eb67a",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/content-popover <-> packages/ui/src/styles/glass",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/content-popover/index.css",
+        "start": 78,
+        "end": 83
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/glass/popover-controls.css",
+        "start": 164,
+        "end": 169
+      }
+    },
+    {
+      "id": "4014269cc3bb05a56ea9d1962e1c427ed306705b512e4626f5a58d477d619084",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/content/parser/page-preparation/history <-> apps/extension/src/features/highlighter/frame-annotation/callout",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/content/parser/page-preparation/history/frame-session.ts",
+        "start": 26,
+        "end": 35
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/highlighter/frame-annotation/callout/model.ts",
+        "start": 63,
+        "end": 72
+      }
+    },
+    {
+      "id": "4239c37917bdff12dc132c6440118d0b25c77496299d98c1d6c0b0a34290322c",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/editor/drawing/object/controls/arrow.ts",
+      "reason": "Viewport-to-parent and parent-to-viewport coordinate transforms are inverse operations with different terminal algebra; parameterization would hide direction.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/editor/drawing/object/controls/arrow.ts",
+        "start": 22,
+        "end": 29
+      },
+      "secondFile": {
+        "path": "apps/extension/src/editor/drawing/object/controls/arrow.ts",
+        "start": 44,
+        "end": 49
+      }
+    },
+    {
+      "id": "43bace75e7985da37e824e8e0a11bb0dc7929ae696baab9c5f2ba4da1d8d4763",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/content/public/preparation-surface/effects.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/content/public/preparation-surface/effects.css",
+        "start": 121,
+        "end": 134
+      },
+      "secondFile": {
+        "path": "apps/extension/src/content/public/preparation-surface/effects.css",
+        "start": 136,
+        "end": 149
+      }
+    },
+    {
+      "id": "47d29325d2c4f87c5a5476ac2e043e0dc203de0ae6037da601093ab04c5864e6",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/ai-modal/shell.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/ai-modal/shell.css",
+        "start": 39,
+        "end": 44
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/ai-modal/shell.css",
+        "start": 49,
+        "end": 54
+      }
+    },
+    {
+      "id": "482fbde9577864217781f12a3116537871c856c2436746689a11b3bfca91344b",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/popup/recording/video/setup/options <-> apps/extension/src/popup/shell/home/page-shell",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/popup/recording/video/setup/options/preset-selector.tsx",
+        "start": 152,
+        "end": 169
+      },
+      "secondFile": {
+        "path": "apps/extension/src/popup/shell/home/page-shell/setup-fields.tsx",
+        "start": 155,
+        "end": 172
+      }
+    },
+    {
+      "id": "49c9313eb6cd98d8dafadd4cef5924981e0334a0f4f33890f03772e4e13a7146",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/feedback <-> packages/ui/src/styles/overlays",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/feedback/index.css",
+        "start": 67,
+        "end": 72
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/overlays/countdown.css",
+        "start": 43,
+        "end": 48
+      }
+    },
+    {
+      "id": "4acc9c9d86f7f39c176c342ac1e9fb7efa4f847b66a600c2d51ba3ed7c1a0e9d",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/frame-annotation-controls/frame/views.tsx",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/frame/views.tsx",
+        "start": 235,
+        "end": 251
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/frame/views.tsx",
+        "start": 456,
+        "end": 472
+      }
+    },
+    {
+      "id": "4ad0d0b8cb57cb407d1756b425cdf12a09a499b75d5f12584ef8efe1029b4eb2",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/editor/controller/instance",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/editor/controller/instance/helpers/viewport.ts",
+        "start": 58,
+        "end": 64
+      },
+      "secondFile": {
+        "path": "apps/extension/src/editor/controller/instance/types/actions.ts",
+        "start": 129,
+        "end": 134
+      }
+    },
+    {
+      "id": "4d2d7eef8351fb744546d5951873ef99e6aea43c24af883e7e7fce390b87a111",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/settings/sections/styles/annotations",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/callouts/types.ts",
+        "start": 25,
+        "end": 31
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/numbering/types.ts",
+        "start": 20,
+        "end": 26
+      }
+    },
+    {
+      "id": "4d3c09631c2f696320fa9787ded7b5cefdf4912306e30fbf0681ef936f8e7236",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/content-popover/index.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/content-popover/index.css",
+        "start": 213,
+        "end": 223
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/content-popover/index.css",
+        "start": 231,
+        "end": 241
+      }
+    },
+    {
+      "id": "50a4e27a85c14ad4a94b84f9814518685d1c18106fe0f1ba2aa2dece22e45148",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/toolbar-shell <-> packages/ui/src/styles/toolbar/transient",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/toolbar-shell/button.css",
+        "start": 142,
+        "end": 147
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/toolbar/transient/menus.css",
+        "start": 109,
+        "end": 114
+      }
+    },
+    {
+      "id": "52c5a49380c71030a2caadc5b19602a4f75e7f5dbf4c41508165a8694469a221",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/content/parser/web-snapshot <-> apps/extension/src/features/web-snapshot",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/content/parser/web-snapshot/asset-fetch.ts",
+        "start": 38,
+        "end": 47
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/web-snapshot/asset-manifest.ts",
+        "start": 96,
+        "end": 106
+      }
+    },
+    {
+      "id": "54860684b05619a55457ff84ae2127832ca218a1896e3d26fec0a68d8f554904",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/content/parser/export-manager/diagnostics",
+      "reason": "The DOM sanitizer deliberately adds long-value redaction absent from the metadata sanitizer; the matching prefix is not one shared policy.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/content/parser/export-manager/diagnostics/extended-evidence.dom.ts",
+        "start": 41,
+        "end": 47
+      },
+      "secondFile": {
+        "path": "apps/extension/src/content/parser/export-manager/diagnostics/extended-evidence.ts",
+        "start": 42,
+        "end": 48
+      }
+    },
+    {
+      "id": "5863d9b94b74024d0000aa996bbb8f8f4c5a58d07d7ee82826f7ffc659561e19",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/glass <-> packages/ui/src/styles/toolbar-shell",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/glass/toolbar-form-layout.css",
+        "start": 122,
+        "end": 129
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/toolbar-shell/vertical.css",
+        "start": 94,
+        "end": 101
+      }
+    },
+    {
+      "id": "5a7bc6618eb1747f55fa8869f6388f34224d719f345944e5a1fb13f5cc933d35",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/overlays/ai-modal-overrides/surface.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/overlays/ai-modal-overrides/surface.css",
+        "start": 108,
+        "end": 123
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/overlays/ai-modal-overrides/surface.css",
+        "start": 293,
+        "end": 308
+      }
+    },
+    {
+      "id": "5ad5052f6f29d34588e357a2cbce1b408efb957ded7013df672f565e304c00c8",
+      "classification": "tool-noise",
+      "owner": "tooling/web-snapshot-smoke/runtime <-> tooling/web-snapshot-smoke/runtime",
+      "reason": "Polygon and full-snapshot smoke entrypoints own different manifest mutation and launch flows; the matching Chromium option tail is declarative launch configuration.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "tooling/web-snapshot-smoke/runtime/polygon-runner.mjs",
+        "start": 41,
+        "end": 55
+      },
+      "secondFile": {
+        "path": "tooling/web-snapshot-smoke/runtime/runner.mjs",
+        "start": 189,
+        "end": 202
+      }
+    },
+    {
+      "id": "5ae95bc84c12217b43f48441101a00745870b46194442fbf2e88f6e7c175b946",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/settings/sections/styles/annotations",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/callouts/controller.ts",
+        "start": 151,
+        "end": 163
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/numbering/controller.ts",
+        "start": 46,
+        "end": 57
+      }
+    },
+    {
+      "id": "5d181690bb7dd4950dfb7566aea7cccafd02499b337c54357393c03de0c0b05a",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/ui/highlighter-preset-editor",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/ui/highlighter-preset-editor/callout/inspector-fields.tsx",
+        "start": 95,
+        "end": 113
+      },
+      "secondFile": {
+        "path": "apps/extension/src/ui/highlighter-preset-editor/step-badge/inspector.tsx",
+        "start": 74,
+        "end": 92
+      }
+    },
+    {
+      "id": "5e790acfa059d2932dfc98ba74b6cf1eed81062b9954f52872944acfc456d2a9",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/toolbar/legacy-actions.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/toolbar/legacy-actions.css",
+        "start": 123,
+        "end": 134
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/toolbar/legacy-actions.css",
+        "start": 58,
+        "end": 69
+      }
+    },
+    {
+      "id": "5e981144b2d87d1a49a5ec8f99422b51bb8bf3a63915f1da27aed4dbf87f445d",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/projects/backup-restore.ts",
+        "start": 84,
+        "end": 94
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/scenario/backup-restore.ts",
+        "start": 66,
+        "end": 76
+      }
+    },
+    {
+      "id": "605ce7fc3f3bff0ab6134979f0dd1d73ff89243e6e69f99dc3430161d0fadd7c",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/settings/sections/styles/annotations",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/borders/presets-panel.tsx",
+        "start": 108,
+        "end": 119
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/callouts/panel.tsx",
+        "start": 135,
+        "end": 146
+      }
+    },
+    {
+      "id": "6556915808f6ab898d217174f402aa88ed0affb4a6b3af5fc4db13682b8e8d5d",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/background/page-access <-> apps/extension/src/background/routing-contracts/runtime-messaging",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/background/page-access/readiness.ts",
+        "start": 20,
+        "end": 30
+      },
+      "secondFile": {
+        "path": "apps/extension/src/background/routing-contracts/runtime-messaging/content-toolbar-readiness.ts",
+        "start": 17,
+        "end": 27
+      }
+    },
+    {
+      "id": "65ba1a8dc4d7784929d20b848556c6a234fa983f114c76fe7989c6cd97d38de3",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/popup-shell <-> packages/ui/src/styles/product-form-controls",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/popup-shell/select.css",
+        "start": 13,
+        "end": 19
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/product-form-controls/select.css",
+        "start": 17,
+        "end": 23
+      }
+    },
+    {
+      "id": "65c209308efe5dfc2e4240e5d2463b772113ddcf2bd079cc19a1aa3bd7484da9",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/content/parser",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/content/parser/page-preparation/snapshot/sanitizer.ts",
+        "start": 150,
+        "end": 162
+      },
+      "secondFile": {
+        "path": "apps/extension/src/content/parser/web-snapshot/stylesheet-assets.ts",
+        "start": 9,
+        "end": 21
+      }
+    },
+    {
+      "id": "660e1a945e63ab4b664b39bd49b02c060d60cff88cebe6904db87a7138c35511",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/content-popover/index.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/content-popover/index.css",
+        "start": 254,
+        "end": 261
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/content-popover/index.css",
+        "start": 9,
+        "end": 16
+      }
+    },
+    {
+      "id": "66a204a9090a5eae5ecc85f81bbb31eaa6a68363f4257c336635a4387d5fc16e",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/features/editor/document/rich-shape/catalog/geometry/decorative.ts",
+      "reason": "Equal and not-equal rich-shape catalogs intentionally repeat two bar polygons and differ by the slash glyph; the coordinates are declarative product geometry.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/features/editor/document/rich-shape/catalog/geometry/decorative.ts",
+        "start": 12,
+        "end": 24
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/editor/document/rich-shape/catalog/geometry/decorative.ts",
+        "start": 26,
+        "end": 38
+      }
+    },
+    {
+      "id": "6709a0c88ba3b6fa72482d2e128c3030ff5da7b4340b4841bc70dfc4eae2045e",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/frame-annotation-controls",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/callout/popover.tsx",
+        "start": 157,
+        "end": 174
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/step-badge/popover.tsx",
+        "start": 165,
+        "end": 182
+      }
+    },
+    {
+      "id": "67cdc039af13efda91f2954300ee8918f61bcf57645aec8f2780e633d9e71c03",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/ai-modal-content",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/ai-modal-content/preview-actions.css",
+        "start": 50,
+        "end": 56
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/ai-modal-content/template-menu.css",
+        "start": 196,
+        "end": 202
+      }
+    },
+    {
+      "id": "6870b11e1975db2d95ed484f3d5201c777bf3da42f6c21472f65a821a90654a1",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/offscreen/recording/encoding",
+      "reason": "Standard and live finalizers remain separate resource and lifecycle authorities; sharing the tail would require a cross-owner callbacks/state bag.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
+        "start": 151,
+        "end": 165
+      },
+      "secondFile": {
+        "path": "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
+        "start": 426,
+        "end": 440
+      }
+    },
+    {
+      "id": "68767f11d20cf8efcbb5b6a1a0d513e34a42876fabcc63978bfc1db6c281a395",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/settings/sections/styles/editor-resources",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/settings/sections/styles/editor-resources/gradients/editor.tsx",
+        "start": 97,
+        "end": 107
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/styles/editor-resources/surface-styles/editor.tsx",
+        "start": 100,
+        "end": 110
+      }
+    },
+    {
+      "id": "68b763a3637b60a34425bb36e2b7dc94a4748806dc21afb244d0426952988c7a",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/editor/controller",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/editor/controller/instance/types/actions.ts",
+        "start": 129,
+        "end": 134
+      },
+      "secondFile": {
+        "path": "apps/extension/src/editor/controller/magnet/manager.ts",
+        "start": 15,
+        "end": 20
+      }
+    },
+    {
+      "id": "6a6480e91b73af5442b1a7cebbc670e2324ef6c3eb7cfca96413302b697b208b",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence/library-lifecycle <-> apps/extension/src/features/highlighter/frame-annotation",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/library-lifecycle/parser.ts",
+        "start": 3,
+        "end": 9
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/highlighter/frame-annotation/parser.ts",
+        "start": 115,
+        "end": 121
+      }
+    },
+    {
+      "id": "6bc551869bfff0e5bde3062dd65bcfe5bf2e48b018573db269a4b32c0101623a",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/content/overlay/scenario-recorder/sidebar/surface.tsx",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/content/overlay/scenario-recorder/sidebar/surface.tsx",
+        "start": 101,
+        "end": 110
+      },
+      "secondFile": {
+        "path": "apps/extension/src/content/overlay/scenario-recorder/sidebar/surface.tsx",
+        "start": 147,
+        "end": 156
+      }
+    },
+    {
+      "id": "71d4f4ea17a7e8018661bbb0fff278c730b76c03aa99609ab9cfbb43651df225",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/glass/popover-controls.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/glass/popover-controls.css",
+        "start": 10,
+        "end": 16
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/glass/popover-controls.css",
+        "start": 144,
+        "end": 150
+      }
+    },
+    {
+      "id": "7365fb62b4a7db9ae4ccf21488d0d18019c41bca8a5510f7d6324648f9513fbd",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/content/public/preparation-surface/effects.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/content/public/preparation-surface/effects.css",
+        "start": 110,
+        "end": 119
+      },
+      "secondFile": {
+        "path": "apps/extension/src/content/public/preparation-surface/effects.css",
+        "start": 124,
+        "end": 133
+      }
+    },
+    {
+      "id": "77d61d1bf2a6ae55ca714ff1c677cb400afa4d34c379a92ae61c04ed44b4ac7b",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/content-popover/index.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/content-popover/index.css",
+        "start": 180,
+        "end": 188
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/content-popover/index.css",
+        "start": 197,
+        "end": 205
+      }
+    },
+    {
+      "id": "787c91076675fb5373282d754519343b853eb9015f29bd357ce1bd3b78a80789",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/offscreen/recording/encoding",
+      "reason": "MediaRecorder and live encoder session owners have independent lifecycle and state authorities; their matching terminal initialization is not a shared controller.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
+        "start": 61,
+        "end": 70
+      },
+      "secondFile": {
+        "path": "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
+        "start": 233,
+        "end": 243
+      }
+    },
+    {
+      "id": "79fee99b537268e7a057172b1246e62f439b82a3543f5db158709c1de5f198fc",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/ai-modal-content/fields.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/ai-modal-content/fields.css",
+        "start": 155,
+        "end": 162
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/ai-modal-content/fields.css",
+        "start": 45,
+        "end": 52
+      }
+    },
+    {
+      "id": "7f3e43228bbd0ae78c12c2eabbe8c3dd1cc7a6223fca1f65257e69b691e7de92",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/frame-annotation-controls",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/callout/styles.css",
+        "start": 68,
+        "end": 81
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/frame/styles.css",
+        "start": 46,
+        "end": 59
+      }
+    },
+    {
+      "id": "8015e1eb1adf9f119998419579406005c8eb4b76bb6cc88db48f0a0d6378a036",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/foundation.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/foundation.css",
+        "start": 59,
+        "end": 65
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/foundation.css",
+        "start": 66,
+        "end": 72
+      }
+    },
+    {
+      "id": "81a343e3511daced48c8bd325b5461c2470f7e6610fca522acc106d8d03d800a",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/frame-annotation-controls",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/callout/body.tsx",
+        "start": 99,
+        "end": 113
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/step-badge/body.tsx",
+        "start": 107,
+        "end": 121
+      }
+    },
+    {
+      "id": "842bb5d011c7620a567dbd6d546c45b8cc298617dd254a9f36e714f91c7dccd0",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/settings/sections/styles/editor-resources",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/settings/sections/styles/editor-resources/gradients/view.tsx",
+        "start": 82,
+        "end": 89
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/styles/editor-resources/surface-styles/view.tsx",
+        "start": 88,
+        "end": 95
+      }
+    },
+    {
+      "id": "87499ab0d069338012e206e4e81a837a21757ac80a4790e0fcdfa66d539a1d35",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/settings/sections/styles/annotations",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/callouts/panel.tsx",
+        "start": 58,
+        "end": 77
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/numbering/panel.tsx",
+        "start": 51,
+        "end": 70
+      }
+    },
+    {
+      "id": "88dc6ad10d1acff30967185af3e4143ce7e7a9b01c992e6977db305afcec353c",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/product-form-controls/range.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/product-form-controls/range.css",
+        "start": 103,
+        "end": 116
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/product-form-controls/range.css",
+        "start": 75,
+        "end": 88
+      }
+    },
+    {
+      "id": "8b591fe6edbc7b1760ef4e0fb86577af0cfd0055a7958cf40154e7c4e030424b",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/ui/highlighter-preset-editor <-> apps/extension/src/ui/surface-style-selector",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/ui/highlighter-preset-editor/modal-lifecycle.ts",
+        "start": 77,
+        "end": 87
+      },
+      "secondFile": {
+        "path": "apps/extension/src/ui/surface-style-selector/layer-lifecycle.ts",
+        "start": 79,
+        "end": 90
+      }
+    },
+    {
+      "id": "8bfbd270afcb8a46031bb10bd89a3368f55d797ab53711425938649fa055f3c9",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/features/video/composition/draw/fitted-media.ts",
+      "reason": "Source-to-frame and frame-to-source mappings are explicit inverse public geometry operations; mirrored setup keeps direction and rounding visible.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/features/video/composition/draw/fitted-media.ts",
+        "start": 111,
+        "end": 123
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/video/composition/draw/fitted-media.ts",
+        "start": 94,
+        "end": 106
+      }
+    },
+    {
+      "id": "8c5c68f747aad9ca0512d61301d31b9abecd774721f0ba22ae48cf02ae3fa3dd",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/features/highlighter/frame-annotation/settings-parser.ts",
+      "reason": "Separate annotation schemas validate a common typography subset inside distinct complete hostile-boundary contracts; extraction would create partial validation authority.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/features/highlighter/frame-annotation/settings-parser.ts",
+        "start": 364,
+        "end": 370
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/highlighter/frame-annotation/settings-parser.ts",
+        "start": 402,
+        "end": 407
+      }
+    },
+    {
+      "id": "929dfd5e208fff568e681c9d12e39ae4e75fb245a5497f317004d3091f74601d",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/content-popover <-> packages/ui/src/styles/glass",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/content-popover/index.css",
+        "start": 83,
+        "end": 93
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/glass/popover-controls.css",
+        "start": 169,
+        "end": 179
+      }
+    },
+    {
+      "id": "92c465654b53e16df9ffa44de355209a1f9a13a7f2f9fc3be429d00cc744f809",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/editor/controller/document/interaction-controls <-> apps/extension/src/editor/drawing/object/controls",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/editor/controller/document/interaction-controls/rotate.ts",
+        "start": 26,
+        "end": 42
+      },
+      "secondFile": {
+        "path": "apps/extension/src/editor/drawing/object/controls/chrome.ts",
+        "start": 53,
+        "end": 69
+      }
+    },
+    {
+      "id": "94bbcda7ac44e16097da7f125e0b15af19fad3777a14915266b73255841e2c33",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/design-system/parity/helpers.tsx",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/design-system/parity/helpers.tsx",
+        "start": 16,
+        "end": 32
+      },
+      "secondFile": {
+        "path": "apps/extension/src/design-system/parity/helpers.tsx",
+        "start": 45,
+        "end": 61
+      }
+    },
+    {
+      "id": "94cf22cbdc0762c3e4b2cc10c0f468dadd1c0ecc2cf848b1e354ca70d9d9d4b9",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/content-popover <-> packages/ui/src/styles/toolbar",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/content-popover/index.css",
+        "start": 62,
+        "end": 73
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/toolbar/legacy-actions.css",
+        "start": 58,
+        "end": 69
+      }
+    },
+    {
+      "id": "95967b1e6f64bea02314c18afa800a6c4cb16a1bda0d4e0d84a62cfcdf3d357c",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/glass/popover-controls.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/glass/popover-controls.css",
+        "start": 209,
+        "end": 220
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/glass/popover-controls.css",
+        "start": 62,
+        "end": 73
+      }
+    },
+    {
+      "id": "967d7a0c6589649515e958b57016bb01ab262b3cec089c7e71bcdab35b37f1a4",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/overlays/ai-modal-overrides <-> packages/ui/src/styles/toolbar",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/overlays/ai-modal-overrides/surface.css",
+        "start": 186,
+        "end": 193
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/toolbar/menu-items.css",
+        "start": 161,
+        "end": 168
+      }
+    },
+    {
+      "id": "98d8d4e01939e28b2590fd3e2203c317e1a3787ed43ed4b37efa9df2c488646d",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/ai-modal-content/preview-actions.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/ai-modal-content/preview-actions.css",
+        "start": 142,
+        "end": 149
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/ai-modal-content/preview-actions.css",
+        "start": 16,
+        "end": 23
+      }
+    },
+    {
+      "id": "990bcb7c4cc687f50f56335fa3707cfa0e6f3c9a74c333753f13a6214a4e12c5",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/workflows/media-hub-backup/v6/root-codecs/editor-document.ts",
+      "reason": "Portable editor-document projection and restoration are inverse recursive traversals with different binary-field terminal operations.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/workflows/media-hub-backup/v6/root-codecs/editor-document.ts",
+        "start": 121,
+        "end": 126
+      },
+      "secondFile": {
+        "path": "apps/extension/src/workflows/media-hub-backup/v6/root-codecs/editor-document.ts",
+        "start": 44,
+        "end": 49
+      }
+    },
+    {
+      "id": "99c465b1e25a775da3304f7fbd6d50b05115d3c356c63a89b5bcb2536d383642",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/background/page-access/service-actions.ts",
+      "reason": "Grant and register-existing page-access routes repeat permission preconditions but own different privileged effects and rollback paths.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/background/page-access/service-actions.ts",
+        "start": 170,
+        "end": 183
+      },
+      "secondFile": {
+        "path": "apps/extension/src/background/page-access/service-actions.ts",
+        "start": 64,
+        "end": 77
+      }
+    },
+    {
+      "id": "9a44d6609cc3ee880d8f8e5f7ca5e200a03001c282f4431cba12a95cedd6a665",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/content-popover <-> packages/ui/src/styles/glass",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/content-popover/index.css",
+        "start": 156,
+        "end": 162
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/glass/input-controls.css",
+        "start": 78,
+        "end": 81
+      }
+    },
+    {
+      "id": "9cab0b82a006fe804bd2ca38a30572e9e63b4d9290fdc7fb505462bb14d670a1",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/content-popover/index.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/content-popover/index.css",
+        "start": 156,
+        "end": 165
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/content-popover/index.css",
+        "start": 188,
+        "end": 197
+      }
+    },
+    {
+      "id": "9e2d73dafeb68f7eb61b52d01bcf85c9b09cc19c1081141135073f3e15c24799",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/offscreen/recording",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/offscreen/recording/encoding/live-video-encoder-pump.ts",
+        "start": 43,
+        "end": 56
+      },
+      "secondFile": {
+        "path": "apps/extension/src/offscreen/recording/stream/frame-pump.ts",
+        "start": 8,
+        "end": 21
+      }
+    },
+    {
+      "id": "9e6e28cc4b50cfd2db91d7e3638a58f00805029ca7f4adf0cc8fa2eec9c555dd",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/content-popover <-> packages/ui/src/styles/glass",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/content-popover/index.css",
+        "start": 94,
+        "end": 105
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/glass/popover-controls.css",
+        "start": 179,
+        "end": 189
+      }
+    },
+    {
+      "id": "9f1f7c5222b8590c72a23ee80f58cb6d27dd51ac0407270804605de12ba57735",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/settings/sections/styles",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/numbering/panel.tsx",
+        "start": 74,
+        "end": 82
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/styles/editor-resources/surface-styles/view.tsx",
+        "start": 63,
+        "end": 71
+      }
+    },
+    {
+      "id": "a1cb256d0ee6981f0c8055d0e59d8b2b82ba0039cac8d4992b53e252b8d69a2e",
+      "classification": "tool-noise",
+      "owner": "packages/runtime-contracts/src/export <-> packages/runtime-contracts/src/page-package",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/runtime-contracts/src/export/index.ts",
+        "start": 212,
+        "end": 224
+      },
+      "secondFile": {
+        "path": "packages/runtime-contracts/src/page-package/contracts.ts",
+        "start": 229,
+        "end": 241
+      }
+    },
+    {
+      "id": "a1fef2c65d557db47cdbecf4cfd7f30a48d1d72713e57a5ca88bad68c2a29225",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/ui/highlighter-preset-editor",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/ui/highlighter-preset-editor/callout/index.tsx",
+        "start": 174,
+        "end": 191
+      },
+      "secondFile": {
+        "path": "apps/extension/src/ui/highlighter-preset-editor/step-badge/index.tsx",
+        "start": 260,
+        "end": 277
+      }
+    },
+    {
+      "id": "a3ce8e8a5fdf6b433589ec0151c8580d4781620f45aaba9ec97e629e7a5a886c",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/gradient-presets/parser.ts",
+        "start": 35,
+        "end": 41
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/surface-style-presets/parser.ts",
+        "start": 40,
+        "end": 46
+      }
+    },
+    {
+      "id": "a50db19c9bbab0edeea2dba49075eb940c0c8cea0752e107130f09e2ebf738ae",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence/scenario/projects",
+      "reason": "Scenario v2 and v3 save functions are separate versioned public contracts; the repeated option projection preserves explicit version typing.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/scenario/projects/project-v3.ts",
+        "start": 15,
+        "end": 23
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/scenario/projects/project.ts",
+        "start": 22,
+        "end": 30
+      }
+    },
+    {
+      "id": "a5586851cb28e9a0a6560f6658f82ac8b9c15dec9c9bda1144c6b8484614daeb",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/glass/input-controls.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/glass/input-controls.css",
+        "start": 110,
+        "end": 115
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/glass/input-controls.css",
+        "start": 78,
+        "end": 83
+      }
+    },
+    {
+      "id": "a58936555a10ce96c872d3cc780bcf83a42866b6b468440cdc71f798e5f9b0d1",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/workflows/media-hub-backup/v6/root-publication",
+      "reason": "Parallel import and owner-local declaration shape; extracting it would create a facade without removing runtime behavior.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/workflows/media-hub-backup/v6/root-publication/scenario-project.ts",
+        "start": 29,
+        "end": 41
+      },
+      "secondFile": {
+        "path": "apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project.ts",
+        "start": 26,
+        "end": 38
+      }
+    },
+    {
+      "id": "a5baa8d27119bddaf4657e4e71a489887d9b030de8ade19317b2de77dfdb1562",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/glass",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/glass/popover-controls.css",
+        "start": 77,
+        "end": 88
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/glass/toolbar-form-layout.css",
+        "start": 98,
+        "end": 109
+      }
+    },
+    {
+      "id": "a7727652388e5ea51e22ed5802b8af74b25d6607f97b2df774e16634ab28fe86",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/frame-annotation-controls",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/callout/body.tsx",
+        "start": 58,
+        "end": 81
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/step-badge/body.tsx",
+        "start": 65,
+        "end": 89
+      }
+    },
+    {
+      "id": "a783ba0f437722feb3bffacc3d99e51031e6c53cc7aca052413a9665e2ca65be",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/content/public/preparation-surface/styles.ts",
+      "reason": "Declaration-colon and scope-normalization scanners track different grammar states and terminal tokens; a callback scanner would obscure parser semantics.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/content/public/preparation-surface/styles.ts",
+        "start": 161,
+        "end": 179
+      },
+      "secondFile": {
+        "path": "apps/extension/src/content/public/preparation-surface/styles.ts",
+        "start": 214,
+        "end": 233
+      }
+    },
+    {
+      "id": "ab68bab4f87cc64bdee1e5496e4beb3cd285571b367f68fc9d543ae1ae31aa5d",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/editor/workspace/toolbar",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/editor/workspace/toolbar/section-helpers.tsx",
+        "start": 47,
+        "end": 54
+      },
+      "secondFile": {
+        "path": "apps/extension/src/editor/workspace/toolbar/sections.tsx",
+        "start": 85,
+        "end": 92
+      }
+    },
+    {
+      "id": "aba4c8b91a70db3f553ff9bcbe7b17d4fdcaa1fb63e99da87549d13b51f968a1",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/settings/sections",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/settings/sections/capture/saving/state/helpers.ts",
+        "start": 35,
+        "end": 48
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/borders/helpers.ts",
+        "start": 25,
+        "end": 38
+      }
+    },
+    {
+      "id": "ada11943928322bed9cd1f7a829a8749945b08a1711aeff26d3bd01873292631",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/frame-annotation-controls/frame/views.tsx",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/frame/views.tsx",
+        "start": 238,
+        "end": 252
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/frame/views.tsx",
+        "start": 459,
+        "end": 473
+      }
+    },
+    {
+      "id": "b03d85213301fff7a839844459a273cbe2c07480c17c76125f76e67d3d76f0f3",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/content-popover <-> packages/ui/src/styles/toolbar/transient",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/content-popover/surface.css",
+        "start": 89,
+        "end": 97
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/toolbar/transient/feedback.css",
+        "start": 59,
+        "end": 64
+      }
+    },
+    {
+      "id": "b074aa91b89d7d1cfd07218eb0d0b67355602f4ebd32b0a0df45ca30e7eba0bd",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/ai-modal/shell.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/ai-modal/shell.css",
+        "start": 40,
+        "end": 45
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/ai-modal/shell.css",
+        "start": 76,
+        "end": 81
+      }
+    },
+    {
+      "id": "b22fcb3a7935262c286b29f8302c18df2cbbbbb166ef30b38e70f33cc9148ca8",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/offscreen/recording/geometry <-> packages/runtime-contracts/src/video/types",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/offscreen/recording/geometry/plan.ts",
+        "start": 35,
+        "end": 44
+      },
+      "secondFile": {
+        "path": "packages/runtime-contracts/src/video/types/output-profile.ts",
+        "start": 65,
+        "end": 73
+      }
+    },
+    {
+      "id": "b2455c4ea6d25a6bc2d68bac285cc95705f315c449f818ea0f8450e5d5b392ff",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/frame-annotation-controls",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/callout/views.tsx",
+        "start": 94,
+        "end": 105
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/step-badge/preset-list.tsx",
+        "start": 86,
+        "end": 99
+      }
+    },
+    {
+      "id": "b43c315f07b3cd57a4c3af24029e8425493d4009ac3ab649ebe02381e506163e",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/product-form-controls/range.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/product-form-controls/range.css",
+        "start": 128,
+        "end": 143
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/product-form-controls/range.css",
+        "start": 157,
+        "end": 172
+      }
+    },
+    {
+      "id": "bccb38d35876f9070033987a3ea90d9c01b10f9d049f7c1020ac9db1023e2104",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/settings/sections/styles/annotations",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/callouts/panel.tsx",
+        "start": 83,
+        "end": 98
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/numbering/panel.tsx",
+        "start": 77,
+        "end": 92
+      }
+    },
+    {
+      "id": "bd88e9338f65b60f20847677dd5dca7a83b52507650aa5d2c034db256cbaef79",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/popup/shell/export",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/popup/shell/export/data-type/section.tsx",
+        "start": 131,
+        "end": 140
+      },
+      "secondFile": {
+        "path": "apps/extension/src/popup/shell/export/ready/index.tsx",
+        "start": 243,
+        "end": 252
+      }
+    },
+    {
+      "id": "bf32b75256f87b0c11dcbef765fa5ba2d1cd394e7bc51b7d3cb4f9cbb8ee15ea",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/ai-modal-content/template-menu.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/ai-modal-content/template-menu.css",
+        "start": 196,
+        "end": 203
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/ai-modal-content/template-menu.css",
+        "start": 212,
+        "end": 219
+      }
+    },
+    {
+      "id": "c1c080519524ad7325d7da4a168eebbe2d8398b2fca2f5e9de04b26fd083e0da",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/editor/controller/instance/helpers/viewport.ts",
+      "reason": "Move and resize snapping share workspace lookup but invoke different magnet and grid algorithms with different result invariants.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/editor/controller/instance/helpers/viewport.ts",
+        "start": 30,
+        "end": 35
+      },
+      "secondFile": {
+        "path": "apps/extension/src/editor/controller/instance/helpers/viewport.ts",
+        "start": 61,
+        "end": 66
+      }
+    },
+    {
+      "id": "c500ec86924ff1c6e90c42e4ce78c8e6e4fc82a823484829e18a069d8164c53d",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/frame-annotation-controls",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/callout/views.tsx",
+        "start": 134,
+        "end": 148
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/step-badge/preset-list.tsx",
+        "start": 122,
+        "end": 136
+      }
+    },
+    {
+      "id": "c656da8debcef61d853a85dc16fd8499d6767337610f80f3997485b4135bde60",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/features/web-snapshot <-> packages/runtime-contracts/src/validation",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/features/web-snapshot/screenshot-validation.ts",
+        "start": 40,
+        "end": 52
+      },
+      "secondFile": {
+        "path": "packages/runtime-contracts/src/validation/data-url.ts",
+        "start": 102,
+        "end": 114
+      }
+    },
+    {
+      "id": "c7b1832072d177e6df0e5a9784d4cee6383538e8d175c187a5d8c117824b58e9",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence/capture-settings <-> packages/runtime-contracts/src/video/types",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/capture-settings/guards.ts",
+        "start": 83,
+        "end": 91
+      },
+      "secondFile": {
+        "path": "packages/runtime-contracts/src/video/types/messages.surface.ts",
+        "start": 134,
+        "end": 142
+      }
+    },
+    {
+      "id": "c8edeeab4c01da5b7fb05e92328ff3b54158548207f0e8fcff4880cdfcbefb18",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/settings/sections/styles/editor-resources",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/settings/sections/styles/editor-resources/gradients/editor.tsx",
+        "start": 49,
+        "end": 72
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/styles/editor-resources/surface-styles/editor.tsx",
+        "start": 40,
+        "end": 63
+      }
+    },
+    {
+      "id": "ca5e14dba8bd6b026c397cea651f5a93a9e4b95c8c73cce6f31a0a9a70cde044",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/content/selection/interactive-frame/controller/types.ts",
+      "reason": "Listener and handler configs expose overlapping refs to different consumers; extracting the intersection would create a broad props/state bag.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/content/selection/interactive-frame/controller/types.ts",
+        "start": 54,
+        "end": 61
+      },
+      "secondFile": {
+        "path": "apps/extension/src/content/selection/interactive-frame/controller/types.ts",
+        "start": 73,
+        "end": 80
+      }
+    },
+    {
+      "id": "ca9d5fc8c61d7bddfb059fdd0b1b100ea443a6d5cb0dcbcfff151d613eebef35",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/glass <-> packages/ui/src/styles/toolbar-shell",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/glass/popover-controls.css",
+        "start": 62,
+        "end": 73
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/toolbar-shell/button.css",
+        "start": 93,
+        "end": 104
+      }
+    },
+    {
+      "id": "caf4f9951f215e8dbdc4baad65079849f0c53a395e0201a368ee56da5e2c3c98",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/frame-annotation-controls/frame/views.tsx",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/frame/views.tsx",
+        "start": 237,
+        "end": 248
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/frame/views.tsx",
+        "start": 91,
+        "end": 102
+      }
+    },
+    {
+      "id": "cb706ceb56eb7256898bccd3a6bccbce9df622bb9aede26a6fc2317f8b02617b",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/glass/input-controls.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/glass/input-controls.css",
+        "start": 130,
+        "end": 143
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/glass/input-controls.css",
+        "start": 163,
+        "end": 176
+      }
+    },
+    {
+      "id": "cbb432ee90c3089981315db2502f0dbabb3caedf53cbbd1e5e94503191c03d32",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/settings/sections/styles/annotations",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/callouts/panel.tsx",
+        "start": 34,
+        "end": 45
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/numbering/panel.tsx",
+        "start": 26,
+        "end": 37
+      }
+    },
+    {
+      "id": "cda58e96d82511f013e73202bebb74fd5b1f7a47cad175d3edae112643c8199d",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/callout-presets/storage.ts",
+        "start": 22,
+        "end": 36
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/highlighter/mutation-write.ts",
+        "start": 37,
+        "end": 51
+      }
+    },
+    {
+      "id": "cf0bdf54418b6e5cd3a4903c27d4612fe9878a21ad49f519a105b41ca0e355bc",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/workflows/media-hub-backup/v6/root-publication",
+      "reason": "Scenario and video publication transactions have different store sets, retained-asset accounting, and rollback roots; callback extraction would hide transaction authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/workflows/media-hub-backup/v6/root-publication/scenario-project.ts",
+        "start": 298,
+        "end": 325
+      },
+      "secondFile": {
+        "path": "apps/extension/src/workflows/media-hub-backup/v6/root-publication/video-project.ts",
+        "start": 230,
+        "end": 256
+      }
+    },
+    {
+      "id": "cf103a84c4454aeed067403209c1427fae723b4a7cd5615408f1873b8b9e9880",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/ui/popup-shell/inline-curtain/select.tsx",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/ui/popup-shell/inline-curtain/select.tsx",
+        "start": 189,
+        "end": 201
+      },
+      "secondFile": {
+        "path": "apps/extension/src/ui/popup-shell/inline-curtain/select.tsx",
+        "start": 347,
+        "end": 359
+      }
+    },
+    {
+      "id": "cff3c0e97287405e5cb705b199e908d27370c360330b3be3aba3205baecf1d6d",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/offscreen/recording/encoding",
+      "reason": "Standard MediaRecorder stop and live encoder stop have different reachable phases and resource effects; the common guards remain lifecycle-owner local.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/offscreen/recording/encoding/artifact-session-owner.ts",
+        "start": 89,
+        "end": 94
+      },
+      "secondFile": {
+        "path": "apps/extension/src/offscreen/recording/encoding/live-artifact-session-owner.ts",
+        "start": 343,
+        "end": 348
+      }
+    },
+    {
+      "id": "d1f3afe5b9058c27e244806f48eb29eaaae869d1855161fbd0e1a96fc50562f3",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/ai-modal-content",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/ai-modal-content/preview-actions.css",
+        "start": 50,
+        "end": 56
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/ai-modal-content/preview-spoilers.css",
+        "start": 77,
+        "end": 83
+      }
+    },
+    {
+      "id": "d4adbd561458a748b5fc29cc8c39351fcb82d46fd047dcd5d2bf68da82ccc492",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/content/drawing <-> apps/extension/src/content/overlay/toolbar/mode-controller",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/content/drawing/mode.ts",
+        "start": 14,
+        "end": 25
+      },
+      "secondFile": {
+        "path": "apps/extension/src/content/overlay/toolbar/mode-controller/types.ts",
+        "start": 11,
+        "end": 22
+      }
+    },
+    {
+      "id": "d89ed9a8151a66bd45841521da4084ec221befa25d45687a88dfcef2892fd008",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/settings/sections/styles/annotations",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/borders/presets-panel.tsx",
+        "start": 91,
+        "end": 102
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/callouts/panel.tsx",
+        "start": 115,
+        "end": 126
+      }
+    },
+    {
+      "id": "da9ae1b38756cba2d3e114e79953ccf111f28ebe6b87cb16ac2256d54aab45cd",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/frame-annotation-controls",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/callout/body.tsx",
+        "start": 61,
+        "end": 81
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/frame/views.tsx",
+        "start": 111,
+        "end": 132
+      }
+    },
+    {
+      "id": "dc4c4676fdbed71d9c743d74111462ca7cc5cca84418632990a869075f180a41",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/overlays/ai-modal-overrides/actions.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/overlays/ai-modal-overrides/actions.css",
+        "start": 11,
+        "end": 16
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/overlays/ai-modal-overrides/actions.css",
+        "start": 36,
+        "end": 41
+      }
+    },
+    {
+      "id": "dc97fbac878a9fefbf3887f5306a5bbd40b77c57e8c79e3e899c9c0173cb70ad",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/frame-annotation-controls",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/callout/styles.css",
+        "start": 92,
+        "end": 103
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/frame/styles.css",
+        "start": 70,
+        "end": 81
+      }
+    },
+    {
+      "id": "ded8371510692f38e45a5d93e074d1862ba1e3fcf4d8c401b360bed23c7a694c",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/settings/sections/styles/editor-resources",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/settings/sections/styles/editor-resources/gradients/editor.tsx",
+        "start": 74,
+        "end": 90
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/styles/editor-resources/surface-styles/editor.tsx",
+        "start": 65,
+        "end": 81
+      }
+    },
+    {
+      "id": "e039f430dcc64381468f9596239f77a79375c74c5760241721ea502303d4a119",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/background/frame-annotation-raster <-> apps/extension/src/composition/frame-annotation-raster-client",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/background/frame-annotation-raster/route.ts",
+        "start": 235,
+        "end": 243
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/frame-annotation-raster-client/orchestrator.ts",
+        "start": 115,
+        "end": 123
+      }
+    },
+    {
+      "id": "e07d28576b103664400177f3a66345a23ebd29b6a2f7a6ae18afc3227b41c960",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/video-editor/workspace/sidebar/selection",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/annotation/summary.tsx",
+        "start": 161,
+        "end": 170
+      },
+      "secondFile": {
+        "path": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/panels/transition-template-actions.tsx",
+        "start": 99,
+        "end": 105
+      }
+    },
+    {
+      "id": "e162eaf56f5ffe630928deae21e11ebfade84a88b8b33982f4fb010fccc8a459",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/content/selection/frame-runtime/session <-> apps/extension/src/features/highlighter/step-badge-presets",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/content/selection/frame-runtime/session/step-badge-defaults.ts",
+        "start": 35,
+        "end": 43
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/highlighter/step-badge-presets/catalog.ts",
+        "start": 290,
+        "end": 298
+      }
+    },
+    {
+      "id": "e598666b69ba0a924deaf654266d34f1d4e6c4bff0b3ace97796fb02b9a40850",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/settings/sections/styles/annotations",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/callouts/panel.tsx",
+        "start": 105,
+        "end": 115
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/numbering/panel.tsx",
+        "start": 103,
+        "end": 113
+      }
+    },
+    {
+      "id": "e7ba45c0cf9a6d4caa57b358452e756d8cdc4ebccf82d9c45d7ea80f85916dc7",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/content-popover <-> packages/ui/src/styles/product-form-controls",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/content-popover/index.css",
+        "start": 83,
+        "end": 89
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/product-form-controls/select.css",
+        "start": 217,
+        "end": 223
+      }
+    },
+    {
+      "id": "e8bc026591c2d8374cc9f0ea462f4a1ff57a0a47275796e9c8cfef3c6ebbc9d1",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/frame-annotation-controls",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/callout/views.tsx",
+        "start": 56,
+        "end": 70
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/step-badge/preset-list.tsx",
+        "start": 51,
+        "end": 65
+      }
+    },
+    {
+      "id": "e8f5bd95f9c1c2ad24662d347ce024b6028cc4c32e62ce7188bc69d72b5d051a",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/background/capture/page-package/job <-> apps/extension/src/content/parser/web-snapshot",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/background/capture/page-package/job/page-phase.ts",
+        "start": 68,
+        "end": 74
+      },
+      "secondFile": {
+        "path": "apps/extension/src/content/parser/web-snapshot/capture.ts",
+        "start": 46,
+        "end": 52
+      }
+    },
+    {
+      "id": "e98c2fd26b0cad05268d62741782cef155ae2c6712ad839bc33a33879a87abd3",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/content/parser/web-snapshot <-> apps/extension/src/editor/controller/document/lifecycle/open/image",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/content/parser/web-snapshot/asset-fetch.ts",
+        "start": 108,
+        "end": 121
+      },
+      "secondFile": {
+        "path": "apps/extension/src/editor/controller/document/lifecycle/open/image/favicon.ts",
+        "start": 57,
+        "end": 70
+      }
+    },
+    {
+      "id": "eaa8989640e24d6495952981843e4694c35b6c7930e270ac30dbaed5064d51e1",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/features/web-snapshot <-> packages/runtime-contracts/src/validation",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/features/web-snapshot/screenshot-validation.ts",
+        "start": 80,
+        "end": 88
+      },
+      "secondFile": {
+        "path": "packages/runtime-contracts/src/validation/data-url.ts",
+        "start": 147,
+        "end": 155
+      }
+    },
+    {
+      "id": "eb1c95c43b3781071204164c58da611216c0bb6e5f1b0f796cc97302ebabe1e6",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/overlays/ai-modal-overrides/actions.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/overlays/ai-modal-overrides/actions.css",
+        "start": 17,
+        "end": 23
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/overlays/ai-modal-overrides/actions.css",
+        "start": 42,
+        "end": 46
+      }
+    },
+    {
+      "id": "ed28807382aceecce3a0bc66a06174c48c92bbe9e42af1dc0b80646555acaee1",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/frame-annotation-controls/step-badge <-> apps/extension/src/ui/highlighter-preset-editor/step-badge",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/step-badge/manual.tsx",
+        "start": 62,
+        "end": 67
+      },
+      "secondFile": {
+        "path": "apps/extension/src/ui/highlighter-preset-editor/step-badge/index.tsx",
+        "start": 64,
+        "end": 69
+      }
+    },
+    {
+      "id": "eecc52967e70fc9abf713159e589b4aef38cc2fc593b62d5aecc973d99570ac7",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/workflows/media-hub-backup/v6/inventory",
+      "reason": "Small parallel inventory loop/control-flow fragment; extraction would add indirection without removing a semantic implementation.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/scenario-projects.ts",
+        "start": 214,
+        "end": 220
+      },
+      "secondFile": {
+        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
+        "start": 214,
+        "end": 220
+      }
+    },
+    {
+      "id": "f0c882f91c743ed5e47d81f89575080bb37393ad20f6d29d5a9a81f5bbc91fbb",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/projects/asset-publication.ts",
+        "start": 113,
+        "end": 122
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/scenario/aggregate-cleanup.ts",
+        "start": 161,
+        "end": 170
+      }
+    },
+    {
+      "id": "f47b57688f9acc08d1127c8fedcc9b746e91c382a60fc3ab979befc79934d41a",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/settings/sections/styles/editor-resources",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/settings/sections/styles/editor-resources/gradients/view.tsx",
+        "start": 61,
+        "end": 75
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/styles/editor-resources/surface-styles/view.tsx",
+        "start": 67,
+        "end": 81
+      }
+    },
+    {
+      "id": "f56efe1c12d1ce2382a8ceea88bd730b8dfcc4dcb9fa2e4eda07827b94e396d9",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/frame-annotation-controls/voice <-> apps/extension/src/content/voice-input",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/frame-annotation-controls/voice/transcript.ts",
+        "start": 75,
+        "end": 91
+      },
+      "secondFile": {
+        "path": "apps/extension/src/content/voice-input/text-transcript.ts",
+        "start": 26,
+        "end": 43
+      }
+    },
+    {
+      "id": "f6e5bd1c467db6ef01514ee76074687ca7edebf072cd09b7a75295e8d9e78ccf",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/image-workspaces/read.ts",
+        "start": 13,
+        "end": 21
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/scenario/editor-documents/index.ts",
+        "start": 25,
+        "end": 31
+      }
+    },
+    {
+      "id": "f79c3b2d24eebeff93432ee1aaedea0f7ca5fa09edde2e7874109437ec8265c8",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/workflows/media-hub-backup/v6/inventory",
+      "reason": "Residual project-thumbnail setup surrounds distinct scenario/video metadata owners; the shared presentation semantic is already consolidated, and another extraction would add indirection only.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/scenario-projects.ts",
+        "start": 182,
+        "end": 197
+      },
+      "secondFile": {
+        "path": "apps/extension/src/workflows/media-hub-backup/v6/inventory/video-projects.ts",
+        "start": 181,
+        "end": 196
+      }
+    },
+    {
+      "id": "f949dae32051c67cd2d9c24a096277be789dbb73f97d5a9a59e5a35a9fe424ce",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/ai-modal-content/fields.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/ai-modal-content/fields.css",
+        "start": 144,
+        "end": 154
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/ai-modal-content/fields.css",
+        "start": 29,
+        "end": 39
+      }
+    },
+    {
+      "id": "f9550b242bab1c06b8e94942aa3dfeff75627d61035b7fceb12674cb8bd21ee8",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/features/highlighter/frame-annotation/floating-toolbar.tsx",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/features/highlighter/frame-annotation/floating-toolbar.tsx",
+        "start": 65,
+        "end": 73
+      },
+      "secondFile": {
+        "path": "apps/extension/src/features/highlighter/frame-annotation/floating-toolbar.tsx",
+        "start": 79,
+        "end": 87
+      }
+    },
+    {
+      "id": "faca5c4d6ed431d0ab46e1316af7e249125c5a2c988463a5f7cf56457f67eaa9",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/gallery/library/sidebar <-> apps/extension/src/gallery/shell/app-shell",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/gallery/library/sidebar/types.ts",
+        "start": 28,
+        "end": 33
+      },
+      "secondFile": {
+        "path": "apps/extension/src/gallery/shell/app-shell/types.ts",
+        "start": 72,
+        "end": 77
+      }
+    },
+    {
+      "id": "fd25a41078b1e6593c736b1993b2e765ad3c4587c8a31847b5e9daf3f2808830",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/composition/persistence",
+      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
+      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/composition/persistence/projects/asset-publication.ts",
+        "start": 113,
+        "end": 122
+      },
+      "secondFile": {
+        "path": "apps/extension/src/composition/persistence/web-snapshots/cleanup.ts",
+        "start": 68,
+        "end": 77
+      }
+    },
+    {
+      "id": "fe0ccc5bdabd7d19b89cd33daa8da660e842ba11fdf99e38d05a575ca599e409",
+      "classification": "tool-noise",
+      "owner": "packages/ui/src/styles/design-tokens.css",
+      "reason": "Declarative selector/token repetition; extraction would couple independent selectors or hide design ownership without reducing operation hops.",
+      "removalCondition": "Remove when the selectors or states acquire one semantic style owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "packages/ui/src/styles/design-tokens.css",
+        "start": 173,
+        "end": 180
+      },
+      "secondFile": {
+        "path": "packages/ui/src/styles/design-tokens.css",
+        "start": 1,
+        "end": 8
+      }
+    },
+    {
+      "id": "fe3a3731f50c2f1befc9b0ad8fab060f9510e5a0ab8d4e2a936cf5b1a1b31976",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/editor/inspector",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/editor/inspector/compact/inspector/browser-frame-details.tsx",
+        "start": 50,
+        "end": 58
+      },
+      "secondFile": {
+        "path": "apps/extension/src/editor/inspector/environment/browser-frame.tsx",
+        "start": 23,
+        "end": 31
+      }
+    },
+    {
+      "id": "fed3df6fef0a6ee553e637bba93f8bf9b63c3ca158c719c1704e4bd7dc4ae73d",
+      "classification": "tool-noise",
+      "owner": "apps/extension/src/settings/sections/styles/annotations",
+      "reason": "Declarative UI shape repetition; a shared component would require a prop/config bag or cross-owner presentation dependency.",
+      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/callouts/panel.tsx",
+        "start": 130,
+        "end": 151
+      },
+      "secondFile": {
+        "path": "apps/extension/src/settings/sections/styles/annotations/numbering/panel.tsx",
+        "start": 128,
+        "end": 149
+      }
     }
   ]
 }

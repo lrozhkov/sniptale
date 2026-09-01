@@ -32,6 +32,7 @@ import {
   recoverProjectMediaPublications,
   type ProjectExportPublicationPayload,
 } from './asset-publication';
+import { deletePublishedProjectEntry } from './asset-references';
 
 export type SaveProjectExportInput = Omit<StoredProjectExportEntry, 'assetId' | 'size'> & {
   blob?: Blob;
@@ -129,17 +130,19 @@ export async function deleteProjectExport(id: string): Promise<void> {
       'readwrite'
     );
     const entry = parseProjectExportEntry(await tx.objectStore(PROJECT_EXPORTS_STORE).get(id));
-    await tx.objectStore(PROJECT_EXPORTS_STORE).delete(id);
-    await tx.objectStore(MEDIA_LIBRARY_STORE).delete(createProjectExportMediaId(id));
-    if (entry) {
-      const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);
-      await ownerStore.delete([PROJECT_EXPORT_OWNER_KIND, id, PROJECT_MEDIA_ASSET_ROLE]);
-      if ((await ownerStore.index('assetId').count(entry.assetId)) === 0) {
-        await tx.objectStore(ASSET_REFS_STORE).delete(entry.assetId);
-        physicalDelete.assetIds.push(entry.assetId);
-        await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
-      }
-    }
+    const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);
+    await deletePublishedProjectEntry({
+      countAssetOwners: (assetId) => ownerStore.index('assetId').count(assetId),
+      deleteAssetEntry: () => tx.objectStore(PROJECT_EXPORTS_STORE).delete(id),
+      deleteAssetOwner: () =>
+        ownerStore.delete([PROJECT_EXPORT_OWNER_KIND, id, PROJECT_MEDIA_ASSET_ROLE]),
+      deleteAssetRef: (assetId) => tx.objectStore(ASSET_REFS_STORE).delete(assetId),
+      deleteMediaEntry: () =>
+        tx.objectStore(MEDIA_LIBRARY_STORE).delete(createProjectExportMediaId(id)),
+      entry,
+      operation: physicalDelete,
+      recordOperation: () => tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete),
+    });
     await tx.done;
   });
   if (physicalDelete.assetIds.length > 0) await completePhysicalDeleteOperation(physicalDelete);

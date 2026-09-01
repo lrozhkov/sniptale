@@ -36,22 +36,6 @@ function applyHoverCustomCssStyles(
   appliedHoverCustomCssProperties.set(element, Object.keys(styles));
 }
 
-function applyHoverVisualDefaults(
-  element: HTMLElement,
-  visual: ReturnType<typeof resolveBorderPresetVisual>
-): void {
-  element.style.border = `${visual.strokeWidth}px ${visual.strokeStyle} ${visual.strokeColor}`;
-  element.style.borderRadius = `${visual.radius === 0 ? 0 : visual.radius + visual.strokeWidth}px`;
-  element.style.boxSizing = 'content-box';
-  element.style.margin = '0';
-  element.style.padding = '0';
-  element.style.outline = 'none';
-  element.style.clipPath = 'none';
-  element.style.boxShadow =
-    resolveBorderShadowVisual(visual.shadow, visual.strokeColor).hoverBoxShadow ?? 'none';
-  element.style.background = visual.fillCss;
-}
-
 function applyCanonicalHoverVisual(
   element: HTMLElement,
   visual: ReturnType<typeof resolveBorderPresetVisual>
@@ -62,6 +46,17 @@ function applyCanonicalHoverVisual(
   element.style.margin = '0';
   element.style.padding = '0';
   element.style.clipPath = 'none';
+}
+
+function applyHoverVisualDefaults(
+  element: HTMLElement,
+  visual: ReturnType<typeof resolveBorderPresetVisual>
+): void {
+  applyCanonicalHoverVisual(element, visual);
+  element.style.outline = 'none';
+  element.style.boxShadow =
+    resolveBorderShadowVisual(visual.shadow, visual.strokeColor).hoverBoxShadow ?? 'none';
+  element.style.background = visual.fillCss;
 }
 
 function applyCanonicalHoverGeometry(

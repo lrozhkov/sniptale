@@ -19,75 +19,65 @@ function isString(value: unknown): value is string {
   return typeof value === 'string';
 }
 
+function collectRecordingSource(
+  recordingIds: Set<string>,
+  source: unknown
+): Record<string, unknown> | null {
+  if (!isRecord(source) || !isString(source['kind'])) return null;
+  if (source['kind'] !== 'recording') return source;
+  if (!isString(source['recordingId'])) return null;
+  recordingIds.add(source['recordingId']);
+  return source;
+}
+
 function collectFromMediaSource(recordingIds: Set<string>, source: unknown): boolean {
-  if (!isRecord(source) || !isString(source['kind'])) {
-    return false;
+  const parsed = collectRecordingSource(recordingIds, source);
+  if (!parsed) return false;
+  if (parsed['kind'] === 'recording') return true;
+  if (parsed['kind'] === 'project-export') {
+    return isString(parsed['exportId']) && isString(parsed['projectId']);
   }
-  if (source['kind'] === 'recording') {
-    if (!isString(source['recordingId'])) {
-      return false;
-    }
-    recordingIds.add(source['recordingId']);
+  if (parsed['kind'] === 'screenshot') {
     return true;
   }
-  if (source['kind'] === 'project-export') {
-    return isString(source['exportId']) && isString(source['projectId']);
+  if (parsed['kind'] === 'project-asset') {
+    return isString(parsed['projectAssetId']);
   }
-  if (source['kind'] === 'screenshot') {
-    return true;
-  }
-  if (source['kind'] === 'project-asset') {
-    return isString(source['projectAssetId']);
-  }
-  if (source['kind'] === 'web-snapshot') {
-    return isString(source['snapshotId']);
+  if (parsed['kind'] === 'web-snapshot') {
+    return isString(parsed['snapshotId']);
   }
   return false;
 }
 
 function collectFromProjectSource(recordingIds: Set<string>, source: unknown): boolean {
-  if (!isRecord(source) || !isString(source['kind'])) {
-    return false;
-  }
-  if (source['kind'] === 'recording') {
-    if (!isString(source['recordingId'])) {
-      return false;
-    }
-    recordingIds.add(source['recordingId']);
+  const parsed = collectRecordingSource(recordingIds, source);
+  if (!parsed) return false;
+  if (parsed['kind'] === 'recording') return true;
+  if (parsed['kind'] === 'manual') {
     return true;
   }
-  if (source['kind'] === 'manual') {
-    return true;
-  }
-  if (source['kind'] === 'scenario') {
-    return isString(source['scenarioProjectId']);
+  if (parsed['kind'] === 'scenario') {
+    return isString(parsed['scenarioProjectId']);
   }
   return false;
 }
 
 function collectFromProjectAssetSource(recordingIds: Set<string>, source: unknown): boolean {
-  if (!isRecord(source) || !isString(source['kind'])) {
-    return false;
-  }
-  if (source['kind'] === 'recording') {
-    if (!isString(source['recordingId'])) {
-      return false;
-    }
-    recordingIds.add(source['recordingId']);
-    return true;
-  }
-  if (source['kind'] === 'project-asset') {
-    const isValid = isString(source['projectAssetId']);
-    if (source['originRecordingId'] !== undefined) {
-      if (!isString(source['originRecordingId'])) {
+  const parsed = collectRecordingSource(recordingIds, source);
+  if (!parsed) return false;
+  if (parsed['kind'] === 'recording') return true;
+  if (parsed['kind'] === 'project-asset') {
+    const isValid = isString(parsed['projectAssetId']);
+    if (parsed['originRecordingId'] !== undefined) {
+      if (!isString(parsed['originRecordingId'])) {
         return false;
       }
-      recordingIds.add(source['originRecordingId']);
+      recordingIds.add(parsed['originRecordingId']);
     }
     return isValid;
   }
-  if (source['kind'] === 'scenario-asset') {
-    return isString(source['scenarioAssetId']);
+  if (parsed['kind'] === 'scenario-asset') {
+    return isString(parsed['scenarioAssetId']);
   }
   return false;
 }

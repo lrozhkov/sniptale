@@ -113,10 +113,18 @@ describe('durable asset operations', () => {
     await expect(
       transitionAssetOperation(operation.operationId, 'pending', 'committed')
     ).rejects.toThrow('not pending');
+
+    installMutationHarness(null);
+    await expect(
+      transitionAssetOperation(operation.operationId, 'pending', 'committed')
+    ).rejects.toThrow('not pending');
   });
 
   it('persists immutable archive identity and checkpoints a root in the caller transaction', async () => {
     const harness = installMutationHarness();
+    await expect(
+      createArchiveRestoreSession({ archiveFingerprint: 'invalid', strategy: 'duplicate' })
+    ).rejects.toThrow('fingerprint is invalid');
     const created = await createArchiveRestoreSession({
       archiveFingerprint: 'a'.repeat(64),
       strategy: 'duplicate',
