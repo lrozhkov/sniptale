@@ -7,11 +7,22 @@ const COMMIT = /^[a-f0-9]{40}$/u;
 const DIGEST = /^sha256:[a-f0-9]{64}$/u;
 
 export function verifyFinalizerAdmission(file, expected) {
-  const stat = fs.lstatSync(file);
-  if (!stat.isFile() || stat.isSymbolicLink()) {
-    throw new Error('Finalizer admission is not a regular file.');
+  let descriptor;
+  let value;
+  try {
+    descriptor = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+    if (!fs.fstatSync(descriptor).isFile()) {
+      throw new Error('Finalizer admission is not a regular file.');
+    }
+    value = JSON.parse(fs.readFileSync(descriptor, 'utf8'));
+  } catch (error) {
+    if (error?.code === 'ELOOP') {
+      throw new Error('Finalizer admission is not a regular file.', { cause: error });
+    }
+    throw error;
+  } finally {
+    if (descriptor !== undefined) fs.closeSync(descriptor);
   }
-  const value = JSON.parse(fs.readFileSync(file, 'utf8'));
   if (
     value.schemaVersion !== 1 ||
     value.artifactKind !== 'sniptale-release-finalizer-admission' ||

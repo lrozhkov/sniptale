@@ -92,9 +92,20 @@ describe('CalloutPresetsPanel', () => {
     const root = createRoot(container);
     await act(async () => root.render(<CalloutPresetsPanel controller={controller} />));
     const buttons = [...container.querySelectorAll<HTMLButtonElement>('button')];
-    for (const button of buttons) {
-      if (!button.disabled) await act(async () => button.click());
-    }
+    const addButton = buttons.find((button) =>
+      button.textContent?.includes('highlighter.calloutPresets.add')
+    );
+    const editButton = container.querySelector<HTMLButtonElement>(
+      '[aria-label="settings.collection.actions.edit"]'
+    );
+    const newSessionButton = container.querySelector<HTMLButtonElement>(
+      '[aria-label="highlighter.calloutPresets.newSession.enabledLabel"]'
+    );
+    await act(async () => {
+      addButton?.click();
+      editButton?.click();
+      newSessionButton?.click();
+    });
     expect(controller.actions.add).toHaveBeenCalled();
     expect(controller.actions.edit).toHaveBeenCalled();
     expect(controller.actions.setNewSessionEnabled).toHaveBeenCalledWith(true);

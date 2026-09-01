@@ -38,7 +38,7 @@
     "complete sorted input file inventory and contents",
     "complete sorted product test inventory",
     "complete product-suite harness and support inputs",
-    "Node platform, version, locale, timezone, pool, and suite",
+    "Node platform, version, locale, timezone, config-owned or overridden pool profile, and suite",
     "container digest when containerized",
     "resource profile and worker counts are recorded as planning metadata and excluded from the semantic input digest"
   ],

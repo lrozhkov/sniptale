@@ -67,6 +67,10 @@ it('publishes every canonical format from the exact production file set', () => 
     'lcov.info',
     'html/index.html',
   ]);
+  expect(Object.keys(result.reporterTimings)).toEqual(['json', 'json-summary', 'lcovonly', 'html']);
+  for (const durationMs of Object.values(result.reporterTimings)) {
+    expect(durationMs).toBeGreaterThanOrEqual(0);
+  }
   const filtered = JSON.parse(
     fs.readFileSync(`${root}/.tmp/coverage/canonical/coverage-final.json`, 'utf8')
   );

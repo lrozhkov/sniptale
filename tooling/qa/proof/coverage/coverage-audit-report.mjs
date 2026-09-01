@@ -189,18 +189,22 @@ export function writeCanonicalCoverageArtifacts({
   fs.rmSync(absoluteOutput, { recursive: true, force: true });
   fs.mkdirSync(absoluteOutput, { recursive: true });
   const context = istanbulReport.createContext({ dir: absoluteOutput, coverageMap: filteredMap });
+  const reporterTimings = {};
   for (const [name, options] of [
     ['json', { file: 'coverage-final.json' }],
     ['json-summary', { file: 'coverage-summary.json' }],
     ['lcovonly', { file: 'lcov.info', projectRoot: root }],
     ['html', { subdir: 'html' }],
   ]) {
+    const startedAt = performance.now();
     istanbulReports.create(name, options).execute(context);
+    reporterTimings[name] = Math.round((performance.now() - startedAt) * 10) / 10;
   }
   return {
     directory: outputDirectory,
     files: ['coverage-final.json', 'coverage-summary.json', 'lcov.info', 'html/index.html'],
     summary: filteredMap.getCoverageSummary().toJSON(),
+    reporterTimings,
   };
 }
 
