@@ -1,7 +1,7 @@
 import {
   assertRange,
   checkedAdd,
-  decodeAsciiPath,
+  decodeZipPath,
   fail,
   readUint16,
   readUint32,
@@ -75,7 +75,10 @@ function readCentralEntryMetadata(
   const nameEnd = args.cursor + 46 + header.nameLength;
   return {
     extra: args.bytes.subarray(nameEnd, nameEnd + header.extraLength),
-    name: decodeAsciiPath(args.bytes.subarray(args.cursor + 46, nameEnd)),
+    name: decodeZipPath(
+      args.bytes.subarray(args.cursor + 46, nameEnd),
+      (header.flags & 0x0800) !== 0
+    ),
     variableLength,
   };
 }

@@ -101,6 +101,27 @@ it('delegates canonical path policy before inflation', () => {
   );
 });
 
+it('decodes UTF-8 entry names when the language encoding flag is set', () => {
+  const name = 'exports/data/Эталонный_стенд.json';
+  const profile = inspectZipCentralDirectory(
+    createZip([{ data: [1], flags: 0x0800, name }]),
+    DEFAULT_OPTIONS
+  );
+
+  expect(profile.entries[0]?.name).toBe(name);
+});
+
+it('rejects malformed UTF-8 entry names', () => {
+  expectZipError(
+    () =>
+      inspectZipCentralDirectory(
+        createZip([{ data: [1], flags: 0x0800, name: 'invalid', nameBytes: [0xc3, 0x28] }]),
+        DEFAULT_OPTIONS
+      ),
+    'archive-invalid'
+  );
+});
+
 it('enforces archive, file, entry, and aggregate inflated limits', () => {
   const archive = createZip([
     { data: [1, 2], name: 'one' },

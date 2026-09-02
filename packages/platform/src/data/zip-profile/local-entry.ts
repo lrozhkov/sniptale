@@ -1,7 +1,7 @@
 import {
   assertRange,
   checkedAdd,
-  decodeAsciiPath,
+  decodeZipPath,
   fail,
   readSafeUint64,
   readUint16,
@@ -50,8 +50,12 @@ export function inspectLocalEntry(args: InspectLocalEntryArgs): ZipCentralDirect
     args.bytes.byteLength,
     'Local ZIP metadata is truncated.'
   );
-  const localName = decodeAsciiPath(
-    args.bytes.subarray(args.localHeaderOffset + 30, args.localHeaderOffset + 30 + local.nameLength)
+  const localName = decodeZipPath(
+    args.bytes.subarray(
+      args.localHeaderOffset + 30,
+      args.localHeaderOffset + 30 + local.nameLength
+    ),
+    (local.flags & 0x0800) !== 0
   );
   assertMatchingLocalHeader(args, local, localName);
   const usesDescriptor = (args.flags & 0x0008) !== 0;

@@ -5,6 +5,7 @@ interface TestZipEntry {
   externalAttributes?: number;
   flags?: number;
   name: string;
+  nameBytes?: number[];
   uncompressedSize?: number;
   versionMadeBy?: number;
 }
@@ -24,7 +25,7 @@ function appendLocalEntry(
 ): { entry: TestZipEntry; flags: number; localOffset: number } {
   const localOffset = bytes.length;
   const flags = (entry.flags ?? 0) | (entry.descriptor ? 0x0008 : 0);
-  const name = ascii(entry.name);
+  const name = encodeEntryName(entry, flags);
   const compressedSize = entry.compressedSize ?? entry.data.length;
   const uncompressedSize = entry.uncompressedSize ?? entry.data.length;
   u32(bytes, 0x04034b50);
@@ -59,7 +60,7 @@ function appendCentralEntry(
   built: { entry: TestZipEntry; flags: number; localOffset: number }
 ): void {
   const { entry, flags, localOffset } = built;
-  const name = ascii(entry.name);
+  const name = encodeEntryName(entry, flags);
   u32(bytes, 0x02014b50);
   u16(bytes, entry.versionMadeBy ?? 20);
   u16(bytes, 20);
@@ -191,6 +192,11 @@ function appendZip64EndRecords(bytes: number[], centralOffset: number, centralSi
 
 function ascii(value: string): number[] {
   return [...value].map((character) => character.charCodeAt(0));
+}
+
+function encodeEntryName(entry: TestZipEntry, flags: number): number[] {
+  if (entry.nameBytes) return entry.nameBytes;
+  return (flags & 0x0800) !== 0 ? [...new TextEncoder().encode(entry.name)] : ascii(entry.name);
 }
 
 function u16(target: number[], value: number): void {
