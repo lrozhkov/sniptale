@@ -182,7 +182,7 @@ it('reflows a near-width static document at a sharp 100% scale', async () => {
   expect(actualSizeButton).toBeDefined();
 });
 
-it('does not expose horizontal scrolling caused only by the vertical scrollbar gutter', async () => {
+it('does not reserve a second scrollbar gutter around the responsive document', async () => {
   mocks.loadWebSnapshotPackage.mockResolvedValue(
     createLoadedPackage({ viewport: { deviceScaleFactor: 1, height: 800, width: 1030 } })
   );
@@ -198,7 +198,8 @@ it('does not expose horizontal scrolling caused only by the vertical scrollbar g
   const viewport = container?.querySelector<HTMLElement>('[data-testid="snapshot-frame-viewport"]');
   expect(viewport?.style.transform).toBe('scale(1)');
   expect(surface?.className).toContain('overflow-x-hidden');
-  expect(surface?.className).toContain('overflow-y-auto');
+  expect(surface?.className).toContain('overflow-y-hidden');
+  expect(surface?.style.scrollbarGutter).toBe('auto');
 });
 
 it('does not let grab navigation consume the collapsed toolbar button pointer gesture', async () => {
@@ -257,8 +258,9 @@ it('uses browser-like zoom without returning the static document to its captured
   );
   const surface = container?.querySelector<HTMLElement>('[data-testid="snapshot-viewer-surface"]');
   expect(surface?.className).toContain('overflow-x-hidden');
-  expect(surface?.className).toContain('overflow-y-auto');
-  expect(surface?.style.scrollbarGutter).toBe('stable');
+  expect(surface?.className).toContain('overflow-y-hidden');
+  expect(surface?.className).not.toContain('overflow-y-auto');
+  expect(surface?.style.scrollbarGutter).toBe('auto');
   expect(surface?.className).not.toContain('cursor-grab');
 
   const zoomButtons = percentButton?.parentElement?.querySelectorAll('button');
@@ -304,6 +306,11 @@ it('pans an enlarged snapshot with primary-button grab navigation', async () => 
   );
   expect(visualModeButton).toBeDefined();
   act(() => visualModeButton?.click());
+  const fixedSurface = container?.querySelector<HTMLElement>(
+    '[data-testid="snapshot-viewer-surface"]'
+  );
+  expect(fixedSurface?.className).toContain('overflow-y-auto');
+  expect(fixedSurface?.style.scrollbarGutter).toBe('stable');
   const percentButton = Array.from(container?.querySelectorAll('button') ?? []).find(
     (button) => button.textContent === '40%'
   );

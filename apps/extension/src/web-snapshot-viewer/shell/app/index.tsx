@@ -412,9 +412,10 @@ function WebSnapshotViewerSurface(props: { loaded: LoadedWebSnapshotPackage; loc
       <section
         ref={zoom.surfaceRef}
         data-testid="snapshot-viewer-surface"
-        className={`relative min-h-0 w-full min-w-0 max-w-full flex-1 overflow-y-auto
+        className={`relative min-h-0 w-full min-w-0 max-w-full flex-1
+          ${responsiveLayout ? 'overflow-y-hidden' : 'overflow-y-auto'}
           ${zoom.horizontalOverflowClassName} ${zoom.grabClassName}`}
-        style={{ scrollbarGutter: 'stable' }}
+        style={{ scrollbarGutter: responsiveLayout ? 'auto' : 'stable' }}
         onPointerDown={zoom.onPointerDown}
         onPointerMove={zoom.onPointerMove}
         onPointerUp={zoom.onPointerUp}
