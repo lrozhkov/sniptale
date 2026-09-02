@@ -165,8 +165,8 @@ function appendZip64EndRecords(bytes: number[], centralOffset: number, centralSi
   u64(bytes, zip64Offset);
   u32(bytes, 1);
   u32(bytes, 0x06054b50);
-  u16(bytes, 0);
-  u16(bytes, 0);
+  u16(bytes, 0xffff);
+  u16(bytes, 0xffff);
   u16(bytes, 0xffff);
   u16(bytes, 0xffff);
   u32(bytes, 0xffffffff);

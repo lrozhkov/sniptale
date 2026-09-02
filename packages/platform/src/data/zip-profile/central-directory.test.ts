@@ -163,6 +163,13 @@ it('rejects truncated archives and local/central header disagreement', () => {
   expectZipError(() => inspectZipCentralDirectory(archive, DEFAULT_OPTIONS), 'archive-invalid');
 });
 
+it('rejects a non-zero disk number from a regular ZIP end record', () => {
+  const archive = createZip([{ data: [1], name: 'manifest.json' }]);
+  archive[archive.byteLength - 18] = 1;
+
+  expectZipError(() => inspectZipCentralDirectory(archive, DEFAULT_OPTIONS), 'archive-invalid');
+});
+
 it('reads single-disk ZIP64 sizes and offsets through the canonical extra field', () => {
   const profile = inspectZipCentralDirectory(createZip64(), DEFAULT_OPTIONS);
 
@@ -177,6 +184,15 @@ it('reads single-disk ZIP64 sizes and offsets through the canonical extra field'
     })
   );
 });
+
+it('rejects a multi-disk ZIP64 locator after accepting legacy sentinel fields', () => {
+  const archive = createZip64();
+  const locatorDiskCountOffset = archive.byteLength - 26;
+  new DataView(archive.buffer).setUint32(locatorDiskCountOffset, 2, true);
+
+  expectZipError(() => inspectZipCentralDirectory(archive, DEFAULT_OPTIONS), 'archive-invalid');
+});
+
 function expectZipError(run: () => unknown, code: string): void {
   try {
     run();
