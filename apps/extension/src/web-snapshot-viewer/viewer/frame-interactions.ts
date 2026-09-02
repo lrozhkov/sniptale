@@ -4,6 +4,7 @@ type DisclosureProjection = {
   controller: HTMLElement;
   controllerAriaExpanded: string | null;
   controllerClass: string | null;
+  initiallyOpen: boolean;
   open: boolean;
   owner: HTMLElement;
   ownerStyle: string | null;
@@ -13,7 +14,9 @@ type DisclosureProjection = {
   regionClass: string | null;
 };
 
-const DISCLOSURE_STATE_CLASS = /^(?:closed|collapsed|folded|hidden|is-collapsed|is-hidden)$/iu;
+const DISCLOSURE_STATE_CLASS =
+  /^(?:closed|collapsed|folded|hidden|is-collapsed|is-hidden|.*__bodyHidden)$/iu;
+const OPEN_CONTROL_STATE_CLASS = /__visibilityControlOpen$/u;
 const DIRECTIONAL_CLASS_PAIRS = [
   ['down', 'up'],
   ['arrow-down', 'arrow-up'],
@@ -56,14 +59,17 @@ function findExplicitAriaRegion(controller: HTMLElement): HTMLElement | null {
     : null;
 }
 
-function findImplicitSiblingRegion(controller: HTMLElement): {
+function findImplicitSiblingRegion(
+  controller: HTMLElement,
+  allowVisibleRegion: boolean
+): {
   owner: HTMLElement;
   region: HTMLElement;
 } | null {
   const view = controller.ownerDocument.defaultView;
   if (view?.getComputedStyle(controller).cursor !== 'pointer') return null;
   let owner = controller.parentElement;
-  for (let depth = 0; owner && depth < 4; depth += 1, owner = owner.parentElement) {
+  for (let depth = 0; owner && depth < 6; depth += 1, owner = owner.parentElement) {
     const directController = findDirectChild(owner, controller);
     if (!directController) continue;
     const siblings = Array.from(owner.children);
@@ -73,7 +79,7 @@ function findImplicitSiblingRegion(controller: HTMLElement): {
       if (
         typeof region.style === 'object' &&
         hasMeaningfulContent(region) &&
-        isVisuallyHidden(region)
+        (allowVisibleRegion || isVisuallyHidden(region))
       ) {
         return { owner, region };
       }
@@ -86,15 +92,24 @@ function createDisclosureProjection(controller: HTMLElement): DisclosureProjecti
   if (controller.closest('a, input, select, textarea, label, [contenteditable="true"]'))
     return null;
   const explicitRegion = findExplicitAriaRegion(controller);
+  const hasOpenState =
+    controller.getAttribute('aria-expanded') === 'true' ||
+    Array.from(controller.classList).some((className) =>
+      OPEN_CONTROL_STATE_CLASS.test(className)
+    ) ||
+    DIRECTIONAL_CLASS_PAIRS.some(([, openClass]) => controller.classList.contains(openClass));
   const implicit = explicitRegion
     ? { owner: explicitRegion.parentElement, region: explicitRegion }
-    : findImplicitSiblingRegion(controller);
-  if (!implicit?.owner || !isVisuallyHidden(implicit.region)) return null;
+    : findImplicitSiblingRegion(controller, hasOpenState);
+  if (!implicit?.owner) return null;
+  const initiallyOpen = !isVisuallyHidden(implicit.region);
+  if (initiallyOpen && !explicitRegion && !hasOpenState) return null;
   return {
     controller,
     controllerAriaExpanded: controller.getAttribute('aria-expanded'),
     controllerClass: controller.getAttribute('class'),
-    open: false,
+    initiallyOpen,
+    open: initiallyOpen,
     owner: implicit.owner,
     ownerStyle: implicit.owner.getAttribute('style'),
     region: implicit.region,
@@ -109,15 +124,43 @@ function restoreAttribute(element: HTMLElement, name: string, value: string | nu
   else element.setAttribute(name, value);
 }
 
-function projectDirectionalClass(controller: HTMLElement): void {
+function projectDirectionalClass(controller: HTMLElement, open: boolean): void {
   for (const [closedClass, openClass] of DIRECTIONAL_CLASS_PAIRS) {
-    if (!controller.classList.contains(closedClass)) continue;
-    controller.classList.replace(closedClass, openClass);
+    const from = open ? closedClass : openClass;
+    const to = open ? openClass : closedClass;
+    if (!controller.classList.contains(from)) continue;
+    controller.classList.replace(from, to);
     return;
   }
+  const openStateClass = Array.from(controller.classList).find((className) =>
+    OPEN_CONTROL_STATE_CLASS.test(className)
+  );
+  if (!open) {
+    if (openStateClass) controller.classList.remove(openStateClass);
+    return;
+  }
+  if (openStateClass) return;
+  const baseClass = Array.from(controller.classList).find((className) =>
+    className.endsWith('__visibilityControl')
+  );
+  if (baseClass) controller.classList.add(`${baseClass}Open`);
+}
+
+function restoreDisclosure(projection: DisclosureProjection): void {
+  restoreAttribute(projection.region, 'class', projection.regionClass);
+  restoreAttribute(projection.region, 'style', projection.regionStyle);
+  restoreAttribute(projection.region, 'hidden', projection.regionHiddenAttribute);
+  restoreAttribute(projection.owner, 'style', projection.ownerStyle);
+  restoreAttribute(projection.controller, 'class', projection.controllerClass);
+  restoreAttribute(projection.controller, 'aria-expanded', projection.controllerAriaExpanded);
+  projection.open = projection.initiallyOpen;
 }
 
 function openDisclosure(projection: DisclosureProjection): void {
+  if (projection.initiallyOpen) {
+    restoreDisclosure(projection);
+    return;
+  }
   projection.region.removeAttribute('hidden');
   for (const className of Array.from(projection.region.classList)) {
     if (DISCLOSURE_STATE_CLASS.test(className)) projection.region.classList.remove(className);
@@ -132,7 +175,7 @@ function openDisclosure(projection: DisclosureProjection): void {
     projection.region.style.setProperty('visibility', 'visible', 'important');
   }
   projection.controller.setAttribute('aria-expanded', 'true');
-  projectDirectionalClass(projection.controller);
+  projectDirectionalClass(projection.controller, true);
   const ownerRect = projection.owner.getBoundingClientRect();
   const regionRect = projection.region.getBoundingClientRect();
   if (regionRect.bottom > ownerRect.bottom + 1) {
@@ -143,12 +186,14 @@ function openDisclosure(projection: DisclosureProjection): void {
 }
 
 function closeDisclosure(projection: DisclosureProjection): void {
-  restoreAttribute(projection.region, 'class', projection.regionClass);
-  restoreAttribute(projection.region, 'style', projection.regionStyle);
-  restoreAttribute(projection.region, 'hidden', projection.regionHiddenAttribute);
-  restoreAttribute(projection.owner, 'style', projection.ownerStyle);
-  restoreAttribute(projection.controller, 'class', projection.controllerClass);
-  restoreAttribute(projection.controller, 'aria-expanded', projection.controllerAriaExpanded);
+  if (!projection.initiallyOpen) {
+    restoreDisclosure(projection);
+    return;
+  }
+  projection.region.setAttribute('hidden', '');
+  projection.region.style.setProperty('display', 'none', 'important');
+  projection.controller.setAttribute('aria-expanded', 'false');
+  projectDirectionalClass(projection.controller, false);
   projection.open = false;
 }
 
@@ -185,6 +230,6 @@ export function installSnapshotFrameStaticInteractions(
   return () => {
     doc.removeEventListener('click', handleClick, true);
     cleanupPan();
-    for (const projection of disclosures.values()) closeDisclosure(projection);
+    for (const projection of disclosures.values()) restoreDisclosure(projection);
   };
 }

@@ -18,6 +18,18 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+function appendLargeScroller(parent: HTMLElement): HTMLElement {
+  const scroller = parent.ownerDocument.createElement('section');
+  scroller.style.cssText = 'height:300px;width:600px;overflow:auto';
+  Object.defineProperties(scroller, {
+    clientHeight: { configurable: true, value: 300 },
+    clientWidth: { configurable: true, value: 600 },
+    scrollHeight: { configurable: true, value: 600 },
+  });
+  parent.append(scroller);
+  return scroller;
+}
+
 it('freezes screen media branches for the captured viewport and removes page-authored print CSS', () => {
   const style = document.createElement('style');
   style.textContent = [
@@ -62,7 +74,7 @@ it('preserves declarations when Chromium exposes an empty nested-rule list on a 
   expect(frozenCss).toContain('position: absolute');
 });
 
-it('prints a disposable offline projection and removes it after the print dialog returns', async () => {
+it('preserves authored print layout before expanding still-clipped scroll regions', async () => {
   const projection = printWebSnapshotProjection({
     documentUrl: null,
     hostDocument: document,
@@ -81,13 +93,57 @@ it('prints a disposable offline projection and removes it after the print dialog
   }
   const authoredPrintStyle = frame.contentDocument?.createElement('style');
   if (authoredPrintStyle && frame.contentDocument?.head) {
-    authoredPrintStyle.textContent =
-      '@media print { .article { display: block; max-width: 42rem; } }';
+    authoredPrintStyle.textContent = [
+      '@media print {',
+      '.article { display: block; max-width: 42rem; }',
+      '.hide-in-print { display: none; }',
+      '.reflow-in-print { display: grid; width: 42rem; grid-template-columns: 1fr; }',
+      '}',
+    ].join('\n');
     frame.contentDocument.head.append(authoredPrintStyle);
   }
+  const printShell = frame.contentDocument?.createElement('main');
+  const reflowedPrintShell = frame.contentDocument?.createElement('main');
+  const sharedPrintShell = frame.contentDocument?.createElement('main');
+  let printScroller: HTMLElement | null = null;
+  let reflowedPrintScroller: HTMLElement | null = null;
+  let siblingPrintScrollers: HTMLElement[] = [];
+  if (printShell && frame.contentDocument?.body) {
+    printShell.className = 'hide-in-print';
+    printScroller = appendLargeScroller(printShell);
+    frame.contentDocument.body.append(printShell);
+  }
+  if (reflowedPrintShell && frame.contentDocument?.body) {
+    reflowedPrintShell.className = 'reflow-in-print';
+    reflowedPrintScroller = appendLargeScroller(reflowedPrintShell);
+    frame.contentDocument.body.append(reflowedPrintShell);
+  }
+  if (sharedPrintShell && frame.contentDocument?.body) {
+    siblingPrintScrollers = [
+      appendLargeScroller(sharedPrintShell),
+      appendLargeScroller(sharedPrintShell),
+    ];
+    frame.contentDocument.body.append(sharedPrintShell);
+  }
   let authoredPrintCss = '';
+  let hiddenPrintScrollerExpanded = false;
+  let reflowedPrintScrollerExpanded = false;
+  let siblingPrintScrollersExpanded: boolean[] = [];
   let printPolicy = '';
   const printWithPolicy = vi.fn(() => {
+    if (printShell) printShell.style.display = 'none';
+    if (reflowedPrintShell) {
+      reflowedPrintShell.style.display = 'grid';
+      reflowedPrintShell.style.width = '42rem';
+    }
+    frameWindow.dispatchEvent(new Event('beforeprint'));
+    hiddenPrintScrollerExpanded =
+      printScroller?.hasAttribute('data-sniptale-print-scroll-region') ?? false;
+    reflowedPrintScrollerExpanded =
+      reflowedPrintScroller?.hasAttribute('data-sniptale-print-scroll-region') ?? false;
+    siblingPrintScrollersExpanded = siblingPrintScrollers.map((scroller) =>
+      scroller.hasAttribute('data-sniptale-print-scroll-region')
+    );
     authoredPrintCss = Array.from(frame.contentDocument?.styleSheets ?? [])
       .flatMap((sheet) => Array.from(sheet.cssRules))
       .map((rule) => rule.cssText)
@@ -125,6 +181,9 @@ it('prints a disposable offline projection and removes it after the print dialog
   expect(printPolicy).toContain('overflow:visible!important');
   expect(printPolicy).toContain('[data-sniptale-print-scroll-region]');
   expect(printPolicy).toContain('width:100%!important');
+  expect(hiddenPrintScrollerExpanded).toBe(false);
+  expect(reflowedPrintScrollerExpanded).toBe(false);
+  expect(siblingPrintScrollersExpanded).toEqual([true, true]);
   expect(printWithPolicy).toHaveBeenCalledOnce();
   expect(document.querySelector('iframe')).toBeNull();
 });

@@ -74,6 +74,7 @@ function useViewerDocumentTitle(loaded: LoadedWebSnapshotPackage | null): AppLoc
 
 function SnapshotFrameSurface(props: {
   availableHeight: number;
+  availableWidth: number;
   currentViewport: ViewerViewport;
   iframeRef: MutableRefObject<HTMLIFrameElement | null>;
   loaded: LoadedWebSnapshotPackage;
@@ -83,6 +84,7 @@ function SnapshotFrameSurface(props: {
   onIframeLoaded: (iframe: HTMLIFrameElement) => void;
   onExternalLinkPreviewChange: (href: string | null) => void;
   onOpenExternalLink: (href: string) => void;
+  responsiveLayout: boolean;
   zoom: number;
 }) {
   const { iframeRef, onIframeElementChange, onIframeLoaded } = props;
@@ -155,8 +157,12 @@ function SnapshotFrameSurface(props: {
     );
   }
 
-  const logicalHeight =
-    props.currentViewport === null && props.zoom < 1
+  const logicalWidth = props.responsiveLayout
+    ? Math.max(1, Math.ceil(props.availableWidth / props.zoom))
+    : resolvedViewport.width;
+  const logicalHeight = props.responsiveLayout
+    ? Math.max(1, Math.ceil(props.availableHeight / props.zoom))
+    : props.currentViewport === null && props.zoom < 1
       ? Math.max(resolvedViewport.height, Math.ceil(props.availableHeight / props.zoom))
       : resolvedViewport.height;
 
@@ -165,8 +171,8 @@ function SnapshotFrameSurface(props: {
       data-testid="snapshot-frame-scaled-viewport"
       className="mx-auto max-w-none shrink-0 overflow-hidden"
       style={{
-        height: `${logicalHeight * props.zoom}px`,
-        width: `${resolvedViewport.width * props.zoom}px`,
+        height: `${props.responsiveLayout ? props.availableHeight : logicalHeight * props.zoom}px`,
+        width: `${props.responsiveLayout ? props.availableWidth : logicalWidth * props.zoom}px`,
       }}
     >
       <div
@@ -175,7 +181,7 @@ function SnapshotFrameSurface(props: {
           height: `${logicalHeight}px`,
           transform: `scale(${props.zoom})`,
           transformOrigin: 'top left',
-          width: `${resolvedViewport.width}px`,
+          width: `${logicalWidth}px`,
         }}
       >
         <WebSnapshotFrame
@@ -240,6 +246,7 @@ function useSnapshotPreparationFrame(loaded: LoadedWebSnapshotPackage) {
 
 function SnapshotModeContent(props: {
   availableHeight: number;
+  availableWidth: number;
   currentViewport: ViewerViewport;
   externalLinksEnabled: boolean;
   handleIframeElementChange: (iframe: HTMLIFrameElement | null) => void;
@@ -253,6 +260,7 @@ function SnapshotModeContent(props: {
   onExternalLinkPreviewChange: (href: string | null) => void;
   onOpenExternalLink: (href: string) => void;
   preparationIframe: HTMLIFrameElement | null;
+  responsiveLayout: boolean;
   zoom: number;
 }) {
   if (props.mode === 'assets') {
@@ -281,6 +289,7 @@ function SnapshotModeContent(props: {
     <>
       <SnapshotFrameSurface
         availableHeight={props.availableHeight}
+        availableWidth={props.availableWidth}
         currentViewport={props.currentViewport}
         externalLinksEnabled={props.externalLinksEnabled}
         iframeRef={props.iframeRef}
@@ -290,6 +299,7 @@ function SnapshotModeContent(props: {
         onIframeLoaded={props.handleIframeLoaded}
         onExternalLinkPreviewChange={props.onExternalLinkPreviewChange}
         onOpenExternalLink={props.onOpenExternalLink}
+        responsiveLayout={props.responsiveLayout}
         zoom={props.zoom}
       />
       {props.preparationIframe ? (
@@ -321,7 +331,8 @@ function WebSnapshotViewerSurface(props: { loaded: LoadedWebSnapshotPackage; loc
       : mode === 'visual'
         ? (props.loaded.manifest.viewport?.width ?? null)
         : null;
-  const zoom = useViewerZoom(zoomContentWidth);
+  const responsiveLayout = mode === 'static-document' && currentViewport === null;
+  const zoom = useViewerZoom(zoomContentWidth, responsiveLayout);
   const openExternalLink = useCallback((href: string) => {
     void browserTabs.create({ active: true, url: href }).catch(() => {
       logger.warn('Failed to open an external snapshot link');
@@ -414,6 +425,7 @@ function WebSnapshotViewerSurface(props: { loaded: LoadedWebSnapshotPackage; loc
         )}
         <SnapshotModeContent
           availableHeight={zoom.availableHeight}
+          availableWidth={zoom.availableWidth}
           currentViewport={currentViewport}
           externalLinksEnabled={externalLinksEnabled}
           handleIframeElementChange={handleIframeElementChange}
@@ -427,6 +439,7 @@ function WebSnapshotViewerSurface(props: { loaded: LoadedWebSnapshotPackage; loc
           onExternalLinkPreviewChange={setExternalLinkPreview}
           onOpenExternalLink={openExternalLink}
           preparationIframe={preparationIframe}
+          responsiveLayout={responsiveLayout}
           zoom={zoom.zoom}
         />
       </section>

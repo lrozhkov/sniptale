@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
 import { createPagePackageManifestFixture } from '../../../features/web-snapshot/manifest.test-support';
+import { translate } from '../../../platform/i18n';
 import type { LoadedWebSnapshotPackage } from '../../viewer/assets';
 
 const mocks = vi.hoisted(() => ({
@@ -143,7 +144,7 @@ it('resizes the snapshot iframe surface when viewer viewport state changes', asy
   expect(viewport?.style.height).toBe('844px');
 });
 
-it('keeps the saved width and expands a reduced default viewport downward', async () => {
+it('reflows the saved static document at the available viewer dimensions in fit mode', async () => {
   mocks.loadWebSnapshotPackage.mockResolvedValue(
     createLoadedPackage({ viewport: { deviceScaleFactor: 2, height: 1440, width: 2560 } })
   );
@@ -151,17 +152,17 @@ it('keeps the saved width and expands a reduced default viewport downward', asyn
   await renderViewer();
 
   const viewport = container?.querySelector<HTMLElement>('[data-testid="snapshot-frame-viewport"]');
-  expect(viewport?.style.width).toBe('2560px');
-  expect(viewport?.style.height).toBe('1920px');
+  expect(viewport?.style.width).toBe('1024px');
+  expect(viewport?.style.height).toBe('768px');
   const scaledViewport = container?.querySelector<HTMLElement>(
     '[data-testid="snapshot-frame-scaled-viewport"]'
   );
   expect(scaledViewport?.style.width).toBe('1024px');
   expect(scaledViewport?.style.height).toBe('768px');
-  expect(viewport?.style.transform).toBe('scale(0.4)');
+  expect(viewport?.style.transform).toBe('scale(1)');
 });
 
-it('uses a true 100% scale instead of blurring a near-width capture by a few pixels', async () => {
+it('reflows a near-width static document at a sharp 100% scale', async () => {
   mocks.loadWebSnapshotPackage.mockResolvedValue(
     createLoadedPackage({ viewport: { deviceScaleFactor: 1, height: 800, width: 1030 } })
   );
@@ -176,7 +177,7 @@ it('uses a true 100% scale instead of blurring a near-width capture by a few pix
     (button) => button.textContent === '100%'
   );
 
-  expect(scaledViewport?.style.width).toBe('1030px');
+  expect(scaledViewport?.style.width).toBe('1024px');
   expect(viewport?.style.transform).toBe('scale(1)');
   expect(actualSizeButton).toBeDefined();
 });
@@ -234,7 +235,7 @@ it('does not let grab navigation consume the collapsed toolbar button pointer ge
   expect(container?.querySelector('header')).not.toBeNull();
 });
 
-it('keeps captured layout dimensions while switching between fit and manual zoom', async () => {
+it('uses browser-like zoom without returning the static document to its captured viewbox', async () => {
   mocks.loadWebSnapshotPackage.mockResolvedValue(
     createLoadedPackage({ viewport: { deviceScaleFactor: 2, height: 1440, width: 2560 } })
   );
@@ -247,43 +248,46 @@ it('keeps captured layout dimensions while switching between fit and manual zoom
     container?.querySelector<HTMLElement>('[data-testid="snapshot-frame-viewport"]');
   expect(scaledViewport()?.style.width).toBe('1024px');
   expect(scaledViewport()?.className).toContain('overflow-hidden');
-  expect(viewport()?.style.width).toBe('2560px');
-  expect(viewport()?.style.height).toBe('1920px');
+  expect(viewport()?.style.width).toBe('1024px');
+  expect(viewport()?.style.height).toBe('768px');
   expect(scaledViewport()?.style.height).toBe('768px');
 
   const percentButton = Array.from(container?.querySelectorAll('button') ?? []).find(
-    (button) => button.textContent === '40%'
+    (button) => button.textContent === '100%'
   );
-  act(() => {
-    percentButton?.click();
-  });
-  expect(scaledViewport()?.style.width).toBe('2560px');
-  expect(viewport()?.style.transform).toBe('scale(1)');
-  expect(viewport()?.style.height).toBe('1440px');
   const surface = container?.querySelector<HTMLElement>('[data-testid="snapshot-viewer-surface"]');
-  expect(surface?.className).toContain('overflow-x-auto');
+  expect(surface?.className).toContain('overflow-x-hidden');
   expect(surface?.className).toContain('overflow-y-auto');
   expect(surface?.style.scrollbarGutter).toBe('stable');
-  expect(surface?.className).toContain('cursor-grab');
+  expect(surface?.className).not.toContain('cursor-grab');
 
   const zoomButtons = percentButton?.parentElement?.querySelectorAll('button');
+  expect(zoomButtons).toHaveLength(3);
   act(() => {
     zoomButtons?.item(2).click();
   });
-  expect(scaledViewport()?.style.width).toBe('2816px');
+  expect(scaledViewport()?.style.width).toBe('1024px');
+  expect(scaledViewport()?.style.height).toBe('768px');
+  expect(viewport()?.style.width).toBe('931px');
+  expect(viewport()?.style.height).toBe('699px');
+  expect(viewport()?.style.transform).toBe('scale(1.1)');
   expect(percentButton?.textContent).toBe('110%');
 
   act(() => {
     zoomButtons?.item(0).click();
   });
-  expect(scaledViewport()?.style.width).toBe('2560px');
+  expect(viewport()?.style.width).toBe('1024px');
+  expect(viewport()?.style.transform).toBe('scale(1)');
   expect(percentButton?.textContent).toBe('100%');
 
   act(() => {
-    zoomButtons?.item(zoomButtons.length - 1).click();
+    zoomButtons?.item(0).click();
   });
   expect(scaledViewport()?.style.width).toBe('1024px');
-  expect(viewport()?.style.transform).toBe('scale(0.4)');
+  expect(viewport()?.style.width).toBe('1138px');
+  expect(viewport()?.style.height).toBe('854px');
+  expect(viewport()?.style.transform).toBe('scale(0.9)');
+  expect(percentButton?.textContent).toBe('90%');
 });
 
 it('pans an enlarged snapshot with primary-button grab navigation', async () => {
@@ -291,9 +295,19 @@ it('pans an enlarged snapshot with primary-button grab navigation', async () => 
     createLoadedPackage({ viewport: { deviceScaleFactor: 2, height: 1440, width: 2560 } })
   );
   await renderViewer();
+  const visualModeLabels = [
+    translate('webSnapshotViewer.app.visualMode', 'en'),
+    translate('webSnapshotViewer.app.visualMode', 'ru'),
+  ];
+  const visualModeButton = Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
+    visualModeLabels.includes(button.textContent ?? '')
+  );
+  expect(visualModeButton).toBeDefined();
+  act(() => visualModeButton?.click());
   const percentButton = Array.from(container?.querySelectorAll('button') ?? []).find(
     (button) => button.textContent === '40%'
   );
+  expect(percentButton).toBeDefined();
   act(() => percentButton?.click());
   const surface = container?.querySelector<HTMLElement>('[data-testid="snapshot-viewer-surface"]');
   Object.defineProperties(surface!, {

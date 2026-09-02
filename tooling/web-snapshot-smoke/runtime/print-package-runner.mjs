@@ -10,6 +10,27 @@ import { enableWebSnapshotsForSmoke } from './popup-driver.mjs';
 
 const MAX_PRINT_HEIGHT_EXPANSION_RATIO = 2;
 
+export function installPrintSmokeLifecycleHook() {
+  const nativeRemove = globalThis.Element.prototype.remove;
+  globalThis.Element.prototype.remove = function remove() {
+    if (
+      this instanceof globalThis.HTMLIFrameElement &&
+      this.contentWindow?.__sniptaleSmokePrintRequested === true
+    ) {
+      this.setAttribute('data-sniptale-smoke-print-projection', 'true');
+      return;
+    }
+    nativeRemove.call(this);
+  };
+  Object.defineProperty(globalThis, 'print', {
+    configurable: true,
+    value: () => {
+      globalThis.dispatchEvent(new globalThis.Event('beforeprint'));
+      globalThis.__sniptaleSmokePrintRequested = true;
+    },
+  });
+}
+
 function fingerprintBody(body) {
   const document = body.ownerDocument;
   const round = (value) => Math.round(value * 10) / 10;
@@ -350,25 +371,7 @@ async function runPrintSmoke({ packageArgument = null, sourceUrl = null }) {
     ignoreDefaultArgs: ['--disable-extensions'],
     viewport: { height: 900, width: 1440 },
   });
-  await context.addInitScript(() => {
-    const nativeRemove = globalThis.Element.prototype.remove;
-    globalThis.Element.prototype.remove = function remove() {
-      if (
-        this instanceof globalThis.HTMLIFrameElement &&
-        this.contentWindow?.__sniptaleSmokePrintRequested === true
-      ) {
-        this.setAttribute('data-sniptale-smoke-print-projection', 'true');
-        return;
-      }
-      nativeRemove.call(this);
-    };
-    Object.defineProperty(globalThis, 'print', {
-      configurable: true,
-      value: () => {
-        globalThis.__sniptaleSmokePrintRequested = true;
-      },
-    });
-  });
+  await context.addInitScript(installPrintSmokeLifecycleHook);
 
   let metrics;
   try {

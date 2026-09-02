@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { verifyPrintCoverage } from './print-package-runner.mjs';
+// @vitest-environment jsdom
+
+import { installPrintSmokeLifecycleHook, verifyPrintCoverage } from './print-package-runner.mjs';
 
 function createElement(overrides: Record<string, unknown> = {}) {
   return {
@@ -19,6 +21,30 @@ function createElement(overrides: Record<string, unknown> = {}) {
 }
 
 describe('Web Snapshot print package coverage', () => {
+  it('dispatches beforeprint before retaining the disposable projection', () => {
+    const originalRemove = globalThis.Element.prototype.remove;
+    const originalPrint = Object.getOwnPropertyDescriptor(globalThis, 'print');
+    let lifecycleState: boolean | null = null;
+    const onBeforePrint = () => {
+      lifecycleState = Reflect.get(globalThis, '__sniptaleSmokePrintRequested') === true;
+    };
+    globalThis.addEventListener('beforeprint', onBeforePrint);
+    try {
+      installPrintSmokeLifecycleHook();
+
+      globalThis.print();
+
+      expect(lifecycleState).toBe(false);
+      expect(Reflect.get(globalThis, '__sniptaleSmokePrintRequested')).toBe(true);
+    } finally {
+      globalThis.Element.prototype.remove = originalRemove;
+      globalThis.removeEventListener('beforeprint', onBeforePrint);
+      Reflect.deleteProperty(globalThis, '__sniptaleSmokePrintRequested');
+      if (originalPrint) Object.defineProperty(globalThis, 'print', originalPrint);
+      else Reflect.deleteProperty(globalThis, 'print');
+    }
+  });
+
   it('rejects a projection that leaves an internal scroll region clipped', () => {
     const coverage = verifyPrintCoverage(
       { documentHeight: 200, elements: [createElement()], textLength: 100 },
