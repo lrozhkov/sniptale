@@ -4,7 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
-import { createVideoCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/test-support';
+import { createVideoCapabilities } from '../../test-support/video-capabilities';
 import type { ExportFooterActions } from '../footer/actions';
 
 const mocks = vi.hoisted(() => ({

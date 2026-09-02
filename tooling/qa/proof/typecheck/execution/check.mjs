@@ -35,7 +35,6 @@ const APP_AMBIENT_DECLARATION_FILES = [
   `${REPO_ROOT}/packages/runtime-contracts/src/video/types/types.literals.d.ts`,
 ];
 const TEST_SUPPORT_FILES = [
-  'packages/runtime-contracts/src/tab-capabilities/test-support.ts',
   'apps/extension/src/features/video/project/timeline/project-meta.test.helpers.ts',
 ];
 

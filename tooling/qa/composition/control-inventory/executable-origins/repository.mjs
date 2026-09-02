@@ -52,7 +52,7 @@ function collectFiles(root, directory, predicate) {
     const current = pending.pop();
     for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
       const absolutePath = path.join(current, entry.name);
-      if (entry.isDirectory()) pending.push(absolutePath);
+      if (entry.isDirectory() && entry.name !== 'node_modules') pending.push(absolutePath);
       else if (entry.isFile() && predicate(absolutePath)) {
         files.push(toRepositoryPath(root, absolutePath));
       }

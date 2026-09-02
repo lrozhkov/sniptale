@@ -90,6 +90,11 @@ describe('repository executable origin projection', () => {
     expect(projection.origins.every(({ target }) => projection.targets.includes(target))).toBe(
       true
     );
+    expect(
+      [...projection.targets, ...projection.registrationAuthorityPaths].every(
+        (repositoryPath) => !repositoryPath.includes('/node_modules/')
+      )
+    ).toBe(true);
     expect(projection.inputs).not.toEqual(expect.arrayContaining(projection.targets));
   }, 90_000);
 });

@@ -146,7 +146,7 @@ function resolveCoverageInclude() {
 export default defineConfig({
   test: {
     include: resolveSuiteInclude(),
-    exclude: ['cases/**', 'tooling/test/e2e/**/*.spec.ts', 'dist/**', 'node_modules/**'],
+    exclude: ['cases/**', 'tooling/test/e2e/**/*.spec.ts', 'dist/**', '**/node_modules/**'],
     setupFiles: ['./tooling/test/harness/vitest.setup.ts'],
     testTimeout: isWrapperTimeoutMode ? 15000 : undefined,
     hookTimeout: isWrapperTimeoutMode ? 15000 : undefined,
@@ -188,7 +188,7 @@ export default defineConfig({
       exclude: [
         'cases/**',
         'dist/**',
-        'node_modules/**',
+        '**/node_modules/**',
         'tooling/test/e2e/**',
         'apps/extension/src/**/*.test.{ts,tsx}',
         'apps/extension/src/**/*.spec.{ts,tsx}',

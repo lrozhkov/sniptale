@@ -590,6 +590,10 @@ jobs:
       - name: Install exact candidate dependencies
         working-directory: candidate
         run: npm ci --ignore-scripts
+      - name: Install locked mutation toolchain
+        if: env.PROOF_LANE == 'release'
+        working-directory: candidate
+        run: npm ci --ignore-scripts --prefix tooling/test/mutation
       - name: Collect report-only advisory evidence
         working-directory: candidate
         run: node tooling/ci/advisory-artifacts.mjs "$PROOF_LANE"

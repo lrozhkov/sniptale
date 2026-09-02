@@ -48,7 +48,6 @@
     "./scenario/types/session": "./src/scenario/types/session.ts",
     "./scenario/types/v3": "./src/scenario/types/v3/index.ts",
     "./schemas/highlighter": "./src/schemas/highlighter.ts",
-    "./tab-capabilities/test-support": "./src/tab-capabilities/test-support.ts",
     "./tab-capabilities/types": "./src/tab-capabilities/types.ts",
     "./validation/base64": "./src/validation/base64.ts",
     "./validation/data-url": "./src/validation/data-url.ts",
