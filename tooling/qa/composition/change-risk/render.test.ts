@@ -42,3 +42,26 @@ it('keeps terminal risk lists bounded and preserves complete evidence in the ful
   expect(full).toContain('packages/runtime-contracts/src/messaging/message-types/index.ts');
   expect(full).toContain('docs/security/manifest-permissions.md');
 });
+
+it('does not present unmatched heuristics as low risk or waive review assessment', () => {
+  const terminal = formatCheckpointRiskSummary({ findings: [], steps: [] });
+  const full = formatFullChangeRiskReport({ findings: [], steps: [] });
+
+  for (const output of [terminal, full]) {
+    expect(output).toContain('No classified change seams detected');
+    expect(output).toContain('Executor review assessment required before closeout');
+    expect(output).not.toContain('LOW');
+    expect(output).not.toContain('No architecture or security review indicated');
+  }
+});
+
+it('requires executor assessment when a classified seam has no automatic review route', () => {
+  const mutationFindings = collectChangeRisks({
+    mode: 'preflight',
+    targetFiles: ['apps/extension/src/composition/persistence/projects/index-mutations.ts'],
+  });
+  const output = formatCheckpointRiskSummary({ findings: mutationFindings, steps: [] });
+
+  expect(output).toContain('Change risk: MEDIUM');
+  expect(output).toContain('Executor review assessment required before closeout');
+});

@@ -44,9 +44,15 @@ it('renders structural watches only through the checkpoint advisory block', asyn
     });
 
     expect(result.steps.find((step) => step.label === 'Advisory report')).toMatchObject({
-      consoleOutput: expect.stringContaining('Change risk: LOW'),
-      stdout: expect.stringContaining('Change risk report: LOW'),
+      consoleOutput: expect.stringContaining('No classified change seams detected'),
+      stdout: expect.stringContaining('No classified change seams detected'),
     });
+    expect(result.steps.find((step) => step.label === 'Advisory report')?.consoleOutput).toContain(
+      'Executor review assessment required before closeout'
+    );
+    expect(
+      result.steps.find((step) => step.label === 'Advisory report')?.consoleOutput
+    ).not.toContain('LOW');
     expect(result.steps.find((step) => step.label === 'Advisory report')?.consoleOutput).toContain(
       'Advisory: attention=0, watch=1'
     );

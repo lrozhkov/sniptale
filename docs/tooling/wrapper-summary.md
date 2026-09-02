@@ -10,7 +10,7 @@ This document owns wrapper scope, freshness, locks, handoffs, and observability.
 - `qa:advisory` runs optional non-blocking diagnosis over the current diff.
 - `qa:structural-audit` writes a manual non-blocking repository topology report.
 - `qa:release-harness` formats supported changed files, validates QA composition and applicable dependencies, runs selected harness proof, and writes a content-bound freshness stamp.
-- `qa:checkpoint` formats supported changed files, recollects the diff, requires applicable harness freshness, records advisory results, and runs selected focused controls and tests. Its change-risk report routes human review but does not affect status or create review state. It does not build, stage, or commit.
+- `qa:checkpoint` formats supported changed files, recollects the diff, requires applicable harness freshness, records advisory results, and runs selected focused controls and tests. Its change-risk report detects a bounded set of classified seams and routes human review but does not determine that unmatched changes are low risk, waive executor review assessment, affect status, or create review state. It does not build, stage, or commit.
 - `qa:closeout` reuses a matching checkpoint or runs one, hands its lock to the internal build, verifies the unchanged diff, stages allowed files, rejects `tasks/**`, and commits after successful build proof.
 
 `qa:internal:build` is an internal closeout script. Its observed identity is `qa:build`. It owns artifact construction and commit automation, not checkpoint semantics. `ci:build` is a build-only bypass without QA or provenance evidence.

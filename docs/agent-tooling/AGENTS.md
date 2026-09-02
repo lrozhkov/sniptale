@@ -67,13 +67,14 @@ Follow this order. Repeat a step only when a later edit invalidates its result.
 4. Apply its change-risk report:
    - Run every indicated `$security-code-review` and `$architecture-code-review`.
    - Treat the routing as required even though wrappers neither store nor enforce it.
-   - When neither review is indicated, report `not required` separately from the risk level.
+   - Absence of a routed review or classified seam is not a low-risk determination or a review waiver.
+   - When a review is not routed, inspect the actual implementation against both review-skill triggers before closeout. Run every applicable review or record an implementation-specific reason why that review is `not required`.
 5. Resolve review findings under the rules below, apply one correction batch, and repeat invalidated proof or review.
 6. Run `npm run qa:closeout -- -m "<commit message>"`.
 
 For a planned broad move, run `$topology-plan-review` before implementation. For an already implemented broad move without prior topology review, run it after all required proof passes.
 
-Each required review uses a new read-only subagent with `fork_turns: "none"`. Provide the scope manifest, exact diff, preflight result, and QA results. Do not provide intended conclusions.
+Each review required by checkpoint routing or executor assessment uses a new read-only subagent with `fork_turns: "none"`. Provide the scope manifest, exact diff, preflight result, and QA results. Do not provide intended conclusions.
 
 Collect all review findings before editing. Confirm each finding against acceptance criteria, evidence, and invariants.
 
@@ -95,8 +96,8 @@ Report:
 
 - the change
 - every required QA and closeout command as `passed`, `failed`, or `not run`
-- the checkpoint risk level, or `not run`
-- each review result, or `not required`
+- the checkpoint risk level, `no classified change seams detected`, or `not run`
+- each review result, or `not required` with the executor's implementation-specific reason
 - the escaped-defect QA decision for an escaped-defect task
 
 After the fourth closeout attempt, also report the repeated causes and resulting documentation or guardrail changes.

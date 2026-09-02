@@ -229,5 +229,5 @@ export function collectRiskReviews(findings) {
 export function resolveChangeRiskLevel(findings) {
   if (findings.some((finding) => finding.level === 'high')) return 'HIGH';
   if (findings.some((finding) => finding.level === 'medium')) return 'MEDIUM';
-  return 'LOW';
+  return null;
 }

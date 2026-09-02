@@ -280,7 +280,7 @@ The normal workflow combines:
 - deterministic build, release packaging, legal notices, SBOM generation, audit evidence, and rollback procedure;
 - dedicated agent skills for architecture review, repository audit, security review, and topology-plan review.
 
-The repository's working convention is to begin with acceptance criteria and non-goals, run a preflight, implement one coherent change, execute the relevant checkpoint, request a separate read-only architecture or security review for high-risk seams, consolidate findings, and close out only after the required proof is green.
+The repository's working convention is to begin with acceptance criteria and non-goals, run a preflight, implement one coherent change, execute the relevant checkpoint, run every routed read-only architecture or security review, independently assess unrouted changes against both review triggers, consolidate findings, and close out only after the required proof is green.
 
 Repository-local commands remain the QA authority. GitHub Actions applies the same pushed-range proof to every pull request and update to `main`; it complements the local workflow rather than defining a second validation path.
 

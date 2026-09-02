@@ -29,7 +29,13 @@ function collectCoverage(findings, steps) {
 
 function formatReviewLines(findings) {
   const reviews = collectRiskReviews(findings);
-  if (reviews.length === 0) return ['Review:', '- No architecture or security review indicated'];
+  if (reviews.length === 0) {
+    return [
+      'Review:',
+      '- No architecture or security review automatically routed by checkpoint heuristics',
+      '- Executor review assessment required before closeout: inspect the actual implementation against both review triggers, then run applicable reviews or record implementation-specific reasons why each is not required',
+    ];
+  }
   return [
     'Review:',
     ...reviews.map((review) => {
@@ -42,12 +48,17 @@ function formatReviewLines(findings) {
   ];
 }
 
+function formatRiskHeading(prefix, findings) {
+  const level = resolveChangeRiskLevel(findings);
+  return level === null ? `${prefix}: No classified change seams detected` : `${prefix}: ${level}`;
+}
+
 export function formatCheckpointRiskSummary({ findings = [], steps = [] } = {}) {
   const visible = findings.slice(0, TERMINAL_RISK_LIMIT);
   const omitted = findings.length - visible.length;
   const coverage = collectCoverage(findings, steps);
   const lines = [
-    `Change risk: ${resolveChangeRiskLevel(findings)}`,
+    formatRiskHeading('Change risk', findings),
     '',
     'Detected:',
     ...(visible.length === 0
@@ -75,7 +86,7 @@ export function formatCheckpointRiskSummary({ findings = [], steps = [] } = {}) 
 export function formatFullChangeRiskReport({ findings = [], steps = [] } = {}) {
   const coverage = collectCoverage(findings, steps);
   const lines = [
-    `Change risk report: ${resolveChangeRiskLevel(findings)}`,
+    formatRiskHeading('Change risk report', findings),
     '',
     'Risk findings:',
     ...(findings.length === 0

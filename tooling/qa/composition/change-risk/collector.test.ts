@@ -7,7 +7,7 @@ import {
   withCwd,
   writeJson,
 } from '../../test-support/test-helpers';
-import { collectChangeRisks } from './collector.mjs';
+import { collectChangeRisks, resolveChangeRiskLevel } from './collector.mjs';
 
 function commitFixture(root: string) {
   runGit(root, 'add', '.');
@@ -107,4 +107,8 @@ it('keeps preflight conservative for the manifest while attaching security guida
     'manifest.runtime-topology',
   ]);
   expect(findings[0]?.docs).toContain('docs/security/manifest-permissions.md');
+});
+
+it('does not assign a risk level when no classified seam is detected', () => {
+  expect(resolveChangeRiskLevel([])).toBeNull();
 });
