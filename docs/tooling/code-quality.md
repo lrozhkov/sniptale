@@ -12,7 +12,7 @@ The canonical machine entrypoints are:
 
 - `tooling/qa/composition/catalog/catalog.mjs` for control identity, category, order, and wrapper membership;
 - `tooling/qa/composition/control-inventory/discovery.mjs` for executable, consumer, and policy closure;
-- `tooling/configs/qa/quality-baseline.json` for narrow accepted static-analysis debt;
+- `tooling/configs/qa/quality-baseline.json` for exact reviewed static-analysis false positives;
 - `tooling/qa/composition/scope/qa-scope.mjs` for product, harness, and inventory scope.
 
 Documentation must not restate the full catalog, file population, lane size, or generated counts.
@@ -79,9 +79,9 @@ The blocking forwarding-drift control is narrower than the manual topology inven
 
 Security syntax and ownership rules use the smallest capable engine. Global data flow remains release-only. Supply-chain locks and artifact digests are valid when they bind an external binary, dependency graph, immutable image, release payload, or proof input.
 
-Repository-derived consumer inventories are validated from the live tree and are not checked in as SHA or count snapshots. A digest stored beside the complete data it hashes is not an independent authority. Baselines contain only measured legacy findings or confirmed tool noise; they never self-update during a blocking run.
+Repository-derived consumer inventories are validated from the live tree and are not checked in as SHA or count snapshots. A digest stored beside the complete data it hashes is not an independent authority. Heuristic findings are triage inputs, not automatic refactoring instructions. Inspect the reported code and detector evidence first. Fix a confirmed defect; add an exception only when the exact finding is a confirmed false-positive. Heuristic baselines may contain only `tool-noise`, never accepted debt, and every entry must resolve to an explicit owner, reason, and removal condition. Broad rule, directory, or message-pattern waivers are forbidden. Baselines never self-update during a blocking run.
 
-An accepted baseline entry remains non-blocking when its finding disappears or its source snapshot drifts. Stale entries and aggregate count/digest drift are maintenance advisories, not release work. New findings that do not match an exact enumerated baseline entry remain blocking, as do malformed or expired baseline policy and analyzer failures. Aggregate repository snapshots are advisory inventory rather than release admission authorities.
+An exact reviewed `tool-noise` entry remains non-blocking while the same finding exists. A disappeared entry is a stale maintenance advisory, not release work. A new or changed finding that does not match an exact entry remains blocking, as do malformed baseline policy and analyzer failures. Baseline composition changes use focused owner validation and do not by themselves schedule the release harness or harness unit suite.
 
 The pinned jscpd 5 release audit admits only exact findings reviewed as `tool-noise`. Every allowance records normalized endpoints, an owner, an evidence-backed reason, a removal condition, and a review date. New or shifted findings, malformed metadata, and expired reviews fail closed. Allowances absent from the live report are safe, non-blocking cleanup advisories because an absent exact ID cannot authorize another clone. Owner-family summaries are display-only and never authorize a clone. Checkpoint, closeout, and `ci:proof` do not run jscpd.
 

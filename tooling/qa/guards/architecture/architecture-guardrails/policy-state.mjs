@@ -139,20 +139,45 @@ export function collectPolicyStateDescriptorViolations(files, options = {}) {
       ),
     ];
   }
-  return collectPolicyStateDescriptorViolationsForFiles(files, {
+  const violations = collectPolicyStateDescriptorFindingsForFiles(files, {
     advisories: options.advisories,
     enforceAll: options.enforceAll === true,
     knownPolicyStateIds: new Set(inventory.ids),
     newFiles: options.newFiles ?? new Set(),
     root,
   });
+  if (options.enforceAll !== true) return violations;
+  const baselineCandidates = violations.filter(
+    ({ rule }) => rule === 'policy-state-descriptor-required'
+  );
+  const baseline = applyRepositoryFindingBaseline({
+    baselinePath: POLICY_STATE_BASELINE_PATH,
+    controlId: 'qa.rule.policy-state-descriptor',
+    findings: baselineCandidates,
+  });
+  options.advisories?.push(...baseline.advisories);
+  return [
+    ...violations.filter(({ rule }) => rule !== 'policy-state-descriptor-required'),
+    ...baseline.violations,
+  ];
 }
 
-function collectPolicyStateDescriptorViolationsForFiles(
+export function collectRepositoryPolicyStateDescriptorFindings(files, { root = repoRoot } = {}) {
+  const inventory = collectPolicyStateInventory({ root });
+  if (!inventory.exists) return [];
+  return collectPolicyStateDescriptorFindingsForFiles(files, {
+    enforceAll: true,
+    knownPolicyStateIds: new Set(inventory.ids),
+    newFiles: new Set(),
+    root,
+  }).filter(({ rule }) => rule === 'policy-state-descriptor-required');
+}
+
+function collectPolicyStateDescriptorFindingsForFiles(
   files,
-  { advisories, enforceAll, knownPolicyStateIds, newFiles, root }
+  { enforceAll, knownPolicyStateIds, newFiles, root }
 ) {
-  const violations = files
+  return files
     .map(toRelativePath)
     .filter(isProductionSourceFile)
     .sort()
@@ -164,20 +189,6 @@ function collectPolicyStateDescriptorViolationsForFiles(
         root,
       })
     );
-  if (!enforceAll) return violations;
-  const baselineCandidates = violations.filter(
-    ({ rule }) => rule === 'policy-state-descriptor-required'
-  );
-  const baseline = applyRepositoryFindingBaseline({
-    baselinePath: POLICY_STATE_BASELINE_PATH,
-    controlId: 'qa.rule.policy-state-descriptor',
-    findings: baselineCandidates,
-  });
-  advisories?.push(...baseline.advisories);
-  return [
-    ...violations.filter(({ rule }) => rule !== 'policy-state-descriptor-required'),
-    ...baseline.violations,
-  ];
 }
 
 function collectPolicyStateDescriptorViolationsForFile(

@@ -126,6 +126,18 @@ it('uses affected harness closure for product-only candidates and full harness f
   ).toMatchObject({ full: true, reason: 'CI/tooling control changed' });
 });
 
+it('does not schedule harness tests for a baseline composition-only candidate', () => {
+  const plan = resolveCiHarnessTestPlan(
+    { mode: 'full-suite' },
+    {
+      environment: { SNIPTALE_BASE_SHA: 'a'.repeat(40) },
+      gitRunner: createCandidateGitRunner('M\0tooling/configs/qa/quality-baseline.json\0'),
+    }
+  );
+
+  expect(plan).toMatchObject({ full: false, relatedFiles: [] });
+});
+
 it.each([
   ['deleted input', 'D\0apps/extension/src/removed.ts\0'],
   ['type-changed input', 'T\0tooling/ci/qa-composition.mjs\0'],

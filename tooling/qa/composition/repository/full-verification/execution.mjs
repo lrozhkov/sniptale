@@ -138,6 +138,7 @@ function collectDeadCommentedCodeStep({ baseline, codeFiles }) {
 }
 
 function collectStructuralRiskStep({
+  baseline,
   codeFiles,
   structuralCodeFiles = codeFiles,
   structuralComparisonRevision = 'HEAD',
@@ -153,7 +154,10 @@ function collectStructuralRiskStep({
     })
   );
   return withDuration(
-    createViolationStep('Structural risk', 'Structural risk violations found:', value),
+    createViolationStep('Structural risk', 'Structural risk violations found:', {
+      ...value,
+      violations: filterAllowedViolations(value.violations, baseline),
+    }),
     durationMs
   );
 }

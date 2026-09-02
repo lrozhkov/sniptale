@@ -119,8 +119,18 @@ it('separates generated inventories from executable harness changes', async () =
     expect(
       module.isHarnessVerificationQaFile('tooling/qa/proof/coverage/test-coverage/registry.mjs')
     ).toBe(true);
-    expect(module.isHarnessVerificationQaFile('tooling/configs/qa/quality-baseline.json')).toBe(
+    expect(module.isHarnessInventoryOnlyFile('tooling/configs/qa/quality-baseline.json')).toBe(
       true
+    );
+    expect(module.isHarnessVerificationQaFile('tooling/configs/qa/quality-baseline.json')).toBe(
+      false
+    );
+    expect(module.isHarnessInventoryOnlyFile('tooling/configs/qa/jscpd-baseline.json')).toBe(true);
+    expect(
+      module.isHarnessInventoryOnlyFile('tooling/configs/qa/structural-risk-allowances.data.json')
+    ).toBe(true);
+    expect(module.isHarnessInventoryOnlyFile('tooling/configs/qa/audit-profiles.data.json')).toBe(
+      false
     );
     expect(module.isHarnessVerificationQaFile('tooling/qa/composition/scope/qa-scope.mjs')).toBe(
       true

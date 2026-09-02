@@ -234,7 +234,8 @@ export function runRepoNodeEntryAsync(
         signal,
         stdout,
         stderr: overflowed
-          ? `${stderr}${stderr.endsWith('\n') || stderr.length === 0 ? '' : '\n'}Harness child output exceeded ${maxBuffer} bytes.\n`
+          ? `${stderr}${stderr.endsWith('\n') || stderr.length === 0 ? '' : '\n'}` +
+            `Harness child output exceeded ${maxBuffer} bytes.\n`
           : stderr,
       });
     });

@@ -59,14 +59,10 @@ export function runLineLengthCheck({ scope = 'workspace', files = null } = {}) {
 }
 
 export function runRepositoryReadabilityCheck() {
-  const baseline = loadBaseline();
+  const currentViolations = collectRepositoryReadabilityFindings();
   const files = collectCodeFiles().map((file) =>
     path.isAbsolute(file) ? path.relative(process.cwd(), file).replaceAll(path.sep, '/') : file
   );
-  const violations = files.flatMap((relativePath) =>
-    collectLineLengthViolations(relativePath, splitLines(readText(relativePath)))
-  );
-  const currentViolations = filterAllowedViolations(violations, baseline);
   const repositoryBaseline = applyRepositoryFindingBaseline({
     baselinePath: REPOSITORY_BASELINE_PATH,
     controlId: 'qa.rule.repository-readability',
@@ -79,6 +75,17 @@ export function runRepositoryReadabilityCheck() {
     violations: repositoryBaseline.violations,
     advisories: repositoryBaseline.advisories,
   };
+}
+
+export function collectRepositoryReadabilityFindings() {
+  const baseline = loadBaseline();
+  const files = collectCodeFiles().map((file) =>
+    path.isAbsolute(file) ? path.relative(process.cwd(), file).replaceAll(path.sep, '/') : file
+  );
+  const violations = files.flatMap((relativePath) =>
+    collectLineLengthViolations(relativePath, splitLines(readText(relativePath)))
+  );
+  return filterAllowedViolations(violations, baseline);
 }
 
 if (isExecutedAsScript(import.meta.url)) {

@@ -134,6 +134,10 @@ export function collectDomainFixtureRealismViolations(files, context = {}) {
   });
 }
 
+export function collectRepositoryDomainFixtureRealismFindings() {
+  return collectDomainFixtureRealismViolations(collectTestFiles());
+}
+
 function collectPreviousFindings(relativePath) {
   const renameSource =
     collectRenameSourceByTarget().get(relativePath) ??
@@ -191,7 +195,7 @@ export function runDomainFixtureRealismCheck({ files = [], scope = 'workspace' }
   const targetFiles = relativeFiles.map((file) => path.join(process.cwd(), file));
   const currentViolations =
     changedTargets == null
-      ? collectDomainFixtureRealismViolations(targetFiles)
+      ? collectRepositoryDomainFixtureRealismFindings()
       : filterNetNewWorkspaceViolations(targetFiles, changedTargets);
   const baseline =
     scope === 'repo-wide'

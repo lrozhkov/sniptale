@@ -1,6 +1,1331 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "controlId": "qa.rule.mock-export-parity",
   "findingCount": 219,
-  "findingDigest": "sha256:6e2051322d071b0900a4bd80f4124b2f7e4ab3156bf4374221f09227a721d0a6"
+  "findingDigest": "sha256:6e2051322d071b0900a4bd80f4124b2f7e4ab3156bf4374221f09227a721d0a6",
+  "findings": [
+    {
+      "file": "apps/extension/src/background/capture/quick-actions/desktop/workflow.test.ts",
+      "message": "Mock for apps/extension/src/platform/media-utils/desktop-capture-source-picker.ts is missing exports: createDesktopMediaSourceChooser, getScreenCaptureSource. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/capture/routing/actions.download.test.ts",
+      "message": "Mock for apps/extension/src/background/capture/download/download-router/index.ts is missing exports: defaultDownloadRouterService, executeDownloadUrl. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/capture/routing/handlers.guard.test.ts",
+      "message": "Mock for apps/extension/src/background/capture/download/download-router/index.ts is missing exports: defaultDownloadRouterService, executeDownloadUrl. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/capture/routing/scenario/index.test.ts",
+      "message": "Mock for apps/extension/src/composition/persistence/scenario/store/v3/index.ts is missing exports: createScenarioProjectRecordV3, deleteScenarioProjectRecordV3, discardPreparedScenarioAsset, getScenarioProjectRecordV3, listScenarioProjectSummariesV3, saveScenarioProjectRecordV3, stageScenarioV3ImageAsset, updateScenarioProjectRecordMetadataV3. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/media/video/runtime/manager/control-route.camera-recorder.test.ts",
+      "message": "Mock for apps/extension/src/background/media/video/capture-surface/recovery.ts is missing exports: deferVideoCaptureSurfaceWorkUntilRecovery, recoverVideoCaptureSurfaceOnStartup. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/media/video/runtime/manager/control-route.settings.test.ts",
+      "message": "Mock for apps/extension/src/background/media/video/runtime/manager/controls.ts is missing exports: stopRecordingForPrivacyErasure. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/media/video/runtime/manager/control-route.test.ts",
+      "message": "Mock for apps/extension/src/background/media/video/capture-surface/recovery.ts is missing exports: deferVideoCaptureSurfaceWorkUntilRecovery, recoverVideoCaptureSurfaceOnStartup. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/media/video/runtime/manager/control-route.test.ts",
+      "message": "Mock for apps/extension/src/background/media/video/runtime/manager/controls.ts is missing exports: stopRecordingForPrivacyErasure. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/media/video/runtime/manager/controls.entry.test.ts",
+      "message": "Mock for apps/extension/src/background/media/video/runtime/manager/controls.ts is missing exports: cancelRecordingStart, stopRecordingForPrivacyErasure, updateRecordingSettings. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/media/video/runtime/router.branches.test.ts",
+      "message": "Mock for apps/extension/src/background/media/video/runtime/handlers/state/recording-state.ts is missing exports: handleAcknowledgePostRecordResult, handleRecordingState. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/media/video/runtime/router.fallback.test.ts",
+      "message": "Mock for apps/extension/src/background/media/video/runtime/handlers/state/recording-state.ts is missing exports: handleAcknowledgePostRecordResult, handleRecordingState. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/media/video/runtime/session-state/badge-state.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/media/video/runtime/session-state/badge-state/clear.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/media/video/runtime/session-state/badge-state/countdown.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/runtime/context-menu/actions.page-access.test.ts",
+      "message": "Mock for apps/extension/src/background/runtime/tab-mode-router-screenshot/index.ts is missing exports: cleanupScreenshotModeAfterTabClose, disableScreenshotModeForContent, enableScreenshotModeGuarded, getScreenshotPresetAvailabilities, handleApplyViewportPreset, handleReleaseViewportPreset. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/runtime/tab-mode-router-screenshot/viewport.test.ts",
+      "message": "Mock for apps/extension/src/background/capture/lifecycle.ts is missing exports: cleanupCapture, createWebSnapshotViewerPorts, reconcileCaptureJobDownloadOnStartup, reconcileCaptureJobsOnStartup, registerWebSnapshotViewerPorts, sendViewerPopupExportMessage. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/runtime/tab-mode-router-screenshot/viewport.test.ts",
+      "message": "Mock for apps/extension/src/background/routing-contracts/runtime-messaging/services.ts is missing exports: resetBackgroundRuntimeMessagingForTests, setBackgroundRuntimeMessagingForTests. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/scenario/router/project-selection.integration.test.ts",
+      "message": "Mock for apps/extension/src/composition/persistence/scenario/store/v3/index.ts is missing exports: deleteScenarioProjectRecordV3, discardPreparedScenarioAsset, getScenarioProjectRecordV3, listScenarioProjectSummariesV3, saveScenarioCaptureSlideToProject, saveScenarioProjectRecordV3, stageScenarioV3ImageAsset, updateScenarioProjectRecordMetadataV3. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/scenario/router/project-selection.integration.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/scenario/router/project-selection.test.ts",
+      "message": "Mock for apps/extension/src/composition/persistence/scenario/store/v3/index.ts is missing exports: deleteScenarioProjectRecordV3, discardPreparedScenarioAsset, getScenarioProjectRecordV3, listScenarioProjectSummariesV3, saveScenarioCaptureSlideToProject, saveScenarioProjectRecordV3, stageScenarioV3ImageAsset, updateScenarioProjectRecordMetadataV3. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/scenario/router/project-selection.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/scenario/router/session-actions.integration.test.ts",
+      "message": "Mock for apps/extension/src/background/scenario/router/action-helpers.ts is missing exports: flushScenarioProjectCapture, saveCaptureStepToScenarioProject, setScenarioProjectSelection. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/scenario/session-actions/index.test.ts",
+      "message": "Mock for apps/extension/src/background/scenario/router/action-helpers.ts is missing exports: flushScenarioProjectCapture, saveCaptureStepToScenarioProject, setScenarioProjectSelection. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/scenario/session-actions/queries.test.ts",
+      "message": "Mock for apps/extension/src/background/scenario/router/action-helpers.ts is missing exports: flushScenarioProjectCapture, saveCaptureStepToScenarioProject, setScenarioProjectSelection. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/scenario/session-actions/queries/mutations.test.ts",
+      "message": "Mock for apps/extension/src/background/scenario/router/action-helpers.ts is missing exports: flushScenarioProjectCapture, saveCaptureStepToScenarioProject, setScenarioProjectSelection. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/scenario/session-actions/queries/query.test.ts",
+      "message": "Mock for apps/extension/src/background/scenario/router/action-helpers.ts is missing exports: flushScenarioProjectCapture, saveCaptureStepToScenarioProject, setScenarioProjectSelection. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/background/scenario/session-actions/suggested-events.test.ts",
+      "message": "Mock for apps/extension/src/background/scenario/router/action-helpers.ts is missing exports: flushScenarioProjectCapture, saveCaptureStepToScenarioProject, setScenarioProjectSelection. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/scenario/aggregate-mutations.test.ts",
+      "message": "Mock for apps/extension/src/composition/persistence/assets/index.ts is missing exports: abortArchiveRestoreSession, appendAssetOperationCompensation, appendCommittedArchiveRootInTransaction, assertAssetWriteAdmission, beginArchiveRestoreRoot, clearArchiveRestoreCurrentRoot, collectQuiescentWritingObjects, completeArchiveRestoreSession, countAssetStorageRoots, createAggregateAssetReservation, createArchiveRestoreSession, createAssetObjectWriter, createBackupRestoreOperation, createPreparedAssetArchiveSink, deleteReadyJournal, eraseAssetStorage, isAssetReadyProtected, listArchiveRestoreSessions, listAssetObjectIds, listReadyJournals, listWritingAssetIds, parseArchiveRestoreSession, parseAssetOwner, parseAssetReadyJournal, parseBackupAssetOperation, parsePhysicalDeleteAssetOperation, readArchiveRestoreSession, readAssetFile, readAssetOperation, runWithAssetObjectLockIfAvailable, runWithDurableAssetOperation, transitionAssetOperation, writeReadyJournal. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/ai/data-panel/json-preview/actions.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/ai/data-panel/selection-preview/actions.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/ai/pick/runtime/dom-apply/comment.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/ai/pick/runtime/dom-apply/table-target/cell-kind.test.ts",
+      "message": "Mock for apps/extension/src/content/overlay/ai/pick/runtime/dom-apply/cell.ts is missing exports: isTechnicalCell. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/ai/pick/runtime/dom-apply/table-target/mapping.test.ts",
+      "message": "Mock for apps/extension/src/content/overlay/ai/pick/runtime/dom-apply/cell.ts is missing exports: determineCellTypeFromDOM. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/ai/pick/runtime/dom-targets.test.ts",
+      "message": "Mock for apps/extension/src/content/platform/frame/index.ts is missing exports: addEventListenerToAllWindowsDynamic, addScrollListenersToAllWindows, addWindowEventListenerToAllWindowsDynamic, clearAllSniptaleIds, clearRetainedSniptaleIds, createDocumentPagePlacement, findElementBySniptaleId, findHtmlElementBySelector, getAbsolutePosition, getAccessibleIframes, getContainingIframe, getDocumentViewportBounds, getIframeDocument, getSniptaleIdCleanupGeneration, getTopViewportPoint, getViewportClientPoint, isAccessibleDocumentRuntimeStyle, isIframeAccessible, isSniptaleIdRetained, mountStyleInAccessibleDocuments, releaseSniptaleId, resolveDocumentPagePlacement, resolveIframeEventElement, resolveIframeEventTarget, resolveIframePointTarget, retainSniptaleId, updateDocumentPagePlacement, waitForAccessibleIframeReady, walkAllDocuments. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/ai/pick/runtime/interaction-target/index.test.ts",
+      "message": "Mock for apps/extension/src/content/platform/frame/index.ts is missing exports: addEventListenerToAllWindowsDynamic, addScrollListenersToAllWindows, addWindowEventListenerToAllWindowsDynamic, clearAllSniptaleIds, clearRetainedSniptaleIds, createDocumentPagePlacement, findElementBySelector, findElementBySniptaleId, findHtmlElementBySelector, getAbsolutePosition, getAccessibleIframes, getContainingIframe, getDocumentViewportBounds, getIframeDocument, getSniptaleIdCleanupGeneration, getTopViewportPoint, getViewportClientPoint, isAccessibleDocumentRuntimeStyle, isIframeAccessible, isSniptaleIdRetained, mountStyleInAccessibleDocuments, releaseSniptaleId, resolveDocumentPagePlacement, resolveIframeEventElement, resolveIframePointTarget, retainSniptaleId, updateDocumentPagePlacement, waitForAccessibleIframeReady, walkAllDocuments. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/ai/pick/runtime/lazy.test.ts",
+      "message": "Mock for apps/extension/src/content/overlay/ai/pick/runtime/runtime.ts is missing exports: refreshAiPickModeSnapshot, resolveAiPickInteractionTarget. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/ai/pick/runtime/lazy.test.ts",
+      "message": "Mock for apps/extension/src/content/overlay/ai/pick/runtime/runtime.ts is missing exports: refreshAiPickModeSnapshot, resolveAiPickInteractionTarget. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/ai/template-list/controls/add.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/ai/template-list/controls/show-more.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/ai/template-list/item/shell/button.test.tsx",
+      "message": "Mock for apps/extension/src/content/overlay/ai/template-list/item/helpers.ts is missing exports: createTemplateMenuClickHandler, getTemplatePillClasses. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/ai/template-list/item/shell/wiring.test.tsx",
+      "message": "Mock for apps/extension/src/content/overlay/ai/template-list/item/helpers.ts is missing exports: createTemplateMenuClickHandler, createTemplateSelectHandler, getTemplatePillClasses. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/ai/template-list/state/index.test.tsx",
+      "message": "Mock for apps/extension/src/content/overlay/ai/template-list/state/derived.ts is missing exports: buildTemplateListDerivedState. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/ai/template-list/view/loading.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/app-layout/index.test.tsx",
+      "message": "Mock for apps/extension/src/content/overlay/app-layout/sidebar-lazy.tsx is missing exports: preloadContentScenarioRecorderSidebar. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/app-layout/toolbar.test.tsx",
+      "message": "Mock for apps/extension/src/content/overlay/app-layout/sidebar-lazy.tsx is missing exports: LazyContentScenarioRecorderSidebar. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/scenario-recorder/sidebar/header.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/scenario-recorder/sidebar/index.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/scenario-recorder/sidebar/step-card.parts.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/toolbar/capture/dropdowns.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/toolbar/capture/history.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/toolbar/capture/local-save.file.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/toolbar/capture/settings-content.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/toolbar/controls/secondary.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/toolbar/mode-controller/editing.test.ts",
+      "message": "Mock for apps/extension/src/content/selection/design-review/index.ts is missing exports: dismissDesignReviewSelection, openDesignReviewTarget, registerDesignReviewInspectorDismissRequestHandler. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/toolbar/shell/navigation-lock.toggle.test.ts",
+      "message": "Mock for apps/extension/src/content/selection/locker/index.ts is missing exports: disableTextSelectionBlock, enableTextSelectionBlock, isLockEnabled, setFullLockMode, setUIHidden. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/toolbar/show-button/index.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/viewport-selector/index.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/parser/popup-export/helpers/preview.test.ts",
+      "message": "Mock for apps/extension/src/content/parser/dom-tree-parser/ai/markdown.ts is missing exports: estimateTokens. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/platform/frame/document-tree.test.ts",
+      "message": "Mock for apps/extension/src/content/platform/frame/core.ts is missing exports: getAbsolutePosition, getContainingIframe, getElementAtPoint, getViewportClientPoint, walkAllDocuments. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/platform/frame/documents.dynamic.test.ts",
+      "message": "Mock for apps/extension/src/content/platform/frame/core.ts is missing exports: getAbsolutePosition, getContainingIframe, getElementAtPoint, getViewportClientPoint, walkAllDocuments. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/platform/frame/listeners.test.ts",
+      "message": "Mock for apps/extension/src/content/platform/frame/core.ts is missing exports: getAbsolutePosition, getContainingIframe, getElementAtPoint, getViewportClientPoint, walkAllDocuments. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/platform/frame/scroll-listeners.test.ts",
+      "message": "Mock for apps/extension/src/content/platform/frame/core.ts is missing exports: getAbsolutePosition, getContainingIframe, getElementAtPoint, getViewportClientPoint, walkAllDocuments. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/platform/frame/target.test.ts",
+      "message": "Mock for apps/extension/src/content/platform/frame/core.ts is missing exports: getAbsolutePosition, getAccessibleIframes, getContainingIframe, getElementAtPoint, getViewportClientPoint, walkAllDocuments. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/runtime/bootstrap.cleanup.test.ts",
+      "message": "Mock for apps/extension/src/content/selection/design-review/index.ts is missing exports: dismissDesignReviewSelection, openDesignReviewTarget, registerDesignReviewInspectorDismissRequestHandler. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/runtime/bootstrap.cleanup.test.ts",
+      "message": "Mock for apps/extension/src/content/selection/highlighter/index.ts is missing exports: consumeHighlighterSuppressedClick, hasHighlighterHoverPreviewTarget, isFrameEditing, isHighlighterCreationEnabled, setHighlighterCreationEnabled. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/runtime/bootstrap.test.ts",
+      "message": "Mock for apps/extension/src/content/selection/design-review/index.ts is missing exports: dismissDesignReviewSelection, openDesignReviewTarget, registerDesignReviewInspectorDismissRequestHandler. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/runtime/bridge/core.test.ts",
+      "message": "Mock for apps/extension/src/content/selection/highlighter/index.ts is missing exports: clearAllHighlights, clearFrameEditing, consumeHighlighterSuppressedClick, hasHighlighterHoverPreviewTarget, invalidateFrameCache, isFrameEditing, isHighlighterCreationEnabled, isHighlighterEnabled, isHighlighterPausedState, pauseHighlighter, registerFrameCallbacks, resumeHighlighter, setFrameEditing, setHighlighterCreationEnabled. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/runtime/bridge/core.test.ts",
+      "message": "Mock for apps/extension/src/content/selection/locker/index.ts is missing exports: disableTextSelectionBlock, enableTextSelectionBlock, isLockEnabled, setUIHidden. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/runtime/bridge/core.test.ts",
+      "message": "Mock for apps/extension/src/content/selection/quick-edit/index.ts is missing exports: disableQuickEditDocumentMode, enableQuickEditDocumentMode, isQuickEditDocumentModeEnabled. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/runtime/entrypoint/bootstrap.test.tsx",
+      "message": "Mock for apps/extension/src/content/application/runtime-services/services.ts is missing exports: createContentRuntimeServices, resetContentRuntimeServicesForTests, setContentRuntimeServicesForTests. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/design-review/mode.test.ts",
+      "message": "Mock for apps/extension/src/content/platform/page-context/mode-events/index.ts is missing exports: addFrameEditingChangedListener, dispatchFrameEditingChanged. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/frame-runtime/manager/step-badge/actions-runtime.test.ts",
+      "message": "Mock for apps/extension/src/content/selection/frame-runtime/manager/step-badge/reorder.ts is missing exports: initializeMissingStepBadgeOrders, sortFramesForStepBadgeReorder. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/frame-runtime/manager/step-badge/actions-runtime.test.ts",
+      "message": "Mock for apps/extension/src/content/selection/frame-runtime/manager/step-badge/update.ts is missing exports: scheduleStepBadgeRecalculation, shouldRecalculateBadge. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/frame-runtime/mutation-actions/auto-blur.test.ts",
+      "message": "Mock for apps/extension/src/content/platform/frame/index.ts is missing exports: addEventListenerToAllWindowsDynamic, addScrollListenersToAllWindows, addWindowEventListenerToAllWindowsDynamic, clearAllSniptaleIds, clearRetainedSniptaleIds, findElementBySelector, findElementBySniptaleId, findHtmlElementBySelector, getAccessibleIframes, getIframeDocument, getSniptaleIdCleanupGeneration, getViewportClientPoint, isAccessibleDocumentRuntimeStyle, isIframeAccessible, isSniptaleIdRetained, mountStyleInAccessibleDocuments, releaseSniptaleId, resolveIframeEventElement, resolveIframeEventTarget, resolveIframePointTarget, retainSniptaleId, updateDocumentPagePlacement, waitForAccessibleIframeReady, walkAllDocuments. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/frame-runtime/mutation-actions/auto-blur.test.ts",
+      "message": "Mock for apps/extension/src/content/platform/frame/selectors/index.ts is missing exports: findElementByCompositeSelector, findElementBySelector, findHtmlElementBySelector, getElementSelector, getIframeSelector, parseCompositeSelector, serializeCompositeSelector. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/frame-runtime/mutation-actions/auto-blur.test.ts",
+      "message": "Mock for apps/extension/src/content/selection/highlighter/index.ts is missing exports: clearAllHighlights, clearFrameEditing, consumeHighlighterSuppressedClick, disableHighlighterMode, enableHighlighterMode, hasHighlighterHoverPreviewTarget, isHighlighterCreationEnabled, isHighlighterEnabled, isHighlighterPausedState, pauseHighlighter, registerFrameCallbacks, resumeHighlighter, setFrameEditing, setHighlighterCreationEnabled. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/frame-runtime/mutation-actions/clear.test.ts",
+      "message": "Mock for apps/extension/src/content/selection/highlighter/index.ts is missing exports: clearAllHighlights, clearFrameEditing, consumeHighlighterSuppressedClick, disableHighlighterMode, enableHighlighterMode, hasHighlighterHoverPreviewTarget, isFrameEditing, isHighlighterCreationEnabled, isHighlighterEnabled, isHighlighterPausedState, pauseHighlighter, registerFrameCallbacks, resumeHighlighter, setFrameEditing, setHighlighterCreationEnabled. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/frame-runtime/mutation-actions/dom.test.ts",
+      "message": "Mock for apps/extension/src/content/selection/highlighter/index.ts is missing exports: clearAllHighlights, clearFrameEditing, consumeHighlighterSuppressedClick, disableHighlighterMode, enableHighlighterMode, hasHighlighterHoverPreviewTarget, isFrameEditing, isHighlighterCreationEnabled, isHighlighterEnabled, isHighlighterPausedState, pauseHighlighter, registerFrameCallbacks, resumeHighlighter, setFrameEditing, setHighlighterCreationEnabled. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/frame-runtime/mutation-actions/frame-post-add.test.ts",
+      "message": "Mock for apps/extension/src/content/selection/highlighter/index.ts is missing exports: clearAllHighlights, clearFrameEditing, consumeHighlighterSuppressedClick, disableHighlighterMode, enableHighlighterMode, hasHighlighterHoverPreviewTarget, isFrameEditing, isHighlighterCreationEnabled, isHighlighterEnabled, isHighlighterPausedState, pauseHighlighter, registerFrameCallbacks, resumeHighlighter, setFrameEditing, setHighlighterCreationEnabled. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/frame-runtime/mutation-actions/remove.test.ts",
+      "message": "Mock for apps/extension/src/content/selection/highlighter/index.ts is missing exports: clearAllHighlights, clearFrameEditing, consumeHighlighterSuppressedClick, disableHighlighterMode, enableHighlighterMode, hasHighlighterHoverPreviewTarget, isFrameEditing, isHighlighterCreationEnabled, isHighlighterEnabled, isHighlighterPausedState, pauseHighlighter, registerFrameCallbacks, resumeHighlighter, setFrameEditing, setHighlighterCreationEnabled. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/highlighter-runtime/runtime-document-mode.test.ts",
+      "message": "Mock for apps/extension/src/content/platform/frame/index.ts is missing exports: addEventListenerToAllWindowsDynamic, addScrollListenersToAllWindows, addWindowEventListenerToAllWindowsDynamic, clearAllSniptaleIds, clearRetainedSniptaleIds, createDocumentPagePlacement, findElementBySelector, findElementBySniptaleId, findHtmlElementBySelector, getAbsolutePosition, getAccessibleIframes, getContainingIframe, getDocumentViewportBounds, getIframeDocument, getSniptaleIdCleanupGeneration, getTopViewportPoint, getViewportClientPoint, isAccessibleDocumentRuntimeStyle, isIframeAccessible, isSniptaleIdRetained, mountStyleInAccessibleDocuments, releaseSniptaleId, resolveDocumentPagePlacement, resolveIframeEventElement, resolveIframeEventTarget, resolveIframePointTarget, retainSniptaleId, updateDocumentPagePlacement, waitForAccessibleIframeReady. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/interactive-frame/controller/render-model.test.tsx",
+      "message": "Mock for apps/extension/src/content/selection/highlighter/index.ts is missing exports: clearAllHighlights, consumeHighlighterSuppressedClick, disableHighlighterMode, enableHighlighterMode, hasHighlighterHoverPreviewTarget, invalidateFrameCache, isFrameEditing, isHighlighterCreationEnabled, isHighlighterEnabled, isHighlighterPausedState, pauseHighlighter, registerFrameCallbacks, resumeHighlighter, setHighlighterCreationEnabled. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/quick-edit-runtime/controller.test.ts",
+      "message": "Mock for apps/extension/src/content/selection/quick-edit-runtime/controller-guards.ts is missing exports: createQuickEditEnableGuards. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/region-selector/recording-overlay.helpers.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/selection-mode/controller/actions.test.ts",
+      "message": "Mock for apps/extension/src/content/selection/selection-mode/diag.ts is missing exports: logSelectionModeDragFinalize, logSelectionModeDragStart, logSelectionModeError, logSelectionModeKeyAction, logSelectionModePointerFinish, logSelectionModeResizeStart, logSelectionModeRuntime. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/selection-mode/events/bridge/root.test.ts",
+      "message": "Mock for apps/extension/src/content/selection/locker/index.ts is missing exports: disableTextSelectionBlock, enableNavigationLock, enableTextSelectionBlock, isLockEnabled, setFullLockMode, setUIHidden. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/selection-mode/events/bridge/root.test.ts",
+      "message": "Mock for apps/extension/src/content/selection/selection-mode/diag.ts is missing exports: logSelectionModeDragFinalize, logSelectionModeDragStart, logSelectionModeKeyAction, logSelectionModePointerFinish, logSelectionModeResizeStart, logSelectionModeRuntime. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/selection-mode/events/handlers/index.test.ts",
+      "message": "Mock for apps/extension/src/content/platform/frame/index.ts is missing exports: addEventListenerToAllWindowsDynamic, addScrollListenersToAllWindows, addWindowEventListenerToAllWindowsDynamic, clearAllSniptaleIds, clearRetainedSniptaleIds, createDocumentPagePlacement, findElementBySelector, findElementBySniptaleId, findHtmlElementBySelector, getAbsolutePosition, getAccessibleIframes, getContainingIframe, getDocumentViewportBounds, getIframeDocument, getSniptaleIdCleanupGeneration, getTopViewportPoint, getViewportClientPoint, isAccessibleDocumentRuntimeStyle, isIframeAccessible, isSniptaleIdRetained, mountStyleInAccessibleDocuments, releaseSniptaleId, resolveDocumentPagePlacement, resolveIframeEventElement, resolveIframePointTarget, retainSniptaleId, updateDocumentPagePlacement, waitForAccessibleIframeReady, walkAllDocuments. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/selection-mode/events/handlers/index.test.ts",
+      "message": "Mock for apps/extension/src/content/selection/selection-mode/diag.ts is missing exports: logSelectionModeDiag, logSelectionModeDragFinalize, logSelectionModeDragStart, logSelectionModeError, logSelectionModeKeyAction, logSelectionModePointerFinish, logSelectionModeResizeStart. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/selection-mode/events/listeners/index.test.ts",
+      "message": "Mock for apps/extension/src/content/platform/frame/index.ts is missing exports: addWindowEventListenerToAllWindowsDynamic, clearAllSniptaleIds, clearRetainedSniptaleIds, createDocumentPagePlacement, findElementBySelector, findElementBySniptaleId, findHtmlElementBySelector, getAbsolutePosition, getAccessibleIframes, getContainingIframe, getDocumentViewportBounds, getIframeDocument, getSniptaleIdCleanupGeneration, getTopViewportPoint, getViewportClientPoint, isAccessibleDocumentRuntimeStyle, isIframeAccessible, isSniptaleIdRetained, mountStyleInAccessibleDocuments, releaseSniptaleId, resolveDocumentPagePlacement, resolveIframeEventElement, resolveIframeEventTarget, resolveIframePointTarget, retainSniptaleId, updateDocumentPagePlacement, waitForAccessibleIframeReady, walkAllDocuments. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/selection-mode/events/listeners/index.test.ts",
+      "message": "Mock for apps/extension/src/content/selection/selection-mode/diag.ts is missing exports: logSelectionModeDiag, logSelectionModeDragFinalize, logSelectionModeDragStart, logSelectionModeError, logSelectionModeKeyAction, logSelectionModePointerFinish, logSelectionModeResizeStart. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/selection-mode/interaction/actions/index.test.ts",
+      "message": "Mock for apps/extension/src/content/selection/selection-mode/ui/index.ts is missing exports: cleanupSelectionModeDom, createDragEventCatcher, createDragFrame, createFinalElements, createHoverElements, createOverlayContainer, createSelectionModeDom, hideHoverFrame, removeDragEventCatcher, resetFinalElements, showHoverFrame. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/selection-mode/interaction/cursor.coverage.test.ts",
+      "message": "Mock for apps/extension/src/content/platform/frame/index.ts is missing exports: addEventListenerToAllWindowsDynamic, addScrollListenersToAllWindows, addWindowEventListenerToAllWindowsDynamic, clearAllSniptaleIds, clearRetainedSniptaleIds, createDocumentPagePlacement, findElementBySelector, findElementBySniptaleId, findHtmlElementBySelector, getAbsolutePosition, getAccessibleIframes, getContainingIframe, getDocumentViewportBounds, getIframeDocument, getSniptaleIdCleanupGeneration, getTopViewportPoint, getViewportClientPoint, isAccessibleDocumentRuntimeStyle, isIframeAccessible, isSniptaleIdRetained, releaseSniptaleId, resolveDocumentPagePlacement, resolveIframeEventElement, resolveIframeEventTarget, resolveIframePointTarget, retainSniptaleId, updateDocumentPagePlacement, waitForAccessibleIframeReady, walkAllDocuments. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/selection-mode/interaction/cursor.test.ts",
+      "message": "Mock for apps/extension/src/content/platform/frame/index.ts is missing exports: addEventListenerToAllWindowsDynamic, addScrollListenersToAllWindows, addWindowEventListenerToAllWindowsDynamic, clearAllSniptaleIds, clearRetainedSniptaleIds, createDocumentPagePlacement, findElementBySelector, findElementBySniptaleId, findHtmlElementBySelector, getAbsolutePosition, getAccessibleIframes, getContainingIframe, getDocumentViewportBounds, getIframeDocument, getSniptaleIdCleanupGeneration, getTopViewportPoint, getViewportClientPoint, isAccessibleDocumentRuntimeStyle, isIframeAccessible, isSniptaleIdRetained, releaseSniptaleId, resolveDocumentPagePlacement, resolveIframeEventElement, resolveIframeEventTarget, resolveIframePointTarget, retainSniptaleId, updateDocumentPagePlacement, waitForAccessibleIframeReady, walkAllDocuments. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/selection-mode/ui/container.test.ts",
+      "message": "Mock for apps/extension/src/content/platform/page-context/dom.ts is missing exports: createContentRuntimeUiGuard, isContentRuntimeUiElement. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/selection-mode/ui/runtime.test.ts",
+      "message": "Mock for apps/extension/src/content/selection/selection-mode/ui/index.ts is missing exports: cleanupSelectionModeDom, createDragEventCatcher, createSelectionModeDom, hideHoverFrame, removeDragEventCatcher, resetFinalElements, showHoverFrame, updateDragFrame, updateFinalFrame. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/content/selection/step-badge/index.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/design-system/catalog/card/variants.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/design-system/previews/expired-overlay/index.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/design-system/shell/page/app-shell.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/design-system/shell/page/catalog-sections.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/design-system/shell/page/filter-sections.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/design-system/shell/page/navigation-rail.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/controller/browser-frame/source-state.test.ts",
+      "message": "Mock for apps/extension/src/editor/controller/document/layers.ts is missing exports: collectLayers, findObjectById, getLayerObjects, getObjectDimensions. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/controller/core/base.instance-ownership.test.ts",
+      "message": "Mock for apps/extension/src/editor/controller/instance/helpers/index.ts is missing exports: snapExternalEditorRectForController, snapExternalEditorResizeRectForController. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/controller/document/index.open-image.test.ts",
+      "message": "Mock for apps/extension/src/editor/browser-frame/layout/index.ts is missing exports: getBrowserHeaderHeight. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/controller/document/index.open-image.test.ts",
+      "message": "Mock for apps/extension/src/editor/controller/core/helpers.ts is missing exports: getBrowserVersion, isGroup, isInteractiveShortcutTarget, isTextbox, nextStepLetter, parseColorForStore. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/controller/document/runner.test.ts",
+      "message": "Mock for apps/extension/src/editor/controller/core/debug.ts is missing exports: logEditorSourceTrace. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/controller/document/scene.browser-frame.test.ts",
+      "message": "Mock for apps/extension/src/editor/browser-frame/layout/index.ts is missing exports: getBrowserHeaderHeight. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/controller/document/scene.browser-frame.test.ts",
+      "message": "Mock for apps/extension/src/editor/controller/document/layers.ts is missing exports: collectLayers, findObjectById, getLayerObjects, getObjectDimensions. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/controller/document/scene.test.ts",
+      "message": "Mock for apps/extension/src/editor/browser-frame/layout/index.ts is missing exports: getBrowserHeaderHeight. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/controller/document/scene.test.ts",
+      "message": "Mock for apps/extension/src/editor/controller/document/layers.ts is missing exports: collectLayers, findObjectById, getLayerObjects, getObjectDimensions. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/controller/public-actions/scene/resize.coverage.test.ts",
+      "message": "Mock for apps/extension/src/editor/browser-frame/layout/index.ts is missing exports: getBrowserHeaderHeight, resolveEditorSceneLayout. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/inspector/compact/inspector/frame-sections.test.tsx",
+      "message": "Mock for apps/extension/src/editor/inspector/scene/index.ts is missing exports: EditorInspectorFrameBackgroundFillEditor, EditorInspectorFramePanel. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/inspector/compact/popover.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/inspector/content-sections/document-actions-section.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/inspector/content-sections/size.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/inspector/content-sections/surface.test.tsx",
+      "message": "Mock for apps/extension/src/editor/inspector/environment/index.tsx is missing exports: EditorInspectorGridPanel, EditorInspectorMetaPanel, EditorInspectorWorkspacePanel. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/inspector/document-actions/disclosures/format/image-size.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/inspector/scene/background/image-actions.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/inspector/sidebar-controller/derived.source-image.test.tsx",
+      "message": "Mock for apps/extension/src/editor/inspector/sidebar-shared/index.tsx is missing exports: AspectToggle, DimensionInput, GRID_COLOR_PALETTE, GRID_SIZE_MAX, GRID_SIZE_MIN, WORKSPACE_BACKGROUND_PALETTE, clampGridSize, getBrowserCanvasModeOptions, getBrowserContentModeOptions, getFrameBackgroundImageFitOptions, getFrameBackgroundModeOptions, getFrameGradientPresets, getFrameLayoutModeOptions, getLineStyleOptions, getStepAlphabetOptions, getStepTypeOptions, loadRecentColors, pushRecentColor, toNumber, updateLockedDraft. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/inspector/tools/helpers.test.tsx",
+      "message": "Mock for apps/extension/src/editor/inspector/sidebar-shared/index.tsx is missing exports: AspectToggle, GRID_COLOR_PALETTE, GRID_SIZE_MAX, GRID_SIZE_MIN, WORKSPACE_BACKGROUND_PALETTE, clampGridSize, getAspectRatio, getBrowserCanvasModeOptions, getBrowserContentModeOptions, getFrameBackgroundImageFitOptions, getFrameBackgroundModeOptions, getFrameGradientPresets, getFrameLayoutModeOptions, getFramePaddingSummary, getLineStyleOptions, getStepAlphabetOptions, getStepTypeOptions, loadRecentColors, pushRecentColor, toNumber. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/inspector/tools/helpers.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/workspace/floating/layers-panel.test.tsx",
+      "message": "Mock for apps/extension/src/editor/application/controller-context/index.tsx is missing exports: EditorControllerProvider, useOptionalEditorController. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/workspace/toolbar/empty-state.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/workspace/toolbar/index.test.tsx",
+      "message": "Mock for apps/extension/src/editor/workspace/toolbar/shared.tsx is missing exports: EditorToolbarDivider, EditorToolbarUndoSection. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/editor/workspace/toolbar/index.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, translate, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/features/ai/schemas/ai-utils.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/features/editor/presets/display.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/features/scenario/capture-metadata-dialog/index.facade.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/features/scenario/capture-metadata-dialog/sections.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/gallery/state/useGalleryScenarioProjectsState.test.tsx",
+      "message": "Mock for apps/extension/src/composition/persistence/scenario/store/project-records/index.ts is missing exports: createScenarioProjectRecord, deleteScenarioProjectRecord, getScenarioProjectRecord, renameScenarioProjectRecord, saveScenarioProjectRecord, updateScenarioProjectRecordMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/capabilities.test.ts",
+      "message": "Mock for apps/extension/src/offscreen/project-export/codecs/index.ts is missing exports: closeEncoderQuietly, ensureMp4ExportSupport, getSupportedMp4AudioEncoder, getSupportedMp4VideoEncoder, isAbortLikeError, normalizeError, resolveExportTargetBitrate, waitForEncoderQueueCapacity. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/codecs/encoders.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/media-playback/seek.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/offline-audio/encode-buffer.test.ts",
+      "message": "Mock for apps/extension/src/offscreen/project-export/codecs/index.ts is missing exports: closeEncoderQuietly, ensureMp4ExportSupport, getSupportedMp4AudioEncoder, getSupportedMp4VideoCodecProfiles, getSupportedMp4VideoEncoder, isAbortLikeError, normalizeError, resolveExportTargetBitrate. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/persistence/format.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-loop/composite/run.test.ts",
+      "message": "Mock for apps/extension/src/offscreen/project-export/render-loop/progress/index.ts is missing exports: sendFrameDrivenProgress. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-loop/composite/run.test.ts",
+      "message": "Mock for apps/extension/src/offscreen/project-export/runtime.ts is missing exports: cleanupJob, getSupportedWebmExportMimeType, sendProgress. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-loop/index.test.ts",
+      "message": "Mock for apps/extension/src/offscreen/project-export/codecs/index.ts is missing exports: closeEncoderQuietly, ensureMp4ExportSupport, getSupportedMp4AudioEncoder, getSupportedMp4VideoCodecProfiles, getSupportedMp4VideoEncoder, isAbortLikeError, normalizeError, resolveExportTargetBitrate. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-loop/index.test.ts",
+      "message": "Mock for apps/extension/src/offscreen/project-export/runtime.ts is missing exports: cleanupJob, getSupportedWebmExportMimeType. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-loop/index.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-loop/progress/composite.test.ts",
+      "message": "Mock for apps/extension/src/offscreen/project-export/runtime.ts is missing exports: cleanupJob, getSupportedWebmExportMimeType, waitForDelay. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-loop/progress/composite.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-mp4/announce.test.ts",
+      "message": "Mock for apps/extension/src/offscreen/project-export/runtime.ts is missing exports: cleanupJob, getSupportedWebmExportMimeType, waitForDelay. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-mp4/announce.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-mp4/audio.test.ts",
+      "message": "Mock for apps/extension/src/offscreen/project-export/offline-audio/index.ts is missing exports: renderOfflineAudioMix, scheduleOfflineAudioClipMix. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-mp4/create/build.test.ts",
+      "message": "Mock for apps/extension/src/offscreen/project-export/codecs/index.ts is missing exports: closeEncoderQuietly, getSupportedMp4VideoCodecProfiles, isAbortLikeError, normalizeError, resolveExportTargetBitrate, waitForEncoderQueueCapacity. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-mp4/create/build.test.ts",
+      "message": "Mock for apps/extension/src/offscreen/project-export/offline-audio/index.ts is missing exports: encodeOfflineAudioBuffer, scheduleOfflineAudioClipMix. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-mp4/encoder-state.test.ts",
+      "message": "Mock for apps/extension/src/offscreen/project-export/codecs/index.ts is missing exports: closeEncoderQuietly, ensureMp4ExportSupport, getSupportedMp4AudioEncoder, getSupportedMp4VideoCodecProfiles, getSupportedMp4VideoEncoder, isAbortLikeError, resolveExportTargetBitrate, waitForEncoderQueueCapacity. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-mp4/encoder-state.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-mp4/finalize.test.ts",
+      "message": "Mock for apps/extension/src/offscreen/project-export/persistence/index.ts is missing exports: finalizeExport, isMimeTypeCompatibleWithFormat, prepareOutputBlob. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-mp4/finalize.test.ts",
+      "message": "Mock for apps/extension/src/offscreen/project-export/runtime.ts is missing exports: cleanupJob, getSupportedWebmExportMimeType, waitForDelay. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-mp4/finalize.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-mp4/integration.test.ts",
+      "message": "Mock for apps/extension/src/offscreen/project-export/codecs/index.ts is missing exports: closeEncoderQuietly, getSupportedMp4VideoCodecProfiles, isAbortLikeError, resolveExportTargetBitrate, waitForEncoderQueueCapacity. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-mp4/integration.test.ts",
+      "message": "Mock for apps/extension/src/offscreen/project-export/offline-audio/index.ts is missing exports: encodeOfflineAudioBuffer, scheduleOfflineAudioClipMix. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-mp4/integration.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-mp4/normalize-error.test.ts",
+      "message": "Mock for apps/extension/src/offscreen/project-export/codecs/index.ts is missing exports: closeEncoderQuietly, ensureMp4ExportSupport, getSupportedMp4AudioEncoder, getSupportedMp4VideoCodecProfiles, getSupportedMp4VideoEncoder, normalizeError, resolveExportTargetBitrate, waitForEncoderQueueCapacity. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-mp4/normalize-error.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-mp4/pipeline/root.test.ts",
+      "message": "Mock for apps/extension/src/offscreen/project-export/codecs/index.ts is missing exports: closeEncoderQuietly, getSupportedMp4VideoCodecProfiles, isAbortLikeError, normalizeError, resolveExportTargetBitrate, waitForEncoderQueueCapacity. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-mp4/pipeline/root.test.ts",
+      "message": "Mock for apps/extension/src/offscreen/project-export/offline-audio/index.ts is missing exports: encodeOfflineAudioBuffer, scheduleOfflineAudioClipMix. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-mp4/render-composite-to-mp4.test.ts",
+      "message": "Mock for apps/extension/src/offscreen/project-export/codecs/index.ts is missing exports: ensureMp4ExportSupport, getSupportedMp4AudioEncoder, getSupportedMp4VideoCodecProfiles, getSupportedMp4VideoEncoder, isAbortLikeError, normalizeError, resolveExportTargetBitrate, waitForEncoderQueueCapacity. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-mp4/render-composite-to-mp4.test.ts",
+      "message": "Mock for apps/extension/src/offscreen/project-export/render-mp4/announce.ts is missing exports: formatMuxerInitMessage. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/platform/media-utils/video-thumbnails.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/popup/shell/app/index.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/locale/state.ts is missing exports: getStoredLocalePreference, setLocalePreference. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/popup/shell/app/index.test.tsx",
+      "message": "Mock for apps/extension/src/ui/theme/index.ts is missing exports: applyScopedThemePreview, getStoredThemePreference, initializeAppTheme, resolveAppTheme, setAppThemePreference. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/popup/shell/export/runtime/copy.test.ts",
+      "message": "Mock for apps/extension/src/popup/shell/export/runtime/logging.ts is missing exports: logPopupExportBatchArchiveSaveFailure, logPopupExportBatchArchiveSaveStart, logPopupExportBatchArchiveSaveSuccess, logPopupExportBatchEmptyResult, logPopupExportBatchStale, logPopupExportBatchStart, logPopupExportBatchTabRequest, logPopupExportBatchTabResult, logPopupExportBatchUnexpectedFailure, logPopupExportCancelFailure. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/popup/shell/export/runtime/root.test.tsx",
+      "message": "Mock for apps/extension/src/popup/shell/export/runtime/actions.ts is missing exports: copyPopupExportPreview, getPopupExportPreviewToCopy, startPopupExport. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/popup/shell/export/runtime/root.test.tsx",
+      "message": "Mock for apps/extension/src/popup/shell/export/runtime/message-listener/index.ts is missing exports: applyPopupExportRuntimeMessage, parsePopupExportRuntimeMessage. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/scenario-editor/page-shell/runtime/load.test.ts",
+      "message": "Mock for apps/extension/src/composition/persistence/scenario/store/v3/index.ts is missing exports: deleteScenarioProjectRecordV3, discardPreparedScenarioAsset, saveScenarioCaptureSlideToProject, saveScenarioProjectRecordV3, stageScenarioV3ImageAsset, updateScenarioProjectRecordMetadataV3. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/scenario-editor/page-shell/runtime/use-state.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/scenario-editor/page-shell/slide-navigator/ScenarioSlideNavigatorStepRow.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/scenario-editor/page-shell/toolbar/project-summary.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/scenario-editor/page-shell/toolbar/ScenarioEditorToolbar.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/scenario-editor/project/export/html/capture.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/scenario-editor/project/export/html/capture.test.ts",
+      "message": "Mock for apps/extension/src/scenario-editor/project/export/images.ts is missing exports: buildScenarioCaptureImageBlob. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/scenario-editor/project/export/html/capture/media.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/scenario-editor/project/export/html/capture/missing.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/scenario-editor/project/export/html/index.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/scenario-editor/project/export/html/index.test.ts",
+      "message": "Mock for apps/extension/src/scenario-editor/project/export/images.ts is missing exports: buildScenarioCaptureImageBlob. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/scenario-editor/project/presentation.test.ts",
+      "message": "Mock for apps/extension/src/composition/persistence/scenario/store/public.ts is missing exports: getScenarioStepEditorDocumentTransferRecord. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/scenario-editor/workspace/image-step/ScenarioImageStepDialogFields.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/scenario-editor/workspace/InsertStepActions.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/scenario-editor/workspace/quick-edit/ScenarioQuickEditTransformSections.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/settings/shell/navigation/sidebar.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/ui/color-selector/picker-layout.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/ui/color-selector/picker-popover.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/ui/color-selector/plane.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/diagnostics/action-text/formatters.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/diagnostics/panel/useDiagnosticsPanelExports.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/export/dialog/capability-state.test.tsx",
+      "message": "Mock for apps/extension/src/video-editor/project/operations/ops.ts is missing exports: cancelProjectExport, createBlankProject, deletePersistedProject, ensureRecordingAsset, importProjectAsset, loadInitialProjectFromLocation, openPersistedProject, startProjectExport. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/export/dialog/codec-options.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/export/progress-overlay/index.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/runtime/session/bootstrap.test.tsx",
+      "message": "Mock for apps/extension/src/video-editor/project/operations/ops.ts is missing exports: cancelProjectExport, createBlankProject, deletePersistedProject, ensureRecordingAsset, getProjectExportCapabilities, importProjectAsset, openPersistedProject, startProjectExport. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/timeline/project/toolbar/sections/clip-actions/actions.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/timeline/project/toolbar/sections/clip-actions/labels.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/workspace/sidebar/libraries/sections.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/annotation/field-sections.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/annotation/options.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/annotation/style-controls.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/annotation/target-controls.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/cursor-fields.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/cursor-options.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/options.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/effect-controls/transition-options.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/media-fit-options.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/inputs/options.test.ts",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/motion/area-controls.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/motion/area.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/motion/fields.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/workspace/sidebar/selection/motion/focus.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/workspace/sidebar/view.test.tsx",
+      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/video-editor/workspace/surface/main.test.tsx",
+      "message": "Mock for apps/extension/src/video-editor/workspace/surface/effects-library.tsx is missing exports: resolveEffectTransitionTargetId. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/web-snapshot-viewer/shell/app/index.viewport.test.tsx",
+      "message": "Mock for apps/extension/src/composition/persistence/settings/index.ts is missing exports: DEFAULT_SETTINGS, clearSettings, createDefaultSettings, patchSettings, removeRetiredSynchronizedSettings, resetSettingsToDefaults, saveSettings. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "apps/extension/src/workflows/media-hub/store.cleanup-targets.test.ts",
+      "message": "Mock for apps/extension/src/composition/persistence/media-library/index.ts is missing exports: addMediaLibraryEntryTags, getMediaAssetBlob, getMediaLibraryEntry, getMediaThumbnail, listMediaLibrary, saveScreenshotMediaAsset, syncLegacyMediaLibrary, updateMediaLibraryEntry. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "packages/ui/src/glass-select/trigger.test.tsx",
+      "message": "Mock for packages/ui/src/glass-select/styles.ts is missing exports: GLASS_SELECT_ANIMATION_CSS, getGlassSelectCheckClassName, getGlassSelectMenuClassName, getGlassSelectMenuSurfaceClassName, getGlassSelectTriggerClassName. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "tooling/ci/select-codeql-proof.test.ts",
+      "message": "Mock for tooling/ci/verify-main-proof.mjs is missing exports: verifyReleaseProof. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "tooling/qa/composition/repository/full-verification/unit-test-steps.test.ts",
+      "message": "Mock for tooling/qa/proof/unit/unit-test-proof.mjs is missing exports: createFullUnitProofInputs, parseFullUnitProof. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    },
+    {
+      "file": "tooling/qa/composition/repository/full-verification/unit-test-steps.test.ts",
+      "message": "Mock for tooling/qa/proof/unit/verify-unit-tests.mjs is missing exports: createUnitTestArgs, createUnitTestEnv, expandRelatedTestScope, normalizeUnitTestPool, resolveProductUnitTestPartitions, resolveProductUnitTestPool. Add explicit stubs or use an importOriginal partial mock.",
+      "rule": "manual-mock-export-parity",
+      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
+    }
+  ],
+  "rationales": [
+    {
+      "id": "noise.mock-export-parity.intentional-closed-mocks",
+      "owner": "qa-platform",
+      "reason": "The exact test mocks intentionally replace a closed subset of a module and do not exercise omitted exports; the export-parity heuristic cannot prove that bounded reachability.",
+      "removalCondition": "Remove an exact entry when the mock becomes importOriginal-based, exposes the complete module surface, or disappears.",
+      "classification": "tool-noise"
+    }
+  ]
 }

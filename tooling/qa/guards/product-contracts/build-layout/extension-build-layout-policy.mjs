@@ -114,24 +114,8 @@ function hasCall(array, callee, argument = null) {
   );
 }
 
-function policyShapeErrors(policy) {
+function htmlInputShapeErrors(policy) {
   const errors = [];
-  if (policy?.schemaVersion !== 1) errors.push('layout schema must be version 1');
-  if (!Number.isInteger(policy?.chunkSizeWarningLimitKb) || policy.chunkSizeWarningLimitKb <= 0) {
-    errors.push('chunk size warning budget must be a positive integer');
-  }
-  if (policy?.appRoot !== 'apps/extension') errors.push('Vite app root must be apps/extension');
-  if (policy?.manifestPath !== 'apps/extension/manifest.json') {
-    errors.push('manifest must be app-owned');
-  }
-  if (policy?.publicRoot !== 'apps/extension/public') errors.push('public root must be app-owned');
-  if (policy?.outputRoot !== 'dist') errors.push('artifact output must remain repository dist');
-  if (policy?.forbiddenOutputRoot !== 'apps/extension/dist') {
-    errors.push('app-local dist must remain explicitly forbidden');
-  }
-  if (!arraysEqual(policy?.externalInputRoots, REQUIRED_EXTERNAL_INPUTS)) {
-    errors.push('external build inputs must match the bounded allowlist');
-  }
   const htmlInputs = Array.isArray(policy?.htmlInputs) ? policy.htmlInputs : [];
   if (!Array.isArray(policy?.htmlInputs)) errors.push('HTML inputs must be an array');
   const outputPaths = htmlInputs.map((entry) => entry?.outputPath);
@@ -163,17 +147,20 @@ function policyShapeErrors(policy) {
       errors.push(`undeclared HTML source input: ${entry.sourcePath}`);
     }
   }
-  const manifestModuleInputs = Array.isArray(policy?.manifestModuleInputs)
-    ? policy.manifestModuleInputs
-    : [];
+  return errors;
+}
+
+function manifestModuleInputShapeErrors(policy) {
+  const errors = [];
+  const inputs = Array.isArray(policy?.manifestModuleInputs) ? policy.manifestModuleInputs : [];
   if (!Array.isArray(policy?.manifestModuleInputs)) {
     errors.push('manifest module inputs must be an array');
   }
-  const manifestVirtualPaths = manifestModuleInputs.map((entry) => entry?.virtualPath);
-  if (new Set(manifestVirtualPaths).size !== manifestVirtualPaths.length) {
+  const virtualPaths = inputs.map((entry) => entry?.virtualPath);
+  if (new Set(virtualPaths).size !== virtualPaths.length) {
     errors.push('manifest module virtual paths must be unique');
   }
-  for (const entry of manifestModuleInputs) {
+  for (const entry of inputs) {
     if (!entry || typeof entry !== 'object') {
       errors.push('manifest module input entries must be objects');
       continue;
@@ -185,27 +172,54 @@ function policyShapeErrors(policy) {
       errors.push(`undeclared manifest module input: ${entry.sourcePath}`);
     }
   }
+  return errors;
+}
+
+function canonicalPathListErrors(policy) {
+  const errors = [];
+  for (const [values, message] of [
+    [policy?.configPaths ?? [], 'build config paths must be unique canonical repository paths'],
+    [
+      policy?.requiredReleaseArtifacts ?? [],
+      'release artifacts must be unique canonical output paths',
+    ],
+  ]) {
+    if (
+      !Array.isArray(values) ||
+      values.some((file) => canonicalRelativePath(file) === null) ||
+      new Set(values).size !== values.length
+    ) {
+      errors.push(message);
+    }
+  }
+  return errors;
+}
+
+function policyShapeErrors(policy) {
+  const errors = [];
+  if (policy?.schemaVersion !== 1) errors.push('layout schema must be version 1');
+  if (!Number.isInteger(policy?.chunkSizeWarningLimitKb) || policy.chunkSizeWarningLimitKb <= 0) {
+    errors.push('chunk size warning budget must be a positive integer');
+  }
+  if (policy?.appRoot !== 'apps/extension') errors.push('Vite app root must be apps/extension');
+  if (policy?.manifestPath !== 'apps/extension/manifest.json') {
+    errors.push('manifest must be app-owned');
+  }
+  if (policy?.publicRoot !== 'apps/extension/public') errors.push('public root must be app-owned');
+  if (policy?.outputRoot !== 'dist') errors.push('artifact output must remain repository dist');
+  if (policy?.forbiddenOutputRoot !== 'apps/extension/dist') {
+    errors.push('app-local dist must remain explicitly forbidden');
+  }
+  if (!arraysEqual(policy?.externalInputRoots, REQUIRED_EXTERNAL_INPUTS)) {
+    errors.push('external build inputs must match the bounded allowlist');
+  }
+  errors.push(...htmlInputShapeErrors(policy), ...manifestModuleInputShapeErrors(policy));
   for (const aliasPath of Object.values(policy?.aliases ?? {})) {
     if (!isDeclaredExtensionBuildInput(aliasPath, policy)) {
       errors.push(`undeclared alias input: ${aliasPath}`);
     }
   }
-  const configPaths = policy?.configPaths ?? [];
-  if (
-    !Array.isArray(configPaths) ||
-    configPaths.some((file) => canonicalRelativePath(file) === null) ||
-    new Set(configPaths).size !== configPaths.length
-  ) {
-    errors.push('build config paths must be unique canonical repository paths');
-  }
-  const releaseArtifacts = policy?.requiredReleaseArtifacts ?? [];
-  if (
-    !Array.isArray(releaseArtifacts) ||
-    releaseArtifacts.some((file) => canonicalRelativePath(file) === null) ||
-    new Set(releaseArtifacts).size !== releaseArtifacts.length
-  ) {
-    errors.push('release artifacts must be unique canonical output paths');
-  }
+  errors.push(...canonicalPathListErrors(policy));
   return errors;
 }
 

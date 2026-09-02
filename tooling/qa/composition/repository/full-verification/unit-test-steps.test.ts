@@ -17,9 +17,13 @@ vi.mock('../../../proof/unit/unit-test-cache.mjs', async (importOriginal) => {
   };
 });
 
-vi.mock('../../../proof/unit/verify-unit-tests.mjs', () => ({
-  runUnitTests: vi.fn(() => ({ status: 0, stderr: '', stdout: '' })),
-}));
+vi.mock('../../../proof/unit/verify-unit-tests.mjs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../proof/unit/verify-unit-tests.mjs')>();
+  return {
+    ...actual,
+    runUnitTests: vi.fn(() => ({ status: 0, stderr: '', stdout: '' })),
+  };
+});
 
 vi.mock('../../../proof/unit/unit-test-proof.mjs', () => ({
   recordSuccessfulFullUnitProof: vi.fn(),

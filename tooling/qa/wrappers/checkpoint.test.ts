@@ -9,7 +9,8 @@ const COVERAGE_ROLLOUT_INVENTORY = 'tooling/qa/proof/coverage/test-coverage/roll
 function createCheckpointTempRoot(prefix: string) {
   const root = createTempRoot(prefix);
   writeJson(root, 'tooling/configs/qa/quality-baseline.json', {
-    schemaVersion: 1,
+    schemaVersion: 2,
+    rationales: [],
     allowances: [],
   });
   return root;

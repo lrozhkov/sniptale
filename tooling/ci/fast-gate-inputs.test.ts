@@ -100,15 +100,23 @@ it('keeps validated inventory data out of executable control identity but inside
   expect(createFastGateInputDigest({ cwd: root })).not.toBe(initialInput);
 });
 
-it('keeps executable, suppressive policy, and unknown control files in control identity', () => {
+it('keeps baseline composition out of executable control identity and fails closed for unknown controls', () => {
   const root = createTempRoot('candidate-control-fail-closed-');
   seed(root);
-  writeFile(root, 'tooling/configs/qa/quality-baseline.json', '{"allowances":[]}\n');
+  writeFile(
+    root,
+    'tooling/configs/qa/quality-baseline.json',
+    '{"schemaVersion":2,"rationales":[],"allowances":[]}\n'
+  );
   const initial = createCandidateControlDigest({ cwd: root });
 
-  writeFile(root, 'tooling/configs/qa/quality-baseline.json', '{"allowances":["weak"]}\n');
+  writeFile(
+    root,
+    'tooling/configs/qa/quality-baseline.json',
+    '{"schemaVersion":2,"rationales":[{"id":"noise.example","classification":"tool-noise","owner":"QA maintainers","reason":"Exact false positive.","removalCondition":"Remove when the rule is precise."}],"allowances":[{"noiseId":"noise.example","rule":"example","file":"src/example.ts","line":1}]}\n'
+  );
   const policyChanged = createCandidateControlDigest({ cwd: root });
-  expect(policyChanged).not.toBe(initial);
+  expect(policyChanged).toBe(initial);
 
   writeFile(root, 'tooling/qa/unknown-control.data.mjs', 'export const weakened = true;\n');
   expect(createCandidateControlDigest({ cwd: root })).not.toBe(policyChanged);

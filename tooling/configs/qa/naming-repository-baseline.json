@@ -1,25 +1,117 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
+  "controlId": "qa.rule.naming",
+  "findingCount": 20,
+  "findingDigest": "sha256:24398fa9b46ced714068e10ac0e59126e016b8f678919bae7c63d0bc5df45cd1",
+  "rationales": [
+    {
+      "id": "noise.naming.reviewed-owner-context",
+      "classification": "tool-noise",
+      "owner": "maintainability-governance",
+      "reason": "The exact paths are intentional owner entrypoints or role names whose local context is clearer than the generic repeated-prefix topology heuristic.",
+      "removalCondition": "Remove an exact entry when the path disappears or can be renamed without obscuring its owner-local role."
+    }
+  ],
   "findings": [
-    { "rule": "repeated-prefix-naming", "file": "apps/extension/src/content/overlay/ai/pick/runtime/runtime.ts" },
-    { "rule": "repeated-prefix-naming", "file": "apps/extension/src/content/overlay/icons/icons.tsx" },
-    { "rule": "repeated-prefix-naming", "file": "apps/extension/src/content/selection/interactive-frame/render-model/render-model.ts" },
-    { "rule": "repeated-prefix-naming", "file": "apps/extension/src/editor/browser-frame/factory/factory.ts" },
-    { "rule": "repeated-prefix-naming", "file": "apps/extension/src/scenario-editor/project/ai/attachments/render/render.ts" },
-    { "rule": "repeated-prefix-naming", "file": "apps/extension/src/ui/page-bootstrap/page-bootstrap-error-boundary.tsx" },
-    { "rule": "repeated-prefix-naming", "file": "apps/extension/src/ui/page-bootstrap/page-bootstrap.tsx" },
-    { "rule": "repeated-prefix-naming", "file": "packages/runtime-contracts/src/video/types/types.literals.d.ts" },
-    { "rule": "repeated-prefix-naming", "file": "packages/runtime-contracts/src/video/types/types.ts" },
-    { "rule": "repeated-child-prefix-topology", "file": "apps/extension/src/content/overlay/video-clicks/dom-driver.ts" },
-    { "rule": "repeated-child-prefix-topology", "file": "apps/extension/src/content/parser/page-preparation/annotations/document-navigation.ts" },
-    { "rule": "repeated-child-prefix-topology", "file": "apps/extension/src/content/selection/frame-dom-driver/timing.ts" },
-    { "rule": "repeated-child-prefix-topology", "file": "apps/extension/src/content/selection/highlighter/index.ts" },
-    { "rule": "repeated-child-prefix-topology", "file": "apps/extension/src/design-system/previews/content-popover-adapter/design-system.tsx" },
-    { "rule": "repeated-child-prefix-topology", "file": "apps/extension/src/design-system/previews/product-feedback/confirm-dialog/design-system.tsx" },
-    { "rule": "repeated-child-prefix-topology", "file": "apps/extension/src/editor/inspector/sidebar/hidden-inputs.tsx" },
-    { "rule": "repeated-child-prefix-topology", "file": "apps/extension/src/offscreen/project-export/media/audio.ts" },
-    { "rule": "repeated-child-prefix-topology", "file": "packages/runtime-contracts/src/scenario/types/base.ts" },
-    { "rule": "repeated-child-prefix-topology", "file": "packages/ui/src/content-popover-adapter/index.tsx" },
-    { "rule": "repeated-child-prefix-topology", "file": "packages/ui/src/product-feedback/confirm-dialog/index.tsx" }
+    {
+      "file": "apps/extension/src/content/overlay/ai/pick/runtime/runtime.ts",
+      "rule": "repeated-prefix-naming",
+      "noiseId": "noise.naming.reviewed-owner-context"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/icons/icons.tsx",
+      "rule": "repeated-prefix-naming",
+      "noiseId": "noise.naming.reviewed-owner-context"
+    },
+    {
+      "file": "apps/extension/src/content/overlay/video-clicks/dom-driver.ts",
+      "rule": "repeated-child-prefix-topology",
+      "noiseId": "noise.naming.reviewed-owner-context"
+    },
+    {
+      "file": "apps/extension/src/content/parser/page-preparation/annotations/document-navigation.ts",
+      "rule": "repeated-child-prefix-topology",
+      "noiseId": "noise.naming.reviewed-owner-context"
+    },
+    {
+      "file": "apps/extension/src/content/selection/frame-dom-driver/timing.ts",
+      "rule": "repeated-child-prefix-topology",
+      "noiseId": "noise.naming.reviewed-owner-context"
+    },
+    {
+      "file": "apps/extension/src/content/selection/highlighter/index.ts",
+      "rule": "repeated-child-prefix-topology",
+      "noiseId": "noise.naming.reviewed-owner-context"
+    },
+    {
+      "file": "apps/extension/src/content/selection/interactive-frame/render-model/render-model.ts",
+      "rule": "repeated-prefix-naming",
+      "noiseId": "noise.naming.reviewed-owner-context"
+    },
+    {
+      "file": "apps/extension/src/design-system/previews/content-popover-adapter/design-system.tsx",
+      "rule": "repeated-child-prefix-topology",
+      "noiseId": "noise.naming.reviewed-owner-context"
+    },
+    {
+      "file": "apps/extension/src/design-system/previews/product-feedback/confirm-dialog/design-system.tsx",
+      "rule": "repeated-child-prefix-topology",
+      "noiseId": "noise.naming.reviewed-owner-context"
+    },
+    {
+      "file": "apps/extension/src/editor/browser-frame/factory/factory.ts",
+      "rule": "repeated-prefix-naming",
+      "noiseId": "noise.naming.reviewed-owner-context"
+    },
+    {
+      "file": "apps/extension/src/editor/inspector/sidebar/hidden-inputs.tsx",
+      "rule": "repeated-child-prefix-topology",
+      "noiseId": "noise.naming.reviewed-owner-context"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/media/audio.ts",
+      "rule": "repeated-child-prefix-topology",
+      "noiseId": "noise.naming.reviewed-owner-context"
+    },
+    {
+      "file": "apps/extension/src/scenario-editor/project/ai/attachments/render/render.ts",
+      "rule": "repeated-prefix-naming",
+      "noiseId": "noise.naming.reviewed-owner-context"
+    },
+    {
+      "file": "apps/extension/src/ui/page-bootstrap/page-bootstrap-error-boundary.tsx",
+      "rule": "repeated-prefix-naming",
+      "noiseId": "noise.naming.reviewed-owner-context"
+    },
+    {
+      "file": "apps/extension/src/ui/page-bootstrap/page-bootstrap.tsx",
+      "rule": "repeated-prefix-naming",
+      "noiseId": "noise.naming.reviewed-owner-context"
+    },
+    {
+      "file": "packages/runtime-contracts/src/scenario/types/base.ts",
+      "rule": "repeated-child-prefix-topology",
+      "noiseId": "noise.naming.reviewed-owner-context"
+    },
+    {
+      "file": "packages/runtime-contracts/src/video/types/types.literals.d.ts",
+      "rule": "repeated-prefix-naming",
+      "noiseId": "noise.naming.reviewed-owner-context"
+    },
+    {
+      "file": "packages/runtime-contracts/src/video/types/types.ts",
+      "rule": "repeated-prefix-naming",
+      "noiseId": "noise.naming.reviewed-owner-context"
+    },
+    {
+      "file": "packages/ui/src/content-popover-adapter/index.tsx",
+      "rule": "repeated-child-prefix-topology",
+      "noiseId": "noise.naming.reviewed-owner-context"
+    },
+    {
+      "file": "packages/ui/src/product-feedback/confirm-dialog/index.tsx",
+      "rule": "repeated-child-prefix-topology",
+      "noiseId": "noise.naming.reviewed-owner-context"
+    }
   ]
 }

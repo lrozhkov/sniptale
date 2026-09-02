@@ -24,6 +24,14 @@ import { applyRepositoryFindingBaseline } from '../../policy/baselines/repositor
 
 const REPOSITORY_BASELINE_PATH = 'tooling/configs/qa/structural-risk-repository-baseline.json';
 
+function structuralFindingKey(finding) {
+  return finding.id;
+}
+
+function isAcceptedStructuralFinding(current, accepted) {
+  return current.id === accepted.id && current.score <= accepted.score;
+}
+
 function resolveStructuralFiles({
   files = [],
   scope = 'workspace',
@@ -74,6 +82,20 @@ function collectPreviousCandidateSources({
     .filter(({ source }) => typeof source === 'string');
 }
 
+export function createRepositoryStructuralRiskReport({ getCurrentSource = readText } = {}) {
+  const targetFiles = resolveStructuralFiles({ scope: 'repo-wide' });
+  return {
+    targetFiles,
+    report: createStructuralRiskReport({
+      files: targetFiles,
+      getCurrentSource,
+      getPreviousSource: () => null,
+      scope: 'repository',
+      enforce: true,
+    }),
+  };
+}
+
 export function runStructuralRiskCheck({
   files = [],
   comparisonRevision = 'HEAD',
@@ -92,24 +114,28 @@ export function runStructuralRiskCheck({
   const previous =
     getPreviousSource ??
     (repositoryMode ? () => null : createPreviousSourceResolver(targetFiles, comparisonRevision));
-  const report = createStructuralRiskReport({
-    files: targetFiles,
-    getCurrentSource,
-    getPreviousSource: previous,
-    previousCandidateSources: collectPreviousCandidateSources({
-      comparisonRevision,
-      deletedFiles,
-      enforce,
-      reportScope,
-    }),
-    scope: reportScope,
-    enforce,
-  });
+  const report = repositoryMode
+    ? createRepositoryStructuralRiskReport({ getCurrentSource }).report
+    : createStructuralRiskReport({
+        files: targetFiles,
+        getCurrentSource,
+        getPreviousSource: previous,
+        previousCandidateSources: collectPreviousCandidateSources({
+          comparisonRevision,
+          deletedFiles,
+          enforce,
+          reportScope,
+        }),
+        scope: reportScope,
+        enforce,
+      });
   const repositoryBaseline = repositoryMode
     ? applyRepositoryFindingBaseline({
         baselinePath: REPOSITORY_BASELINE_PATH,
         controlId: 'qa.rule.structural-risk',
+        findingKey: structuralFindingKey,
         findings: report.violations,
+        isAcceptedFinding: isAcceptedStructuralFinding,
       })
     : null;
   return {

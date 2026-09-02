@@ -50,32 +50,32 @@ function runDeadCommentedCodeStep(codeFiles, baseline) {
   return createViolationStep('Dead commented code', 'Dead commented code found:', result);
 }
 
-function runStructuralRiskStep(codeFiles) {
+function runStructuralRiskStep(codeFiles, baseline) {
   const behavioralCodeFiles = filterImportOrMockOnlyDiffFiles(codeFiles);
-  return createViolationStep(
-    'Structural risk',
-    'Structural risk violations found:',
-    runStructuralRiskCheck({
-      files: behavioralCodeFiles,
-      reportScope: 'current-diff',
-      enforce: true,
-    })
-  );
+  const result = runStructuralRiskCheck({
+    files: behavioralCodeFiles,
+    reportScope: 'current-diff',
+    enforce: true,
+  });
+  return createViolationStep('Structural risk', 'Structural risk violations found:', {
+    ...result,
+    violations: filterAllowedViolations(result.violations, baseline),
+  });
 }
 
-function runManualMockExportParityStep(targetFiles) {
-  return createViolationStep(
-    'Mock export parity',
-    'Manual mock export parity violations found:',
-    runManualMockExportParityCheck({ targetFiles })
-  );
+function runManualMockExportParityStep(targetFiles, baseline) {
+  const result = runManualMockExportParityCheck({ targetFiles });
+  return createViolationStep('Mock export parity', 'Manual mock export parity violations found:', {
+    ...result,
+    violations: filterAllowedViolations(result.violations, baseline),
+  });
 }
 
 export function resolveFocusedCodeStepFiles(options, codeFiles, behavioralCodeFiles) {
   return options?.preserveImportOnly ? codeFiles : behavioralCodeFiles;
 }
 
-async function runFocusedCodeSteps(codeFiles, targetFiles) {
+async function runFocusedCodeSteps(codeFiles, targetFiles, baseline) {
   const behavioralCodeFiles = filterImportOrMockOnlyDiffFiles(codeFiles);
   const astGrepReceipt =
     codeFiles.length > 0 ? runUnifiedAstGrepReceipt({ files: codeFiles }) : null;
@@ -87,26 +87,26 @@ async function runFocusedCodeSteps(codeFiles, targetFiles) {
       behavioralCodeFiles
     );
     steps.push(
-      await timeAsyncStep(async () =>
-        createViolationStep(
-          label,
-          header,
-          await runCodeStep(stepCodeFiles, () =>
-            runner({ astGrepReceipt, files: stepCodeFiles, scope: 'workspace' })
-          )
-        )
-      )
+      await timeAsyncStep(async () => {
+        const result = await runCodeStep(stepCodeFiles, () =>
+          runner({ astGrepReceipt, files: stepCodeFiles, scope: 'workspace' })
+        );
+        return createViolationStep(label, header, {
+          ...result,
+          violations: filterAllowedViolations(result.violations, baseline),
+        });
+      })
     );
   }
   for (const { label, header } of FOCUSED_CONTEXTUAL_VIOLATION_STEPS) {
     steps.push(
-      await timeAsyncStep(async () =>
-        createViolationStep(
-          label,
-          header,
-          runMessagingCheck({ astGrepReceipt, files: codeFiles, targetFiles })
-        )
-      )
+      await timeAsyncStep(async () => {
+        const result = runMessagingCheck({ astGrepReceipt, files: codeFiles, targetFiles });
+        return createViolationStep(label, header, {
+          ...result,
+          violations: filterAllowedViolations(result.violations, baseline),
+        });
+      })
     );
   }
   return steps;
@@ -201,9 +201,9 @@ export async function collectFocusedLightLane({
     qualitySteps: [
       timeSyncStep(() => runChangedLineReadabilityStep(qualityCodeFiles)),
       timeSyncStep(() => runDeadCommentedCodeStep(qualityCodeFiles, baseline)),
-      timeSyncStep(() => runStructuralRiskStep(qualityCodeFiles)),
-      timeSyncStep(() => runManualMockExportParityStep(qualityTargetFiles)),
-      ...(await runFocusedCodeSteps(qualityCodeFiles, targetFiles)),
+      timeSyncStep(() => runStructuralRiskStep(qualityCodeFiles, baseline)),
+      timeSyncStep(() => runManualMockExportParityStep(qualityTargetFiles, baseline)),
+      ...(await runFocusedCodeSteps(qualityCodeFiles, targetFiles, baseline)),
     ],
     triggeredStaticSteps: runFocusedTriggeredStaticChecks({
       deferOwnerGuards: true,

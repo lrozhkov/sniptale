@@ -266,7 +266,7 @@ export function runManualMockExportParityCheck({ targetFiles = [] } = {}) {
   };
 }
 
-export function runRepositoryManualMockExportParityCheck() {
+export function collectRepositoryManualMockExportParityFindings() {
   const candidateTestFiles = collectRepositoryTestFiles();
   const violations = [];
 
@@ -283,6 +283,11 @@ export function runRepositoryManualMockExportParityCheck() {
     }
   }
 
+  return { candidateTestFiles, violations };
+}
+
+export function runRepositoryManualMockExportParityCheck() {
+  const { candidateTestFiles, violations } = collectRepositoryManualMockExportParityFindings();
   const baseline = applyRepositoryFindingBaseline({
     baselinePath: REPOSITORY_BASELINE_PATH,
     controlId: 'qa.rule.mock-export-parity',

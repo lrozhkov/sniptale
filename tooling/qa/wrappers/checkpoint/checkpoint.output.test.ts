@@ -15,7 +15,8 @@ function okStep(label: string, consoleOutput?: string) {
 it('renders structural watches only through the checkpoint advisory block', async () => {
   const root = createTempRoot('qa-checkpoint-output-');
   writeJson(root, 'tooling/configs/qa/quality-baseline.json', {
-    schemaVersion: 1,
+    schemaVersion: 2,
+    rationales: [],
     allowances: [],
   });
 

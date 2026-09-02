@@ -45,9 +45,18 @@ it('rejects malformed nested focused baseline allowances', () => {
   const context = {
     ...focusedContext(),
     baseline: {
+      rationales: [
+        {
+          id: 'noise.example',
+          classification: 'tool-noise',
+          owner: 'QA maintainers',
+          reason: 'Test fixture for malformed exact finding identity.',
+          removalCondition: 'Remove with the malformed fixture.',
+        },
+      ],
       allowances: [
         {
-          debtId: 'debt.example',
+          noiseId: 'noise.example',
           file: 'src/example.ts',
           rule: 'example',
         },
