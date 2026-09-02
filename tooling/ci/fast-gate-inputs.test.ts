@@ -113,7 +113,19 @@ it('keeps baseline composition out of executable control identity and fails clos
   writeFile(
     root,
     'tooling/configs/qa/quality-baseline.json',
-    '{"schemaVersion":2,"rationales":[{"id":"noise.example","classification":"tool-noise","owner":"QA maintainers","reason":"Exact false positive.","removalCondition":"Remove when the rule is precise."}],"allowances":[{"noiseId":"noise.example","rule":"example","file":"src/example.ts","line":1}]}\n'
+    `${JSON.stringify({
+      schemaVersion: 2,
+      rationales: [
+        {
+          id: 'noise.example',
+          classification: 'tool-noise',
+          owner: 'QA maintainers',
+          reason: 'Exact false positive.',
+          removalCondition: 'Remove when the rule is precise.',
+        },
+      ],
+      allowances: [{ noiseId: 'noise.example', rule: 'example', file: 'src/example.ts', line: 1 }],
+    })}\n`
   );
   const policyChanged = createCandidateControlDigest({ cwd: root });
   expect(policyChanged).toBe(initial);

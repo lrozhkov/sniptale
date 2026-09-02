@@ -121,7 +121,9 @@ function staleFindingAdvisory({ baselinePath, controlId, finding }) {
     rule: 'repository-baseline-stale',
     file: typeof finding.file === 'string' ? finding.file : baselinePath,
     ...(Number.isInteger(finding.line) ? { line: finding.line } : {}),
-    message: `Reviewed ${controlId} tool-noise finding is absent from the repository; baseline cleanup is non-blocking.`,
+    message:
+      `Reviewed ${controlId} tool-noise finding is absent from the repository; ` +
+      'baseline cleanup is non-blocking.',
   };
 }
 
