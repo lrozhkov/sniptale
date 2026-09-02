@@ -6,7 +6,7 @@ This document records intentional exceptions to shared platform patterns. Treat 
 
 Use `renderPageShell` for extension-page root lookup, theme bootstrap, locale binding, and fatal errors. Keep routing, persistence, transport orchestration, and domain behavior outside entrypoints. Keep a page-specific startup hook page-local until a second runtime needs the same policy.
 
-Page-local hooks, stores, and editor controllers may coexist. Unify them only to fix a demonstrated ownership defect, behavior duplication, or measured runtime cost.
+Page-local hooks, stores, and editor controllers may coexist only when their state, effect, and lifecycle authorities do not overlap. Use one owner when an authority overlaps. Otherwise unify them only to fix demonstrated behavior duplication or measured runtime cost.
 
 `apps/extension/src/platform/runtime-messaging/default-transport.ts` may lazily create the injectable default transport under the [factory and facade rule](../engineering/implementation-rules.md#ownership-selection). It must not own caller-specific retries or context-dependent state.
 

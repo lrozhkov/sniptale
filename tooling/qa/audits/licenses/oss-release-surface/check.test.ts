@@ -160,9 +160,6 @@ function seedLegalAndContributorFiles(root: string, font: Buffer) {
     'docs/oss/release.md',
     'qa:release-harness qa:checkpoint qa:closeout ci:proof ci:release Corresponding Source AGPL-3.0-or-later\n'
   );
-  for (const relativePath of ['docs/agent-tooling/AGENTS.md', 'docs/tooling/wrapper-summary.md']) {
-    write(root, relativePath, '`implementation → qa:checkpoint → required review → qa:closeout`\n');
-  }
   return legal;
 }
 
@@ -272,22 +269,6 @@ it('rejects retired layout instructions and missing private-reporting guidance',
     expect.arrayContaining([
       'retired release documentation fragment in docs/oss/release.md: src/shared',
       'private vulnerability reporting guidance is missing',
-    ])
-  );
-});
-
-it('rejects review-before-checkpoint workflow guidance', async () => {
-  const root = await createFixture();
-  write(
-    root,
-    'docs/tooling/wrapper-summary.md',
-    'required review completes before the first `qa:checkpoint`\n'
-  );
-
-  expect(collectOssReleaseSurfaceErrors(root)).toEqual(
-    expect.arrayContaining([
-      'workflow document is missing checkpoint-before-review order: docs/tooling/wrapper-summary.md',
-      'workflow document retains review-before-checkpoint guidance: docs/tooling/wrapper-summary.md',
     ])
   );
 });

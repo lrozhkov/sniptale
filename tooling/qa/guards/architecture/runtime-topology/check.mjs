@@ -13,7 +13,6 @@ import { collectContentRuntimeReferenceViolations } from './content-runtime.mjs'
 
 const MANIFEST_PATH = 'apps/extension/manifest.json';
 const BUILD_LAYOUT_PATH = 'apps/extension/build/layout.data.json';
-const RUNTIME_CONTEXTS_DOC_PATH = 'docs/architecture/runtime-contexts.md';
 const DYNAMIC_CONTENT_RUNTIME_ROOT = 'apps/extension/src/content';
 const TOPOLOGY_PATH = 'tooling/qa/guards/architecture/runtime-topology/runtime-topology.data.json';
 const ACTIVE_TOPOLOGY_FILES = [
@@ -165,20 +164,6 @@ function collectStaticContentScriptViolations(manifest, manifestPath) {
   ];
 }
 
-function collectDocsCoverageViolations(rootDir, docsPath, topology) {
-  const docsText = fs.readFileSync(toAbsolutePath(rootDir, docsPath), 'utf8');
-
-  return topology
-    .filter((runtime) => !runtime.docsMarkers.some((marker) => docsText.includes(marker)))
-    .map((runtime) =>
-      createViolation(
-        'runtime-topology-docs-drift',
-        docsPath,
-        `Runtime "${runtime.id}" is missing from ${docsPath}.`
-      )
-    );
-}
-
 function loadBuildRuntimeInputs(rootDir, buildLayoutPath) {
   const layout = JSON.parse(fs.readFileSync(toAbsolutePath(rootDir, buildLayoutPath), 'utf8'));
   if (
@@ -324,7 +309,6 @@ export function collectRuntimeTopologyViolations({
   rootDir = repoRoot,
   manifestPath = MANIFEST_PATH,
   buildLayoutPath = BUILD_LAYOUT_PATH,
-  docsPath = RUNTIME_CONTEXTS_DOC_PATH,
   retiredRuntimeIds = RETIRED_RUNTIME_IDS,
 } = {}) {
   let topology;
@@ -346,7 +330,6 @@ export function collectRuntimeTopologyViolations({
     ...collectRegistryManifestCoverageViolations(rootDir, manifestPath, topology),
     ...collectRegistryBuildCoverageViolations(rootDir, buildLayoutPath, topology),
     ...collectContentRuntimeReferenceViolations(rootDir),
-    ...collectDocsCoverageViolations(rootDir, docsPath, topology),
     ...collectRetiredRuntimeViolations(rootDir, retiredRuntimeIds),
   ];
 }

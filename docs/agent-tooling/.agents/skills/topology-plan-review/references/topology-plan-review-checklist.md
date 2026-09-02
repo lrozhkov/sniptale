@@ -25,7 +25,8 @@ The manifest is an open-set inventory over the selected root/seam, not a hand-pi
 - facade/index/leaf-bridge decisions and compatibility consumers
 - mocks, type-query module IDs, source-reading tests, fixtures, and path-bearing product registries
 - docs, build inputs, owner maps, policy/allowlists, quality classification, focused-coverage maps, and validation consumers
-- authoritative modes, digests/generated inputs where relevant, negative proof, user-visible proof, rollback groups, and target collision checks
+- file mode and content digest for every affected file
+- authoritative runtime modes and generated-input digests where relevant, negative proof, user-visible proof, rollback groups, and target collision checks
 - exact high-risk proof ownership, including moved tests and production targets
 
 Validate all source paths, target parents, file/directory collisions, duplicate targets, case collisions, and composed mappings before the first rename. Missing or ambiguous entries block planning approval.

@@ -4,14 +4,7 @@ import path from 'node:path';
 const topologyPath = new URL('./runtime-topology.data.json', import.meta.url);
 const TOPOLOGY_RELATIVE_PATH =
   'tooling/qa/guards/architecture/runtime-topology/runtime-topology.data.json';
-const RUNTIME_KEYS = new Set([
-  'docsMarkers',
-  'entrypointFiles',
-  'featureRoot',
-  'id',
-  'manifestOwned',
-  'root',
-]);
+const RUNTIME_KEYS = new Set(['entrypointFiles', 'featureRoot', 'id', 'manifestOwned', 'root']);
 
 function escapeRegex(source) {
   return source.replace(/[|\\{}()[\]^$+*?.]/gu, '\\$&');
@@ -57,7 +50,6 @@ function parseRuntime(runtime, index) {
   }
 
   return {
-    docsMarkers: requireUniqueStringArray(runtime.docsMarkers, 'docsMarkers', runtime.id),
     entrypointFiles: requireUniqueStringArray(
       runtime.entrypointFiles,
       'entrypointFiles',
@@ -84,7 +76,7 @@ export function parseRuntimeTopology(value) {
     throw new Error('Runtime topology must be a non-empty array.');
   }
   const topology = value.map(parseRuntime);
-  for (const field of ['id', 'root', 'entrypointFiles', 'docsMarkers']) {
+  for (const field of ['id', 'root', 'entrypointFiles']) {
     assertUniqueRuntimeField(topology, field);
   }
   return topology;

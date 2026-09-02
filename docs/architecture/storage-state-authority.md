@@ -4,10 +4,14 @@ This document owns state classifications and persistence authority. [Persistence
 
 ## State classes
 
-- Authoritative state drives user-visible or privileged behavior. Give it one persistence owner, mutation API, ordering rule, failure behavior, and recovery proof.
-- Session state coordinates a bounded browser or extension lifetime. Define expiry, stale-entry handling, and storage-unavailable behavior.
-- Advisory state may be rebuilt or discarded. Do not make it a prerequisite for correctness.
-- Disposable state belongs to one page or runtime instance. Persist it only through an explicit mutation owner.
+Classify state by the first matching rule for its declared lifetime:
+
+- Advisory state may be rebuilt or discarded during that lifetime without changing correctness. Do not make it a prerequisite for correctness.
+- Disposable state is non-advisory state needed only by one page or runtime instance. It has no contract after that instance ends.
+- Session state is non-advisory state that must span runtime instances within one bounded browser or extension lifetime and expires at that boundary. Define expiry, stale-entry handling, and storage-unavailable behavior.
+- Authoritative state is the accepted source of truth for a domain outcome that does not match a shorter-lived class. Give it one authority, mutation API, ordering rule, failure behavior, and recovery proof. Persist it only when its declared lifetime crosses a restart or storage boundary.
+
+User visibility and privileged use are not state classes. Give every class one mutation authority and explicit failure behavior appropriate to its lifetime.
 
 Do not use browser storage, IndexedDB, memory, or React state as parallel authorities. A fallback cache must identify the winning backend, reconciliation rule, and restart loss.
 

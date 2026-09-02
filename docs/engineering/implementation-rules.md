@@ -12,7 +12,7 @@ Keep production `fabric` value imports under `apps/extension/src/editor/**`. Kee
 
 Apply the [public-surface rules](../architecture/code-organization.md#public-surfaces) instead of reintroducing a broad shared facade.
 
-Expose a factory with explicit dependencies for a mutable service. Keep a default facade only as a lazy compatibility wrapper around that factory. Do not let the facade add caller-specific policy or become a second lifecycle authority.
+Use a factory with explicit dependencies as the default for a mutable service. Retain a lazy default facade only for an existing compatibility consumer registered by its machine policy. Inject the factory directly for every new consumer. Do not let the facade add a hidden dependency, caller-specific policy, or lifecycle authority.
 
 ## Boundary values
 

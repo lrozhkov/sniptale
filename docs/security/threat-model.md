@@ -45,9 +45,9 @@ The adversaries are malicious pages and frames, unauthorized or replayed senders
 
 Treat pull-request source, dependency hooks, candidate QA controls, and candidate-built image contents as untrusted. Candidate execution must not receive repository tokens, cloud credentials, OIDC authority, or write access to the trusted mount.
 
-The trusted-base launcher must bind proof to the candidate and both control digests. It must reject cross-digest reuse and documentation-only derived proof. A control-digest mismatch reports `candidate-controls`; the new controls become accepted only after merge to `main`. Release provenance requires the accepted `main` control digest.
+Proof admission must bind evidence to the candidate and preserve the trusted-control boundary. Canonical candidate-admission and proof-reuse rules belong to [Canonical CI/CD](../tooling/ci-cd.md).
 
-The canonical CI topology, runner isolation, metadata-service block, action pinning, and proof admission rules belong to [Canonical CI/CD](../tooling/ci-cd.md). Legal closure belongs to [OSS provenance](../oss/provenance.md). Publication admission belongs to the [release runbook](../oss/release.md).
+Legal closure belongs to [OSS provenance](../oss/provenance.md). Publication admission belongs to the [release runbook](../oss/release.md).
 
 ## Review ownership
 

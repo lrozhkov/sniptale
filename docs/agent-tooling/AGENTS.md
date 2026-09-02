@@ -1,113 +1,102 @@
 # AGENTS.md
 
-Compact workflow contract for Sniptale.
+Workflow contract for Sniptale. Technical decisions follow `docs/engineering/implementation-rules.md`.
 
-## Coherent Delivery
+## Task Scope
 
-- Before a broad move, generate and validate one complete bounded manifest covering files, consumers, owners, proof, rollback, modes, digests, and collision checks. A representative sample is not a complete inventory.
-- Freeze the task's acceptance criteria and explicit non-goals before implementation. Do not strengthen manifest promises or convert nearby hardening into current-wave acceptance without evidence that the original criteria require it.
-- Do not start broad QA or required review until the coherent candidate and its deterministic negative proof are complete.
-- Collect all review findings before editing. Confirm each finding against acceptance criteria, source evidence, and invariants, then make one consolidated correction. Repeat only proof invalidated by a changed behavior, owner, public contract, or security seam.
-- Classify findings as current-wave regressions, direct acceptance blockers, provable security issues, or pre-existing hardening. Only the first three categories block closeout. Report pre-existing hardening only when it is evidenced, materially relevant to the reviewed decision, and useful to the user, or when the user explicitly requested a broader inventory; otherwise omit it. Unrelated pre-existing defects are not `Request changes`.
-- Treat every heuristic finding as a triage input, not an automatic code-change instruction. Inspect the reported code and rule evidence, then either fix a confirmed defect or record only a confirmed false-positive as exact `tool-noise` with owner, reason, and removal condition in the detector's baseline. Accepted debt is forbidden in heuristic baselines; do not weaken a rule or add a broad exception to make a release pass.
-- Canonical proof is `qa:release-harness` when the diff has harness/shared-control targets, `qa:checkpoint`, an artifact build when its closure changes, and the affected runtime or E2E smoke.
-- Canonical order: `implementation → qa:checkpoint → required review → qa:closeout`.
+- Before implementation, record the acceptance criteria, non-goals, planned files, and consumers.
+- Do not infer urgency.
+- Expand scope only for an acceptance criterion, observed defect, existing invariant, reachable supported flow, or material risk.
+- Material risks are security, privacy, authorization, trust-boundary, and irreversible-data-loss risks.
 
-## No Implied Urgency
+Classify each review finding by the first matching definition:
 
-- Do not assume urgency unless the user explicitly says so.
-- Quality, correctness, maintainability, security, and explicit ownership are the default priorities.
-- Do not justify topology debt, temporary hacks, weaker proof, smaller diffs, or deferred cleanup by presumed time pressure.
-- If the accepted behavior cannot be implemented coherently inside the selected owner without a refactor, ownership split, or topology cleanup, do that prerequisite work in the same change set unless the user explicitly chooses a narrower tradeoff. Existing structural pressure or a nearby cleanup opportunity alone does not expand the task.
+1. `security issue`: an evidenced material risk within the task scope
+2. `current regression`: a non-security defect introduced or worsened by the candidate
+3. `acceptance blocker`: another condition that prevents an acceptance criterion
+4. `pre-existing hardening`: a condition that does not block acceptance and was not worsened by the candidate
 
-## Scope Discipline
-
-- Frozen acceptance criteria and explicit non-goals define the required behavior. An unmentioned edge case is not current scope merely because it is imaginable.
-- Add a branch, state, retry, fallback, compatibility path, rollback, replay guard, stale-result guard, or recovery mode only when its triggering scenario is supported by evidence: explicit acceptance, an observed defect, an existing product invariant, reachable behavior in a supported platform flow, or a material trust-boundary, security, privacy, authorization, or irreversible data-loss risk.
-- `Could happen` is not evidence. Before adding defensive logic, identify the concrete trigger, how it is reachable in the current flow, its user or system impact, and why existing platform or owner behavior does not already contain it.
-- Rare but material hostile-input, trust-boundary, security, privacy, authorization, and irreversible data-loss risks remain mandatory. Rare low-impact or recoverable scenarios stay outside current behavior until an observed trigger or accepted requirement promotes them.
-- Do not enumerate the universe of hypothetical exclusions. When a non-trivial case was actively proposed or materially constrains the chosen design, record only its current ceiling and the concrete trigger that would promote it; do not add scaffolding for it.
-- Known accepted adjacent changes may test whether an owner placement is immediately brittle, but hypothetical future changes must not cause speculative interfaces, configuration, state, compatibility layers, or behavior to be implemented now.
-- The default budget for new dependencies, public contracts, persisted authorities, configuration modes, compatibility layers, and fallback modes is zero. Each addition requires direct acceptance or invariant evidence.
+The first three classes block completion. Report pre-existing hardening only when it affects a task decision or the user requests it.
 
 ## Preflight
 
-Before non-trivial implementation, read:
+Run preflight before a task that changes production behavior, public contracts, persistence, runtime boundaries, permissions, topology, QA tooling, or more than one owner.
+
+Read:
 
 - `AGENTS.md`
 - `docs/engineering/implementation-rules.md`
 - `docs/architecture/repository-overview.md`
 
-Read deeper docs only when the task touches their area:
+Also read the matching policy:
 
-- runtime entrypoints, browser/context routing, or cross-runtime ownership: `docs/architecture/runtime-contexts.md`
-- folder topology, module roles, naming, or split strategy: `docs/architecture/code-organization.md`
-- entrypoint/state-pattern divergence or platform-policy tradeoffs: `docs/architecture/platform-patterns-and-tradeoffs.md`
-- translated UI, locale behavior, or locale-aware formatting: `docs/architecture/i18n-architecture.md`
-- parser, snapshot, page-profile, traversal, export, or apply-back flows: `docs/architecture/parser-architecture.md`
-- product UX, visual direction, interaction design, or extension-owned UI: `DESIGN.md`
-- AI credentials, sensitive storage, diagnostics, tracing, or secret-bearing network headers: `docs/security/data-handling.md`
-- manifest grants, host permissions, content scripts, web-accessible resources, offscreen reasons, action/default popup, or context-menu permissions: `docs/security/manifest-permissions.md`
-- user-reported regressions, escaped defects, or QA blind spots: add failing proof first, identify why existing QA missed it, and decide whether the same change needs a deterministic guard improvement
+- runtimes or cross-runtime ownership: `docs/architecture/runtime-contexts.md`
+- topology, naming, or split strategy: `docs/architecture/code-organization.md`
+- platform-pattern divergence: `docs/architecture/platform-patterns-and-tradeoffs.md`
+- translated UI or locale behavior: `docs/architecture/i18n-architecture.md`
+- parsing, snapshots, traversal, export, or apply-back: `docs/architecture/parser-architecture.md`
+- product UX or extension UI: `DESIGN.md`
+- credentials, sensitive storage, diagnostics, tracing, or secret headers: `docs/security/data-handling.md`
+- extension permissions or manifest capabilities: `docs/security/manifest-permissions.md`
 
-Run `npm run qa:preflight` when scope is unclear or non-trivial. Use `npm run qa:preflight -- --files <paths...>` for pre-edit planning before a diff exists.
+For planned paths, run `npm run qa:preflight -- --files <paths...>`. For the current task diff, run `npm run qa:preflight`.
 
-Record the owner seam, runtime boundary, target topology, known accepted adjacent changes that materially constrain placement, state authorities, evidence-backed risk families, structural pressure, transitive consumers, and expected negative/user-visible proof before editing. For a broad topology move, pin a bounded manifest with the owner/import boundary, public contracts, complete consumer set, typecheck blast radius, collision handling, rollback, negative proof, acceptance proof, and structurally pressured files/functions.
+Use the reported owners, risks, documents, consumers, and proof requirements to finalize the plan.
 
-If preflight shows mixed ownership, low cohesion, a broad public surface, flat sibling scatter, repeated-prefix names, root-facade drift, or multiple independent reasons for the same file to change, fix the shape before adding behavior only when the planned change would cross or worsen that boundary or the accepted behavior cannot fit coherently inside it. Existing pressure alone is not permission to widen the task. Metrics are signals, not architecture boundaries. Token counts are not a quality signal, and a mechanical or distributed split is not a fix when the same broad owner contract remains.
+A broad move adds, moves, or renames files across an owner boundary or changes a public import path.
 
-Return to preflight and the minimal correction class when a proposed fix starts changing new runtime contracts, all persistence writers, or dozens of additional owners beyond the accepted manifest. Expand the task only when those changes are proved necessary for the frozen acceptance criteria.
+Before a broad move, list every affected file and consumer, owner boundary, public contract, typecheck scope, collision, rollback, file mode, content digest, risk, and proof. The inventory must be complete.
+
+Return to preflight when implementation exceeds the recorded scope.
 
 ## Implementation
 
-Keep changes inside the selected owner seam. Use canonical browser, messaging, storage, parser, i18n, design-system, and security seams instead of reaching around them. Boundary payloads from JSON, storage, IPC, browser APIs, DOM, process output, or network calls stay `unknown` until a local parser or adapter narrows them.
+- For an escaped defect, add failing proof first. Record why existing QA missed it and whether a deterministic guard is required.
+- Format only with `npm run format:write`.
+- Do not run a formatter on authored Markdown.
+- Modify generated legal text only through its generator or digest owner.
+- Subagents may investigate, diagnose, or implement disjoint work. The main thread runs all blocking QA wrappers.
 
-For background runtime route changes, update the canonical contracts-owned background-ingress descriptor and its exhaustive runtime handler/authorization bindings. Generated action-kernel, guard, sender, policy-state usage, documentation, and QA projections must not become independent authorities. Legacy family routers are adapters; dispatch and authorization proof should run through listener/action-kernel paths.
+## QA, Review, and Closeout
 
-Implement a coherent wave before running blocking QA. Use targeted commands only to investigate a specific wrapper failure, answer a focused debugging question, or satisfy an explicit user request.
+Follow this order. Repeat a step only when a later edit invalidates its result.
 
-Structural enforcement analyzes behavioral files in the current diff and compares their current AST shape with `HEAD`; unchanged, import-only, mock-only, and rename-only files are not candidates. A cohesive registered orchestration owner may legitimately coordinate state, effects, recovery, and narrow adapters, but must not absorb unrelated UI or arbitrary branching. `qa:preflight -- --files ...` is a read-only planning snapshot, while `qa:structural-audit` is a manual report-only maintenance tool and is not a routine agent or PR gate.
+1. Complete the candidate and deterministic proof for required success and failure paths.
+2. If preflight reports harness or shared-control files, run `npm run qa:release-harness`.
+3. Run `npm run qa:checkpoint`.
+4. Apply its change-risk report:
+   - Run every indicated `$security-code-review` and `$architecture-code-review`.
+   - Treat the routing as required even though wrappers neither store nor enforce it.
+   - When neither review is indicated, report `not required` separately from the risk level.
+5. Resolve review findings under the rules below, apply one correction batch, and repeat invalidated proof or review.
+6. Run `npm run qa:closeout -- -m "<commit message>"`.
 
-Plan architecture work by owner/change-reason cluster and classify each candidate as `Split`, `Consolidate`, or `Keep`. Optimize the number of navigation transitions required to understand one operation, not the raw file count: retain explicit runtime, owner, adapter, and public-contract boundaries. Before and after a topology wave, compare navigation transitions, forwarding/proxy layers, public contract surface, state authorities, effects/recovery placement, and cohesion. A split or consolidation must include negative proof for cycles, dual authority, cross-owner imports, broad facade/state/props bags, forwarding-only layers, dead exports, generic helpers, and UI mixed with privileged, persistence, or transport effects.
+For a planned broad move, run `$topology-plan-review` before implementation. For an already implemented broad move without prior topology review, run it after all required proof passes.
 
-When an explicitly requested manual topology snapshot reports forwarding-only modules with one production consumer, treat them as overlapping edge-derived operation candidates rather than path-partition owners. Before declaring an area complete, require the artifact's complete compact edge inventory and classify every such candidate as `Consolidate` or retain it with explicit contract, runtime, cross-owner, unresolved-topology, or independent-change-reason `Keep` evidence. A zero `Consolidate` count is not proof that fragmentation is absent unless this edge inventory is empty or fully vetoed.
+Each required review uses a new read-only subagent with `fork_turns: "none"`. Provide the scope manifest, exact diff, preflight result, and QA results. Do not provide intended conclusions.
 
-Run `npm run qa:release-harness` before `qa:checkpoint` when the diff has executable harness/shared-control targets. This includes executable `tooling/**`, `.github/workflows/**`, `.agents/**`, `AGENTS.md`, hooks, QA-affecting root/package/TypeScript/Vite configuration, and active `docs/tooling/**` guidance. Exact machine-owned inventory-only files classified by `tooling/qa/composition/scope/qa-scope.mjs` use checkpoint owner validators and do not require a fresh harness stamp; the internal closeout build still requires that fresh checkpoint. A composition-only change to a baseline, allowlist, allowance set, debt registry, or equivalent exception inventory must not require `qa:release-harness` or harness unit tests. Changes to executable matchers, parsers, validators, generators, or registry consumers remain harness targets.
+Collect all review findings before editing. Confirm each finding against acceptance criteria, evidence, and invariants.
 
-Run `npm run qa:checkpoint` after each substantial coherent implementation wave. It owns supported non-Markdown formatting, advisory state, focused static checks, typecheck, focused tests, and diff coverage; it does not build, stage, or commit.
+A finding may require new behavior or proof only for a reachable trigger tied to acceptance or a material invariant.
 
-Subagents may perform read-only investigation, diagnosis, or disjoint implementation work. Do not assign them `qa:release-harness`, `qa:checkpoint`, the internal build phase, or `qa:closeout`; blocking wrappers stay in the main thread.
+Repeat review only when a correction changes behavior, ownership, public contracts, dependency direction, parser semantics, or security.
 
-## Required Review
+Treat heuristic findings as triage. Fix confirmed defects.
 
-Run `$security-code-review` only when the current diff actually changes a trust boundary, authorization decision, privileged API use, sanitization/import-export policy, secret handling, retention, privacy behavior, manifest permission, or MV3 lifecycle authority. Run `$architecture-code-review` only when the current diff actually changes runtime ownership, state/public contracts, dependency direction, parser semantics, UI/i18n/design-system ownership, or notable topology. Low-risk owner-local extraction, test/proof-only changes, literal clone removal, and mechanical moves that preserve those seams do not require independent review; report `not required: low-risk change`. Use `$topology-plan-review` before implementation to validate a large move plan or after green proof to review the completed move.
+Record a confirmed false positive as exact `tool-noise` with its owner, reason, and removal condition. Do not baseline debt, weaken a rule, or add a broad exception.
 
-Required closeout review runs only after the complete candidate, deterministic negative proof, applicable green harness proof, and green `qa:checkpoint` exist. Spawn a new independent read-only reviewer with `fork_turns: "none"`; do not reuse an agent that saw implementation context. The initial review task must supply the explicit bounded manifest/completion matrix, exact current diff scope, preflight shape, and QA results; do not pass intended conclusions.
+`qa:closeout` owns checkpoint reuse, build, diff validation, staging, and commit. Do not stage manually, run blocking wrappers concurrently, stage `tasks/**`, amend, or replace closeout unless the user requests it.
 
-Collect all findings, classify them with the four finding categories, confirm blockers against evidence and the frozen acceptance criteria, and apply one consolidated correction. A finding that asks for new behavior, state, recovery, compatibility, or proof must identify its concrete reachable trigger and connection to frozen acceptance or a material invariant; without that evidence it is not a current finding and should be omitted unless the user explicitly requested a speculative-hardening inventory. A reviewer may not turn an unrelated test wish, hypothetical future scenario, or stronger guarantee into a blocker. Do not repeat review after mechanical cleanup unless the correction changed the reviewed behavior, owner, public contract, dependency direction, parser semantics, or security seam. Rerun only proof invalidated by the correction.
-
-Expect QA or review to reject dual authority, write-on-read repair, blind overwrites, reachable stale-result races, missing recovery or failure surfacing at evidenced partial-failure points, raw privileged effects outside canonical owners, unsafe boundary casts, broad controller/state/props bags, hidden multi-transport orchestration, topology-only line splitting, distributed god-objects, dead exports/cycles, i18n/design-system bypasses, and success-only proof for evidenced failure-prone seams.
-
-## Closeout
-
-Normal implementation flow:
-
-1. implement a coherent phase
-2. run `npm run qa:release-harness` when harness/shared-control targets changed
-3. run `npm run qa:checkpoint`
-4. fix checkpoint failures and restore green proof
-5. obtain required independent review when the changed seam is high risk
-6. apply one consolidated correction and rerun only invalidated proof/review
-7. run `npm run qa:closeout -- -m "<commit message>"`
-
-`qa:closeout` reuses a fresh matching checkpoint or runs one, invokes its internal build phase, validates the unchanged diff and task-artifact policy, stages allowed changes, and commits only after the build is green. It requires a fresh harness stamp whenever the live diff has executable harness/shared-control targets; exact machine-owned inventory-only targets are validated by their owner checks instead.
-
-Do not run a manual closeout chain, manually stage the candidate, start another blocking wrapper while closeout runs, stage `tasks/**`, or amend an existing commit unless the user explicitly requests it.
-
-If closeout fails, fix local implementation defects in the current seam; return to preflight when the failure exposes wrong ownership, topology, proof scope, or seam choice; use targeted debug commands only for the failed stage; then rerun the single closeout wrapper.
-
-Authored Markdown uses natural paragraphs without hard wrapping. Do not run formatters that reflow Markdown. License and generated legal text stays byte-for-byte under its canonical generator or digest owner.
+If closeout fails, debug only the failed stage. Fix local defects and rerun closeout. Return to preflight when the failure identifies the wrong owner, topology, proof scope, or runtime boundary.
 
 ## Final Report
 
-Final delivery summarizes what changed, the closeout command and result, review status (`not required: low-risk change` or the required review result), and the escaped-defect/QA-improvement decision when applicable. If closeout needed more than `2-3` attempts, include the repeated-failure causes and concrete documentation, preflight, wrapper-feedback, or guardrail improvements.
+Report:
+
+- the change
+- every required QA and closeout command as `passed`, `failed`, or `not run`
+- the checkpoint risk level, or `not run`
+- each review result, or `not required`
+- the escaped-defect QA decision for an escaped-defect task
+
+After the fourth closeout attempt, also report the repeated causes and resulting documentation or guardrail changes.

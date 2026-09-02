@@ -1,9 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 
-const WORKFLOW_ORDER_MARKER = '`implementation → qa:checkpoint → required review → qa:closeout`';
-const WORKFLOW_ORDER_DOCS = ['docs/agent-tooling/AGENTS.md', 'docs/tooling/wrapper-summary.md'];
-
 function contributionDocumentErrors(root) {
   const contributing = readFileSync(path.resolve(root, 'CONTRIBUTING.md'), 'utf8');
   const conduct = readFileSync(path.resolve(root, 'CODE_OF_CONDUCT.md'), 'utf8');
@@ -58,17 +55,6 @@ export function validateDocuments(root, policy) {
   }
   if (!release.includes('Corresponding Source') || !release.includes('AGPL-3.0-or-later')) {
     errors.push('release documentation is missing corresponding-source terms');
-  }
-  for (const relativePath of WORKFLOW_ORDER_DOCS) {
-    const contents = existsSync(path.resolve(root, relativePath))
-      ? readFileSync(path.resolve(root, relativePath), 'utf8')
-      : '';
-    if (!contents.includes(WORKFLOW_ORDER_MARKER)) {
-      errors.push(`workflow document is missing checkpoint-before-review order: ${relativePath}`);
-    }
-    if (/before the first `qa:checkpoint`/u.test(contents)) {
-      errors.push(`workflow document retains review-before-checkpoint guidance: ${relativePath}`);
-    }
   }
   return errors;
 }

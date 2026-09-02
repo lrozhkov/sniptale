@@ -9,7 +9,7 @@
 
 ## Runtime And Ownership
 
-- Runtime folders do not import each other directly. Cross-runtime reuse uses `@sniptale/*` packages, typed contracts, browser adapters, messaging, persistence, i18n, theme, and reusable UI owners.
+- Runtime imports follow the canonical dependency rule in `docs/architecture/code-organization.md`; do not copy its machine-documented exceptions into this checklist. Cross-runtime reuse otherwise uses exact package exports or concrete app-core owners.
 - Entrypoints, page shells, app shells, and public facades stay thin. Runtime route, authorization-policy, and drift registries stay aligned.
 - Paths own domains and filenames own roles. A split must reduce real owner complexity rather than move the same broad contract, state authority, or effect surface into neighboring files as a distributed god-object.
 - Review the owner/change-reason cluster, not raw files in isolation. A valid `Split`, `Consolidate`, or `Keep` result reduces cognitive/navigation load without erasing runtime, owner, adapter, or public-contract boundaries. Fewer files alone is not evidence.

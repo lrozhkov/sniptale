@@ -22,7 +22,7 @@ Parse cross-runtime messages at the receiver. Treat sender identity as context p
 
 ## Extension and editing pages
 
-`apps/extension/src/popup/index.tsx`, `apps/extension/src/settings/index.tsx`, `apps/extension/src/gallery/index.tsx`, `apps/extension/src/design-system/index.tsx`, `apps/extension/src/web-snapshot-viewer/index.tsx`, `apps/extension/src/camera-recorder/index.tsx`, `apps/extension/src/editor/index.tsx`, `apps/extension/src/video-editor/index.tsx`, and `apps/extension/src/scenario-editor/index.tsx` own their page shells and page-local workflows. Durable state remains in named persistence owners. Apply the [video-editor layering rules](video-editor-layering.md) inside the video-editor runtime.
+Extension and editing page runtimes own their page shells and page-local workflows. The changing inventory is projected in [generated project facts](../engineering/project-facts.md) from the [machine runtime registry](../../tooling/qa/guards/architecture/runtime-topology/runtime-topology.data.json). Durable state remains in named persistence owners. Apply the [video-editor layering rules](video-editor-layering.md) inside the video-editor runtime.
 
 ## Offscreen
 

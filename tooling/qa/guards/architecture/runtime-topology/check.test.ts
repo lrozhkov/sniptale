@@ -9,7 +9,6 @@ import {
 } from '../../../test-support/test-helpers';
 import {
   DEFAULT_BUILD_HTML_INPUTS,
-  DEFAULT_DOC_MARKERS,
   DEFAULT_RUNTIME_TOPOLOGY,
   DEFAULT_WEB_ACCESSIBLE_RESOURCES,
 } from './test.data';
@@ -58,12 +57,7 @@ function writeTopologyFixture(
   writeFile(root, 'docs/architecture/runtime-contexts.md', docsText);
 }
 
-function defaultDocsText(overrides: string[] = []) {
-  return [
-    ...DEFAULT_DOC_MARKERS.filter((marker) => !overrides.includes(marker)),
-    ...overrides,
-  ].join('\n');
-}
+const defaultDocsText = () => 'Runtime coordination rules.\n';
 
 async function loadRuntimeTopologyModule(root: string) {
   return withCwd(root, async () =>
@@ -94,28 +88,6 @@ it('does not require a runtime id to mirror its existing runtime folder name', a
   const module = await loadRuntimeTopologyModule(root);
 
   expect(module.collectRuntimeTopologyViolations({ rootDir: root })).toEqual([]);
-});
-
-it('flags docs drift when scenario-editor is missing from runtime contexts', async () => {
-  const root = createTempRoot('verify-runtime-topology-');
-  writeTopologyFixture(
-    root,
-    DEFAULT_DOC_MARKERS.filter(
-      (marker) => marker !== 'apps/extension/src/scenario-editor/index.tsx'
-    ).join('\n')
-  );
-
-  const module = await loadRuntimeTopologyModule(root);
-
-  expect(module.collectRuntimeTopologyViolations({ rootDir: root })).toEqual(
-    expect.arrayContaining([
-      expect.objectContaining({
-        rule: 'runtime-topology-docs-drift',
-        file: 'docs/architecture/runtime-contexts.md',
-        message: expect.stringContaining('scenario-editor'),
-      }),
-    ])
-  );
 });
 
 it('flags static content script manifest registration', async () => {
@@ -232,7 +204,6 @@ it('flags registered entrypoint paths that do not resolve to files', async () =>
   writeJson(root, 'tooling/qa/guards/architecture/runtime-topology/runtime-topology.data.json', [
     ...DEFAULT_RUNTIME_TOPOLOGY,
     {
-      docsMarkers: ['apps/extension/src/missing-runtime/index.ts'],
       entrypointFiles: ['apps/extension/src/missing-runtime/index.ts'],
       featureRoot: false,
       id: 'missing-runtime',
@@ -348,7 +319,6 @@ it('rejects a registry-only folder with no manifest or build runtime authority',
   const root = createTempRoot('verify-runtime-topology-registry-only-');
   writeTopologyFixture(root, defaultDocsText());
   const runtime = {
-    docsMarkers: ['apps/extension/src/artificial-runtime/index.ts'],
     entrypointFiles: ['apps/extension/src/artificial-runtime/index.ts'],
     featureRoot: false,
     id: 'artificial-runtime',
@@ -356,11 +326,6 @@ it('rejects a registry-only folder with no manifest or build runtime authority',
     root: 'apps/extension/src/artificial-runtime',
   };
   writeFile(root, runtime.entrypointFiles[0], 'entrypoint\n');
-  writeFile(
-    root,
-    'docs/architecture/runtime-contexts.md',
-    `${defaultDocsText()}\n${runtime.docsMarkers[0]}\n`
-  );
   writeJson(root, 'tooling/qa/guards/architecture/runtime-topology/runtime-topology.data.json', [
     ...DEFAULT_RUNTIME_TOPOLOGY,
     runtime,

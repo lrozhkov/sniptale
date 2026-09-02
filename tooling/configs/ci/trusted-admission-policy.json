@@ -106,6 +106,6 @@
       }
     }
   },
-  "proof": "A pull request executes its candidate QA controls once. Trusted base validates mandatory phases, candidate identity, proof schema, evidence hashes, execution compatibility, artifact closure, reuse disposition, and final graph status without re-executing the previous controls. Both control digests and candidate-controls disposition remain explicit; cross-digest reuse and docs-only derivation are forbidden, and release provenance requires the accepted main control digest.",
+  "proof": "A pull request executes its candidate QA controls once. Trusted base validates mandatory phases, candidate identity, proof schema, evidence hashes, execution compatibility, artifact closure, reuse disposition, and final graph status without re-executing the previous controls. Both control digests and candidate-controls disposition remain explicit. Cross-digest reuse is forbidden. Candidate-bound non-gate-input reuse requires equal gate-input and control digests plus registered validators. Release provenance requires fresh release phases and the accepted main control digest.",
   "rollback": "Reject the candidate bundle and execute a fresh gate after restoring the trusted admission owner."
 }
