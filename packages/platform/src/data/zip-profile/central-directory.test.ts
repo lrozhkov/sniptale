@@ -193,6 +193,13 @@ it('rejects a multi-disk ZIP64 locator after accepting legacy sentinel fields', 
   expectZipError(() => inspectZipCentralDirectory(archive, DEFAULT_OPTIONS), 'archive-invalid');
 });
 
+it('rejects ZIP64 data descriptor sizes that disagree with the central directory', () => {
+  expectZipError(
+    () => inspectZipCentralDirectory(createZip64({ compressed: 2 }), DEFAULT_OPTIONS),
+    'archive-invalid'
+  );
+});
+
 function expectZipError(run: () => unknown, code: string): void {
   try {
     run();

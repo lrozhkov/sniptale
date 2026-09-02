@@ -96,10 +96,12 @@ function appendEndOfCentralDirectory(
   u16(bytes, 0);
 }
 
-export function createZip64(): Uint8Array {
+export function createZip64(
+  descriptorSizes: { compressed?: number; uncompressed?: number } = {}
+): Uint8Array {
   const bytes: number[] = [];
   const name = ascii('manifest.json');
-  appendZip64LocalEntry(bytes, name);
+  appendZip64LocalEntry(bytes, name, descriptorSizes);
   const centralOffset = bytes.length;
   appendZip64CentralEntry(bytes, name);
   const centralSize = bytes.length - centralOffset;
@@ -107,26 +109,39 @@ export function createZip64(): Uint8Array {
   return Uint8Array.from(bytes);
 }
 
-function appendZip64LocalEntry(bytes: number[], name: number[]): void {
+function appendZip64LocalEntry(
+  bytes: number[],
+  name: number[],
+  descriptorSizes: { compressed?: number; uncompressed?: number }
+): void {
   u32(bytes, 0x04034b50);
   u16(bytes, 45);
+  u16(bytes, 0x0008);
   u16(bytes, 0);
   u16(bytes, 0);
   u16(bytes, 0);
-  u16(bytes, 0);
-  u32(bytes, 0x12345678);
-  u32(bytes, 1);
-  u32(bytes, 1);
+  u32(bytes, 0);
+  u32(bytes, 0xffffffff);
+  u32(bytes, 0xffffffff);
   u16(bytes, name.length);
-  u16(bytes, 0);
-  bytes.push(...name, 1);
+  u16(bytes, 20);
+  bytes.push(...name);
+  u16(bytes, 0x0001);
+  u16(bytes, 16);
+  u64(bytes, 0);
+  u64(bytes, 0);
+  bytes.push(1);
+  u32(bytes, 0x08074b50);
+  u32(bytes, 0x12345678);
+  u64(bytes, descriptorSizes.compressed ?? 1);
+  u64(bytes, descriptorSizes.uncompressed ?? 1);
 }
 
 function appendZip64CentralEntry(bytes: number[], name: number[]): void {
   u32(bytes, 0x02014b50);
   u16(bytes, 45);
   u16(bytes, 45);
-  u16(bytes, 0);
+  u16(bytes, 0x0008);
   u16(bytes, 0);
   u16(bytes, 0);
   u16(bytes, 0);
