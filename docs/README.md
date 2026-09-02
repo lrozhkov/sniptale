@@ -14,9 +14,17 @@ Active documentation is organized by ownership. This tree contains current autho
 ### Review-only guidance
 
 - Code, machine-readable policy, and deterministic checks are the primary authority. Authored documentation records only context, decisions, operating procedures, audit evidence, or judgment that the implementation cannot express directly.
-- Give each rule or fact one document owner and link to it instead of duplicating it.
-- Keep prose concise and factual. Omit generic purpose sections, literary comparisons, repeated implementation detail, and large tables.
-- Update affected documentation, indexes, policies, guards, and consumers in the same coherent change.
+- Give each rule or fact one owner. Other documents link to that owner without restating the rule or fact.
+- State each requirement once. Do not repeat it as both a summary and a detailed procedure or checklist.
+- Use one imperative per sentence. State the action, trigger, and exception explicitly.
+- Define local terms before using them. Replace qualitative triggers with an exact path, state, threshold, command, or machine classification.
+- Make categories mutually exclusive. When overlap is possible, define the matching order.
+- Keep independent properties separate. Do not infer risk, completion, review, or proof status from another property.
+- Use machine output as the authority for generated classifications and inventories. Do not maintain a prose copy of the mapping.
+- Keep only text that changes an action or records a decision.
+- Use a table only for repeated field comparison or mapping.
+- Examples clarify a rule but do not extend it.
+- When a rule changes, update its index, machine policy, guard, and consumers in the same change.
 
 ## Architecture and product
 
