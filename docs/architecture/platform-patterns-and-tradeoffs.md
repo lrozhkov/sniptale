@@ -1,45 +1,25 @@
 # Platform patterns and tradeoffs
 
-This document records current sanctioned divergence that should not be treated as a defect without a changed product, threat-model, or ownership requirement.
+This document records intentional exceptions to shared platform patterns. Treat an exception as remediation only when its stated assumption fails or current behavior violates a product, security, or ownership requirement.
 
-## Extension page bootstrap
+## Page bootstrap and state
 
-Extension pages use the shared `renderPageShell` owner for root lookup, theme bootstrap, locale binding, and fatal error handling. Lightweight pages keep entrypoints thin. Editor-style pages may add page-owned startup hooks such as tracer initialization, delayed runtime-bridge registration, or `StrictMode` when those effects remain outside the entrypoint.
+Use `renderPageShell` for extension-page root lookup, theme bootstrap, locale binding, and fatal errors. Keep routing, persistence, transport orchestration, and domain behavior outside entrypoints. Keep a page-specific startup hook page-local until a second runtime needs the same policy.
 
-An entrypoint must not absorb routing, persistence, browser transport orchestration, or domain behavior. Move a repeated page-specific hook into a shared owner when it appears across multiple runtimes or begins to carry independent policy.
+Page-local hooks, stores, and editor controllers may coexist. Unify them only to fix a demonstrated ownership defect, behavior duplication, or measured runtime cost.
 
-## State patterns
+`apps/extension/src/platform/runtime-messaging/default-transport.ts` may lazily create the injectable default transport under the [factory and facade rule](../engineering/implementation-rules.md#ownership-selection). It must not own caller-specific retries or context-dependent state.
 
-Small page-shaped surfaces may use owner-local hooks or stores. Editors may use controller and store seams for workspace history and project orchestration. Convergence requires a concrete ownership problem, repeated defect, duplicated behavior, or measurable runtime cost; stylistic difference alone is not a reason to merge state models.
+## Security tradeoffs
 
-Thin default facades are permitted when the factory-created or injectable owner remains available and the facade adds no caller-specific policy.
+When passphrase protection is disabled, `@sniptale/platform/security/local-secret-crypto` stores ciphertext and its AES key in the same browser profile. This protects against accidental plaintext disclosure, not profile compromise. [Data handling](../security/data-handling.md) owns secret and retention policy.
 
-## Accepted tradeoffs
+The offscreen `capabilityToken` field is a compatibility name for a payload binding. Its expiry, generation, and unkeyed hash provide freshness, consistency, and idempotency inputs. They do not authenticate the sender. Exact browser-derived background sender verification is the authorization boundary.
 
-### Transparent local secret crypto
+`packages/platform/src/browser/shadow-dom/index.ts` uses open Shadow DOM for inspectability and style isolation. It is not a security boundary.
 
-`@sniptale/platform/security/local-secret-crypto` may keep ciphertext and an extension-local AES key in the same browser profile when passphrase protection is disabled. This reduces accidental plaintext exposure but does not protect a compromised profile and is not equivalent to passphrase or hardware-backed storage.
+## History tradeoff
 
-Passphrase protection is opt-in. Its unlocked key material belongs to the background runtime's in-memory owner and is lost when the worker restarts. Exact secret and retention rules live in [data handling](../security/data-handling.md).
+`packages/foundation/src/history/snapshot-history.ts` is generic, but current production consumers store strings. Define cloning and equality before storing mutable objects.
 
-### Offscreen command binding
-
-The offscreen `capabilityToken` field and `offscreen-command-capability` helper names are retained wire and import compatibility names. Their self-contained payload, expiry, generation, and unkeyed binding hash provide freshness, payload-consistency, and idempotency inputs; they do not authenticate a sender and are not an independent capability security boundary.
-
-Offscreen authorization belongs to the browser-derived exact background sender policy that runs before the binding check. A future transport that cannot rely on that sender authority must introduce an independently verifiable MAC or issuer-side opaque-token registry rather than reuse this binding as authentication.
-
-### Open Shadow DOM
-
-`packages/platform/src/browser/shadow-dom/index.ts` uses open Shadow DOM for inspectable, testable, extension-owned content surfaces. It provides style and ownership isolation, not a security boundary.
-
-### String snapshot history
-
-`packages/foundation/src/history/snapshot-history.ts` is generic, while current production consumers store strings. Mutable object snapshots require a separate semantics decision for cloning and equality before adoption.
-
-### Lazy default messaging transport
-
-`apps/extension/src/platform/runtime-messaging/default-transport.ts` lazily creates the default transport over `createRuntimeMessagingTransport(...)`. The singleton is acceptable only while it remains a browser-binding convenience with no business policy, caller-specific retry state, or context-dependent behavior.
-
-## Review rule
-
-Treat a sanctioned tradeoff as remediation work only when current behavior is unsafe, its assumptions no longer hold, or it has become a demonstrated ownership or maintenance hotspot. Update this document in the same change that alters the accepted boundary.
+Update this document in the change that adds, removes, or alters an exception.

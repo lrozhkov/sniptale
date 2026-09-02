@@ -1,6 +1,6 @@
 # Code organization
 
-Sniptale is organized by runtime or package first, then by the narrowest owner that can enforce the behavior. The canonical source map is [repository overview](repository-overview.md); exact app-core classification is machine-owned as described in [shared topology](shared-topology.md).
+This document owns source placement and dependency direction. The [repository overview](repository-overview.md) maps top-level paths. [Shared topology](shared-topology.md) owns package and app-core residency.
 
 ## Dependency direction
 
@@ -8,53 +8,22 @@ Sniptale is organized by runtime or package first, then by the narrowest owner t
 foundation -> runtime-contracts -> platform -> ui -> extension app
 ```
 
-An edge may skip layers but must not reverse. Packages never import the extension app. Cross-package imports use declared `package.json#exports`; relative imports stay inside one package.
+Dependencies may skip layers but must not reverse them. Packages must not import `apps/extension/**`. Cross-package imports must use declared `package.json#exports`. Relative imports must stay inside one package.
 
-Runtime folders do not import sibling runtime implementations. Cross-runtime reuse goes through an exact package export or a concrete app-core owner. The only sanctioned runtime-to-runtime reuse is one-way: `apps/extension/src/web-snapshot-viewer/preparation/**` may consume `apps/extension/src/content/public/preparation-surface/**`.
+Runtime folders must not import sibling runtime implementations. Cross-runtime reuse must use an exact package export or a concrete app-core owner. The only exception is `apps/extension/src/web-snapshot-viewer/preparation/**` importing `apps/extension/src/content/public/preparation-surface/**`.
 
 ## Owner folders
 
-Use shallow folders that name an actual behavior, contract, state authority, UI surface, effect boundary, or workflow. Once the path owns the domain, child files use role names such as `view`, `controller`, `model`, `types`, `adapter`, `parser`, `guards`, or `test-support`; do not repeat the owner name in every filename.
+Name a folder for the behavior, contract, state authority, UI surface, effect boundary, or workflow it owns. Inside that folder, name files by role, such as `view`, `state`, `service`, `adapter`, `parser`, `guards`, or `test-support`.
 
-Conventional roles are:
+Keep runtime-neutral Page Package composition under `apps/extension/src/workflows/page-package`. Keep its temporary OPFS sink under `apps/extension/src/composition/persistence/assets`. Keep capture, messaging, publication, retention, and download effects in their existing runtime or composition owners. Keep the hostile Page Package manifest parser in `@sniptale/runtime-contracts/page-package`.
 
-- `components/` for React presentation and local composition.
-- `hooks/` for React subscriptions and view orchestration.
-- `logic/` or `lib/` for imperative workflows, algorithms, factories, and support.
-- `store/` for state containers and mutations.
-- `storage/` or `db/` for persistence adapters and authorities.
-- `contracts/` for wire and data contracts.
-- `styles/` for owner-local token-driven styles.
-- `test-support/` or `*.test-support.ts(x)` for owner-local fixtures and mocks.
-
-Create an owner folder when current behavior spans multiple files, combines state with effects, exposes contracts plus adapters, or already has independent change reasons. Do not add placeholder folders or ownership seams for hypothetical extensions. Split an existing owner by current independent change reason and dependency direction, not solely by line count. Known accepted adjacent changes may test whether the result is immediately brittle, but must not cause speculative structure; moving the same broad state/effect contract into neighboring files creates a distributed god-object rather than a real split.
-
-Evaluate topology as an owner/change-reason cluster and choose `Split`, `Consolidate`, or `Keep`. The target is the fewest navigation transitions needed to understand an operation while preserving explicit architectural boundaries, not the fewest files. Consolidate only within one owner and one shared reason to change. Forwarding-only modules, getter/setter/ref/sync proxy families, facade or re-export ladders, single-consumer files without an independent contract, groups of tiny files implementing one operation, and tests that only prove delegation are consolidation signals; corroborate at least two signal families and retain a proven existing merge target.
-
-A forwarding-only module with exactly one production consumer is direct edge-level corroboration: forwarding and single-consumer evidence describe the same operation hop. Classify it as a consolidation candidate with a stable non-forwarding consumer target, or retain it with explicit public-contract, runtime, cross-owner, unresolved-topology, or independent-change-reason proof. Edge-derived candidates may overlap the disjoint path-owner partition; the overlap must be labeled rather than presented as a second ownership partition.
-
-A workflow may be an explicit orchestration owner when it coordinates one cohesive domain transaction through narrow adapters, owns recovery, avoids UI effects, and keeps branching bounded. Adapter owners may combine a platform effect with logging or error translation; a stateful adapter is narrow only when all mutations resolve to one normalized receiver root. UI owners are stricter: browser privilege, persistence, transport, and unrelated workflow authority stay behind application/workflow seams.
-
-`apps/extension/src/workflows/page-package` owns the runtime-neutral logical layout used to combine existing page-export and safe Web-copy contributions. Its composer and collection planner operate on opaque entry sources and canonical metadata only. Its archive adapters emit already composed Blob-backed Page Packages and flat Collection Packages through the canonical streaming archive writer. `composition/persistence/assets` supplies the temporary OPFS output sink; browser messaging, capture, publication, retention, and download effects remain in their runtime or composition owners. The hostile versioned manifest parser is the lower public contract at `@sniptale/runtime-contracts/page-package`.
-
-Page Package content-to-background transfer is sequential and bounded. Content owns the message-backed archive sink, the background Page Package job owns exact job/tab/ordinal/staged-object authority, and the canonical asset writer owns temporary OPFS bytes and writing-marker recovery. Background staging retains metadata and one in-flight decoded chunk only; it does not reconstruct package or screenshot payloads from in-memory chunk arrays. Library persistence remains a separate durable publication authority until it commits its own immutable package and screenshot objects, after which job staging is discarded.
-
-Every topology change proves the negative shape as well as the positive contract: no new cycles, dual state authorities, cross-owner imports, broad facade/state/props bags, forwarding-only layers, dead exports, generic helpers, or UI mixed with privileged, persistence, or transport effects. Preserve business ordering and the reachable failure, rollback, and cleanup behavior already required by acceptance or material invariants. A cohesive transaction owner with narrow adapters is a valid `Keep` even when its effects, state, or recovery are concentrated.
+Let content own the Page Package message archive sink. Let the background job own job, tab, ordinal, and staged-object identity. Apply the [transfer policy](../security/data-handling.md#import-and-export) to staging, validation, publication, and cleanup.
 
 ## Public surfaces
 
-Package public surfaces are exact exports. App-core cross-runtime surfaces are narrow owner paths. Runtime internals do not become public because another folder can reach them relatively.
+Package public surfaces are exact exports. App-core cross-runtime surfaces are explicit owner paths. Do not add root barrels, wildcard package exports, import-time effects outside init or service owners, or compatibility facades that hide ownership.
 
-Do not add broad root barrels, wildcard package exports, compatibility facades that hide ownership, or import-time side effects outside explicit initialization/service owners. Test support is private to its owner.
+## Topology changes
 
-Browser APIs and messaging stay behind `@sniptale/platform` exports or an explicit app-local platform owner. External payloads remain `unknown` until a local parser or adapter narrows them. Reusable UI uses `@sniptale/ui`; product catalogs, persistence-aware controllers, and runtime interaction state remain app-owned.
-
-## State and persistence
-
-Durable app composition normally belongs under `apps/extension/src/composition/persistence`; background-only leases, capabilities, and recovery state stay under the background storage owner. Reads do not repair storage. Migrations, reconciliation, cleanup, mutation serialization, rollback, and failure reporting belong to explicit write owners.
-
-Local React or page state is disposable until an explicit persistence mutation commits it. Do not introduce a second cache or storage backend as parallel authority.
-
-## Tests
-
-Keep tests beside their owner. When the changed control flow actually exposes boundary, lifecycle, stale-result, rollback, or failure states, add their acceptance-shaped proof to focused owner-local test files instead of extending a mixed hotspot. Do not add states or fixtures solely to complete a theoretical matrix. A helper may support tests but must not become a second public API.
+Apply the split, consolidation, and proof rules in [implementation rules](../engineering/implementation-rules.md#code-shape). Tests stay beside their owner. Test support must remain owner-private.

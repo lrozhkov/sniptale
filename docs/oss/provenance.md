@@ -1,25 +1,29 @@
 # OSS provenance
 
-This record describes the Sniptale release source and redistribution evidence published through `https://github.com/lrozhkov/sniptale`. Confidential vulnerability disclosure is independent of redistribution provenance and is owned by [SECURITY.md](../../.github/SECURITY.md).
+This document records redistribution decisions for releases from `https://github.com/lrozhkov/sniptale`. `tooling/configs/qa/oss-release.data.json` owns the exact paths, identities, versions, digests, archive inventory, and release consumers.
 
-## Project-authored material
+## Project material
 
-`NOTICE` is the committed project attribution owner: Sniptale, Copyright (C) 2026 Lev Rozhkov, licensed as `AGPL-3.0-or-later`. The same author/license identity is declared by the root and workspace package metadata. `LICENSE` contains the byte-pinned standard GNU AGPL v3 text; the “or later” election is stated in `NOTICE`, README, and package metadata.
+`NOTICE` owns the Sniptale attribution and `AGPL-3.0-or-later` election. `LICENSE` contains the pinned GNU AGPL v3 text. Package metadata declares the same identity. Git authorship supports history but does not replace these committed declarations.
 
-Local Git authorship corroborates repository history but does not replace the committed attribution and package declarations. Product-critical non-font assets are treated as project-authored material unless a checked-in third-party provenance entry states otherwise.
+Treat a product asset as project-authored unless the release policy contains a third-party provenance entry.
 
-## Bundled Manrope font
+## Bundled fonts
 
-The extension bundles three Manrope 5.3.0 WOFF2 files from `@fontsource-variable/manrope`. Each policy entry maps the bundled path to an exact installed package source path and SHA-256; validation rejects missing, additional, changed, or source-divergent bytes. `LICENSES/OFL-1.1.txt` is the single canonical redistributed copy of the installed package `LICENSE`. The dependency manifest references that file instead of generating a duplicate. The fonts remain under OFL-1.1; Sniptale code remains under AGPL-3.0-or-later.
+The release policy maps every bundled font to an installed package source and SHA-256 digest. Validation rejects missing, additional, changed, or source-divergent bytes.
 
-## Dependency legal closure
+`LICENSES/OFL-1.1.txt` is the canonical redistributed OFL text. Dependency metadata must reference this file when its bytes match instead of creating a duplicate. Font licensing does not change the Sniptale code license.
 
-`THIRD_PARTY_DEPENDENCIES.json`, `THIRD_PARTY_NOTICES.md`, and `LICENSES/dependencies/**` are generated from the exact production redistribution closure. The current closure contains 38 packages: ordinary installed license files, one README-extracted license section, and one version-tagged, byte-pinned upstream source for a package whose tarball omits its license text.
+## Dependency closure
 
-`@iconify-icons/tabler@2.0.0` embeds Tabler Icons 3.46.0 metadata in its package-root `index.js` but ships only a mutable-link license pointer. Its full MIT text is read offline from `tooling/release/dependency-legal/sources/tabler-icons-3.46.0.LICENSE`, byte-identical to `https://raw.githubusercontent.com/tabler/tabler-icons/v3.46.0/LICENSE`, SHA-256 `b740a1d46122672da62833e97f7e7c8a13fa85cbc7445b584b297cc00dde93db`. Exact pinned sources take precedence over ordinary installed license files. Policy pins the wrapper tarball URL/integrity, metadata path, icon-set version, author identity/URL, SPDX license, package-declared license metadata URL, version-tagged origin, local source path, and digest. The package's mutable `master` URL is checked only as installed metadata identity; mutable or catalog URLs are never license evidence. An upstream tag can be retargeted, so the checked-in bytes and digest are the release authority.
+Generate `THIRD_PARTY_DEPENDENCIES.json`, `THIRD_PARTY_NOTICES.md`, and `LICENSES/dependencies/**` from the production redistribution closure. Do not treat the whole-lock audit inventory as the shipped dependency closure.
 
-The production redistribution closure is not the whole-lock audit inventory. `npm run ci:release` evaluates the full package-lock CycloneDX SBOM and writes ignored local evidence under `.tmp/licenses/`; the generated release notices cover only dependencies reachable from production roots and actually admitted to the extension artifact.
+Use an installed package license as ordinary evidence. When a package omits usable license text, admit only a checked-in version-tagged or commit-addressed upstream source with an exact digest and reviewed package-to-upstream identity. Treat the checked-in bytes and digest as authority because an upstream tag can be retargeted. Do not use a branch, catalog page, or mutable metadata URL as license evidence.
 
-## Repository and publication scope
+`npm run ci:release` audits the full lockfile and writes local SBOM and summary evidence under `.tmp/licenses/`. That evidence does not replace the generated redistribution files.
 
-The optional native companion is a separate repository and outside this source tree and artifact. The release policy records the current bounded legal, package, font, documentation, and consumer contract through explicit paths, identities, and digests; historical migration trees are not active authority. The canonical repository publishes source and deterministic archives through GitHub Releases under the machine-owned tag and immutability policy projected in the [generated project facts](../engineering/project-facts.md). Browser-store submission and native-companion publication remain outside this release surface.
+## Scope
+
+The optional native companion is a separate repository and artifact. Browser-store submission and native-companion publication are outside this release surface.
+
+GitHub is the source and release channel. The generated [project facts](../engineering/project-facts.md) project its mutable release settings. Confidential reporting remains owned by [SECURITY.md](../../.github/SECURITY.md).

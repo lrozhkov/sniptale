@@ -1,102 +1,54 @@
 # Code quality
 
-This document defines the Sniptale quality model and the acceptance rules for guards. Commands belong in the [operator handbook](operator-handbook.md), wrapper order in [wrapper summary](wrapper-summary.md), and exact executable membership in the machine-owned QA catalog and control inventory.
+This document owns quality-control and exception policy. Commands belong in [operator-handbook.md](operator-handbook.md). Wrapper behavior belongs in [wrapper-summary.md](wrapper-summary.md).
 
-## Model
+## Authorities
 
-Quality enforcement is hybrid. Oxfmt owns formatting. Oxlint owns ordinary JS/TS lint, type-aware rules, React, Vitest, accessibility, Security rules, and the retained syntax-only SonarJS rules through its JS-plugin adapter. Ast-grep owns syntax patterns that do not need semantic state. The standalone typed SonarJS/ESLint lane was retired because its small residual rule set did not justify a repository-wide typed pass or the additional dependency and configuration surface. Repository-specific ownership, lifecycle, topology, cross-artifact, and proof-reuse invariants remain custom only when a ready engine cannot express them without losing semantics.
+Oxfmt owns formatting. Oxlint owns JS/TS lint, typed rules, React, Vitest, accessibility, security syntax, and retained SonarJS syntax rules. Ast-grep owns syntax patterns that do not require semantic state. Custom guards are allowed only for repository invariants that these engines, types, or owner tests cannot express without losing semantics.
 
-A logical result may aggregate several controls, but it is not automatically one analyzer owner. Categories organize execution; they do not define filesystem ownership. One owner has one authority and one independent reason to change.
+Machine authorities are:
 
-The canonical machine entrypoints are:
+- [`catalog.mjs`](../../tooling/qa/composition/catalog/catalog.mjs) for control identity, order, category, and wrapper membership
+- [`discovery.mjs`](../../tooling/qa/composition/control-inventory/discovery.mjs) for executable and consumer closure
+- [`quality-baseline.json`](../../tooling/configs/qa/quality-baseline.json) for exact static-analysis false positives
+- [`qa-scope.mjs`](../../tooling/qa/composition/scope/qa-scope.mjs) for product, harness, and inventory scope
 
-- `tooling/qa/composition/catalog/catalog.mjs` for control identity, category, order, and wrapper membership;
-- `tooling/qa/composition/control-inventory/discovery.mjs` for executable, consumer, and policy closure;
-- `tooling/configs/qa/quality-baseline.json` for exact reviewed static-analysis false positives;
-- `tooling/qa/composition/scope/qa-scope.mjs` for product, harness, and inventory scope.
+Do not copy their inventories, counts, or classifications into documentation.
 
-Documentation must not restate the full catalog, file population, lane size, or generated counts.
+Local workflow order belongs in [wrapper-summary.md](wrapper-summary.md). [AGENTS.md](../../AGENTS.md) owns workflow actions.
 
-## Wrapper boundary
+## Guard acceptance
 
-`qa:release-harness` owns executable tooling and shared-control changes. It auto-formats the current diff, validates composition and conditional dependency admission/typecheck, runs Oxlint and affected harness tests, then writes a freshness stamp.
+Keep a guard only when all of these conditions hold:
 
-`qa:checkpoint` auto-formats the diff, requires a fresh harness stamp where applicable, records non-blocking advisory signals, and runs focused product controls and affected tests. `qa:closeout` consumes a fresh checkpoint, performs a fresh build and artifact closure, stages the admitted diff, and commits.
+- it protects a reachable defect or named invariant
+- its roots, consumers, modes, and owner match the current repository
+- its live scan evaluates an eligible target or explicit repository-state input
+- no type, analyzer, owner test, or stronger guard already owns the invariant
+- valid code can pass without artificial files, facades, names, or abstractions
+- blocking findings have deterministic negative fixtures
+- changed-file and full-scan modes preserve their declared scope
 
-Change-risk reporting is a projection of the actual scope and checkpoint execution plan, not a second control scheduler. Preflight uses the same stable risk vocabulary only to orient the implementer and keeps its console summary bounded; checkpoint classifies the completed diff, reports the controls and test profiles that already ran, and preserves complete evidence in the run log. Architecture and security review routing remains a stated workflow requirement but never changes a wrapper exit code or creates review-admission state.
+Remove a redundant or vacuous guard. Replace a custom guard when a maintained engine preserves its semantics. Consolidate guards that enforce the same invariant through the same evidence.
 
-The canonical local order is `implementation → qa:checkpoint → required review → qa:closeout`. When harness/shared-control files changed, `qa:release-harness` runs before checkpoint.
+Metrics are signals, not architecture boundaries. Block only a concrete ownership, dependency, public-surface, side-effect, state-authority, or current-diff invariant. Repository-wide complexity and topology inventories remain advisory until a low-noise blocking invariant exists.
 
-`ci:proof` is the complete repository proof. It includes read-only formatting, Oxlint, full product coverage and tests, then a non-competing harness wave. Product-only candidates use the affected harness closure; CI/tooling/shared-control changes and periodic full proofs run the complete balanced harness partitions. Coverage is not enabled for this harness unit step. `ci:release` requires that exact admitted proof, inherits its evidence, and owns only the separate release build/package proof and release-time assurance such as CodeQL and history-scoped controls. Mutation, repository evidence, and topology inventories remain advisory artifacts.
+Generated documentation facts are exact machine output. Authored-prose contradiction and phrase checks are advisory unless they test an explicit contract.
 
-## Guard necessity
+## Exceptions
 
-Every guard family is accepted against the current repository, not its historical name or registry row. Before changing or retaining it, answer:
+Treat heuristic findings as triage. Fix confirmed defects.
 
-1. Which reachable defect or product/process invariant does it protect?
-2. Are its roots, paths, consumers, wrapper modes, and owners current?
-3. Is the current repository population non-vacuous?
-4. Is the invariant already owned by types, a ready analyzer, an owner test, or another stronger guard?
-5. Would the rule encourage artificial files, facades, wrappers, naming, or abstractions merely to satisfy a metric?
-6. Can a ready engine replace it without losing diff-aware checkpoint/closeout behavior?
-7. Is the correct disposition `Remove`, `Replace`, `Consolidate`, or a proved `Keep`?
+Record only confirmed false positives as exact `tool-noise`. Each entry names the rule, exact scope, owner, reason, removal condition, and review date when the schema requires one. Do not baseline debt, auto-update a baseline, weaken a rule, or add a directory or message-pattern waiver.
 
-A useful intent with a failed implementation is not automatically retired. Reimplement it only when the invariant remains valuable and can be expressed with current, low-noise evidence. Otherwise remove it instead of preserving an identity for its own sake.
+A stale exception is cleanup advice unless its schema declares expiry blocking. A malformed exception or unmatched new finding fails under the owning control.
 
-## Atomic acceptance
+Structural allowances additionally bind the current symbol and body hashes defined by machine policy. Clone allowances bind normalized endpoints. Machine-generated summaries never authorize an exception.
 
-An atomic guard change is accepted only when all of the following hold:
+## Coverage and assurance
 
-- production consumers and wrapper occurrences are known;
-- current roots and owner seams are used;
-- every claimed smell has a negative fixture that blocks;
-- a cohesive valid example passes without artificial splitting;
-- live-repository execution proves the detector is not vacuous;
-- changed-file and full-scan modes preserve their intended scope;
-- previous and candidate findings are compared when an engine changes;
-- old implementations, stale paths, forwarding layers, duplicate authority, and temporary comparison paths are gone after parity;
-- production modules, single-consumer helpers, proxies, and navigation transitions have an explicit Consolidate or justified Keep result.
+Changed-scope product coverage follows the machine rollout registry. `ci:proof` owns full product coverage. Tooling coverage is a separate maintenance proof; its current scope and thresholds come from the executable owner.
 
-Test names and fixtures should describe the defect, not detector internals. A registry entry or declared `pass`/`fail` state is navigation metadata, not proof by itself.
+Global data-flow and history-scoped audits remain release-only. Supply-chain locks and digests are justified only when they bind an external dependency, immutable image, proof input, or release artifact.
 
-## Structural and topology controls
-
-Metrics are signals, not architecture boundaries. They must not force a cohesive owner to split or create a folder merely to reduce a score. Blocking structure rules require a concrete dependency, ownership, public-surface, side-effect, or state-authority invariant. Broad complexity and topology reports stay advisory/manual unless a low-noise semantic defect is demonstrated.
-
-Root scatter is a diff-only advisory smell. It may prompt an owner-placement review for changed files, but it never blocks proof or requires an extra folder, facade, or forwarding layer.
-
-Dead commented code is a blocking current-diff defect. Oversized inline literals are a separate diff-only advisory about ownership and reviewability; they are not called AI hygiene and do not pretend to measure bundle impact. Actual bundle pressure is reported by Vite's configured chunk-size warning budget.
-
-Generated documentation facts remain blocking exact machine output. Word-based contradiction and required-phrase heuristics over authored Markdown are current-diff advisories, so stale prose never turns release into baseline maintenance work.
-
-Diff-aware structural analysis compares behavioral files with `HEAD` locally and with one resolved candidate merge-base commit in CI; candidate paths, prior sources, rename identities, and deleted consolidation lineage all use that same commit. Unchanged, import-only, mock-only, and rename-only files are not candidates. `ci:proof` uses this regression model instead of an absolute repository scan. A topology change optimizes navigation and ownership clarity, not raw file count. Forwarding-only and single-consumer modules require consolidation unless a public contract, runtime boundary, cross-owner seam, or independent change reason justifies them.
-
-Heavy runtime import ownership is expressed in the canonical dependency graph: Fabric value imports belong to the editor owner, DOMPurify value imports belong to the platform sanitizer, and content code may not statically own JSZip. There is no parallel TypeScript AST scanner. Bundle size remains an independent build warning signal rather than a duplicate import-policy authority.
-
-App-core ownership blocks dependency direction, cross-feature public API bypasses, runtime implementation imports, persistence backedges, missing declared authorities, and broad public barrels. Exact directory residency is not a gate or a manually maintained allowlist. The current app-core owner shape is derived from the live tree in generated project facts, so moving or introducing a cohesive owner does not require policy admission.
-
-The blocking forwarding-drift control is narrower than the manual topology inventory. It evaluates only production modules newly becoming pure forwarding in the candidate diff and only when the module has one direct production consumer. Exact package exports, registered runtime entrypoints, runtime boundaries, and canonically classified cross-owner edges are derived Keep evidence. Independent change reasons and temporary unresolved topology require an exact forwarder/direct-consumer policy entry with owner, evidence, removal condition, and an unexpired review date. Unchanged forwarding debt remains report-only.
-
-## Security and release assurance
-
-Security syntax and ownership rules use the smallest capable engine. Global data flow remains release-only. Supply-chain locks and artifact digests are valid when they bind an external binary, dependency graph, immutable image, release payload, or proof input.
-
-Repository-derived consumer inventories are validated from the live tree and are not checked in as SHA or count snapshots. A digest stored beside the complete data it hashes is not an independent authority. Heuristic findings are triage inputs, not automatic refactoring instructions. Inspect the reported code and detector evidence first. Fix a confirmed defect; add an exception only when the exact finding is a confirmed false-positive. Heuristic baselines may contain only `tool-noise`, never accepted debt, and every entry must resolve to an explicit owner, reason, and removal condition. Broad rule, directory, or message-pattern waivers are forbidden. Baselines never self-update during a blocking run.
-
-An exact reviewed `tool-noise` entry remains non-blocking while the same finding exists. A disappeared entry is a stale maintenance advisory, not release work. A new or changed finding that does not match an exact entry remains blocking, as do malformed baseline policy and analyzer failures. Baseline composition changes use focused owner validation and do not by themselves schedule the release harness or harness unit suite.
-
-The pinned jscpd 5 release audit admits only exact findings reviewed as `tool-noise`. Every allowance records normalized endpoints, an owner, an evidence-backed reason, a removal condition, and a review date. New or shifted findings, malformed metadata, and expired reviews fail closed. Allowances absent from the live report are safe, non-blocking cleanup advisories because an absent exact ID cannot authorize another clone. Owner-family summaries are display-only and never authorize a clone. Checkpoint, closeout, and `ci:proof` do not run jscpd.
-
-## Coverage
-
-Changed-scope coverage enrolls every added or untracked eligible production TypeScript file, while unchanged legacy files outside the rollout registry remain unenrolled. Full product coverage belongs to `ci:proof` and is inherited by release only through exact admission. Tooling coverage is invoked separately with `node tooling/qa/proof/unit/verify-unit-tests.mjs --suite harness --coverage`; it instruments executable `tooling/**/*.{mjs,cjs,js,ts,tsx}`, writes `.tmp/coverage/tooling`, and applies one global floor of 70% statements, 67% branches, 78% functions, and 70% lines. Owner-local smell fixtures remain the primary semantic proof.
-
-## Review and exceptions
-
-Automated controls own deterministic properties. Architecture and security review own intent, authority placement, trust boundaries, and semantic tradeoffs that cannot be reduced safely to a low-noise rule.
-
-Review findings are classified as current-wave regressions, direct acceptance blockers, provable security issues, or pre-existing hardening. Only the first three block closeout when supported by evidence. A new behavior, recovery path, compatibility layer, or proof obligation requires a concrete reachable trigger and connection to acceptance or a material invariant.
-
-Every exception names its rule, exact scope, owner, reason, risk, and removal condition. Baseline growth is a policy change. Inline suppression directives are not a local exception mechanism.
-
-An escaped defect gets a failing proof first, followed by a decision on whether the miss was narrow scope, weak semantics, stale topology, or an accepted tradeoff. A repeated low-noise pattern may justify a guard; a single incident or hypothetical bypass does not.
+Automated controls own deterministic properties. Review owns intent, authority placement, trust boundaries, and semantic tradeoffs that cannot be reduced to a low-noise check.

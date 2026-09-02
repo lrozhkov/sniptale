@@ -110,6 +110,10 @@ function expectActiveWorkflowDocPaths() {
 }
 
 function expectArchitectureDocPaths() {
+  const codeOrganization = fs.readFileSync(
+    path.join(repoRoot, 'docs/architecture/code-organization.md'),
+    'utf8'
+  );
   const implementationRules = fs.readFileSync(
     path.join(repoRoot, 'docs/engineering/implementation-rules.md'),
     'utf8'
@@ -124,20 +128,22 @@ function expectArchitectureDocPaths() {
   );
 
   expect(implementationRules).toContain('@sniptale/platform/observability/logger');
-  expect(implementationRules).toContain('Retired broad shared facades');
-  expect(implementationRules).toContain('exact package export or concrete app owner');
-  expect(implementationRules).toContain('app-core contracts');
-  expect(implementationRules).toContain('@sniptale/ui');
-  expect(implementationRules).toContain('must not be reintroduced');
+  expect(implementationRules).toContain(
+    '[public-surface rules](../architecture/code-organization.md#public-surfaces)'
+  );
+  expect(codeOrganization).toContain('exact package export or a concrete app-core owner');
+  expect(codeOrganization).toContain('Do not add root barrels');
   expect(implementationRules).not.toContain('src/shared/logger.ts');
   expect(implementationRules).not.toContain('src/shared/types.ts');
   expect(implementationRules).not.toContain('src/shared/storage.ts');
   expect(implementationRules).not.toContain('src/shared/db.ts');
   expect(implementationRules).not.toContain('src/shared/video-types.ts');
 
-  expect(runtimeContexts).toContain('packages/runtime-contracts');
-  expect(runtimeContexts).toContain('apps/extension/src/composition/persistence');
-  expect(runtimeContexts).toContain('packages/ui');
+  expect(sharedTopology).toContain('packages/runtime-contracts');
+  expect(sharedTopology).toContain('apps/extension/src/composition/persistence');
+  expect(sharedTopology).toContain('packages/ui');
+  expect(sharedTopology).toContain('app-core contracts');
+  expect(sharedTopology).toContain('@sniptale/ui');
   expect(runtimeContexts).not.toContain('src/shared/types.ts');
   expect(runtimeContexts).not.toContain('src/shared/storage.ts');
   expect(runtimeContexts).not.toContain('src/shared/db.ts');
