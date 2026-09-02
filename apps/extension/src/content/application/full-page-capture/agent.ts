@@ -192,7 +192,11 @@ export function createFullPageCaptureAgent(): FullPageCaptureAgent {
       preparePageMutations(active);
       active.floating = collectFloatingCandidates(active.root);
       armWatchdog(active);
-      if (active.preferences.preloadLazyContent) {
+      // A dominant internal scroller can be a paginated or virtual application list. Sweeping it
+      // before tile capture triggers application data loading, inflates the measured raster, and
+      // then repeats the same visible scrolling during capture. Tiles already visit and stabilize
+      // every admitted internal-list position, so eager warm-up is reserved for document pages.
+      if (active.preferences.preloadLazyContent && active.root.kind === 'document') {
         await warmUpLazyContent(
           active.root,
           active.geometry,

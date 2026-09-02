@@ -14,13 +14,14 @@ const mocks = vi.hoisted(() => ({
     extentWidth: 800,
     outputHeight: 1_200,
     outputWidth: 800,
-    rootKind: 'document' as const,
+    rootKind: 'document' as 'document' | 'element',
     rootViewport: { height: 600, width: 800, x: 0, y: 0 },
     viewportHeight: 600,
     viewportWidth: 800,
   },
   preparePageMutations: vi.fn(),
   restorePageMutations: vi.fn(),
+  rootKind: 'document' as 'document' | 'element',
   scroll: { x: 31, y: 47 },
   waitForCaptureStability: vi.fn().mockResolvedValue(undefined),
   warmUpLazyContent: vi.fn().mockResolvedValue(undefined),
@@ -38,7 +39,10 @@ vi.mock('./geometry', () => ({
 vi.mock('../../platform/page-scroll', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/page-scroll')>()),
   readPageScroll: () => ({ ...mocks.scroll }),
-  resolvePageScrollRoot: () => ({ element: document.documentElement, kind: 'document' }),
+  resolvePageScrollRoot: () => ({
+    element: mocks.rootKind === 'document' ? document.documentElement : document.body,
+    kind: mocks.rootKind,
+  }),
   writePageScroll: mocks.writeRootScroll,
 }));
 
@@ -68,11 +72,29 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.scroll.x = 31;
   mocks.scroll.y = 47;
+  mocks.rootKind = 'document';
+  mocks.geometry.rootKind = 'document';
   mocks.geometry.extentHeight = 1_200;
   mocks.geometry.extentWidth = 800;
   mocks.geometry.outputHeight = 1_200;
   mocks.geometry.outputWidth = 800;
   mocks.geometry.rootViewport = { height: 600, width: 800, x: 0, y: 0 };
+});
+
+it('does not pre-scroll a dominant internal application list before tile capture', async () => {
+  mocks.rootKind = 'element';
+  mocks.geometry.rootKind = 'element';
+  const agent = createFullPageCaptureAgent();
+
+  await agent.handle({
+    ...identity,
+    preferences: { ...DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES, preloadLazyContent: true },
+    type: MessageType.PREPARE_FULL_PAGE_CAPTURE,
+  });
+
+  expect(mocks.warmUpLazyContent).not.toHaveBeenCalled();
+  expect(mocks.writeRootScroll).not.toHaveBeenCalled();
+  agent.dispose();
 });
 
 it('prepares, scrolls to the requested tile, verifies, and restores the original offsets', async () => {
