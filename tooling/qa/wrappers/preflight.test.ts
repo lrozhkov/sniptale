@@ -141,6 +141,27 @@ it('accepts explicit files for pre-edit planning', async () => {
   );
 });
 
+it('keeps the terminal summary bounded while preserving complete risk context in the step log', async () => {
+  const root = createTempRoot('qa-preflight-risk-output-');
+  writeFile(root, 'apps/extension/manifest.json', '{"manifest_version":3}\n');
+
+  const result = await withCwd(root, async () => {
+    const module = await importFresh<typeof import('./preflight.mjs')>(
+      './preflight.mjs',
+      import.meta.url
+    );
+    return module.runPreflightWrapper({ files: ['apps/extension/manifest.json'] });
+  });
+  const step = result.steps[0];
+
+  expect(step?.consoleOutput).toContain('Likely risk areas:');
+  expect(step?.consoleOutput).toContain('1 product target(s), 0 harness target(s)');
+  expect(step?.consoleOutput).toContain('docs/security/manifest-permissions.md');
+  expect(step?.consoleOutput).not.toContain('Contracts and consumers:');
+  expect(step?.stdout).toContain('Contracts and consumers:');
+  expect(step?.stdout).toContain('manifest.permissions');
+});
+
 it('does not route a local state snapshot helper to parser architecture', async () => {
   const module = await import('./preflight.mjs');
   expect(

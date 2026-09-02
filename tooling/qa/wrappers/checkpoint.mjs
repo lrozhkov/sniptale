@@ -6,6 +6,11 @@ import { loadBaseline } from '../policy/baselines/shared-baseline.mjs';
 import { isExecutedAsScript } from '../runtime/process/shared-cli.mjs';
 import { collectAndPersistAdvisoryReport } from '../composition/advisory/advisory-report.helpers.mjs';
 import { formatAdvisoryReport } from '../composition/advisory/execution/report.mjs';
+import { collectChangeRisks } from '../composition/change-risk/collector.mjs';
+import {
+  formatCheckpointRiskSummary,
+  formatFullChangeRiskReport,
+} from '../composition/change-risk/render.mjs';
 import { collectCurrentDiffContext } from '../runtime/scope/current-diff.helpers.mjs';
 import { collectFocusedStepResults } from '../composition/checkpoint/focused/execution.mjs';
 import { FOCUSED_CODE_VIOLATION_STEPS } from '../composition/checkpoint/focused/code-steps.mjs';
@@ -136,11 +141,22 @@ async function collectCheckpointVerificationSteps({
     shouldRunManifestPermissions,
     shouldRunRuntimeTopology,
   });
+  const findings = collectChangeRisks({
+    targetFiles: context.allQualityTargetFiles ?? context.qualityTargetFiles ?? context.targetFiles,
+    mode: 'checkpoint',
+  });
+  const reportedAdvisoryStep = {
+    ...advisoryStep,
+    consoleOutput: `${formatCheckpointRiskSummary({ findings, steps: focusedSteps })}\n${
+      advisoryStep.consoleOutput ?? ''
+    }`,
+    stdout: formatFullChangeRiskReport({ findings, steps: focusedSteps }),
+  };
 
   return [
     formatStep,
-    advisoryStep,
-    ...deduplicateAdvisoryCoveredConsoleOutput(advisoryStep, focusedSteps),
+    reportedAdvisoryStep,
+    ...deduplicateAdvisoryCoveredConsoleOutput(reportedAdvisoryStep, focusedSteps),
   ];
 }
 

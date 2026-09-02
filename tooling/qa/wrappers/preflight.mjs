@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import { collectFocusedGuardrailReport } from '../composition/preflight/guardrail-preflight-report/check.mjs';
 import { collectCurrentDiffContext } from '../runtime/scope/current-diff.helpers.mjs';
 import { collectAdvisoryFindings } from '../composition/advisory/execution/collectors.mjs';
+import { collectChangeRisks, collectRiskDocuments } from '../composition/change-risk/collector.mjs';
 import { filterImportOrMockOnlyDiffFiles } from '../analysis/imports/import-only-diff/check.mjs';
 import { collectCodeFiles } from '../analysis/repository/shared-files.mjs';
 import {
@@ -23,7 +24,10 @@ import {
   collectTypecheckBlastRadius,
 } from './preflight/preflight-contract-report.mjs';
 import { collectRelevantDocs, isUiFile } from './preflight/preflight-docs.mjs';
-import { collectPreflightReportLines } from './preflight/preflight-render.mjs';
+import {
+  collectPreflightReportLines,
+  renderPreflightTerminalSummary,
+} from './preflight/preflight-render.mjs';
 import { runObservedWrapper } from './observed/runner.mjs';
 import { classifyOwnerGroup } from '../analysis/structural-risk/owner-classifier.mjs';
 import { runStructuralRiskCheck } from '../analysis/structural-risk/check.mjs';
@@ -208,10 +212,17 @@ export function collectPreflightReport({ files = [] } = {}) {
       addedFiles: collectedContext.addedFiles,
     },
   });
+  const riskFiles = files.length > 0 ? context.allTargetFiles : context.allQualityTargetFiles;
+  const riskFindings = collectChangeRisks({ targetFiles: riskFiles, mode: 'preflight' });
 
   return {
     context,
-    relevantDocs: collectRelevantDocs(context.allTargetFiles ?? context.targetFiles),
+    relevantDocs: [
+      ...new Set([
+        ...collectRelevantDocs(context.allTargetFiles ?? context.targetFiles),
+        ...collectRiskDocuments(riskFindings),
+      ]),
+    ],
     ownerRuntime: collectPreflightOwnerRuntime(context),
     guardrailReport,
     structuralReport: structuralResult.report,
@@ -230,6 +241,7 @@ export function collectPreflightReport({ files = [] } = {}) {
     contractChecklist: collectContractChecklist(context),
     transitiveConsumerHints: collectTransitiveConsumerHints(context),
     typecheckBlastRadius: collectTypecheckBlastRadius(context),
+    riskFindings,
   };
 }
 
@@ -247,7 +259,8 @@ export function runPreflightWrapper({ files = [] } = {}) {
     steps: [
       {
         ...createOkStep('QA preflight', `inspected=${report.context.targetFiles.length}`),
-        consoleOutput: renderPreflightReport(report),
+        consoleOutput: renderPreflightTerminalSummary(report),
+        stdout: renderPreflightReport(report),
         advisories: report.advisoryFindings,
       },
     ],

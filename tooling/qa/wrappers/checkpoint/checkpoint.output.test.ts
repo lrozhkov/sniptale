@@ -44,8 +44,12 @@ it('renders structural watches only through the checkpoint advisory block', asyn
     });
 
     expect(result.steps.find((step) => step.label === 'Advisory report')).toMatchObject({
-      consoleOutput: 'Advisory: attention=0, watch=1\n',
+      consoleOutput: expect.stringContaining('Change risk: LOW'),
+      stdout: expect.stringContaining('Change risk report: LOW'),
     });
+    expect(result.steps.find((step) => step.label === 'Advisory report')?.consoleOutput).toContain(
+      'Advisory: attention=0, watch=1'
+    );
     expect(result.steps.find((step) => step.label === 'Structural risk')).not.toHaveProperty(
       'consoleOutput'
     );

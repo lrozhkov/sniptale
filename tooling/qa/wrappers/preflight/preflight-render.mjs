@@ -4,6 +4,7 @@ import {
   HARNESS_QA_GUIDANCE,
   hasHarnessVerificationQaTargets,
 } from '../../composition/scope/qa-scope.mjs';
+import { formatPreflightRiskSummary } from '../../composition/change-risk/render.mjs';
 
 const MAXIMUM_LIST_ITEMS = 16;
 const HEAD_LIST_ITEMS = 10;
@@ -102,6 +103,13 @@ export function collectPreflightReportLines(report, context, guardrailReport) {
     'Owner/runtime:',
     ...formatList(report.ownerRuntime ?? []),
     '',
+    'Likely change risks:',
+    ...formatList(
+      (report.riskFindings ?? []).map(
+        (finding) => `${finding.id}: ${finding.evidence.map(({ file }) => file).join(', ')}`
+      )
+    ),
+    '',
     'Relevant docs:',
     ...formatList(report.relevantDocs),
     '',
@@ -119,4 +127,35 @@ export function collectPreflightReportLines(report, context, guardrailReport) {
     'Non-blocking advisory findings:',
     ...formatAdvisoryFindings(report.advisoryFindings ?? []),
   ];
+}
+
+function summarizeValues(values, maximum) {
+  const visible = values.slice(0, maximum);
+  const omitted = values.length - visible.length;
+  return [...visible.map((value) => `- ${value}`), ...(omitted > 0 ? [`- +${omitted} more`] : [])];
+}
+
+export function renderPreflightTerminalSummary(report) {
+  const { context } = report;
+  const ownerRuntime = report.ownerRuntime ?? [];
+  const harnessTargetCount = context.harnessTargetFiles?.length ?? 0;
+  const riskDocs = (report.riskFindings ?? []).flatMap((finding) => finding.docs ?? []);
+  const relevantDocs = [...new Set([...riskDocs, ...(report.relevantDocs ?? [])])];
+  return `${[
+    [
+      `QA preflight: ${context.targetFiles.length} product target(s)`,
+      `${harnessTargetCount} harness target(s)`,
+      `${ownerRuntime.length} owner(s)`,
+    ].join(', '),
+    '',
+    'Primary owners:',
+    ...(ownerRuntime.length === 0 ? ['- none detected'] : summarizeValues(ownerRuntime, 4)),
+    '',
+    ...formatPreflightRiskSummary(report.riskFindings ?? []),
+    '',
+    'Read first:',
+    ...summarizeValues(relevantDocs, 4),
+    '',
+    'Full context is preserved in the run log printed below.',
+  ].join('\n')}\n`;
 }

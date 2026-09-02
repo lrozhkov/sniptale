@@ -23,6 +23,8 @@ Documentation must not restate the full catalog, file population, lane size, or 
 
 `qa:checkpoint` auto-formats the diff, requires a fresh harness stamp where applicable, records non-blocking advisory signals, and runs focused product controls and affected tests. `qa:closeout` consumes a fresh checkpoint, performs a fresh build and artifact closure, stages the admitted diff, and commits.
 
+Change-risk reporting is a projection of the actual scope and checkpoint execution plan, not a second control scheduler. Preflight uses the same stable risk vocabulary only to orient the implementer and keeps its console summary bounded; checkpoint classifies the completed diff, reports the controls and test profiles that already ran, and preserves complete evidence in the run log. Architecture and security review routing remains a stated workflow requirement but never changes a wrapper exit code or creates review-admission state.
+
 The canonical local order is `implementation → qa:checkpoint → required review → qa:closeout`. When harness/shared-control files changed, `qa:release-harness` runs before checkpoint.
 
 `ci:proof` is the complete repository proof. It includes read-only formatting, Oxlint, full product coverage and tests, then a non-competing harness wave. Product-only candidates use the affected harness closure; CI/tooling/shared-control changes and periodic full proofs run the complete balanced harness partitions. Coverage is not enabled for this harness unit step. `ci:release` requires that exact admitted proof, inherits its evidence, and owns only the separate release build/package proof and release-time assurance such as CodeQL and history-scoped controls. Mutation, repository evidence, and topology inventories remain advisory artifacts.
