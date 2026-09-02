@@ -52,6 +52,17 @@ Optional fixture controls are:
 - `SNAPSHOT_SMOKE_RICH_PACKAGE=1` to use the full data-and-files profile
 - `SNAPSHOT_SMOKE_TIMEOUT_MS=<milliseconds>` to replace the fixture completion timeout when the value is an integer of at least `10000`
 
+## Snapshot print
+
+Run the Viewer print path against a saved Page Package:
+
+```bash
+npm run web-snapshot:smoke -- --print-package /absolute/snapshot.sniptale-page-package.zip
+npm run web-snapshot:smoke -- --print-url https://example.test/application
+```
+
+The package smoke serves the saved inert Web copy and captures it into Library again so old package profiles remain usable without weakening import policy. The URL smoke captures the live page. Both open the real Viewer, prepare its disposable print projection, and write `screen.png`, `print.png`, portrait and landscape A4 PDFs, and `metrics.json` under `.tmp/web-snapshot-smoke/results/print-package/`. It fails when an internal scroll region remains clipped, the projected document misses required content height, most source text disappears, or layout expansion creates implausible blank space.
+
 Fixture output is bound to the built `dist` bytes and selected case set. Temporary browser profiles and extension copies are removed after success or failure. A temporary manifest copy receives the permissions needed for arbitrary test origins; the product manifest and user profiles are unchanged.
 
 Install Chromium and its Linux dependencies through the [WSL browser prerequisites](wsl-setup.md#browser-smoke-prerequisites) when the repository browser is unavailable.

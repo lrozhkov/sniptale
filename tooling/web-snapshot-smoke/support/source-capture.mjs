@@ -20,8 +20,11 @@ export async function captureSmokeSource({ context, out, popup, popupUi, spec, s
       process.stderr.write(`[smoke:${spec.name}] ${message.text()}\n`);
     }
   });
-  await target.goto(spec.url, { waitUntil: 'domcontentloaded', timeout: 60_000 });
-  await target.waitForTimeout(1500);
+  await target.goto(spec.url, {
+    waitUntil: spec.navigationWaitUntil ?? 'domcontentloaded',
+    timeout: 60_000,
+  });
+  await target.waitForTimeout(spec.settleDelayMs ?? 1500);
   const targetTab = (await popup.evaluate(() => globalThis.chrome.tabs.query({}))).find(
     (tab) => tab.url === target.url()
   );
