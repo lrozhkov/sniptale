@@ -322,6 +322,25 @@ it('prepares the sanitized static document as a PDF projection on explicit actio
   expect(pdfButton?.disabled).toBe(false);
 });
 
+it('shows a pointer cursor for every enabled upper-toolbar action', async () => {
+  mocks.loadWebSnapshotPackage.mockResolvedValue(createLoadedPackage({}));
+
+  await act(async () => {
+    root?.render(<WebSnapshotViewerApp />);
+  });
+
+  const controls = container?.querySelectorAll<HTMLElement>('header a[href], header button');
+  expect(controls?.length).toBeGreaterThan(0);
+  for (const control of controls ?? []) {
+    expect(control.className).toContain('cursor-pointer');
+  }
+  expect(
+    container?.querySelector<HTMLButtonElement>(
+      `button[aria-label="${translate('webSnapshotViewer.app.exportPdf', 'en')}"]`
+    )?.className
+  ).toContain('disabled:cursor-wait');
+});
+
 it('prevents duplicate PDF preparation and surfaces a localized failure', async () => {
   let rejectPrint: (error: Error) => void = () => undefined;
   mocks.printWebSnapshotProjection.mockReturnValue(

@@ -4,6 +4,7 @@ import { readSnapshotIdFromLocation } from './route';
 import { SnapshotPreparationHost } from '../../preparation/host';
 import { blockSnapshotFrameNavigation } from '../../viewer/frame-navigation';
 import { installSnapshotFrameStaticInteractions } from '../../viewer/frame-interactions';
+import { installSnapshotFrameLayoutPolicy } from '../../viewer/frame-layout';
 import { hydrateSnapshotDeclarativeShadowDom } from '../../viewer/declarative-shadow';
 import { loadWebSnapshotPackage, revokeWebSnapshotObjectUrls } from '../../viewer/assets';
 import { WebSnapshotFrame } from '../../viewer/iframe';
@@ -90,6 +91,7 @@ function SnapshotFrameSurface(props: {
   const { iframeRef, onIframeElementChange, onIframeLoaded } = props;
   const navigationCleanupRef = useRef<(() => void) | null>(null);
   const interactionCleanupRef = useRef<(() => void) | null>(null);
+  const layoutCleanupRef = useRef<(() => void) | null>(null);
   const handleIframeRef = useCallback(
     (node: HTMLIFrameElement | null) => {
       iframeRef.current = node;
@@ -116,14 +118,27 @@ function SnapshotFrameSurface(props: {
       dragHint: translate('webSnapshotViewer.app.dragScrollableArea', props.locale),
     });
   }, [iframeRef, props.locale]);
+  const installFrameLayoutPolicy = useCallback(() => {
+    layoutCleanupRef.current?.();
+    layoutCleanupRef.current = props.responsiveLayout
+      ? installSnapshotFrameLayoutPolicy(iframeRef.current)
+      : null;
+  }, [iframeRef, props.responsiveLayout]);
   const handleIframeLoad = useCallback(() => {
     hydrateSnapshotDeclarativeShadowDom(iframeRef.current?.contentDocument ?? null);
     installNavigationPolicy();
     installStaticInteractions();
+    installFrameLayoutPolicy();
     if (iframeRef.current) {
       onIframeLoaded(iframeRef.current);
     }
-  }, [iframeRef, installNavigationPolicy, installStaticInteractions, onIframeLoaded]);
+  }, [
+    iframeRef,
+    installFrameLayoutPolicy,
+    installNavigationPolicy,
+    installStaticInteractions,
+    onIframeLoaded,
+  ]);
   useEffect(() => {
     if (iframeRef.current?.contentDocument?.readyState === 'complete') {
       installNavigationPolicy();
@@ -142,6 +157,15 @@ function SnapshotFrameSurface(props: {
       interactionCleanupRef.current = null;
     };
   }, [iframeRef, installStaticInteractions]);
+  useEffect(() => {
+    if (iframeRef.current?.contentDocument?.readyState === 'complete') {
+      installFrameLayoutPolicy();
+    }
+    return () => {
+      layoutCleanupRef.current?.();
+      layoutCleanupRef.current = null;
+    };
+  }, [iframeRef, installFrameLayoutPolicy]);
   const resolvedViewport = props.currentViewport ?? props.loaded.manifest.viewport ?? null;
   if (resolvedViewport === null) {
     return (

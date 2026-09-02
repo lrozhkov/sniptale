@@ -405,12 +405,14 @@ export async function loadWebSnapshotPackage(
           allowedObjectUrls: objectUrls,
           offlineOnly: true,
         });
-    const documentUrl = URL.createObjectURL(
-      new Blob([withOfflineSnapshotPolicy(sanitizedDocument, xhtml)], {
-        type: xhtml ? 'application/xhtml+xml' : 'text/html',
-      })
-    );
-    objectUrls.push(documentUrl);
+    const documentUrl = xhtml
+      ? URL.createObjectURL(
+          new Blob([withOfflineSnapshotPolicy(sanitizedDocument, true)], {
+            type: 'application/xhtml+xml',
+          })
+        )
+      : null;
+    if (documentUrl) objectUrls.push(documentUrl);
     const screenshotUrl = URL.createObjectURL(screenshot);
     objectUrls.push(screenshotUrl);
     const archiveUrl = URL.createObjectURL(record.packageFile);

@@ -13,7 +13,7 @@ import { WebSnapshotViewerModeSwitch, type WebSnapshotViewerMode } from './view-
 import { WebSnapshotZoomControls, type ViewerZoomControls } from './viewport-zoom';
 
 const toolbarButtonClassName = [
-  'inline-flex h-8 shrink-0 items-center justify-center rounded-md',
+  'inline-flex h-8 shrink-0 cursor-pointer items-center justify-center rounded-md',
   'text-[var(--sniptale-color-text-muted)] transition',
   'hover:bg-[var(--sniptale-color-surface-hover)] hover:text-[var(--sniptale-color-text-primary)]',
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',

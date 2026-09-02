@@ -167,7 +167,7 @@ export function WebSnapshotZoomControls(props: ViewerZoomControls & { locale: Ap
   if (!props.canZoom) return null;
   const percent = `${Math.round(props.zoom * 100)}%`;
   const buttonClassName = [
-    'inline-flex h-8 min-w-8 items-center justify-center rounded-md px-2 text-xs font-semibold',
+    'inline-flex h-8 min-w-8 cursor-pointer items-center justify-center rounded-md px-2 text-xs font-semibold',
     'text-[var(--sniptale-color-text-muted)] transition hover:bg-[var(--sniptale-color-surface-hover)]',
     'hover:text-[var(--sniptale-color-text-primary)] focus-visible:outline-none',
     'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',
