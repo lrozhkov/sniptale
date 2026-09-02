@@ -81,7 +81,7 @@ beforeEach(() => {
   mocks.geometry.rootViewport = { height: 600, width: 800, x: 0, y: 0 };
 });
 
-it('does not pre-scroll a dominant internal application list before tile capture', async () => {
+it('stabilizes a dominant internal application list at its first tile without lazy warm-up', async () => {
   mocks.rootKind = 'element';
   mocks.geometry.rootKind = 'element';
   const agent = createFullPageCaptureAgent();
@@ -93,7 +93,67 @@ it('does not pre-scroll a dominant internal application list before tile capture
   });
 
   expect(mocks.warmUpLazyContent).not.toHaveBeenCalled();
-  expect(mocks.writeRootScroll).not.toHaveBeenCalled();
+  expect(mocks.writeRootScroll).toHaveBeenCalledOnce();
+  expect(mocks.writeRootScroll).toHaveBeenCalledWith(
+    expect.objectContaining({ kind: 'element' }),
+    0,
+    0
+  );
+  agent.dispose();
+});
+
+it('corrects an intermediate tile after an internal viewport expands upward', async () => {
+  mocks.rootKind = 'element';
+  mocks.geometry.rootKind = 'element';
+  mocks.geometry.extentHeight = 1_107;
+  mocks.geometry.outputHeight = 1_299;
+  mocks.geometry.rootViewport = { height: 575, width: 800, x: 0, y: 192 };
+  const agent = createFullPageCaptureAgent();
+  await agent.handle({
+    ...identity,
+    preferences: { ...DEFAULT_FULL_PAGE_CAPTURE_PREFERENCES, preloadLazyContent: true },
+    type: MessageType.PREPARE_FULL_PAGE_CAPTURE,
+  });
+
+  mocks.waitForCaptureStability.mockImplementationOnce(async () => {
+    mocks.geometry.outputHeight = 1_231;
+    mocks.geometry.rootViewport = { height: 643, width: 800, x: 0, y: 124 };
+    mocks.scroll.y = 464;
+  });
+  const tile = {
+    ...identity,
+    column: 0,
+    firstColumn: true,
+    firstRow: false,
+    lastColumn: true,
+    lastRow: false,
+    row: 1,
+    targetX: 0,
+    targetY: 511,
+  };
+
+  await expect(
+    agent.handle({ ...tile, type: MessageType.PREPARE_FULL_PAGE_TILE })
+  ).resolves.toEqual(
+    expect.objectContaining({
+      result: expect.objectContaining({ actualY: 511, geometry: expect.any(Object) }),
+      success: true,
+    })
+  );
+  expect(mocks.writeRootScroll).toHaveBeenCalledWith(
+    expect.objectContaining({ kind: 'element' }),
+    0,
+    443
+  );
+  await expect(
+    agent.handle({
+      ...tile,
+      layoutGeneration: 'layout-generation-1',
+      type: MessageType.VERIFY_FULL_PAGE_TILE,
+    })
+  ).resolves.toEqual(
+    expect.objectContaining({ result: expect.objectContaining({ actualY: 511 }), success: true })
+  );
   agent.dispose();
 });
 

@@ -234,7 +234,10 @@ async function runPreparedPageCaptureWithViewportRetry(
     ) {
       throw error;
     }
-    logger.log(`Retrying full-page capture after page geometry stabilization: ${error.message}`);
+    logger.warn('Retrying full-page capture after page geometry stabilization', {
+      error: error.message,
+      exportCapture: args.options.exportRunId !== undefined,
+    });
     try {
       return await runPreparedPageCapture({
         ...args,
@@ -253,9 +256,10 @@ async function runPreparedPageCaptureWithViewportRetry(
       ) {
         throw retryError;
       }
-      logger.warn(
-        `Using visible viewport fallback after persistent page geometry changes: ${retryError.message}`
-      );
+      logger.warn('Using visible viewport fallback after persistent page geometry changes', {
+        firstError: error.message,
+        retryError: retryError.message,
+      });
       return runPreparedViewportFallback(args, VIEWPORT_FALLBACK_WARNING);
     }
   }
@@ -272,9 +276,10 @@ async function runReducedFullPageOrViewportFallback(
     (policy.minScalePercent > FULL_PAGE_QUALITY_ABSOLUTE_LIMITS.minScalePercent ||
       originalError.message === FULL_PAGE_FILE_BUDGET_ERROR)
   ) {
-    logger.warn(
-      `Retrying export capture at the minimum safe full-page scale: ${originalError.message}`
-    );
+    logger.warn('Retrying export capture at the minimum safe full-page scale', {
+      error: originalError.message,
+      policy,
+    });
     try {
       return await runPreparedPageCapture({
         ...args,
@@ -293,12 +298,16 @@ async function runReducedFullPageOrViewportFallback(
       ) {
         throw retryError;
       }
-      logger.warn(`Minimum-scale full-page export retry failed: ${retryError.message}`);
+      logger.warn('Minimum-scale full-page export retry failed', {
+        firstError: originalError.message,
+        retryError: retryError.message,
+      });
     }
   }
-  logger.warn(
-    `Using visible viewport fallback after full-page quality limit: ${originalError.message}`
-  );
+  logger.warn('Using visible viewport fallback after full-page quality limit', {
+    error: originalError.message,
+    policy,
+  });
   return runPreparedViewportFallback(args, QUALITY_FALLBACK_WARNING);
 }
 
@@ -317,6 +326,11 @@ async function runPreparedViewportFallback(
       preferences: args.preferences,
     });
     prepared = true;
+    logger.warn('Capturing visible viewport fallback', {
+      geometry: page.geometry,
+      policy: args.options.qualityPolicy ?? DEFAULT_FULL_PAGE_QUALITY_POLICY,
+      warning,
+    });
     throwIfFullPageCaptureAborted(args.abortSignal);
     const dataUrl = await args.raster.captureFrame(args.abortSignal);
     throwIfFullPageCaptureAborted(args.abortSignal);
@@ -379,6 +393,12 @@ async function runPreparedPageCapture(args: {
         args.onPageRestored();
       },
       preferences: args.preferences,
+    });
+    logger.debug('Full-page capture plan prepared', {
+      exportCapture: args.options.exportRunId !== undefined,
+      geometry: page.geometry,
+      policy: args.options.qualityPolicy ?? DEFAULT_FULL_PAGE_QUALITY_POLICY,
+      restartOnExtentGrowth: args.restartOnExtentGrowth !== false,
     });
     heartbeat = startFullPageCaptureHeartbeat({
       agent: args.agent,
