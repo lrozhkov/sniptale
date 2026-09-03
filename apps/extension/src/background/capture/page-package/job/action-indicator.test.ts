@@ -81,6 +81,9 @@ it('retries popup restoration after the first post-activation open is rejected',
     .mockResolvedValueOnce(undefined);
 
   const restoration = restorePagePackageProgressPopup(createJob(2), 3);
+  expect(browserActionMocks.openPopup).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(120);
+  expect(browserActionMocks.openPopup).toHaveBeenCalledTimes(1);
   await vi.advanceTimersByTimeAsync(120);
   await restoration;
 

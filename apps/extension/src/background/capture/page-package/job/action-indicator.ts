@@ -56,6 +56,9 @@ export async function restorePagePackageProgressPopup(
   windowId: number
 ): Promise<void> {
   if (job.cancelled || job.status.orderedTabs.length < 2) return;
+  // Chrome can resolve openPopup while the popup closed by tab activation is still dismissing.
+  await new Promise<void>((resolve) => setTimeout(resolve, POPUP_RESTORE_RETRY_DELAY_MS));
+  if (job.cancelled) return;
   try {
     await browserAction.openPopup({ windowId });
   } catch {

@@ -58,6 +58,28 @@ export interface CollectedStagedPagePackage {
 
 export class PopupExportPagePackageFatalError extends Error {}
 
+type PageReadinessOutcome = { ready: true } | { error: unknown; ready: false };
+
+function startPagePackageReadinessWaits(
+  job: ActivePopupExportJob,
+  tabs: Map<number, chrome.tabs.Tab>
+): Map<number, Promise<PageReadinessOutcome>> {
+  const timing = job.captureTiming ?? DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING;
+  return new Map(
+    [...tabs.keys()].map((tabId) => [
+      tabId,
+      waitForPagePackageCaptureReadiness({
+        signal: job.abortController.signal,
+        tabId,
+        timing,
+      }).then(
+        () => ({ ready: true }) as const,
+        (error: unknown) => ({ error, ready: false }) as const
+      ),
+    ])
+  );
+}
+
 function waitForPagePackageResponse(
   request: Promise<unknown>,
   signal: AbortSignal
@@ -138,6 +160,8 @@ export async function collectPopupExportPagePackages(
   );
   const packages: CollectedStagedPagePackage[] = [];
   const packageOptions: ExportOptions = { ...job.status.effectiveOptions };
+  // All selected pages begin their load and settle clocks together. Collection remains ordered.
+  const readinessByTabId = startPagePackageReadinessWaits(job, tabs);
 
   for (const [index, selected] of job.status.orderedTabs.entries()) {
     if (job.cancelled) break;
@@ -155,11 +179,9 @@ export async function collectPopupExportPagePackages(
       },
     });
     try {
-      await waitForPagePackageCaptureReadiness({
-        signal: job.abortController.signal,
-        tabId: selected.tabId,
-        timing: job.captureTiming ?? DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING,
-      });
+      const readiness = await readinessByTabId.get(selected.tabId);
+      if (!readiness) throw new Error('Page readiness was not started.');
+      if (!readiness.ready) throw readiness.error;
       const descriptor = await requestPopupExportPagePackage(
         job,
         tab,

@@ -53,7 +53,13 @@ function getStepStatusClassName(step: PopupExportProgressStep) {
   return progressStepIdleClassName;
 }
 
-function ExportProgressStepRow({ step }: { step: PopupExportProgressStep }) {
+function ExportProgressStepRow({
+  counter,
+  step,
+}: {
+  counter: string | null;
+  step: PopupExportProgressStep;
+}) {
   return (
     <div
       className={progressStepRowClassName}
@@ -74,24 +80,32 @@ function ExportProgressStepRow({ step }: { step: PopupExportProgressStep }) {
         <div aria-hidden="true" className={progressStepDividerClassName} />
       </div>
       <span className={cx(progressStepBadgeClassName, getStepStatusClassName(step))}>
-        {step.statusLabel}
+        {counter ?? step.statusLabel}
       </span>
     </div>
   );
 }
 
 function ExportErrors({ errors }: { errors: string[] }) {
-  if (errors.length <= 1) {
-    return null;
-  }
+  if (errors.length === 0) return null;
 
   return (
-    <div className={progressErrorListClassName}>
-      {errors.slice(0, 2).map((error, index) => (
-        <div key={`${error}-${index}`} className="truncate">
-          • {error}
-        </div>
-      ))}
+    <div
+      aria-label={translate('popup.export.issuesTitle')}
+      className={progressErrorListClassName}
+      data-ui="popup.export.progress-issues"
+      role="alert"
+    >
+      <div className="mb-1 font-semibold">
+        {translate('popup.export.issuesTitle')} ({errors.length})
+      </div>
+      <ul className="space-y-1">
+        {errors.map((error, index) => (
+          <li key={`${error}-${index}`} className="break-words">
+            {error}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
@@ -120,11 +134,11 @@ function getProgressDescription(props: ExportProgressSectionProps) {
   }
 
   if (props.result && !props.result.success) {
-    return props.result.errors[0] ?? props.progress.errors[0] ?? null;
+    return null;
   }
 
   if (props.progress.phase === 'error') {
-    return props.progress.message || props.progress.errors[0] || null;
+    return null;
   }
 
   if (props.progress.phase === 'cancelled') {
@@ -132,14 +146,8 @@ function getProgressDescription(props: ExportProgressSectionProps) {
   }
 
   const activeStep = props.progressSteps.find((step) => step.status === 'active') ?? null;
-  const progressCounter =
-    props.progress.phase === 'downloading' && props.progress.total > 0
-      ? `${props.progress.current}/${props.progress.total}`
-      : null;
-
-  if (activeStep) {
-    return progressCounter ? `${activeStep.label} • ${progressCounter}` : activeStep.label;
-  }
+  if (props.progress.message) return props.progress.message;
+  if (activeStep) return activeStep.label;
 
   return formatPhaseLabel(props.progress);
 }
@@ -182,7 +190,11 @@ function ExportStatusHeader(props: ExportProgressSectionProps) {
             {getProgressHeading(props)}
           </div>
           {description ? (
-            <div title={description} className={descriptionClassName}>
+            <div
+              title={description}
+              className={descriptionClassName}
+              data-ui="popup.export.progress-description"
+            >
               {description}
             </div>
           ) : null}
@@ -195,7 +207,13 @@ function ExportStatusHeader(props: ExportProgressSectionProps) {
 export function ExportProgressSectionView(props: ExportProgressSectionProps) {
   const currentErrors = props.result?.success
     ? []
-    : (props.result?.errors ?? props.progress.errors);
+    : props.result?.errors.length
+      ? props.result.errors
+      : props.progress.errors;
+  const activeCounter =
+    props.progress.phase === 'downloading' && props.progress.total > 0
+      ? `${props.progress.current}/${props.progress.total}`
+      : null;
 
   return (
     <div className={exportSectionContainerClassName}>
@@ -203,7 +221,11 @@ export function ExportProgressSectionView(props: ExportProgressSectionProps) {
         <ExportStatusHeader {...props} />
         <div className={progressStepListClassName}>
           {props.progressSteps.map((step) => (
-            <ExportProgressStepRow key={step.key} step={step} />
+            <ExportProgressStepRow
+              key={step.key}
+              counter={step.status === 'active' ? activeCounter : null}
+              step={step}
+            />
           ))}
         </div>
         <ExportErrors errors={currentErrors} />

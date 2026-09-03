@@ -5,7 +5,7 @@ export const progressHeaderClassName = [
 ].join(' ');
 
 export const progressDescriptionClassName = [
-  'mt-0.5 text-[11px] leading-4 text-[var(--sniptale-color-text-secondary)]',
+  'mt-0.5 break-words text-[11px] leading-4 text-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 
 export const progressStepListClassName = [
@@ -56,11 +56,11 @@ export const progressStepIdleClassName = [
 ].join(' ');
 
 export const progressErrorListClassName = [
-  'shrink-0',
+  'max-h-28 shrink-0 overflow-y-auto',
   'rounded-[12px]',
   'border border-[color:color-mix(in_srgb,var(--sniptale-color-danger)_28%,var(--sniptale-color-border-soft)_72%)]',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-danger-soft)_78%,var(--sniptale-color-surface-panel)_22%)]',
-  'px-2.5 py-2 text-[10px] leading-4 text-[var(--sniptale-color-text-primary)]',
+  'px-2.5 py-2 text-[11px] leading-4 text-[var(--sniptale-color-text-primary)]',
 ].join(' ');
 
 export const cancelButtonClassName = [

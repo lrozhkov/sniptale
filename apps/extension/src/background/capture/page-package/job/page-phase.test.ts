@@ -16,6 +16,7 @@ import { updatePagePackageJobStatus } from './runtime-state';
 import { parsePagePackageJobStatusV1 } from './status';
 import { collectPopupExportPagePackages } from './page-phase';
 import { activatePopupExportCaptureTarget } from './visible';
+import { waitForPagePackageCaptureReadiness } from './page-readiness';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -209,6 +210,27 @@ it('interleaves each Save build with its publication callback', async () => {
 
   expect(sequence).toEqual(['build-0', 'publish-0', 'build-1', 'publish-1']);
   expect(result).toEqual({ errors: [], packages: [] });
+});
+
+it('starts readiness waits for every available page before collecting the first package', async () => {
+  const sequence: string[] = [];
+  vi.mocked(waitForPagePackageCaptureReadiness).mockImplementation(async ({ tabId }) => {
+    sequence.push(`ready-${tabId}`);
+  });
+  const request = vi.fn(async ({ ordinal }: { ordinal: number }) => {
+    sequence.push(`build-${ordinal}`);
+    return { success: true, stagedPagePackage: descriptor(ordinal) };
+  });
+
+  await collectPopupExportPagePackages(
+    job(request),
+    new Map([
+      [7, { id: 7 } as chrome.tabs.Tab],
+      [8, { id: 8 } as chrome.tabs.Tab],
+    ])
+  );
+
+  expect(sequence).toEqual(['ready-7', 'ready-8', 'build-0', 'build-1']);
 });
 
 it('does not request the next Save page after cancellation settles the current callback', async () => {

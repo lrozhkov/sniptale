@@ -62,6 +62,10 @@ export const popupExportMessages = defineMessageSource({
     ru: 'Экспорт завершён с ошибками',
     en: 'Export finished with errors',
   },
+  issuesTitle: {
+    ru: 'Не удалось обработать',
+    en: 'Could not process',
+  },
   dataTypesSectionLabel: {
     ru: 'Состав пакета',
     en: 'Package contents',
