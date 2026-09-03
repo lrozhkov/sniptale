@@ -2,7 +2,18 @@ import fs from 'node:fs';
 
 import { expect, it } from 'vitest';
 
+import playwrightConfig, { DEFAULT_PLAYWRIGHT_WORKERS } from '../../../playwright.config';
 import { parseE2eOptions, runE2e } from './run-e2e.mjs';
+
+it('uses bounded file-level parallelism by default while preserving explicit worker authority', () => {
+  expect(DEFAULT_PLAYWRIGHT_WORKERS).toBe(3);
+  expect(playwrightConfig.fullyParallel).toBe(false);
+  expect(playwrightConfig.workers).toBe(
+    process.env.SNIPTALE_QA_PLAYWRIGHT_WORKERS
+      ? Number(process.env.SNIPTALE_QA_PLAYWRIGHT_WORKERS)
+      : DEFAULT_PLAYWRIGHT_WORKERS
+  );
+});
 
 it('maps e2e suites to canonical Playwright spec sets', () => {
   expect(parseE2eOptions(['--suite', 'smoke'])).toMatchObject({
@@ -37,6 +48,7 @@ it('maps e2e suites to canonical Playwright spec sets', () => {
 
 it('builds both production and instrumented artifacts for the security suite', () => {
   const builds: string[][] = [];
+  const commandNames: string[] = [];
   const commands: string[][] = [];
   const result = runE2e({
     argv: ['--suite', 'security'],
@@ -44,7 +56,8 @@ it('builds both production and instrumented artifacts for the security suite', (
       builds.push(args);
       return { status: 0, stdout: '', stderr: '' };
     },
-    commandRunner: (_command, args) => {
+    commandRunner: (command, args) => {
+      commandNames.push(command);
       commands.push(args);
       return { status: 0, stdout: '', stderr: '' };
     },
@@ -56,6 +69,10 @@ it('builds both production and instrumented artifacts for the security suite', (
     ['run', 'qa:e2e:build:security'],
   ]);
   expect(commands).toHaveLength(1);
+  if (process.platform === 'linux' && !process.env.DISPLAY) {
+    expect(commandNames).toEqual(['xvfb-run']);
+  }
+  expect(commands[0]).toContain('--workers=1');
 });
 
 it('rejects unknown or missing CLI values before building', () => {

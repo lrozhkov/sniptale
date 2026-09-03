@@ -1,6 +1,14 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+
+export function resolveBuiltAssetPath(
+  requestPath: string,
+  repositoryRoot = process.cwd(),
+  extensionBuildDir = process.env.SNIPTALE_EXTENSION_BUILD_DIR
+): string {
+  return resolve(repositoryRoot, extensionBuildDir ?? 'dist', requestPath.replace(/^\//u, ''));
+}
 
 function getContentType(pathname: string): string {
   if (pathname.endsWith('.html')) return 'text/html; charset=utf-8';
@@ -54,8 +62,8 @@ async function serveRequest(
       response.end(html);
       return;
     }
-    const distPath = join(process.cwd(), 'dist', requestUrl.pathname.replace(/^\//, ''));
-    const file = await readFile(distPath);
+    const builtAssetPath = resolveBuiltAssetPath(requestUrl.pathname);
+    const file = await readFile(builtAssetPath);
     response.writeHead(200, {
       'access-control-allow-origin': '*',
       'content-type': getContentType(requestUrl.pathname),
