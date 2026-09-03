@@ -112,6 +112,19 @@ it('fails closed and reports an invalid background response', async () => {
   );
 });
 
+it('silently falls back when an obsolete content script loses its extension context', async () => {
+  runtimeMocks.sendRuntimeMessage.mockRejectedValueOnce(
+    new Error('Extension context invalidated.')
+  );
+
+  await expect(loadContentPinToTabSessionState()).resolves.toEqual({
+    pinToTab: false,
+    pinToTabAvailable: false,
+    toolbarVisible: true,
+  });
+  expect(loggerMocks.warn).not.toHaveBeenCalled();
+});
+
 it('persists pin state through the background owner', async () => {
   runtimeMocks.sendRuntimeMessage.mockResolvedValueOnce({
     pinToTab: true,
