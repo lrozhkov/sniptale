@@ -1,5 +1,6 @@
 import { collectAdvisoryFindings, printAdvisoryReport } from './execution/collectors.mjs';
 import { createAdvisoryState, writeAdvisoryState } from './execution/state.mjs';
+import { classifyAdvisoryFindings } from './advisory-catalog.data.mjs';
 
 export function collectAndPersistAdvisoryReport(
   context,
@@ -13,8 +14,9 @@ export function collectAndPersistAdvisoryReport(
       targetFiles,
     });
 
+    const buckets = classifyAdvisoryFindings(findings, { mode: 'checkpoint' });
     if (printReport) {
-      printAdvisoryReport({ findings });
+      printAdvisoryReport({ buckets });
     }
     writeAdvisoryState(
       createAdvisoryState({
@@ -25,7 +27,7 @@ export function collectAndPersistAdvisoryReport(
         producerRunId,
       })
     );
-    return { findings };
+    return { buckets, findings };
   } catch (error) {
     writeAdvisoryState(
       createAdvisoryState({

@@ -3,6 +3,37 @@ import { createHash } from 'node:crypto';
 import { expect, it } from 'vitest';
 
 import { renderPreflightReport } from '../preflight.mjs';
+import { renderPreflightTerminalSummary } from './preflight-render.mjs';
+
+it('shows changed advisory details and collapses unchanged context in terminal output', () => {
+  const report = {
+    context: { targetFiles: ['apps/extension/src/content/example.ts'] },
+    relevantDocs: [],
+    ownerRuntime: [],
+    riskFindings: [],
+  };
+  const finding = {
+    id: 'advisory.structural-function',
+    file: 'apps/extension/src/content/example.ts',
+    line: 12,
+    family: 'Structural function pressure',
+    hint: 'Keep the transaction boundary cohesive.',
+    reason: 'score=6, delta=2',
+    severity: 'watch',
+  };
+  const output = renderPreflightTerminalSummary(report, {
+    introduced: [],
+    worsened: [finding],
+    existing: [{ ...finding, line: 30, reason: 'score=5, delta=0' }],
+  });
+
+  expect(output).toContain('Advisory: introduced=0, worsened=1, existing=1');
+  expect(output).toContain('Worsened:');
+  expect(output).toContain('example.ts:12');
+  expect(output).toContain('score=6, delta=2');
+  expect(output).toContain('Existing context: 1 unchanged — see run log');
+  expect(output).not.toContain('score=5, delta=0');
+});
 
 it('renders deduplicated owner, structural, advisory, and proof sections', () => {
   const output = renderPreflightReport({
@@ -171,8 +202,7 @@ it('bounds large scope and boundary inventories without hiding later report sect
   expect(output).toContain(`full-list-sha256=${digest}`);
   expect(output).toContain('Proof:');
   expect(output).toContain('Build forecast:');
-  expect(output).toContain('Non-blocking advisory findings:');
-  expect(output).toContain('attention=0, watch=0');
+  expect(output).toContain('Structural context:');
   expect(output).not.toContain('console output truncated');
   expect(Buffer.byteLength(output)).toBeLessThan(16 * 1024);
 

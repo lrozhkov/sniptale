@@ -8,7 +8,7 @@ afterEach(() => {
 
 function expectAuditReportSections(report: string) {
   expect(report).toContain('Advisory scripts:\n');
-  expect(report).toContain('- qa:advisory: verify-advisory.mjs\n');
+  expect(report).toContain('Advisory scripts:\n- none\n');
   expect(report).toContain('Repo audit report tools:\n');
   expect(report).toContain(
     '- Structural maintenance: npm run qa:structural-audit (manual-report-only)\n'
@@ -35,19 +35,14 @@ function createAuditReportFixture() {
       ownerScopedToolProof: [],
       qualityScripts: [],
       manualOnlyCheckScripts: [],
-      advisoryScripts: [
-        {
-          script: 'qa:advisory',
-          tool: 'verify-advisory.mjs',
-        },
-      ],
+      advisoryScripts: [],
       repoAuditReportDefinitions: [],
       skipCapableTools: [],
     },
   };
 }
 
-it('prints advisory scripts in the human-readable audit report', () => {
+it('shows that advisory has no standalone script', () => {
   const writes: string[] = [];
   vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
     writes.push(String(chunk));

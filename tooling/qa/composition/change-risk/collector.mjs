@@ -30,6 +30,8 @@ const IPC_ROUTE_PATTERN =
 const AUTHORIZATION_PATTERN = /(?:authorization|capabilit|sender-policy|permission-lifecycle)/u;
 const AUTHORIZATION_ROOT_PATTERN =
   /^apps\/extension\/src\/(?:background\/.*routing|contracts\/messaging|platform\/security)/u;
+const TRUSTED_EVENT_BRIDGE_PATTERN =
+  /^apps\/extension\/src\/(?:content\/runtime\/(?:ui-activation-bridge|.*trusted.*event)|platform\/browser\/.*event.*bridge)/u;
 
 const RISK_DEFINITIONS = Object.freeze({
   'manifest.permissions': {
@@ -37,12 +39,14 @@ const RISK_DEFINITIONS = Object.freeze({
     controls: ['Manifest permissions', 'Manifest integrity'],
     reviews: ['security'],
     docs: ['docs/security/manifest-permissions.md'],
+    requirements: ['Security review', 'Permission compatibility proof'],
   },
   'manifest.runtime-topology': {
     level: 'high',
     controls: ['Manifest integrity', 'Runtime topology'],
     reviews: ['architecture'],
     docs: ['docs/architecture/runtime-contexts.md'],
+    requirements: ['Architecture review', 'Runtime entrypoint compatibility check'],
   },
   'persistence.schema': {
     level: 'high',
@@ -52,36 +56,53 @@ const RISK_DEFINITIONS = Object.freeze({
       'docs/architecture/persistence-contracts.md',
       'docs/architecture/storage-state-authority.md',
     ],
+    requirements: ['Architecture review', 'Migration and backward compatibility test'],
   },
   'persistence.mutation': {
     level: 'medium',
     controls: ['Persistence ownership', 'Unit tests', 'Test coverage'],
     reviews: [],
     docs: ['docs/architecture/storage-state-authority.md'],
+    requirements: ['Durable mutation failure and rollback proof'],
   },
   'runtime-contract.public': {
     level: 'high',
     controls: ['Package boundaries', 'Dependency boundaries', 'Typecheck', 'Unit tests'],
     reviews: ['architecture'],
     docs: ['docs/architecture/runtime-contexts.md'],
+    requirements: ['Architecture review', 'Transitive consumer graph check'],
   },
   'ipc.wire-contract': {
     level: 'high',
     controls: ['Messaging', 'Typecheck', 'Unit tests'],
     reviews: ['architecture'],
     docs: ['docs/architecture/runtime-contexts.md'],
+    requirements: ['Architecture review', 'Wire compatibility check'],
   },
   'ipc.route': {
     level: 'high',
     controls: ['Messaging', 'Runtime topology', 'Typecheck', 'Unit tests'],
     reviews: ['architecture'],
     docs: ['docs/architecture/runtime-contexts.md'],
+    requirements: ['Architecture review', 'Route compatibility check'],
   },
   authorization: {
     level: 'high',
     controls: ['Messaging', 'Runtime topology', 'Unit tests'],
     reviews: ['security'],
     docs: ['docs/architecture/runtime-contexts.md'],
+    requirements: ['Security review', 'Authorization negative proof'],
+  },
+  'trusted-event.bridge': {
+    level: 'high',
+    controls: ['Runtime topology', 'Unit tests', 'Test coverage'],
+    reviews: ['security'],
+    docs: ['docs/architecture/runtime-contexts.md', 'docs/security/data-handling.md'],
+    requirements: [
+      'Security review',
+      'Trusted and untrusted event negative proof',
+      'Registered-root boundary proof',
+    ],
   },
 });
 
@@ -127,6 +148,7 @@ function createFinding(id, file, detail) {
     controls: [...definition.controls],
     reviews: [...definition.reviews],
     docs: [...definition.docs],
+    requirements: [...definition.requirements],
   };
 }
 
@@ -175,6 +197,9 @@ function collectPathFindings(file) {
   }
   if (AUTHORIZATION_ROOT_PATTERN.test(file) && AUTHORIZATION_PATTERN.test(file)) {
     findings.push(createFinding('authorization', file, 'authorization or capability owner'));
+  }
+  if (TRUSTED_EVENT_BRIDGE_PATTERN.test(file)) {
+    findings.push(createFinding('trusted-event.bridge', file, 'trusted browser event bridge'));
   }
   return findings;
 }

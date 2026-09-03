@@ -11,14 +11,6 @@ import {
 export const ADVISORY_STATE_PATH = '.tmp/qa/agent-advisory-state.json';
 const ADVISORY_WRAPPER_VERSION = 'agent-advisory-v2';
 
-export function assertDiffOnlyAdvisoryRun(files = [], wrapperName = 'qa:advisory') {
-  if (files.length > 0) {
-    throw new Error(
-      `${wrapperName} uses the current uncommitted diff only; remove the explicit --files scope`
-    );
-  }
-}
-
 export function createAdvisoryState({
   context,
   findings = [],

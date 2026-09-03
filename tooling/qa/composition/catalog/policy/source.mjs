@@ -12,7 +12,7 @@ const TOOL_SOURCES = new Map([
   ['osv.mjs', 'tooling/qa/audits/osv/check.mjs'],
   ['package-dist.mjs', 'tooling/release/package/package-dist.mjs'],
   ['qa-scope.mjs', 'tooling/qa/composition/scope/qa-scope.mjs'],
-  ['verify-advisory.mjs', 'tooling/qa/wrappers/advisory.mjs'],
+  ['verify-advisory.mjs', 'tooling/qa/wrappers/checkpoint.mjs'],
   ['verify-dead-commented-code.mjs', 'tooling/qa/composition/quality/dead-commented-code.mjs'],
   [
     'verify-app-core-owners.mjs',

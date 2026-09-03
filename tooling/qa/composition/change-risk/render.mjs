@@ -1,4 +1,4 @@
-import { collectRiskReviews, resolveChangeRiskLevel } from './collector.mjs';
+import { resolveChangeRiskLevel } from './collector.mjs';
 
 const TERMINAL_RISK_LIMIT = 5;
 const TERMINAL_EVIDENCE_LIMIT = 2;
@@ -27,25 +27,27 @@ function collectCoverage(findings, steps) {
   });
 }
 
-function formatReviewLines(findings) {
-  const reviews = collectRiskReviews(findings);
-  if (reviews.length === 0) {
-    return [
-      'Review:',
-      '- No architecture or security review automatically routed by checkpoint heuristics',
-      '- Executor review assessment required before closeout: inspect the actual implementation against both review triggers, then run applicable reviews or record implementation-specific reasons why each is not required',
-    ];
-  }
+const EXECUTOR_ASSESSMENT =
+  'Inspect the implementation against architecture and security review triggers; run applicable reviews or record an implementation-specific reason why not required';
+
+export function collectRiskRequirements(findings) {
   return [
-    'Review:',
-    ...reviews.map((review) => {
-      const ids = findings
-        .filter((finding) => finding.reviews.includes(review))
-        .map((finding) => finding.id)
-        .join(', ');
-      return `- ${review === 'security' ? 'Security' : 'Architecture'} review required: ${ids}`;
-    }),
+    ...new Set([...findings.flatMap((finding) => finding.requirements), EXECUTOR_ASSESSMENT]),
   ];
+}
+
+export function createChangeRiskAnalysis(findings) {
+  return {
+    level: resolveChangeRiskLevel(findings),
+    seams: findings.map(({ id, level, evidence, requirements, reviews }) => ({
+      id,
+      level,
+      evidence,
+      requirements,
+      reviews,
+    })),
+    requirements: collectRiskRequirements(findings),
+  };
 }
 
 function formatRiskHeading(prefix, findings) {
@@ -59,26 +61,31 @@ export function formatCheckpointRiskSummary({ findings = [], steps = [] } = {}) 
   const coverage = collectCoverage(findings, steps);
   const lines = [
     formatRiskHeading('Change risk', findings),
-    '',
-    'Detected:',
     ...(visible.length === 0
-      ? ['- No classified high-impact change seams']
-      : visible.flatMap((finding) => [
-          `- ${finding.id}`,
-          ...finding.evidence
-            .slice(0, TERMINAL_EVIDENCE_LIMIT)
-            .map(({ detail, file }) => `  ${file}: ${detail}`),
-        ])),
-    ...(omitted > 0 ? [`- +${omitted} more risk families in the run log`] : []),
+      ? []
+      : [
+          '',
+          'Detected:',
+          ...visible.flatMap((finding) => [
+            `- ${finding.id}`,
+            ...finding.evidence
+              .slice(0, TERMINAL_EVIDENCE_LIMIT)
+              .map(({ detail, file }) => `  ${file}: ${detail}`),
+          ]),
+          ...(omitted > 0 ? [`- +${omitted} more risk families in the run log`] : []),
+        ]),
     '',
-    'Covered by checkpoint:',
+    'Required:',
+    ...collectRiskRequirements(findings).map((requirement) => `- ${requirement}`),
     ...(coverage.length === 0
-      ? ['- No risk-specific checkpoint coverage selected']
-      : coverage.map(
-          ({ detail, label, status }) => `- ${label}: ${status}${detail ? ` (${detail})` : ''}`
-        )),
-    '',
-    ...formatReviewLines(findings),
+      ? []
+      : [
+          '',
+          'Checkpoint coverage:',
+          ...coverage.map(
+            ({ detail, label, status }) => `- ${label}: ${status}${detail ? ` (${detail})` : ''}`
+          ),
+        ]),
   ];
   return `${lines.join('\n')}\n`;
 }
@@ -96,7 +103,7 @@ export function formatFullChangeRiskReport({ findings = [], steps = [] } = {}) {
           ...finding.evidence.map(({ detail, file }) => `  - ${file}: ${detail}`),
           `  owners: ${finding.owners.join(', ') || 'none'}`,
           `  controls: ${finding.controls.join(', ') || 'none'}`,
-          `  review: ${finding.reviews.join(', ') || 'none'}`,
+          `  requirements: ${finding.requirements.join(', ')}`,
           `  docs: ${finding.docs.join(', ') || 'none'}`,
         ])),
     '',
@@ -107,7 +114,8 @@ export function formatFullChangeRiskReport({ findings = [], steps = [] } = {}) {
           ({ detail, label, status }) => `- ${label}: ${status}${detail ? ` (${detail})` : ''}`
         )),
     '',
-    ...formatReviewLines(findings),
+    'Required:',
+    ...collectRiskRequirements(findings).map((requirement) => `- ${requirement}`),
   ];
   return `${lines.join('\n')}\n`;
 }

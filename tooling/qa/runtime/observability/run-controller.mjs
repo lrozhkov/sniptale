@@ -245,6 +245,19 @@ export class ObservabilityRunController {
     return structuredClone(this.#record.repository);
   }
 
+  attachAnalysis({ preflightContext, changeRisk, advisory } = {}) {
+    this.#assertActive();
+    if (preflightContext !== undefined) this.#record.preflightContext = preflightContext;
+    if (changeRisk !== undefined) this.#record.changeRisk = changeRisk;
+    if (advisory !== undefined) this.#record.advisory = advisory;
+    this.#persist();
+    return {
+      preflightContext: structuredClone(this.#record.preflightContext),
+      changeRisk: structuredClone(this.#record.changeRisk),
+      advisory: structuredClone(this.#record.advisory),
+    };
+  }
+
   finalize({ status, exitCode } = {}) {
     this.#assertActive();
     const finishedAt = isoTimestamp(this.#clock);
@@ -257,7 +270,14 @@ export class ObservabilityRunController {
     return this.snapshot();
   }
 
-  fail(error, { stepId = 'wrapper.lifecycle', problemId = 'wrapper.unhandled-error' } = {}) {
+  fail(
+    error,
+    {
+      stepId = 'wrapper.lifecycle',
+      problemId = 'wrapper.unhandled-error',
+      remediation = 'Inspect the recorded lifecycle failure and correct the owning wrapper contract.',
+    } = {}
+  ) {
     for (const activity of this.#record.timeline.activities) {
       if (activity.finishedAt === null) {
         this.recordActivityTransition({
@@ -277,8 +297,7 @@ export class ObservabilityRunController {
       diagnostic: {
         summary: error instanceof Error ? error.message : String(error),
         locations: [],
-        remediation:
-          'Inspect the recorded lifecycle failure and correct the owning wrapper contract.',
+        remediation,
         ruleDoc: 'docs/tooling/wrapper-summary.md',
         evidence: [],
       },

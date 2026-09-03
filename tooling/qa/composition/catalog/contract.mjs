@@ -120,7 +120,6 @@ function closeoutContract(mode, hasFailure) {
 function resolveContract({ wrapperId, mode, hasFailure, formatBarrierFailure }) {
   if (mode === 'help') return { required: ['Wrapper help'] };
   if (wrapperId === 'qa:preflight') return { required: ['QA preflight'] };
-  if (wrapperId === 'qa:advisory') return { required: tupleLabels(ADVISORY_STEPS) };
   if (wrapperId === 'qa:structural-audit') {
     return { required: tupleLabels(STRUCTURAL_AUDIT_STEPS) };
   }

@@ -97,6 +97,44 @@ it('does not classify unrelated UI handlers as IPC routes', () => {
   ).toEqual([]);
 });
 
+it('classifies trusted event bridges as a security boundary with explicit proof', () => {
+  const findings = collectChangeRisks({
+    targetFiles: ['apps/extension/src/content/runtime/ui-activation-bridge/editable-keydown.ts'],
+    mode: 'preflight',
+  });
+
+  expect(findings).toEqual([
+    expect.objectContaining({
+      id: 'trusted-event.bridge',
+      reviews: ['security'],
+      requirements: expect.arrayContaining([
+        'Security review',
+        'Trusted and untrusted event negative proof',
+        'Registered-root boundary proof',
+      ]),
+    }),
+  ]);
+});
+
+it('attaches deterministic requirements to every classified seam', () => {
+  const findings = collectChangeRisks({
+    targetFiles: [
+      'apps/extension/manifest.json',
+      'apps/extension/src/composition/persistence/projects/index-mutations.ts',
+      'packages/runtime-contracts/src/messaging/message-types/index.ts',
+    ],
+    mode: 'preflight',
+  });
+
+  expect(findings.every((finding) => finding.requirements.length > 0)).toBe(true);
+  expect(findings.find(({ id }) => id === 'persistence.mutation')?.requirements).toContain(
+    'Durable mutation failure and rollback proof'
+  );
+  expect(findings.find(({ id }) => id === 'runtime-contract.public')?.requirements).toContain(
+    'Transitive consumer graph check'
+  );
+});
+
 it('keeps preflight conservative for the manifest while attaching security guidance', () => {
   const findings = collectChangeRisks({
     targetFiles: ['apps/extension/manifest.json'],

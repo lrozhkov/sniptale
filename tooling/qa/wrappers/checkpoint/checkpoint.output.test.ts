@@ -45,10 +45,10 @@ it('renders structural watches only through the checkpoint advisory block', asyn
 
     expect(result.steps.find((step) => step.label === 'Advisory report')).toMatchObject({
       consoleOutput: expect.stringContaining('No classified change seams detected'),
-      stdout: expect.stringContaining('No classified change seams detected'),
+      stdout: expect.stringMatching(/No classified change seams detected[\s\S]*Advisory log:/u),
     });
     expect(result.steps.find((step) => step.label === 'Advisory report')?.consoleOutput).toContain(
-      'Executor review assessment required before closeout'
+      'Inspect the implementation against architecture and security review triggers'
     );
     expect(
       result.steps.find((step) => step.label === 'Advisory report')?.consoleOutput
@@ -62,5 +62,7 @@ it('renders structural watches only through the checkpoint advisory block', asyn
     expect(result.steps.find((step) => step.label === 'Focused diagnostics')).toMatchObject({
       consoleOutput: 'unique focused diagnostics\n',
     });
+    expect(result.changeRisk).toMatchObject({ level: null, seams: [] });
+    expect(result.advisory).toEqual({ introduced: [], worsened: [], existing: [] });
   });
 });

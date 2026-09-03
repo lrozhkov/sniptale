@@ -7,6 +7,10 @@ import fs from 'node:fs';
 import { collectFocusedGuardrailReport } from '../composition/preflight/guardrail-preflight-report/check.mjs';
 import { collectCurrentDiffContext } from '../runtime/scope/current-diff.helpers.mjs';
 import { collectAdvisoryFindings } from '../composition/advisory/execution/collectors.mjs';
+import {
+  classifyAdvisoryFindings,
+  createAdvisoryAnalysis,
+} from '../composition/advisory/advisory-catalog.data.mjs';
 import { collectChangeRisks, collectRiskDocuments } from '../composition/change-risk/collector.mjs';
 import { filterImportOrMockOnlyDiffFiles } from '../analysis/imports/import-only-diff/check.mjs';
 import { collectCodeFiles } from '../analysis/repository/shared-files.mjs';
@@ -137,6 +141,7 @@ export function collectPreflightOwnerRuntime(context) {
     ...new Set([
       ...(context.codeFiles ?? []),
       ...behavioralTargetFiles.filter((file) => JS_LIKE_FILE_PATTERN.test(file)),
+      ...(context.harnessTargetFiles ?? []),
     ]),
   ];
   return [...new Set(ownerFiles.map(classifyOwnerGroup))].sort();
@@ -252,16 +257,63 @@ export function renderPreflightReport(report) {
   return `${lines.join('\n')}\n`;
 }
 
+function collectRuntimeLabels(files) {
+  return [
+    ...new Set(
+      files.map((file) => {
+        const extension = file.match(/^apps\/extension\/src\/([^/]+)/u);
+        if (extension) return `extension:${extension[1]}`;
+        const packageName = file.match(/^packages\/([^/]+)\//u);
+        if (packageName) return `package:${packageName[1]}`;
+        if (file.startsWith('tooling/')) return 'tooling';
+        if (file === 'apps/extension/manifest.json') return 'extension:manifest';
+        return 'repository';
+      })
+    ),
+  ].sort();
+}
+
+function createPreflightAnalysis(report) {
+  const consumers = [
+    ...(report.contractChecklist ?? []),
+    ...(report.transitiveConsumerHints ?? []),
+    ...(report.typecheckBlastRadius ?? []),
+  ];
+  return {
+    owners: [...(report.ownerRuntime ?? [])],
+    runtimes: collectRuntimeLabels(report.context.allTargetFiles ?? report.context.targetFiles),
+    riskAreas: (report.riskFindings ?? []).map(({ id }) => id),
+    documents: [...(report.relevantDocs ?? [])],
+    consumers: [...new Set(consumers)],
+    proofRequirements: [
+      ...new Set([
+        ...(report.proofHints ?? []),
+        ...(report.guardrailReport?.hints ?? []),
+        ...(report.riskFindings ?? []).flatMap((finding) => finding.requirements ?? []),
+      ]),
+    ],
+    structuralContext: [...(report.structuralPressure ?? [])],
+  };
+}
+
 export function runPreflightWrapper({ files = [] } = {}) {
   const report = collectPreflightReport({ files });
+  const advisoryBuckets = classifyAdvisoryFindings(report.advisoryFindings, {
+    mode: report.context.mode === 'explicit-files' ? 'preflight' : 'checkpoint',
+  });
   return {
     context: report.context,
+    preflightContext: createPreflightAnalysis(report),
+    advisory: createAdvisoryAnalysis(advisoryBuckets),
     steps: [
       {
         ...createOkStep('QA preflight', `inspected=${report.context.targetFiles.length}`),
-        consoleOutput: renderPreflightTerminalSummary(report),
+        consoleOutput: renderPreflightTerminalSummary(report, advisoryBuckets),
         stdout: renderPreflightReport(report),
-        advisories: report.advisoryFindings,
+        advisories: [...advisoryBuckets.worsened],
+        ...(advisoryBuckets.worsened.length > 0
+          ? { advice: 'Use worsened structural context to refine scope and proof.' }
+          : {}),
       },
     ],
   };

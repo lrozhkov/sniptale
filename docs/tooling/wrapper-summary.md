@@ -7,7 +7,7 @@ This document owns wrapper scope, freshness, locks, handoffs, and observability.
 ## Local wrappers
 
 - `qa:preflight` reads the current diff or explicit files. It writes an observability record but does not format, lock, build, or write proof state.
-- `qa:advisory` runs optional non-blocking diagnosis over the current diff.
+- Advisory diagnosis is an embedded, non-blocking stage of `qa:preflight`, `qa:checkpoint`, and checkpoint reuse in `qa:closeout`; it has no standalone workflow command.
 - `qa:structural-audit` writes a manual non-blocking repository topology report.
 - `qa:release-harness` formats supported changed files, validates QA composition and applicable dependencies, runs selected harness proof, and writes a content-bound freshness stamp.
 - `qa:checkpoint` formats supported changed files, recollects the diff, requires applicable harness freshness, records advisory results, and runs selected focused controls and tests. Its change-risk report detects a bounded set of classified seams and routes human review but does not determine that unmatched changes are low risk, waive executor review assessment, affect status, or create review state. It does not build, stage, or commit.
@@ -37,7 +37,7 @@ Pre-push runs `qa:checkpoint`.
 
 ## Observability and failure
 
-Wrappers write atomic structured run records and bounded sanitized logs under `.tmp`. Records include scope, controls, states, timing, waits, resources, reuse, skips, and failures. Full gates also collect allowlisted reports, receipts, manifests, checksums, and release artifacts under `build/ci-artifacts`.
+Wrappers write atomic structured run records and bounded sanitized logs under `.tmp`. Records include scope, controls, states, timing, waits, resources, reuse, skips, and failures. Preflight context, checkpoint change risk, and advisory introduced/worsened/existing buckets are structured record fields rather than log-only prose. Correlation uses the task ID plus an explicit workflow ID or a deterministic candidate workflow derived from the task and base Git HEAD; it does not record review completion. Full gates also collect allowlisted reports, receipts, manifests, checksums, and release artifacts under `build/ci-artifacts`.
 
 A failed full gate still seals available diagnostic evidence. Timeout handling writes best-effort incremental evidence before external cleanup.
 

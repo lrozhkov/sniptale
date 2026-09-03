@@ -1,4 +1,4 @@
-export const OBSERVABILITY_SCHEMA_VERSION = 4;
+export const OBSERVABILITY_SCHEMA_VERSION = 5;
 
 export const ACTIVITY_STATES = Object.freeze([
   'queued',

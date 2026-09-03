@@ -15,7 +15,7 @@ const findings = collectChangeRisks({
   ],
 });
 
-it('renders bounded checkpoint evidence, actual coverage states, and untracked review guidance', () => {
+it('renders bounded checkpoint evidence, coverage, and explicit requirements', () => {
   const output = formatCheckpointRiskSummary({
     findings,
     steps: [
@@ -29,8 +29,10 @@ it('renders bounded checkpoint evidence, actual coverage states, and untracked r
   expect(output).toContain('Manifest permissions: passed');
   expect(output).toContain('Manifest integrity: not selected');
   expect(output).toContain('Typecheck: failed');
-  expect(output).toContain('Security review required: manifest.permissions');
-  expect(output).toContain('Architecture review required:');
+  expect(output).toContain('Required:');
+  expect(output).toContain('Security review');
+  expect(output).toContain('Architecture review');
+  expect(output).toContain('Transitive consumer graph check');
   expect(output).not.toMatch(/pending|receipt|informational/iu);
 });
 
@@ -49,7 +51,9 @@ it('does not present unmatched heuristics as low risk or waive review assessment
 
   for (const output of [terminal, full]) {
     expect(output).toContain('No classified change seams detected');
-    expect(output).toContain('Executor review assessment required before closeout');
+    expect(output).toContain(
+      'Inspect the implementation against architecture and security review triggers'
+    );
     expect(output).not.toContain('LOW');
     expect(output).not.toContain('No architecture or security review indicated');
   }
@@ -63,5 +67,8 @@ it('requires executor assessment when a classified seam has no automatic review 
   const output = formatCheckpointRiskSummary({ findings: mutationFindings, steps: [] });
 
   expect(output).toContain('Change risk: MEDIUM');
-  expect(output).toContain('Executor review assessment required before closeout');
+  expect(output).toContain('Durable mutation failure and rollback proof');
+  expect(output).toContain(
+    'Inspect the implementation against architecture and security review triggers'
+  );
 });

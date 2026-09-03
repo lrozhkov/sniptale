@@ -131,7 +131,6 @@ export const CLOSEOUT_STEPS = [
 
 export const CANONICAL_WRAPPER_IDS = Object.freeze([
   'qa:preflight',
-  'qa:advisory',
   'qa:structural-audit',
   'qa:checkpoint',
   'qa:closeout',

@@ -5,15 +5,9 @@ import {
   createRuntimeAdvisoryFixtureRoot,
   createStructuralAdvisoryFixtureRoot,
 } from '../composition/advisory/execution/test-support';
-import {
-  createTempRoot,
-  importFresh,
-  initGitRepo,
-  runGit,
-  withCwd,
-  writeFile,
-} from '../test-support/test-helpers';
+import { createTempRoot, initGitRepo, runGit, writeFile } from '../test-support/test-helpers';
 import { collectAdvisoryFindings as collectRawAdvisoryFindings } from '../composition/advisory/execution/collectors.mjs';
+import { classifyAdvisoryFindings } from '../composition/advisory/advisory-catalog.data.mjs';
 
 it('reuses a supplied structural report instead of recollecting structural findings', () => {
   const file = 'virtual/example.ts';
@@ -45,38 +39,50 @@ it('reuses a supplied structural report instead of recollecting structural findi
   );
 });
 
-it('rejects explicit file scopes because advisory is diff-only', async () => {
-  const module = await import('./advisory.mjs');
+it('classifies advisory findings by their relationship to the current change', () => {
+  const findings = [
+    {
+      id: 'advisory.structural-function',
+      family: 'Structural function pressure',
+      file: 'src/existing.ts',
+      line: 10,
+      symbol: 'existing',
+      reason: 'score=5, delta=0, delta-kind=same-path',
+      hint: 'Keep the owner cohesive.',
+      severity: 'watch',
+    },
+    {
+      id: 'advisory.structural-file',
+      family: 'Structural file pressure',
+      file: 'src/worsened.ts',
+      line: null,
+      symbol: null,
+      reason: 'score=6, delta=2, delta-kind=same-path',
+      hint: 'Split only by change reason.',
+      severity: 'attention',
+    },
+    {
+      id: 'advisory.root-scatter',
+      family: 'Root scatter',
+      file: 'src/new-helper.ts',
+      line: null,
+      symbol: null,
+      reason: 'new root helper',
+      hint: 'Confirm owner placement.',
+      severity: 'watch',
+    },
+  ];
 
-  expect(() =>
-    module.runAdvisoryVerification({
-      files: ['docs/agent-tooling/AGENTS.md', 'tooling/qa/wrappers/advisory.mjs'],
-    })
-  ).toThrow(/current uncommitted diff only/u);
-});
-
-it('discovers changed tracked and untracked files for advisory runs', async () => {
-  const root = createTempRoot('verify-advisory-diff-');
-  initGitRepo(root);
-  writeFile(root, 'package.json', '{"name":"verify-advisory-temp"}\n');
-  writeFile(root, 'tracked.ts', 'export const value = 1;\n');
-  runGit(root, 'add', 'package.json', 'tracked.ts');
-  runGit(root, 'commit', '-m', 'init');
-
-  writeFile(root, 'tracked.ts', 'export const value = 2;\n');
-  writeFile(root, 'untracked.ts', 'export const next = 3;\n');
-
-  const result = await withCwd(root, async () => {
-    const module = await importFresh<typeof import('./advisory.mjs')>(
-      './advisory.mjs',
-      import.meta.url
-    );
-    return module.runAdvisoryVerification();
+  expect(classifyAdvisoryFindings(findings, { mode: 'checkpoint' })).toEqual({
+    introduced: [findings[2]],
+    worsened: [findings[1]],
+    existing: [findings[0]],
   });
-
-  expect(result.targetFiles).toEqual(['tracked.ts', 'untracked.ts']);
-  expect(result.codeFiles).toEqual(['tracked.ts', 'untracked.ts']);
-  expect(result.untrackedFiles).toEqual(['untracked.ts']);
+  expect(classifyAdvisoryFindings(findings, { mode: 'preflight' })).toEqual({
+    introduced: [],
+    worsened: [findings[1]],
+    existing: [findings[0], findings[2]],
+  });
 });
 
 it('replaces legacy smell collectors with the machine-owned structural catalog', async () => {
@@ -360,7 +366,7 @@ it('keeps migrated preflight advisory printing out of focused and full wrappers'
   expect(fullSource.includes('printFocusedGuardrailReport')).toBe(false);
 });
 
-it('prints advisory check coverage so the wrapper explains what it inspects', async () => {
+it('prints only introduced and worsened details while collapsing existing context', async () => {
   const module = await import('../composition/advisory/execution/report.mjs');
   const stdoutChunks: string[] = [];
   const writeSpy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk) => {
@@ -369,20 +375,52 @@ it('prints advisory check coverage so the wrapper explains what it inspects', as
   });
 
   module.printAdvisoryReport({
-    findings: [],
+    buckets: {
+      introduced: [],
+      worsened: [],
+      existing: [
+        {
+          id: 'advisory.structural-function',
+          family: 'Structural function pressure',
+          file: 'src/existing.ts',
+          line: 7,
+          reason: 'score=5, delta=0, delta-kind=same-path',
+          hint: 'Keep the owner cohesive.',
+          severity: 'watch',
+        },
+      ],
+    },
   });
 
   writeSpy.mockRestore();
 
   const output = stdoutChunks.join('');
-  expect(output).toContain('Non-blocking advisory checks:');
-  expect(output).toContain('structural file pressure');
-  expect(output).toContain('structural function pressure');
-  expect(output).toContain('root scatter');
-  expect(output).toContain('documentation prose drift');
-  expect(output).toContain('oversized inline literals');
-  expect(output).toContain('UI proof gaps');
-  expect(output).toContain('Advisory (non-blocking): attention=0, watch=0');
+  expect(output).toContain('Advisory: introduced=0, worsened=0, existing=1');
+  expect(output).toContain('Existing context: 1 unchanged — see run log');
+  expect(output).not.toContain('src/existing.ts');
+  expect(output).not.toContain('Non-blocking advisory checks:');
+});
+
+it('preserves every advisory bucket in the run-log representation', async () => {
+  const { formatAdvisoryLog } = await import('../composition/advisory/execution/report.mjs');
+  const finding = {
+    id: 'advisory.structural-function',
+    family: 'Structural function pressure',
+    file: 'src/existing.ts',
+    line: 7,
+    reason: 'score=5, delta=0, delta-kind=same-path',
+    hint: 'Keep the owner cohesive.',
+    severity: 'watch',
+  };
+
+  const output = formatAdvisoryLog({
+    buckets: { introduced: [], worsened: [], existing: [finding] },
+  });
+
+  expect(output).toContain('Advisory log: introduced=0, worsened=0, existing=1');
+  expect(output).toContain('Existing:');
+  expect(output).toContain('src/existing.ts:7');
+  expect(output).toContain('score=5, delta=0, delta-kind=same-path');
 });
 
 it('keeps the advisory catalog exact and separate from blocking guard IDs', async () => {

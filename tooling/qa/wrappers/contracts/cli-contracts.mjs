@@ -26,15 +26,6 @@ export const QA_WRAPPER_CLI_CONTRACTS = Object.freeze({
       },
     ],
   },
-  'qa:advisory': {
-    command: 'qa:advisory',
-    entrypoint: 'tooling/qa/wrappers/advisory.mjs',
-    lifecycleLabel: 'QA advisory',
-    scripts: ['qa:advisory'],
-    usage: 'npm run qa:advisory',
-    description: 'Collect non-blocking advisory evidence for the current diff.',
-    options: NO_OPTIONS,
-  },
   'qa:structural-audit': {
     command: 'qa:structural-audit',
     entrypoint: 'tooling/qa/wrappers/structural-audit.mjs',
