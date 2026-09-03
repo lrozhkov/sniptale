@@ -5,11 +5,11 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createDrawingSession } from '../../features/drawing/public';
 import { createContentDrawingController, type ContentDrawingController } from './controller';
 import { DrawingSurface } from './surface';
+import { initializeContentUiRoots } from '../platform/dom-host';
 
 const trustedEventMocks = vi.hoisted(() => ({
   isTrustedKeyboardEvent: vi.fn(() => true),
 }));
-
 vi.mock('../platform/trusted-events', () => trustedEventMocks);
 
 beforeEach(() => {
@@ -46,12 +46,122 @@ it('rejects synthetic drawing keyboard commands', () => {
   document.body.append(host);
   const root = createRoot(host);
   act(() => root.render(<DrawingSurface active chromeHidden={false} controller={controller} />));
+  const canvas = host.querySelector('canvas');
 
   act(() =>
-    document.body.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Delete' }))
+    canvas?.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, composed: true, key: 'Delete' })
+    )
   );
 
   expect(deleteSelected).not.toHaveBeenCalled();
+  act(() => root.unmount());
+});
+
+it('owns Escape and Delete while focus remains on content toolbar chrome', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  session.setActiveTool('arrow');
+  const deleteSelected = vi.spyOn(session, 'deleteSelected');
+  const controller: ContentDrawingController = {
+    session,
+    applyPalette: vi.fn(),
+    finalizeInteraction: vi.fn(),
+    getPalette: () => ['#ef4444'],
+    getScrollRoot: () => ({ kind: 'viewport', element: null }),
+    prepareActivation: () => true,
+    registerInteractionFinalizer: vi.fn(),
+  };
+  const contentHost = document.createElement('div');
+  contentHost.setAttribute('role', 'dialog');
+  contentHost.setAttribute('aria-expanded', 'true');
+  document.body.append(contentHost);
+  const { appContainer } = initializeContentUiRoots(contentHost.attachShadow({ mode: 'open' }));
+  const root = createRoot(appContainer);
+  act(() =>
+    root.render(
+      <>
+        <DrawingSurface active chromeHidden={false} controller={controller} />
+        <div data-ui="shared.ui.content-toolbar">
+          <button data-ui="test.drawing-toolbar-button" />
+        </div>
+      </>
+    )
+  );
+  const toolbarButton = appContainer.querySelector<HTMLButtonElement>(
+    '[data-ui="test.drawing-toolbar-button"]'
+  )!;
+  toolbarButton.focus();
+
+  act(() =>
+    toolbarButton.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, composed: true, key: 'Delete' })
+    )
+  );
+  act(() =>
+    toolbarButton.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, composed: true, key: 'Escape' })
+    )
+  );
+
+  expect(deleteSelected).toHaveBeenCalledOnce();
+  expect(session.getSnapshot().activeTool).toBe('select');
+  act(() => root.unmount());
+});
+
+it('defers Escape to an active floating toolbar layer', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  const session = createDrawingSession({ onDocumentCommit: () => true });
+  session.setActiveTool('arrow');
+  const controller: ContentDrawingController = {
+    session,
+    applyPalette: vi.fn(),
+    finalizeInteraction: vi.fn(),
+    getPalette: () => ['#ef4444'],
+    getScrollRoot: () => ({ kind: 'viewport', element: null }),
+    prepareActivation: () => true,
+    registerInteractionFinalizer: vi.fn(),
+  };
+  const contentHost = document.createElement('div');
+  document.body.append(contentHost);
+  const { appContainer } = initializeContentUiRoots(contentHost.attachShadow({ mode: 'open' }));
+  const root = createRoot(appContainer);
+  act(() =>
+    root.render(
+      <>
+        <DrawingSurface active chromeHidden={false} controller={controller} />
+        <div data-ui="shared.ui.content-toolbar">
+          <div data-open="true" data-ui="shared.ui.color-selector">
+            <button data-ui="test.color-trigger" />
+          </div>
+        </div>
+      </>
+    )
+  );
+  const trigger = appContainer.querySelector<HTMLButtonElement>('[data-ui="test.color-trigger"]')!;
+  const dismissLayer = vi.fn((event: KeyboardEvent) => {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  });
+  document.addEventListener('keydown', dismissLayer, { capture: true });
+
+  act(() =>
+    trigger.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        composed: true,
+        key: 'Escape',
+      })
+    )
+  );
+
+  expect(session.getSnapshot().activeTool).toBe('arrow');
+  expect(dismissLayer).toHaveBeenCalledOnce();
+  document.removeEventListener('keydown', dismissLayer, { capture: true });
   act(() => root.unmount());
 });
 
@@ -70,9 +180,12 @@ it('owns Escape outside the canvas without exposing the browser default focus fr
     registerInteractionFinalizer: vi.fn(),
   };
   const onExit = vi.fn();
+  const pageDialog = document.createElement('div');
+  pageDialog.setAttribute('role', 'dialog');
   const pageButton = document.createElement('button');
   const host = document.createElement('div');
-  document.body.append(pageButton, host);
+  pageDialog.append(pageButton);
+  document.body.append(pageDialog, host);
   const root = createRoot(host);
   act(() =>
     root.render(

@@ -5,8 +5,8 @@ import {
   type DrawingSessionSnapshot,
   type DrawingTextObject,
 } from '../../features/drawing/public';
-import { isContentOwnedEvent } from '../platform/dom-host';
 import { isTrustedKeyboardEvent } from '../platform/trusted-events';
+import { isContentOwnedEvent, resolveContentShadowRoot } from '../platform/dom-host';
 
 const DRAWING_OWNED_KEYS = new Set([
   'ArrowDown',
@@ -79,6 +79,43 @@ function isDrawingEditableKeyboardTarget(event: KeyboardEvent): boolean {
     );
 }
 
+function isDrawingKeyboardSurface(event: KeyboardEvent): boolean {
+  const contentRoot = resolveContentShadowRoot();
+  if (!contentRoot) return false;
+  return event
+    .composedPath()
+    .some(
+      (target) =>
+        target instanceof Element &&
+        target.getRootNode() === contentRoot &&
+        Boolean(target.closest('.sniptale-drawing-canvas, [data-ui="shared.ui.content-toolbar"]'))
+    );
+}
+
+function hasHigherContentKeyboardLayer(event: KeyboardEvent): boolean {
+  const contentRoot = resolveContentShadowRoot();
+  if (!contentRoot) return false;
+  return event
+    .composedPath()
+    .some(
+      (target) =>
+        target instanceof Element &&
+        target.getRootNode() === contentRoot &&
+        Boolean(
+          target.closest(
+            [
+              '[aria-expanded="true"]',
+              '[aria-modal="true"]',
+              '[data-ui="shared.ui.color-selector"][data-open="true"]',
+              '[role="dialog"]',
+              '[role="listbox"]',
+              '[role="menu"]',
+            ].join(',')
+          )
+        )
+    );
+}
+
 export function useDrawingEscapeOwnership(args: {
   active: boolean;
   cancelDraft: () => void;
@@ -93,16 +130,12 @@ export function useDrawingEscapeOwnership(args: {
   useEffect(() => {
     if (!args.active) return;
     const handleDrawingKey = (event: KeyboardEvent) => {
-      const path = event.composedPath();
-      const isCanvasTarget = path.some(
-        (target) =>
-          target instanceof Element && target.classList.contains('sniptale-drawing-canvas')
-      );
+      const contentOwned = isContentOwnedEvent(event);
       if (
         !isTrustedKeyboardEvent(event) ||
         !DRAWING_OWNED_KEYS.has(event.key) ||
         isDrawingEditableKeyboardTarget(event) ||
-        (isContentOwnedEvent(event) && !isCanvasTarget)
+        (contentOwned && (hasHigherContentKeyboardLayer(event) || !isDrawingKeyboardSurface(event)))
       ) {
         return;
       }

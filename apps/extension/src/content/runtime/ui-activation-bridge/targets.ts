@@ -1,7 +1,4 @@
-import { createLogger } from '@sniptale/platform/observability/logger';
 import { isTrustedDomEvent } from '../../platform/trusted-events';
-
-const logger = createLogger({ namespace: 'ContentUiEditableKeydownBridge' });
 
 const ACTIVATABLE_SELECTOR = [
   'button:not([disabled])',
@@ -233,7 +230,6 @@ function applyControlledTextEdit(event: KeyboardEvent, target: HTMLElement): boo
   const edit = resolveTextControlEdit(event, target);
   if (!edit) return false;
 
-  const beforeLength = target.value.length;
   const value = `${target.value.slice(0, edit.start)}${edit.data}${target.value.slice(edit.end)}`;
   if (edit.data.length > 0 && target.maxLength >= 0 && value.length > target.maxLength) {
     return false;
@@ -248,22 +244,6 @@ function applyControlledTextEdit(event: KeyboardEvent, target: HTMLElement): boo
   nativeSetter.call(target, value);
   target.setSelectionRange(selection, selection);
   target.dispatchEvent(new Event('input', { bubbles: true, composed: false }));
-  logger.log('Applied controlled edit', {
-    afterLength: target.value.length,
-    beforeLength,
-    connected: target.isConnected,
-  });
-  queueMicrotask(() => {
-    const rootNode = target.getRootNode();
-    logger.log('Controlled edit settled', {
-      connected: target.isConnected,
-      focused:
-        rootNode instanceof ShadowRoot
-          ? rootNode.activeElement === target
-          : target.ownerDocument.activeElement === target,
-      valueLength: target.value.length,
-    });
-  });
   return true;
 }
 
@@ -487,10 +467,6 @@ function applyContentEditableTextEdit(event: KeyboardEvent, target: HTMLElement)
   selection.removeAllRanges();
   selection.addRange(range);
   target.dispatchEvent(new Event('input', { bubbles: true, composed: false }));
-  logger.log('Applied contenteditable edit', {
-    connected: target.isConnected,
-    textLength: target.textContent?.length ?? 0,
-  });
   return true;
 }
 
@@ -501,12 +477,8 @@ export function installEditableKeydownBridge(root: ShadowRoot | HTMLElement): ()
     if (!target) return;
 
     const hostPreventedDefault = event.defaultPrevented;
-    logger.log('Captured editable keydown', {
-      defaultPrevented: hostPreventedDefault,
-    });
     event.stopPropagation();
     const accepted = target.dispatchEvent(createLocalKeydown(event));
-    logger.log('Delivered local keydown', { accepted });
     if (!accepted) {
       event.preventDefault();
       event.stopImmediatePropagation();
