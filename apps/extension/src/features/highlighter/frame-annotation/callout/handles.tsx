@@ -123,8 +123,8 @@ function renderCalloutWidthHandle(
       onKeyDown={control.onKeyDown}
       onFocus={props.handleHandleFocus}
       onBlur={props.handleHandleBlur}
-      onMouseEnter={props.handleMouseEnter}
-      onMouseLeave={props.handleMouseLeave}
+      onPointerEnter={props.handleMouseEnter}
+      onPointerLeave={props.handleMouseLeave}
     />
   );
 }
@@ -175,8 +175,8 @@ function renderCalloutSettingsHandle(props: CalloutInteractionHandleProps) {
       }}
       onFocus={props.handleHandleFocus}
       onBlur={props.handleHandleBlur}
-      onMouseEnter={props.handleMouseEnter}
-      onMouseLeave={props.handleMouseLeave}
+      onPointerEnter={props.handleMouseEnter}
+      onPointerLeave={props.handleMouseLeave}
     >
       <Settings2 size={15} aria-hidden="true" />
     </button>
@@ -217,8 +217,8 @@ function renderCalloutMoveHandle(props: CalloutInteractionHandleProps) {
       onKeyDown={props.handleDragKeyDown}
       onFocus={props.handleHandleFocus}
       onBlur={props.handleHandleBlur}
-      onMouseEnter={props.handleMouseEnter}
-      onMouseLeave={props.handleMouseLeave}
+      onPointerEnter={props.handleMouseEnter}
+      onPointerLeave={props.handleMouseLeave}
     >
       <Move size={14} aria-hidden="true" style={{ display: 'block' }} />
     </button>
@@ -270,8 +270,8 @@ function renderCalloutTitleToggleHandle(props: CalloutInteractionHandleProps) {
       }}
       onFocus={props.handleHandleFocus}
       onBlur={props.handleHandleBlur}
-      onMouseEnter={props.handleMouseEnter}
-      onMouseLeave={props.handleMouseLeave}
+      onPointerEnter={props.handleMouseEnter}
+      onPointerLeave={props.handleMouseLeave}
     >
       <Heading aria-hidden="true" size={14} strokeWidth={1.6} />
     </button>
@@ -305,8 +305,8 @@ function renderCalloutAdjacentControls(props: CalloutInteractionHandleProps) {
       <div
         className="sniptale-callout-adjacent-controls sniptale-content-ui-zoom-surface"
         style={{ display: 'flex', gap: 4 }}
-        onMouseEnter={props.handleMouseEnter}
-        onMouseLeave={props.handleMouseLeave}
+        onPointerEnter={props.handleMouseEnter}
+        onPointerLeave={props.handleMouseLeave}
       >
         {renderCalloutMoveHandle(groupedProps)}
         {renderCalloutTitleToggleHandle(groupedProps)}
@@ -343,8 +343,8 @@ function renderCalloutTailBaseRangeHandle(props: CalloutInteractionHandleProps) 
       onKeyDown={props.handleTailBaseRangeKeyDown}
       onFocus={props.handleHandleFocus}
       onBlur={props.handleHandleBlur}
-      onMouseEnter={props.handleMouseEnter}
-      onMouseLeave={props.handleMouseLeave}
+      onPointerEnter={props.handleMouseEnter}
+      onPointerLeave={props.handleMouseLeave}
     />
   );
 }
@@ -396,8 +396,8 @@ function renderCalloutTailHandle(
       onKeyDown={control.onKeyDown}
       onFocus={props.handleHandleFocus}
       onBlur={props.handleHandleBlur}
-      onMouseEnter={props.handleMouseEnter}
-      onMouseLeave={props.handleMouseLeave}
+      onPointerEnter={props.handleMouseEnter}
+      onPointerLeave={props.handleMouseLeave}
     />
   );
 }
@@ -421,8 +421,8 @@ function renderCalloutWaypointHandle(props: CalloutInteractionHandleProps) {
         onKeyDown={props.handleWaypointKeyDown}
         onFocus={props.handleHandleFocus}
         onBlur={props.handleHandleBlur}
-        onMouseEnter={props.handleMouseEnter}
-        onMouseLeave={props.handleMouseLeave}
+        onPointerEnter={props.handleMouseEnter}
+        onPointerLeave={props.handleMouseLeave}
       >
         {props.hasWaypoint || props.isPolylineWaypoint ? null : (
           <Plus aria-hidden="true" size={8} strokeWidth={3} />

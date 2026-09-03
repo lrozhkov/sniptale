@@ -17,6 +17,14 @@ const iframeListenerMocks = vi.hoisted(() => {
       cleanupFns.push(cleanup);
       return cleanup;
     }),
+    addWindowEventListenerToAllWindowsDynamicMock: vi.fn(
+      (event: string, handler: EventListener) => {
+        registrations.push({ event, handler });
+        const cleanup = vi.fn();
+        cleanupFns.push(cleanup);
+        return cleanup;
+      }
+    ),
     addScrollListenersToAllWindowsMock: vi.fn((handler: () => void) => {
       scrollHandlers.push(handler);
       const cleanup = vi.fn();
@@ -32,6 +40,8 @@ const iframeListenerMocks = vi.hoisted(() => {
 vi.mock('../../platform/frame', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../platform/frame')>()),
   addEventListenerToAllWindowsDynamic: iframeListenerMocks.addEventListenerToAllWindowsDynamicMock,
+  addWindowEventListenerToAllWindowsDynamic:
+    iframeListenerMocks.addWindowEventListenerToAllWindowsDynamicMock,
   addScrollListenersToAllWindows: iframeListenerMocks.addScrollListenersToAllWindowsMock,
 }));
 
@@ -43,6 +53,7 @@ beforeEach(() => {
   iframeListenerMocks.registrations.length = 0;
   iframeListenerMocks.scrollHandlers.length = 0;
   iframeListenerMocks.addEventListenerToAllWindowsDynamicMock.mockClear();
+  iframeListenerMocks.addWindowEventListenerToAllWindowsDynamicMock.mockClear();
   iframeListenerMocks.addScrollListenersToAllWindowsMock.mockClear();
 });
 
@@ -98,7 +109,7 @@ describe('registerHighlighterRuntimeListeners', () => {
       { capture: true }
     );
     expect(iframeListenerMocks.addScrollListenersToAllWindowsMock).toHaveBeenCalledTimes(1);
-    expect(iframeListenerMocks.addEventListenerToAllWindowsDynamicMock).toHaveBeenCalledWith(
+    expect(iframeListenerMocks.addWindowEventListenerToAllWindowsDynamicMock).toHaveBeenCalledWith(
       'keydown',
       expect.any(Function),
       { capture: true }

@@ -130,7 +130,7 @@ async function dragToolbarToViewportEdge() {
   expect(getDragState().isDragging).toBe(true);
 
   act(() => {
-    window.dispatchEvent(new MouseEvent('mousemove', { clientX: -50, clientY: 900 }));
+    window.dispatchEvent(new MouseEvent('pointermove', { clientX: -50, clientY: 900 }));
   });
 
   expect(getDragState().position).toEqual({
@@ -139,7 +139,7 @@ async function dragToolbarToViewportEdge() {
   });
 
   act(() => {
-    window.dispatchEvent(new MouseEvent('mouseup'));
+    window.dispatchEvent(new MouseEvent('pointerup'));
     vi.advanceTimersByTime(160);
   });
   await flushAsyncState();
@@ -181,14 +181,19 @@ async function expectPassiveDragListeners() {
   });
 
   expect(addEventListenerSpy).toHaveBeenCalledWith(
-    'mousemove',
+    'pointermove',
     expect.any(Function),
-    expect.objectContaining({ passive: true })
+    expect.objectContaining({ capture: true, passive: true })
   );
   expect(addEventListenerSpy).toHaveBeenCalledWith(
-    'mouseup',
+    'pointerup',
     expect.any(Function),
-    expect.objectContaining({ passive: true })
+    expect.objectContaining({ capture: true, passive: true })
+  );
+  expect(addEventListenerSpy).toHaveBeenCalledWith(
+    'pointercancel',
+    expect.any(Function),
+    expect.objectContaining({ capture: true, passive: true })
   );
 }
 

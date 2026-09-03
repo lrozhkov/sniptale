@@ -9,6 +9,7 @@ const {
   createRootMock,
   initializeTopLevelContentRuntimeMock,
   installContentUiActivationBridgeMock,
+  activationBridgeCleanupMock,
   logTopLevelContentScriptLoadMock,
   rootUnmountMock,
   runtimeCleanupMock,
@@ -17,6 +18,7 @@ const {
   createRootMock: vi.fn(),
   initializeTopLevelContentRuntimeMock: vi.fn(),
   installContentUiActivationBridgeMock: vi.fn(),
+  activationBridgeCleanupMock: vi.fn(),
   logTopLevelContentScriptLoadMock: vi.fn(),
   rootUnmountMock: vi.fn(),
   runtimeCleanupMock: vi.fn(),
@@ -25,6 +27,10 @@ const {
 
 const CONTENT_RUNTIME_MARKER_ATTRIBUTE = 'data-sniptale-content-runtime';
 const CONTENT_RUNTIME_MARKER_VERSION = 'dynamic-dev';
+const originalShowPopoverDescriptor = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  'showPopover'
+);
 
 vi.mock('react-dom/client', () => ({
   createRoot: createRootMock,
@@ -120,6 +126,7 @@ beforeEach(() => {
   Reflect.deleteProperty(globalThis, '__sniptaleContentRuntimeCleanup');
   createRootMock.mockReturnValue({ render: vi.fn(), unmount: rootUnmountMock });
   initializeTopLevelContentRuntimeMock.mockReturnValue(runtimeCleanupMock);
+  installContentUiActivationBridgeMock.mockReturnValue(activationBridgeCleanupMock);
   sendRuntimeMessageMock.mockResolvedValue({ success: true, pageZoom: 1 });
   document.documentElement.removeAttribute('data-theme');
   document.body.removeAttribute('data-theme');
@@ -136,6 +143,11 @@ afterEach(() => {
   document.head.replaceChildren();
   document.body.replaceChildren();
   vi.restoreAllMocks();
+  if (originalShowPopoverDescriptor) {
+    Object.defineProperty(HTMLElement.prototype, 'showPopover', originalShowPopoverDescriptor);
+  } else {
+    Reflect.deleteProperty(HTMLElement.prototype, 'showPopover');
+  }
 });
 
 it('keeps the content host theme-owned without adding giant inline host styles', async () => {
@@ -165,6 +177,39 @@ it('keeps the content host theme-owned without adding giant inline host styles',
   expect(installContentUiActivationBridgeMock).toHaveBeenCalledWith(shadowRoot);
   expect(initializeTopLevelContentRuntimeMock).toHaveBeenCalledTimes(1);
   expect(logTopLevelContentScriptLoadMock).toHaveBeenCalledTimes(1);
+});
+
+it('promotes the content host above late host-page modal backdrops', async () => {
+  const showPopover = vi.fn();
+  Object.defineProperty(HTMLElement.prototype, 'showPopover', {
+    configurable: true,
+    value: showPopover,
+  });
+  const { initializeTopLevelContentEntry } = await import('./bootstrap');
+
+  initializeTopLevelContentEntry();
+
+  const host = document.getElementById(CONTENT_ROOT_ID);
+  expect(host?.getAttribute('popover')).toBe('manual');
+  expect(showPopover).toHaveBeenCalledOnce();
+  expect(showPopover.mock.instances[0]).toBe(host);
+});
+
+it('keeps the content host mounted when top-layer promotion fails', async () => {
+  Object.defineProperty(HTMLElement.prototype, 'showPopover', {
+    configurable: true,
+    value: vi.fn(() => {
+      throw new DOMException('Popover is unavailable', 'NotSupportedError');
+    }),
+  });
+  const { initializeTopLevelContentEntry } = await import('./bootstrap');
+
+  expect(() => initializeTopLevelContentEntry()).not.toThrow();
+
+  const host = document.getElementById(CONTENT_ROOT_ID);
+  expect(host).toBeTruthy();
+  expect(host?.hasAttribute('popover')).toBe(false);
+  expect(createRootMock).toHaveBeenCalledOnce();
 });
 
 it('ignores repeated initialization when the content host already exists', async () => {
@@ -241,6 +286,7 @@ it('replaces a content host from a previous injected runtime build', async () =>
     CONTENT_RUNTIME_MARKER_VERSION
   );
   expect(runtimeCleanupMock).toHaveBeenCalledTimes(1);
+  expect(activationBridgeCleanupMock).toHaveBeenCalledTimes(1);
   expect(rootUnmountMock).toHaveBeenCalledTimes(1);
   expect(createRootMock).toHaveBeenCalledTimes(2);
   expect(initializeTopLevelContentRuntimeMock).toHaveBeenCalledTimes(2);

@@ -109,6 +109,18 @@ describe('quick edit keydown, pointer, and session flows', () => {
     expect(options.disableRequested).not.toHaveBeenCalled();
   });
 
+  it('handles Escape already prevented by the host page', () => {
+    const options = createKeyboardOptions();
+    const pageTarget = document.createElement('div');
+    const event = new KeyboardEvent('keydown', { cancelable: true, key: 'Escape' });
+    Object.defineProperty(event, 'target', { value: pageTarget });
+    event.preventDefault();
+
+    handleQuickEditKeyDown(event, options);
+
+    expect(options.disableRequested).toHaveBeenCalledOnce();
+  });
+
   it('disables document mode first when Escape is pressed', () => {
     const options = createKeyboardOptions();
     options.isDocumentModeEnabled.mockReturnValue(true);

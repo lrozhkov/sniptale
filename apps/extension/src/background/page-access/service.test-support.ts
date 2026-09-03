@@ -150,6 +150,7 @@ beforeEach(async () => {
   browserTabsGetMock.mockResolvedValue({ id: 7, url: 'https://example.test/path' });
   browserTabsQueryMock.mockResolvedValue([{ id: 7, url: 'https://example.test/path' }]);
   sendTabMessageMock.mockResolvedValue({
+    success: true,
     contentRuntimeProtocolVersion: CONTENT_RUNTIME_PROTOCOL_VERSION,
     coords: { x: 0, y: 0, width: 100, height: 100, outerWidth: 100, outerHeight: 100 },
   });

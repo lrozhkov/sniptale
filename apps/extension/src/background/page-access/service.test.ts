@@ -176,6 +176,7 @@ it('keeps repeated temporary activation idempotent for the same tab', async () =
   const { handlePageAccessMessage } = await import('./service');
   const message = createMessage(PageAccessOperation.ACTIVATE_CURRENT_TAB, 9);
   browserTabsGetMock.mockResolvedValue({ id: 9, url: 'https://example.test/path' });
+  sendTabMessageMock.mockRejectedValueOnce(new Error('Receiving end does not exist.'));
 
   await expect(handlePageAccessMessage(message)).resolves.toEqual(
     expect.objectContaining({ result: 'activated', success: true })
@@ -281,17 +282,13 @@ it('keeps temporary activation usable when session storage write fails', async (
   );
 });
 
-it('refreshes active all-sites page access by reinjecting the current content runtime', async () => {
+it('refreshes active all-sites page access without reinjecting a current content runtime', async () => {
   const { refreshActivePageAccessRuntime } = await import('./service');
   browserPermissionsContainsMock.mockResolvedValue(true);
 
   await expect(refreshActivePageAccessRuntime(7)).resolves.toBe(true);
 
-  expect(browserScriptingExecuteScriptMock).toHaveBeenCalledWith({
-    files: ['assets/contentRuntime.js'],
-    injectImmediately: false,
-    target: { allFrames: true, tabId: 7 },
-  });
+  expect(browserScriptingExecuteScriptMock).not.toHaveBeenCalled();
   expect(sendTabMessageMock).toHaveBeenCalledWith(
     7,
     { type: VideoMessageType.GET_VIEWPORT_COORDS },

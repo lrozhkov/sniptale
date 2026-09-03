@@ -5,6 +5,19 @@ import {
   type DrawingSessionSnapshot,
   type DrawingTextObject,
 } from '../../features/drawing/public';
+import { isContentOwnedEvent } from '../platform/dom-host';
+import { isTrustedKeyboardEvent } from '../platform/trusted-events';
+
+const DRAWING_OWNED_KEYS = new Set([
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowUp',
+  'Backspace',
+  'Delete',
+  'Enter',
+  'Escape',
+]);
 
 export function handleDrawingKeyDown(args: {
   event: {
@@ -79,17 +92,23 @@ export function useDrawingEscapeOwnership(args: {
 }) {
   useEffect(() => {
     if (!args.active) return;
-    const handleEscape = (event: KeyboardEvent) => {
+    const handleDrawingKey = (event: KeyboardEvent) => {
+      const path = event.composedPath();
+      const isCanvasTarget = path.some(
+        (target) =>
+          target instanceof Element && target.classList.contains('sniptale-drawing-canvas')
+      );
       if (
-        event.key !== 'Escape' ||
-        event.defaultPrevented ||
-        isDrawingEditableKeyboardTarget(event)
+        !isTrustedKeyboardEvent(event) ||
+        !DRAWING_OWNED_KEYS.has(event.key) ||
+        isDrawingEditableKeyboardTarget(event) ||
+        (isContentOwnedEvent(event) && !isCanvasTarget)
       ) {
         return;
       }
       event.stopPropagation();
       event.stopImmediatePropagation();
-      if (args.exitImmediately) {
+      if (event.key === 'Escape' && args.exitImmediately) {
         event.preventDefault();
         args.cancelDraft();
         args.cancelText();
@@ -111,7 +130,7 @@ export function useDrawingEscapeOwnership(args: {
         snapshot: args.session.getSnapshot(),
       });
     };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
+    window.addEventListener('keydown', handleDrawingKey, { capture: true });
+    return () => window.removeEventListener('keydown', handleDrawingKey, { capture: true });
   }, [args]);
 }
