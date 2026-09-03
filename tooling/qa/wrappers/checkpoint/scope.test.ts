@@ -38,7 +38,7 @@ it('rejects explicit file scopes because focused verify is diff-only', async () 
 
   await expect(
     module.runFocusedVerification({
-      files: ['docs/agent-tooling/AGENTS.md', 'tooling/qa/wrappers/checkpoint.mjs'],
+      files: ['docs/agent-tooling/agent-tooling.zip', 'tooling/qa/wrappers/checkpoint.mjs'],
     })
   ).rejects.toThrow(/current uncommitted diff only/u);
 }, 15000);

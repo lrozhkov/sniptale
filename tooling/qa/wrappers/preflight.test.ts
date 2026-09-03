@@ -446,7 +446,7 @@ it('routes UI work to the root design contract', async () => {
     });
   });
 
-  expect(result.relevantDocs).toContain('docs/agent-tooling/DESIGN.md');
+  expect(result.relevantDocs).toContain('docs/agent-tooling/agent-tooling.zip');
   expect(result.relevantDocs).not.toContain(
     ['docs/design', 'ux-ui-concept', 'design-concept.md'].join('/')
   );
@@ -531,8 +531,8 @@ it('does not route markdown docs through structural analysis', async () => {
   const root = createTempRoot('qa-preflight-docs-');
   initGitRepo(root);
   writeFile(root, 'package.json', '{"name":"qa-preflight-docs-temp"}\n');
-  writeFile(root, 'docs/agent-tooling/AGENTS.md', `${'long documentation line '.repeat(20)}\n`);
-  runGit(root, 'add', 'package.json', 'docs/agent-tooling/AGENTS.md');
+  writeFile(root, 'docs/README.md', `${'long documentation line '.repeat(20)}\n`);
+  runGit(root, 'add', 'package.json', 'docs/README.md');
   runGit(root, 'commit', '-m', 'init');
 
   const result = await withCwd(root, async () => {
@@ -541,7 +541,7 @@ it('does not route markdown docs through structural analysis', async () => {
       import.meta.url
     );
     return module.collectPreflightReport({
-      files: ['docs/agent-tooling/AGENTS.md'],
+      files: ['docs/README.md'],
     });
   });
 

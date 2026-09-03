@@ -96,7 +96,7 @@ function expectSharedOffscreenLifecycleOwnership() {
 function expectActiveWorkflowDocPaths() {
   const codeQuality = fs.readFileSync(path.join(repoRoot, 'docs/tooling/code-quality.md'), 'utf8');
   const repoAuditSkill = fs.readFileSync(
-    path.join(repoRoot, 'docs/agent-tooling/.agents/skills/repo-audit/SKILL.md'),
+    path.join(repoRoot, '.agents/skills/repo-audit/SKILL.md'),
     'utf8'
   );
 
@@ -161,7 +161,7 @@ function expectFocusedTriggerPaths() {
     path.join(repoRoot, 'tooling/qa/composition/checkpoint/focused/config.mjs'),
     'utf8'
   );
-  expect(focusedConfig).toContain('docs/agent-tooling/DESIGN.md');
+  expect(focusedConfig).toContain('docs/agent-tooling/agent-tooling.zip');
   expect(focusedConfig).toContain(
     'apps/extension/src/background/offscreen-document/create-options.ts'
   );
@@ -252,10 +252,8 @@ describe('active QA policy path integrity', () => {
     expect(isDataCarrierFile(configPath)).toBe(true);
   });
 
-  it('keeps tracked review skills visible while local installed copies stay ignored', () => {
-    expect(
-      isIgnoredRelativePath('docs/agent-tooling/.agents/skills/topology-plan-review/SKILL.md')
-    ).toBe(false);
+  it('keeps the tracked archive visible while local installed copies stay ignored', () => {
+    expect(isIgnoredRelativePath('docs/agent-tooling/agent-tooling.zip')).toBe(false);
     expect(isIgnoredRelativePath('.agents/skills/topology-plan-review/SKILL.md')).toBe(true);
     expect(isIgnoredRelativePath('AGENTS.md')).toBe(true);
   });

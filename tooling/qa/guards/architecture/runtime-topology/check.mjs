@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { loadAgentToolingArchive } from '../../../../agent-tooling/agent-tooling.mjs';
 import { repoRoot } from '../../../analysis/repository/shared-paths.mjs';
 import { isExecutedAsScript, printViolations } from '../../../runtime/process/shared-cli.mjs';
 import { getValidatedRuntimeTopology } from './model.mjs';
@@ -16,8 +17,6 @@ const BUILD_LAYOUT_PATH = 'apps/extension/build/layout.data.json';
 const DYNAMIC_CONTENT_RUNTIME_ROOT = 'apps/extension/src/content';
 const TOPOLOGY_PATH = 'tooling/qa/guards/architecture/runtime-topology/runtime-topology.data.json';
 const ACTIVE_TOPOLOGY_FILES = [
-  'docs/agent-tooling/AGENTS.md',
-  'docs/agent-tooling/DESIGN.md',
   'docs/architecture/code-organization.md',
   'docs/architecture/runtime-contexts.md',
   'docs/tooling/code-quality.md',
@@ -25,6 +24,7 @@ const ACTIVE_TOPOLOGY_FILES = [
   '.dependency-cruiser.cjs',
   'tooling/qa/guards/architecture/runtime-topology/runtime-topology.data.json',
 ];
+const AGENT_TOOLING_ARCHIVE = 'docs/agent-tooling/agent-tooling.zip';
 const RETIRED_RUNTIME_IDS = ['sidepanel'];
 const STATIC_CONTENT_SCRIPTS_MESSAGE = [
   'Top-level manifest content_scripts are intentionally forbidden;',
@@ -299,6 +299,35 @@ function collectRetiredRuntimeViolations(rootDir, retiredRuntimeIds = RETIRED_RU
           )
         );
       }
+    }
+  }
+
+  const archivePath = toAbsolutePath(rootDir, AGENT_TOOLING_ARCHIVE);
+  if (fs.existsSync(archivePath)) {
+    try {
+      const archivedFiles = loadAgentToolingArchive(archivePath);
+      for (const relativePath of ['AGENTS.md', 'DESIGN.md']) {
+        const text = archivedFiles.get(relativePath).contents.toString('utf8');
+        for (const runtimeId of retiredRuntimeIds) {
+          if (text.includes(runtimeId)) {
+            violations.push(
+              createViolation(
+                'runtime-topology-retired-runtime',
+                AGENT_TOOLING_ARCHIVE,
+                `Retired runtime "${runtimeId}" still appears in archived ${relativePath}.`
+              )
+            );
+          }
+        }
+      }
+    } catch (error) {
+      violations.push(
+        createViolation(
+          'runtime-topology-agent-tooling-archive-invalid',
+          AGENT_TOOLING_ARCHIVE,
+          error instanceof Error ? error.message : String(error)
+        )
+      );
     }
   }
 

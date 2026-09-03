@@ -89,6 +89,7 @@
     "ci:github:apply": "node tooling/ci/github-policy.mjs apply",
     "ci:github:restore": "node tooling/ci/github-policy.mjs restore",
     "ci:dependencies:plan": "node tooling/ci/dependency-freshness.mjs",
+    "agents:pack": "node tooling/agent-tooling/pack.mjs",
     "agents:install": "node tooling/agent-tooling/install.mjs",
     "agents:remove": "node tooling/agent-tooling/remove.mjs",
     "backup:repo": "bash tooling/backup/sc-backup.sh",

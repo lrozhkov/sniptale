@@ -34,7 +34,7 @@ Protect against stale results only when concurrent results can arrive out of ord
 
 ## UI, i18n, and design
 
-Apply [DESIGN.md](../agent-tooling/DESIGN.md) to product UI. Apply [i18n architecture](../architecture/i18n-architecture.md) to localized surfaces. Apply [code organization](../architecture/code-organization.md#public-surfaces) to reusable and runtime-specific UI placement.
+Apply `DESIGN.md` from the tracked optional agent-tooling archive (installed locally by `npm run agents:install`) to product UI. Apply [i18n architecture](../architecture/i18n-architecture.md) to localized surfaces. Apply [code organization](../architecture/code-organization.md#public-surfaces) to reusable and runtime-specific UI placement.
 
 For mounted, hidden, or portaled UI, prove only the lifecycle states reachable in the changed flow. Use one owner for placement, dismissal, focus, theme inheritance, pointer blocking, and restoration.
 

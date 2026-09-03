@@ -62,7 +62,7 @@ node node_modules/@ast-grep/cli/postinstall.js
 npm run prepare
 ```
 
-Do not delete or regenerate `package-lock.json` during setup. Install optional local agent files separately through the [agent-tooling guide](../agent-tooling/README.md).
+Do not delete or regenerate `package-lock.json` during setup. Install optional local agent files separately with `npm run agents:install`; maintainers refresh their archive with `npm run agents:pack`.
 
 The repository npm policy owns release-age admission. For an evidenced urgent security fix that is younger than the configured window, exclude only the exact package for one install command. Do not commit an exclusion to `.npmrc`.
 

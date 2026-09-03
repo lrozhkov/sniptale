@@ -17,9 +17,8 @@ export const RUNTIME_SOURCE_PATTERN = {
 export const SRC_SOURCE_PATTERN = /^(?:apps\/extension\/src|packages\/[^/]+\/src)\//u;
 
 export const RUNTIME_TOPOLOGY_TRIGGER_FILES = new Set([
-  'docs/agent-tooling/AGENTS.md',
+  'docs/agent-tooling/agent-tooling.zip',
   '.dependency-cruiser.cjs',
-  'docs/agent-tooling/DESIGN.md',
   'docs/architecture/code-organization.md',
   'docs/architecture/runtime-contexts.md',
   'docs/tooling/code-quality.md',
@@ -81,6 +80,7 @@ export const DESIGN_SYSTEM_TRIGGER_PATTERNS = [
   /^tooling\/qa\/guards\/product-contracts\/verify-design-system\.mjs$/u,
   /^tooling\/qa\/guards\/product-contracts\/design-system\//u,
   /^tooling\/configs\/qa\/ast-grep\//u,
+  /^docs\/agent-tooling\/agent-tooling\.zip$/u,
 ];
 
 export const DEPENDENCY_GRAPH_TRIGGER_FILES = new Set([

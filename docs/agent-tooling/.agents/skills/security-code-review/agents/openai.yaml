@@ -1,4 +1,0 @@
-interface:
-  display_name: 'Security Code Review'
-  short_description: 'Review Sniptale security risks'
-  default_prompt: 'Use $security-code-review in a new reviewer spawned with fork_turns: "none" and supplied an explicit bounded manifest, exact diff scope, and green QA results.'

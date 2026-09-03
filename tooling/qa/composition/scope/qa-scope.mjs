@@ -7,7 +7,7 @@ export const HARNESS_QA_SUITE = 'harness';
 export const ALL_QA_SUITE = 'all';
 export const HARNESS_QA_GUIDANCE = [
   'run npm run qa:release-harness for executable tooling/**, QA-affecting root configuration,',
-  'hooks, docs/agent-tooling/**, or active tooling guidance; machine-owned inventory-only changes',
+  'hooks, the docs/agent-tooling archive, or active tooling guidance; machine-owned inventory-only changes',
   'use their owner validators without a fresh harness stamp',
 ].join(' ');
 

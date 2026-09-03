@@ -34,7 +34,7 @@ This index lists current active documents and their authority.
 - [Storage state authority](architecture/storage-state-authority.md) owns state classes and mutation rules.
 - [Persistence contracts](architecture/persistence-contracts.md) owns IndexedDB admission, domain versions, migration, and recovery policy.
 - [Parser architecture](architecture/parser-architecture.md), [i18n architecture](architecture/i18n-architecture.md), [platform tradeoffs](architecture/platform-patterns-and-tradeoffs.md), [video editor layering](architecture/video-editor-layering.md), and [EffectV1 bundles](architecture/video-effect-bundles.md) own their domain contracts.
-- [DESIGN.md](agent-tooling/DESIGN.md) owns UX, accessibility, theme, and interaction requirements.
+- Repository-local `DESIGN.md` owns UX, accessibility, theme, and interaction requirements.
 
 ## Implementation, operation, and release
 
@@ -43,7 +43,7 @@ This index lists current active documents and their authority.
 - [Project facts](engineering/project-facts.md) is the generated projection of changeable product, browser, permission, persistence, runtime, security-reporting, and release-policy values.
 - [Canonical CI/CD](tooling/ci-cd.md) owns external execution and release admission; [operator handbook](tooling/operator-handbook.md) routes commands; [wrapper summary](tooling/wrapper-summary.md) explains wrapper behavior; [code quality](tooling/code-quality.md) owns gate and exception policy; [Web Snapshot Smoke](tooling/web-snapshot-smoke.md) owns local snapshot fidelity verification.
 - [WSL setup](tooling/wsl-setup.md) owns environment setup, and [repository root inventory](tooling/repo-root-inventory.md) owns required root entries.
-- [Optional agent tooling](agent-tooling/README.md) owns opt-in installation and removal for local agent instructions and skills.
+- `docs/agent-tooling/agent-tooling.zip` is the optional agent-tooling distribution; `npm run agents:pack`, `npm run agents:install`, and `npm run agents:remove` own its lifecycle.
 - [Data handling](security/data-handling.md), [manifest permissions](security/manifest-permissions.md), and [threat model](security/threat-model.md) own security policy.
 - [Provenance](oss/provenance.md) and [release](oss/release.md) own redistribution evidence and local release procedure.
 - [CONTRIBUTING.md](../CONTRIBUTING.md) owns issue and proposal guidance and records the current external code-contribution policy; [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) governs participation.

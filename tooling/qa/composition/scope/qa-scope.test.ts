@@ -14,20 +14,14 @@ it('routes harness-owned policy and shared guidance without blind spots', async 
     );
     expect(
       module.partitionQaScopeFiles([
-        'docs/agent-tooling/AGENTS.md',
-        'docs/agent-tooling/.agents/skills/security-code-review/SKILL.md',
+        'docs/agent-tooling/agent-tooling.zip',
         'tooling/configs/qa/guardrail-policy.data.json',
         'src/example.ts',
       ])
     ).toEqual({
-      productFiles: [
-        'docs/agent-tooling/AGENTS.md',
-        'docs/agent-tooling/.agents/skills/security-code-review/SKILL.md',
-        'src/example.ts',
-      ],
+      productFiles: ['docs/agent-tooling/agent-tooling.zip', 'src/example.ts'],
       harnessFiles: [
-        'docs/agent-tooling/AGENTS.md',
-        'docs/agent-tooling/.agents/skills/security-code-review/SKILL.md',
+        'docs/agent-tooling/agent-tooling.zip',
         'tooling/configs/qa/guardrail-policy.data.json',
       ],
     });
@@ -178,7 +172,7 @@ describe('shared QA controls', () => {
         '.oxfmtrc.json',
         '.github/workflows/_canonical-proof.yml',
         '.husky/pre-push',
-        'docs/agent-tooling/AGENTS.md',
+        'docs/agent-tooling/agent-tooling.zip',
         'docs/tooling/code-quality.md',
       ];
 

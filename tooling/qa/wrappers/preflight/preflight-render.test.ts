@@ -38,7 +38,7 @@ it('shows changed advisory details and collapses unchanged context in terminal o
 it('renders deduplicated owner, structural, advisory, and proof sections', () => {
   const output = renderPreflightReport({
     context: { targetFiles: ['apps/extension/src/composition/persistence/storage/session.ts'] },
-    relevantDocs: ['docs/agent-tooling/AGENTS.md'],
+    relevantDocs: ['docs/agent-tooling/agent-tooling.zip'],
     ownerRuntime: ['extension:composition:persistence'],
     guardrailReport: {
       clusters: ['owner:shared=1'],
@@ -184,7 +184,7 @@ it('bounds large scope and boundary inventories without hiding later report sect
   const createReport = (files) =>
     renderPreflightReport({
       context: { mode: 'explicit-files', targetFiles: files },
-      relevantDocs: ['docs/agent-tooling/AGENTS.md'],
+      relevantDocs: ['docs/agent-tooling/agent-tooling.zip'],
       ownerRuntime: ['extension:content:selection'],
       guardrailReport: { buildScopeForecast: ['extension artifact build'] },
       structuralPressure: ['attention=0'],

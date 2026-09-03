@@ -49,7 +49,7 @@ This build can run natively on Windows. Linux, or WSL with the repository and `n
 
 ### Optional agent tooling
 
-Repository-local agent instructions and review skills are opt-in. Install ignored local copies of `AGENTS.md` and `.agents/**` with `npm run agents:install`; this command is never run by dependency installation, hooks, CI, or QA. The reviewable source, removal command, and conflict behavior are documented in [Optional agent tooling](docs/agent-tooling/README.md).
+Repository-local agent instructions and review skills are opt-in. Their reviewable distribution is `docs/agent-tooling/agent-tooling.zip`. Install ignored local copies of `AGENTS.md`, `DESIGN.md`, and `.agents/**` with `npm run agents:install`; remove them with `npm run agents:remove`. Maintainers rebuild the archive from the repository-local copies with `npm run agents:pack`. None of these commands runs during dependency installation, hooks, CI, or QA; install and remove refuse local conflicts unless `--force` is explicit.
 
 ## Why this project exists
 
@@ -286,7 +286,7 @@ Repository-local commands remain the QA authority. GitHub Actions applies the sa
 
 These guardrails reduce risk; they do not prove correctness. A green pipeline is not a substitute for real-user testing, browser and operating-system compatibility work, production observability, performance profiling, malicious-page testing, fuzzing, or an independent professional security assessment.
 
-The operating model is documented in the [optional agent workflow](docs/agent-tooling/AGENTS.md), [Implementation rules](docs/engineering/implementation-rules.md), [Code quality](docs/tooling/code-quality.md), and the [Operator handbook](docs/tooling/operator-handbook.md).
+The operating model is documented in the repository-local `AGENTS.md`, [Implementation rules](docs/engineering/implementation-rules.md), [Code quality](docs/tooling/code-quality.md), and the [Operator handbook](docs/tooling/operator-handbook.md).
 
 ## Known gaps and next priorities
 
@@ -313,7 +313,7 @@ Until those decisions are made, the alpha should be evaluated as a transparent e
 - `packages/platform` — browser, storage, transport, observability, media, and security adapters.
 - `packages/ui` — reusable presentation primitives.
 - `tooling` — quality gates, inventories, security checks, test runners, release tooling, and audit evidence.
-- `docs/agent-tooling` — reviewable source for optional repository-local agent instructions and skills.
+- `docs/agent-tooling/agent-tooling.zip` — reviewable archive of optional repository-local agent instructions and skills.
 - `docs` — active architecture, engineering, security, tooling, provenance, and release documentation.
 
 ## Documentation
