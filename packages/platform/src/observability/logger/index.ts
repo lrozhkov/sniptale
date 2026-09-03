@@ -21,6 +21,15 @@ interface CreateLoggerOptions {
 const LOGGER_SANITIZE_KEYS = SECRET_KEY_FRAGMENTS.map((pattern) => pattern.toLowerCase());
 const LOGGER_MAX_PAYLOAD_SIZE = 1000;
 const LOGGER_MAX_DEPTH = 5;
+const EXTENSION_CONTEXT_INVALIDATED_MESSAGE = 'Extension context invalidated';
+
+function isExpectedExtensionContextInvalidation(arg: unknown): boolean {
+  const message = arg instanceof Error ? arg.message : typeof arg === 'string' ? arg : '';
+  return (
+    message === EXTENSION_CONTEXT_INVALIDATED_MESSAGE ||
+    message === `${EXTENSION_CONTEXT_INVALIDATED_MESSAGE}.`
+  );
+}
 
 function sanitizeSinkString(value: string): string {
   return redactSensitiveString(value, LOGGER_MAX_PAYLOAD_SIZE);
@@ -112,6 +121,10 @@ function emit(
   args: unknown[],
   traceEnabled: boolean
 ): void {
+  if (args.some(isExpectedExtensionContextInvalidation)) {
+    return;
+  }
+
   if (isReleaseBuild() && RELEASE_SILENCED_LEVELS.has(level)) {
     return;
   }

@@ -179,6 +179,24 @@ it('ignores repeated initialization when the content host already exists', async
   expect(initializeTopLevelContentRuntimeMock).toHaveBeenCalledTimes(1);
 });
 
+it('replaces a same-build host that belongs to an invalidated extension context', async () => {
+  const { initializeTopLevelContentEntry } = await import('./bootstrap');
+  const staleHost = document.createElement('div');
+  staleHost.id = CONTENT_ROOT_ID;
+  staleHost.setAttribute(CONTENT_RUNTIME_MARKER_ATTRIBUTE, CONTENT_RUNTIME_MARKER_VERSION);
+  document.body.append(staleHost);
+
+  initializeTopLevelContentEntry();
+
+  const currentHost = document.getElementById(CONTENT_ROOT_ID);
+  expect(currentHost).not.toBe(staleHost);
+  expect(currentHost?.getAttribute(CONTENT_RUNTIME_MARKER_ATTRIBUTE)).toBe(
+    CONTENT_RUNTIME_MARKER_VERSION
+  );
+  expect(createRootMock).toHaveBeenCalledOnce();
+  expect(initializeTopLevelContentRuntimeMock).toHaveBeenCalledOnce();
+});
+
 it('resynchronizes page zoom after viewport emulation changes the content viewport', async () => {
   const { initializeTopLevelContentEntry } = await import('./bootstrap');
   initializeTopLevelContentEntry();

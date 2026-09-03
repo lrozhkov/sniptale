@@ -23,6 +23,7 @@ import { installContentToastHostAdapter } from '../../platform/dom-host/toast-ho
 import { CONTENT_RUNTIME_HOST_ID, CONTENT_RUNTIME_MARKER_ATTRIBUTE } from './markers';
 import {
   disposeExistingContentRuntime,
+  hasRegisteredContentRuntimeCleanup,
   registerContentRuntimeCleanup,
   runWhenContentBodyReady,
 } from './lifecycle';
@@ -91,7 +92,8 @@ export function initializeTopLevelContentEntry(): void {
   const existingHost = document.getElementById(CONTENT_RUNTIME_HOST_ID);
   const contentRuntimeMarkerVersion = getContentRuntimeMarkerVersion();
   if (
-    existingHost?.getAttribute(CONTENT_RUNTIME_MARKER_ATTRIBUTE) === contentRuntimeMarkerVersion
+    existingHost?.getAttribute(CONTENT_RUNTIME_MARKER_ATTRIBUTE) === contentRuntimeMarkerVersion &&
+    hasRegisteredContentRuntimeCleanup()
   ) {
     return;
   }
