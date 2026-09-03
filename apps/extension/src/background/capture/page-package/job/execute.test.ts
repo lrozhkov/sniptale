@@ -5,8 +5,10 @@ const mocks = vi.hoisted(() => ({
   complete: vi.fn(),
   cleanupCancellation: vi.fn(),
   download: vi.fn(),
+  finishActionIndicator: vi.fn(),
   prepareDownloadRuntime: vi.fn(),
   save: vi.fn(),
+  startActionIndicator: vi.fn(),
   release: vi.fn(),
   releaseOne: vi.fn(),
   resolveTabs: vi.fn(),
@@ -25,6 +27,9 @@ vi.mock('./download', async (importOriginal) => ({
 vi.mock('./offscreen-download-gateway', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./offscreen-download-gateway')>()),
   preparePagePackageDownloadRuntime: mocks.prepareDownloadRuntime,
+}));
+vi.mock('./action-indicator', () => ({
+  startPagePackageActionIndicator: mocks.startActionIndicator,
 }));
 vi.mock('./visible', () => ({
   activatePopupExportCaptureTarget: vi.fn(),
@@ -127,6 +132,8 @@ function createJob(): ActivePopupExportJob {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.finishActionIndicator.mockResolvedValue(undefined);
+  mocks.startActionIndicator.mockReturnValue(mocks.finishActionIndicator);
   mocks.cleanupTemporaryTabs.mockResolvedValue(undefined);
   mocks.resolveTabs.mockResolvedValue(new Map([[7, { id: 7 }]]));
   mocks.prepareDownloadRuntime.mockResolvedValue(undefined);
@@ -195,6 +202,30 @@ beforeEach(() => {
     };
     return true;
   });
+});
+
+it('opens the final result only after restoring and closing capture tabs', async () => {
+  const sequence: string[] = [];
+  const job = createJob();
+  const onFinished = vi.fn(() => sequence.push('finished'));
+  mocks.restore.mockImplementationOnce(async () => {
+    sequence.push('restored-tabs');
+  });
+  mocks.cleanupTemporaryTabs.mockImplementationOnce(async () => {
+    sequence.push('closed-temporary-tabs');
+  });
+  mocks.finishActionIndicator.mockImplementationOnce(async () => {
+    sequence.push('opened-final-popup');
+  });
+
+  await executePopupExportJob(job, onFinished);
+
+  expect(sequence).toEqual([
+    'restored-tabs',
+    'closed-temporary-tabs',
+    'finished',
+    'opened-final-popup',
+  ]);
 });
 
 it('downloads staged pages and publishes terminal status only after browser completion', async () => {

@@ -369,7 +369,10 @@ export async function executePopupExportJob(
   } catch (error) {
     await publishJobFailure(job, state, error);
   } finally {
-    await finishActionIndicator();
-    await finalizePopupExportJob(job, state.stagedCleanupComplete, onFinished);
+    try {
+      await finalizePopupExportJob(job, state.stagedCleanupComplete, onFinished);
+    } finally {
+      await finishActionIndicator();
+    }
   }
 }
