@@ -45,6 +45,7 @@ export function usePopupExportMessageListener(state: PopupExportRuntimeContract)
     const applyJobStatus = (status: PagePackageJobStatusV1, locale?: 'en' | 'ru' | null) => {
       if (terminalRequestIdRef.current === status.jobId) return;
       const applied = applyMessage({
+        ...(locale ? { locale } : {}),
         type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED,
         status,
       });

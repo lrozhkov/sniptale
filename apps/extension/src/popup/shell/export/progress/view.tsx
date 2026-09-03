@@ -80,7 +80,7 @@ function ExportProgressStepRow({
         <div aria-hidden="true" className={progressStepDividerClassName} />
       </div>
       <span className={cx(progressStepBadgeClassName, getStepStatusClassName(step))}>
-        {counter ?? step.statusLabel}
+        {counter ? `${step.statusLabel} · ${counter}` : step.statusLabel}
       </span>
     </div>
   );
@@ -138,7 +138,7 @@ function getProgressDescription(props: ExportProgressSectionProps) {
   }
 
   if (props.progress.phase === 'error') {
-    return null;
+    return props.progress.message || null;
   }
 
   if (props.progress.phase === 'cancelled') {
@@ -146,7 +146,6 @@ function getProgressDescription(props: ExportProgressSectionProps) {
   }
 
   const activeStep = props.progressSteps.find((step) => step.status === 'active') ?? null;
-  if (props.progress.message) return props.progress.message;
   if (activeStep) return activeStep.label;
 
   return formatPhaseLabel(props.progress);

@@ -52,7 +52,7 @@ describe('editor sidebar storage prompt save failure handling', () => {
     expect(confirmOpenLibrary).toHaveBeenCalledWith(
       expect.objectContaining({
         confirmText: 'gallery.app.openLibrary',
-        message: 'storage is full',
+        message: 'editor.documentActions.saveToLibraryError. common.errors.storageDetail',
       })
     );
     expect(openGalleryPageMock).toHaveBeenCalledWith();

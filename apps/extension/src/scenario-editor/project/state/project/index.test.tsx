@@ -283,5 +283,6 @@ it('surfaces bootstrap load errors', async () => {
   await renderHarness(<BootstrapHarness />);
 
   expect(getHarness<{ loading: boolean }>().loading).toBe(false);
-  expect(getHarness<{ error: string | null }>().error).toBe('Boom');
+  expect(getHarness<{ error: string | null }>().error).toContain('Sniptale');
+  expect(getHarness<{ error: string | null }>().error).not.toContain('Boom');
 });

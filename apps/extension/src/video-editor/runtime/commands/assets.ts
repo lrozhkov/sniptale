@@ -129,7 +129,7 @@ function useRecordingAssetHandler(port: AssetHandlerPort) {
         port.addAssetClip(asset, null, port.getCurrentTime());
       } catch (assetError) {
         logger.error('Failed to add recording', assetError);
-        port.setError(toErrorMessage(assetError));
+        port.setError(toErrorMessage(assetError, 'common.errors.actionFailed'));
       }
     },
     [port]
@@ -147,7 +147,7 @@ function useProjectAssetImportHandler(
         await importProjectAssetFile(file, assetType, port, placement);
       } catch (assetError) {
         logger.error(`Failed to import ${failureLabel}`, assetError);
-        port.setError(toErrorMessage(assetError));
+        port.setError(toErrorMessage(assetError, 'common.errors.actionFailed'));
       }
     },
     [assetType, failureLabel, port]
@@ -186,7 +186,7 @@ export function useAssetHandlers(
         await importRecordedAudioFile(file, trim, port);
       } catch (assetError) {
         logger.error('Failed to import recorded audio', assetError);
-        port.setError(toErrorMessage(assetError));
+        port.setError(toErrorMessage(assetError, 'common.errors.actionFailed'));
       }
     },
     [port]

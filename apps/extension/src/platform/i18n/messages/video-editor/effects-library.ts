@@ -1,6 +1,10 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorEffectsLibraryMessages = defineMessageSource({
+  applyFailed: {
+    ru: 'Не удалось добавить эффект.',
+    en: 'The effect could not be added.',
+  },
   applyButton: { ru: 'Добавить', en: 'Add' },
   applyFailedWithDetail: {
     ru: 'Не удалось добавить эффект: {detail}',
@@ -10,6 +14,10 @@ export const videoEditorEffectsLibraryMessages = defineMessageSource({
   catalogLoadErrorWithDetail: {
     ru: 'Не удалось загрузить каталог эффектов: {detail}',
     en: 'The effects catalog could not be loaded: {detail}',
+  },
+  deleteFailed: {
+    ru: 'Не удалось удалить набор эффектов.',
+    en: 'The effects bundle could not be deleted.',
   },
   deleteFailedWithDetail: {
     ru: 'Не удалось удалить набор эффектов: {detail}',
@@ -27,6 +35,10 @@ export const videoEditorEffectsLibraryMessages = defineMessageSource({
   importFailedWithDetail: {
     ru: 'EffectV1 не импортирован: {detail}',
     en: 'EffectV1 was not imported: {detail}',
+  },
+  importFailed: {
+    ru: 'Не удалось импортировать EffectV1.',
+    en: 'EffectV1 could not be imported.',
   },
   incompatibleButton: { ru: 'Выберите цель', en: 'Select target' },
   invalidPack: { ru: 'Повреждённый EffectV1 bundle', en: 'Invalid EffectV1 bundle' },
@@ -50,5 +62,9 @@ export const videoEditorEffectsLibraryMessages = defineMessageSource({
   updateFailedWithDetail: {
     ru: 'Не удалось изменить набор эффектов: {detail}',
     en: 'The effects bundle could not be updated: {detail}',
+  },
+  updateFailed: {
+    ru: 'Не удалось изменить набор эффектов.',
+    en: 'The effects bundle could not be updated.',
   },
 });

@@ -17,6 +17,7 @@ import type {
 import { insertStepAt, moveStep } from '../../helpers';
 import { createScenarioMutationMetadata } from '../../timestamps';
 import type { ScenarioProjectSelectionActionArgs, UpdateProject } from '../types';
+import { createUserFacingErrorMessage } from '../../../../../platform/i18n/user-facing-error';
 
 function isScenarioCaptureStep(step: ScenarioStep): step is ScenarioCaptureStep {
   return step.kind === 'capture';
@@ -77,7 +78,12 @@ function buildMoveStepUpdater(
 }
 
 export function resolveScenarioActionErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
+  void fallback;
+  return createUserFacingErrorMessage({
+    cause: error,
+    detail: 'storage',
+    summaryKey: 'common.errors.actionFailed',
+  });
 }
 
 export function createInsertStepAction(args: ScenarioProjectSelectionActionArgs) {

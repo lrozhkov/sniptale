@@ -83,8 +83,9 @@ it('surfaces invalid responses without committing a partial project', async () =
 
   expect(applyProject).not.toHaveBeenCalled();
   expect(aiState.setError).toHaveBeenLastCalledWith(
-    expect.stringContaining('Unknown slide id: missing')
+    expect.stringContaining(translate('common.errors.externalServiceDetail'))
   );
+  expect(aiState.setError).not.toHaveBeenLastCalledWith(expect.stringContaining('Unknown slide'));
 });
 
 it('drops stale deck AI responses after the editor project changes', async () => {
@@ -135,7 +136,9 @@ it('surfaces provider failures without applying a project', async () => {
   })();
 
   expect(applyProject).not.toHaveBeenCalled();
-  expect(aiState.setError).toHaveBeenLastCalledWith('provider failed');
+  expect(aiState.setError).toHaveBeenLastCalledWith(
+    expect.stringContaining(translate('common.errors.externalServiceDetail'))
+  );
 });
 
 it('rejects successful responses that omit v3 operations', async () => {
@@ -154,7 +157,7 @@ it('rejects successful responses that omit v3 operations', async () => {
 
   expect(applyProject).not.toHaveBeenCalled();
   expect(aiState.setError).toHaveBeenLastCalledWith(
-    translate('scenario.editor.aiEditorInvalidResponse')
+    expect.stringContaining(translate('common.errors.externalServiceDetail'))
   );
 });
 
@@ -174,7 +177,7 @@ it('surfaces unknown request failures through the generic deck AI error label', 
 
   expect(applyProject).not.toHaveBeenCalled();
   expect(aiState.setError).toHaveBeenLastCalledWith(
-    translate('scenario.editor.aiEditorRequestFailed')
+    expect.stringContaining(translate('common.errors.externalServiceDetail'))
   );
 });
 

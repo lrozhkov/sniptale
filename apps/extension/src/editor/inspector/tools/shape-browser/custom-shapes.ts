@@ -12,6 +12,7 @@ import {
 import type { EditorCustomShapeStoredDefinition } from '../../../../features/editor/document/rich-shape';
 import { createShapeBrowserImportSummary } from './import-state';
 import type { ShapeBrowserEntry, ShapeBrowserImportState } from './types';
+import { createUserFacingErrorMessage } from '../../../../platform/i18n/user-facing-error';
 
 interface ShapeBrowserCustomShapeState {
   entries: readonly ShapeBrowserEntry[];
@@ -27,7 +28,11 @@ type OperationIdRef = React.MutableRefObject<number>;
 type ReloadCustomShapes = (operationId: number) => Promise<boolean>;
 
 function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return createUserFacingErrorMessage({
+    cause: error,
+    detail: 'storage',
+    summaryKey: 'editor.shapeCatalog.browser.customErrorTitle',
+  });
 }
 
 function createCustomShapeBrowserEntry(item: EditorCustomShapeStoredDefinition): ShapeBrowserEntry {

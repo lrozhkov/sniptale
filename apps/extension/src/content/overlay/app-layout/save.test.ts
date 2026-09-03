@@ -55,7 +55,10 @@ async function verifiesRuntimeErrorToast() {
     translateMessage: createTranslateMock(),
   });
 
-  expect(showToastMessage).toHaveBeenCalledWith('save failed', 'error');
+  expect(showToastMessage).toHaveBeenCalledWith(
+    'translated:content.interactiveFrame.screenshotSaveError. translated:common.errors.storageDetail',
+    'error'
+  );
 }
 
 async function verifiesTranslatedFallbackErrorToast() {
@@ -78,7 +81,7 @@ async function verifiesTranslatedFallbackErrorToast() {
   });
 
   expect(showToastMessage).toHaveBeenCalledWith(
-    'translated:content.interactiveFrame.screenshotSaveError',
+    'translated:content.interactiveFrame.screenshotSaveError. translated:common.errors.storageDetail',
     'error'
   );
 }
@@ -100,9 +103,10 @@ async function verifiesRejectedTransportShowsTranslatedErrorToast() {
   });
 
   expect(showToastMessage).toHaveBeenCalledWith(
-    'translated:content.interactiveFrame.screenshotSaveError',
+    'translated:content.interactiveFrame.screenshotSaveError. translated:common.errors.storageDetail',
     'error'
   );
+  expect(JSON.stringify(showToastMessage.mock.calls)).not.toContain('transport failed');
 }
 
 describe('content-app-layout.save', () => {

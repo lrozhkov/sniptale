@@ -27,10 +27,10 @@ export function useExportHandlers(
     try {
       const response = await startProjectExport(jobId, project, resolvedSettings);
       if (!response?.success) {
-        port.failExport(response?.error || translate('videoEditor.app.exportStartFailed'));
+        port.failExport(toErrorMessage(response?.error, 'videoEditor.app.exportStartFailed'));
       }
     } catch (exportError) {
-      port.failExport(toErrorMessage(exportError));
+      port.failExport(toErrorMessage(exportError, 'videoEditor.app.exportStartFailed'));
     }
   }, [port]);
 
@@ -44,7 +44,7 @@ export function useExportHandlers(
       await cancelProjectExport(exportState.jobId);
       port.cancelExport();
     } catch (cancelError) {
-      port.failExportCancellation(toErrorMessage(cancelError));
+      port.failExportCancellation(toErrorMessage(cancelError, 'common.errors.actionFailed'));
     }
   }, [port]);
 

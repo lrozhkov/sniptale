@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from 'react';
+import { createUserFacingErrorMessage } from '../../../../platform/i18n/user-facing-error';
 
 import { getScenarioProjectRecord } from '../../../../composition/persistence/scenario/store/public';
 import type {
@@ -142,7 +143,13 @@ async function runScenarioEditorBootstrap(args: {
     await args.loadInitialProject();
     args.setLoading(false);
   } catch (loadError) {
-    args.setError(loadError instanceof Error ? loadError.message : 'Failed to load scenarios');
+    args.setError(
+      createUserFacingErrorMessage({
+        cause: loadError,
+        detail: 'storage',
+        summaryKey: 'common.errors.loadFailed',
+      })
+    );
     args.setLoading(false);
   }
 }

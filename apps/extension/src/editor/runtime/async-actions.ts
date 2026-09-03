@@ -1,4 +1,5 @@
-import { translate } from '../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../platform/i18n/user-facing-error';
+import type { TranslationKey } from '../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { toast } from '@sniptale/ui/product-feedback/toast-service';
 
@@ -8,17 +9,16 @@ type EditorAsyncAction = () => Promise<void> | void;
 
 type EditorActionFailureOptions = {
   context?: Record<string, unknown> | undefined;
-  fallbackMessage?: string | undefined;
+  fallbackKey?: TranslationKey | undefined;
   notify?: boolean | undefined;
 };
 
-function resolveEditorActionErrorMessage(
-  error: unknown,
-  fallbackMessage = translate('common.states.error')
-) {
-  return error instanceof Error && error.message.trim().length > 0
-    ? error.message
-    : fallbackMessage;
+function resolveEditorActionErrorMessage(error: unknown, fallbackKey?: TranslationKey) {
+  return createUserFacingErrorMessage({
+    cause: error,
+    detail: 'unexpected',
+    summaryKey: fallbackKey ?? 'common.states.error',
+  });
 }
 
 export function reportEditorActionFailure(
@@ -26,7 +26,7 @@ export function reportEditorActionFailure(
   error: unknown,
   options: EditorActionFailureOptions = {}
 ): string {
-  const message = resolveEditorActionErrorMessage(error, options.fallbackMessage);
+  const message = resolveEditorActionErrorMessage(error, options.fallbackKey);
   logger.error(`${action} failed`, error, options.context);
   if (options.notify !== false) {
     toast.error(message);

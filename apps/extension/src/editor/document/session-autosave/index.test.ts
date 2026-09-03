@@ -193,7 +193,8 @@ describe('image aggregate autosave', () => {
     await expect(autosave.persistSnapshot(() => createDocument('direct'))).rejects.toBe(
       'write failed'
     );
-    expect(useEditorStore.getState().saveErrorMessage).toBe('Failed to save draft');
+    expect(useEditorStore.getState().saveErrorMessage).toContain('Sniptale');
+    expect(useEditorStore.getState().saveErrorMessage).not.toContain('write failed');
   });
 
   it('updates presentation after a durable commit and tolerates presentation failures', async () => {

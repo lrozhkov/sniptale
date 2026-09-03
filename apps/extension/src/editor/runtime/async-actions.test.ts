@@ -31,7 +31,7 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-it('logs and surfaces explicit error messages', () => {
+it('logs technical errors but surfaces only localized user-facing messages', () => {
   const message = reportEditorActionFailure('save-image', new Error('write failed'), {
     context: { attempt: 1 },
   });
@@ -39,8 +39,10 @@ it('logs and surfaces explicit error messages', () => {
   expect(loggerErrorMock).toHaveBeenCalledWith('save-image failed', expect.any(Error), {
     attempt: 1,
   });
-  expect(toastErrorMock).toHaveBeenCalledWith('write failed');
-  expect(message).toBe('write failed');
+  expect(toastErrorMock).toHaveBeenCalledWith(
+    'common.states.error. common.errors.unexpectedDetail'
+  );
+  expect(message).toBe('common.states.error. common.errors.unexpectedDetail');
 });
 
 it('can report an inline failure without showing a toast', () => {
@@ -54,7 +56,7 @@ it('can report an inline failure without showing a toast', () => {
     undefined
   );
   expect(toastErrorMock).not.toHaveBeenCalled();
-  expect(message).toBe('clipboard');
+  expect(message).toBe('common.states.error. common.errors.unexpectedDetail');
 });
 
 it('falls back to the shared error label and catches detached async actions', async () => {
@@ -71,7 +73,9 @@ it('falls back to the shared error label and catches detached async actions', as
     expect.any(Error),
     undefined
   );
-  expect(toastErrorMock).toHaveBeenCalledWith('common.states.error');
+  expect(toastErrorMock).toHaveBeenCalledWith(
+    'common.states.error. common.errors.unexpectedDetail'
+  );
 });
 
 it('awaits action completion before resolving feedback-capable actions', async () => {

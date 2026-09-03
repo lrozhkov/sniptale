@@ -165,7 +165,8 @@ async function verifiesStartFailures() {
 
   await startRecordingHandler(createStartArgs());
 
-  expect(setStartError).toHaveBeenCalledWith(expect.stringContaining('runtime failed'));
+  expect(setStartError).toHaveBeenCalledWith(expect.stringContaining('Sniptale'));
+  expect(setStartError).not.toHaveBeenCalledWith(expect.stringContaining('runtime failed'));
   expect(setIsStartPending).toHaveBeenCalledWith(false);
 }
 
@@ -188,7 +189,8 @@ async function verifiesThrownRuntimeFailure() {
   await startRecordingHandler(createStartArgs());
 
   expect(setIsStartPending).toHaveBeenCalledWith(false);
-  expect(setStartError).toHaveBeenCalledWith('runtime exploded');
+  expect(setStartError).toHaveBeenCalledWith(expect.stringContaining('Sniptale'));
+  expect(setStartError).not.toHaveBeenCalledWith(expect.stringContaining('runtime exploded'));
 }
 
 async function verifiesCancelledStartClearsPendingWithInlineStatus() {

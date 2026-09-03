@@ -120,7 +120,9 @@ function registerSaveFeedbackTests(): void {
 
     expect(getSaveButton()?.getAttribute('data-status')).toBe('error');
     expect(showToastMock).toHaveBeenCalledWith(
-      `${translate('content.toolbar.localHtmlSaveError')} disk full`,
+      `${translate('content.toolbar.localHtmlSaveError')}. ${translate(
+        'common.errors.storageDetail'
+      )}`,
       'error',
       5000
     );

@@ -1,4 +1,5 @@
 import { translate } from '../../../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../../../platform/i18n/user-facing-error';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { isImageDataUrl } from '@sniptale/runtime-contracts/validation/data-url';
@@ -109,7 +110,11 @@ function handleCopyTextMessage(
     .catch((error) => {
       sendResponse({
         success: false,
-        error: error instanceof Error ? error.message : translate('content.runtime.copyTextFailed'),
+        error: createUserFacingErrorMessage({
+          cause: error,
+          detail: 'unexpected',
+          summaryKey: 'content.runtime.copyTextFailed',
+        }),
       });
     });
 

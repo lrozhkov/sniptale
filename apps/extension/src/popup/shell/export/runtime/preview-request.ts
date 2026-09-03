@@ -2,6 +2,7 @@ import type { PopupExportPreview } from '@sniptale/runtime-contracts/export';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { getPopupRuntimeErrorMessage } from '../../../diagnostics/runtime-errors';
 import { translate } from '../../../../platform/i18n/popup';
+import { createUserFacingErrorMessage } from '../../../../platform/i18n/user-facing-error';
 import type { AppLocale } from '../../../../platform/i18n/popup';
 import { sendPopupExportTabMessage } from './tab-message-routing';
 
@@ -16,8 +17,13 @@ export function getPopupExportTransportErrorMessage(
   locale?: AppLocale
 ): string {
   const localized = getPopupRuntimeErrorMessage(error, fallbackKey, locale);
-  const raw = typeof error === 'string' ? error : error instanceof Error ? error.message : '';
-  return !raw || localized === raw
+  const genericFallback = createUserFacingErrorMessage({
+    cause: error,
+    detail: 'unexpected',
+    ...(locale ? { locale } : { translator: translate }),
+    summaryKey: fallbackKey,
+  });
+  return localized === genericFallback
     ? `${translate(fallbackKey, locale)}. ${translate(
         'popup.export.exportTransportErrorDetail',
         locale

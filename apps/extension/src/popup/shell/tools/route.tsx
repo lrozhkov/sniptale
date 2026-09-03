@@ -3,6 +3,7 @@ import '@sniptale/ui/styles/glass';
 import '@sniptale/ui/styles/toolbar';
 import { useState } from 'react';
 import { translate } from '../../../platform/i18n/popup';
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 import { openScreenshotMode } from '../navigation/actions';
 import { useActiveTabCapabilities } from '../tab-access/capabilities';
 import { PopupToolsPanel } from './panel';
@@ -29,7 +30,11 @@ export function ToolsRoute() {
           setError(null);
           void openScreenshotMode(mode).catch((openError) => {
             setError(
-              openError instanceof Error ? openError.message : translate('popup.home.openPrepError')
+              createUserFacingErrorMessage({
+                cause: openError,
+                detail: 'browserCommunication',
+                summaryKey: 'popup.home.openPrepError',
+              })
             );
           });
         }}

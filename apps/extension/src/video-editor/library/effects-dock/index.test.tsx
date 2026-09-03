@@ -142,7 +142,8 @@ it('surfaces a rejected dropped apply through the shared operation owner', async
 
   expect(onApplyEffect).toHaveBeenCalledOnce();
   const alert = container?.querySelector('[role="alert"]')?.textContent;
-  expect(alert).toContain('EFFECT_OPERATION_FAILED');
+  expect(alert).toContain('Sniptale');
+  expect(alert).not.toContain('EFFECT_OPERATION_FAILED');
   expect(alert).not.toContain('drop-apply-rejected');
 });
 
@@ -157,7 +158,8 @@ it('surfaces only an allowlisted EffectV1 diagnostic code', async () => {
   await click(dropButton);
 
   const alert = container?.querySelector('[role="alert"]')?.textContent;
-  expect(alert).toContain('BUNDLE_ARCHIVE_INVALID');
+  expect(alert).toContain('Sniptale');
+  expect(alert).not.toContain('BUNDLE_ARCHIVE_INVALID');
   expect(alert).not.toContain('private failure detail');
 });
 

@@ -5,6 +5,7 @@ import {
   type AppLocale,
   type TranslationKey,
 } from '../../../platform/i18n/popup';
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 import { getViewportPresetErrorMessage } from '../../../features/viewport-presets/error-message';
 
 const STALE_PAGE_RUNTIME_PATTERNS = [
@@ -70,7 +71,12 @@ export function getPopupRuntimeErrorMessage(
     return translator(localizedError.key);
   }
 
-  return message || translator(fallbackKey);
+  return createUserFacingErrorMessage({
+    cause: error,
+    detail: 'unexpected',
+    summaryKey: fallbackKey,
+    ...(locale ? { locale } : { translator }),
+  });
 }
 
 export function getPopupResponseErrorMessage(
@@ -82,5 +88,10 @@ export function getPopupResponseErrorMessage(
     return getPopupRuntimeErrorMessage(response.error, fallbackKey, locale);
   }
 
-  return locale ? createTranslator(locale)(fallbackKey) : translate(fallbackKey);
+  return createUserFacingErrorMessage({
+    cause: response,
+    detail: 'unexpected',
+    summaryKey: fallbackKey,
+    ...(locale ? { locale } : { translator: translate }),
+  });
 }

@@ -112,7 +112,8 @@ function runUseSettingsStoreLoadSuite() {
 
     await store.getState().loadSettings();
 
-    expect(store.getState().error).toBe('load failed');
+    expect(store.getState().error).toContain('Sniptale');
+    expect(store.getState().error).not.toContain('load failed');
     expect(store.getState().isLoading).toBe(false);
   });
 }
@@ -271,11 +272,10 @@ function runUseSettingsStoreUpdateSuite() {
     const store = await loadStore();
     updateSettingsRuntimeStateMock.mockRejectedValueOnce(new Error('save failed'));
 
-    await expect(store.getState().updateSettings({ imageQuality: 80 })).rejects.toThrow(
-      'save failed'
-    );
+    await expect(store.getState().updateSettings({ imageQuality: 80 })).rejects.toThrow('Sniptale');
 
-    expect(store.getState().error).toBe('save failed');
+    expect(store.getState().error).toContain('Sniptale');
+    expect(store.getState().error).not.toContain('save failed');
     expect(store.getState().isLoading).toBe(false);
   });
 
@@ -283,11 +283,10 @@ function runUseSettingsStoreUpdateSuite() {
     const store = await loadStore();
     updateSettingsRuntimeStateMock.mockRejectedValueOnce('save failed');
 
-    await expect(store.getState().updateSettings({ imageQuality: 80 })).rejects.toThrow(
-      'Failed to save settings'
-    );
+    await expect(store.getState().updateSettings({ imageQuality: 80 })).rejects.toThrow('Sniptale');
 
-    expect(store.getState().error).toBe('Failed to save settings');
+    expect(store.getState().error).toContain('Sniptale');
+    expect(store.getState().error).not.toContain('save failed');
     expect(store.getState().isLoading).toBe(false);
   });
 }
@@ -312,9 +311,10 @@ function runUseSettingsStoreClearSuite() {
     const store = await loadStore();
     resetSettingsRuntimeStateMock.mockRejectedValueOnce(new Error('reset failed'));
 
-    await expect(store.getState().clearSettings()).rejects.toThrow('reset failed');
+    await expect(store.getState().clearSettings()).rejects.toThrow('Sniptale');
 
-    expect(store.getState().error).toBe('reset failed');
+    expect(store.getState().error).toContain('Sniptale');
+    expect(store.getState().error).not.toContain('reset failed');
     expect(store.getState().isLoading).toBe(false);
   });
 }

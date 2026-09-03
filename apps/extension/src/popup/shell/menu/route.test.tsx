@@ -289,5 +289,7 @@ it('surfaces a rejected page-tool operation through the menu alert', async () =>
   );
   await act(async () => toolbarButton?.click());
 
-  expect(container.querySelector('[role="alert"]')?.textContent).toContain('Toolbar unavailable');
+  const alertText = container.querySelector('[role="alert"]')?.textContent;
+  expect(alertText).toContain('Sniptale');
+  expect(alertText).not.toContain('Toolbar unavailable');
 });

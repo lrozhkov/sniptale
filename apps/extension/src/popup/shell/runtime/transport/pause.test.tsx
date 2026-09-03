@@ -106,7 +106,7 @@ it('surfaces unsuccessful pause responses inline and clears stale errors on retr
     ...controlCapability,
   });
   expect(setRecordingErrorMock).toHaveBeenNthCalledWith(1, null);
-  expect(setRecordingErrorMock).toHaveBeenNthCalledWith(2, 'pause blocked');
+  expect(setRecordingErrorMock).toHaveBeenNthCalledWith(2, expect.stringContaining('Sniptale'));
   expect(setRecordingErrorMock).toHaveBeenNthCalledWith(3, null);
 });
 
@@ -124,7 +124,7 @@ it('surfaces thrown pause failures inline and keeps logger diagnostics', async (
     ...controlCapability,
   });
   expect(loggerErrorMock).toHaveBeenCalledWith('Failed to change pause state', error);
-  expect(setRecordingErrorMock).toHaveBeenLastCalledWith('transport failed');
+  expect(setRecordingErrorMock).toHaveBeenLastCalledWith(expect.stringContaining('Sniptale'));
 });
 
 it('does not send pause or resume controls without a recording capability', async () => {

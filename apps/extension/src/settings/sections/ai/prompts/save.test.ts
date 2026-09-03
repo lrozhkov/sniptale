@@ -42,6 +42,18 @@ it('keeps prompt mutations with the canonical runtime owner', async () => {
   expect(mocks.saveScenario).toHaveBeenCalledWith('scenario');
 });
 
+it('reports localized storage details when prompt saves fail', async () => {
+  mocks.saveGlobal.mockRejectedValueOnce(new Error('global raw failure'));
+  mocks.saveScenario.mockRejectedValueOnce(new Error('scenario raw failure'));
+
+  await expect(saveAiProvidersGlobalPrompt('global')).resolves.toBe(
+    'common.states.errorsettings.aiProviders.globalPromptSaveErrorSuffix common.errors.storageDetail'
+  );
+  await expect(saveAiProvidersScenarioEditorPrompt('scenario')).resolves.toBe(
+    'common.states.errorsettings.aiProviders.scenarioEditorPromptSaveErrorSuffix common.errors.storageDetail'
+  );
+});
+
 it('reports a committed reset without a fallible post-commit read', async () => {
   mocks.resetGlobal.mockResolvedValue(undefined);
   mocks.resetScenario.mockResolvedValue(undefined);
@@ -59,6 +71,7 @@ it('reports a committed reset without a fallible post-commit read', async () => 
 it('reports reset failures without supplying a replacement value', async () => {
   mocks.resetGlobal.mockRejectedValueOnce(new Error('reset failed'));
   await expect(resetAiProvidersGlobalPrompt()).resolves.toEqual({
-    error: 'common.states.errorsettings.aiProviders.globalPromptResetErrorSuffix',
+    error:
+      'common.states.errorsettings.aiProviders.globalPromptResetErrorSuffix common.errors.storageDetail',
   });
 });

@@ -1,6 +1,7 @@
 import { InspectorShellPanel } from '@sniptale/ui/inspector-shell';
 
 import { translate } from '../../../platform/i18n';
+import { getUserFacingErrorDetail } from '../../../platform/i18n/user-facing-error';
 import { VIDEO_EDITOR_PANEL_STYLE } from '../../chrome/styles';
 import { CatalogSection } from './catalog-section';
 import type { EffectLibraryOperationError } from './operations';
@@ -95,11 +96,11 @@ function EffectImportControl(props: {
 function formatOperationError(error: EffectLibraryOperationError): string {
   const message =
     error.kind === 'import'
-      ? translate('videoEditor.effectsLibrary.importFailedWithDetail')
+      ? translate('videoEditor.effectsLibrary.importFailed')
       : error.kind === 'apply'
-        ? translate('videoEditor.effectsLibrary.applyFailedWithDetail')
+        ? translate('videoEditor.effectsLibrary.applyFailed')
         : error.kind === 'delete'
-          ? translate('videoEditor.effectsLibrary.deleteFailedWithDetail')
-          : translate('videoEditor.effectsLibrary.updateFailedWithDetail');
-  return message.replace('{detail}', error.code);
+          ? translate('videoEditor.effectsLibrary.deleteFailed')
+          : translate('videoEditor.effectsLibrary.updateFailed');
+  return `${message} ${getUserFacingErrorDetail('unexpected')}`;
 }

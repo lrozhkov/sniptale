@@ -144,7 +144,8 @@ async function verifyRefreshFailuresSurfaceBeforeReady() {
   await flushEffects();
 
   expect(applyLoadedProject).toHaveBeenCalledWith(project, 'recording-2');
-  expect(setError).toHaveBeenCalledWith('exports failed');
+  expect(setError).toHaveBeenCalledWith(expect.stringContaining('Sniptale'));
+  expect(setError).not.toHaveBeenCalledWith(expect.stringContaining('exports failed'));
   expect(setReady).toHaveBeenCalledWith(true);
 }
 

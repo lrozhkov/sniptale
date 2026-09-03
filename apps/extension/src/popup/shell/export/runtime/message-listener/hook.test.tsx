@@ -205,7 +205,11 @@ it('passes parsed runtime messages to the apply seam and exposes request clearin
   expect(mocks.applyPopupExportRuntimeMessage).toHaveBeenCalledTimes(1);
   expect(mocks.applyPopupExportRuntimeMessage).toHaveBeenCalledWith(
     expect.objectContaining({
-      message: { status: parsedMessage.status, type: parsedMessage.type },
+      message: {
+        locale: parsedMessage.locale,
+        status: parsedMessage.status,
+        type: parsedMessage.type,
+      },
       requestId: 'req-1',
       setProgress: state.setProgress,
       setResult: state.setResult,

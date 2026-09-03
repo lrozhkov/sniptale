@@ -77,9 +77,9 @@ it('surfaces provider persistence failures back into the form state', async () =
 
   expect(loggerErrorMock).toHaveBeenCalledTimes(1);
   expect(setErrors).toHaveBeenCalledWith({
-    submit:
-      `${translate('common.states.error')}` +
-      `${translate('settings.aiProviders.providerSaveErrorSuffix')}: save failed`,
+    submit: `${translate('common.errors.saveFailed')} ${translate(
+      'common.errors.externalServiceDetail'
+    )}`,
   });
   expect(toastErrorMock).not.toHaveBeenCalled();
   expect(setIsSaving).toHaveBeenNthCalledWith(1, true);

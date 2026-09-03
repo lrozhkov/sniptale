@@ -5,6 +5,7 @@ import {
   ProductGlassSectionLabel,
 } from '@sniptale/ui/product-glass-controls';
 import { translate } from '../../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 import { fireAndReportEditorAction, runAndReportEditorAction } from '../../runtime/async-actions';
 import type { CompactSelectOption } from '../../chrome/ui';
 import { INSPECTOR_PRIMARY_BUTTON_CLASS_NAME } from '../chrome';
@@ -84,11 +85,17 @@ export const BrowserFrameInsertSection: React.FC<{
     setActionError(null);
     try {
       await runAndReportEditorAction('browser-frame-insert-update', insertOrUpdateBrowserFrame, {
-        fallbackMessage: translate('editor.compact.browserFrameApplyFailed'),
+        fallbackKey: 'editor.compact.browserFrameApplyFailed',
         notify: false,
       });
-    } catch {
-      setActionError(translate('editor.compact.browserFrameApplyFailed'));
+    } catch (error) {
+      setActionError(
+        createUserFacingErrorMessage({
+          cause: error,
+          detail: 'unexpected',
+          summaryKey: 'editor.compact.browserFrameApplyFailed',
+        })
+      );
     } finally {
       setPending(false);
     }

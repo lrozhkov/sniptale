@@ -20,9 +20,10 @@ import {
   printWebSnapshotProjection,
 } from '../../viewer/print-projection';
 import { CollapsedToolbarButton, SnapshotViewerToolbar } from './toolbar';
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 
 type ViewerViewport = { width: number; height: number } | null;
-type ViewerError = { kind: 'missing-snapshot-id' } | { kind: 'load-error'; message: string };
+type ViewerError = { kind: 'missing-snapshot-id' } | { kind: 'load-error' };
 type ReadySnapshotIframe = { iframe: HTMLIFrameElement; loadedKey: string };
 let loadedPackageRevisionSeed = 0;
 const PACKAGE_FILE_DOWNLOAD_URL_LIFETIME_MS = 1500;
@@ -47,7 +48,11 @@ function getViewerErrorMessage(error: ViewerError, locale: AppLocale): string {
     return translate('webSnapshotViewer.app.missingSnapshotId', locale);
   }
 
-  return error.message;
+  return createUserFacingErrorMessage({
+    detail: 'storage',
+    locale,
+    summaryKey: 'common.errors.loadFailed',
+  });
 }
 
 function downloadViewerPackageFile(blob: Blob, filename: string): void {
@@ -511,10 +516,8 @@ function useLoadedWebSnapshotPackage() {
       })
       .catch((loadError) => {
         if (!disposed) {
-          setError({
-            kind: 'load-error',
-            message: loadError instanceof Error ? loadError.message : String(loadError),
-          });
+          logger.error('Failed to load Web Snapshot package', loadError);
+          setError({ kind: 'load-error' });
         }
       });
 

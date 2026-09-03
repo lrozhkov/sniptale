@@ -221,10 +221,7 @@ async function verifyErrorListLayout() {
   );
 
   const stepList = container?.querySelector('.overflow-y-auto');
-  const errorListEntry = Array.from(container?.querySelectorAll('div') ?? []).find(
-    (element) => element.textContent === '• Ошибка 1'
-  );
-  const errorList = errorListEntry?.parentElement ?? null;
+  const errorList = container?.querySelector('[data-ui="popup.export.progress-issues"]') ?? null;
 
   expect(stepList).not.toBeNull();
   expect(errorList).not.toBeNull();

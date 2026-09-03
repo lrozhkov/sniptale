@@ -111,5 +111,6 @@ it('does not send START_RECORDING when webcam permission fails', async () => {
 
   expect(requestWebcamPermission).toHaveBeenCalledWith('cam-1');
   expect(runtimeSendMessage).not.toHaveBeenCalled();
-  expect(setStartError).toHaveBeenCalledWith('camera blocked');
+  expect(setStartError).toHaveBeenCalledWith(expect.stringContaining('Sniptale'));
+  expect(setStartError).not.toHaveBeenCalledWith(expect.stringContaining('camera blocked'));
 });

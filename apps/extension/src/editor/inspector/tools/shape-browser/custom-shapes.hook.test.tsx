@@ -226,7 +226,10 @@ it('surfaces invalid imports and mutation failures as import state errors', asyn
   await act(async () => {
     await latestState?.deleteShape('custom-badge');
   });
-  expect(latestState?.importState).toEqual({ status: 'error', message: 'delete failed' });
+  expect(latestState?.importState).toEqual({
+    status: 'error',
+    message: expect.stringContaining('Sniptale'),
+  });
 });
 
 it('disables and deletes custom shapes through storage actions', async () => {
@@ -249,7 +252,10 @@ it('surfaces file read and save failures as import state errors', async () => {
       createFile('broken.json', 'application/json', Promise.reject('read failed') as never)
     );
   });
-  expect(latestState?.importState).toEqual({ status: 'error', message: 'read failed' });
+  expect(latestState?.importState).toEqual({
+    status: 'error',
+    message: expect.stringContaining('Sniptale'),
+  });
 
   mocks.parseCustomShapeImport.mockReturnValue({
     ok: true,
@@ -261,20 +267,29 @@ it('surfaces file read and save failures as import state errors', async () => {
   await act(async () => {
     await latestState?.importFile(createFile('badge.json', 'application/json', '{}'));
   });
-  expect(latestState?.importState).toEqual({ status: 'error', message: 'save failed' });
+  expect(latestState?.importState).toEqual({
+    status: 'error',
+    message: expect.stringContaining('Sniptale'),
+  });
 });
 
 it('surfaces initial load and disable failures as import state errors', async () => {
   mocks.loadCustomShapeLibrary.mockRejectedValueOnce(new Error('load failed'));
   await renderHarness();
 
-  expect(latestState?.importState).toEqual({ status: 'error', message: 'load failed' });
+  expect(latestState?.importState).toEqual({
+    status: 'error',
+    message: expect.stringContaining('Sniptale'),
+  });
 
   mocks.disableCustomShapeDefinition.mockRejectedValueOnce(new Error('disable failed'));
   await act(async () => {
     await latestState?.disableShape('custom-badge');
   });
-  expect(latestState?.importState).toEqual({ status: 'error', message: 'disable failed' });
+  expect(latestState?.importState).toEqual({
+    status: 'error',
+    message: expect.stringContaining('Sniptale'),
+  });
 });
 
 it('ignores an initial load result after the browser unmounts', async () => {

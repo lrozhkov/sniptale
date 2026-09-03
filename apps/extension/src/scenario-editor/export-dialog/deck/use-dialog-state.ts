@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { translate } from '../../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 import type {
   ScenarioDeckExportOptions,
   ScenarioDeckExportResult,
@@ -25,7 +25,11 @@ export function useScenarioDeckExportDialogState(
       setStatus('done');
     } catch (nextError) {
       setError(
-        nextError instanceof Error ? nextError.message : translate('scenario.editor.exportFailed')
+        createUserFacingErrorMessage({
+          cause: nextError,
+          detail: 'unexpected',
+          summaryKey: 'scenario.editor.exportFailed',
+        })
       );
       setStatus('error');
     }
