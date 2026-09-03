@@ -52,15 +52,16 @@ export async function grantAllSitesAccessFromSettings(settings: Page): Promise<v
       (entry) => entry.id === 'sniptale-page-access-all-sites'
     )
   );
-  await allSites.waitFor({ state: 'attached' });
-  if (await allSites.isEnabled()) {
-    await settings.waitForFunction(() =>
+  await settings.waitForFunction(
+    () =>
       Array.from(document.querySelectorAll('button')).some(
         (button) =>
-          ['All sites', 'Все сайты'].includes(button.textContent?.trim() ?? '') && button.disabled
-      )
-    );
-  }
+          ['All sites', 'Все сайты'].includes(button.textContent?.trim() ?? '') &&
+          button.getAttribute('aria-pressed') === 'true'
+      ),
+    undefined,
+    { timeout: 5_000 }
+  );
 }
 
 export async function revokeAllSitesAccessFromSettings(settings: Page): Promise<void> {
@@ -111,7 +112,8 @@ export function startPagePackageSave(args: {
     includeWebCopy: true,
     intent: 'save',
     jobId: args.requestId,
-    orderedTabs: [{ tabId: args.tabId, title: 'Security fixture' }],
+    captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
+    sources: [{ kind: 'tab', tabId: args.tabId, title: 'Security fixture' }],
     options: { ...EMPTY_EXPORT_OPTIONS, includeFullPageScreenshot: true },
     type: 'START_PAGE_PACKAGE_JOB',
     warnings: [],

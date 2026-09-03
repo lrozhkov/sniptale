@@ -27,6 +27,11 @@ export const GALLERY_CONFIRM_EXPORT_BACKUP_LABEL = translate(
 );
 export const GALLERY_IMPORT_BACKUP_LABEL = translate('gallery.app.importBackup', 'ru');
 export const GALLERY_IMPORT_DUPLICATE_LABEL = translate('gallery.importModal.duplicateTitle', 'ru');
+export const GALLERY_IMPORT_CONFLICT_ACTION_LABEL = translate(
+  'gallery.importModal.conflictActionLabel',
+  'ru'
+);
+export const GALLERY_IMPORT_RESTORE_LABEL = translate('gallery.importModal.restore', 'ru');
 export const GALLERY_OPEN_IN_EDITOR_LABEL = translate('gallery.preview.openInEditor', 'ru');
 export const SETTINGS_QUICK_ACTIONS_LABEL = translate('settings.navigation.quickactions', 'ru');
 export const SETTINGS_ADD_ACTION_LABEL = translate('settings.quickActions.addButton', 'ru');
@@ -94,6 +99,18 @@ export type HarnessRuntimeMessage = {
 export const E2E_RUNTIME_SUCCESS_API_BEHAVIOR: SniptaleHarnessApiBehaviorOverrides = {
   runtimeFallback: 'typed-success',
 };
+
+export const E2E_ACTIVE_PAGE_ACCESS_RESPONSE = {
+  success: true,
+  status: {
+    allSitesGranted: false,
+    currentTabActive: true,
+    currentTabId: 1,
+    currentTabOrigin: 'https://example.test',
+    siteGranted: false,
+    supported: true,
+  },
+} as const;
 
 export function createQuickAction(name: string) {
   return {
