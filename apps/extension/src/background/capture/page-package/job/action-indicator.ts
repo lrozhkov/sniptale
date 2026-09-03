@@ -13,7 +13,7 @@ const DEFAULT_ACTION_ICON_PATHS = {
 };
 
 type PagePackageActionIndicatorDeps = {
-  openPopup: () => Promise<void>;
+  openPopup: (options?: chrome.action.OpenPopupOptions) => Promise<void>;
   renderFrame: (size: number, frame: number) => ImageData;
   setIcon: (details: Parameters<typeof chrome.action.setIcon>[0]) => Promise<void>;
   setTitle: (details: chrome.action.TitleDetails) => Promise<void>;
@@ -45,34 +45,50 @@ function renderCaptureIconFrame(size: number, frame: number): ImageData {
 }
 
 const DEFAULT_DEPS: PagePackageActionIndicatorDeps = {
-  openPopup: () => browserAction.openPopup(),
+  openPopup: (options) => browserAction.openPopup(options),
   renderFrame: renderCaptureIconFrame,
   setIcon: (details) => browserAction.setIcon(details),
   setTitle: (details) => browserAction.setTitle(details),
 };
 
+function waitForPopupBrowserTransition(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, POPUP_RESTORE_RETRY_DELAY_MS));
+}
+
+async function openPopupAfterBrowserTransition(
+  job: ActivePopupExportJob,
+  openPopup: () => Promise<void>
+): Promise<void> {
+  if (job.cancelled) return;
+  await waitForPopupBrowserTransition();
+  if (job.cancelled) return;
+  try {
+    await openPopup();
+  } catch {
+    await waitForPopupBrowserTransition();
+    if (job.cancelled) return;
+    await openPopup().catch(() => undefined);
+  }
+}
+
+function shouldPresentPagePackageProgress(job: ActivePopupExportJob): boolean {
+  return job.status.orderedTabs.length >= 2 || (job.temporaryTabIds?.length ?? 0) > 0;
+}
+
 export async function restorePagePackageProgressPopup(
   job: ActivePopupExportJob,
   windowId: number
 ): Promise<void> {
-  if (job.cancelled || job.status.orderedTabs.length < 2) return;
-  // Chrome can resolve openPopup while the popup closed by tab activation is still dismissing.
-  await new Promise<void>((resolve) => setTimeout(resolve, POPUP_RESTORE_RETRY_DELAY_MS));
-  if (job.cancelled) return;
-  try {
-    await browserAction.openPopup({ windowId });
-  } catch {
-    await new Promise<void>((resolve) => setTimeout(resolve, POPUP_RESTORE_RETRY_DELAY_MS));
-    if (job.cancelled) return;
-    await browserAction.openPopup({ windowId }).catch(() => undefined);
-  }
+  if (!shouldPresentPagePackageProgress(job)) return;
+  // Chrome may resolve openPopup while action UI closed by a tab transition is still dismissing.
+  await openPopupAfterBrowserTransition(job, () => browserAction.openPopup({ windowId }));
 }
 
 export function startPagePackageActionIndicator(
   job: ActivePopupExportJob,
   deps: PagePackageActionIndicatorDeps = DEFAULT_DEPS
 ): () => Promise<void> {
-  if (job.status.orderedTabs.length < 2) return async () => undefined;
+  if (!shouldPresentPagePackageProgress(job)) return async () => undefined;
   let frame = 0;
   const paint = () => {
     try {
@@ -101,10 +117,9 @@ export function startPagePackageActionIndicator(
     await Promise.resolve()
       .then(() => deps.setTitle({ title: translate('background.runtime.actionOpenApp') }))
       .catch(() => undefined);
-    if (!job.cancelled) {
-      await Promise.resolve()
-        .then(() => deps.openPopup())
-        .catch(() => undefined);
-    }
+    const originalWindowId = job.status.originalActiveTabs?.[0]?.windowId;
+    await openPopupAfterBrowserTransition(job, () =>
+      deps.openPopup(originalWindowId === undefined ? undefined : { windowId: originalWindowId })
+    );
   };
 }
