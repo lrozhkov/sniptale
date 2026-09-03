@@ -42,15 +42,22 @@ export function usePopupExportMessageListener(state: PopupExportRuntimeContract)
           requestIdRef.current = null;
         },
       });
-    const applyJobStatus = (status: PagePackageJobStatusV1) => {
+    const applyJobStatus = (status: PagePackageJobStatusV1, locale?: 'en' | 'ru' | null) => {
       if (terminalRequestIdRef.current === status.jobId) return;
       const applied = applyMessage({
         type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED,
         status,
       });
       if (applied && (status.phase === 'running' || status.phase === 'cancelling')) {
+        const currentCancellation = cancelRetryRef.current;
+        const retainedLocale =
+          locale ??
+          (currentCancellation?.exportRunId === status.jobId
+            ? currentCancellation.locale
+            : undefined);
         cancelRetryRef.current = {
           exportRunId: status.jobId,
+          ...(retainedLocale ? { locale: retainedLocale } : {}),
           owner: 'job',
           tabIds: status.orderedTabs.map((tab) => tab.tabId),
         };
@@ -63,7 +70,7 @@ export function usePopupExportMessageListener(state: PopupExportRuntimeContract)
         return;
       }
 
-      applyJobStatus(typedMessage.status);
+      applyJobStatus(typedMessage.status, typedMessage.locale);
     };
 
     const unsubscribe = browserRuntime.subscribeToMessages(handleMessage);
@@ -71,7 +78,9 @@ export function usePopupExportMessageListener(state: PopupExportRuntimeContract)
     if (getJobStatus) {
       void getJobStatus({ type: MessageType.GET_PAGE_PACKAGE_JOB_STATUS })
         .then((response) => {
-          if (response?.success && response.status) applyJobStatus(response.status);
+          if (response?.success && response.status) {
+            applyJobStatus(response.status, response.locale);
+          }
         })
         .catch(() => undefined);
     }

@@ -24,6 +24,7 @@ export function createStorageBackedPreferenceState<TCurrent>(
     hydrated: false,
     hydrationPromise: null,
     listeners: new Set(),
+    revision: 0,
     storageListenerCleanup: null,
   };
 }
@@ -73,8 +74,12 @@ export function createPreferenceAppliers<TCurrent, TStored extends string>(
     args.dispatchChange?.(value);
   };
 
-  const applyCurrentValue = (value: TCurrent, { notify = true }: ApplyPreferenceOptions = {}) => {
+  const applyCurrentValue = (
+    value: TCurrent,
+    { markNewer = true, notify = true }: ApplyPreferenceOptions = {}
+  ) => {
     state.currentValue = value;
+    if (markNewer) state.revision += 1;
 
     if (notify) {
       notifyListeners(value);
@@ -108,6 +113,7 @@ export function createStorageChangeHandlers<TCurrent, TStored extends string>(pr
   state: PreferenceState<TCurrent>;
 }) {
   const applyNextStoredPreference = (value: TStored | null) => {
+    props.state.revision += 1;
     const nextCurrentValue = props.args.mapStoredPreferenceToCurrent(
       value,
       props.state.currentValue
@@ -143,23 +149,27 @@ export function createStorageChangeHandlers<TCurrent, TStored extends string>(pr
 
 function applyHydratedStoredPreference<TCurrent, TStored extends string>(
   props: PreferenceHydratorProps<TCurrent, TStored>,
+  expectedRevision: number,
   value: TStored | null
 ) {
-  const nextCurrentValue = props.args.mapStoredPreferenceToCurrent(value, props.state.currentValue);
   props.state.hydrated = true;
+  if (props.state.revision !== expectedRevision) return;
+  const nextCurrentValue = props.args.mapStoredPreferenceToCurrent(value, props.state.currentValue);
 
   if (!currentValueEquals(nextCurrentValue, props.state.currentValue)) {
-    props.applyCurrentValue(nextCurrentValue);
+    props.applyCurrentValue(nextCurrentValue, { markNewer: false });
   }
 }
 
 function hydrateFromBrowserStorage<TCurrent, TStored extends string>(
   props: PreferenceHydratorProps<TCurrent, TStored>
 ) {
+  const hydrationRevision = props.state.revision;
   props.state.hydrationPromise = readBrowserStoredPreference(props.args.storageKey)
     .then((result) => {
       applyHydratedStoredPreference(
         props,
+        hydrationRevision,
         props.args.normalizeStoredPreference(result[props.args.storageKey])
       );
       props.state.hydrationPromise = null;
@@ -189,7 +199,11 @@ export function createPreferenceHydrator<TCurrent, TStored extends string>(
     props.ensureStorageListenerRegistered();
 
     if (resolveStorageBackedPreferenceBackend(props.args, props.state) === 'local') {
-      applyHydratedStoredPreference(props, props.args.readLocalStoragePreference());
+      applyHydratedStoredPreference(
+        props,
+        props.state.revision,
+        props.args.readLocalStoragePreference()
+      );
       props.cleanupStorageListenerIfUnused();
       return Promise.resolve();
     }

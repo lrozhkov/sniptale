@@ -3,12 +3,12 @@ import {
   type ExportOptions,
 } from '@sniptale/runtime-contracts/export';
 import type { PagePackageJobTab } from '@sniptale/runtime-contracts/page-package';
-import { translate } from '../../../../platform/i18n';
 import { isPopupExportPackageResponse } from '../../../../contracts/messaging/validators/export';
 import type { StagedPagePackageDescriptor } from './page-boundary';
 import {
   appendPopupExportJobWarning,
   popupExportJobErrorText,
+  translatePopupExportJob,
   updatePagePackageJobStatus,
   type ActivePopupExportJob,
 } from './runtime-state';
@@ -18,9 +18,10 @@ import { markActivePagePackageJobProducerFailure } from './active-job';
 import type { ExportProgressStepKey } from '@sniptale/runtime-contracts/export';
 import { waitForPagePackageCaptureReadiness } from './page-readiness';
 import { DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING } from '@sniptale/runtime-contracts/page-package';
+import type { TranslationKey } from '../../../../platform/i18n';
 
 const logger = createLogger({ namespace: 'BackgroundPagePackageJob' });
-const PAGE_PACKAGE_PREPARATION_CODE_PATTERN = /\[([A-Z][A-Z0-9_]{1,63})\]$/u;
+const PAGE_PACKAGE_PREPARATION_CODE_PATTERN = /\[([A-Z][A-Z0-9_]{1,63})\](?::|$)/u;
 const WEB_COPY_FAILURE_STEPS: Record<string, ExportProgressStepKey> = {
   WEB_COPY_WEBSNAPSHOTASSETS: 'webSnapshotAssets',
   WEB_COPY_WEBSNAPSHOTDOM: 'webSnapshotDom',
@@ -28,6 +29,18 @@ const WEB_COPY_FAILURE_STEPS: Record<string, ExportProgressStepKey> = {
   WEB_COPY_WEBSNAPSHOTSTYLES: 'webSnapshotStyles',
   WEB_COPY_WEBSNAPSHOTWARNINGS: 'webSnapshotWarnings',
 };
+const PAGE_PACKAGE_FAILURE_DETAILS: Partial<Record<string, TranslationKey>> = {
+  ARCHIVE_STAGING: 'popup.export.temporaryStorageErrorDetail',
+  SELECTED_DATA: 'popup.export.pageDataPreparationErrorDetail',
+  WEB_COPY_START: 'popup.export.webCopyPreparationErrorDetail',
+  WEB_COPY_WEBSNAPSHOTASSETS: 'popup.export.webCopyPreparationErrorDetail',
+  WEB_COPY_WEBSNAPSHOTDOM: 'popup.export.webCopyPreparationErrorDetail',
+  WEB_COPY_WEBSNAPSHOTPREVIEW: 'popup.export.webCopyPreparationErrorDetail',
+  WEB_COPY_WEBSNAPSHOTSTYLES: 'popup.export.webCopyPreparationErrorDetail',
+  WEB_COPY_WEBSNAPSHOTWARNINGS: 'popup.export.webCopyPreparationErrorDetail',
+};
+
+export class PopupExportPagePackagePublicError extends Error {}
 
 function resolveFailedProgressStep(
   error: unknown,
@@ -42,13 +55,24 @@ function resolveFailedProgressStep(
   return WEB_COPY_FAILURE_STEPS[code] ?? null;
 }
 
-function getPublicPagePackagePreparationError(response: unknown): string {
-  const fallback = translate('content.runtime.exportPrepareFailed');
-  if (!isPopupExportPackageResponse(response) || response.success !== false || !response.error) {
-    return fallback;
-  }
-  const code = PAGE_PACKAGE_PREPARATION_CODE_PATTERN.exec(response.error)?.[1];
-  return code ? `${fallback} [${code}]` : fallback;
+function getPublicPagePackagePreparationError(
+  job: ActivePopupExportJob,
+  response: unknown,
+  fallbackDetailKey: TranslationKey
+): string {
+  if (response instanceof PopupExportPagePackagePublicError) return response.message;
+  const fallback = translatePopupExportJob(job, 'content.runtime.exportPrepareFailed');
+  const detail =
+    isPopupExportPackageResponse(response) && response.success === false
+      ? (response.error ?? '')
+      : response instanceof Error
+        ? response.message
+        : typeof response === 'string'
+          ? response
+          : '';
+  const code = PAGE_PACKAGE_PREPARATION_CODE_PATTERN.exec(detail)?.[1];
+  const detailKey = (code && PAGE_PACKAGE_FAILURE_DETAILS[code]) || fallbackDetailKey;
+  return `${fallback}. ${translatePopupExportJob(job, detailKey)}`;
 }
 
 export interface CollectedStagedPagePackage {
@@ -112,7 +136,10 @@ async function requestPopupExportPagePackage(
       await appendPopupExportJobWarning(
         job,
         truncatePopupExportStatusText(
-          `${selected.title}: ${translate('content.runtime.captureFullPageScreenshotFailed')}`
+          `${selected.title}: ${translatePopupExportJob(
+            job,
+            'content.runtime.captureFullPageScreenshotFailed'
+          )}`
         )
       );
     }
@@ -129,11 +156,19 @@ async function requestPopupExportPagePackage(
     job.abortController.signal
   );
   if (!isPopupExportPackageResponse(response) || !response.success || !response.stagedPagePackage) {
-    throw new Error(getPublicPagePackagePreparationError(response));
+    throw new PopupExportPagePackagePublicError(
+      getPublicPagePackagePreparationError(job, response, 'popup.export.pagePreparationErrorDetail')
+    );
   }
   const descriptor = response.stagedPagePackage;
   if (descriptor.jobId !== job.status.jobId || descriptor.ordinal !== ordinal) {
-    throw new Error('Page Package response is bound to another job page.');
+    throw new PopupExportPagePackagePublicError(
+      getPublicPagePackagePreparationError(
+        job,
+        undefined,
+        'popup.export.pagePreparationErrorDetail'
+      )
+    );
   }
   return descriptor;
 }
@@ -173,15 +208,17 @@ export async function collectPopupExportPagePackages(
         total: job.status.orderedTabs.length,
         errors: [...errors],
         message: truncatePopupExportStatusText(
-          `${translate('popup.export.batchCollectingMessage')} ${selected.title}`
+          `${translatePopupExportJob(job, 'popup.export.batchCollectingMessage')} ${selected.title}`
         ),
         phase: 'downloading',
       },
     });
+    let failureDetailKey: TranslationKey = 'popup.export.pageReadinessErrorDetail';
     try {
       const readiness = await readinessByTabId.get(selected.tabId);
       if (!readiness) throw new Error('Page readiness was not started.');
       if (!readiness.ready) throw readiness.error;
+      failureDetailKey = 'popup.export.pagePreparationErrorDetail';
       const descriptor = await requestPopupExportPagePackage(
         job,
         tab,
@@ -207,7 +244,7 @@ export async function collectPopupExportPagePackages(
         tabId: selected.tabId,
       });
       const errorText = truncatePopupExportStatusText(
-        `${selected.title}: ${popupExportJobErrorText(error)}`
+        `${getPublicPagePackagePreparationError(job, error, failureDetailKey)} (${selected.title})`
       );
       await markActivePagePackageJobProducerFailure(
         job,

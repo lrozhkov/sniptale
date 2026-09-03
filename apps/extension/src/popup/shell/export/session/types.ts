@@ -7,6 +7,7 @@ import type {
 import type { PopupExportProgressStep } from '../progress/steps';
 import type { PreviewFormat } from '../selection/utils';
 import type { PopupExportTabSelectionState } from '../selection/tabs/types';
+import type { AppLocale } from '../../../../platform/i18n/popup';
 
 export type PopupExportPreferenceValues = PopupExportPreferences;
 
@@ -55,6 +56,7 @@ export type PopupExportSessionRefs = {
   cancelRetryRef: MutableRefObject<{
     cancellationPending?: true;
     exportRunId: string;
+    locale?: AppLocale;
     owner: 'job';
     tabIds: number[];
   } | null>;

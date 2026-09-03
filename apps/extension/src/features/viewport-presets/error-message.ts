@@ -1,4 +1,4 @@
-import { translate } from '../../platform/i18n';
+import { translate, type AppLocale } from '../../platform/i18n';
 
 const errorMessageKeys = {
   disabled: 'viewportPresets.availability.disabled',
@@ -17,10 +17,10 @@ const errorMessageKeys = {
   'restore-impossible': 'viewportPresets.availability.restoreImpossible',
 } as const;
 
-export function getViewportPresetErrorMessage(error: unknown): string | null {
+export function getViewportPresetErrorMessage(error: unknown, locale?: AppLocale): string | null {
   const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
   const code = Object.keys(errorMessageKeys).find(
     (candidate) => message === candidate || message.includes(candidate)
   ) as keyof typeof errorMessageKeys | undefined;
-  return code ? translate(errorMessageKeys[code]) : null;
+  return code ? translate(errorMessageKeys[code], locale) : null;
 }

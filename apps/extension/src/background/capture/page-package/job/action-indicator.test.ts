@@ -15,10 +15,12 @@ import {
   startPagePackageActionIndicator,
 } from './action-indicator';
 import type { ActivePopupExportJob } from './runtime-state';
+import { translate } from '../../../../platform/i18n';
 
 function createJob(tabCount: number): ActivePopupExportJob {
   return {
     cancelled: false,
+    locale: 'ru',
     status: {
       orderedTabs: Array.from({ length: tabCount }, (_, index) => ({
         tabId: index + 1,
@@ -50,6 +52,9 @@ it('animates the main browser action icon and restores it before reopening multi
   expect(deps.setIcon).toHaveBeenCalledWith(
     expect.objectContaining({ imageData: expect.anything() })
   );
+  expect(deps.setTitle).toHaveBeenCalledWith({
+    title: translate('popup.export.batchCollectingMessage', 'ru'),
+  });
   const completion = finish();
   await vi.advanceTimersByTimeAsync(0);
   expect(deps.openPopup).not.toHaveBeenCalled();

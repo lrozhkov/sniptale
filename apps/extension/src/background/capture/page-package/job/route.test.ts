@@ -1,11 +1,12 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { runtimeActionExportMessageContracts } from '../../../../contracts/messaging/contracts/runtime/actions/export';
 
 const mocks = vi.hoisted(() => ({
   ack: vi.fn(),
   cancel: vi.fn(),
-  getStatus: vi.fn(),
+  getSnapshot: vi.fn(),
   start: vi.fn(),
 }));
 
@@ -13,7 +14,7 @@ vi.mock('./index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./index')>()),
   acknowledgePagePackageJobStatus: mocks.ack,
   cancelPagePackageJob: mocks.cancel,
-  getPagePackageJobStatus: mocks.getStatus,
+  getPagePackageJobSnapshot: mocks.getSnapshot,
   startPagePackageJobFromSources: mocks.start,
 }));
 
@@ -39,7 +40,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.ack.mockResolvedValue(null);
   mocks.cancel.mockResolvedValue({ phase: 'cancelling' });
-  mocks.getStatus.mockResolvedValue(null);
+  mocks.getSnapshot.mockResolvedValue({ locale: 'en', status: null });
   mocks.start.mockResolvedValue({ phase: 'running' });
 });
 
@@ -51,6 +52,7 @@ it('routes start, status, cancellation, and acknowledgement through the job owne
         includeWebCopy: false,
         intent: 'export',
         jobId: 'job-1',
+        locale: 'en',
         options,
         captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
         sources: [{ kind: 'tab', tabId: 7, title: 'Page' }],
@@ -80,7 +82,7 @@ it('routes start, status, cancellation, and acknowledgement through the job owne
   );
   await vi.waitFor(() => expect(sendResponse).toHaveBeenCalledTimes(4));
 
-  expect(mocks.getStatus).toHaveBeenCalledWith('job-1');
+  expect(mocks.getSnapshot).toHaveBeenCalledWith('job-1');
   expect(mocks.cancel).toHaveBeenCalledWith('job-1');
   expect(mocks.ack).toHaveBeenCalledWith('job-1');
 });
@@ -101,4 +103,25 @@ it('rejects unrelated messages and surfaces owner failures', async () => {
   await vi.waitFor(() =>
     expect(sendResponse).toHaveBeenCalledWith({ error: 'cancel failed', success: false })
   );
+});
+
+it('returns a parseable canonical failure when status snapshot reading fails', async () => {
+  const sendResponse = vi.fn();
+  mocks.getSnapshot.mockRejectedValueOnce(new Error('storage unavailable'));
+
+  expect(
+    routePagePackageJobMessage(
+      { type: MessageType.GET_PAGE_PACKAGE_JOB_STATUS },
+      sendResponse,
+      contentPort
+    )
+  ).toBe(true);
+  await vi.waitFor(() => expect(sendResponse).toHaveBeenCalledOnce());
+
+  const response = sendResponse.mock.calls[0]![0];
+  expect(
+    runtimeActionExportMessageContracts[MessageType.GET_PAGE_PACKAGE_JOB_STATUS].parseResponse(
+      response
+    )
+  ).toEqual({ error: 'storage unavailable', success: false });
 });

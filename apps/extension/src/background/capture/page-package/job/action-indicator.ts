@@ -1,7 +1,7 @@
 import { browserAction } from '@sniptale/platform/browser/action';
 import { DEFAULT_COLOR_ACCENT } from '@sniptale/ui/default-colors/constants';
 import { translate } from '../../../../platform/i18n';
-import type { ActivePopupExportJob } from './runtime-state';
+import { translatePopupExportJob, type ActivePopupExportJob } from './runtime-state';
 
 const ACTION_ICON_SIZES = [16, 32] as const;
 const ACTION_ICON_FRAME_INTERVAL_MS = 420;
@@ -105,7 +105,9 @@ export function startPagePackageActionIndicator(
   };
   paint();
   void Promise.resolve()
-    .then(() => deps.setTitle({ title: translate('popup.export.batchCollectingMessage') }))
+    .then(() =>
+      deps.setTitle({ title: translatePopupExportJob(job, 'popup.export.batchCollectingMessage') })
+    )
     .catch(() => undefined);
   const timer = setInterval(paint, ACTION_ICON_FRAME_INTERVAL_MS);
 

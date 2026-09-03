@@ -10,6 +10,7 @@ import {
   getPopupRuntimeErrorMessage,
   isStalePageRuntimeErrorMessage,
 } from './index';
+import { createTranslator } from '../../../platform/i18n/popup';
 
 describe('popup runtime errors', () => {
   it('detects stale page runtime transport errors', () => {
@@ -50,5 +51,16 @@ describe('popup runtime errors', () => {
     expect(
       getPopupResponseErrorMessage({ success: false }, 'popup.video.startRecordingError')
     ).toBe('t:popup.video.startRecordingError');
+  });
+
+  it('uses the captured job locale for recognized runtime errors', () => {
+    const staleError = 'Could not establish connection. Receiving end does not exist.';
+
+    expect(getPopupRuntimeErrorMessage(staleError, 'popup.home.openPrepError', 'en')).toBe(
+      createTranslator('en')('popup.common.stalePageRuntimeHint')
+    );
+    expect(getPopupRuntimeErrorMessage(staleError, 'popup.home.openPrepError', 'ru')).toBe(
+      createTranslator('ru')('popup.common.stalePageRuntimeHint')
+    );
   });
 });

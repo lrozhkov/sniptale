@@ -243,6 +243,7 @@ test('factory reset cancels an export admitted before its first publication', as
           includeWebCopy: true,
           intent: 'save',
           jobId: 'security-erasure-export',
+          locale: 'en',
           options,
           sources: [{ kind: 'tab', tabId: selectedTabId, title: 'Security export' }],
           type: 'START_PAGE_PACKAGE_JOB',

@@ -1,5 +1,4 @@
 import type { PopupExportRuntimeMessage, PopupExportRuntimeContract } from '../types';
-import { translate } from '../../../../../platform/i18n/popup';
 import type { PagePackageJobStatusV1 } from '@sniptale/runtime-contracts/page-package';
 import type { PopupPagePackageSelection } from '../../../../../composition/persistence/popup-export-preferences';
 
@@ -22,7 +21,8 @@ function selectionFromEffectivePlan(status: PagePackageJobStatusV1): PopupPagePa
 }
 
 type PopupExportMessageListenerApplyArgs = {
-  message: PopupExportRuntimeMessage;
+  message: Pick<PopupExportRuntimeMessage, 'status' | 'type'> &
+    Partial<Pick<PopupExportRuntimeMessage, 'locale'>>;
   requestId: string | null;
   setProgress: PopupExportRuntimeContract['setProgress'];
   setResult: PopupExportRuntimeContract['setResult'];
@@ -46,10 +46,7 @@ export function applyPopupExportRuntimeMessage(args: PopupExportMessageListenerA
     ...status.progress,
     activeStepKey: status.progress.activeStepKey ?? null,
     errors: [...new Set([...status.progress.errors, ...status.warnings])],
-    message:
-      status.phase === 'cancelling'
-        ? translate('popup.export.cancellingMessage')
-        : status.progress.message,
+    message: status.progress.message,
   });
   if (status.result) args.setResult(status.result);
   if (

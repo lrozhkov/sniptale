@@ -1,4 +1,3 @@
-import { translate } from '../../../../platform/i18n';
 import type { ExportResult } from '@sniptale/runtime-contracts/export';
 import {
   downloadCollectedPagePackages,
@@ -13,6 +12,7 @@ import {
 import {
   collectPopupExportPagePackages,
   PopupExportPagePackageFatalError,
+  PopupExportPagePackagePublicError,
   type CollectedStagedPagePackage,
 } from './page-phase';
 import { saveCollectedPagePackages } from './library';
@@ -20,6 +20,7 @@ import {
   appendPopupExportJobWarning,
   completePagePackageJobStatus,
   popupExportJobErrorText,
+  translatePopupExportJob,
   updatePagePackageJobStatus,
   type ActivePopupExportJob,
 } from './runtime-state';
@@ -27,6 +28,23 @@ import { cleanupPopupExportJobCancellation } from './cancellation';
 import { startPagePackageActionIndicator } from './action-indicator';
 import { preparePagePackageDownloadRuntime } from './offscreen-download-gateway';
 import { cleanupTemporaryPagePackageTabs } from './source-tabs';
+import type { TranslationKey } from '../../../../platform/i18n';
+
+class PopupExportJobFailure extends Error {
+  constructor(
+    readonly detailKey: TranslationKey,
+    options?: ErrorOptions
+  ) {
+    super(detailKey, options);
+  }
+}
+
+function localizedExportFailure(job: ActivePopupExportJob, detailKey: TranslationKey): string {
+  return `${translatePopupExportJob(job, 'content.runtime.exportFailed')}. ${translatePopupExportJob(
+    job,
+    detailKey
+  )}`;
+}
 
 function aggregateProducerStats(
   current: ExportResult['stats'],
@@ -75,7 +93,7 @@ async function publishCompletedJob(
       current: args.pageCount,
       total: job.status.orderedTabs.length,
       errors: args.errors,
-      message: translate('popup.export.batchCompletedMessage'),
+      message: translatePopupExportJob(job, 'popup.export.batchCompletedMessage'),
       phase: 'done',
     },
   });
@@ -115,10 +133,10 @@ async function publishFailedJob(
       total: job.status.orderedTabs.length,
       errors: cancelledCleanly ? [] : args.errors,
       message: args.cancellationCleanupIncomplete
-        ? translate('content.runtime.exportCancelFailed')
+        ? translatePopupExportJob(job, 'content.runtime.exportCancelFailed')
         : args.cancelled
-          ? translate('content.runtime.exportCancelled')
-          : translate('popup.export.startExportError'),
+          ? translatePopupExportJob(job, 'content.runtime.exportCancelled')
+          : (args.errors.at(-1) ?? translatePopupExportJob(job, 'content.runtime.exportFailed')),
       phase: cancelledCleanly ? 'cancelled' : 'error',
     },
   });
@@ -128,7 +146,7 @@ async function releaseStagedBeforeSuccess(job: ActivePopupExportJob): Promise<vo
   try {
     await releaseCollectedPagePackages(job.status.jobId);
   } catch (error) {
-    throw new Error('Page Package cleanup is incomplete.', { cause: error });
+    throw new PopupExportJobFailure('popup.export.temporaryStorageErrorDetail', { cause: error });
   }
 }
 
@@ -140,11 +158,11 @@ async function downloadValidatedPagePackages(
   } catch (error) {
     if (
       error instanceof Error &&
-      error.message === 'Page Package download could not be completed safely.'
+      error.message.startsWith('Page Package download could not be completed safely')
     ) {
-      throw error;
+      throw new PopupExportJobFailure('popup.export.archiveDownloadErrorDetail', { cause: error });
     }
-    throw new Error('Page Package could not be validated or downloaded safely.', { cause: error });
+    throw new PopupExportJobFailure('popup.export.archiveValidationErrorDetail', { cause: error });
   }
 }
 
@@ -152,16 +170,23 @@ async function saveValidatedPagePackage(
   job: ActivePopupExportJob,
   item: CollectedStagedPagePackage
 ): Promise<string> {
-  const saved = await saveCollectedPagePackages({
-    jobId: job.status.jobId,
-    packages: [item],
-    signal: job.abortController.signal,
-  });
-  const failure = saved.failures[0];
-  if (failure) throw new Error(popupExportJobErrorText(failure.error));
-  const snapshotId = saved.snapshotIds[0];
-  if (!snapshotId) throw new Error('Page Package Library publication returned no snapshot ID.');
-  return snapshotId;
+  try {
+    const saved = await saveCollectedPagePackages({
+      jobId: job.status.jobId,
+      packages: [item],
+      signal: job.abortController.signal,
+    });
+    const failure = saved.failures[0];
+    if (failure) throw new Error(popupExportJobErrorText(failure.error));
+    const snapshotId = saved.snapshotIds[0];
+    if (!snapshotId) throw new Error('Page Package Library publication returned no snapshot ID.');
+    return snapshotId;
+  } catch (error) {
+    throw new PopupExportPagePackagePublicError(
+      localizedExportFailure(job, 'popup.export.librarySaveErrorDetail'),
+      { cause: error }
+    );
+  }
 }
 
 async function finalizePopupExportJob(
@@ -174,7 +199,10 @@ async function finalizePopupExportJob(
     await cleanupTemporaryPagePackageTabs(job.status.jobId, job.temporaryTabIds ?? []);
     job.temporaryTabIds = [];
   } catch {
-    await appendPopupExportJobWarning(job, translate('popup.export.temporaryTabsCleanupWarning'));
+    await appendPopupExportJobWarning(
+      job,
+      translatePopupExportJob(job, 'popup.export.temporaryTabsCleanupWarning')
+    );
   }
   if (!stagedCleanupComplete && !job.cancelled) {
     await releaseCollectedPagePackages(job.status.jobId).catch(() => undefined);
@@ -213,14 +241,14 @@ async function collectPagePackages(
   );
   if (job.cancelled) throw new Error('Popup export cancelled');
   if (collection.packages.length === 0) {
-    throw new Error(state.errors[0] || 'No Page Packages were collected');
+    throw new PopupExportJobFailure('popup.export.pageCollectionErrorDetail');
   }
   await updatePagePackageJobStatus(job, {
     progress: {
       current: collection.packages.length,
       total: job.status.orderedTabs.length,
       errors: state.errors,
-      message: translate('popup.export.batchArchiveMessage'),
+      message: translatePopupExportJob(job, 'popup.export.batchArchiveMessage'),
       phase: 'zipping',
     },
   });
@@ -264,13 +292,14 @@ async function completeSaveJob(
   state.errors = collection.errors;
   if (job.cancelled) throw new Error('Page Package save cancelled');
   if (state.pageCount === 0) {
-    throw new Error(state.errors[0] || 'No Page Packages were saved');
+    throw new PopupExportJobFailure('popup.export.pageCollectionErrorDetail');
   }
   await releaseStagedBeforeSuccess(job);
   state.stagedCleanupComplete = true;
   const completed = await publishCompletedJob(job, {
     errors: state.errors,
-    filename: translate(
+    filename: translatePopupExportJob(
+      job,
       state.pageCount > 1 ? 'popup.export.webSnapshotsSaved' : 'popup.export.webSnapshotSaved'
     ),
     pageCount: state.pageCount,
@@ -285,7 +314,8 @@ function failedDownloadPages(job: ActivePopupExportJob) {
     outcome.status === 'failed'
       ? [
           {
-            message: outcome.error ?? 'Page capture failed.',
+            message:
+              outcome.error ?? translatePopupExportJob(job, 'content.runtime.exportPrepareFailed'),
             ordinal: outcome.ordinal + 1,
             title: job.status.orderedTabs[outcome.ordinal]?.title ?? null,
           },
@@ -326,20 +356,24 @@ async function publishJobFailure(
   error: unknown
 ): Promise<void> {
   const cancelled = job.cancelled;
-  let finalError: unknown = error;
   if (cancelled) {
     try {
       await cleanupPopupExportJobCancellation(job);
       state.stagedCleanupComplete = true;
-    } catch (cleanupError) {
-      finalError = new AggregateError(
-        [error, cleanupError],
-        'Page Package cancellation cleanup is incomplete.',
-        { cause: cleanupError }
-      );
+    } catch {
+      // The cancellation owner retains the private failure; public status uses localized copy.
     }
   }
-  const errorText = popupExportJobErrorText(finalError);
+  const errorText = cancelled
+    ? translatePopupExportJob(job, 'content.runtime.exportCancelFailed')
+    : localizedExportFailure(
+        job,
+        error instanceof PopupExportJobFailure
+          ? error.detailKey
+          : error instanceof PopupExportPagePackageFatalError
+            ? 'popup.export.temporaryStorageErrorDetail'
+            : 'popup.export.exportProcessingErrorDetail'
+      );
   if (!cancelled && !state.errors.includes(errorText)) state.errors = [...state.errors, errorText];
   if (cancelled && job.cancellationCleanupError) state.errors = [...state.errors, errorText];
   await publishFailedJob(job, {
@@ -362,7 +396,13 @@ export async function executePopupExportJob(
     if (job.status.intent === 'save') {
       await completeSaveJob(job, state);
     } else {
-      await preparePagePackageDownloadRuntime();
+      try {
+        await preparePagePackageDownloadRuntime();
+      } catch (error) {
+        throw new PopupExportJobFailure('popup.export.downloadPreparationErrorDetail', {
+          cause: error,
+        });
+      }
       const packages = await collectPagePackages(job, state);
       await completeExportJob(job, state, packages);
     }

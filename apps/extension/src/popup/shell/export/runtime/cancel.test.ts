@@ -23,6 +23,7 @@ function createState(overrides = {}) {
       current: null as {
         cancellationPending?: true;
         exportRunId: string;
+        locale?: 'en' | 'ru';
         owner: 'job';
         tabIds: number[];
       } | null,
@@ -89,6 +90,7 @@ it('retains authority and shows cancelling until the terminal status broadcast a
   expect(state.cancelRetryRef.current).toEqual({
     cancellationPending: true,
     exportRunId: 'req-1',
+    locale: 'ru',
     owner: 'job',
     tabIds: [12, 14],
   });
@@ -97,7 +99,7 @@ it('retains authority and shows cancelling until the terminal status broadcast a
   expect(state.setProgress).toHaveBeenCalledWith({
     activeStepKey: 'webSnapshotAssets',
     phase: 'scanning',
-    message: 'popup.export.cancellingMessage',
+    message: 'Collecting',
     current: 2,
     total: 4,
     errors: [],
@@ -122,6 +124,7 @@ it('logs cancel failures from the runtime boundary', async () => {
   expect(state.requestIdRef.current).toBe('req-1');
   expect(state.cancelRetryRef.current).toEqual({
     exportRunId: 'req-1',
+    locale: 'ru',
     owner: 'job',
     tabIds: [12],
   });
@@ -144,6 +147,7 @@ it('treats a fulfilled unsuccessful cancel response as retryable cleanup failure
   expect(state.requestIdRef.current).toBe('req-1');
   expect(state.cancelRetryRef.current).toEqual({
     exportRunId: 'req-1',
+    locale: 'ru',
     owner: 'job',
     tabIds: [12],
   });
@@ -173,10 +177,11 @@ it('retains local job authority after cancellation admission until terminal publ
   expect(state.cancelRetryRef.current).toEqual({
     cancellationPending: true,
     exportRunId: 'req-1',
+    locale: 'ru',
     owner: 'job',
     tabIds: [12, 14],
   });
-  expect(state.setProgress).toHaveBeenCalledWith(expect.any(Function));
+  expect(state.setProgress).not.toHaveBeenCalled();
   state.selectedTabIdsInOrder.splice(0, 2, 99);
   resolveCancellation?.(createCancellingResponse());
   await cancellation;

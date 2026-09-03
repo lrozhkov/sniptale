@@ -112,6 +112,7 @@ export function startPagePackageSave(args: {
     includeWebCopy: true,
     intent: 'save',
     jobId: args.requestId,
+    locale: 'en',
     captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
     sources: [{ kind: 'tab', tabId: args.tabId, title: 'Security fixture' }],
     options: { ...EMPTY_EXPORT_OPTIONS, includeFullPageScreenshot: true },

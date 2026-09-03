@@ -2,6 +2,7 @@ import {
   createTranslator,
   SUPPORTED_LOCALES,
   translate,
+  type AppLocale,
   type TranslationKey,
 } from '../../../platform/i18n/popup';
 import { getViewportPresetErrorMessage } from '../../../features/viewport-presets/error-message';
@@ -44,36 +45,42 @@ export function isStalePageRuntimeErrorMessage(message: string): boolean {
   return STALE_PAGE_RUNTIME_PATTERNS.some((pattern) => message.includes(pattern));
 }
 
-export function getPopupRuntimeErrorMessage(error: unknown, fallbackKey: TranslationKey): string {
+export function getPopupRuntimeErrorMessage(
+  error: unknown,
+  fallbackKey: TranslationKey,
+  locale?: AppLocale
+): string {
+  const translator = locale ? createTranslator(locale) : translate;
   const message = getErrorMessage(error);
-  const viewportPresetError = getViewportPresetErrorMessage(message);
+  const viewportPresetError = getViewportPresetErrorMessage(message, locale);
   if (viewportPresetError) return viewportPresetError;
 
   if (message && isStalePageRuntimeErrorMessage(message)) {
-    return translate('popup.common.stalePageRuntimeHint');
+    return translator('popup.common.stalePageRuntimeHint');
   }
 
   if (PAGE_ACCESS_REQUIRED_PATTERNS.includes(message)) {
-    return translate('popup.home.pageAccessRequired');
+    return translator('popup.home.pageAccessRequired');
   }
 
   const localizedError = LOCALIZED_RUNTIME_ERROR_MESSAGES.find((entry) =>
     SUPPORTED_LOCALES.some((locale) => createTranslator(locale)(entry.sourceKey) === message)
   );
   if (localizedError) {
-    return translate(localizedError.key);
+    return translator(localizedError.key);
   }
 
-  return message || translate(fallbackKey);
+  return message || translator(fallbackKey);
 }
 
 export function getPopupResponseErrorMessage(
   response: unknown,
-  fallbackKey: TranslationKey
+  fallbackKey: TranslationKey,
+  locale?: AppLocale
 ): string {
   if (response && typeof response === 'object' && 'error' in response) {
-    return getPopupRuntimeErrorMessage(response.error, fallbackKey);
+    return getPopupRuntimeErrorMessage(response.error, fallbackKey, locale);
   }
 
-  return translate(fallbackKey);
+  return locale ? createTranslator(locale)(fallbackKey) : translate(fallbackKey);
 }
