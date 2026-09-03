@@ -178,6 +178,7 @@ it('keeps the terminal summary bounded while preserving complete risk context in
   expect(step?.stdout).toContain('Security review');
   expect(step?.stdout).toContain('Permission compatibility proof');
   expect(result.preflightContext).toMatchObject({
+    owners: ['extension:manifest'],
     runtimes: ['extension:manifest'],
     riskAreas: ['manifest.permissions', 'manifest.runtime-topology'],
     documents: expect.arrayContaining(['docs/security/manifest-permissions.md']),
@@ -187,6 +188,61 @@ it('keeps the terminal summary bounded while preserving complete risk context in
     ]),
   });
   expect(result.advisory).toEqual({ introduced: [], worsened: [], existing: [] });
+});
+
+it('routes observability record contract changes to candidate-proof admission', async () => {
+  const root = createTempRoot('qa-preflight-observability-consumer-');
+  const schemaFile = 'tooling/qa/runtime/observability/schema.mjs';
+  writeFile(root, schemaFile, 'export const parseRunRecord = (value) => value;\n');
+
+  const result = await withCwd(root, async () => {
+    const module = await importFresh<typeof import('./preflight.mjs')>(
+      './preflight.mjs',
+      import.meta.url
+    );
+    return module.runPreflightWrapper({ files: [schemaFile] });
+  });
+
+  expect(result.preflightContext.consumers).toEqual(
+    expect.arrayContaining([
+      expect.stringContaining('tooling/ci/admit-candidate-proof.mjs'),
+      expect.stringContaining('tooling/ci/admit-candidate-proof.test.ts'),
+    ])
+  );
+  expect(result.preflightContext.proofRequirements).toContain(
+    'observability record contract: run candidate-proof admission tests for proof and release fixtures'
+  );
+  expect(result.steps[0]?.stdout).toContain('tooling/ci/admit-candidate-proof.mjs');
+  expect(result.steps[0]?.stdout).toContain('candidate-proof admission tests');
+});
+
+it('keeps every observability record owner in candidate-proof routing', async () => {
+  const module = await import('./preflight/preflight-contract-report.mjs');
+  const contractOwners = [
+    'analysis-schema.mjs',
+    'constants.mjs',
+    'run.mjs',
+    'run-controller.mjs',
+    'run-record.mjs',
+    'schema.mjs',
+    'schema-parts.mjs',
+  ];
+
+  for (const owner of contractOwners) {
+    const context = {
+      allQualityCodeFiles: [`tooling/qa/runtime/observability/${owner}`],
+      codeFiles: [],
+    };
+    expect(module.collectTransitiveConsumerHints(context), owner).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('tooling/ci/admit-candidate-proof.mjs'),
+        expect.stringContaining('tooling/ci/admit-candidate-proof.test.ts'),
+      ])
+    );
+    expect(module.collectContractProofRequirements(context), owner).toContain(
+      'observability record contract: run candidate-proof admission tests for proof and release fixtures'
+    );
+  }
 });
 
 it(

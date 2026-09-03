@@ -24,6 +24,7 @@ import { createOkStep } from '../composition/checkpoint/focused-qa-results.mjs';
 import { PRODUCT_QA_SUITE, createScopedQaContext } from '../composition/scope/qa-scope.mjs';
 import {
   collectContractChecklist,
+  collectContractProofRequirements,
   collectTransitiveConsumerHints,
   collectTypecheckBlastRadius,
 } from './preflight/preflight-contract-report.mjs';
@@ -49,6 +50,7 @@ const SECURITY_CONTROL_FILE =
   /(?:security-|dependency-|source-sbom|codeql|threat-model|manifest-permissions)/u;
 const SECURITY_CONTROL_PROOF_HINT =
   'security/dependency policy changes require compact admission and guard fixtures; route review by changed seam';
+const OWNER_SIGNIFICANT_TARGET_FILES = new Set(['apps/extension/manifest.json']);
 
 function collectSecurityControlHints(files) {
   return files.some((file) => SECURITY_CONTROL_FILE.test(file))
@@ -141,6 +143,7 @@ export function collectPreflightOwnerRuntime(context) {
     ...new Set([
       ...(context.codeFiles ?? []),
       ...behavioralTargetFiles.filter((file) => JS_LIKE_FILE_PATTERN.test(file)),
+      ...behavioralTargetFiles.filter((file) => OWNER_SIGNIFICANT_TARGET_FILES.has(file)),
       ...(context.harnessTargetFiles ?? []),
     ]),
   ];
@@ -239,6 +242,7 @@ export function collectPreflightReport({ files = [] } = {}) {
     }).slice(0, 12),
     proofHints: [
       ...collectProofHints(context, guardrailReport),
+      ...collectContractProofRequirements(context),
       ...collectSecurityControlHints(
         files.length > 0 ? context.allTargetFiles : context.allQualityTargetFiles
       ),

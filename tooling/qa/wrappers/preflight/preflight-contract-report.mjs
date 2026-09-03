@@ -1,6 +1,8 @@
 import { getRuntimeRoots } from '../../guards/architecture/runtime-topology/model.mjs';
 
 const BOUNDARY_TARGET_PATTERN = /^(?:apps\/extension\/src|packages\/[^/]+\/src)\//u;
+const OBSERVABILITY_RECORD_CONTRACT_PATTERN =
+  /^tooling\/qa\/runtime\/observability\/(?:analysis-schema|constants|run|run-controller|run-record|schema|schema-parts)\.mjs$/u;
 const RUNTIME_ROOTS = getRuntimeRoots();
 const BOUNDARY_ROLE_TOKENS = [
   'contracts',
@@ -22,6 +24,16 @@ const BOUNDARY_ROLE_TOKENS = [
 function isBoundaryTarget(file) {
   return (
     BOUNDARY_TARGET_PATTERN.test(file) && BOUNDARY_ROLE_TOKENS.some((token) => file.includes(token))
+  );
+}
+
+function collectContextCodeFiles(context) {
+  return context.allQualityCodeFiles ?? context.codeFiles ?? [];
+}
+
+function changesObservabilityRecordContract(context) {
+  return collectContextCodeFiles(context).some((file) =>
+    OBSERVABILITY_RECORD_CONTRACT_PATTERN.test(file)
   );
 }
 
@@ -53,9 +65,10 @@ export function collectContractChecklist(context) {
 
 export function collectTransitiveConsumerHints(context) {
   const hints = [];
+  const codeFiles = collectContextCodeFiles(context);
 
   if (
-    context.codeFiles.some((file) =>
+    codeFiles.some((file) =>
       /^(?:apps\/extension\/src\/contracts\/messaging|packages\/runtime-contracts\/src\/messaging)\//u.test(
         file
       )
@@ -69,15 +82,21 @@ export function collectTransitiveConsumerHints(context) {
       'consumer discovery is a planning prompt only; pin a bounded manifest before claiming a complete consumer set'
     );
   }
+  if (changesObservabilityRecordContract(context)) {
+    hints.push(
+      'observability record consumer: tooling/ci/admit-candidate-proof.mjs',
+      'observability record proof consumer: tooling/ci/admit-candidate-proof.test.ts'
+    );
+  }
   if (
-    context.codeFiles.some((file) =>
+    codeFiles.some((file) =>
       /^apps\/extension\/src\/composition\/persistence\/(?:storage|db)\//u.test(file)
     )
   ) {
     hints.push('storage/db contracts: check bootstrap, clone/delete, backup/restore, settings UI');
   }
   if (
-    context.codeFiles.some((file) =>
+    codeFiles.some((file) =>
       /^apps\/extension\/src\/(?:effect-runtime-sandbox|features\/video\/project\/effect-bundle)\//u.test(
         file
       )
@@ -87,22 +106,24 @@ export function collectTransitiveConsumerHints(context) {
       'EffectV1 contracts: check bundle import, snapshot materialization, preview, audio, and export'
     );
   }
-  if (
-    context.codeFiles.some((file) =>
-      /^apps\/extension\/src\/editor\/lib\/file-actions\//u.test(file)
-    )
-  ) {
+  if (codeFiles.some((file) => /^apps\/extension\/src\/editor\/lib\/file-actions\//u.test(file))) {
     hints.push('editor file-actions: check sidebar/action-rail callers and import roundtrip tests');
   }
   if (
-    context.codeFiles.some((file) =>
-      /^apps\/extension\/src\/content\/logic\/web-snapshot\//u.test(file)
-    )
+    codeFiles.some((file) => /^apps\/extension\/src\/content\/logic\/web-snapshot\//u.test(file))
   ) {
     hints.push('web-snapshot: check popup export, staged transfer, background save, viewer tests');
   }
 
   return [...new Set(hints)];
+}
+
+export function collectContractProofRequirements(context) {
+  return changesObservabilityRecordContract(context)
+    ? [
+        'observability record contract: run candidate-proof admission tests for proof and release fixtures',
+      ]
+    : [];
 }
 
 export function collectTypecheckBlastRadius(context) {
