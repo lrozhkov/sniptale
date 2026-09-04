@@ -5,7 +5,6 @@ import {
 import { mapSourceTimeToProjectPoint } from '../../../features/video/project/timeline/source-time';
 import type {
   VideoProject,
-  VideoProjectAudioClip,
   VideoProjectClip,
   VideoProjectVideoClip,
 } from '../../../features/video/project/types/model';
@@ -18,8 +17,14 @@ import {
   VideoClipLinkMode,
   VideoProjectClipType,
 } from '../../../features/video/project/types/model';
+import {
+  projectSourceTimeAnchor,
+  type AnchorProjection,
+  type SourceTimedClip,
+} from './source-timed-anchor-projection';
+import { reconcileSourceBoundObjectTracks } from './source-timed-object-tracks';
 
-export type SourceTimedClip = VideoProjectVideoClip | VideoProjectAudioClip;
+export type { SourceTimedClip } from './source-timed-anchor-projection';
 
 export function isSourceTimedClip(clip: VideoProjectClip): clip is SourceTimedClip {
   return clip.type === VideoProjectClipType.VIDEO || clip.type === VideoProjectClipType.AUDIO;
@@ -122,14 +127,6 @@ export function collectRepresentativeRecordingSourceClips(
   );
 }
 
-interface AnchorProjection {
-  anchor: VideoProjectSourceTimeAnchor;
-  time: number;
-  timeScale: number;
-}
-
-const SOURCE_SPLIT_BOUNDARY_EPSILON = 0.000_001;
-
 function isValidPreviousAnchor(
   anchor: VideoProjectSourceTimeAnchor,
   recordingId: string,
@@ -178,65 +175,6 @@ function hasSourceTimelineChanged(
   });
 }
 
-function projectAnchor(
-  anchor: VideoProjectSourceTimeAnchor,
-  recordingId: string,
-  previousClips: SourceTimedClip[],
-  nextClips: SourceTimedClip[]
-): AnchorProjection | null {
-  if (anchor.recordingId !== recordingId) {
-    return null;
-  }
-
-  const previousClip = previousClips.find((clip) => clip.id === anchor.sourceClipId);
-  if (!previousClip) {
-    return null;
-  }
-
-  const previousClipIds = new Set(previousClips.map((clip) => clip.id));
-  const trailingSplitClips = nextClips.filter(
-    (clip) =>
-      !previousClipIds.has(clip.id) &&
-      clip.assetId === previousClip.assetId &&
-      Math.abs(clip.sourceStart - anchor.sourceTime) <= SOURCE_SPLIT_BOUNDARY_EPSILON
-  );
-  let point = mapSourceTimeToProjectPoint(trailingSplitClips, anchor.sourceTime);
-  point ??= mapSourceTimeToProjectPoint(
-    nextClips.filter((clip) => clip.id === anchor.sourceClipId),
-    anchor.sourceTime,
-    anchor.sourceClipId
-  );
-  if (!point) {
-    const sourceClipStillExists = nextClips.some((clip) => clip.id === anchor.sourceClipId);
-    if (!sourceClipStillExists) {
-      return null;
-    }
-
-    point = mapSourceTimeToProjectPoint(
-      nextClips.filter(
-        (clip) => !previousClipIds.has(clip.id) && clip.assetId === previousClip.assetId
-      ),
-      anchor.sourceTime
-    );
-  }
-  if (!point) {
-    return null;
-  }
-
-  const nextClip = nextClips.find((clip) => clip.id === point.clipId);
-  if (!nextClip) {
-    return null;
-  }
-
-  return {
-    anchor: { ...anchor, sourceClipId: point.clipId },
-    time: point.time,
-    timeScale:
-      normalizeClipPlaybackRate(previousClip.playbackRate ?? 1) /
-      normalizeClipPlaybackRate(nextClip.playbackRate ?? 1),
-  };
-}
-
 function reconcileActionEvents(
   previousProject: VideoProject,
   nextProject: VideoProject,
@@ -261,7 +199,12 @@ function reconcileActionEvents(
         return [withoutSourceAnchor(event)];
       }
 
-      const projection = projectAnchor(event.sourceAnchor, recordingId, previousClips, nextClips);
+      const projection = projectSourceTimeAnchor(
+        event.sourceAnchor,
+        recordingId,
+        previousClips,
+        nextClips
+      );
       if (!projection) {
         return [];
       }
@@ -301,7 +244,12 @@ function reconcileCursorTrack(
         return [withoutSourceAnchor(sample)];
       }
 
-      const projection = projectAnchor(sample.sourceAnchor, recordingId, previousClips, nextClips);
+      const projection = projectSourceTimeAnchor(
+        sample.sourceAnchor,
+        recordingId,
+        previousClips,
+        nextClips
+      );
       return projection
         ? [{ ...sample, sourceAnchor: projection.anchor, time: projection.time }]
         : [];
@@ -376,6 +324,13 @@ export function reconcileRecordingInteractionAnchors(
     nextClips
   );
   const motionRegions = reconcileMotionRegions(previousProject, nextProject, events, projections);
+  const objectTracks = reconcileSourceBoundObjectTracks({
+    nextClips,
+    nextProject,
+    previousClips,
+    previousProject,
+    recordingId,
+  });
 
   return {
     ...nextProject,
@@ -387,6 +342,7 @@ export function reconcileRecordingInteractionAnchors(
       previousClips,
       nextClips
     ),
+    ...(objectTracks === undefined ? {} : { objectTracks }),
     ...(motionRegions === undefined ? {} : { motionRegions }),
   };
 }
