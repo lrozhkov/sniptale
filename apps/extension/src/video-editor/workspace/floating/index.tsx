@@ -4,8 +4,10 @@ import type { VideoPreviewCanvasInsertKind } from '../../preview/stage/types';
 import { VideoEditorFloatingDocumentBar } from './document-bar';
 import { VideoEditorFloatingInspectorStack } from './inspector-stack';
 import { VideoEditorFloatingInsertPanel, VideoEditorFloatingWorkspacePanel } from './top-panels';
+import type { useInspectorResize } from './inspector-resize';
 
 type VideoEditorFloatingWorkspaceProps = {
+  inspectorResize: ReturnType<typeof useInspectorResize>;
   activeInsertKind: VideoPreviewCanvasInsertKind | null;
   diagnosticsContent: React.ReactNode;
   effectsLibraryDock: {
@@ -16,6 +18,7 @@ type VideoEditorFloatingWorkspaceProps = {
 };
 
 export function VideoEditorFloatingWorkspace({
+  inspectorResize,
   activeInsertKind,
   diagnosticsContent,
   effectsLibraryDock,
@@ -30,7 +33,10 @@ export function VideoEditorFloatingWorkspace({
         onActiveInsertKindChange={onActiveInsertKindChange}
       />
       <VideoEditorFloatingWorkspacePanel />
-      <VideoEditorFloatingInspectorStack diagnosticsContent={diagnosticsContent} />
+      <VideoEditorFloatingInspectorStack
+        diagnosticsContent={diagnosticsContent}
+        resize={inspectorResize}
+      />
     </FloatingChromeRoot>
   );
 }

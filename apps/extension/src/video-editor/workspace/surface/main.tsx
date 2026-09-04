@@ -16,6 +16,7 @@ import type { VideoPreviewCanvasInsertKind } from '../../preview/stage/types';
 import { VideoEditorWorkspaceCanvas } from './canvas';
 import { useWorkspaceEffectBundles } from './effect-bundles';
 import { useEffectLibraryOperations } from '../../library/effects-dock/operations';
+import { useInspectorResize } from '../floating/inspector-resize';
 
 interface VideoEditorWorkspaceMainProps {
   diagnosticsContent: React.ReactNode;
@@ -36,6 +37,10 @@ export function VideoEditorWorkspaceMain({
   const [inspectorGroupFocus] = useState<InspectorGroupFocusIntent | null>(null);
   const effectBundles = useWorkspaceEffectBundles();
   const effectOperations = useEffectLibraryOperations();
+  const inspectorResize = useInspectorResize();
+  const workspaceStyle: React.CSSProperties & { '--video-editor-inspector-width': string } = {
+    '--video-editor-inspector-width': `${inspectorResize.width}px`,
+  };
   useActiveCanvasInsertEscape({
     active: activeInsertKind !== null,
     onCancel: () => setActiveInsertKind(null),
@@ -43,7 +48,7 @@ export function VideoEditorWorkspaceMain({
 
   return (
     <InspectorGroupFocusContext.Provider value={inspectorGroupFocus}>
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden" style={workspaceStyle}>
         <VideoEditorWorkspaceCanvas
           activeInsertKind={activeInsertKind}
           effectBundles={effectBundles}
@@ -54,6 +59,7 @@ export function VideoEditorWorkspaceMain({
           onEffectsLibraryDockOpenChange={setEffectsLibraryDockOpen}
         />
         <VideoEditorWorkspaceOverlays
+          inspectorResize={inspectorResize}
           activeInsertKind={activeInsertKind}
           diagnosticsContent={diagnosticsContent}
           effectsLibraryDockOpen={effectsLibraryDockOpen}
@@ -66,6 +72,7 @@ export function VideoEditorWorkspaceMain({
 }
 
 function VideoEditorWorkspaceOverlays(props: {
+  inspectorResize: ReturnType<typeof useInspectorResize>;
   activeInsertKind: VideoPreviewCanvasInsertKind | null;
   diagnosticsContent: React.ReactNode;
   effectsLibraryDockOpen: boolean;
@@ -75,6 +82,7 @@ function VideoEditorWorkspaceOverlays(props: {
   return (
     <>
       <VideoEditorFloatingWorkspace
+        inspectorResize={props.inspectorResize}
         activeInsertKind={props.activeInsertKind}
         diagnosticsContent={props.diagnosticsContent}
         effectsLibraryDock={{

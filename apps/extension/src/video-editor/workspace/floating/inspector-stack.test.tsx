@@ -51,7 +51,10 @@ vi.mock('../sidebar/view', () => ({
 it('hides the context inspector when the inspector rail state is collapsed', () => {
   hookMocks.collapsed = true;
   const markup = renderToStaticMarkup(
-    <VideoEditorFloatingInspectorStack diagnosticsContent={null} />
+    <VideoEditorFloatingInspectorStack
+      diagnosticsContent={null}
+      resize={{ width: 344, onPointerDown: vi.fn(), onKeyDown: vi.fn() }}
+    />
   );
 
   expect(markup).toBe('');
@@ -61,7 +64,10 @@ it('hides the context inspector when the inspector rail state is collapsed', () 
 it('renders a context inspector surface without introducing a layers panel', () => {
   hookMocks.collapsed = false;
   const markup = renderToStaticMarkup(
-    <VideoEditorFloatingInspectorStack diagnosticsContent={null} />
+    <VideoEditorFloatingInspectorStack
+      diagnosticsContent={null}
+      resize={{ width: 344, onPointerDown: vi.fn(), onKeyDown: vi.fn() }}
+    />
   );
 
   expect(markup).toContain('data-ui="video-editor.floating.context-inspector"');
@@ -69,6 +75,8 @@ it('renders a context inspector surface without introducing a layers panel', () 
   expect(markup).toContain('data-ui="mock-context-inspector-content"');
   expect(markup).toContain('data-ui="video-editor.floating.context-inspector.resize"');
   expect(markup).toContain('role="separator"');
+  expect(markup).toContain('width:344px');
+  expect(markup).toContain('aria-valuenow="344"');
   expect(markup).not.toContain('layers');
   expect(contentSpy.mock.calls[0]?.[0]).toEqual(
     expect.objectContaining({

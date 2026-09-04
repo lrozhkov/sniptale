@@ -151,10 +151,67 @@ async function expectBuiltVideoEditorGeometry(
   expect(geometry.timeline.right).toBeLessThanOrEqual(geometry.inspector.left);
   expect(geometry.preview.right - geometry.preview.left).toBeLessThan(defaultPreviewWidth);
 
+  const divider = page.locator('[data-ui="video-editor.floating.context-inspector.resize"]');
+  await divider.focus();
+  await divider.press('ArrowLeft');
+  await expect(divider).toHaveAttribute('aria-valuenow', '344');
+  await expect
+    .poll(() => preview.evaluate((element) => element.getBoundingClientRect().right))
+    .toBe(geometry.preview.right - 24);
+  await expect
+    .poll(() => timeline.evaluate((element) => element.getBoundingClientRect().right))
+    .toBe(geometry.timeline.right - 24);
+  await divider.press('ArrowRight');
+  await expect(divider).toHaveAttribute('aria-valuenow', '320');
+  const dividerBox = await divider.boundingBox();
+  if (!dividerBox) throw new Error('Missing inspector divider');
+  expect(dividerBox.x).toBeGreaterThan(geometry.timeline.right);
+  expect(dividerBox.x + dividerBox.width).toBeLessThan(geometry.inspector.left);
+  await page.mouse.move(dividerBox.x + dividerBox.width / 2, dividerBox.y + 100);
+  await page.mouse.down();
+  await page.mouse.move(dividerBox.x + dividerBox.width / 2 - 80, dividerBox.y + 100);
+  await page.mouse.up();
+  await expect(divider).toHaveAttribute('aria-valuenow', '400');
+  await expect
+    .poll(() => timeline.evaluate((element) => element.getBoundingClientRect().right))
+    .toBe(geometry.timeline.right - 80);
+
   await page.screenshot({
     fullPage: true,
     path: effectsDockScreenshotPath,
   });
+
+  await page.evaluate(() => chrome.storage.local.set({ 'sniptale-theme-preference': 'dark' }));
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await page.screenshot({
+    animations: 'disabled',
+    fullPage: true,
+    path: effectsDockScreenshotPath.replace('.png', '-dark.png'),
+  });
+  await page.setViewportSize({ width: 1100, height: 900 });
+  await expect(inspector).toBeHidden();
+  await expect(divider).toBeHidden();
+  await expect(canvasShell).toHaveCSS('padding-right', '12px');
+  await page.screenshot({
+    animations: 'disabled',
+    fullPage: true,
+    path: effectsDockScreenshotPath.replace('.png', '-compact.png'),
+  });
+  await page.setViewportSize({ width: 1600, height: 1100 });
+  await expect(divider).toHaveAttribute('aria-valuenow', '400');
+  await expect
+    .poll(() => timeline.evaluate((element) => element.getBoundingClientRect().right))
+    .toBe(geometry.timeline.right - 80);
+  await page.evaluate(() => chrome.storage.local.set({ 'sniptale-theme-preference': 'light' }));
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await divider.focus();
+  const resizedBox = await divider.boundingBox();
+  if (!resizedBox) throw new Error('Missing resized inspector divider');
+  await page.mouse.move(resizedBox.x + resizedBox.width / 2, resizedBox.y + 100);
+  await page.mouse.down();
+  await page.mouse.move(resizedBox.x + resizedBox.width / 2 + 80, resizedBox.y + 100);
+  await page.mouse.up();
+  await expect(divider).toHaveAttribute('aria-valuenow', '320');
 
   await effectsToggle.click();
   await expect(effectsDock).toHaveCount(0);

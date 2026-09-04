@@ -211,7 +211,9 @@ function VideoEditorWorkspaceResizeHandle({
 function getWorkspaceCanvasShellClassName(inspectorCollapsed: boolean): string {
   return [
     'min-h-0 min-w-0 flex-1 p-3 pt-[4.75rem]',
-    inspectorCollapsed ? 'pr-3' : 'pr-[21.75rem] max-[1120px]:pr-3',
+    inspectorCollapsed
+      ? 'pr-3'
+      : 'pr-[calc(var(--video-editor-inspector-width)+1.75rem)] max-[1120px]:pr-3',
     'max-[860px]:pt-[11.75rem]',
   ].join(' ');
 }
