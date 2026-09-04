@@ -2,7 +2,7 @@
 
 This document owns wrapper scope, freshness, locks, handoffs, and observability. Public commands belong in [operator-handbook.md](operator-handbook.md). Quality policy belongs in [code-quality.md](code-quality.md).
 
-[AGENTS.md](../../AGENTS.md) owns implementation, QA, review, and closeout order, including conditional workflow requirements. This document describes the behavior of each wrapper within that workflow.
+`AGENTS.md` owns implementation, QA, review, and closeout order, including conditional workflow requirements. This document describes the behavior of each wrapper within that workflow.
 
 ## Local wrappers
 

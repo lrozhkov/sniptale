@@ -1,6 +1,6 @@
 # Implementation rules
 
-This document owns implementation decisions that apply across domains. [AGENTS.md](../../AGENTS.md) owns workflow. [Code quality](../tooling/code-quality.md) owns gates and exceptions. [Wrapper summary](../tooling/wrapper-summary.md) owns wrapper behavior.
+This document owns implementation decisions that apply across domains. `AGENTS.md` owns workflow. [Code quality](../tooling/code-quality.md) owns gates and exceptions. [Wrapper summary](../tooling/wrapper-summary.md) owns wrapper behavior.
 
 ## Ownership selection
 

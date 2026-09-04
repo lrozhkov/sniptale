@@ -15,7 +15,7 @@ Machine authorities are:
 
 Do not copy their inventories, counts, or classifications into documentation.
 
-Local workflow order belongs in [wrapper-summary.md](wrapper-summary.md). [AGENTS.md](../../AGENTS.md) owns workflow actions.
+Local workflow order belongs in [wrapper-summary.md](wrapper-summary.md). `AGENTS.md` owns workflow actions.
 
 ## Guard acceptance
 
