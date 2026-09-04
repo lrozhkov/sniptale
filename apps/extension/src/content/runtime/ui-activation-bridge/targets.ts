@@ -170,7 +170,7 @@ export function resolveTextControlOffsetAtPoint(
   try {
     while (low < high) {
       const middle = Math.ceil((low + high) / 2);
-      prefix.data = target.value.slice(0, middle);
+      prefix.textContent = target.value.slice(0, middle);
       if (compareMarkerToPoint(marker.getBoundingClientRect(), x, y) <= 0) low = middle;
       else high = middle - 1;
     }
