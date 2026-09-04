@@ -33,7 +33,7 @@ Resource settings are recorded execution metadata. They do not alter semantic sc
 
 Checkpoint completes formatting before parallel focused lanes start. Fast proof schedules repository controls, product proof, harness proof, audits, and build through the machine catalog. Release does not rerun product or harness tests.
 
-Pre-push runs `qa:checkpoint`.
+Pre-push runs `qa:release-harness` and then `qa:checkpoint` in the same pushed-range workspace.
 
 ## Observability and failure
 
