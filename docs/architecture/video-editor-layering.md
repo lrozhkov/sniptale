@@ -29,3 +29,7 @@ Load telemetry by `project.baseRecordingId`. Reject mismatched or late results. 
 Permit auto-processing only when the project still contains source-timed clips for the recording and telemetry contains an action, cursor sample, or overlapping idle or static range. Use the same predicate for UI availability and mutation admission.
 
 Treat missing, malformed, metadata-only, and stale telemetry as unavailable. Do not synthesize fallback telemetry. Delete and export telemetry through the recording and media-hub lifecycle owners.
+
+## Export lifecycle
+
+The background runtime commits matching offscreen progress and terminal events to the project-export ledger before forwarding them to the editor owner. Serialize these transitions with export start/cancel admission. Ignore superseded jobs and late progress after terminal state. The offscreen document supplies rendering events through runtime messages; it cannot write Chrome session storage. A completed editor notification must therefore never be the only evidence of completion while the admission ledger remains running.
