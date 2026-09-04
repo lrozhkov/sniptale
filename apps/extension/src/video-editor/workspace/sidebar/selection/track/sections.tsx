@@ -1,21 +1,32 @@
 import { translate } from '../../../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { TextField } from '../../../../../ui/compact-inspector-controls';
 import type { VideoProjectTrack } from '../../../../../features/video/project/types';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { DetailItem, DetailList, PANEL_META_CLASS_NAME } from '../shared/panel';
+import { getVideoTrackKindLabel } from '../../track-kind-label';
 
 export function TrackGeneralFields(props: {
+  onRenameTrack?: WorkspaceSidebarSelectionPanelProps['onRenameTrack'];
   selectedTrack: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedTrack']>;
 }) {
+  const kindLabel = getVideoTrackKindLabel(props.selectedTrack.kind);
+
   return (
     <>
-      <p className={`mt-1 ${PANEL_META_CLASS_NAME}`}>{getTrackPanelMeta(props.selectedTrack)}</p>
+      <TextField
+        key={`${props.selectedTrack.id}:${props.selectedTrack.name}`}
+        defaultValue={props.selectedTrack.name}
+        label={translate('videoEditor.sidebar.trackNameLabel')}
+        readOnly={!props.onRenameTrack}
+        onValueCommit={(name) => props.onRenameTrack?.(props.selectedTrack.id, name)}
+      />
+      <p className={`mt-3 ${PANEL_META_CLASS_NAME}`}>
+        {getTrackPanelMeta(kindLabel, props.selectedTrack.locked)}
+      </p>
       <div className="mt-3">
         <DetailList>
-          <DetailItem
-            label={translate('videoEditor.timeline.tracksTitle')}
-            value={props.selectedTrack.kind}
-          />
+          <DetailItem label={translate('videoEditor.timeline.tracksTitle')} value={kindLabel} />
           <DetailItem
             label={translate('videoEditor.sidebar.selectionTitle')}
             value={
@@ -59,10 +70,10 @@ export function TrackPanelDeleteButton(props: {
   );
 }
 
-function getTrackPanelMeta(track: Pick<VideoProjectTrack, 'kind' | 'locked'>) {
+function getTrackPanelMeta(kindLabel: string, locked: VideoProjectTrack['locked']) {
   return [
-    track.kind,
-    track.locked
+    kindLabel,
+    locked
       ? translate('videoEditor.timeline.trackLocked')
       : translate('videoEditor.timeline.trackEditable'),
   ].join(' · ');

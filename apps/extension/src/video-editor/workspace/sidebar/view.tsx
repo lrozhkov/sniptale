@@ -27,6 +27,7 @@ import type { WorkspaceSidebarProps } from './contracts/props';
 import type { InspectorGroupHeaderSlot } from './selection/grouped-inspector';
 import { InspectorGroupSwitch } from './selection/grouped-inspector';
 import { getClipTypeLabel } from '../../chrome/display';
+import { getVideoTrackKindLabel } from './track-kind-label';
 
 interface WorkspaceSidebarPanelContentProps extends WorkspaceSidebarPanelContentSharedProps {
   selectionTitle: string;
@@ -213,22 +214,7 @@ function getInspectorHeaderSubtitle(
       return translate('videoEditor.sidebar.gridSettingsSubtitle');
     case 'selection':
       return selectedTrack
-        ? `${translate('videoEditor.sidebar.trackPrefix')} ${getSelectedTrackKindLabel(selectedTrack.kind)}`
+        ? `${translate('videoEditor.sidebar.trackPrefix')} ${getVideoTrackKindLabel(selectedTrack.kind)}`
         : translate('videoEditor.sidebar.projectInspector');
-  }
-}
-
-function getSelectedTrackKindLabel(
-  kind: NonNullable<WorkspaceSidebarProps['selectedTrack']>['kind']
-) {
-  switch (kind) {
-    case 'PRIMARY':
-      return translate('videoEditor.timeline.trackKindPrimary');
-    case 'AUDIO':
-      return translate('videoEditor.timeline.trackKindAudio');
-    case 'OVERLAY':
-      return translate('videoEditor.timeline.trackKindOverlay');
-    case 'SUBTITLE':
-      return translate('videoEditor.timeline.trackKindSubtitle');
   }
 }

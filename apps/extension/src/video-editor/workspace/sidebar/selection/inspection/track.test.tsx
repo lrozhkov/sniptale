@@ -1,3 +1,7 @@
+// @vitest-environment jsdom
+
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -13,9 +17,6 @@ vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
   useAppLocale: () => 'en',
 }));
-
-vi.stubGlobal('HTMLElement', class HTMLElement {});
-vi.stubGlobal('ShadowRoot', class ShadowRoot {});
 
 function createSharedCallbacks() {
   return {
@@ -110,9 +111,52 @@ describe('workspace-sidebar/selection/inspect-track', () => {
       <WorkspaceSidebarInspectPanel {...createProps(VideoTrackKind.PRIMARY, true)} />
     );
 
-    expect(markup).not.toContain('videoEditor.sidebar.trackNameLabel');
+    expect(markup).toContain('videoEditor.sidebar.trackNameLabel');
     expect(markup).not.toContain('videoEditor.sidebar.inspectorGroupLayout');
     expect(markup).not.toContain('videoEditor.sidebar.inspectorGroupStyle');
     expect(markup).not.toContain('videoEditor.timeline.deleteTrackTitle');
+  });
+
+  it('commits a localized track name without exposing the internal kind enum', () => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const props = createProps(VideoTrackKind.OVERLAY);
+    const container = document.createElement('div');
+    const root = createRoot(container);
+
+    act(() => {
+      root.render(<WorkspaceSidebarInspectPanel {...props} />);
+    });
+
+    expect(container.textContent).toContain('videoEditor.timeline.trackKindOverlay');
+    expect(container.textContent).not.toContain(VideoTrackKind.OVERLAY);
+    const input = container.querySelector<HTMLInputElement>(
+      'input[aria-label="videoEditor.sidebar.trackNameLabel"]'
+    );
+    expect(input).not.toBeNull();
+
+    if (input) {
+      input.value = 'Callouts';
+      act(() => {
+        input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+      });
+    }
+
+    expect(props.onRenameTrack).toHaveBeenCalledWith(props.selectedTrack.id, 'Callouts');
+
+    const restoredProps = {
+      ...props,
+      selectedTrack: { ...props.selectedTrack, name: 'Restored overlays' },
+    };
+    act(() => {
+      root.render(<WorkspaceSidebarInspectPanel {...restoredProps} />);
+    });
+    expect(
+      container.querySelector<HTMLInputElement>(
+        'input[aria-label="videoEditor.sidebar.trackNameLabel"]'
+      )?.value
+    ).toBe('Restored overlays');
+
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
   });
 });

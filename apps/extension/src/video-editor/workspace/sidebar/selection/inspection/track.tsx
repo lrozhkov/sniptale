@@ -5,20 +5,29 @@ import { SelectionEmptyState } from './helpers';
 import { PANEL_SECTION_CLASS_NAME } from '../shared/panel';
 import { TrackGeneralFields, TrackPanelDeleteButton } from '../track/sections';
 import { isVideoEditorPresentedTrack } from '../../../../project/operations/presented-tracks';
+import { getVideoTrackKindLabel } from '../../track-kind-label';
 
 export function InspectTrackPanel({
   onDeleteTrack,
+  onRenameTrack,
   selectedTrack,
 }: WorkspaceSidebarSelectionPanelProps) {
   if (!selectedTrack || !isVideoEditorPresentedTrack(selectedTrack)) {
     return <SelectionEmptyState />;
   }
 
-  return <TrackInspectorContent selectedTrack={selectedTrack} onDeleteTrack={onDeleteTrack} />;
+  return (
+    <TrackInspectorContent
+      selectedTrack={selectedTrack}
+      onDeleteTrack={onDeleteTrack}
+      onRenameTrack={onRenameTrack}
+    />
+  );
 }
 
 function TrackInspectorContent(props: {
   onDeleteTrack: WorkspaceSidebarSelectionPanelProps['onDeleteTrack'];
+  onRenameTrack: WorkspaceSidebarSelectionPanelProps['onRenameTrack'];
   onUpdateSubtitleTrackStyle?: WorkspaceSidebarSelectionPanelProps['onUpdateSubtitleTrackStyle'];
   selectedTrack: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedTrack']>;
 }) {
@@ -45,12 +54,18 @@ function createTrackGroups(props: TrackGroupProps) {
       id: 'general',
       label: translate('videoEditor.sidebar.inspectorGroupGeneral'),
       defaultActive: true,
-      content: <TrackGeneralFields selectedTrack={props.selectedTrack} />,
+      content: (
+        <TrackGeneralFields
+          selectedTrack={props.selectedTrack}
+          onRenameTrack={props.onRenameTrack}
+        />
+      ),
     },
   ] as const;
 }
 
 interface TrackGroupProps {
+  onRenameTrack: WorkspaceSidebarSelectionPanelProps['onRenameTrack'];
   selectedTrack: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedTrack']>;
 }
 
@@ -59,7 +74,7 @@ function TrackInfo(props: {
 }) {
   return (
     <p className="text-xs leading-5 text-[var(--sniptale-color-text-secondary)]">
-      {props.selectedTrack.kind}
+      {getVideoTrackKindLabel(props.selectedTrack.kind)}
     </p>
   );
 }

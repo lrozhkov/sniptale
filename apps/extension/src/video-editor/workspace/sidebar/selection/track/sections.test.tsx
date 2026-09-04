@@ -18,7 +18,9 @@ it('renders only general supported-track metadata and the explicit delete action
     </>
   );
 
-  expect(markup).toContain(VideoTrackKind.OVERLAY);
+  expect(markup).toContain('videoEditor.sidebar.trackNameLabel');
+  expect(markup).toContain('videoEditor.timeline.trackKindOverlay');
+  expect(markup).not.toContain(`>${VideoTrackKind.OVERLAY}<`);
   expect(markup).toContain('videoEditor.timeline.deleteTrackTitle');
   expect(markup).not.toContain('videoEditor.sidebar.subtitlePlacementLabel');
   expect(markup).not.toContain('type="range"');

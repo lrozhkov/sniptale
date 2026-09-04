@@ -192,6 +192,29 @@ async function verifyVideoEditorAddTrackMenu(
   await expect(addTrackButton).toBeFocused();
 }
 
+async function verifyVideoEditorTrackRename(
+  page: import('@playwright/test').Page,
+  screenshotPath: string
+): Promise<void> {
+  const cameraTrackButton = page
+    .locator('[data-ui="video-editor.timeline.track-select"]')
+    .filter({ hasText: 'Camera' });
+  await cameraTrackButton.click();
+
+  const nameInput = page.getByRole('textbox', {
+    name: translate('videoEditor.sidebar.trackNameLabel', 'ru'),
+  });
+  await nameInput.fill('Face cam');
+  await nameInput.press('Enter');
+
+  await expect(
+    page.locator('[data-ui="video-editor.timeline.track-select"]').filter({ hasText: 'Face cam' })
+  ).toBeVisible();
+  await expect(page.getByText('OVERLAY', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('PRIMARY', { exact: true })).toHaveCount(0);
+  await page.screenshot({ fullPage: true, path: screenshotPath });
+}
+
 async function verifyVideoEditorAnnotationCanvasFlow(
   page: import('@playwright/test').Page,
   screenshotPath: string
@@ -360,6 +383,8 @@ test('video editor keeps webcam independent with camera timeline and inspector c
     fullPage: true,
     path: testInfo.outputPath('video-editor-camera-overlay.png'),
   });
+
+  await verifyVideoEditorTrackRename(page, testInfo.outputPath('video-editor-track-inspector.png'));
 
   await verifyVideoEditorAddTrackMenu(page, testInfo.outputPath('video-editor-add-track-menu.png'));
 
