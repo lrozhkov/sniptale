@@ -58,3 +58,23 @@ it('resolves static and empty clip selection metadata through descriptor helpers
     getSelectionMeta({ kind: VideoEditorSelectionKind.CLIP, clipId: 'clip-1' }, null).title
   ).toBe('videoEditor.sidebar.sceneProperties');
 });
+
+it('uses the selected track name as its inspector identity', () => {
+  const selectedTrack = {
+    id: 'track-1',
+    isRoot: false,
+    kind: VideoTrackKind.OVERLAY,
+    locked: false,
+    name: 'Callouts',
+    order: 1,
+    visible: true,
+  };
+
+  expect(
+    getSelectionMeta(
+      { kind: VideoEditorSelectionKind.TRACK, trackId: selectedTrack.id },
+      null,
+      selectedTrack
+    )
+  ).toMatchObject({ label: 'Callouts', title: 'Callouts' });
+});

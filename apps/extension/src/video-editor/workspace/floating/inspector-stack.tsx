@@ -51,7 +51,8 @@ function VideoEditorFloatingInspectorContent({
     sidebarProps.selectedClip,
     sidebarProps.recordingId,
     sidebarProps.diagnosticsOpen,
-    sidebarProps.onToggleDiagnostics
+    sidebarProps.onToggleDiagnostics,
+    sidebarProps.selectedTrack
   );
   const [inspectorHeaderSlot, setInspectorHeaderSlot] = useState<InspectorGroupHeaderSlot | null>(
     null

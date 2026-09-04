@@ -11,7 +11,8 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = (props) => {
     props.selectedClip,
     props.recordingId,
     props.diagnosticsOpen,
-    props.onToggleDiagnostics
+    props.onToggleDiagnostics,
+    props.selectedTrack
   );
 
   if (props.collapsed) {

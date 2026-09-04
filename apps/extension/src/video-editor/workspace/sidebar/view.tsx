@@ -76,7 +76,8 @@ function createStaticSelectionMeta(Icon: LucideIcon, labelKey: TranslationKey) {
 
 export function getSelectionMeta(
   selection: VideoEditorSelection,
-  clip: WorkspaceSidebarProps['selectedClip']
+  clip: WorkspaceSidebarProps['selectedClip'],
+  selectedTrack?: WorkspaceSidebarProps['selectedTrack']
 ): { icon: React.ReactNode; label: string; title: string } {
   switch (selection.kind) {
     case VideoEditorSelectionKind.SCENE:
@@ -88,7 +89,13 @@ export function getSelectionMeta(
         title: clip?.name ?? translate('videoEditor.sidebar.sceneProperties'),
       };
     case VideoEditorSelectionKind.TRACK:
-      return createStaticSelectionMeta(Film, 'videoEditor.timeline.tracksTitle');
+      return selectedTrack
+        ? {
+            icon: renderSidebarIcon(Film),
+            label: selectedTrack.name,
+            title: selectedTrack.name,
+          }
+        : createStaticSelectionMeta(Film, 'videoEditor.timeline.tracksTitle');
     case VideoEditorSelectionKind.TRANSITION_JUNCTION:
       return createStaticSelectionMeta(Sparkles, 'videoEditor.timeline.transitionLane');
     case VideoEditorSelectionKind.CURSOR_SEGMENT:
