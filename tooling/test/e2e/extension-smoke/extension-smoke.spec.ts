@@ -163,6 +163,31 @@ async function expectBuiltVideoEditorGeometry(
     .toBe(defaultPreviewWidth);
 }
 
+async function verifyVideoEditorAnnotationCanvasFlow(
+  page: import('@playwright/test').Page,
+  screenshotPath: string
+): Promise<void> {
+  const timelineClips = page.locator('[data-project-timeline-clip]');
+  const timelineClipCount = await timelineClips.count();
+  const textTool = page.locator('[data-ui="video-editor.floating.insert-panel.text"]');
+  const stage = page.locator('[data-ui="video.preview.stage.root"]');
+  await expect(textTool).toHaveAttribute(
+    'title',
+    translate('videoEditor.app.textToolButton', 'ru')
+  );
+  await textTool.click();
+  await expect(textTool).toHaveAttribute('aria-pressed', 'true');
+  await expect(stage).toHaveClass(/cursor-crosshair/);
+
+  await stage.click({ position: { x: 680, y: 240 } });
+
+  await expect(timelineClips).toHaveCount(timelineClipCount + 1);
+  await expect(textTool).not.toHaveAttribute('aria-pressed', 'true');
+  await expect(stage).toHaveClass(/cursor-default/);
+  await expect(page.locator('[data-preview-selection-state="editable"]')).toBeVisible();
+  await page.screenshot({ fullPage: true, path: screenshotPath });
+}
+
 test('background service worker boots', async ({ context, extensionId }) => {
   const page = await context.newPage();
   await page.goto(`chrome-extension://${extensionId}/apps/extension/src/popup/index.html`, {
@@ -325,6 +350,11 @@ test('video editor keeps webcam independent with camera timeline and inspector c
     fullPage: true,
     path: testInfo.outputPath('video-editor-zoom-flow.png'),
   });
+
+  await verifyVideoEditorAnnotationCanvasFlow(
+    page,
+    testInfo.outputPath('video-editor-annotation-canvas-flow.png')
+  );
 });
 
 for (const extensionPage of builtExtensionPages) {

@@ -145,6 +145,17 @@ it('prioritizes active insert tools over existing preview overlays', () => {
   expect(props.onAddShapeOverlay).toHaveBeenCalledWith(VideoProjectShapeType.RECTANGLE);
 });
 
+it('shows insertion intent on the canvas only while an annotation tool is armed', () => {
+  const props = createProps();
+  const stage = renderRoot(props);
+
+  expect(stage.className).toContain('cursor-crosshair');
+
+  const idleStage = renderRoot({ ...props, activeInsertKind: null });
+  expect(idleStage.className).toContain('cursor-default');
+  expect(idleStage.className).not.toContain('cursor-crosshair');
+});
+
 it('drops pending video insert sessions when active insert is cleared externally', () => {
   const props = createProps();
   const stage = renderRoot(props);

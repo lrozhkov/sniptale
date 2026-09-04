@@ -207,6 +207,61 @@ it('selects the upper-track active clip first when clip bounds overlap', () => {
   );
 });
 
+it('clicks through a locked upper clip to the editable clip below it', () => {
+  const project = createSelectionProject();
+  const lowerClip = project.clips[0]!;
+  const upperClip = {
+    ...lowerClip,
+    id: 'locked-upper-clip',
+    trackId: project.tracks[0]!.id,
+  };
+  const beginInteraction = vi.fn();
+
+  lowerClip.id = 'editable-lower-clip';
+  lowerClip.trackId = project.tracks[2]!.id;
+  project.tracks[0]!.locked = true;
+
+  handleStagePointerDown(createPointerEvent(44, 48), {
+    activeClips: [lowerClip, upperClip],
+    beginInteraction,
+    camera: createCamera(),
+    onSelectClip: vi.fn(),
+    project,
+    stageRef: { current: createStage() },
+  });
+
+  expect(beginInteraction).toHaveBeenCalledWith(
+    expect.objectContaining({ clientX: 44, clientY: 48 }),
+    lowerClip,
+    'move'
+  );
+});
+
+it('shows a read-only outline without resize handles for a selected locked clip', () => {
+  const project = createSelectionProject();
+  const selectedClip = project.clips[0]!;
+
+  act(() => {
+    root?.render(
+      <PreviewStageSelectionOverlay
+        beginInteraction={vi.fn()}
+        camera={createCamera()}
+        project={project}
+        selectedClip={selectedClip}
+        selectedClipLocked={true}
+        stageRef={{ current: createStage() }}
+      />
+    );
+  });
+
+  const outline = container?.querySelector(
+    '[data-preview-selection-state="locked"]'
+  ) as HTMLElement | null;
+  expect(outline).toBeTruthy();
+  expect(outline?.className).toContain('border-dotted');
+  expect(outline?.querySelector('button')).toBeNull();
+});
+
 it('keeps locked annotation overlays fixed on stage even when the camera zooms and pans', () => {
   const { clip, project } = createLockedAnnotationProject();
   const stage = createStage();

@@ -60,7 +60,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('keeps temporary point-annotation tools out of the production insert panel', () => {
+it('exposes every supported one-shot annotation tool without mutating the project', () => {
   const controller = createFloatingWorkspaceController();
   hookMocks.controller = controller;
   const onActiveInsertKindChange = vi.fn();
@@ -76,12 +76,18 @@ it('keeps temporary point-annotation tools out of the production insert panel', 
   );
 
   clickByLabel(translate('videoEditor.app.selectMoveButton'));
+  clickByLabel(translate('videoEditor.app.textToolButton'));
+  clickByLabel(translate('videoEditor.app.shapeToolButton'));
+  clickByLabel(translate('videoEditor.app.arrowToolButton'));
+  clickByLabel(translate('videoEditor.app.lineToolButton'));
 
-  expect(container?.textContent).not.toContain(translate('videoEditor.stage.addText'));
-  expect(container?.textContent).not.toContain(translate('videoEditor.stage.addRectangle'));
-  expect(container?.textContent).not.toContain(translate('videoEditor.stage.addLine'));
-  expect(container?.textContent).not.toContain(translate('videoEditor.stage.addArrow'));
-  expect(onActiveInsertKindChange).toHaveBeenCalledWith(null);
+  expect(onActiveInsertKindChange.mock.calls).toEqual([
+    [null],
+    ['text'],
+    ['shape'],
+    ['arrow'],
+    ['line'],
+  ]);
   expect(controller.timeline.actions.insertion.onAddTextOverlay).not.toHaveBeenCalled();
   expect(controller.timeline.actions.insertion.onAddShapeOverlay).not.toHaveBeenCalled();
   expect(queryUi('video-editor.floating.tool-rail')).toBeNull();

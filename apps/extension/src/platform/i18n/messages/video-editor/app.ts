@@ -121,6 +121,22 @@ export const videoEditorAppMessages = defineMessageSource({
     ru: 'Медиа',
     en: 'Media',
   },
+  textToolButton: {
+    ru: 'Добавить текст',
+    en: 'Add text',
+  },
+  shapeToolButton: {
+    ru: 'Нарисовать фигуру',
+    en: 'Draw shape',
+  },
+  arrowToolButton: {
+    ru: 'Нарисовать стрелку',
+    en: 'Draw arrow',
+  },
+  lineToolButton: {
+    ru: 'Нарисовать линию',
+    en: 'Draw line',
+  },
   gridButton: {
     ru: 'Сетка',
     en: 'Grid',

@@ -88,8 +88,8 @@ export function beginPreviewStageInteraction(params: {
   tracks: VideoProject['tracks'];
 }): void {
   stopPreviewStagePointerEvent(params.event);
-  params.onSelectClip(params.clip.id);
   if (isPreviewStageInteractionBlocked(params.tracks, params.clip.trackId, params.stage)) return;
+  params.onSelectClip(params.clip.id);
 
   const stage = params.stage;
   if (!stage) return;
