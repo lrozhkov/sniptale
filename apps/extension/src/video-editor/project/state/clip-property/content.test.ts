@@ -84,7 +84,7 @@ it('updates textual content and style through the split text style owner', () =>
   store.getState().setProject(project);
   const shapeClipId = store
     .getState()
-    .addShapeOverlay(VideoProjectShapeType.RECTANGLE, project.tracks[2]!.id, 0);
+    .addShapeOverlay(VideoProjectShapeType.RECTANGLE, project.tracks[1]!.id, 0);
 
   store.getState().updateTextClipContent('clip-text', 'Updated text');
   store.getState().updateTextClipStyle('clip-text', {

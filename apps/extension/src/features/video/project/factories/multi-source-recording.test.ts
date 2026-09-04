@@ -121,7 +121,7 @@ function registerMultiSourceWebcamTests() {
       })
     );
     expect(videoClips[2]?.transform.width).toBeLessThan(project.width / 2);
-    expect(project.tracks.filter((track) => track.role === undefined)).toHaveLength(4);
+    expect(project.tracks.filter((track) => track.role === undefined)).toHaveLength(3);
     const frame = resolveVideoCompositionFrame(project, 1);
     const screenLayer = frame.visualLayers.find((layer) => layer.clipId === videoClips[0]?.id);
     const cameraLayer = frame.visualLayers.find((layer) => layer.clipId === videoClips[2]?.id);
@@ -164,7 +164,7 @@ describe('multi-source recording project factory edge cases', () => {
 
     expect(project.width).toBe(1280);
     expect(project.height).toBe(720);
-    expect(project.tracks.filter((track) => track.kind === VideoTrackKind.AUDIO)).toHaveLength(1);
+    expect(project.tracks.filter((track) => track.kind === VideoTrackKind.AUDIO)).toHaveLength(0);
     expect(project.clips.map((clip) => clip.type)).toEqual([VideoProjectClipType.VIDEO]);
     expect(project.duration).toBe(5);
   });

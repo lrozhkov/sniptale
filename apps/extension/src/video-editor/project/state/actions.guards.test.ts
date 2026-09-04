@@ -39,15 +39,13 @@ describe('video editor store project action guards', () => {
     vi.spyOn(Date, 'now').mockReturnValue(500);
     const store = createVideoEditorTestStore();
     const project = createEmptyVideoProject('Strict guards');
-    const [primaryTrack, , overlayTrack] = project.tracks;
+    const [primaryTrack] = project.tracks;
 
     store.getState().setProject(project);
     const videoClipId = store
       .getState()
       .addAssetClip(createVideoAsset('clip-guard-shared', true), primaryTrack!.id, 1);
-    const textClipId = store
-      .getState()
-      .addShapeOverlay(VideoProjectShapeType.RECTANGLE, overlayTrack!.id, 2);
+    const textClipId = store.getState().addShapeOverlay(VideoProjectShapeType.RECTANGLE, null, 2);
 
     store.getState().updateShapeClipStyle(textClipId!, {
       borderRadius: Number.NaN,

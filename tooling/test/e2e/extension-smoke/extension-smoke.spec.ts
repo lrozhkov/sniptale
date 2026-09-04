@@ -1,10 +1,14 @@
 import { mkdir } from 'node:fs/promises';
 import { CONTENT_APP_CONTAINER_ID, CONTENT_ROOT_ID } from '@sniptale/ui/branding';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
-import { createEmptyVideoProject } from '../../../../apps/extension/src/features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { createTextClip } from '../../../../apps/extension/src/features/video/project/factories/overlay-clip';
 import { createVideoProjectFromMultiSourceRecording } from '../../../../apps/extension/src/features/video/project/factories/multi-source-recording';
 import {
+  VideoTrackKind,
   VideoProjectClipType,
   VideoProjectTrackRole,
 } from '../../../../apps/extension/src/features/video/project/types';
@@ -424,9 +428,8 @@ test('video editor focused timeline reveals contextual clip actions', async ({
   hostOrigin,
 }, testInfo) => {
   const project = createEmptyVideoProject('Focused timeline proof');
-  const overlayTrack = project.tracks.find((track) => track.kind === 'OVERLAY');
-  if (!overlayTrack) throw new Error('Missing overlay track in video editor fixture');
-  overlayTrack.name = 'Titles';
+  const overlayTrack = createVideoProjectTrack('Titles', 0, VideoTrackKind.OVERLAY);
+  project.tracks.push(overlayTrack);
   const clip = createTextClip(overlayTrack.id, project.width, project.height, 0.5);
   clip.name = 'Intro title';
   project.clips = [clip];

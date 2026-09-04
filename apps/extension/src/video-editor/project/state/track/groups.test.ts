@@ -82,8 +82,8 @@ function verifyTrackGroupMutations() {
   const subtitleTrack = nextProject.tracks.find((track) => track.id === subtitleTrackId);
 
   expect(nextProject.name).toBe('Edited');
-  expect(nextProject.tracks).toHaveLength(5);
-  expect(nextProject.tracks[0]?.isRoot).toBe(true);
+  expect(nextProject.tracks).toHaveLength(3);
+  expect(primaryTrack?.isRoot).toBe(true);
   expect(primaryTrack).toEqual(
     expect.objectContaining({
       locked: true,
@@ -151,7 +151,7 @@ function verifyTrackDeleteSelectionCleanup() {
 
   const rootPrimaryTrackId = runtime.getState().project!.tracks[0]!.id;
   structure.deleteTrack(rootPrimaryTrackId);
-  expect(runtime.getState().project?.tracks).toHaveLength(3);
+  expect(runtime.getState().project?.tracks).toHaveLength(1);
   expect(runtime.getState().project?.tracks.some((track) => track.id === rootPrimaryTrackId)).toBe(
     true
   );

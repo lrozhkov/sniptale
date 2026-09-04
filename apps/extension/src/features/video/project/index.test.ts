@@ -3,6 +3,7 @@ import { convertTextClipToAnnotationClip } from './annotation/conversion';
 import { createAnnotationClip, createTextClip } from './factories/overlay-clip';
 import {
   createEmptyVideoProject,
+  createVideoProjectTrack,
   createVideoProjectFromRecording,
   getDefaultTrackName,
 } from './factories/creation';
@@ -55,11 +56,7 @@ function verifyPublicFacadeSourceTimeExports() {
     })
   ).toBe(true);
   expect(primaryTrack?.kind).toBe(VideoTrackKind.PRIMARY);
-  expect(sortedTracks.map((track) => track.kind)).toEqual([
-    VideoTrackKind.OVERLAY,
-    VideoTrackKind.PRIMARY,
-    VideoTrackKind.AUDIO,
-  ]);
+  expect(sortedTracks.map((track) => track.kind)).toEqual([VideoTrackKind.PRIMARY]);
   expect(getVideoProjectUtilityLanes(project)).toEqual({
     actions: { visible: true, locked: false },
     camera: { visible: true, locked: false },
@@ -125,8 +122,9 @@ function verifyRecordingSidecarVideos() {
 
 function verifyAnnotationFacadeExports() {
   const project = createEmptyVideoProject('Templates');
-  const annotationClip = createAnnotationClip(project.tracks[2]!.id, 1280, 720, 1);
-  const textClip = createTextClip(project.tracks[2]!.id, 1280, 720, 2);
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
+  const annotationClip = createAnnotationClip(project.tracks[1]!.id, 1280, 720, 1);
+  const textClip = createTextClip(project.tracks[1]!.id, 1280, 720, 2);
 
   expect(isAnnotationClip(annotationClip)).toBe(true);
   expect(resolveAnnotationPresentation(project, annotationClip, 1.25)).toEqual(

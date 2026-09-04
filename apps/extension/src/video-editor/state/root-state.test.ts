@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createEmptyVideoProject } from '../../features/video/project/factories/creation';
 import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../features/video/project/factories/creation';
+import {
+  VideoTrackKind,
   type VideoProjectAudioClip,
   type VideoProjectVideoClip,
   VideoMotionFocusMode,
@@ -93,6 +97,7 @@ function createRecordedTimelineState() {
 describe('video editor store timeline initial selection helpers', () => {
   it('prefers the first non-audio clip for the initial selection', () => {
     const project = createEmptyVideoProject('Demo');
+    project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
     const [primaryTrack, audioTrack] = project.tracks;
     project.clips = [
       createAudioClip({
@@ -110,6 +115,7 @@ describe('video editor store timeline initial selection helpers', () => {
 
   it('falls back to the first clip when the project only has audio clips', () => {
     const project = createEmptyVideoProject('Demo');
+    project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
     const [, audioTrack] = project.tracks;
     project.clips = [
       createAudioClip({
@@ -125,6 +131,7 @@ describe('video editor store timeline initial selection helpers', () => {
 describe('video editor store timeline track selection helpers', () => {
   it('resolves the selected track from the selected clip id', () => {
     const project = createEmptyVideoProject('Demo');
+    project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
     const [primaryTrack, audioTrack] = project.tracks;
     project.clips = [
       createVideoClip({
@@ -150,6 +157,7 @@ describe('video editor store timeline track selection helpers', () => {
 
   it('falls back to the current track when the clip is not found', () => {
     const project = createEmptyVideoProject('Demo');
+    project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
     const [primaryTrack] = project.tracks;
 
     expect(
@@ -176,6 +184,7 @@ describe('video editor store timeline project state owner', () => {
 function verifyProjectHydration(): void {
   const timeline = createRecordedTimelineState();
   const project = createEmptyVideoProject('Demo', 1440, 900);
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
 
   timeline.getState().setProject(project, 'rec-1');
 
@@ -197,6 +206,7 @@ function verifyProjectHydration(): void {
 function verifyTimelineActions(): void {
   const timeline = createRecordedTimelineState();
   const project = createEmptyVideoProject('Demo');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const [primaryTrack, audioTrack] = project.tracks;
   project.duration = 12;
   project.clips = [
@@ -220,6 +230,7 @@ function verifyTimelineActions(): void {
 function verifyProjectUpdateHydration(): void {
   const timeline = createRecordedTimelineState();
   const project = createEmptyVideoProject('Before');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
 
   timeline.getState().setProject(project);
   timeline.getState().updateProject((currentProject) => ({
@@ -234,6 +245,7 @@ describe('video editor store timeline control state owner', () => {
   it('updates readiness, diagnostics, and simple selection controls through state actions', () => {
     const timeline = createRecordedTimelineState();
     const project = createEmptyVideoProject('Scene');
+    project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
     project.motionRegions = [
       {
         duration: 1,

@@ -549,3 +549,26 @@ it('does not route markdown docs through structural analysis', async () => {
   expect(result.structuralPressure).toEqual([]);
   expect(result.structuralReport.files).toEqual([]);
 });
+
+it('preserves large boundary inventories within the observability text limits', async () => {
+  const { collectContractChecklist } = await import('./preflight/preflight-contract-report.mjs');
+  const { parsePreflightContext } = await import('../runtime/observability/analysis-schema.mjs');
+  const files = Array.from(
+    { length: 200 },
+    (_, index) => `apps/extension/src/video-editor/runtime/consumer-${index}.ts`
+  );
+  const consumers = collectContractChecklist({ codeFiles: files });
+  const analysis = {
+    owners: [],
+    runtimes: [],
+    riskAreas: [],
+    documents: [],
+    consumers,
+    proofRequirements: [],
+    structuralContext: [],
+  };
+  expect(() => parsePreflightContext(analysis)).not.toThrow();
+  for (const file of files) {
+    expect(consumers).toContain(`runtime/import boundary files: ${file}`);
+  }
+});

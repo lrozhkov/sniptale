@@ -2,8 +2,10 @@ import { expect, it, vi } from 'vitest';
 import {
   createEmptyVideoProject,
   createVideoProjectAsset,
+  createVideoProjectTrack,
 } from '../../../../features/video/project/factories/creation';
 import {
+  VideoTrackKind,
   VideoClipLinkMode,
   VideoProjectAssetType,
   VideoProjectClipType,
@@ -83,6 +85,7 @@ function createVideoClip(trackId: string, assetId: string) {
 
 function seedSingleClipState(runtime: ReturnType<typeof createMutableState>, locked = false) {
   const project = runtime.getState().project!;
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const asset = createVideoAsset();
   const trackId = project.tracks[0]!.id;
 
@@ -135,6 +138,7 @@ function createLinkedAudioClip(trackId: string, assetId: string) {
 
 function seedLinkedClipState(runtime: ReturnType<typeof createMutableState>) {
   const project = runtime.getState().project!;
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const asset = createVideoAsset();
 
   runtime.set({

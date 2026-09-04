@@ -1,5 +1,9 @@
+import { VideoTrackKind } from '../../../features/video/project/types';
 import { expect, it } from 'vitest';
-import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../features/video/project/factories/creation';
 import { VideoMediaFitMode } from '../../../features/video/project/types/media';
 import {
   VideoClipLinkMode,
@@ -63,6 +67,7 @@ function createClip(id: string, type: VideoProjectClipType, trackId: string): So
 
 function createProject(): VideoProject {
   const project = createEmptyVideoProject('Source timed clips');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const [primaryTrack, audioTrack] = project.tracks;
   project.assets = [createRecordingAsset()];
   project.clips = [

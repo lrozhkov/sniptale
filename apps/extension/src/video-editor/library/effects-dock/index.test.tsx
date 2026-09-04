@@ -6,7 +6,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import type { EffectBundleCatalogEntry } from '../../../features/video/project/effect-bundle/catalog';
 import { translate } from '../../../platform/i18n';
-import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../features/video/project/factories/creation';
 import { createTextClip } from '../../../features/video/project/factories/overlay-clip';
 import {
   VideoTrackKind,
@@ -123,6 +126,7 @@ it('keeps an invalid EffectV1 catalog row visible with delete-only recovery', as
 
 it('does not expose a transition that already owns an EffectV1 instance', () => {
   const project = createEmptyVideoProject('occupied transition');
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
   const track = project.tracks.find(({ kind }) => kind === VideoTrackKind.OVERLAY)!;
   const leading = { ...createTextClip(track.id, project.width, project.height, 0), id: 'leading' };
   const trailing = {

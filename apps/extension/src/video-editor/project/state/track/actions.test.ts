@@ -39,7 +39,7 @@ it('combines structure and toggle track actions into one project track owner', (
   actions.toggleUtilityLaneVisibility('actions');
   actions.toggleUtilityLaneLock('camera');
 
-  expect(runtime.getState().project?.tracks).toHaveLength(4);
+  expect(runtime.getState().project?.tracks).toHaveLength(2);
   expect(runtime.getState().project?.utilityLanes).toEqual({
     actions: { visible: false, locked: false },
     camera: { visible: true, locked: true },

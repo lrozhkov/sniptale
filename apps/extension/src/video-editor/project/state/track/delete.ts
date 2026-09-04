@@ -12,22 +12,7 @@ function canDeleteProjectTrack(project: VideoProject, trackId: string): boolean 
     return false;
   }
 
-  const sameKindTracks = project.tracks.filter((item) => item.kind === track.kind);
-  if (sameKindTracks.length <= 1) {
-    return false;
-  }
-
-  return !isProtectedRootTrack(sameKindTracks, trackId);
-}
-
-function isProtectedRootTrack(sameKindTracks: VideoProject['tracks'], trackId: string): boolean {
-  const explicitRootTrack = sameKindTracks.find((track) => track.isRoot);
-  if (explicitRootTrack) {
-    return explicitRootTrack.id === trackId;
-  }
-
-  const fallbackRootTrack = [...sameKindTracks].sort((left, right) => left.order - right.order)[0];
-  return fallbackRootTrack?.id === trackId;
+  return !track.isRoot;
 }
 
 export function deleteProjectTrack(project: VideoProject, trackId: string): VideoProject {

@@ -1,6 +1,9 @@
 import { fileURLToPath } from 'node:url';
 import { expect, type Page } from '@playwright/test';
-import { createEmptyVideoProject } from '../../../../apps/extension/src/features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { createTextClip } from '../../../../apps/extension/src/features/video/project/factories/overlay-clip';
 // prettier-ignore
 import {
@@ -19,7 +22,6 @@ import {
 import {
   applyHarnessBootstrap,
   E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
-  VIDEO_EDITOR_EFFECT_ADD_LABEL,
   VIDEO_EDITOR_EFFECT_IMPORT_LABEL,
   VIDEO_EDITOR_HARNESS_PATH,
 } from '../extension-critical.helpers';
@@ -66,8 +68,8 @@ export async function openEffectVideoEditorHarness(
 
 export function createTransitionE2eProject(): VideoProject {
   const project = createEmptyVideoProject('EffectV1 transition E2E', 3840, 2160);
-  const track = project.tracks.find(({ kind }) => kind === VideoTrackKind.OVERLAY);
-  if (!track) throw new Error('Overlay track unavailable');
+  const track = createVideoProjectTrack('Effects', 0, VideoTrackKind.OVERLAY);
+  project.tracks.push(track);
   const laneId = createVideoProjectClipLogicalLaneId(0);
   const leading = {
     ...createTextClip(track.id, project.width, project.height, 0),
@@ -105,10 +107,7 @@ export async function importAndApplyEffect(
   await importEffectFile(page, args);
 
   const documentLabel = page.getByText(args.documentId, { exact: true });
-  const addButton = documentLabel.locator('..').locator('..').getByRole('button', {
-    name: VIDEO_EDITOR_EFFECT_ADD_LABEL,
-    exact: true,
-  });
+  const addButton = documentLabel.locator('..').locator('..').getByRole('button');
   await expect(addButton).toBeEnabled();
   await addButton.click();
 }
@@ -117,9 +116,18 @@ export async function importEffectFile(
   page: Page,
   args: { documentId: string; fixturePath: string }
 ): Promise<void> {
-  const importControl = page.getByText(VIDEO_EDITOR_EFFECT_IMPORT_LABEL, { exact: true });
-  await expect(importControl).toBeVisible();
-  await importControl.locator('input[type="file"]').setInputFiles(args.fixturePath);
+  const dock = page.locator('[data-ui="video-editor.effects-library.dock"]');
+  if (!(await dock.isVisible())) {
+    await page.locator('[data-ui="video-editor.floating.insert-panel.templates"]').click();
+  }
+  const importControl = dock.getByRole('button', {
+    name: VIDEO_EDITOR_EFFECT_IMPORT_LABEL,
+    exact: true,
+  });
+  await expect(importControl).toBeEnabled();
+  const chooserPromise = page.waitForEvent('filechooser');
+  await importControl.click();
+  await (await chooserPromise).setFiles(args.fixturePath);
 
   const documentLabel = page.getByText(args.documentId, { exact: true });
   await expect(documentLabel).toBeVisible();

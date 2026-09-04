@@ -64,6 +64,8 @@ it('moves tracks against normalized visual order rather than raw array position'
     .getState()
     .project!.tracks.find((track) => track.kind === VideoTrackKind.PRIMARY)!.id;
 
+  structure.addTrack(VideoTrackKind.OVERLAY);
+  structure.addTrack(VideoTrackKind.AUDIO);
   structure.moveTrack(primaryTrackId, 'up');
 
   expect(getSortedTracks(runtime.getState().project!).map((track) => track.kind)).toEqual([
@@ -76,15 +78,15 @@ it('moves tracks against normalized visual order rather than raw array position'
 it('protects root tracks while allowing selected extra tracks to fall back to the first remaining track', () => {
   const runtime = createMutableState();
   const structure = createProjectTrackStructureActions(runtime.set);
-  const rootOverlayTrackId = runtime
+  const rootPrimaryTrackId = runtime
     .getState()
-    .project!.tracks.find((track) => track.kind === VideoTrackKind.OVERLAY)!.id;
+    .project!.tracks.find((track) => track.kind === VideoTrackKind.PRIMARY)!.id;
 
   structure.addTrack(VideoTrackKind.OVERLAY);
   const extraOverlayTrackId = runtime.getState().project!.tracks.at(-1)!.id;
 
-  structure.deleteTrack(rootOverlayTrackId);
-  expect(runtime.getState().project?.tracks.some((track) => track.id === rootOverlayTrackId)).toBe(
+  structure.deleteTrack(rootPrimaryTrackId);
+  expect(runtime.getState().project?.tracks.some((track) => track.id === rootPrimaryTrackId)).toBe(
     true
   );
 

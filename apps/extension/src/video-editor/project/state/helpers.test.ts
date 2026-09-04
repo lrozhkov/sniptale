@@ -26,7 +26,10 @@ import {
 import { resetVideoEditorProjectHistory } from '../history';
 
 function createLinkedProject(): VideoProject {
-  const project = createEmptyVideoProject('Helpers');
+  const project = ensureTrackForKind(
+    createEmptyVideoProject('Helpers'),
+    VideoTrackKind.AUDIO
+  ).project;
   const [primaryTrack, audioTrack] = project.tracks;
   project.clips = [
     {
@@ -93,15 +96,16 @@ function verifyEnsureTrackForKind(): void {
     project,
     trackId: project.tracks[0]!.id,
   });
-  expect(ensureTrackForKind(project, VideoTrackKind.AUDIO, null)).toEqual({
-    project,
-    trackId: project.tracks[1]!.id,
-  });
+  const audio = ensureTrackForKind(project, VideoTrackKind.AUDIO);
+  expect(audio.project.tracks).toHaveLength(2);
+  expect(audio.project.tracks[1]?.order).toBeGreaterThan(project.tracks[0]!.order);
+  expect(ensureTrackForKind(audio.project, VideoTrackKind.AUDIO).project).toBe(audio.project);
 
-  const withoutOverlay = { ...project, tracks: project.tracks.slice(0, 2) };
-  const created = ensureTrackForKind(withoutOverlay, VideoTrackKind.OVERLAY, null);
-  expect(created.project.tracks).toHaveLength(3);
+  const created = ensureTrackForKind(project, VideoTrackKind.OVERLAY);
+  expect(created.project.tracks).toHaveLength(2);
+  expect(created.project.tracks[1]?.order).toBeLessThan(project.tracks[0]!.order);
   expect(created.project.updatedAt).toBe(100);
+  expect(project.tracks).toHaveLength(1);
 }
 
 function verifyProjectHelperGuards(): void {

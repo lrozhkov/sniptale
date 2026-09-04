@@ -1,7 +1,11 @@
 import { expect, it } from 'vitest';
 import { createAnnotationClip } from '../../../../features/video/project/factories/overlay-clip';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../features/video/project/factories/creation';
+import {
+  VideoTrackKind,
   VideoClipLinkMode,
   VideoClipTransitionKind,
   VideoMediaFitMode,
@@ -102,7 +106,8 @@ function createAnnotationOverlayClip(
   project: ReturnType<typeof createVideoProject>
 ): VideoProjectAnnotationClip {
   const overlayProject = createEmptyVideoProject('Preview');
-  const clip = createAnnotationClip(overlayProject.tracks[2]!.id, project.width, project.height, 0);
+  overlayProject.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
+  const clip = createAnnotationClip(overlayProject.tracks[1]!.id, project.width, project.height, 0);
   clip.transform.rotation = 15;
   return clip;
 }

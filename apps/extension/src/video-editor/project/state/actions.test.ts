@@ -32,11 +32,11 @@ describe('video editor store project track and asset actions', () => {
     const project = createEmptyVideoProject('Delete track');
 
     store.getState().setProject(project);
-    const audioTrackId = project.tracks[1]!.id;
     store.getState().addTrack(VideoTrackKind.OVERLAY);
     const extraOverlayTrackId = store.getState().project!.tracks.at(-1)!.id;
     const overlayClipId = store.getState().addTextOverlay(extraOverlayTrackId, 1);
     store.getState().addTrack(VideoTrackKind.AUDIO);
+    const audioTrackId = store.getState().selectedTrackId!;
     store.getState().selectClip(overlayClipId!);
     store.getState().deleteTrack(extraOverlayTrackId);
     store.getState().deleteTrack(audioTrackId);
@@ -88,7 +88,7 @@ function verifyTrackAndAssetMutations(): void {
 
   const nextProject = store.getState().project;
   expect(nextProject?.name).toBe('Edited');
-  expect(nextProject?.tracks).toHaveLength(5);
+  expect(nextProject?.tracks).toHaveLength(3);
   expect(nextProject?.tracks.find((track) => track.id === primaryTrackId)).toEqual(
     expect.objectContaining({
       locked: true,
@@ -172,14 +172,17 @@ function verifyClipTimelineMutations(): void {
 
   store.getState().setProject(project);
   const videoClipId = store.getState().addAssetClip(groupedVideoAsset, project.tracks[0]!.id, 1);
-  const textClipId = store.getState().addTextOverlay(project.tracks[2]!.id, 4);
+  const textClipId = store.getState().addTextOverlay(null, 4);
   expect(videoClipId).toBeTruthy();
   expect(textClipId).toBeTruthy();
 
+  const overlayTrackId = store
+    .getState()
+    .project!.clips.find((clip) => clip.id === textClipId)!.trackId;
   store.getState().detachClipGroup(videoClipId!);
   store.getState().duplicateClip(textClipId!);
   expect(
-    store.getState().project!.clips.filter((clip) => clip.trackId === project.tracks[2]!.id).length
+    store.getState().project!.clips.filter((clip) => clip.trackId === overlayTrackId).length
   ).toBeGreaterThan(1);
   store.getState().moveClip(textClipId!, 5);
   store.getState().trimClipStart(textClipId!, 5.2);
@@ -193,7 +196,7 @@ function verifyClipTimelineMutations(): void {
   expect(groupedClips.every((clip) => clip.linkMode === 'DETACHED')).toBe(true);
   expect(nextProject.clips.some((clip) => clip.id === textClipId)).toBe(false);
   expect(
-    nextProject.clips.filter((clip) => clip.trackId === project.tracks[2]!.id).length
+    nextProject.clips.filter((clip) => clip.trackId === overlayTrackId).length
   ).toBeGreaterThan(0);
   expect(nextProject.updatedAt).toBe(500);
 }
@@ -223,16 +226,14 @@ function verifyCloseGapAction(): void {
 function verifyClipPropertyMutations(): void {
   const store = createVideoEditorTestStore();
   const project = createEmptyVideoProject('Draft');
-  const [primaryTrack, , overlayTrack] = project.tracks;
+  const [primaryTrack] = project.tracks;
   const groupedVideoAsset = createVideoAsset('clip-b', true);
 
   store.getState().setProject(project);
   const videoClipId = store.getState().addAssetClip(groupedVideoAsset, primaryTrack!.id, 1);
-  const annotationClipId = store.getState().addAnnotationOverlay(overlayTrack!.id, 1.5);
-  const textClipId = store.getState().addTextOverlay(overlayTrack!.id, 2);
-  const shapeClipId = store
-    .getState()
-    .addShapeOverlay(VideoProjectShapeType.RECTANGLE, overlayTrack!.id, 3);
+  const annotationClipId = store.getState().addAnnotationOverlay(null, 1.5);
+  const textClipId = store.getState().addTextOverlay(null, 2);
+  const shapeClipId = store.getState().addShapeOverlay(VideoProjectShapeType.RECTANGLE, null, 3);
 
   expect(videoClipId).toBeTruthy();
   expect(annotationClipId).toBeTruthy();
@@ -252,16 +253,14 @@ function verifyClipPropertyMutations(): void {
 function verifyNumericGuardPaths(): void {
   const store = createVideoEditorTestStore();
   const project = createEmptyVideoProject('Numeric guards');
-  const [primaryTrack, , overlayTrack] = project.tracks;
+  const [primaryTrack] = project.tracks;
 
   store.getState().setProject(project);
   const videoClipId = store
     .getState()
     .addAssetClip(createVideoAsset('clip-guard', true), primaryTrack!.id, 1);
-  const textClipId = store.getState().addTextOverlay(overlayTrack!.id, 2);
-  const shapeClipId = store
-    .getState()
-    .addShapeOverlay(VideoProjectShapeType.RECTANGLE, overlayTrack!.id, 3);
+  const textClipId = store.getState().addTextOverlay(null, 2);
+  const shapeClipId = store.getState().addShapeOverlay(VideoProjectShapeType.RECTANGLE, null, 3);
 
   store.getState().updateClipTransform(videoClipId!, { x: Number.NaN, width: Number.NaN });
   store.getState().updateClipVolume(videoClipId!, Number.NaN);

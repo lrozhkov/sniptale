@@ -5,9 +5,11 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createEmptyVideoProject,
+  createVideoProjectTrack,
   createVideoProjectAsset,
 } from '../../../../features/video/project/factories/creation';
 import {
+  VideoTrackKind,
   type VideoProject,
   type VideoProjectAudioClip,
   type VideoProjectClip,
@@ -96,6 +98,7 @@ function createProject(
   audioCapableVideoAssetIds: string[] = []
 ): VideoProject {
   const project = createEmptyVideoProject('Preview');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const audioCapableVideoSet = new Set(audioCapableVideoAssetIds);
 
   project.assets = clips.map((clip) =>
@@ -175,6 +178,7 @@ afterEach(async () => {
 
 async function verifiesActiveVideoClipAudio() {
   const project = createEmptyVideoProject('Preview');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const clip = createVideoClip(project.tracks[0]!.id);
   const audio = createAudioElement();
 
@@ -193,6 +197,7 @@ async function verifiesActiveVideoClipAudio() {
 
 async function verifiesActiveAudioClipPlayback() {
   const project = createEmptyVideoProject('Preview');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const clip = createAudioClip(project.tracks[1]!.id);
   const audio = createAudioElement();
 
@@ -211,6 +216,7 @@ async function verifiesActiveAudioClipPlayback() {
 
 async function verifiesPausedSeekSync() {
   const project = createEmptyVideoProject('Preview');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const clip = createAudioClip(project.tracks[1]!.id);
   const audio = createAudioElement({ currentTime: 3.9 });
 
@@ -228,6 +234,7 @@ async function verifiesPausedSeekSync() {
 
 async function verifiesStableAcceleratedAudioPlayback() {
   const project = createEmptyVideoProject('Preview');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const clip = createAudioClip(project.tracks[1]!.id, { playbackRate: 3 });
   const audio = createAudioElement({
     currentTime: 8.22,
@@ -251,6 +258,7 @@ async function verifiesStableAcceleratedAudioPlayback() {
 
 async function verifiesSlowPlaybackRateAudioSync() {
   const project = createEmptyVideoProject('Preview');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const clips = [0.5, 1, 2].map((playbackRate) =>
     createAudioClip(project.tracks[1]!.id, {
       id: `clip-audio-${playbackRate}`,

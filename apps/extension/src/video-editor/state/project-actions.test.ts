@@ -142,6 +142,7 @@ describe('video editor timeline project state', () => {
   it('hydrates subtitle-first projects with one presented selection authority', () => {
     const store = createTimelineStore();
     const project = createEmptyVideoProject('Subtitle-first');
+    project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
     const subtitleTrack = createVideoProjectTrack('Subtitles', 4, VideoTrackKind.SUBTITLE);
     const overlayTrack = project.tracks.find((track) => track.kind === VideoTrackKind.OVERLAY)!;
     const subtitleClip = createSubtitleClip(subtitleTrack.id, project.width, project.height, 0);

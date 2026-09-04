@@ -56,11 +56,21 @@ export function collectContractChecklist(context) {
 
   return [
     'owner seam / boundary: name the runtime or import owner before editing',
-    `public/shared contracts touched: ${sharedContracts.join(', ') || 'none detected'}`,
-    `runtime/import boundary files: ${[...runtimeBoundaries, ...importBoundaries].join(', ') || 'none detected'}`,
+    ...describeBoundaryFiles('public/shared contracts touched', sharedContracts),
+    ...describeBoundaryFiles('runtime/import boundary files', [
+      ...runtimeBoundaries,
+      ...importBoundaries,
+    ]),
     'negative/failure proof: malformed, stale/replay/duplicate, cancellation, rollback if applicable',
     'user-visible acceptance proof: roundtrip or UI workflow for the changed owner seam',
   ];
+}
+
+function describeBoundaryFiles(label, files) {
+  const uniqueFiles = [...new Set(files)];
+  return uniqueFiles.length > 0
+    ? uniqueFiles.map((file) => `${label}: ${file}`)
+    : [`${label}: none detected`];
 }
 
 export function collectTransitiveConsumerHints(context) {

@@ -1,9 +1,14 @@
 import { createAnnotationClip, createShapeClip, createTextClip } from '../factories/overlay-clip';
-import { createEmptyVideoProject, createVideoProjectAsset } from '../factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+  createVideoProjectAsset,
+} from '../factories/creation';
 import { createVideoClipFromAsset } from '../factories/clip';
 import { createVideoProjectCursorTrack } from '../defaults';
 import { createVideoProjectMotionRegion } from '../motion/index';
 import {
+  VideoTrackKind,
   VideoProjectActionEventKind,
   VideoProjectActionPreset,
   VideoProjectAssetType,
@@ -47,9 +52,10 @@ export function createActionEvent(): VideoProjectActionEvent {
 
 export function createProject() {
   const project = createEmptyVideoProject('Domain Boundary', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
   const asset = createAsset();
   const clip = createVideoClipFromAsset(project.tracks[0]!.id, asset, 1280, 720);
-  const annotationClip = createAnnotationClip(project.tracks[2]!.id, 1280, 720, 1);
+  const annotationClip = createAnnotationClip(project.tracks[1]!.id, 1280, 720, 1);
   const actionEvent = createActionEvent();
 
   return {
@@ -70,17 +76,19 @@ export function createProject() {
 
 export function createTextProject() {
   const project = createEmptyVideoProject('Text Domain Boundary', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
   return {
     ...project,
-    clips: [createTextClip(project.tracks[2]!.id, 1280, 720, 0)],
+    clips: [createTextClip(project.tracks[1]!.id, 1280, 720, 0)],
   };
 }
 
 export function createShapeProject() {
   const project = createEmptyVideoProject('Shape Domain Boundary', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
   const asset = createAsset();
   const shapeClip = createShapeClip(
-    project.tracks[2]!.id,
+    project.tracks[1]!.id,
     1280,
     720,
     0,

@@ -48,7 +48,8 @@ it('renders a compact track header together with track rows and effect lanes', (
   expect(container?.textContent).toContain('videoEditor.timeline.telemetryLane');
   expect(container?.textContent).toContain('videoEditor.timeline.motionLane');
   expect(container?.textContent).toContain('User custom video title');
-  expect(container?.textContent).toContain('O1');
+  expect(container?.textContent).toContain('V1');
+  expect(container?.textContent).not.toContain('O1');
 });
 
 it('omits the telemetry label row when the read-only telemetry lane is hidden', () => {

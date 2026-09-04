@@ -5,7 +5,7 @@ import { expect, it } from 'vitest';
 import { createEffectCatalogEntry } from '../../../../composition/persistence/effect-bundles/catalog-builder';
 import type { EffectBundleCatalogEntry } from '../effect-bundle/catalog';
 import { importRawEffectDocument } from '../effect-bundle/import/zip';
-import { createEmptyVideoProject } from '../factories/creation';
+import { createEmptyVideoProject, createVideoProjectTrack } from '../factories/creation';
 import {
   createRecordingAudioClip,
   createRecordingBaseClip,
@@ -68,9 +68,10 @@ it('fails when a declared transition has no renderable overlap segment', async (
 it('rejects audio and standalone-host clips as target-effect inputs', async () => {
   const catalog = await createRawCatalog('neutral-target-effect.sniptale-effect.json');
   const project = createProjectWithTransition();
-  const audioTrack = project.tracks.find(({ kind }) => kind === VideoTrackKind.AUDIO)!;
+  const audioTrack = createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO);
+  const overlayTrack = createVideoProjectTrack('Effects', 0, VideoTrackKind.OVERLAY);
+  project.tracks.push(audioTrack, overlayTrack);
   const audio = createRecordingAudioClip(project.assets[0]!, audioTrack.id, 1, 'audio-group');
-  const overlayTrack = project.tracks.find(({ kind }) => kind === VideoTrackKind.OVERLAY)!;
   const host = createEffectHostClip({
     duration: 1,
     effectInstanceId: 'standalone-host-owner',

@@ -1,9 +1,13 @@
+import { VideoTrackKind } from '../../../../features/video/project/types';
 // @vitest-environment jsdom
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../features/video/project/factories/creation';
 import type { VideoEditorImportPlacement } from '../../../contracts/insertion';
 import { createSceneSelection } from '../../../project/selection/model';
 import { ProjectTimelineCanvas } from './';
@@ -71,6 +75,8 @@ function renderCanvas(options: {
   onUnsupportedTimelineFileDrop?: () => void;
 }) {
   const project = createEmptyVideoProject('Canvas drop');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
 
   act(() => {
     root?.render(

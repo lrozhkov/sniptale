@@ -3,8 +3,12 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../features/video/project/factories/creation';
+import {
+  VideoTrackKind,
   type VideoProject,
   type VideoProjectAudioClip,
   VideoClipLinkMode,
@@ -46,6 +50,7 @@ function createAudioClip(trackId: string): VideoProjectAudioClip {
 
 function createProject(clip: VideoProjectAudioClip): VideoProject {
   const project = createEmptyVideoProject('Preview');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   project.clips = [clip];
   project.duration = clip.startTime + clip.duration;
   return project;
@@ -109,6 +114,7 @@ afterEach(() => {
 
 it('keeps 1x preview audio free-running across modest playback drift between render ticks', async () => {
   const project = createEmptyVideoProject('Preview');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const clip = createAudioClip(project.tracks[1]!.id);
   const audio = createAudioElement();
   const props = {

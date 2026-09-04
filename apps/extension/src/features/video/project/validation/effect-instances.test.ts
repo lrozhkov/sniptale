@@ -7,14 +7,19 @@ import {
   validateEffectV1Document,
 } from '@sniptale/runtime-contracts/effect-v1';
 
-import { createEmptyVideoProject } from '../factories/creation';
+import { createEmptyVideoProject, createVideoProjectTrack } from '../factories/creation';
 import { createEffectHostClip } from '../factories/overlay-clip';
 import { createRecordingBaseClip, createRecordingProjectAsset } from '../factories/recording';
 import type {
   VideoProjectEffectInstance,
   VideoProjectEffectSnapshot,
 } from '../effect-instance/types';
-import { VideoTransitionEasing, VideoTransitionKind, type VideoProject } from '../types';
+import {
+  VideoTrackKind,
+  VideoTransitionEasing,
+  VideoTransitionKind,
+  type VideoProject,
+} from '../types';
 import {
   hasValidEffectProjectReferences,
   isEffectProjectBranches,
@@ -198,6 +203,7 @@ function createInstance(
 
 function createProjectWithTargets(): VideoProject {
   const project = createEmptyVideoProject('references');
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
   const asset = createRecordingProjectAsset({
     duration: 9,
     filename: 'recording.webm',

@@ -3,12 +3,16 @@ import type {
   VideoProjectEffectInstance,
   VideoProjectEffectSnapshot,
 } from '../../../features/video/project/effect-instance/types';
-import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../features/video/project/factories/creation';
 import {
   createEffectHostClip,
   createTextClip,
 } from '../../../features/video/project/factories/overlay-clip';
 import {
+  VideoTrackKind,
   VideoTransitionEasing,
   VideoTransitionKind,
   type VideoProject,
@@ -23,6 +27,7 @@ export function createStoreWithEffects() {
 
 export function createProjectWithEffects(): VideoProject {
   const project = createEmptyVideoProject('effect-actions');
+  project.tracks.push(createVideoProjectTrack('Effects', 0, VideoTrackKind.OVERLAY));
   const primaryTrackId = project.tracks[0]!.id;
   const overlayTrackId = project.tracks.find(({ kind }) => kind === 'OVERLAY')!.id;
   const leading = createTextClip(primaryTrackId, project.width, project.height, 3);

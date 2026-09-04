@@ -1,6 +1,13 @@
 import { expect, it } from 'vitest';
-import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
-import { VideoProjectAssetType, VideoProjectClipType } from '../../../features/video/project/types';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../features/video/project/factories/creation';
+import {
+  VideoTrackKind,
+  VideoProjectAssetType,
+  VideoProjectClipType,
+} from '../../../features/video/project/types';
 import { pruneUnusedProjectAssets } from './helpers';
 
 function createVideoAsset(id: string, name: string) {
@@ -91,7 +98,9 @@ it('prunes orphaned assets that are no longer referenced by project clips', () =
 
 it('keeps assets referenced by embedded shape template graphics', () => {
   const project = createEmptyVideoProject('Embedded assets');
-  const overlayTrackId = project.tracks[2]!.id;
+  const overlayTrack = createVideoProjectTrack('Graphics', 0, VideoTrackKind.OVERLAY);
+  project.tracks.push(overlayTrack);
+  const overlayTrackId = overlayTrack.id;
 
   project.assets = [
     createVideoAsset('badge-asset', 'Kept badge'),

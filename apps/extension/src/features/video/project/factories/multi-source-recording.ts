@@ -99,21 +99,12 @@ function createVideoTracks(count: number, cameraTrackIndex: number | null): Vide
   });
 }
 
-function createOverlayTrack(): VideoProjectTrack {
-  return createVideoProjectTrack(
-    getDefaultTrackName(VideoTrackKind.OVERLAY, 1),
-    0,
-    VideoTrackKind.OVERLAY,
-    true
-  );
-}
-
 function createAudioTrack(order: number): VideoProjectTrack {
   return createVideoProjectTrack(
     getDefaultTrackName(VideoTrackKind.AUDIO, 1),
     order,
     VideoTrackKind.AUDIO,
-    true
+    false
   );
 }
 
@@ -198,7 +189,7 @@ export function createVideoProjectFromMultiSourceRecording(options: {
     createdAt: now,
     updatedAt: now,
     assets: audioAsset ? [...videoAssets, audioAsset] : videoAssets,
-    tracks: [createOverlayTrack(), ...videoTracks, audioTrack],
+    tracks: audioAsset ? [...videoTracks, audioTrack] : videoTracks,
     clips,
     transitions: [],
     utilityLanes: createDefaultVideoProjectUtilityLanes(),

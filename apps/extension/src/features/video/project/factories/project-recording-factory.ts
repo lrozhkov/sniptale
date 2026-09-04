@@ -75,22 +75,15 @@ export function createRecordingVideoProject(
     motionRegions: options.motionRegions ?? [],
     options,
     sidecarAssets,
-    tracks: tracks.allTracks,
+    tracks: tracks.allTracks.filter((track) => clips.some((clip) => clip.trackId === track.id)),
   });
 }
 
 function createDefaultProjectTracks(deps: RecordingProjectFactoryDeps): {
   audioTrack: VideoProjectTrack;
-  overlayTrack: VideoProjectTrack;
   primaryTrack: VideoProjectTrack;
 } {
   return {
-    overlayTrack: deps.createVideoProjectTrack(
-      deps.getDefaultTrackName(VideoTrackKind.OVERLAY, 1),
-      0,
-      VideoTrackKind.OVERLAY,
-      true
-    ),
     primaryTrack: deps.createVideoProjectTrack(
       deps.getDefaultTrackName(VideoTrackKind.PRIMARY, 1),
       1,
@@ -101,7 +94,7 @@ function createDefaultProjectTracks(deps: RecordingProjectFactoryDeps): {
       deps.getDefaultTrackName(VideoTrackKind.AUDIO, 1),
       2,
       VideoTrackKind.AUDIO,
-      true
+      false
     ),
   };
 }
@@ -131,15 +124,10 @@ function createRecordingProjectTrackSet(
           deps.getDefaultTrackName(VideoTrackKind.AUDIO, 1),
           sidecarAssetCount + 2,
           VideoTrackKind.AUDIO,
-          true
+          false
         );
   return {
-    allTracks: [
-      defaultTracks.primaryTrack,
-      ...sidecarTracks,
-      audioTrack,
-      defaultTracks.overlayTrack,
-    ],
+    allTracks: [defaultTracks.primaryTrack, ...sidecarTracks, audioTrack],
     audioTrack,
     sidecarTracks,
   };

@@ -1,8 +1,14 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { createAnnotationClip } from '../../../../../features/video/project/factories/overlay-clip';
-import { createEmptyVideoProject } from '../../../../../features/video/project/factories/creation';
-import { VideoOverlayTemplateKind } from '../../../../../features/video/project/types';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../../features/video/project/factories/creation';
+import {
+  VideoTrackKind,
+  VideoOverlayTemplateKind,
+} from '../../../../../features/video/project/types';
 import { AnnotationStyleControls } from './style-controls';
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
@@ -13,8 +19,9 @@ vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
 
 function createProps() {
   const project = createEmptyVideoProject('Annotation style controls');
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
   const clip = createAnnotationClip(
-    project.tracks[2]!.id,
+    project.tracks[1]!.id,
     project.width,
     project.height,
     0,

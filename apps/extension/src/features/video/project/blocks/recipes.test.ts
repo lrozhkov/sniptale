@@ -1,6 +1,11 @@
 import { expect, it } from 'vitest';
-import { createEmptyVideoProject } from '../factories/creation';
-import { VideoBlockKind, VideoClipLinkMode, VideoProjectClipType } from '../types/index';
+import { createEmptyVideoProject, createVideoProjectTrack } from '../factories/creation';
+import {
+  VideoTrackKind,
+  VideoBlockKind,
+  VideoClipLinkMode,
+  VideoProjectClipType,
+} from '../types/index';
 import {
   expandVideoBlockRecipe,
   getVideoBlockRecipeDefinition,
@@ -20,15 +25,16 @@ it('keeps the block selection order stable for the gallery-first insertion flow'
 
 it('expands recipes into normal project clips without hidden state', () => {
   const project = createEmptyVideoProject('Blocks');
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
   const clips = expandVideoBlockRecipe(
     VideoBlockKind.CHAPTER_OPENER,
-    project.tracks[2]!.id,
+    project.tracks[1]!.id,
     project,
     3
   );
 
   expect(clips).toHaveLength(2);
-  expect(clips.every((clip) => clip.trackId === project.tracks[2]!.id)).toBe(true);
+  expect(clips.every((clip) => clip.trackId === project.tracks[1]!.id)).toBe(true);
   expect(clips.every((clip) => clip.type === VideoProjectClipType.ANNOTATION)).toBe(true);
   expect(new Set(clips.map((clip) => clip.groupId)).size).toBe(1);
   expect(clips.every((clip) => clip.groupId)).toBe(true);
@@ -52,9 +58,10 @@ it('keeps subtitle-first recipes on subtitle tracks and spotlight recipes on ove
 
 it('uses the editorial lower-third starter for speaker intro recipes', () => {
   const project = createEmptyVideoProject('Speaker intro');
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
   const clips = expandVideoBlockRecipe(
     VideoBlockKind.SPEAKER_INTRO,
-    project.tracks[2]!.id,
+    project.tracks[1]!.id,
     project,
     1
   );
@@ -62,7 +69,7 @@ it('uses the editorial lower-third starter for speaker intro recipes', () => {
   expect(clips).toEqual([
     expect.objectContaining({
       templateKind: 'LOWER_THIRD_EDITORIAL',
-      trackId: project.tracks[2]!.id,
+      trackId: project.tracks[1]!.id,
       type: VideoProjectClipType.ANNOTATION,
     }),
   ]);
@@ -70,7 +77,8 @@ it('uses the editorial lower-third starter for speaker intro recipes', () => {
 
 it('expands every shipped block kind into valid clips', () => {
   const project = createEmptyVideoProject('All blocks');
-  const trackId = project.tracks[2]!.id;
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  const trackId = project.tracks[1]!.id;
 
   for (const blockKind of getVideoBlockRecipeSelectionOrder()) {
     const clips = expandVideoBlockRecipe(blockKind, trackId, project, 1);

@@ -6,8 +6,12 @@ import type React from 'react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { VideoCompositionCameraState } from '../../../../features/video/composition/types';
 import { createAnnotationClip } from '../../../../features/video/project/factories/overlay-clip';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../features/video/project/factories/creation';
+import {
+  VideoTrackKind,
   VideoClipLinkMode,
   VideoClipTransitionKind,
   VideoMediaFitMode,
@@ -49,6 +53,7 @@ function createStage(width = 220, height = 140) {
 
 function createSelectionProject() {
   const project = createEmptyVideoProject('Selection', 200, 100);
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
   project.clips = [
     {
       assetId: 'asset-1',
@@ -86,7 +91,8 @@ function createSelectionProject() {
 
 function createLockedAnnotationProject() {
   const project = createEmptyVideoProject('Annotation selection', 200, 100);
-  const clip = createAnnotationClip(project.tracks[2]!.id, 200, 100, 0);
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
+  const clip = createAnnotationClip(project.tracks[1]!.id, 200, 100, 0);
   clip.transform = {
     ...clip.transform,
     height: 30,
@@ -189,7 +195,7 @@ it('selects the upper-track active clip first when clip bounds overlap', () => {
   const stage = createStage();
 
   lowerClip.id = 'lower-clip';
-  lowerClip.trackId = project.tracks[2]!.id;
+  lowerClip.trackId = project.tracks[1]!.id;
 
   handleStagePointerDown(createPointerEvent(44, 48), {
     activeClips: [lowerClip, upperClip],
@@ -218,7 +224,7 @@ it('clicks through a locked upper clip to the editable clip below it', () => {
   const beginInteraction = vi.fn();
 
   lowerClip.id = 'editable-lower-clip';
-  lowerClip.trackId = project.tracks[2]!.id;
+  lowerClip.trackId = project.tracks[1]!.id;
   project.tracks[0]!.locked = true;
 
   handleStagePointerDown(createPointerEvent(44, 48), {

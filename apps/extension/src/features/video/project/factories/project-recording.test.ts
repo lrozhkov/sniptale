@@ -50,11 +50,7 @@ it('creates a silent recording project and clamps tiny source duration', () => {
   expect(project.baseRecordingId).toBe('rec-silent');
   expect(project.assets).toHaveLength(1);
   expect(project.clips.map((clip) => clip.type)).toEqual([VideoProjectClipType.VIDEO]);
-  expect(project.tracks.map((track) => track.kind)).toEqual([
-    VideoTrackKind.PRIMARY,
-    VideoTrackKind.AUDIO,
-    VideoTrackKind.OVERLAY,
-  ]);
+  expect(project.tracks.map((track) => track.kind)).toEqual([VideoTrackKind.PRIMARY]);
 });
 
 it('anchors recording interactions to the independent source clip', () => {

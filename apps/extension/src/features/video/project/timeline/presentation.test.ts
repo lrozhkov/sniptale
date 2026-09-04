@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createAnnotationClip } from '../factories/overlay-clip';
-import { createEmptyVideoProject } from '../factories/creation';
+import { createEmptyVideoProject, createVideoProjectTrack } from '../factories/creation';
 import {
   createProject,
   createShapeClip,
@@ -23,6 +23,7 @@ import {
   isVisualClip,
 } from './presentation';
 import {
+  VideoTrackKind,
   VideoClipTransitionKind,
   type VideoProjectClip,
   VideoProjectClipType,
@@ -48,8 +49,9 @@ function verifyClipKinds(): void {
   const videoClip = createVideoClip();
   const textClip = createTextClip();
   const annotationProject = createEmptyVideoProject('Timeline');
+  annotationProject.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
   const annotationClip = createAnnotationClip(
-    annotationProject.tracks[2]!.id,
+    annotationProject.tracks[1]!.id,
     annotationProject.width,
     annotationProject.height,
     0

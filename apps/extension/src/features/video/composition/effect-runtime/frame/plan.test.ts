@@ -2,9 +2,13 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
-import { createEmptyVideoProject } from '../../../project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../project/factories/creation';
 import { createEffectHostClip } from '../../../project/factories/overlay-clip';
 import {
+  VideoTrackKind,
   VideoClipLinkMode,
   VideoClipTransitionKind,
   VideoMediaFitMode,
@@ -102,6 +106,7 @@ function expectTransitionPlan(plan: unknown): void {
 
 function createProject(): VideoProject {
   const project = createEmptyVideoProject('Effect runtime', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
   const trackId = project.tracks[0]!.id;
   project.duration = 5;
   project.clips = [createClip('clip-a', trackId, 0), createClip('clip-b', trackId, 2)];

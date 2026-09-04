@@ -1,9 +1,13 @@
 import { readFileSync } from 'node:fs';
 
 import type { EffectV1Document } from '@sniptale/runtime-contracts/effect-v1';
-import { createEmptyVideoProject } from '../../../project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../project/factories/creation';
 import { createEffectHostClip } from '../../../project/factories/overlay-clip';
 import {
+  VideoTrackKind,
   VideoClipLinkMode,
   VideoMediaFitMode,
   VideoProjectClipType,
@@ -19,6 +23,7 @@ const AUDIO_SHA = '0'.repeat(64);
 export function createAudioProject(): VideoProject {
   const document = createAudioDocument();
   const project = createEmptyVideoProject('Effect audio');
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
   project.duration = 10;
   project.effectSnapshots = [createAudioSnapshot(document)];
   project.effectInstances = [

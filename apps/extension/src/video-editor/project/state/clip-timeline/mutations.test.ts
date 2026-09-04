@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../features/video/project/factories/creation';
+import {
+  VideoTrackKind,
   VideoClipLinkMode,
   VideoClipTransitionKind,
   VideoMediaFitMode,
@@ -62,6 +66,7 @@ function createTimelineProject(): VideoProject {
 
 function createLinkedTimelineProject(): VideoProject {
   const project = createEmptyVideoProject('Timeline linked');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const [primaryTrack, audioTrack] = project.tracks;
   project.clips = [
     {

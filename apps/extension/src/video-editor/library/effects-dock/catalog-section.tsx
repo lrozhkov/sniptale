@@ -13,7 +13,7 @@ const CATALOG_CARD_CLASS_NAME = [
 ].join(' ');
 
 const DOCUMENT_CARD_CLASS_NAME = [
-  'flex items-center justify-between gap-3 rounded-[10px] border p-3',
+  'flex min-w-0 flex-col items-stretch gap-3 rounded-[10px] border p-3',
   'border-[var(--sniptale-color-border-subtle)]',
   'bg-[var(--sniptale-color-surface-overlay)]',
 ].join(' ');
@@ -78,9 +78,9 @@ function CatalogEntry(
   const { catalog } = props;
   return (
     <article className={CATALOG_CARD_CLASS_NAME}>
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex min-w-0 flex-col gap-2">
         <div>
-          <h4 className="text-sm font-medium">{readLocalized(catalog.label)}</h4>
+          <h4 className="break-words text-sm font-medium">{readLocalized(catalog.label)}</h4>
           <p className="text-xs text-[var(--sniptale-color-text-muted)]">
             {catalog.packId} · {catalog.version}
           </p>
@@ -97,7 +97,7 @@ function CatalogEntry(
 
 function CatalogActions(props: Parameters<typeof CatalogEntry>[0]): React.JSX.Element {
   return (
-    <div className="flex gap-1">
+    <div className="flex flex-wrap gap-1">
       <ProductActionButton
         compact
         tone="secondary"
@@ -145,7 +145,7 @@ function CatalogDocument(
       }
     >
       <div>
-        <p className="text-sm font-medium text-[var(--sniptale-color-text-primary)]">
+        <p className="break-all text-sm font-medium text-[var(--sniptale-color-text-primary)]">
           {props.document.id}
         </p>
         <p className="text-xs text-[var(--sniptale-color-text-muted)]">

@@ -4,8 +4,12 @@ import type React from 'react';
 import { act, useRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../features/video/project/factories/creation';
+import {
+  VideoTrackKind,
   VideoClipLinkMode,
   VideoClipTransitionKind,
   VideoMediaFitMode,
@@ -485,6 +489,7 @@ it('cleans up drag listeners when the timeline unmounts mid-interaction', () => 
 
 it('moves clips to the intended track when rows have mixed heights', () => {
   const project = createEmptyVideoProject('Mixed heights');
+  project.tracks.push(createVideoProjectTrack('Video 2', 2, VideoTrackKind.PRIMARY));
   const clip = createClip(project.tracks[0]!.id);
   project.clips = [clip];
   const onMoveClip =
@@ -517,6 +522,7 @@ it('moves clips to the intended track when rows have mixed heights', () => {
 
 it('maps vertical movement to the physical track and its base lane', () => {
   const project = createEmptyVideoProject('Drag ghost');
+  project.tracks.push(createVideoProjectTrack('Video 2', 2, VideoTrackKind.PRIMARY));
   const clip = createClip(project.tracks[0]!.id);
   project.tracks[0] = {
     ...project.tracks[0]!,

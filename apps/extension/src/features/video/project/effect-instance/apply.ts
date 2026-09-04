@@ -2,6 +2,7 @@ import type { EffectBundleCatalogEntry } from '../effect-bundle/catalog';
 import type { VideoProject } from '../types';
 import { VideoProjectClipType, VideoTrackKind } from '../types';
 import { createEffectHostClip } from '../factories/overlay-clip';
+import { createVideoProjectTrack, getDefaultTrackName } from '../factories/creation';
 import { buildProjectTransitionSegments } from '../transition/project';
 import { readVerifiedCatalogDocument, type VerifiedCatalogAsset } from './catalog-reader';
 import { ApplyEffectInstanceError } from './errors';
@@ -48,16 +49,28 @@ export async function applyEffectCatalogDocument(args: {
     startTime: timing.startTime,
     target: args.target,
   };
-  const clips =
+  const overlayTrack =
     document.kind === 'standalone'
-      ? [
-          ...args.project.clips,
-          createStandaloneHostClip(args.project, instance, catalogDocument.id),
-        ]
-      : args.project.clips;
+      ? (args.project.tracks.find(({ kind }) => kind === VideoTrackKind.OVERLAY) ??
+        createVideoProjectTrack(
+          getDefaultTrackName(VideoTrackKind.OVERLAY),
+          Math.min(0, ...args.project.tracks.map((track) => track.order)) - 1,
+          VideoTrackKind.OVERLAY
+        ))
+      : null;
+  const clips = overlayTrack
+    ? [
+        ...args.project.clips,
+        createStandaloneHostClip(args.project, instance, catalogDocument.id, overlayTrack.id),
+      ]
+    : args.project.clips;
   return {
     ...args.project,
     clips,
+    tracks:
+      overlayTrack && !args.project.tracks.includes(overlayTrack)
+        ? [...args.project.tracks, overlayTrack]
+        : args.project.tracks,
     effectInstances: [...(args.project.effectInstances ?? []), instance],
     effectSnapshots: snapshots,
   };
@@ -66,10 +79,9 @@ export async function applyEffectCatalogDocument(args: {
 function createStandaloneHostClip(
   project: VideoProject,
   instance: VideoProjectEffectInstance,
-  name: string
+  name: string,
+  trackId: string
 ) {
-  const overlayTrack = project.tracks.find(({ kind }) => kind === VideoTrackKind.OVERLAY);
-  if (!overlayTrack) throw new ApplyEffectInstanceError('effectTargetMissing');
   return createEffectHostClip({
     duration: instance.duration,
     effectInstanceId: instance.id,
@@ -77,7 +89,7 @@ function createStandaloneHostClip(
     projectHeight: project.height,
     projectWidth: project.width,
     startTime: instance.startTime,
-    trackId: overlayTrack.id,
+    trackId,
   });
 }
 

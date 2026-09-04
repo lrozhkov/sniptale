@@ -64,12 +64,8 @@ describe('empty project factory', () => {
     expect(project.cursorTrack).toBeNull();
     expect(project.actionEvents).toEqual([]);
     expect(project.motionRegions).toEqual([]);
-    expect(project.tracks).toHaveLength(3);
-    expect(project.tracks.map((track) => track.kind)).toEqual([
-      VideoTrackKind.PRIMARY,
-      VideoTrackKind.AUDIO,
-      VideoTrackKind.OVERLAY,
-    ]);
+    expect(project.tracks).toHaveLength(1);
+    expect(project.tracks.map((track) => track.kind)).toEqual([VideoTrackKind.PRIMARY]);
     expect(project.tracks.every((track) => track.isRoot === true)).toBe(true);
   });
 });
@@ -247,13 +243,18 @@ function verifySharedRecordingProjectOverrides() {
   });
 
   expect(project.clips).toHaveLength(1);
+  expect(project.tracks.map((track) => track.kind)).toEqual([VideoTrackKind.PRIMARY]);
   expect(project.assets[0]).toBe(customAsset);
-  expect(project.cursorTrack).toBe(customCursorTrack);
+  expect(project.cursorTrack).toEqual(customCursorTrack);
   expect(project.motionRegions).toEqual([customMotionRegion]);
   expect(project.tracks.every((track) => track.isRoot === true)).toBe(true);
 }
 
 function expectRecordingProjectShape(project: ReturnType<typeof createVideoProjectFromRecording>) {
+  expect(project.tracks.map((track) => track.kind)).toEqual([
+    VideoTrackKind.PRIMARY,
+    VideoTrackKind.AUDIO,
+  ]);
   expect(project.baseRecordingId).toBe('rec-1');
   expect(project.name).toBe('demo');
   expect(project.assets).toHaveLength(1);
