@@ -227,38 +227,46 @@ it('applies printable keys to the document selection in direct page design mode'
   expect(paragraph.textContent).toBe('teфxt');
 });
 
-it('extends direct page editing selection for Shift+Home after host cancellation', () => {
-  const editable = document.createElement('div');
-  editable.className = 'sniptale-editing';
-  editable.contentEditable = 'true';
-  editable.textContent = 'text';
-  document.body.appendChild(editable);
-  const selection = document.getSelection();
-  const modify = vi.fn();
-  Object.defineProperty(selection, 'modify', { configurable: true, value: modify });
-  const event = new KeyboardEvent('keydown', {
-    cancelable: true,
-    key: 'Home',
-    shiftKey: true,
-  });
-  event.preventDefault();
-  Object.defineProperty(event, 'target', { configurable: true, value: editable });
+it.each([
+  ['ArrowDown', 'forward', 'line'],
+  ['ArrowLeft', 'backward', 'character'],
+  ['ArrowRight', 'forward', 'character'],
+  ['ArrowUp', 'backward', 'line'],
+  ['End', 'forward', 'lineboundary'],
+  ['Home', 'backward', 'lineboundary'],
+] as const)(
+  'extends document-mode selection for Shift+%s after host cancellation',
+  (key, direction, granularity) => {
+    const paragraph = document.createElement('p');
+    paragraph.textContent = 'text';
+    document.body.appendChild(paragraph);
+    const selection = document.getSelection();
+    const modify = vi.fn();
+    Object.defineProperty(selection, 'modify', { configurable: true, value: modify });
+    const event = new KeyboardEvent('keydown', {
+      cancelable: true,
+      key,
+      shiftKey: true,
+    });
+    event.preventDefault();
+    Object.defineProperty(event, 'target', { configurable: true, value: paragraph });
 
-  handleQuickEditKeyDown(event, {
-    cancelEditing: vi.fn(),
-    disableDocumentMode: vi.fn(),
-    disableRequested: vi.fn(),
-    editingElementsSize: () => 1,
-    finishEditing: vi.fn(),
-    hideHoverOverlay: vi.fn(),
-    isDocumentModeEnabled: () => true,
-    isEnabled: () => true,
-    makeElementEditable: vi.fn(),
-    showHoverOverlay: vi.fn(),
-  });
+    handleQuickEditKeyDown(event, {
+      cancelEditing: vi.fn(),
+      disableDocumentMode: vi.fn(),
+      disableRequested: vi.fn(),
+      editingElementsSize: () => 1,
+      finishEditing: vi.fn(),
+      hideHoverOverlay: vi.fn(),
+      isDocumentModeEnabled: () => true,
+      isEnabled: () => true,
+      makeElementEditable: vi.fn(),
+      showHoverOverlay: vi.fn(),
+    });
 
-  expect(modify).toHaveBeenCalledWith('extend', 'backward', 'lineboundary');
-});
+    expect(modify).toHaveBeenCalledWith('extend', direction, granularity);
+  }
+);
 
 it('preserves a trailing space when the caret is already at the end of the editable text', () => {
   const editable = document.createElement('div');

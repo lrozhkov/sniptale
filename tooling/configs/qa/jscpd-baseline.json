@@ -472,24 +472,6 @@
       }
     },
     {
-      "id": "445e0836f37779daac2cc910b7468023c7c0df779befd76b22794fb0e29e8bdc",
-      "classification": "tool-noise",
-      "owner": "content activation bridge <-> quick-edit keyboard runtime",
-      "reason": "The two keyboard layers own separate propagation and selection lifecycles; extracting their small navigation adapters would create a cross-owner control dependency.",
-      "removalCondition": "Remove when both keyboard layers acquire one navigation authority, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/content/runtime/ui-activation-bridge/targets.ts",
-        "start": 359,
-        "end": 378
-      },
-      "secondFile": {
-        "path": "apps/extension/src/content/selection/quick-edit-runtime/keydown.ts",
-        "start": 124,
-        "end": 143
-      }
-    },
-    {
       "id": "47d29325d2c4f87c5a5476ac2e043e0dc203de0ae6037da601093ab04c5864e6",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/ai-modal/shell.css",

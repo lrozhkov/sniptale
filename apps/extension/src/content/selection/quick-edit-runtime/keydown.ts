@@ -127,17 +127,31 @@ function applyDocumentModeNavigation(event: KeyboardEvent, selection: Selection)
     return true;
   }
   if (event.ctrlKey || event.metaKey || event.altKey || !selection.modify) return false;
-  const movement = {
-    ArrowDown: ['forward', 'line'],
-    ArrowLeft: ['backward', 'character'],
-    ArrowRight: ['forward', 'character'],
-    ArrowUp: ['backward', 'line'],
-    End: ['forward', 'lineboundary'],
-    Home: ['backward', 'lineboundary'],
-  }[event.key] as ['backward' | 'forward', 'character' | 'line' | 'lineboundary'] | undefined;
+  const movement = resolveDocumentModeMovement(event.key);
   if (!movement) return false;
   selection.modify(event.shiftKey ? 'extend' : 'move', movement[0], movement[1]);
   return true;
+}
+
+function resolveDocumentModeMovement(
+  key: string
+): ['backward' | 'forward', 'character' | 'line' | 'lineboundary'] | undefined {
+  switch (key) {
+    case 'ArrowDown':
+      return ['forward', 'line'];
+    case 'ArrowLeft':
+      return ['backward', 'character'];
+    case 'ArrowRight':
+      return ['forward', 'character'];
+    case 'ArrowUp':
+      return ['backward', 'line'];
+    case 'End':
+      return ['forward', 'lineboundary'];
+    case 'Home':
+      return ['backward', 'lineboundary'];
+    default:
+      return undefined;
+  }
 }
 
 function applyDocumentModeKeyDown(event: KeyboardEvent): void {
