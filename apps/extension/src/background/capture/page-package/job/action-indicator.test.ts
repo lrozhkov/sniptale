@@ -15,10 +15,12 @@ import {
   startPagePackageActionIndicator,
 } from './action-indicator';
 import type { ActivePopupExportJob } from './runtime-state';
+import { translate } from '../../../../platform/i18n';
 
 function createJob(tabCount: number): ActivePopupExportJob {
   return {
     cancelled: false,
+    locale: 'ru',
     status: {
       orderedTabs: Array.from({ length: tabCount }, (_, index) => ({
         tabId: index + 1,
@@ -35,27 +37,38 @@ afterEach(() => {
 
 it('animates the main browser action icon and restores it before reopening multi-tab results', async () => {
   vi.useFakeTimers();
+  const job = createJob(3);
+  job.status.originalActiveTabs = [{ tabId: 17, windowId: 9 }];
   const deps = {
     openPopup: vi.fn().mockResolvedValue(undefined),
     renderFrame: vi.fn(() => ({}) as ImageData),
     setIcon: vi.fn().mockResolvedValue(undefined),
     setTitle: vi.fn().mockResolvedValue(undefined),
   };
-  const finish = startPagePackageActionIndicator(createJob(3), deps);
+  const finish = startPagePackageActionIndicator(job, deps);
   await vi.advanceTimersByTimeAsync(840);
 
   expect(deps.renderFrame).toHaveBeenCalledTimes(6);
   expect(deps.setIcon).toHaveBeenCalledWith(
     expect.objectContaining({ imageData: expect.anything() })
   );
-  await finish();
+  expect(deps.setTitle).toHaveBeenCalledWith({
+    title: translate('popup.export.batchCollectingMessage', 'ru'),
+  });
+  const completion = finish();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(deps.openPopup).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(120);
+  await completion;
   expect(deps.setIcon).toHaveBeenLastCalledWith({
     path: { 16: 'icons/icon-16.png', 48: 'icons/icon-48.png', 128: 'icons/icon-128.png' },
   });
   expect(deps.openPopup).toHaveBeenCalledOnce();
+  expect(deps.openPopup).toHaveBeenCalledWith({ windowId: 9 });
 });
 
-it('does not change the action icon for a single page or reopen a cancelled job', async () => {
+it('keeps a current-tab single page quiet but reopens a single temporary URL result', async () => {
+  vi.useFakeTimers();
   const deps = {
     openPopup: vi.fn().mockResolvedValue(undefined),
     renderFrame: vi.fn(() => ({}) as ImageData),
@@ -64,6 +77,14 @@ it('does not change the action icon for a single page or reopen a cancelled job'
   };
   await startPagePackageActionIndicator(createJob(1), deps)();
   expect(deps.setIcon).not.toHaveBeenCalled();
+
+  const temporaryUrlJob = createJob(1);
+  temporaryUrlJob.temporaryTabIds = [1];
+  const completion = startPagePackageActionIndicator(temporaryUrlJob, deps)();
+  await vi.advanceTimersByTimeAsync(120);
+  await completion;
+  expect(deps.openPopup).toHaveBeenCalledOnce();
+  deps.openPopup.mockClear();
 
   const cancelled = createJob(2);
   cancelled.cancelled = true;
@@ -81,6 +102,9 @@ it('retries popup restoration after the first post-activation open is rejected',
     .mockResolvedValueOnce(undefined);
 
   const restoration = restorePagePackageProgressPopup(createJob(2), 3);
+  expect(browserActionMocks.openPopup).not.toHaveBeenCalled();
+  await vi.advanceTimersByTimeAsync(120);
+  expect(browserActionMocks.openPopup).toHaveBeenCalledTimes(1);
   await vi.advanceTimersByTimeAsync(120);
   await restoration;
 
@@ -105,9 +129,11 @@ it('keeps capture authority independent from action presentation failures', asyn
 
   const finish = startPagePackageActionIndicator(job, deps);
   await vi.advanceTimersByTimeAsync(420);
-  await expect(finish()).resolves.toBeUndefined();
+  const completion = finish();
+  await vi.advanceTimersByTimeAsync(240);
+  await expect(completion).resolves.toBeUndefined();
   expect(deps.renderFrame).toHaveBeenCalled();
-  expect(deps.openPopup).toHaveBeenCalledOnce();
+  expect(deps.openPopup).toHaveBeenCalledTimes(2);
 });
 
 it('renders the production action frame through the canonical browser adapter', async () => {
@@ -143,6 +169,8 @@ it('renders the production action frame through the canonical browser adapter', 
   expect(browserActionMocks.setIcon).toHaveBeenCalledWith({
     imageData: { 16: expect.anything(), 32: expect.anything() },
   });
-  await finish();
+  const completion = finish();
+  await vi.advanceTimersByTimeAsync(120);
+  await completion;
   expect(browserActionMocks.openPopup).toHaveBeenCalledOnce();
 });

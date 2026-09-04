@@ -72,14 +72,14 @@ function collectArchitectureDocs(targetFiles) {
     docs.push('docs/architecture/parser-architecture.md');
   }
   if (hasAny(targetFiles, (file) => isUiFile(file) && /\.(?:tsx|css)$/u.test(file))) {
-    docs.push('docs/agent-tooling/DESIGN.md');
+    docs.push('docs/agent-tooling/agent-tooling.zip');
   }
   return docs;
 }
 
 export function collectRelevantDocs(targetFiles) {
   const docs = [
-    'docs/agent-tooling/AGENTS.md',
+    'docs/agent-tooling/agent-tooling.zip',
     'docs/engineering/implementation-rules.md',
     'docs/architecture/repository-overview.md',
     ...collectArchitectureDocs(targetFiles),

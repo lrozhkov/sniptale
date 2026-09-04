@@ -219,7 +219,6 @@ it('keeps qa:build gated on fresh checkpoint state with opt-in commit close-out'
 it('routes every canonical wrapper entrypoint through the observed lifecycle', () => {
   const entrypoints = [
     'tooling/qa/wrappers/preflight.mjs',
-    'tooling/qa/wrappers/advisory.mjs',
     'tooling/qa/wrappers/checkpoint/checkpoint-cli.mjs',
     'tooling/qa/wrappers/closeout.mjs',
     'tooling/qa/wrappers/build.mjs',

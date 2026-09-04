@@ -254,10 +254,10 @@ export function startDesignReviewPicker(args: DesignReviewPickerArgs): DesignRev
   const cleanupResize = addWindowEventListenerToAllWindowsDynamic<Event>('resize', () =>
     refreshPickerFrame(state)
   );
-  const cleanupKeydown = addEventListenerToAllWindowsDynamic<KeyboardEvent>(
+  const cleanupKeydown = addWindowEventListenerToAllWindowsDynamic<KeyboardEvent>(
     'keydown',
     (event) => {
-      if (event.defaultPrevented || !isTrustedKeyboardEvent(event) || event.key !== 'Escape') {
+      if (!isTrustedKeyboardEvent(event) || event.key !== 'Escape') {
         return;
       }
       if (

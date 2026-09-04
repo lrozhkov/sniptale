@@ -7,6 +7,7 @@ import type { EditorDocument } from '../../features/editor/document/types';
 interface LocalImageDraftController extends EditorDocumentOpenPort {
   autosaveService: Pick<EditorSessionAutosaveService, 'activate' | 'flushAutosave'> | null;
   exportDocument(): EditorDocument;
+  isDocumentReadyForExport(): boolean;
   renderForExport(options: { format: 'png'; quality: 1 }): Promise<string> | string;
 }
 
@@ -25,7 +26,9 @@ export function openLocalImageAsEditorDraft(
       if (!autosaveService) {
         throw new Error('Image autosave is unavailable.');
       }
-      await autosaveService.flushAutosave(() => controller.exportDocument());
+      if (controller.isDocumentReadyForExport()) {
+        await autosaveService.flushAutosave(() => controller.exportDocument());
+      }
     },
     onOpened: () => {
       const autosaveService = controller.autosaveService;

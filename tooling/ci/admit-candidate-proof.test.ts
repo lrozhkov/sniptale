@@ -12,6 +12,7 @@ import { createCandidateControlDigest } from './control-digest.mjs';
 import { createFastGateInputDigest } from './fast-gate-inputs.mjs';
 import { createTrustedControlMatrix } from './trusted-control-matrix.mjs';
 import { expectedProofPopulationKind } from './proof-population-policy.mjs';
+import { OBSERVABILITY_SCHEMA_VERSION } from '../qa/runtime/observability/constants.mjs';
 
 const roots: string[] = [];
 const sha256 = (value: Buffer | string) => crypto.createHash('sha256').update(value).digest('hex');
@@ -178,11 +179,14 @@ function fixture({ candidateControl = 'export {};\n' } = {}) {
     artifact,
     record,
     `${JSON.stringify({
-      schemaVersion: 4,
+      schemaVersion: OBSERVABILITY_SCHEMA_VERSION,
       wrapperId: 'ci:proof',
       status: 'all-passed',
       exitCode: 0,
       parentRunId: null,
+      preflightContext: null,
+      changeRisk: null,
+      advisory: null,
       repository: { head: commit },
       log: { path: log },
       steps: [
@@ -363,7 +367,10 @@ function releaseFixture({ reused = false } = {}) {
   const recordPath = '.tmp/qa-observability/runs/2026-08-23/run.json';
   const record = JSON.parse(fs.readFileSync(path.join(artifact, recordPath), 'utf8'));
   const controlMatrix = createTrustedControlMatrix('release');
-  record.schemaVersion = 4;
+  record.schemaVersion = OBSERVABILITY_SCHEMA_VERSION;
+  record.preflightContext = null;
+  record.changeRisk = null;
+  record.advisory = null;
   record.wrapperId = 'ci:release';
   record.steps = [
     ...controlMatrix.requiredPassed.map((stepId) => ({
@@ -442,6 +449,29 @@ it('admits a complete candidate proof only through trusted-base policy', () => {
       trustedRoot: value.trusted,
     })
   ).toMatchObject({ outcome: 'admitted', derived: false });
+});
+
+it('requires the current observability schema and its analysis ownership fields', () => {
+  for (const field of ['preflightContext', 'changeRisk', 'advisory']) {
+    const value = fixture();
+    const relative = '.tmp/qa-observability/runs/2026-08-23/run.json';
+    const record = JSON.parse(fs.readFileSync(path.join(value.artifact, relative), 'utf8'));
+    delete record[field];
+    write(value.artifact, relative, `${JSON.stringify(record)}\n`);
+    refreshDeclaredFile(value.artifact, value.manifest, relative);
+
+    expect(() =>
+      admitCandidateProof({
+        artifactRoot: value.artifact,
+        baseSha: value.baseSha,
+        candidateRoot: value.candidate,
+        commit: value.commit,
+        expectedTrustedControlSha: value.commit,
+        lane: 'proof',
+        trustedRoot: value.trusted,
+      })
+    ).toThrow(/run record is incomplete or has unexpected ownership/u);
+  }
 });
 
 it('rejects missing phases or profile authority without imposing resource minimums', () => {

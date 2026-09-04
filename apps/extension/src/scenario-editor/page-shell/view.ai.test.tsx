@@ -138,9 +138,10 @@ describe('scenario v3 editor shell AI panel', () => {
 
     expect(onProjectChange).not.toHaveBeenCalled();
     await vi.waitFor(() => {
-      expect(container?.querySelector('[role="alert"]')?.textContent).toContain(
-        translate('scenario.editor.aiEditorInvalidResponse')
-      );
+      const errorText = container?.querySelector('[role="alert"]')?.textContent;
+      expect(errorText).toContain(translate('scenario.editor.aiEditorRequestFailed'));
+      expect(errorText).toContain(translate('common.errors.externalServiceDetail'));
+      expect(errorText).not.toContain('Unknown slide id');
     });
   });
 });

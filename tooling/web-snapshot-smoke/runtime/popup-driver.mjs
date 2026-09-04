@@ -21,6 +21,7 @@ async function runSnapshotJobInPopup({ id, intent, jobId, richPackage, timeoutMs
       includeWebCopy: true,
       intent,
       jobId,
+      locale: 'en',
       captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
       sources: [{ kind: 'tab', tabId: id, title: 'Smoke page' }],
       options: {

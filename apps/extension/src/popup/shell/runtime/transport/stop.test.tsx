@@ -105,7 +105,7 @@ it('sends stop messages with and without the optional discard flag and logs fail
   expect(loggerErrorMock).toHaveBeenCalledWith('Failed to stop recording', expect.any(Error));
   expect(setRecordingErrorMock).toHaveBeenNthCalledWith(1, null);
   expect(setRecordingErrorMock).toHaveBeenNthCalledWith(2, null);
-  expect(setRecordingErrorMock).toHaveBeenLastCalledWith('stop failed');
+  expect(setRecordingErrorMock).toHaveBeenLastCalledWith(expect.stringContaining('Sniptale'));
 });
 
 it('surfaces unsuccessful stop responses inline and clears stale errors on retry', async () => {
@@ -122,7 +122,7 @@ it('surfaces unsuccessful stop responses inline and clears stale errors on retry
   });
 
   expect(setRecordingErrorMock).toHaveBeenNthCalledWith(1, null);
-  expect(setRecordingErrorMock).toHaveBeenNthCalledWith(2, 'No active recording');
+  expect(setRecordingErrorMock).toHaveBeenNthCalledWith(2, expect.stringContaining('Sniptale'));
   expect(setRecordingErrorMock).toHaveBeenNthCalledWith(3, null);
 });
 

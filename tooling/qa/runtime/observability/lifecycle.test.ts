@@ -18,6 +18,25 @@ function createRepository(prefix: string) {
 }
 
 describe('successful observability run persistence', () => {
+  it('derives a candidate workflow from task and base HEAD', () => {
+    const root = createRepository('qa-observability-workflow-');
+    const first = createObservabilityRun({
+      wrapperId: 'qa.preflight',
+      rootDir: root,
+      environment: { CODEX_THREAD_ID: 'thread-17' },
+    });
+    const second = createObservabilityRun({
+      wrapperId: 'qa.checkpoint',
+      rootDir: root,
+      environment: { CODEX_THREAD_ID: 'thread-17' },
+    });
+
+    expect(first.snapshot().correlation.workflowId).toMatch(/^workflow\.[a-f0-9]{24}$/u);
+    expect(second.snapshot().correlation).toEqual(first.snapshot().correlation);
+    first.finalize();
+    second.finalize();
+  });
+
   it('persists an atomic lifecycle record with repository context and a private log', () => {
     const root = createRepository('qa-observability-lifecycle-');
     writeFile(root, 'tracked.txt', 'changed\n');

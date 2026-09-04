@@ -1,6 +1,6 @@
 {
   "name": "@sniptale/runtime-contracts",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "license": "AGPL-3.0-or-later",
   "author": "Lev Rozhkov",
@@ -48,7 +48,6 @@
     "./scenario/types/session": "./src/scenario/types/session.ts",
     "./scenario/types/v3": "./src/scenario/types/v3/index.ts",
     "./schemas/highlighter": "./src/schemas/highlighter.ts",
-    "./tab-capabilities/test-support": "./src/tab-capabilities/test-support.ts",
     "./tab-capabilities/types": "./src/tab-capabilities/types.ts",
     "./validation/base64": "./src/validation/base64.ts",
     "./validation/data-url": "./src/validation/data-url.ts",
@@ -71,7 +70,7 @@
     "./web-snapshot": "./src/web-snapshot/index.ts"
   },
   "dependencies": {
-    "@sniptale/foundation": "0.4.0",
+    "@sniptale/foundation": "0.4.1",
     "zod": "^4.4.3"
   },
   "devDependencies": {

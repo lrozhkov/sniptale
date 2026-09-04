@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { browserRuntime } from '@sniptale/platform/browser/runtime';
 import { parseRuntimeRequestMessage } from '../../contracts/messaging/parsers/boundary';
 import { translate } from '../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../platform/i18n/user-facing-error';
 import type { RuntimeMessagingTransport } from '../../platform/runtime-messaging';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import {
@@ -48,7 +49,7 @@ export function useRecordingState(
       return;
     }
     if (response?.success !== true) {
-      throw new Error(getResponseError(response, translate('common.states.error')));
+      throw new Error(getResponseError(response, 'popup.video.loadingPopupError'));
     }
     if (response?.state) {
       setState(response.state);
@@ -77,7 +78,7 @@ export function useRecordingState(
       recordingId: postRecordResult.recordingId,
     });
     if (response?.success !== true) {
-      throw new Error(getResponseError(response, translate('common.states.error')));
+      throw new Error(getResponseError(response, 'popup.video.postRecordActionError'));
     }
     if (response.result !== 'acknowledged' && response.result !== 'stale') {
       throw new Error(translate('common.states.error'));
@@ -156,7 +157,11 @@ function registerCameraRecorder(
     } catch (error) {
       if (!disposed) {
         setRegistrationError(
-          error instanceof Error ? error.message : translate('common.states.error')
+          createUserFacingErrorMessage({
+            cause: error,
+            detail: 'browserCommunication',
+            summaryKey: 'popup.video.loadingPopupError',
+          })
         );
       }
     }
@@ -186,9 +191,7 @@ function applyCameraRegistrationResponse(args: {
   setRegistrationError: (error: string | null) => void;
 }): string | null {
   if (args.registration.success === false) {
-    args.setRegistrationError(
-      getResponseError(args.registration, translate('common.states.error'))
-    );
+    args.setRegistrationError(getResponseError(args.registration, 'popup.video.loadingPopupError'));
     return null;
   }
   if (
@@ -227,7 +230,11 @@ function subscribeToRecordingUpdates(
     if (parsed.state.status === VideoRecordingStatus.IDLE) {
       void refreshState().catch((error) => {
         setRegistrationError(
-          error instanceof Error ? error.message : translate('common.states.error')
+          createUserFacingErrorMessage({
+            cause: error,
+            detail: 'browserCommunication',
+            summaryKey: 'popup.video.loadingPopupError',
+          })
         );
       });
     }

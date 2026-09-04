@@ -1,4 +1,4 @@
-import { translate } from '../../../../platform/i18n/popup';
+import { getCurrentLocale, translate } from '../../../../platform/i18n/popup';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { getDefaultPopupExportRuntimeDeps } from './default-deps';
 import { logPopupExportCancelFailure } from './logging';
@@ -30,9 +30,13 @@ async function cancelOwnedExport(
   });
 }
 
-function reportCancellationFailure(state: PopupExportCancellationState, error: unknown): void {
+function reportCancellationFailure(
+  state: PopupExportCancellationState,
+  error: unknown,
+  locale = getCurrentLocale()
+): void {
   logPopupExportCancelFailure(error);
-  const message = translate('content.runtime.exportCancelFailed');
+  const message = translate('content.runtime.exportCancelFailed', locale);
   state.setProgress({
     activeStepKey: null,
     phase: 'error',
@@ -65,6 +69,7 @@ export async function cancelPopupExport(
       (activeExportRunId
         ? {
             exportRunId: activeExportRunId,
+            locale: getCurrentLocale(),
             owner: 'job' as const,
             tabIds: [...state.selectedTabIdsInOrder],
           }
@@ -74,14 +79,14 @@ export async function cancelPopupExport(
     }
     if (cancellation.cancellationPending === true) return;
     state.cancelRetryRef.current = { ...cancellation, cancellationPending: true };
-    state.setProgress((current) => ({
-      ...current,
-      message: translate('popup.export.cancellingMessage'),
-    }));
     const response = await cancelOwnedExport(cancellation, deps);
     if (!isOwnedCancellingStatus(response, cancellation.exportRunId)) {
       state.cancelRetryRef.current = { ...cancellation };
-      reportCancellationFailure(state, response?.error || 'Popup export cancellation was rejected');
+      reportCancellationFailure(
+        state,
+        response?.error || 'Popup export cancellation was rejected',
+        cancellation.locale
+      );
       return;
     }
     const status = response.status;
@@ -89,7 +94,7 @@ export async function cancelPopupExport(
     state.setProgress({
       ...status.progress,
       activeStepKey: status.progress.activeStepKey ?? null,
-      message: translate('popup.export.cancellingMessage'),
+      message: status.progress.message,
     });
   } catch (error) {
     const cancellation = state.cancelRetryRef.current;
@@ -97,6 +102,6 @@ export async function cancelPopupExport(
       const { cancellationPending: _pending, ...retryable } = cancellation;
       state.cancelRetryRef.current = retryable;
     }
-    reportCancellationFailure(state, error);
+    reportCancellationFailure(state, error, cancellation?.locale);
   }
 }

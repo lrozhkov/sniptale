@@ -22,6 +22,7 @@ import {
 } from '../../../analysis/repository/src-production-targets.mjs';
 import { hasAmbiguousSameNameFacadeSource, isThinFacadeSource } from './facades.mjs';
 import { collectChangedTargets } from '../../../runtime/scope/changed-targets.helpers.mjs';
+import { applyRepositoryFindingBaseline } from '../../../policy/baselines/repository-finding-baseline.mjs';
 
 const REPEATED_CHILD_PREFIX_MIN_COUNT = 3;
 const REPOSITORY_BASELINE_PATH = 'tooling/configs/qa/naming-repository-baseline.json';
@@ -201,27 +202,6 @@ function findingKey({ file, rule }) {
   return `${rule}\u0000${file}`;
 }
 
-function loadRepositoryBaseline() {
-  const value = JSON.parse(fs.readFileSync(REPOSITORY_BASELINE_PATH, 'utf8'));
-  if (
-    value?.schemaVersion !== 1 ||
-    !Array.isArray(value.findings) ||
-    value.findings.some(
-      (finding) =>
-        typeof finding?.file !== 'string' ||
-        typeof finding?.rule !== 'string' ||
-        Object.keys(finding).sort().join(',') !== 'file,rule'
-    )
-  ) {
-    throw new Error('Repository naming baseline must contain exact file/rule findings.');
-  }
-  const keys = value.findings.map(findingKey);
-  if (new Set(keys).size !== keys.length) {
-    throw new Error('Repository naming baseline contains duplicate findings.');
-  }
-  return new Map(value.findings.map((finding) => [findingKey(finding), finding]));
-}
-
 function getLeadingToken(value) {
   return value.split('-')[0];
 }
@@ -350,19 +330,18 @@ export function runChangedNamingCheck({ files = [] } = {}) {
 export function runRepositoryNamingCheck() {
   const namingFiles = collectCodeFiles();
   const findings = collectNamingViolations(namingFiles, { includeRepeatedPrefix: true });
-  const baseline = loadRepositoryBaseline();
-  const currentKeys = new Set(findings.map(findingKey));
-  const stale = [...baseline.entries()]
-    .filter(([key]) => !currentKeys.has(key))
-    .map(([, finding]) => ({
-      ...finding,
-      message: 'Repository naming baseline entry is stale and must be removed.',
-      rule: 'stale-naming-baseline',
-    }));
+  const baseline = applyRepositoryFindingBaseline({
+    baselinePath: REPOSITORY_BASELINE_PATH,
+    controlId: 'qa.rule.naming',
+    findingKey,
+    findings,
+    isAcceptedFinding: (current, accepted) => findingKey(current) === findingKey(accepted),
+  });
   return {
     files: namingFiles.map(toRelativePath),
     scope: 'repo-wide',
-    violations: [...findings.filter((finding) => !baseline.has(findingKey(finding))), ...stale],
+    violations: baseline.violations,
+    advisories: baseline.advisories,
   };
 }
 

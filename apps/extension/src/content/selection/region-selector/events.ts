@@ -12,6 +12,8 @@ type RegionSelectorDocumentHandlers = {
   handlePointerUp: () => void;
 };
 
+const REGION_GESTURE_LISTENER_OPTIONS: AddEventListenerOptions = { capture: true };
+
 export function bindRegionSelectorRootEvents(props: {
   overlay: HTMLElement;
   region: HTMLElement;
@@ -52,17 +54,25 @@ export function detachRegionSelectorListeners(args: {
   handlePointerUp: () => void;
   state: RegionSelectorState;
 }): void {
-  document.removeEventListener('mousemove', args.handleMouseMove);
-  document.removeEventListener('mouseup', args.handleMouseUp);
-  document.removeEventListener('pointermove', args.handlePointerMove);
-  document.removeEventListener('pointerup', args.handlePointerUp);
-  document.removeEventListener('pointercancel', args.handlePointerUp);
+  window.removeEventListener('mousemove', args.handleMouseMove, REGION_GESTURE_LISTENER_OPTIONS);
+  window.removeEventListener('mouseup', args.handleMouseUp, REGION_GESTURE_LISTENER_OPTIONS);
+  window.removeEventListener(
+    'pointermove',
+    args.handlePointerMove,
+    REGION_GESTURE_LISTENER_OPTIONS
+  );
+  window.removeEventListener('pointerup', args.handlePointerUp, REGION_GESTURE_LISTENER_OPTIONS);
+  window.removeEventListener(
+    'pointercancel',
+    args.handlePointerUp,
+    REGION_GESTURE_LISTENER_OPTIONS
+  );
 
   if (!args.state.keyDownHandler) {
     return;
   }
 
-  document.removeEventListener('keydown', args.handleKeyDown);
+  window.removeEventListener('keydown', args.handleKeyDown, REGION_GESTURE_LISTENER_OPTIONS);
   args.state.keyDownHandler = null;
 }
 
@@ -72,13 +82,13 @@ function bindRegionSelectorDocumentEvents(args: {
   handlePointerUp: () => void;
   state: RegionSelectorState;
 }): void {
-  document.addEventListener('mousemove', args.handlePointerMove);
-  document.addEventListener('mouseup', args.handlePointerUp);
-  document.addEventListener('pointermove', args.handlePointerMove);
-  document.addEventListener('pointerup', args.handlePointerUp);
-  document.addEventListener('pointercancel', args.handlePointerUp);
+  window.addEventListener('mousemove', args.handlePointerMove, REGION_GESTURE_LISTENER_OPTIONS);
+  window.addEventListener('mouseup', args.handlePointerUp, REGION_GESTURE_LISTENER_OPTIONS);
+  window.addEventListener('pointermove', args.handlePointerMove, REGION_GESTURE_LISTENER_OPTIONS);
+  window.addEventListener('pointerup', args.handlePointerUp, REGION_GESTURE_LISTENER_OPTIONS);
+  window.addEventListener('pointercancel', args.handlePointerUp, REGION_GESTURE_LISTENER_OPTIONS);
   args.state.keyDownHandler = args.handleKeyDown;
-  document.addEventListener('keydown', args.handleKeyDown);
+  window.addEventListener('keydown', args.handleKeyDown, REGION_GESTURE_LISTENER_OPTIONS);
 }
 
 function createRegionSelectorPointerMoveHandler(args: {

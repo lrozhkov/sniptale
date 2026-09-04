@@ -153,6 +153,42 @@ it('projects an unambiguous hidden sibling as a reversible disclosure', () => {
   expect(trigger.className).toBe('chevron-down');
 });
 
+it('collapses a disclosure that was already open in the captured document and restores it', () => {
+  const { doc, iframe } = createFrame();
+  const owner = doc.createElement('section');
+  const header = doc.createElement('div');
+  const trigger = doc.createElement('span');
+  trigger.className = 'CollapsibleBlock__visibilityControl CollapsibleBlock__visibilityControlOpen';
+  trigger.style.cursor = 'pointer';
+  trigger.setAttribute('aria-expanded', 'true');
+  trigger.textContent = 'Details';
+  header.append(trigger);
+  const region = doc.createElement('div');
+  region.className = 'panel';
+  region.textContent = 'Initially expanded static content';
+  owner.append(header, region);
+  doc.body.append(owner);
+  const cleanup = installSnapshotFrameStaticInteractions(iframe);
+
+  trigger.click();
+
+  expect(region.hidden).toBe(true);
+  expect(trigger.classList.contains('CollapsibleBlock__visibilityControlOpen')).toBe(false);
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+
+  trigger.click();
+  expect(region.hidden).toBe(false);
+  expect(region.className).toBe('panel');
+  expect(trigger.className).toContain('CollapsibleBlock__visibilityControlOpen');
+  expect(trigger.getAttribute('aria-expanded')).toBe('true');
+
+  trigger.click();
+  cleanup();
+  expect(region.hidden).toBe(false);
+  expect(trigger.className).toContain('CollapsibleBlock__visibilityControlOpen');
+  expect(trigger.getAttribute('aria-expanded')).toBe('true');
+});
+
 it('does not reinterpret links or ordinary pointer controls as disclosures', () => {
   const { doc, iframe } = createFrame();
   const owner = doc.createElement('section');

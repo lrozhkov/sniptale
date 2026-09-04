@@ -177,7 +177,6 @@ test('video editor export reacts to runtime progress and completion events', asy
     type: VideoMessageType.PROJECT_EXPORT_COMPLETED,
     jobId,
     projectId,
-    recordingId: 'recording-harness',
     exportId: 'export-harness',
     filename: 'demo.webm',
     format: VideoExportFormat.WEBM,

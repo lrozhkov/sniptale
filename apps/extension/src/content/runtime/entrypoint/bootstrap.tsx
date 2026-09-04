@@ -23,6 +23,7 @@ import { installContentToastHostAdapter } from '../../platform/dom-host/toast-ho
 import { CONTENT_RUNTIME_HOST_ID, CONTENT_RUNTIME_MARKER_ATTRIBUTE } from './markers';
 import {
   disposeExistingContentRuntime,
+  hasRegisteredContentRuntimeCleanup,
   registerContentRuntimeCleanup,
   runWhenContentBodyReady,
 } from './lifecycle';
@@ -84,6 +85,25 @@ function installPageZoomSynchronization(): () => void {
   };
 }
 
+function mountContentHost(host: HTMLElement): void {
+  const canUseTopLayer = typeof host.showPopover === 'function';
+  if (canUseTopLayer) {
+    host.setAttribute('popover', 'manual');
+  }
+
+  document.body.appendChild(host);
+
+  if (!canUseTopLayer) {
+    return;
+  }
+
+  try {
+    host.showPopover();
+  } catch {
+    host.removeAttribute('popover');
+  }
+}
+
 /**
  * Boots the top-level content UI and wires its runtime ownership seams.
  */
@@ -91,7 +111,8 @@ export function initializeTopLevelContentEntry(): void {
   const existingHost = document.getElementById(CONTENT_RUNTIME_HOST_ID);
   const contentRuntimeMarkerVersion = getContentRuntimeMarkerVersion();
   if (
-    existingHost?.getAttribute(CONTENT_RUNTIME_MARKER_ATTRIBUTE) === contentRuntimeMarkerVersion
+    existingHost?.getAttribute(CONTENT_RUNTIME_MARKER_ATTRIBUTE) === contentRuntimeMarkerVersion &&
+    hasRegisteredContentRuntimeCleanup()
   ) {
     return;
   }
@@ -110,8 +131,8 @@ export function initializeTopLevelContentEntry(): void {
 
   const shadow = createShadowRootWithStyles(host, createContentEntrypointStyles());
   const { appContainer } = initializeContentUiRoots(shadow);
-  installContentUiActivationBridge(shadow);
-  document.body.appendChild(host);
+  const disposeContentUiActivationBridge = installContentUiActivationBridge(shadow);
+  mountContentHost(host);
   const disposeContentUiScaleCompensation = installContentUiScaleCompensation(host);
 
   const root = createRoot(appContainer);
@@ -124,6 +145,7 @@ export function initializeTopLevelContentEntry(): void {
       disposeContentRuntime();
     } finally {
       try {
+        disposeContentUiActivationBridge();
         disposeContentUiScaleCompensation();
         disposePageZoomSynchronization();
         disposeToastHostAdapter();

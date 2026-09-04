@@ -3,22 +3,32 @@ import fs from 'node:fs';
 
 import { expect, it } from 'vitest';
 
-import { isAllowedViolation, loadBaseline } from './shared-baseline.mjs';
+import { isAllowedViolation, loadBaseline, parseQualityBaseline } from './shared-baseline.mjs';
 import { createTempRoot, writeFile } from '../../test-support/test-helpers';
 
 it('requires a matching content hash for baseline allowances', () => {
   const root = createTempRoot('shared-baseline-');
   const filePath = writeFile(root, 'feature.ts', 'export const value = 1;\n');
   const contentHash = crypto.createHash('sha256').update('export const value = 1;\n').digest('hex');
-  const baseline = {
+  const baseline = parseQualityBaseline({
+    rationales: [
+      {
+        id: 'noise.test-coverage.generated-fixture',
+        classification: 'tool-noise',
+        owner: 'qa-platform',
+        reason: 'The generated fixture is intentionally not executable product code.',
+        removalCondition: 'Remove when the fixture no longer participates in the detector.',
+      },
+    ],
     allowances: [
       {
+        noiseId: 'noise.test-coverage.generated-fixture',
         rule: 'test-coverage-lines',
         file: filePath,
         contentHash,
       },
     ],
-  };
+  });
   const violation = { rule: 'test-coverage-lines', file: filePath };
 
   expect(isAllowedViolation(baseline, violation)).toBe(true);
@@ -26,6 +36,23 @@ it('requires a matching content hash for baseline allowances', () => {
   writeFile(root, 'feature.ts', 'export const value = 2;\n');
 
   expect(isAllowedViolation(baseline, violation)).toBe(false);
+});
+
+it('rejects debt and unexplained heuristic allowances', () => {
+  expect(() =>
+    parseQualityBaseline({
+      rationales: [
+        {
+          id: 'accepted.example',
+          classification: 'accepted-debt',
+          owner: 'qa-platform',
+          reason: 'Known debt.',
+          removalCondition: 'Eventually.',
+        },
+      ],
+      allowances: [],
+    })
+  ).toThrow('tool-noise classification');
 });
 
 it('keeps the canonical quality baseline empty', () => {

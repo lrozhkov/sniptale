@@ -11,7 +11,8 @@ const { loadProjectMock, readScenarioEditorProjectIdMock, saveProjectMock } = vi
   saveProjectMock: vi.fn(),
 }));
 
-vi.mock('../../../platform/i18n', () => ({
+vi.mock('../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
 vi.mock('@sniptale/runtime-contracts/scenario-editor/session', async (importOriginal) => ({

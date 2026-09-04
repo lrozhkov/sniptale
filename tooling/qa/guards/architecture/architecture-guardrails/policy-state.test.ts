@@ -15,7 +15,7 @@ async function loadModule(root: string) {
 }
 
 function writeRuntimeTopology(root: string) {
-  const runtimeDefaults = { docsMarkers: [], entrypointFiles: [] };
+  const runtimeDefaults = { entrypointFiles: [] };
   writeJson(root, 'tooling/qa/guards/architecture/runtime-topology/runtime-topology.data.json', [
     { ...runtimeDefaults, id: 'background', root: 'apps/extension/src/background' },
   ]);

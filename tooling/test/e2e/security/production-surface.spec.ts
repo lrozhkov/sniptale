@@ -79,7 +79,10 @@ test('production artifact exposes no security harness or internal web surface', 
     const missing = await launched.context.newPage();
     let navigationError = '';
     await missing
-      .goto(`chrome-extension://${extensionId}/tooling/test/harness/security-control.html`)
+      .goto(`chrome-extension://${extensionId}/tooling/test/harness/security-control.html`, {
+        timeout: 5_000,
+        waitUntil: 'commit',
+      })
       .catch((error: unknown) => {
         navigationError = error instanceof Error ? error.message : String(error);
       });
@@ -87,9 +90,14 @@ test('production artifact exposes no security harness or internal web surface', 
     await missing.close();
     await host.close();
   } finally {
-    await new Promise<void>((resolve, reject) =>
-      hostServer.server.close((error) => (error ? reject(error) : resolve()))
-    );
-    await closeExtensionBrowser(launched, { removeUserDataDir: true });
+    try {
+      await closeExtensionBrowser(launched, { removeUserDataDir: true });
+    } finally {
+      const closed = new Promise<void>((resolve, reject) =>
+        hostServer.server.close((error) => (error ? reject(error) : resolve()))
+      );
+      hostServer.server.closeAllConnections();
+      await closed;
+    }
   }
 });

@@ -1,7 +1,8 @@
 import { useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
+import { createSolidPaint } from '@sniptale/foundation/paint';
 
 import type {
-  BorderPreset,
+  AppliedBorderSettings,
   FrameData,
 } from '../../../apps/extension/src/features/highlighter/contracts';
 import {
@@ -42,18 +43,16 @@ declare global {
 
 export type DynamicAnchorScenario = 'carousel' | 'iframe' | 'nested';
 
-const DYNAMIC_PRESET: BorderPreset = {
-  id: 'dynamic-anchor-border',
-  name: 'Dynamic anchor border',
-  enabled: true,
-  order: 0,
+const DYNAMIC_SETTINGS: AppliedBorderSettings = {
+  sourcePresetId: 'dynamic-anchor-border',
+  sourcePresetName: 'Dynamic anchor border',
   color: '#ff00ff',
   width: 3,
   style: 'solid',
   radius: 8,
   padding: { top: 2, right: 2, bottom: 2, left: 2 },
   shadow: 0,
-  fillColor: '#00d4ff00',
+  fillPaint: createSolidPaint('#00d4ff00'),
   inheritCustomCss: false,
   customCss: '',
 };
@@ -144,7 +143,7 @@ function createIframeFixtureMarkup(revision: number, includeAnchor: boolean): st
 }
 
 function createDynamicFrame(target: HTMLAnchorElement, scenario: DynamicAnchorScenario): FrameData {
-  const measured = calculateFrameViewportCoords(target, DYNAMIC_PRESET);
+  const measured = calculateFrameViewportCoords(target, DYNAMIC_SETTINGS);
   const coords = {
     x: measured.x + DYNAMIC_MANUAL_ADJUSTMENT.x,
     y: measured.y + DYNAMIC_MANUAL_ADJUSTMENT.y,
@@ -161,7 +160,7 @@ function createDynamicFrame(target: HTMLAnchorElement, scenario: DynamicAnchorSc
       scenario === 'iframe' ? '#dynamic-same-origin-iframe => #dynamic-anchor' : '#dynamic-anchor',
     offset: calculateFrameOffsetFromElement(coords, target),
     effectMode: 'focus',
-    borderSettings: DYNAMIC_PRESET,
+    borderSettings: DYNAMIC_SETTINGS,
     focusSettings: { opacity: 0.35, showBorder: true },
   };
 }

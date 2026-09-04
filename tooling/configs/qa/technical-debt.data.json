@@ -212,8 +212,8 @@
       "targetAction": "Keep only this exact immutable-history fingerprint reviewed; all worktree and new-history findings remain blocking."
     },
     {
-      "id": "accepted.codeql.locked-toolchain-download-write",
-      "classification": "accepted-architecture",
+      "id": "noise.codeql.locked-toolchain-download-write",
+      "classification": "tool-noise",
       "owner": "qa-platform",
       "risk": "Downloaded tool bytes are written into the QA image and would be executable if their locked digest were incorrectly reviewed.",
       "reason": "The installer writes only to fixed image-owned destinations after verifying every response byte against the exact SHA-256 in the trusted toolchain lock.",
@@ -233,8 +233,8 @@
       "targetAction": "Retain fixed destinations and exact pre-write SHA-256 verification; any content or line drift requires renewed review."
     },
     {
-      "id": "accepted.codeql.locked-toolchain-download-url",
-      "classification": "accepted-architecture",
+      "id": "noise.codeql.locked-toolchain-download-url",
+      "classification": "tool-noise",
       "owner": "qa-platform",
       "risk": "A tool URL selected from mutable or candidate-controlled data could turn the QA image build into an unintended outbound request.",
       "reason": "GitHub CI materializes the Dockerfile and machine lock from the trusted control commit, and every fetched object is additionally bound to an exact reviewed SHA-256.",
@@ -254,8 +254,8 @@
       "targetAction": "Keep CI build inputs trusted-control-bound and all downloads exact-digest-verified; any source drift requires renewed review."
     },
     {
-      "id": "accepted.codeql.local-toolchain-download-write",
-      "classification": "accepted-architecture",
+      "id": "noise.codeql.local-toolchain-download-write",
+      "classification": "tool-noise",
       "owner": "qa-platform",
       "risk": "Downloaded tool bytes become executable in the local QA toolchain if the locked digest or destination policy is incorrectly reviewed.",
       "reason": "The local adapter accepts only HTTPS GitHub release URLs, validates an exact SHA-256 lock before writing, uses exclusive creation, and writes only below the user-owned Sniptale toolchain cache.",
@@ -275,8 +275,8 @@
       "targetAction": "Retain the trusted-origin allowlist, exact pre-write SHA-256 verification, exclusive creation, and cache-root confinement; any source drift requires renewed review."
     },
     {
-      "id": "accepted.codeql.transform-stream-transformer-constructor",
-      "classification": "accepted-architecture",
+      "id": "noise.codeql.transform-stream-transformer-constructor",
+      "classification": "tool-noise",
       "owner": "archive-transfer",
       "risk": "A broad suppression of argument-count findings could conceal real API misuse in archive streaming code.",
       "reason": "The Web Streams TransformStream constructor accepts a transformer object as its first argument; CodeQL resolves the browser global to an incompatible zero-argument model and reports this standards-compliant call as superfluous.",

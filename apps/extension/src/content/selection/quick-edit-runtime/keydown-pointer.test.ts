@@ -72,7 +72,7 @@ it('uses the inner iframe text node for quick edit hover resolution', () => {
   expect(hideHoverOverlay).not.toHaveBeenCalled();
 });
 
-it('lets native contenteditable insertion handle spaces when text remains to the right', () => {
+it('inserts a regular space when editable text remains to the right', () => {
   const editable = document.createElement('div');
   editable.className = 'sniptale-editing';
   editable.contentEditable = 'true';
@@ -110,9 +110,163 @@ it('lets native contenteditable insertion handle spaces when text remains to the
     showHoverOverlay: vi.fn(),
   });
 
-  expect(preventDefault).not.toHaveBeenCalled();
-  expect(editable.textContent).toBe('abc');
+  expect(preventDefault).toHaveBeenCalledOnce();
+  expect(editable.textContent).toBe('a bc');
 });
+
+it('keeps editing an active managed target after the host modal prevents the keydown', () => {
+  const editable = document.createElement('div');
+  editable.className = 'sniptale-editing';
+  editable.contentEditable = 'true';
+  document.body.appendChild(editable);
+  const event = new KeyboardEvent('keydown', { cancelable: true, key: 'ф' });
+  event.preventDefault();
+  Object.defineProperty(event, 'target', { configurable: true, value: editable });
+
+  handleQuickEditKeyDown(event, {
+    cancelEditing: vi.fn(),
+    disableDocumentMode: vi.fn(),
+    disableRequested: vi.fn(),
+    editingElementsSize: () => 1,
+    finishEditing: vi.fn(),
+    hideHoverOverlay: vi.fn(),
+    isDocumentModeEnabled: () => false,
+    isEnabled: () => true,
+    makeElementEditable: vi.fn(),
+    showHoverOverlay: vi.fn(),
+  });
+
+  expect(editable.textContent).toBe('ф');
+});
+
+it('deletes managed contenteditable text after host cancellation', () => {
+  const editable = document.createElement('div');
+  editable.className = 'sniptale-editing';
+  editable.contentEditable = 'true';
+  editable.textContent = 'abc';
+  document.body.appendChild(editable);
+  const selection = document.getSelection();
+  const range = document.createRange();
+  range.setStart(editable.firstChild ?? editable, 3);
+  range.collapse(true);
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+  const event = new KeyboardEvent('keydown', { cancelable: true, key: 'Backspace' });
+  event.preventDefault();
+  Object.defineProperty(event, 'target', { configurable: true, value: editable });
+
+  handleQuickEditKeyDown(event, {
+    cancelEditing: vi.fn(),
+    disableDocumentMode: vi.fn(),
+    disableRequested: vi.fn(),
+    editingElementsSize: () => 1,
+    finishEditing: vi.fn(),
+    hideHoverOverlay: vi.fn(),
+    isDocumentModeEnabled: () => false,
+    isEnabled: () => true,
+    makeElementEditable: vi.fn(),
+    showHoverOverlay: vi.fn(),
+  });
+
+  expect(editable.textContent).toBe('ab');
+});
+
+it('edits the active managed target while direct page document mode remains enabled', () => {
+  const editable = document.createElement('div');
+  editable.className = 'sniptale-editing';
+  editable.contentEditable = 'true';
+  document.body.appendChild(editable);
+  const event = new KeyboardEvent('keydown', { cancelable: true, key: 'ф' });
+  event.preventDefault();
+  Object.defineProperty(event, 'target', { configurable: true, value: editable });
+
+  handleQuickEditKeyDown(event, {
+    cancelEditing: vi.fn(),
+    disableDocumentMode: vi.fn(),
+    disableRequested: vi.fn(),
+    editingElementsSize: () => 1,
+    finishEditing: vi.fn(),
+    hideHoverOverlay: vi.fn(),
+    isDocumentModeEnabled: () => true,
+    isEnabled: () => true,
+    makeElementEditable: vi.fn(),
+    showHoverOverlay: vi.fn(),
+  });
+
+  expect(editable.textContent).toBe('ф');
+});
+
+it('applies printable keys to the document selection in direct page design mode', () => {
+  const paragraph = document.createElement('p');
+  const text = document.createTextNode('text');
+  paragraph.append(text);
+  document.body.append(paragraph);
+  const selection = document.getSelection();
+  const range = document.createRange();
+  range.setStart(text, 2);
+  range.collapse(true);
+  selection?.removeAllRanges();
+  selection?.addRange(range);
+  const event = new KeyboardEvent('keydown', { cancelable: true, key: 'ф' });
+  event.preventDefault();
+  Object.defineProperty(event, 'target', { configurable: true, value: paragraph });
+
+  handleQuickEditKeyDown(event, {
+    cancelEditing: vi.fn(),
+    disableDocumentMode: vi.fn(),
+    disableRequested: vi.fn(),
+    editingElementsSize: () => 0,
+    finishEditing: vi.fn(),
+    hideHoverOverlay: vi.fn(),
+    isDocumentModeEnabled: () => true,
+    isEnabled: () => true,
+    makeElementEditable: vi.fn(),
+    showHoverOverlay: vi.fn(),
+  });
+
+  expect(paragraph.textContent).toBe('teфxt');
+});
+
+it.each([
+  ['ArrowDown', 'forward', 'line'],
+  ['ArrowLeft', 'backward', 'character'],
+  ['ArrowRight', 'forward', 'character'],
+  ['ArrowUp', 'backward', 'line'],
+  ['End', 'forward', 'lineboundary'],
+  ['Home', 'backward', 'lineboundary'],
+] as const)(
+  'extends document-mode selection for Shift+%s after host cancellation',
+  (key, direction, granularity) => {
+    const paragraph = document.createElement('p');
+    paragraph.textContent = 'text';
+    document.body.appendChild(paragraph);
+    const selection = document.getSelection();
+    const modify = vi.fn();
+    Object.defineProperty(selection, 'modify', { configurable: true, value: modify });
+    const event = new KeyboardEvent('keydown', {
+      cancelable: true,
+      key,
+      shiftKey: true,
+    });
+    event.preventDefault();
+    Object.defineProperty(event, 'target', { configurable: true, value: paragraph });
+
+    handleQuickEditKeyDown(event, {
+      cancelEditing: vi.fn(),
+      disableDocumentMode: vi.fn(),
+      disableRequested: vi.fn(),
+      editingElementsSize: () => 1,
+      finishEditing: vi.fn(),
+      hideHoverOverlay: vi.fn(),
+      isDocumentModeEnabled: () => true,
+      isEnabled: () => true,
+      makeElementEditable: vi.fn(),
+      showHoverOverlay: vi.fn(),
+    });
+
+    expect(modify).toHaveBeenCalledWith('extend', direction, granularity);
+  }
+);
 
 it('preserves a trailing space when the caret is already at the end of the editable text', () => {
   const editable = document.createElement('div');

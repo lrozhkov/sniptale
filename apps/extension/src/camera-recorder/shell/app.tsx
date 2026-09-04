@@ -1,10 +1,10 @@
 import { useCallback, useMemo, useState } from 'react';
-import { translate } from '../../platform/i18n';
 import type { RuntimeMessagingTransport } from '../../platform/runtime-messaging';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import { CameraControlBar } from './control-bar';
 import { getResponseError } from './format';
+import { createUserFacingErrorMessage } from '../../platform/i18n/user-facing-error';
 import { CameraLivePanel } from './live-panel';
 import { CameraPostRecordPanel } from './post-record-panel';
 import { consumeCameraRecorderRouteState } from './route-state';
@@ -31,13 +31,17 @@ export function CameraRecorderApp({ messaging }: { messaging: RuntimeMessagingTr
         setError(null);
         const response = await messaging.sendRuntimeMessage(message);
         if (response?.success === false) {
-          setError(getResponseError(response, translate('common.states.error')));
+          setError(getResponseError(response, 'common.errors.actionFailed'));
           return;
         }
         await refreshState();
       } catch (controlError) {
         setError(
-          controlError instanceof Error ? controlError.message : translate('common.states.error')
+          createUserFacingErrorMessage({
+            cause: controlError,
+            detail: 'browserCommunication',
+            summaryKey: 'common.errors.actionFailed',
+          })
         );
       }
     },

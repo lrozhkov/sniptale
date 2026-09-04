@@ -87,7 +87,11 @@ function writePassingConfigPolicyFixture(root) {
   writeFile(
     root,
     'apps/extension/vite.config.ts',
-    "export default { build: { target: 'chrome140' } };\n"
+    [
+      "import { CHROME_BUILD_TARGET } from './build/manifest.ts';",
+      'export default { build: { target: CHROME_BUILD_TARGET } };',
+      '',
+    ].join('\n')
   );
 }
 
@@ -149,7 +153,7 @@ function expectConfigPolicyViolationsToContain(violations) {
       }),
       expect.objectContaining({
         file: 'apps/extension/vite.config.ts',
-        message: 'build.target must be "chrome140"',
+        message: 'build.target must derive from manifest.minimum_chrome_version',
       }),
     ])
   );
@@ -163,13 +167,13 @@ it('passes when runtime baseline config matches policy', async () => {
   expect(module.collectConfigPolicyViolations({ rootDir: root })).toEqual([]);
 });
 
-it('does not accept the Vite build target when chrome140 appears only in a comment', async () => {
+it('does not accept a literal Vite build target even when it matches the manifest today', async () => {
   const root = createTempRoot('verify-config-policy-vite-comment-');
   writePassingConfigPolicyFixture(root);
   writeFile(
     root,
     'apps/extension/vite.config.ts',
-    ['// target: "chrome140"', "export default { build: { target: 'chrome139' } };", ''].join('\n')
+    ["export default { build: { target: 'chrome148' } };", ''].join('\n')
   );
 
   const module = await importConfigPolicyModule();
@@ -177,7 +181,7 @@ it('does not accept the Vite build target when chrome140 appears only in a comme
   expect(module.collectConfigPolicyViolations({ rootDir: root })).toEqual([
     expect.objectContaining({
       file: 'apps/extension/vite.config.ts',
-      message: 'build.target must be "chrome140"',
+      message: 'build.target must derive from manifest.minimum_chrome_version',
     }),
   ]);
 });
@@ -255,9 +259,9 @@ it('does not accept the Vite build target from an unrelated object', async () =>
     root,
     'apps/extension/vite.config.ts',
     [
-      "const fixture = { build: { target: 'chrome140' } };",
+      'const fixture = { build: { target: CHROME_BUILD_TARGET } };',
       'void fixture;',
-      "export default { build: { target: 'chrome139' } };",
+      "export default { build: { target: 'chrome148' } };",
       '',
     ].join('\n')
   );
@@ -267,7 +271,7 @@ it('does not accept the Vite build target from an unrelated object', async () =>
   expect(module.collectConfigPolicyViolations({ rootDir: root })).toEqual([
     expect.objectContaining({
       file: 'apps/extension/vite.config.ts',
-      message: 'build.target must be "chrome140"',
+      message: 'build.target must derive from manifest.minimum_chrome_version',
     }),
   ]);
 });
@@ -280,7 +284,8 @@ it('accepts the Vite build target from a defineConfig callback return object', a
     'apps/extension/vite.config.ts',
     [
       "import { defineConfig } from 'vite';",
-      "export default defineConfig(() => ({ build: { target: 'chrome140' } }));",
+      "import { CHROME_BUILD_TARGET } from './build/manifest.ts';",
+      'export default defineConfig(() => ({ build: { target: CHROME_BUILD_TARGET } }));',
       '',
     ].join('\n')
   );
@@ -288,6 +293,33 @@ it('accepts the Vite build target from a defineConfig callback return object', a
   const module = await importConfigPolicyModule();
 
   expect(module.collectConfigPolicyViolations({ rootDir: root })).toEqual([]);
+});
+
+it('rejects a Vite build target that shadows the manifest-owned import', async () => {
+  const root = createTempRoot('verify-config-policy-vite-shadowed-target-');
+  writePassingConfigPolicyFixture(root);
+  writeFile(
+    root,
+    'apps/extension/vite.config.ts',
+    [
+      "import { defineConfig } from 'vite';",
+      "import { CHROME_BUILD_TARGET } from './build/manifest.ts';",
+      'export default defineConfig(() => {',
+      "  const CHROME_BUILD_TARGET = 'chrome149';",
+      '  return { build: { target: CHROME_BUILD_TARGET } };',
+      '});',
+      '',
+    ].join('\n')
+  );
+
+  const module = await importConfigPolicyModule();
+
+  expect(module.collectConfigPolicyViolations({ rootDir: root })).toEqual([
+    expect.objectContaining({
+      file: 'apps/extension/vite.config.ts',
+      message: 'build.target must derive from manifest.minimum_chrome_version',
+    }),
+  ]);
 });
 
 it('reports missing strictness flags, build target, and malformed runtime config', async () => {

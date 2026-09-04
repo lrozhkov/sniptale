@@ -3,9 +3,17 @@ import { isOwnerGuardLabel } from '../../../shared/owner-guard-step-helpers.mjs'
 import { measureAsyncStep } from '../../../../runtime/observability/step-timing.helpers.mjs';
 import { VERIFY_ALL_VIOLATION_STEPS } from '../violation-steps.mjs';
 import { runUnifiedAstGrepReceipt } from '../../../../audits/ast-grep/unified-ast-grep.mjs';
+import { filterAllowedViolations } from '../../../../policy/baselines/shared-baseline.mjs';
 
 export async function collectViolationSteps(
-  { codeFiles, deferOwnerGuards = false, excludedControlLabels = [], releaseMode, targetFiles },
+  {
+    baseline,
+    codeFiles,
+    deferOwnerGuards = false,
+    excludedControlLabels = [],
+    releaseMode,
+    targetFiles,
+  },
   violationSteps = VERIFY_ALL_VIOLATION_STEPS
 ) {
   const runnerScope = releaseMode
@@ -23,9 +31,12 @@ export async function collectViolationSteps(
     const { durationMs, value: rawResult } = await measureAsyncStep(() =>
       runner({ ...runnerScope, astGrepReceipt })
     );
-    const result = releaseMode
-      ? { ...rawResult, files: rawResult.files ?? codeFiles, scope: 'repo-wide' }
+    const baselineResult = baseline
+      ? { ...rawResult, violations: filterAllowedViolations(rawResult.violations, baseline) }
       : rawResult;
+    const result = releaseMode
+      ? { ...baselineResult, files: baselineResult.files ?? codeFiles, scope: 'repo-wide' }
+      : baselineResult;
     steps.push({ ...createViolationStep(label, header, result), durationMs });
   }
   return steps;

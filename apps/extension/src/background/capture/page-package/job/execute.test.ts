@@ -5,8 +5,10 @@ const mocks = vi.hoisted(() => ({
   complete: vi.fn(),
   cleanupCancellation: vi.fn(),
   download: vi.fn(),
+  finishActionIndicator: vi.fn(),
   prepareDownloadRuntime: vi.fn(),
   save: vi.fn(),
+  startActionIndicator: vi.fn(),
   release: vi.fn(),
   releaseOne: vi.fn(),
   resolveTabs: vi.fn(),
@@ -25,6 +27,10 @@ vi.mock('./download', async (importOriginal) => ({
 vi.mock('./offscreen-download-gateway', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./offscreen-download-gateway')>()),
   preparePagePackageDownloadRuntime: mocks.prepareDownloadRuntime,
+}));
+vi.mock('./action-indicator', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./action-indicator')>()),
+  startPagePackageActionIndicator: mocks.startActionIndicator,
 }));
 vi.mock('./visible', () => ({
   activatePopupExportCaptureTarget: vi.fn(),
@@ -56,6 +62,7 @@ vi.mock('./source-tabs', async (importOriginal) => ({
 
 import { executePopupExportJob } from './execute';
 import type { ActivePopupExportJob } from './runtime-state';
+import { translate } from '../../../../platform/i18n';
 
 const producerDescriptor = {
   producerStats: { filesCount: 3, filesFailed: 1, rowsCount: 5, sectionsCount: 2 },
@@ -86,6 +93,7 @@ function createJob(): ActivePopupExportJob {
     contentPort: { cancelPagePackage: vi.fn(), requestPagePackage: vi.fn() },
     expectedActivation: null,
     lastActivatedByWindow: new Map(),
+    locale: 'en',
     manualActivationConflict: false,
     publicationQueue: Promise.resolve(),
     status: {
@@ -127,6 +135,8 @@ function createJob(): ActivePopupExportJob {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.finishActionIndicator.mockResolvedValue(undefined);
+  mocks.startActionIndicator.mockReturnValue(mocks.finishActionIndicator);
   mocks.cleanupTemporaryTabs.mockResolvedValue(undefined);
   mocks.resolveTabs.mockResolvedValue(new Map([[7, { id: 7 }]]));
   mocks.prepareDownloadRuntime.mockResolvedValue(undefined);
@@ -195,6 +205,30 @@ beforeEach(() => {
     };
     return true;
   });
+});
+
+it('opens the final result only after restoring and closing capture tabs', async () => {
+  const sequence: string[] = [];
+  const job = createJob();
+  const onFinished = vi.fn(() => sequence.push('finished'));
+  mocks.restore.mockImplementationOnce(async () => {
+    sequence.push('restored-tabs');
+  });
+  mocks.cleanupTemporaryTabs.mockImplementationOnce(async () => {
+    sequence.push('closed-temporary-tabs');
+  });
+  mocks.finishActionIndicator.mockImplementationOnce(async () => {
+    sequence.push('opened-final-popup');
+  });
+
+  await executePopupExportJob(job, onFinished);
+
+  expect(sequence).toEqual([
+    'restored-tabs',
+    'closed-temporary-tabs',
+    'finished',
+    'opened-final-popup',
+  ]);
 });
 
 it('downloads staged pages and publishes terminal status only after browser completion', async () => {
@@ -382,7 +416,7 @@ it('keeps cancellation retryable when session or asset cleanup is incomplete', a
 
   expect(job.status.phase).toBe('cancelling');
   expect(job.status.result).toMatchObject({
-    errors: expect.arrayContaining([expect.stringContaining('cancellation cleanup is incomplete')]),
+    errors: [translate('content.runtime.exportCancelFailed', 'en')],
     success: false,
   });
   expect(job.cancellationCleanupError).toBeInstanceOf(Error);
@@ -393,19 +427,48 @@ it('keeps cancellation retryable when session or asset cleanup is incomplete', a
 
 it('fails without invoking download when no staged page survived collection', async () => {
   const job = createJob();
-  mocks.collect.mockResolvedValue({ errors: ['Page: capture failed'], packages: [] });
+  const pageError = `Page: ${translate('content.runtime.exportPrepareFailed', 'en')}`;
+  mocks.collect.mockResolvedValue({ errors: [pageError], packages: [] });
 
   await executePopupExportJob(job, vi.fn());
 
   expect(job.status.phase).toBe('failed');
-  expect(job.status.result).toMatchObject({ success: false, errors: ['Page: capture failed'] });
+  expect(job.status.result).toMatchObject({
+    success: false,
+    errors: [
+      pageError,
+      `${translate('content.runtime.exportFailed', 'en')}. ${translate(
+        'popup.export.pageCollectionErrorDetail',
+        'en'
+      )}`,
+    ],
+  });
   expect(mocks.download).not.toHaveBeenCalled();
 });
+
+it.each(['en', 'ru'] as const)(
+  'localizes an unknown execution error for the %s Export Popup without exposing internals',
+  async (locale) => {
+    const job = createJob();
+    job.locale = locale;
+    mocks.prepareDownloadRuntime.mockRejectedValueOnce(new Error('offscreen private detail'));
+
+    await executePopupExportJob(job, vi.fn());
+
+    expect(job.status.result?.errors).toContain(
+      `${translate('content.runtime.exportFailed', locale)}. ${translate(
+        'popup.export.downloadPreparationErrorDetail',
+        locale
+      )}`
+    );
+    expect(JSON.stringify(job.status)).not.toContain('offscreen private detail');
+  }
+);
 
 it('publishes only a fixed download lifecycle failure without cleanup internals', async () => {
   const job = createJob();
   mocks.download.mockRejectedValueOnce(
-    new Error('Page Package download could not be completed safely.')
+    new Error('Page Package download could not be completed safely [browser-event].')
   );
   mocks.release.mockRejectedValueOnce(new Error('staged cleanup failed'));
 
@@ -413,7 +476,12 @@ it('publishes only a fixed download lifecycle failure without cleanup internals'
 
   expect(job.status.phase).toBe('failed');
   expect(job.status.result).toMatchObject({
-    errors: ['Page Package download could not be completed safely.'],
+    errors: [
+      `${translate('content.runtime.exportFailed', 'en')}. ${translate(
+        'popup.export.archiveDownloadErrorDetail',
+        'en'
+      )}`,
+    ],
     success: false,
     warnings: [],
   });
@@ -429,7 +497,12 @@ it('does not persist hostile archive validation detail in public status', async 
 
   expect(job.status.phase).toBe('failed');
   expect(job.status.result).toMatchObject({
-    errors: ['Page Package could not be validated or downloaded safely.'],
+    errors: [
+      `${translate('content.runtime.exportFailed', 'en')}. ${translate(
+        'popup.export.archiveValidationErrorDetail',
+        'en'
+      )}`,
+    ],
     success: false,
   });
   expect(JSON.stringify(job.status)).not.toContain('private/account-42.json');
@@ -443,7 +516,12 @@ it('does not publish completed before durable staged cleanup succeeds', async ()
 
   expect(job.status.phase).toBe('failed');
   expect(job.status.result).toMatchObject({
-    errors: ['Page Package cleanup is incomplete.'],
+    errors: [
+      `${translate('content.runtime.exportFailed', 'en')}. ${translate(
+        'popup.export.temporaryStorageErrorDetail',
+        'en'
+      )}`,
+    ],
     success: false,
   });
   expect(job.status.result?.errors.join(' ')).not.toContain('OPFS internal detail');

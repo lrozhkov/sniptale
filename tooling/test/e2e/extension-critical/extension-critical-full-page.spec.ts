@@ -199,7 +199,7 @@ test('native full-page capture crops the outer browser surface to a custom viewp
   }
 });
 
-test('native full-page capture composes one dominant internal scroller with its shell', async ({
+test('native full-page capture composes one dominant internal scroller vertically with its shell', async ({
   extensionId,
   page,
 }) => {
@@ -212,8 +212,8 @@ test('native full-page capture composes one dominant internal scroller with its 
   const after = await getState(page);
 
   expect(result.metadata).toMatchObject({
-    cssHeight: 1580,
-    cssWidth: 1290,
+    cssHeight: 1595,
+    cssWidth: 800,
     downscaled: false,
   });
   expect(after.lazyLoaded).toBe(true);
@@ -224,8 +224,8 @@ test('native full-page capture composes one dominant internal scroller with its 
       { x: 20, y: 20 },
       { x: 195, y: 185 },
       { x: 195, y: 785 },
-      { x: 1145, y: 1385 },
-      { x: 995, y: 1235 },
+      { x: 195, y: 1385 },
+      { x: 595, y: 1235 },
     ])
   ).resolves.toEqual([
     [17, 24, 39, 255],

@@ -25,6 +25,7 @@ it('parses the native popup export job lifecycle contracts', () => {
     includeWebCopy: false,
     intent: 'export',
     jobId: 'job-1',
+    locale: 'en',
     options,
     captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
     sources: [{ kind: 'tab', tabId: 7, title: 'Page' }],
@@ -45,6 +46,18 @@ it('parses the native popup export job lifecycle contracts', () => {
   expect(
     getStatus.parseRequest({ jobId: 'job-1', type: MessageType.GET_PAGE_PACKAGE_JOB_STATUS })
   ).toEqual({ jobId: 'job-1', type: MessageType.GET_PAGE_PACKAGE_JOB_STATUS });
+  expect(getStatus.parseResponse({ locale: 'en', status: null, success: true })).toEqual({
+    locale: 'en',
+    status: null,
+    success: true,
+  });
+  expect(getStatus.parseResponse({ error: 'storage unavailable', success: false })).toEqual({
+    error: 'storage unavailable',
+    success: false,
+  });
+  expect(() => getStatus.parseResponse({ locale: 'en', success: true })).toThrow();
+  expect(() => getStatus.parseResponse({ status: null, success: true })).toThrow();
+  expect(() => getStatus.parseResponse({ locale: 'fr', status: null, success: true })).toThrow();
   expect(
     cancel.parseRequest({ jobId: 'job-1', type: MessageType.CANCEL_PAGE_PACKAGE_JOB })
   ).toEqual({ jobId: 'job-1', type: MessageType.CANCEL_PAGE_PACKAGE_JOB });
@@ -58,6 +71,9 @@ it('parses the native popup export job lifecycle contracts', () => {
     start.parseRequest({ ...request, sources: [{ kind: 'tab', title: 'Page' }] })
   ).toThrow();
   expect(() => start.parseRequest({ ...request, intent: 'other' })).toThrow();
+  const { locale: _omittedLocale, ...requestWithoutLocale } = request;
+  expect(() => start.parseRequest(requestWithoutLocale)).toThrow();
+  expect(() => start.parseRequest({ ...request, locale: 'fr' })).toThrow();
   const { includeWebCopy: _omittedWebCopy, ...requestWithoutWebCopy } = request;
   expect(() => start.parseRequest(requestWithoutWebCopy)).toThrow();
   expect(() => start.parseRequest({ ...request, includeWebCopy: 'yes' })).toThrow();
@@ -154,6 +170,44 @@ it('parses the native popup export job lifecycle contracts', () => {
   expect(() =>
     requestCapability.parseRequest({ ...capabilityRequest, operation: 'UNKNOWN_OPERATION' })
   ).toThrow();
+});
+
+it('requires a supported locale on popup-export status broadcasts', () => {
+  const contract = runtimeActionExportMessageContracts[MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED];
+  const status = {
+    activatedTabIds: [],
+    effectiveComponentPlan: {
+      components: {
+        attachments: false,
+        diagnostics: false,
+        images: false,
+        pageData: true,
+        webCopy: false,
+      },
+      diagnosticsLevel: 'none' as const,
+      includeScreenshot: false,
+    },
+    effectiveOptions: options,
+    intent: 'export' as const,
+    jobId: 'job-1',
+    orderedTabs: [{ tabId: 7, title: 'Page' }],
+    originalActiveTabs: [],
+    pageOutcomes: [{ ordinal: 0, status: 'pending' as const, tabId: 7 }],
+    phase: 'running' as const,
+    progress: { current: 0, errors: [], message: 'Running', phase: 'scanning' as const, total: 1 },
+    revision: 1,
+    warnings: [],
+  };
+  const message = {
+    locale: 'ru' as const,
+    status,
+    type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED,
+  };
+
+  expect(contract.parseRequest(message)).toEqual(message);
+  const { locale: _locale, ...withoutLocale } = message;
+  expect(() => contract.parseRequest(withoutLocale)).toThrow();
+  expect(() => contract.parseRequest({ ...message, locale: 'fr' })).toThrow();
 });
 
 it('parses every structured Page Package producer progress step', () => {

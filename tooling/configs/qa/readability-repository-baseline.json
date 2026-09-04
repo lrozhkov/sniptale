@@ -1,6 +1,213 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "controlId": "qa.rule.repository-readability",
   "findingCount": 28,
-  "findingDigest": "sha256:f8d4b9411b937cb573c3c768645720d72f0a57a196dae2eaabb8aa97b6079022"
+  "findingDigest": "sha256:f8d4b9411b937cb573c3c768645720d72f0a57a196dae2eaabb8aa97b6079022",
+  "findings": [
+    {
+      "file": "tooling/ci/candidate-image-maintenance.mjs",
+      "line": 78,
+      "message": "has 124 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/ci/workflow-contract.test.ts",
+      "line": 192,
+      "message": "has 125 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/audits/jscpd/jscpd-baseline-contract.mjs",
+      "line": 245,
+      "message": "has 178 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/composition/control-inventory/policy.test.ts",
+      "line": 25,
+      "message": "has 134 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/guards/architecture/architecture-guardrails/storage.test.ts",
+      "line": 24,
+      "message": "has 178 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/guards/architecture/architecture-guardrails/storage.test.ts",
+      "line": 29,
+      "message": "has 179 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/guards/architecture/architecture-guardrails/storage.test.ts",
+      "line": 34,
+      "message": "has 181 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/guards/architecture/architecture-guardrails/storage.test.ts",
+      "line": 39,
+      "message": "has 191 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/guards/architecture/architecture-guardrails/storage.test.ts",
+      "line": 44,
+      "message": "has 173 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/guards/architecture/forwarding-module-drift/check.mjs",
+      "line": 306,
+      "message": "has 123 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/guards/architecture/ownership/instance-ownership/check.test.ts",
+      "line": 216,
+      "message": "has 141 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/guards/architecture/runtime-topology/check.mjs",
+      "line": 254,
+      "message": "has 123 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/guards/architecture/runtime-topology/check.mjs",
+      "line": 265,
+      "message": "has 125 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/proof/coverage/profile-v8-coverage-provider.mjs",
+      "line": 90,
+      "message": "has 128 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/proof/focused-coverage/maps/editor.mjs",
+      "line": 23,
+      "message": "has 123 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/proof/focused-coverage/maps/local.mjs",
+      "line": 108,
+      "message": "has 121 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/proof/focused-coverage/maps/local.mjs",
+      "line": 129,
+      "message": "has 142 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/proof/focused-coverage/maps/local.mjs",
+      "line": 167,
+      "message": "has 133 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/proof/focused-coverage/maps/local.mjs",
+      "line": 175,
+      "message": "has 148 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/proof/focused-coverage/maps/local.mjs",
+      "line": 183,
+      "message": "has 129 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/proof/focused-coverage/maps/local.mjs",
+      "line": 202,
+      "message": "has 136 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/proof/focused-coverage/maps/local.mjs",
+      "line": 210,
+      "message": "has 144 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/proof/focused-coverage/maps/local.mjs",
+      "line": 218,
+      "message": "has 132 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/proof/focused-coverage/maps/local.mjs",
+      "line": 245,
+      "message": "has 143 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/proof/focused-coverage/maps/local.mjs",
+      "line": 253,
+      "message": "has 125 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/proof/focused-coverage/maps/local.mjs",
+      "line": 269,
+      "message": "has 127 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/proof/focused-coverage/maps/local.mjs",
+      "line": 296,
+      "message": "has 130 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    },
+    {
+      "file": "tooling/qa/proof/focused-coverage/maps/video-project-export.mjs",
+      "line": 118,
+      "message": "has 144 characters on a changed line (limit 120)",
+      "rule": "max-line-length",
+      "noiseId": "noise.repository-readability.reviewed-exact-lines"
+    }
+  ],
+  "rationales": [
+    {
+      "id": "noise.repository-readability.reviewed-exact-lines",
+      "owner": "maintainability-governance",
+      "reason": "The exact long lines are fixture, policy, or generated-like literals whose wrapping would reduce fidelity or obscure the reviewed value; the length heuristic cannot distinguish those cases.",
+      "removalCondition": "Remove an exact entry when its line disappears or can be wrapped without reducing fixture or policy fidelity.",
+      "classification": "tool-noise"
+    }
+  ]
 }

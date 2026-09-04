@@ -17,7 +17,8 @@ vi.mock('@sniptale/platform/browser/runtime', async (importOriginal) => ({
   },
 }));
 
-vi.mock('../../../../platform/i18n', () => ({
+vi.mock('../../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
 

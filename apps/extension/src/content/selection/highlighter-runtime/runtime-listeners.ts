@@ -2,6 +2,7 @@ import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   addEventListenerToAllWindowsDynamic,
   addScrollListenersToAllWindows,
+  addWindowEventListenerToAllWindowsDynamic,
 } from '../../platform/frame';
 import {
   dispatchContentModeDisabled,
@@ -33,7 +34,6 @@ export function createHighlighterRuntimeEscapeKeyHandler(props: {
 }) {
   return (event: KeyboardEvent) => {
     if (
-      event.defaultPrevented ||
       event.key !== 'Escape' ||
       isContentOwnedEvent(event) ||
       isCalloutEscapeTarget(event) ||
@@ -138,7 +138,7 @@ export function registerHighlighterRuntimeListeners(props: {
   isAnyFrameEditing: () => boolean;
 }) {
   const cleanupHoverListeners = registerHoverListeners(props.hoverController);
-  const cleanupKeyDown = addEventListenerToAllWindowsDynamic<KeyboardEvent>(
+  const cleanupKeyDown = addWindowEventListenerToAllWindowsDynamic<KeyboardEvent>(
     'keydown',
     createHighlighterRuntimeEscapeKeyHandler({
       ...props,

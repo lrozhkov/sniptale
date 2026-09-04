@@ -6,9 +6,19 @@ const mocks = vi.hoisted(() => ({
   createJournal: vi.fn(),
   deleteJournal: vi.fn(),
   discard: vi.fn(),
+  ensureLocaleHydrated: vi.fn(),
+  getCurrentLocale: vi.fn(() => 'ru' as const),
   journals: [] as unknown[],
   setStorage: vi.fn(),
   state: {} as Record<string, unknown>,
+  translate: vi.fn((key: string, locale?: string) => `${key}:${locale ?? 'current'}`),
+}));
+
+vi.mock('../../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
+  ensureLocaleHydrated: mocks.ensureLocaleHydrated,
+  getCurrentLocale: mocks.getCurrentLocale,
+  translate: mocks.translate,
 }));
 
 vi.mock('../../../../composition/persistence/infrastructure/browser-storage', () => ({
@@ -39,6 +49,7 @@ import {
   interruptStoredPopupExportJob,
   cleanupRecordedPagePackageOutput,
   readPagePackageJobRecoveryState,
+  readPagePackageJobLocale,
   readPagePackageJobStatus,
   recordPagePackageLibraryCleanupAsset,
   recordPopupExportDownloadLease,
@@ -50,6 +61,7 @@ import {
   removePopupExportStagedPage,
   writePagePackageJobStatus,
 } from './storage';
+import { parsePagePackageJobRecordV1 } from './storage-record';
 
 function status(phase: PagePackageJobStatusV1['phase'] = 'running'): PagePackageJobStatusV1 {
   return {
@@ -104,8 +116,64 @@ beforeEach(() => {
   mocks.createJournal.mockResolvedValue({ journalId: 'journal-1' });
   mocks.deleteJournal.mockResolvedValue(undefined);
   mocks.discard.mockResolvedValue(undefined);
+  mocks.ensureLocaleHydrated.mockResolvedValue(undefined);
   mocks.setStorage.mockImplementation(async (value: Record<string, unknown>) => {
     Object.assign(mocks.state, value);
+  });
+});
+
+it('hydrates locale before publishing an interrupted-job message', async () => {
+  await writePagePackageJobStatus(status());
+  let finishHydration!: () => void;
+  mocks.ensureLocaleHydrated.mockImplementationOnce(
+    () => new Promise<void>((resolve) => (finishHydration = resolve))
+  );
+
+  const interruption = interruptStoredPopupExportJob('job-1');
+  await Promise.resolve();
+  expect(mocks.setStorage).toHaveBeenCalledTimes(1);
+  finishHydration();
+  await interruption;
+  expect(mocks.setStorage).toHaveBeenCalledTimes(2);
+});
+
+it('retains the job locale when recovery runs after the current locale changes', async () => {
+  await writePagePackageJobStatus(status(), 'en');
+
+  await interruptStoredPopupExportJob('job-1');
+
+  expect(await readPagePackageJobLocale()).toBe('en');
+  expect(await readPagePackageJobStatus()).toMatchObject({
+    phase: 'interrupted',
+    progress: { message: 'popup.export.jobInterruptedMessage:en' },
+  });
+});
+
+it('parses persisted locale, migrates a legacy record, and rejects an unknown locale', async () => {
+  await writePagePackageJobStatus(status(), 'en');
+  const record = structuredClone(mocks.state[PAGE_PACKAGE_JOB_STORAGE_KEY]) as Record<
+    string,
+    unknown
+  >;
+
+  expect(parsePagePackageJobRecordV1(record)).toMatchObject({ locale: 'en' });
+
+  const legacyRecord = { ...record };
+  delete legacyRecord['locale'];
+  expect(parsePagePackageJobRecordV1(legacyRecord)).toMatchObject({ locale: null });
+  expect(parsePagePackageJobRecordV1({ ...record, locale: null })).toMatchObject({ locale: null });
+  expect(parsePagePackageJobRecordV1({ ...record, locale: 'fr' })).toBeNull();
+});
+
+it('still interrupts a stored job when locale hydration fails', async () => {
+  await writePagePackageJobStatus(status());
+  mocks.ensureLocaleHydrated.mockRejectedValueOnce(new Error('locale storage unavailable'));
+
+  await expect(interruptStoredPopupExportJob('job-1')).resolves.toBeUndefined();
+
+  expect(await readPagePackageJobStatus()).toMatchObject({
+    jobId: 'job-1',
+    phase: 'interrupted',
   });
 });
 
@@ -403,6 +471,8 @@ it('fails closed when a stored output reference has no exact domain journal evid
       kind: 'download-output',
     },
   });
+  const legacyRecord = mocks.state[PAGE_PACKAGE_JOB_STORAGE_KEY] as Record<string, unknown>;
+  delete legacyRecord['locale'];
 
   await expect(
     cleanupRecordedPagePackageOutput({ jobId: 'job-1', operationId: 'operation-1' })
@@ -411,6 +481,11 @@ it('fails closed when a stored output reference has no exact domain journal evid
   expect(mocks.discard).not.toHaveBeenCalled();
   expect(mocks.deleteJournal).not.toHaveBeenCalledWith('download-journal');
   expect(mocks.state[PAGE_PACKAGE_JOB_STORAGE_KEY]).toMatchObject({
+    locale: null,
+    output: { assetRef: ref, phase: 'cleanup-failed' },
+  });
+  await expect(readPagePackageJobRecoveryState()).resolves.toMatchObject({
+    locale: null,
     output: { assetRef: ref, phase: 'cleanup-failed' },
   });
 });

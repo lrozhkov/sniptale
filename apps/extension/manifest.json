@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Sniptale",
-  "version": "0.4.0",
-  "version_name": "0.4.0 alpha",
+  "version": "0.4.1",
+  "version_name": "0.4.1 alpha",
   "minimum_chrome_version": "148",
   "description": "Workspace for capturing, understanding, annotating, recording, editing, and exporting the web.",
   "default_locale": "en",

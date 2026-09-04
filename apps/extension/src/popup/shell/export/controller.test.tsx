@@ -4,7 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { ActiveTabCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/types';
-import { createVideoCapabilities } from '@sniptale/runtime-contracts/tab-capabilities/test-support';
+import { createVideoCapabilities } from '../test-support/video-capabilities';
 import type { PopupPageAccessRuntime } from '../runtime/page-access';
 
 const popupExportControllerMocks = vi.hoisted(() => ({

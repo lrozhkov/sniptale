@@ -167,6 +167,7 @@ function normalize(value) {
 
 export function classifyOwnerGroup(relativePath) {
   const file = normalize(relativePath).replace(/^\.\//u, '');
+  if (file === 'apps/extension/manifest.json') return 'extension:manifest';
   const parts = file.split('/');
   if (parts[0] === 'apps' && parts[1] === 'extension' && parts[2] === 'src') {
     const runtime = RUNTIME_TOPOLOGY.find(

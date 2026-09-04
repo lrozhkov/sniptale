@@ -7,7 +7,8 @@ import { ScenarioRecorderSidebar } from '.';
 import type { ScenarioRecorderSidebarPosition } from './position';
 import type { ScenarioRecorderSidebarStep } from './types';
 
-vi.mock('../../../../platform/i18n', () => ({
+vi.mock('../../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
 

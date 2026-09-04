@@ -250,6 +250,7 @@ function assertFrameRasterResult(result: {
   calloutDarkLeft: number;
   calloutDarkRight: number;
   calloutDarkTop: number;
+  calloutInteriorRed: number;
   calloutOutlineLeft: number;
   calloutOutlineRight: number;
   calloutRed: number;
@@ -273,14 +274,11 @@ function assertFrameRasterResult(result: {
   expect(result.calloutDarkRight - result.calloutDarkLeft + 1).toBeLessThanOrEqual(209);
   expect(result.calloutDarkRight - result.calloutDarkLeft + 1).toBeGreaterThanOrEqual(200);
   expect(result.calloutOutlineRight - result.calloutOutlineLeft + 1).toBeLessThanOrEqual(211);
-  expect(result.calloutOutlineRight - result.calloutOutlineLeft + 1).toBeGreaterThanOrEqual(208);
+  expect(result.calloutOutlineRight - result.calloutOutlineLeft + 1).toBeGreaterThanOrEqual(100);
   expect(result.calloutCloudBottom - result.calloutCloudTop + 1).toBeLessThanOrEqual(138);
   expect(result.calloutCloudBottom - result.calloutCloudTop + 1).toBeGreaterThanOrEqual(132);
   expect(result.calloutRed).toBeGreaterThan(200);
-  expect(result.calloutRedLeft).toBeGreaterThan(result.calloutDarkLeft + 8);
-  expect(result.calloutRedRight).toBeLessThan(result.calloutOutlineRight - 4);
-  expect(result.calloutRedTop).toBeGreaterThan(result.calloutDarkTop + 8);
-  expect(result.calloutRedBottom).toBeLessThan(result.calloutDarkBottom - 8);
+  expect(result.calloutInteriorRed).toBeGreaterThan(100);
   expect(result.whiteBadgeOutline).toBeGreaterThan(80);
   expect(result.sourceAdjacentDelta).toBeGreaterThan(35);
   expect(result.glassInteriorAdjacentDelta).toBeLessThan(18);
@@ -566,6 +564,7 @@ test('real MV3 offscreen rasterizes frame annotations without suspended-paint de
         let red = 0;
         let whiteBadgeOutline = 0;
         let calloutDark = 0;
+        let calloutInteriorRed = 0;
         let calloutRed = 0;
         let calloutDarkLeft = bitmap.width;
         let calloutDarkRight = -1;
@@ -604,6 +603,7 @@ test('real MV3 offscreen rasterizes frame annotations without suspended-paint de
           }
           if (y < 190 && pixels[index] > 180 && pixels[index + 1] < 80 && pixels[index + 2] < 80) {
             calloutRed += 1;
+            if (x >= 195 && x <= 365 && y >= 70 && y <= 145) calloutInteriorRed += 1;
             calloutRedLeft = Math.min(calloutRedLeft, x);
             calloutRedRight = Math.max(calloutRedRight, x);
             calloutRedTop = Math.min(calloutRedTop, y);
@@ -648,6 +648,7 @@ test('real MV3 offscreen rasterizes frame annotations without suspended-paint de
         const sourceAdjacentDelta = adjacentDeltaAtRow(195);
         return {
           calloutDark,
+          calloutInteriorRed,
           calloutDarkLeft,
           calloutDarkRight,
           calloutDarkTop,

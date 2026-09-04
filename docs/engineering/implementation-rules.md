@@ -1,89 +1,63 @@
-# Implementation Rules
+# Implementation rules
 
-Updated: 2026-08-14
+This document owns implementation decisions that apply across domains. `AGENTS.md` owns workflow. [Code quality](../tooling/code-quality.md) owns gates and exceptions. [Wrapper summary](../tooling/wrapper-summary.md) owns wrapper behavior.
 
-This document owns Sniptale implementation decisions: topology, boundaries, state, security, code shape, and proof shape. Workflow order belongs in the [optional agent workflow](../agent-tooling/AGENTS.md), quality policy in [code-quality.md](../tooling/code-quality.md), and wrapper behavior in [wrapper-summary.md](../tooling/wrapper-summary.md).
+## Ownership selection
 
-## Preflight Shape
+Choose the narrowest existing owner that can enforce the accepted behavior. Use [code organization](../architecture/code-organization.md) for placement and dependencies. Use [shared topology](../architecture/shared-topology.md) for package and app-core residency. Use [runtime contexts](../architecture/runtime-contexts.md) for runtime coordination.
 
-Before editing a non-trivial task, identify the owner seam and runtime boundary, target files/folders, authoritative/advisory/disposable state, public consumers, and the reachable failure, rollback, or stale-result scenarios that current acceptance or material invariants actually require. Use known accepted adjacent changes only to reject an immediately brittle placement; hypothetical future work does not justify current abstractions or behavior. Account for mixed ownership, low cohesion, effect and state-authority concentration, changed-line width, import-depth fallout, dead exports, cycles, i18n/design-system fallout, and test-support growth caused by the accepted change.
+Refactor first only when the accepted change would cross or worsen an ownership boundary. Return to planning when a correction reaches owners, contracts, or persistence writers outside the accepted scope.
 
-Freeze the original acceptance criteria, explicit non-goals, and bounded manifest before implementation. Do not add stronger manifest guarantees merely because a broader redesign is possible. Classify later findings as current-wave regressions, direct acceptance blockers, provable security issues, or pre-existing hardening; only the first three categories belong in the current correction. Report pre-existing hardening only when it is evidenced and materially relevant to the decision, or when the user explicitly requested a broader inventory; otherwise omit it.
+Keep production `fabric` value imports under `apps/extension/src/editor/**`. Keep the vendored Fabric adapter under `apps/extension/src/editor/fabric/vendor/**`. Keep `dompurify` in the sanitizer owner. Do not statically import `jszip` from `apps/extension/src/content/**`.
 
-If the accepted task would cross or worsen a broad public surface, flat sibling scatter, repeated-prefix family, root-facade implementation owner, structurally pressured owner, or owner with several current independent change reasons, refactor the shape first in the same change set unless the user explicitly chooses a narrower tradeoff. Existing pressure, a nearby cleanup opportunity, or a hypothetical extension is not sufficient. Metrics inform that decision but do not define the architecture.
+Apply the [public-surface rules](../architecture/code-organization.md#public-surfaces) instead of reintroducing a broad shared facade.
 
-If a correction begins to change new runtime contracts, every persistence writer, or dozens of owners outside the manifest, return to preflight and find the minimal correction class inside the original seam. Expand the manifest only with evidence that the frozen acceptance criteria cannot be met otherwise.
+Use a factory with explicit dependencies as the default for a mutable service. Retain a lazy default facade only for an existing compatibility consumer registered by its machine policy. Inject the factory directly for every new consumer. Do not let the facade add a hidden dependency, caller-specific policy, or lifecycle authority.
 
-## Runtime And Package Ownership
+## Boundary values
 
-Runtime folders under `apps/extension/src/background`, `apps/extension/src/content`, `apps/extension/src/camera-recorder`, `apps/extension/src/effect-runtime-sandbox`, and extension/editor page roots do not import one another directly by default. The sanctioned one-way Web Snapshot Viewer preparation reuse is documented in the runtime and code-organization architecture notes. The canonical runtime set lives in `tooling/qa/guards/architecture/runtime-topology/runtime-topology.data.json`.
+Receive JSON, storage, IPC, ZIP, browser, DOM, process, and network values as `unknown`. Parse them at the receiving boundary. Do not use `any`, raw boundary casts, enum casts, string coercion, or suppression directives as validation. Use `as never` only in an exhaustiveness helper.
 
-Cross-runtime reuse goes through explicit workspace packages or app-core contracts, adapters, messaging, persistence, i18n, theme, and UI owners. Root entrypoints stay bootstrap, dependency wiring, page/app shells, or thin public facades.
+Use typed contracts for cross-owner messages. Apply background route registration and authorization rules from [runtime contexts](../architecture/runtime-contexts.md#background). Apply secret, diagnostic, retention, and sink rules from [data handling](../security/data-handling.md).
 
-Use the current owner topology rather than inventing generic landing zones. Paths own domains and filenames own roles. Inside an owned seam, prefer role names such as `service`, `state`, `actions`, `view`, `guards`, `session-locals`, or `render-loop`; retain a repeated prefix only for a stable public entrypoint, manifest-owned path, active collision boundary, or thin compatibility facade.
+Use `@sniptale/platform/observability/logger` for product logging.
 
-Shared/public roots stay side-effect-free unless they are explicit init/service owners. New mutable services expose a factory receiving explicit dependencies; a retained default export is a thin compatibility facade over that factory-owned service, not a second lifecycle authority.
+Keep dynamic code and raw HTML sinks closed by default. Do not use `eval`, `Function`, raw `innerHTML`, or unsanitized `dangerouslySetInnerHTML`. Route HTML through the canonical sanitizer owner.
 
-Retired broad shared facades must not be reintroduced. Import an exact package export or concrete app owner instead. Package and app-core contracts remain explicit and dependency-closed.
+## State, persistence, and async safety
 
-Heavy dependency ownership remains canonical:
+Apply state classifications, mutation rules, and database policy from [storage state authority](../architecture/storage-state-authority.md) and [persistence contracts](../architecture/persistence-contracts.md).
 
-- production value imports of `fabric` belong in `apps/extension/src/editor/**`; the vendored adapter lives under `apps/extension/src/editor/fabric/vendor/**`
-- `dompurify` belongs in the sanitizer seam
-- `jszip` is not statically imported from `apps/extension/src/content/**`
+Define rollback or compensation only for a reachable non-atomic sequence that can partially commit. Otherwise propagate a typed failure or apply the owner-documented advisory fail-soft policy.
 
-## Boundary Discipline
+Protect against stale results only when concurrent results can arrive out of order and change an accepted outcome. Use an owner-issued revision for authoritative ordering. Give a resource-acquiring transaction one owner for commit, cancellation, and cleanup.
 
-Messaging uses typed transport/contracts. UI, hooks, and ordinary orchestration do not call raw runtime messaging or listeners when a canonical transport exists. Background ingress parser, route, sender, freshness/replay, policy-state usage, and documentation metadata come from the contracts-owned background-ingress descriptor registry; runtime-only action and authorization bindings must be exhaustive. Leaf owners may consume named preauthorization handles but do not re-decide authority.
+## UI, i18n, and design
 
-Privileged browser APIs belong behind `@sniptale/platform/browser/**` or an app-local platform boundary. Product logging uses `@sniptale/platform/observability/logger` with a narrow namespace.
+Apply `DESIGN.md` from the tracked optional agent-tooling archive (installed locally by `npm run agents:install`) to product UI. Apply [i18n architecture](../architecture/i18n-architecture.md) to localized surfaces. Apply [code organization](../architecture/code-organization.md#public-surfaces) to reusable and runtime-specific UI placement.
 
-JSON, storage, IPC, ZIP, browser, DOM, process, and network payloads arrive as `unknown`, then are parsed and validated locally. Raw boundary casts, `any`, suppression directives, generic typed JSON readers, enum casts, and string coercion are defects unless prior owner-parser proof establishes the narrowed value. Product `as never` is limited to narrow exhaustiveness helpers.
+For mounted, hidden, or portaled UI, prove only the lifecycle states reachable in the changed flow. Use one owner for placement, dismissal, focus, theme inheritance, pointer blocking, and restoration.
 
-Content parsing follows `PageProfile -> PageSnapshot -> ParserPipeline -> ParsedDocument -> Projectors`. Detection belongs in page-profile owners, pipeline/extractor composition belongs in parser pipelines, and AI-pick, Markdown, JSON export, and apply-back consume the shared parsed document/projector contracts rather than live DOM or output-specific heuristics.
+## Code shape
 
-## State, Persistence, And Async Safety
+Evaluate an owner by responsibility, dependency edges, public surface, effects, state authorities, recovery, control flow, and cohesion. Do not use token or file count as an architecture target.
 
-Every seam distinguishes authoritative state, rebuildable advisory/cache state, and disposable derived state. Do not create dual authority such as parallel local/browser storage, persisted/UI snapshots, or live-DOM/parser truth unless one side is an explicit degraded fallback or cache.
+Analyze topology by owner and change reason. Classify each candidate as `Split`, `Consolidate`, or `Keep`. Minimize navigation between the files needed to understand one operation while preserving runtime, owner, adapter, and public-contract boundaries.
 
-Read paths stay read-only. Repair, reconciliation, healing, and migrations use explicit write/maintenance owners. A persistence or cross-runtime mutation path defines rollback or compensation only when a reachable non-atomic sequence can partially commit; otherwise use the narrowest typed failure or documented fail-soft behavior required by its current semantics. User-visible committed data is not silently best-effort.
+Split when current behavior has independent change reasons or requires a dependency boundary. Consolidate only within one owner and one change reason. Treat forwarding-only modules, facade ladders, proxy families, single-consumer files without an independent contract, and delegation-only tests as review evidence, not automatic instructions.
 
-Avoid blind read-modify-write and whole-object overwrites where concurrent fields can be lost. Add stale-result protection only when the current flow permits competing async results and ordering changes the accepted outcome. History/order uses an owned revision token rather than timestamps when order is authoritative. Grouped transaction owners own both commit and cancellation/cleanup when the transaction actually acquires resources or can partially apply effects.
+Do not compress logic or distribute one broad state or effect authority across mechanical helper files. Put a multi-message, multi-transport, or multi-persistence transition in a named orchestration owner.
 
-## UI, i18n, And Design Reuse
+After a split or consolidation, prove no new cycle, dual authority, cross-owner import, broad facade or state bag, forwarding layer, dead export, generic helper, or UI owner with privileged, persistence, or transport effects. Preserve reachable ordering, failure, rollback, and cleanup behavior.
 
-Inspect existing patterns before adding a component or interaction. Reusable UI goes through `@sniptale/ui`; runtime-specific UI stays app-local. i18n-adopted surfaces do not reintroduce hard-coded user-facing strings, and design-system preview copy uses i18n or typed data/copy owners.
+Follow machine-reported structural limits and allowances from [code quality](../tooling/code-quality.md). Use JSDoc for public contracts. Use inline comments only for invariants, platform behavior, protocol boundaries, or explicit tradeoffs. Do not retain commented-out code.
 
-Floating/portaled UI has one owner for semantic and visual placement, pointer blocking, `Escape`, dismissal, focus, theme inheritance, and underlying-mode restore. Hide/unhide and mount/unmount flows prove visible, hidden, restored, and first-visible-render states. Transient feedback prefers explicit owner events/tokens over derived list shape.
+## Proof selection
 
-## Code Shape
+Select proof from affected behavior, risks, and consumers. Do not select tests only from edited filenames. Do not add behavior solely to make a test matrix symmetric.
 
-Treat code shape as a combination of responsibility, ownership, dependency edges, exported surface, effect families, state authorities, control-flow/recovery pressure, and cohesion. Token count is not a quality signal. Physical length is supporting evidence and a safety cap, not the architectural boundary.
+Prove transitive consumers of a changed shared contract. For parser changes, apply [parser architecture](../architecture/parser-architecture.md#diagnostics-and-proof). For persistence changes, prove each reachable changed operation and its failure or concurrency behavior. For UI, messaging, and async changes, prove a failure, duplicate, replay, stale result, rollback, or restore state only when the changed flow exposes it.
 
-The diff-scoped structural guard analyzes the complete current AST of behaviorally changed files and compares existing files with `HEAD`. Unchanged, import-only, mock-only, and rename-only files are excluded. New owners must satisfy the absolute policy; existing owners are primarily governed by worsened structural delta and newly crossed hard caps. A registered orchestration/workflow owner may coordinate effects, state, recovery, and narrow adapters without failing only because of a high composite score when it remains cohesive, excludes UI effects, and avoids arbitrary branching.
+Use exact owner-direct tests only when the machine owner mapping is complete and the change-risk report admits them. Otherwise use transitive affected-test discovery. Test cost does not reduce required coverage.
 
-The unit of architecture analysis is an owner/change-reason cluster, not an individual file. Classify each candidate as `Split`, `Consolidate`, or `Keep`. Optimize for the minimum navigation transitions needed to understand one operation while retaining explicit runtime, owner, adapter, and public-contract boundaries; neither fewer files nor more files is a success criterion. Before and after a wave, compare files and transitions, facade/proxy/pass-through layers, public contract size, state authorities, effect/recovery placement, cohesion, and independence of change reasons.
-
-Keep changed ordinary lines at `<= 120` characters, module specifiers at `<= 200`, classified URL/regex/hash/protocol/snapshot literals at `<= 240`, and generated/data/fixture lines at `<= 1000`. Untouched legacy lines are not checked. Structural allowances require an exact rule, file/symbol, normalized AST-body hash, symbol-signature hash, owner, reason, removal condition, and review date; formatting changes alone must not invalidate them.
-
-Do not compress logic, scatter one owner across mechanically named helpers, or distribute a god-object across neighboring files merely to reduce a metric. A valid split creates stable change reasons, narrower dependency direction, and explicit state/effect ownership. Consolidation is valid only inside one owner and one shared change reason; forwarding-only modules, getter/setter/ref/sync proxy families, facade/re-export ladders, single-consumer files without an independent contract, and delegation-only tests are review candidates, not automatic merge instructions.
-
-For manual maintenance triage, a forwarding-only module with exactly one production consumer supplies two corroborating signals on one graph edge. Follow forwarding ladders to a stable non-forwarding merge target, then classify the edge as `Consolidate` or record an explicit public-contract, runtime, cross-owner, unresolved-topology, or independent-change-reason `Keep` veto. Do not let fixed path-depth clustering hide these overlapping operation candidates.
-
-After a split or consolidation, prove that the result adds no cycle, dual state authority, cross-owner import, broad facade/state/props bag, forwarding-only layer, dead export, generic helper, or UI owner mixed with privileged, persistence, or transport effects. Structural pressure must not worsen, and affected tests must preserve ordering, failure, rollback, cleanup, and other business invariants.
-
-Prefer vertical composition and stable roles over dense expressions, `*.helpers` scatter, or broad controller/state/props bags mixing view, actions, transport, persistence, workspace, and derived state. Multi-message, multi-transport, or multi-persistence transitions need a named orchestration owner rather than a generic helper.
-
-Use JSDoc for public contracts. Inline comments explain why: invariants, browser quirks, protocol edges, or explicit tradeoffs. Dead commented code and inline suppression directives are forbidden unless a rare exception is represented by policy and a local explanation.
-
-## Security
-
-Every task considers unsafe sinks, retention, secret handling, diagnostics, permission creep, and boundary trust. Forbidden by default: `eval`, `new Function`, raw `innerHTML`, unsanitized `dangerouslySetInnerHTML`, plaintext secret propagation outside explicit resolution/transport owners, unbranded privileged bypass sentinels, unsanitized diagnostic/export paths, and raw product `console.*` outside narrow tracing policy.
-
-## Proof Shape
-
-Proof follows affected risk and consumers rather than edited filenames. Tests prove admitted scenarios; do not invent product behavior merely to make a failure matrix symmetric. Shared/public interface changes prove transitive consumers. Persistence changes prove only reachable affected operations among create/load/update/delete, duplicate/clone, project-delete cleanup, bootstrap/fallback, owner-local mocks, failure, rollback, and concurrent update behavior. Parser/snapshot/traversal changes prove builders, facades, projectors, and direct orchestrators that consume the changed semantics. UI lifecycle, messaging, parser, and persistence changes prove failure, duplicate, replay, stale-result, rollback, or restore only when the current control flow exposes that distinct state and its impact is material to acceptance or an invariant.
-
-Test-profile cost does not redefine risk. Exact owner-direct execution is valid only when deterministic owner mappings are complete and the diff stays below the machine-owned small-change limits. A deleted production consolidation may also use exact owner-direct proof when its complete HEAD consumer frontier and current redirect closure are graph-closed inside one owner and every surviving changed production file has deterministic tests. Public/shared, runtime, persistence, messaging, parser/export, ambiguous, uncovered, cross-owner, or over-budget changes otherwise retain transitive affected-test discovery.
-
-For an escaped defect, add failing proof first and record what existing QA missed, why it escaped, and whether a deterministic same-change guard improvement is warranted. Required review and wrapper sequencing remain owned by the [optional agent workflow](../agent-tooling/AGENTS.md).
+For an escaped defect, add failing proof before the fix. Record why existing proof missed the defect. Add a deterministic guard only when the same defect family is machine-detectable without heuristic debt.

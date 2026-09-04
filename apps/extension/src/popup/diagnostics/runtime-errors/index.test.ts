@@ -10,6 +10,7 @@ import {
   getPopupRuntimeErrorMessage,
   isStalePageRuntimeErrorMessage,
 } from './index';
+import { createTranslator } from '../../../platform/i18n/popup';
 
 describe('popup runtime errors', () => {
   it('detects stale page runtime transport errors', () => {
@@ -25,7 +26,9 @@ describe('popup runtime errors', () => {
   });
 
   it('normalizes stale runtime errors and falls back for unknown values', () => {
-    expect(getPopupRuntimeErrorMessage(new Error('boom'), 'popup.home.openPrepError')).toBe('boom');
+    expect(getPopupRuntimeErrorMessage(new Error('boom'), 'popup.home.openPrepError')).toBe(
+      't:popup.home.openPrepError. t:common.errors.unexpectedDetail'
+    );
     expect(
       getPopupRuntimeErrorMessage(
         'Could not establish connection. Receiving end does not exist.',
@@ -33,7 +36,7 @@ describe('popup runtime errors', () => {
       )
     ).toBe('t:popup.common.stalePageRuntimeHint');
     expect(getPopupRuntimeErrorMessage(null, 'popup.home.openPrepError')).toBe(
-      't:popup.home.openPrepError'
+      't:popup.home.openPrepError. t:common.errors.unexpectedDetail'
     );
   });
 
@@ -49,6 +52,17 @@ describe('popup runtime errors', () => {
     ).toBe('t:popup.common.stalePageRuntimeHint');
     expect(
       getPopupResponseErrorMessage({ success: false }, 'popup.video.startRecordingError')
-    ).toBe('t:popup.video.startRecordingError');
+    ).toBe('t:popup.video.startRecordingError. t:common.errors.unexpectedDetail');
+  });
+
+  it('uses the captured job locale for recognized runtime errors', () => {
+    const staleError = 'Could not establish connection. Receiving end does not exist.';
+
+    expect(getPopupRuntimeErrorMessage(staleError, 'popup.home.openPrepError', 'en')).toBe(
+      createTranslator('en')('popup.common.stalePageRuntimeHint')
+    );
+    expect(getPopupRuntimeErrorMessage(staleError, 'popup.home.openPrepError', 'ru')).toBe(
+      createTranslator('ru')('popup.common.stalePageRuntimeHint')
+    );
   });
 });

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
-import { CaptureMode } from '../video/types/types';
-import { createVideoCapabilities } from './test-support';
+import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
+import { createVideoCapabilities } from './video-capabilities';
 
 it('creates a capability record for every video capture mode', () => {
   const capability = { reason: null, supported: true };

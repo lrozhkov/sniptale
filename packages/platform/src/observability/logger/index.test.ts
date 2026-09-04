@@ -132,6 +132,32 @@ describe('createLogger trace observer integration', () => {
 
     dispose();
   });
+
+  it('does not publish expected extension-context invalidation to console or traces', () => {
+    const { dispose, events } = createObserverHarness();
+    const { sink, logger } = createTraceLogger();
+
+    logger.error('Content runtime persistence failed', new Error('Extension context invalidated.'));
+
+    expect(sink.error).not.toHaveBeenCalled();
+    expect(events).toEqual([]);
+
+    dispose();
+  });
+
+  it('preserves string and Error messages that only contain the lifecycle phrase', () => {
+    const { sink, logger } = createTraceLogger();
+    const stringCollision = 'Page said: Extension context invalidated.';
+    const errorCollision = new Error('Extension context invalidated while saving user data.');
+
+    logger.warn(stringCollision);
+    logger.error(errorCollision);
+
+    expect(sink.warn).toHaveBeenCalledWith('[BackgroundVideo]', stringCollision);
+    expect(sink.error).toHaveBeenCalledWith('[BackgroundVideo]', expect.any(Error));
+    const emittedError = sink.error.mock.calls[0]![1] as Error;
+    expect(emittedError.message).toBe(errorCollision.message);
+  });
 });
 
 describe('createLogger tracing payload sanitization', () => {

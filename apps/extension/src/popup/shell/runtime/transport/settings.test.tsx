@@ -99,9 +99,9 @@ it('surfaces unsuccessful setting update responses inline', async () => {
   sendRuntimeMessageMock.mockResolvedValueOnce({ success: false, error: 'update blocked' });
   await renderHarness();
 
-  await expect(getSettingsHandler()({ webcamEnabled: false })).rejects.toThrow('update blocked');
+  await expect(getSettingsHandler()({ webcamEnabled: false })).rejects.toThrow('Sniptale');
 
-  expect(setRecordingErrorMock).toHaveBeenLastCalledWith('update blocked');
+  expect(setRecordingErrorMock).toHaveBeenLastCalledWith(expect.stringContaining('Sniptale'));
   expect(loggerErrorMock).toHaveBeenCalledWith(
     'Failed to update recording settings',
     expect.any(Error)

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { loadSettings, patchSettings } from '../../../../composition/persistence/settings';
+import { createUserFacingErrorMessage } from '../../../../platform/i18n/user-facing-error';
 
 export type WebCopyResourcePreferences = {
   anonymousCrossOriginAssetsEnabled: boolean;
@@ -39,7 +40,16 @@ export function useWebCopyResourcePreferences(): WebCopyResourcePreferences {
         }
       })
       .catch((error: unknown) => {
-        if (mounted) setState((current) => ({ ...current, error: String(error) }));
+        if (mounted) {
+          setState((current) => ({
+            ...current,
+            error: createUserFacingErrorMessage({
+              cause: error,
+              detail: 'storage',
+              summaryKey: 'common.errors.loadFailed',
+            }),
+          }));
+        }
       });
     return () => {
       mounted = false;
@@ -62,7 +72,15 @@ export function useWebCopyResourcePreferences(): WebCopyResourcePreferences {
         pending: null,
       });
     } catch (error) {
-      setState((current) => ({ ...current, error: String(error), pending: null }));
+      setState((current) => ({
+        ...current,
+        error: createUserFacingErrorMessage({
+          cause: error,
+          detail: 'storage',
+          summaryKey: 'common.errors.saveFailed',
+        }),
+        pending: null,
+      }));
     }
   };
 

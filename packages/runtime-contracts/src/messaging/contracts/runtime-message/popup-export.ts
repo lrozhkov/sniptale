@@ -39,6 +39,7 @@ export type RuntimePopupExportRequestByType = {
     includeWebCopy: boolean;
     intent: 'export' | 'save';
     jobId: string;
+    locale: 'en' | 'ru';
     captureTiming: PagePackageCaptureTimingPolicy;
     sources: PagePackageCaptureSource[];
     options: ExportOptions;
@@ -58,6 +59,7 @@ export type RuntimePopupExportRequestByType = {
   };
   [MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED]: {
     type: typeof MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED;
+    locale: 'en' | 'ru';
     status: PagePackageJobStatusV1;
   };
   [MessageType.WEB_SNAPSHOT_SAVE_PROGRESS_UPDATED]: {
@@ -91,6 +93,7 @@ export type RuntimePopupExportResponseByType = {
     status: PagePackageJobStatusV1;
   }>;
   [MessageType.GET_PAGE_PACKAGE_JOB_STATUS]: import('../response').RuntimeMessageResponse<{
+    locale: 'en' | 'ru' | null;
     status: PagePackageJobStatusV1 | null;
   }>;
   [MessageType.CANCEL_PAGE_PACKAGE_JOB]: import('../response').RuntimeMessageResponse<{

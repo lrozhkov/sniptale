@@ -14,7 +14,8 @@ vi.mock('../../platform/dom-host', async (importOriginal) => ({
   resolveContentShadowRoot: mocks.resolveContentShadowRootMock,
 }));
 
-vi.mock('../../../platform/i18n', () => ({
+vi.mock('../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   translate: mocks.translateMock,
 }));
 

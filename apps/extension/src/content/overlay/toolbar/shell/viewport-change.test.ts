@@ -88,12 +88,12 @@ describe('toolbar viewport change action', () => {
 
     expect(viewportChangeMocks.showToast).toHaveBeenNthCalledWith(
       1,
-      'content.toolbar.viewportErrorPrefix Custom error',
+      'Не удалось изменить размер окна. common.errors.browserCommunicationDetail',
       'error'
     );
     expect(viewportChangeMocks.showToast).toHaveBeenNthCalledWith(
       2,
-      'Не удалось изменить размер окна',
+      'Не удалось изменить размер окна. common.errors.browserCommunicationDetail',
       'error'
     );
     expect(consoleError).toHaveBeenCalledTimes(2);

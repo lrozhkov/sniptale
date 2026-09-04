@@ -1,7 +1,13 @@
 import type { PopupExportRuntimeMessage, PopupExportRuntimeContract } from '../types';
-import { translate } from '../../../../../platform/i18n/popup';
 import type { PagePackageJobStatusV1 } from '@sniptale/runtime-contracts/page-package';
 import type { PopupPagePackageSelection } from '../../../../../composition/persistence/popup-export-preferences';
+import { getPopupExportErrorMessage } from '../preview-request';
+import type { AppLocale } from '../../../../../platform/i18n/popup';
+
+function normalizeJobErrors(errors: readonly string[], locale?: AppLocale): string[] {
+  if (errors.length === 0) return [];
+  return [getPopupExportErrorMessage(errors[0], 'popup.export.prepareExportError', locale)];
+}
 
 function selectionFromEffectivePlan(status: PagePackageJobStatusV1): PopupPagePackageSelection {
   const { components } = status.effectiveComponentPlan;
@@ -22,7 +28,8 @@ function selectionFromEffectivePlan(status: PagePackageJobStatusV1): PopupPagePa
 }
 
 type PopupExportMessageListenerApplyArgs = {
-  message: PopupExportRuntimeMessage;
+  message: Pick<PopupExportRuntimeMessage, 'status' | 'type'> &
+    Partial<Pick<PopupExportRuntimeMessage, 'locale'>>;
   requestId: string | null;
   setProgress: PopupExportRuntimeContract['setProgress'];
   setResult: PopupExportRuntimeContract['setResult'];
@@ -42,16 +49,24 @@ export function applyPopupExportRuntimeMessage(args: PopupExportMessageListenerA
   args.setLatestStatus({ jobId: status.jobId, revision: status.revision });
   args.setRequestId?.(status.jobId);
   args.setLaunchedPlan?.(selectionFromEffectivePlan(status));
+  const normalizedProgressErrors = normalizeJobErrors(status.progress.errors, args.message.locale);
+  const normalizedErrorMessage =
+    status.progress.phase === 'error'
+      ? (normalizedProgressErrors[0] ??
+        normalizeJobErrors([status.progress.message], args.message.locale)[0])
+      : status.progress.message;
   args.setProgress({
     ...status.progress,
     activeStepKey: status.progress.activeStepKey ?? null,
-    errors: [...new Set([...status.progress.errors, ...status.warnings])],
-    message:
-      status.phase === 'cancelling'
-        ? translate('popup.export.cancellingMessage')
-        : status.progress.message,
+    errors: [...new Set([...normalizedProgressErrors, ...status.warnings])],
+    message: normalizedErrorMessage ?? '',
   });
-  if (status.result) args.setResult(status.result);
+  if (status.result) {
+    args.setResult({
+      ...status.result,
+      errors: normalizeJobErrors(status.result.errors, args.message.locale),
+    });
+  }
   if (
     status.phase === 'cancelled' ||
     status.phase === 'completed' ||

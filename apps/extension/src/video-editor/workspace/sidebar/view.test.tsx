@@ -4,7 +4,8 @@ import { VideoTrackKind } from '../../../features/video/project/types';
 import { VideoEditorSelectionKind } from '../../contracts/selection';
 import { getSelectionMeta, WorkspaceSidebarHeader } from './view';
 
-vi.mock('../../../platform/i18n', () => ({
+vi.mock('../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
 

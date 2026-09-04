@@ -170,7 +170,9 @@ describe('ScenarioV3EditorPage failure states', () => {
       .mockResolvedValueOnce(createScenarioProjectV3('Recovered'));
 
     await renderPage();
-    expect(container?.textContent).toContain('IndexedDB unavailable');
+    const loadError = 'scenario.editor.v3OperationFailed. common.errors.storageDetail';
+    expect(container?.textContent).toContain(loadError);
+    expect(container?.textContent).not.toContain('IndexedDB unavailable');
 
     await clickButtonText('scenario.editor.v3Retry');
     expect(container?.textContent).toContain('Recovered');
@@ -184,14 +186,16 @@ describe('ScenarioV3EditorPage failure states', () => {
 
     await clickButton('Mutate project');
     expect(container?.textContent).toContain('Changed');
-    expect(container?.textContent).toContain('Quota exceeded');
+    const saveError = 'scenario.editor.v3OperationFailed. common.errors.storageDetail';
+    expect(container?.textContent).toContain(saveError);
+    expect(container?.textContent).not.toContain('Quota exceeded');
     expect(scenarioShellPropsMock).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        saveStatus: expect.objectContaining({ error: 'Quota exceeded', state: 'error' }),
+        saveStatus: expect.objectContaining({ error: saveError, state: 'error' }),
       })
     );
 
-    await clickButtonText('Quota exceeded');
+    await clickButtonText(saveError);
     expect(saveScenarioProjectRecordV3Mock).toHaveBeenLastCalledWith(
       expect.objectContaining({ name: 'Changed' }),
       { baseUpdatedAt: expect.any(Number) }

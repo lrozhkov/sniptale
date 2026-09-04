@@ -26,6 +26,54 @@ export const popupExportMessages = defineMessageSource({
     ru: 'Не удалось восстановить исходную вкладку',
     en: 'Could not restore the original tab',
   },
+  pageReadinessErrorDetail: {
+    ru: 'Страница не завершила загрузку за отведённое время.',
+    en: 'The page did not finish loading within the allowed time.',
+  },
+  pagePreparationErrorDetail: {
+    ru: 'Страница не смогла передать данные для экспорта.',
+    en: 'The page could not provide its export data.',
+  },
+  pageDataPreparationErrorDetail: {
+    ru: 'Не удалось собрать выбранные данные страницы.',
+    en: 'The selected page data could not be collected.',
+  },
+  webCopyPreparationErrorDetail: {
+    ru: 'Не удалось собрать веб-копию страницы.',
+    en: 'The page Web copy could not be collected.',
+  },
+  temporaryStorageErrorDetail: {
+    ru: 'Не удалось сохранить или очистить временные данные экспорта.',
+    en: 'Temporary export data could not be saved or cleaned up.',
+  },
+  exportTransportErrorDetail: {
+    ru: 'Не удалось связаться с компонентом экспорта.',
+    en: 'The export component could not be reached.',
+  },
+  downloadPreparationErrorDetail: {
+    ru: 'Не удалось запустить компонент скачивания.',
+    en: 'The download component could not be started.',
+  },
+  archiveValidationErrorDetail: {
+    ru: 'Собранные данные не прошли проверку перед скачиванием.',
+    en: 'The collected data could not be validated before download.',
+  },
+  archiveDownloadErrorDetail: {
+    ru: 'Браузер не завершил скачивание архива.',
+    en: 'The browser did not complete the archive download.',
+  },
+  librarySaveErrorDetail: {
+    ru: 'Не удалось сохранить веб-копию в библиотеку.',
+    en: 'The Web copy could not be saved to the Library.',
+  },
+  pageCollectionErrorDetail: {
+    ru: 'Ни одну из выбранных страниц не удалось собрать.',
+    en: 'None of the selected pages could be collected.',
+  },
+  exportProcessingErrorDetail: {
+    ru: 'Сбой произошёл при обработке собранных данных.',
+    en: 'A problem occurred while processing the collected data.',
+  },
   jobInterruptedMessage: {
     ru: 'Экспорт прерван перезапуском фонового процесса',
     en: 'Export interrupted by background restart',
@@ -61,6 +109,10 @@ export const popupExportMessages = defineMessageSource({
   finishedWithErrors: {
     ru: 'Экспорт завершён с ошибками',
     en: 'Export finished with errors',
+  },
+  issuesTitle: {
+    ru: 'Не удалось обработать',
+    en: 'Could not process',
   },
   dataTypesSectionLabel: {
     ru: 'Состав пакета',

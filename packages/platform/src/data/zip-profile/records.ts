@@ -48,10 +48,20 @@ export function readEndOfCentralDirectory(view: DataView): EndOfCentralDirectory
   const totalEntries = readUint16(view, eocdOffset + 10);
   const centralSize32 = readUint32(view, eocdOffset + 12);
   const centralOffset32 = readUint32(view, eocdOffset + 16);
-  if (disk !== 0 || centralDisk !== 0 || diskEntries !== totalEntries)
-    fail('archive-invalid', 'Multi-disk ZIP archives are unsupported.');
   const needsZip64 =
-    totalEntries === ZIP16_MAX || centralSize32 === ZIP32_MAX || centralOffset32 === ZIP32_MAX;
+    disk === ZIP16_MAX ||
+    centralDisk === ZIP16_MAX ||
+    diskEntries === ZIP16_MAX ||
+    totalEntries === ZIP16_MAX ||
+    centralSize32 === ZIP32_MAX ||
+    centralOffset32 === ZIP32_MAX;
+  if (
+    (disk !== 0 && disk !== ZIP16_MAX) ||
+    (centralDisk !== 0 && centralDisk !== ZIP16_MAX) ||
+    (diskEntries !== ZIP16_MAX && totalEntries !== ZIP16_MAX && diskEntries !== totalEntries)
+  ) {
+    fail('archive-invalid', 'Multi-disk ZIP archives are unsupported.');
+  }
   return needsZip64
     ? readZip64End(view, eocdOffset)
     : {

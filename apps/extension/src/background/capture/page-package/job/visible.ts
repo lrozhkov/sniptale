@@ -2,11 +2,10 @@ import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { browserWindows } from '@sniptale/platform/browser/windows';
 import { truncatePopupExportStatusText } from '@sniptale/runtime-contracts/export';
 import type { PagePackageJobTab } from '@sniptale/runtime-contracts/page-package';
-import { translate } from '../../../../platform/i18n';
 import { restorePagePackageProgressPopup } from './action-indicator';
 import {
   appendPopupExportJobWarning,
-  popupExportJobErrorText,
+  translatePopupExportJob,
   updatePagePackageJobStatus,
   type ActivePopupExportJob,
 } from './runtime-state';
@@ -20,11 +19,12 @@ export async function resolvePopupExportTabsAndOriginals(
       const tab = await browserTabs.get(selected.tabId);
       tabs.set(selected.tabId, tab);
       if (typeof tab.windowId === 'number') job.affectedWindowIds.add(tab.windowId);
-    } catch (error) {
+    } catch {
       const errorText = truncatePopupExportStatusText(
-        `${selected.title}: ${translate(
+        `${selected.title}: ${translatePopupExportJob(
+          job,
           'popup.export.tabUnavailableWarningPrefix'
-        )} (${popupExportJobErrorText(error)})`
+        )}`
       );
       await appendPopupExportJobWarning(job, errorText);
       await updatePagePackageJobStatus(job, {
@@ -55,9 +55,10 @@ export function subscribeToPopupExportManualActivation(job: ActivePopupExportJob
       return;
     }
     job.manualActivationConflict = true;
-    void appendPopupExportJobWarning(job, translate('popup.export.manualTabConflictWarning')).catch(
-      () => undefined
-    );
+    void appendPopupExportJobWarning(
+      job,
+      translatePopupExportJob(job, 'popup.export.manualTabConflictWarning')
+    ).catch(() => undefined);
   });
 }
 
@@ -99,11 +100,11 @@ export async function restorePopupExportOriginalTabs(job: ActivePopupExportJob):
       if (active?.id !== lastActivated) continue;
       job.expectedActivation = { tabId: original.tabId, windowId: original.windowId };
       await browserTabs.update(original.tabId, { active: true });
-    } catch (error) {
+    } catch {
       await appendPopupExportJobWarning(
         job,
         truncatePopupExportStatusText(
-          `${translate('popup.export.restoreOriginalTabWarningPrefix')} (${popupExportJobErrorText(error)})`
+          translatePopupExportJob(job, 'popup.export.restoreOriginalTabWarningPrefix')
         )
       );
     }

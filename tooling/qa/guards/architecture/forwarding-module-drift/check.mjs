@@ -353,7 +353,7 @@ export function runForwardingModuleDriftCheck({
     headSourceResolver: createHeadFileTextResolver(resolvedScope.changedFiles, { root }),
     revisionSourceResolver: (file, revision) => readRevisionFileText(file, { revision, root }),
   });
-  return collectForwardingModuleDriftReport({
+  const result = collectForwardingModuleDriftReport({
     allFiles,
     baselineSource,
     changedFiles: resolvedScope.changedFiles,
@@ -362,6 +362,7 @@ export function runForwardingModuleDriftCheck({
     root,
     today,
   });
+  return scope === 'repo-wide' ? { ...result, populationKind: 'repository-state' } : result;
 }
 
 if (isExecutedAsScript(import.meta.url)) {

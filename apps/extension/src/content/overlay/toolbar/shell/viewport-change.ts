@@ -1,4 +1,5 @@
 import { translate } from '../../../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../../../platform/i18n/user-facing-error';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { getContentRuntimeServices } from '../../../application/runtime-services/services';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
@@ -84,17 +85,27 @@ export async function handleToolbarViewportChange(
       return;
     }
 
-    const errorMessage =
-      getViewportPresetErrorMessage(response?.error) ??
-      response?.error ??
-      translate('content.toolbar.unknownError');
-    logger.error('Failed to set viewport', errorMessage);
-    showToast(`${translate('content.toolbar.viewportErrorPrefix')} ${errorMessage}`, 'error');
+    const errorMessage = getViewportPresetErrorMessage(response?.error);
+    logger.error('Failed to set viewport', response?.error);
+    showToast(
+      errorMessage ??
+        createUserFacingErrorMessage({
+          cause: response?.error,
+          detail: 'browserCommunication',
+          summaryKey: 'content.toolbar.viewportChangeError',
+        }),
+      'error'
+    );
     await refreshToolbarViewportStatus(setCurrentViewport).catch(() => undefined);
   } catch (error) {
     logger.error('Failed to set viewport', error);
     showToast(
-      getViewportPresetErrorMessage(error) ?? translate('content.toolbar.viewportChangeError'),
+      getViewportPresetErrorMessage(error) ??
+        createUserFacingErrorMessage({
+          cause: error,
+          detail: 'browserCommunication',
+          summaryKey: 'content.toolbar.viewportChangeError',
+        }),
       'error'
     );
     if (!mutateViewport) {

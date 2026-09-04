@@ -141,6 +141,142 @@ it('accepts explicit files for pre-edit planning', async () => {
   );
 });
 
+it('reports harness owners for QA tooling preflight', async () => {
+  const root = createTempRoot('qa-preflight-harness-owner-');
+  writeFile(root, 'tooling/qa/wrappers/example.mjs', 'export const value = true;\n');
+
+  const result = await withCwd(root, async () => {
+    const module = await importFresh<typeof import('./preflight.mjs')>(
+      './preflight.mjs',
+      import.meta.url
+    );
+    return module.collectPreflightReport({ files: ['tooling/qa/wrappers/example.mjs'] });
+  });
+
+  expect(result.ownerRuntime).toEqual(['tooling:qa:wrappers']);
+});
+
+it('keeps the terminal summary bounded while preserving complete risk context in the step log', async () => {
+  const root = createTempRoot('qa-preflight-risk-output-');
+  writeFile(root, 'apps/extension/manifest.json', '{"manifest_version":3}\n');
+
+  const result = await withCwd(root, async () => {
+    const module = await importFresh<typeof import('./preflight.mjs')>(
+      './preflight.mjs',
+      import.meta.url
+    );
+    return module.runPreflightWrapper({ files: ['apps/extension/manifest.json'] });
+  });
+  const step = result.steps[0];
+
+  expect(step?.consoleOutput).toContain('Likely risk areas:');
+  expect(step?.consoleOutput).toContain('1 product target(s), 0 harness target(s)');
+  expect(step?.consoleOutput).toContain('docs/security/manifest-permissions.md');
+  expect(step?.consoleOutput).not.toContain('Contracts and consumers:');
+  expect(step?.stdout).toContain('Contracts and consumers:');
+  expect(step?.stdout).toContain('manifest.permissions');
+  expect(step?.stdout).toContain('Security review');
+  expect(step?.stdout).toContain('Permission compatibility proof');
+  expect(result.preflightContext).toMatchObject({
+    owners: ['extension:manifest'],
+    runtimes: ['extension:manifest'],
+    riskAreas: ['manifest.permissions', 'manifest.runtime-topology'],
+    documents: expect.arrayContaining(['docs/security/manifest-permissions.md']),
+    proofRequirements: expect.arrayContaining([
+      'Security review',
+      'Permission compatibility proof',
+    ]),
+  });
+  expect(result.advisory).toEqual({ introduced: [], worsened: [], existing: [] });
+});
+
+it('routes observability record contract changes to candidate-proof admission', async () => {
+  const root = createTempRoot('qa-preflight-observability-consumer-');
+  const schemaFile = 'tooling/qa/runtime/observability/schema.mjs';
+  writeFile(root, schemaFile, 'export const parseRunRecord = (value) => value;\n');
+
+  const result = await withCwd(root, async () => {
+    const module = await importFresh<typeof import('./preflight.mjs')>(
+      './preflight.mjs',
+      import.meta.url
+    );
+    return module.runPreflightWrapper({ files: [schemaFile] });
+  });
+
+  expect(result.preflightContext.consumers).toEqual(
+    expect.arrayContaining([
+      expect.stringContaining('tooling/ci/admit-candidate-proof.mjs'),
+      expect.stringContaining('tooling/ci/admit-candidate-proof.test.ts'),
+    ])
+  );
+  expect(result.preflightContext.proofRequirements).toContain(
+    'observability record contract: run candidate-proof admission tests for proof and release fixtures'
+  );
+  expect(result.steps[0]?.stdout).toContain('tooling/ci/admit-candidate-proof.mjs');
+  expect(result.steps[0]?.stdout).toContain('candidate-proof admission tests');
+});
+
+it('keeps every observability record owner in candidate-proof routing', async () => {
+  const module = await import('./preflight/preflight-contract-report.mjs');
+  const contractOwners = [
+    'analysis-schema.mjs',
+    'constants.mjs',
+    'run.mjs',
+    'run-controller.mjs',
+    'run-record.mjs',
+    'schema.mjs',
+    'schema-parts.mjs',
+  ];
+
+  for (const owner of contractOwners) {
+    const context = {
+      allQualityCodeFiles: [`tooling/qa/runtime/observability/${owner}`],
+      codeFiles: [],
+    };
+    expect(module.collectTransitiveConsumerHints(context), owner).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining('tooling/ci/admit-candidate-proof.mjs'),
+        expect.stringContaining('tooling/ci/admit-candidate-proof.test.ts'),
+      ])
+    );
+    expect(module.collectContractProofRequirements(context), owner).toContain(
+      'observability record contract: run candidate-proof admission tests for proof and release fixtures'
+    );
+  }
+});
+
+it(
+  'treats current-diff non-structural advisories as introduced',
+  async () => {
+    const root = createTempRoot('qa-preflight-current-diff-advisory-');
+    initGitRepo(root);
+    writeFile(root, 'package.json', '{"name":"qa-preflight-temp"}\n');
+    runGit(root, 'add', 'package.json');
+    runGit(root, 'commit', '-m', 'init');
+    writeFile(root, 'src/shared/example-helper.ts', 'export const value = true;\n');
+
+    const result = await withCwd(root, async () => {
+      const module = await importFresh<typeof import('./preflight.mjs')>(
+        './preflight.mjs',
+        import.meta.url
+      );
+      return module.runPreflightWrapper();
+    });
+
+    expect(result.advisory.introduced).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'advisory.root-scatter',
+          file: 'src/shared/example-helper.ts',
+        }),
+      ])
+    );
+    expect(result.steps[0]?.consoleOutput).toContain('Introduced:');
+    expect(result.steps[0]?.consoleOutput).toContain('src/shared/example-helper.ts');
+  },
+  GIT_INTEGRATION_TIMEOUT
+);
+
 it('does not route a local state snapshot helper to parser architecture', async () => {
   const module = await import('./preflight.mjs');
   expect(
@@ -310,7 +446,7 @@ it('routes UI work to the root design contract', async () => {
     });
   });
 
-  expect(result.relevantDocs).toContain('docs/agent-tooling/DESIGN.md');
+  expect(result.relevantDocs).toContain('docs/agent-tooling/agent-tooling.zip');
   expect(result.relevantDocs).not.toContain(
     ['docs/design', 'ux-ui-concept', 'design-concept.md'].join('/')
   );
@@ -395,8 +531,8 @@ it('does not route markdown docs through structural analysis', async () => {
   const root = createTempRoot('qa-preflight-docs-');
   initGitRepo(root);
   writeFile(root, 'package.json', '{"name":"qa-preflight-docs-temp"}\n');
-  writeFile(root, 'docs/agent-tooling/AGENTS.md', `${'long documentation line '.repeat(20)}\n`);
-  runGit(root, 'add', 'package.json', 'docs/agent-tooling/AGENTS.md');
+  writeFile(root, 'docs/README.md', `${'long documentation line '.repeat(20)}\n`);
+  runGit(root, 'add', 'package.json', 'docs/README.md');
   runGit(root, 'commit', '-m', 'init');
 
   const result = await withCwd(root, async () => {
@@ -405,7 +541,7 @@ it('does not route markdown docs through structural analysis', async () => {
       import.meta.url
     );
     return module.collectPreflightReport({
-      files: ['docs/agent-tooling/AGENTS.md'],
+      files: ['docs/README.md'],
     });
   });
 

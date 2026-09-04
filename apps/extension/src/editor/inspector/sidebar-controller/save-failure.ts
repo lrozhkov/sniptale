@@ -2,6 +2,7 @@ import { openGalleryPage } from '../../../platform/navigation/extension-pages';
 import { translate } from '../../../platform/i18n';
 import { isEditorStoragePromptError } from '../../document/file-actions';
 import type { EditorInspectorConfirmDialogState } from '../content/types';
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 
 function buildOpenLibraryDialog(message: string): EditorInspectorConfirmDialogState {
   return {
@@ -22,7 +23,13 @@ export async function maybeHandleEditorSaveFailure(args: {
   }
 
   const shouldOpenLibrary = await args.confirmOpenLibrary(
-    buildOpenLibraryDialog(args.error.message)
+    buildOpenLibraryDialog(
+      createUserFacingErrorMessage({
+        cause: args.error,
+        detail: 'storage',
+        summaryKey: 'editor.documentActions.saveToLibraryError',
+      })
+    )
   );
   if (shouldOpenLibrary) {
     await (args.openLibrary?.() ?? openGalleryPage());

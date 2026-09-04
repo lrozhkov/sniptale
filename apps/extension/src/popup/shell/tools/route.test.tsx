@@ -48,7 +48,7 @@ it('shows the localized owner error when opening a tool fails', async () => {
 
   await act(async () => container.querySelector('button')?.click());
 
-  expect(container.textContent).toContain('popup.home.openPrepError');
+  expect(container.textContent).toContain('Sniptale');
   act(() => root.unmount());
 });
 
@@ -61,6 +61,7 @@ it('shows a concrete toolbar error message', async () => {
 
   await act(async () => container.querySelector('button')?.click());
 
-  expect(container.textContent).toContain('Toolbar unavailable');
+  expect(container.textContent).toContain('Sniptale');
+  expect(container.textContent).not.toContain('Toolbar unavailable');
   act(() => root.unmount());
 });

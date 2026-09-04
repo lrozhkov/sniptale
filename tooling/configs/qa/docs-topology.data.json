@@ -39,20 +39,7 @@
     "CONTRIBUTING.md",
     "README.md"
   ],
-  "skillDocuments": [
-    "docs/agent-tooling/README.md",
-    "docs/agent-tooling/AGENTS.md",
-    "docs/agent-tooling/DESIGN.md",
-    "docs/agent-tooling/.agents/README.md",
-    "docs/agent-tooling/.agents/skills/architecture-code-review/SKILL.md",
-    "docs/agent-tooling/.agents/skills/architecture-code-review/references/architecture-review-checklist.md",
-    "docs/agent-tooling/.agents/skills/repo-audit/SKILL.md",
-    "docs/agent-tooling/.agents/skills/repo-audit/references/repo-audit-checklist.md",
-    "docs/agent-tooling/.agents/skills/security-code-review/SKILL.md",
-    "docs/agent-tooling/.agents/skills/security-code-review/references/security-review-checklist.md",
-    "docs/agent-tooling/.agents/skills/topology-plan-review/SKILL.md",
-    "docs/agent-tooling/.agents/skills/topology-plan-review/references/topology-plan-review-checklist.md"
-  ],
+  "skillDocuments": [],
   "productDocuments": [],
   "requiredIndexContractFragments": [
     "## Documentation policy",

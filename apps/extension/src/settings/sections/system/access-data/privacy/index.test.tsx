@@ -99,7 +99,7 @@ it('runs factory reset with preferences and AI provider secrets included', async
   });
 });
 
-it('shows the background-owned erasure failure without reporting success', async () => {
+it('shows a localized erasure failure without exposing the background error', async () => {
   requestErasureMock.mockRejectedValueOnce(new Error('transaction verification failed'));
   await renderSection();
 
@@ -110,6 +110,7 @@ it('shows the background-owned erasure failure without reporting success', async
     findButton('settings.privacy.confirmFactoryReset').click();
   });
 
-  expect(container?.textContent).toContain('transaction verification failed');
+  expect(container?.textContent).toContain('settings.privacy.error. common.errors.storageDetail');
+  expect(container?.textContent).not.toContain('transaction verification failed');
   expect(container?.textContent).not.toContain('settings.privacy.success');
 });

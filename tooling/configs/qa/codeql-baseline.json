@@ -5,7 +5,7 @@
   "findings": [
     {
       "contentHash": "a435a1261358e4f8880b43ab4e3616f5ba4d95da2174a43cffc7b25fc2b9906e",
-      "debtId": "accepted.codeql.locked-toolchain-download-write",
+      "debtId": "noise.codeql.locked-toolchain-download-write",
       "file": "tooling/ci/install-toolchain.mjs",
       "line": 55,
       "messageHash": "b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668",
@@ -13,7 +13,7 @@
     },
     {
       "contentHash": "a435a1261358e4f8880b43ab4e3616f5ba4d95da2174a43cffc7b25fc2b9906e",
-      "debtId": "accepted.codeql.locked-toolchain-download-url",
+      "debtId": "noise.codeql.locked-toolchain-download-url",
       "file": "tooling/ci/install-toolchain.mjs",
       "line": 50,
       "messageHash": "b8b677cc6098459648c1f92b0a508b33bd6ea774bc23e0a4797214ee3c0e42b4",
@@ -21,7 +21,7 @@
     },
     {
       "contentHash": "4e2437f8286b15875ad1a2364486fb8a1d3c1c968dedc6dc064a8ee070bb802d",
-      "debtId": "accepted.codeql.local-toolchain-download-write",
+      "debtId": "noise.codeql.local-toolchain-download-write",
       "file": "tooling/ci/local-toolchain.mjs",
       "line": 68,
       "messageHash": "b44f8805d91bcfc4a7b7f870aa060988613270e8fd7c7611be584164ee8b4668",
@@ -29,7 +29,7 @@
     },
     {
       "contentHash": "f017877e2a5d1e391ae4cad1027c792e00d65548ce641f25450a2c6c3af4a61f",
-      "debtId": "accepted.codeql.transform-stream-transformer-constructor",
+      "debtId": "noise.codeql.transform-stream-transformer-constructor",
       "file": "apps/extension/src/composition/archive-transfer/writer.ts",
       "line": 38,
       "messageHash": "6c37367b283864ab510c2c8cbc86a63292496848d74ac577524697bd1745a48b",

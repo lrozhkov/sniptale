@@ -31,6 +31,7 @@ function createController(
     loadDocument: vi.fn(async () => undefined),
     openImage: vi.fn(async () => undefined),
     exportDocument: vi.fn(() => createEditorDocumentFixture()),
+    isDocumentReadyForExport: vi.fn(() => true),
     renderForExport: vi.fn(async () => 'data:image/png;base64,YQ=='),
   };
 }
@@ -70,6 +71,35 @@ it('flushes the current draft and creates the new identity only after the image 
   const renderPresentation = mocks.beginDraft.mock.calls[0]?.[0].renderPresentation;
   await renderPresentation();
   expect(controller.renderForExport).toHaveBeenCalledWith({ format: 'png', quality: 1 });
+});
+
+it('opens the first local image without exporting the empty start page', async () => {
+  const flushAutosave = vi.fn(async (serialize: () => unknown) => void serialize());
+  const controller = createController({ activate: vi.fn(), flushAutosave });
+  controller.isDocumentReadyForExport.mockReturnValue(false);
+  controller.exportDocument.mockImplementation(() => {
+    throw new Error('Editor is not initialized yet');
+  });
+  const file = new File(['image'], 'first.png', { type: 'image/png' });
+  mocks.openFile.mockImplementation(
+    async (
+      draftController: { openImage: (dataUrl: string, sourceName: string) => Promise<void> },
+      selectedFile: File,
+      _setImageData: unknown,
+      lifecycle: { beforeOpen: () => Promise<void>; onOpened: () => void }
+    ) => {
+      await lifecycle.beforeOpen();
+      await draftController.openImage('data:image/png;base64,YQ==', selectedFile.name);
+      lifecycle.onOpened();
+    }
+  );
+
+  await openLocalImageAsEditorDraft(controller, file, vi.fn());
+
+  expect(flushAutosave).not.toHaveBeenCalled();
+  expect(controller.exportDocument).not.toHaveBeenCalled();
+  expect(controller.openImage).toHaveBeenCalledOnce();
+  expect(mocks.beginDraft).toHaveBeenCalledOnce();
 });
 
 it('fails instead of opening an unpersisted local document without autosave', async () => {

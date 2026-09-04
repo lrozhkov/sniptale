@@ -66,40 +66,40 @@ it('uses the empty tree as the base for new branch pushes', () => {
   ]);
 });
 
-it('uses only the changed-range checkpoint for new branch pushes', () => {
+it('uses changed-range harness proof and checkpoint for new branch pushes', () => {
   const commands = resolvePrePushCommands({
     prePushInput: `refs/heads/feature ${LOCAL_SHA} refs/heads/feature ${ZERO_SHA}\n`,
     gitRunner: () => ({ stdout: 'src/example.ts\n' }),
   });
 
-  expect(commands).toEqual(['qa:checkpoint']);
+  expect(commands).toEqual(['qa:release-harness', 'qa:checkpoint']);
 });
 
-it('leaves release-harness proof to explicit closeout for tooling changes', () => {
+it('runs release-harness proof before checkpoint for tooling changes', () => {
   const commands = resolvePrePushCommands({
     prePushInput: `refs/heads/main ${LOCAL_SHA} refs/heads/main ${REMOTE_SHA}\n`,
     gitRunner: () => ({ stdout: 'tooling/qa/hooks/pre-push.mjs\n' }),
   });
 
-  expect(commands).toEqual(['qa:checkpoint']);
+  expect(commands).toEqual(['qa:release-harness', 'qa:checkpoint']);
 });
 
-it('keeps shared-control pre-push proof checkpoint-only', () => {
+it('runs release-harness proof before checkpoint for shared-control changes', () => {
   const commands = resolvePrePushCommands({
     prePushInput: `refs/heads/main ${LOCAL_SHA} refs/heads/main ${REMOTE_SHA}\n`,
     gitRunner: () => ({ stdout: 'package.json\n.husky/pre-push\n' }),
   });
 
-  expect(commands).toEqual(['qa:checkpoint']);
+  expect(commands).toEqual(['qa:release-harness', 'qa:checkpoint']);
 });
 
-it('skips release harness for a generated inventory-only push', () => {
+it('lets release harness classify a generated inventory-only push', () => {
   const commands = resolvePrePushCommands({
     prePushInput: `refs/heads/main ${LOCAL_SHA} refs/heads/main ${REMOTE_SHA}\n`,
     gitRunner: () => ({ stdout: 'tooling/configs/qa/technical-debt.data.json\n' }),
   });
 
-  expect(commands).toEqual(['qa:checkpoint']);
+  expect(commands).toEqual(['qa:release-harness', 'qa:checkpoint']);
 });
 
 it('rejects malformed hook input instead of silently weakening pushed-range proof', () => {
@@ -257,7 +257,7 @@ it('rejects a bad pushed commit even when the source worktree is clean', () => {
   });
 
   expect(gitOutput(root, 'status', '--porcelain')).toBe('');
-  expect(commands).toEqual(['qa:checkpoint']);
+  expect(commands).toEqual(['qa:release-harness', 'qa:checkpoint']);
   expect(status).toBe(23);
 });
 

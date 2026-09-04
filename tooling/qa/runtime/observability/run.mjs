@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import { DEFAULT_LIMITS, OBSERVABILITY_SCHEMA_VERSION } from './constants.mjs';
 import { collectRepositoryContext } from './repository-context.mjs';
@@ -44,6 +44,18 @@ function collectRepository(options) {
   };
 }
 
+function resolveCorrelation(options, repository) {
+  const correlation = parseCorrelation(
+    options.correlation ?? readCorrelationEnvironment(options.environment)
+  );
+  if (correlation.workflowId || !correlation.taskId || !repository.head) return correlation;
+  const digest = createHash('sha256')
+    .update(`${correlation.taskId}\0${repository.head}`)
+    .digest('hex')
+    .slice(0, 24);
+  return parseCorrelation({ ...correlation, workflowId: `workflow.${digest}` });
+}
+
 function createRecord(options, identity, startedAt, paths, log, repository) {
   return parseRunRecord({
     schemaVersion: OBSERVABILITY_SCHEMA_VERSION,
@@ -56,12 +68,13 @@ function createRecord(options, identity, startedAt, paths, log, repository) {
     finishedAt: null,
     durationMs: null,
     repository,
-    correlation: parseCorrelation(
-      options.correlation ?? readCorrelationEnvironment(options.environment)
-    ),
+    correlation: resolveCorrelation(options, repository),
     summary: emptySummary(),
     steps: [],
     timeline: { events: [], activities: [] },
+    preflightContext: null,
+    changeRisk: null,
+    advisory: null,
     log: {
       path: paths.logRelativePath,
       digest: log.digest,

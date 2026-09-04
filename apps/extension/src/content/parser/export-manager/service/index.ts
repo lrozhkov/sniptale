@@ -71,7 +71,7 @@ function reportServiceFailure(
   warnings: string[],
   error: unknown
 ): string {
-  const errorMessage = getExportErrorMessage(error, translate('content.runtime.unknownError'));
+  const errorMessage = getExportErrorMessage(error, 'content.runtime.exportFailed');
   warnings.push(errorMessage);
 
   updateExportManagerProgress(state, {

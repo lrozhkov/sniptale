@@ -26,9 +26,11 @@ beforeEach(() => {
 
 function verifiesExplicitAndFallbackErrorMessages() {
   expect(getPopupExportErrorMessage(new Error('boom'), 'popup.export.prepareExportError')).toBe(
-    'boom'
+    't:popup.export.prepareExportError. t:popup.export.exportTransportErrorDetail'
   );
-  expect(getPopupExportErrorMessage('ignored', 'popup.export.prepareExportError')).toBe('ignored');
+  expect(getPopupExportErrorMessage('ignored', 'popup.export.prepareExportError')).toBe(
+    't:popup.export.prepareExportError. t:popup.export.exportTransportErrorDetail'
+  );
 }
 
 function verifiesStaleErrorNormalization() {
@@ -82,7 +84,7 @@ async function verifiesStalePreviewFailure() {
 
 describe('popup export runtime preview request', () => {
   it(
-    'uses the error message from real errors before falling back to translation',
+    'keeps unknown runtime error details out of the localized UI',
     verifiesExplicitAndFallbackErrorMessages
   );
   it('normalizes stale page runtime errors into a refresh hint', verifiesStaleErrorNormalization);

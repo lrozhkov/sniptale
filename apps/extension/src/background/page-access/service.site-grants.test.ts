@@ -12,6 +12,7 @@ import {
   browserScriptingUnregisterContentScriptsMock,
   createMessage,
   browserTabsGetMock,
+  sendTabMessageMock,
 } from './service.test-support';
 
 it('does not register content scripts when an optional site grant is denied', async () => {
@@ -83,7 +84,8 @@ it('reuses matching site script registrations after granting site access', async
 
   expect(browserScriptingUnregisterContentScriptsMock).not.toHaveBeenCalled();
   expect(browserScriptingRegisterContentScriptsMock).not.toHaveBeenCalled();
-  expect(browserScriptingExecuteScriptMock).toHaveBeenCalledOnce();
+  expect(sendTabMessageMock).toHaveBeenCalledOnce();
+  expect(browserScriptingExecuteScriptMock).not.toHaveBeenCalled();
 });
 
 it.each([

@@ -11,6 +11,7 @@ import { validateTrustedControlResults } from './trusted-control-matrix.mjs';
 import { stableStringify } from '../qa/proof/contracts/proof-input.mjs';
 import { listRegularProofFiles } from './proof-file-inventory.mjs';
 import { parseFullUnitProof } from '../qa/proof/unit/unit-test-proof.mjs';
+import { OBSERVABILITY_SCHEMA_VERSION } from '../qa/runtime/observability/constants.mjs';
 
 const POLICY_PATH = 'tooling/configs/ci/trusted-admission-policy.json';
 const SEMANTICS_POLICY_PATH = 'tooling/configs/ci/proof-semantics.json';
@@ -262,11 +263,14 @@ function validateRunRecord(root, manifest, lane, derived, trustedRoot) {
     throw new Error('Candidate proof must contain one top-level run record.');
   const record = JSON.parse(fs.readFileSync(path.join(root, records[0]), 'utf8'));
   if (
-    record?.schemaVersion !== 4 ||
+    record?.schemaVersion !== OBSERVABILITY_SCHEMA_VERSION ||
     record.wrapperId !== `ci:${lane}` ||
     record.status !== 'all-passed' ||
     record.exitCode !== 0 ||
     record.parentRunId !== null ||
+    record.preflightContext !== null ||
+    record.changeRisk !== null ||
+    record.advisory !== null ||
     typeof record.log?.path !== 'string' ||
     !manifest.files.some(({ file }) => file === record.log.path)
   ) {

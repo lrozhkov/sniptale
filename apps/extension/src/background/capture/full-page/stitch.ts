@@ -21,6 +21,9 @@ import {
 import { resolveCaptureBlobOptions } from './helpers';
 import type { FullPageTilePlan } from './planner';
 import type { FullPageCaptureOptions } from './types';
+import { createLogger } from '@sniptale/platform/observability/logger';
+
+const logger = createLogger({ namespace: 'BackgroundFullPageCaptureStitch' });
 
 type OutputCanvas = {
   canvas: OffscreenCanvas;
@@ -86,6 +89,17 @@ function resolveOutputScale(args: {
   );
   const scale = Math.min(args.nativeScale, dimensionScale, areaScale, workingScale);
   if (!Number.isFinite(scale) || scale < budget.minOutputScale) {
+    logger.warn('Full-page raster scale rejected by quality policy', {
+      areaScale,
+      dimensionScale,
+      geometry,
+      minOutputScale: budget.minOutputScale,
+      nativeScale: args.nativeScale,
+      scale,
+      tileHeight: args.tileHeight,
+      tileWidth: args.tileWidth,
+      workingScale,
+    });
     throw new Error(FULL_PAGE_RASTER_BUDGET_ERROR);
   }
   return scale;
@@ -287,6 +301,12 @@ async function downscaleOversizedEncoding(args: {
   const requestedRatio = Math.min(0.9, Math.sqrt(retryTargetBytes / args.blob.size));
   const nextScale = Math.max(budget.minOutputScale, args.output.outputScale * requestedRatio);
   if (nextScale >= args.output.outputScale) {
+    logger.warn('Full-page encoded image cannot be reduced within policy', {
+      encodedBytes: args.blob.size,
+      maxEncodedBytes: budget.maxEncodedBytes,
+      minOutputScale: budget.minOutputScale,
+      outputScale: args.output.outputScale,
+    });
     throw new Error(FULL_PAGE_FILE_BUDGET_ERROR);
   }
   const ratio = nextScale / args.output.outputScale;
@@ -296,6 +316,11 @@ async function downscaleOversizedEncoding(args: {
     Math.floor(args.output.canvas.height * ratio) *
     BYTES_PER_PIXEL;
   if (oldCanvasBytes + nextCanvasBytes > MAX_WORKING_SET_BYTES) {
+    logger.warn('Full-page encoded-image retry exceeds working-set budget', {
+      maxWorkingSetBytes: MAX_WORKING_SET_BYTES,
+      nextCanvasBytes,
+      oldCanvasBytes,
+    });
     throw new Error(FULL_PAGE_RASTER_BUDGET_ERROR);
   }
   const nextCanvas = new OffscreenCanvas(
@@ -319,6 +344,12 @@ async function downscaleOversizedEncoding(args: {
   const encoded = await encodeCanvas(nextOutput, args.options, args.abortSignal);
   throwIfStitchFinalizationAborted(args.abortSignal);
   if (encoded.blob.size > budget.maxEncodedBytes) {
+    logger.warn('Full-page encoded-image retry remains above file budget', {
+      encodedBytes: encoded.blob.size,
+      maxEncodedBytes: budget.maxEncodedBytes,
+      outputHeight: nextOutput.canvas.height,
+      outputWidth: nextOutput.canvas.width,
+    });
     throw new Error(FULL_PAGE_FILE_BUDGET_ERROR);
   }
   return { blob: encoded.blob, output: nextOutput };

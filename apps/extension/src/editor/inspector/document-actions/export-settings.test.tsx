@@ -110,7 +110,8 @@ it('commits quality once for the current draft and rolls back on failure', async
   });
 
   expect(lastState?.imageQuality).toBe(80);
-  expect(mocks.toastError).toHaveBeenCalledWith('persist failed');
+  expect(mocks.toastError).toHaveBeenCalledWith(expect.stringContaining('Sniptale'));
+  expect(mocks.toastError).not.toHaveBeenCalledWith(expect.stringContaining('persist failed'));
 });
 
 it('dispatches and reads export settings change events', () => {

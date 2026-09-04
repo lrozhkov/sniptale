@@ -80,7 +80,7 @@ export function getCalloutLayoutState(args: {
   };
   const effectiveZIndex = args.isEditing
     ? FRAME_ANNOTATION_Z_INDEX.calloutEditing
-    : Math.min(args.zIndex, FRAME_ANNOTATION_Z_INDEX.calloutViewing);
+    : FRAME_ANNOTATION_Z_INDEX.calloutViewing;
   const connectorState = getCalloutConnectorState({
     anchorPos,
     args,

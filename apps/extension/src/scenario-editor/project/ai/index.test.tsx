@@ -157,7 +157,8 @@ async function verifiesScenarioAiSubmit() {
     await submit();
   });
 
-  expect(latestState?.error).toBe('request failed');
+  expect(latestState?.error).toContain('Внешний сервис');
+  expect(latestState?.error).not.toContain('request failed');
   expect(latestState?.loading).toBe(false);
 }
 

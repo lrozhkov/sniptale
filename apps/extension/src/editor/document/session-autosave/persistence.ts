@@ -7,6 +7,7 @@ import type { EditorDocument } from '../../../features/editor/document/types';
 import { dataUrlToBlob } from '../../../platform/media-utils/data-url';
 import { createImageThumbnailBlob } from '../../../platform/media-utils/image-thumbnail';
 import { createLogger } from '@sniptale/platform/observability/logger';
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 import { useEditorStore } from '../../state/useEditorStore';
 import {
   clearPendingAutosaveTimer,
@@ -84,7 +85,13 @@ async function persistEditorSessionDocument(args: {
       args.state.activeContext?.aggregateId === args.context.aggregateId &&
       args.revision === args.state.autosaveRevision
     ) {
-      setEditorSaveErrorMessage(error instanceof Error ? error.message : 'Failed to save draft');
+      setEditorSaveErrorMessage(
+        createUserFacingErrorMessage({
+          cause: error,
+          detail: 'storage',
+          summaryKey: 'common.errors.saveFailed',
+        })
+      );
       setEditorSaveState('error');
     }
   }

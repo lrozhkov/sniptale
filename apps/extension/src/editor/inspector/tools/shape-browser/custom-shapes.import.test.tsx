@@ -82,6 +82,9 @@ it('rejects oversized custom shape files before reading contents', async () => {
   expect(mocks.saveCustomShapeDefinition).not.toHaveBeenCalled();
   expect(latestState?.importState).toEqual({
     status: 'error',
-    message: 'Custom shape import file is too large.',
+    message: expect.stringContaining('Sniptale'),
   });
+  expect(latestState?.importState).not.toEqual(
+    expect.objectContaining({ message: 'Custom shape import file is too large.' })
+  );
 });

@@ -1,13 +1,4 @@
-const ADVISORY_CHECK_DESCRIPTIONS = [
-  'structural file pressure',
-  'structural function pressure',
-  'root scatter',
-  'documentation prose drift',
-  'oversized inline literals',
-  'UI proof gaps',
-];
-
-function formatFindingSection(title, findings) {
+function formatFindingSection(title, findings, maximumPerFamily = 3) {
   if (findings.length === 0) {
     return [];
   }
@@ -20,28 +11,43 @@ function formatFindingSection(title, findings) {
   }
 
   for (const [family, familyFindings] of findingsByFamily.entries()) {
-    for (const finding of familyFindings.slice(0, 3)) {
+    for (const finding of familyFindings.slice(0, maximumPerFamily)) {
       const lineLabel = finding.line != null ? `:${finding.line}` : '';
       lines.push(
         `- ${finding.file}${lineLabel} [${finding.id}] ${finding.reason} Hint: ${finding.hint}`
       );
     }
 
-    if (familyFindings.length > 3) {
-      lines.push(`- [${family}] +${familyFindings.length - 3} more finding(s)`);
+    if (familyFindings.length > maximumPerFamily) {
+      lines.push(`- [${family}] +${familyFindings.length - maximumPerFamily} more finding(s)`);
     }
   }
   return lines;
 }
 
-export function formatAdvisoryReport({ findings }) {
-  const attention = findings.filter((finding) => finding.severity === 'attention');
-  const watch = findings.filter((finding) => finding.severity !== 'attention');
+export function formatAdvisoryReport({ buckets }) {
+  const introduced = buckets?.introduced ?? [];
+  const worsened = buckets?.worsened ?? [];
+  const existing = buckets?.existing ?? [];
   return `${[
-    `Non-blocking advisory checks: ${ADVISORY_CHECK_DESCRIPTIONS.join(', ')}`,
-    ...formatFindingSection('Attention (non-blocking)', attention),
-    ...formatFindingSection('Review signals', watch),
-    `Advisory (non-blocking): attention=${attention.length}, watch=${watch.length}`,
+    `Advisory: introduced=${introduced.length}, worsened=${worsened.length}, existing=${existing.length}`,
+    ...formatFindingSection('Introduced', introduced),
+    ...formatFindingSection('Worsened', worsened),
+    ...(existing.length > 0
+      ? [`Existing context: ${existing.length} unchanged — see run log`]
+      : []),
+  ].join('\n')}\n`;
+}
+
+export function formatAdvisoryLog({ buckets }) {
+  const introduced = buckets?.introduced ?? [];
+  const worsened = buckets?.worsened ?? [];
+  const existing = buckets?.existing ?? [];
+  return `${[
+    `Advisory log: introduced=${introduced.length}, worsened=${worsened.length}, existing=${existing.length}`,
+    ...formatFindingSection('Introduced', introduced, Number.POSITIVE_INFINITY),
+    ...formatFindingSection('Worsened', worsened, Number.POSITIVE_INFINITY),
+    ...formatFindingSection('Existing', existing, Number.POSITIVE_INFINITY),
   ].join('\n')}\n`;
 }
 

@@ -6,6 +6,7 @@ import {
 } from '@sniptale/runtime-contracts/page-package';
 import type { AssetRef } from '../../../../composition/persistence/assets';
 import { parsePagePackageJobStatusV1, type PagePackageJobStatusV1 } from './status';
+import type { AppLocale } from '../../../../platform/i18n';
 
 const MAX_IDENTIFIER_LENGTH = 512;
 const MAX_FILENAME_LENGTH = 4096;
@@ -50,6 +51,7 @@ export interface PersistedPagePackageOutput {
 export interface PagePackageJobRecordV1 {
   jobId: string;
   libraryCleanupAssetIds: string[];
+  locale: AppLocale | null;
   output: PersistedPagePackageOutput | null;
   schemaVersion: 1;
   stagedPages: PersistedStagedPage[];
@@ -219,18 +221,18 @@ function parseOutput(value: unknown): PersistedPagePackageOutput | null {
 }
 
 export function parsePagePackageJobRecordV1(value: unknown): PagePackageJobRecordV1 | null {
-  if (
-    !isExactRecord(value, [
-      'jobId',
-      'libraryCleanupAssetIds',
-      'output',
-      'schemaVersion',
-      'stagedPages',
-      'status',
-      'updatedAt',
-    ])
-  )
-    return null;
+  const recordKeys = [
+    'jobId',
+    'libraryCleanupAssetIds',
+    'locale',
+    'output',
+    'schemaVersion',
+    'stagedPages',
+    'status',
+    'updatedAt',
+  ];
+  const legacyRecordKeys = recordKeys.filter((key) => key !== 'locale');
+  if (!isExactRecord(value, recordKeys) && !isExactRecord(value, legacyRecordKeys)) return null;
   const status = parsePagePackageJobStatusV1(value['status']);
   if (
     !status ||
@@ -241,6 +243,10 @@ export function parsePagePackageJobRecordV1(value: unknown): PagePackageJobRecor
     !value['libraryCleanupAssetIds'].every(isIdentifier) ||
     new Set(value['libraryCleanupAssetIds']).size !== value['libraryCleanupAssetIds'].length ||
     value['schemaVersion'] !== 1 ||
+    (value['locale'] !== undefined &&
+      value['locale'] !== null &&
+      value['locale'] !== 'en' &&
+      value['locale'] !== 'ru') ||
     !isNonNegativeInteger(value['updatedAt']) ||
     !Array.isArray(value['stagedPages']) ||
     value['stagedPages'].length > MAX_STAGED_PAGES
@@ -268,6 +274,7 @@ export function parsePagePackageJobRecordV1(value: unknown): PagePackageJobRecor
   return {
     jobId: value['jobId'],
     libraryCleanupAssetIds: value['libraryCleanupAssetIds'] as string[],
+    locale: value['locale'] === 'en' || value['locale'] === 'ru' ? value['locale'] : null,
     output,
     schemaVersion: 1,
     stagedPages: pages,

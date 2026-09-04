@@ -3,10 +3,7 @@ import type { VideoEditorLibrariesState } from '../app-model/types';
 import { loadInitialProjectFromLocation } from '../../project/operations/ops';
 import type { ApplyLoadedProject } from './types';
 import type { VideoEditorSessionActions } from '../../contracts/commands/session';
-
-function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 
 /**
  * Resolves the initial workspace from the location and warms sidebar libraries.
@@ -42,7 +39,13 @@ export function useVideoEditorBootstrap(
         }
       } catch (bootstrapError) {
         if (!cancelled) {
-          setError(toErrorMessage(bootstrapError));
+          setError(
+            createUserFacingErrorMessage({
+              cause: bootstrapError,
+              detail: 'storage',
+              summaryKey: 'videoEditor.app.openFailed',
+            })
+          );
           setReady(true);
         }
       }

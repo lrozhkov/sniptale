@@ -1,67 +1,56 @@
 # Sniptale threat model
 
-Owner: security architecture. Review when a privileged entrypoint, store, permission, network destination, import/export format, dependency admission rule, or release boundary changes.
+Review this model when a privileged entrypoint, store, permission, network destination, import or export format, dependency-admission rule, or release boundary changes.
 
-## Assets
+## Trust assumptions
 
-| ID | Asset | Objective |
-| --- | --- | --- |
-| DATA-SECRET | API keys, unlock material, authorization handles | Confidentiality and sender-bound use |
-| DATA-CAPTURE | Page content, screenshots, media, projects | Confidentiality, integrity, user-controlled retention |
-| DATA-PERSIST | Preferences, databases, backups, sync | Integrity, deletion, explicit authority |
-| DATA-AI | Prompts, responses, provider configuration | Consent, minimization, redacted diagnostics |
-| DATA-ARTIFACT | Dependencies, lockfile, build inputs, release artifact | Provenance and reproducibility |
-| DATA-AUTHORITY | Browser and native privileges | Least privilege |
-| DATA-DIAGNOSTICS | Diagnostics, traces, logs, erasure evidence | Redaction and deletion |
-| DATA-ARCHIVE | Imported/exported archives and renderer inputs | Integrity and safe parsing |
+Chromium APIs and the browser profile are trusted computing base. Encryption and sender authorization do not protect a compromised profile or extension runtime.
 
-Chromium APIs and the browser profile are trusted-computing-base assumptions, not confidential enclaves. Storage encryption and sender authorization reduce exposure but cannot protect against a compromised profile or extension runtime.
+The optional native companion, native-host registration, executable loading, code-signing enforcement, and operating system are outside this repository and extension artifact. The extension cannot attest a compromised local account, operating system, or replaced registered host.
 
-## Native companion trust boundary
+Treat native messages as untrusted protocol input. Parse them through the native contract. Negotiate the protocol version. Enforce capability bounds. Bind each message to its request. Route effects through the native controller. Treat `signedBinary`, `rollbackProtected`, `notarized`, and `packageIntegrity` as self-reported compatibility fields, not cryptographic attestation.
 
-The optional native companion is outside the extension artifact and this repository. Chrome's native-messaging host selection and the local operating system's native-host registration, executable loading, code-signing enforcement, and package distribution are trusted-computing-base assumptions. A compromised local account, replaced registered host, or compromised operating system is outside the extension's ability to attest.
-
-Native messages remain untrusted protocol input and must pass the native contract parsers, version negotiation, controller ownership, capability bounds, and request correlation before they affect extension state. The `signedBinary`, `rollbackProtected`, `notarized`, and `packageIntegrity` install fields are self-reported by the connected host. They drive compatibility and repair guidance; they are not cryptographic proof verified by the extension, do not identify the executable with a pinned key, and must not be presented as an extension security verdict.
-
-## Adversaries
-
-Threats include malicious pages and frames, replayed or unauthorized senders, hostile archives/templates/renderers, compromised AI endpoints, unsafe DOM sinks, dependency/build compromise, hostile QA child processes or hooks, accidental retention, and local profile readers.
-
-## Zones
-
-| Zone | Inputs | Sensitive sinks |
-| --- | --- | --- |
-| PAGE / CONTENT | Hostile DOM in page and isolated worlds | Runtime messages, injected UI |
-| EXTENSION / BACKGROUND | Extension pages and typed routes | Storage, tabs, capture, downloads, native messaging |
-| OFFSCREEN / SANDBOX | Media and renderer payloads | Media processing and isolated evaluation |
-| EXTERNAL / AI / NATIVE | Providers, native host, portable archives | Network egress, external process, import/export |
-| LOCAL / SESSION / SYNC / IDB | Extension state | Persistent, ephemeral, replicated, and structured storage |
-| CONTRIBUTOR / INSTALL / CI | Source, lock resolution, hooks, child output | Dependency admission and build inputs |
-| RELEASE / DISTRIBUTION | Build inputs and verified legal closure | Reproducible artifact and distribution provenance |
-
-GitHub Actions treats pull-request source and dependency hooks as untrusted. The required result is the default-branch `pull_request_target` job `pr-gate`. Trusted-base code admits exactly one graph: a candidate-bound derived-reuse proof with every VM job skipped, or locked-image execution with canonical proof, trusted admission, and successful cleanup. Sniptale intentionally permits a pull request to execute its candidate QA control implementation once. The trusted-base envelope verifies mandatory phase presence, candidate identity, proof schema, evidence hashes, execution compatibility, artifact closure, and final job-graph status, but does not independently re-execute the previous control implementation. QA-control changes therefore rely on normal human review and become canonical authority only after merge to `main`. This avoids a duplicate CI lane and a separate bootstrap merge for routine QA evolution.
-
-Both candidate and trusted control digests are sealed into proof. A mismatch is reported as `QA controls changed` and `candidate-controls`; it is not itself a PR failure. Cross-digest proof reuse and documentation-only derived proof are forbidden. Release provenance is admissible only when the control digest is already the accepted digest on `main`. Candidate code never receives the workflow token, cloud credentials, OIDC authority, or write access to the trusted mount. The trusted runner host owns and records the mandatory phase schedule, overrides candidate image `ENTRYPOINT` and working-directory metadata for every phase, and performs final artifact collection and sealing. The executable filesystem inside a candidate-built QA image remains part of the candidate control implementation: it is not independently attested by the envelope and can weaken its own internal checks. This is the same deliberately accepted candidate-controls risk described above, not a claim that candidate Node, loader, or library bytes are trusted. The disposable VM pulls the public immutable QA image without a registry credential. Before the JIT runner starts, trusted bootstrap installs and verifies a Docker forwarding rule that rejects the OpenStack metadata address; a missing rule prevents candidate execution. External Actions are pinned to full commit SHAs. GitHub Releases must have repository-enforced immutability enabled before publication; the exact mutable draft receives and verifies the complete asset set before publication locks the tag and assets.
-
-## Invariants
+## Threats and invariants
 
 | Threat | Invariant | Owner | Residual risk |
 | --- | --- | --- | --- |
-| Malformed, hostile, or replayed IPC | INV-IPC-AUTH | background route policy | Sender-classification defects |
-| Injection or all-sites access exceeds intent | INV-PAGE-CAPABILITY | background/content authority | User-granted host access remains broad |
-| Capture or diagnostics leak | INV-CAPTURE-RETENTION | capture/media owners | Profile access remains outside extension control |
-| Hostile import crosses trust boundary | INV-IMPORT-PARSE | parser/import owners | User may retain malicious but valid content |
-| AI secret or prompt leaves owner | INV-AI-SECRET-EGRESS | AI transport | Provider receives consented request data |
-| Sync or backup defeats erasure | INV-PERSIST-ERASURE | persistence owners | External replicas require participant proof |
-| Dependency or build input poisons evidence | INV-SUPPLY-CHAIN-PROVENANCE | QA/release owner | Local-machine compromise is out of scope |
-| Sandbox execution escapes | INV-SANDBOX-ISOLATION | sandbox owner | Chromium sandbox is a TCB assumption |
-| Hostile DOM reaches unsafe sink | INV-DOM-SANITIZATION | sanitizer owner | Sanitizer and browser rendering defects |
-| Diagnostics retain sensitive data | INV-OBS-REDACTION | diagnostics owner | Existing user-controlled logs may persist |
-| Manifest or artifact exceeds policy | INV-ARTIFACT-BOUNDARY | build/release owner | Distribution relies on the release builder |
-| Native host report is mistaken for attestation | INV-NATIVE-TRUST | native adapter and compatibility owner | A locally replaced registered host is indistinguishable to the extension |
+| Malformed, hostile, or replayed IPC | `INV-IPC-AUTH` | background route policy | Sender-classification defects |
+| Page injection or all-sites access exceeds intent | `INV-PAGE-CAPABILITY` | background and content authority | User-granted host access remains broad |
+| Capture or diagnostics disclose content | `INV-CAPTURE-RETENTION` | capture, media, and diagnostics owners | Profile access and user-shared output |
+| Hostile import crosses a trust boundary | `INV-IMPORT-PARSE` | parser and import owners | Valid content may still be malicious to its user |
+| AI secret or prompt leaves its owner | `INV-AI-SECRET-EGRESS` | AI transport | Provider receives the consented request |
+| Sync or backup defeats erasure | `INV-PERSIST-ERASURE` | persistence owners | External replicas need participant deletion proof |
+| Dependency or build input poisons evidence | `INV-SUPPLY-CHAIN-PROVENANCE` | QA and release owners | Local-machine compromise |
+| Sandbox execution escapes | `INV-SANDBOX-ISOLATION` | sandbox owner | Chromium sandbox defects |
+| Hostile DOM reaches an unsafe sink | `INV-DOM-SANITIZATION` | sanitizer owner | Sanitizer or browser-rendering defects |
+| Diagnostics retain sensitive data | `INV-OBS-REDACTION` | diagnostics owner | Previously exported user-controlled logs |
+| Manifest or artifact exceeds policy | `INV-ARTIFACT-BOUNDARY` | build and release owners | Compromise of the admitted release builder |
+| Native status is presented as attestation | `INV-NATIVE-TRUST` | native adapter and compatibility owner | A replaced registered host is indistinguishable |
 
-The release invariant requires the production closure to be recomputed from the lockfile and installed tree, license exceptions to use checked-in version-tagged or commit-addressed bytes with an exact digest, bundled Manrope bytes to match their installed package sources and OFL text, and the archive legal payload to match policy digests. Ordinary validation remains offline.
+The adversaries are malicious pages and frames, unauthorized or replayed senders, hostile archives and render inputs, compromised external endpoints, dependency or build compromise, hostile QA child processes or hooks, accidental retention, and local profile readers.
+
+## Boundary map
+
+| Zone | Untrusted input | Privileged or sensitive sink |
+| --- | --- | --- |
+| Page and content | DOM and page events | runtime messages and injected UI |
+| Extension and background | extension pages and routed messages | storage, tabs, capture, downloads, and native messaging |
+| Offscreen and sandbox | media and renderer payloads | media processing and isolated evaluation |
+| External systems | AI providers, native host, and portable archives | network egress, external process, and import/export |
+| Persistence | local, session, sync, IndexedDB, and OPFS values | durable, replicated, or ephemeral state |
+| Contributor and CI | source, dependency hooks, and child output | build inputs and proof |
+| Release | admitted build inputs and legal closure | artifact and public distribution |
+
+## Supply-chain boundary
+
+Treat pull-request source, dependency hooks, candidate QA controls, and candidate-built image contents as untrusted. Candidate execution must not receive repository tokens, cloud credentials, OIDC authority, or write access to the trusted mount.
+
+Proof admission must bind evidence to the candidate and preserve the trusted-control boundary. Canonical candidate-admission and proof-reuse rules belong to [Canonical CI/CD](../tooling/ci-cd.md).
+
+Legal closure belongs to [OSS provenance](../oss/provenance.md). Publication admission belongs to the [release runbook](../oss/release.md).
 
 ## Review ownership
 
-Security architecture reviews semantic changes to privileged entrypoints, permissions, storage, native/AI destinations, imports/exports, renderers, diagnostics, dependency admission, hooks, GitHub workflows, and release boundaries. Relocation alone does not change authority or invariants. GitHub is the canonical source and immutable release channel. The current confidential reporting mechanism is projected in the [generated project facts](../engineering/project-facts.md); disclosure instructions remain owned by [SECURITY.md](../../.github/SECURITY.md).
+Security architecture reviews semantic changes to the triggers listed at the top of this document. A relocation that preserves authority and invariants does not require threat-model changes.
+
+The current reporting and GitHub release facts are projected in the [generated project facts](../engineering/project-facts.md). Confidential reporting instructions belong to [SECURITY.md](../../.github/SECURITY.md).

@@ -7,6 +7,11 @@ import fs from 'node:fs';
 import { collectFocusedGuardrailReport } from '../composition/preflight/guardrail-preflight-report/check.mjs';
 import { collectCurrentDiffContext } from '../runtime/scope/current-diff.helpers.mjs';
 import { collectAdvisoryFindings } from '../composition/advisory/execution/collectors.mjs';
+import {
+  classifyAdvisoryFindings,
+  createAdvisoryAnalysis,
+} from '../composition/advisory/advisory-catalog.data.mjs';
+import { collectChangeRisks, collectRiskDocuments } from '../composition/change-risk/collector.mjs';
 import { filterImportOrMockOnlyDiffFiles } from '../analysis/imports/import-only-diff/check.mjs';
 import { collectCodeFiles } from '../analysis/repository/shared-files.mjs';
 import {
@@ -19,11 +24,15 @@ import { createOkStep } from '../composition/checkpoint/focused-qa-results.mjs';
 import { PRODUCT_QA_SUITE, createScopedQaContext } from '../composition/scope/qa-scope.mjs';
 import {
   collectContractChecklist,
+  collectContractProofRequirements,
   collectTransitiveConsumerHints,
   collectTypecheckBlastRadius,
 } from './preflight/preflight-contract-report.mjs';
 import { collectRelevantDocs, isUiFile } from './preflight/preflight-docs.mjs';
-import { collectPreflightReportLines } from './preflight/preflight-render.mjs';
+import {
+  collectPreflightReportLines,
+  renderPreflightTerminalSummary,
+} from './preflight/preflight-render.mjs';
 import { runObservedWrapper } from './observed/runner.mjs';
 import { classifyOwnerGroup } from '../analysis/structural-risk/owner-classifier.mjs';
 import { runStructuralRiskCheck } from '../analysis/structural-risk/check.mjs';
@@ -41,6 +50,7 @@ const SECURITY_CONTROL_FILE =
   /(?:security-|dependency-|source-sbom|codeql|threat-model|manifest-permissions)/u;
 const SECURITY_CONTROL_PROOF_HINT =
   'security/dependency policy changes require compact admission and guard fixtures; route review by changed seam';
+const OWNER_SIGNIFICANT_TARGET_FILES = new Set(['apps/extension/manifest.json']);
 
 function collectSecurityControlHints(files) {
   return files.some((file) => SECURITY_CONTROL_FILE.test(file))
@@ -133,6 +143,8 @@ export function collectPreflightOwnerRuntime(context) {
     ...new Set([
       ...(context.codeFiles ?? []),
       ...behavioralTargetFiles.filter((file) => JS_LIKE_FILE_PATTERN.test(file)),
+      ...behavioralTargetFiles.filter((file) => OWNER_SIGNIFICANT_TARGET_FILES.has(file)),
+      ...(context.harnessTargetFiles ?? []),
     ]),
   ];
   return [...new Set(ownerFiles.map(classifyOwnerGroup))].sort();
@@ -208,10 +220,17 @@ export function collectPreflightReport({ files = [] } = {}) {
       addedFiles: collectedContext.addedFiles,
     },
   });
+  const riskFiles = files.length > 0 ? context.allTargetFiles : context.allQualityTargetFiles;
+  const riskFindings = collectChangeRisks({ targetFiles: riskFiles, mode: 'preflight' });
 
   return {
     context,
-    relevantDocs: collectRelevantDocs(context.allTargetFiles ?? context.targetFiles),
+    relevantDocs: [
+      ...new Set([
+        ...collectRelevantDocs(context.allTargetFiles ?? context.targetFiles),
+        ...collectRiskDocuments(riskFindings),
+      ]),
+    ],
     ownerRuntime: collectPreflightOwnerRuntime(context),
     guardrailReport,
     structuralReport: structuralResult.report,
@@ -223,6 +242,7 @@ export function collectPreflightReport({ files = [] } = {}) {
     }).slice(0, 12),
     proofHints: [
       ...collectProofHints(context, guardrailReport),
+      ...collectContractProofRequirements(context),
       ...collectSecurityControlHints(
         files.length > 0 ? context.allTargetFiles : context.allQualityTargetFiles
       ),
@@ -230,6 +250,7 @@ export function collectPreflightReport({ files = [] } = {}) {
     contractChecklist: collectContractChecklist(context),
     transitiveConsumerHints: collectTransitiveConsumerHints(context),
     typecheckBlastRadius: collectTypecheckBlastRadius(context),
+    riskFindings,
   };
 }
 
@@ -240,15 +261,63 @@ export function renderPreflightReport(report) {
   return `${lines.join('\n')}\n`;
 }
 
+function collectRuntimeLabels(files) {
+  return [
+    ...new Set(
+      files.map((file) => {
+        const extension = file.match(/^apps\/extension\/src\/([^/]+)/u);
+        if (extension) return `extension:${extension[1]}`;
+        const packageName = file.match(/^packages\/([^/]+)\//u);
+        if (packageName) return `package:${packageName[1]}`;
+        if (file.startsWith('tooling/')) return 'tooling';
+        if (file === 'apps/extension/manifest.json') return 'extension:manifest';
+        return 'repository';
+      })
+    ),
+  ].sort();
+}
+
+function createPreflightAnalysis(report) {
+  const consumers = [
+    ...(report.contractChecklist ?? []),
+    ...(report.transitiveConsumerHints ?? []),
+    ...(report.typecheckBlastRadius ?? []),
+  ];
+  return {
+    owners: [...(report.ownerRuntime ?? [])],
+    runtimes: collectRuntimeLabels(report.context.allTargetFiles ?? report.context.targetFiles),
+    riskAreas: (report.riskFindings ?? []).map(({ id }) => id),
+    documents: [...(report.relevantDocs ?? [])],
+    consumers: [...new Set(consumers)],
+    proofRequirements: [
+      ...new Set([
+        ...(report.proofHints ?? []),
+        ...(report.guardrailReport?.hints ?? []),
+        ...(report.riskFindings ?? []).flatMap((finding) => finding.requirements ?? []),
+      ]),
+    ],
+    structuralContext: [...(report.structuralPressure ?? [])],
+  };
+}
+
 export function runPreflightWrapper({ files = [] } = {}) {
   const report = collectPreflightReport({ files });
+  const advisoryBuckets = classifyAdvisoryFindings(report.advisoryFindings, {
+    mode: report.context.mode === 'explicit-files' ? 'preflight' : 'checkpoint',
+  });
   return {
     context: report.context,
+    preflightContext: createPreflightAnalysis(report),
+    advisory: createAdvisoryAnalysis(advisoryBuckets),
     steps: [
       {
         ...createOkStep('QA preflight', `inspected=${report.context.targetFiles.length}`),
-        consoleOutput: renderPreflightReport(report),
-        advisories: report.advisoryFindings,
+        consoleOutput: renderPreflightTerminalSummary(report, advisoryBuckets),
+        stdout: renderPreflightReport(report),
+        advisories: [...advisoryBuckets.worsened],
+        ...(advisoryBuckets.worsened.length > 0
+          ? { advice: 'Use worsened structural context to refine scope and proof.' }
+          : {}),
       },
     ],
   };

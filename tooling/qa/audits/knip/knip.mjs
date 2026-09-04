@@ -4,6 +4,7 @@ import { KNIP_CONFIG_PATH } from '../../policy/external-tools/external-tools.mjs
 import { resolveKnipExecutable, runToolCommand } from '../../tools/tool-cli.mjs';
 import { AUDIT_ADAPTER_SKIP_REASONS } from '../profiles/index.mjs';
 import { AuditExecutionError, auditResultError } from '../contracts/execution-error.mjs';
+import { filterAllowedViolations, loadBaseline } from '../../policy/baselines/shared-baseline.mjs';
 import {
   isAuditObject,
   parseRequiredAuditJson,
@@ -53,6 +54,7 @@ function collectIssueViolations(entry) {
 }
 
 export function runKnipCheck({
+  baseline = loadBaseline(),
   configPath = KNIP_CONFIG_PATH,
   executable = resolveKnipExecutable(),
   runCommandImpl,
@@ -98,7 +100,7 @@ export function runKnipCheck({
   });
   return {
     skipped: false,
-    violations,
+    violations: filterAllowedViolations(violations, baseline),
   };
 }
 

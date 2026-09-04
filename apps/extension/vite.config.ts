@@ -17,7 +17,7 @@ import {
 import { createContentRuntimeBuildId } from './build/content-runtime-build-id.ts';
 import { extensionHtmlInputs } from './build/extension-html-inputs.ts';
 import { createExtensionBuildLayout, extensionRollupInputs, layoutPolicy } from './build/layout.ts';
-import { buildManifestForMode } from './build/manifest.ts';
+import { buildManifestForMode, CHROME_BUILD_TARGET } from './build/manifest.ts';
 
 const APP_ROOT = fileURLToPath(new URL('.', import.meta.url));
 const BUILD_LAYOUT = createExtensionBuildLayout(APP_ROOT);
@@ -173,7 +173,7 @@ export default defineConfig(({ mode }) => ({
     // Vite's preload helper resolves chunk URLs against the host page inside content scripts.
     modulePreload: false,
     chunkSizeWarningLimit: layoutPolicy.chunkSizeWarningLimitKb,
-    target: 'chrome140',
+    target: CHROME_BUILD_TARGET,
     sourcemap: shouldEmitBuildSourcemaps(mode),
     rollupOptions: createRollupOptions(mode),
   },

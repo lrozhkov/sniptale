@@ -24,9 +24,9 @@ type DynamicAction =
 type DynamicFrameState = {
   borderSettings: {
     color: string;
-    id: string;
     padding: { bottom: number; left: number; right: number; top: number };
     radius: number;
+    sourcePresetId: string;
     width: number;
   };
   effectMode: string;
@@ -212,7 +212,7 @@ async function openDynamicHarness(
   const snapshot = await readDynamicHarnessSnapshot(harness);
   expect(snapshot.frame.id).toBe('dynamic-frame');
   expect(snapshot.frame.offset).not.toEqual({ height: 0, width: 0, x: 0, y: 0 });
-  expect(snapshot.frame.borderSettings.id).toBe('dynamic-anchor-border');
+  expect(snapshot.frame.borderSettings.sourcePresetId).toBe('dynamic-anchor-border');
   const status = await readDynamicHarnessStatus(page);
   expect(status).toMatchObject({ connected: true, context: scenario });
   await expectRecovery(page, null);
@@ -275,7 +275,17 @@ for (const zoomPercent of ZOOM_LEVELS) {
       expect(fillRect).not.toBeNull();
       expect(strokeRect).not.toBeNull();
       expectRectClose(fillRect!, frameRect!, tolerance * scale);
-      expectRectClose(strokeRect!, frameRect!, tolerance * scale);
+      const strokeWidth = 20 * scale;
+      expectRectClose(
+        strokeRect!,
+        {
+          x: frameRect!.x - strokeWidth,
+          y: frameRect!.y - strokeWidth,
+          width: frameRect!.width + strokeWidth * 2,
+          height: frameRect!.height + strokeWidth * 2,
+        },
+        tolerance * scale
+      );
 
       const effect = testCase.locator('[data-layer="effect"]');
       if ((await effect.count()) > 0) {
@@ -308,7 +318,7 @@ for (const zoomPercent of ZOOM_LEVELS) {
   });
 }
 
-test('viewer capture keeps the thick inward stroke on the canonical surface', async ({
+test('viewer capture keeps the thick outward stroke around the canonical surface', async ({
   page,
   hostOrigin,
 }) => {
@@ -343,20 +353,25 @@ test('viewer capture keeps the thick inward stroke on the canonical surface', as
     return {
       bounds: { minX, minY, maxX, maxY },
       dpr: image.naturalWidth / image.width,
+      strokeWidth: Number(image.dataset['strokeWidth']),
       surface,
     };
   });
 
   const [x, y, width, height] = scan.surface;
   const tolerance = Math.max(0.5, 1 / scan.dpr);
-  expect(Math.abs(scan.bounds.minX / scan.dpr - x!)).toBeLessThanOrEqual(tolerance);
-  expect(Math.abs(scan.bounds.minY / scan.dpr - y!)).toBeLessThanOrEqual(tolerance);
-  expect(Math.abs((scan.bounds.maxX + 1) / scan.dpr - (x! + width!))).toBeLessThanOrEqual(
+  expect(Math.abs(scan.bounds.minX / scan.dpr - (x! - scan.strokeWidth))).toBeLessThanOrEqual(
     tolerance
   );
-  expect(Math.abs((scan.bounds.maxY + 1) / scan.dpr - (y! + height!))).toBeLessThanOrEqual(
+  expect(Math.abs(scan.bounds.minY / scan.dpr - (y! - scan.strokeWidth))).toBeLessThanOrEqual(
     tolerance
   );
+  expect(
+    Math.abs((scan.bounds.maxX + 1) / scan.dpr - (x! + width! + scan.strokeWidth))
+  ).toBeLessThanOrEqual(tolerance);
+  expect(
+    Math.abs((scan.bounds.maxY + 1) / scan.dpr - (y! + height! + scan.strokeWidth))
+  ).toBeLessThanOrEqual(tolerance);
 });
 
 test('thick frame, effect, and fill matrix matches the visual baseline', async ({

@@ -59,3 +59,37 @@ export function compareAdvisoryFindings(left, right) {
     left.reason.localeCompare(right.reason)
   );
 }
+
+function structuralDelta(finding) {
+  if (!finding.id.startsWith('advisory.structural-')) return null;
+  const match = finding.reason.match(/(?:^|,\s*)delta=(-?\d+)(?:,|$)/u);
+  return match ? Number(match[1]) : null;
+}
+
+export function classifyAdvisoryFindings(findings, { mode = 'checkpoint' } = {}) {
+  const buckets = { introduced: [], worsened: [], existing: [] };
+  for (const finding of findings) {
+    const delta = structuralDelta(finding);
+    if (delta !== null) {
+      buckets[delta > 0 ? 'worsened' : 'existing'].push(finding);
+      continue;
+    }
+    buckets[mode === 'checkpoint' ? 'introduced' : 'existing'].push(finding);
+  }
+  return buckets;
+}
+
+export function createAdvisoryAnalysis(buckets) {
+  return Object.fromEntries(
+    Object.entries(buckets).map(([key, findings]) => [
+      key,
+      findings.map(({ id, file, line, reason, severity }) => ({
+        id,
+        file,
+        line: line ?? null,
+        reason,
+        severity,
+      })),
+    ])
+  );
+}

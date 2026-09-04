@@ -1,48 +1,50 @@
 # GitHub OSS release
 
-This runbook prepares and verifies a Sniptale artifact for publication from `https://github.com/lrozhkov/sniptale`. GitHub is the source and release channel; browser-store submission and security-reporting setup remain outside this workflow.
+This runbook publishes a Sniptale extension archive from `https://github.com/lrozhkov/sniptale` within the [redistribution scope](provenance.md#scope).
 
-## Inputs
+## Preconditions
 
-- The runtime declared by the repository toolchain authority and a clean `npm ci` installation.
-- Source under `apps/extension` and `packages`, locked by `package-lock.json`.
-- Project terms in `LICENSE` and `NOTICE`.
-- Bundled and dependency material in `THIRD_PARTY_NOTICES.md`, `THIRD_PARTY_DEPENDENCIES.json`, and `LICENSES/**`.
-- Release policy in `tooling/configs/qa/oss-release.data.json`.
-- A clean `main` checkout whose commit exists in the canonical GitHub repository.
-- GitHub repository release immutability enabled and verified before creating the release.
+- Use the repository-declared toolchain and a clean `npm ci` installation.
+- Use a clean `main` checkout whose commit exists in the canonical GitHub repository.
+- Confirm that `LICENSE`, `NOTICE`, `THIRD_PARTY_NOTICES.md`, `THIRD_PARTY_DEPENDENCIES.json`, and `LICENSES/**` match `tooling/configs/qa/oss-release.data.json`.
+- Confirm that GitHub release immutability is enabled.
 
-## Legal generation
+The [generated project facts](../engineering/project-facts.md) own current GitHub checks, tag rules, and release settings.
 
-Run `npm run release:legal` only when the dependency closure, reviewed license choice, pinned upstream source, bundled asset mapping, or authored legal notice changes. The command recomputes the production closure offline from the lockfile, installed tree, and checked-in pinned sources; it replaces generated files under `LICENSES/dependencies/**`, reuses policy-declared canonical license files when their bytes match, regenerates the manifest/notices, and updates policy-owned legal digests. Do not hand-edit generated legal outputs.
+## Legal material
 
-Pinned upstream refresh is an explicit reviewed acquisition: obtain a version-tagged or commit-addressed resource, verify package/upstream identity and bytes, update the checked-in source plus policy URL/version/digest, then regenerate. The checked-in bytes and digest remain authoritative because tags can be retargeted. Ordinary validation never fetches legal text and rejects missing sources, branch/catalog URLs, metadata/integrity drift, and byte mismatch.
+Run `npm run release:legal` when the production dependency closure, reviewed license selection, pinned upstream source, bundled-asset mapping, or authored notice changes. Do not edit generated legal output.
 
-## Canonical proof
+For a pinned upstream refresh, acquire a version-tagged or commit-addressed resource. Verify its package identity. Verify its bytes. Update the checked-in source and its policy fields. Then regenerate the legal output. Ordinary validation must not fetch legal text.
 
-Complete the normal diff-local implementation flow first, then run the full release gate locally:
+See [OSS provenance](provenance.md) for the evidence policy.
+
+## Candidate proof
+
+Run these commands in order:
 
 ```bash
 npm run qa:release-harness
 npm run qa:checkpoint
 npm run qa:closeout -- -m "chore(release): prepare release"
+npm run ci:proof
 npm run ci:release
 ```
 
-`ci:release` runs the same release-only composition locally in WSL and externally through the pinned QA image, but only after an exact Fast proof for the candidate tree and environment has been admitted. Product tests, deterministic controls, coverage, and the production build are inherited from that proof; release executes its history/supply-chain/CodeQL controls, creates the release-mode extension build, validates manifest/security boundaries, and writes a deterministic archive under `build/`. CI runs mutation profiles only afterward in an isolated non-blocking advisory-artifact job. The archive combines extension files with the complete policy-owned legal payload and rejects missing files, extra dependency legal files, digest drift, unsafe paths, or collisions.
+`ci:release` requires the admitted candidate proof. It runs release-only history, supply-chain, and CodeQL controls. It builds in release mode, validates the artifact and legal closure, and writes the deterministic archive under `build/`. A failed command blocks publication.
 
-The extension zip is not a stand-alone source distribution. Conveyance must make Corresponding Source for the exact artifact available under AGPL-3.0-or-later through the same distribution surface, including the repository tree, lockfile, build/QA tooling, legal notices, and producing commit identity.
+The extension archive is not a stand-alone source distribution. Publish Corresponding Source for the exact artifact under `AGPL-3.0-or-later` on the same distribution surface. Include the repository tree, lockfile, build and QA tooling, legal notices, and producing commit identity.
 
-## Hosted publication
+## Publication
 
-Publish only a commit already present on `main` with a successful Release provenance Gate. A pre-merge branch diagnostic may verify its exact branch proof, notes, release state, and prepared assets while deferring remote-tag and GitHub-attestation admission. After merge, create and push a GitHub-verifiable annotated tag matching the package version, then dispatch Continuous Deployment in diagnostic mode with the tag and exact main provenance run ID. The main diagnostic creates no release: it adds repository immutability, tag-ruleset, signature, and attestation verification, then preserves the deployment artifact. After that gate is green, dispatch publication with the same inputs. Deployment creates no VM and does not rebuild. Publication verifies the admitted assets again, verifies the mutable draft, and checks the published immutable identity. GitHub's source archives at that tag provide the Corresponding Source alongside the extension archive.
+Follow the hosted release procedure in the [operator handbook](../tooling/operator-handbook.md). Publication requires the admitted `main` artifact and a matching GitHub-verifiable annotated version tag. Deployment must not rebuild or create a VM.
 
-The full audit inside `ci:release` generates `.tmp/licenses/sbom.cdx.json` and `.tmp/licenses/summary.json`, scans history for credentials, and runs configured static and supply-chain audits. Ignored evidence does not replace Git state or command status.
+Publish GitHub's source archive for the same tag beside the extension archive.
 
-After required review, use `npm run qa:closeout -- -m "chore(oss): update local release provenance"` for the coherent candidate.
+## Inspection and correction
 
-## Inspection and rollback
+Load `dist/` for local browser smoke. Inspect the archive under `build/` and confirm that it contains every policy-owned legal file.
 
-Load `dist/` for local browser smoke. Inspect the deterministic archive in `build/`; all policy legal files are mandatory. Before distribution, rollback is a revert of the complete candidate. After distribution, preserve history and make a forward corrective commit rather than rewriting published provenance.
+Before publication, revert the complete candidate to roll it back. After publication, preserve history and use a forward corrective commit.
 
-Security reporting is independent of release packaging. Its current repository policy is projected in the [generated project facts](../engineering/project-facts.md), while contributor instructions remain in [SECURITY.md](../../.github/SECURITY.md).
+Security reporting is independent of release packaging. Current repository policy is projected in the [generated project facts](../engineering/project-facts.md); reporting instructions belong to [SECURITY.md](../../.github/SECURITY.md).

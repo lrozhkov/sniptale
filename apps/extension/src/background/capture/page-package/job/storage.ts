@@ -10,7 +10,12 @@ import {
   listReadyJournals,
 } from '../../../../composition/persistence/assets';
 import { browserStorage } from '../../../../composition/persistence/infrastructure/browser-storage';
-import { translate } from '../../../../platform/i18n';
+import {
+  ensureLocaleHydrated,
+  getCurrentLocale,
+  translate,
+  type AppLocale,
+} from '../../../../platform/i18n';
 import {
   MAX_POPUP_EXPORT_JOB_TABS,
   isCanonicalPopupExportJobId,
@@ -33,6 +38,7 @@ const PAGE_PACKAGE_JOB_JOURNAL_DOMAIN = 'page-package-job-temp';
 interface PagePackageJobRecoveryState {
   jobId: string;
   libraryCleanupAssetIds: string[];
+  locale: AppLocale | null;
   output: (PersistedPagePackageOutput & { journalVerified: boolean }) | null;
   stagedPages: Array<PersistedStagedPage & { journalVerified: boolean }>;
   status: PagePackageJobStatusV1;
@@ -205,8 +211,20 @@ export async function reconcileUnmatchedPagePackageJobJournals(): Promise<void> 
 }
 
 export async function readPagePackageJobStatus(): Promise<PagePackageJobStatusV1 | null> {
+  return (await readPagePackageJobSnapshot())?.status ?? null;
+}
+
+export async function readPagePackageJobLocale(): Promise<AppLocale | null> {
+  return (await readPagePackageJobSnapshot())?.locale ?? null;
+}
+
+export async function readPagePackageJobSnapshot(): Promise<{
+  locale: AppLocale | null;
+  status: PagePackageJobStatusV1;
+} | null> {
   await mutationQueue;
-  return structuredClone((await readRecordUnlocked())?.status ?? null);
+  const record = await readRecordUnlocked();
+  return record ? { locale: record.locale, status: structuredClone(record.status) } : null;
 }
 
 export async function readPagePackageJobRecoveryState(): Promise<PagePackageJobRecoveryState | null> {
@@ -217,6 +235,7 @@ export async function readPagePackageJobRecoveryState(): Promise<PagePackageJobR
   return {
     jobId: record.status.jobId,
     libraryCleanupAssetIds: [...record.libraryCleanupAssetIds],
+    locale: record.locale,
     output: record.output
       ? {
           ...structuredClone(record.output),
@@ -233,7 +252,10 @@ export async function readPagePackageJobRecoveryState(): Promise<PagePackageJobR
   };
 }
 
-export function writePagePackageJobStatus(status: PagePackageJobStatusV1): Promise<void> {
+export function writePagePackageJobStatus(
+  status: PagePackageJobStatusV1,
+  locale?: AppLocale
+): Promise<void> {
   const parsedStatus = parsePagePackageJobStatusV1(status);
   if (!parsedStatus) return Promise.reject(new Error('Page Package private status is invalid.'));
   return mutateRecord((record) => {
@@ -269,6 +291,7 @@ export function writePagePackageJobStatus(status: PagePackageJobStatusV1): Promi
     return {
       jobId: parsedStatus.jobId,
       libraryCleanupAssetIds,
+      locale: sameJobRecord?.locale ?? locale ?? getCurrentLocale(),
       output: sameJobRecord?.output ?? null,
       schemaVersion: 1,
       stagedPages: sameJobRecord?.stagedPages ?? [],
@@ -680,6 +703,8 @@ async function cleanupStoredStagedPage(
 }
 
 export async function interruptStoredPopupExportJob(expectedJobId: string): Promise<void> {
+  // Recovery must proceed even if the advisory locale preference cannot be read.
+  await ensureLocaleHydrated().catch(() => undefined);
   const recovery = await readPagePackageJobRecoveryState();
   if (!recovery || recovery.jobId !== expectedJobId) return;
   if (recovery.status.phase === 'running' || recovery.status.phase === 'cancelling') {
@@ -690,7 +715,10 @@ export async function interruptStoredPopupExportJob(expectedJobId: string): Prom
       progress: {
         ...recovery.status.progress,
         phase: 'error',
-        message: translate('popup.export.jobInterruptedMessage'),
+        message: translate(
+          'popup.export.jobInterruptedMessage',
+          recovery.locale ?? getCurrentLocale()
+        ),
       },
     });
   }

@@ -1,7 +1,7 @@
 import {
   assertRange,
   checkedAdd,
-  decodeAsciiPath,
+  decodeZipPath,
   fail,
   readSafeUint64,
   readUint16,
@@ -12,7 +12,6 @@ import type { ZipCentralDirectoryEntry } from './types.js';
 
 const DATA_DESCRIPTOR_SIGNATURE = 0x08074b50;
 const LOCAL_FILE_HEADER_SIGNATURE = 0x04034b50;
-const ZIP32_MAX = 0xffffffff;
 
 interface InspectLocalEntryArgs {
   bytes: Uint8Array;
@@ -26,6 +25,7 @@ interface InspectLocalEntryArgs {
   name: string;
   uncompressedSize: number;
   view: DataView;
+  zip64Sizes: boolean;
 }
 
 export function inspectLocalEntry(args: InspectLocalEntryArgs): ZipCentralDirectoryEntry {
@@ -50,8 +50,12 @@ export function inspectLocalEntry(args: InspectLocalEntryArgs): ZipCentralDirect
     args.bytes.byteLength,
     'Local ZIP metadata is truncated.'
   );
-  const localName = decodeAsciiPath(
-    args.bytes.subarray(args.localHeaderOffset + 30, args.localHeaderOffset + 30 + local.nameLength)
+  const localName = decodeZipPath(
+    args.bytes.subarray(
+      args.localHeaderOffset + 30,
+      args.localHeaderOffset + 30 + local.nameLength
+    ),
+    (local.flags & 0x0800) !== 0
   );
   assertMatchingLocalHeader(args, local, localName);
   const usesDescriptor = (args.flags & 0x0008) !== 0;
@@ -127,16 +131,25 @@ function assertMatchingLocalSizes(
 function inspectDataDescriptor(
   view: DataView,
   offset: number,
-  expected: { compressedSize: number; crc32: number; name: string; uncompressedSize: number }
+  expected: {
+    compressedSize: number;
+    crc32: number;
+    name: string;
+    uncompressedSize: number;
+    zip64Sizes: boolean;
+  }
 ): number {
   let cursor = offset;
   if (readUint32(view, cursor) === DATA_DESCRIPTOR_SIGNATURE) cursor += 4;
-  const zip64 = expected.compressedSize > ZIP32_MAX || expected.uncompressedSize > ZIP32_MAX;
-  const size = zip64 ? 20 : 12;
+  const size = expected.zip64Sizes ? 20 : 12;
   assertRange(cursor, size, view.byteLength, 'ZIP data descriptor is truncated.');
   const crc32 = readUint32(view, cursor);
-  const compressed = zip64 ? readSafeUint64(view, cursor + 4) : readUint32(view, cursor + 4);
-  const uncompressed = zip64 ? readSafeUint64(view, cursor + 12) : readUint32(view, cursor + 8);
+  const compressed = expected.zip64Sizes
+    ? readSafeUint64(view, cursor + 4)
+    : readUint32(view, cursor + 4);
+  const uncompressed = expected.zip64Sizes
+    ? readSafeUint64(view, cursor + 12)
+    : readUint32(view, cursor + 8);
   if (
     crc32 !== expected.crc32 ||
     compressed !== expected.compressedSize ||

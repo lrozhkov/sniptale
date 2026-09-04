@@ -10,6 +10,7 @@ import {
   sanitizeDiagnosticUrl,
   sanitizeDiagnosticsEvents,
   sanitizeDiagnosticsMeta,
+  stringifyDiagnosticValue,
 } from './sanitizer';
 
 describe('diagnostic sanitizer', () => {
@@ -61,6 +62,18 @@ describe('diagnostic sanitizer', () => {
   it('strips nested event URL query and hash data before retention', verifyEventUrlSanitization);
   it('sanitizes complete typed diagnostic metadata', verifyTypedMetadataSanitization);
   it('preserves privacy-safe diagnostic metric keys', verifySafeDiagnosticMetrics);
+  it('preserves safe scalar shapes while sanitizing nested arrays', verifyScalarAndArrayShapes);
+  it('bounds deeply nested structured diagnostic exports', verifyStructuredExportDepthLimit);
+  it('distinguishes URL values from ordinary diagnostic messages', verifyStructuredValueRouting);
+  it(
+    'stringifies sanitized object diagnostics through the bounded serializer',
+    verifyObjectStringification
+  );
+  it(
+    'preserves primitive exports and bounds deeply nested arrays',
+    verifyPrimitiveAndDeepArrayExports
+  );
+  it('redacts every exact structured HTML field', verifyExactHtmlFieldRedaction);
 });
 
 function verifyNestedRedaction() {
@@ -356,4 +369,85 @@ function verifySafeDiagnosticMetrics() {
     value: '***',
     valueLength: 12,
   });
+}
+
+function verifyScalarAndArrayShapes() {
+  expect(sanitizeDiagnosticData(null)).toBeNull();
+  expect(sanitizeDiagnosticData(42)).toBe(42);
+  expect(sanitizeDiagnosticData([null, 7, { authorization: 'secret' }])).toEqual([
+    null,
+    7,
+    { authorization: '***' },
+  ]);
+  expect(
+    sanitizeDiagnosticExportData([
+      null,
+      { sourceUrl: 'https://example.test/path?token=secret#fragment' },
+    ])
+  ).toEqual([null, { sourceUrl: 'https://example.test/path' }]);
+}
+
+function verifyStructuredExportDepthLimit() {
+  let value: unknown = { leaf: 'safe' };
+  for (let depth = 0; depth < 12; depth += 1) {
+    value = { nested: value };
+  }
+
+  const sanitized = sanitizeStructuredDiagnosticExportData(value);
+  let cursor = sanitized as Record<string, unknown>;
+  for (let depth = 0; depth < 5; depth += 1) {
+    cursor = cursor['nested'] as Record<string, unknown>;
+  }
+  expect(JSON.stringify(sanitized)).toContain('[max depth]');
+  expect(cursor).toBeTypeOf('object');
+  expect(JSON.stringify(sanitized)).not.toContain('"leaf":"safe"');
+}
+
+function verifyStructuredValueRouting() {
+  expect(
+    sanitizeStructuredDiagnosticExportData({
+      message: 'request failed token=known-secret',
+      requestUrl: 'https://example.test/path?token=known-secret#fragment',
+      values: [
+        'ordinary token=known-secret',
+        'https://example.test/path?token=known-secret#fragment',
+      ],
+    })
+  ).toEqual({
+    message: 'request failed token=***',
+    requestUrl: 'https://example.test/path',
+    values: ['ordinary token=***', 'https://example.test/path'],
+  });
+}
+
+function verifyObjectStringification() {
+  expect(stringifyDiagnosticValue({ authorization: 'secret', safe: 7 })).toBe(
+    '{"authorization":"***","safe":7}'
+  );
+}
+
+function verifyPrimitiveAndDeepArrayExports() {
+  expect(sanitizeStructuredDiagnosticExportData(null)).toBeNull();
+  expect(sanitizeStructuredDiagnosticExportData(42)).toBe(42);
+  expect(sanitizeDiagnosticExportData(null)).toBeNull();
+  expect(sanitizeDiagnosticExportData(42)).toBe(42);
+  expect(sanitizeDiagnosticExportData({ requestUrl: { nested: 'safe' } })).toEqual({
+    requestUrl: { nested: 'safe' },
+  });
+
+  let nestedArray: unknown = 'leaf';
+  for (let depth = 0; depth < 12; depth += 1) nestedArray = [nestedArray];
+  expect(JSON.stringify(sanitizeStructuredDiagnosticExportData(nestedArray))).toContain(
+    '[max depth]'
+  );
+}
+
+function verifyExactHtmlFieldRedaction() {
+  expect(
+    sanitizeStructuredDiagnosticExportData({
+      html: '<main>secret</main>',
+      innerhtml: '<span>secret</span>',
+      outerhtml: '<section>secret</section>',
+    })
+  ).toEqual({ html: '***', innerhtml: '***', outerhtml: '***' });
 }

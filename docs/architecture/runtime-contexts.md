@@ -1,78 +1,47 @@
 # Runtime contexts
 
-`tooling/qa/guards/architecture/runtime-topology/runtime-topology.data.json` is the machine authority for runtime roots, manifest ownership, entrypoint files, and documentation markers. This document interprets those boundaries and records the coordination rules that code review must preserve.
+`tooling/qa/guards/architecture/runtime-topology/runtime-topology.data.json` owns runtime roots, manifest ownership, entrypoints, and documentation markers. This document owns runtime coordination rules.
 
-## Coordination model
+## Coordination
 
-Runtime folders do not import sibling runtime implementations. Shared wire/data contracts use `packages/runtime-contracts`; browser and transport adapters use `packages/platform` or `apps/extension/src/platform`; reusable presentation uses `packages/ui`; app lifecycle, product workflows, and durable state use concrete app-core owners including `apps/extension/src/composition/persistence`.
+Apply the runtime dependency rule in [code organization](code-organization.md#dependency-direction) and the residency rules in [shared topology](shared-topology.md). Put runtime-specific coordination rules in this document.
 
-Cross-runtime messages are typed and parsed at the receiving boundary. Sender identity proves context, not operation authority. Privileged actions initiated from page DOM events require a trusted local gesture or an owner-scoped, short-lived capability before crossing into background routes.
+Parse cross-runtime messages at the receiver. Treat sender identity as context proof, not operation authority. Require a trusted local gesture or owner-scoped short-lived capability for privileged actions initiated by page DOM events. Validate capability or lease scope, owner, operation, identity, generation, purpose, freshness, expiry, and replay state before side effects.
 
-Capabilities and leases bind the minimum applicable sender, tab or document, operation, request or job, generation, purpose, and expiry. Stale, mismatched, expired, and replayed authority fails closed before side effects.
+## Background
 
-## Background routing
+`apps/extension/src/background/index.ts` is the service-worker entrypoint. The background runtime owns privileged APIs, lifecycle, route authorization and dispatch, capture and recording orchestration, and background-local state.
 
-The service worker entrypoint is `apps/extension/src/background/index.ts`. It owns privileged browser APIs, service-worker lifecycle, route authorization and dispatch, capture/recording orchestration, background-local state, and coordination with extension pages and the offscreen document.
+`apps/extension/src/contracts/messaging/contracts/runtime/background-ingress.data.ts` owns background-ingress descriptors. Keep runtime handler and authorization bindings exhaustive over its IDs. Keep dispatch policy in the action kernel and domain behavior in named route or lifecycle owners. Keep legacy family routers as adapters.
 
-`apps/extension/src/contracts/messaging/contracts/runtime/background-ingress.data.ts` is the canonical background-ingress descriptor registry beside the runtime parser contracts. Action-kernel routes, message guards, sender classifications, policy-state usage, documentation metadata, and machine inventories are projections of that registry. Background runtime bindings remain exhaustive maps from descriptor-owned handler and authorization IDs to effectful owner functions.
+## Content
 
-Action-kernel code owns execution policy and dispatch, not domain behavior. Feature behavior enters through named route and lifecycle entrypoints. Legacy family routers remain adapters; authorization and dispatch proof runs through listener/action-kernel paths.
+`apps/extension/src/content/index.tsx` is the content entrypoint. Content owns page DOM access, Shadow DOM UI, capture preparation, parsing, export preparation, and apply-back. Treat host DOM as untrusted. Restore page state changed for capture.
 
-Shared route DTOs, typed contexts, response builders, and cross-feature background ports live under `apps/extension/src/background/routing-contracts`. Route handlers consume owner-local state or a named preauthorization handle and do not re-decide authority after dispatch.
+`apps/extension/src/features/drawing` owns renderer-neutral drawing documents, geometry, and transforms. `apps/extension/src/content/drawing` owns DOM and Canvas rendering, input, session lifecycle, and reversible page-preparation effects. Persist palette and tool preferences only. Keep the active tool and drawing document disposable.
 
-## Content script
+## Extension and editing pages
 
-The content entrypoint is `apps/extension/src/content/index.tsx`. This runtime owns page DOM access, Shadow DOM surfaces, capture preparation, page parsing, export preparation, and apply-back interaction. It does not call privileged browser APIs directly when a typed background route owns the operation.
+Extension and editing page runtimes own their page shells and page-local workflows. The changing inventory is projected in [generated project facts](../engineering/project-facts.md) from the [machine runtime registry](../../tooling/qa/guards/architecture/runtime-topology/runtime-topology.data.json). Durable state remains in named persistence owners. Apply the [video-editor layering rules](video-editor-layering.md) inside the video-editor runtime.
 
-Content UI treats the host page as untrusted input. DOM-derived payloads stay `unknown` until parsed, page events do not create privilege by themselves, and cleanup restores any page state changed for capture.
+## Offscreen
 
-Page-preparation drawing keeps its renderer-neutral document, geometry, and transforms under `apps/extension/src/features/drawing`; this owner has no DOM, Canvas, Fabric, browser, persistence, or independent undo/redo authority. The content-only adapter under `apps/extension/src/content/drawing` owns viewport projection, Canvas2D rendering, blur and text DOM, pointer input, preparation-session lifecycle, and reversible Drawing effects recorded in the canonical page-preparation history. Drawing objects use scroll-root content coordinates rather than DOM anchors, remain visible but non-interactive outside Drawing mode, and are disposable when the preparation surface ends. The shared drawing palette and per-tool drawing preferences are durable through their named local persistence owners; the active tool and drawing document are not persisted.
+`apps/extension/src/offscreen/offscreen.ts` owns delegated media capture, recording, viewport, export, clipboard image delivery, and voice-input work. `apps/extension/src/background/offscreen-document` owns document lifecycle.
 
-## Extension pages
+Accept offscreen commands only from the verified background channel. Validate freshness, command binding, and rate limits before updating idempotency state. Key side-effect deduplication by binding generation and request, job, or recording identity. [Platform tradeoffs](platform-patterns-and-tradeoffs.md#security-tradeoffs) owns the legacy field-name semantics.
 
-- `apps/extension/src/popup/index.tsx` owns the popup shell and popup-scoped workflows.
-- `apps/extension/src/settings/index.tsx` owns settings UI; persistence remains in its named composition owners.
-- `apps/extension/src/gallery/index.tsx` owns saved-media browsing and gallery interaction.
-- `apps/extension/src/design-system/index.tsx` owns the component and token preview catalog, not shared component implementation.
-- `apps/extension/src/web-snapshot-viewer/index.tsx` owns read-only saved-page viewing.
+Keep reusable voice input under `workflows/voice-input`, `background/voice-input`, and `offscreen/voice-input`. Register each consumer policy explicitly. Scope events to the active consumer Port. Translate the private offscreen session nonce to consumer identity in background. Serialize video recording, desktop capture, and speech recognition through one offscreen media-activity lease.
 
-Viewer preparation has one sanctioned one-way exception: `apps/extension/src/web-snapshot-viewer/preparation/**` may import `apps/extension/src/content/public/preparation-surface/**`. This does not make content a shared layer and does not permit reverse or unrelated content imports.
+## Effect sandbox
 
-## Editing runtimes
-
-- `apps/extension/src/editor/index.tsx` owns image workspace state, Fabric integration, editing commands, and editor persistence adapters. Its document-load path retains the owner-local legacy Fabric arrow-group compatibility backend.
-- `apps/extension/src/video-editor/index.tsx` owns video workspace state, timeline editing, project persistence adapters, and the parent-side EffectV1 preview adapter.
-- The video editor's project-history owner retains at most 100 undoable actions for the active project in memory. It resets on accepted project replacement and never becomes a durable project or persistence authority.
-- Activated timeline pointer gestures open one explicit project-history transaction, so all intermediate clip, trim, and effect-lane updates commit as one undoable action when the gesture ends.
-- `apps/extension/src/video-editor/contracts/**` is the page-local exchange seam for cross-owner DTOs and command ports. It stays independent of React, Zustand, and video-editor product surfaces; `apps/extension/src/video-editor/runtime/controller/store.ts` is the sole runtime adapter from the full Zustand state to the explicit controller port.
-- `apps/extension/src/scenario-editor/index.tsx` owns scenario authoring, presentation, and scenario-specific project adapters. Shared scenario contracts and projections remain under named app-core owners rather than direct editor imports.
-
-Page-local workspace state is disposable or advisory until an explicit persistence owner commits it. A failed commit must remain visible to the editing surface.
-
-## Camera recorder
-
-`apps/extension/src/camera-recorder/index.tsx` is the camera-recorder page entrypoint. It owns camera preview and recorder-page UI, uses typed runtime routes for privileged coordination, and does not import sibling runtime implementations.
-
-## Offscreen document
-
-`apps/extension/src/offscreen/offscreen.html` and `apps/extension/src/offscreen/offscreen.ts` define the offscreen runtime. It owns approved media capture, one-shot desktop-frame encoding and PNG clipboard delivery, recording, viewport, export, and one-shot voice-input work delegated by the background service worker. `background/offscreen-document` owns the shared document lifecycle as a sibling of the runtime composition root; feature owners must not place generic lifecycle authority under runtime, video, or voice input.
-
-Offscreen commands accept only the verified background/offscreen channel and then validate freshness, a self-contained command binding, and rate limits before parsing or mutating idempotency state. The legacy `capabilityToken` wire field binds the payload to expiry and idempotency generation; it is not cryptographic sender authentication. Browser-derived exact background sender verification remains the authorization boundary. Side-effect commands key duplicate execution by binding generation and request, job, or recording identity.
-
-Reusable voice input is owned by `workflows/voice-input`, `background/voice-input`, and `offscreen/voice-input`. Settings is the first registered consumer, not the feature owner. New annotation, comment, or editor consumers reuse the Port contract and client but require an explicit consumer-policy entry; transcript and normalized audio-level events remain scoped to the Port that owns the active session. The background translates a private offscreen session nonce to the consumer session identity so delayed events cannot cross Port ownership, even when a consumer reuses an identifier. Video recording, desktop-frame capture, and speech recognition contend on one atomic offscreen media-activity lease.
-
-## Effect runtime sandbox
-
-`apps/extension/src/effect-runtime-sandbox/index.html` is the manifest-declared sandbox page for declarative EffectV1 frame evaluation. It has no extension API authority and is driven only by extension-owned parents through the validated effect-runtime protocol.
-
-The parent resolves a content-addressed project snapshot, validates the EffectV1 document and retained assets, enforces raster/media budgets, and transfers only the required frame inputs. Its build-owned inline Worker independently parses a private request envelope from `unknown`, repeats protocol and budget validation, interprets the closed EffectV1 command/expression vocabulary, and closes after a bounded failure or typed result. The sandbox cannot execute imported source code, access the network or browser persistence, or create a second runtime authority. Timeout, malformed output, identity mismatch, unsupported command, or resource overflow fails the render request without fallback.
+`apps/extension/src/effect-runtime-sandbox/index.html` is the manifest sandbox for EffectV1 frame evaluation. It has no extension API authority. [EffectV1 bundles](video-effect-bundles.md#runtime) owns its runtime contract.
 
 ## State and egress
 
-Capture/download job authority lives in `apps/extension/src/background/capture/jobs/state-machine.ts`; project-export ledger authority lives in `apps/extension/src/composition/persistence/export-ledger/index.ts`. Advisory runtime maps must remain tied to these durable or revisioned owners.
+`apps/extension/src/background/capture/jobs/state-machine.ts` owns capture and download jobs. `apps/extension/src/composition/persistence/export-ledger/index.ts` owns project-export ledger state. Tie advisory runtime maps to these durable or revisioned owners.
 
-Content AI egress uses `apps/extension/src/features/ai/privacy/index.ts` for DOM privacy proof and the named content egress pipeline for sanitized payload construction. Secret handling, retention, diagnostics, and network-header rules remain governed by [data handling](../security/data-handling.md).
+Use `apps/extension/src/features/ai/privacy/index.ts` and the content egress pipeline for sanitized AI payloads. Apply [data handling](../security/data-handling.md) to secrets, retention, diagnostics, and headers.
 
-## Adding or changing a runtime
+## Runtime changes
 
-Update the runtime topology registry, manifest/build inputs, entrypoint ownership, documentation markers, and drift tests in one coherent change. A new privileged background ingress route is declared once beside its contract parser with its handler, authorization, sender, authority/freshness/replay, policy-state, failure-response, and owner metadata; exhaustive runtime bindings and listener-path proof must resolve those declared IDs before effects.
+For a new or changed runtime, update the runtime registry, manifest or build input, entrypoint ownership, documentation marker, and drift proof. Declare a privileged background route once beside its parser with handler, authorization, sender, freshness and replay, policy-state, failure-response, and owner metadata.

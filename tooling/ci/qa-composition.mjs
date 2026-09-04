@@ -15,8 +15,11 @@ import { collectCodeFiles } from '../qa/analysis/repository/shared-files.mjs';
 import { runTimelineActivitySync } from '../qa/runtime/observability/timeline-context.mjs';
 import { runNpm } from '../qa/runtime/process/shared-process.mjs';
 import { runFullHarnessUnitTests, runUnitTests } from '../qa/proof/unit/verify-unit-tests.mjs';
-import { HARNESS_QA_SUITE } from '../qa/composition/scope/qa-scope.mjs';
-import { isHarnessQaFile } from '../qa/composition/scope/qa-scope.mjs';
+import {
+  HARNESS_QA_SUITE,
+  isHarnessInventoryOnlyFile,
+  isHarnessVerificationQaFile,
+} from '../qa/composition/scope/qa-scope.mjs';
 import { runGit } from '../qa/runtime/scope/git-command.helpers.mjs';
 import { measureAsyncStep } from '../qa/runtime/observability/step-timing.helpers.mjs';
 import {
@@ -127,57 +130,31 @@ export function resolveCiHarnessTestPlan(
       reason: 'candidate deletion, rename, or type change',
     };
   }
-  if (candidateFiles.some(isHarnessQaFile)) {
+  if (candidateFiles.some(isHarnessVerificationQaFile)) {
     return { full: true, relatedFiles: [], reason: 'CI/tooling control changed' };
   }
   return {
     full: false,
-    relatedFiles: candidateFiles.filter((file) => fs.existsSync(file)),
+    relatedFiles: candidateFiles.filter(
+      (file) => !isHarnessInventoryOnlyFile(file) && fs.existsSync(file)
+    ),
     reason: 'product-only candidate affected closure',
     repositoryScope: verifyScope?.mode ?? null,
   };
 }
 
-export function resolveCiCandidateDiff({ environment = process.env, gitRunner = runGit } = {}) {
-  const baseSha = environment.SNIPTALE_BASE_SHA;
-  if (!/^[0-9a-f]{40}$/u.test(baseSha ?? '')) {
-    return {
-      available: false,
-      candidateFiles: [],
-      comparisonRevision: null,
-      deletedFiles: [],
-      requiresFullHarness: true,
-    };
-  }
-  const mergeBaseResult = gitRunner(['merge-base', baseSha, 'HEAD']);
-  const comparisonRevision = mergeBaseResult.stdout.trim();
-  if (mergeBaseResult.skipped || !/^[0-9a-f]{40}$/u.test(comparisonRevision)) {
-    return {
-      available: false,
-      candidateFiles: [],
-      comparisonRevision: null,
-      deletedFiles: [],
-      requiresFullHarness: true,
-    };
-  }
-  const result = gitRunner([
-    'diff',
-    '--name-status',
-    '-z',
-    '--find-renames',
-    '--diff-filter=ACMRTD',
-    `${comparisonRevision}..HEAD`,
-  ]);
-  if (result.skipped) {
-    return {
-      available: false,
-      candidateFiles: [],
-      comparisonRevision: null,
-      deletedFiles: [],
-      requiresFullHarness: true,
-    };
-  }
-  const fields = result.stdout.split('\0');
+function unavailableCandidateDiff() {
+  return {
+    available: false,
+    candidateFiles: [],
+    comparisonRevision: null,
+    deletedFiles: [],
+    requiresFullHarness: true,
+  };
+}
+
+function parseCandidateDiffFields(stdout) {
+  const fields = stdout.split('\0');
   if (fields.at(-1) === '') fields.pop();
   const candidateFiles = [];
   const deletedFiles = [];
@@ -200,13 +177,39 @@ export function resolveCiCandidateDiff({ environment = process.env, gitRunner = 
       candidateFiles.push(destination);
     }
   }
-  candidateFiles.sort();
   return {
-    available: true,
-    candidateFiles,
-    comparisonRevision,
+    candidateFiles: candidateFiles.sort(),
     deletedFiles: deletedFiles.sort(),
     requiresFullHarness,
+  };
+}
+
+export function resolveCiCandidateDiff({ environment = process.env, gitRunner = runGit } = {}) {
+  const baseSha = environment.SNIPTALE_BASE_SHA;
+  if (!/^[0-9a-f]{40}$/u.test(baseSha ?? '')) {
+    return unavailableCandidateDiff();
+  }
+  const mergeBaseResult = gitRunner(['merge-base', baseSha, 'HEAD']);
+  const comparisonRevision = mergeBaseResult.stdout.trim();
+  if (mergeBaseResult.skipped || !/^[0-9a-f]{40}$/u.test(comparisonRevision)) {
+    return unavailableCandidateDiff();
+  }
+  const result = gitRunner([
+    'diff',
+    '--name-status',
+    '-z',
+    '--find-renames',
+    '--diff-filter=ACMRTD',
+    `${comparisonRevision}..HEAD`,
+  ]);
+  if (result.skipped) {
+    return unavailableCandidateDiff();
+  }
+  const parsed = parseCandidateDiffFields(result.stdout);
+  return {
+    available: true,
+    comparisonRevision,
+    ...parsed,
   };
 }
 

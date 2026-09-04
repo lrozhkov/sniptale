@@ -47,7 +47,8 @@ describe('popup bootstrap recording-state resolution', () => {
 
     expect(result.recordingState.status).toBe(VideoRecordingStatus.RECORDING);
     expect(result.recordingState.error).toBe('Microphone unavailable');
-    expect(result.recordingStatusError).toBe('Microphone unavailable');
+    expect(result.recordingStatusError).not.toContain('Microphone unavailable');
+    expect(result.recordingStatusError).toContain('Sniptale');
   });
 
   it('maps failed recording responses to idle with an explicit error', () => {
@@ -57,7 +58,7 @@ describe('popup bootstrap recording-state resolution', () => {
     });
 
     expect(result.recordingState.status).toBe(VideoRecordingStatus.IDLE);
-    expect(result.recordingStatusError).toBe('background.runtime.recordingUnavailable');
+    expect(result.recordingStatusError).toContain('Sniptale');
   });
 });
 

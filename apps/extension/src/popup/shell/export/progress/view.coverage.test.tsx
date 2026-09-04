@@ -146,6 +146,49 @@ it('renders an active step without a download counter', async () => {
   expect(container?.textContent).not.toContain('0/0');
 });
 
+it('keeps current-page context separate from the active producer counter', async () => {
+  await renderSection(
+    createProps({
+      progress: {
+        phase: 'downloading',
+        message: 'Collecting page: Example page',
+        current: 1,
+        total: 4,
+        errors: [],
+      },
+      progressSteps: [
+        { key: 'files', label: 'Attachments', status: 'active', statusLabel: 'Active' },
+      ],
+    })
+  );
+
+  const description = container?.querySelector('[data-ui="popup.export.progress-description"]');
+  expect(description?.textContent).toContain('Collecting page: Example page');
+  expect(description?.textContent).not.toContain('Attachments');
+  const activeStep = container?.querySelector('[data-status="active"]');
+  expect(activeStep?.textContent).toContain('Attachments');
+  expect(activeStep?.textContent).toContain('1/4');
+});
+
+it('shows a labelled, wrapping issue list during an in-progress batch', async () => {
+  await renderSection(
+    createProps({
+      progress: {
+        phase: 'downloading',
+        message: 'Collecting page',
+        current: 1,
+        total: 4,
+        errors: ['First page could not be prepared', 'Second page could not be prepared'],
+      },
+    })
+  );
+
+  const issues = container?.querySelector('[data-ui="popup.export.progress-issues"]');
+  expect(issues?.textContent).toContain('popup.export.issuesTitle');
+  expect(issues?.textContent).toContain('First page could not be prepared');
+  expect(issues?.querySelector('.truncate')).toBeNull();
+});
+
 it('renders cancellation as a neutral stopped outcome without a user attribution', async () => {
   await renderSection(
     createProps({

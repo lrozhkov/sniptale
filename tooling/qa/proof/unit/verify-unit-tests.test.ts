@@ -32,26 +32,24 @@ it('builds a focused related-test command for changed files', () => {
     expect.arrayContaining([
       expect.stringContaining('node_modules/vitest/vitest.mjs'),
       'related',
-      'src/shared/example.ts',
-      'apps/extension/src/background/example.ts',
+      './src/shared/example.ts',
+      './apps/extension/src/background/example.ts',
       '--run',
       '--passWithNoTests',
-      '--',
     ])
   );
-  expect(args.indexOf('--run')).toBeLessThan(args.indexOf('--'));
+  expect(args).not.toContain('--');
 });
 
-it('keeps option-shaped hostile paths behind the Vitest operand separator', () => {
+it('normalizes option-shaped hostile paths into Vitest filter operands', () => {
   const args = createUnitTestArgs({
     relatedFiles: ['--help', 'apps/extension/src/background/index.ts'],
   });
-  expect(args.slice(args.indexOf('--'))).toEqual([
-    '--',
-    '--help',
-    'apps/extension/src/background/index.ts',
-  ]);
-  expect(args.indexOf('--run')).toBeLessThan(args.indexOf('--'));
+  expect(args).toEqual(
+    expect.arrayContaining(['./--help', './apps/extension/src/background/index.ts'])
+  );
+  expect(args).not.toContain('--help');
+  expect(args).not.toContain('--');
 });
 
 it('builds a direct diff-test command when only changed test files should run', () => {
@@ -64,7 +62,7 @@ it('builds a direct diff-test command when only changed test files should run', 
     expect.arrayContaining([
       expect.stringContaining('node_modules/vitest/vitest.mjs'),
       'run',
-      'apps/extension/src/popup/shell/export/pages/page.test.tsx',
+      './apps/extension/src/popup/shell/export/pages/page.test.tsx',
       '--passWithNoTests',
     ])
   );
@@ -83,7 +81,7 @@ it('adds coverage to the focused related-test command when requested', () => {
       coverage: true,
       relatedFiles: ['src/shared/example.ts'],
     })
-  ).toEqual(expect.arrayContaining(['related', 'src/shared/example.ts', '--coverage']));
+  ).toEqual(expect.arrayContaining(['related', './src/shared/example.ts', '--coverage']));
   expect(
     createUnitTestArgs({
       allowNoTests: false,

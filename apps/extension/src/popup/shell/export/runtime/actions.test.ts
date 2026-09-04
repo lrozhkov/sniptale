@@ -321,7 +321,7 @@ it('reports a start export error when the runtime response fails', async () => {
   expect(state.requestIdRef.current).toBeNull();
   expect(state.setProgress).toHaveBeenLastCalledWith(
     expect.objectContaining({
-      message: 'Start failed',
+      message: expect.stringContaining('Не удалось связаться с компонентом экспорта'),
       phase: 'error',
     })
   );

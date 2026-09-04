@@ -43,7 +43,11 @@ const status = {
 };
 
 it('parses only revisioned popup-export job status updates', () => {
-  const message = { status, type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED };
+  const message = {
+    locale: 'en' as const,
+    status,
+    type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED,
+  };
   expect(parsePopupExportRuntimeMessage(message)).toEqual(message);
   expect(
     parsePopupExportRuntimeMessage({
@@ -109,6 +113,7 @@ it('shows cancellation admission without treating it as terminal', () => {
   const cancellingStatus = {
     ...status,
     phase: 'cancelling' as const,
+    progress: { ...status.progress, message: 'Stopping collection...' },
     revision: 3,
   };
 
@@ -128,7 +133,7 @@ it('shows cancellation admission without treating it as terminal', () => {
   ).toBe(true);
 
   expect(setProgress).toHaveBeenCalledWith(
-    expect.objectContaining({ message: 'Останавливаем сбор...' })
+    expect.objectContaining({ message: 'Stopping collection...' })
   );
   expect(clearRequestId).not.toHaveBeenCalled();
 });

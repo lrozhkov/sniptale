@@ -1,6 +1,45 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "controlId": "qa.rule.domain-fixture-realism",
   "findingCount": 4,
-  "findingDigest": "sha256:65b98aaa453dc317ae35a05109cde4d489a41c6e0c8ef0c857af8ca492d28442"
+  "findingDigest": "sha256:65b98aaa453dc317ae35a05109cde4d489a41c6e0c8ef0c857af8ca492d28442",
+  "findings": [
+    {
+      "file": "apps/extension/src/features/video/project/annotation-engine/resolver.presentation.test.ts",
+      "line": 13,
+      "message": "Valid domain fixtures should use builders/factories instead of broad casts; reserve casts for explicit malformed-boundary tests.",
+      "rule": "domain-fixture-realism",
+      "noiseId": "noise.domain-fixture-realism.intentional-narrow-fixtures"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-mp4/hybrid/accelerated.test.ts",
+      "line": 10,
+      "message": "Valid domain fixtures should use builders/factories instead of broad casts; reserve casts for explicit malformed-boundary tests.",
+      "rule": "domain-fixture-realism",
+      "noiseId": "noise.domain-fixture-realism.intentional-narrow-fixtures"
+    },
+    {
+      "file": "apps/extension/src/offscreen/project-export/render-mp4/hybrid/planner.test.ts",
+      "line": 22,
+      "message": "Valid domain fixtures should use builders/factories instead of broad casts; reserve casts for explicit malformed-boundary tests.",
+      "rule": "domain-fixture-realism",
+      "noiseId": "noise.domain-fixture-realism.intentional-narrow-fixtures"
+    },
+    {
+      "file": "apps/extension/src/workflows/media-hub/store.test.ts",
+      "line": 147,
+      "message": "Valid domain fixtures should use builders/factories instead of broad casts; reserve casts for explicit malformed-boundary tests.",
+      "rule": "domain-fixture-realism",
+      "noiseId": "noise.domain-fixture-realism.intentional-narrow-fixtures"
+    }
+  ],
+  "rationales": [
+    {
+      "id": "noise.domain-fixture-realism.intentional-narrow-fixtures",
+      "owner": "qa-platform",
+      "reason": "The exact casts intentionally construct a narrowed fixture for the behavior under test; the cast heuristic cannot distinguish that bounded fixture from an unrealistic domain aggregate.",
+      "removalCondition": "Remove an exact entry when a local builder expresses the same narrowed fixture without a broad cast or the test disappears.",
+      "classification": "tool-noise"
+    }
+  ]
 }

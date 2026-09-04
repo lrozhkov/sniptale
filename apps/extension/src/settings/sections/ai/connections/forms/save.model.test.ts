@@ -91,9 +91,9 @@ async function verifyModelSaveErrorPath() {
   expect(setIsSaving).toHaveBeenNthCalledWith(1, true);
   expect(setIsSaving).toHaveBeenLastCalledWith(false);
   expect(setErrors).toHaveBeenCalledWith({
-    submit:
-      `${translate('common.states.error')}` +
-      `${translate('settings.aiProviders.modelSaveErrorSuffix')}: save failed`,
+    submit: `${translate('common.errors.saveFailed')} ${translate(
+      'common.errors.externalServiceDetail'
+    )}`,
   });
 }
 

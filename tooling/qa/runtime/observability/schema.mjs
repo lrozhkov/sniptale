@@ -12,6 +12,7 @@ import { assertLifecycleConsistency } from './schema-consistency.mjs';
 import { parseDiagnostic } from './diagnostic-schema.mjs';
 import { parseCorrelation, parseLog, parseRepository, parseSummary } from './schema-parts.mjs';
 import { parseTimeline } from './timeline-schema.mjs';
+import { parseAdvisory, parseChangeRisk, parsePreflightContext } from './analysis-schema.mjs';
 
 export {
   parseCorrelation,
@@ -38,6 +39,13 @@ const V2_RECORD_KEYS = [
   'log',
 ];
 const RECORD_KEYS = [...V2_RECORD_KEYS.slice(0, -1), 'timeline', 'log'];
+const V5_RECORD_KEYS = [
+  ...RECORD_KEYS.slice(0, -1),
+  'preflightContext',
+  'changeRisk',
+  'advisory',
+  'log',
+];
 const LEGACY_STEP_KEYS = [
   'stepId',
   'outcome',
@@ -167,8 +175,18 @@ export function parseRunRecord(value) {
   assertObject(value, 'run record');
   const isLegacyV2 = value.schemaVersion === 2;
   const isLegacyV3 = value.schemaVersion === 3;
-  assertExactKeys(value, isLegacyV2 ? V2_RECORD_KEYS : RECORD_KEYS, 'run record');
-  if (!isLegacyV2 && !isLegacyV3 && value.schemaVersion !== OBSERVABILITY_SCHEMA_VERSION) {
+  const isLegacyV4 = value.schemaVersion === 4;
+  assertExactKeys(
+    value,
+    isLegacyV2 ? V2_RECORD_KEYS : isLegacyV3 || isLegacyV4 ? RECORD_KEYS : V5_RECORD_KEYS,
+    'run record'
+  );
+  if (
+    !isLegacyV2 &&
+    !isLegacyV3 &&
+    !isLegacyV4 &&
+    value.schemaVersion !== OBSERVABILITY_SCHEMA_VERSION
+  ) {
     throw new TypeError(`Unsupported observability schema version: ${String(value.schemaVersion)}`);
   }
   assertId(value.runId, 'runId');
@@ -191,6 +209,13 @@ export function parseRunRecord(value) {
     summary: parseSummary(value.summary),
     steps: value.steps.map((step) => parseStep(step, { legacy: isLegacyV2 || isLegacyV3 })),
     ...(isLegacyV2 ? {} : { timeline: parseTimeline(value.timeline) }),
+    ...(isLegacyV2 || isLegacyV3 || isLegacyV4
+      ? {}
+      : {
+          preflightContext: parsePreflightContext(value.preflightContext),
+          changeRisk: parseChangeRisk(value.changeRisk),
+          advisory: parseAdvisory(value.advisory),
+        }),
     log: parseLog(value.log, value),
   };
   assertLifecycleConsistency(record);

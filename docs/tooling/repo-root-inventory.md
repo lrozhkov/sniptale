@@ -1,27 +1,26 @@
-# Repo Root Inventory
+# Repository root policy
 
-Updated: 2026-08-29
+This document owns the reasons a file may live at the repository root. Current entries come from the Git tree, not from a prose inventory.
 
-The repository root contains only package entrypoints, externally auto-discovered configuration, canonical human guidance, and explicitly ignored workspace/build artifacts. Tooling implementation belongs under `tooling/**`; extension implementation/build inputs belong under `apps/extension/**`.
+## Tracked entries
 
-## Required Root Entries
+A tracked root entry must be one of:
 
-- Package/dependency entrypoints: `package.json`, `package-lock.json`.
-- Auto-discovered configuration: `tsconfig.json`, `tsconfig.node.json`, `vitest.config.ts`, `.oxlintrc.json`, `.oxlintrc.strict.json`, `playwright.config.ts`, `.dependency-cruiser.cjs`, `.oxfmtrc.json`, `.oxfmtignore`, `.editorconfig`, `.nvmrc`, `.npmrc`.
-- GitHub-owned configuration: `.github/workflows/**` and `.github/pull_request_template.md`.
-- Human and contributor guidance: `README.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`; installable agent and design guidance is canonical under `docs/agent-tooling/`.
-- Legal/release entrypoints: `LICENSE`, `NOTICE`, `LICENSES/**`, `THIRD_PARTY_DEPENDENCIES.json`, and `THIRD_PARTY_NOTICES.md`. These stay at the conventional root release boundary. `LICENSES/OFL-1.1.txt` is the canonical bundled Manrope license; the dependency generator verifies and references it without creating a versioned duplicate. Other `LICENSES/dependencies/**` files and the two third-party indexes are generator-owned.
+- a package-manager or workspace entrypoint
+- configuration auto-discovered by Git, GitHub, an editor, or a repository tool
+- project, contribution, security, or legal guidance conventionally discovered at the root
+- a legal or release artifact whose archive path is defined by machine policy
 
-Extension Vite/PostCSS/Tailwind configuration, manifest, public assets, and injected-bundle helpers live under `apps/extension/**`; root package scripts select the app configuration explicitly.
+Tooling implementation belongs under `tooling/**`. Extension implementation, configuration, manifest data, public assets, and build inputs belong under `apps/extension/**`. Workspace package implementation belongs under `packages/**`.
 
-## Retired Roots
+[`package.json`](../../package.json) owns root commands. [`.gitignore`](../../.gitignore) owns ignored paths. [`target-only-paths.data.json`](../../tooling/configs/qa/target-only-paths.data.json) and the extension build-layout policy own retired and app-local path enforcement. Generated [project facts](../engineering/project-facts.md) owns changing topology values.
 
-- `scripts/**`, root `tests/**`, root `test-support/**`, and `src/test-harness/**` are retired. Use `tooling/release/**`, `tooling/test/**`, `tooling/backup/**`, or `tooling/configs/**`.
-- Root backup scripts are retired; use `npm run backup:repo` or `npm run backup:prod`.
-- Root Vite/PostCSS/Tailwind configuration, `src/manifest.json`, `src/vite-env.d.ts`, and root `public/**` are retired; the extension app owns them.
+Do not reintroduce root implementation under `src/**`, `scripts/**`, `tests/**`, `test-support/**`, or `public/**`. Do not add root Vite, PostCSS, Tailwind, manifest, or extension environment files.
 
-## Ignored Workspace And Build Roots
+Keep conventional license and notice files at the root release boundary. Keep bundled license texts under `LICENSES/**`. Modify generated dependency notices only through their generator.
 
-Dependencies, root build/test output, caches, editor state, local environment files, optional agent-tooling copies, and workspace tasks are ignored by `.gitignore`. The principal roots are `node_modules/**`, `dist/**`, `build/**`, `.tmp/**`, `.backup/**`, `.output/**`, `coverage/**`, `.playwright-browsers/**`, `playwright-report/**`, `test-results/**`, root `AGENTS.md`, root `.agents/**`, and root `/tasks/**`; tracked exceptions keep `tooling/build/**` and `apps/extension/build/**` in source. `tasks/**` must never be staged.
+## Ignored entries
 
-`.gitignore` is part of this topology contract. Before adding an ignored root, verify that the owner cannot use an existing ignored location and update this inventory together with the ignore rule. Before adding a tracked root, prove external auto-discovery or package semantics, update this inventory, and add only the narrow guardrail exception required by that proof.
+Dependencies, build output, test output, caches, local environment state, optional agent copies, and task artifacts must remain ignored. Tracked build-policy sources under `tooling/build/**` and `apps/extension/build/**` are not output directories.
+
+Before adding a tracked root entry, prove which external discovery or package rule requires that location. Before adding an ignored root, prove that no existing ignored owner fits the artifact. Update the owning machine policy and this rationale in the same change.

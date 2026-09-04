@@ -6,7 +6,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ScenarioEditorToolbar } from './ScenarioEditorToolbar';
 import { createScenarioEditorToolbarController } from './test-support';
 
-vi.mock('../../../platform/i18n', () => ({
+vi.mock('../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
 

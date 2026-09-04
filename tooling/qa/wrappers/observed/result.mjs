@@ -66,6 +66,11 @@ export function recordObservedResult(session, result, verbose, contract) {
     result.executionMode ?? (result.skipped ? 'no-targets' : contract.executionMode);
   const observationMode = result.context?.mode ?? executionMode ?? contract.invocationMode;
   attachResultContext(session, result, observationMode);
+  session.attachAnalysis({
+    ...(result.preflightContext === undefined ? {} : { preflightContext: result.preflightContext }),
+    ...(result.changeRisk === undefined ? {} : { changeRisk: result.changeRisk }),
+    ...(result.advisory === undefined ? {} : { advisory: result.advisory }),
+  });
   contract.validator({
     wrapperId: contract.wrapperId,
     mode: executionMode,
@@ -80,11 +85,6 @@ export function recordObservedResult(session, result, verbose, contract) {
         session.sanitizeConsoleOutput(step.consoleOutput);
       process.stdout.write(consoleOutput.endsWith('\n') ? consoleOutput : `${consoleOutput}\n`);
       session.writeLog(`[${step.label}.console]\n${fullOutput}\n`);
-      if ((step.advisories?.length ?? 0) > 0) {
-        session.writeLog(
-          `[${step.label}.advisories]\n${JSON.stringify(step.advisories, null, 2)}\n`
-        );
-      }
     }
     const normalized = normalizeObservedStep(step);
     session.addStep(normalized.observation);

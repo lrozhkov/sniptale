@@ -16,7 +16,7 @@ import { resolveContentUiViewport } from '@sniptale/ui/floating-interactions/sca
 
 const DEFAULT_TOOLBAR_TOP = 5;
 const TOOLBAR_POSITION_PERSIST_DELAY_MS = 150;
-const PASSIVE_MOUSE_LISTENER_OPTIONS: AddEventListenerOptions = { passive: true };
+const PASSIVE_POINTER_LISTENER_OPTIONS: AddEventListenerOptions = { capture: true, passive: true };
 
 const logger = createLogger({ namespace: 'ContentToolbarDragPosition' });
 
@@ -218,7 +218,7 @@ export function useToolbarDragListeners(params: {
       return;
     }
 
-    const handleMouseMove = (event: MouseEvent) => {
+    const handlePointerMove = (event: PointerEvent) => {
       if (!toolbarRef.current) {
         return;
       }
@@ -231,12 +231,18 @@ export function useToolbarDragListeners(params: {
       setPosition(clampToolbarPosition(nextPosition, toolbarRef.current, params.uiScale));
     };
 
-    window.addEventListener('mousemove', handleMouseMove, PASSIVE_MOUSE_LISTENER_OPTIONS);
-    window.addEventListener('mouseup', stopDragging, PASSIVE_MOUSE_LISTENER_OPTIONS);
+    window.addEventListener('pointermove', handlePointerMove, PASSIVE_POINTER_LISTENER_OPTIONS);
+    window.addEventListener('pointerup', stopDragging, PASSIVE_POINTER_LISTENER_OPTIONS);
+    window.addEventListener('pointercancel', stopDragging, PASSIVE_POINTER_LISTENER_OPTIONS);
 
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove, PASSIVE_MOUSE_LISTENER_OPTIONS);
-      window.removeEventListener('mouseup', stopDragging, PASSIVE_MOUSE_LISTENER_OPTIONS);
+      window.removeEventListener(
+        'pointermove',
+        handlePointerMove,
+        PASSIVE_POINTER_LISTENER_OPTIONS
+      );
+      window.removeEventListener('pointerup', stopDragging, PASSIVE_POINTER_LISTENER_OPTIONS);
+      window.removeEventListener('pointercancel', stopDragging, PASSIVE_POINTER_LISTENER_OPTIONS);
     };
   }, [dragOffset, isDragging, params.uiScale, setPosition, stopDragging, toolbarRef]);
 }

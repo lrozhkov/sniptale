@@ -1,4 +1,5 @@
 import { translate } from '../../../../../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../../../../../platform/i18n/user-facing-error';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { applyAiResponseChanges } from './apply';
@@ -148,7 +149,12 @@ export async function submitAiPickPrompt(
 
 function handleAiSubmissionError(error: unknown) {
   logger.error('AI prompt submission failed', error);
-  const errorMessage =
-    error instanceof Error ? error.message : translate('content.toolbar.unknownError');
-  showToast(`${translate('content.toolbar.aiErrorPrefix')} ${errorMessage}`, 'error');
+  showToast(
+    createUserFacingErrorMessage({
+      cause: error,
+      detail: 'externalService',
+      summaryKey: 'content.toolbar.aiErrorPrefix',
+    }),
+    'error'
+  );
 }

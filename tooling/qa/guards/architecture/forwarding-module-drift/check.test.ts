@@ -5,6 +5,7 @@ import {
   createForwardingBaselineSource,
   parseRevisionNameStatus,
   resolveForwardingDriftScope,
+  runForwardingModuleDriftCheck,
 } from './check.mjs';
 
 const forwarder = 'apps/extension/src/content/overlay/demo/facade.ts';
@@ -239,6 +240,24 @@ it('accepts deletion-only committed ranges as a real candidate diff', () => {
   });
 
   expect(scope.changedFiles).toEqual(['apps/extension/src/content/overlay/demo/removed.ts']);
+});
+
+it('classifies a repo-wide tooling-only range as repository state', () => {
+  const result = runForwardingModuleDriftCheck({
+    allFiles: [],
+    files: ['tooling/qa/hooks/pre-push.mjs'],
+    gitRunner: () => ({ stdout: '' }),
+    policy: { schemaVersion: 1, exemptions: [] },
+    readFile: () => '',
+    root: '/unused',
+    scope: 'repo-wide',
+  });
+
+  expect(result).toMatchObject({
+    files: [],
+    populationKind: 'repository-state',
+    violations: [],
+  });
 });
 
 it('analyzes a committed type change and fails closed on unsupported status records', () => {

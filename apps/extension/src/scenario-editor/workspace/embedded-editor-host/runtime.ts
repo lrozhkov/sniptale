@@ -9,7 +9,7 @@ import {
 import type { EditorDocument } from '../../../features/editor/document/types';
 import type { EditorEmbedMessage } from '../../../features/editor/contracts/embed';
 import { isEditorEmbedMessage } from '../../../features/editor/contracts/embed';
-import { translate } from '../../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 import type { EmbeddedEditorState } from './ScenarioEmbeddedEditorHost.view';
 
 export interface ScenarioEmbeddedEditorApplyPayload {
@@ -53,7 +53,11 @@ function setEmbeddedEditorSaveError(
 ) {
   setState((current) => ({
     ...current,
-    error: error instanceof Error ? error.message : translate('editor.runtime.saveImageFailed'),
+    error: createUserFacingErrorMessage({
+      cause: error,
+      detail: 'storage',
+      summaryKey: 'editor.runtime.saveImageFailed',
+    }),
     saving: false,
   }));
 }
@@ -84,8 +88,11 @@ function useScenarioEmbeddedEditorFrame(
       .catch((error: unknown) => {
         if (!cancelled) {
           setState({
-            error:
-              error instanceof Error ? error.message : translate('shared.runtime.readBlobFailed'),
+            error: createUserFacingErrorMessage({
+              cause: error,
+              detail: 'storage',
+              summaryKey: 'shared.runtime.readBlobFailed',
+            }),
             iframeUrl: null,
             loading: false,
             saving: false,

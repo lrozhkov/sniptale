@@ -101,6 +101,27 @@ it('delegates canonical path policy before inflation', () => {
   );
 });
 
+it('decodes UTF-8 entry names when the language encoding flag is set', () => {
+  const name = 'exports/data/Эталонный_стенд.json';
+  const profile = inspectZipCentralDirectory(
+    createZip([{ data: [1], flags: 0x0800, name }]),
+    DEFAULT_OPTIONS
+  );
+
+  expect(profile.entries[0]?.name).toBe(name);
+});
+
+it('rejects malformed UTF-8 entry names', () => {
+  expectZipError(
+    () =>
+      inspectZipCentralDirectory(
+        createZip([{ data: [1], flags: 0x0800, name: 'invalid', nameBytes: [0xc3, 0x28] }]),
+        DEFAULT_OPTIONS
+      ),
+    'archive-invalid'
+  );
+});
+
 it('enforces archive, file, entry, and aggregate inflated limits', () => {
   const archive = createZip([
     { data: [1, 2], name: 'one' },
@@ -163,6 +184,13 @@ it('rejects truncated archives and local/central header disagreement', () => {
   expectZipError(() => inspectZipCentralDirectory(archive, DEFAULT_OPTIONS), 'archive-invalid');
 });
 
+it('rejects a non-zero disk number from a regular ZIP end record', () => {
+  const archive = createZip([{ data: [1], name: 'manifest.json' }]);
+  archive[archive.byteLength - 18] = 1;
+
+  expectZipError(() => inspectZipCentralDirectory(archive, DEFAULT_OPTIONS), 'archive-invalid');
+});
+
 it('reads single-disk ZIP64 sizes and offsets through the canonical extra field', () => {
   const profile = inspectZipCentralDirectory(createZip64(), DEFAULT_OPTIONS);
 
@@ -177,6 +205,22 @@ it('reads single-disk ZIP64 sizes and offsets through the canonical extra field'
     })
   );
 });
+
+it('rejects a multi-disk ZIP64 locator after accepting legacy sentinel fields', () => {
+  const archive = createZip64();
+  const locatorDiskCountOffset = archive.byteLength - 26;
+  new DataView(archive.buffer).setUint32(locatorDiskCountOffset, 2, true);
+
+  expectZipError(() => inspectZipCentralDirectory(archive, DEFAULT_OPTIONS), 'archive-invalid');
+});
+
+it('rejects ZIP64 data descriptor sizes that disagree with the central directory', () => {
+  expectZipError(
+    () => inspectZipCentralDirectory(createZip64({ compressed: 2 }), DEFAULT_OPTIONS),
+    'archive-invalid'
+  );
+});
+
 function expectZipError(run: () => unknown, code: string): void {
   try {
     run();

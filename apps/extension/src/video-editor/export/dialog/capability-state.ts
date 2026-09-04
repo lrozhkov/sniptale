@@ -14,6 +14,7 @@ import type {
   VideoProjectExportSettingsPatch,
 } from '../../../features/video/project/types';
 import { getProjectExportCapabilities } from '../../project/operations/ops';
+import { getUserFacingErrorDetail } from '../../../platform/i18n/user-facing-error';
 
 function createFallbackExportCapabilities(): VideoExportCapabilities {
   return createVideoExportCapabilities({
@@ -112,7 +113,9 @@ function handleCapabilitySuccess(
     }
 ) {
   applyCapabilityResolution({
-    capabilityError: args.response.success ? null : (args.response.error ?? null),
+    capabilityError: args.response.success
+      ? null
+      : getUserFacingErrorDetail('browserCommunication'),
     currentSettings: args.currentSettings,
     nextCapabilities:
       args.response.success && args.response.capabilities
@@ -132,7 +135,7 @@ function handleCapabilityFailure(
     }
 ) {
   applyCapabilityResolution({
-    capabilityError: args.error instanceof Error ? args.error.message : String(args.error),
+    capabilityError: getUserFacingErrorDetail('browserCommunication'),
     currentSettings: args.currentSettings,
     nextCapabilities: createFallbackExportCapabilities(),
     onChange: args.onChange,

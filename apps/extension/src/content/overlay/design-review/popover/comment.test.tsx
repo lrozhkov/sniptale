@@ -253,6 +253,20 @@ it('closes on Enter while preserving Shift+Enter for a new line', () => {
   expect(actions.close).toHaveBeenCalledOnce();
 });
 
+it('closes the active comment editor on Escape', () => {
+  const { actions } = renderField();
+  const textarea = document.querySelector<HTMLTextAreaElement>('textarea');
+  if (!textarea) throw new Error('Expected Design Review comment field');
+
+  act(() => {
+    textarea.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Escape' })
+    );
+  });
+
+  expect(actions.close).toHaveBeenCalledOnce();
+});
+
 it('starts at the current caret, supports push-to-talk, and renders before the Enter hint', () => {
   vi.useFakeTimers();
   const actions = createActions();

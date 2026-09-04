@@ -7,6 +7,7 @@ import {
 } from '../support/security-helpers';
 import {
   EMPTY_EXPORT_OPTIONS,
+  grantAllSitesAccessFromSettings,
   openRealExtensionPage,
   POPUP_PATH,
   sendRuntimeMessage,
@@ -207,15 +208,21 @@ test('worker termination during queued erasure remains retryable without late re
 test('factory reset cancels an export admitted before its first publication', async ({
   context,
   extensionId,
+  hostOrigin,
 }) => {
   const control = await openSecurityControl(context, extensionId);
   const popup = await openRealExtensionPage(context, extensionId, POPUP_PATH);
-  const settings = await openRealExtensionPage(context, extensionId, SETTINGS_PATH);
+  const settings = await openRealExtensionPage(
+    context,
+    extensionId,
+    `${SETTINGS_PATH}?section=access-data`
+  );
+  await grantAllSitesAccessFromSettings(settings);
   const tab = await context.newPage();
-  await tab.goto('data:text/html,<title>Security export target</title><main>Target</main>');
+  await tab.goto(`${hostOrigin}/fixtures/host-page.html?privacy-erasure-export=1`);
   const tabId = await popup.evaluate(async () => {
     const tabs = await chrome.tabs.query({});
-    const target = tabs.find((candidate) => candidate.title === 'Security export target');
+    const target = tabs.find((candidate) => candidate.url?.includes('privacy-erasure-export=1'));
     if (target?.id === undefined) throw new Error('Security export target tab is unavailable');
     return target.id;
   });
@@ -232,15 +239,22 @@ test('factory reset cancels an export admitted before its first publication', as
             issuedAtEpochMs: Date.now(),
             nonce: crypto.randomUUID(),
           },
+          captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
+          includeWebCopy: true,
+          intent: 'save',
           jobId: 'security-erasure-export',
+          locale: 'en',
           options,
-          orderedTabs: [{ tabId: selectedTabId, title: 'Security export' }],
+          sources: [{ kind: 'tab', tabId: selectedTabId, title: 'Security export' }],
           type: 'START_PAGE_PACKAGE_JOB',
           warnings: [],
         }),
       });
     },
-    { options: EMPTY_EXPORT_OPTIONS, selectedTabId: tabId }
+    {
+      options: { ...EMPTY_EXPORT_OPTIONS, includeFullPageScreenshot: true },
+      selectedTabId: tabId,
+    }
   );
   await controlCheckpoint(control, 'waitUntilPaused', 'popup-export-after-admission');
   const erasurePromise = sendRuntimeMessage(settings, {

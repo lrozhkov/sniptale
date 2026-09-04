@@ -5,7 +5,8 @@ import { DEFAULT_BORDER_PRESET } from '../../highlighter/style/defaults';
 
 const translateMock = vi.hoisted(() => vi.fn((key: string) => key));
 
-vi.mock('../../../platform/i18n', () => ({
+vi.mock('../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   translate: translateMock,
 }));
 

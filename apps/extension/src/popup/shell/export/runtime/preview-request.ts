@@ -1,6 +1,9 @@
 import type { PopupExportPreview } from '@sniptale/runtime-contracts/export';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { getPopupRuntimeErrorMessage } from '../../../diagnostics/runtime-errors';
+import { translate } from '../../../../platform/i18n/popup';
+import { createUserFacingErrorMessage } from '../../../../platform/i18n/user-facing-error';
+import type { AppLocale } from '../../../../platform/i18n/popup';
 import { sendPopupExportTabMessage } from './tab-message-routing';
 
 type PopupExportPreviewErrorKey =
@@ -10,16 +13,30 @@ type PopupExportPreviewErrorKey =
 
 export function getPopupExportTransportErrorMessage(
   error: unknown,
-  fallbackKey: PopupExportPreviewErrorKey
+  fallbackKey: PopupExportPreviewErrorKey,
+  locale?: AppLocale
 ): string {
-  return getPopupRuntimeErrorMessage(error, fallbackKey);
+  const localized = getPopupRuntimeErrorMessage(error, fallbackKey, locale);
+  const genericFallback = createUserFacingErrorMessage({
+    cause: error,
+    detail: 'unexpected',
+    ...(locale ? { locale } : { translator: translate }),
+    summaryKey: fallbackKey,
+  });
+  return localized === genericFallback
+    ? `${translate(fallbackKey, locale)}. ${translate(
+        'popup.export.exportTransportErrorDetail',
+        locale
+      )}`
+    : localized;
 }
 
 export function getPopupExportErrorMessage(
   error: unknown,
-  fallbackKey: PopupExportPreviewErrorKey
+  fallbackKey: PopupExportPreviewErrorKey,
+  locale?: AppLocale
 ): string {
-  return getPopupExportTransportErrorMessage(error, fallbackKey);
+  return getPopupExportTransportErrorMessage(error, fallbackKey, locale);
 }
 
 export async function requestPopupExportPreview(

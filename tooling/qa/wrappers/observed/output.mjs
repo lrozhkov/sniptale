@@ -113,6 +113,7 @@ function createStructuredDiagnostic(step, definition, failed) {
 }
 
 export function renderObservedStepLog(step, definition) {
+  const shouldRenderRemediation = ['failed', 'blocked'].includes(step.status) || step.advice;
   const lines = [
     `${step.label} [${definition.id}]`,
     `status: ${step.status}`,
@@ -124,7 +125,7 @@ export function renderObservedStepLog(step, definition) {
     step.stdout ? `stdout:\n${step.stdout}` : '',
     step.stderr ? `stderr:\n${step.stderr}` : '',
     step.advice ? `step remediation: ${step.advice}` : '',
-    `repository remediation: ${definition.remediation}`,
+    shouldRenderRemediation ? `repository remediation: ${definition.remediation}` : '',
     `rule: ${definition.ruleDoc}`,
   ].filter(Boolean);
   return `${lines.join('\n')}\n`;

@@ -191,7 +191,7 @@ it('disables an enabled media setting without refreshing devices', async () => {
     enabledKey: 'webcamEnabled',
     deviceIdKey: 'webcamDeviceId',
     noDevicesError: 'no devices',
-    accessError: 'access denied',
+    accessErrorKey: 'popup.video.webcamAccessError',
     resolveDeviceId: vi.fn(),
   });
 
@@ -217,7 +217,7 @@ it('enables media capture with the resolved refreshed device id', async () => {
     enabledKey: 'webcamEnabled',
     deviceIdKey: 'webcamDeviceId',
     noDevicesError: 'no devices',
-    accessError: 'access denied',
+    accessErrorKey: 'popup.video.webcamAccessError',
     resolveDeviceId,
   });
 
@@ -242,7 +242,7 @@ it('surfaces empty and failed refreshes without changing settings', async () => 
     enabledKey: 'webcamEnabled',
     deviceIdKey: 'webcamDeviceId',
     noDevicesError: 'no devices',
-    accessError: 'access denied',
+    accessErrorKey: 'popup.video.webcamAccessError',
     resolveDeviceId: vi.fn(),
   });
   await togglePopupMediaDevice({
@@ -253,11 +253,11 @@ it('surfaces empty and failed refreshes without changing settings', async () => 
     enabledKey: 'webcamEnabled',
     deviceIdKey: 'webcamDeviceId',
     noDevicesError: 'no devices',
-    accessError: 'access denied',
+    accessErrorKey: 'popup.video.webcamAccessError',
     resolveDeviceId: vi.fn(),
   });
 
   expect(setStartError).toHaveBeenCalledWith('no devices');
-  expect(setStartError).toHaveBeenCalledWith('permission denied');
+  expect(setStartError).toHaveBeenCalledWith(expect.stringContaining('Sniptale'));
   expect(setVideoSettings).not.toHaveBeenCalled();
 });

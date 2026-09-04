@@ -10,6 +10,7 @@ import {
 } from '../../../../runtime/ai-settings/mutations';
 import { translate } from '../../../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
+import { createUserFacingErrorMessage } from '../../../../../platform/i18n/user-facing-error';
 import type {
   ModelFormData,
   ProviderFormData,
@@ -79,11 +80,12 @@ function buildMutationFailureMessage(error: unknown, fallbackMessage: string): s
     return translate('settings.aiProviders.providerSaveSecretLocked');
   }
 
-  if (error instanceof Error && error.message.trim()) {
-    return `${fallbackMessage}: ${error.message.trim()}`;
-  }
-
-  return fallbackMessage;
+  void fallbackMessage;
+  return createUserFacingErrorMessage({
+    cause: error,
+    detail: 'externalService',
+    summaryKey: 'common.errors.saveFailed',
+  });
 }
 
 export type ProviderFormSaveParams = {

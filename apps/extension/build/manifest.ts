@@ -1,8 +1,21 @@
+import manifest from '../manifest.json' with { type: 'json' };
+
 type ExtensionManifest = Record<string, unknown> & {
   host_permissions?: string[];
   key?: string;
+  minimum_chrome_version?: unknown;
   optional_host_permissions?: string[];
 };
+
+export function getChromeBuildTarget(source: ExtensionManifest): `chrome${number}` {
+  const version = source.minimum_chrome_version;
+  if (typeof version !== 'string' || !/^\d+$/u.test(version)) {
+    throw new Error('minimum_chrome_version must be an integer');
+  }
+  return `chrome${version}` as `chrome${number}`;
+}
+
+export const CHROME_BUILD_TARGET = getChromeBuildTarget(manifest);
 
 // Public test identity only. Keeping browser-E2E artifacts on one extension ID lets the harness
 // address a dormant MV3 worker without making the worker target itself an identity authority.

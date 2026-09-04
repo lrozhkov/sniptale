@@ -165,7 +165,8 @@ it('keeps disabled apply inert and exposes a localized async failure', async () 
   });
 
   expect(container?.querySelector('[role="alert"]')?.textContent).toBe(
-    'editor.compact.browserFrameApplyFailed'
+    'editor.compact.browserFrameApplyFailed. common.errors.unexpectedDetail'
   );
+  expect(container?.querySelector('[role="alert"]')?.textContent).not.toContain('boom');
   expect(container?.querySelector('button')?.disabled).toBe(false);
 });

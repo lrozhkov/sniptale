@@ -132,14 +132,16 @@ it('surfaces load and update failures without leaving a pending switch', async (
   mocks.patchSettings.mockRejectedValueOnce(new Error('write failed'));
   await act(async () => root.render(<Harness />));
   await flush();
-  expect(latest?.error).toContain('load failed');
+  expect(latest?.error).toContain('Sniptale');
+  expect(latest?.error).not.toContain('load failed');
 
   await act(async () => latest?.setAnonymousCrossOriginAssetsEnabled(false));
 
   expect(mocks.patchSettings).toHaveBeenCalledWith({
     anonymousCrossOriginSnapshotAssetsEnabled: false,
   });
-  expect(latest?.error).toContain('write failed');
+  expect(latest?.error).toContain('Sniptale');
+  expect(latest?.error).not.toContain('write failed');
   expect(latest?.pending).toBeNull();
 });
 

@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import type { AIProviderSelectorEntry } from '../../../contracts/messaging/ai-settings-runtime';
 import type { AIModel } from '../../../contracts/settings';
 import { requestAIModelSelectionBootstrap } from '../../../workflows/ai-settings/query';
+import type { TranslationKey } from '../../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 
-export function useScenarioAiModelBootstrapState<TRunSummary>(fallbackErrorMessage: string) {
+export function useScenarioAiModelBootstrapState<TRunSummary>(fallbackErrorKey: TranslationKey) {
   const [instruction, setInstruction] = useState('');
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const [availableModels, setAvailableModels] = useState<AIModel[]>([]);
@@ -27,14 +29,20 @@ export function useScenarioAiModelBootstrapState<TRunSummary>(fallbackErrorMessa
       })
       .catch((loadError) => {
         if (!cancelled) {
-          setError(loadError instanceof Error ? loadError.message : fallbackErrorMessage);
+          setError(
+            createUserFacingErrorMessage({
+              cause: loadError,
+              detail: 'externalService',
+              summaryKey: fallbackErrorKey,
+            })
+          );
         }
       });
 
     return () => {
       cancelled = true;
     };
-  }, [fallbackErrorMessage]);
+  }, [fallbackErrorKey]);
 
   return {
     availableModels,

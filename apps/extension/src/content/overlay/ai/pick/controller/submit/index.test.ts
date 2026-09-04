@@ -148,7 +148,10 @@ async function expectRequestFailureWithSelectedData() {
     prompt: 'Summarize selected fields',
   });
   expect(applyAiResponseChangesMock).not.toHaveBeenCalled();
-  expect(showToastMock).toHaveBeenCalledWith('content.toolbar.aiErrorPrefix boom', 'error');
+  expect(showToastMock).toHaveBeenCalledWith(
+    'content.toolbar.aiErrorPrefix. common.errors.externalServiceDetail',
+    'error'
+  );
   expect(context.setIsAILoading).toHaveBeenLastCalledWith(false);
 }
 

@@ -4,6 +4,7 @@ import { readSnapshotIdFromLocation } from './route';
 import { SnapshotPreparationHost } from '../../preparation/host';
 import { blockSnapshotFrameNavigation } from '../../viewer/frame-navigation';
 import { installSnapshotFrameStaticInteractions } from '../../viewer/frame-interactions';
+import { installSnapshotFrameLayoutPolicy } from '../../viewer/frame-layout';
 import { hydrateSnapshotDeclarativeShadowDom } from '../../viewer/declarative-shadow';
 import { loadWebSnapshotPackage, revokeWebSnapshotObjectUrls } from '../../viewer/assets';
 import { WebSnapshotFrame } from '../../viewer/iframe';
@@ -19,9 +20,10 @@ import {
   printWebSnapshotProjection,
 } from '../../viewer/print-projection';
 import { CollapsedToolbarButton, SnapshotViewerToolbar } from './toolbar';
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 
 type ViewerViewport = { width: number; height: number } | null;
-type ViewerError = { kind: 'missing-snapshot-id' } | { kind: 'load-error'; message: string };
+type ViewerError = { kind: 'missing-snapshot-id' } | { kind: 'load-error' };
 type ReadySnapshotIframe = { iframe: HTMLIFrameElement; loadedKey: string };
 let loadedPackageRevisionSeed = 0;
 const PACKAGE_FILE_DOWNLOAD_URL_LIFETIME_MS = 1500;
@@ -46,7 +48,11 @@ function getViewerErrorMessage(error: ViewerError, locale: AppLocale): string {
     return translate('webSnapshotViewer.app.missingSnapshotId', locale);
   }
 
-  return error.message;
+  return createUserFacingErrorMessage({
+    detail: 'storage',
+    locale,
+    summaryKey: 'common.errors.loadFailed',
+  });
 }
 
 function downloadViewerPackageFile(blob: Blob, filename: string): void {
@@ -74,6 +80,7 @@ function useViewerDocumentTitle(loaded: LoadedWebSnapshotPackage | null): AppLoc
 
 function SnapshotFrameSurface(props: {
   availableHeight: number;
+  availableWidth: number;
   currentViewport: ViewerViewport;
   iframeRef: MutableRefObject<HTMLIFrameElement | null>;
   loaded: LoadedWebSnapshotPackage;
@@ -83,11 +90,13 @@ function SnapshotFrameSurface(props: {
   onIframeLoaded: (iframe: HTMLIFrameElement) => void;
   onExternalLinkPreviewChange: (href: string | null) => void;
   onOpenExternalLink: (href: string) => void;
+  responsiveLayout: boolean;
   zoom: number;
 }) {
   const { iframeRef, onIframeElementChange, onIframeLoaded } = props;
   const navigationCleanupRef = useRef<(() => void) | null>(null);
   const interactionCleanupRef = useRef<(() => void) | null>(null);
+  const layoutCleanupRef = useRef<(() => void) | null>(null);
   const handleIframeRef = useCallback(
     (node: HTMLIFrameElement | null) => {
       iframeRef.current = node;
@@ -114,14 +123,27 @@ function SnapshotFrameSurface(props: {
       dragHint: translate('webSnapshotViewer.app.dragScrollableArea', props.locale),
     });
   }, [iframeRef, props.locale]);
+  const installFrameLayoutPolicy = useCallback(() => {
+    layoutCleanupRef.current?.();
+    layoutCleanupRef.current = props.responsiveLayout
+      ? installSnapshotFrameLayoutPolicy(iframeRef.current)
+      : null;
+  }, [iframeRef, props.responsiveLayout]);
   const handleIframeLoad = useCallback(() => {
     hydrateSnapshotDeclarativeShadowDom(iframeRef.current?.contentDocument ?? null);
     installNavigationPolicy();
     installStaticInteractions();
+    installFrameLayoutPolicy();
     if (iframeRef.current) {
       onIframeLoaded(iframeRef.current);
     }
-  }, [iframeRef, installNavigationPolicy, installStaticInteractions, onIframeLoaded]);
+  }, [
+    iframeRef,
+    installFrameLayoutPolicy,
+    installNavigationPolicy,
+    installStaticInteractions,
+    onIframeLoaded,
+  ]);
   useEffect(() => {
     if (iframeRef.current?.contentDocument?.readyState === 'complete') {
       installNavigationPolicy();
@@ -140,6 +162,15 @@ function SnapshotFrameSurface(props: {
       interactionCleanupRef.current = null;
     };
   }, [iframeRef, installStaticInteractions]);
+  useEffect(() => {
+    if (iframeRef.current?.contentDocument?.readyState === 'complete') {
+      installFrameLayoutPolicy();
+    }
+    return () => {
+      layoutCleanupRef.current?.();
+      layoutCleanupRef.current = null;
+    };
+  }, [iframeRef, installFrameLayoutPolicy]);
   const resolvedViewport = props.currentViewport ?? props.loaded.manifest.viewport ?? null;
   if (resolvedViewport === null) {
     return (
@@ -155,8 +186,12 @@ function SnapshotFrameSurface(props: {
     );
   }
 
-  const logicalHeight =
-    props.currentViewport === null && props.zoom < 1
+  const logicalWidth = props.responsiveLayout
+    ? Math.max(1, Math.ceil(props.availableWidth / props.zoom))
+    : resolvedViewport.width;
+  const logicalHeight = props.responsiveLayout
+    ? Math.max(1, Math.ceil(props.availableHeight / props.zoom))
+    : props.currentViewport === null && props.zoom < 1
       ? Math.max(resolvedViewport.height, Math.ceil(props.availableHeight / props.zoom))
       : resolvedViewport.height;
 
@@ -165,8 +200,8 @@ function SnapshotFrameSurface(props: {
       data-testid="snapshot-frame-scaled-viewport"
       className="mx-auto max-w-none shrink-0 overflow-hidden"
       style={{
-        height: `${logicalHeight * props.zoom}px`,
-        width: `${resolvedViewport.width * props.zoom}px`,
+        height: `${props.responsiveLayout ? props.availableHeight : logicalHeight * props.zoom}px`,
+        width: `${props.responsiveLayout ? props.availableWidth : logicalWidth * props.zoom}px`,
       }}
     >
       <div
@@ -175,7 +210,7 @@ function SnapshotFrameSurface(props: {
           height: `${logicalHeight}px`,
           transform: `scale(${props.zoom})`,
           transformOrigin: 'top left',
-          width: `${resolvedViewport.width}px`,
+          width: `${logicalWidth}px`,
         }}
       >
         <WebSnapshotFrame
@@ -240,6 +275,7 @@ function useSnapshotPreparationFrame(loaded: LoadedWebSnapshotPackage) {
 
 function SnapshotModeContent(props: {
   availableHeight: number;
+  availableWidth: number;
   currentViewport: ViewerViewport;
   externalLinksEnabled: boolean;
   handleIframeElementChange: (iframe: HTMLIFrameElement | null) => void;
@@ -253,6 +289,7 @@ function SnapshotModeContent(props: {
   onExternalLinkPreviewChange: (href: string | null) => void;
   onOpenExternalLink: (href: string) => void;
   preparationIframe: HTMLIFrameElement | null;
+  responsiveLayout: boolean;
   zoom: number;
 }) {
   if (props.mode === 'assets') {
@@ -281,6 +318,7 @@ function SnapshotModeContent(props: {
     <>
       <SnapshotFrameSurface
         availableHeight={props.availableHeight}
+        availableWidth={props.availableWidth}
         currentViewport={props.currentViewport}
         externalLinksEnabled={props.externalLinksEnabled}
         iframeRef={props.iframeRef}
@@ -290,6 +328,7 @@ function SnapshotModeContent(props: {
         onIframeLoaded={props.handleIframeLoaded}
         onExternalLinkPreviewChange={props.onExternalLinkPreviewChange}
         onOpenExternalLink={props.onOpenExternalLink}
+        responsiveLayout={props.responsiveLayout}
         zoom={props.zoom}
       />
       {props.preparationIframe ? (
@@ -321,7 +360,8 @@ function WebSnapshotViewerSurface(props: { loaded: LoadedWebSnapshotPackage; loc
       : mode === 'visual'
         ? (props.loaded.manifest.viewport?.width ?? null)
         : null;
-  const zoom = useViewerZoom(zoomContentWidth);
+  const responsiveLayout = mode === 'static-document' && currentViewport === null;
+  const zoom = useViewerZoom(zoomContentWidth, responsiveLayout);
   const openExternalLink = useCallback((href: string) => {
     void browserTabs.create({ active: true, url: href }).catch(() => {
       logger.warn('Failed to open an external snapshot link');
@@ -401,9 +441,10 @@ function WebSnapshotViewerSurface(props: { loaded: LoadedWebSnapshotPackage; loc
       <section
         ref={zoom.surfaceRef}
         data-testid="snapshot-viewer-surface"
-        className={`relative min-h-0 w-full min-w-0 max-w-full flex-1 overflow-y-auto
+        className={`relative min-h-0 w-full min-w-0 max-w-full flex-1
+          ${responsiveLayout ? 'overflow-y-hidden' : 'overflow-y-auto'}
           ${zoom.horizontalOverflowClassName} ${zoom.grabClassName}`}
-        style={{ scrollbarGutter: 'stable' }}
+        style={{ scrollbarGutter: responsiveLayout ? 'auto' : 'stable' }}
         onPointerDown={zoom.onPointerDown}
         onPointerMove={zoom.onPointerMove}
         onPointerUp={zoom.onPointerUp}
@@ -414,6 +455,7 @@ function WebSnapshotViewerSurface(props: { loaded: LoadedWebSnapshotPackage; loc
         )}
         <SnapshotModeContent
           availableHeight={zoom.availableHeight}
+          availableWidth={zoom.availableWidth}
           currentViewport={currentViewport}
           externalLinksEnabled={externalLinksEnabled}
           handleIframeElementChange={handleIframeElementChange}
@@ -427,6 +469,7 @@ function WebSnapshotViewerSurface(props: { loaded: LoadedWebSnapshotPackage; loc
           onExternalLinkPreviewChange={setExternalLinkPreview}
           onOpenExternalLink={openExternalLink}
           preparationIframe={preparationIframe}
+          responsiveLayout={responsiveLayout}
           zoom={zoom.zoom}
         />
       </section>
@@ -471,12 +514,10 @@ function useLoadedWebSnapshotPackage() {
         objectUrls = nextLoaded.objectUrls;
         setLoaded(nextLoaded);
       })
-      .catch((loadError) => {
+      .catch(() => {
         if (!disposed) {
-          setError({
-            kind: 'load-error',
-            message: loadError instanceof Error ? loadError.message : String(loadError),
-          });
+          logger.error('web-snapshot-viewer.package-load-failed');
+          setError({ kind: 'load-error' });
         }
       });
 

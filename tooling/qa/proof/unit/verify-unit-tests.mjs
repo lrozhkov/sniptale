@@ -52,6 +52,10 @@ export function resolveProductUnitTestPool(env = process.env) {
   return normalizeUnitTestPool(env.SNIPTALE_PRODUCT_VITEST_POOL);
 }
 
+function normalizeVitestOperand(path) {
+  return path.startsWith('./') ? path : `./${path}`;
+}
+
 export function createUnitTestArgs({
   allowNoTests = true,
   coverage = false,
@@ -94,7 +98,7 @@ export function createUnitTestArgs({
   }
 
   if (operands.length > 0) {
-    args.push('--', ...operands);
+    args.push(...operands.map(normalizeVitestOperand));
   }
 
   return args;
@@ -234,7 +238,8 @@ export function runRepoNodeEntryAsync(
         signal,
         stdout,
         stderr: overflowed
-          ? `${stderr}${stderr.endsWith('\n') || stderr.length === 0 ? '' : '\n'}Harness child output exceeded ${maxBuffer} bytes.\n`
+          ? `${stderr}${stderr.endsWith('\n') || stderr.length === 0 ? '' : '\n'}` +
+            `Harness child output exceeded ${maxBuffer} bytes.\n`
           : stderr,
       });
     });

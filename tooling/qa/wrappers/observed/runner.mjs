@@ -68,11 +68,26 @@ function writeMaintenanceFailure(session, action, error) {
   session.writeLog(`[observability.maintenance]\nUnable to ${action}: ${message}\n`);
 }
 
+function deniedGitAccess(error) {
+  const message = error instanceof Error ? `${error.message} ${error.stack ?? ''}` : String(error);
+  return (
+    (error?.code === 'EPERM' || /\bEPERM\b/u.test(message)) &&
+    (String(error?.syscall ?? '').includes('git') || /spawnSync git/u.test(message))
+  );
+}
+
 function failObservedRun(session, error) {
-  return session.fail(error, {
-    stepId: 'wrapper.lifecycle',
-    problemId: 'wrapper.unhandled-error',
-  });
+  return deniedGitAccess(error)
+    ? session.fail(error, {
+        stepId: 'wrapper.lifecycle',
+        problemId: 'environment.git-access',
+        remediation:
+          'Repeat the wrapper with read-only git access; this is an environment failure, not a project defect.',
+      })
+    : session.fail(error, {
+        stepId: 'wrapper.lifecycle',
+        problemId: 'wrapper.unhandled-error',
+      });
 }
 
 async function executeObservedCommand(input) {

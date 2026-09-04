@@ -71,7 +71,7 @@ it('keeps owner-local mode when docs change with an owner-local seam', () => {
 it('keeps owner-local mode when the optional agent workflow changes with an owner-local seam', () => {
   const result = classifyFullVerifyScope({
     targetFiles: [
-      'docs/agent-tooling/AGENTS.md',
+      'docs/agent-tooling/agent-tooling.zip',
       'apps/extension/src/editor/workspace/toolbar/EditorToolbar.tsx',
     ],
     codeFiles: ['apps/extension/src/editor/workspace/toolbar/EditorToolbar.tsx'],

@@ -1,6 +1,7 @@
 import type { CaptureActionType } from '../../../contracts/settings';
 
 import { translate } from '../../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { disableNavigationLock, enableNavigationLock, setUIHidden } from '../../selection/locker';
@@ -79,8 +80,12 @@ export function showSelectionError(error: unknown): void {
 
 export function showScreenshotError(error: unknown): void {
   logger.error('Screenshot error', error);
-  const errorMessage =
-    error instanceof Error ? error.message : translate('content.toolbar.unknownErrorWithArticle');
-
-  showToast(`${translate('content.toolbar.selectionErrorPrefix')} ${errorMessage}`, 'error');
+  showToast(
+    createUserFacingErrorMessage({
+      cause: error,
+      detail: 'unexpected',
+      summaryKey: 'content.toolbar.selectionErrorPrefix',
+    }),
+    'error'
+  );
 }
