@@ -1,15 +1,9 @@
-import { FloatingChromeRoot } from '@sniptale/ui/floating-chrome';
-import type React from 'react';
 import type { VideoPreviewCanvasInsertKind } from '../../preview/stage/types';
 import { VideoEditorFloatingDocumentBar } from './document-bar';
-import { VideoEditorFloatingInspectorStack } from './inspector-stack';
 import { VideoEditorFloatingInsertPanel, VideoEditorFloatingWorkspacePanel } from './top-panels';
-import type { useInspectorResize } from './inspector-resize';
 
 type VideoEditorFloatingWorkspaceProps = {
-  inspectorResize: ReturnType<typeof useInspectorResize>;
   activeInsertKind: VideoPreviewCanvasInsertKind | null;
-  diagnosticsContent: React.ReactNode;
   effectsLibraryDock: {
     isOpen: boolean;
     onToggle: () => void;
@@ -18,25 +12,21 @@ type VideoEditorFloatingWorkspaceProps = {
 };
 
 export function VideoEditorFloatingWorkspace({
-  inspectorResize,
   activeInsertKind,
-  diagnosticsContent,
   effectsLibraryDock,
   onActiveInsertKindChange,
 }: VideoEditorFloatingWorkspaceProps) {
   return (
-    <FloatingChromeRoot dataUi="video-editor.floating-workspace">
+    <div data-ui="video-editor.floating-workspace" className="flex shrink-0 flex-col gap-2 p-3">
       <VideoEditorFloatingDocumentBar />
-      <VideoEditorFloatingInsertPanel
-        activeInsertKind={activeInsertKind}
-        effectsLibraryDock={effectsLibraryDock}
-        onActiveInsertKindChange={onActiveInsertKindChange}
-      />
-      <VideoEditorFloatingWorkspacePanel />
-      <VideoEditorFloatingInspectorStack
-        diagnosticsContent={diagnosticsContent}
-        resize={inspectorResize}
-      />
-    </FloatingChromeRoot>
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+        <VideoEditorFloatingInsertPanel
+          activeInsertKind={activeInsertKind}
+          effectsLibraryDock={effectsLibraryDock}
+          onActiveInsertKindChange={onActiveInsertKindChange}
+        />
+        <VideoEditorFloatingWorkspacePanel />
+      </div>
+    </div>
   );
 }

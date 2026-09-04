@@ -11,14 +11,9 @@ import { useVideoEditorClipSelectionPort } from '../../runtime/controller/store'
 import type { VideoPreviewCanvasInsertKind } from '../../preview/stage/types';
 import { buildVideoInsertActions, buildVideoWorkspaceActions } from './actions';
 
-const INSERT_STACK_CLASS_NAME = floatingChromeClassNames(
-  'absolute left-1/2 top-3 z-40 flex -translate-x-1/2 items-center',
-  'max-[1180px]:top-[4.75rem] max-[860px]:left-3 max-[860px]:right-3 max-[860px]:translate-x-0'
-);
-
+const INSERT_STACK_CLASS_NAME = floatingChromeClassNames('relative z-40 flex min-w-0 items-center');
 const WORKSPACE_STACK_CLASS_NAME = floatingChromeClassNames(
-  'absolute right-3 top-3 z-50 flex max-w-[calc(100vw-1.5rem)] items-center',
-  'max-[860px]:top-[8rem] max-[860px]:left-3'
+  'relative z-40 flex min-w-0 items-center'
 );
 
 const TOP_PANEL_CLASS_NAME = floatingChromeClassNames(

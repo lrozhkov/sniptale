@@ -1,4 +1,4 @@
-import { Clapperboard, FolderKanban, Pencil, Redo2, Undo2 } from 'lucide-react';
+import { Clapperboard, FolderKanban, PanelRight, Pencil, Redo2, Undo2 } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { EditorDivider, ValueBadge } from '@sniptale/ui/editor-chrome';
 import { FloatingChromeToolbar, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
@@ -12,7 +12,7 @@ import { VideoProjectStorageStatus } from './storage-status';
 import { requestVideoEditorSaveRetry } from '../../runtime/session/save-retry';
 
 const DOCUMENT_BAR_CLASS_NAME = floatingChromeClassNames(
-  'absolute left-3 top-3 z-50 flex max-w-[calc(100vw-1.5rem)] items-center'
+  'relative z-50 flex min-w-0 w-full items-center'
 );
 
 const PROJECT_TITLE_CLASS_NAME = [
@@ -86,7 +86,7 @@ export function VideoEditorFloatingDocumentBar() {
     <div data-ui="video-editor.floating.document-bar" className={DOCUMENT_BAR_CLASS_NAME}>
       <FloatingChromeToolbar
         dataUi="video-editor.floating.document-bar.surface"
-        className="items-center gap-1.5"
+        className="w-full flex-wrap items-center gap-1.5"
       >
         <VideoEditorProjectTitle
           projectName={header.projectName}
@@ -119,6 +119,19 @@ export function VideoEditorFloatingDocumentBar() {
           </span>
         ) : null}
         <EditorDivider className="mx-1 h-7" />
+        <span className="min-w-0 flex-1" />
+        <ContentToolbarButton
+          title={translate(
+            header.leftSidebarCollapsed
+              ? 'videoEditor.app.expandInspector'
+              : 'videoEditor.app.collapseInspector'
+          )}
+          active={!header.leftSidebarCollapsed}
+          onClick={header.onToggleSidebar}
+          dataUi="video-editor.floating.document-bar.inspector"
+        >
+          <PanelRight size={17} strokeWidth={2.1} />
+        </ContentToolbarButton>
         <ContentToolbarButton
           title={translate('videoEditor.app.libraryButton')}
           active={header.libraryPanelOpen}

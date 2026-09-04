@@ -2,6 +2,7 @@ import { AudioRecordingModal } from '../../recording/audio-modal';
 import { VideoEditorLibraryPanel } from '../../library/panel';
 import React, { useState } from 'react';
 import { VideoEditorFloatingWorkspace } from '../floating';
+import { VideoEditorFloatingInspectorStack } from '../floating/inspector-stack';
 import {
   InspectorGroupFocusContext,
   type InspectorGroupFocusIntent,
@@ -49,7 +50,21 @@ export function VideoEditorWorkspaceMain({
   return (
     <InspectorGroupFocusContext.Provider value={inspectorGroupFocus}>
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden" style={workspaceStyle}>
+        <VideoEditorFloatingWorkspace
+          activeInsertKind={activeInsertKind}
+          effectsLibraryDock={{
+            isOpen: effectsLibraryDockOpen,
+            onToggle: () => setEffectsLibraryDockOpen((value) => !value),
+          }}
+          onActiveInsertKindChange={setActiveInsertKind}
+        />
         <VideoEditorWorkspaceCanvas
+          inspector={
+            <VideoEditorFloatingInspectorStack
+              diagnosticsContent={diagnosticsContent}
+              resize={inspectorResize}
+            />
+          }
           activeInsertKind={activeInsertKind}
           effectBundles={effectBundles}
           effectOperations={effectOperations}
@@ -58,39 +73,17 @@ export function VideoEditorWorkspaceMain({
           onClearActiveInsertKind={() => setActiveInsertKind(null)}
           onEffectsLibraryDockOpenChange={setEffectsLibraryDockOpen}
         />
-        <VideoEditorWorkspaceOverlays
-          inspectorResize={inspectorResize}
-          activeInsertKind={activeInsertKind}
-          diagnosticsContent={diagnosticsContent}
-          effectsLibraryDockOpen={effectsLibraryDockOpen}
-          onActiveInsertKindChange={setActiveInsertKind}
-          onEffectsLibraryDockOpenChange={setEffectsLibraryDockOpen}
-        />
+        <VideoEditorWorkspaceOverlays diagnosticsContent={diagnosticsContent} />
       </div>
     </InspectorGroupFocusContext.Provider>
   );
 }
 
 function VideoEditorWorkspaceOverlays(props: {
-  inspectorResize: ReturnType<typeof useInspectorResize>;
-  activeInsertKind: VideoPreviewCanvasInsertKind | null;
   diagnosticsContent: React.ReactNode;
-  effectsLibraryDockOpen: boolean;
-  onActiveInsertKindChange: (insertKind: VideoPreviewCanvasInsertKind | null) => void;
-  onEffectsLibraryDockOpenChange: (open: boolean | ((open: boolean) => boolean)) => void;
 }): React.JSX.Element {
   return (
     <>
-      <VideoEditorFloatingWorkspace
-        inspectorResize={props.inspectorResize}
-        activeInsertKind={props.activeInsertKind}
-        diagnosticsContent={props.diagnosticsContent}
-        effectsLibraryDock={{
-          isOpen: props.effectsLibraryDockOpen,
-          onToggle: () => props.onEffectsLibraryDockOpenChange((value) => !value),
-        }}
-        onActiveInsertKindChange={props.onActiveInsertKindChange}
-      />
       <VideoEditorWorkspaceLibraryPanel diagnosticsContent={props.diagnosticsContent} />
       <VideoEditorAudioRecordingModal diagnosticsContent={props.diagnosticsContent} />
     </>

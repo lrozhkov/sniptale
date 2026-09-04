@@ -9,7 +9,7 @@ import type { EffectLibraryOperationError } from './operations';
 import type { VideoEditorEffectsLibraryDockProps } from './types';
 
 const EFFECT_LIBRARY_DOCK_CLASS_NAME = [
-  'relative z-20 flex h-full w-[28rem] max-w-[calc(100vw-1.5rem)] shrink-0',
+  'relative z-20 flex h-full w-[clamp(15rem,24vw,20rem)] max-w-[calc(100vw-1.5rem)] shrink-0',
   'max-[980px]:absolute max-[980px]:bottom-3 max-[980px]:left-3 max-[980px]:top-[4.75rem]',
 ].join(' ');
 

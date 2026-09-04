@@ -6,6 +6,7 @@ import { createHeaderController, createPreviewController } from './main.test-sup
 const audioRecordingModalSpy = vi.fn();
 const libraryPanelSpy = vi.fn();
 const floatingWorkspaceSpy = vi.fn();
+const inspectorSpy = vi.fn();
 const previewSpy = vi.fn();
 const timelineSpy = vi.fn();
 const hookMocks = vi.hoisted(() => ({ controller: null as unknown }));
@@ -37,6 +38,13 @@ vi.mock('../floating', () => ({
   VideoEditorFloatingWorkspace: (props: unknown) => {
     floatingWorkspaceSpy(props);
     return <div data-testid="floating-workspace" />;
+  },
+}));
+
+vi.mock('../floating/inspector-stack', () => ({
+  VideoEditorFloatingInspectorStack: (props: unknown) => {
+    inspectorSpy(props);
+    return <div data-testid="context-inspector" />;
   },
 }));
 
@@ -249,12 +257,12 @@ function createTimelineState() {
 
 function expectWorkspaceMarkup(markup: string) {
   expect(markup).toContain('video-editor.workspace.canvas-shell');
-  expect(markup).toContain('pt-[4.75rem]');
-  expect(markup).toContain('pr-3');
+  expect(markup).not.toContain('pt-[4.75rem]');
+  expect(markup).toContain('px-3 pb-3');
   expect(markup).not.toContain('pr-[21.75rem]');
-  expect(markup).toContain('max-[860px]:pt-[11.75rem]');
+  expect(markup).not.toContain('max-[860px]:pt-[11.75rem]');
   expect(markup).toContain('flex-col gap-0');
-  expect(markup).toContain('flex min-h-0 shrink-0 gap-3');
+  expect(markup).toContain('flex min-h-0 shrink-0 gap-0');
   expect(markup).toContain('video-editor.workspace.timeline-resize-zone');
   expect(markup).toContain('h-2 shrink-0 cursor-row-resize');
   expect(markup).not.toContain('h-1.5 w-full rounded-full');
@@ -271,9 +279,11 @@ function verifyWorkspaceMainRouting() {
   );
 
   expect(floatingWorkspaceSpy.mock.calls[0]?.[0]).toMatchObject({
-    diagnosticsContent: 'diagnostics',
     effectsLibraryDock: { isOpen: false },
   });
+  expect(inspectorSpy.mock.calls[0]?.[0]).toMatchObject({ diagnosticsContent: 'diagnostics' });
+  expect(markup).toContain('data-ui="video-editor.workspace.upper"');
+  expect(markup).not.toContain('pr-[calc(var(--video-editor-inspector-width)');
   expect(previewSpy.mock.calls[0]?.[0]).toMatchObject({
     currentTime: 8,
     selectedClipId: 'clip-1',
@@ -295,6 +305,7 @@ function verifyWorkspaceMainRouting() {
 describe('VideoEditorWorkspaceMain', () => {
   afterEach(() => {
     floatingWorkspaceSpy.mockReset();
+    inspectorSpy.mockReset();
     previewSpy.mockReset();
     timelineSpy.mockReset();
     libraryPanelSpy.mockReset();

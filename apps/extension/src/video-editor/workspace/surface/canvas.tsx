@@ -20,12 +20,13 @@ import type { EffectEditingPort } from '../../contracts/controller-store';
 export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProps) {
   const layout = useVideoEditorLayoutController();
   return (
-    <div
-      data-ui="video-editor.workspace.canvas-shell"
-      className={getWorkspaceCanvasShellClassName(layout.leftSidebarCollapsed)}
-    >
+    <div data-ui="video-editor.workspace.canvas-shell" className="min-h-0 min-w-0 flex-1 px-3 pb-3">
       <div ref={layout.workspaceSplitRef} className="flex h-full min-h-0 flex-col gap-0">
-        <div className="flex min-h-0 shrink-0 gap-3" style={props.previewHeightStyle}>
+        <div
+          data-ui="video-editor.workspace.upper"
+          className="flex min-h-0 shrink-0 gap-0"
+          style={props.previewHeightStyle}
+        >
           <VideoEditorWorkspaceEffectsLibrary
             effectBundles={props.effectBundles}
             effectOperations={props.effectOperations}
@@ -33,6 +34,7 @@ export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProp
             onOpenChange={props.onEffectsLibraryDockOpenChange}
           />
           <VideoEditorWorkspacePreview {...props} />
+          {props.inspector}
         </div>
         <VideoEditorWorkspaceResizeHandle onPointerDown={layout.handleStartVerticalResize} />
         <VideoEditorWorkspaceTimeline {...props} />
@@ -42,6 +44,7 @@ export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProp
 }
 
 interface VideoEditorWorkspaceCanvasProps {
+  inspector: React.ReactNode;
   activeInsertKind: VideoPreviewCanvasInsertKind | null;
   effectBundles: WorkspaceEffectBundlesState;
   effectOperations: EffectLibraryOperations;
@@ -206,14 +209,4 @@ function VideoEditorWorkspaceResizeHandle({
       className="h-2 shrink-0 cursor-row-resize"
     />
   );
-}
-
-function getWorkspaceCanvasShellClassName(inspectorCollapsed: boolean): string {
-  return [
-    'min-h-0 min-w-0 flex-1 p-3 pt-[4.75rem]',
-    inspectorCollapsed
-      ? 'pr-3'
-      : 'pr-[calc(var(--video-editor-inspector-width)+1.75rem)] max-[1120px]:pr-3',
-    'max-[860px]:pt-[11.75rem]',
-  ].join(' ');
 }
