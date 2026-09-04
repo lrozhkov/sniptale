@@ -1,11 +1,8 @@
-import { translate } from '../../../../../platform/i18n';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
-import { InspectorGroupedPanel } from '../grouped-inspector';
 import { SelectionEmptyState } from './helpers';
 import { PANEL_SECTION_CLASS_NAME } from '../shared/panel';
 import { TrackGeneralFields, TrackPanelDeleteButton } from '../track/sections';
 import { isVideoEditorPresentedTrack } from '../../../../project/operations/presented-tracks';
-import { getVideoTrackKindLabel } from '../../track-kind-label';
 
 export function InspectTrackPanel({
   onDeleteTrack,
@@ -33,48 +30,12 @@ function TrackInspectorContent(props: {
 }) {
   return (
     <section className={PANEL_SECTION_CLASS_NAME}>
-      <InspectorGroupedPanel groups={createTrackGroups(props)} />
+      <TrackGeneralFields selectedTrack={props.selectedTrack} onRenameTrack={props.onRenameTrack} />
       <TrackPanelDeleteButton
         canDeleteTrack={!props.selectedTrack.isRoot}
         trackId={props.selectedTrack.id}
         onDeleteTrack={props.onDeleteTrack}
       />
     </section>
-  );
-}
-
-function createTrackGroups(props: TrackGroupProps) {
-  return [
-    {
-      id: 'info',
-      label: translate('videoEditor.sidebar.inspectorGroupInfo'),
-      content: <TrackInfo selectedTrack={props.selectedTrack} />,
-    },
-    {
-      id: 'general',
-      label: translate('videoEditor.sidebar.inspectorGroupGeneral'),
-      defaultActive: true,
-      content: (
-        <TrackGeneralFields
-          selectedTrack={props.selectedTrack}
-          onRenameTrack={props.onRenameTrack}
-        />
-      ),
-    },
-  ] as const;
-}
-
-interface TrackGroupProps {
-  onRenameTrack: WorkspaceSidebarSelectionPanelProps['onRenameTrack'];
-  selectedTrack: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedTrack']>;
-}
-
-function TrackInfo(props: {
-  selectedTrack: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedTrack']>;
-}) {
-  return (
-    <p className="text-xs leading-5 text-[var(--sniptale-color-text-secondary)]">
-      {getVideoTrackKindLabel(props.selectedTrack.kind)}
-    </p>
   );
 }

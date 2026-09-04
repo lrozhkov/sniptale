@@ -215,6 +215,11 @@ async function verifyVideoEditorTrackRename(
       .locator('[data-ui="video-editor.workspace.sidebar-header-title-row"]')
       .getByText('Face cam', { exact: true })
   ).toBeVisible();
+  await expect(
+    page.getByRole('group', {
+      name: translate('videoEditor.sidebar.inspectorGroupSwitcherLabel', 'ru'),
+    })
+  ).toHaveCount(0);
   await expect(page.getByText('OVERLAY', { exact: true })).toHaveCount(0);
   await expect(page.getByText('PRIMARY', { exact: true })).toHaveCount(0);
   await page.screenshot({ fullPage: true, path: screenshotPath });
