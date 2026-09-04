@@ -265,3 +265,27 @@ it('cancels the registered preview preparation when its project is cleared', asy
 
   expect(runtime.cancel).toHaveBeenCalledOnce();
 });
+
+it('keeps the ticker active after cached-frame playback preparation', async () => {
+  const useVideoEditorPlayback = await importPlaybackHook();
+  const project = createRerenderProject();
+  let controller: ReturnType<typeof useVideoEditorPlayback> | null = null;
+  renderPlaybackHarness(root, {
+    ...createPlaybackRerenderProps(0, project, vi.fn(), vi.fn(), vi.fn(), useVideoEditorPlayback),
+    onController: (value) => (controller = value),
+  });
+  const runtime = {
+    cancel: vi.fn(),
+    prepare: vi.fn().mockResolvedValue('frame-cache-ready' as const),
+    present: vi.fn(),
+    settle: vi.fn(),
+    subscribe: vi.fn(),
+  };
+  controller!.registerPreviewRuntime(runtime);
+
+  act(() => controller!.setPlaybackPlaying(false));
+  await act(async () => controller!.setPlaybackPlaying(true));
+
+  expect(runtime.prepare).toHaveBeenCalledOnce();
+  expect(frameCallback).not.toBeNull();
+});

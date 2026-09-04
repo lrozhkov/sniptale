@@ -61,6 +61,7 @@ function createToolbarProps(): ProjectTimelineToolbarTestProps {
     onDuplicateSelectedClip: vi.fn(),
     onFitProject: vi.fn(),
     onFitSelection: vi.fn(),
+    onSeekToEnd: vi.fn(),
     onSeekToStart: vi.fn(),
     onSplitSelectedClip: vi.fn(),
     onTimelinePreviewSuspendedChange: vi.fn(),

@@ -36,6 +36,7 @@ function renderPlaybackSummary(isPlaying: boolean, withRange = false) {
   }
 
   const onTogglePlay = vi.fn();
+  const onSeekToEnd = vi.fn();
   const onSeekToStart = vi.fn();
   act(() => {
     root?.render(
@@ -45,13 +46,14 @@ function renderPlaybackSummary(isPlaying: boolean, withRange = false) {
         isPlaying={isPlaying}
         playbackRange={withRange ? { start: 4.5, end: 6.75 } : null}
         onClearPlaybackRange={onTogglePlay}
+        onSeekToEnd={onSeekToEnd}
         onSeekToStart={onSeekToStart}
         onTogglePlay={onTogglePlay}
       />
     );
   });
 
-  return { onSeekToStart, onTogglePlay };
+  return { onSeekToEnd, onSeekToStart, onTogglePlay };
 }
 
 it('renders playback summary metadata and toggles play state', () => {
@@ -73,6 +75,18 @@ it('seeks to the start from the playback summary control', () => {
   });
 
   expect(onSeekToStart).toHaveBeenCalledTimes(1);
+});
+
+it('seeks to the end from the symmetric playback summary control', () => {
+  const { onSeekToEnd } = renderPlaybackSummary(false);
+  const endButton = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+    (button) => button.getAttribute('aria-label') === 'videoEditor.timeline.seekToEnd'
+  );
+
+  act(() => endButton?.click());
+
+  expect(endButton).toBeDefined();
+  expect(onSeekToEnd).toHaveBeenCalledTimes(1);
 });
 
 it('renders a play label when playback is idle', () => {
@@ -102,8 +116,8 @@ it('keeps playback control slots stable when the range reset is unavailable', ()
   renderPlaybackSummary(false, true);
   const buttonsWithRange = container?.querySelectorAll<HTMLButtonElement>('button');
 
-  expect(buttonsWithoutRange).toHaveLength(3);
-  expect(buttonsWithRange).toHaveLength(3);
+  expect(buttonsWithoutRange).toHaveLength(4);
+  expect(buttonsWithRange).toHaveLength(4);
   expect(container?.querySelector('[data-playback-counter]')?.className).toContain('tabular-nums');
 });
 

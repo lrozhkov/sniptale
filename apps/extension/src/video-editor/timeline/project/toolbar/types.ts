@@ -23,6 +23,7 @@ export interface ProjectTimelineToolbarProps {
   onFitProject: () => void;
   onFitSelection: () => void;
   onZoomChange: (value: number) => void;
+  onSeekToEnd: () => void;
   onSeekToStart: () => void;
   onTogglePlay: () => void;
   onSplitSelectedClip: () => void;

@@ -9,7 +9,11 @@ import { VideoEditorSelectionKind } from '../../../contracts/selection';
 import type { ClipSelectionPort } from '../../../contracts/controller-store';
 import { useVideoEditorStore, type VideoEditorState } from '../../../state/store';
 import type { VideoEditorWorkspaceState } from '../workspace-state';
-import { createWorkspaceTimelineEditingActions } from './timeline-actions';
+import type { VideoEditorRuntimeController } from '../../session';
+import {
+  createWorkspaceTimelineEditingActions,
+  createWorkspaceTimelineSelectionActions,
+} from './timeline-actions';
 
 function createStore(project = createEmptyVideoProject('Timeline actions')) {
   const store: VideoEditorState & Pick<ClipSelectionPort, 'selectedClipId'> = {
@@ -53,6 +57,23 @@ function createSelectedClipActions() {
     splitSelectedClip: vi.fn(),
   };
 }
+
+it('routes timeline boundary controls through the playback seek pipeline', () => {
+  const project = createEmptyVideoProject('Timeline boundaries');
+  project.duration = 9.5;
+  const seekTo = vi.fn();
+  const actions = createWorkspaceTimelineSelectionActions(
+    createStore(project),
+    { seekTo, togglePlayback: vi.fn() } as unknown as VideoEditorRuntimeController,
+    createWorkspace()
+  );
+
+  actions.onSeekToStart();
+  actions.onSeekToEnd();
+
+  expect(seekTo).toHaveBeenNthCalledWith(1, 0);
+  expect(seekTo).toHaveBeenNthCalledWith(2, 9.5);
+});
 
 it('deletes the selected object track from timeline delete actions', () => {
   const store = createStore();

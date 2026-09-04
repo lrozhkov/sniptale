@@ -1,4 +1,4 @@
-import { Pause, Play, RotateCcw, SkipBack } from 'lucide-react';
+import { Pause, Play, RotateCcw, SkipBack, SkipForward } from 'lucide-react';
 
 import { translate } from '../../../../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -73,6 +73,20 @@ function PlaybackSeekToStartButton(props: { onSeekToStart: () => void }) {
   );
 }
 
+function PlaybackSeekToEndButton(props: { onSeekToEnd: () => void }) {
+  return (
+    <ContentToolbarButton
+      type="button"
+      onClick={props.onSeekToEnd}
+      className={toolbarIconButtonClassName}
+      aria-label={translate('videoEditor.timeline.seekToEnd')}
+      title={translate('videoEditor.timeline.seekToEnd')}
+    >
+      <SkipForward size={14} strokeWidth={2} />
+    </ContentToolbarButton>
+  );
+}
+
 function formatToolbarLoopRange(
   playbackRange: ProjectTimelineToolbarProps['playbackRange']
 ): string | null {
@@ -122,6 +136,7 @@ export function ProjectTimelinePlaybackSummary({
   isPlaying,
   playbackRange,
   onClearPlaybackRange,
+  onSeekToEnd,
   onSeekToStart,
   onTogglePlay,
 }: Pick<
@@ -131,6 +146,7 @@ export function ProjectTimelinePlaybackSummary({
   | 'isPlaying'
   | 'playbackRange'
   | 'onClearPlaybackRange'
+  | 'onSeekToEnd'
   | 'onSeekToStart'
   | 'onTogglePlay'
 >) {
@@ -143,6 +159,7 @@ export function ProjectTimelinePlaybackSummary({
     >
       <PlaybackToggleButton isPlaying={isPlaying} onTogglePlay={onTogglePlay} />
       <PlaybackSeekToStartButton onSeekToStart={onSeekToStart} />
+      <PlaybackSeekToEndButton onSeekToEnd={onSeekToEnd} />
       <PlaybackResetButton disabled={!playbackRange} onClearPlaybackRange={onClearPlaybackRange} />
       <PlaybackSummaryMeta
         currentTime={currentTime}

@@ -54,6 +54,7 @@ export interface ProjectTimelineProps {
   telemetryLaneVisible: boolean;
   timelinePreviews: TimelineClipPreviewMap;
   onSeek: (time: number) => void;
+  onSeekToEnd: () => void;
   onSeekToStart: () => void;
   onZoomChange: (value: number) => void;
   onTogglePlay: () => void;

@@ -59,6 +59,7 @@ interface VideoEditorTimelineActions {
   onResizeMotionRegion: (motionRegionId: string, startTime: number, duration: number) => void;
   onUpdateEffectInstance: VideoEditorProjectActions['updateEffectInstance'];
   onSeek: VideoEditorRuntimeController['seekTo'];
+  onSeekToEnd: () => void;
   onSeekToStart: () => void;
   onSelectActionSegment: VideoEditorSessionActions['selectActionSegment'];
   onSelectClip: VideoEditorSessionActions['selectClip'];

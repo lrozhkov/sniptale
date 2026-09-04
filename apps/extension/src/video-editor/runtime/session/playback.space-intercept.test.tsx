@@ -11,11 +11,12 @@ import type { PlaybackHandlers, PlaybackLatestState } from '../../interaction/pl
 function ShortcutHarness(props: {
   latestState: PlaybackLatestState;
   handlers: PlaybackHandlers;
+  seekTo: (time: number) => void;
   togglePlayback: () => void;
 }) {
   const latestStateRef = { current: props.latestState };
   const handlersRef = { current: props.handlers };
-  usePlaybackShortcuts(latestStateRef, handlersRef, props.togglePlayback);
+  usePlaybackShortcuts(latestStateRef, handlersRef, props.seekTo, props.togglePlayback);
   return null;
 }
 
@@ -85,17 +86,51 @@ function dispatchSpaceKeyDownInAct(target: EventTarget): KeyboardEvent {
   return event;
 }
 
-function renderShortcutHarness(root: Root, togglePlayback: () => void) {
+function renderShortcutHarness(root: Root, togglePlayback: () => void, seekTo = vi.fn()) {
   act(() => {
     root.render(
       <ShortcutHarness
         handlers={createHandlers()}
         latestState={createLatestState()}
+        seekTo={seekTo}
         togglePlayback={togglePlayback}
       />
     );
   });
 }
+
+it('owns plain Home and End while leaving modified and text-entry navigation native', () => {
+  const seekTo = vi.fn();
+  const latestState = createLatestState();
+  latestState.project!.duration = 12;
+  act(() => {
+    root!.render(
+      <ShortcutHarness
+        handlers={createHandlers()}
+        latestState={latestState}
+        seekTo={seekTo}
+        togglePlayback={vi.fn()}
+      />
+    );
+  });
+  const input = document.createElement('input');
+  document.body.append(input);
+
+  act(() => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, code: 'Home' }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, code: 'End' }));
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, code: 'Home', shiftKey: true })
+    );
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, code: 'End', ctrlKey: true })
+    );
+    input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, code: 'Home' }));
+  });
+
+  expect(seekTo.mock.calls).toEqual([[0], [12]]);
+  input.remove();
+});
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -164,6 +199,7 @@ it('deletes selected object tracks through playback shortcuts', async () => {
             objectTrackId: 'visual-cursor',
           },
         }}
+        seekTo={vi.fn()}
         togglePlayback={vi.fn()}
       />
     );
@@ -189,6 +225,7 @@ it('leaves mutation shortcuts inert during a project-history transaction', async
           selectedClipId: 'clip-1',
           selection: { kind: VideoEditorSelectionKind.CLIP, clipId: 'clip-1' },
         }}
+        seekTo={vi.fn()}
         togglePlayback={vi.fn()}
       />
     );

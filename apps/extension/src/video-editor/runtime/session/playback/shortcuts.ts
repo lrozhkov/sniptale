@@ -41,6 +41,7 @@ function handlePlaybackShortcutKeyDown(
   event: KeyboardEvent,
   latestStateRef: MutableRefObject<PlaybackLatestState>,
   handlersRef: MutableRefObject<PlaybackHandlers>,
+  seekTo: (time: number) => void,
   togglePlayback: () => void
 ): void {
   const latestState = latestStateRef.current;
@@ -55,6 +56,10 @@ function handlePlaybackShortcutKeyDown(
   }
 
   if (handlePlaybackToggleShortcut(event, togglePlayback)) {
+    return;
+  }
+
+  if (handlePlaybackBoundaryShortcut(event, latestState.project.duration, seekTo)) {
     return;
   }
 
@@ -78,6 +83,24 @@ function handlePlaybackShortcutKeyDown(
 
   event.preventDefault();
   handleSelectionDelete(latestState, handlersRef);
+}
+
+function handlePlaybackBoundaryShortcut(
+  event: KeyboardEvent,
+  projectDuration: number,
+  seekTo: (time: number) => void
+): boolean {
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+    return false;
+  }
+
+  if (event.code !== 'Home' && event.code !== 'End') {
+    return false;
+  }
+
+  event.preventDefault();
+  seekTo(event.code === 'Home' ? 0 : projectDuration);
+  return true;
 }
 
 function handlePlaybackToggleShortcut(event: KeyboardEvent, togglePlayback: () => void): boolean {
@@ -120,6 +143,7 @@ function handlePlaybackNudgeShortcut(
 export function usePlaybackShortcuts(
   latestStateRef: MutableRefObject<PlaybackLatestState>,
   handlersRef: MutableRefObject<PlaybackHandlers>,
+  seekTo: (time: number) => void,
   togglePlayback: () => void
 ) {
   useEffect(() => {
@@ -129,7 +153,7 @@ export function usePlaybackShortcuts(
       }
 
       handledKeyDownEvents.add(event);
-      handlePlaybackShortcutKeyDown(event, latestStateRef, handlersRef, togglePlayback);
+      handlePlaybackShortcutKeyDown(event, latestStateRef, handlersRef, seekTo, togglePlayback);
     };
 
     window.addEventListener('keydown', handleKeyDown, KEYDOWN_LISTENER_OPTIONS);
@@ -138,5 +162,5 @@ export function usePlaybackShortcuts(
       window.removeEventListener('keydown', handleKeyDown, KEYDOWN_LISTENER_OPTIONS);
       document.removeEventListener('keydown', handleKeyDown, KEYDOWN_LISTENER_OPTIONS);
     };
-  }, [handlersRef, latestStateRef, togglePlayback]);
+  }, [handlersRef, latestStateRef, seekTo, togglePlayback]);
 }

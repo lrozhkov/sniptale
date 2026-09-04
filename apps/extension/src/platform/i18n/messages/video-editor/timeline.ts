@@ -31,6 +31,10 @@ export const videoEditorTimelineMessages = defineMessageSource({
     ru: 'В начало',
     en: 'Go to start',
   },
+  seekToEnd: {
+    ru: 'В конец',
+    en: 'Go to end',
+  },
   title: {
     ru: 'Таймлайн',
     en: 'Timeline',

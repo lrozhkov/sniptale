@@ -241,6 +241,37 @@ async function verifyVideoEditorTrackRename(
   await page.screenshot({ fullPage: true, path: screenshotPath });
 }
 
+async function verifyVideoEditorTimelineBoundaries(
+  page: import('@playwright/test').Page,
+  screenshotPath: string,
+  compactScreenshotPath: string
+): Promise<void> {
+  const counter = page.locator('[data-playback-counter="true"]');
+  const seekToStart = page.getByRole('button', {
+    name: translate('videoEditor.timeline.seekToStart', 'ru'),
+  });
+  const seekToEnd = page.getByRole('button', {
+    name: translate('videoEditor.timeline.seekToEnd', 'ru'),
+  });
+
+  await seekToEnd.click();
+  await expect(counter).toContainText('0:12.0 / 0:12.0');
+  await page.keyboard.press('Home');
+  await expect(counter).toContainText('0:00.0 / 0:12.0');
+  await page.keyboard.press('End');
+  await expect(counter).toContainText('0:12.0 / 0:12.0');
+  await seekToStart.click();
+  await expect(counter).toContainText('0:00.0 / 0:12.0');
+  await page.screenshot({ fullPage: true, path: screenshotPath });
+
+  await page.setViewportSize({ width: 700, height: 900 });
+  await expect(seekToStart).toBeVisible();
+  await expect(seekToEnd).toBeVisible();
+  await expect(counter).toBeVisible();
+  await page.screenshot({ fullPage: true, path: compactScreenshotPath });
+  await page.setViewportSize({ width: 1600, height: 1100 });
+}
+
 async function verifyVideoEditorAnnotationCanvasFlow(
   page: import('@playwright/test').Page,
   screenshotPath: string
@@ -409,6 +440,12 @@ test('video editor keeps webcam independent with camera timeline and inspector c
     fullPage: true,
     path: testInfo.outputPath('video-editor-camera-overlay.png'),
   });
+
+  await verifyVideoEditorTimelineBoundaries(
+    page,
+    testInfo.outputPath('video-editor-timeline-transport.png'),
+    testInfo.outputPath('video-editor-timeline-transport-compact.png')
+  );
 
   await verifyVideoEditorTrackRename(page, testInfo.outputPath('video-editor-track-inspector.png'));
 

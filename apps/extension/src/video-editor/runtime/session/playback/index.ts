@@ -109,7 +109,7 @@ function usePlaybackSeek(
     playback.isPlaying &&
       (phase === 'live' || phase === 'cached-frame-playback' || phase === 'cached-video-playback')
   );
-  usePlaybackShortcuts(latestStateRef, handlersRef, togglePlayback);
+  usePlaybackShortcuts(latestStateRef, handlersRef, seekTo, togglePlayback);
   return createPlaybackController(
     pausePlayback,
     registerPreviewRuntime,

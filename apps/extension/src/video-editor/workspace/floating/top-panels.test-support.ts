@@ -101,6 +101,7 @@ function createTimelineEditActions(): Omit<
     onResizeActionEvent: noop(),
     onResizeMotionRegion: noop(),
     onSeek: noop(),
+    onSeekToEnd: noop(),
     onSeekToStart: noop(),
     onSetPlaybackRange: noop(),
     onSplitSelectedClip: noop(),

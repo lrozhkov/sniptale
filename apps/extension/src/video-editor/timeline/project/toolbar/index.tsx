@@ -71,6 +71,7 @@ export function ProjectTimelineToolbar({
   duration,
   isPlaying,
   playbackRange,
+  onSeekToEnd,
   onSeekToStart,
   onTogglePlay,
   onClearPlaybackRange,
@@ -94,6 +95,7 @@ export function ProjectTimelineToolbar({
         duration={duration}
         isPlaying={isPlaying}
         playbackRange={playbackRange}
+        onSeekToEnd={onSeekToEnd}
         onSeekToStart={onSeekToStart}
         onTogglePlay={onTogglePlay}
         onClearPlaybackRange={onClearPlaybackRange}

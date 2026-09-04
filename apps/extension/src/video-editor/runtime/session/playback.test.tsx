@@ -211,6 +211,7 @@ it('routes playback shortcuts through the supplied callbacks', async () => {
   const setPlaying = vi.fn<(playing: boolean) => void>();
   const splitClipAt = vi.fn<(clipId: string, time: number) => void>();
   const deleteClip = vi.fn<(clipId: string) => void>();
+  const setCurrentTime = vi.fn<(time: number) => void>();
   const updateClipTransform = vi.fn<(clipId: string, patch: Record<string, unknown>) => void>();
   renderPlaybackHarness(root, {
     currentTime: 0.75,
@@ -226,7 +227,7 @@ it('routes playback shortcuts through the supplied callbacks', async () => {
     project,
     selection: { kind: VideoEditorSelectionKind.CLIP, clipId: 'clip-1' },
     selectedClipId: 'clip-1',
-    setCurrentTime: vi.fn<(time: number) => void>(),
+    setCurrentTime,
     setPlaying,
     splitClipAt,
     updateActionEventDetails: vi.fn(),
@@ -240,12 +241,16 @@ it('routes playback shortcuts through the supplied callbacks', async () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyK', bubbles: true }));
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyS', bubbles: true }));
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowRight', bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Home', bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'End', bubbles: true }));
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Delete', bubbles: true }));
   });
 
   expect(setPlaying).toHaveBeenCalledWith(true);
   expect(splitClipAt).toHaveBeenCalledWith('clip-1', 0.75);
   expect(updateClipTransform).toHaveBeenCalledWith('clip-1', { x: 1, y: 0 });
+  expect(setCurrentTime).toHaveBeenCalledWith(0);
+  expect(setCurrentTime).toHaveBeenCalledWith(2);
   expect(deleteClip).toHaveBeenCalledWith('clip-1');
 });
 
