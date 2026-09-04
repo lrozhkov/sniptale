@@ -1,5 +1,10 @@
 import { expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
+import {
+  createProject,
+  createVideoClip,
+} from '../../../../features/video/project/timeline/project-meta.test.helpers.ts';
+import { reconcileRecordingInteractionAnchors } from '../../../project/operations/source-timed-clips';
 import { VideoEditorSelectionKind } from '../../../contracts/selection';
 import type { ClipSelectionPort } from '../../../contracts/controller-store';
 import { useVideoEditorStore, type VideoEditorState } from '../../../state/store';
@@ -64,4 +69,77 @@ it('deletes the selected object track from timeline delete actions', () => {
   ).onDeleteSelectedTimelineObject();
 
   expect(store.deleteObjectTrack).toHaveBeenCalledWith('visual-cursor');
+});
+
+it('moves anchored interactions into durable project time before later source edits', () => {
+  const project = createProject([createVideoClip()]);
+  project.baseRecordingId = 'rec-asset-video';
+  project.source = { kind: 'recording', recordingId: 'rec-asset-video' };
+  project.actionEvents = [
+    {
+      data: {},
+      duration: 0,
+      id: 'action-1',
+      kind: 'CLICK',
+      label: 'Click',
+      point: null,
+      preset: 'CLICK_RIPPLE',
+      sourceAnchor: {
+        kind: 'recording-source',
+        recordingId: 'rec-asset-video',
+        sourceClipId: 'clip-video',
+        sourceTime: 1,
+      },
+      time: 1,
+    },
+  ];
+  project.cursorTrack = {
+    captureMode: 'separate',
+    samples: [
+      {
+        id: 'cursor-1',
+        sourceAnchor: {
+          kind: 'recording-source',
+          recordingId: 'rec-asset-video',
+          sourceClipId: 'clip-video',
+          sourceTime: 1,
+        },
+        time: 1,
+        visible: true,
+        x: 10,
+        y: 20,
+      },
+    ],
+    skin: {
+      animationPreset: 'NONE',
+      color: '#fff',
+      hidden: false,
+      preset: 'ARROW',
+      scale: 1,
+      shadow: false,
+    },
+  };
+  const store = createStore(project);
+  const actions = createWorkspaceTimelineEditingActions(
+    store,
+    createWorkspace(),
+    createSelectedClipActions()
+  );
+
+  actions.onMoveActionEvent('action-1', 5);
+  actions.onMoveCursorSegment('cursor-1', null, 4, null);
+  const detachedProject = store.project!;
+  const sourceEdited = reconcileRecordingInteractionAnchors(detachedProject, {
+    ...detachedProject,
+    clips: detachedProject.clips.map((clip) => ({ ...clip, startTime: 2 })),
+  });
+
+  expect(sourceEdited.actionEvents[0]).toEqual(
+    expect.objectContaining({ time: 5, timeBasis: 'project' })
+  );
+  expect(sourceEdited.actionEvents[0]).not.toHaveProperty('sourceAnchor');
+  expect(sourceEdited.cursorTrack?.samples[0]).toEqual(
+    expect.objectContaining({ time: 4, timeBasis: 'project' })
+  );
+  expect(sourceEdited.cursorTrack?.samples[0]).not.toHaveProperty('sourceAnchor');
 });

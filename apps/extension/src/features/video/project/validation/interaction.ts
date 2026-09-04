@@ -7,6 +7,7 @@ import {
   VideoMotionOverlayZoomMode,
   VideoProjectActionEventKind,
   VideoProjectActionPreset,
+  VideoProjectInteractionTimeBasis,
   VideoTemporalEasing,
 } from '../types/index';
 import {
@@ -39,6 +40,16 @@ function isCursorSkin(value: unknown): boolean {
   );
 }
 
+function isSourceTimeAnchor(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    value['kind'] === 'recording-source' &&
+    isString(value['recordingId']) &&
+    isString(value['sourceClipId']) &&
+    isBoundedNumber(value['sourceTime'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS)
+  );
+}
+
 function isCursorSample(value: unknown): boolean {
   return (
     isRecord(value) &&
@@ -47,6 +58,9 @@ function isCursorSample(value: unknown): boolean {
     isCoordinate(value['x']) &&
     isCoordinate(value['y']) &&
     isBoolean(value['visible']) &&
+    (value['sourceAnchor'] === undefined || isSourceTimeAnchor(value['sourceAnchor'])) &&
+    (value['timeBasis'] === undefined ||
+      isEnumValue(value['timeBasis'], VideoProjectInteractionTimeBasis)) &&
     (value['interpolation'] === undefined ||
       isEnumValue(value['interpolation'], VideoTemporalEasing)) &&
     (value['skinOverride'] === undefined || isNullable(value['skinOverride'], isCursorSkin))
@@ -72,7 +86,10 @@ export function isActionEvent(value: unknown): boolean {
     isNullable(value['point'], isPoint) &&
     isBoundedString(value['label']) &&
     isPrimitiveRecord(value['data']) &&
-    isEnumValue(value['preset'], VideoProjectActionPreset)
+    isEnumValue(value['preset'], VideoProjectActionPreset) &&
+    (value['sourceAnchor'] === undefined || isSourceTimeAnchor(value['sourceAnchor'])) &&
+    (value['timeBasis'] === undefined ||
+      isEnumValue(value['timeBasis'], VideoProjectInteractionTimeBasis))
   );
 }
 

@@ -2,6 +2,12 @@ import { expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import { createVideoProjectMotionRegion } from '../../../features/video/project/motion/index';
 import type { VideoObjectTrack } from '../../../features/video/project/object-tracks';
+import { hydrateVideoProject } from '../../../features/video/project/hydration';
+import {
+  createProject,
+  createVideoClip,
+} from '../../../features/video/project/timeline/project-meta.test.helpers.ts';
+import type { VideoProject } from '../../../features/video/project/types';
 import { useVideoEditorStore } from '../../state/store';
 import { createWorkspaceProjectUpdaters } from './shared-actions';
 
@@ -25,7 +31,25 @@ it('generates a camera path from a hidden detected cursor track that needs ancho
   ]);
 });
 
-type TestVideoProject = ReturnType<typeof createEmptyVideoProject>;
+it('stamps manually authored actions and cursor samples with durable project-time ownership', () => {
+  const project = createProject([createVideoClip()]);
+  project.baseRecordingId = 'rec-asset-video';
+  project.source = { kind: 'recording', recordingId: 'rec-asset-video' };
+  const store = createStore(project);
+  const actions = createWorkspaceProjectUpdaters(store);
+
+  actions.enableCursorTrack();
+  actions.addActionEvent('CLICK_RIPPLE');
+
+  expect(project.cursorTrack?.samples[0]?.timeBasis).toBe('project');
+  expect(project.actionEvents[0]?.timeBasis).toBe('project');
+
+  const reloaded = hydrateVideoProject(project, { inferLegacyInteractionAnchors: true });
+  expect(reloaded.cursorTrack?.samples[0]).not.toHaveProperty('sourceAnchor');
+  expect(reloaded.actionEvents[0]).not.toHaveProperty('sourceAnchor');
+});
+
+type TestVideoProject = VideoProject;
 
 function createStore(project: TestVideoProject) {
   return {

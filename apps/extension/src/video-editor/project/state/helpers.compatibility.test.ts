@@ -16,10 +16,12 @@ import {
 } from '../../../features/video/project/types';
 import {
   applyProjectUpdate,
+  areClipTracksEditable,
   ensureTrackForKind,
   isTrackCompatibleWithClip,
   pruneUnusedProjectAssets,
 } from './helpers';
+import { resetVideoEditorProjectHistory } from '../history';
 
 function createClip(
   id: string,
@@ -94,12 +96,95 @@ it('checks helper compatibility guards and asset pruning branches', () => {
   expect(applyProjectUpdate({ project: null } as VideoEditorProjectState, () => project)).toEqual(
     {}
   );
+  expect(
+    applyProjectUpdate(
+      {
+        project,
+        projectHistory: resetVideoEditorProjectHistory(project.id),
+      } as VideoEditorProjectState,
+      (currentProject) => currentProject
+    )
+  ).toEqual({});
   expect(isTrackCompatibleWithClip(project.tracks[0]!, videoClip)).toBe(true);
   expect(isTrackCompatibleWithClip(project.tracks[1]!, videoClip)).toBe(false);
   expect(isTrackCompatibleWithClip(project.tracks[1]!, audioClip)).toBe(true);
+  expect(isTrackCompatibleWithClip(project.tracks[0]!, audioClip)).toBe(false);
   expect(isTrackCompatibleWithClip(subtitleTrack, videoClip)).toBe(false);
+  const subtitleClip = {
+    ...videoClip,
+    text: 'Subtitle',
+    type: VideoProjectClipType.SUBTITLE,
+  } as VideoProjectClip;
+  expect(isTrackCompatibleWithClip(subtitleTrack, subtitleClip)).toBe(true);
+  expect(isTrackCompatibleWithClip(project.tracks[0]!, subtitleClip)).toBe(false);
+  expect(areClipTracksEditable(project, ['missing'])).toBe(false);
 
-  const withAssets = { ...project, assets: [createAsset('asset-1'), createAsset('asset-2')] };
-  expect(pruneUnusedProjectAssets(withAssets).assets.map((asset) => asset.id)).toEqual(['asset-1']);
+  const shapeClip = {
+    ...videoClip,
+    embeddedAsset: {
+      assetId: 'asset-embedded',
+      placement: { height: 10, width: 10, x: 0, y: 0 },
+    },
+    id: 'shape-1',
+    shapeType: 'RECTANGLE',
+    style: { borderRadius: 0, fillColor: '#000', strokeColor: '#fff', strokeWidth: 1 },
+    type: VideoProjectClipType.SHAPE,
+  } as VideoProjectClip;
+  const withAssets = {
+    ...project,
+    assets: [createAsset('asset-1'), createAsset('asset-embedded'), createAsset('asset-2')],
+    clips: [...project.clips, shapeClip],
+  };
+  expect(pruneUnusedProjectAssets(withAssets).assets.map((asset) => asset.id)).toEqual([
+    'asset-1',
+    'asset-embedded',
+  ]);
   expect(pruneUnusedProjectAssets(project)).toBe(project);
+});
+
+it('records source-anchor reprojection in the same project history action', () => {
+  const project = createProject();
+  project.baseRecordingId = 'recording-1';
+  project.assets = [
+    {
+      ...createAsset('asset-1'),
+      source: { kind: 'recording', recordingId: 'recording-1' },
+      type: VideoProjectAssetType.RECORDING,
+    },
+  ];
+  project.actionEvents = [
+    {
+      data: {},
+      duration: 0,
+      id: 'anchored-action',
+      kind: 'CLICK',
+      label: 'Click',
+      point: null,
+      preset: 'CLICK_RIPPLE',
+      sourceAnchor: {
+        kind: 'recording-source',
+        recordingId: 'recording-1',
+        sourceClipId: 'video-1',
+        sourceTime: 1,
+      },
+      time: 1,
+    },
+  ];
+  const state = {
+    currentTime: 0,
+    placementMode: null,
+    project,
+    projectHistory: resetVideoEditorProjectHistory(project.id),
+    selection: { kind: 'scene' },
+    selectedTrackId: project.tracks[0]!.id,
+  } as VideoEditorProjectState;
+
+  const update = applyProjectUpdate(state, (currentProject) => ({
+    ...currentProject,
+    clips: currentProject.clips.map((clip) => ({ ...clip, startTime: 3 })),
+  }));
+
+  expect(update.project?.actionEvents[0]?.time).toBe(4);
+  expect(update.projectHistory?.past).toHaveLength(1);
+  expect(update.projectHistory?.past[0]?.actionEvents[0]?.time).toBe(1);
 });

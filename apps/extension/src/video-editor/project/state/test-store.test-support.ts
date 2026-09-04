@@ -54,7 +54,9 @@ export function createVideoEditorProjectTestStore() {
       set({ placementMode: createActionPointPlacementMode(actionEventId) }),
     setCurrentTime: (currentTime) => set({ currentTime }),
     setProject: (project) => {
-      const hydratedProject = hydrateVideoProject(project);
+      const hydratedProject = hydrateVideoProject(project, {
+        inferLegacyInteractionAnchors: true,
+      });
       const selection = resolveInitialVideoEditorSelection(hydratedProject);
       set({
         project: hydratedProject,

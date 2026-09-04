@@ -15,8 +15,10 @@ import {
   VideoTemporalEasing,
   VideoTimelinePlacementMode,
 } from '../types/index';
+import { hydrateRecordingInteractionAnchors } from './interaction-anchors';
 
 interface VideoProjectHydrationOptions {
+  inferLegacyInteractionAnchors?: boolean;
   legacyClipNames?: ReadonlyMap<string, string>;
   legacyTrackNames?: ReadonlyMap<string, string>;
 }
@@ -191,7 +193,11 @@ export function hydrateVideoProject(
     utilityLanes: getVideoProjectUtilityLanes(project),
   } satisfies VideoProject;
 
-  const synchronizedProject = syncProjectTransitions(hydratedProject);
+  const synchronizedProject = syncProjectTransitions(
+    hydrateRecordingInteractionAnchors(hydratedProject, {
+      inferMissing: options.inferLegacyInteractionAnchors === true,
+    })
+  );
   return {
     ...synchronizedProject,
     // Hydration normalizes a durable snapshot; merely opening it is not a workspace mutation.

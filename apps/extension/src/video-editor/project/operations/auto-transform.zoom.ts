@@ -14,16 +14,12 @@ import {
   RecordingTelemetrySignalKind,
   VideoMotionFocusMode,
   VideoProjectActionEventKind,
+  VideoProjectInteractionTimeBasis,
 } from '../../../features/video/project/types/interaction';
-import { mapSourceTimeToProjectTime } from './auto-transform.clip-timeline';
 import {
   resolveAutoZoomProfileVariant,
   type AutoZoomProfile,
 } from './auto-transform.zoom-profiles';
-import {
-  createRecordingTelemetryNormalizationParams,
-  normalizeRecordingActionEventsToProjectSpace,
-} from './telemetry';
 
 const AUTO_ZOOM_THROTTLE = 4;
 const AUTO_ZOOM_MIN_DURATION = 3;
@@ -83,30 +79,20 @@ function resolveAutoZoomProfile(
 function buildNormalizedRecordingClicks(params: {
   project: VideoProject;
   recordingId: string;
-  telemetry: RecordingTelemetryEntry;
 }): Click[] {
-  return normalizeRecordingActionEventsToProjectSpace(
-    params.telemetry.actionEvents,
-    createRecordingTelemetryNormalizationParams(params.telemetry, params.project)
-  )
+  return params.project.actionEvents
     .filter(
       (event): event is ActionEvent & { point: ActionPoint } =>
-        event.kind === VideoProjectActionEventKind.CLICK && event.point !== null
+        event.kind === VideoProjectActionEventKind.CLICK &&
+        event.point !== null &&
+        event.sourceAnchor?.recordingId === params.recordingId
     )
-    .map((event) => {
-      const time = mapSourceTimeToProjectTime(params.project, params.recordingId, event.time);
-      if (time === null) {
-        return null;
-      }
-
-      return {
-        id: event.id,
-        point: event.point,
-        sourceTime: event.time,
-        time,
-      };
-    })
-    .filter((event): event is Click => event !== null)
+    .map((event) => ({
+      id: event.id,
+      point: event.point,
+      sourceTime: event.sourceAnchor!.sourceTime,
+      time: event.time,
+    }))
     .sort((left, right) => left.time - right.time);
 }
 
@@ -195,7 +181,16 @@ export function buildAutoZoomRegions(params: BuildParams): MotionRegion[] {
   const typingSignals = getTelemetryTypingSignals(params.telemetry.signals);
   const project = params.project;
   const baseRegions = project.motionRegions ?? [];
-  const manualRegions = baseRegions.filter((region) => !region.id.startsWith('auto-motion:'));
+  const projectTimeActionIds = new Set(
+    project.actionEvents
+      .filter((event) => event.timeBasis === VideoProjectInteractionTimeBasis.PROJECT)
+      .map((event) => event.id)
+  );
+  const manualRegions = baseRegions.filter(
+    (region) =>
+      !region.id.startsWith('auto-motion:') ||
+      (region.targetActionEventId !== null && projectTimeActionIds.has(region.targetActionEventId))
+  );
   const autoRegions: MotionRegion[] = [];
   let lastAutoZoomTime = -Infinity;
 

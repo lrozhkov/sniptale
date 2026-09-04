@@ -2,12 +2,18 @@ import {
   getSourceTimedClipProjectDuration,
   normalizeClipPlaybackRate,
 } from '../../../features/video/project/timeline/basics';
+import { mapSourceTimeToProjectPoint } from '../../../features/video/project/timeline/source-time';
 import type {
   VideoProject,
   VideoProjectAudioClip,
   VideoProjectClip,
   VideoProjectVideoClip,
 } from '../../../features/video/project/types/model';
+import type {
+  VideoProjectActionEvent,
+  VideoProjectSourceTimeAnchor,
+} from '../../../features/video/project/types/interaction';
+import { VideoProjectInteractionTimeBasis } from '../../../features/video/project/types/interaction';
 import {
   VideoClipLinkMode,
   VideoProjectClipType,
@@ -93,20 +99,20 @@ export function collectRecordingSourceUnits(project: VideoProject, recordingId: 
 export function collectRepresentativeRecordingSourceClips(
   project: VideoProject,
   recordingId: string
-): SourceTimedClip[] {
-  const clipMap = new Map<string, SourceTimedClip>();
+): VideoProjectVideoClip[] {
+  const clipMap = new Map<string, VideoProjectVideoClip>();
 
   for (const clip of project.clips) {
-    if (!isRecordingSourceTimedClip(project, clip, recordingId)) {
+    if (
+      clip.type !== VideoProjectClipType.VIDEO ||
+      !isRecordingSourceTimedClip(project, clip, recordingId)
+    ) {
       continue;
     }
 
     const key = getSourceUnitKey(clip);
     const current = clipMap.get(key);
-    if (
-      !current ||
-      (current.type === VideoProjectClipType.AUDIO && clip.type === VideoProjectClipType.VIDEO)
-    ) {
+    if (!current) {
       clipMap.set(key, clip);
     }
   }
@@ -114,4 +120,273 @@ export function collectRepresentativeRecordingSourceClips(
   return [...clipMap.values()].sort(
     (left, right) => left.sourceStart - right.sourceStart || left.startTime - right.startTime
   );
+}
+
+interface AnchorProjection {
+  anchor: VideoProjectSourceTimeAnchor;
+  time: number;
+  timeScale: number;
+}
+
+const SOURCE_SPLIT_BOUNDARY_EPSILON = 0.000_001;
+
+function isValidPreviousAnchor(
+  anchor: VideoProjectSourceTimeAnchor,
+  recordingId: string,
+  previousClips: SourceTimedClip[]
+): boolean {
+  return (
+    anchor.recordingId === recordingId &&
+    mapSourceTimeToProjectPoint(
+      previousClips.filter((clip) => clip.id === anchor.sourceClipId),
+      anchor.sourceTime,
+      anchor.sourceClipId
+    ) !== null
+  );
+}
+
+function withoutSourceAnchor<T extends { sourceAnchor?: VideoProjectSourceTimeAnchor }>(
+  value: T
+): T {
+  const nextValue = {
+    ...value,
+    timeBasis: VideoProjectInteractionTimeBasis.PROJECT,
+  };
+  delete nextValue.sourceAnchor;
+  return nextValue;
+}
+
+function hasSourceTimelineChanged(
+  previousClips: SourceTimedClip[],
+  nextClips: SourceTimedClip[]
+): boolean {
+  if (previousClips.length !== nextClips.length) {
+    return true;
+  }
+
+  return previousClips.some((clip, index) => {
+    const nextClip = nextClips[index];
+    return (
+      !nextClip ||
+      clip.id !== nextClip.id ||
+      clip.startTime !== nextClip.startTime ||
+      clip.sourceStart !== nextClip.sourceStart ||
+      clip.sourceDuration !== nextClip.sourceDuration ||
+      normalizeClipPlaybackRate(clip.playbackRate ?? 1) !==
+        normalizeClipPlaybackRate(nextClip.playbackRate ?? 1)
+    );
+  });
+}
+
+function projectAnchor(
+  anchor: VideoProjectSourceTimeAnchor,
+  recordingId: string,
+  previousClips: SourceTimedClip[],
+  nextClips: SourceTimedClip[]
+): AnchorProjection | null {
+  if (anchor.recordingId !== recordingId) {
+    return null;
+  }
+
+  const previousClip = previousClips.find((clip) => clip.id === anchor.sourceClipId);
+  if (!previousClip) {
+    return null;
+  }
+
+  const previousClipIds = new Set(previousClips.map((clip) => clip.id));
+  const trailingSplitClips = nextClips.filter(
+    (clip) =>
+      !previousClipIds.has(clip.id) &&
+      clip.assetId === previousClip.assetId &&
+      Math.abs(clip.sourceStart - anchor.sourceTime) <= SOURCE_SPLIT_BOUNDARY_EPSILON
+  );
+  let point = mapSourceTimeToProjectPoint(trailingSplitClips, anchor.sourceTime);
+  point ??= mapSourceTimeToProjectPoint(
+    nextClips.filter((clip) => clip.id === anchor.sourceClipId),
+    anchor.sourceTime,
+    anchor.sourceClipId
+  );
+  if (!point) {
+    const sourceClipStillExists = nextClips.some((clip) => clip.id === anchor.sourceClipId);
+    if (!sourceClipStillExists) {
+      return null;
+    }
+
+    point = mapSourceTimeToProjectPoint(
+      nextClips.filter(
+        (clip) => !previousClipIds.has(clip.id) && clip.assetId === previousClip.assetId
+      ),
+      anchor.sourceTime
+    );
+  }
+  if (!point) {
+    return null;
+  }
+
+  const nextClip = nextClips.find((clip) => clip.id === point.clipId);
+  if (!nextClip) {
+    return null;
+  }
+
+  return {
+    anchor: { ...anchor, sourceClipId: point.clipId },
+    time: point.time,
+    timeScale:
+      normalizeClipPlaybackRate(previousClip.playbackRate ?? 1) /
+      normalizeClipPlaybackRate(nextClip.playbackRate ?? 1),
+  };
+}
+
+function reconcileActionEvents(
+  previousProject: VideoProject,
+  nextProject: VideoProject,
+  recordingId: string,
+  previousClips: SourceTimedClip[],
+  nextClips: SourceTimedClip[]
+): {
+  events: VideoProjectActionEvent[];
+  projections: Map<string, AnchorProjection>;
+} {
+  if (nextProject.actionEvents !== previousProject.actionEvents) {
+    return { events: nextProject.actionEvents, projections: new Map() };
+  }
+
+  const projections = new Map<string, AnchorProjection>();
+  const events = nextProject.actionEvents
+    .flatMap((event) => {
+      if (!event.sourceAnchor) {
+        return [event];
+      }
+      if (!isValidPreviousAnchor(event.sourceAnchor, recordingId, previousClips)) {
+        return [withoutSourceAnchor(event)];
+      }
+
+      const projection = projectAnchor(event.sourceAnchor, recordingId, previousClips, nextClips);
+      if (!projection) {
+        return [];
+      }
+
+      projections.set(event.id, projection);
+      return [
+        {
+          ...event,
+          duration: event.duration * projection.timeScale,
+          sourceAnchor: projection.anchor,
+          time: projection.time,
+        },
+      ];
+    })
+    .sort((left, right) => left.time - right.time);
+
+  return { events, projections };
+}
+
+function reconcileCursorTrack(
+  previousProject: VideoProject,
+  nextProject: VideoProject,
+  recordingId: string,
+  previousClips: SourceTimedClip[],
+  nextClips: SourceTimedClip[]
+): VideoProject['cursorTrack'] {
+  if (nextProject.cursorTrack !== previousProject.cursorTrack || nextProject.cursorTrack === null) {
+    return nextProject.cursorTrack;
+  }
+
+  const samples = nextProject.cursorTrack.samples
+    .flatMap((sample) => {
+      if (!sample.sourceAnchor) {
+        return [sample];
+      }
+      if (!isValidPreviousAnchor(sample.sourceAnchor, recordingId, previousClips)) {
+        return [withoutSourceAnchor(sample)];
+      }
+
+      const projection = projectAnchor(sample.sourceAnchor, recordingId, previousClips, nextClips);
+      return projection
+        ? [{ ...sample, sourceAnchor: projection.anchor, time: projection.time }]
+        : [];
+    })
+    .sort((left, right) => left.time - right.time);
+
+  return samples.length > 0 ? { ...nextProject.cursorTrack, samples } : null;
+}
+
+function reconcileMotionRegions(
+  previousProject: VideoProject,
+  nextProject: VideoProject,
+  nextEvents: VideoProjectActionEvent[],
+  actionProjections: Map<string, AnchorProjection>
+): VideoProject['motionRegions'] {
+  if (nextProject.motionRegions !== previousProject.motionRegions) {
+    return nextProject.motionRegions;
+  }
+
+  const previousEvents = new Map(previousProject.actionEvents.map((event) => [event.id, event]));
+  const nextEventIds = new Set(nextEvents.map((event) => event.id));
+  return (nextProject.motionRegions ?? []).flatMap((region) => {
+    if (!region.targetActionEventId) {
+      return [region];
+    }
+
+    const previousEvent = previousEvents.get(region.targetActionEventId);
+    if (!previousEvent?.sourceAnchor) {
+      return [region];
+    }
+    if (!nextEventIds.has(region.targetActionEventId)) {
+      return [];
+    }
+
+    const projection = actionProjections.get(region.targetActionEventId);
+    if (!projection) {
+      return [region];
+    }
+
+    return [
+      {
+        ...region,
+        duration: region.duration * projection.timeScale,
+        startTime: projection.time + (region.startTime - previousEvent.time) * projection.timeScale,
+        zoomInDuration: region.zoomInDuration * projection.timeScale,
+        zoomOutDuration: region.zoomOutDuration * projection.timeScale,
+      },
+    ];
+  });
+}
+
+export function reconcileRecordingInteractionAnchors(
+  previousProject: VideoProject,
+  nextProject: VideoProject
+): VideoProject {
+  const recordingId = previousProject.baseRecordingId;
+  if (!recordingId || nextProject.baseRecordingId !== recordingId) {
+    return nextProject;
+  }
+
+  const previousClips = collectRepresentativeRecordingSourceClips(previousProject, recordingId);
+  const nextClips = collectRepresentativeRecordingSourceClips(nextProject, recordingId);
+  if (!hasSourceTimelineChanged(previousClips, nextClips)) {
+    return nextProject;
+  }
+
+  const { events, projections } = reconcileActionEvents(
+    previousProject,
+    nextProject,
+    recordingId,
+    previousClips,
+    nextClips
+  );
+  const motionRegions = reconcileMotionRegions(previousProject, nextProject, events, projections);
+
+  return {
+    ...nextProject,
+    actionEvents: events,
+    cursorTrack: reconcileCursorTrack(
+      previousProject,
+      nextProject,
+      recordingId,
+      previousClips,
+      nextClips
+    ),
+    ...(motionRegions === undefined ? {} : { motionRegions }),
+  };
 }

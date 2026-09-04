@@ -15,7 +15,11 @@ import {
   resolvePlacementModeAfterProjectUpdate,
   resolvePlacementModeAfterSelectionChange,
 } from '../selection/placement';
-import { isSourceTimedClip, updateSourceTimedClipTiming } from '../operations/source-timed-clips';
+import {
+  isSourceTimedClip,
+  reconcileRecordingInteractionAnchors,
+  updateSourceTimedClipTiming,
+} from '../operations/source-timed-clips';
 import type { VideoEditorProjectState } from './contracts';
 import {
   resolveSelectedTrackIdFromSelection,
@@ -77,7 +81,9 @@ export function applyProjectUpdate(
   if (updatedProject === state.project) {
     return {};
   }
-  const nextProject = syncProjectDuration(updatedProject);
+  const nextProject = syncProjectDuration(
+    reconcileRecordingInteractionAnchors(state.project, updatedProject)
+  );
   return {
     ...applyProjectSnapshot(state, nextProject),
     projectHistory: recordVideoEditorProjectHistory(

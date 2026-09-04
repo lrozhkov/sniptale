@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isLegacyScrollActionEvent, mapSourceRangeToProjectSpans } from './source-time';
+import {
+  isLegacyScrollActionEvent,
+  mapProjectTimeToSourcePoint,
+  mapSourceRangeToProjectSpans,
+  mapSourceTimeToProjectPoint,
+} from './source-time';
 import { VideoProjectActionEventKind, VideoProjectActionPreset } from '../types/interaction';
 import { createVideoClip } from './project-meta.test.helpers.ts';
 
@@ -110,4 +115,35 @@ describe('timeline source-time helpers', () => {
     verifyNormalizedSourceRanges
   );
   it('treats scroll actions as legacy-only compatibility data', verifyLegacyScrollCompatibility);
+  it('maps source and project points bidirectionally with a stable preferred clip', () => {
+    const clips = [
+      createVideoClip({
+        duration: 4,
+        id: 'original',
+        playbackRate: 2,
+        sourceDuration: 8,
+        sourceStart: 0,
+        startTime: 3,
+      }),
+      createVideoClip({
+        duration: 4,
+        id: 'duplicate',
+        playbackRate: 2,
+        sourceDuration: 8,
+        sourceStart: 0,
+        startTime: 10,
+      }),
+    ];
+
+    expect(mapProjectTimeToSourcePoint(clips, 5)).toEqual({
+      clipId: 'original',
+      sourceTime: 4,
+      time: 5,
+    });
+    expect(mapSourceTimeToProjectPoint(clips, 4, 'duplicate')).toEqual({
+      clipId: 'duplicate',
+      sourceTime: 4,
+      time: 12,
+    });
+  });
 });

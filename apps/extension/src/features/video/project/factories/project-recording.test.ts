@@ -3,6 +3,9 @@ import { expect, it } from 'vitest';
 import { createVideoProjectFromRecording } from './creation';
 import { createRecordingProjectDocument } from './project-recording';
 import {
+  VideoCursorCaptureMode,
+  VideoProjectActionEventKind,
+  VideoProjectActionPreset,
   VideoProjectAssetType,
   VideoProjectClipType,
   VideoTrackKind,
@@ -50,6 +53,79 @@ it('creates a silent recording project and clamps tiny source duration', () => {
     VideoTrackKind.AUDIO,
     VideoTrackKind.OVERLAY,
   ]);
+});
+
+it('anchors recording interactions to the independent source clip', () => {
+  const project = createVideoProjectFromRecording({
+    actionEvents: [
+      {
+        data: {},
+        duration: 0,
+        id: 'click-1',
+        kind: VideoProjectActionEventKind.CLICK,
+        label: 'Click',
+        point: { x: 10, y: 20 },
+        preset: VideoProjectActionPreset.CLICK_RIPPLE,
+        time: 2,
+      },
+      {
+        data: {},
+        duration: 0,
+        id: 'manual-click',
+        kind: VideoProjectActionEventKind.CLICK,
+        label: 'Manual click',
+        point: null,
+        preset: VideoProjectActionPreset.CLICK_RIPPLE,
+        time: 3,
+        timeBasis: 'project',
+      },
+    ],
+    cursorTrack: {
+      captureMode: VideoCursorCaptureMode.SEPARATE,
+      samples: [
+        { id: 'cursor-1', time: 1, visible: true, x: 10, y: 20 },
+        {
+          id: 'manual-cursor',
+          time: 3,
+          timeBasis: 'project',
+          visible: true,
+          x: 30,
+          y: 40,
+        },
+      ],
+      skin: {
+        animationPreset: 'NONE',
+        color: '#fff',
+        hidden: false,
+        preset: 'ARROW',
+        scale: 1,
+        shadow: true,
+      },
+    },
+    duration: 4,
+    filename: 'anchored.webm',
+    height: 720,
+    mimeType: 'video/webm',
+    recordingId: 'rec-anchored',
+    size: 1024,
+    width: 1280,
+  });
+  const sourceClipId = project.clips.find((clip) => clip.type === VideoProjectClipType.VIDEO)?.id;
+
+  expect(project.actionEvents[0]?.sourceAnchor).toEqual({
+    kind: 'recording-source',
+    recordingId: 'rec-anchored',
+    sourceClipId,
+    sourceTime: 2,
+  });
+  expect(project.cursorTrack?.samples[0]?.sourceAnchor).toEqual({
+    kind: 'recording-source',
+    recordingId: 'rec-anchored',
+    sourceClipId,
+    sourceTime: 1,
+  });
+  expect(project.actionEvents[1]).not.toHaveProperty('sourceAnchor');
+  expect(project.cursorTrack?.samples[1]).not.toHaveProperty('sourceAnchor');
 });
 
 it('keeps provided recording assets, audio clips, and sidecar tracks together', () => {

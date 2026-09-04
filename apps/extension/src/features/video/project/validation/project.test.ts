@@ -142,6 +142,75 @@ it('accepts real project factory output at hydration and export boundaries', () 
   expect(isExportReadyVideoProject(project)).toBe(true);
 });
 
+it('requires recording anchor provenance and source references only at export readiness', () => {
+  const project = createProject();
+  const recordingId = 'recording-1';
+  const clip = project.clips[0]!;
+  const sourceAnchor = {
+    kind: 'recording-source' as const,
+    recordingId,
+    sourceClipId: clip.id,
+    sourceTime: 1,
+  };
+  const cursorSourceAnchor = { ...sourceAnchor, sourceTime: 0.5 };
+  const recordingProject = {
+    ...project,
+    baseRecordingId: recordingId,
+    source: { kind: 'recording' as const, recordingId },
+    assets: [
+      {
+        ...project.assets[0]!,
+        source: { kind: 'recording' as const, recordingId },
+      },
+    ],
+    actionEvents: [{ ...project.actionEvents[0]!, sourceAnchor }],
+    cursorTrack: {
+      ...project.cursorTrack!,
+      samples: [{ ...project.cursorTrack!.samples[0]!, sourceAnchor: cursorSourceAnchor }],
+    },
+  };
+
+  expect(isExportReadyVideoProject(recordingProject)).toBe(true);
+  expect(
+    isExportReadyVideoProject({
+      ...recordingProject,
+      actionEvents: [
+        {
+          ...recordingProject.actionEvents[0]!,
+          sourceAnchor: undefined,
+          timeBasis: 'project',
+        },
+      ],
+    })
+  ).toBe(true);
+  expect(
+    isExportReadyVideoProject({
+      ...recordingProject,
+      actionEvents: [{ ...recordingProject.actionEvents[0]!, sourceAnchor, timeBasis: 'project' }],
+    })
+  ).toBe(false);
+  expect(
+    isExportReadyVideoProject({
+      ...recordingProject,
+      actionEvents: [{ ...recordingProject.actionEvents[0]!, time: 4 }],
+    })
+  ).toBe(false);
+
+  for (const invalidAnchor of [
+    { ...sourceAnchor, recordingId: 'foreign-recording' },
+    { ...sourceAnchor, sourceClipId: 'missing-clip' },
+    { ...sourceAnchor, sourceTime: 10 },
+  ]) {
+    const invalidProject = {
+      ...recordingProject,
+      actionEvents: [{ ...recordingProject.actionEvents[0]!, sourceAnchor: invalidAnchor }],
+    };
+    expect(isHydratableVideoProject(invalidProject)).toBe(true);
+    expect(parseHydratableVideoProject(invalidProject)).toBe(invalidProject);
+    expect(isExportReadyVideoProject(invalidProject)).toBe(false);
+  }
+});
+
 it('rejects pre-public v1 projects at the hydration boundary', () => {
   const project = createProject();
 
@@ -193,6 +262,12 @@ it('rejects malformed nested clip, asset, track, cursor, and motion fields', () 
   expect(
     isHydratableVideoProject({
       ...project,
+      actionEvents: [{ ...project.actionEvents[0]!, timeBasis: 'source' }],
+    })
+  ).toBe(false);
+  expect(
+    isHydratableVideoProject({
+      ...project,
       tracks: [{ ...project.tracks[0]!, locked: 'false' }],
     })
   ).toBe(false);
@@ -202,6 +277,41 @@ it('rejects malformed nested clip, asset, track, cursor, and motion fields', () 
       cursorTrack: {
         ...project.cursorTrack!,
         samples: [{ ...project.cursorTrack!.samples[0]!, time: Number.POSITIVE_INFINITY }],
+      },
+    })
+  ).toBe(false);
+  expect(
+    isHydratableVideoProject({
+      ...project,
+      actionEvents: [
+        {
+          ...project.actionEvents[0]!,
+          sourceAnchor: {
+            kind: 'recording-source',
+            recordingId: 'recording-1',
+            sourceClipId: project.clips[0]!.id,
+            sourceTime: Number.POSITIVE_INFINITY,
+          },
+        },
+      ],
+    })
+  ).toBe(false);
+  expect(
+    isHydratableVideoProject({
+      ...project,
+      cursorTrack: {
+        ...project.cursorTrack!,
+        samples: [
+          {
+            ...project.cursorTrack!.samples[0]!,
+            sourceAnchor: {
+              kind: 'project-time',
+              recordingId: 'recording-1',
+              sourceClipId: project.clips[0]!.id,
+              sourceTime: 1,
+            },
+          },
+        ],
       },
     })
   ).toBe(false);

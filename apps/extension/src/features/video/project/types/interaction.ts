@@ -120,10 +120,31 @@ export type VideoProjectSource =
       scenarioProjectId: string;
     };
 
+/**
+ * Immutable recording provenance for an interaction whose rendered `time` is projected into the
+ * editable project timeline. `sourceClipId` keeps duplicated uses of the same source range from
+ * stealing the interaction; split operations may migrate it to the newly created trailing clip.
+ */
+export interface VideoProjectSourceTimeAnchor {
+  kind: 'recording-source';
+  recordingId: string;
+  sourceClipId: string;
+  sourceTime: number;
+}
+
+export const VideoProjectInteractionTimeBasis = {
+  PROJECT: 'project',
+} as const;
+
+export type VideoProjectInteractionTimeBasis =
+  (typeof VideoProjectInteractionTimeBasis)[keyof typeof VideoProjectInteractionTimeBasis];
+
 export interface VideoProjectCursorSample {
   id: string;
   interpolation?: VideoTemporalEasing;
   skinOverride?: VideoProjectCursorSkin | null;
+  sourceAnchor?: VideoProjectSourceTimeAnchor;
+  timeBasis?: VideoProjectInteractionTimeBasis;
   time: number;
   x: number;
   y: number;
@@ -159,6 +180,8 @@ export interface VideoProjectActionEvent {
   label: string;
   data: Record<string, string | number | boolean | null>;
   preset: VideoProjectActionPreset;
+  sourceAnchor?: VideoProjectSourceTimeAnchor;
+  timeBasis?: VideoProjectInteractionTimeBasis;
 }
 
 export const RecordingTelemetrySignalKind = {
