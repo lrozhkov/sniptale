@@ -198,3 +198,4 @@ export {
   type VideoProjectClipLogicalLaneAssignment,
 } from './logical-lanes';
 export { canSplitProjectClipAtTime, MINIMUM_CLIP_SPLIT_EDGE_SECONDS } from './split-eligibility';
+export { areProjectClipsEditable, canEditProjectClip } from './clip-editability';

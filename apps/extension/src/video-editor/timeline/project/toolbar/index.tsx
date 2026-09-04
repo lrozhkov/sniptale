@@ -16,6 +16,7 @@ type ToolbarTrailingControlsInput = Pick<
 >;
 
 function createToolbarLeadingControlsProps({
+  canEditSelectedClip,
   insertion,
   canSplitSelectedClip,
   selectedClip,
@@ -26,6 +27,7 @@ function createToolbarLeadingControlsProps({
   onSplitSelectedClip,
 }: Pick<
   ProjectTimelineToolbarProps,
+  | 'canEditSelectedClip'
   | 'insertion'
   | 'canSplitSelectedClip'
   | 'selectedClip'
@@ -36,6 +38,7 @@ function createToolbarLeadingControlsProps({
   | 'onSplitSelectedClip'
 >) {
   return {
+    canEditSelectedClip,
     insertion,
     canSplitSelectedClip,
     selectedClip,

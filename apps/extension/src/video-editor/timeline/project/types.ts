@@ -43,6 +43,7 @@ export interface ProjectTimelineInsertionActions {
 }
 
 export interface ProjectTimelineProps {
+  canEditSelectedClip: boolean;
   canSplitSelectedClip: boolean;
   historyTransaction: VideoEditorProjectHistoryTransactionActions;
   project: VideoProject;

@@ -32,6 +32,7 @@ afterEach(() => {
 
 function renderLeadingControls(options?: {
   canAutoTransformRecording?: boolean;
+  canEditSelectedClip?: boolean;
   canSplitSelectedClip?: boolean;
   selectedClip?: boolean;
 }) {
@@ -52,6 +53,7 @@ function renderLeadingControls(options?: {
     root?.render(
       <ProjectTimelineToolbarLeadingControls
         canAutoTransformRecording={options?.canAutoTransformRecording ?? false}
+        canEditSelectedClip={options?.canEditSelectedClip ?? options?.selectedClip ?? false}
         canSplitSelectedClip={options?.canSplitSelectedClip ?? options?.selectedClip ?? false}
         insertion={{
           onAddActionEvent: vi.fn(),

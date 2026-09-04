@@ -67,6 +67,10 @@ export const videoEditorTimelineMessages = defineMessageSource({
     ru: 'Переместите позицию воспроизведения внутрь выбранного клипа',
     en: 'Move the playhead inside the selected clip',
   },
+  clipLockedTitle: {
+    ru: 'Разблокируйте дорожку, чтобы редактировать выбранный клип',
+    en: 'Unlock the track to edit the selected clip',
+  },
   duplicate: {
     ru: 'Копия',
     en: 'Duplicate',

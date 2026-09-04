@@ -327,3 +327,95 @@ it('selects the trailing standalone effect host after splitting it', () => {
   });
   expect(state.projectHistory.past).toHaveLength(1);
 });
+
+it('selects the created duplicate and records one history entry', () => {
+  const runtime = createMutableState();
+  const actions = createVideoEditorProjectClipTimelineActions(runtime.set);
+  seedSingleClipState(runtime);
+  runtime.set({ currentTime: 2.5 });
+
+  actions.duplicateClip('clip-1');
+
+  const state = runtime.getState();
+  const selectedId = state.selection.kind === 'clip' ? state.selection.clipId : null;
+  expect(state.currentTime).toBe(2.5);
+  expect(selectedId).not.toBe('clip-1');
+  expect(state.project?.clips.find((clip) => clip.id === selectedId)).toMatchObject({
+    name: expect.stringContaining('Clip 1'),
+    type: VideoProjectClipType.VIDEO,
+  });
+  expect(state.projectHistory.past).toHaveLength(1);
+});
+
+it('keeps project selection and history unchanged for missing or locked duplicate targets', () => {
+  const runtime = createMutableState();
+  const actions = createVideoEditorProjectClipTimelineActions(runtime.set);
+  seedSingleClipState(runtime, true);
+  const before = runtime.getState();
+
+  actions.duplicateClip('missing');
+  actions.duplicateClip('clip-1');
+
+  expect(runtime.getState().project).toBe(before.project);
+  expect(runtime.getState().selection).toBe(before.selection);
+  expect(runtime.getState().projectHistory.past).toHaveLength(0);
+});
+
+it('ignores duplicate requests while no project is loaded', () => {
+  const runtime = createMutableState();
+  runtime.set({ project: null });
+  const before = runtime.getState();
+
+  createVideoEditorProjectClipTimelineActions(runtime.set).duplicateClip('clip-1');
+
+  expect(runtime.getState()).toEqual(before);
+});
+
+it('selects the duplicated counterpart of the originally selected linked clip', () => {
+  const runtime = createMutableState();
+  const actions = createVideoEditorProjectClipTimelineActions(runtime.set);
+  seedLinkedClipState(runtime);
+  runtime.set({ selection: { kind: 'clip', clipId: 'video-1' } });
+
+  actions.duplicateClip('video-1');
+
+  const state = runtime.getState();
+  const selectedId = state.selection.kind === 'clip' ? state.selection.clipId : null;
+  const selected = state.project?.clips.find((clip) => clip.id === selectedId);
+  expect(selected).toMatchObject({ type: VideoProjectClipType.VIDEO });
+  expect(selected?.groupId).not.toBe('group-1');
+  expect(
+    state.project?.clips.some(
+      (clip) =>
+        clip.type === VideoProjectClipType.AUDIO &&
+        clip.groupId === selected?.groupId &&
+        clip.linkMode === VideoClipLinkMode.LINKED
+    )
+  ).toBe(true);
+});
+
+it('selects the duplicated standalone effect host and its paired instance', () => {
+  const runtime = createMutableState();
+  const actions = createVideoEditorProjectClipTimelineActions(runtime.set);
+  const project = createProjectWithEffects();
+  const host = project.clips.find(
+    (clip) => clip.type === VideoProjectClipType.EFFECT && clip.startTime === 1
+  )!;
+  runtime.set({
+    project,
+    projectHistory: resetVideoEditorProjectHistory(project.id),
+    selection: { kind: 'clip', clipId: host.id },
+  });
+
+  actions.duplicateClip(host.id);
+
+  const state = runtime.getState();
+  const selectedId = state.selection.kind === 'clip' ? state.selection.clipId : null;
+  const duplicate = state.project?.clips.find((clip) => clip.id === selectedId);
+  expect(duplicate).toMatchObject({ type: VideoProjectClipType.EFFECT });
+  const effectInstanceId =
+    duplicate?.type === VideoProjectClipType.EFFECT ? duplicate.effectInstanceId : null;
+  expect(state.project?.effectInstances?.some((instance) => instance.id === effectInstanceId)).toBe(
+    true
+  );
+});

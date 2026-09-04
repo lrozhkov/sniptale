@@ -79,16 +79,36 @@ export function splitProjectClipsAtTimeWithResult(
 }
 
 export function duplicateProjectClips(project: VideoProject, clipId: string): VideoProject {
+  return duplicateProjectClipsWithResult(project, clipId)?.project ?? project;
+}
+
+interface ProjectClipDuplicateMutationResult {
+  duplicateClipId: string;
+  duplicateTrackId: string;
+  project: VideoProject;
+}
+
+export function duplicateProjectClipsWithResult(
+  project: VideoProject,
+  clipId: string
+): ProjectClipDuplicateMutationResult | null {
   const operation = resolveEditableClipOperation(project, clipId);
-  if (!operation) {
-    return project;
-  }
+  if (!operation) return null;
   if (operation.clip.type === VideoProjectClipType.EFFECT) {
-    return duplicateStandaloneEffectHost(project, clipId)?.project ?? project;
+    const result = duplicateStandaloneEffectHost(project, clipId);
+    const duplicateHost = result?.project.clips.find((clip) => clip.id === result.hostClipId);
+    return result && duplicateHost
+      ? {
+          duplicateClipId: duplicateHost.id,
+          duplicateTrackId: duplicateHost.trackId,
+          project: result.project,
+        }
+      : null;
   }
 
   const duplicateGroupId = operation.clipIds.length > 1 ? createClipGroupId() : null;
   const duplicateIds: string[] = [];
+  let duplicateClipId: string | null = null;
   const nextProject = applyVideoProjectMutationPatch(project, {
     clips: project.clips.flatMap((item) => {
       if (!operation.clipIdSet.has(item.id)) {
@@ -106,10 +126,19 @@ export function duplicateProjectClips(project: VideoProject, clipId: string): Vi
       } as VideoProjectClip;
 
       duplicateIds.push(duplicate.id);
+      if (item.id === clipId) duplicateClipId = duplicate.id;
       return [item, duplicate];
     }),
   });
-  return applyTimelinePlacementPolicy(nextProject, duplicateIds);
+  const placedProject = applyTimelinePlacementPolicy(nextProject, duplicateIds);
+  const selectedDuplicate = placedProject.clips.find((clip) => clip.id === duplicateClipId);
+  return selectedDuplicate
+    ? {
+        duplicateClipId: selectedDuplicate.id,
+        duplicateTrackId: selectedDuplicate.trackId,
+        project: placedProject,
+      }
+    : null;
 }
 
 function splitProjectClip(

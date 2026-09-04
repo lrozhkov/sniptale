@@ -7,6 +7,7 @@ import { isRecordingTelemetryEligibleForAutoProcessing } from '../../project/ope
 
 type ProjectTimelineSurfaceProps = Pick<
   ProjectTimelineProps & ReturnType<typeof useProjectTimelineState>,
+  | 'canEditSelectedClip'
   | 'currentTime'
   | 'canSplitSelectedClip'
   | 'fitSelectionDuration'
@@ -47,6 +48,7 @@ export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
       ].join(' ')}
     >
       <ProjectTimelineToolbar
+        canEditSelectedClip={props.canEditSelectedClip}
         canSplitSelectedClip={props.canSplitSelectedClip}
         currentTime={props.currentTime}
         duration={props.project.duration}

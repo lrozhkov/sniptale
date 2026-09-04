@@ -9,6 +9,7 @@ function getActionDisabled(selectedClip: boolean) {
 }
 
 export function ProjectTimelineClipActions({
+  canEditSelectedClip,
   canSplitSelectedClip,
   selectedClip,
   onDeleteSelectedClip,
@@ -16,13 +17,14 @@ export function ProjectTimelineClipActions({
   onSplitSelectedClip,
 }: Pick<
   ProjectTimelineToolbarProps,
+  | 'canEditSelectedClip'
   | 'canSplitSelectedClip'
   | 'selectedClip'
   | 'onDeleteSelectedClip'
   | 'onDuplicateSelectedClip'
   | 'onSplitSelectedClip'
 >) {
-  const disabled = getActionDisabled(selectedClip);
+  const disabled = getActionDisabled(selectedClip) || !canEditSelectedClip;
 
   return (
     <>
@@ -31,14 +33,14 @@ export function ProjectTimelineClipActions({
         icon={<Scissors size={14} strokeWidth={2} />}
         label={getClipActionLabel('split')}
         onClick={onSplitSelectedClip}
-        title={getSplitActionTitle(canSplitSelectedClip)}
+        title={getSplitActionTitle(canSplitSelectedClip, canEditSelectedClip)}
       />
       <ProjectTimelineToolbarActionButton
         disabled={disabled}
         icon={<Copy size={14} strokeWidth={2} />}
         label={getClipActionLabel('duplicate')}
         onClick={onDuplicateSelectedClip}
-        title={getClipActionTitle('duplicate', disabled)}
+        title={getClipActionTitle('duplicate', disabled, canEditSelectedClip)}
       />
       <ProjectTimelineToolbarActionButton
         danger
@@ -46,7 +48,7 @@ export function ProjectTimelineClipActions({
         icon={<Trash2 size={14} strokeWidth={2} />}
         label={getClipActionLabel('delete')}
         onClick={onDeleteSelectedClip}
-        title={getClipActionTitle('delete', disabled)}
+        title={getClipActionTitle('delete', disabled, canEditSelectedClip)}
       />
     </>
   );

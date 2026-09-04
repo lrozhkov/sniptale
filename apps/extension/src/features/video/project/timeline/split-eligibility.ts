@@ -1,5 +1,6 @@
 import type { VideoProject } from '../types';
 import { getLinkedClipIds } from './basics';
+import { canEditProjectClip } from './clip-editability';
 
 export const MINIMUM_CLIP_SPLIT_EDGE_SECONDS = 0.05;
 
@@ -9,14 +10,11 @@ export function canSplitProjectClipAtTime(
   splitTime: number
 ): boolean {
   const clipIds = getLinkedClipIds(project, clipId);
-  if (clipIds.length === 0) return false;
+  if (!canEditProjectClip(project, clipId)) return false;
 
   return clipIds.every((affectedClipId) => {
     const clip = project.clips.find((item) => item.id === affectedClipId);
     if (!clip) return false;
-    const track = project.tracks.find((item) => item.id === clip.trackId);
-    if (!track || track.locked) return false;
-
     const startOffset = splitTime - clip.startTime;
     const endOffset = clip.duration - startOffset;
     const tolerance =

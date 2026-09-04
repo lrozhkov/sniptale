@@ -119,6 +119,10 @@ it('projects valid selected-clip split eligibility into the timeline controller'
     );
 
   expect(createController().state.canSplitSelectedClip).toBe(true);
+  expect(createController().state.canEditSelectedClip).toBe(true);
+  project.tracks.find((track) => track.id === 'track-video')!.locked = true;
+  expect(createController().state.canEditSelectedClip).toBe(false);
+  project.tracks.find((track) => track.id === 'track-video')!.locked = false;
   store.currentTime = 0.05;
   expect(createController().state.canSplitSelectedClip).toBe(false);
   store.selectedClipId = null;

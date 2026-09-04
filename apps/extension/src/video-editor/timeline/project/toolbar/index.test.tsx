@@ -50,6 +50,7 @@ function createInsertionActions() {
 function createToolbarProps(): ProjectTimelineToolbarTestProps {
   return {
     canAutoTransformRecording: true,
+    canEditSelectedClip: true,
     canSplitSelectedClip: true,
     currentTime: 12,
     duration: 45,

@@ -36,6 +36,7 @@ function renderSurface(
 ) {
   return renderToStaticMarkup(
     <ProjectTimelineSurface
+      canEditSelectedClip={false}
       canSplitSelectedClip={false}
       currentTime={0}
       fitSelectionDuration={null}

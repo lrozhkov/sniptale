@@ -21,5 +21,11 @@ describe('clip actions labels', () => {
       'translated:videoEditor.timeline.splitUnavailableTitle'
     );
     expect(getSplitActionTitle(true)).toBe('translated:videoEditor.timeline.split');
+    expect(getClipActionTitle('duplicate', true, false)).toBe(
+      'translated:videoEditor.timeline.clipLockedTitle'
+    );
+    expect(getSplitActionTitle(false, false)).toBe(
+      'translated:videoEditor.timeline.clipLockedTitle'
+    );
   });
 });

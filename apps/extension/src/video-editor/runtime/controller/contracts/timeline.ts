@@ -12,6 +12,7 @@ import type { VideoEditorWorkspaceState } from '../workspace-state';
 import type { VideoEditorInsertionActions } from './insertion';
 
 interface VideoEditorTimelineState {
+  canEditSelectedClip: boolean;
   canSplitSelectedClip: boolean;
   currentTime: number;
   isPlaying: boolean;

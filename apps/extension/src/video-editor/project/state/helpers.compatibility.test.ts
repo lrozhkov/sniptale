@@ -117,6 +117,14 @@ it('checks helper compatibility guards and asset pruning branches', () => {
   } as VideoProjectClip;
   expect(isTrackCompatibleWithClip(subtitleTrack, subtitleClip)).toBe(true);
   expect(isTrackCompatibleWithClip(project.tracks[0]!, subtitleClip)).toBe(false);
+  expect(areClipTracksEditable(project, ['video-1', 'audio-1'])).toBe(true);
+  const lockedLinkedProject = {
+    ...project,
+    tracks: project.tracks.map((track) =>
+      track.id === project.tracks[1]!.id ? { ...track, locked: true } : track
+    ),
+  };
+  expect(areClipTracksEditable(lockedLinkedProject, ['video-1', 'audio-1'])).toBe(false);
   expect(areClipTracksEditable(project, ['missing'])).toBe(false);
 
   const shapeClip = {

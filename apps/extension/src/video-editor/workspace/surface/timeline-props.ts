@@ -23,6 +23,7 @@ function getProjectTimelineStateProps(
   controller: VideoEditorTimelineController
 ): Pick<
   ProjectTimelineProps,
+  | 'canEditSelectedClip'
   | 'canSplitSelectedClip'
   | 'currentTime'
   | 'isPlaying'
@@ -38,6 +39,7 @@ function getProjectTimelineStateProps(
   | 'timelinePreviews'
 > {
   return {
+    canEditSelectedClip: controller.state.canEditSelectedClip,
     canSplitSelectedClip: controller.state.canSplitSelectedClip,
     currentTime: controller.state.currentTime,
     isPlaying: controller.state.isPlaying,

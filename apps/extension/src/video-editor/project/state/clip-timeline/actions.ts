@@ -10,12 +10,11 @@ import {
 } from '../helpers';
 import {
   closeProjectTrackGap,
-  duplicateProjectClips,
   moveProjectClip,
   trimProjectClipEnd,
   trimProjectClipStart,
 } from './mutations';
-import { splitProjectClipsAtTimeWithResult } from './split';
+import { duplicateProjectClipsWithResult, splitProjectClipsAtTimeWithResult } from './split';
 
 type VideoEditorStoreSet = VideoEditorProjectSliceSet;
 
@@ -39,13 +38,26 @@ export function createVideoEditorProjectClipTimelineActions(
     trimClipEnd: createClipTimingAction(set, trimProjectClipEnd),
     splitClipAt: createSplitClipAction(set),
     deleteClip: createDeleteClipAction(set),
-    duplicateClip: (clipId) =>
-      set((state) =>
-        applyProjectUpdate(state, (project) => duplicateProjectClips(project, clipId))
-      ),
+    duplicateClip: createDuplicateClipAction(set),
     detachClipGroup: (clipId) =>
       set((state) => applyProjectUpdate(state, (project) => detachLinkedClips(project, clipId))),
   };
+}
+
+function createDuplicateClipAction(
+  set: VideoEditorStoreSet
+): VideoEditorProjectState['duplicateClip'] {
+  return (clipId) =>
+    set((state) => {
+      if (!state.project) return {};
+      const result = duplicateProjectClipsWithResult(state.project, clipId);
+      if (!result) return {};
+      return {
+        ...applyProjectUpdate(state, () => result.project),
+        selection: { kind: VideoEditorSelectionKind.CLIP, clipId: result.duplicateClipId },
+        selectedTrackId: result.duplicateTrackId,
+      };
+    });
 }
 
 function createSplitClipAction(set: VideoEditorStoreSet): VideoEditorProjectState['splitClipAt'] {

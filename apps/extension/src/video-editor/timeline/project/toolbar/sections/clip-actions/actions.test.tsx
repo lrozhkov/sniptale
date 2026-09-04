@@ -28,7 +28,11 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function renderClipActions(selectedClip: boolean, canSplitSelectedClip = selectedClip) {
+function renderClipActions(
+  selectedClip: boolean,
+  canSplitSelectedClip = selectedClip,
+  canEditSelectedClip = selectedClip
+) {
   if (!container) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -42,6 +46,7 @@ function renderClipActions(selectedClip: boolean, canSplitSelectedClip = selecte
   act(() => {
     root?.render(
       <ProjectTimelineClipActions
+        canEditSelectedClip={canEditSelectedClip}
         canSplitSelectedClip={canSplitSelectedClip}
         selectedClip={selectedClip}
         onDeleteSelectedClip={onDeleteSelectedClip}
@@ -103,4 +108,23 @@ it('disables only Split and explains how to make the cut point valid', () => {
   expect(handlers.onSplitSelectedClip).not.toHaveBeenCalled();
   expect(handlers.onDuplicateSelectedClip).toHaveBeenCalledOnce();
   expect(handlers.onDeleteSelectedClip).toHaveBeenCalledOnce();
+});
+
+it('disables every edit action for a locked clip while preserving accessible names', () => {
+  const handlers = renderClipActions(true, false, false);
+  const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
+
+  expect(buttons.every((button) => button.disabled)).toBe(true);
+  expect(buttons.every((button) => button.title === 'videoEditor.timeline.clipLockedTitle')).toBe(
+    true
+  );
+  expect(buttons.map((button) => button.getAttribute('aria-label'))).toEqual([
+    'videoEditor.timeline.split',
+    'videoEditor.timeline.duplicate',
+    'videoEditor.timeline.delete',
+  ]);
+  act(() => buttons.forEach((button) => button.click()));
+  expect(handlers.onSplitSelectedClip).not.toHaveBeenCalled();
+  expect(handlers.onDuplicateSelectedClip).not.toHaveBeenCalled();
+  expect(handlers.onDeleteSelectedClip).not.toHaveBeenCalled();
 });

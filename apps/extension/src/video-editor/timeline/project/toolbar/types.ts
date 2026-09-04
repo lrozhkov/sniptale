@@ -3,6 +3,7 @@ import type { VideoEditorPlaybackRange } from '../../../interaction/playback/ran
 import type { VideoAutoProcessingSettings } from '@sniptale/runtime-contracts/video/types/types';
 
 export interface ProjectTimelineToolbarProps {
+  canEditSelectedClip: boolean;
   canSplitSelectedClip: boolean;
   currentTime: number;
   duration: number;

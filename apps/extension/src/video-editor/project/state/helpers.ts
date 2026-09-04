@@ -4,7 +4,11 @@ import {
 } from '../../../features/video/project/factories/creation';
 import { clampNumber } from '../../../features/video/project/hydration';
 import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
-import { getLinkedClipIds, syncProjectDuration } from '../../../features/video/project/timeline';
+import {
+  areProjectClipsEditable,
+  getLinkedClipIds,
+  syncProjectDuration,
+} from '../../../features/video/project/timeline';
 import type { VideoProject, VideoProjectClip } from '../../../features/video/project/types/index';
 import {
   VideoClipLinkMode,
@@ -177,15 +181,7 @@ export function isTrackCompatibleWithClip(
 }
 
 export function areClipTracksEditable(project: VideoProject, clipIds: string[]): boolean {
-  return clipIds.every((clipId) => {
-    const clip = project.clips.find((item) => item.id === clipId);
-    if (!clip) {
-      return false;
-    }
-
-    const track = project.tracks.find((item) => item.id === clip.trackId);
-    return Boolean(track && !track.locked);
-  });
+  return areProjectClipsEditable(project, clipIds);
 }
 
 export function detachLinkedClips(project: VideoProject, clipId: string): VideoProject {

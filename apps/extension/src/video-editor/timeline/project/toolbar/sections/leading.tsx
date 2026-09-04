@@ -47,6 +47,7 @@ function ProjectTimelineAutoTransformButton(props: {
 
 export function ProjectTimelineToolbarLeadingControls({
   canAutoTransformRecording,
+  canEditSelectedClip,
   canSplitSelectedClip,
   insertion,
   selectedClip,
@@ -57,6 +58,7 @@ export function ProjectTimelineToolbarLeadingControls({
 }: Pick<
   ProjectTimelineToolbarProps,
   | 'canAutoTransformRecording'
+  | 'canEditSelectedClip'
   | 'canSplitSelectedClip'
   | 'insertion'
   | 'selectedClip'
@@ -73,6 +75,7 @@ export function ProjectTimelineToolbarLeadingControls({
       ) : null}
       {selectedClip ? (
         <ProjectTimelineClipActions
+          canEditSelectedClip={canEditSelectedClip}
           canSplitSelectedClip={canSplitSelectedClip}
           selectedClip
           onDeleteSelectedClip={onDeleteSelectedClip}

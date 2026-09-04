@@ -413,8 +413,33 @@ test('video editor focused timeline reveals contextual clip actions', async ({
     'title',
     translate('videoEditor.timeline.splitUnavailableTitle', 'ru')
   );
-  await expect(timeline.getByText(translate('videoEditor.timeline.duplicate', 'ru'))).toBeVisible();
-  await expect(timeline.getByText(translate('videoEditor.timeline.delete', 'ru'))).toBeVisible();
+  const duplicateButton = timeline.getByRole('button', {
+    name: translate('videoEditor.timeline.duplicate', 'ru'),
+  });
+  const deleteButton = timeline.getByRole('button', {
+    name: translate('videoEditor.timeline.delete', 'ru'),
+  });
+  await expect(duplicateButton).toBeEnabled();
+  await expect(deleteButton).toBeEnabled();
+
+  const titleTrackRow = timeline
+    .locator('[data-ui="video-editor.timeline.track-select"]')
+    .filter({ hasText: 'Titles' })
+    .locator('..');
+  await titleTrackRow
+    .getByRole('button', { name: translate('videoEditor.timeline.trackEditable', 'ru') })
+    .click();
+  await expect(splitButton).toBeDisabled();
+  await expect(duplicateButton).toBeDisabled();
+  await expect(deleteButton).toBeDisabled();
+  await expect(splitButton).toHaveAttribute(
+    'title',
+    translate('videoEditor.timeline.clipLockedTitle', 'ru')
+  );
+  await titleTrackRow
+    .getByRole('button', { name: translate('videoEditor.timeline.trackLocked', 'ru') })
+    .click();
+
   const clipBox = await timelineClip.boundingBox();
   const rulerBox = await timeline.locator('[data-ui="video-editor.timeline.ruler"]').boundingBox();
   if (!clipBox || !rulerBox) throw new Error('Expected clip and ruler bounds for Split proof');
@@ -422,10 +447,19 @@ test('video editor focused timeline reveals contextual clip actions', async ({
   await expect(splitButton).toBeEnabled();
   await splitButton.click();
   await expect(page.locator('[data-project-timeline-clip]')).toHaveCount(2);
+  const splitPartName = `Intro title · ${translate('shared.projectActions.splitPartSuffix', 'ru')} 2`;
   await expect(
     page
       .locator('[data-ui="video-editor.floating.context-inspector"]')
-      .getByText(`Intro title · ${translate('shared.projectActions.splitPartSuffix', 'ru')} 2`, {
+      .getByText(splitPartName, { exact: true })
+      .first()
+  ).toBeVisible();
+  await duplicateButton.click();
+  await expect(page.locator('[data-project-timeline-clip]')).toHaveCount(3);
+  await expect(
+    page
+      .locator('[data-ui="video-editor.floating.context-inspector"]')
+      .getByText(`${splitPartName} ${translate('shared.projectActions.copySuffix', 'ru')}`, {
         exact: true,
       })
       .first()

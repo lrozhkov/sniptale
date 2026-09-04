@@ -14,14 +14,29 @@ export function getClipActionLabel(kind: ClipActionKind): string {
   }
 }
 
-export function getClipActionTitle(kind: ClipActionKind, disabled: boolean): string {
+export function getClipActionTitle(
+  kind: ClipActionKind,
+  disabled: boolean,
+  canEditSelectedClip = true
+): string {
+  if (disabled && !canEditSelectedClip) {
+    return translate('videoEditor.timeline.clipLockedTitle');
+  }
+
   return getTimelineActionTitle({
     disabled,
     label: getClipActionLabel(kind),
   });
 }
 
-export function getSplitActionTitle(canSplitSelectedClip: boolean): string {
+export function getSplitActionTitle(
+  canSplitSelectedClip: boolean,
+  canEditSelectedClip = true
+): string {
+  if (!canEditSelectedClip) {
+    return translate('videoEditor.timeline.clipLockedTitle');
+  }
+
   return canSplitSelectedClip
     ? getClipActionLabel('split')
     : translate('videoEditor.timeline.splitUnavailableTitle');
