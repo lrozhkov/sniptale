@@ -102,6 +102,8 @@ function getTimelineInteractionActionProps(controller: VideoEditorTimelineContro
     onSeek: controller.actions.onSeek,
     onSeekToEnd: controller.actions.onSeekToEnd,
     onSeekToStart: controller.actions.onSeekToStart,
+    onStepToNextFrame: controller.actions.onStepToNextFrame,
+    onStepToPreviousFrame: controller.actions.onStepToPreviousFrame,
     onSelectActionSegment: controller.actions.onSelectActionSegment,
     onSelectClip: controller.actions.onSelectClip,
     onSelectCursorSegment: controller.actions.onSelectCursorSegment,

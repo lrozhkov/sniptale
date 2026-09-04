@@ -1,4 +1,4 @@
-import { Pause, Play, RotateCcw, SkipBack, SkipForward } from 'lucide-react';
+import { Pause, Play, RotateCcw, SkipBack, SkipForward, StepBack, StepForward } from 'lucide-react';
 
 import { translate } from '../../../../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -87,6 +87,29 @@ function PlaybackSeekToEndButton(props: { onSeekToEnd: () => void }) {
   );
 }
 
+function PlaybackFrameStepButton(props: { direction: 'next' | 'previous'; onStep: () => void }) {
+  const label = translate(
+    props.direction === 'previous'
+      ? 'videoEditor.timeline.previousFrame'
+      : 'videoEditor.timeline.nextFrame'
+  );
+  return (
+    <ContentToolbarButton
+      type="button"
+      onClick={props.onStep}
+      className={toolbarIconButtonClassName}
+      aria-label={label}
+      title={label}
+    >
+      {props.direction === 'previous' ? (
+        <StepBack size={14} strokeWidth={2} />
+      ) : (
+        <StepForward size={14} strokeWidth={2} />
+      )}
+    </ContentToolbarButton>
+  );
+}
+
 function formatToolbarLoopRange(
   playbackRange: ProjectTimelineToolbarProps['playbackRange']
 ): string | null {
@@ -138,6 +161,8 @@ export function ProjectTimelinePlaybackSummary({
   onClearPlaybackRange,
   onSeekToEnd,
   onSeekToStart,
+  onStepToNextFrame,
+  onStepToPreviousFrame,
   onTogglePlay,
 }: Pick<
   ProjectTimelineToolbarProps,
@@ -148,6 +173,8 @@ export function ProjectTimelinePlaybackSummary({
   | 'onClearPlaybackRange'
   | 'onSeekToEnd'
   | 'onSeekToStart'
+  | 'onStepToNextFrame'
+  | 'onStepToPreviousFrame'
   | 'onTogglePlay'
 >) {
   return (
@@ -157,8 +184,10 @@ export function ProjectTimelinePlaybackSummary({
         'max-[720px]:justify-start max-[720px]:gap-1.5',
       ].join(' ')}
     >
-      <PlaybackToggleButton isPlaying={isPlaying} onTogglePlay={onTogglePlay} />
       <PlaybackSeekToStartButton onSeekToStart={onSeekToStart} />
+      <PlaybackFrameStepButton direction="previous" onStep={onStepToPreviousFrame} />
+      <PlaybackToggleButton isPlaying={isPlaying} onTogglePlay={onTogglePlay} />
+      <PlaybackFrameStepButton direction="next" onStep={onStepToNextFrame} />
       <PlaybackSeekToEndButton onSeekToEnd={onSeekToEnd} />
       <PlaybackResetButton disabled={!playbackRange} onClearPlaybackRange={onClearPlaybackRange} />
       <PlaybackSummaryMeta

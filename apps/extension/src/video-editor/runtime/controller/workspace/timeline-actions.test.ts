@@ -75,6 +75,20 @@ it('routes timeline boundary controls through the playback seek pipeline', () =>
   expect(seekTo).toHaveBeenNthCalledWith(2, 9.5);
 });
 
+it('routes timeline frame controls through the playback frame-step authority', () => {
+  const stepByFrames = vi.fn();
+  const actions = createWorkspaceTimelineSelectionActions(
+    createStore(),
+    { stepByFrames, togglePlayback: vi.fn() } as unknown as VideoEditorRuntimeController,
+    createWorkspace()
+  );
+
+  actions.onStepToPreviousFrame();
+  actions.onStepToNextFrame();
+
+  expect(stepByFrames.mock.calls).toEqual([[-1], [1]]);
+});
+
 it('deletes the selected object track from timeline delete actions', () => {
   const store = createStore();
   store.selection = {

@@ -19,6 +19,8 @@ type ProjectTimelineSurfaceProps = Pick<
   | 'onFitSelection'
   | 'onSeekToEnd'
   | 'onSeekToStart'
+  | 'onStepToNextFrame'
+  | 'onStepToPreviousFrame'
   | 'onSplitSelectedClip'
   | 'onTimelinePreviewSuspendedChange'
   | 'onTogglePlay'
@@ -66,6 +68,8 @@ export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
         onClearPlaybackRange={props.onClearPlaybackRange}
         onSeekToEnd={props.onSeekToEnd}
         onSeekToStart={props.onSeekToStart}
+        onStepToNextFrame={props.onStepToNextFrame}
+        onStepToPreviousFrame={props.onStepToPreviousFrame}
         onAutoTransformRecording={props.onAutoTransformRecording}
         onFitProject={props.onFitProject}
         onFitSelection={props.onFitSelection}

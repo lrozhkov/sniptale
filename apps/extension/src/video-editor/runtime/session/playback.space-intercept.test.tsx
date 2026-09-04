@@ -12,11 +12,18 @@ function ShortcutHarness(props: {
   latestState: PlaybackLatestState;
   handlers: PlaybackHandlers;
   seekTo: (time: number) => void;
+  stepByFrames: (frameDelta: number) => void;
   togglePlayback: () => void;
 }) {
   const latestStateRef = { current: props.latestState };
   const handlersRef = { current: props.handlers };
-  usePlaybackShortcuts(latestStateRef, handlersRef, props.seekTo, props.togglePlayback);
+  usePlaybackShortcuts(
+    latestStateRef,
+    handlersRef,
+    props.seekTo,
+    props.stepByFrames,
+    props.togglePlayback
+  );
   return null;
 }
 
@@ -93,6 +100,7 @@ function renderShortcutHarness(root: Root, togglePlayback: () => void, seekTo = 
         handlers={createHandlers()}
         latestState={createLatestState()}
         seekTo={seekTo}
+        stepByFrames={vi.fn()}
         togglePlayback={togglePlayback}
       />
     );
@@ -109,6 +117,7 @@ it('owns plain Home and End while leaving modified and text-entry navigation nat
         handlers={createHandlers()}
         latestState={latestState}
         seekTo={seekTo}
+        stepByFrames={vi.fn()}
         togglePlayback={vi.fn()}
       />
     );
@@ -129,6 +138,38 @@ it('owns plain Home and End while leaving modified and text-entry navigation nat
   });
 
   expect(seekTo.mock.calls).toEqual([[0], [12]]);
+  input.remove();
+});
+
+it('owns plain Comma and Period for symmetric frame stepping', () => {
+  const stepByFrames = vi.fn();
+  const input = document.createElement('input');
+  document.body.append(input);
+  act(() => {
+    root!.render(
+      <ShortcutHarness
+        handlers={createHandlers()}
+        latestState={createLatestState()}
+        seekTo={vi.fn()}
+        stepByFrames={stepByFrames}
+        togglePlayback={vi.fn()}
+      />
+    );
+  });
+
+  act(() => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, code: 'Comma' }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, code: 'Period' }));
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, code: 'Comma', shiftKey: true })
+    );
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, code: 'Period', ctrlKey: true })
+    );
+    input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, code: 'Comma' }));
+  });
+
+  expect(stepByFrames.mock.calls).toEqual([[-1], [1]]);
   input.remove();
 });
 
@@ -200,6 +241,7 @@ it('deletes selected object tracks through playback shortcuts', async () => {
           },
         }}
         seekTo={vi.fn()}
+        stepByFrames={vi.fn()}
         togglePlayback={vi.fn()}
       />
     );
@@ -226,6 +268,7 @@ it('leaves mutation shortcuts inert during a project-history transaction', async
           selection: { kind: VideoEditorSelectionKind.CLIP, clipId: 'clip-1' },
         }}
         seekTo={vi.fn()}
+        stepByFrames={vi.fn()}
         togglePlayback={vi.fn()}
       />
     );

@@ -89,6 +89,7 @@ const mocks = vi.hoisted(() => {
     pausePlayback: action,
     registerPreviewRuntime: action,
     seekTo: action,
+    stepByFrames: action,
     setPlaybackPlaying: action,
     setTimelinePreviewSuspended: action,
     setTimelinePreviewViewport: action,

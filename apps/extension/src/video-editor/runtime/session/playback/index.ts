@@ -7,6 +7,7 @@ import { usePlaybackPreparation } from './prepare';
 import { usePlaybackShortcuts } from './shortcuts';
 import { createPlaybackHandlers, createPlaybackLatestState, usePlaybackStateRefs } from './state';
 import { usePlaybackTicker } from './ticker';
+import { resolvePlaybackFrameStepTime } from './cadence';
 import type {
   PlaybackHandlers,
   PlaybackLatestState,
@@ -29,6 +30,7 @@ export interface VideoEditorPlaybackController {
   pausePlayback: () => number;
   registerPreviewRuntime: (runtime: PlaybackPreviewRuntime | null) => void;
   seekTo: (time: number) => void;
+  stepByFrames: (frameDelta: number) => void;
   setPlaybackPlaying: (playing: boolean) => void;
   togglePlayback: () => void;
 }
@@ -37,6 +39,7 @@ function createPlaybackController(
   pausePlayback: VideoEditorPlaybackController['pausePlayback'],
   registerPreviewRuntime: VideoEditorPlaybackController['registerPreviewRuntime'],
   seekTo: VideoEditorPlaybackController['seekTo'],
+  stepByFrames: VideoEditorPlaybackController['stepByFrames'],
   setPlaybackPlaying: VideoEditorPlaybackController['setPlaybackPlaying'],
   togglePlayback: VideoEditorPlaybackController['togglePlayback']
 ): VideoEditorPlaybackController {
@@ -44,6 +47,7 @@ function createPlaybackController(
     pausePlayback,
     registerPreviewRuntime,
     seekTo,
+    stepByFrames,
     setPlaybackPlaying,
     togglePlayback,
   };
@@ -95,9 +99,26 @@ function usePlaybackSeek(
     pausePlayback,
     phase,
     seekTo,
+    seekToPaused,
     setPlaybackPlaying,
     togglePlayback,
   } = transport;
+  const stepByFrames = useCallback(
+    (frameDelta: number) => {
+      const currentProject = latestStateRef.current.project;
+      if (!currentProject || !Number.isFinite(frameDelta) || frameDelta === 0) return;
+      const settledTime = pausePlayback();
+      seekToPaused(
+        resolvePlaybackFrameStepTime(
+          settledTime,
+          currentProject.duration,
+          currentProject.fps,
+          frameDelta
+        )
+      );
+    },
+    [latestStateRef, pausePlayback, seekToPaused]
+  );
   usePlaybackProjectReset(cancelPlaybackPreparation, project);
 
   usePlaybackTicker(
@@ -109,11 +130,12 @@ function usePlaybackSeek(
     playback.isPlaying &&
       (phase === 'live' || phase === 'cached-frame-playback' || phase === 'cached-video-playback')
   );
-  usePlaybackShortcuts(latestStateRef, handlersRef, seekTo, togglePlayback);
+  usePlaybackShortcuts(latestStateRef, handlersRef, seekTo, stepByFrames, togglePlayback);
   return createPlaybackController(
     pausePlayback,
     registerPreviewRuntime,
     seekTo,
+    stepByFrames,
     setPlaybackPlaying,
     togglePlayback
   );

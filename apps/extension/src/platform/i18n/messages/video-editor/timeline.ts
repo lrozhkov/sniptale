@@ -35,6 +35,14 @@ export const videoEditorTimelineMessages = defineMessageSource({
     ru: 'В конец',
     en: 'Go to end',
   },
+  previousFrame: {
+    ru: 'Предыдущий кадр',
+    en: 'Previous frame',
+  },
+  nextFrame: {
+    ru: 'Следующий кадр',
+    en: 'Next frame',
+  },
   title: {
     ru: 'Таймлайн',
     en: 'Timeline',

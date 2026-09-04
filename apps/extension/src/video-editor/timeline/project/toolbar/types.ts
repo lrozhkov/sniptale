@@ -25,6 +25,8 @@ export interface ProjectTimelineToolbarProps {
   onZoomChange: (value: number) => void;
   onSeekToEnd: () => void;
   onSeekToStart: () => void;
+  onStepToNextFrame: () => void;
+  onStepToPreviousFrame: () => void;
   onTogglePlay: () => void;
   onSplitSelectedClip: () => void;
   onDuplicateSelectedClip: () => void;

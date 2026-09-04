@@ -73,6 +73,8 @@ export function ProjectTimelineToolbar({
   playbackRange,
   onSeekToEnd,
   onSeekToStart,
+  onStepToNextFrame,
+  onStepToPreviousFrame,
   onTogglePlay,
   onClearPlaybackRange,
   ...controlsProps
@@ -97,6 +99,8 @@ export function ProjectTimelineToolbar({
         playbackRange={playbackRange}
         onSeekToEnd={onSeekToEnd}
         onSeekToStart={onSeekToStart}
+        onStepToNextFrame={onStepToNextFrame}
+        onStepToPreviousFrame={onStepToPreviousFrame}
         onTogglePlay={onTogglePlay}
         onClearPlaybackRange={onClearPlaybackRange}
       />

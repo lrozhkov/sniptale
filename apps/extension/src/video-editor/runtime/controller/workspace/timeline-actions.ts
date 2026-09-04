@@ -244,6 +244,8 @@ export function createWorkspaceTimelineSelectionActions(
     onSeek: runtime.seekTo,
     onSeekToEnd: () => runtime.seekTo(store.project?.duration ?? 0),
     onSeekToStart: () => runtime.seekTo(0),
+    onStepToNextFrame: () => runtime.stepByFrames(1),
+    onStepToPreviousFrame: () => runtime.stepByFrames(-1),
     onSetPlaybackRange: workspace.setPlaybackRange,
     onSelectActionSegment: selectWithInspector(store.selectActionSegment),
     onSelectClip: selectWithInspector(store.selectClip),

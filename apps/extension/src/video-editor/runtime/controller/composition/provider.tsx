@@ -261,10 +261,17 @@ function useVideoEditorContextProjections(
     () => ({
       pausePlayback: runtime.pausePlayback,
       seekTo: runtime.seekTo,
+      stepByFrames: runtime.stepByFrames,
       setPlaybackPlaying: runtime.setPlaybackPlaying,
       togglePlayback: runtime.togglePlayback,
     }),
-    [runtime.pausePlayback, runtime.seekTo, runtime.setPlaybackPlaying, runtime.togglePlayback]
+    [
+      runtime.pausePlayback,
+      runtime.seekTo,
+      runtime.setPlaybackPlaying,
+      runtime.stepByFrames,
+      runtime.togglePlayback,
+    ]
   );
   const runtimePreview = useMemo(
     () => ({

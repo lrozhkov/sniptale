@@ -186,9 +186,10 @@ export function requestPlaybackSeek(
   refs: PlaybackRuntimeRefs,
   requestRef: MutableRefObject<PlaybackRequestState>,
   setPhase: PhaseSetter,
-  time: number
+  time: number,
+  keepPlayingOverride?: boolean
 ): void {
-  const keepPlaying = refs.latestStateRef.current.isPlaying;
+  const keepPlaying = keepPlayingOverride ?? refs.latestStateRef.current.isPlaying;
   const request = beginRequest(requestRef);
   refs.handlersRef.current.setCurrentTime(time);
   setPhase('starting');

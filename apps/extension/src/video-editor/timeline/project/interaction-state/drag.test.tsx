@@ -351,7 +351,7 @@ it('keeps an independent delete shortcut outside an active drag transaction', ()
     const handlersRef = useRef<PlaybackHandlers>(createPlaybackShortcutHandlers(state));
     latestStateRef.current = createPlaybackShortcutState(state);
     handlersRef.current = createPlaybackShortcutHandlers(state);
-    usePlaybackShortcuts(latestStateRef, handlersRef, vi.fn(), vi.fn());
+    usePlaybackShortcuts(latestStateRef, handlersRef, vi.fn(), vi.fn(), vi.fn());
     const timelineDrag = useProjectTimelineDrag({
       historyTransaction: {
         beginProjectHistoryTransaction: state.beginProjectHistoryTransaction,

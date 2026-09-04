@@ -253,7 +253,17 @@ async function verifyVideoEditorTimelineBoundaries(
   const seekToEnd = page.getByRole('button', {
     name: translate('videoEditor.timeline.seekToEnd', 'ru'),
   });
+  const previousFrame = page.getByRole('button', {
+    name: translate('videoEditor.timeline.previousFrame', 'ru'),
+  });
+  const nextFrame = page.getByRole('button', {
+    name: translate('videoEditor.timeline.nextFrame', 'ru'),
+  });
 
+  for (let step = 0; step < 3; step += 1) await nextFrame.click();
+  await expect(counter).toContainText('0:00.1 / 0:12.0');
+  for (let step = 0; step < 3; step += 1) await page.keyboard.press(',');
+  await expect(counter).toContainText('0:00.0 / 0:12.0');
   await seekToEnd.click();
   await expect(counter).toContainText('0:12.0 / 0:12.0');
   await page.keyboard.press('Home');
@@ -267,6 +277,8 @@ async function verifyVideoEditorTimelineBoundaries(
   await page.setViewportSize({ width: 700, height: 900 });
   await expect(seekToStart).toBeVisible();
   await expect(seekToEnd).toBeVisible();
+  await expect(previousFrame).toBeVisible();
+  await expect(nextFrame).toBeVisible();
   await expect(counter).toBeVisible();
   await page.screenshot({ fullPage: true, path: compactScreenshotPath });
   await page.setViewportSize({ width: 1600, height: 1100 });

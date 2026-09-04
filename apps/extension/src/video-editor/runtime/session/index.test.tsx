@@ -111,8 +111,10 @@ it('composes asset, preview, playback, load, and lifecycle owners into one runti
   const params = createParams();
   const applyLoadedProject = vi.fn();
   const playback = {
+    pausePlayback: vi.fn(),
     registerPreviewRuntime: vi.fn(),
     seekTo: vi.fn(),
+    stepByFrames: vi.fn(),
     setPlaybackPlaying: vi.fn(),
     togglePlayback: vi.fn(),
   };
@@ -138,6 +140,7 @@ it('composes asset, preview, playback, load, and lifecycle owners into one runti
     timelinePreviews: { 'clip-1': 'blob:preview-1' },
     registerPreviewRuntime: playback.registerPreviewRuntime,
     seekTo: playback.seekTo,
+    stepByFrames: playback.stepByFrames,
     setPlaybackPlaying: playback.setPlaybackPlaying,
     togglePlayback: playback.togglePlayback,
   });

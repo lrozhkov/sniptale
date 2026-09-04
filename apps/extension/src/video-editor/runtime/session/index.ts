@@ -18,6 +18,7 @@ export interface VideoEditorRuntimeController {
   registerPreviewRuntime: (runtime: PlaybackPreviewRuntime | null) => void;
   pausePlayback: () => number;
   seekTo: (time: number) => void;
+  stepByFrames: (frameDelta: number) => void;
   setPlaybackPlaying: (playing: boolean) => void;
   togglePlayback: () => void;
   applyLoadedProject: ApplyLoadedProject;
@@ -39,6 +40,7 @@ function createVideoEditorRuntimeController(
     registerPreviewRuntime: playback.registerPreviewRuntime,
     pausePlayback: playback.pausePlayback,
     seekTo: playback.seekTo,
+    stepByFrames: playback.stepByFrames,
     setPlaybackPlaying: playback.setPlaybackPlaying,
     togglePlayback: playback.togglePlayback,
     applyLoadedProject,

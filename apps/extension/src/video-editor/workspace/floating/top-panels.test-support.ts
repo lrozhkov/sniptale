@@ -103,6 +103,8 @@ function createTimelineEditActions(): Omit<
     onSeek: noop(),
     onSeekToEnd: noop(),
     onSeekToStart: noop(),
+    onStepToNextFrame: noop(),
+    onStepToPreviousFrame: noop(),
     onSetPlaybackRange: noop(),
     onSplitSelectedClip: noop(),
     onTimelinePreviewSuspendedChange: noop(),

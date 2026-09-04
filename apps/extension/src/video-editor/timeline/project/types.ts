@@ -56,6 +56,8 @@ export interface ProjectTimelineProps {
   onSeek: (time: number) => void;
   onSeekToEnd: () => void;
   onSeekToStart: () => void;
+  onStepToNextFrame: () => void;
+  onStepToPreviousFrame: () => void;
   onZoomChange: (value: number) => void;
   onTogglePlay: () => void;
   onSetPlaybackRange: (range: VideoEditorPlaybackRange | null) => void;

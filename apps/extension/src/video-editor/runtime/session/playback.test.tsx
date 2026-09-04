@@ -75,6 +75,7 @@ interface PlaybackHarnessProps {
   updateMotionRegion: (motionRegionId: string, patch: Record<string, unknown>) => void;
   useVideoEditorPlayback: (typeof import('./playback'))['useVideoEditorPlayback'];
   onSeekReady?: (seekTo: (time: number) => void) => void;
+  onStepReady?: (stepByFrames: (frameDelta: number) => void) => void;
 }
 
 type PlaybackHarnessActionEvent = ReturnType<
@@ -114,6 +115,7 @@ function PlaybackHarness(props: PlaybackHarnessProps) {
     }
   );
   props.onSeekReady?.(playback.seekTo);
+  props.onStepReady?.(playback.stepByFrames);
   return null;
 }
 
@@ -126,6 +128,7 @@ function renderPlaybackHarness(root: Root | null, props: PlaybackHarnessProps) {
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 let seekTo: ((time: number) => void) | null = null;
+let stepByFrames: ((frameDelta: number) => void) | null = null;
 let frameCallback: FrameRequestCallback | null = null;
 
 beforeEach(() => {
@@ -134,6 +137,7 @@ beforeEach(() => {
   root = createRoot(container);
   frameCallback = null;
   seekTo = null;
+  stepByFrames = null;
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.spyOn(performance, 'now').mockReturnValue(1000);
   vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
@@ -141,6 +145,48 @@ beforeEach(() => {
     return 1;
   });
   vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
+});
+
+it('settles active playback before a paused one-frame seek', async () => {
+  const useVideoEditorPlayback = await importPlaybackHook();
+  const project = createEmptyVideoProject('Playback frame step');
+  project.duration = 2;
+  project.fps = 30;
+  const setCurrentTime = vi.fn<(time: number) => void>();
+  const setPlaying = vi.fn<(playing: boolean) => void>();
+  renderPlaybackHarness(root, {
+    currentTime: 0.2,
+    clearPlacementMode: vi.fn(),
+    deleteActionEvent: vi.fn(),
+    deleteClip: vi.fn(),
+    deleteCursorSample: vi.fn(),
+    deleteMotionRegion: vi.fn(),
+    deleteObjectTrack: vi.fn(),
+    isPlaying: true,
+    onStepReady: (value) => {
+      stepByFrames = value;
+    },
+    project,
+    selection: { kind: VideoEditorSelectionKind.SCENE },
+    selectedClipId: null,
+    setCurrentTime,
+    setPlaying,
+    splitClipAt: vi.fn(),
+    updateActionEventDetails: vi.fn(),
+    updateClipTransform: vi.fn(),
+    updateMotionRegion: vi.fn(),
+    useVideoEditorPlayback,
+  });
+  vi.spyOn(performance, 'now').mockReturnValue(1250);
+
+  act(() => {
+    stepByFrames?.(1);
+  });
+
+  expect(setPlaying).toHaveBeenCalledWith(false);
+  expect(setCurrentTime).toHaveBeenCalledWith(14 / 30);
+  expect(setCurrentTime).toHaveBeenLastCalledWith(15 / 30);
+  expect(setPlaying).not.toHaveBeenLastCalledWith(true);
 });
 
 afterEach(() => {
