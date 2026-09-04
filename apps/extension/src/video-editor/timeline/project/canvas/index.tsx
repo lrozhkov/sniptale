@@ -41,6 +41,7 @@ interface ProjectTimelineCanvasProps {
   project: VideoProject;
   recordingTelemetry: RecordingTelemetryEntry | null;
   selection: VideoEditorSelection;
+  snapGuideTime: number | null;
   hoveredClipId: string | null;
   selectedClipId: string | null;
   selectedEffectSelection: TimelineEffectSelection | null;
@@ -229,6 +230,10 @@ function ProjectTimelineCanvasContent(
         hoverTime={props.hoverTime}
         pixelsPerSecond={props.pixelsPerSecond}
       />
+      <ProjectTimelineSnapGuide
+        height={props.playheadHeight}
+        left={props.snapGuideTime === null ? null : props.snapGuideTime * props.pixelsPerSecond}
+      />
       <ProjectTimelinePlayheadLine height={props.playheadHeight} left={props.playheadX} />
       {props.telemetryLaneVisible ? (
         <ProjectTimelineTelemetryLane
@@ -245,6 +250,22 @@ function ProjectTimelineCanvasContent(
       />
       <ProjectTimelineCanvasEffectRows {...props} />
     </div>
+  );
+}
+
+function ProjectTimelineSnapGuide(props: { height: number; left: number | null }) {
+  if (props.left === null) return null;
+  return (
+    <div
+      aria-hidden="true"
+      data-ui="video-editor.timeline.snap-guide"
+      className={[
+        'pointer-events-none absolute top-0 z-30 w-px',
+        'bg-[var(--sniptale-color-accent-emphasis)] opacity-80',
+        'shadow-[0_0_8px_var(--sniptale-color-accent-soft)]',
+      ].join(' ')}
+      style={{ height: props.height, left: props.left }}
+    />
   );
 }
 

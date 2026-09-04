@@ -20,6 +20,10 @@ import type { VideoProjectEffectInstancePatch } from '../../contracts/commands/p
 import type { VideoProjectEffectTarget } from '../../../features/video/project/effect-instance/types';
 import type { VideoEditorEffectDocumentDragPayload } from '../../contracts/effect-document-drag';
 import type { VideoEditorProjectHistoryTransactionActions } from '../../contracts/commands/history';
+import type {
+  VideoEditorMoveClipAction,
+  VideoEditorTrimClipAction,
+} from '../../contracts/commands/timeline';
 
 export interface ProjectTimelineInsertionActions {
   onAddActionEvent: (preset: VideoProjectActionPreset) => void;
@@ -76,17 +80,12 @@ export interface ProjectTimelineProps {
   onSelectActionSegment: (actionEventId: string) => void;
   onSelectMotionRegion: (motionRegionId: string) => void;
   onSelectObjectTrack: (objectTrackId: string) => void;
-  onMoveClip: (
-    clipId: string,
-    startTime: number,
-    trackId?: string,
-    timelineLaneId?: string | null
-  ) => void;
+  onMoveClip: VideoEditorMoveClipAction;
   onCloseTrackGap: (trackId: string, gapStart: number, gapEnd: number) => void;
   onAddTrackLogicalLane: (trackId: string) => void;
   onRenameTrack: (trackId: string, name: string) => void;
-  onTrimClipStart: (clipId: string, nextStartTime: number) => void;
-  onTrimClipEnd: (clipId: string, nextEndTime: number) => void;
+  onTrimClipStart: VideoEditorTrimClipAction;
+  onTrimClipEnd: VideoEditorTrimClipAction;
   onSplitSelectedClip: () => void;
   onDuplicateSelectedClip: () => void;
   onDeleteSelectedClip: () => void;

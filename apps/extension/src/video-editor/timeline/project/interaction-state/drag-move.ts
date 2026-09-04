@@ -1,32 +1,43 @@
 import type React from 'react';
 import { resolveClipLogicalLaneId } from '../../../../features/video/project/timeline';
-import type { VideoProjectClip } from '../../../../features/video/project/types';
+import type { VideoProject, VideoProjectClip } from '../../../../features/video/project/types';
 import { resolveTrackPlacementFromClientY } from '../tracks/layout';
 import type { buildTimelineTrackLayoutModel } from '../tracks/layout';
 import type { TimelineClipDragGhost, TimelineInteraction } from '../types';
+import { resolveTimelineSnap } from '../effect-lanes/snap';
+import type {
+  VideoEditorMoveClipAction,
+  VideoEditorTrimClipAction,
+} from '../../../contracts/commands/timeline';
 
 export type MoveClipHandler = (
-  clipId: string,
-  startTime: number,
-  trackId?: string,
-  timelineLaneId?: string | null
-) => void;
+  ...args: Parameters<VideoEditorMoveClipAction>
+) => ReturnType<VideoEditorMoveClipAction> | void;
+export type TrimClipHandler = (
+  ...args: Parameters<VideoEditorTrimClipAction>
+) => ReturnType<VideoEditorTrimClipAction> | void;
 
 interface TimelineDragMoveParams {
   interaction: TimelineInteraction;
+  currentTime: number;
+  magnetEnabled: boolean;
   moveEvent: PointerEvent;
   pixelsPerSecond: number;
   trackLayoutModel: ReturnType<typeof buildTimelineTrackLayoutModel>;
   onMoveClip: MoveClipHandler;
   setDragGhost: React.Dispatch<React.SetStateAction<TimelineClipDragGhost | null>>;
-  onTrimClipEnd: (clipId: string, nextEndTime: number) => void;
-  onTrimClipStart: (clipId: string, nextStartTime: number) => void;
+  onTrimClipEnd: TrimClipHandler;
+  onTrimClipStart: TrimClipHandler;
+  project: VideoProject;
+  setSnapGuideTime: React.Dispatch<React.SetStateAction<number | null>>;
 }
 
 const CLIP_LANE_CHANGE_INTENT_THRESHOLD_PX = 24;
 
 export function applyTimelineDragMove({
   interaction,
+  currentTime,
+  magnetEnabled,
   moveEvent,
   pixelsPerSecond,
   trackLayoutModel,
@@ -34,6 +45,8 @@ export function applyTimelineDragMove({
   setDragGhost,
   onTrimClipEnd,
   onTrimClipStart,
+  project,
+  setSnapGuideTime,
 }: TimelineDragMoveParams) {
   const deltaSeconds = (moveEvent.clientX - interaction.startClientX) / pixelsPerSecond;
   if (interaction.mode === 'move') {
@@ -41,9 +54,14 @@ export function applyTimelineDragMove({
       clip: interaction.clip,
       deltaSeconds,
       interaction,
+      currentTime,
+      magnetEnabled: magnetEnabled && !moveEvent.altKey,
       moveEvent,
       onMoveClip,
+      pixelsPerSecond,
+      project,
       setDragGhost,
+      setSnapGuideTime,
       trackLayoutModel,
     });
     return;
@@ -51,25 +69,57 @@ export function applyTimelineDragMove({
 
   if (interaction.mode === 'trim-start') {
     setDragGhost(null);
-    onTrimClipStart(interaction.clip.id, interaction.originalStart + deltaSeconds);
+    const result = resolveClipEdgeSnap({
+      clipId: interaction.clip.id,
+      currentTime,
+      magnetEnabled: magnetEnabled && !moveEvent.altKey,
+      pixelsPerSecond,
+      project,
+      time: interaction.originalStart + deltaSeconds,
+    });
+    const applied = onTrimClipStart(interaction.clip.id, result.time);
+    setSnapGuideTime(resolveAppliedSnapGuide(result.targetTime, applied?.startTime ?? result.time));
     return;
   }
 
   setDragGhost(null);
-  onTrimClipEnd(interaction.clip.id, interaction.originalEnd + deltaSeconds);
+  const result = resolveClipEdgeSnap({
+    clipId: interaction.clip.id,
+    currentTime,
+    magnetEnabled: magnetEnabled && !moveEvent.altKey,
+    pixelsPerSecond,
+    project,
+    time: interaction.originalEnd + deltaSeconds,
+  });
+  const applied = onTrimClipEnd(interaction.clip.id, result.time);
+  setSnapGuideTime(resolveAppliedSnapGuide(result.targetTime, applied?.endTime ?? result.time));
 }
 
 function applyTimelineClipMove({
   clip,
   deltaSeconds,
   interaction,
+  currentTime,
+  magnetEnabled,
   moveEvent,
   onMoveClip,
+  pixelsPerSecond,
+  project,
   setDragGhost,
+  setSnapGuideTime,
   trackLayoutModel,
 }: Pick<
   TimelineDragMoveParams,
-  'interaction' | 'moveEvent' | 'onMoveClip' | 'setDragGhost' | 'trackLayoutModel'
+  | 'currentTime'
+  | 'interaction'
+  | 'magnetEnabled'
+  | 'moveEvent'
+  | 'onMoveClip'
+  | 'pixelsPerSecond'
+  | 'project'
+  | 'setDragGhost'
+  | 'setSnapGuideTime'
+  | 'trackLayoutModel'
 > & {
   clip: VideoProjectClip;
   deltaSeconds: number;
@@ -80,16 +130,101 @@ function applyTimelineClipMove({
     moveEvent,
     trackLayoutModel,
   });
-  const startTime = Math.max(0, interaction.originalStart + deltaSeconds);
+  const rawStartTime = Math.max(0, interaction.originalStart + deltaSeconds);
+  const snapResult = resolveMovingClipSnap({
+    clip,
+    currentTime,
+    magnetEnabled,
+    pixelsPerSecond,
+    project,
+    rawStartTime,
+  });
+  const applied = onMoveClip(
+    clip.id,
+    snapResult.time,
+    targetPlacement?.trackId,
+    targetPlacement?.timelineLaneId
+  );
+  const startTime = applied?.startTime ?? snapResult.time;
+  const duration = applied?.duration ?? clip.duration;
+  const trackId = applied?.trackId ?? targetPlacement?.trackId ?? clip.trackId;
+  const timelineLaneId = applied?.timelineLaneId ?? targetPlacement?.timelineLaneId ?? null;
+  setSnapGuideTime(
+    resolveAppliedSnapGuide(
+      snapResult.targetTime,
+      snapResult.targetTime === null
+        ? null
+        : nearestAppliedClipEdge(snapResult.targetTime, startTime, startTime + duration)
+    )
+  );
   setDragGhost({
     clipId: clip.id,
-    duration: clip.duration,
+    duration,
     name: clip.name,
     startTime,
-    timelineLaneId: targetPlacement?.timelineLaneId ?? null,
-    trackId: targetPlacement?.trackId ?? clip.trackId,
+    timelineLaneId,
+    trackId,
   });
-  onMoveClip(clip.id, startTime, targetPlacement?.trackId, targetPlacement?.timelineLaneId);
+}
+
+function nearestAppliedClipEdge(targetTime: number, startTime: number, endTime: number): number {
+  return Math.abs(startTime - targetTime) <= Math.abs(endTime - targetTime) ? startTime : endTime;
+}
+
+function resolveAppliedSnapGuide(targetTime: number | null, appliedEdgeTime: number | null) {
+  const tolerance =
+    Number.EPSILON * 16 * Math.max(1, Math.abs(targetTime ?? 0), Math.abs(appliedEdgeTime ?? 0));
+  return targetTime !== null &&
+    appliedEdgeTime !== null &&
+    Math.abs(targetTime - appliedEdgeTime) <= tolerance
+    ? targetTime
+    : null;
+}
+
+function resolveClipEdgeSnap(params: {
+  clipId: string;
+  currentTime: number;
+  magnetEnabled: boolean;
+  pixelsPerSecond: number;
+  project: VideoProject;
+  time: number;
+}) {
+  if (!params.magnetEnabled) return { targetTime: null, time: params.time };
+  return resolveTimelineSnap(params.time, params.project, params.pixelsPerSecond, {
+    additionalTimes: [params.currentTime],
+    excludedClipId: params.clipId,
+    includeMotionRegions: false,
+  });
+}
+
+function resolveMovingClipSnap(params: {
+  clip: VideoProjectClip;
+  currentTime: number;
+  magnetEnabled: boolean;
+  pixelsPerSecond: number;
+  project: VideoProject;
+  rawStartTime: number;
+}) {
+  if (!params.magnetEnabled) return { targetTime: null, time: params.rawStartTime };
+  const options = {
+    additionalTimes: [params.currentTime],
+    excludedClipId: params.clip.id,
+    includeMotionRegions: false,
+  };
+  const start = resolveTimelineSnap(
+    params.rawStartTime,
+    params.project,
+    params.pixelsPerSecond,
+    options
+  );
+  const rawEndTime = params.rawStartTime + params.clip.duration;
+  const end = resolveTimelineSnap(rawEndTime, params.project, params.pixelsPerSecond, options);
+  const startCorrection = Math.abs(start.time - params.rawStartTime);
+  const endCorrection = Math.abs(end.time - rawEndTime);
+  if (end.targetTime !== null && (start.targetTime === null || endCorrection < startCorrection)) {
+    return { targetTime: end.targetTime, time: Math.max(0, end.time - params.clip.duration) };
+  }
+  return start;
 }
 
 function resolveClipDragTargetPlacement({

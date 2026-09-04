@@ -51,7 +51,9 @@ function createClip(trackId: string): VideoProjectClip {
 }
 
 function createTimelineHarness(props: {
+  currentTime?: number;
   historyTransaction?: VideoEditorProjectHistoryTransactionActions;
+  magnetEnabled?: boolean;
   project: ReturnType<typeof createEmptyVideoProject>;
   onMoveClip: (
     clipId: string,
@@ -68,12 +70,14 @@ function createTimelineHarness(props: {
   return function TimelineHarness() {
     const fallbackLease = Symbol('test-history-transaction');
     const timelineDrag = useProjectTimelineDrag({
+      currentTime: props.currentTime ?? 0,
       historyTransaction: props.historyTransaction ?? {
         beginProjectHistoryTransaction: () => fallbackLease,
         endProjectHistoryTransaction: () => undefined,
         isProjectHistoryTransactionCurrent: (lease) => lease === fallbackLease,
       },
       pixelsPerSecond: 10,
+      magnetEnabled: props.magnetEnabled ?? false,
       project: props.project,
       ...(props.trackHeightByTrackId ? { trackHeightByTrackId: props.trackHeightByTrackId } : {}),
       onMoveClip: props.onMoveClip,
@@ -90,10 +94,11 @@ function createTimelineHarness(props: {
   };
 }
 
-function dispatchTimelinePointerMove(clientX: number, clientY: number) {
+function dispatchTimelinePointerMove(clientX: number, clientY: number, altKey = false) {
   const moveEvent = new Event('pointermove');
   Object.defineProperty(moveEvent, 'clientX', { value: clientX });
   Object.defineProperty(moveEvent, 'clientY', { value: clientY });
+  Object.defineProperty(moveEvent, 'altKey', { value: altKey });
   window.dispatchEvent(moveEvent);
 }
 
@@ -353,11 +358,13 @@ it('keeps an independent delete shortcut outside an active drag transaction', ()
     handlersRef.current = createPlaybackShortcutHandlers(state);
     usePlaybackShortcuts(latestStateRef, handlersRef, vi.fn(), vi.fn(), vi.fn());
     const timelineDrag = useProjectTimelineDrag({
+      currentTime: state.currentTime,
       historyTransaction: {
         beginProjectHistoryTransaction: state.beginProjectHistoryTransaction,
         endProjectHistoryTransaction: state.endProjectHistoryTransaction,
         isProjectHistoryTransactionCurrent: state.isProjectHistoryTransactionCurrent,
       },
+      magnetEnabled: false,
       pixelsPerSecond: 10,
       project: state.project!,
       onMoveClip: state.moveClip,
@@ -403,11 +410,13 @@ it('rejects stale pointer movement after same-id project replacement', () => {
   function Harness() {
     const state = useVideoEditorStore();
     const timelineDrag = useProjectTimelineDrag({
+      currentTime: state.currentTime,
       historyTransaction: {
         beginProjectHistoryTransaction: state.beginProjectHistoryTransaction,
         endProjectHistoryTransaction: state.endProjectHistoryTransaction,
         isProjectHistoryTransactionCurrent: state.isProjectHistoryTransactionCurrent,
       },
+      magnetEnabled: false,
       pixelsPerSecond: 10,
       project: state.project!,
       onMoveClip: state.moveClip,

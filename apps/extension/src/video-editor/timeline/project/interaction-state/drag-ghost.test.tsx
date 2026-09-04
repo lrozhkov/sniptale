@@ -96,12 +96,14 @@ it('keeps the drag ghost visible across parent rerenders during a move', () => {
   function StatefulHarness() {
     const [revision, setRevision] = useState(0);
     const timelineDrag = useProjectTimelineDrag({
+      currentTime: 0,
       historyTransaction: {
         beginProjectHistoryTransaction: () => TEST_HISTORY_LEASE,
         endProjectHistoryTransaction: () => undefined,
         isProjectHistoryTransactionCurrent: (lease) => lease === TEST_HISTORY_LEASE,
       },
       pixelsPerSecond: 10,
+      magnetEnabled: false,
       project,
       onMoveClip: (...args) => {
         onMoveClip(...args);

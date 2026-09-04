@@ -47,6 +47,7 @@ type ProjectTimelineBodyProps = Pick<
   | 'recordingTelemetry'
   | 'selection'
   | 'seekToClientX'
+  | 'snapGuideTime'
   | 'selectedClipId'
   | 'selectedEffectSelection'
   | 'selectedTrackId'
@@ -138,6 +139,7 @@ function createCanvasProps(props: ProjectTimelineBodyProps): ProjectTimelineBody
     selectedEffectSelection: props.selectedEffectSelection,
     selectedTrackId: props.selectedTrackId,
     selection: props.selection,
+    snapGuideTime: props.snapGuideTime,
     telemetryLaneVisible: props.telemetryLaneVisible,
     timelinePreviews: props.timelinePreviews,
     timelineRef: props.timelineRef,

@@ -80,6 +80,7 @@ function renderCanvas() {
         project={project}
         recordingTelemetry={null}
         selection={createSceneSelection()}
+        snapGuideTime={null}
         hoveredClipId={null}
         selectedClipId={null}
         selectedEffectSelection={null}

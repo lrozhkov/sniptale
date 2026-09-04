@@ -110,6 +110,7 @@ function createCanvasProps(
     selectedEffectSelection: null,
     selectedTrackId: null,
     selection: createSceneSelection(),
+    snapGuideTime: null,
     seekToClientX: vi.fn(),
     telemetryLaneVisible: false,
     timelinePreviews: {},

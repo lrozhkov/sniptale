@@ -132,6 +132,16 @@ it('keeps the playhead handle inside the sticky ruler while tracks scroll vertic
   expect(stickyRuler?.contains(handle ?? null)).toBe(true);
 });
 
+it('renders the active magnetic snap guide at the accepted timeline target', () => {
+  renderCanvas({ snapGuideTime: 2 });
+
+  const guide = container?.querySelector<HTMLElement>(
+    '[data-ui="video-editor.timeline.snap-guide"]'
+  );
+  expect(guide?.style.left).toBe('180px');
+  expect(guide?.getAttribute('aria-hidden')).toBe('true');
+});
+
 it('routes slider arrow keys through frame-step actions', () => {
   const onStepToNextFrame = vi.fn();
   const onStepToPreviousFrame = vi.fn();
@@ -246,6 +256,7 @@ function renderCanvas(overrides: {
   onSelectTrack?: (trackId: string) => void;
   playbackRange?: React.ComponentProps<typeof ProjectTimelineCanvas>['playbackRange'];
   recordingTelemetry?: React.ComponentProps<typeof ProjectTimelineCanvas>['recordingTelemetry'];
+  snapGuideTime?: number | null;
   onImportTimelineFile?: ProjectTimelineInsertionActions['onImport'];
   seekToClientX?: (clientX: number) => void;
   telemetryLaneVisible?: boolean;
@@ -282,6 +293,7 @@ function createCanvasProps(
     onSelectTrack?: (trackId: string) => void;
     playbackRange?: React.ComponentProps<typeof ProjectTimelineCanvas>['playbackRange'];
     recordingTelemetry?: React.ComponentProps<typeof ProjectTimelineCanvas>['recordingTelemetry'];
+    snapGuideTime?: number | null;
     onImportTimelineFile?: ProjectTimelineInsertionActions['onImport'];
     seekToClientX?: (clientX: number) => void;
     telemetryLaneVisible?: boolean;
@@ -297,6 +309,7 @@ function createCanvasProps(
     project,
     recordingTelemetry: overrides.recordingTelemetry ?? null,
     selection: createSceneSelection(),
+    snapGuideTime: overrides.snapGuideTime ?? null,
     hoveredClipId: null,
     selectedClipId: null,
     selectedEffectSelection: null,

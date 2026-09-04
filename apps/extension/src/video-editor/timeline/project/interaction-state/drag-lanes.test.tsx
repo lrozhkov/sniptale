@@ -133,12 +133,14 @@ function renderStatefulDragHarness(project: VideoProject, onMove: MoveClipCallba
   function StatefulHarness() {
     const [currentProject, setCurrentProject] = useState(project);
     const timelineDrag = useProjectTimelineDrag({
+      currentTime: 0,
       historyTransaction: {
         beginProjectHistoryTransaction: () => TEST_HISTORY_LEASE,
         endProjectHistoryTransaction: () => undefined,
         isProjectHistoryTransactionCurrent: (lease) => lease === TEST_HISTORY_LEASE,
       },
       pixelsPerSecond: 10,
+      magnetEnabled: false,
       project: currentProject,
       onMoveClip: (clipId, startTime, trackId, timelineLaneId) => {
         onMove(clipId, startTime, trackId, timelineLaneId);
@@ -165,12 +167,14 @@ function createTimelineHarness(props: {
 }) {
   return function TimelineHarness() {
     const timelineDrag = useProjectTimelineDrag({
+      currentTime: 0,
       historyTransaction: {
         beginProjectHistoryTransaction: () => TEST_HISTORY_LEASE,
         endProjectHistoryTransaction: () => undefined,
         isProjectHistoryTransactionCurrent: (lease) => lease === TEST_HISTORY_LEASE,
       },
       pixelsPerSecond: 10,
+      magnetEnabled: false,
       project: props.project,
       onMoveClip: props.onMoveClip,
       onSelectClip: () => undefined,

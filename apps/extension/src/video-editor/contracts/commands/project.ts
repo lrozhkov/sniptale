@@ -17,7 +17,7 @@ import type { VideoEditorAnnotationActions } from './annotation';
 import type { VideoEditorObjectTrackActions } from './object-tracks';
 import type { VideoEditorTemporalActions } from './temporal';
 import type { VideoEditorEffectInstanceActions } from './effect-instance';
-import type { VideoEditorMoveClipAction } from './timeline';
+import type { VideoEditorMoveClipAction, VideoEditorTrimClipAction } from './timeline';
 
 export interface VideoEditorProjectActions
   extends
@@ -56,8 +56,8 @@ export interface VideoEditorProjectActions
     startTime?: number
   ) => string | null;
   moveClip: VideoEditorMoveClipAction;
-  trimClipStart: (clipId: string, nextStartTime: number) => void;
-  trimClipEnd: (clipId: string, nextEndTime: number) => void;
+  trimClipStart: VideoEditorTrimClipAction;
+  trimClipEnd: VideoEditorTrimClipAction;
   splitClipAt: (clipId: string, splitTime: number) => void;
   deleteClip: (clipId: string) => void;
   duplicateClip: (clipId: string) => void;

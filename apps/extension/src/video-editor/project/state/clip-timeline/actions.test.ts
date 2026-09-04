@@ -218,3 +218,27 @@ it('applies move trim split duplicate and detach actions through the timeline ac
 
   expectTimelineMutationSequence(runtime);
 });
+
+it('returns the authoritative applied clip timing after move and trim constraints', () => {
+  const runtime = createMutableState();
+  const actions = createVideoEditorProjectClipTimelineActions(runtime.set);
+  seedSingleClipState(runtime);
+
+  expect(actions.moveClip('clip-1', 2)).toEqual({
+    clipId: 'clip-1',
+    duration: 4,
+    endTime: 6,
+    startTime: 2,
+    timelineLaneId: null,
+    trackId: expect.any(String),
+  });
+  const trimmed = actions.trimClipStart('clip-1', 5.8);
+  expect(trimmed).toMatchObject({
+    clipId: 'clip-1',
+    endTime: 6,
+    startTime: 5.8,
+    timelineLaneId: null,
+    trackId: expect.any(String),
+  });
+  expect(trimmed?.duration).toBeCloseTo(0.2);
+});

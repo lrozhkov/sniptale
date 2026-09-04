@@ -1,5 +1,6 @@
 import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
 import type { VideoEditorProjectState, VideoEditorProjectSliceSet } from '../contracts';
+import type { VideoEditorClipTimingResult } from '../../../contracts/commands/timeline';
 import {
   applyProjectUpdate,
   detachLinkedClips,
@@ -31,21 +32,10 @@ export function createVideoEditorProjectClipTimelineActions(
   set: VideoEditorStoreSet
 ): Pick<VideoEditorProjectState, VideoEditorProjectClipTimelineActionKeys> {
   return {
-    moveClip: (clipId, startTime, trackId, timelineLaneId) =>
-      set((state) =>
-        applyProjectUpdate(state, (project) =>
-          moveProjectClip(project, clipId, startTime, trackId, timelineLaneId)
-        )
-      ),
+    moveClip: createMoveClipAction(set),
     closeTrackGap: createCloseTrackGapAction(set),
-    trimClipStart: (clipId, nextStartTime) =>
-      set((state) =>
-        applyProjectUpdate(state, (project) => trimProjectClipStart(project, clipId, nextStartTime))
-      ),
-    trimClipEnd: (clipId, nextEndTime) =>
-      set((state) =>
-        applyProjectUpdate(state, (project) => trimProjectClipEnd(project, clipId, nextEndTime))
-      ),
+    trimClipStart: createClipTimingAction(set, trimProjectClipStart),
+    trimClipEnd: createClipTimingAction(set, trimProjectClipEnd),
     splitClipAt: (clipId, splitTime) =>
       set((state) =>
         applyProjectUpdate(state, (project) => splitProjectClipsAtTime(project, clipId, splitTime))
@@ -58,6 +48,56 @@ export function createVideoEditorProjectClipTimelineActions(
     detachClipGroup: (clipId) =>
       set((state) => applyProjectUpdate(state, (project) => detachLinkedClips(project, clipId))),
   };
+}
+
+function createMoveClipAction(set: VideoEditorStoreSet): VideoEditorProjectState['moveClip'] {
+  return (clipId, startTime, trackId, timelineLaneId) => {
+    let result: VideoEditorClipTimingResult | null = null;
+    set((state) => {
+      const patch = applyProjectUpdate(state, (project) =>
+        moveProjectClip(project, clipId, startTime, trackId, timelineLaneId)
+      );
+      result = resolveAppliedClipTiming(patch.project ?? state.project, clipId);
+      return patch;
+    });
+    return result;
+  };
+}
+
+function createClipTimingAction(
+  set: VideoEditorStoreSet,
+  mutate: (
+    project: NonNullable<VideoEditorProjectState['project']>,
+    clipId: string,
+    time: number
+  ) => NonNullable<VideoEditorProjectState['project']>
+): VideoEditorProjectState['trimClipStart'] {
+  return (clipId, time) => {
+    let result: VideoEditorClipTimingResult | null = null;
+    set((state) => {
+      const patch = applyProjectUpdate(state, (project) => mutate(project, clipId, time));
+      result = resolveAppliedClipTiming(patch.project ?? state.project, clipId);
+      return patch;
+    });
+    return result;
+  };
+}
+
+function resolveAppliedClipTiming(
+  project: VideoEditorProjectState['project'] | undefined,
+  clipId: string
+): VideoEditorClipTimingResult | null {
+  const clip = project?.clips.find((item) => item.id === clipId);
+  return clip
+    ? {
+        clipId,
+        duration: clip.duration,
+        endTime: clip.startTime + clip.duration,
+        startTime: clip.startTime,
+        timelineLaneId: clip.timelineLaneId ?? null,
+        trackId: clip.trackId,
+      }
+    : null;
 }
 
 function createDeleteClipAction(set: VideoEditorStoreSet): VideoEditorProjectState['deleteClip'] {

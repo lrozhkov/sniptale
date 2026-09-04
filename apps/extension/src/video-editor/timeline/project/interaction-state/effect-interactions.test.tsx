@@ -107,7 +107,9 @@ it('supersedes a clip pointer session before starting an effect transaction', ()
   function Harness() {
     const pointerSessionCleanupRef = useRef<(() => void) | null>(null);
     const clipInteraction = useProjectTimelineDrag({
+      currentTime: 0,
       historyTransaction,
+      magnetEnabled: false,
       pointerSessionCleanupRef,
       pixelsPerSecond: 10,
       project,

@@ -314,6 +314,26 @@ async function verifyVideoEditorTimelineBoundaries(
   await page.setViewportSize({ width: 1600, height: 1100 });
 }
 
+async function verifyVideoEditorClipMagnet(
+  page: import('@playwright/test').Page,
+  timelineClip: import('@playwright/test').Locator,
+  screenshotPath: string
+): Promise<void> {
+  const magnet = page.getByRole('button', {
+    name: translate('videoEditor.app.magnetButton', 'ru'),
+  });
+  await expect(magnet).toHaveAttribute('aria-pressed', 'true');
+  const clipBox = await timelineClip.boundingBox();
+  if (!clipBox) throw new Error('Expected a visible clip for magnetic drag proof');
+  await page.mouse.move(clipBox.x + clipBox.width / 2, clipBox.y + clipBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(clipBox.x + clipBox.width / 2 + 6, clipBox.y + clipBox.height / 2);
+  await expect(page.locator('[data-ui="video-editor.timeline.snap-guide"]')).toBeVisible();
+  await page.screenshot({ fullPage: true, path: screenshotPath });
+  await page.mouse.up();
+  await expect(page.locator('[data-ui="video-editor.timeline.snap-guide"]')).toHaveCount(0);
+}
+
 async function verifyVideoEditorAnnotationCanvasFlow(
   page: import('@playwright/test').Page,
   screenshotPath: string
@@ -488,6 +508,12 @@ test('video editor keeps webcam independent with camera timeline and inspector c
     testInfo.outputPath('video-editor-timeline-transport.png'),
     testInfo.outputPath('video-editor-timeline-transport-compact.png'),
     testInfo.outputPath('video-editor-timeline-transport-scrolled.png')
+  );
+
+  await verifyVideoEditorClipMagnet(
+    page,
+    timelineClip,
+    testInfo.outputPath('video-editor-timeline-clip-magnet.png')
   );
 
   await verifyVideoEditorTrackRename(page, testInfo.outputPath('video-editor-track-inspector.png'));
