@@ -514,9 +514,9 @@ function useLoadedWebSnapshotPackage() {
         objectUrls = nextLoaded.objectUrls;
         setLoaded(nextLoaded);
       })
-      .catch((loadError) => {
+      .catch(() => {
         if (!disposed) {
-          logger.error('Failed to load Web Snapshot package', loadError);
+          logger.error('web-snapshot-viewer.package-load-failed');
           setError({ kind: 'load-error' });
         }
       });

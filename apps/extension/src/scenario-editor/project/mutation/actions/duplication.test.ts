@@ -284,7 +284,8 @@ async function verifiesCaptureStepDuplicationFailure() {
 
   expect(harness.getProject().steps).toHaveLength(2);
   expect(harness.selectedStepIds).toEqual([]);
-  expect(harness.setError).toHaveBeenCalledWith('clone failed');
+  expect(harness.setError).toHaveBeenLastCalledWith(expect.stringContaining('Sniptale'));
+  expect(harness.setError).not.toHaveBeenCalledWith('clone failed');
 }
 
 describe('scenario editor controller duplication actions', () => {

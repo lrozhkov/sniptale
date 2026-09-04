@@ -63,6 +63,7 @@ it('starts a screenshot-free job with one warning when all-sites access is denie
     includeWebCopy: false,
     intent: 'export',
     jobId: expect.any(String),
+    locale: expect.any(String),
     orderedTabs: [{ tabId: 15, title: 'Example tab' }],
     options: expect.objectContaining({ includeFullPageScreenshot: false }),
     warnings: ['popup.export.screenshotPermissionDeniedWarning'],

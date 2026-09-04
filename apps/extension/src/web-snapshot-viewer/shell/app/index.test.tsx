@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
   browserTabsCreate: vi.fn(),
   latestFrameLoad: null as (() => void) | null,
   loadWebSnapshotPackage: vi.fn(),
+  loggerError: vi.fn(),
+  loggerWarn: vi.fn(),
   printWebSnapshotImageProjection: vi.fn(),
   printWebSnapshotProjection: vi.fn(),
   readSnapshotIdFromLocation: vi.fn(),
@@ -30,6 +32,11 @@ const mocks = vi.hoisted(() => ({
       />
     )
   ),
+}));
+
+vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@sniptale/platform/observability/logger')>()),
+  createLogger: () => ({ error: mocks.loggerError, warn: mocks.loggerWarn }),
 }));
 
 vi.mock('./route', () => ({
@@ -140,6 +147,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.latestFrameLoad = null;
   mocks.loadWebSnapshotPackage.mockReset();
+  mocks.loggerError.mockReset();
+  mocks.loggerWarn.mockReset();
   mocks.printWebSnapshotProjection.mockReset();
   mocks.printWebSnapshotProjection.mockResolvedValue(undefined);
   mocks.printWebSnapshotImageProjection.mockReset();
@@ -153,6 +162,23 @@ beforeEach(() => {
   mocks.readSnapshotIdFromLocation.mockReturnValue('snapshot-1');
   mocks.useAppLocale.mockReturnValue('en');
   mocks.SnapshotPreparationHost.mockClear();
+});
+
+it('logs only a fixed code when snapshot loading fails with page-derived identifiers', async () => {
+  const sensitiveFailure = new Error(
+    'Snapshot asset snapshot-secret-42 failed integrity for private/customer-name.png'
+  );
+  mocks.loadWebSnapshotPackage.mockRejectedValue(sensitiveFailure);
+
+  await act(async () => {
+    root?.render(<WebSnapshotViewerApp />);
+  });
+
+  expect(mocks.loggerError).toHaveBeenCalledWith('web-snapshot-viewer.package-load-failed');
+  const logged = JSON.stringify(mocks.loggerError.mock.calls);
+  expect(logged).not.toContain('snapshot-secret-42');
+  expect(logged).not.toContain('private/customer-name.png');
+  expect(container?.textContent).toContain(translate('common.errors.loadFailed', 'en'));
 });
 
 it('keeps links blocked until the Viewer toggle enables preview and external navigation', async () => {

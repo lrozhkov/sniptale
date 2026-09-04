@@ -6,7 +6,7 @@ import { createRoot } from 'react-dom/client';
 
 const trustedEventMocks = vi.hoisted(() => ({
   isTrustedDomEvent: vi.fn(() => true),
-  isTrustedPointerEvent: vi.fn(() => true),
+  isTrustedPointerEvent: vi.fn((_event?: Event) => true),
 }));
 
 vi.mock('../../platform/trusted-events', async (importOriginal) => ({
@@ -74,6 +74,41 @@ function dispatchPointerUp(target: EventTarget = window): void {
       bubbles: true,
       button: 0,
       cancelable: true,
+      composed: true,
+    })
+  );
+}
+
+function mountPointerSelectionTextarea(): HTMLTextAreaElement {
+  const { root } = mountBridgeRoot();
+  const textarea = document.createElement('textarea');
+  textarea.value = 'abcdef';
+  root.append(textarea);
+  vi.spyOn(textarea, 'getBoundingClientRect').mockReturnValue(
+    DOMRect.fromRect({ height: 40, width: 100 })
+  );
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(
+    function (this: HTMLElement) {
+      if (this.tagName === 'SPAN' && this.previousSibling instanceof Text) {
+        return DOMRect.fromRect({
+          height: 20,
+          x: this.previousSibling.data.length * 10,
+        });
+      }
+      return DOMRect.fromRect();
+    }
+  );
+  return textarea;
+}
+
+function startPointerSelection(textarea: HTMLTextAreaElement): void {
+  textarea.dispatchEvent(
+    new MouseEvent('pointerdown', {
+      bubbles: true,
+      button: 0,
+      cancelable: true,
+      clientX: 10,
+      clientY: 10,
       composed: true,
     })
   );
@@ -281,6 +316,36 @@ describe('content UI activation bridge focus ownership', () => {
     expect(textarea.selectionStart).toBe(1);
     expect(textarea.selectionEnd).toBe(4);
   });
+
+  it('rejects an untrusted pointer move after a trusted selection start', () => {
+    const textarea = mountPointerSelectionTextarea();
+    trustedEventMocks.isTrustedPointerEvent.mockImplementation(
+      (event) => event?.type !== 'pointermove'
+    );
+
+    startPointerSelection(textarea);
+    dispatchPointerMove(window, 40);
+
+    expect(textarea.selectionStart).toBe(1);
+    expect(textarea.selectionEnd).toBe(1);
+  });
+
+  it.each(['pointerup', 'pointercancel'] as const)(
+    'rejects an untrusted %s without terminating the trusted selection session',
+    (eventType) => {
+      const textarea = mountPointerSelectionTextarea();
+      trustedEventMocks.isTrustedPointerEvent.mockImplementation(
+        (event) => event?.type !== eventType
+      );
+
+      startPointerSelection(textarea);
+      window.dispatchEvent(new MouseEvent(eventType, { bubbles: true, composed: true }));
+      dispatchPointerMove(window, 40);
+
+      expect(textarea.selectionStart).toBe(1);
+      expect(textarea.selectionEnd).toBe(4);
+    }
+  );
 
   it('owns pointer drag selection before a host window guard stops propagation', () => {
     const hostGuard = (event: Event) => event.stopPropagation();

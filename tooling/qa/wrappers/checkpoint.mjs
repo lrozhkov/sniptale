@@ -111,7 +111,9 @@ function collectAdvisoryStep(context, { producerRunId } = {}) {
     return {
       ...createOkStep(
         'Advisory report',
-        `introduced=${report.buckets.introduced.length}, worsened=${report.buckets.worsened.length}, existing=${report.buckets.existing.length}`
+        `introduced=${report.buckets.introduced.length}, ` +
+          `worsened=${report.buckets.worsened.length}, ` +
+          `existing=${report.buckets.existing.length}`
       ),
       consoleOutput: formatAdvisoryReport(report),
       advisories: actionable,

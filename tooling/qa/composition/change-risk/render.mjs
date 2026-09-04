@@ -28,7 +28,8 @@ function collectCoverage(findings, steps) {
 }
 
 const EXECUTOR_ASSESSMENT =
-  'Inspect the implementation against architecture and security review triggers; run applicable reviews or record an implementation-specific reason why not required';
+  'Inspect the implementation against architecture and security review triggers; ' +
+  'run applicable reviews or record an implementation-specific reason why not required';
 
 export function collectRiskRequirements(findings) {
   return [

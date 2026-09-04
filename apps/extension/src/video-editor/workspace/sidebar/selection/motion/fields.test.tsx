@@ -12,7 +12,8 @@ import {
 import { MotionBlurField, MotionEasingField, MotionOverlayZoomField } from './fields';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 
-vi.mock('../../../../../platform/i18n', () => ({
+vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
   translate: (key: string) => key,
   useAppLocale: () => 'en',
 }));

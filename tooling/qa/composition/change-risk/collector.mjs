@@ -30,8 +30,11 @@ const IPC_ROUTE_PATTERN =
 const AUTHORIZATION_PATTERN = /(?:authorization|capabilit|sender-policy|permission-lifecycle)/u;
 const AUTHORIZATION_ROOT_PATTERN =
   /^apps\/extension\/src\/(?:background\/.*routing|contracts\/messaging|platform\/security)/u;
-const TRUSTED_EVENT_BRIDGE_PATTERN =
-  /^apps\/extension\/src\/(?:content\/runtime\/(?:ui-activation-bridge|.*trusted.*event)|platform\/browser\/.*event.*bridge)/u;
+const TRUSTED_EVENT_BRIDGE_PATTERN = new RegExp(
+  '^apps/extension/src/(?:content/runtime/(?:ui-activation-bridge|.*trusted.*event)' +
+    '|platform/browser/(?:.*event.*bridge))',
+  'u'
+);
 
 const RISK_DEFINITIONS = Object.freeze({
   'manifest.permissions': {

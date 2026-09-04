@@ -308,7 +308,8 @@ export function removeAgentTooling({
   }
   if (modified.length > 0 && !force) {
     throw new Error(
-      `Local agent tooling has modified files: ${modified.join(', ')}. Rerun with --force to remove only the kit-owned paths.`
+      `Local agent tooling has modified files: ${modified.join(', ')}. ` +
+        'Rerun with --force to remove only the kit-owned paths.'
     );
   }
   for (const relativePath of files.keys())

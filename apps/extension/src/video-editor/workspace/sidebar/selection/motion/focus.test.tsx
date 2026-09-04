@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { ManualFocusFields } from './focus';
 import { createMotionPanelProps } from './test-support';
 
-vi.mock('../../../../../platform/i18n', () => ({
+vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
   translate: (key: string) => key,
   useAppLocale: () => 'en',
 }));

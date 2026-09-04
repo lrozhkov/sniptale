@@ -236,7 +236,8 @@ function collectRegistryBuildCoverageViolations(rootDir, buildLayoutPath, topolo
         createViolation(
           'runtime-topology-unregistered-build-runtime',
           buildLayoutPath,
-          `Build ${input.mode} input "${input.sourcePath}" → "${input.outputPath}" is not owned by one registered runtime.`
+          `Build ${input.mode} input "${input.sourcePath}" → "${input.outputPath}" ` +
+            'is not owned by one registered runtime.'
         )
       );
       continue;
@@ -247,7 +248,8 @@ function collectRegistryBuildCoverageViolations(rootDir, buildLayoutPath, topolo
         createViolation(
           'runtime-topology-build-entrypoint-missing',
           buildLayoutPath,
-          `Runtime "${sourceRuntime.id}" does not register build ${input.mode} input "${input.sourcePath}" as an entrypoint.`
+          `Runtime "${sourceRuntime.id}" does not register build ${input.mode} input ` +
+            `"${input.sourcePath}" as an entrypoint.`
         )
       );
     }

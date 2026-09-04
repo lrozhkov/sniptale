@@ -5,7 +5,7 @@ This file projects changeable values and inventories from their existing machine
 
 | Fact | Current projection | Machine authority |
 | --- | --- | --- |
-| Product version | `0.4.0` | `package.json#/version` |
+| Product version | `0.4.1` | `package.json#/version` |
 | Minimum Chrome version | `148` | `apps/extension/manifest.json#/minimum_chrome_version` |
 | Persistence database version | `1` | `apps/extension/src/composition/persistence/infrastructure/indexed-db/core.stores.ts#DB_VERSION` |
 | Security reporting | .github/SECURITY.md and GitHub private vulnerability reporting | `tooling/configs/ci/github-policy.json#/security/privateVulnerabilityReporting` |

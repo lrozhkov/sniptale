@@ -5,7 +5,8 @@ import { createEmptyVideoProject } from '../../../../../features/video/project/f
 import { VideoOverlayTemplateKind } from '../../../../../features/video/project/types';
 import { AnnotationStyleControls } from './style-controls';
 
-vi.mock('../../../../../platform/i18n', () => ({
+vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
   translate: (key: string) => key,
   useAppLocale: () => 'en',
 }));

@@ -23,6 +23,7 @@ import type {
   RuntimePopupExportResponseByType,
 } from '@sniptale/runtime-contracts/messaging/contracts/runtime-message/popup-export';
 
+// policyStateId: popup-tab-route-capabilities
 const popupTabRouteOperations = new Set<string>([
   MessageType.EXPORT_POPUP_PREVIEW,
   MessageType.EXPORT_POPUP_BUILD_PACKAGE,

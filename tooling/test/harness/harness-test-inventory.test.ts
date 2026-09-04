@@ -38,6 +38,7 @@ it('keeps the repository harness inventory complete and balances node VM source 
     ...inventory.nodeVmThreadsFilesB,
   ];
   expect(new Set(projected).size).toBe(inventory.files.length);
+  expect(inventory.forkFiles).toContain('tooling/qa/wrappers/advisory.test.ts');
   expect(inventory.nodeVmThreadsFilesA.length).toBeGreaterThan(0);
   expect(inventory.nodeVmThreadsFilesB.length).toBeGreaterThan(0);
 });

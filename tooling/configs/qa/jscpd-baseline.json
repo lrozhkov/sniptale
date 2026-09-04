@@ -472,6 +472,24 @@
       }
     },
     {
+      "id": "445e0836f37779daac2cc910b7468023c7c0df779befd76b22794fb0e29e8bdc",
+      "classification": "tool-noise",
+      "owner": "content activation bridge <-> quick-edit keyboard runtime",
+      "reason": "The two keyboard layers own separate propagation and selection lifecycles; extracting their small navigation adapters would create a cross-owner control dependency.",
+      "removalCondition": "Remove when both keyboard layers acquire one navigation authority, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/content/runtime/ui-activation-bridge/targets.ts",
+        "start": 359,
+        "end": 378
+      },
+      "secondFile": {
+        "path": "apps/extension/src/content/selection/quick-edit-runtime/keydown.ts",
+        "start": 124,
+        "end": 143
+      }
+    },
+    {
       "id": "47d29325d2c4f87c5a5476ac2e043e0dc203de0ae6037da601093ab04c5864e6",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/ai-modal/shell.css",
@@ -685,24 +703,6 @@
         "path": "packages/ui/src/styles/overlays/ai-modal-overrides/surface.css",
         "start": 293,
         "end": 308
-      }
-    },
-    {
-      "id": "5ad5052f6f29d34588e357a2cbce1b408efb957ded7013df672f565e304c00c8",
-      "classification": "tool-noise",
-      "owner": "tooling/web-snapshot-smoke/runtime <-> tooling/web-snapshot-smoke/runtime",
-      "reason": "Polygon and full-snapshot smoke entrypoints own different manifest mutation and launch flows; the matching Chromium option tail is declarative launch configuration.",
-      "removalCondition": "Remove when one accepted semantic owner can replace both endpoints without a configuration bag or cross-owner coupling, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "tooling/web-snapshot-smoke/runtime/polygon-runner.mjs",
-        "start": 41,
-        "end": 55
-      },
-      "secondFile": {
-        "path": "tooling/web-snapshot-smoke/runtime/runner.mjs",
-        "start": 189,
-        "end": 202
       }
     },
     {
@@ -1063,6 +1063,24 @@
         "path": "apps/extension/src/content/public/preparation-surface/effects.css",
         "start": 124,
         "end": 133
+      }
+    },
+    {
+      "id": "76d71fdadf0aa201bbe0f61b636b341bd84fc75e31976c1f26c396d94b8f7602",
+      "classification": "tool-noise",
+      "owner": "tooling/web-snapshot-smoke/runtime",
+      "reason": "Polygon and full-snapshot smoke entrypoints own different browser lifecycles; the matching Chromium launch configuration remains explicit in each operator flow.",
+      "removalCondition": "Remove when both smoke entrypoints adopt one lifecycle owner, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "tooling/web-snapshot-smoke/runtime/polygon-runner.mjs",
+        "start": 57,
+        "end": 71
+      },
+      "secondFile": {
+        "path": "tooling/web-snapshot-smoke/runtime/runner.mjs",
+        "start": 189,
+        "end": 202
       }
     },
     {
@@ -2002,6 +2020,24 @@
       }
     },
     {
+      "id": "ca811183def941774a45d9a709e21bc77247e915f8c6645d20ddd8fb9481bdf2",
+      "classification": "tool-noise",
+      "owner": "background page-package job <-> content web-snapshot capture",
+      "reason": "Cancellation races cross the background/content runtime boundary; sharing this adapter would violate runtime dependency direction.",
+      "removalCondition": "Remove when a runtime-neutral cancellation contract owns both adapters, or when the exact detector pair disappears.",
+      "reviewBy": "2027-09-01",
+      "firstFile": {
+        "path": "apps/extension/src/background/capture/page-package/job/page-phase.ts",
+        "start": 114,
+        "end": 120
+      },
+      "secondFile": {
+        "path": "apps/extension/src/content/parser/web-snapshot/capture.ts",
+        "start": 46,
+        "end": 52
+      }
+    },
+    {
       "id": "ca9d5fc8c61d7bddfb059fdd0b1b100ea443a6d5cb0dcbcfff151d613eebef35",
       "classification": "tool-noise",
       "owner": "packages/ui/src/styles/glass <-> packages/ui/src/styles/toolbar-shell",
@@ -2377,24 +2413,6 @@
         "path": "apps/extension/src/composition/frame-annotation-controls/step-badge/preset-list.tsx",
         "start": 51,
         "end": 65
-      }
-    },
-    {
-      "id": "e8f5bd95f9c1c2ad24662d347ce024b6028cc4c32e62ce7188bc69d72b5d051a",
-      "classification": "tool-noise",
-      "owner": "apps/extension/src/background/capture/page-package/job <-> apps/extension/src/content/parser/web-snapshot",
-      "reason": "The endpoints belong to different runtime/domain owners or contracts; similar control shape does not establish one shared authority.",
-      "removalCondition": "Remove when both endpoints acquire one shared state, effect, or contract authority, or when the exact detector pair disappears.",
-      "reviewBy": "2027-09-01",
-      "firstFile": {
-        "path": "apps/extension/src/background/capture/page-package/job/page-phase.ts",
-        "start": 68,
-        "end": 74
-      },
-      "secondFile": {
-        "path": "apps/extension/src/content/parser/web-snapshot/capture.ts",
-        "start": 46,
-        "end": 52
       }
     },
     {

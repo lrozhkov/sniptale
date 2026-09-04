@@ -15,7 +15,8 @@ const {
   logSelectionModeRuntimeMock: vi.fn(),
 }));
 
-vi.mock('../../../../platform/frame', () => ({
+vi.mock('../../../../platform/frame', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/frame')>()),
   addEventListenerToAllWindowsDynamic: addEventListenerToAllWindowsDynamicMock,
   addWindowEventListenerToAllWindowsDynamic: addWindowEventListenerToAllWindowsDynamicMock,
   addScrollListenersToAllWindows: addScrollListenersToAllWindowsMock,

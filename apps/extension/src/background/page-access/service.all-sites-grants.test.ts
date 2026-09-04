@@ -12,6 +12,7 @@ import {
   browserScriptingUnregisterContentScriptsMock,
   browserTabsGetMock,
   createMessage,
+  sendTabMessageMock,
 } from './service.test-support';
 
 function createDeferred<T>() {
@@ -169,6 +170,7 @@ it('does not roll back all-sites permission when it already existed before failu
 
 it('rolls back just-granted all-sites permission when current-tab injection fails', async () => {
   const { handlePageAccessMessage } = await import('./service');
+  sendTabMessageMock.mockRejectedValue(new Error('runtime unavailable'));
   browserScriptingExecuteScriptMock.mockRejectedValueOnce(new Error('inject failed'));
 
   await expect(
@@ -217,7 +219,8 @@ it('registers already-granted all-sites access without requesting permissions ag
       matches: ['http://*/*', 'https://*/*'],
     }),
   ]);
-  expect(browserScriptingExecuteScriptMock).toHaveBeenCalledOnce();
+  expect(sendTabMessageMock).toHaveBeenCalledOnce();
+  expect(browserScriptingExecuteScriptMock).not.toHaveBeenCalled();
 });
 
 it('replaces stale all-sites registrations even when origin matches are current', async () => {

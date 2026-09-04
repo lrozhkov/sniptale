@@ -9,6 +9,7 @@ import {
   isPrimaryPointerEvent,
   resolveActivationTarget,
   resolveEditableTarget,
+  resolveTextControlOffsetAtPoint,
 } from './targets';
 import { isTrustedPointerEvent } from '../../platform/trusted-events';
 
@@ -75,102 +76,6 @@ function resolveContentEditablePoint(
   return range && target.contains(range.startContainer)
     ? { node: range.startContainer, offset: range.startOffset }
     : null;
-}
-
-const MIRRORED_STYLE_PROPERTIES = [
-  'borderBottomWidth',
-  'borderLeftWidth',
-  'borderRightWidth',
-  'borderTopWidth',
-  'boxSizing',
-  'direction',
-  'fontFamily',
-  'fontSize',
-  'fontStyle',
-  'fontWeight',
-  'letterSpacing',
-  'lineHeight',
-  'paddingBottom',
-  'paddingLeft',
-  'paddingRight',
-  'paddingTop',
-  'tabSize',
-  'textAlign',
-  'textIndent',
-  'textRendering',
-  'textTransform',
-  'wordBreak',
-  'wordSpacing',
-] as const;
-
-function createTextControlMirror(target: HTMLInputElement | HTMLTextAreaElement): HTMLDivElement {
-  const mirror = target.ownerDocument.createElement('div');
-  const sourceStyle = target.ownerDocument.defaultView?.getComputedStyle(target);
-  const rect = target.getBoundingClientRect();
-  mirror.setAttribute('aria-hidden', 'true');
-  Object.assign(mirror.style, {
-    all: 'initial',
-    display: 'block',
-    left: `${rect.left - target.scrollLeft}px`,
-    overflow: 'hidden',
-    overflowWrap: 'break-word',
-    pointerEvents: 'none',
-    position: 'fixed',
-    top: `${rect.top - target.scrollTop}px`,
-    visibility: 'hidden',
-    whiteSpace: target instanceof HTMLInputElement || target.wrap === 'off' ? 'pre' : 'pre-wrap',
-    width: `${rect.width}px`,
-    zIndex: '-1',
-  });
-  if (sourceStyle) {
-    for (const property of MIRRORED_STYLE_PROPERTIES) {
-      mirror.style[property] = sourceStyle[property];
-    }
-  }
-  const root = target.getRootNode();
-  if (root instanceof ShadowRoot) root.append(mirror);
-  else target.ownerDocument.body.append(mirror);
-  return mirror;
-}
-
-function compareMarkerToPoint(rect: DOMRect, x: number, y: number): number {
-  if (rect.bottom <= y) return -1;
-  if (rect.top > y) return 1;
-  return rect.left <= x ? -1 : 1;
-}
-
-function resolveTextControlOffsetAtPoint(
-  target: HTMLInputElement | HTMLTextAreaElement,
-  x: number,
-  y: number
-): number {
-  const mirror = createTextControlMirror(target);
-  const prefix = target.ownerDocument.createTextNode('');
-  const marker = target.ownerDocument.createElement('span');
-  marker.textContent = '\u200b';
-  Object.assign(marker.style, {
-    all: 'initial',
-    border: '0',
-    display: 'inline',
-    font: 'inherit',
-    margin: '0',
-    padding: '0',
-    transform: 'none',
-  });
-  mirror.append(prefix, marker);
-  let low = 0;
-  let high = target.value.length;
-  try {
-    while (low < high) {
-      const middle = Math.ceil((low + high) / 2);
-      prefix.data = target.value.slice(0, middle);
-      if (compareMarkerToPoint(marker.getBoundingClientRect(), x, y) <= 0) low = middle;
-      else high = middle - 1;
-    }
-    return low;
-  } finally {
-    mirror.remove();
-  }
 }
 
 function resolveSelectionPoint(
@@ -312,14 +217,14 @@ function installEditablePointerSelectionBridge(root: ShadowRoot | HTMLElement): 
     applyPointerSelection(target, anchor, point);
   };
   const handlePointerMove = (event: PointerEvent) => {
-    if (!session || session.pointerId !== event.pointerId) return;
+    if (!session || session.pointerId !== event.pointerId || !isTrustedPointerEvent(event)) return;
     const point = resolveSelectionPoint(session.target, event, root);
     if (point === null) return;
     event.preventDefault();
     applyPointerSelection(session.target, session.anchor, point);
   };
   const clearSession = (event: PointerEvent) => {
-    if (session?.pointerId === event.pointerId) session = null;
+    if (session?.pointerId === event.pointerId && isTrustedPointerEvent(event)) session = null;
   };
   const pointerDownListener = handlePointerDown as EventListener;
   window.addEventListener('pointerdown', pointerDownListener, { capture: true });

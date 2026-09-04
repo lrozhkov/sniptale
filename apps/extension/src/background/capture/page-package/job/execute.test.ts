@@ -28,7 +28,8 @@ vi.mock('./offscreen-download-gateway', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./offscreen-download-gateway')>()),
   preparePagePackageDownloadRuntime: mocks.prepareDownloadRuntime,
 }));
-vi.mock('./action-indicator', () => ({
+vi.mock('./action-indicator', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./action-indicator')>()),
   startPagePackageActionIndicator: mocks.startActionIndicator,
 }));
 vi.mock('./visible', () => ({

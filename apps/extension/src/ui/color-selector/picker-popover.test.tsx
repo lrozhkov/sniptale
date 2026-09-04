@@ -8,7 +8,8 @@ import { ColorSelectorPickerPopover } from './picker-popover';
 import { getNextColorSelectorFormatMode } from '@sniptale/ui/color-selector/types';
 import { useEyedropper } from '@sniptale/ui/color-selector/popover-state';
 
-vi.mock('../../platform/i18n', () => ({
+vi.mock('../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
 

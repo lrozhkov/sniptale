@@ -261,7 +261,10 @@ it('rejects retired layout instructions and missing private-reporting guidance',
   write(
     root,
     'docs/oss/release.md',
-    'qa:release-harness qa:checkpoint qa:closeout ci:proof ci:release src/shared Corresponding Source AGPL-3.0-or-later\n'
+    [
+      'qa:release-harness qa:checkpoint qa:closeout ci:proof ci:release src/shared',
+      'Corresponding Source AGPL-3.0-or-later\n',
+    ].join(' ')
   );
   write(root, '.github/SECURITY.md', '# Reporting\n');
 

@@ -11,7 +11,8 @@ import {
 import type { ScenarioStep } from '../../../features/scenario/contracts/types/project';
 import { ScenarioNavigatorStepRow } from './ScenarioSlideNavigatorStepRow';
 
-vi.mock('../../../platform/i18n', () => ({
+vi.mock('../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
 

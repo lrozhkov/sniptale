@@ -146,7 +146,7 @@ function compareMarkerToPoint(rect: DOMRect, x: number, y: number): number {
   return rect.left <= x ? -1 : 1;
 }
 
-function resolveTextControlOffsetAtPoint(
+export function resolveTextControlOffsetAtPoint(
   target: HTMLInputElement | HTMLTextAreaElement,
   x: number,
   y: number

@@ -410,12 +410,16 @@ async function runPrintSmoke({ packageArgument = null, sourceUrl = null }) {
   const failures = [];
   if (metrics.coverage.documentHeightCoverage < 0.99) {
     failures.push(
-      `print document covers only ${(metrics.coverage.documentHeightCoverage * 100).toFixed(2)}% of the required content height`
+      'print document covers only ' +
+        `${(metrics.coverage.documentHeightCoverage * 100).toFixed(2)}% ` +
+        'of the required content height'
     );
   }
   if (metrics.coverage.documentHeightExpansionRatio > MAX_PRINT_HEIGHT_EXPANSION_RATIO) {
     failures.push(
-      `print document expands to ${(metrics.coverage.documentHeightExpansionRatio * 100).toFixed(2)}% of the source document height`
+      'print document expands to ' +
+        `${(metrics.coverage.documentHeightExpansionRatio * 100).toFixed(2)}% ` +
+        'of the source document height'
     );
   }
   if (metrics.coverage.unexpandedScrollRegions.length > 0) {
@@ -425,7 +429,8 @@ async function runPrintSmoke({ packageArgument = null, sourceUrl = null }) {
   }
   if (metrics.coverage.textRetentionRatio < 0.25) {
     failures.push(
-      `print projection retains only ${(metrics.coverage.textRetentionRatio * 100).toFixed(2)}% of the source text`
+      'print projection retains only ' +
+        `${(metrics.coverage.textRetentionRatio * 100).toFixed(2)}% of the source text`
     );
   }
   const report = { ...metrics, failures, status: failures.length === 0 ? 'passed' : 'failed' };
@@ -434,7 +439,9 @@ async function runPrintSmoke({ packageArgument = null, sourceUrl = null }) {
     throw new Error(`Web Snapshot print package smoke failed: ${failures.join('; ')}`);
   }
   process.stdout.write(
-    `PASS print-source PDF portrait=${metrics.pdfBytes.portrait} landscape=${metrics.pdfBytes.landscape} bytes. Report: ${join(outputRoot, 'metrics.json')}\n`
+    `PASS print-source PDF portrait=${metrics.pdfBytes.portrait} ` +
+      `landscape=${metrics.pdfBytes.landscape} bytes. ` +
+      `Report: ${join(outputRoot, 'metrics.json')}\n`
   );
 }
 

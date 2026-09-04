@@ -151,7 +151,7 @@ it('keeps current-page context separate from the active producer counter', async
     createProps({
       progress: {
         phase: 'downloading',
-        message: 'popup.export.batchCollectingMessage Example page',
+        message: 'Collecting page: Example page',
         current: 1,
         total: 4,
         errors: [],
@@ -163,7 +163,7 @@ it('keeps current-page context separate from the active producer counter', async
   );
 
   const description = container?.querySelector('[data-ui="popup.export.progress-description"]');
-  expect(description?.textContent).toContain('popup.export.batchCollectingMessage Example page');
+  expect(description?.textContent).toContain('Collecting page: Example page');
   expect(description?.textContent).not.toContain('Attachments');
   const activeStep = container?.querySelector('[data-status="active"]');
   expect(activeStep?.textContent).toContain('Attachments');
