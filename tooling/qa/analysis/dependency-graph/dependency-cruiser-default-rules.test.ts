@@ -21,6 +21,15 @@ function loadRules() {
   return require(rulesPath) as DependencyRule[];
 }
 
+function findNobleSha2Pattern(rules: DependencyRule[]) {
+  const rule = rules.find((candidate) => candidate.name === 'no-non-package-json');
+  return rule?.to?.pathNot?.[0];
+}
+
+function escapeRegex(source: string) {
+  return source.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&');
+}
+
 it('admits only the resolved installed noble sha2 export in a pushed-range workspace', async () => {
   const workspaceRoot = createTempRoot('dependency-rules-pushed-range-');
   const installedSha2Path = require.resolve('@noble/hashes/sha2.js');
@@ -29,15 +38,19 @@ it('admits only the resolved installed noble sha2 export in a pushed-range works
     path.join(workspaceRoot, 'node_modules')
   );
   const rules = await withCwd(workspaceRoot, () => loadRules());
-  const rule = rules.find((candidate) => candidate.name === 'no-non-package-json');
-  const pathPattern = rule?.to?.pathNot?.find((pattern) => pattern.includes('@noble/hashes'));
+  const pathPattern = findNobleSha2Pattern(rules);
 
-  expect(pathPattern).toBeDefined();
-  const allowedPath = new RegExp(pathPattern!);
   const pushedRangePath = path.relative(workspaceRoot, installedSha2Path).split(path.sep).join('/');
 
-  expect(allowedPath.test(pushedRangePath)).toBe(true);
-  expect(allowedPath.test('packages/hostile/node_modules/@noble/hashes/sha2.js')).toBe(false);
-  expect(allowedPath.test('node_modules/@noble/hashes/sha3.js')).toBe(false);
-  expect(allowedPath.test('node_modules/other-package/sha2.js')).toBe(false);
+  expect(pathPattern).toBe(`^${escapeRegex(pushedRangePath)}$`);
+  expect(pathPattern).not.toBe('^packages/hostile/node_modules/@noble/hashes/sha2[.]js$');
+  expect(pathPattern).not.toBe('^node_modules/@noble/hashes/sha3[.]js$');
+  expect(pathPattern).not.toBe('^node_modules/other-package/sha2[.]js$');
+});
+
+it('keeps the exception fail-closed when installed dependencies are unavailable', async () => {
+  const workspaceRoot = createTempRoot('dependency-rules-without-install-');
+  const rules = await withCwd(workspaceRoot, () => loadRules());
+
+  expect(findNobleSha2Pattern(rules)).toBe('(?!)');
 });

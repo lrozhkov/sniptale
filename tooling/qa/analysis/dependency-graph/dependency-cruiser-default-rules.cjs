@@ -5,7 +5,13 @@ function escapeRegex(source) {
 }
 
 function resolveInstalledDependencyPattern(specifier) {
-  const installedPath = require.resolve(specifier, { paths: [process.cwd()] });
+  let installedPath;
+  try {
+    installedPath = require.resolve(specifier, { paths: [process.cwd()] });
+  } catch (error) {
+    if (error?.code === 'MODULE_NOT_FOUND') return '(?!)';
+    throw error;
+  }
   const repositoryRelativePath = path
     .relative(process.cwd(), installedPath)
     .split(path.sep)
