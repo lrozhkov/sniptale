@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { resolveVideoCompositionFrame } from '../../composition/timeline/frame';
 
 import { createVideoProjectFromMultiSourceRecording } from './multi-source-recording';
-import { VideoMediaFitMode, VideoProjectClipType, VideoTrackKind } from '../types/index';
+import {
+  VideoMediaFitMode,
+  VideoProjectClipType,
+  VideoProjectTrackRole,
+  VideoTrackKind,
+} from '../types/index';
 
 function createVideoInput(
   recordingId: string,
@@ -85,6 +91,7 @@ function registerMultiSourceWebcamTests() {
       },
     });
     const videoClips = project.clips.filter((clip) => clip.type === VideoProjectClipType.VIDEO);
+    const cameraTrack = project.tracks.find((track) => track.role === VideoProjectTrackRole.CAMERA);
 
     expect(project.baseRecordingId).toBe('rec-1');
     expect(project.duration).toBe(14);
@@ -104,9 +111,23 @@ function registerMultiSourceWebcamTests() {
       expect.objectContaining({
         muted: true,
         startTime: 0,
-        transform: expect.objectContaining({ height: 360, width: 640, x: 0, y: 0 }),
+        trackId: cameraTrack?.id,
+        transform: expect.objectContaining({
+          height: expect.any(Number),
+          width: expect.any(Number),
+          x: expect.any(Number),
+          y: expect.any(Number),
+        }),
       })
     );
+    expect(videoClips[2]?.transform.width).toBeLessThan(project.width / 2);
+    expect(project.tracks.filter((track) => track.role === undefined)).toHaveLength(4);
+    const frame = resolveVideoCompositionFrame(project, 1);
+    const screenLayer = frame.visualLayers.find((layer) => layer.clipId === videoClips[0]?.id);
+    const cameraLayer = frame.visualLayers.find((layer) => layer.clipId === videoClips[2]?.id);
+    expect(cameraTrack?.order).toBeGreaterThan(0);
+    expect(cameraTrack?.order).toBeLessThan(1);
+    expect(cameraLayer?.zIndex).toBeGreaterThan(screenLayer?.zIndex ?? -1);
   });
 }
 

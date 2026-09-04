@@ -13,12 +13,18 @@ import {
   VideoMediaFitMode,
   VideoProjectAssetType,
   VideoProjectClipType,
+  VideoProjectTrackRole,
   VideoTimelinePlacementMode,
   VideoTrackKind,
   type VideoProject,
   type VideoProjectClip,
   type VideoProjectTrack,
 } from '../types/index';
+import {
+  resolveVideoProjectCameraPlacement,
+  VideoProjectCameraPlacement,
+} from '../camera/placement';
+import { resolveVideoProjectCameraTrackOrder } from '../camera/track-order';
 
 export type MultiSourceRecordingProjectAssetInput = {
   recordingId: string;
@@ -81,15 +87,16 @@ function createAudioAsset(input: MultiSourceAudioProjectAssetInput) {
   );
 }
 
-function createVideoTracks(count: number): VideoProjectTrack[] {
-  return Array.from({ length: count }, (_item, index) =>
-    createVideoProjectTrack(
+function createVideoTracks(count: number, cameraTrackIndex: number | null): VideoProjectTrack[] {
+  return Array.from({ length: count }, (_item, index) => {
+    const track = createVideoProjectTrack(
       getDefaultTrackName(VideoTrackKind.PRIMARY, index + 1),
-      index + 1,
+      index === cameraTrackIndex ? resolveVideoProjectCameraTrackOrder(0, 1) : index + 1,
       VideoTrackKind.PRIMARY,
       index === 0
-    )
-  );
+    );
+    return index === cameraTrackIndex ? { ...track, role: VideoProjectTrackRole.CAMERA } : track;
+  });
 }
 
 function createOverlayTrack(): VideoProjectTrack {
@@ -132,7 +139,19 @@ function createVideoClips(params: {
     return {
       ...clip,
       fitMode: VideoMediaFitMode.SOURCE_100,
-      transform: createVideoProjectTransform(asset.metadata.width, asset.metadata.height),
+      transform:
+        params.tracks[index]?.role === VideoProjectTrackRole.CAMERA
+          ? {
+              ...clip.transform,
+              ...resolveVideoProjectCameraPlacement({
+                placement: VideoProjectCameraPlacement.BOTTOM_RIGHT,
+                projectHeight: params.projectHeight,
+                projectWidth: params.projectWidth,
+                sourceHeight: asset.metadata.height,
+                sourceWidth: asset.metadata.width,
+              }),
+            }
+          : createVideoProjectTransform(asset.metadata.width, asset.metadata.height),
     };
   });
 }
@@ -147,7 +166,10 @@ export function createVideoProjectFromMultiSourceRecording(options: {
   const videos = options.webcamVideo ? [...options.videos, options.webcamVideo] : options.videos;
   const projectWidth = firstVideo?.width ?? 1920;
   const projectHeight = firstVideo?.height ?? 1080;
-  const videoTracks = createVideoTracks(videos.length);
+  const videoTracks = createVideoTracks(
+    videos.length,
+    options.webcamVideo ? options.videos.length : null
+  );
   const audioTrack = createAudioTrack(videoTracks.length + 1);
   const videoAssets = videos.map(createVideoAsset);
   const audioAsset = options.microphoneAudio ? createAudioAsset(options.microphoneAudio) : null;

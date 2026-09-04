@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { resolveVideoCompositionFrame } from '../../composition/timeline/frame';
 
 import { createVideoProjectFromRecording } from './creation';
 import { createRecordingProjectDocument } from './project-recording';
@@ -8,6 +9,7 @@ import {
   VideoProjectActionPreset,
   VideoProjectAssetType,
   VideoProjectClipType,
+  VideoProjectTrackRole,
   VideoTrackKind,
   type VideoProjectAsset,
 } from '../types/index';
@@ -140,9 +142,45 @@ it('keeps provided recording assets, audio clips, and sidecar tracks together', 
   expect(project.clips[0]).toEqual(expect.objectContaining({ muted: true }));
   expect(project.clips[1]?.groupId).toBe(project.clips[0]?.groupId);
   expect(project.tracks.filter((track) => track.kind === VideoTrackKind.PRIMARY)).toHaveLength(2);
+  expect(
+    project.tracks
+      .filter((track) => track.kind === VideoTrackKind.PRIMARY)
+      .map((track) => track.order)
+  ).toEqual([1, 2]);
+  expect(project.tracks.some((track) => track.role !== undefined)).toBe(false);
 });
 
-function createProjectWithSidecarRecording() {
+it('creates an explicitly independent camera track with a safe overlay placement', () => {
+  const project = createProjectWithSidecarRecording(VideoProjectTrackRole.CAMERA);
+  const cameraTrack = project.tracks.find((track) => track.role === VideoProjectTrackRole.CAMERA);
+  const cameraClip = project.clips.find((clip) => clip.trackId === cameraTrack?.id);
+
+  expect(cameraTrack).toEqual(expect.objectContaining({ kind: VideoTrackKind.PRIMARY }));
+  expect(cameraClip).toEqual(
+    expect.objectContaining({
+      muted: true,
+      transform: expect.objectContaining({
+        height: expect.any(Number),
+        width: expect.any(Number),
+        x: expect.any(Number),
+        y: expect.any(Number),
+      }),
+    })
+  );
+  expect(cameraClip?.transform.width).toBeLessThan(project.width / 2);
+  expect(cameraClip?.transform.x).toBeGreaterThan(project.width / 2);
+  const screenClip = project.clips.find(
+    (clip) => clip.type === VideoProjectClipType.VIDEO && clip.assetId === 'asset-main'
+  );
+  const frame = resolveVideoCompositionFrame(project, 1);
+  const screenLayer = frame.visualLayers.find((layer) => layer.clipId === screenClip?.id);
+  const cameraLayer = frame.visualLayers.find((layer) => layer.clipId === cameraClip?.id);
+  expect(cameraTrack?.order).toBeGreaterThan(0);
+  expect(cameraTrack?.order).toBeLessThan(1);
+  expect(cameraLayer?.zIndex).toBeGreaterThan(screenLayer?.zIndex ?? -1);
+});
+
+function createProjectWithSidecarRecording(trackRole?: VideoProjectTrackRole) {
   const sidecarAsset = createRecordingAsset({
     id: 'asset-sidecar',
     name: 'camera.webm',
@@ -180,6 +218,7 @@ function createProjectWithSidecarRecording() {
         mimeType: 'video/webm',
         size: 2048,
         asset: sidecarAsset,
+        ...(trackRole ? { trackRole } : {}),
       },
     ],
   });

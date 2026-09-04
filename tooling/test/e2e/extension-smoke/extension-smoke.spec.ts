@@ -3,6 +3,11 @@ import { CONTENT_APP_CONTAINER_ID, CONTENT_ROOT_ID } from '@sniptale/ui/branding
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { createEmptyVideoProject } from '../../../../apps/extension/src/features/video/project/factories/creation';
 import { createTextClip } from '../../../../apps/extension/src/features/video/project/factories/overlay-clip';
+import { createVideoProjectFromMultiSourceRecording } from '../../../../apps/extension/src/features/video/project/factories/multi-source-recording';
+import {
+  VideoProjectClipType,
+  VideoProjectTrackRole,
+} from '../../../../apps/extension/src/features/video/project/types';
 import { test, expect, resolveExtensionServiceWorkerUrl } from '../support/extension-fixture';
 import {
   captureDesignSystemScreenshot,
@@ -203,6 +208,95 @@ test('video editor focused timeline reveals contextual clip actions', async ({
   await page.screenshot({
     fullPage: true,
     path: testInfo.outputPath('video-editor-focused-timeline.png'),
+  });
+});
+
+test('video editor keeps webcam independent with camera timeline and inspector controls', async ({
+  page,
+  hostOrigin,
+}, testInfo) => {
+  const project = createVideoProjectFromMultiSourceRecording({
+    name: 'Camera overlay proof',
+    videos: [
+      {
+        duration: 12,
+        filename: 'screen.webm',
+        height: 1080,
+        mimeType: 'video/webm',
+        recordingId: 'screen-recording',
+        size: 1024,
+        width: 1920,
+      },
+    ],
+    webcamVideo: {
+      duration: 12,
+      filename: 'webcam.webm',
+      height: 720,
+      mimeType: 'video/webm',
+      recordingId: 'webcam-recording',
+      size: 512,
+      width: 1280,
+    },
+  });
+  const cameraTrack = project.tracks.find((track) => track.role === VideoProjectTrackRole.CAMERA);
+  if (!cameraTrack) throw new Error('Missing camera track in video editor fixture');
+  cameraTrack.name = 'Camera';
+  const cameraClip = project.clips.find(
+    (clip) => clip.type === VideoProjectClipType.VIDEO && clip.trackId === cameraTrack.id
+  );
+  if (!cameraClip) throw new Error('Missing camera clip in video editor fixture');
+
+  await page.addInitScript((videoProject) => {
+    window.__sniptaleHarnessBootstrap = {
+      apiBehavior: { runtimeFallback: 'typed-success' },
+      videoProjects: [videoProject],
+    };
+  }, project);
+  await page.setViewportSize({ width: 1600, height: 1100 });
+  await page.goto(`${hostOrigin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}`, {
+    waitUntil: 'domcontentloaded',
+  });
+
+  const timelineClip = page.locator(`[data-project-timeline-clip="${cameraClip.id}"]`);
+  await expect(page.getByText('C1', { exact: true })).toBeVisible();
+  await expect(page.getByText('Camera', { exact: true })).toBeVisible();
+  await expect(page.locator('[data-camera-track-icon]')).toBeVisible();
+  await expect(timelineClip).toBeVisible();
+  await timelineClip.click();
+
+  const inspector = page.locator('[data-ui="video-editor.floating.context-inspector"]');
+  await inspector
+    .locator(`button[title="${translate('videoEditor.sidebar.inspectorGroupCamera', 'ru')}"]`)
+    .click();
+  await expect(
+    inspector.getByText(translate('videoEditor.sidebar.cameraPlacementDescription', 'ru'))
+  ).toBeVisible();
+  await inspector
+    .getByRole('button', {
+      name: translate('videoEditor.sidebar.cameraPlacementBottomLeft', 'ru'),
+    })
+    .click();
+  await expect(page.locator('[data-ui="video-editor.camera-placement-controls"]')).toBeVisible();
+
+  const geometry = await page.evaluate(() => {
+    const bounds = (selector: string) => {
+      const element = document.querySelector(selector);
+      if (!(element instanceof HTMLElement)) throw new Error(`Missing ${selector}`);
+      return element.getBoundingClientRect().toJSON();
+    };
+    return {
+      inspector: bounds('[data-ui="video-editor.floating.context-inspector"]'),
+      preview: bounds('[data-ui="video.preview.viewport"]'),
+      timeline: bounds('[data-ui="video-editor.timeline.surface"]'),
+    };
+  });
+  expect(geometry.preview.right).toBeLessThanOrEqual(geometry.inspector.left);
+  expect(geometry.timeline.right).toBeLessThanOrEqual(geometry.inspector.left);
+
+  await mkdir(testInfo.outputDir, { recursive: true });
+  await page.screenshot({
+    fullPage: true,
+    path: testInfo.outputPath('video-editor-camera-overlay.png'),
   });
 });
 

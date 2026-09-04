@@ -3,7 +3,7 @@ import { translate } from '../../../../platform/i18n';
 import type { VideoProject } from '../../../../features/video/project/types';
 import { getTrackKindLabel } from '../interaction-state/helpers';
 import { TimelineIconButton } from '../controls/icon-button';
-import { getTrackKindIcon, TimelineLaneIconFrame } from './lane-icons';
+import { getTrackIcon, TimelineLaneIconFrame } from './lane-icons';
 import type { TimelineTrackLayout } from './layout';
 
 const TRACK_SELECT_FOCUS_CLASS_NAME = [
@@ -83,7 +83,7 @@ function ProjectTimelineTrackMeta({
       ].join(' ')}
       onClick={() => onSelectTrack(track.id)}
     >
-      <TimelineLaneIconFrame>{getTrackKindIcon(track.kind)}</TimelineLaneIconFrame>
+      <TimelineLaneIconFrame>{getTrackIcon(track)}</TimelineLaneIconFrame>
       {compactRows ? null : (
         <>
           <span className="shrink-0 text-[10px] font-semibold tabular-nums text-[var(--sniptale-color-text-dim)]">

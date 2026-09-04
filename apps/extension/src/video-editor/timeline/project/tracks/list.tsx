@@ -1,7 +1,11 @@
 import type { MutableRefObject } from 'react';
 import { translate } from '../../../../platform/i18n';
 import type { VideoProjectUtilityLaneKind } from '../../../../features/video/project/utility-lanes';
-import { VideoTrackKind, type VideoProject } from '../../../../features/video/project/types';
+import {
+  VideoProjectTrackRole,
+  VideoTrackKind,
+  type VideoProject,
+} from '../../../../features/video/project/types';
 import { ProjectTimelineEffectLaneLabelRows } from '../effect-lanes/labels';
 import type { TimelineTrackLayoutModel } from './layout';
 import { ProjectTimelineExpandedRows } from '../panel';
@@ -134,9 +138,19 @@ function ProjectTimelineRailRows(props: {
 function getTrackPositionLabel(tracks: VideoProject['tracks'], trackIndex: number): string {
   const track = tracks[trackIndex];
   if (!track) return '';
+  if (track.role === VideoProjectTrackRole.CAMERA) {
+    const cameraPosition = tracks
+      .slice(0, trackIndex + 1)
+      .filter((item) => item.role === VideoProjectTrackRole.CAMERA).length;
+    return `C${cameraPosition}`;
+  }
   const position = tracks
     .slice(0, trackIndex + 1)
-    .filter((item) => item.kind === track.kind).length;
+    .filter(
+      (item) =>
+        item.kind === track.kind &&
+        (track.kind !== VideoTrackKind.PRIMARY || item.role !== VideoProjectTrackRole.CAMERA)
+    ).length;
   const prefix = {
     [VideoTrackKind.PRIMARY]: 'V',
     [VideoTrackKind.AUDIO]: 'A',

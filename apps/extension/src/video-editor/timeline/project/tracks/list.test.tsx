@@ -7,6 +7,7 @@ import { createEmptyVideoProject } from '../../../../features/video/project/fact
 import { DEFAULT_VIDEO_EDITOR_TRACK_PANEL_PREFS } from '../../../persistence/track-panel';
 import { buildTimelineTrackLayoutModel } from './layout';
 import { ProjectTimelineTrackList } from './list';
+import { VideoProjectTrackRole } from '../../../../features/video/project/types';
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
@@ -146,6 +147,44 @@ it('hides row text in compact track panel mode', () => {
   expect(
     container?.querySelectorAll('[data-ui="timeline.track-kind-icon"]').length
   ).toBeGreaterThan(0);
+});
+
+it('distinguishes a camera source track from the motion camera utility lane', () => {
+  const project = createEmptyVideoProject('Camera source');
+  const screenTrack = { ...project.tracks[0]!, id: 'screen-track', name: 'Screen' };
+  project.tracks[0] = {
+    ...project.tracks[0]!,
+    name: 'Webcam',
+    role: VideoProjectTrackRole.CAMERA,
+  };
+  project.tracks.push(screenTrack);
+
+  renderTrackList(project, { showTelemetryLane: false });
+
+  expect(container?.textContent).toContain('C1');
+  expect(container?.textContent).toContain('V1');
+  expect(container?.textContent).toContain('Webcam');
+  expect(container?.querySelector('[data-camera-track-icon]')).not.toBeNull();
+  expect(container?.textContent).toContain('videoEditor.timeline.motionLane');
+});
+
+it('numbers multiple explicit camera sources independently from video tracks', () => {
+  const project = createEmptyVideoProject('Multiple cameras');
+  project.tracks = [
+    { ...project.tracks[0]!, name: 'Camera A', role: VideoProjectTrackRole.CAMERA },
+    {
+      ...project.tracks[0]!,
+      id: 'camera-b',
+      name: 'Camera B',
+      order: 2,
+      role: VideoProjectTrackRole.CAMERA,
+    },
+  ];
+
+  renderTrackList(project, { showTelemetryLane: false });
+
+  expect(container?.textContent).toContain('C1');
+  expect(container?.textContent).toContain('C2');
 });
 
 function renderTrackList(

@@ -13,7 +13,11 @@ import {
   createTextClip,
 } from '../../../../../features/video/project/factories/overlay-clip';
 import { createVideoClipFromAsset } from '../../../../../features/video/project/factories/clip';
-import { VideoProjectAssetType, VideoTrackKind } from '../../../../../features/video/project/types';
+import {
+  VideoProjectAssetType,
+  VideoProjectTrackRole,
+  VideoTrackKind,
+} from '../../../../../features/video/project/types';
 import { VideoEditorSelectionKind } from '../../../../contracts/selection';
 import { WorkspaceSidebarInspectPanel } from '../inspect';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
@@ -218,6 +222,55 @@ describe('workspace-sidebar/selection/inspect-core', () => {
 
     expect(container?.textContent).not.toContain('videoEditor.sidebar.inspectorGroupTracking');
     expect(container?.textContent).not.toContain('videoEditor.sidebar.cursorDetectionRun');
+  });
+
+  it('shows camera placement only for a camera-role clip and reuses the transform command', () => {
+    const props = createVideoProps();
+    props.project.tracks = props.project.tracks.map((track) =>
+      track.id === props.selectedClip?.trackId
+        ? { ...track, role: VideoProjectTrackRole.CAMERA }
+        : track
+    );
+
+    renderInspectPanel(props);
+    clickGroup('videoEditor.sidebar.inspectorGroupCamera');
+
+    expect(container?.textContent).toContain('videoEditor.sidebar.cameraPlacementDescription');
+    const bottomLeft = Array.from(container?.querySelectorAll('button') ?? []).find(
+      (button) => button.textContent === 'videoEditor.sidebar.cameraPlacementBottomLeft'
+    );
+    act(() => bottomLeft?.click());
+    expect(props.onUpdateClipTransform).toHaveBeenCalledWith(
+      props.selectedClip?.id,
+      expect.objectContaining({ height: expect.any(Number), width: expect.any(Number) })
+    );
+  });
+
+  it('keeps camera-specific controls out of ordinary video inspection', () => {
+    renderInspectPanel(createVideoProps());
+
+    expect(container?.textContent).not.toContain('videoEditor.sidebar.inspectorGroupCamera');
+  });
+
+  it('disables camera placement actions on a locked camera track', () => {
+    const props = createVideoProps();
+    props.project.tracks = props.project.tracks.map((track) =>
+      track.id === props.selectedClip?.trackId
+        ? { ...track, locked: true, role: VideoProjectTrackRole.CAMERA }
+        : track
+    );
+
+    renderInspectPanel(props);
+    clickGroup('videoEditor.sidebar.inspectorGroupCamera');
+
+    const placementControls = container?.querySelector(
+      '[data-ui="video-editor.camera-placement-controls"]'
+    );
+    expect(
+      Array.from(placementControls?.querySelectorAll('button') ?? []).every(
+        (button) => button.disabled
+      )
+    ).toBe(true);
   });
 
   it('keeps persisted subtitle clips out of clip inspection', () => {

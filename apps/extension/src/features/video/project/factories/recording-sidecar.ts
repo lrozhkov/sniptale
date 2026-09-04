@@ -3,9 +3,15 @@ import { createRecordingProjectAsset } from './recording';
 import {
   VideoMediaFitMode,
   VideoProjectClipType,
+  VideoProjectTrackRole,
   type VideoProjectAsset,
   type VideoProjectClip,
+  type VideoProjectTrackRole as VideoProjectTrackRoleValue,
 } from '../types/index';
+import {
+  resolveVideoProjectCameraPlacement,
+  VideoProjectCameraPlacement,
+} from '../camera/placement';
 
 export type RecordingSidecarVideoProjectInput = {
   recordingId: string;
@@ -16,6 +22,7 @@ export type RecordingSidecarVideoProjectInput = {
   mimeType: string;
   size: number;
   asset?: VideoProjectAsset;
+  trackRole?: VideoProjectTrackRoleValue;
 };
 
 export function createRecordingSidecarClip(params: {
@@ -23,6 +30,7 @@ export function createRecordingSidecarClip(params: {
   projectHeight: number;
   projectWidth: number;
   trackId: string;
+  trackRole?: VideoProjectTrackRoleValue;
 }): VideoProjectClip {
   const clip = createVideoClipFromAsset(
     params.trackId,
@@ -39,10 +47,19 @@ export function createRecordingSidecarClip(params: {
   return {
     ...clip,
     fitMode: VideoMediaFitMode.SOURCE_100,
-    transform: createVideoProjectTransform(
-      params.asset.metadata.width,
-      params.asset.metadata.height
-    ),
+    transform:
+      params.trackRole === VideoProjectTrackRole.CAMERA
+        ? {
+            ...clip.transform,
+            ...resolveVideoProjectCameraPlacement({
+              placement: VideoProjectCameraPlacement.BOTTOM_RIGHT,
+              projectHeight: params.projectHeight,
+              projectWidth: params.projectWidth,
+              sourceHeight: params.asset.metadata.height,
+              sourceWidth: params.asset.metadata.width,
+            }),
+          }
+        : createVideoProjectTransform(params.asset.metadata.width, params.asset.metadata.height),
   };
 }
 

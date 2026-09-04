@@ -17,7 +17,8 @@ import type {
   VideoProjectCursorTrack,
   VideoProjectTrack,
 } from '../types/index';
-import { VideoTrackKind } from '../types/index';
+import { VideoProjectTrackRole, VideoTrackKind } from '../types/index';
+import { resolveVideoProjectCameraTrackOrder } from '../camera/track-order';
 
 export type CreateVideoProjectFromRecordingOptions = {
   recordingId: string;
@@ -54,7 +55,7 @@ export function createRecordingVideoProject(
   const defaultTracks = createDefaultProjectTracks(deps);
   const asset = options.asset ?? createRecordingProjectAsset(options);
   const sidecarAssets = createRecordingSidecarAssets(options.sidecarVideos);
-  const tracks = createRecordingProjectTrackSet(defaultTracks, sidecarAssets.length, deps);
+  const tracks = createRecordingProjectTrackSet(defaultTracks, options.sidecarVideos ?? [], deps);
   const normalizedDuration = Math.max(0.1, options.duration);
   const clips = createRecordingProjectClipSet({
     asset,
@@ -107,12 +108,22 @@ function createDefaultProjectTracks(deps: RecordingProjectFactoryDeps): {
 
 function createRecordingProjectTrackSet(
   defaultTracks: ReturnType<typeof createDefaultProjectTracks>,
-  sidecarAssetCount: number,
+  sidecarVideos: RecordingSidecarVideoProjectInput[],
   deps: RecordingProjectFactoryDeps
 ) {
-  const sidecarTracks = Array.from({ length: sidecarAssetCount }, (_asset, index) =>
-    createRecordingSidecarTrack(index + 1, deps)
+  const sidecarTracks = sidecarVideos.map((sidecar, index) =>
+    createRecordingSidecarTrack({
+      deps,
+      index: index + 1,
+      ...(sidecar.trackRole ? { role: sidecar.trackRole } : {}),
+      cameraIndex: sidecarVideos
+        .slice(0, index)
+        .filter((item) => item.trackRole === VideoProjectTrackRole.CAMERA).length,
+      cameraCount: sidecarVideos.filter((item) => item.trackRole === VideoProjectTrackRole.CAMERA)
+        .length,
+    })
   );
+  const sidecarAssetCount = sidecarVideos.length;
   const audioTrack =
     sidecarAssetCount === 0
       ? defaultTracks.audioTrack
@@ -134,16 +145,22 @@ function createRecordingProjectTrackSet(
   };
 }
 
-function createRecordingSidecarTrack(
-  index: number,
-  deps: RecordingProjectFactoryDeps
-): VideoProjectTrack {
-  return deps.createVideoProjectTrack(
-    deps.getDefaultTrackName(VideoTrackKind.PRIMARY, index + 1),
-    index + 1,
+function createRecordingSidecarTrack(params: {
+  cameraCount: number;
+  cameraIndex: number;
+  deps: RecordingProjectFactoryDeps;
+  index: number;
+  role?: VideoProjectTrackRole;
+}): VideoProjectTrack {
+  const track = params.deps.createVideoProjectTrack(
+    params.deps.getDefaultTrackName(VideoTrackKind.PRIMARY, params.index + 1),
+    params.role === VideoProjectTrackRole.CAMERA
+      ? resolveVideoProjectCameraTrackOrder(params.cameraIndex, params.cameraCount)
+      : params.index + 1,
     VideoTrackKind.PRIMARY,
     false
   );
+  return params.role ? { ...track, role: params.role } : track;
 }
 
 function createRecordingProjectClipSet(params: {
@@ -171,6 +188,9 @@ function createRecordingProjectClipSet(params: {
         projectHeight: params.options.height,
         projectWidth: params.options.width,
         trackId: params.sidecarTracks[index]?.id ?? params.defaultTracks.primaryTrack.id,
+        ...(params.sidecarTracks[index]?.role
+          ? { trackRole: params.sidecarTracks[index].role }
+          : {}),
       })
     ),
   ];
