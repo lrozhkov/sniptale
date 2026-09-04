@@ -163,6 +163,35 @@ async function expectBuiltVideoEditorGeometry(
     .toBe(defaultPreviewWidth);
 }
 
+async function verifyVideoEditorAddTrackMenu(
+  page: import('@playwright/test').Page,
+  screenshotPath: string
+): Promise<void> {
+  const addTrackButton = page.locator('[data-ui="video-editor.timeline.toolbar.add-track"]');
+  await addTrackButton.click();
+  const addTrackMenu = page.locator('[data-ui="video-editor.timeline.toolbar.add-track.choices"]');
+  await expect(
+    addTrackMenu.locator('[data-ui="video-editor.timeline.toolbar.add-track.primary"]')
+  ).toBeVisible();
+  for (const key of [
+    'videoEditor.timeline.addVideoTrackNote',
+    'videoEditor.timeline.addAudioTrackNote',
+    'videoEditor.timeline.addOverlayTrackNote',
+  ] as const) {
+    await expect(addTrackMenu.getByText(translate(key, 'ru'), { exact: true })).toBeVisible();
+  }
+  await expect(addTrackMenu.locator('.sniptale-toolbar-menu-item')).toHaveCount(3);
+  await expect(
+    addTrackMenu.getByText(translate('videoEditor.timeline.addSubtitleTrack', 'ru'), {
+      exact: true,
+    })
+  ).toHaveCount(0);
+  await page.screenshot({ fullPage: true, path: screenshotPath });
+  await page.keyboard.press('Escape');
+  await expect(addTrackMenu).toHaveCount(0);
+  await expect(addTrackButton).toBeFocused();
+}
+
 async function verifyVideoEditorAnnotationCanvasFlow(
   page: import('@playwright/test').Page,
   screenshotPath: string
@@ -330,6 +359,8 @@ test('video editor keeps webcam independent with camera timeline and inspector c
     fullPage: true,
     path: testInfo.outputPath('video-editor-camera-overlay.png'),
   });
+
+  await verifyVideoEditorAddTrackMenu(page, testInfo.outputPath('video-editor-add-track-menu.png'));
 
   const addZoomButton = page.locator('[data-ui="video-editor.timeline.add-zoom"]');
   await expect(

@@ -67,13 +67,25 @@ export const videoEditorTimelineMessages = defineMessageSource({
     ru: 'Видео-дорожка',
     en: 'Video track',
   },
+  addVideoTrackNote: {
+    ru: 'Дополнительные видео и визуальные слои',
+    en: 'Extra footage and visual layers',
+  },
   addAudioTrack: {
     ru: 'Аудио-дорожка',
     en: 'Audio track',
   },
+  addAudioTrackNote: {
+    ru: 'Музыка, голос и другие аудиослои',
+    en: 'Music, voice, and other audio layers',
+  },
   addOverlayTrack: {
     ru: 'Дорожка аннотаций',
     en: 'Annotation track',
+  },
+  addOverlayTrackNote: {
+    ru: 'Текст, фигуры и экранные пометки',
+    en: 'Text, shapes, and on-screen callouts',
   },
   addSubtitleTrack: {
     ru: 'Дорожка субтитров',

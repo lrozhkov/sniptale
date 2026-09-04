@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { ChevronDown, Music, Plus, StickyNote, Video } from 'lucide-react';
 import { translate } from '../../../../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -14,16 +14,19 @@ import { toolbarButtonClassName } from './constants/button';
 const TRACK_MENU_OPTIONS = [
   {
     icon: <Video size={14} strokeWidth={2.1} />,
+    hintKey: 'videoEditor.timeline.addVideoTrackNote',
     kind: VideoTrackKind.PRIMARY,
     labelKey: 'videoEditor.timeline.addVideoTrack',
   },
   {
     icon: <Music size={14} strokeWidth={2.1} />,
+    hintKey: 'videoEditor.timeline.addAudioTrackNote',
     kind: VideoTrackKind.AUDIO,
     labelKey: 'videoEditor.timeline.addAudioTrack',
   },
   {
     icon: <StickyNote size={14} strokeWidth={2.1} />,
+    hintKey: 'videoEditor.timeline.addOverlayTrackNote',
     kind: VideoTrackKind.OVERLAY,
     labelKey: 'videoEditor.timeline.addOverlayTrack',
   },
@@ -36,6 +39,7 @@ export function ProjectTimelineAddControls(props: { insertion: ProjectTimelineIn
     <div className="flex min-w-0 flex-wrap items-center gap-1">
       <div ref={trackChoices.menuRootRef} className="relative">
         <ContentToolbarButton
+          ref={trackChoices.triggerRef}
           type="button"
           onClick={trackChoices.toggle}
           className={toolbarButtonClassName}
@@ -63,18 +67,27 @@ export function ProjectTimelineAddControls(props: { insertion: ProjectTimelineIn
 function useTrackChoicesMenuState() {
   const [visible, setVisible] = useState(false);
   const menuRootRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+
+  const close = useCallback((restoreFocus = false) => {
+    setVisible(false);
+    if (restoreFocus) {
+      triggerRef.current?.focus();
+    }
+  }, []);
 
   useEffect(() => {
     if (!visible) {
       return;
     }
 
-    return bindTrackChoicesDismissHandlers(menuRootRef, () => setVisible(false));
-  }, [visible]);
+    return bindTrackChoicesDismissHandlers(menuRootRef, close);
+  }, [close, visible]);
 
   return {
-    close: () => setVisible(false),
+    close,
     menuRootRef,
+    triggerRef,
     toggle: () => setVisible((open) => !open),
     visible,
   };
@@ -82,7 +95,7 @@ function useTrackChoicesMenuState() {
 
 function bindTrackChoicesDismissHandlers(
   menuRootRef: RefObject<HTMLDivElement | null>,
-  close: () => void
+  close: (restoreFocus?: boolean) => void
 ) {
   const closeMenu = (event: PointerEvent) => {
     if (!menuRootRef.current?.contains(event.target as Node)) {
@@ -91,7 +104,7 @@ function bindTrackChoicesDismissHandlers(
   };
   const closeOnEscape = (event: KeyboardEvent) => {
     if (event.key === 'Escape') {
-      close();
+      close(true);
     }
   };
 
@@ -105,7 +118,7 @@ function bindTrackChoicesDismissHandlers(
 
 function TrackKindChoiceGroup(props: {
   insertion: ProjectTimelineInsertionActions;
-  onClose: () => void;
+  onClose: (restoreFocus?: boolean) => void;
 }) {
   return (
     <ProductToolbarMenu compact title={translate('videoEditor.timeline.addTrackMenuTitle')}>
@@ -116,11 +129,15 @@ function TrackKindChoiceGroup(props: {
           dataUi={`video-editor.timeline.toolbar.add-track.${option.kind.toLowerCase()}`}
           onClick={() => {
             props.insertion.onAddTrack(option.kind);
-            props.onClose();
+            props.onClose(true);
           }}
         >
           {option.icon}
-          <ProductToolbarMenuItemCopy label={translate(option.labelKey)} />
+          <ProductToolbarMenuItemCopy
+            hint={translate(option.hintKey)}
+            label={translate(option.labelKey)}
+            showHintInCompact
+          />
         </ProductToolbarMenuItem>
       ))}
     </ProductToolbarMenu>

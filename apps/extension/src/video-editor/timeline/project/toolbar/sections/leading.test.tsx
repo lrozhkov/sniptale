@@ -189,23 +189,50 @@ it('wires clip actions from the leading side', () => {
 
 it('wires track creation from the leading side', () => {
   const handlers = renderLeadingControls();
+  const trigger = getButtonByText('videoEditor.timeline.addTrack');
 
   act(() => {
-    getButtonByText('videoEditor.timeline.addTrack').click();
+    trigger.click();
   });
 
   expect(handlers.onAddTrack).not.toHaveBeenCalled();
   expect(container?.querySelector('.sniptale-toolbar-menu')).not.toBeNull();
   expect(container?.textContent).toContain('videoEditor.timeline.addVideoTrack');
+  expect(container?.textContent).toContain('videoEditor.timeline.addVideoTrackNote');
   expect(container?.textContent).toContain('videoEditor.timeline.addAudioTrack');
+  expect(container?.textContent).toContain('videoEditor.timeline.addAudioTrackNote');
   expect(container?.textContent).toContain('videoEditor.timeline.addOverlayTrack');
+  expect(container?.textContent).toContain('videoEditor.timeline.addOverlayTrackNote');
   expect(container?.textContent).not.toContain('videoEditor.timeline.addSubtitleTrack');
+  expect(
+    container?.querySelectorAll(
+      '.sniptale-toolbar-menu-item[data-ui^="video-editor.timeline.toolbar.add-track."]'
+    )
+  ).toHaveLength(3);
 
   act(() => {
     getButtonByText('videoEditor.timeline.addAudioTrack').click();
   });
 
   expect(handlers.onAddTrack).toHaveBeenCalledWith(VideoTrackKind.AUDIO);
+  expect(container?.querySelector('.sniptale-toolbar-menu')).toBeNull();
+  expect(document.activeElement).toBe(trigger);
+});
+
+it('restores focus to the add-track trigger when Escape dismisses the menu', () => {
+  renderLeadingControls();
+  const trigger = getButtonByText('videoEditor.timeline.addTrack');
+
+  act(() => {
+    trigger.click();
+  });
+
+  act(() => {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+  });
+
+  expect(container?.querySelector('.sniptale-toolbar-menu')).toBeNull();
+  expect(document.activeElement).toBe(trigger);
 });
 
 it('keeps zoom region creation out of the toolbar action cluster', () => {
