@@ -89,6 +89,26 @@ it('keeps hidden utility lanes visible in the track rail with state controls', (
   expect(container?.textContent).toContain('videoEditor.timeline.actionsLane');
   expect(container?.textContent).toContain('videoEditor.timeline.motionLane');
   expect(container?.querySelectorAll('[data-ui="timeline.utility-lane-state"]').length).toBe(4);
+  expect(
+    container?.querySelector<HTMLButtonElement>('[data-ui="video-editor.timeline.add-zoom"]')
+      ?.disabled
+  ).toBe(true);
+});
+
+it('adds a zoom at the playhead from the persistent editable lane action', () => {
+  const project = createEmptyVideoProject('Zoom add action');
+  const onAddMotionRegion = vi.fn();
+
+  renderTrackList(project, { showTelemetryLane: false, onAddMotionRegion });
+
+  const addButton = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="video-editor.timeline.add-zoom"]'
+  );
+  expect(addButton?.disabled).toBe(false);
+
+  act(() => addButton?.click());
+
+  expect(onAddMotionRegion).toHaveBeenCalledOnce();
 });
 
 it('keeps persisted clip logical lanes inside one physical track row', () => {
@@ -194,6 +214,7 @@ function renderTrackList(
     cursorLaneVisible?: boolean;
     panelExpanded?: boolean;
     showTelemetryLane: boolean;
+    onAddMotionRegion?: () => void;
   }
 ) {
   act(() => {
@@ -214,6 +235,7 @@ function renderTrackList(
           panelExpanded: options.panelExpanded ?? false,
         })}
         tracks={project.tracks}
+        onAddMotionRegion={options.onAddMotionRegion ?? vi.fn()}
         onClearUtilityLane={vi.fn()}
         onDeleteTrack={vi.fn()}
         onMoveTrack={vi.fn()}

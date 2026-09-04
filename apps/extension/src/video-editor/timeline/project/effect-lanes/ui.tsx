@@ -46,10 +46,10 @@ export function ProjectTimelineEffectLaneRow({
   );
 }
 
-export function ProjectTimelineEffectLaneEmptyLabel() {
+export function ProjectTimelineEffectLaneEmptyLabel({ label }: { label?: string }) {
   return (
     <span className={EFFECT_LANE_EMPTY_LABEL_CLASS_NAME}>
-      {translate('videoEditor.timeline.emptyLaneLabel')}
+      {label ?? translate('videoEditor.timeline.emptyLaneLabel')}
     </span>
   );
 }

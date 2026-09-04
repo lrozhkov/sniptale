@@ -104,6 +104,7 @@ function createTrackListProps(props: ProjectTimelineBodyProps): ProjectTimelineB
     trackListRef: props.trackListRef,
     trackPanelPrefs: props.trackPanelPrefs,
     tracks: props.tracks,
+    onAddMotionRegion: () => props.insertion.onAddMotionRegion(),
     onClearUtilityLane: props.onClearUtilityLane,
     onDeleteTrack: props.onDeleteTrack,
     onMoveTrack: props.onMoveTrack,

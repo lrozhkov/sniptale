@@ -233,6 +233,10 @@ export const videoEditorTimelineMessages = defineMessageSource({
     ru: 'Сегменты появятся здесь, когда в проекте появятся данные.',
     en: 'Segments will appear here when the project contains data.',
   },
+  emptyZoomLaneLabel: {
+    ru: 'Нажмите + или наведите на дорожку, чтобы добавить зум.',
+    en: 'Press + or point at the lane to add a zoom.',
+  },
   fileDropUnsupported: {
     ru: 'Этот файл нельзя добавить на таймлайн.',
     en: 'This file cannot be added to the timeline.',

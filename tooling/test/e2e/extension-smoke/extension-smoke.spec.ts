@@ -298,6 +298,26 @@ test('video editor keeps webcam independent with camera timeline and inspector c
     fullPage: true,
     path: testInfo.outputPath('video-editor-camera-overlay.png'),
   });
+
+  const addZoomButton = page.locator('[data-ui="video-editor.timeline.add-zoom"]');
+  await expect(
+    page.getByText(translate('videoEditor.timeline.motionLane', 'ru'), { exact: true })
+  ).toBeVisible();
+  await expect(addZoomButton).toBeEnabled();
+  await addZoomButton.click();
+  await expect(
+    inspector.getByText(translate('videoEditor.sidebar.motionScaleLabel', 'ru'), { exact: true })
+  ).toBeVisible();
+  await expect(
+    inspector.getByText(translate('videoEditor.sidebar.motionFocusLabel', 'ru'), { exact: true })
+  ).toBeVisible();
+  await expect(
+    inspector.getByText(translate('videoEditor.sidebar.motionDurationLabel', 'ru'), { exact: true })
+  ).toHaveCount(0);
+  await page.screenshot({
+    fullPage: true,
+    path: testInfo.outputPath('video-editor-zoom-flow.png'),
+  });
 });
 
 for (const extensionPage of builtExtensionPages) {

@@ -30,13 +30,22 @@ export function MotionCameraFields(props: {
     <div className="grid grid-cols-1 gap-3">
       <MotionCameraModeField motionRegion={props.motionRegion} panel={props.panel} />
       {!isMovingZoom ? (
-        <MotionScaleFields motionRegion={props.motionRegion} panel={props.panel} />
+        <>
+          <MotionScaleFields motionRegion={props.motionRegion} panel={props.panel} />
+          <MotionFocusModeField motionRegion={props.motionRegion} panel={props.panel} />
+          <MotionPlacementFields motionRegion={props.motionRegion} panel={props.panel} />
+        </>
       ) : null}
-      <MotionOverlayZoomField
-        motionRegionId={props.motionRegion.id}
-        panel={props.panel}
-        value={props.motionRegion.overlayZoomMode}
-      />
+    </div>
+  );
+}
+
+export function MotionTimingFields(props: {
+  motionRegion: VideoProjectMotionRegion;
+  panel: WorkspaceSidebarSelectionPanelProps;
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-3">
       <MotionDurationField
         duration={props.motionRegion.duration}
         motionRegionId={props.motionRegion.id}
@@ -48,27 +57,26 @@ export function MotionCameraFields(props: {
         panel={props.panel}
         value={props.motionRegion.easing}
       />
+    </div>
+  );
+}
+
+export function MotionBehaviorFields(props: {
+  motionRegion: VideoProjectMotionRegion;
+  panel: WorkspaceSidebarSelectionPanelProps;
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-3">
+      <MotionOverlayZoomField
+        motionRegionId={props.motionRegion.id}
+        panel={props.panel}
+        value={props.motionRegion.overlayZoomMode}
+      />
       <MotionBlurField
         motionRegionId={props.motionRegion.id}
         panel={props.panel}
         value={props.motionRegion.motionBlurAmount ?? 0}
       />
-    </div>
-  );
-}
-
-export function MotionTargetFields(props: {
-  motionRegion: VideoProjectMotionRegion;
-  panel: WorkspaceSidebarSelectionPanelProps;
-}) {
-  if (props.motionRegion.cameraMode === VideoMotionCameraMode.PATH) {
-    return null;
-  }
-
-  return (
-    <div className="grid grid-cols-1 gap-3">
-      <MotionFocusModeField motionRegion={props.motionRegion} panel={props.panel} />
-      <MotionPlacementFields motionRegion={props.motionRegion} panel={props.panel} />
     </div>
   );
 }

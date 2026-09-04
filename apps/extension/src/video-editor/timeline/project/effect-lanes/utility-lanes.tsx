@@ -52,9 +52,7 @@ function ProjectTimelineMotionLane(
   props: UtilityLaneProps & { laneLocked: boolean; laneVisible: boolean }
 ) {
   const [addPreview, setAddPreview] = useState<MotionLaneAddPreview | null>(null);
-  const segments = props.laneVisible
-    ? buildVideoCompositionMotionSegments(props.project)
-    : buildTimelineMotionSegments(props.project);
+  const segments = resolveMotionLaneSegments(props);
   const previewHandler = createMotionLanePreviewHandler(props, setAddPreview);
   return (
     <ProjectTimelineEffectLaneRow
@@ -62,7 +60,7 @@ function ProjectTimelineMotionLane(
       onMouseLeave={() => setAddPreview(null)}
       onMouseMove={previewHandler}
     >
-      {segments.length === 0 ? <ProjectTimelineEffectLaneEmptyLabel /> : null}
+      <MotionLaneEmptyState visible={segments.length === 0} />
       <ProjectTimelineMotionLaneAddPreview
         preview={addPreview}
         onAddMotionRegion={props.onAddMotionRegion}
@@ -71,6 +69,20 @@ function ProjectTimelineMotionLane(
       <MotionSegments {...props} segments={segments} />
     </ProjectTimelineEffectLaneRow>
   );
+}
+
+function resolveMotionLaneSegments(props: UtilityLaneProps & { laneVisible: boolean }) {
+  return props.laneVisible
+    ? buildVideoCompositionMotionSegments(props.project)
+    : buildTimelineMotionSegments(props.project);
+}
+
+function MotionLaneEmptyState({ visible }: { visible: boolean }) {
+  return visible ? (
+    <ProjectTimelineEffectLaneEmptyLabel
+      label={translate('videoEditor.timeline.emptyZoomLaneLabel')}
+    />
+  ) : null;
 }
 
 function MotionSegments(
