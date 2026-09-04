@@ -1,5 +1,6 @@
 import { getContentEventTargetElement } from '../../../../platform/dom-host';
 import { resolveIframeEventTarget } from '../../../../platform/frame';
+import { resolveShieldedPageElement } from '../../../page-element-target';
 
 function hasClientPoint(event: MouseEvent): boolean {
   return Number.isFinite(event.clientX) && Number.isFinite(event.clientY);
@@ -36,6 +37,12 @@ export function resolveSelectionModePointerTarget(
   event: MouseEvent,
   iframe?: HTMLIFrameElement
 ): HTMLElement | null {
-  const target = resolveIframeEventTarget(event, iframe) ?? getContentEventTargetElement(event);
+  const shieldedTarget = resolveShieldedPageElement(event);
+  const target =
+    (shieldedTarget?.namespaceURI === 'http://www.w3.org/1999/xhtml'
+      ? (shieldedTarget as HTMLElement)
+      : null) ??
+    resolveIframeEventTarget(event, iframe) ??
+    getContentEventTargetElement(event);
   return target ? resolveLinkedPreviewImage(target, event) : null;
 }

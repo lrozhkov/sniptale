@@ -236,7 +236,12 @@ function createHoverClickHandler(props: HoverInteractionProps) {
     event.stopPropagation();
     event.stopImmediatePropagation();
 
-    const elementForFrame = props.session.lastHoverTarget || target;
+    const cachedTarget = props.session.lastHoverTarget;
+    const elementForFrame =
+      cachedTarget &&
+      (cachedTarget === target || cachedTarget.contains(target) || target.contains(cachedTarget))
+        ? cachedTarget
+        : target;
     const { addFrame, hasFrameForElement } = props.getCallbacks();
     if (hasFrameForElement?.(elementForFrame)) {
       clickLogger.debug('Blocked duplicate frame creation');

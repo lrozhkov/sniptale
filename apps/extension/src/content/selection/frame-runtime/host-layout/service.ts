@@ -399,6 +399,7 @@ class FrameHostLayoutServiceOwner implements FrameHostLayoutService {
 
   private runReconcile = (stageLinkedMeasurements = false) => {
     const projectOffscreenGeometry = this.viewportScrollInvalidated;
+    const shouldStageLinkedMeasurements = stageLinkedMeasurements && !projectOffscreenGeometry;
     this.viewportScrollInvalidated = false;
     const runtime = this.runtime;
     if (!runtime) {
@@ -421,7 +422,7 @@ class FrameHostLayoutServiceOwner implements FrameHostLayoutService {
       movingFrameGenerations: this.motionAuthority.getMovingGenerations(),
       projectOffscreenGeometry,
       registry: this.registry,
-      stageLinkedMeasurements,
+      stageLinkedMeasurements: shouldStageLinkedMeasurements,
     });
     this.motionAuthority.discardStale();
     if (result.frames !== sourceFrames) {

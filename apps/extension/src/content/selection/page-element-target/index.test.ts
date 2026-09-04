@@ -98,6 +98,59 @@ describe('shared selectable page element target', () => {
     expect(resolveSelectablePageElement(ownedEvent)).toBeNull();
   });
 
+  it('resolves the page element below the navigation input shield only', () => {
+    const pageTarget = makeVisible(document.createElement('button'));
+    document.body.append(pageTarget);
+    const contentHost = document.createElement('div');
+    const contentRoot = contentHost.attachShadow({ mode: 'open' });
+    initializeContentUiRoots(contentRoot);
+    const shield = makeVisible(document.createElement('div'));
+    shield.id = 'sniptale-navigation-lock-overlay';
+    contentRoot.append(shield);
+    document.body.append(contentHost);
+    Object.defineProperty(document, 'elementsFromPoint', {
+      configurable: true,
+      value: vi.fn(() => [contentHost, pageTarget]),
+    });
+    const shieldEvent = new MouseEvent('mousemove', {
+      bubbles: true,
+      clientX: 24,
+      clientY: 36,
+      composed: true,
+    });
+    let shieldTarget: Element | null = null;
+    window.addEventListener(
+      'mousemove',
+      (event) => {
+        shieldTarget = resolveSelectablePageElement(event);
+      },
+      { capture: true, once: true }
+    );
+    shield.dispatchEvent(shieldEvent);
+
+    expect(shieldTarget).toBe(pageTarget);
+
+    const regularOwnedControl = makeVisible(document.createElement('button'));
+    contentRoot.append(regularOwnedControl);
+    const ownedEvent = new MouseEvent('mousemove', {
+      bubbles: true,
+      clientX: 24,
+      clientY: 36,
+      composed: true,
+    });
+    let ownedTarget: Element | null = pageTarget;
+    window.addEventListener(
+      'mousemove',
+      (event) => {
+        ownedTarget = resolveSelectablePageElement(event);
+      },
+      { capture: true, once: true }
+    );
+    regularOwnedControl.dispatchEvent(ownedEvent);
+
+    expect(ownedTarget).toBeNull();
+  });
+
   it('keeps SVG exact for Design Review and projects Annotation to its HTML container', () => {
     const container = makeVisible(document.createElement('figure'));
     const svg = makeVisible(document.createElementNS('http://www.w3.org/2000/svg', 'svg'));
@@ -110,6 +163,21 @@ describe('shared selectable page element target', () => {
 
     expect(resolveSelectablePageElement(event)).toBe(path);
     expect(resolveSelectablePageHtmlElement(event)).toBe(container);
+  });
+
+  it('projects Annotation toolbar icons to their interactive control owner', () => {
+    const button = makeVisible(document.createElement('div'));
+    button.setAttribute('role', 'button');
+    button.setAttribute('tabindex', '0');
+    const icon = makeVisible(document.createElement('span'));
+    icon.setAttribute('aria-hidden', 'true');
+    button.append(icon);
+    document.body.append(button);
+    const event = new MouseEvent('mousemove', { bubbles: true, composed: true });
+    icon.dispatchEvent(event);
+
+    expect(resolveSelectablePageElement(event)).toBe(icon);
+    expect(resolveSelectablePageHtmlElement(event)).toBe(button);
   });
 
   it('projects open-shadow SVG to its selectable HTML host through the composed tree', () => {

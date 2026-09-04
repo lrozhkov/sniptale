@@ -53,6 +53,54 @@ describe('frame host-layout state authority', () => {
     service.dispose();
   });
 
+  it('publishes linked geometry on the first animation frame of continuous viewport scroll', () => {
+    vi.useFakeTimers();
+    const target = document.createElement('button');
+    target.id = 'target';
+    document.body.appendChild(target);
+    let targetRect: DOMRectInit = { x: 120, y: 60, width: 140, height: 44 };
+    installDynamicRect(target, () => targetRect);
+    const frame: FrameData = {
+      id: 'frame-1',
+      x: 120,
+      y: 60,
+      width: 140,
+      height: 44,
+      linkedElementSelector: '#target',
+      pagePlacement: { iframePath: [], pageX: 120, pageY: 60 },
+    };
+    const framesRef = { current: [frame] };
+    const setFrames = vi.fn<(frames: FrameData[]) => void>();
+    const service = createFrameHostLayoutService();
+    service.link(frame.id, target, frame.linkedElementSelector!, {
+      pagePlacement: frame.pagePlacement!,
+      rect: { x: frame.x, y: frame.y, width: frame.width, height: frame.height },
+    });
+    service.start({
+      frameStatesRef: { current: new Map() },
+      framesRef,
+      onAnchorUnavailable: vi.fn(),
+      setFrames,
+    });
+    vi.advanceTimersByTime(64);
+    setFrames.mockClear();
+
+    targetRect = { x: 220, y: 80, width: 140, height: 44 };
+    window.dispatchEvent(new Event('scroll'));
+    vi.advanceTimersToNextTimer();
+
+    expect(setFrames).toHaveBeenCalledTimes(1);
+    expect(framesRef.current[0]).toMatchObject({ x: 217, y: 77 });
+
+    targetRect = { x: 260, y: 100, width: 140, height: 44 };
+    window.dispatchEvent(new Event('scroll'));
+    vi.advanceTimersToNextTimer();
+
+    expect(setFrames).toHaveBeenCalledTimes(2);
+    expect(framesRef.current[0]).toMatchObject({ x: 257, y: 97 });
+    service.dispose();
+  });
+
   it('does not publish stale geometry after a frame is removed before reconcile', () => {
     vi.useFakeTimers();
     const target = document.createElement('button');

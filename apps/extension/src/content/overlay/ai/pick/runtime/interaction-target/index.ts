@@ -7,6 +7,7 @@ import {
   resolveAiPickShadowPointTarget,
 } from './shadow';
 import { resolveAiPickUnderlyingTarget } from './underlying';
+import { resolveShieldedPageElement } from '../../../../../selection/page-element-target';
 
 /**
  * Resolves the effective target for AI-pick after shadow retargeting and frame overlay ownership.
@@ -15,6 +16,11 @@ export function resolveAiPickInteractionTarget(
   event: MouseEvent,
   iframe?: HTMLIFrameElement
 ): HTMLElement | null {
+  const shieldedTarget = resolveShieldedPageElement(event);
+  if (shieldedTarget?.namespaceURI === 'http://www.w3.org/1999/xhtml') {
+    return shieldedTarget as HTMLElement;
+  }
+
   const target = resolveIframeEventTarget(event, iframe);
   if (!target) {
     return null;

@@ -196,6 +196,10 @@ export function createNavigationLocker(deps: NavigationLockerDeps = defaultNavig
     isFullLockEnabled: () => state.isFullLockMode,
     isLockEnabled: () => state.isNavigationLocked,
     isTextSelectionBlockEnabled: () => state.isTextSelectionBlocked,
+    setInputShieldSuspended: (suspended: boolean) => {
+      state.isInputShieldSuspended = suspended;
+      syncNavigationLockSurfaces(deps, state);
+    },
     setUIHidden: (hidden: boolean) => {
       state.isUIHidden = hidden;
       deps.toggleBodyClass('sniptale-capture-ui-hidden', hidden);
