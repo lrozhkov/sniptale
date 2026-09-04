@@ -17,6 +17,7 @@ type ToolbarTrailingControlsInput = Pick<
 
 function createToolbarLeadingControlsProps({
   insertion,
+  canSplitSelectedClip,
   selectedClip,
   canAutoTransformRecording,
   onAutoTransformRecording,
@@ -26,6 +27,7 @@ function createToolbarLeadingControlsProps({
 }: Pick<
   ProjectTimelineToolbarProps,
   | 'insertion'
+  | 'canSplitSelectedClip'
   | 'selectedClip'
   | 'canAutoTransformRecording'
   | 'onAutoTransformRecording'
@@ -35,6 +37,7 @@ function createToolbarLeadingControlsProps({
 >) {
   return {
     insertion,
+    canSplitSelectedClip,
     selectedClip,
     canAutoTransformRecording: canAutoTransformRecording ?? false,
     ...(onAutoTransformRecording ? { onAutoTransformRecording } : {}),

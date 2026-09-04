@@ -23,6 +23,7 @@ function getProjectTimelineStateProps(
   controller: VideoEditorTimelineController
 ): Pick<
   ProjectTimelineProps,
+  | 'canSplitSelectedClip'
   | 'currentTime'
   | 'isPlaying'
   | 'magnetEnabled'
@@ -37,6 +38,7 @@ function getProjectTimelineStateProps(
   | 'timelinePreviews'
 > {
   return {
+    canSplitSelectedClip: controller.state.canSplitSelectedClip,
     currentTime: controller.state.currentTime,
     isPlaying: controller.state.isPlaying,
     magnetEnabled: controller.state.magnetEnabled,

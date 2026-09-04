@@ -2,31 +2,36 @@ import { Copy, Scissors, Trash2 } from 'lucide-react';
 
 import type { ProjectTimelineToolbarProps } from '../../types';
 import { ProjectTimelineToolbarActionButton } from './button';
-import { getClipActionLabel, getClipActionTitle } from './labels';
+import { getClipActionLabel, getClipActionTitle, getSplitActionTitle } from './labels';
 
 function getActionDisabled(selectedClip: boolean) {
   return !selectedClip;
 }
 
 export function ProjectTimelineClipActions({
+  canSplitSelectedClip,
   selectedClip,
   onDeleteSelectedClip,
   onDuplicateSelectedClip,
   onSplitSelectedClip,
 }: Pick<
   ProjectTimelineToolbarProps,
-  'selectedClip' | 'onDeleteSelectedClip' | 'onDuplicateSelectedClip' | 'onSplitSelectedClip'
+  | 'canSplitSelectedClip'
+  | 'selectedClip'
+  | 'onDeleteSelectedClip'
+  | 'onDuplicateSelectedClip'
+  | 'onSplitSelectedClip'
 >) {
   const disabled = getActionDisabled(selectedClip);
 
   return (
     <>
       <ProjectTimelineToolbarActionButton
-        disabled={disabled}
+        disabled={!canSplitSelectedClip}
         icon={<Scissors size={14} strokeWidth={2} />}
         label={getClipActionLabel('split')}
         onClick={onSplitSelectedClip}
-        title={getClipActionTitle('split', disabled)}
+        title={getSplitActionTitle(canSplitSelectedClip)}
       />
       <ProjectTimelineToolbarActionButton
         disabled={disabled}

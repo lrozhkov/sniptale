@@ -9,7 +9,7 @@ vi.mock('../../../../../../platform/i18n', async (importOriginal) => ({
   translate: translateMock.translate,
 }));
 
-import { getClipActionLabel, getClipActionTitle } from './labels';
+import { getClipActionLabel, getClipActionTitle, getSplitActionTitle } from './labels';
 
 describe('clip actions labels', () => {
   it('returns stable action labels and selection-required titles', () => {
@@ -17,5 +17,9 @@ describe('clip actions labels', () => {
     expect(getClipActionLabel('duplicate')).toBe('translated:videoEditor.timeline.duplicate');
     expect(getClipActionLabel('delete')).toBe('translated:videoEditor.timeline.delete');
     expect(getClipActionTitle('split', true)).toContain('translated:videoEditor.timeline.split');
+    expect(getSplitActionTitle(false)).toBe(
+      'translated:videoEditor.timeline.splitUnavailableTitle'
+    );
+    expect(getSplitActionTitle(true)).toBe('translated:videoEditor.timeline.split');
   });
 });

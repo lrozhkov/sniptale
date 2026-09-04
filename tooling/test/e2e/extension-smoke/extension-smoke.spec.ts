@@ -404,9 +404,32 @@ test('video editor focused timeline reveals contextual clip actions', async ({
 
   await timelineClip.click();
 
-  await expect(timeline.getByText(translate('videoEditor.timeline.split', 'ru'))).toBeVisible();
+  const splitButton = timeline.getByRole('button', {
+    name: translate('videoEditor.timeline.split', 'ru'),
+  });
+  await expect(splitButton).toBeVisible();
+  await expect(splitButton).toBeDisabled();
+  await expect(splitButton).toHaveAttribute(
+    'title',
+    translate('videoEditor.timeline.splitUnavailableTitle', 'ru')
+  );
   await expect(timeline.getByText(translate('videoEditor.timeline.duplicate', 'ru'))).toBeVisible();
   await expect(timeline.getByText(translate('videoEditor.timeline.delete', 'ru'))).toBeVisible();
+  const clipBox = await timelineClip.boundingBox();
+  const rulerBox = await timeline.locator('[data-ui="video-editor.timeline.ruler"]').boundingBox();
+  if (!clipBox || !rulerBox) throw new Error('Expected clip and ruler bounds for Split proof');
+  await page.mouse.click(clipBox.x + clipBox.width / 2, rulerBox.y + rulerBox.height / 2);
+  await expect(splitButton).toBeEnabled();
+  await splitButton.click();
+  await expect(page.locator('[data-project-timeline-clip]')).toHaveCount(2);
+  await expect(
+    page
+      .locator('[data-ui="video-editor.floating.context-inspector"]')
+      .getByText(`Intro title · ${translate('shared.projectActions.splitPartSuffix', 'ru')} 2`, {
+        exact: true,
+      })
+      .first()
+  ).toBeVisible();
   await mkdir(testInfo.outputDir, { recursive: true });
   await page.screenshot({
     fullPage: true,

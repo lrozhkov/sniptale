@@ -11,6 +11,7 @@ import {
 import { createVideoEditorProjectClipTimelineActions } from './actions';
 import type { VideoEditorProjectState } from '../contracts';
 import { resetVideoEditorProjectHistory } from '../../history';
+import { createProjectWithEffects } from '../effects.effect-instance.test-support';
 
 function createMutableState() {
   const project = createEmptyVideoProject('Timeline actions');
@@ -241,4 +242,88 @@ it('returns the authoritative applied clip timing after move and trim constraint
     trackId: expect.any(String),
   });
   expect(trimmed?.duration).toBeCloseTo(0.2);
+});
+
+it('selects the trailing half and records one history entry after a split', () => {
+  const runtime = createMutableState();
+  const actions = createVideoEditorProjectClipTimelineActions(runtime.set);
+  seedSingleClipState(runtime);
+  runtime.set({ currentTime: 3 });
+
+  actions.splitClipAt('clip-1', 3);
+
+  const state = runtime.getState();
+  expect(state.currentTime).toBe(3);
+  expect(state.projectHistory.past).toHaveLength(1);
+  expect(state.selection).toEqual({
+    kind: 'clip',
+    clipId: state.project?.clips.find((clip) => clip.id !== 'clip-1' && clip.startTime === 3)?.id,
+  });
+});
+
+it('keeps selection and history unchanged when the split point is invalid', () => {
+  const runtime = createMutableState();
+  const actions = createVideoEditorProjectClipTimelineActions(runtime.set);
+  seedSingleClipState(runtime);
+  const before = runtime.getState();
+
+  actions.splitClipAt('clip-1', 1.05);
+
+  expect(runtime.getState().project).toBe(before.project);
+  expect(runtime.getState().selection).toBe(before.selection);
+  expect(runtime.getState().projectHistory.past).toHaveLength(0);
+});
+
+it('ignores split requests while no project is loaded', () => {
+  const runtime = createMutableState();
+  runtime.set({ project: null });
+  const before = runtime.getState();
+
+  createVideoEditorProjectClipTimelineActions(runtime.set).splitClipAt('clip-1', 3);
+
+  expect(runtime.getState()).toEqual(before);
+});
+
+it('selects the trailing counterpart of the originally selected linked clip', () => {
+  const runtime = createMutableState();
+  const actions = createVideoEditorProjectClipTimelineActions(runtime.set);
+  seedLinkedClipState(runtime);
+  runtime.set({ currentTime: 3, selection: { kind: 'clip', clipId: 'video-1' } });
+
+  actions.splitClipAt('video-1', 3);
+
+  const state = runtime.getState();
+  const selectedId = state.selection.kind === 'clip' ? state.selection.clipId : null;
+  expect(state.project?.clips.find((clip) => clip.id === selectedId)).toMatchObject({
+    startTime: 3,
+    type: VideoProjectClipType.VIDEO,
+  });
+  expect(
+    state.project?.clips.filter((clip) => clip.linkMode === VideoClipLinkMode.LINKED)
+  ).toHaveLength(4);
+});
+
+it('selects the trailing standalone effect host after splitting it', () => {
+  const runtime = createMutableState();
+  const actions = createVideoEditorProjectClipTimelineActions(runtime.set);
+  const project = createProjectWithEffects();
+  const host = project.clips.find(
+    (clip) => clip.type === VideoProjectClipType.EFFECT && clip.startTime === 1
+  )!;
+  runtime.set({
+    currentTime: 2,
+    project,
+    projectHistory: resetVideoEditorProjectHistory(project.id),
+    selection: { kind: 'clip', clipId: host.id },
+  });
+
+  actions.splitClipAt(host.id, 2);
+
+  const state = runtime.getState();
+  const selectedId = state.selection.kind === 'clip' ? state.selection.clipId : null;
+  expect(state.project?.clips.find((clip) => clip.id === selectedId)).toMatchObject({
+    startTime: 2,
+    type: VideoProjectClipType.EFFECT,
+  });
+  expect(state.projectHistory.past).toHaveLength(1);
 });

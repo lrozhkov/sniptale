@@ -14,6 +14,7 @@ import {
   createWorkspaceTimelineEditingActions,
   createWorkspaceTimelineSelectionActions,
 } from './timeline-actions';
+import { createWorkspaceTimelineController } from './timeline';
 
 function createStore(project = createEmptyVideoProject('Timeline actions')) {
   const store: VideoEditorState & Pick<ClipSelectionPort, 'selectedClipId'> = {
@@ -87,6 +88,41 @@ it('routes timeline frame controls through the playback frame-step authority', (
   actions.onStepToNextFrame();
 
   expect(stepByFrames.mock.calls).toEqual([[-1], [1]]);
+});
+
+it('projects valid selected-clip split eligibility into the timeline controller', () => {
+  const project = createProject([createVideoClip()]);
+  const store = createStore(project);
+  store.currentTime = 3;
+  store.selectedClipId = 'clip-video';
+  store.selection = { kind: VideoEditorSelectionKind.CLIP, clipId: 'clip-video' };
+  type ControllerArgs = Parameters<typeof createWorkspaceTimelineController>;
+  const runtime = {
+    timelinePreviews: {},
+    setTimelinePreviewSuspended: vi.fn(),
+    setTimelinePreviewViewport: vi.fn(),
+  } as unknown as ControllerArgs[1];
+  const workspace = {
+    ...createWorkspace(),
+    grid: { magnetEnabled: true },
+    playbackRange: null,
+  } as unknown as ControllerArgs[4];
+  const createController = () =>
+    createWorkspaceTimelineController(
+      store as unknown as ControllerArgs[0],
+      runtime,
+      project,
+      {} as ControllerArgs[3],
+      workspace,
+      {} as ControllerArgs[5],
+      createSelectedClipActions()
+    );
+
+  expect(createController().state.canSplitSelectedClip).toBe(true);
+  store.currentTime = 0.05;
+  expect(createController().state.canSplitSelectedClip).toBe(false);
+  store.selectedClipId = null;
+  expect(createController().state.canSplitSelectedClip).toBe(false);
 });
 
 it('deletes the selected object track from timeline delete actions', () => {

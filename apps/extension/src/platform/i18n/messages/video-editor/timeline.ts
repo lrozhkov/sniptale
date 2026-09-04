@@ -63,6 +63,10 @@ export const videoEditorTimelineMessages = defineMessageSource({
     ru: 'Разрезать',
     en: 'Split',
   },
+  splitUnavailableTitle: {
+    ru: 'Переместите позицию воспроизведения внутрь выбранного клипа',
+    en: 'Move the playhead inside the selected clip',
+  },
   duplicate: {
     ru: 'Копия',
     en: 'Duplicate',

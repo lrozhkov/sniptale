@@ -32,6 +32,7 @@ afterEach(() => {
 
 function renderLeadingControls(options?: {
   canAutoTransformRecording?: boolean;
+  canSplitSelectedClip?: boolean;
   selectedClip?: boolean;
 }) {
   if (!container) {
@@ -51,6 +52,7 @@ function renderLeadingControls(options?: {
     root?.render(
       <ProjectTimelineToolbarLeadingControls
         canAutoTransformRecording={options?.canAutoTransformRecording ?? false}
+        canSplitSelectedClip={options?.canSplitSelectedClip ?? options?.selectedClip ?? false}
         insertion={{
           onAddActionEvent: vi.fn(),
           onAddMotionRegion: handlers.onAddMotionRegion,

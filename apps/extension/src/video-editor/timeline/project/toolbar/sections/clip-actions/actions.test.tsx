@@ -28,7 +28,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function renderClipActions(selectedClip: boolean) {
+function renderClipActions(selectedClip: boolean, canSplitSelectedClip = selectedClip) {
   if (!container) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -42,6 +42,7 @@ function renderClipActions(selectedClip: boolean) {
   act(() => {
     root?.render(
       <ProjectTimelineClipActions
+        canSplitSelectedClip={canSplitSelectedClip}
         selectedClip={selectedClip}
         onDeleteSelectedClip={onDeleteSelectedClip}
         onDuplicateSelectedClip={onDuplicateSelectedClip}
@@ -85,4 +86,21 @@ it('wires clip action handlers and labels when a clip is selected', () => {
   expect(handlers.onSplitSelectedClip).toHaveBeenCalledTimes(1);
   expect(handlers.onDuplicateSelectedClip).toHaveBeenCalledTimes(1);
   expect(handlers.onDeleteSelectedClip).toHaveBeenCalledTimes(1);
+});
+
+it('disables only Split and explains how to make the cut point valid', () => {
+  const handlers = renderClipActions(true, false);
+  const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
+
+  expect(buttons[0]).toMatchObject({
+    disabled: true,
+    title: 'videoEditor.timeline.splitUnavailableTitle',
+  });
+  expect(buttons[0]?.getAttribute('aria-label')).toBe('videoEditor.timeline.split');
+  expect(buttons[1]?.disabled).toBe(false);
+  expect(buttons[2]?.disabled).toBe(false);
+  act(() => buttons.forEach((button) => button.click()));
+  expect(handlers.onSplitSelectedClip).not.toHaveBeenCalled();
+  expect(handlers.onDuplicateSelectedClip).toHaveBeenCalledOnce();
+  expect(handlers.onDeleteSelectedClip).toHaveBeenCalledOnce();
 });

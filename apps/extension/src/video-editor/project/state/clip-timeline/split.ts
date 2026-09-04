@@ -2,6 +2,7 @@ import { createClipGroupId } from '../../../../features/video/project/factories/
 import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
 import {
   applyTimelinePlacementPolicy,
+  canSplitProjectClipAtTime,
   getSourceTimedClipSourceOffset,
 } from '../../../../features/video/project/timeline';
 import type {
@@ -11,7 +12,7 @@ import type {
 import { VideoClipLinkMode } from '../../../../features/video/project/types/index';
 import { translate } from '../../../../platform/i18n';
 import { VideoProjectClipType } from '../../../../features/video/project/types/index';
-import { duplicateStandaloneEffectHost, splitStandaloneEffectHost } from './effect-host';
+import { duplicateStandaloneEffectHost, splitStandaloneEffectHostWithResult } from './effect-host';
 import {
   isSourceTimedClip,
   resolveEditableClipOperation,
@@ -23,35 +24,58 @@ export function splitProjectClipsAtTime(
   clipId: string,
   splitTime: number
 ): VideoProject {
+  return splitProjectClipsAtTimeWithResult(project, clipId, splitTime)?.project ?? project;
+}
+
+interface ProjectClipSplitMutationResult {
+  project: VideoProject;
+  trailingClipId: string;
+  trailingTrackId: string;
+}
+
+export function splitProjectClipsAtTimeWithResult(
+  project: VideoProject,
+  clipId: string,
+  splitTime: number
+): ProjectClipSplitMutationResult | null {
   const operation = resolveEditableClipOperation(project, clipId);
-  if (!operation) {
-    return project;
-  }
+  if (!operation || !canSplitProjectClipAtTime(project, clipId, splitTime)) return null;
   if (operation.clip.type === VideoProjectClipType.EFFECT) {
-    return splitStandaloneEffectHost(project, clipId, splitTime) ?? project;
+    const result = splitStandaloneEffectHostWithResult(project, clipId, splitTime);
+    const trailingHost = result?.project.clips.find((clip) => clip.id === result.hostClipId);
+    return result && trailingHost
+      ? {
+          project: result.project,
+          trailingClipId: result.hostClipId,
+          trailingTrackId: trailingHost.trackId,
+        }
+      : null;
   }
 
   const offsets = new Map(
     operation.affectedClips.map((item) => [item.id, splitTime - item.startTime])
   );
-  const hasInvalidOffset = operation.affectedClips.some((item) => {
-    const offset = offsets.get(item.id) ?? 0;
-    return offset <= 0.05 || offset >= item.duration - 0.05;
-  });
-  if (hasInvalidOffset) {
-    return project;
-  }
-
   const secondGroupId = operation.clipIds.length > 1 ? createClipGroupId() : null;
-  return applyVideoProjectMutationPatch(project, {
+  let trailingClipId: string | null = null;
+  const nextProject = applyVideoProjectMutationPatch(project, {
     clips: project.clips.flatMap((item) => {
       if (!operation.clipIdSet.has(item.id)) {
         return [item];
       }
 
-      return splitProjectClip(item, offsets.get(item.id) ?? 0, secondGroupId);
+      const splitClips = splitProjectClip(item, offsets.get(item.id) ?? 0, secondGroupId);
+      if (item.id === clipId) trailingClipId = splitClips[1]?.id ?? null;
+      return splitClips;
     }),
   });
+  const trailingClip = nextProject.clips.find((clip) => clip.id === trailingClipId);
+  return trailingClip
+    ? {
+        project: nextProject,
+        trailingClipId: trailingClip.id,
+        trailingTrackId: trailingClip.trackId,
+      }
+    : null;
 }
 
 export function duplicateProjectClips(project: VideoProject, clipId: string): VideoProject {

@@ -70,11 +70,20 @@ export function splitStandaloneEffectHost(
   hostClipId: string,
   splitTime: number
 ): VideoProject | null {
+  if (!findStandaloneEffectSource(project, hostClipId)) return null;
+  return splitStandaloneEffectHostWithResult(project, hostClipId, splitTime)?.project ?? project;
+}
+
+export function splitStandaloneEffectHostWithResult(
+  project: VideoProject,
+  hostClipId: string,
+  splitTime: number
+): EffectHostMutationResult | null {
   const source = findStandaloneEffectSource(project, hostClipId);
   if (!source) return null;
   const { sourceHost, sourceInstance } = source;
   const localOffset = splitTime - sourceHost.startTime;
-  if (localOffset <= 0.05 || localOffset >= sourceHost.duration - 0.05) return project;
+  if (localOffset <= 0.05 || localOffset >= sourceHost.duration - 0.05) return null;
 
   const secondDuration = sourceHost.duration - localOffset;
   const sourcePlaybackDuration = sourceInstance.duration * sourceInstance.playbackRate;
@@ -102,7 +111,7 @@ export function splitStandaloneEffectHost(
     playbackRate: sourcePlaybackDuration / secondDuration,
     startTime: splitTime,
   };
-  return applyVideoProjectMutationPatch(project, {
+  const nextProject = applyVideoProjectMutationPatch(project, {
     clips: project.clips.flatMap((clip) =>
       clip.id === sourceHost.id ? [{ ...sourceHost, duration: localOffset }, secondHost] : [clip]
     ),
@@ -110,6 +119,7 @@ export function splitStandaloneEffectHost(
       instance.id === sourceInstance.id ? [firstInstance, secondInstance] : [instance]
     ),
   });
+  return { effectInstanceId: instanceId, hostClipId: secondHost.id, project: nextProject };
 }
 
 function findEffectHost(project: VideoProject, clipId: string): VideoProjectEffectClip | null {

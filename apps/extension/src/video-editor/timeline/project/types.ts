@@ -43,6 +43,7 @@ export interface ProjectTimelineInsertionActions {
 }
 
 export interface ProjectTimelineProps {
+  canSplitSelectedClip: boolean;
   historyTransaction: VideoEditorProjectHistoryTransactionActions;
   project: VideoProject;
   currentTime: number;

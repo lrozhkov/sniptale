@@ -1,6 +1,7 @@
 import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
 import type { VideoEditorProjectState, VideoEditorProjectSliceSet } from '../contracts';
 import type { VideoEditorClipTimingResult } from '../../../contracts/commands/timeline';
+import { VideoEditorSelectionKind } from '../../../contracts/selection';
 import {
   applyProjectUpdate,
   detachLinkedClips,
@@ -11,10 +12,10 @@ import {
   closeProjectTrackGap,
   duplicateProjectClips,
   moveProjectClip,
-  splitProjectClipsAtTime,
   trimProjectClipEnd,
   trimProjectClipStart,
 } from './mutations';
+import { splitProjectClipsAtTimeWithResult } from './split';
 
 type VideoEditorStoreSet = VideoEditorProjectSliceSet;
 
@@ -36,10 +37,7 @@ export function createVideoEditorProjectClipTimelineActions(
     closeTrackGap: createCloseTrackGapAction(set),
     trimClipStart: createClipTimingAction(set, trimProjectClipStart),
     trimClipEnd: createClipTimingAction(set, trimProjectClipEnd),
-    splitClipAt: (clipId, splitTime) =>
-      set((state) =>
-        applyProjectUpdate(state, (project) => splitProjectClipsAtTime(project, clipId, splitTime))
-      ),
+    splitClipAt: createSplitClipAction(set),
     deleteClip: createDeleteClipAction(set),
     duplicateClip: (clipId) =>
       set((state) =>
@@ -48,6 +46,21 @@ export function createVideoEditorProjectClipTimelineActions(
     detachClipGroup: (clipId) =>
       set((state) => applyProjectUpdate(state, (project) => detachLinkedClips(project, clipId))),
   };
+}
+
+function createSplitClipAction(set: VideoEditorStoreSet): VideoEditorProjectState['splitClipAt'] {
+  return (clipId, splitTime) =>
+    set((state) => {
+      if (!state.project) return {};
+      const result = splitProjectClipsAtTimeWithResult(state.project, clipId, splitTime);
+      if (!result) return {};
+      const patch = applyProjectUpdate(state, () => result.project);
+      return {
+        ...patch,
+        selection: { kind: VideoEditorSelectionKind.CLIP, clipId: result.trailingClipId },
+        selectedTrackId: result.trailingTrackId,
+      };
+    });
 }
 
 function createMoveClipAction(set: VideoEditorStoreSet): VideoEditorProjectState['moveClip'] {

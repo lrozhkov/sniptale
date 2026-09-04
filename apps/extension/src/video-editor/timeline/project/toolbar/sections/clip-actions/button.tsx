@@ -23,6 +23,7 @@ export function ProjectTimelineToolbarActionButton({
   return (
     <ContentToolbarButton
       type="button"
+      aria-label={label}
       className={toolbarButtonClassName}
       disabled={disabled}
       onClick={onClick}

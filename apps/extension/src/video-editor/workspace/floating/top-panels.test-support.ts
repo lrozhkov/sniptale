@@ -134,6 +134,7 @@ function createTimelineController(
       ...createTimelineSelectionActions(),
     },
     state: {
+      canSplitSelectedClip: false,
       currentTime: 0,
       isPlaying: false,
       magnetEnabled: true,

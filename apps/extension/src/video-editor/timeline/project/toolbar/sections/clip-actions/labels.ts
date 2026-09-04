@@ -20,3 +20,9 @@ export function getClipActionTitle(kind: ClipActionKind, disabled: boolean): str
     label: getClipActionLabel(kind),
   });
 }
+
+export function getSplitActionTitle(canSplitSelectedClip: boolean): string {
+  return canSplitSelectedClip
+    ? getClipActionLabel('split')
+    : translate('videoEditor.timeline.splitUnavailableTitle');
+}
