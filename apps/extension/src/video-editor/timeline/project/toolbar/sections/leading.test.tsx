@@ -31,6 +31,7 @@ afterEach(() => {
 });
 
 function renderLeadingControls(options?: {
+  canAddMotionRegion?: boolean;
   canAutoTransformRecording?: boolean;
   canEditSelectedClip?: boolean;
   canSplitSelectedClip?: boolean;
@@ -52,6 +53,7 @@ function renderLeadingControls(options?: {
   act(() => {
     root?.render(
       <ProjectTimelineToolbarLeadingControls
+        canAddMotionRegion={options?.canAddMotionRegion ?? true}
         canAutoTransformRecording={options?.canAutoTransformRecording ?? false}
         canEditSelectedClip={options?.canEditSelectedClip ?? options?.selectedClip ?? false}
         canSplitSelectedClip={options?.canSplitSelectedClip ?? options?.selectedClip ?? false}
@@ -239,8 +241,16 @@ it('restores focus to the add-track trigger when Escape dismisses the menu', () 
   expect(document.activeElement).toBe(trigger);
 });
 
-it('keeps zoom region creation out of the toolbar action cluster', () => {
-  renderLeadingControls();
+it('adds zoom at the playhead through the explicit toolbar action', () => {
+  const handlers = renderLeadingControls();
+  act(() => getButtonByText('videoEditor.timeline.addZoomRegion').click());
+  expect(handlers.onAddMotionRegion).toHaveBeenCalledWith();
+});
 
-  expect(container?.textContent).not.toContain('videoEditor.timeline.addZoomRegion');
+it('does not add zoom while its lane is unavailable for editing', () => {
+  const handlers = renderLeadingControls({ canAddMotionRegion: false });
+  const button = getButtonByText('videoEditor.timeline.addZoomRegion');
+  expect(button.disabled).toBe(true);
+  act(() => button.click());
+  expect(handlers.onAddMotionRegion).not.toHaveBeenCalled();
 });

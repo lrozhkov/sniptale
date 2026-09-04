@@ -25,7 +25,12 @@ export function ProjectTimelineToolbarTrailingActions({
   | 'onZoomChange'
 >) {
   return (
-    <div className="flex min-w-0 flex-wrap items-center justify-end gap-2 max-[720px]:justify-start">
+    <div
+      className={[
+        'flex min-w-0 flex-wrap items-center justify-end gap-2',
+        'max-[1360px]:col-span-2 max-[720px]:col-span-1 max-[720px]:justify-start',
+      ].join(' ')}
+    >
       <ProjectTimelineTrackViewControls trackView={trackView} />
       <ProjectTimelineFitControls
         fitSelectionDuration={fitSelectionDuration}

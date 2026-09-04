@@ -35,8 +35,8 @@ export function ProjectTimelineZoomControl({
   };
 
   return (
-    <div className="flex h-10 min-w-[248px] items-center gap-2 px-1 text-[var(--sniptale-color-text-secondary)]">
-      <span className="text-[11px] font-medium text-[var(--sniptale-color-text-muted)]">
+    <div className="flex h-10 min-w-max items-center gap-2 px-1 text-[var(--sniptale-color-text-secondary)]">
+      <span className="whitespace-nowrap text-[11px] font-medium text-[var(--sniptale-color-text-muted)]">
         {translate('videoEditor.timeline.zoom')}
       </span>
       <TimelineZoomIcon direction="out" />

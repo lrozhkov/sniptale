@@ -12,7 +12,7 @@ export function InspectorGroupSwitch<TId extends string>(props: {
       activeId={props.activeGroupId}
       ariaLabel={props.ariaLabel}
       options={props.groups}
-      wrap={props.groups.length > 4}
+      wrap
       onChange={props.onChange}
     />
   );

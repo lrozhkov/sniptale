@@ -1,3 +1,4 @@
+import { getTimelineUtilityRowPresence } from './segments';
 import { Eye, EyeOff, Lock, Plus, Unlock } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import { getVideoProjectUtilityLanes } from '../../../../features/video/project/utility-lanes';
@@ -25,6 +26,7 @@ export function ProjectTimelineEffectLaneLabelRows({
   project: VideoProject;
 }) {
   const utilityLanes = getVideoProjectUtilityLanes(project);
+  const rows = getTimelineUtilityRowPresence(project);
 
   return (
     <>
@@ -33,23 +35,27 @@ export function ProjectTimelineEffectLaneLabelRows({
         cursorLaneVisible={cursorLaneVisible}
         project={project}
       />
-      <ProjectTimelineUtilityLaneLabelRow
-        compactRows={compactRows}
-        label={translate('videoEditor.timeline.actionsLane')}
-        lane="actions"
-        state={utilityLanes.actions}
-        onToggleUtilityLaneLock={onToggleUtilityLaneLock}
-        onToggleUtilityLaneVisibility={onToggleUtilityLaneVisibility}
-      />
-      <ProjectTimelineUtilityLaneLabelRow
-        compactRows={compactRows}
-        label={translate('videoEditor.timeline.motionLane')}
-        lane="camera"
-        state={utilityLanes.camera}
-        onAdd={() => onAddMotionRegion()}
-        onToggleUtilityLaneLock={onToggleUtilityLaneLock}
-        onToggleUtilityLaneVisibility={onToggleUtilityLaneVisibility}
-      />
+      {rows.actions ? (
+        <ProjectTimelineUtilityLaneLabelRow
+          compactRows={compactRows}
+          label={translate('videoEditor.timeline.actionsLane')}
+          lane="actions"
+          state={utilityLanes.actions}
+          onToggleUtilityLaneLock={onToggleUtilityLaneLock}
+          onToggleUtilityLaneVisibility={onToggleUtilityLaneVisibility}
+        />
+      ) : null}
+      {rows.motion ? (
+        <ProjectTimelineUtilityLaneLabelRow
+          compactRows={compactRows}
+          label={translate('videoEditor.timeline.motionLane')}
+          lane="camera"
+          state={utilityLanes.camera}
+          onAdd={() => onAddMotionRegion()}
+          onToggleUtilityLaneLock={onToggleUtilityLaneLock}
+          onToggleUtilityLaneVisibility={onToggleUtilityLaneVisibility}
+        />
+      ) : null}
     </>
   );
 }

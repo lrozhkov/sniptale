@@ -7,7 +7,12 @@ import { createEmptyVideoProject } from '../../../../features/video/project/fact
 import { DEFAULT_VIDEO_EDITOR_TRACK_PANEL_PREFS } from '../../../persistence/track-panel';
 import { buildTimelineTrackLayoutModel } from './layout';
 import { ProjectTimelineTrackList } from './list';
-import { VideoProjectTrackRole } from '../../../../features/video/project/types';
+import { createVideoProjectMotionRegion } from '../../../../features/video/project/motion';
+import {
+  VideoProjectActionEventKind,
+  VideoProjectActionPreset,
+  VideoProjectTrackRole,
+} from '../../../../features/video/project/types';
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
@@ -46,7 +51,7 @@ it('renders a compact track header together with track rows and effect lanes', (
   expect(header?.className).toContain('h-[30px]');
   expect(header?.className).not.toContain('uppercase');
   expect(container?.textContent).toContain('videoEditor.timeline.telemetryLane');
-  expect(container?.textContent).toContain('videoEditor.timeline.motionLane');
+  expect(container?.textContent).not.toContain('videoEditor.timeline.motionLane');
   expect(container?.textContent).toContain('User custom video title');
   expect(container?.textContent).toContain('V1');
   expect(container?.textContent).not.toContain('O1');
@@ -80,12 +85,25 @@ it('keeps the expanded track list within the parent width without horizontal ove
 
 it('keeps hidden utility lanes visible in the track rail with state controls', () => {
   const project = createEmptyVideoProject('Utility lane visibility');
+  project.motionRegions = [createVideoProjectMotionRegion(project, 12)];
+  project.actionEvents = [
+    {
+      id: 'click',
+      kind: VideoProjectActionEventKind.CLICK,
+      preset: VideoProjectActionPreset.CLICK_RIPPLE,
+      time: 12,
+      duration: 1,
+      label: 'Click',
+      point: { x: 10, y: 10 },
+      data: {},
+    },
+  ];
   project.utilityLanes = {
     actions: { visible: false, locked: false },
     camera: { visible: false, locked: true },
   };
 
-  renderTrackList(project, { showTelemetryLane: true });
+  renderTrackList(project, { showTelemetryLane: true, panelExpanded: true });
 
   expect(container?.textContent).toContain('videoEditor.timeline.actionsLane');
   expect(container?.textContent).toContain('videoEditor.timeline.motionLane');
@@ -98,6 +116,7 @@ it('keeps hidden utility lanes visible in the track rail with state controls', (
 
 it('adds a zoom at the playhead from the persistent editable lane action', () => {
   const project = createEmptyVideoProject('Zoom add action');
+  project.motionRegions = [createVideoProjectMotionRegion(project, 0)];
   const onAddMotionRegion = vi.fn();
 
   renderTrackList(project, { showTelemetryLane: false, onAddMotionRegion });
@@ -186,7 +205,7 @@ it('distinguishes a camera source track from the motion camera utility lane', ()
   expect(container?.textContent).toContain('V1');
   expect(container?.textContent).toContain('Webcam');
   expect(container?.querySelector('[data-camera-track-icon]')).not.toBeNull();
-  expect(container?.textContent).toContain('videoEditor.timeline.motionLane');
+  expect(container?.textContent).not.toContain('videoEditor.timeline.motionLane');
 });
 
 it('numbers multiple explicit camera sources independently from video tracks', () => {

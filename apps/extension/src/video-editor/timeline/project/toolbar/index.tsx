@@ -16,6 +16,7 @@ type ToolbarTrailingControlsInput = Pick<
 >;
 
 function createToolbarLeadingControlsProps({
+  canAddMotionRegion,
   canEditSelectedClip,
   insertion,
   canSplitSelectedClip,
@@ -27,6 +28,7 @@ function createToolbarLeadingControlsProps({
   onSplitSelectedClip,
 }: Pick<
   ProjectTimelineToolbarProps,
+  | 'canAddMotionRegion'
   | 'canEditSelectedClip'
   | 'insertion'
   | 'canSplitSelectedClip'
@@ -38,6 +40,7 @@ function createToolbarLeadingControlsProps({
   | 'onSplitSelectedClip'
 >) {
   return {
+    canAddMotionRegion,
     canEditSelectedClip,
     insertion,
     canSplitSelectedClip,
@@ -90,6 +93,7 @@ export function ProjectTimelineToolbar({
       className={[
         'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border-b',
         'border-[color:var(--sniptale-color-border-soft)] px-3 py-1.5',
+        'max-[1360px]:grid-cols-[minmax(0,1fr)_auto] max-[1360px]:gap-y-0',
         'max-[720px]:grid-cols-1 max-[720px]:gap-1.5',
       ].join(' ')}
     >

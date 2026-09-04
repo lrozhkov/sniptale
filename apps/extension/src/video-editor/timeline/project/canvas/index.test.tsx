@@ -4,6 +4,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
+import { createVideoProjectMotionRegion } from '../../../../features/video/project/motion';
 import { createSceneSelection } from '../../../project/selection/model';
 import { ProjectTimelineCanvas } from './';
 import type { ProjectTimelineInsertionActions } from '../types';
@@ -29,6 +30,34 @@ afterEach(() => {
   root = null;
   container?.remove();
   container = null;
+});
+
+it('adds and removes utility rows and playhead height with authored data', () => {
+  const project = createEmptyVideoProject('Contextual rows');
+  const render = () =>
+    act(() =>
+      root?.render(<ProjectTimelineCanvas {...createCanvasProps(project, { snapGuideTime: 1 })} />)
+    );
+  render();
+  expect(container?.querySelectorAll('[data-project-timeline-effect-lane-row]')).toHaveLength(0);
+  const line = () =>
+    container?.querySelector<HTMLElement>('[data-ui="video-editor.timeline.snap-guide"]');
+  const emptyHeight = line()?.style.height;
+  project.motionRegions = [createVideoProjectMotionRegion(project, 12)];
+  project.utilityLanes = {
+    actions: { visible: true, locked: false },
+    camera: { visible: false, locked: true },
+  };
+  render();
+  expect(container?.querySelectorAll('[data-project-timeline-effect-lane-row]')).toHaveLength(1);
+  expect(parseFloat(line()?.style.height ?? '0')).toBe(parseFloat(emptyHeight ?? '0') + 46);
+  project.motionRegions = [];
+  render();
+  expect(container?.querySelectorAll('[data-project-timeline-effect-lane-row]')).toHaveLength(1);
+  project.utilityLanes.camera = { visible: true, locked: false };
+  render();
+  expect(container?.querySelectorAll('[data-project-timeline-effect-lane-row]')).toHaveLength(0);
+  expect(line()?.style.height).toBe(emptyHeight);
 });
 
 it('routes empty track-lane pointer selection through scene selection and seek', () => {

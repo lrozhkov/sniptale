@@ -31,6 +31,7 @@ import type {
 } from '../types';
 import { resolveTimelineDropTrackId, type TimelineDropImportKind } from './drop-targets';
 import { ProjectTimelineCanvasEffectRows } from './effect-rows';
+import { getTimelineUtilityRowPresence } from '../effect-lanes/segments';
 
 interface ProjectTimelineCanvasProps {
   currentTime: number;
@@ -295,6 +296,7 @@ function createTimelineFileDropHandler(props: ProjectTimelineCanvasProps) {
   };
 }
 
-function getEffectLaneCount(cursorLaneVisible: boolean, _project: VideoProject): number {
-  return 2 + (cursorLaneVisible ? 1 : 0);
+function getEffectLaneCount(cursorLaneVisible: boolean, project: VideoProject): number {
+  const rows = getTimelineUtilityRowPresence(project);
+  return Number(rows.actions) + Number(rows.motion) + Number(cursorLaneVisible);
 }

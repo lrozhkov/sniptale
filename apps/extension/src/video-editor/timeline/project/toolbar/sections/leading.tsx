@@ -47,6 +47,7 @@ function ProjectTimelineAutoTransformButton(props: {
 
 export function ProjectTimelineToolbarLeadingControls({
   canAutoTransformRecording,
+  canAddMotionRegion,
   canEditSelectedClip,
   canSplitSelectedClip,
   insertion,
@@ -58,6 +59,7 @@ export function ProjectTimelineToolbarLeadingControls({
 }: Pick<
   ProjectTimelineToolbarProps,
   | 'canAutoTransformRecording'
+  | 'canAddMotionRegion'
   | 'canEditSelectedClip'
   | 'canSplitSelectedClip'
   | 'insertion'
@@ -69,20 +71,22 @@ export function ProjectTimelineToolbarLeadingControls({
 >) {
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-2 max-[720px]:gap-1">
-      <ProjectTimelineAddControls insertion={insertion} />
+      <ProjectTimelineAddControls insertion={insertion} canAddMotionRegion={canAddMotionRegion} />
       {canAutoTransformRecording && onAutoTransformRecording ? (
         <ProjectTimelineAutoTransformButton onAutoTransformRecording={onAutoTransformRecording} />
       ) : null}
-      {selectedClip ? (
-        <ProjectTimelineClipActions
-          canEditSelectedClip={canEditSelectedClip}
-          canSplitSelectedClip={canSplitSelectedClip}
-          selectedClip
-          onDeleteSelectedClip={onDeleteSelectedClip}
-          onDuplicateSelectedClip={onDuplicateSelectedClip}
-          onSplitSelectedClip={onSplitSelectedClip}
-        />
-      ) : null}
+      <div className="flex h-9 w-[116px] shrink-0 items-center gap-1">
+        {selectedClip ? (
+          <ProjectTimelineClipActions
+            canEditSelectedClip={canEditSelectedClip}
+            canSplitSelectedClip={canSplitSelectedClip}
+            selectedClip
+            onDeleteSelectedClip={onDeleteSelectedClip}
+            onDuplicateSelectedClip={onDuplicateSelectedClip}
+            onSplitSelectedClip={onSplitSelectedClip}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }

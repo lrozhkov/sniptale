@@ -1,3 +1,4 @@
+import { getVideoProjectUtilityLanes } from '../../../features/video/project/utility-lanes';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ProjectTimelineToolbar } from './toolbar';
 import type { ProjectTimelineProps } from './types';
@@ -39,6 +40,7 @@ type ProjectTimelineSurfaceProps = Pick<
 };
 
 export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
+  const motionLane = getVideoProjectUtilityLanes(props.project).camera;
   return (
     <FloatingChromePanel
       dataUi="video-editor.timeline.surface"
@@ -48,6 +50,7 @@ export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
       ].join(' ')}
     >
       <ProjectTimelineToolbar
+        canAddMotionRegion={props.project.duration > 0 && motionLane.visible && !motionLane.locked}
         canEditSelectedClip={props.canEditSelectedClip}
         canSplitSelectedClip={props.canSplitSelectedClip}
         currentTime={props.currentTime}

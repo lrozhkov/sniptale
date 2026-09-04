@@ -122,7 +122,7 @@ describe('grouped-inspector switch', () => {
 });
 
 describe('grouped-inspector switch visuals', () => {
-  it('renders one-line equal group columns with moving active background vars', () => {
+  it('wraps groups while preserving the active selection and activation', () => {
     act(() => {
       root?.render(
         <TestHarness
@@ -137,19 +137,19 @@ describe('grouped-inspector switch visuals', () => {
     });
 
     const switchNode = container?.querySelector<HTMLElement>('[role="group"]');
-    const activeBackground = switchNode?.querySelector<HTMLElement>('span[aria-hidden="true"]');
     const activeButton = switchNode?.querySelector<HTMLButtonElement>(
       'button[aria-pressed="true"]'
     );
 
-    expect(switchNode?.className).toContain('grid');
-    expect(switchNode?.style.getPropertyValue('--sniptale-group-count')).toBe('4');
-    expect(switchNode?.style.getPropertyValue('--sniptale-group-index')).toBe('1');
-    expect(switchNode?.style.gridTemplateColumns).toBe('repeat(4, minmax(0, 1fr))');
-    expect(activeBackground?.style.transform).toContain('var(--sniptale-group-index)');
-    expect(activeButton?.className).toContain('bg-transparent');
-    expect(activeButton?.className).toContain('shadow-none');
-    expect(activeButton?.className).not.toContain('hover:bg');
+    expect(switchNode?.className).toContain('flex-wrap');
+    expect(activeButton?.textContent).toBe('General');
+    const targetButton = Array.from(switchNode?.querySelectorAll('button') ?? []).find(
+      (button) => button.textContent === 'Target'
+    );
+    act(() => targetButton?.click());
+    expect(targetButton?.getAttribute('aria-pressed')).toBe('true');
+    expect(container?.textContent).toContain('Target content');
+    expect(container?.textContent).not.toContain('General content');
   });
 
   it('does not duplicate the active group label inside the body', () => {

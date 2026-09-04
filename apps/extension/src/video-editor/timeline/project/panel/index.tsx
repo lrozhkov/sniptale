@@ -1,3 +1,4 @@
+import { getTimelineUtilityRowPresence } from '../effect-lanes/segments';
 import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import type { VideoEditorTrackHeightMultiplier } from '../../../persistence/track-panel';
@@ -70,6 +71,7 @@ function ProjectTimelineExpandedEffectRows(props: {
   onToggleUtilityLaneVisibility: (lane: VideoProjectUtilityLaneKind) => void;
 }) {
   const utilityLanes = getVideoProjectUtilityLanes(props.project);
+  const rows = getTimelineUtilityRowPresence(props.project);
 
   return (
     <>
@@ -81,24 +83,28 @@ function ProjectTimelineExpandedEffectRows(props: {
           onVisibleChange={props.trackPanelPrefs.setCollapsedCursorLaneVisible}
         />
       ) : null}
-      <UtilityProjectLaneControlRow
-        height={EFFECT_LANE_ROW_HEIGHT}
-        label={translate('videoEditor.timeline.actionsLane')}
-        lane="actions"
-        state={utilityLanes.actions}
-        onClearUtilityLane={props.onClearUtilityLane}
-        onToggleUtilityLaneLock={props.onToggleUtilityLaneLock}
-        onToggleUtilityLaneVisibility={props.onToggleUtilityLaneVisibility}
-      />
-      <UtilityProjectLaneControlRow
-        height={EFFECT_LANE_ROW_HEIGHT}
-        label={translate('videoEditor.timeline.motionLane')}
-        lane="camera"
-        state={utilityLanes.camera}
-        onClearUtilityLane={props.onClearUtilityLane}
-        onToggleUtilityLaneLock={props.onToggleUtilityLaneLock}
-        onToggleUtilityLaneVisibility={props.onToggleUtilityLaneVisibility}
-      />
+      {rows.actions ? (
+        <UtilityProjectLaneControlRow
+          height={EFFECT_LANE_ROW_HEIGHT}
+          label={translate('videoEditor.timeline.actionsLane')}
+          lane="actions"
+          state={utilityLanes.actions}
+          onClearUtilityLane={props.onClearUtilityLane}
+          onToggleUtilityLaneLock={props.onToggleUtilityLaneLock}
+          onToggleUtilityLaneVisibility={props.onToggleUtilityLaneVisibility}
+        />
+      ) : null}
+      {rows.motion ? (
+        <UtilityProjectLaneControlRow
+          height={EFFECT_LANE_ROW_HEIGHT}
+          label={translate('videoEditor.timeline.motionLane')}
+          lane="camera"
+          state={utilityLanes.camera}
+          onClearUtilityLane={props.onClearUtilityLane}
+          onToggleUtilityLaneLock={props.onToggleUtilityLaneLock}
+          onToggleUtilityLaneVisibility={props.onToggleUtilityLaneVisibility}
+        />
+      ) : null}
     </>
   );
 }

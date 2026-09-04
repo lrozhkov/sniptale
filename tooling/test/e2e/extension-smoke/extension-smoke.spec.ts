@@ -349,6 +349,10 @@ async function verifyVideoEditorTimelineBoundaries(
   await expect(counter).toContainText('0:00.0 / 0:12.0');
   await page.screenshot({ fullPage: true, path: screenshotPath });
 
+  for (let index = 0; index < 3; index++) {
+    await page.locator('[data-ui="video-editor.timeline.toolbar.add-track"]').click();
+    await page.locator('[data-ui="video-editor.timeline.toolbar.add-track.primary"]').click();
+  }
   await page.setViewportSize({ width: 700, height: 900 });
   await expect(seekToStart).toBeVisible();
   await expect(seekToEnd).toBeVisible();
@@ -661,12 +665,22 @@ test('video editor keeps webcam independent with camera timeline and inspector c
 
   await verifyVideoEditorAddTrackMenu(page, testInfo.outputPath('video-editor-add-track-menu.png'));
 
-  const addZoomButton = page.locator('[data-ui="video-editor.timeline.add-zoom"]');
+  const addZoomButton = page.locator('[data-ui="video-editor.timeline.toolbar.add-zoom"]');
   await expect(
     page.getByText(translate('videoEditor.timeline.motionLane', 'ru'), { exact: true })
-  ).toBeVisible();
+  ).toHaveCount(0);
   await expect(addZoomButton).toBeEnabled();
   await addZoomButton.click();
+  await expect(page.locator('[data-ui="video-editor.timeline.add-zoom"]')).toBeVisible();
+  const groupLabels = inspector.locator('[role="group"]').first().locator('button span');
+  await expect(groupLabels).not.toHaveCount(0);
+  expect(
+    await groupLabels.evaluateAll((nodes) =>
+      nodes
+        .filter((node) => node.scrollWidth > node.clientWidth + 1)
+        .map((node) => node.textContent)
+    )
+  ).toEqual([]);
   await expect(
     inspector.getByText(translate('videoEditor.sidebar.motionScaleLabel', 'ru'), { exact: true })
   ).toBeVisible();

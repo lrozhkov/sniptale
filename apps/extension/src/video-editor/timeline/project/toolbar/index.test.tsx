@@ -50,6 +50,7 @@ function createInsertionActions() {
 function createToolbarProps(): ProjectTimelineToolbarTestProps {
   return {
     canAutoTransformRecording: true,
+    canAddMotionRegion: true,
     canEditSelectedClip: true,
     canSplitSelectedClip: true,
     currentTime: 12,
@@ -108,7 +109,7 @@ it('keeps add actions left, playback center, and zoom on the right', () => {
   expect(regions[2]?.className).toContain('max-[720px]:justify-start');
   expect(regions[0]?.textContent).not.toContain('videoEditor.timeline.addButton');
   expect(regions[0]?.textContent).toContain('videoEditor.timeline.addTrack');
-  expect(regions[0]?.textContent).not.toContain('videoEditor.timeline.addZoomRegion');
+  expect(regions[0]?.textContent).toContain('videoEditor.timeline.addZoomRegion');
   expect(regions[0]?.textContent).toContain('videoEditor.timeline.split');
   expect(regions[1]?.textContent).toContain('0:12.0 / 0:45.0');
   expect(regions[2]?.textContent).not.toContain('videoEditor.timeline.telemetryToggle');

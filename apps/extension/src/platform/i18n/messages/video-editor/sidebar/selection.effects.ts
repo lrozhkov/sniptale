@@ -58,12 +58,12 @@ export const videoEditorSidebarSelectionEffectMessages = defineMessageSource({
     en: 'Instant',
   },
   motionScaleLabel: {
-    ru: 'Масштаб камеры',
-    en: 'Camera scale',
+    ru: 'Масштаб зума',
+    en: 'Zoom scale',
   },
   motionCameraModeLabel: {
-    ru: 'Режим камеры',
-    en: 'Camera mode',
+    ru: 'Режим зума',
+    en: 'Zoom mode',
   },
   motionCameraModeStatic: {
     ru: 'Статика',

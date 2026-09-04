@@ -39,7 +39,7 @@ it('wraps long dense switch groups when requested', () => {
   );
 
   expect(markup).toContain('flex-wrap');
-  expect(markup).toContain('min-w-[4.25rem]');
+  expect(markup).toContain('min-w-fit max-w-full flex-auto');
   expect(markup).toContain('whitespace-normal');
   expect(markup).not.toContain('gridTemplateColumns');
 });

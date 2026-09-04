@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
-import { ChevronDown, Music, Plus, StickyNote, Video } from 'lucide-react';
+import { ChevronDown, Music, Plus, StickyNote, Video, ZoomIn } from 'lucide-react';
 import { translate } from '../../../../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
@@ -32,11 +32,25 @@ const TRACK_MENU_OPTIONS = [
   },
 ] as const;
 
-export function ProjectTimelineAddControls(props: { insertion: ProjectTimelineInsertionActions }) {
+export function ProjectTimelineAddControls(props: {
+  insertion: ProjectTimelineInsertionActions;
+  canAddMotionRegion: boolean;
+}) {
   const trackChoices = useTrackChoicesMenuState();
 
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-1">
+      <ContentToolbarButton
+        type="button"
+        disabled={!props.canAddMotionRegion}
+        onClick={() => props.insertion.onAddMotionRegion()}
+        className={toolbarButtonClassName}
+        title={translate('videoEditor.timeline.addZoomRegion')}
+        dataUi="video-editor.timeline.toolbar.add-zoom"
+      >
+        <ZoomIn size={14} strokeWidth={2} />
+        <span>{translate('videoEditor.timeline.addZoomRegion')}</span>
+      </ContentToolbarButton>
       <div ref={trackChoices.menuRootRef} className="relative">
         <ContentToolbarButton
           ref={trackChoices.triggerRef}
