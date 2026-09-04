@@ -334,28 +334,20 @@ async function verifyVideoEditorClipMagnet(
   await expect(page.locator('[data-ui="video-editor.timeline.snap-guide"]')).toHaveCount(0);
 }
 
-async function verifyVideoEditorAnnotationCanvasFlow(
+async function verifyVideoEditorMinimalInsertTools(
   page: import('@playwright/test').Page,
   screenshotPath: string
 ): Promise<void> {
-  const timelineClips = page.locator('[data-project-timeline-clip]');
-  const timelineClipCount = await timelineClips.count();
-  const textTool = page.locator('[data-ui="video-editor.floating.insert-panel.text"]');
-  const stage = page.locator('[data-ui="video.preview.stage.root"]');
-  await expect(textTool).toHaveAttribute(
-    'title',
-    translate('videoEditor.app.textToolButton', 'ru')
-  );
-  await textTool.click();
-  await expect(textTool).toHaveAttribute('aria-pressed', 'true');
-  await expect(stage).toHaveClass(/cursor-crosshair/);
-
-  await stage.click({ position: { x: 680, y: 240 } });
-
-  await expect(timelineClips).toHaveCount(timelineClipCount + 1);
-  await expect(textTool).not.toHaveAttribute('aria-pressed', 'true');
-  await expect(stage).toHaveClass(/cursor-default/);
-  await expect(page.locator('[data-preview-selection-state="editable"]')).toBeVisible();
+  for (const kind of ['text', 'shape', 'arrow', 'line']) {
+    await expect(
+      page.locator(`[data-ui="video-editor.floating.insert-panel.${kind}"]`)
+    ).toHaveCount(0);
+  }
+  for (const kind of ['select-move', 'media', 'templates']) {
+    await expect(
+      page.locator(`[data-ui="video-editor.floating.insert-panel.${kind}"]`)
+    ).toBeVisible();
+  }
   await page.screenshot({ fullPage: true, path: screenshotPath });
 }
 
@@ -627,9 +619,9 @@ test('video editor keeps webcam independent with camera timeline and inspector c
     path: testInfo.outputPath('video-editor-zoom-flow.png'),
   });
 
-  await verifyVideoEditorAnnotationCanvasFlow(
+  await verifyVideoEditorMinimalInsertTools(
     page,
-    testInfo.outputPath('video-editor-annotation-canvas-flow.png')
+    testInfo.outputPath('video-editor-minimal-insert-tools.png')
   );
 });
 

@@ -60,7 +60,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('exposes every supported one-shot annotation tool without mutating the project', () => {
+it('keeps temporary drawing tools absent and selection available without mutating the project', () => {
   const controller = createFloatingWorkspaceController();
   hookMocks.controller = controller;
   const onActiveInsertKindChange = vi.fn();
@@ -76,18 +76,11 @@ it('exposes every supported one-shot annotation tool without mutating the projec
   );
 
   clickByLabel(translate('videoEditor.app.selectMoveButton'));
-  clickByLabel(translate('videoEditor.app.textToolButton'));
-  clickByLabel(translate('videoEditor.app.shapeToolButton'));
-  clickByLabel(translate('videoEditor.app.arrowToolButton'));
-  clickByLabel(translate('videoEditor.app.lineToolButton'));
+  for (const kind of ['text', 'shape', 'arrow', 'line']) {
+    expect(queryUi(`video-editor.floating.insert-panel.${kind}`)).toBeNull();
+  }
 
-  expect(onActiveInsertKindChange.mock.calls).toEqual([
-    [null],
-    ['text'],
-    ['shape'],
-    ['arrow'],
-    ['line'],
-  ]);
+  expect(onActiveInsertKindChange.mock.calls).toEqual([[null]]);
   expect(controller.timeline.actions.insertion.onAddTextOverlay).not.toHaveBeenCalled();
   expect(controller.timeline.actions.insertion.onAddShapeOverlay).not.toHaveBeenCalled();
   expect(queryUi('video-editor.floating.tool-rail')).toBeNull();

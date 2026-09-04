@@ -26,32 +26,9 @@ export function buildVideoInsertActions(args: {
 }) {
   return [
     createSelectMoveAction(args.activeInsertKind, args.onActiveInsertKindChange),
-    ...createAnnotationInsertActions(args.activeInsertKind, args.onActiveInsertKindChange),
     createMediaInsertAction(args.insertion),
     createTemplatesInsertAction(args.effectsLibraryDock),
   ] satisfies CanvasToolAction[];
-}
-
-function createAnnotationInsertActions(
-  activeInsertKind: VideoPreviewCanvasInsertKind | null,
-  onActiveInsertKindChange: (kind: VideoPreviewCanvasInsertKind | null) => void
-) {
-  const actions = [
-    { kind: 'text', labelKey: 'videoEditor.app.textToolButton' },
-    { kind: 'shape', labelKey: 'videoEditor.app.shapeToolButton' },
-    { kind: 'arrow', labelKey: 'videoEditor.app.arrowToolButton' },
-    { kind: 'line', labelKey: 'videoEditor.app.lineToolButton' },
-  ] as const;
-  return actions.map(({ kind, labelKey }) =>
-    createCanvasToolAction({
-      active: activeInsertKind === kind,
-      group: 'secondary',
-      id: kind,
-      kind,
-      label: translate(labelKey),
-      onSelect: () => onActiveInsertKindChange(activeInsertKind === kind ? null : kind),
-    })
-  );
 }
 
 export function buildVideoWorkspaceActions(controller: {

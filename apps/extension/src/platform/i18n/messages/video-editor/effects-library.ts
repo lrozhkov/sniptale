@@ -28,8 +28,8 @@ export const videoEditorEffectsLibraryMessages = defineMessageSource({
   },
   deletePack: { ru: 'Удалить bundle', en: 'Delete bundle' },
   description: {
-    ru: 'Библиотека EffectV1. Текст и фигуры добавляются с панели над холстом.',
-    en: 'EffectV1 library. Add text and shapes from the toolbar above the canvas.',
+    ru: 'Импортируйте набор эффектов и выберите эффект для сцены, клипа или перехода.',
+    en: 'Import an effects bundle and choose an effect for the scene, a clip, or a transition.',
   },
   disablePack: { ru: 'Выключить bundle', en: 'Disable bundle' },
   enablePack: { ru: 'Включить bundle', en: 'Enable bundle' },
