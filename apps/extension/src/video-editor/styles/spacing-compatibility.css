@@ -1,0 +1,33 @@
+/* Preserve the Tailwind v3 stack geometry until video-editor panels migrate to gap layouts. */
+:is(.space-y-1\.5, .space-y-2, .space-y-2\.5, .space-y-3, .space-y-4) > :not(:last-child) {
+  margin-block-start: 0;
+  margin-block-end: 0;
+}
+
+.space-y-1\.5 {
+  --sniptale-video-stack-space: calc(var(--spacing) * 1.5);
+}
+
+.space-y-2 {
+  --sniptale-video-stack-space: calc(var(--spacing) * 2);
+}
+
+.space-y-2\.5 {
+  --sniptale-video-stack-space: calc(var(--spacing) * 2.5);
+}
+
+.space-y-3 {
+  --sniptale-video-stack-space: calc(var(--spacing) * 3);
+}
+
+.space-y-4 {
+  --sniptale-video-stack-space: calc(var(--spacing) * 4);
+}
+
+:is(.space-y-1\.5, .space-y-2, .space-y-2\.5, .space-y-3, .space-y-4)
+  > :not([hidden])
+  ~ :not([hidden]) {
+  --tw-space-y-reverse: 0;
+  margin-block-start: calc(var(--sniptale-video-stack-space) * calc(1 - var(--tw-space-y-reverse)));
+  margin-block-end: calc(var(--sniptale-video-stack-space) * var(--tw-space-y-reverse));
+}

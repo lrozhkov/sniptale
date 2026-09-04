@@ -50,6 +50,31 @@ async function openVideoEditorHarness(page: Page, hostOrigin: string) {
   });
 }
 
+async function expectVideoEditorStackSpacingCompatibility(page: Page): Promise<void> {
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const stack = document.createElement('div');
+        const first = document.createElement('div');
+        const second = document.createElement('div');
+        stack.className = 'space-y-3';
+        stack.append(first, second);
+        document.body.append(stack);
+
+        const result = {
+          firstMarginBottom: getComputedStyle(first).marginBottom,
+          secondMarginTop: getComputedStyle(second).marginTop,
+        };
+        stack.remove();
+        return result;
+      })
+    )
+    .toEqual({
+      firstMarginBottom: '0px',
+      secondMarginTop: '12px',
+    });
+}
+
 async function startVideoExport(page: Page): Promise<StartedVideoExport> {
   const exportButton = page.getByRole('button', {
     name: VIDEO_EDITOR_EXPORT_BUTTON_LABEL,
@@ -150,6 +175,7 @@ test('video editor export reacts to runtime progress and completion events', asy
   hostOrigin,
 }, testInfo) => {
   await openVideoEditorHarness(page, hostOrigin);
+  await expectVideoEditorStackSpacingCompatibility(page);
   await page.getByRole('button', { name: VIDEO_EDITOR_EXPORT_BUTTON_LABEL, exact: true }).click();
   await expect(
     page.getByRole('button', { name: VIDEO_EDITOR_EXPORT_SUBMIT_LABEL, exact: true })
