@@ -21,6 +21,7 @@ interface PlaybackHookState {
   selection: VideoEditorSelection;
   placementMode: VideoEditorPlacementMode | null;
   projectHistoryTransactionActive: boolean;
+  shortcutsEnabled: boolean;
   selectedClipId: string | null;
   selectedActionEvent: PlaybackLatestState['selectedActionEvent'];
   selectedMotionRegion: PlaybackLatestState['selectedMotionRegion'];
@@ -130,7 +131,14 @@ function usePlaybackSeek(
     playback.isPlaying &&
       (phase === 'live' || phase === 'cached-frame-playback' || phase === 'cached-video-playback')
   );
-  usePlaybackShortcuts(latestStateRef, handlersRef, seekTo, stepByFrames, togglePlayback);
+  usePlaybackShortcuts(
+    latestStateRef,
+    handlersRef,
+    seekTo,
+    stepByFrames,
+    togglePlayback,
+    playback.shortcutsEnabled
+  );
   return createPlaybackController(
     pausePlayback,
     registerPreviewRuntime,

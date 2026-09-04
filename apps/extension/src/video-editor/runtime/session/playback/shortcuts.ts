@@ -72,9 +72,7 @@ function handlePlaybackShortcutKeyDown(
     return;
   }
 
-  if (event.code === 'KeyS' && latestState.selectedClipId) {
-    event.preventDefault();
-    handlersRef.current.splitClipAt(latestState.selectedClipId, latestState.currentTime);
+  if (handleSelectedClipShortcut(event, latestState, handlersRef)) {
     return;
   }
 
@@ -88,6 +86,39 @@ function handlePlaybackShortcutKeyDown(
 
   event.preventDefault();
   handleSelectionDelete(latestState, handlersRef);
+}
+
+function handleSelectedClipShortcut(
+  event: KeyboardEvent,
+  latestState: PlaybackLatestState,
+  handlersRef: MutableRefObject<PlaybackHandlers>
+): boolean {
+  if (!latestState.selectedClipId) return false;
+
+  if (
+    event.code === 'KeyD' &&
+    event.ctrlKey !== event.metaKey &&
+    !event.altKey &&
+    !event.shiftKey
+  ) {
+    event.preventDefault();
+    handlersRef.current.duplicateClip(latestState.selectedClipId);
+    return true;
+  }
+
+  if (
+    event.code === 'KeyS' &&
+    !event.altKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.shiftKey
+  ) {
+    event.preventDefault();
+    handlersRef.current.splitClipAt(latestState.selectedClipId, latestState.currentTime);
+    return true;
+  }
+
+  return false;
 }
 
 function handlePlaybackFrameStepShortcut(
@@ -127,7 +158,13 @@ function handlePlaybackToggleShortcut(event: KeyboardEvent, togglePlayback: () =
     return true;
   }
 
-  if (event.code === 'KeyK') {
+  if (
+    event.code === 'KeyK' &&
+    !event.altKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.shiftKey
+  ) {
     event.preventDefault();
     togglePlayback();
     return true;
@@ -168,9 +205,12 @@ export function usePlaybackShortcuts(
   handlersRef: MutableRefObject<PlaybackHandlers>,
   seekTo: (time: number) => void,
   stepByFrames: (frameDelta: number) => void,
-  togglePlayback: () => void
+  togglePlayback: () => void,
+  enabled = true
 ) {
   useEffect(() => {
+    if (!enabled) return;
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (handledKeyDownEvents.has(event)) {
         return;
@@ -193,5 +233,5 @@ export function usePlaybackShortcuts(
       window.removeEventListener('keydown', handleKeyDown, KEYDOWN_LISTENER_OPTIONS);
       document.removeEventListener('keydown', handleKeyDown, KEYDOWN_LISTENER_OPTIONS);
     };
-  }, [handlersRef, latestStateRef, seekTo, stepByFrames, togglePlayback]);
+  }, [enabled, handlersRef, latestStateRef, seekTo, stepByFrames, togglePlayback]);
 }

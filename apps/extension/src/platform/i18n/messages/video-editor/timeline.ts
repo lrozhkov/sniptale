@@ -63,6 +63,10 @@ export const videoEditorTimelineMessages = defineMessageSource({
     ru: 'Разрезать',
     en: 'Split',
   },
+  splitShortcut: {
+    ru: 'S',
+    en: 'S',
+  },
   splitUnavailableTitle: {
     ru: 'Переместите позицию воспроизведения внутрь выбранного клипа',
     en: 'Move the playhead inside the selected clip',
@@ -75,8 +79,16 @@ export const videoEditorTimelineMessages = defineMessageSource({
     ru: 'Копия',
     en: 'Duplicate',
   },
+  duplicateShortcut: {
+    ru: 'Ctrl/⌘+D',
+    en: 'Ctrl/⌘+D',
+  },
   delete: {
     ru: 'Удалить',
+    en: 'Delete',
+  },
+  deleteShortcut: {
+    ru: 'Delete',
     en: 'Delete',
   },
   addTrack: {

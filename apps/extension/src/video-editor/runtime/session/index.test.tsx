@@ -40,6 +40,7 @@ function createPlaybackParams(): UseVideoEditorRuntimeParams['playback'] {
     isPlaying: false,
     playbackRange: null,
     projectHistoryTransactionActive: false,
+    shortcutsEnabled: true,
     placementMode: null,
     selection: { kind: VideoEditorSelectionKind.SCENE },
     selectedActionEvent: null,
@@ -52,6 +53,7 @@ function createPlaybackParams(): UseVideoEditorRuntimeParams['playback'] {
       motionRegion: fn(),
       objectTrack: fn(),
     },
+    duplicateClip: fn(),
     clearPlacementMode: fn(),
     setCurrentTime: fn(),
     setPlaying: fn(),
@@ -145,6 +147,9 @@ it('composes asset, preview, playback, load, and lifecycle owners into one runti
     togglePlayback: playback.togglePlayback,
   });
   expect(mocks.useVideoEditorPlayback).toHaveBeenCalledOnce();
+  expect(mocks.useVideoEditorPlayback.mock.calls[0]?.[2]).toEqual(
+    expect.objectContaining({ duplicateClip: params.playback.duplicateClip })
+  );
   expect(mocks.useVideoEditorRuntimeEffects).toHaveBeenCalledWith(
     expect.objectContaining({
       project: params.project,

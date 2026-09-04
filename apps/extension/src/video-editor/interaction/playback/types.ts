@@ -36,6 +36,7 @@ export interface PlaybackHandlers {
   deleteCursorSample: (sampleId: string) => void;
   deleteMotionRegion: (motionRegionId: string) => void;
   deleteObjectTrack: (objectTrackId: string) => void;
+  duplicateClip: (clipId: string) => void;
   setCurrentTime: (time: number) => void;
   setPlaying: (playing: boolean) => void;
   splitClipAt: (clipId: string, time: number) => void;

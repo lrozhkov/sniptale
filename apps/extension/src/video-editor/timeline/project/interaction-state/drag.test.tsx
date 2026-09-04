@@ -131,6 +131,7 @@ function createPlaybackShortcutHandlers(state: VideoEditorState): PlaybackHandle
     clearPlacementMode: state.clearPlacementMode,
     deleteActionEvent: state.deleteActionEvent,
     deleteClip: state.deleteClip,
+    duplicateClip: state.duplicateClip,
     deleteCursorSample: state.deleteCursorSample,
     deleteMotionRegion: state.deleteMotionRegion,
     deleteObjectTrack: state.deleteObjectTrack,

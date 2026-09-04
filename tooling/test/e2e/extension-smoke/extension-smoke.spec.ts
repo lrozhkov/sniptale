@@ -421,6 +421,20 @@ test('video editor focused timeline reveals contextual clip actions', async ({
   });
   await expect(duplicateButton).toBeEnabled();
   await expect(deleteButton).toBeEnabled();
+  await expect(duplicateButton).toHaveAttribute(
+    'title',
+    `${translate('videoEditor.timeline.duplicate', 'ru')} (${translate(
+      'videoEditor.timeline.duplicateShortcut',
+      'ru'
+    )})`
+  );
+  await expect(deleteButton).toHaveAttribute(
+    'title',
+    `${translate('videoEditor.timeline.delete', 'ru')} (${translate(
+      'videoEditor.timeline.deleteShortcut',
+      'ru'
+    )})`
+  );
 
   const titleTrackRow = timeline
     .locator('[data-ui="video-editor.timeline.track-select"]')
@@ -445,6 +459,13 @@ test('video editor focused timeline reveals contextual clip actions', async ({
   if (!clipBox || !rulerBox) throw new Error('Expected clip and ruler bounds for Split proof');
   await page.mouse.click(clipBox.x + clipBox.width / 2, rulerBox.y + rulerBox.height / 2);
   await expect(splitButton).toBeEnabled();
+  await expect(splitButton).toHaveAttribute(
+    'title',
+    `${translate('videoEditor.timeline.split', 'ru')} (${translate(
+      'videoEditor.timeline.splitShortcut',
+      'ru'
+    )})`
+  );
   await splitButton.click();
   await expect(page.locator('[data-project-timeline-clip]')).toHaveCount(2);
   const splitPartName = `Intro title · ${translate('shared.projectActions.splitPartSuffix', 'ru')} 2`;
@@ -454,7 +475,7 @@ test('video editor focused timeline reveals contextual clip actions', async ({
       .getByText(splitPartName, { exact: true })
       .first()
   ).toBeVisible();
-  await duplicateButton.click();
+  await page.keyboard.press('Control+D');
   await expect(page.locator('[data-project-timeline-clip]')).toHaveCount(3);
   await expect(
     page
@@ -464,6 +485,15 @@ test('video editor focused timeline reveals contextual clip actions', async ({
       })
       .first()
   ).toBeVisible();
+  await page.keyboard.press('Control+K');
+  const commandPaletteClose = page.getByRole('button', {
+    name: translate('shared.ui.commandPaletteCloseTitle', 'ru'),
+  });
+  await expect(commandPaletteClose).toBeVisible();
+  await commandPaletteClose.focus();
+  await page.keyboard.press('Control+D');
+  await expect(page.locator('[data-project-timeline-clip]')).toHaveCount(3);
+  await commandPaletteClose.click();
   await mkdir(testInfo.outputDir, { recursive: true });
   await page.screenshot({
     fullPage: true,

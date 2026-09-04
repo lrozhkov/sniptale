@@ -14,6 +14,7 @@ function ShortcutHarness(props: {
   seekTo: (time: number) => void;
   stepByFrames: (frameDelta: number) => void;
   togglePlayback: () => void;
+  shortcutsEnabled?: boolean;
 }) {
   const latestStateRef = { current: props.latestState };
   const handlersRef = { current: props.handlers };
@@ -22,7 +23,8 @@ function ShortcutHarness(props: {
     handlersRef,
     props.seekTo,
     props.stepByFrames,
-    props.togglePlayback
+    props.togglePlayback,
+    props.shortcutsEnabled ?? true
   );
   return null;
 }
@@ -50,6 +52,7 @@ function createHandlers(): PlaybackHandlers {
     deleteCursorSample: vi.fn(),
     deleteMotionRegion: vi.fn(),
     deleteObjectTrack: vi.fn(),
+    duplicateClip: vi.fn(),
     setCurrentTime: vi.fn(),
     setPlaying: vi.fn(),
     splitClipAt: vi.fn(),
@@ -57,6 +60,21 @@ function createHandlers(): PlaybackHandlers {
     updateClipTransform: vi.fn(),
     updateMotionRegion: vi.fn(),
   };
+}
+
+function dispatchDuplicateKeyDown(
+  target: EventTarget,
+  modifier: 'control' | 'meta'
+): KeyboardEvent {
+  const event = new KeyboardEvent('keydown', {
+    bubbles: true,
+    cancelable: true,
+    code: 'KeyD',
+    ctrlKey: modifier === 'control',
+    metaKey: modifier === 'meta',
+  });
+  target.dispatchEvent(event);
+  return event;
 }
 
 function dispatchSpaceKeyDown(target: EventTarget): KeyboardEvent {
@@ -275,6 +293,31 @@ it('owns Space on focused non-text controls before target handlers run', async (
   selectTrigger.remove();
 });
 
+it('leaves modified K shortcuts available to application commands', async () => {
+  const togglePlayback = vi.fn();
+  renderShortcutHarness(root!, togglePlayback);
+  await act(async () => undefined);
+
+  const controlEvent = new KeyboardEvent('keydown', {
+    bubbles: true,
+    cancelable: true,
+    code: 'KeyK',
+    ctrlKey: true,
+  });
+  const metaEvent = new KeyboardEvent('keydown', {
+    bubbles: true,
+    cancelable: true,
+    code: 'KeyK',
+    metaKey: true,
+  });
+  document.body.dispatchEvent(controlEvent);
+  document.body.dispatchEvent(metaEvent);
+
+  expect(controlEvent.defaultPrevented).toBe(false);
+  expect(metaEvent.defaultPrevented).toBe(false);
+  expect(togglePlayback).not.toHaveBeenCalled();
+});
+
 it('deletes selected object tracks through playback shortcuts', async () => {
   const handlers = createHandlers();
   act(() => {
@@ -301,6 +344,107 @@ it('deletes selected object tracks through playback shortcuts', async () => {
   });
 
   expect(handlers.deleteObjectTrack).toHaveBeenCalledWith('visual-cursor');
+});
+
+it('duplicates the selected clip through Control or Command D', async () => {
+  const handlers = createHandlers();
+  const latestState = {
+    ...createLatestState(),
+    selectedClipId: 'clip-1',
+    selection: { kind: VideoEditorSelectionKind.CLIP, clipId: 'clip-1' } as const,
+  };
+  act(() => {
+    root?.render(
+      <ShortcutHarness
+        handlers={handlers}
+        latestState={latestState}
+        seekTo={vi.fn()}
+        stepByFrames={vi.fn()}
+        togglePlayback={vi.fn()}
+      />
+    );
+  });
+  await act(async () => undefined);
+
+  const controlEvent = dispatchDuplicateKeyDown(document.body, 'control');
+  const metaEvent = dispatchDuplicateKeyDown(document.body, 'meta');
+
+  expect(controlEvent.defaultPrevented).toBe(true);
+  expect(metaEvent.defaultPrevented).toBe(true);
+  expect(handlers.duplicateClip).toHaveBeenCalledTimes(2);
+  expect(handlers.duplicateClip).toHaveBeenNthCalledWith(1, 'clip-1');
+});
+
+it('leaves duplicate shortcuts native without a clip, during transactions, and in text fields', async () => {
+  const handlers = createHandlers();
+  const latestState = createLatestState();
+  act(() => {
+    root?.render(
+      <ShortcutHarness
+        handlers={handlers}
+        latestState={latestState}
+        seekTo={vi.fn()}
+        stepByFrames={vi.fn()}
+        togglePlayback={vi.fn()}
+      />
+    );
+  });
+  await act(async () => undefined);
+  const noSelectionEvent = dispatchDuplicateKeyDown(document.body, 'control');
+
+  latestState.selectedClipId = 'clip-1';
+  latestState.selection = { kind: VideoEditorSelectionKind.CLIP, clipId: 'clip-1' };
+  latestState.projectHistoryTransactionActive = true;
+  const transactionEvent = dispatchDuplicateKeyDown(document.body, 'control');
+
+  latestState.projectHistoryTransactionActive = false;
+  const input = document.createElement('input');
+  document.body.append(input);
+  const inputEvent = dispatchDuplicateKeyDown(input, 'control');
+  const modifiedSplitEvent = new KeyboardEvent('keydown', {
+    bubbles: true,
+    cancelable: true,
+    code: 'KeyS',
+    ctrlKey: true,
+  });
+  document.body.dispatchEvent(modifiedSplitEvent);
+
+  expect(noSelectionEvent.defaultPrevented).toBe(false);
+  expect(transactionEvent.defaultPrevented).toBe(false);
+  expect(inputEvent.defaultPrevented).toBe(false);
+  expect(modifiedSplitEvent.defaultPrevented).toBe(false);
+  expect(handlers.duplicateClip).not.toHaveBeenCalled();
+  expect(handlers.splitClipAt).not.toHaveBeenCalled();
+  input.remove();
+});
+
+it('leaves duplicate shortcuts native behind a blocking overlay', async () => {
+  const handlers = createHandlers();
+  const overlayButton = document.createElement('button');
+  document.body.append(overlayButton);
+  act(() => {
+    root?.render(
+      <ShortcutHarness
+        handlers={handlers}
+        latestState={{
+          ...createLatestState(),
+          selectedClipId: 'clip-1',
+          selection: { kind: VideoEditorSelectionKind.CLIP, clipId: 'clip-1' },
+        }}
+        seekTo={vi.fn()}
+        shortcutsEnabled={false}
+        stepByFrames={vi.fn()}
+        togglePlayback={vi.fn()}
+      />
+    );
+  });
+  await act(async () => undefined);
+
+  const event = dispatchDuplicateKeyDown(overlayButton, 'control');
+
+  expect(event.defaultPrevented).toBe(false);
+  expect(handlers.duplicateClip).not.toHaveBeenCalled();
+  overlayButton.remove();
 });
 
 it('leaves mutation shortcuts inert during a project-history transaction', async () => {

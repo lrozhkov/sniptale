@@ -23,6 +23,10 @@ export function getClipActionTitle(
     return translate('videoEditor.timeline.clipLockedTitle');
   }
 
+  if (!disabled) {
+    return getEnabledClipActionTitle(kind);
+  }
+
   return getTimelineActionTitle({
     disabled,
     label: getClipActionLabel(kind),
@@ -38,6 +42,10 @@ export function getSplitActionTitle(
   }
 
   return canSplitSelectedClip
-    ? getClipActionLabel('split')
+    ? getEnabledClipActionTitle('split')
     : translate('videoEditor.timeline.splitUnavailableTitle');
+}
+
+function getEnabledClipActionTitle(kind: ClipActionKind): string {
+  return `${getClipActionLabel(kind)} (${translate(`videoEditor.timeline.${kind}Shortcut`)})`;
 }

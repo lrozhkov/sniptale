@@ -20,7 +20,15 @@ describe('clip actions labels', () => {
     expect(getSplitActionTitle(false)).toBe(
       'translated:videoEditor.timeline.splitUnavailableTitle'
     );
-    expect(getSplitActionTitle(true)).toBe('translated:videoEditor.timeline.split');
+    expect(getSplitActionTitle(true)).toBe(
+      'translated:videoEditor.timeline.split (translated:videoEditor.timeline.splitShortcut)'
+    );
+    expect(getClipActionTitle('duplicate', false)).toBe(
+      'translated:videoEditor.timeline.duplicate (translated:videoEditor.timeline.duplicateShortcut)'
+    );
+    expect(getClipActionTitle('delete', false)).toBe(
+      'translated:videoEditor.timeline.delete (translated:videoEditor.timeline.deleteShortcut)'
+    );
     expect(getClipActionTitle('duplicate', true, false)).toBe(
       'translated:videoEditor.timeline.clipLockedTitle'
     );
