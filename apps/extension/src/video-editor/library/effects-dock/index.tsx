@@ -4,11 +4,12 @@ import { translate } from '../../../platform/i18n';
 import { getUserFacingErrorDetail } from '../../../platform/i18n/user-facing-error';
 import { VIDEO_EDITOR_PANEL_STYLE } from '../../chrome/styles';
 import { CatalogSection } from './catalog-section';
+import { EffectImportControl, EffectsLibraryHeader } from './header';
 import type { EffectLibraryOperationError } from './operations';
 import type { VideoEditorEffectsLibraryDockProps } from './types';
 
 const EFFECT_LIBRARY_DOCK_CLASS_NAME = [
-  'relative z-20 flex h-full w-[34rem] shrink-0',
+  'relative z-20 flex h-full w-[28rem] max-w-[calc(100vw-1.5rem)] shrink-0',
   'max-[980px]:absolute max-[980px]:bottom-3 max-[980px]:left-3 max-[980px]:top-[4.75rem]',
 ].join(' ');
 
@@ -51,45 +52,6 @@ export function VideoEditorEffectsLibraryDock(
         </div>
       </InspectorShellPanel>
     </aside>
-  );
-}
-
-function EffectsLibraryHeader(props: { onClose(): void }): React.JSX.Element {
-  return (
-    <header className="flex items-start justify-between gap-3">
-      <div>
-        <h2 className="text-base font-semibold">{translate('videoEditor.effectsLibrary.title')}</h2>
-        <p className="text-xs text-[var(--sniptale-color-text-muted)]">
-          {translate('videoEditor.effectsLibrary.description')}
-        </p>
-      </div>
-      <button type="button" onClick={props.onClose} aria-label={translate('common.actions.close')}>
-        ×
-      </button>
-    </header>
-  );
-}
-
-function EffectImportControl(props: {
-  disabled: boolean;
-  onImport(file: File): Promise<void>;
-  run(kind: 'import', action: () => Promise<unknown>): Promise<void>;
-}): React.JSX.Element {
-  return (
-    <label className="inline-flex cursor-pointer items-center justify-center rounded-lg border px-3 py-2 text-sm">
-      {translate('videoEditor.effectsLibrary.importPack')}
-      <input
-        className="sr-only"
-        type="file"
-        accept=".sniptale-bundle.zip,.sniptale-effect.json,application/zip,application/json"
-        disabled={props.disabled}
-        onChange={(event) => {
-          const file = event.currentTarget.files?.[0];
-          event.currentTarget.value = '';
-          if (file) void props.run('import', () => props.onImport(file));
-        }}
-      />
-    </label>
   );
 }
 

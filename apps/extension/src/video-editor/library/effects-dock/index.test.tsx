@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import type { EffectBundleCatalogEntry } from '../../../features/video/project/effect-bundle/catalog';
+import { translate } from '../../../platform/i18n';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import { createTextClip } from '../../../features/video/project/factories/overlay-clip';
 import {
@@ -40,6 +41,30 @@ it('renders nothing while the EffectV1 dock is closed', () => {
   expect(container?.querySelector('[data-ui="video-editor.effects-library.dock"]')).toBeNull();
 });
 
+it('uses the compact tokenized dock and user-facing EffectV1 target labels', () => {
+  renderDock();
+
+  const dock = container?.querySelector<HTMLElement>(
+    '[data-ui="video-editor.effects-library.dock"]'
+  );
+  const documentRows = container?.querySelectorAll<HTMLElement>('[draggable="true"]');
+
+  expect(dock?.className).toContain('w-[28rem]');
+  expect(dock?.className).toContain('max-w-[calc(100vw-1.5rem)]');
+  expect(documentRows).toHaveLength(3);
+  expect(documentRows?.[0]?.className).toContain('var(--sniptale-color-surface-overlay)');
+  expect(container?.textContent).toContain(
+    translate('videoEditor.effectsLibrary.documentKindScene')
+  );
+  expect(container?.textContent).toContain(
+    translate('videoEditor.effectsLibrary.documentKindClip')
+  );
+  expect(container?.textContent).toContain(
+    translate('videoEditor.effectsLibrary.selectClipTarget')
+  );
+  expect(container?.textContent).not.toContain('targetEffect');
+});
+
 it('exposes only targets that are available for each EffectV1 kind', async () => {
   const onApplyEffect = vi.fn(async () => 'instance-1');
   renderDock({ onApplyEffect, selectedClipId: null, selectedTransitionId: null });
@@ -50,6 +75,8 @@ it('exposes only targets that are available for each EffectV1 kind', async () =>
   expect(standalone.disabled).toBe(false);
   expect(target.disabled).toBe(true);
   expect(transition.disabled).toBe(true);
+  expect(standalone.textContent).toBe(translate('videoEditor.effectsLibrary.applyToScene'));
+  expect(target.textContent).toBe(translate('videoEditor.effectsLibrary.selectClipTarget'));
 
   await click(standalone);
   expect(onApplyEffect).toHaveBeenCalledWith(

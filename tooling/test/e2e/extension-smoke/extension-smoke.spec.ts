@@ -83,7 +83,8 @@ async function expectBuiltSurfaceLayout(
 }
 
 async function expectBuiltVideoEditorGeometry(
-  page: import('@playwright/test').Page
+  page: import('@playwright/test').Page,
+  effectsDockScreenshotPath: string
 ): Promise<void> {
   const canvasShell = page.locator('[data-ui="video-editor.workspace.canvas-shell"]');
   const documentBar = page.locator('[data-ui="video-editor.floating.document-bar"]');
@@ -145,9 +146,15 @@ async function expectBuiltVideoEditorGeometry(
   });
 
   expect(geometry.effectsDock.top).toBeGreaterThanOrEqual(geometry.documentBar.bottom);
+  expect(geometry.effectsDock.right - geometry.effectsDock.left).toBeLessThanOrEqual(448);
   expect(geometry.preview.right).toBeLessThanOrEqual(geometry.inspector.left);
   expect(geometry.timeline.right).toBeLessThanOrEqual(geometry.inspector.left);
   expect(geometry.preview.right - geometry.preview.left).toBeLessThan(defaultPreviewWidth);
+
+  await page.screenshot({
+    fullPage: true,
+    path: effectsDockScreenshotPath,
+  });
 
   await effectsToggle.click();
   await expect(effectsDock).toHaveCount(0);
@@ -338,7 +345,10 @@ for (const extensionPage of builtExtensionPages) {
     );
     await expectBuiltSurfaceLayout(page, extensionPage.selector, extensionPage.viewport);
     if (extensionPage.name === 'video-editor') {
-      await expectBuiltVideoEditorGeometry(page);
+      await expectBuiltVideoEditorGeometry(
+        page,
+        testInfo.outputPath('built-video-editor-effects-dock.png')
+      );
     }
     if (extensionPage.name === 'settings') {
       const layout = page.locator('[data-ui="settings.page.layout"]');

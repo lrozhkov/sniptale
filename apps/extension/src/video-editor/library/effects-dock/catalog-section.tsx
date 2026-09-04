@@ -1,9 +1,22 @@
 import type { EffectBundleCatalogEntry } from '../../../features/video/project/effect-bundle/catalog';
 import type { VideoProjectEffectTarget } from '../../../features/video/project/effect-instance/types';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { writeVideoEditorEffectDocumentDragPayload } from '../../contracts/effect-document-drag';
 import { getCurrentLocale, translate } from '../../../platform/i18n';
 import type { EffectLibraryOperations } from './operations';
 import type { VideoEditorEffectsLibraryDockProps } from './types';
+
+const CATALOG_CARD_CLASS_NAME = [
+  'space-y-3 rounded-[12px] border p-3',
+  'border-[var(--sniptale-color-border-soft)]',
+  'bg-[var(--sniptale-color-surface-panel)]',
+].join(' ');
+
+const DOCUMENT_CARD_CLASS_NAME = [
+  'flex items-center justify-between gap-3 rounded-[10px] border p-3',
+  'border-[var(--sniptale-color-border-subtle)]',
+  'bg-[var(--sniptale-color-surface-overlay)]',
+].join(' ');
 
 export function CatalogSection(
   props: VideoEditorEffectsLibraryDockProps & {
@@ -38,19 +51,20 @@ function InvalidCatalogEntry(
   } & Pick<EffectLibraryOperations, 'run'>
 ): React.JSX.Element {
   return (
-    <article className="space-y-2 rounded-xl border p-3" data-state="invalid">
+    <article className={CATALOG_CARD_CLASS_NAME} data-state="invalid">
       <h4 className="text-sm font-medium">{translate('videoEditor.effectsLibrary.invalidPack')}</h4>
       <p className="break-all text-xs text-[var(--sniptale-color-text-muted)]">{props.packId}</p>
       <p className="text-xs text-[var(--sniptale-color-danger)]">
         {translate('videoEditor.effectsLibrary.invalidPackDescription')}
       </p>
-      <button
-        type="button"
+      <ProductActionButton
+        compact
+        tone="danger"
         disabled={props.disabled}
         onClick={() => void props.run('delete', () => props.onDeleteEffectBundle(props.packId))}
       >
         {translate('videoEditor.effectsLibrary.deletePack')}
-      </button>
+      </ProductActionButton>
     </article>
   );
 }
@@ -63,7 +77,7 @@ function CatalogEntry(
 ): React.JSX.Element {
   const { catalog } = props;
   return (
-    <article className="space-y-2 rounded-xl border p-3">
+    <article className={CATALOG_CARD_CLASS_NAME}>
       <div className="flex items-center justify-between gap-2">
         <div>
           <h4 className="text-sm font-medium">{readLocalized(catalog.label)}</h4>
@@ -84,8 +98,9 @@ function CatalogEntry(
 function CatalogActions(props: Parameters<typeof CatalogEntry>[0]): React.JSX.Element {
   return (
     <div className="flex gap-1">
-      <button
-        type="button"
+      <ProductActionButton
+        compact
+        tone="secondary"
         disabled={props.disabled}
         onClick={() =>
           void props.run('update', () =>
@@ -96,16 +111,17 @@ function CatalogActions(props: Parameters<typeof CatalogEntry>[0]): React.JSX.El
         {props.catalog.enabled
           ? translate('videoEditor.effectsLibrary.disablePack')
           : translate('videoEditor.effectsLibrary.enablePack')}
-      </button>
-      <button
-        type="button"
+      </ProductActionButton>
+      <ProductActionButton
+        compact
+        tone="danger"
         disabled={props.disabled}
         onClick={() =>
           void props.run('delete', () => props.onDeleteEffectBundle(props.catalog.packId))
         }
       >
         {translate('videoEditor.effectsLibrary.deletePack')}
-      </button>
+      </ProductActionButton>
     </div>
   );
 }
@@ -118,7 +134,7 @@ function CatalogDocument(
   const target = resolveDocumentTarget(props.document.kind, props);
   return (
     <div
-      className="flex items-center justify-between gap-2 rounded-lg bg-black/10 p-2"
+      className={DOCUMENT_CARD_CLASS_NAME}
       draggable={!props.disabled}
       onDragStart={(event) =>
         writeVideoEditorEffectDocumentDragPayload(event.dataTransfer, {
@@ -129,11 +145,16 @@ function CatalogDocument(
       }
     >
       <div>
-        <p className="text-sm">{props.document.id}</p>
-        <p className="text-xs text-[var(--sniptale-color-text-muted)]">{props.document.kind}</p>
+        <p className="text-sm font-medium text-[var(--sniptale-color-text-primary)]">
+          {props.document.id}
+        </p>
+        <p className="text-xs text-[var(--sniptale-color-text-muted)]">
+          {getDocumentKindLabel(props.document.kind)}
+        </p>
       </div>
-      <button
-        type="button"
+      <ProductActionButton
+        compact
+        tone={target ? 'primary' : 'secondary'}
         disabled={props.disabled || !target}
         onClick={() =>
           target &&
@@ -147,12 +168,30 @@ function CatalogDocument(
           )
         }
       >
-        {target
-          ? translate('videoEditor.effectsLibrary.applyButton')
-          : translate('videoEditor.effectsLibrary.incompatibleButton')}
-      </button>
+        {getDocumentActionLabel(props.document.kind, target)}
+      </ProductActionButton>
     </div>
   );
+}
+
+function getDocumentKindLabel(kind: EffectBundleCatalogEntry['documents'][number]['kind']): string {
+  if (kind === 'standalone') return translate('videoEditor.effectsLibrary.documentKindScene');
+  if (kind === 'targetEffect') return translate('videoEditor.effectsLibrary.documentKindClip');
+  return translate('videoEditor.effectsLibrary.documentKindTransition');
+}
+
+function getDocumentActionLabel(
+  kind: EffectBundleCatalogEntry['documents'][number]['kind'],
+  target: VideoProjectEffectTarget | null
+): string {
+  if (!target) {
+    return kind === 'targetEffect'
+      ? translate('videoEditor.effectsLibrary.selectClipTarget')
+      : translate('videoEditor.effectsLibrary.selectTransitionTarget');
+  }
+  if (kind === 'standalone') return translate('videoEditor.effectsLibrary.applyToScene');
+  if (kind === 'targetEffect') return translate('videoEditor.effectsLibrary.applyToClip');
+  return translate('videoEditor.effectsLibrary.applyToTransition');
 }
 
 function resolveDocumentTarget(
