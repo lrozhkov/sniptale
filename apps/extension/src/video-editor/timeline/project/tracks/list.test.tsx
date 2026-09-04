@@ -46,8 +46,8 @@ it('renders a compact track header together with track rows and effect lanes', (
   expect(header?.className).not.toContain('uppercase');
   expect(container?.textContent).toContain('videoEditor.timeline.telemetryLane');
   expect(container?.textContent).toContain('videoEditor.timeline.motionLane');
-  expect(container?.textContent).toContain('videoEditor.timeline.trackKindPrimary');
-  expect(container?.textContent).not.toContain('User custom video title');
+  expect(container?.textContent).toContain('User custom video title');
+  expect(container?.textContent).toContain('O1');
 });
 
 it('omits the telemetry label row when the read-only telemetry lane is hidden', () => {
@@ -129,7 +129,7 @@ it('never creates a version-specific rail for effect instances', () => {
   renderTrackList(project, { showTelemetryLane: false });
 
   expect(container?.textContent).not.toContain('EffectV1');
-  expect(container?.textContent).toContain('videoEditor.timeline.trackKindPrimary');
+  expect(container?.textContent).toContain(project.tracks[0]!.name);
 });
 
 it('hides row text in compact track panel mode', () => {
@@ -140,7 +140,7 @@ it('hides row text in compact track panel mode', () => {
   const scrollArea = container?.querySelector<HTMLElement>('[data-project-timeline-track-list]');
 
   expect(scrollArea?.style.gridTemplateColumns).toBe('minmax(0, 1fr)');
-  expect(container?.textContent).not.toContain('videoEditor.timeline.trackKindPrimary');
+  expect(container?.textContent).not.toContain(project.tracks[0]!.name);
   expect(container?.textContent).not.toContain('videoEditor.timeline.telemetryLane');
   expect(container?.querySelectorAll('[data-ui="timeline.utility-lane-state"]')).toHaveLength(0);
   expect(

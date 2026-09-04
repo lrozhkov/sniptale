@@ -1,6 +1,8 @@
 import { mkdir } from 'node:fs/promises';
 import { CONTENT_APP_CONTAINER_ID, CONTENT_ROOT_ID } from '@sniptale/ui/branding';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
+import { createEmptyVideoProject } from '../../../../apps/extension/src/features/video/project/factories/creation';
+import { createTextClip } from '../../../../apps/extension/src/features/video/project/factories/overlay-clip';
 import { test, expect, resolveExtensionServiceWorkerUrl } from '../support/extension-fixture';
 import {
   captureDesignSystemScreenshot,
@@ -18,6 +20,7 @@ const POPUP_HARNESS_PATH = '/tooling/test/harness/popup.html';
 const POPUP_HOME_TAB_LABEL = translate('popup.tabs.home', 'ru');
 const POPUP_VIDEO_TAB_LABEL = translate('popup.tabs.video', 'ru');
 const POPUP_EXPORT_TAB_LABEL = translate('popup.tabs.export', 'ru');
+const VIDEO_EDITOR_HARNESS_PATH = '/tooling/test/harness/video-editor.html';
 
 const builtExtensionPages = [
   {
@@ -80,13 +83,15 @@ async function expectBuiltVideoEditorGeometry(
   const canvasShell = page.locator('[data-ui="video-editor.workspace.canvas-shell"]');
   const documentBar = page.locator('[data-ui="video-editor.floating.document-bar"]');
   const effectsDock = page.locator('[data-ui="video-editor.effects-library.dock"]');
+  const effectsToggle = page.locator('[data-ui="video-editor.floating.insert-panel.templates"]');
   const inspector = page.locator('[data-ui="video-editor.floating.context-inspector"]');
   const preview = page.locator('[data-ui="video.preview.viewport"]');
   const timeline = page.locator('[data-ui="video-editor.timeline.surface"]');
 
   await expect(canvasShell).toBeVisible();
   await expect(documentBar).toBeVisible();
-  await expect(effectsDock).toBeVisible();
+  await expect(effectsDock).toHaveCount(0);
+  await expect(effectsToggle).toBeVisible();
   await expect(inspector).toBeVisible();
   await expect(preview).toBeVisible();
   await expect(timeline).toBeVisible();
@@ -105,6 +110,13 @@ async function expectBuiltVideoEditorGeometry(
       paddingRight: '348px',
       paddingTop: '76px',
     });
+
+  const defaultPreviewWidth = await preview.evaluate(
+    (element) => element.getBoundingClientRect().width
+  );
+
+  await effectsToggle.click();
+  await expect(effectsDock).toBeVisible();
 
   const geometry = await page.evaluate(() => {
     const getBounds = (selector: string) => {
@@ -130,6 +142,13 @@ async function expectBuiltVideoEditorGeometry(
   expect(geometry.effectsDock.top).toBeGreaterThanOrEqual(geometry.documentBar.bottom);
   expect(geometry.preview.right).toBeLessThanOrEqual(geometry.inspector.left);
   expect(geometry.timeline.right).toBeLessThanOrEqual(geometry.inspector.left);
+  expect(geometry.preview.right - geometry.preview.left).toBeLessThan(defaultPreviewWidth);
+
+  await effectsToggle.click();
+  await expect(effectsDock).toHaveCount(0);
+  await expect
+    .poll(() => preview.evaluate((element) => element.getBoundingClientRect().width))
+    .toBe(defaultPreviewWidth);
 }
 
 test('background service worker boots', async ({ context, extensionId }) => {
@@ -140,6 +159,51 @@ test('background service worker boots', async ({ context, extensionId }) => {
   const serviceWorkerUrl = await resolveExtensionServiceWorkerUrl(context);
   await expect(serviceWorkerUrl).toContain(extensionId);
   await page.close();
+});
+
+test('video editor focused timeline reveals contextual clip actions', async ({
+  page,
+  hostOrigin,
+}, testInfo) => {
+  const project = createEmptyVideoProject('Focused timeline proof');
+  const overlayTrack = project.tracks.find((track) => track.kind === 'OVERLAY');
+  if (!overlayTrack) throw new Error('Missing overlay track in video editor fixture');
+  overlayTrack.name = 'Titles';
+  const clip = createTextClip(overlayTrack.id, project.width, project.height, 0.5);
+  clip.name = 'Intro title';
+  project.clips = [clip];
+  project.duration = 6;
+
+  await page.addInitScript((videoProject) => {
+    window.__sniptaleHarnessBootstrap = {
+      apiBehavior: { runtimeFallback: 'typed-success' },
+      videoProjects: [videoProject],
+    };
+  }, project);
+  await page.setViewportSize({ width: 1600, height: 1100 });
+  await page.goto(`${hostOrigin}${VIDEO_EDITOR_HARNESS_PATH}?project=${project.id}`, {
+    waitUntil: 'domcontentloaded',
+  });
+
+  const timeline = page.locator('[data-ui="video-editor.timeline.surface"]');
+  const timelineClip = page.locator(`[data-project-timeline-clip="${clip.id}"]`);
+  const sceneButton = page.locator('[data-ui="video-editor.floating.workspace-panel.scene"]');
+  await expect(timeline).toBeVisible();
+  await expect(page.getByText('Titles', { exact: true })).toBeVisible();
+  await expect(timelineClip).toBeVisible();
+  await sceneButton.click();
+  await expect(timeline.getByText(translate('videoEditor.timeline.split', 'ru'))).toHaveCount(0);
+
+  await timelineClip.click();
+
+  await expect(timeline.getByText(translate('videoEditor.timeline.split', 'ru'))).toBeVisible();
+  await expect(timeline.getByText(translate('videoEditor.timeline.duplicate', 'ru'))).toBeVisible();
+  await expect(timeline.getByText(translate('videoEditor.timeline.delete', 'ru'))).toBeVisible();
+  await mkdir(testInfo.outputDir, { recursive: true });
+  await page.screenshot({
+    fullPage: true,
+    path: testInfo.outputPath('video-editor-focused-timeline.png'),
+  });
 });
 
 for (const extensionPage of builtExtensionPages) {

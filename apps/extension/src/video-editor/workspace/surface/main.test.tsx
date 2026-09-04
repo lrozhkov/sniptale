@@ -272,6 +272,7 @@ function verifyWorkspaceMainRouting() {
 
   expect(floatingWorkspaceSpy.mock.calls[0]?.[0]).toMatchObject({
     diagnosticsContent: 'diagnostics',
+    effectsLibraryDock: { isOpen: false },
   });
   expect(previewSpy.mock.calls[0]?.[0]).toMatchObject({
     currentTime: 8,

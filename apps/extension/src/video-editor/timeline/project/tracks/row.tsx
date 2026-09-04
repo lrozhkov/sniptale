@@ -6,10 +6,16 @@ import { TimelineIconButton } from '../controls/icon-button';
 import { getTrackKindIcon, TimelineLaneIconFrame } from './lane-icons';
 import type { TimelineTrackLayout } from './layout';
 
+const TRACK_SELECT_FOCUS_CLASS_NAME = [
+  'rounded-[9px] focus-visible:outline-none focus-visible:ring-2',
+  'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
+].join(' ');
+
 interface ProjectTimelineTrackRowProps {
   compactRows: boolean;
   isSelected: boolean;
   track: VideoProject['tracks'][number];
+  trackLabel: string;
   trackLayout: TimelineTrackLayout | undefined;
   onSelectTrack: (trackId: string) => void;
   onToggleTrackLock: (trackId: string) => void;
@@ -20,6 +26,7 @@ export function ProjectTimelineTrackRow({
   compactRows,
   isSelected,
   track,
+  trackLabel,
   trackLayout,
   onSelectTrack,
   onToggleTrackLock,
@@ -35,9 +42,14 @@ export function ProjectTimelineTrackRow({
           : 'hover:bg-[color:var(--sniptale-color-surface-panel)]',
       ].join(' ')}
       style={{ height: trackLayout?.rowHeight }}
-      onClick={() => onSelectTrack(track.id)}
     >
-      <ProjectTimelineTrackMeta compactRows={compactRows} track={track} />
+      <ProjectTimelineTrackMeta
+        compactRows={compactRows}
+        isSelected={isSelected}
+        track={track}
+        trackLabel={trackLabel}
+        onSelectTrack={onSelectTrack}
+      />
       {compactRows ? null : (
         <ProjectTimelineTrackStateControls
           track={track}
@@ -51,21 +63,38 @@ export function ProjectTimelineTrackRow({
 
 function ProjectTimelineTrackMeta({
   compactRows,
+  isSelected,
   track,
-}: Pick<ProjectTimelineTrackRowProps, 'compactRows' | 'track'>) {
+  trackLabel,
+  onSelectTrack,
+}: Pick<
+  ProjectTimelineTrackRowProps,
+  'compactRows' | 'isSelected' | 'onSelectTrack' | 'track' | 'trackLabel'
+>) {
   return (
-    <div
-      className={
-        compactRows ? 'flex min-w-0 items-center' : 'flex min-w-0 flex-1 items-center gap-2.5'
-      }
+    <button
+      type="button"
+      aria-pressed={isSelected}
+      data-ui="video-editor.timeline.track-select"
+      className={[
+        'flex min-w-0 items-center',
+        compactRows ? '' : 'flex-1 gap-2 text-left',
+        TRACK_SELECT_FOCUS_CLASS_NAME,
+      ].join(' ')}
+      onClick={() => onSelectTrack(track.id)}
     >
       <TimelineLaneIconFrame>{getTrackKindIcon(track.kind)}</TimelineLaneIconFrame>
       {compactRows ? null : (
-        <p className="truncate text-xs font-semibold text-[var(--sniptale-color-text-primary)]">
-          {getTrackKindLabel(track.kind)}
-        </p>
+        <>
+          <span className="shrink-0 text-[10px] font-semibold tabular-nums text-[var(--sniptale-color-text-dim)]">
+            {trackLabel}
+          </span>
+          <span className="truncate text-xs font-semibold text-[var(--sniptale-color-text-primary)]">
+            {track.name || getTrackKindLabel(track.kind)}
+          </span>
+        </>
       )}
-    </div>
+    </button>
   );
 }
 

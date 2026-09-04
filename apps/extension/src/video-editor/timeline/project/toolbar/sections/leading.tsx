@@ -69,12 +69,14 @@ export function ProjectTimelineToolbarLeadingControls({
       {canAutoTransformRecording && onAutoTransformRecording ? (
         <ProjectTimelineAutoTransformButton onAutoTransformRecording={onAutoTransformRecording} />
       ) : null}
-      <ProjectTimelineClipActions
-        selectedClip={selectedClip}
-        onDeleteSelectedClip={onDeleteSelectedClip}
-        onDuplicateSelectedClip={onDuplicateSelectedClip}
-        onSplitSelectedClip={onSplitSelectedClip}
-      />
+      {selectedClip ? (
+        <ProjectTimelineClipActions
+          selectedClip
+          onDeleteSelectedClip={onDeleteSelectedClip}
+          onDuplicateSelectedClip={onDuplicateSelectedClip}
+          onSplitSelectedClip={onSplitSelectedClip}
+        />
+      ) : null}
     </div>
   );
 }

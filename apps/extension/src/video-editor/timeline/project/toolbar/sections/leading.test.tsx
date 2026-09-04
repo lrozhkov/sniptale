@@ -95,7 +95,17 @@ it('renders timeline-specific actions on the leading side without the shared ins
   expect(container?.textContent).not.toContain('videoEditor.timeline.addButton');
   expect(container?.textContent).toContain('videoEditor.timeline.addTrack');
   expect(container?.textContent).toContain('videoEditor.timeline.autoTransform');
+  expect(container?.textContent).not.toContain('videoEditor.timeline.split');
+});
+
+it('reveals clip actions only for an active clip selection', () => {
+  renderLeadingControls({ selectedClip: false });
+  expect(container?.textContent).not.toContain('videoEditor.timeline.split');
+
+  renderLeadingControls({ selectedClip: true });
   expect(container?.textContent).toContain('videoEditor.timeline.split');
+  expect(container?.textContent).toContain('videoEditor.timeline.duplicate');
+  expect(container?.textContent).toContain('videoEditor.timeline.delete');
 });
 
 it('opens the auto-transform wizard before applying transform settings', () => {

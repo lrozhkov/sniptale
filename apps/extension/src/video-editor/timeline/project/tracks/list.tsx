@@ -1,7 +1,7 @@
 import type { MutableRefObject } from 'react';
 import { translate } from '../../../../platform/i18n';
 import type { VideoProjectUtilityLaneKind } from '../../../../features/video/project/utility-lanes';
-import type { VideoProject } from '../../../../features/video/project/types';
+import { VideoTrackKind, type VideoProject } from '../../../../features/video/project/types';
 import { ProjectTimelineEffectLaneLabelRows } from '../effect-lanes/labels';
 import type { TimelineTrackLayoutModel } from './layout';
 import { ProjectTimelineExpandedRows } from '../panel';
@@ -107,11 +107,12 @@ function ProjectTimelineRailRows(props: {
           compactRows={props.trackPanelPrefs.prefs.compactRows}
         />
       ) : null}
-      {props.tracks.map((track) => (
+      {props.tracks.map((track, index) => (
         <ProjectTimelineTrackRow
           key={track.id}
           compactRows={props.trackPanelPrefs.prefs.compactRows}
           isSelected={props.selectedTrackId === track.id}
+          trackLabel={getTrackPositionLabel(props.tracks, index)}
           trackLayout={props.trackLayoutModel.layoutByTrackId.get(track.id)}
           track={track}
           onSelectTrack={props.onSelectTrack}
@@ -128,4 +129,19 @@ function ProjectTimelineRailRows(props: {
       />
     </div>
   );
+}
+
+function getTrackPositionLabel(tracks: VideoProject['tracks'], trackIndex: number): string {
+  const track = tracks[trackIndex];
+  if (!track) return '';
+  const position = tracks
+    .slice(0, trackIndex + 1)
+    .filter((item) => item.kind === track.kind).length;
+  const prefix = {
+    [VideoTrackKind.PRIMARY]: 'V',
+    [VideoTrackKind.AUDIO]: 'A',
+    [VideoTrackKind.OVERLAY]: 'O',
+    [VideoTrackKind.SUBTITLE]: 'S',
+  }[track.kind];
+  return `${prefix}${position}`;
 }

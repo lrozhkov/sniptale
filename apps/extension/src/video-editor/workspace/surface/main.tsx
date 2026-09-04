@@ -32,7 +32,7 @@ export function VideoEditorWorkspaceMain({
   const [activeInsertKind, setActiveInsertKind] = useState<VideoPreviewCanvasInsertKind | null>(
     null
   );
-  const [effectsLibraryDockOpen, setEffectsLibraryDockOpen] = useState(true);
+  const [effectsLibraryDockOpen, setEffectsLibraryDockOpen] = useState(false);
   const [inspectorGroupFocus] = useState<InspectorGroupFocusIntent | null>(null);
   const effectBundles = useWorkspaceEffectBundles();
   const effectOperations = useEffectLibraryOperations();
