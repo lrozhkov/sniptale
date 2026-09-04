@@ -2,7 +2,7 @@
   "schemaVersion": 2,
   "controlId": "qa.rule.policy-state-descriptor",
   "findingCount": 296,
-  "findingDigest": "sha256:ab060f7d8e0a50d6bdd02f4c4a6d6fb1277cfb723a3032c7375904879e420576",
+  "findingDigest": "sha256:28210d51d7d07d43be230f8496d3d075ed5eb8dd4515aed625eecb7eba6cc354",
   "findings": [
     {
       "file": "apps/extension/src/background/ai/llm/service-history.ts",
@@ -707,6 +707,12 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
+      "file": "apps/extension/src/content/drawing/keyboard.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
       "file": "apps/extension/src/content/overlay/ai/pick/runtime/interaction-target/shadow.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
@@ -900,7 +906,7 @@
     },
     {
       "file": "apps/extension/src/contracts/messaging/contracts/runtime/actions/export.ts",
-      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set, mutation-queue-name.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
@@ -1729,12 +1735,6 @@
     {
       "file": "packages/runtime-contracts/src/protocol/content-privileged-action.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
-      "rule": "policy-state-descriptor-required",
-      "noiseId": "noise.policy-state-descriptor.non-authority-signals"
-    },
-    {
-      "file": "packages/runtime-contracts/src/tab-capabilities/test-support.ts",
-      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: capability-path.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },

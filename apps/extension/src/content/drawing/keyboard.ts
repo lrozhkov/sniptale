@@ -8,7 +8,6 @@ import {
 import { isTrustedKeyboardEvent } from '../platform/trusted-events';
 import { isContentOwnedEvent, resolveContentShadowRoot } from '../platform/dom-host';
 
-// policyStateIds: [] - immutable keyboard routing allowlist, not mutable authority state.
 const DRAWING_OWNED_KEYS = new Set([
   'ArrowDown',
   'ArrowLeft',
