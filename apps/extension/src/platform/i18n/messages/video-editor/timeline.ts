@@ -43,6 +43,10 @@ export const videoEditorTimelineMessages = defineMessageSource({
     ru: 'Следующий кадр',
     en: 'Next frame',
   },
+  playhead: {
+    ru: 'Позиция воспроизведения',
+    en: 'Playhead position',
+  },
   title: {
     ru: 'Таймлайн',
     en: 'Timeline',

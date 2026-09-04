@@ -5,6 +5,7 @@ import type { buildProjectTimelineRulerMarkers } from './render-data';
 type ProjectTimelineRulerMarker = ReturnType<typeof buildProjectTimelineRulerMarkers>[number];
 
 export function ProjectTimelineCanvasChrome(props: {
+  playheadHandle: React.ReactNode;
   playbackRange: VideoEditorPlaybackRange | null;
   pixelsPerSecond: number;
   rulerMarkers: ProjectTimelineRulerMarker[];
@@ -17,7 +18,9 @@ export function ProjectTimelineCanvasChrome(props: {
         playbackRange={props.playbackRange}
         pixelsPerSecond={props.pixelsPerSecond}
         rulerMarkers={props.rulerMarkers}
-      />
+      >
+        {props.playheadHandle}
+      </ProjectTimelineRuler>
       <ProjectTimelinePlaybackRangeOverlay
         pixelsPerSecond={props.pixelsPerSecond}
         playbackRange={props.playbackRange}

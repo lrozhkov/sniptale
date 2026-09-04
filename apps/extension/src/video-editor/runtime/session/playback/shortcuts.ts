@@ -141,6 +141,13 @@ function handlePlaybackNudgeShortcut(
   latestState: PlaybackLatestState,
   handlersRef: MutableRefObject<PlaybackHandlers>
 ): boolean {
+  if (
+    event.target instanceof Element &&
+    event.target.closest('[role="slider"]') !== null &&
+    event.code.startsWith('Arrow')
+  ) {
+    return false;
+  }
   const nudge = resolvePlaybackSelectionNudge(event.code, event.shiftKey, {
     altKey: event.altKey,
     ctrlKey: event.ctrlKey,

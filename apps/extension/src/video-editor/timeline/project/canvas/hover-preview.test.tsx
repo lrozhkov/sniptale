@@ -72,6 +72,7 @@ function renderCanvas() {
   act(() => {
     root?.render(
       <ProjectTimelineCanvas
+        consumeCompletedScrubClick={() => false}
         currentTime={0}
         dragGhost={null}
         playbackRange={null}
@@ -101,6 +102,9 @@ function createCanvasTestActions() {
   return {
     onBeginClipInteraction: vi.fn(),
     onBeginEffectInteraction: vi.fn(),
+    onBeginPlayheadScrub: vi.fn(),
+    onStepToNextFrame: vi.fn(),
+    onStepToPreviousFrame: vi.fn(),
     onBeginEffectRangeSelection: vi.fn(),
     onBeginRangeSelection: vi.fn(),
     onBeginTrackRangeSelection: () => vi.fn(),

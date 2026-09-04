@@ -115,11 +115,13 @@ function useTimelineRangeSelectionState(
 function useProjectTimelinePlaybackState(props: TimelineRangeSelectionProps) {
   const { onSeek, pixelsPerSecond } = props;
   const { timelineRef, trackListRef, syncTracksScroll } = useProjectTimelineScrollSync();
-  const { handleTimelineSeek, seekToClientX } = useProjectTimelineSeek({
-    pixelsPerSecond,
-    timelineRef,
-    onSeek,
-  });
+  const { beginPlayheadScrub, consumeCompletedScrubClick, handleTimelineSeek, seekToClientX } =
+    useProjectTimelineSeek({
+      pixelsPerSecond,
+      projectDuration: props.project.duration,
+      timelineRef,
+      onSeek,
+    });
   const {
     beginEffectRangeSelection,
     beginRangeSelection,
@@ -129,6 +131,8 @@ function useProjectTimelinePlaybackState(props: TimelineRangeSelectionProps) {
 
   return {
     beginEffectRangeSelection,
+    beginPlayheadScrub,
+    consumeCompletedScrubClick,
     beginRangeSelection,
     beginTrackRangeSelection,
     handleTimelineSeek,

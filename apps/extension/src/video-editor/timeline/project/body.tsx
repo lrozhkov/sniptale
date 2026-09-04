@@ -10,9 +10,11 @@ type ProjectTimelineBodyProps = Pick<
   | 'beginClipInteraction'
   | 'beginEffectInteraction'
   | 'beginEffectRangeSelection'
+  | 'beginPlayheadScrub'
   | 'beginRangeSelection'
   | 'beginTrackRangeSelection'
   | 'currentTime'
+  | 'consumeCompletedScrubClick'
   | 'dragGhost'
   | 'handleTimelineSeek'
   | 'hoveredClipId'
@@ -33,6 +35,8 @@ type ProjectTimelineBodyProps = Pick<
   | 'onResizeActionEvent'
   | 'onResizeMotionRegion'
   | 'onSeek'
+  | 'onStepToNextFrame'
+  | 'onStepToPreviousFrame'
   | 'onToggleTrackLock'
   | 'onToggleTrackVisibility'
   | 'onToggleUtilityLaneLock'
@@ -121,6 +125,7 @@ function createTrackListProps(props: ProjectTimelineBodyProps): ProjectTimelineB
 function createCanvasProps(props: ProjectTimelineBodyProps): ProjectTimelineBodyCanvasProps {
   return {
     currentTime: props.currentTime,
+    consumeCompletedScrubClick: props.consumeCompletedScrubClick,
     cursorLaneVisible: props.cursorLaneVisible,
     dragGhost: props.dragGhost,
     hoveredClipId: props.hoveredClipId,
@@ -143,6 +148,7 @@ function createCanvasProps(props: ProjectTimelineBodyProps): ProjectTimelineBody
     onBeginClipInteraction: props.beginClipInteraction,
     onBeginEffectInteraction: props.beginEffectInteraction,
     onBeginEffectRangeSelection: props.beginEffectRangeSelection,
+    onBeginPlayheadScrub: props.beginPlayheadScrub,
     onBeginRangeSelection: props.beginRangeSelection,
     onBeginTrackRangeSelection: props.beginTrackRangeSelection,
     onCloseTrackGap: props.onCloseTrackGap,
@@ -153,6 +159,8 @@ function createCanvasProps(props: ProjectTimelineBodyProps): ProjectTimelineBody
     onScroll: () => props.syncTracksScroll('timeline'),
     onSeek: props.handleTimelineSeek,
     onSeekTime: props.onSeek,
+    onStepToNextFrame: props.onStepToNextFrame,
+    onStepToPreviousFrame: props.onStepToPreviousFrame,
     onSelectActionSegment: props.onSelectActionSegment,
     onSelectClip: props.onSelectClip,
     onSelectCursorSegment: props.onSelectCursorSegment,

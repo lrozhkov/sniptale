@@ -173,6 +173,54 @@ it('owns plain Comma and Period for symmetric frame stepping', () => {
   input.remove();
 });
 
+it('leaves focused playhead slider arrows with the local frame-step owner', () => {
+  const handlers = createHandlers();
+  const latestState = createLatestState();
+  latestState.project!.clips = [
+    {
+      id: 'clip-1',
+      trackId: latestState.project!.tracks[0]!.id,
+      transform: { height: 100, opacity: 1, rotation: 0, width: 100, x: 0, y: 0 },
+    },
+  ] as never;
+  latestState.selectedClipId = 'clip-1';
+  latestState.selection = { kind: VideoEditorSelectionKind.CLIP, clipId: 'clip-1' };
+  const localStep = vi.fn();
+  const slider = document.createElement('div');
+  slider.dataset['ui'] = 'video-editor.timeline.playhead-handle';
+  slider.setAttribute('role', 'slider');
+  slider.addEventListener('keydown', (event) => {
+    if (!event.defaultPrevented && event.key === 'ArrowRight') localStep();
+  });
+  document.body.append(slider);
+  act(() => {
+    root!.render(
+      <ShortcutHarness
+        handlers={handlers}
+        latestState={latestState}
+        seekTo={vi.fn()}
+        stepByFrames={vi.fn()}
+        togglePlayback={vi.fn()}
+      />
+    );
+  });
+
+  act(() => {
+    slider.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        code: 'ArrowRight',
+        key: 'ArrowRight',
+      })
+    );
+  });
+
+  expect(localStep).toHaveBeenCalledOnce();
+  expect(handlers.updateClipTransform).not.toHaveBeenCalled();
+  slider.remove();
+});
+
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 

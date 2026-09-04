@@ -79,6 +79,21 @@ it('keeps root timeline clicks scene-owned for empty-space seeking', () => {
   expect(onSeek).toHaveBeenCalledTimes(1);
 });
 
+it('consumes the synthetic canvas click that follows a completed playhead scrub', () => {
+  const onSelectScene = vi.fn();
+  const onSeek = vi.fn();
+  renderCanvas({ consumeCompletedScrubClick: () => true, onSelectScene, onSeek });
+
+  act(() => {
+    container
+      ?.querySelector('.relative.min-w-0.overflow-auto')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, clientX: 90 }));
+  });
+
+  expect(onSelectScene).not.toHaveBeenCalled();
+  expect(onSeek).not.toHaveBeenCalled();
+});
+
 it('creates a playback range when the ruler is dragged', () => {
   const onBeginRangeSelection = vi.fn();
 
@@ -89,10 +104,72 @@ it('creates a playback range when the ruler is dragged', () => {
   act(() => {
     const pointerEvent = new Event('pointerdown', { bubbles: true });
     Object.defineProperty(pointerEvent, 'clientX', { value: 120 });
-    container?.querySelector('.sticky.top-0.z-20')?.dispatchEvent(pointerEvent);
+    container
+      ?.querySelector('[data-ui="video-editor.timeline.ruler"]')
+      ?.dispatchEvent(pointerEvent);
   });
 
   expect(onBeginRangeSelection).toHaveBeenCalledTimes(1);
+});
+
+it('renders a dedicated accessible playhead scrub handle', () => {
+  renderCanvas({});
+
+  const handle = container?.querySelector('[data-ui="video-editor.timeline.playhead-handle"]');
+  expect(handle).not.toBeNull();
+  expect(handle?.getAttribute('role')).toBe('slider');
+  expect(handle?.getAttribute('aria-label')).toBe('videoEditor.timeline.playhead');
+  expect(handle?.getAttribute('aria-valuetext')).toBe('0:00.000');
+});
+
+it('keeps the playhead handle inside the sticky ruler while tracks scroll vertically', () => {
+  renderCanvas({});
+
+  const handle = container?.querySelector('[data-ui="video-editor.timeline.playhead-handle"]');
+  const stickyRuler = container?.querySelector('[data-ui="video-editor.timeline.ruler"]');
+
+  expect(stickyRuler).not.toBeNull();
+  expect(stickyRuler?.contains(handle ?? null)).toBe(true);
+});
+
+it('routes slider arrow keys through frame-step actions', () => {
+  const onStepToNextFrame = vi.fn();
+  const onStepToPreviousFrame = vi.fn();
+  renderCanvas({ onStepToNextFrame, onStepToPreviousFrame });
+  const handle = container?.querySelector('[data-ui="video-editor.timeline.playhead-handle"]');
+
+  act(() => {
+    handle?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowLeft' }));
+    handle?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }));
+    handle?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
+    handle?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowUp' }));
+  });
+
+  expect(onStepToPreviousFrame).toHaveBeenCalledTimes(2);
+  expect(onStepToNextFrame).toHaveBeenCalledTimes(2);
+});
+
+it('gives playhead pointer ownership to scrubbing instead of ruler selection', () => {
+  const onBeginPlayheadScrub = vi.fn((event: React.PointerEvent<HTMLElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+  });
+  const onBeginRangeSelection = vi.fn();
+  const onSelectScene = vi.fn();
+  renderCanvas({ onBeginPlayheadScrub, onBeginRangeSelection, onSelectScene });
+
+  const event = new Event('pointerdown', { bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'clientX', { value: 120 });
+  act(() => {
+    container
+      ?.querySelector('[data-ui="video-editor.timeline.playhead-handle"]')
+      ?.dispatchEvent(event);
+  });
+
+  expect(event.defaultPrevented).toBe(true);
+  expect(onBeginPlayheadScrub).toHaveBeenCalledTimes(1);
+  expect(onBeginRangeSelection).not.toHaveBeenCalled();
+  expect(onSelectScene).not.toHaveBeenCalled();
 });
 
 it('routes empty track-lane pointer ownership through track range selection handlers', () => {
@@ -155,11 +232,15 @@ it('does not render telemetry empty text when the telemetry lane is hidden', () 
 });
 
 function renderCanvas(overrides: {
+  consumeCompletedScrubClick?: () => boolean;
   onBeginEffectRangeSelection?: React.PointerEventHandler<HTMLDivElement>;
+  onBeginPlayheadScrub?: React.PointerEventHandler<HTMLElement>;
   onBeginRangeSelection?: (event: React.PointerEvent<HTMLDivElement>) => void;
   onBeginTrackRangeSelection?: (trackId: string) => React.PointerEventHandler<HTMLDivElement>;
   dragGhost?: React.ComponentProps<typeof ProjectTimelineCanvas>['dragGhost'];
   onSeek?: (event: React.MouseEvent<HTMLDivElement>) => void;
+  onStepToNextFrame?: () => void;
+  onStepToPreviousFrame?: () => void;
   onSeekTime?: (time: number) => void;
   onSelectScene?: () => void;
   onSelectTrack?: (trackId: string) => void;
@@ -187,12 +268,16 @@ function renderCanvas(overrides: {
 function createCanvasProps(
   project: ReturnType<typeof createEmptyVideoProject>,
   overrides: {
+    consumeCompletedScrubClick?: () => boolean;
     onBeginEffectRangeSelection?: React.PointerEventHandler<HTMLDivElement>;
+    onBeginPlayheadScrub?: React.PointerEventHandler<HTMLElement>;
     onBeginRangeSelection?: (event: React.PointerEvent<HTMLDivElement>) => void;
     onBeginTrackRangeSelection?: (trackId: string) => React.PointerEventHandler<HTMLDivElement>;
     dragGhost?: React.ComponentProps<typeof ProjectTimelineCanvas>['dragGhost'];
     onSeek?: (event: React.MouseEvent<HTMLDivElement>) => void;
     onSeekTime?: (time: number) => void;
+    onStepToNextFrame?: () => void;
+    onStepToPreviousFrame?: () => void;
     onSelectScene?: () => void;
     onSelectTrack?: (trackId: string) => void;
     playbackRange?: React.ComponentProps<typeof ProjectTimelineCanvas>['playbackRange'];
@@ -205,6 +290,7 @@ function createCanvasProps(
 ): React.ComponentProps<typeof ProjectTimelineCanvas> {
   return {
     currentTime: 0,
+    consumeCompletedScrubClick: overrides.consumeCompletedScrubClick ?? (() => false),
     dragGhost: overrides.dragGhost ?? null,
     playbackRange: overrides.playbackRange ?? null,
     pixelsPerSecond: 90,
@@ -228,10 +314,13 @@ function createCanvasProps(
 
 function createCanvasActionProps(overrides: {
   onBeginEffectRangeSelection?: React.PointerEventHandler<HTMLDivElement>;
+  onBeginPlayheadScrub?: React.PointerEventHandler<HTMLElement>;
   onBeginRangeSelection?: (event: React.PointerEvent<HTMLDivElement>) => void;
   onBeginTrackRangeSelection?: (trackId: string) => React.PointerEventHandler<HTMLDivElement>;
   onImportTimelineFile?: ProjectTimelineInsertionActions['onImport'];
   onSeek?: (event: React.MouseEvent<HTMLDivElement>) => void;
+  onStepToNextFrame?: () => void;
+  onStepToPreviousFrame?: () => void;
   onSelectScene?: () => void;
   onSelectTrack?: (trackId: string) => void;
   onUnsupportedTimelineFileDrop?: () => void;
@@ -239,6 +328,9 @@ function createCanvasActionProps(overrides: {
   return {
     onBeginClipInteraction: vi.fn(),
     onBeginEffectInteraction: vi.fn(),
+    onBeginPlayheadScrub: overrides.onBeginPlayheadScrub ?? vi.fn(),
+    onStepToNextFrame: overrides.onStepToNextFrame ?? vi.fn(),
+    onStepToPreviousFrame: overrides.onStepToPreviousFrame ?? vi.fn(),
     onBeginEffectRangeSelection: overrides.onBeginEffectRangeSelection ?? vi.fn(),
     onBeginRangeSelection: overrides.onBeginRangeSelection ?? vi.fn(),
     onBeginTrackRangeSelection: overrides.onBeginTrackRangeSelection ?? (() => vi.fn()),

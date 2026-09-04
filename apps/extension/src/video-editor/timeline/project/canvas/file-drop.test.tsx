@@ -95,6 +95,7 @@ function createCanvasProps(
 ): React.ComponentProps<typeof ProjectTimelineCanvas> {
   return {
     currentTime: 0,
+    consumeCompletedScrubClick: () => false,
     dragGhost: null,
     playbackRange: null,
     pixelsPerSecond: 90,
@@ -119,6 +120,9 @@ function createCanvasActionProps(options: { onUnsupportedTimelineFileDrop?: () =
   return {
     onBeginClipInteraction: vi.fn(),
     onBeginEffectInteraction: vi.fn(),
+    onBeginPlayheadScrub: vi.fn(),
+    onStepToNextFrame: vi.fn(),
+    onStepToPreviousFrame: vi.fn(),
     onBeginEffectRangeSelection: vi.fn(),
     onBeginRangeSelection: vi.fn(),
     onBeginTrackRangeSelection: () => vi.fn(),

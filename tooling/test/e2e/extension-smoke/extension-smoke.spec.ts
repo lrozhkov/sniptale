@@ -244,7 +244,8 @@ async function verifyVideoEditorTrackRename(
 async function verifyVideoEditorTimelineBoundaries(
   page: import('@playwright/test').Page,
   screenshotPath: string,
-  compactScreenshotPath: string
+  compactScreenshotPath: string,
+  scrolledScreenshotPath: string
 ): Promise<void> {
   const counter = page.locator('[data-playback-counter="true"]');
   const seekToStart = page.getByRole('button', {
@@ -259,6 +260,7 @@ async function verifyVideoEditorTimelineBoundaries(
   const nextFrame = page.getByRole('button', {
     name: translate('videoEditor.timeline.nextFrame', 'ru'),
   });
+  const playhead = page.locator('[data-ui="video-editor.timeline.playhead-handle"]');
 
   for (let step = 0; step < 3; step += 1) await nextFrame.click();
   await expect(counter).toContainText('0:00.1 / 0:12.0');
@@ -268,9 +270,20 @@ async function verifyVideoEditorTimelineBoundaries(
   await expect(counter).toContainText('0:12.0 / 0:12.0');
   await page.keyboard.press('Home');
   await expect(counter).toContainText('0:00.0 / 0:12.0');
+  await page.mouse.move(0, 0);
+  await expect(page.locator('[data-timeline-hover-preview="true"]')).toHaveCount(0);
   await page.keyboard.press('End');
   await expect(counter).toContainText('0:12.0 / 0:12.0');
   await seekToStart.click();
+  await expect(counter).toContainText('0:00.0 / 0:12.0');
+  const playheadBox = await playhead.boundingBox();
+  if (!playheadBox) throw new Error('Expected a visible timeline playhead handle');
+  await page.mouse.move(playheadBox.x + playheadBox.width / 2, playheadBox.y + 8);
+  await page.mouse.down();
+  await page.mouse.move(playheadBox.x + playheadBox.width / 2 + 90, playheadBox.y + 8);
+  await page.mouse.up();
+  await expect(counter).not.toContainText('0:00.0 / 0:12.0');
+  await page.keyboard.press('Home');
   await expect(counter).toContainText('0:00.0 / 0:12.0');
   await page.screenshot({ fullPage: true, path: screenshotPath });
 
@@ -279,7 +292,24 @@ async function verifyVideoEditorTimelineBoundaries(
   await expect(seekToEnd).toBeVisible();
   await expect(previousFrame).toBeVisible();
   await expect(nextFrame).toBeVisible();
+  await expect(playhead).toBeVisible();
   await expect(counter).toBeVisible();
+  const timelineScroll = page.locator('[data-ui="video-editor.timeline.canvas-scroll"]');
+  const ruler = page.locator('[data-ui="video-editor.timeline.ruler"]');
+  const handleTopBeforeScroll = (await playhead.boundingBox())?.y;
+  const rulerTopBeforeScroll = (await ruler.boundingBox())?.y;
+  const verticalScrollTop = await timelineScroll.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+    return element.scrollTop;
+  });
+  expect(verticalScrollTop).toBeGreaterThan(0);
+  await expect(playhead).toBeVisible();
+  expect((await playhead.boundingBox())?.y).toBeCloseTo(handleTopBeforeScroll ?? 0, 0);
+  expect((await ruler.boundingBox())?.y).toBeCloseTo(rulerTopBeforeScroll ?? 0, 0);
+  await page.screenshot({ fullPage: true, path: scrolledScreenshotPath });
+  await timelineScroll.evaluate((element) => {
+    element.scrollTop = 0;
+  });
   await page.screenshot({ fullPage: true, path: compactScreenshotPath });
   await page.setViewportSize({ width: 1600, height: 1100 });
 }
@@ -456,7 +486,8 @@ test('video editor keeps webcam independent with camera timeline and inspector c
   await verifyVideoEditorTimelineBoundaries(
     page,
     testInfo.outputPath('video-editor-timeline-transport.png'),
-    testInfo.outputPath('video-editor-timeline-transport-compact.png')
+    testInfo.outputPath('video-editor-timeline-transport-compact.png'),
+    testInfo.outputPath('video-editor-timeline-transport-scrolled.png')
   );
 
   await verifyVideoEditorTrackRename(page, testInfo.outputPath('video-editor-track-inspector.png'));
