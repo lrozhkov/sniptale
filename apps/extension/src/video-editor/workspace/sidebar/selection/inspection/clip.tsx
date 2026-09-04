@@ -60,10 +60,14 @@ export function InspectClipPanel(props: WorkspaceSidebarSelectionPanelProps) {
   }
 
   const runtime = createSelectionRuntime(props);
+  const cameraRoleClip = isCameraRoleVideoClip(props.project, clip);
 
   return (
     <section className={PANEL_SECTION_CLASS_NAME}>
-      <InspectorGroupedPanel groups={createClipGroups(props, clip, runtime)} />
+      <InspectorGroupedPanel
+        key={cameraRoleClip ? 'camera' : 'standard'}
+        groups={createClipGroups(props, clip, runtime, cameraRoleClip)}
+      />
     </section>
   );
 }
@@ -71,13 +75,14 @@ export function InspectClipPanel(props: WorkspaceSidebarSelectionPanelProps) {
 function createClipGroups(
   props: WorkspaceSidebarSelectionPanelProps,
   clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>,
-  runtime: ReturnType<typeof createSelectionRuntime>
+  runtime: ReturnType<typeof createSelectionRuntime>,
+  cameraRoleClip: boolean
 ) {
   const asset = resolveClipAsset(props.project, clip);
   const infoGroup = {
     id: 'info',
     label: translate('videoEditor.sidebar.inspectorGroupSummary'),
-    defaultActive: true,
+    defaultActive: !cameraRoleClip,
     content: <ClipInfo asset={asset} clip={clip} locked={runtime.selectedTrackLocked} />,
   } as const;
 
@@ -185,13 +190,12 @@ function createCameraPlacementGroup(
   clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>,
   locked: boolean
 ) {
-  const track = props.project.tracks.find((item) => item.id === clip.trackId);
-  const isCameraClip =
-    clip.type === VideoProjectClipType.VIDEO && track?.role === VideoProjectTrackRole.CAMERA;
+  const isCameraClip = isCameraRoleVideoClip(props.project, clip);
 
   return {
     id: 'camera',
     label: translate('videoEditor.sidebar.inspectorGroupCamera'),
+    defaultActive: isCameraClip,
     content: isCameraClip ? (
       <CameraPlacementControls
         clip={clip}
@@ -202,6 +206,17 @@ function createCameraPlacementGroup(
     ) : null,
     visible: isCameraClip,
   } as const;
+}
+
+function isCameraRoleVideoClip(
+  project: WorkspaceSidebarSelectionPanelProps['project'],
+  clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>
+): clip is Extract<
+  WorkspaceSidebarSelectionPanelProps['project']['clips'][number],
+  { type: 'VIDEO' }
+> {
+  const track = project.tracks.find((item) => item.id === clip.trackId);
+  return clip.type === VideoProjectClipType.VIDEO && track?.role === VideoProjectTrackRole.CAMERA;
 }
 
 function CameraPlacementControls(props: {

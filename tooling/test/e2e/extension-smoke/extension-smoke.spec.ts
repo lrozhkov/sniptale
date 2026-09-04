@@ -326,9 +326,10 @@ test('video editor keeps webcam independent with camera timeline and inspector c
   await timelineClip.click();
 
   const inspector = page.locator('[data-ui="video-editor.floating.context-inspector"]');
-  await inspector
-    .locator(`button[title="${translate('videoEditor.sidebar.inspectorGroupCamera', 'ru')}"]`)
-    .click();
+  const cameraGroupButton = inspector.locator(
+    `button[title="${translate('videoEditor.sidebar.inspectorGroupCamera', 'ru')}"]`
+  );
+  await expect(cameraGroupButton).toHaveAttribute('aria-pressed', 'true');
   await expect(
     inspector.getByText(translate('videoEditor.sidebar.cameraPlacementDescription', 'ru'))
   ).toBeVisible();

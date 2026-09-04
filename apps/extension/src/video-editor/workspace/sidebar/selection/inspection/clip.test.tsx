@@ -224,7 +224,7 @@ describe('workspace-sidebar/selection/inspect-core', () => {
     expect(container?.textContent).not.toContain('videoEditor.sidebar.cursorDetectionRun');
   });
 
-  it('shows camera placement only for a camera-role clip and reuses the transform command', () => {
+  it('opens camera placement by default for a camera-role clip and reuses the transform command', () => {
     const props = createVideoProps();
     props.project.tracks = props.project.tracks.map((track) =>
       track.id === props.selectedClip?.trackId
@@ -233,7 +233,6 @@ describe('workspace-sidebar/selection/inspect-core', () => {
     );
 
     renderInspectPanel(props);
-    clickGroup('videoEditor.sidebar.inspectorGroupCamera');
 
     expect(container?.textContent).toContain('videoEditor.sidebar.cameraPlacementDescription');
     const bottomLeft = Array.from(container?.querySelectorAll('button') ?? []).find(
@@ -244,6 +243,27 @@ describe('workspace-sidebar/selection/inspect-core', () => {
       props.selectedClip?.id,
       expect.objectContaining({ height: expect.any(Number), width: expect.any(Number) })
     );
+  });
+
+  it('preserves a manual group within one clip context and resets when it becomes a camera', () => {
+    const props = createVideoProps();
+
+    renderInspectPanel(props);
+    clickGroup('videoEditor.sidebar.inspectorGroupTransform');
+    expect(container?.textContent).toContain('videoEditor.sidebar.fitModeLabel');
+
+    renderInspectPanel({ ...props });
+    expect(container?.textContent).toContain('videoEditor.sidebar.fitModeLabel');
+
+    props.project.tracks = props.project.tracks.map((track) =>
+      track.id === props.selectedClip?.trackId
+        ? { ...track, role: VideoProjectTrackRole.CAMERA }
+        : track
+    );
+    renderInspectPanel({ ...props });
+
+    expect(container?.textContent).toContain('videoEditor.sidebar.cameraPlacementDescription');
+    expect(container?.textContent).not.toContain('videoEditor.sidebar.fitModeLabel');
   });
 
   it('keeps camera-specific controls out of ordinary video inspection', () => {
