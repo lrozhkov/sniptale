@@ -8,6 +8,8 @@ describe('workspace/sidebar-props', () => {
     const props = getWorkspaceSidebarProps(controller);
 
     expect(props.onRenameTrack).toBe(controller.projectActions.onRenameTrack);
+    expect(props.onToggleTrackLock).toBe(controller.projectActions.onToggleTrackLock);
+    expect(props.onToggleTrackVisibility).toBe(controller.projectActions.onToggleTrackVisibility);
     expect(props.gridSettings).toBe(controller.state.gridSettings);
     expect(props.onApplyMediaClipVisualsToTrack).toBe(
       controller.clipActions.onApplyMediaClipVisualsToTrack

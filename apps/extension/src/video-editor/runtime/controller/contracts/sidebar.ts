@@ -72,6 +72,8 @@ interface VideoEditorSidebarProjectActions {
   onInsertCursorSample: VideoEditorSidebarCommands['insertCursorSample'];
   onOpenProject: VideoEditorActionHandlers['handleOpenProject'];
   onRenameTrack: VideoEditorSidebarCommands['renameTrack'];
+  onToggleTrackLock: VideoEditorSidebarCommands['toggleTrackLock'];
+  onToggleTrackVisibility: VideoEditorSidebarCommands['toggleTrackVisibility'];
   onResizeProject: (width: number, height: number) => void;
   onSetCursorCaptureMode: (captureMode: VideoProjectCursorTrack['captureMode']) => void;
   onSetSceneBackground: (sceneBackground: VideoProjectSceneBackground) => void;

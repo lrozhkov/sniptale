@@ -220,6 +220,22 @@ async function verifyVideoEditorTrackRename(
       name: translate('videoEditor.sidebar.inspectorGroupSwitcherLabel', 'ru'),
     })
   ).toHaveCount(0);
+  const visibilityToggle = page.getByRole('button', {
+    name: translate('videoEditor.sidebar.trackVisibilityLabel', 'ru'),
+  });
+  const lockToggle = page.getByRole('button', {
+    name: translate('videoEditor.sidebar.trackLockLabel', 'ru'),
+  });
+  await expect(visibilityToggle).toHaveAttribute('aria-pressed', 'true');
+  await visibilityToggle.click();
+  await expect(visibilityToggle).toHaveAttribute('aria-pressed', 'false');
+  await visibilityToggle.click();
+  await expect(visibilityToggle).toHaveAttribute('aria-pressed', 'true');
+  await expect(lockToggle).toHaveAttribute('aria-pressed', 'false');
+  await lockToggle.click();
+  await expect(lockToggle).toHaveAttribute('aria-pressed', 'true');
+  await lockToggle.click();
+  await expect(lockToggle).toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByText('OVERLAY', { exact: true })).toHaveCount(0);
   await expect(page.getByText('PRIMARY', { exact: true })).toHaveCount(0);
   await page.screenshot({ fullPage: true, path: screenshotPath });

@@ -68,6 +68,8 @@ export interface WorkspaceSidebarProps {
   onResetSceneBackgroundPreview?: () => void;
   onResizeProject: (width: number, height: number) => void;
   onRenameTrack?: (trackId: string, name: string) => void;
+  onToggleTrackLock?: (trackId: string) => void;
+  onToggleTrackVisibility?: (trackId: string) => void;
   onSetCursorCaptureMode: (mode: VideoCursorCaptureMode) => void;
   onSetSceneBackground: (sceneBackground: NonNullable<VideoProject['sceneBackground']>) => void;
   onStartActionPointPlacement?: (actionEventId: string) => void;

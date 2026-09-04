@@ -1,13 +1,14 @@
 import { translate } from '../../../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { TextField } from '../../../../../ui/compact-inspector-controls';
-import type { VideoProjectTrack } from '../../../../../features/video/project/types';
+import { StatusRow, TextField } from '../../../../../ui/compact-inspector-controls';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
-import { DetailItem, DetailList, PANEL_META_CLASS_NAME } from '../shared/panel';
+import { ToggleField } from '../shared/controls';
 import { getVideoTrackKindLabel } from '../../track-kind-label';
 
 export function TrackGeneralFields(props: {
   onRenameTrack?: WorkspaceSidebarSelectionPanelProps['onRenameTrack'];
+  onToggleTrackLock?: WorkspaceSidebarSelectionPanelProps['onToggleTrackLock'];
+  onToggleTrackVisibility?: WorkspaceSidebarSelectionPanelProps['onToggleTrackVisibility'];
   selectedTrack: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedTrack']>;
 }) {
   const kindLabel = getVideoTrackKindLabel(props.selectedTrack.kind);
@@ -21,29 +22,20 @@ export function TrackGeneralFields(props: {
         readOnly={!props.onRenameTrack}
         onValueCommit={(name) => props.onRenameTrack?.(props.selectedTrack.id, name)}
       />
-      <p className={`mt-3 ${PANEL_META_CLASS_NAME}`}>
-        {getTrackPanelMeta(kindLabel, props.selectedTrack.locked)}
-      </p>
-      <div className="mt-3">
-        <DetailList>
-          <DetailItem label={translate('videoEditor.timeline.tracksTitle')} value={kindLabel} />
-          <DetailItem
-            label={translate('videoEditor.sidebar.selectionTitle')}
-            value={
-              props.selectedTrack.locked
-                ? translate('videoEditor.timeline.trackLocked')
-                : translate('videoEditor.timeline.trackEditable')
-            }
-          />
-          <DetailItem
-            label={translate('videoEditor.timeline.trackVisible')}
-            value={
-              props.selectedTrack.visible
-                ? translate('videoEditor.timeline.trackVisible')
-                : translate('videoEditor.timeline.trackHidden')
-            }
-          />
-        </DetailList>
+      <div className="mt-3 space-y-2">
+        <StatusRow label={translate('videoEditor.sidebar.trackTypeLabel')} value={kindLabel} />
+        <ToggleField
+          checked={props.selectedTrack.visible}
+          disabled={!props.onToggleTrackVisibility}
+          label={translate('videoEditor.sidebar.trackVisibilityLabel')}
+          onChange={() => props.onToggleTrackVisibility?.(props.selectedTrack.id)}
+        />
+        <ToggleField
+          checked={props.selectedTrack.locked}
+          disabled={!props.onToggleTrackLock}
+          label={translate('videoEditor.sidebar.trackLockLabel')}
+          onChange={() => props.onToggleTrackLock?.(props.selectedTrack.id)}
+        />
       </div>
     </>
   );
@@ -68,13 +60,4 @@ export function TrackPanelDeleteButton(props: {
       {translate('videoEditor.timeline.deleteTrackTitle')}
     </ProductActionButton>
   );
-}
-
-function getTrackPanelMeta(kindLabel: string, locked: VideoProjectTrack['locked']) {
-  return [
-    kindLabel,
-    locked
-      ? translate('videoEditor.timeline.trackLocked')
-      : translate('videoEditor.timeline.trackEditable'),
-  ].join(' · ');
 }

@@ -7,6 +7,8 @@ import { isVideoEditorPresentedTrack } from '../../../../project/operations/pres
 export function InspectTrackPanel({
   onDeleteTrack,
   onRenameTrack,
+  onToggleTrackLock,
+  onToggleTrackVisibility,
   selectedTrack,
 }: WorkspaceSidebarSelectionPanelProps) {
   if (!selectedTrack || !isVideoEditorPresentedTrack(selectedTrack)) {
@@ -18,6 +20,8 @@ export function InspectTrackPanel({
       selectedTrack={selectedTrack}
       onDeleteTrack={onDeleteTrack}
       onRenameTrack={onRenameTrack}
+      onToggleTrackLock={onToggleTrackLock}
+      onToggleTrackVisibility={onToggleTrackVisibility}
     />
   );
 }
@@ -25,12 +29,19 @@ export function InspectTrackPanel({
 function TrackInspectorContent(props: {
   onDeleteTrack: WorkspaceSidebarSelectionPanelProps['onDeleteTrack'];
   onRenameTrack: WorkspaceSidebarSelectionPanelProps['onRenameTrack'];
+  onToggleTrackLock: WorkspaceSidebarSelectionPanelProps['onToggleTrackLock'];
+  onToggleTrackVisibility: WorkspaceSidebarSelectionPanelProps['onToggleTrackVisibility'];
   onUpdateSubtitleTrackStyle?: WorkspaceSidebarSelectionPanelProps['onUpdateSubtitleTrackStyle'];
   selectedTrack: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedTrack']>;
 }) {
   return (
     <section className={PANEL_SECTION_CLASS_NAME}>
-      <TrackGeneralFields selectedTrack={props.selectedTrack} onRenameTrack={props.onRenameTrack} />
+      <TrackGeneralFields
+        selectedTrack={props.selectedTrack}
+        onRenameTrack={props.onRenameTrack}
+        onToggleTrackLock={props.onToggleTrackLock}
+        onToggleTrackVisibility={props.onToggleTrackVisibility}
+      />
       <TrackPanelDeleteButton
         canDeleteTrack={!props.selectedTrack.isRoot}
         trackId={props.selectedTrack.id}

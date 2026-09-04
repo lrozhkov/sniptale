@@ -29,6 +29,8 @@ export interface WorkspaceSidebarSelectionPanelProps {
   onEnableCursorTrack: NonNullable<WorkspaceSidebarProps['onEnableCursorTrack']>;
   onInsertCursorSample: NonNullable<WorkspaceSidebarProps['onInsertCursorSample']>;
   onRenameTrack?: WorkspaceSidebarProps['onRenameTrack'];
+  onToggleTrackLock?: WorkspaceSidebarProps['onToggleTrackLock'];
+  onToggleTrackVisibility?: WorkspaceSidebarProps['onToggleTrackVisibility'];
   onResizeProject: WorkspaceSidebarProps['onResizeProject'];
   onPreviewSceneBackground: NonNullable<WorkspaceSidebarProps['onPreviewSceneBackground']>;
   onRememberRecentColor: NonNullable<WorkspaceSidebarProps['onRememberRecentColor']>;

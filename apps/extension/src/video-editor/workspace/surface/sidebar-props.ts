@@ -68,6 +68,8 @@ function getWorkspaceSidebarProjectActionProps(
   | 'onImportVideo'
   | 'onOpenProject'
   | 'onRenameTrack'
+  | 'onToggleTrackLock'
+  | 'onToggleTrackVisibility'
   | 'onResizeProject'
   | 'onStartActionPointPlacement'
   | 'onStartMotionAreaPlacement'
@@ -89,6 +91,8 @@ function getWorkspaceSidebarProjectActionProps(
     onImportVideo: controller.projectActions.onImportVideo,
     onOpenProject: controller.projectActions.onOpenProject,
     onRenameTrack: controller.projectActions.onRenameTrack,
+    onToggleTrackLock: controller.projectActions.onToggleTrackLock,
+    onToggleTrackVisibility: controller.projectActions.onToggleTrackVisibility,
     onResizeProject: controller.projectActions.onResizeProject,
     onStartActionPointPlacement: controller.projectActions.onStartActionPointPlacement,
     onStartMotionAreaPlacement: controller.projectActions.onStartMotionAreaPlacement,

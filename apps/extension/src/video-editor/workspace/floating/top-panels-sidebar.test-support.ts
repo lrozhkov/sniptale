@@ -82,6 +82,8 @@ function createProjectEditActions(): Omit<
     onSelectObjectTrack: noop(),
     onSetCursorCaptureMode: noop(),
     onSetSceneBackground: noop(),
+    onToggleTrackLock: noop(),
+    onToggleTrackVisibility: noop(),
     onToggleCollapsed: noop(),
     onToggleDiagnostics: noop(),
     onUpdateActionEventDetails: noop(),

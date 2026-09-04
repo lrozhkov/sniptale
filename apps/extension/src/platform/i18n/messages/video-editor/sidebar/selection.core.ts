@@ -187,6 +187,18 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
     ru: 'Название дорожки',
     en: 'Track name',
   },
+  trackTypeLabel: {
+    ru: 'Тип дорожки',
+    en: 'Track type',
+  },
+  trackVisibilityLabel: {
+    ru: 'Видимость',
+    en: 'Visibility',
+  },
+  trackLockLabel: {
+    ru: 'Блокировка',
+    en: 'Lock',
+  },
   fitModeContain: {
     ru: 'Вписать',
     en: 'Contain',

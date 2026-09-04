@@ -70,6 +70,8 @@ type WorkspaceSidebarSelectionBodyProps = Partial<
     | 'onApplyMediaClipVisualsToTrack'
     | 'onConvertTextClipToAnnotation'
     | 'onRenameTrack'
+    | 'onToggleTrackLock'
+    | 'onToggleTrackVisibility'
     | 'onUpdateTextContent'
     | 'onUpdateTextStyle'
     | 'onUpdateSubtitleTrackStyle'
@@ -132,6 +134,8 @@ function createInspectPanelProps(props: WorkspaceSidebarSelectionBodyProps) {
     onApplyMediaClipVisualsToTrack: props.onApplyMediaClipVisualsToTrack,
     ...createSelectionAnnotationUpdateDefaults(props),
     onRenameTrack: props.onRenameTrack,
+    onToggleTrackLock: props.onToggleTrackLock,
+    onToggleTrackVisibility: props.onToggleTrackVisibility,
     onUpdateShapeStyle: props.onUpdateShapeStyle,
     onUpdateSubtitleTrackStyle: props.onUpdateSubtitleTrackStyle,
     onUpdateTextContent: props.onUpdateTextContent,

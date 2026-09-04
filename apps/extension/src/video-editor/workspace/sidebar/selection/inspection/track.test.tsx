@@ -41,6 +41,8 @@ function createSharedCallbacks() {
     onStartActionPointPlacement: vi.fn(),
     onStartMotionAreaPlacement: vi.fn(),
     onStartMotionFocusPlacement: vi.fn(),
+    onToggleTrackLock: vi.fn(),
+    onToggleTrackVisibility: vi.fn(),
     onUpdateActionEventDetails: vi.fn(),
     onUpdateClipAudioEnvelope: vi.fn(),
     onUpdateClipFades: vi.fn(),
@@ -135,6 +137,26 @@ describe('workspace-sidebar/selection/inspect-track', () => {
       'input[aria-label="videoEditor.sidebar.trackNameLabel"]'
     );
     expect(input).not.toBeNull();
+    expect(
+      container.querySelectorAll('[data-ui="shared.ui.compact-inspector.option-row"]')
+    ).toHaveLength(2);
+    const visibilityToggle = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(
+        '[data-ui="shared.ui.compact-inspector.option-row"]'
+      )
+    ).find((button) => button.textContent?.includes('videoEditor.sidebar.trackVisibilityLabel'));
+    const lockToggle = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(
+        '[data-ui="shared.ui.compact-inspector.option-row"]'
+      )
+    ).find((button) => button.textContent?.includes('videoEditor.sidebar.trackLockLabel'));
+
+    act(() => {
+      visibilityToggle?.click();
+      lockToggle?.click();
+    });
+    expect(props.onToggleTrackVisibility).toHaveBeenCalledWith(props.selectedTrack.id);
+    expect(props.onToggleTrackLock).toHaveBeenCalledWith(props.selectedTrack.id);
 
     if (input) {
       input.value = 'Callouts';
@@ -147,7 +169,12 @@ describe('workspace-sidebar/selection/inspect-track', () => {
 
     const restoredProps = {
       ...props,
-      selectedTrack: { ...props.selectedTrack, name: 'Restored overlays' },
+      selectedTrack: {
+        ...props.selectedTrack,
+        locked: true,
+        name: 'Restored overlays',
+        visible: false,
+      },
     };
     act(() => {
       root.render(<WorkspaceSidebarInspectPanel {...restoredProps} />);
@@ -157,6 +184,8 @@ describe('workspace-sidebar/selection/inspect-track', () => {
         'input[aria-label="videoEditor.sidebar.trackNameLabel"]'
       )?.value
     ).toBe('Restored overlays');
+    expect(visibilityToggle?.getAttribute('aria-pressed')).toBe('false');
+    expect(lockToggle?.getAttribute('aria-pressed')).toBe('true');
 
     act(() => root.unmount());
     vi.unstubAllGlobals();
