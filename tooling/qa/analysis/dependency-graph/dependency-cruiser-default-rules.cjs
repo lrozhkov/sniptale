@@ -1,3 +1,20 @@
+const path = require('node:path');
+
+function escapeRegex(source) {
+  return source.replace(/[|\\{}()[\]^$+*?.]/g, '\\$&');
+}
+
+function resolveInstalledDependencyPattern(specifier) {
+  const installedPath = require.resolve(specifier, { paths: [process.cwd()] });
+  const repositoryRelativePath = path
+    .relative(process.cwd(), installedPath)
+    .split(path.sep)
+    .join('/');
+  return `^${escapeRegex(repositoryRelativePath)}$`;
+}
+
+const NOBLE_SHA2_PATH_PATTERN = resolveInstalledDependencyPattern('@noble/hashes/sha2.js');
+
 module.exports = [
   {
     name: 'no-circular',
@@ -77,7 +94,7 @@ module.exports = [
     },
     to: {
       dependencyTypes: ['npm-no-pkg', 'npm-unknown'],
-      pathNot: ['^node_modules/@noble/hashes/sha2[.]js$'],
+      pathNot: [NOBLE_SHA2_PATH_PATTERN],
     },
   },
   {
