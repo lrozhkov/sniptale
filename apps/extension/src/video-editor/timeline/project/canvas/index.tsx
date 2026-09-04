@@ -62,6 +62,7 @@ interface ProjectTimelineCanvasProps {
   onDropEffectDocument?: import('../types').ProjectTimelineProps['onDropEffectDocument'];
   onImportTimelineFile: ProjectTimelineInsertionActions['onImport'];
   onSeek: (event: React.MouseEvent<HTMLDivElement>) => void;
+  onSeekTime: (time: number) => void;
   onSelectActionSegment: (actionEventId: string) => void;
   onSelectClip: (clipId: string | null) => void;
   onSelectCursorSegment: (sampleId: string) => void;
@@ -192,6 +193,7 @@ function ProjectTimelineCanvasContent(
       <ProjectTimelinePlayhead height={props.playheadHeight} left={props.playheadX} />
       {props.telemetryLaneVisible ? (
         <ProjectTimelineTelemetryLane
+          onSeek={props.onSeekTime}
           pixelsPerSecond={props.pixelsPerSecond}
           project={props.project}
           recordingTelemetry={props.recordingTelemetry}

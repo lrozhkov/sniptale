@@ -126,6 +126,7 @@ function createCanvasActionProps(options: { onUnsupportedTimelineFileDrop?: () =
     onCloseTrackGap: vi.fn(),
     onImportTimelineFile: createImportHandlers({}),
     onSeek: vi.fn(),
+    onSeekTime: vi.fn(),
     onSelectActionSegment: vi.fn(),
     onSelectClip: vi.fn(),
     onSelectCursorSegment: vi.fn(),

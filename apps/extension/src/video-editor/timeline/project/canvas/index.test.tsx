@@ -160,6 +160,7 @@ function renderCanvas(overrides: {
   onBeginTrackRangeSelection?: (trackId: string) => React.PointerEventHandler<HTMLDivElement>;
   dragGhost?: React.ComponentProps<typeof ProjectTimelineCanvas>['dragGhost'];
   onSeek?: (event: React.MouseEvent<HTMLDivElement>) => void;
+  onSeekTime?: (time: number) => void;
   onSelectScene?: () => void;
   onSelectTrack?: (trackId: string) => void;
   playbackRange?: React.ComponentProps<typeof ProjectTimelineCanvas>['playbackRange'];
@@ -191,6 +192,7 @@ function createCanvasProps(
     onBeginTrackRangeSelection?: (trackId: string) => React.PointerEventHandler<HTMLDivElement>;
     dragGhost?: React.ComponentProps<typeof ProjectTimelineCanvas>['dragGhost'];
     onSeek?: (event: React.MouseEvent<HTMLDivElement>) => void;
+    onSeekTime?: (time: number) => void;
     onSelectScene?: () => void;
     onSelectTrack?: (trackId: string) => void;
     playbackRange?: React.ComponentProps<typeof ProjectTimelineCanvas>['playbackRange'];
@@ -216,6 +218,7 @@ function createCanvasProps(
     telemetryLaneVisible: overrides.telemetryLaneVisible ?? false,
     timelinePreviews: {},
     seekToClientX: overrides.seekToClientX ?? vi.fn(),
+    onSeekTime: overrides.onSeekTime ?? vi.fn(),
     timelineRef: { current: null },
     timelineWidth: 900,
     tracks: project.tracks,

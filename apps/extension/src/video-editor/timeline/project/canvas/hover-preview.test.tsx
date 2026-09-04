@@ -108,6 +108,7 @@ function createCanvasTestActions() {
     onCloseTrackGap: vi.fn(),
     onImportTimelineFile: { audio: vi.fn(), image: vi.fn(), video: vi.fn() },
     onSeek: vi.fn(),
+    onSeekTime: vi.fn(),
     onSelectActionSegment: vi.fn(),
     onSelectClip: vi.fn(),
     onSelectCursorSegment: vi.fn(),

@@ -32,6 +32,7 @@ type ProjectTimelineBodyProps = Pick<
   | 'onSelectTransition'
   | 'onResizeActionEvent'
   | 'onResizeMotionRegion'
+  | 'onSeek'
   | 'onToggleTrackLock'
   | 'onToggleTrackVisibility'
   | 'onToggleUtilityLaneLock'
@@ -151,6 +152,7 @@ function createCanvasProps(props: ProjectTimelineBodyProps): ProjectTimelineBody
     onResizeMotionRegion: props.onResizeMotionRegion,
     onScroll: () => props.syncTracksScroll('timeline'),
     onSeek: props.handleTimelineSeek,
+    onSeekTime: props.onSeek,
     onSelectActionSegment: props.onSelectActionSegment,
     onSelectClip: props.onSelectClip,
     onSelectCursorSegment: props.onSelectCursorSegment,

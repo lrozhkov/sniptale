@@ -133,6 +133,7 @@ function createCanvasActionProps() {
     onResizeMotionRegion: vi.fn(),
     onScroll: vi.fn(),
     onSeek: vi.fn(),
+    onSeekTime: vi.fn(),
     onSelectActionSegment: vi.fn(),
     onSelectClip: vi.fn(),
     onSelectCursorSegment: vi.fn(),
