@@ -74,6 +74,64 @@ async function expectBuiltSurfaceLayout(
     .toBeGreaterThanOrEqual(1);
 }
 
+async function expectBuiltVideoEditorGeometry(
+  page: import('@playwright/test').Page
+): Promise<void> {
+  const canvasShell = page.locator('[data-ui="video-editor.workspace.canvas-shell"]');
+  const documentBar = page.locator('[data-ui="video-editor.floating.document-bar"]');
+  const effectsDock = page.locator('[data-ui="video-editor.effects-library.dock"]');
+  const inspector = page.locator('[data-ui="video-editor.floating.context-inspector"]');
+  const preview = page.locator('[data-ui="video.preview.viewport"]');
+  const timeline = page.locator('[data-ui="video-editor.timeline.surface"]');
+
+  await expect(canvasShell).toBeVisible();
+  await expect(documentBar).toBeVisible();
+  await expect(effectsDock).toBeVisible();
+  await expect(inspector).toBeVisible();
+  await expect(preview).toBeVisible();
+  await expect(timeline).toBeVisible();
+
+  await expect
+    .poll(() =>
+      canvasShell.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          paddingRight: style.paddingRight,
+          paddingTop: style.paddingTop,
+        };
+      })
+    )
+    .toEqual({
+      paddingRight: '348px',
+      paddingTop: '76px',
+    });
+
+  const geometry = await page.evaluate(() => {
+    const getBounds = (selector: string) => {
+      const element = document.querySelector(selector);
+      if (!(element instanceof HTMLElement)) throw new Error(`Missing ${selector}`);
+      const bounds = element.getBoundingClientRect();
+      return {
+        bottom: bounds.bottom,
+        left: bounds.left,
+        right: bounds.right,
+        top: bounds.top,
+      };
+    };
+    return {
+      documentBar: getBounds('[data-ui="video-editor.floating.document-bar"]'),
+      effectsDock: getBounds('[data-ui="video-editor.effects-library.dock"]'),
+      inspector: getBounds('[data-ui="video-editor.floating.context-inspector"]'),
+      preview: getBounds('[data-ui="video.preview.viewport"]'),
+      timeline: getBounds('[data-ui="video-editor.timeline.surface"]'),
+    };
+  });
+
+  expect(geometry.effectsDock.top).toBeGreaterThanOrEqual(geometry.documentBar.bottom);
+  expect(geometry.preview.right).toBeLessThanOrEqual(geometry.inspector.left);
+  expect(geometry.timeline.right).toBeLessThanOrEqual(geometry.inspector.left);
+}
+
 test('background service worker boots', async ({ context, extensionId }) => {
   const page = await context.newPage();
   await page.goto(`chrome-extension://${extensionId}/apps/extension/src/popup/index.html`, {
@@ -101,6 +159,9 @@ for (const extensionPage of builtExtensionPages) {
         url.pathname === extensionPage.path
     );
     await expectBuiltSurfaceLayout(page, extensionPage.selector, extensionPage.viewport);
+    if (extensionPage.name === 'video-editor') {
+      await expectBuiltVideoEditorGeometry(page);
+    }
     if (extensionPage.name === 'settings') {
       const layout = page.locator('[data-ui="settings.page.layout"]');
       const layoutBox = await layout.boundingBox();
