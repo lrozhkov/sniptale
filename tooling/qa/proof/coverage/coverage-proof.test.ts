@@ -107,6 +107,26 @@ it('reuses coverage only when production, tests, config, lock, image, and every 
   });
 });
 
+it('refreshes validated local reports when materializing reusable coverage', () => {
+  const { policy, root } = fixture();
+  recordSuccessfulCoverageProof({ cwd: root });
+  const staleTime = new Date(0);
+  for (const file of policy.reportFiles) {
+    fs.utimesSync(path.join(root, policy.reportDirectory, file), staleTime, staleTime);
+  }
+  const reusable = resolveReusableCoverageProof({ cwd: root });
+  expect(reusable.matched).toBe(true);
+  const materializedAt = Date.now();
+
+  materializeReusableCoverageProof(reusable, { cwd: root });
+
+  for (const file of policy.reportFiles) {
+    expect(
+      fs.statSync(path.join(root, policy.reportDirectory, file)).mtimeMs
+    ).toBeGreaterThanOrEqual(materializedAt - 1000);
+  }
+});
+
 it('materializes an admitted external receipt without granting candidate-local authority', () => {
   const source = fixture();
   process.env.SNIPTALE_CI_CONTAINER_DIGEST = `sha256:${'b'.repeat(64)}`;
