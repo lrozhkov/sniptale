@@ -5,6 +5,7 @@ import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { createVideoProject } from '../../../../apps/extension/src/composition/persistence/projects/index.test-support';
 import { createScenarioProjectV3 } from '../../../../apps/extension/src/features/scenario/project/v3';
 import { betaV1Fixture as betaV1PersistenceFixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
+import { betaV2Fixture as betaV2PersistenceFixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v2';
 import { test } from '../support/extension-fixture';
 import { startHostServer } from '../support/host-server';
 import {
@@ -43,10 +44,61 @@ const GALLERY_INCLUDE_DRAFTS_DESCRIPTION = translate(
 );
 
 browserTest(
-  'beta-v1 fixture hydrates a real IndexedDB and OPFS graph with stable domain contracts',
+  'beta-v1 upgrades to beta-v2 and preserves real IndexedDB and OPFS data through reload',
   async ({ page }) => {
     const host = await startHostServer();
     try {
+      await applyHarnessBootstrap(page, { preserveMediaLibrary: true });
+      await page.goto(host.origin);
+      await page.evaluate(async (fixture) => {
+        const keyPaths: Record<string, string | string[]> = {
+          recording_telemetry: 'recordingId',
+          diagnostics_meta: 'recordingId',
+          diagnostics_events: ['recordingId', 'chunkIndex'],
+          scenario_step_editor_documents: 'stepId',
+          thumbnails: 'assetId',
+          image_workspaces: 'aggregateId',
+          aggregate_presentations: ['aggregateKind', 'aggregateId'],
+          video_effect_bundles: 'packId',
+          project_export_inputs: 'jobId',
+          frame_annotation_raster_jobs: 'jobId',
+          state_manager: ['domain', 'key'],
+          native_transfer_chunks: ['sessionId', 'chunkIndex'],
+          asset_refs: 'assetId',
+          asset_owners: ['ownerKind', 'ownerId', 'role'],
+          asset_operations: 'operationId',
+          schema_contracts: 'domainId',
+        };
+        const database = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open(fixture.databaseName, fixture.databaseVersion);
+          request.onupgradeneeded = () => {
+            for (const [name, indexes] of Object.entries(fixture.indexes)) {
+              const store = request.result.createObjectStore(name, {
+                keyPath: keyPaths[name] ?? 'id',
+              });
+              for (const index of indexes) store.createIndex(index, index);
+            }
+            const contracts = request.transaction!.objectStore('schema_contracts');
+            for (const [domainId, schemaVersion] of Object.entries(fixture.domainVersions))
+              contracts.put({ domainId, schemaVersion });
+            for (const [name, entries] of Object.entries(fixture.records)) {
+              for (const entry of entries) request.transaction!.objectStore(name).put(entry);
+            }
+          };
+          request.onerror = () => reject(request.error);
+          request.onsuccess = () => resolve(request.result);
+        });
+        database.close();
+        const root = await navigator.storage.getDirectory();
+        const assets = await root.getDirectoryHandle('sniptale-assets', { create: true });
+        const objects = await assets.getDirectoryHandle('objects', { create: true });
+        for (const object of fixture.opfsObjects) {
+          const handle = await objects.getFileHandle(object.assetId, { create: true });
+          const writable = await handle.createWritable();
+          await writable.write(object.text);
+          await writable.close();
+        }
+      }, betaV1PersistenceFixture);
       await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`, { waitUntil: 'domcontentloaded' });
       await page.locator('[data-ui="gallery.page.root"]').waitFor({ state: 'visible' });
 
@@ -65,23 +117,10 @@ browserTest(
           });
         const database = await openDatabase();
         const recordStores = Object.keys(fixture.records);
-        const write = database.transaction(recordStores, 'readwrite');
-        for (const [storeName, entries] of Object.entries(fixture.records)) {
-          const store = write.objectStore(storeName);
-          for (const entry of entries) store.put(entry);
-        }
-        await complete(write);
         database.close();
-
         const origin = await navigator.storage.getDirectory();
-        const assets = await origin.getDirectoryHandle('sniptale-assets', { create: true });
-        const objects = await assets.getDirectoryHandle('objects', { create: true });
-        for (const object of fixture.opfsObjects) {
-          const handle = await objects.getFileHandle(object.assetId, { create: true });
-          const writable = await handle.createWritable();
-          await writable.write(object.text);
-          await writable.close();
-        }
+        const assets = await origin.getDirectoryHandle('sniptale-assets');
+        const objects = await assets.getDirectoryHandle('objects');
 
         const reopened = await openDatabase();
         const read = reopened.transaction([...recordStores, 'schema_contracts'], 'readonly');
@@ -120,9 +159,9 @@ browserTest(
         };
       }, betaV1PersistenceFixture);
 
-      expect(snapshot.databaseVersion).toBe(betaV1PersistenceFixture.databaseVersion);
-      expect(snapshot.stores).toEqual([...betaV1PersistenceFixture.stores].sort());
-      expect(snapshot.contracts).toEqual(betaV1PersistenceFixture.domainVersions);
+      expect(snapshot.databaseVersion).toBe(betaV2PersistenceFixture.databaseVersion);
+      expect(snapshot.stores).toEqual([...betaV2PersistenceFixture.stores].sort());
+      expect(snapshot.contracts).toEqual(betaV2PersistenceFixture.domainVersions);
       expect(snapshot.objectText).toBe(betaV1PersistenceFixture.opfsObjects[0]?.text);
       expect(snapshot.recordKeys).toMatchObject({
         asset_owners: [['recording', 'beta-v1-recording', 'body']],
@@ -131,6 +170,26 @@ browserTest(
         recordings: ['beta-v1-recording'],
         state_manager: [['video-recording-completion-outbox', 'pending']],
       });
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.locator('[data-ui="gallery.page.root"]').waitFor({ state: 'visible' });
+      const reopened = await page.evaluate(async () => {
+        const request = indexedDB.open('sniptale-db');
+        const database = await new Promise<IDBDatabase>((resolve, reject) => {
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        const count = database
+          .transaction('recordings')
+          .objectStore('recordings')
+          .count('beta-v1-recording');
+        const remaining = await new Promise<number>((resolve, reject) => {
+          count.onsuccess = () => resolve(count.result);
+          count.onerror = () => reject(count.error);
+        });
+        database.close();
+        return { remaining, version: database.version };
+      });
+      expect(reopened).toEqual({ remaining: 1, version: betaV2PersistenceFixture.databaseVersion });
     } finally {
       await new Promise<void>((resolve, reject) =>
         host.server.close((error) => (error ? reject(error) : resolve()))

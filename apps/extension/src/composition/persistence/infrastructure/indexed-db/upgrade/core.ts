@@ -8,6 +8,8 @@ import {
   EDITOR_CUSTOM_SHAPES_STORE,
   FRAME_ANNOTATION_RASTER_JOBS_STORE,
   IMAGE_WORKSPACES_STORE,
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
   MEDIA_LIBRARY_STORE,
   NATIVE_TRANSFER_CHUNKS_STORE,
   NATIVE_TRANSFER_SESSIONS_STORE,
@@ -108,6 +110,8 @@ function createBetaBaseline(db: UpgradeDatabase): void {
   createStore(db, MEDIA_LIBRARY_STORE, 'id', ['createdAt', 'kind']);
   createStore(db, THUMBNAILS_STORE, 'assetId');
   createStore(db, IMAGE_WORKSPACES_STORE, 'aggregateId', ['updatedAt']);
+  createStore(db, VIDEO_WORKSPACES_STORE, 'aggregateId', ['updatedAt']);
+  createStore(db, VIDEO_WORKSPACE_DRAFTS_STORE, 'aggregateId', ['updatedAt']);
   createStore(db, AGGREGATE_PRESENTATIONS_STORE, ['aggregateKind', 'aggregateId'], ['updatedAt']);
   createStore(db, WEB_SNAPSHOTS_STORE, 'id', ['createdAt']);
   createStore(db, VIDEO_EFFECT_BUNDLES_STORE, 'packId', ['enabled', 'updatedAt']);

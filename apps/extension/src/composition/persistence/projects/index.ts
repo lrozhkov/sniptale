@@ -1,3 +1,7 @@
+import {
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
+} from '../infrastructure/indexed-db/core.stores';
 import type { VideoProject } from '../../../features/video/project/types';
 import {
   ASSET_OPERATIONS_STORE,
@@ -78,6 +82,8 @@ export async function saveVideoProject(
       assetOwnerStore,
       assetRefStore,
       mediaLibraryStore,
+      videoWorkspaceStore,
+      videoDraftStore,
       projectAssetStore,
       projectStore,
       tx,
@@ -126,6 +132,8 @@ export async function saveVideoProject(
       assetOwnerStore,
       assetRefStore,
       mediaLibraryStore,
+      videoWorkspaceStore,
+      videoDraftStore,
       operation: physicalDelete,
       ownerProjectId: project.id,
       projectAssetIds: removedProjectAssetIds,
@@ -314,6 +322,8 @@ export async function deleteProjectAsset(id: string): Promise<void> {
       [
         PROJECT_ASSETS_STORE,
         MEDIA_LIBRARY_STORE,
+        VIDEO_WORKSPACES_STORE,
+        VIDEO_WORKSPACE_DRAFTS_STORE,
         ASSET_OWNERS_STORE,
         ASSET_REFS_STORE,
         ASSET_OPERATIONS_STORE,
@@ -328,8 +338,11 @@ export async function deleteProjectAsset(id: string): Promise<void> {
       deleteAssetOwner: () =>
         ownerStore.delete([PROJECT_ASSET_OWNER_KIND, id, PROJECT_MEDIA_ASSET_ROLE]),
       deleteAssetRef: (assetId) => tx.objectStore(ASSET_REFS_STORE).delete(assetId),
-      deleteMediaEntry: () =>
-        tx.objectStore(MEDIA_LIBRARY_STORE).delete(createProjectAssetMediaId(id)),
+      deleteMediaEntry: async () => {
+        await tx.objectStore(MEDIA_LIBRARY_STORE).delete(createProjectAssetMediaId(id));
+        await tx.objectStore(VIDEO_WORKSPACES_STORE).delete(createProjectAssetMediaId(id));
+        await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(createProjectAssetMediaId(id));
+      },
       entry,
       operation: physicalDelete,
       recordOperation: () => tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete),

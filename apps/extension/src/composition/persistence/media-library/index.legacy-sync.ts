@@ -1,3 +1,7 @@
+import {
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
+} from '../infrastructure/indexed-db/core.stores';
 import { MEDIA_LIBRARY_STORE, THUMBNAILS_STORE } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import {
@@ -42,8 +46,18 @@ export async function syncLegacyMediaLibrary(): Promise<void> {
     ]);
     const currentMap = new Map(currentEntries.map((entry) => [entry.id, entry]));
     const desiredManagedIds = new Set<string>();
-    const tx = db.transaction([MEDIA_LIBRARY_STORE, THUMBNAILS_STORE], 'readwrite');
-    const mediaStore = tx.objectStore(MEDIA_LIBRARY_STORE);
+    const tx = db.transaction(
+      [MEDIA_LIBRARY_STORE, THUMBNAILS_STORE, VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+      'readwrite'
+    );
+    const mediaStore: LegacyMediaStore = {
+      put: (value) => tx.objectStore(MEDIA_LIBRARY_STORE).put(value),
+      async delete(key) {
+        await tx.objectStore(MEDIA_LIBRARY_STORE).delete(key);
+        await tx.objectStore(VIDEO_WORKSPACES_STORE).delete(key);
+        await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(key);
+      },
+    };
     const thumbnailsStore = tx.objectStore(THUMBNAILS_STORE);
 
     await syncRecordingMirrors({

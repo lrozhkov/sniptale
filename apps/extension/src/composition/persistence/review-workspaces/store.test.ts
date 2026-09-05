@@ -1,0 +1,328 @@
+import { beforeEach, expect, it, vi } from 'vitest';
+import { betaV1Fixture } from '../infrastructure/indexed-db/fixtures/beta-v1';
+import type { ReviewAnnotation, ReviewOperation } from '../../../features/video/review/types';
+import { parseVideoWorkspace } from './parser';
+
+const harness = vi.hoisted(() => ({ database: vi.fn(), failure: false }));
+vi.mock('../infrastructure/indexed-db/core', () => ({
+  initDB: harness.database,
+  MEDIA_LIBRARY_STORE: 'media_library',
+  VIDEO_WORKSPACES_STORE: 'video_workspaces',
+  VIDEO_WORKSPACE_DRAFTS_STORE: 'video_workspace_drafts',
+}));
+vi.mock('../infrastructure/indexed-db/mutation', () => ({
+  runWithIndexedDbMutation: async (operation: (db: unknown) => Promise<unknown>) =>
+    operation(await harness.database()),
+}));
+
+import {
+  commitVideoWorkspace,
+  moveVideoWorkspaceHistory,
+  openVideoWorkspace,
+  readVideoWorkspace,
+  saveVideoWorkspaceDraft,
+} from './store';
+
+const id = 'recording:beta-v1-recording';
+const source = { duration: 12, width: 640, height: 360, mimeType: 'video/webm', size: 15 };
+const annotation: ReviewAnnotation = {
+  id: 'a',
+  text: 'Before',
+  anchor: { kind: 'point', time: 2 },
+};
+const operation: ReviewOperation = {
+  id: 'op1',
+  at: 1,
+  target: 'annotation',
+  before: null,
+  after: annotation,
+};
+let rows: Map<string, Map<string, unknown>>;
+
+beforeEach(() => {
+  harness.failure = false;
+  rows = new Map([
+    ['media_library', new Map([[id, betaV1Fixture.records.media_library[0]]])],
+    ['recordings', new Map([['beta-v1-recording', betaV1Fixture.records.recordings[0]]])],
+    ['project_assets', new Map()],
+    ['project_exports', new Map()],
+    ['video_workspaces', new Map()],
+    ['video_workspace_drafts', new Map()],
+  ]);
+  harness.database.mockResolvedValue({
+    transaction: (_stores: string[], mode: string) => {
+      const pending = structuredClone(rows);
+      let aborted = false;
+      return {
+        abort() {
+          aborted = true;
+        },
+        objectStore(name: string) {
+          const store = pending.get(name)!;
+          return {
+            get: async (key: string) => structuredClone(store.get(key)),
+            put: async (value: { aggregateId: string }) => {
+              if (harness.failure) throw new DOMException('No space', 'QuotaExceededError');
+              store.set(value.aggregateId, structuredClone(value));
+            },
+            delete: async (key: string) => {
+              store.delete(key);
+            },
+          };
+        },
+        get done() {
+          if (aborted) return Promise.reject(new DOMException('Aborted', 'AbortError'));
+          if (mode === 'readwrite') rows = pending;
+          return Promise.resolve();
+        },
+      };
+    },
+  });
+});
+
+it('reopens exactly one durable history and rejects missing, malformed or changed media', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  expect(opened.workspace.revision).toBe(1);
+  expect(await openVideoWorkspace(id, source)).toEqual(opened);
+  await expect(openVideoWorkspace(id, { ...source, duration: 14 })).rejects.toMatchObject({
+    code: 'changed-source',
+  });
+  await expect(openVideoWorkspace('missing', source)).rejects.toMatchObject({
+    code: 'missing-media',
+  });
+  await expect(openVideoWorkspace(id, { ...source, duration: Infinity })).rejects.toMatchObject({
+    code: 'invalid',
+  });
+  rows.get('video_workspaces')!.set(id, { broken: true });
+  await expect(readVideoWorkspace(id)).rejects.toMatchObject({ code: 'invalid' });
+  await expect(openVideoWorkspace(id, source)).rejects.toMatchObject({ code: 'invalid' });
+  expect(rows.get('video_workspaces')!.get(id)).toEqual({ broken: true });
+});
+
+it('recovers text separately and commits/consumes it in a single revisioned transaction', async () => {
+  await openVideoWorkspace(id, source);
+  const draft = await saveVideoWorkspaceDraft({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: 1,
+    expectedDraftRevision: null,
+    annotation,
+    before: null,
+  });
+  expect(draft.workspace.history).toEqual([]);
+  expect(draft.workspace.revision).toBe(1);
+  expect((await readVideoWorkspace(id))?.draft?.annotation.text).toBe('Before');
+  const committed = await commitVideoWorkspace({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: 1,
+    operation,
+    consumeDraftRevision: 1,
+  });
+  expect(committed.workspace.history).toEqual([operation]);
+  expect(committed.draft).toBeNull();
+  const undone = await moveVideoWorkspaceHistory({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: 2,
+    direction: 'undo',
+  });
+  expect(undone.workspace.cursor).toBe(0);
+  expect(undone.workspace.history).toEqual([operation]);
+  const reopened = await openVideoWorkspace(id, source);
+  expect(reopened.workspace).toEqual(undone.workspace);
+  const redone = await moveVideoWorkspaceHistory({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: 3,
+    direction: 'redo',
+  });
+  expect(redone.workspace.cursor).toBe(1);
+});
+
+it('rejects stale saves and preserves the old field and history after quota failure', async () => {
+  await openVideoWorkspace(id, source);
+  await saveVideoWorkspaceDraft({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: 1,
+    expectedDraftRevision: null,
+    annotation,
+    before: null,
+  });
+  await expect(
+    saveVideoWorkspaceDraft({
+      aggregateId: id,
+      expectedSourceAssetId: 'beta-v1-recording-asset',
+      expectedRevision: 1,
+      expectedDraftRevision: null,
+      annotation: { ...annotation, text: 'Stale' },
+      before: null,
+    })
+  ).rejects.toMatchObject({ code: 'conflict' });
+  await expect(
+    commitVideoWorkspace({
+      aggregateId: id,
+      expectedSourceAssetId: 'beta-v1-recording-asset',
+      expectedRevision: 1,
+      operation: { ...operation, after: { ...annotation, text: 'Different' } },
+      consumeDraftRevision: 1,
+    })
+  ).rejects.toMatchObject({ code: 'conflict' });
+  harness.failure = true;
+  await expect(
+    commitVideoWorkspace({
+      aggregateId: id,
+      expectedSourceAssetId: 'beta-v1-recording-asset',
+      expectedRevision: 1,
+      operation,
+      consumeDraftRevision: 1,
+    })
+  ).rejects.toMatchObject({ name: 'QuotaExceededError' });
+  const restored = await readVideoWorkspace(id);
+  expect(restored?.workspace.history).toEqual([]);
+  expect(restored?.draft?.annotation.text).toBe('Before');
+  harness.failure = false;
+  await commitVideoWorkspace({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: 1,
+    operation,
+    consumeDraftRevision: 1,
+  });
+  await expect(
+    commitVideoWorkspace({
+      aggregateId: id,
+      expectedSourceAssetId: 'beta-v1-recording-asset',
+      expectedRevision: 1,
+      operation,
+    })
+  ).rejects.toMatchObject({ code: 'conflict' });
+});
+
+it('does not let an old field writer overwrite a new draft after discard', async () => {
+  await openVideoWorkspace(id, source);
+  await saveVideoWorkspaceDraft({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: 1,
+    expectedDraftRevision: null,
+    annotation,
+    before: null,
+  });
+  const discarded = await saveVideoWorkspaceDraft({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: 1,
+    expectedDraftRevision: 1,
+    annotation: null,
+    before: null,
+  });
+  expect(discarded.workspace.history).toEqual([]);
+  await saveVideoWorkspaceDraft({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: 2,
+    expectedDraftRevision: null,
+    annotation: { ...annotation, text: 'New field' },
+    before: null,
+  });
+  await expect(
+    saveVideoWorkspaceDraft({
+      aggregateId: id,
+      expectedSourceAssetId: 'beta-v1-recording-asset',
+      expectedRevision: 1,
+      expectedDraftRevision: 1,
+      annotation,
+      before: null,
+    })
+  ).rejects.toMatchObject({ code: 'conflict' });
+});
+
+it('retains more than 100 operations, with persistent undo cursor and strict redo branching', async () => {
+  let snapshot = await openVideoWorkspace(id, source);
+  for (let index = 0; index < 110; index++) {
+    snapshot = await commitVideoWorkspace({
+      aggregateId: id,
+      expectedSourceAssetId: 'beta-v1-recording-asset',
+      expectedRevision: snapshot.workspace.revision,
+      operation: { ...operation, id: `op${index}`, after: { ...annotation, id: `a${index}` } },
+    });
+  }
+  expect((await readVideoWorkspace(id))?.workspace.history).toHaveLength(110);
+  snapshot = await moveVideoWorkspaceHistory({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: snapshot.workspace.revision,
+    direction: 'undo',
+  });
+  snapshot = await commitVideoWorkspace({
+    aggregateId: id,
+    expectedSourceAssetId: 'beta-v1-recording-asset',
+    expectedRevision: snapshot.workspace.revision,
+    operation: { ...operation, id: 'branch', after: { ...annotation, id: 'branch' } },
+  });
+  expect(snapshot.workspace.history.at(-1)?.id).toBe('branch');
+  expect(snapshot.workspace.history).toHaveLength(110);
+  expect(
+    await moveVideoWorkspaceHistory({
+      aggregateId: id,
+      expectedSourceAssetId: 'beta-v1-recording-asset',
+      expectedRevision: snapshot.workspace.revision,
+      direction: 'redo',
+    })
+  ).toEqual(snapshot);
+});
+
+it('validates duplicate operations and the entire redo suffix before accepting stored history', async () => {
+  const { workspace } = await openVideoWorkspace(id, source);
+  expect(
+    parseVideoWorkspace({ ...workspace, history: [operation, operation], cursor: 0 })
+  ).toBeNull();
+  expect(
+    parseVideoWorkspace({
+      ...workspace,
+      history: [{ ...operation, before: annotation, after: null }],
+      cursor: 0,
+    })
+  ).toBeNull();
+  expect(parseVideoWorkspace({ ...workspace, revision: Infinity })).toBeNull();
+  expect(parseVideoWorkspace({ ...workspace, cursor: 1 })).toBeNull();
+  rows.get('video_workspace_drafts')!.set(id, { aggregateId: 'wrong' });
+  await expect(readVideoWorkspace(id)).rejects.toMatchObject({ code: 'invalid' });
+});
+
+it('refuses edits against replaced original bytes without deleting the old session', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  rows
+    .get('recordings')!
+    .set('beta-v1-recording', { ...betaV1Fixture.records.recordings[0], assetId: 'replacement' });
+  await expect(openVideoWorkspace(id, source)).rejects.toMatchObject({ code: 'changed-source' });
+  await expect(
+    commitVideoWorkspace({
+      aggregateId: id,
+      expectedSourceAssetId: 'beta-v1-recording-asset',
+      expectedRevision: 1,
+      operation,
+    })
+  ).rejects.toMatchObject({ code: 'changed-source' });
+  expect(rows.get('video_workspaces')!.get(id)).toEqual(opened.workspace);
+});
+
+it('rejects a stale tab after restore even when imported history has the same numeric revision', async () => {
+  const opened = await openVideoWorkspace(id, source);
+  rows.get('recordings')!.set('beta-v1-recording', {
+    ...betaV1Fixture.records.recordings[0],
+    assetId: 'restored-local',
+  });
+  rows.get('video_workspaces')!.set(id, { ...opened.workspace, sourceAssetId: 'restored-local' });
+  await expect(
+    commitVideoWorkspace({
+      aggregateId: id,
+      expectedRevision: 1,
+      expectedSourceAssetId: 'beta-v1-recording-asset',
+      operation,
+    })
+  ).rejects.toMatchObject({ code: 'conflict' });
+  expect((await readVideoWorkspace(id))?.workspace.history).toEqual([]);
+});

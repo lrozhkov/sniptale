@@ -8,6 +8,7 @@ import { buildVideoProjectRootInventory } from './video-projects';
 
 function database(rows: unknown[]) {
   return {
+    transaction: emptyReviewTransaction,
     get: vi.fn(async () => undefined),
     getAll: vi.fn(async () => rows),
     getAllFromIndex: vi.fn(async () => []),
@@ -64,3 +65,7 @@ describe('project draft archive inventory', () => {
     expect(root?.summary.draftCount).toBe(1);
   });
 });
+
+function emptyReviewTransaction() {
+  return { objectStore: () => ({ get: async () => undefined }), done: Promise.resolve() };
+}

@@ -1,3 +1,4 @@
+import { parsePortableMediaMetadata } from '../root-codecs/media';
 import { describe, expect, it, vi } from 'vitest';
 import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
 
@@ -64,13 +65,88 @@ function ref(assetId: string) {
   };
 }
 
+it.each([true, false])(
+  'backs up selected export without parent, explicit MIME=%s',
+  async (explicitMime) => {
+    const entry = mediaEntry({
+      id: 'export:selected',
+      kind: 'export',
+      mimeType: 'video/webm',
+      source: { kind: 'project-export', exportId: 'selected', projectId: 'not-selected' },
+      filename: 'result.webm',
+      originalFilename: 'result.webm',
+      duration: 1,
+      size: 6,
+    });
+    const review = {
+      aggregateId: entry.id,
+      formatVersion: 1,
+      sourceAssetId: 'video-object',
+      source: { duration: 1, width: 100, height: 80, size: 6, mimeType: 'video/webm' },
+      revision: 1,
+      cursor: 0,
+      history: [],
+      createdAt: 1,
+      updatedAt: 1,
+    };
+    const db = {
+      transaction: () => ({
+        objectStore: (store: string) => ({
+          get: async () => (store === 'video_workspaces' ? review : undefined),
+        }),
+        done: Promise.resolve(),
+      }),
+      get: vi.fn(async (store: string) => {
+        if (store === 'media_library') return entry;
+        if (store === 'project_exports')
+          return {
+            id: 'selected',
+            projectId: 'not-selected',
+            assetId: 'video-object',
+            filename: 'result.webm',
+            createdAt: 1,
+            duration: 1,
+            width: 100,
+            height: 80,
+            fps: 30,
+            size: 6,
+            ...(explicitMime ? { mimeType: 'video/webm' } : {}),
+          };
+        if (store === 'asset_refs') return { ...ref('video-object'), mimeType: 'video/webm' };
+        return undefined;
+      }),
+    };
+    mocks.readFile.mockResolvedValue(new File(['video!'], 'result.webm', { type: 'video/webm' }));
+    const roots = await buildMediaRootInventory({
+      db,
+      items: [item(entry)],
+      options: createMediaHubBackupExportOptions({
+        scope: 'selected',
+        selected: {
+          mediaAssetIds: [entry.id],
+          scenarioProjectIds: [],
+          videoProjectIds: [],
+        },
+      }),
+      paths: createArchivePathAllocator(),
+    });
+    expect(roots).toHaveLength(1);
+    expect(roots[0]?.descriptor.rootKind).toBe('media');
+    expect(roots[0]?.descriptor.rootId).toBe('export:selected');
+    const payload = await roots[0]!.load();
+    const portable = parsePortableMediaMetadata(payload.metadata);
+    expect(portable.videoReview?.workspace.aggregateId).toBe(entry.id);
+    expect(portable.videoReview?.workspace.history).toEqual([]);
+  }
+);
+
 describe('media v6 root inventory', () => {
   it('excludes drafts by default and places included drafts in readable folders', async () => {
     const entry = mediaEntry({
       id: 'draft-image',
       lifecycle: { savedAt: null, storageClass: 'temporary', updatedAt: 2 },
     });
-    const db = { get: vi.fn(async () => entry) };
+    const db = { transaction: emptyReviewTransaction, get: vi.fn(async () => entry) };
     await expect(
       buildMediaRootInventory({
         db,
@@ -98,6 +174,7 @@ describe('media v6 root inventory', () => {
       'workspace-source'
     );
     const db = {
+      transaction: emptyReviewTransaction,
       get: vi.fn(async (store: string) => {
         if (store === 'media_library') return entry;
         if (store === 'image_workspaces') {
@@ -168,6 +245,7 @@ describe('media v6 root inventory', () => {
       width: 1280,
     });
     const db = {
+      transaction: emptyReviewTransaction,
       get: vi.fn(async (store: string) => {
         if (store === 'media_library') return entry;
         if (store === 'recordings') {
@@ -223,7 +301,7 @@ describe('media v6 root inventory', () => {
       mimeType: 'audio/webm',
     });
     const [root] = await buildMediaRootInventory({
-      db: { get: vi.fn(async () => entry) },
+      db: { transaction: emptyReviewTransaction, get: vi.fn(async () => entry) },
       items: [item(entry)],
       options: createMediaHubBackupExportOptions(),
       paths: createArchivePathAllocator(),
@@ -264,6 +342,7 @@ describe('media v6 root inventory', () => {
       )
       .mockResolvedValueOnce(new File(['image'], 'snapshot.png', { type: 'image/png' }));
     const db = {
+      transaction: emptyReviewTransaction,
       get: vi.fn(async (store: string) => {
         if (store === 'media_library') return entry;
         if (store === 'web_snapshots') return stored;
@@ -303,3 +382,7 @@ describe('media v6 root inventory', () => {
     );
   });
 });
+
+function emptyReviewTransaction() {
+  return { objectStore: () => ({ get: async () => undefined }), done: Promise.resolve() };
+}

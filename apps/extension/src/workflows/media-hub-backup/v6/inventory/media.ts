@@ -1,3 +1,15 @@
+import {
+  readVideoReviewForBackup,
+  type VideoReviewBackupDatabase,
+} from '../../../../composition/persistence/review-workspaces/backup-restore';
+import {
+  PROJECT_ASSETS_STORE,
+  PROJECT_EXPORTS_STORE,
+} from '../../../../composition/persistence/infrastructure/indexed-db/core.stores';
+import {
+  parseProjectAssetEntry,
+  parseProjectExportEntry,
+} from '../../../../composition/persistence/projects/read-guards';
 import type { ArchivePathAllocator } from '../../../../composition/archive-transfer';
 import { parseAssetRef, readAssetFile } from '../../../../composition/persistence/assets';
 import { parseImageWorkspaceEntry } from '../../../../composition/persistence/image-workspaces/parser';
@@ -33,7 +45,7 @@ import { METADATA_ROOT, withDraftRoot } from '../layout';
 import { PAGE_PACKAGE_ARCHIVE_MIME_TYPE } from '@sniptale/runtime-contracts/page-package';
 import { buildPortableAggregatePresentation } from './presentation';
 
-interface MediaInventoryDatabase {
+interface MediaInventoryDatabase extends VideoReviewBackupDatabase {
   get(store: string, key: unknown): Promise<unknown>;
 }
 
@@ -67,7 +79,11 @@ async function readRefFile(
 }
 
 function selected(item: MediaLibraryItem, options: MediaHubBackupExportOptions): boolean {
-  if (item.source.kind === 'project-asset' || item.source.kind === 'project-export') return false;
+  if (
+    (item.source.kind === 'project-asset' || item.source.kind === 'project-export') &&
+    !item.mimeType.startsWith('video/')
+  )
+    return false;
   if (item.source.kind === 'web-snapshot' && !options.includeWebSnapshots) return false;
   const explicitlySelected = Boolean(options.selected?.mediaAssetIds.includes(item.id));
   if (item.lifecycle?.storageClass === 'temporary' && !options.includeDrafts) return false;
@@ -243,7 +259,12 @@ async function buildMediaSource(args: {
   entry: MediaLibraryEntry;
   options: MediaHubBackupExportOptions;
 }): Promise<
-  Partial<Pick<PortableMediaMetadata, 'recording' | 'webSnapshot'>> & {
+  Partial<
+    Pick<
+      PortableMediaMetadata,
+      'recording' | 'webSnapshot' | 'projectAsset' | 'projectExport' | 'videoReview'
+    >
+  > & {
     originalObjectId: string;
   }
 > {
@@ -260,12 +281,49 @@ async function buildMediaSource(args: {
     };
   }
   if (entry.source.kind === 'recording') {
-    return buildRecordingSource({ ...args, entry, recordingId: entry.source.recordingId });
+    const recording = parseRecordingEntry(await args.db.get(STORE_NAME, entry.source.recordingId));
+    if (!recording) throw new Error('Recording source is missing.');
+    const videoReview = await readVideoReviewForBackup({
+      db: args.db,
+      aggregateId: entry.id,
+      sourceAssetId: recording.assetId,
+    });
+    return {
+      ...(await buildRecordingSource({ ...args, entry, recordingId: entry.source.recordingId })),
+      ...(videoReview ? { videoReview } : {}),
+    };
   }
   if (entry.source.kind === 'web-snapshot') {
     return buildWebSnapshotSource({ ...args, entry, snapshotId: entry.source.snapshotId });
   }
-  throw new Error('Project-owned media mirror escaped the project root inventory.');
+  const child =
+    entry.source.kind === 'project-asset'
+      ? parseProjectAssetEntry(await args.db.get(PROJECT_ASSETS_STORE, entry.source.projectAssetId))
+      : parseProjectExportEntry(await args.db.get(PROJECT_EXPORTS_STORE, entry.source.exportId));
+  if (!child || !entry.mimeType.startsWith('video/'))
+    throw new Error('Project video source is missing.');
+  const file = await readRefFile(args.db, child.assetId, entry.filename);
+  const videoReview = await readVideoReviewForBackup({
+    db: args.db,
+    aggregateId: entry.id,
+    sourceAssetId: child.assetId,
+  });
+  const originalObjectId = args.collector.add(
+    file,
+    entry.filename,
+    entry.mimeType,
+    mediaObjectDirectory(entry, args.options)
+  );
+  if (entry.source.kind === 'project-asset') {
+    const asset = parseProjectAssetEntry(child);
+    if (!asset) throw new Error('Project video asset is invalid.');
+    const { assetId: _localId, ...projectAsset } = asset;
+    return { originalObjectId, projectAsset, ...(videoReview ? { videoReview } : {}) };
+  }
+  const exportEntry = parseProjectExportEntry(child);
+  if (!exportEntry) throw new Error('Project video export is invalid.');
+  const { assetId: _exportLocalId, ...projectExport } = exportEntry;
+  return { originalObjectId, projectExport, ...(videoReview ? { videoReview } : {}) };
 }
 
 async function buildThumbnail(args: {
@@ -379,6 +437,9 @@ async function buildMediaRoot(args: {
     originalObjectId: source.originalObjectId,
     ...(presentation ? { presentation } : {}),
     ...(source.recording ? { recording: source.recording } : {}),
+    ...(source.projectAsset ? { projectAsset: source.projectAsset } : {}),
+    ...(source.projectExport ? { projectExport: source.projectExport } : {}),
+    ...(source.videoReview ? { videoReview: source.videoReview } : {}),
     ...(thumbnail ? { thumbnail } : {}),
     ...(source.webSnapshot ? { webSnapshot: source.webSnapshot } : {}),
     ...(workspace ? { workspace } : {}),
@@ -400,12 +461,13 @@ async function buildMediaRoot(args: {
 export async function buildMediaRootInventory(args: {
   db: MediaInventoryDatabase;
   items: MediaLibraryItem[];
+  coveredProjectMediaIds?: ReadonlySet<string>;
   options: MediaHubBackupExportOptions;
   paths: ArchivePathAllocator;
 }): Promise<MediaHubBackupRootInventoryItem[]> {
   const roots: MediaHubBackupRootInventoryItem[] = [];
   const items = args.items
-    .filter((item) => selected(item, args.options))
+    .filter((item) => selected(item, args.options) && !args.coveredProjectMediaIds?.has(item.id))
     .sort((a, b) => a.id.localeCompare(b.id));
   for (const [rootIndex, item] of items.entries()) {
     roots.push(await buildMediaRoot({ ...args, item, rootIndex }));

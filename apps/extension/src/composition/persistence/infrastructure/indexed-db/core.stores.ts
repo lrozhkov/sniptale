@@ -1,7 +1,7 @@
 // This is the first stable beta persistence generation. Alpha databases use a different name and
 // are intentionally excluded from the supported migration graph.
 export const DB_NAME = 'sniptale-db';
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 export const LEGACY_ALPHA_DB_NAMES = ['sniptale-video-db'] as const;
 export const ALPHA_RESET_JOURNAL_KEY = 'sniptale.persistence.alpha-reset.v1';
 export const DATABASE_RESET_JOURNAL_KEY = 'sniptale.persistence.database-reset.v1';
@@ -22,6 +22,8 @@ export const SCENARIO_STEP_EDITOR_DOCUMENTS_STORE = 'scenario_step_editor_docume
 export const MEDIA_LIBRARY_STORE = 'media_library';
 export const THUMBNAILS_STORE = 'thumbnails';
 export const IMAGE_WORKSPACES_STORE = 'image_workspaces';
+export const VIDEO_WORKSPACES_STORE = 'video_workspaces';
+export const VIDEO_WORKSPACE_DRAFTS_STORE = 'video_workspace_drafts';
 export const AGGREGATE_PRESENTATIONS_STORE = 'aggregate_presentations';
 export const WEB_SNAPSHOTS_STORE = 'web_snapshots';
 export const VIDEO_EFFECT_BUNDLES_STORE = 'video_effect_bundles';
@@ -52,6 +54,8 @@ export const EXPECTED_STORES = [
   MEDIA_LIBRARY_STORE,
   THUMBNAILS_STORE,
   IMAGE_WORKSPACES_STORE,
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
   AGGREGATE_PRESENTATIONS_STORE,
   WEB_SNAPSHOTS_STORE,
   VIDEO_EFFECT_BUNDLES_STORE,
@@ -83,6 +87,8 @@ export const EXPECTED_INDEXES = {
   [MEDIA_LIBRARY_STORE]: ['createdAt', 'kind'],
   [THUMBNAILS_STORE]: [],
   [IMAGE_WORKSPACES_STORE]: ['updatedAt'],
+  [VIDEO_WORKSPACES_STORE]: ['updatedAt'],
+  [VIDEO_WORKSPACE_DRAFTS_STORE]: ['updatedAt'],
   [AGGREGATE_PRESENTATIONS_STORE]: ['updatedAt'],
   [WEB_SNAPSHOTS_STORE]: ['createdAt'],
   [VIDEO_EFFECT_BUNDLES_STORE]: ['enabled', 'updatedAt'],

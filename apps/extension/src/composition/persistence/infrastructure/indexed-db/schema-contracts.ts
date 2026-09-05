@@ -8,6 +8,8 @@ import {
   EDITOR_CUSTOM_SHAPES_STORE,
   FRAME_ANNOTATION_RASTER_JOBS_STORE,
   IMAGE_WORKSPACES_STORE,
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
   MEDIA_LIBRARY_STORE,
   NATIVE_TRANSFER_CHUNKS_STORE,
   NATIVE_TRANSFER_SESSIONS_STORE,
@@ -71,11 +73,13 @@ export const PERSISTENCE_DOMAIN_REGISTRY = [
   },
   {
     domainId: 'mediaLibrary',
-    schemaVersion: 1,
+    schemaVersion: 2,
     stores: [
       { storeName: MEDIA_LIBRARY_STORE, dataClass: 'durable-authority' },
       { storeName: THUMBNAILS_STORE, dataClass: 'derived-rebuildable' },
       { storeName: IMAGE_WORKSPACES_STORE, dataClass: 'durable-authority' },
+      { storeName: VIDEO_WORKSPACES_STORE, dataClass: 'durable-authority' },
+      { storeName: VIDEO_WORKSPACE_DRAFTS_STORE, dataClass: 'durable-authority' },
       { storeName: AGGREGATE_PRESENTATIONS_STORE, dataClass: 'derived-rebuildable' },
     ],
   },
@@ -170,7 +174,36 @@ export interface DatabaseMigrationDescriptor {
 
 // The beta baseline has no predecessor. Every future database version must append a complete,
 // contiguous descriptor and retain the fixtures for every released beta source version.
-export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [];
+export const DATABASE_MIGRATIONS: readonly DatabaseMigrationDescriptor[] = [
+  {
+    backupCoverage: 'none',
+    domainVersions: [{ domainId: 'mediaLibrary', from: 1, to: 2 }],
+    estimateAdditionalBytes: async () => 64 * 1024,
+    fromDatabaseVersion: 1,
+    toDatabaseVersion: 2,
+    risk: 'additive',
+    stores: [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_DRAFTS_STORE],
+    migrate(db) {
+      for (const name of [VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_DRAFTS_STORE]) {
+        db.createObjectStore(name, { keyPath: 'aggregateId' }).createIndex(
+          'updatedAt',
+          'updatedAt'
+        );
+      }
+      return undefined;
+    },
+    validate(db) {
+      if (
+        ![VIDEO_WORKSPACES_STORE, VIDEO_WORKSPACE_DRAFTS_STORE].every((name) =>
+          db.objectStoreNames.contains(name)
+        )
+      ) {
+        throw new Error('Video workspace schema creation failed.');
+      }
+      return undefined;
+    },
+  },
+];
 
 export function buildDatabaseMigrationPlan(
   fromDatabaseVersion: number,

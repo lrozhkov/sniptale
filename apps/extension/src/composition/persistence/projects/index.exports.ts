@@ -1,4 +1,8 @@
 import {
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
+} from '../infrastructure/indexed-db/core.stores';
+import {
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
   ASSET_REFS_STORE,
@@ -123,6 +127,8 @@ export async function deleteProjectExport(id: string): Promise<void> {
       [
         PROJECT_EXPORTS_STORE,
         MEDIA_LIBRARY_STORE,
+        VIDEO_WORKSPACES_STORE,
+        VIDEO_WORKSPACE_DRAFTS_STORE,
         ASSET_OWNERS_STORE,
         ASSET_REFS_STORE,
         ASSET_OPERATIONS_STORE,
@@ -137,8 +143,11 @@ export async function deleteProjectExport(id: string): Promise<void> {
       deleteAssetOwner: () =>
         ownerStore.delete([PROJECT_EXPORT_OWNER_KIND, id, PROJECT_MEDIA_ASSET_ROLE]),
       deleteAssetRef: (assetId) => tx.objectStore(ASSET_REFS_STORE).delete(assetId),
-      deleteMediaEntry: () =>
-        tx.objectStore(MEDIA_LIBRARY_STORE).delete(createProjectExportMediaId(id)),
+      deleteMediaEntry: async () => {
+        await tx.objectStore(MEDIA_LIBRARY_STORE).delete(createProjectExportMediaId(id));
+        await tx.objectStore(VIDEO_WORKSPACES_STORE).delete(createProjectExportMediaId(id));
+        await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(createProjectExportMediaId(id));
+      },
       entry,
       operation: physicalDelete,
       recordOperation: () => tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete),

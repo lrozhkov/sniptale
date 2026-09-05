@@ -1,4 +1,8 @@
 import {
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
+} from '../infrastructure/indexed-db/core.stores';
+import {
   initDB,
   ASSET_OWNERS_STORE,
   ASSET_OPERATIONS_STORE,
@@ -70,6 +74,8 @@ export async function deleteRecording(id: string): Promise<void> {
       [
         STORE_NAME,
         MEDIA_LIBRARY_STORE,
+        VIDEO_WORKSPACES_STORE,
+        VIDEO_WORKSPACE_DRAFTS_STORE,
         RECORDING_TELEMETRY_STORE,
         ASSET_OWNERS_STORE,
         ASSET_REFS_STORE,
@@ -81,6 +87,8 @@ export async function deleteRecording(id: string): Promise<void> {
     let deleteObject = false;
     await tx.objectStore(STORE_NAME).delete(id);
     await tx.objectStore(MEDIA_LIBRARY_STORE).delete(createRecordingMediaId(id));
+    await tx.objectStore(VIDEO_WORKSPACES_STORE).delete(createRecordingMediaId(id));
+    await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(createRecordingMediaId(id));
     await tx.objectStore(RECORDING_TELEMETRY_STORE).delete(id);
     if (entry) {
       const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);

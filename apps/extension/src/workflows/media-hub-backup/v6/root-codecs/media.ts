@@ -10,6 +10,19 @@ import type { StoredWebSnapshotRecord } from '../../../../composition/persistenc
 import type { StoredImageWorkspaceEntry } from '../../../../composition/persistence/image-workspaces/contracts';
 import type { AggregatePresentationEntry } from '../../../../composition/persistence/aggregate-presentations/contracts';
 import type { PortableEditorDocumentV3 } from './editor-document';
+import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
+import {
+  parseProjectAssetEntry,
+  parseProjectExportEntry,
+} from '../../../../composition/persistence/projects/read-guards';
+import type {
+  StoredProjectAssetEntry,
+  StoredProjectExportEntry,
+} from '../../../../composition/persistence/projects/contracts';
+import {
+  parsePortableVideoReview,
+  type PortableVideoReview,
+} from '../../../../composition/persistence/review-workspaces/backup-restore';
 
 export interface PortableMediaThumbnail {
   objectId: string;
@@ -28,6 +41,9 @@ export interface PortableAggregatePresentation {
 export interface PortableMediaMetadata {
   entry: Omit<MediaLibraryEntry, 'blob'>;
   originalObjectId: string;
+  projectAsset?: Omit<StoredProjectAssetEntry, 'assetId'>;
+  projectExport?: Omit<StoredProjectExportEntry, 'assetId'>;
+  videoReview?: PortableVideoReview;
   thumbnail?: PortableMediaThumbnail;
   recording?: {
     entry: Omit<StoredRecordingEntry, 'assetId'>;
@@ -82,8 +98,15 @@ export function parsePortableMediaMetadata(value: unknown): PortableMediaMetadat
   ) {
     throw new Error('Portable media root metadata is invalid.');
   }
-  const metadata = value as Partial<PortableMediaMetadata>;
-  if (metadata.recording && metadata.webSnapshot) {
+  const metadata = { ...value } as Partial<PortableMediaMetadata>;
+  if (
+    [
+      metadata.recording,
+      metadata.webSnapshot,
+      metadata.projectAsset,
+      metadata.projectExport,
+    ].filter((owner) => owner !== undefined).length > 1
+  ) {
     throw new Error('Portable media root has multiple durable byte owners.');
   }
   if (
@@ -115,5 +138,56 @@ export function parsePortableMediaMetadata(value: unknown): PortableMediaMetadat
   ) {
     throw new Error('Portable web snapshot role association is invalid.');
   }
+  validateProjectMedia(metadata);
+  if (metadata.videoReview !== undefined) {
+    if (!metadata.entry || !metadata.entry.mimeType.startsWith('video/'))
+      throw new Error('Video review requires video media.');
+    metadata.videoReview = parsePortableVideoReview(metadata.videoReview, metadata.entry.id);
+    if (metadata.videoReview.workspace.source.size !== metadata.entry.size)
+      throw new Error('Video review source size is inconsistent.');
+  }
   return metadata as PortableMediaMetadata;
+}
+
+function validateProjectMedia(metadata: Partial<PortableMediaMetadata>): void {
+  const source = metadata.entry?.source;
+  if (metadata.projectAsset !== undefined || source?.kind === 'project-asset') {
+    const raw: unknown = metadata.projectAsset;
+    const parsed =
+      isRecord(raw) && !('assetId' in raw)
+        ? parseProjectAssetEntry({ ...raw, assetId: 'portable' })
+        : null;
+    if (
+      !parsed ||
+      source?.kind !== 'project-asset' ||
+      source.projectAssetId !== parsed.id ||
+      metadata.entry?.id !== `project-asset:${parsed.id}` ||
+      !parsed.mimeType.startsWith('video/') ||
+      metadata.entry.mimeType !== parsed.mimeType
+    ) {
+      throw new Error('Portable project video asset association is invalid.');
+    }
+    const { assetId: _localId, ...portable } = parsed;
+    metadata.projectAsset = portable;
+  }
+  if (metadata.projectExport !== undefined || source?.kind === 'project-export') {
+    const raw: unknown = metadata.projectExport;
+    const parsed =
+      isRecord(raw) && !('assetId' in raw)
+        ? parseProjectExportEntry({ ...raw, assetId: 'portable' })
+        : null;
+    if (
+      !parsed ||
+      source?.kind !== 'project-export' ||
+      source.exportId !== parsed.id ||
+      source.projectId !== parsed.projectId ||
+      metadata.entry?.id !== `export:${parsed.id}` ||
+      !(parsed.mimeType ?? 'video/webm').startsWith('video/') ||
+      metadata.entry.mimeType !== (parsed.mimeType ?? 'video/webm')
+    ) {
+      throw new Error('Portable project video export association is invalid.');
+    }
+    const { assetId: _localId, ...portable } = parsed;
+    metadata.projectExport = portable;
+  }
 }

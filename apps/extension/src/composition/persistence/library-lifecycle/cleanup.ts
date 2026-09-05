@@ -1,4 +1,8 @@
 import {
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
+} from '../infrastructure/indexed-db/core.stores';
+import {
   AGGREGATE_PRESENTATIONS_STORE,
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
@@ -358,6 +362,8 @@ async function cleanupVideoProjectMedia(args: {
   refStore: CleanupMutableStore;
   thumbnailStore: CleanupDeleteStore;
   workspaceStore: CleanupMutableStore;
+  videoWorkspaceStore: CleanupDeleteStore;
+  videoDraftStore: CleanupDeleteStore;
 }): Promise<void> {
   for (const raw of await args.mediaStore.getAll()) {
     const media = parseMediaLibraryEntry(raw);
@@ -379,6 +385,8 @@ async function cleanupVideoProjectMedia(args: {
     }
     if (cleanup.kind !== 'delete') continue;
     await args.mediaStore.delete(media.id);
+    await args.videoWorkspaceStore.delete(media.id);
+    await args.videoDraftStore.delete(media.id);
     await args.thumbnailStore.delete(media.id);
     await deleteImageAggregateSidecars({
       aggregateId: media.id,
@@ -434,6 +442,8 @@ async function deleteExpiredMedia(
     const tx = db.transaction(
       [
         MEDIA_LIBRARY_STORE,
+        VIDEO_WORKSPACES_STORE,
+        VIDEO_WORKSPACE_DRAFTS_STORE,
         THUMBNAILS_STORE,
         IMAGE_WORKSPACES_STORE,
         AGGREGATE_PRESENTATIONS_STORE,
@@ -478,6 +488,8 @@ async function deleteExpiredMedia(
     }
 
     await mediaStore.delete(id);
+    await tx.objectStore(VIDEO_WORKSPACES_STORE).delete(id);
+    await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(id);
     await tx.objectStore(THUMBNAILS_STORE).delete(id);
     await deleteImageAggregateSidecars({
       aggregateId: id,
@@ -536,6 +548,8 @@ async function deleteExpiredVideoProjectGraph(args: {
         VIDEO_PROJECTS_STORE,
         STORE_NAME,
         MEDIA_LIBRARY_STORE,
+        VIDEO_WORKSPACES_STORE,
+        VIDEO_WORKSPACE_DRAFTS_STORE,
         THUMBNAILS_STORE,
         PROJECT_ASSETS_STORE,
         IMAGE_WORKSPACES_STORE,
@@ -565,6 +579,8 @@ async function deleteExpiredVideoProjectGraph(args: {
     await cleanupVideoProjectMedia({
       context: args,
       mediaStore: tx.objectStore(MEDIA_LIBRARY_STORE),
+      videoWorkspaceStore: tx.objectStore(VIDEO_WORKSPACES_STORE),
+      videoDraftStore: tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE),
       operation,
       ownerStore: tx.objectStore(ASSET_OWNERS_STORE),
       presentationStore,
