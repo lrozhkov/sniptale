@@ -218,7 +218,8 @@ it('moves the selected clip through pointer listeners and clears interaction on 
     window.dispatchEvent(new Event('pointerup'));
   });
 
-  expect(onMoveClip).toHaveBeenCalledWith('clip-1', 10, project.tracks[0]!.id, 'line-1');
+  expect(onMoveClip).toHaveBeenCalledOnce();
+  expect(onMoveClip).toHaveBeenCalledWith('clip-1', 11, project.tracks[0]!.id, 'line-1');
   expect(onTrimClipStart).not.toHaveBeenCalled();
   expect(onTrimClipEnd).not.toHaveBeenCalled();
   expect(beginProjectHistoryTransaction).toHaveBeenCalledOnce();
@@ -517,6 +518,8 @@ it('moves clips to the intended track when rows have mixed heights', () => {
     dispatchTimelinePointerMove(100, 120);
   });
 
+  expect(onMoveClip).not.toHaveBeenCalled();
+  act(() => window.dispatchEvent(new Event('pointerup')));
   expect(onMoveClip).toHaveBeenLastCalledWith('clip-1', 5, project.tracks[1]!.id, 'line-1');
 });
 
@@ -553,6 +556,8 @@ it('maps vertical movement to the physical track and its base lane', () => {
     dispatchTimelinePointerMove(130, 53);
   });
 
+  expect(onMoveClip).not.toHaveBeenCalled();
+  act(() => window.dispatchEvent(new Event('pointerup')));
   expect(onMoveClip).toHaveBeenLastCalledWith('clip-1', 8, project.tracks[1]!.id, 'line-1');
 });
 
@@ -589,5 +594,7 @@ it('keeps the current logical lane during horizontal clip drags', () => {
     dispatchTimelinePointerMove(150, 20);
   });
 
+  expect(onMoveClip).not.toHaveBeenCalled();
+  act(() => window.dispatchEvent(new Event('pointerup')));
   expect(onMoveClip).toHaveBeenLastCalledWith('clip-1', 10, project.tracks[0]!.id, 'line-1');
 });

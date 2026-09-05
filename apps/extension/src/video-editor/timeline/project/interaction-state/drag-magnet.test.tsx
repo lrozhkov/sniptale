@@ -147,10 +147,12 @@ it('snaps the nearest moving edge and clears its guide in one history transactio
     pointerMove(114);
   });
 
-  expect(onMoveClip).toHaveBeenLastCalledWith('clip-1', 7, project.tracks[0]!.id, 'line-1');
+  expect(onMoveClip).not.toHaveBeenCalled();
   expect(harness.ghosts.at(-1)?.startTime).toBe(7);
   expect(harness.guides.at(-1)).toBe(10);
   act(() => window.dispatchEvent(new Event('pointerup')));
+  expect(onMoveClip).toHaveBeenCalledOnce();
+  expect(onMoveClip).toHaveBeenLastCalledWith('clip-1', 7, project.tracks[0]!.id, 'line-1');
   expect(harness.guides.at(-1)).toBeNull();
   expect(history.beginProjectHistoryTransaction).toHaveBeenCalledOnce();
   expect(history.endProjectHistoryTransaction).toHaveBeenCalledOnce();
@@ -167,6 +169,7 @@ it('uses the live playhead target after the drag has started', () => {
   harness.render(8);
   act(() => pointerMove(124));
 
+  act(() => window.dispatchEvent(new Event('pointerup')));
   expect(onMoveClip).toHaveBeenLastCalledWith('clip-1', 8, project.tracks[0]!.id, 'line-1');
 });
 
@@ -183,6 +186,7 @@ it('keeps motion regions and the dragged clip own edges out of clip targets', ()
     pointerMove(114);
   });
 
+  act(() => window.dispatchEvent(new Event('pointerup')));
   expect(onMoveClip).toHaveBeenLastCalledWith('clip-1', 6.4, project.tracks[0]!.id, 'line-1');
   expect(harness.guides.at(-1)).toBeNull();
 });
@@ -208,6 +212,7 @@ it('supports disabled Magnet and transient Alt bypass near an eligible edge', ()
     alt.begin()?.(pointerStart(), clip, 'move');
     pointerMove(114, true);
   });
+  act(() => window.dispatchEvent(new Event('pointerup')));
   expect(altMove).toHaveBeenLastCalledWith('clip-1', 6.4, project.tracks[0]!.id, 'line-1');
 });
 
@@ -229,18 +234,21 @@ it('snaps project bounds plus the actively trimmed start and end edges', () => {
     harness.begin()?.(pointerStart(), clip, 'move');
     pointerMove(54);
   });
+  act(() => window.dispatchEvent(new Event('pointerup')));
   expect(onMoveClip).toHaveBeenLastCalledWith('clip-1', 0, project.tracks[0]!.id, 'line-1');
   act(() => window.dispatchEvent(new Event('pointerup')));
   act(() => {
     harness.begin()?.(pointerStart(), clip, 'trim-start');
     pointerMove(94);
   });
+  act(() => window.dispatchEvent(new Event('pointerup')));
   expect(onTrimClipStart).toHaveBeenLastCalledWith('clip-1', 4);
   act(() => window.dispatchEvent(new Event('pointerup')));
   act(() => {
     harness.begin()?.(pointerStart(), clip, 'trim-end');
     pointerMove(104);
   });
+  act(() => window.dispatchEvent(new Event('pointerup')));
   expect(onTrimClipEnd).toHaveBeenLastCalledWith('clip-1', 9);
 });
 
@@ -260,25 +268,20 @@ it('renders the authoritative applied result instead of an unreachable snap cand
     pointerMove(120);
   });
 
-  const persistedStart = useVideoEditorStore.getState().project!.clips[0]!.startTime;
-  expect(persistedStart).not.toBe(7);
-  expect(harness.ghosts.at(-1)?.startTime).toBe(persistedStart);
+  expect(useVideoEditorStore.getState().project!.clips[0]!.startTime).toBe(5);
+  const previewStart = harness.ghosts.at(-1)?.startTime;
+  expect(previewStart).toBeCloseTo(6.9);
   expect(harness.guides.at(-1)).toBeNull();
+  act(() => window.dispatchEvent(new Event('pointerup')));
+  expect(useVideoEditorStore.getState().project!.clips[0]!.startTime).toBe(previewStart);
 });
 
 it('hides a trim guide when the mutation owner clamps away from the snap target', () => {
   const project = createEmptyVideoProject('Applied trim result');
-  const clip = createClip(project.tracks[0]!.id);
-  project.duration = 8;
+  const clip = createClip(project.tracks[0]!.id, 'clip-1', 0);
+  project.duration = 3;
   project.clips = [clip];
-  const onTrimClipStart = vi.fn(() => ({
-    clipId: clip.id,
-    duration: 0.1,
-    endTime: 8,
-    startTime: 7.9,
-    timelineLaneId: 'line-1',
-    trackId: clip.trackId,
-  }));
+  const onTrimClipStart = vi.fn();
   const harness = createHarness({ onTrimClipStart, project });
   harness.render();
   act(() => {
@@ -286,8 +289,11 @@ it('hides a trim guide when the mutation owner clamps away from the snap target'
     pointerMove(130);
   });
 
-  expect(onTrimClipStart).toHaveBeenLastCalledWith(clip.id, 8);
+  expect(onTrimClipStart).not.toHaveBeenCalled();
+  expect(harness.ghosts.at(-1)?.startTime).toBeCloseTo(2.9);
   expect(harness.guides.at(-1)).toBeNull();
+  act(() => window.dispatchEvent(new Event('pointerup')));
+  expect(onTrimClipStart).toHaveBeenLastCalledWith(clip.id, 3);
 });
 
 it('keeps the guide when a fractional trim-end result matches the snap target', () => {
@@ -310,9 +316,11 @@ it('keeps the guide when a fractional trim-end result matches the snap target', 
     pointerMove(-221);
   });
 
+  expect(useVideoEditorStore.getState().project!.clips[0]!.duration).toBe(42.2);
+  expect(harness.guides.at(-1)).toBe(10.2);
+  act(() => window.dispatchEvent(new Event('pointerup')));
   const persisted = useVideoEditorStore.getState().project!.clips[0]!;
   expect(persisted.startTime + persisted.duration).toBeCloseTo(10.2);
-  expect(harness.guides.at(-1)).toBe(10.2);
 });
 
 it('clears an active guide on cancel, replacement, and unmount', () => {
@@ -342,3 +350,85 @@ it('clears an active guide on cancel, replacement, and unmount', () => {
   expect(container?.querySelector('[data-snap-guide]')).toBeNull();
   root = null;
 });
+
+it.each(['pointercancel', 'Escape'])(
+  'discards %s without publishing a move or consuming undo',
+  (cancel) => {
+    const project = createEmptyVideoProject('Cancelled gesture');
+    const clip = createClip(project.tracks[0]!.id);
+    project.clips = [clip];
+    useVideoEditorStore.getState().setProject(project);
+    const before = useVideoEditorStore.getState().project!;
+    const onMoveClip = vi.fn(useVideoEditorStore.getState().moveClip);
+    const harness = createHarness({ onMoveClip, project: before });
+    harness.render();
+    act(() => {
+      harness.begin()?.(pointerStart(), before.clips[0]!, 'move');
+      pointerMove(130);
+    });
+    expect(harness.ghosts.at(-1)?.startTime).toBe(8);
+    expect(onMoveClip).not.toHaveBeenCalled();
+    expect(useVideoEditorStore.getState().project).toBe(before);
+    act(() => {
+      window.dispatchEvent(
+        cancel === 'Escape'
+          ? new KeyboardEvent('keydown', {
+              key: 'Escape',
+              code: 'Escape',
+              bubbles: true,
+              cancelable: true,
+            })
+          : new Event('pointercancel')
+      );
+      window.dispatchEvent(new Event('pointerup'));
+    });
+    expect(harness.ghosts.at(-1)).toBeNull();
+    expect(onMoveClip).not.toHaveBeenCalled();
+    expect(useVideoEditorStore.getState().project).toBe(before);
+  }
+);
+
+it.each(['trim-start', 'trim-end'] as const)(
+  'previews %s without changing timing or redo, then commits once',
+  (mode) => {
+    const project = createEmptyVideoProject('Trim draft');
+    project.clips = [createClip(project.tracks[0]!.id)];
+    const store = useVideoEditorStore.getState();
+    store.setProject(project);
+    store.renameProject('Redo target');
+    store.undoProject();
+    const before = useVideoEditorStore.getState().project!;
+    const history = {
+      beginProjectHistoryTransaction: store.beginProjectHistoryTransaction,
+      endProjectHistoryTransaction: store.endProjectHistoryTransaction,
+      isProjectHistoryTransactionCurrent: store.isProjectHistoryTransactionCurrent,
+    };
+    const harness = createHarness({
+      history,
+      project: before,
+      magnetEnabled: false,
+      onTrimClipStart: store.trimClipStart,
+      onTrimClipEnd: store.trimClipEnd,
+    });
+    harness.render();
+    const target = mode === 'trim-start' ? 110 : 90;
+    act(() => {
+      harness.begin()?.(pointerStart(), before.clips[0]!, mode);
+      pointerMove(target);
+    });
+    expect(harness.ghosts.at(-1)?.duration).toBe(2);
+    expect(useVideoEditorStore.getState().project).toBe(before);
+    act(() => window.dispatchEvent(new Event('pointercancel')));
+    expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(0);
+    expect(useVideoEditorStore.getState().projectHistory.future).toHaveLength(1);
+    act(() => {
+      harness.begin()?.(pointerStart(), before.clips[0]!, mode);
+      pointerMove(target);
+      window.dispatchEvent(new Event('pointerup'));
+    });
+    expect(useVideoEditorStore.getState().project!.clips[0]!.duration).toBe(2);
+    expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(1);
+    store.undoProject();
+    expect(useVideoEditorStore.getState().project!.clips).toEqual(before.clips);
+  }
+);

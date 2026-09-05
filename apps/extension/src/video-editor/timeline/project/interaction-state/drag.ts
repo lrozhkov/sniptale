@@ -5,7 +5,12 @@ import type { VideoProject, VideoProjectClip } from '../../../../features/video/
 import { startWindowPointerSession } from '../../../interaction/pointer-session';
 import { buildTimelineTrackLayoutModel } from '../tracks/layout';
 import type { DragMode, TimelineClipDragGhost, TimelineInteraction } from '../types';
-import { applyTimelineDragMove, type MoveClipHandler, type TrimClipHandler } from './drag-move';
+import {
+  applyTimelineDragMove,
+  createTimelineDragDraft,
+  type MoveClipHandler,
+  type TrimClipHandler,
+} from './drag-move';
 import { isVideoEditorPresentedTrack } from '../../../project/operations/presented-tracks';
 import type {
   VideoEditorProjectHistoryTransactionActions,
@@ -161,6 +166,13 @@ export function useProjectTimelineDrag({
   const trackLayoutModelRef = useRef(trackLayoutModel);
   trackLayoutModelRef.current = trackLayoutModel;
 
+  useEffect(
+    () => () => {
+      if (interactionRef.current) cleanupRef.current?.();
+    },
+    [cleanupRef, project, pixelsPerSecond]
+  );
+
   useTimelineDragCleanup(
     cleanupRef,
     interactionRef,
@@ -233,6 +245,7 @@ function attachTimelinePointerListeners({
   let dragActivated = false;
   let historyTransactionLease: VideoEditorProjectHistoryTransactionLease | null = null;
   let finished = false;
+  const draft = createTimelineDragDraft({ project, onMoveClip, onTrimClipStart, onTrimClipEnd });
 
   const endHistoryTransaction = () => {
     if (!historyTransactionLease) return;
@@ -279,15 +292,28 @@ function attachTimelinePointerListeners({
         moveEvent,
         pixelsPerSecond,
         trackLayoutModel: trackLayoutModelRef.current,
-        onMoveClip,
+        onMoveClip: draft.onMoveClip,
         setDragGhost,
-        onTrimClipEnd,
-        onTrimClipStart,
+        onTrimClipEnd: draft.onTrimClipEnd,
+        onTrimClipStart: draft.onTrimClipStart,
         project,
         setSnapGuideTime,
       });
     },
-    onEnd: finishInteraction,
+    onEnd: () => {
+      try {
+        if (
+          !finished &&
+          historyTransactionLease &&
+          historyTransaction.isProjectHistoryTransactionCurrent(historyTransactionLease)
+        ) {
+          draft.commit();
+        }
+      } finally {
+        finishInteraction();
+      }
+    },
+    onCancel: finishInteraction,
   });
 
   return () => {

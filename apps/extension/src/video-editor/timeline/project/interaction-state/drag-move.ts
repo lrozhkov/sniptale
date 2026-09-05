@@ -1,4 +1,9 @@
 import type React from 'react';
+import {
+  moveProjectClip,
+  trimProjectClipStart,
+  trimProjectClipEnd,
+} from '../../../project/state/clip-timeline/mutations';
 import { resolveClipLogicalLaneId } from '../../../../features/video/project/timeline';
 import type { VideoProject, VideoProjectClip } from '../../../../features/video/project/types';
 import { resolveTrackPlacementFromClientY } from '../tracks/layout';
@@ -33,6 +38,43 @@ interface TimelineDragMoveParams {
 }
 
 const CLIP_LANE_CHANGE_INTENT_THRESHOLD_PX = 24;
+
+/** Projects a gesture through the same mutation owner as its eventual command. */
+export function createTimelineDragDraft(
+  params: Pick<
+    TimelineDragMoveParams,
+    'project' | 'onMoveClip' | 'onTrimClipStart' | 'onTrimClipEnd'
+  >
+) {
+  let commit: (() => void) | null = null;
+  const preview = (project: VideoProject, clipId: string, action: () => void) => {
+    commit = action;
+    const clip = project.clips.find((item) => item.id === clipId);
+    return clip
+      ? {
+          clipId,
+          duration: clip.duration,
+          startTime: clip.startTime,
+          endTime: clip.startTime + clip.duration,
+          trackId: clip.trackId,
+          timelineLaneId: clip.timelineLaneId ?? null,
+        }
+      : null;
+  };
+  return {
+    commit: () => commit?.(),
+    onMoveClip: (...args: Parameters<MoveClipHandler>) =>
+      preview(moveProjectClip(params.project, ...args), args[0], () => params.onMoveClip(...args)),
+    onTrimClipStart: (...args: Parameters<TrimClipHandler>) =>
+      preview(trimProjectClipStart(params.project, ...args), args[0], () =>
+        params.onTrimClipStart(...args)
+      ),
+    onTrimClipEnd: (...args: Parameters<TrimClipHandler>) =>
+      preview(trimProjectClipEnd(params.project, ...args), args[0], () =>
+        params.onTrimClipEnd(...args)
+      ),
+  };
+}
 
 export function applyTimelineDragMove({
   interaction,
@@ -78,6 +120,7 @@ export function applyTimelineDragMove({
       time: interaction.originalStart + deltaSeconds,
     });
     const applied = onTrimClipStart(interaction.clip.id, result.time);
+    if (applied) setDragGhost({ ...applied, name: interaction.clip.name });
     setSnapGuideTime(resolveAppliedSnapGuide(result.targetTime, applied?.startTime ?? result.time));
     return;
   }
@@ -92,6 +135,7 @@ export function applyTimelineDragMove({
     time: interaction.originalEnd + deltaSeconds,
   });
   const applied = onTrimClipEnd(interaction.clip.id, result.time);
+  if (applied) setDragGhost({ ...applied, name: interaction.clip.name });
   setSnapGuideTime(resolveAppliedSnapGuide(result.targetTime, applied?.endTime ?? result.time));
 }
 
