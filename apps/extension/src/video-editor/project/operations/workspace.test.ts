@@ -235,6 +235,8 @@ async function verifyPersistedRecordingMigration() {
     originRecordingId: 'recording-1',
   });
   expect(project.assets[0]?.id).toBeTruthy();
+  expect(project.assets[0]?.recordingPart).toEqual(persistedProject.assets[0]?.recordingPart);
+  expect(project.assets[0]?.recordingPart).toEqual({ recordingId: 'recording-1', role: 'primary' });
   expect(saveVideoProject).toHaveBeenCalledWith(
     expect.objectContaining({
       id: project.id,

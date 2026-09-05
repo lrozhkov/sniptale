@@ -150,6 +150,14 @@ it('adds a saved webcam sidecar as a separate muted recording track', async () =
     })
   );
   expect(videoClips[1]?.transform.width).toBeLessThan(result.project.width / 2);
-  expect(result.project.duration).toBe(7);
+  expect(result.project.duration).toBe(5);
+  expect(videoClips[1]?.duration).toBe(5);
+  expect(videoClips[1]?.groupId).toBe(videoClips[0]?.groupId);
+  expect(videoClips[0]?.groupId).not.toBeNull();
+  expect(result.project.assets.map((asset) => asset.recordingPart)).toEqual([
+    { recordingId: 'recording-1', role: 'primary' },
+    { recordingId: 'recording-1', role: 'camera' },
+  ]);
+  expect(result.project.assets[1]?.metadata.duration).toBe(7);
   expect(saveVideoProject).toHaveBeenCalledOnce();
 });

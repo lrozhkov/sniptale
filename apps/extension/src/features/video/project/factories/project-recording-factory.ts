@@ -53,8 +53,11 @@ export function createRecordingVideoProject(
   deps: RecordingProjectFactoryDeps
 ): VideoProject {
   const defaultTracks = createDefaultProjectTracks(deps);
-  const asset = options.asset ?? createRecordingProjectAsset(options);
-  const sidecarAssets = createRecordingSidecarAssets(options.sidecarVideos);
+  const asset: VideoProjectAsset = {
+    ...(options.asset ?? createRecordingProjectAsset(options)),
+    recordingPart: { recordingId: options.recordingId, role: 'primary' },
+  };
+  const sidecarAssets = createRecordingSidecarAssets(options.sidecarVideos, options.recordingId);
   const tracks = createRecordingProjectTrackSet(defaultTracks, options.sidecarVideos ?? [], deps);
   const normalizedDuration = Math.max(0.1, options.duration);
   const clips = createRecordingProjectClipSet({
@@ -161,11 +164,15 @@ function createRecordingProjectClipSet(params: {
   sidecarAssets: VideoProjectAsset[];
   sidecarTracks: VideoProjectTrack[];
 }) {
+  const groupId =
+    params.asset.metadata.hasAudio || params.sidecarAssets.length > 0
+      ? params.deps.createClipGroupId()
+      : null;
   return [
     ...createRecordingProjectClips({
       asset: params.asset,
       audioTrackId: params.audioTrack.id,
-      deps: params.deps,
+      groupId,
       normalizedDuration: params.normalizedDuration,
       options: params.options,
       primaryTrackId: params.defaultTracks.primaryTrack.id,
@@ -173,6 +180,8 @@ function createRecordingProjectClipSet(params: {
     ...params.sidecarAssets.map((sidecarAsset, index) =>
       createRecordingSidecarClip({
         asset: sidecarAsset,
+        groupId,
+        duration: params.normalizedDuration,
         projectHeight: params.options.height,
         projectWidth: params.options.width,
         trackId: params.sidecarTracks[index]?.id ?? params.defaultTracks.primaryTrack.id,
@@ -187,12 +196,12 @@ function createRecordingProjectClipSet(params: {
 function createRecordingProjectClips(params: {
   asset: VideoProjectAsset;
   audioTrackId: string;
-  deps: RecordingProjectFactoryDeps;
+  groupId: string | null;
   normalizedDuration: number;
   options: CreateVideoProjectFromRecordingOptions;
   primaryTrackId: string;
 }) {
-  const groupId = params.asset.metadata.hasAudio ? params.deps.createClipGroupId() : null;
+  const groupId = params.groupId;
   const clips: VideoProjectClip[] = [
     createRecordingBaseClip(params.asset, params.options, params.primaryTrackId, groupId),
   ];

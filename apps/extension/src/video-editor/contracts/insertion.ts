@@ -7,11 +7,17 @@ export interface VideoEditorImportPlacement {
 
 export type VideoEditorImportKind = 'audio' | 'image' | 'video';
 
+/** Half-open interval in source seconds, independent of the montage playhead. */
+export interface VideoEditorMaterialSourceRange {
+  start: number;
+  end: number;
+}
+
 export type VideoEditorMaterialPlacementResult =
   | { status: 'placed'; clipId: string }
   | {
       status: 'rejected';
-      reason: 'no-project' | 'missing-material' | 'locked-track' | 'invalid-cut';
+      reason: 'no-project' | 'missing-material' | 'locked-track' | 'invalid-cut' | 'invalid-range';
     };
 
 type VideoEditorImportHandler = (

@@ -94,7 +94,16 @@ function registerMultiSourceWebcamTests() {
     const cameraTrack = project.tracks.find((track) => track.role === VideoProjectTrackRole.CAMERA);
 
     expect(project.baseRecordingId).toBe('rec-1');
-    expect(project.duration).toBe(14);
+    expect(project.duration).toBe(12);
+    expect(project.clips.map((clip) => clip.duration)).toEqual([12, 10, 12, 12]);
+    expect(new Set(project.clips.map((clip) => clip.groupId)).size).toBe(1);
+    expect(project.clips[0]!.groupId).not.toBeNull();
+    expect(project.assets.map((asset) => asset.recordingPart)).toEqual([
+      { recordingId: 'rec-1', role: 'primary' },
+      { recordingId: 'rec-1', role: 'video' },
+      { recordingId: 'rec-1', role: 'camera' },
+      { recordingId: 'rec-1', role: 'audio' },
+    ]);
     expect(project.assets.map((asset) => asset.name)).toEqual([
       'window-1.webm',
       'window-2.webm',
@@ -180,4 +189,15 @@ describe('multi-source recording project factory edge cases', () => {
     expect(project.duration).toBe(0.1);
     expect(project.clips).toHaveLength(0);
   });
+});
+
+it('keeps a camera-only capture explicitly camera-typed when no screen source is finalized', () => {
+  const project = createVideoProjectFromMultiSourceRecording({
+    name: 'Camera only',
+    videos: [],
+    webcamVideo: createVideoInput('camera', 'camera.webm', 4),
+  });
+  expect(project.assets[0]?.recordingPart).toEqual({ recordingId: 'camera', role: 'camera' });
+  expect(project.tracks[0]?.role).toBe(VideoProjectTrackRole.CAMERA);
+  expect(project.duration).toBe(4);
 });

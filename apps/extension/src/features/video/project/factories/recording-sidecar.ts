@@ -31,21 +31,30 @@ export function createRecordingSidecarClip(params: {
   projectWidth: number;
   trackId: string;
   trackRole?: VideoProjectTrackRoleValue;
+  groupId?: string | null;
+  startTime?: number;
+  sourceStart?: number;
+  duration?: number;
 }): VideoProjectClip {
   const clip = createVideoClipFromAsset(
     params.trackId,
     params.asset,
     params.projectWidth,
     params.projectHeight,
-    0,
-    { muted: true }
+    params.startTime ?? 0,
+    { muted: true, groupId: params.groupId ?? null }
   );
   if (clip.type !== VideoProjectClipType.VIDEO) {
     return clip;
   }
 
+  const sourceStart = params.sourceStart ?? 0;
+  const duration = Math.min(params.duration ?? clip.duration, clip.duration - sourceStart);
   return {
     ...clip,
+    duration,
+    sourceStart,
+    sourceDuration: duration,
     fitMode: VideoMediaFitMode.SOURCE_100,
     transform:
       params.trackRole === VideoProjectTrackRole.CAMERA
@@ -64,9 +73,14 @@ export function createRecordingSidecarClip(params: {
 }
 
 export function createRecordingSidecarAssets(
-  sidecarVideos: RecordingSidecarVideoProjectInput[] | undefined
+  sidecarVideos: RecordingSidecarVideoProjectInput[] | undefined,
+  recordingId: string
 ): VideoProjectAsset[] {
-  return (sidecarVideos ?? []).map(
-    (sidecar) => sidecar.asset ?? createRecordingProjectAsset(sidecar)
-  );
+  return (sidecarVideos ?? []).map((sidecar) => ({
+    ...(sidecar.asset ?? createRecordingProjectAsset(sidecar)),
+    recordingPart: {
+      recordingId,
+      role: sidecar.trackRole === VideoProjectTrackRole.CAMERA ? 'camera' : 'video',
+    },
+  }));
 }

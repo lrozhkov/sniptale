@@ -42,6 +42,30 @@ const sidebarContractMappings = SIDEBAR_CONTRACT_FILES.map((productionFile) => (
 export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
   ...controllerContractMappings,
   {
+    owner: 'video-project-asset-validation',
+    productionFile: 'apps/extension/src/features/video/project/validation/assets.ts',
+    reason:
+      'Recording membership and existing source variants are validated through the asset and project boundary suites.',
+    testFiles: [
+      'apps/extension/src/features/video/project/validation/assets.test.ts',
+      'apps/extension/src/features/video/project/validation/project.test.ts',
+      'apps/extension/src/features/video/project/validation/optional-branches.test.ts',
+    ],
+  },
+  {
+    owner: 'video-editor-clip-timing-mutations',
+    productionFile: 'apps/extension/src/video-editor/project/state/clip-timeline/mutations.ts',
+    reason:
+      'Linked clip edges, source limits, locks and gap closure use the same timing mutation owner.',
+    testFiles: [
+      'apps/extension/src/video-editor/project/state/clip-timeline/actions.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-timeline/mutations.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-timeline/mutations.gap.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-timeline/mutations.gap.logical-lanes.test.ts',
+      'apps/extension/src/video-editor/project/state/insertion/material-recording.test.ts',
+    ],
+  },
+  {
     allowCrossOwner: true,
     owner: 'video-editor-preview-preferences-contract',
     productionFile: 'apps/extension/src/features/video/preview/preferences.ts',

@@ -108,7 +108,7 @@ function verifyRecordingSidecarVideos() {
   const videoClips = project.clips.filter((clip) => clip.type === VideoProjectClipType.VIDEO);
 
   expect(project.baseRecordingId).toBe('rec-1');
-  expect(project.duration).toBe(8);
+  expect(project.duration).toBe(6);
   expect(project.assets.map((asset) => asset.name)).toEqual(['demo.webm', 'webcam.webm']);
   expect(project.clips.map((clip) => clip.type)).toEqual(['VIDEO', 'AUDIO', 'VIDEO']);
   expect(videoClips[1]).toEqual(

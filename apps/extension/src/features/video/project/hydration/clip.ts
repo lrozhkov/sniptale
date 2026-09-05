@@ -17,7 +17,7 @@ function normalizeClipPlayback(clip: VideoProject['clips'][number]) {
   }
 
   const playbackRate = normalizeClipPlaybackRate(clip.playbackRate ?? 1);
-  const sourceDuration = Math.max(0.1, clip.sourceDuration);
+  const sourceDuration = clip.sourceDuration > 0 ? clip.sourceDuration : 0.1;
 
   return {
     playbackRate,

@@ -2,7 +2,7 @@ import { VideoEditorSelectionKind } from '../../../contracts/selection';
 import type { VideoEditorMaterialPlacementResult } from '../../../contracts/insertion';
 import type { VideoEditorProjectState, VideoEditorProjectSliceSet } from '../contracts';
 import { applyProjectUpdate } from '../helpers';
-import { buildMaterialPlacement } from './material-plan';
+import { buildMaterialPlacement, isMaterialSourceRangeValid } from './material-plan';
 import { makeRoomForMaterial } from './material-insert';
 import { reconcileRecordingInteractionAnchors } from '../../operations/source-timed-clips';
 import { areMaterialInsertActionsLocked, insertMaterialActionGap } from './material-actions';
@@ -13,7 +13,7 @@ export function createMaterialPlacementAction(
   set: VideoEditorProjectSliceSet,
   mode: 'append' | 'overlay' | 'insert'
 ): VideoEditorProjectState['appendMaterial'] {
-  return (assetId) => {
+  return (assetId, range) => {
     let outcome: VideoEditorMaterialPlacementResult = { status: 'rejected', reason: 'no-project' };
     set((state) => {
       const project = state.project;
@@ -21,6 +21,10 @@ export function createMaterialPlacementAction(
       const asset = project.assets.find(({ id }) => id === assetId);
       if (!asset) {
         outcome = { status: 'rejected', reason: 'missing-material' };
+        return state;
+      }
+      if (range && !isMaterialSourceRangeValid(asset, range, project.fps)) {
+        outcome = { status: 'rejected', reason: 'invalid-range' };
         return state;
       }
       const end = project.clips.reduce(
@@ -31,7 +35,8 @@ export function createMaterialPlacementAction(
         project,
         asset,
         mode === 'append' ? end : state.currentTime,
-        mode === 'overlay' ? 'overlay' : 'append'
+        mode === 'overlay' ? 'overlay' : 'append',
+        range
       );
       const existingIds = new Set(project.clips.map(({ id }) => id));
       const addedClips = result.project.clips.filter(({ id }) => !existingIds.has(id));

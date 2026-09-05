@@ -159,6 +159,7 @@ function mergeMigratedRecordingAsset(
     id: asset.id,
     name: asset.name,
     createdAt: asset.createdAt,
+    ...(asset.recordingPart ? { recordingPart: asset.recordingPart } : {}),
   };
 }
 

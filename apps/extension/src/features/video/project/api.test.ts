@@ -244,7 +244,11 @@ function verifySharedRecordingProjectOverrides() {
 
   expect(project.clips).toHaveLength(1);
   expect(project.tracks.map((track) => track.kind)).toEqual([VideoTrackKind.PRIMARY]);
-  expect(project.assets[0]).toBe(customAsset);
+  expect(project.assets[0]).toEqual({
+    ...customAsset,
+    recordingPart: { recordingId: 'rec-3', role: 'primary' },
+  });
+  expect(customAsset.recordingPart).toBeUndefined();
   expect(project.cursorTrack).toEqual(customCursorTrack);
   expect(project.motionRegions).toEqual([customMotionRegion]);
   expect(project.tracks.every((track) => track.isRoot === true)).toBe(true);
