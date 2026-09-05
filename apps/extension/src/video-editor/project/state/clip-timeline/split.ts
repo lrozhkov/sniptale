@@ -31,6 +31,7 @@ interface ProjectClipSplitMutationResult {
   project: VideoProject;
   trailingClipId: string;
   trailingTrackId: string;
+  trailingClipIdsBySourceId: ReadonlyMap<string, string>;
 }
 
 export function splitProjectClipsAtTimeWithResult(
@@ -48,6 +49,7 @@ export function splitProjectClipsAtTimeWithResult(
           project: result.project,
           trailingClipId: result.hostClipId,
           trailingTrackId: trailingHost.trackId,
+          trailingClipIdsBySourceId: new Map([[clipId, trailingHost.id]]),
         }
       : null;
   }
@@ -57,13 +59,18 @@ export function splitProjectClipsAtTimeWithResult(
   );
   const secondGroupId = operation.clipIds.length > 1 ? createClipGroupId() : null;
   let trailingClipId: string | null = null;
+  const trailingClipIdsBySourceId = new Map<string, string>();
   const nextProject = applyVideoProjectMutationPatch(project, {
     clips: project.clips.flatMap((item) => {
       if (!operation.clipIdSet.has(item.id)) {
         return [item];
       }
 
+      if (item.startTime + item.duration <= splitTime) return [item];
+      if (item.startTime >= splitTime) return [{ ...item, groupId: secondGroupId }];
+
       const splitClips = splitProjectClip(item, offsets.get(item.id) ?? 0, secondGroupId);
+      if (splitClips[1]) trailingClipIdsBySourceId.set(item.id, splitClips[1].id);
       if (item.id === clipId) trailingClipId = splitClips[1]?.id ?? null;
       return splitClips;
     }),
@@ -74,6 +81,7 @@ export function splitProjectClipsAtTimeWithResult(
         project: nextProject,
         trailingClipId: trailingClip.id,
         trailingTrackId: trailingClip.trackId,
+        trailingClipIdsBySourceId,
       }
     : null;
 }

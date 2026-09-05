@@ -47,7 +47,7 @@ export function createPreviewController() {
       onUpsertObjectTrackCorrectionAnchor: vi.fn(),
     },
     preferences: createPreviewPreferencesController(),
-    project: { clips: [], id: 'project-1', tracks: [], transitions: [] },
+    project: { assets: [], clips: [], id: 'project-1', tracks: [], transitions: [] },
     transport: {
       currentTime: 8,
       isPlaying: false,

@@ -11,6 +11,7 @@ import {
   createTextInsertionAction,
   createVideoBlockInsertionAction,
 } from './helpers';
+import { createMaterialPlacementAction } from './material';
 
 type VideoEditorStoreSet = VideoEditorProjectSliceSet;
 type VideoEditorStoreGet = VideoEditorProjectSliceGet;
@@ -21,6 +22,9 @@ export function createVideoEditorProjectInsertionActions(
 ): Pick<
   VideoEditorProjectState,
   | 'addAssetClip'
+  | 'appendMaterial'
+  | 'insertMaterial'
+  | 'overlayMaterial'
   | 'addAnnotationOverlay'
   | 'addVideoBlock'
   | 'addTextOverlay'
@@ -28,6 +32,9 @@ export function createVideoEditorProjectInsertionActions(
   | 'addShapeOverlay'
 > {
   return {
+    appendMaterial: createMaterialPlacementAction(set, 'append'),
+    insertMaterial: createMaterialPlacementAction(set, 'insert'),
+    overlayMaterial: createMaterialPlacementAction(set, 'overlay'),
     addAssetClip: createAssetInsertionAction(set, get),
     addAnnotationOverlay: createAnnotationInsertionAction(set, get),
     addVideoBlock: createVideoBlockInsertionAction(set, get),

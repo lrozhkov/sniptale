@@ -20,7 +20,8 @@ export function projectSourceTimeAnchor(
   anchor: VideoProjectSourceTimeAnchor,
   recordingId: string,
   previousClips: SourceTimedClip[],
-  nextClips: SourceTimedClip[]
+  nextClips: SourceTimedClip[],
+  splitLineage?: ReadonlyMap<string, string>
 ): AnchorProjection | null {
   if (anchor.recordingId !== recordingId) {
     return null;
@@ -34,7 +35,9 @@ export function projectSourceTimeAnchor(
   const previousClipIds = new Set(previousClips.map((clip) => clip.id));
   const trailingSplitClips = nextClips.filter(
     (clip) =>
-      !previousClipIds.has(clip.id) &&
+      (splitLineage
+        ? clip.id === splitLineage.get(previousClip.id)
+        : !previousClipIds.has(clip.id)) &&
       clip.assetId === previousClip.assetId &&
       Math.abs(clip.sourceStart - anchor.sourceTime) <= SOURCE_SPLIT_BOUNDARY_EPSILON
   );
@@ -52,7 +55,10 @@ export function projectSourceTimeAnchor(
 
     point = mapSourceTimeToProjectPoint(
       nextClips.filter(
-        (clip) => !previousClipIds.has(clip.id) && clip.assetId === previousClip.assetId
+        (clip) =>
+          (splitLineage
+            ? clip.id === splitLineage.get(previousClip.id)
+            : !previousClipIds.has(clip.id)) && clip.assetId === previousClip.assetId
       ),
       anchor.sourceTime
     );

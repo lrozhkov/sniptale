@@ -36,7 +36,7 @@ function resolveActionState(
   }
   const end = event.time + duration;
 
-  if (currentTime < event.time || currentTime > end) {
+  if (currentTime < event.time || currentTime >= end) {
     return null;
   }
 
@@ -44,7 +44,14 @@ function resolveActionState(
     duration,
     event,
     point: event.point,
-    progress: clampProgress(duration <= 0 ? 1 : (currentTime - event.time) / duration),
+    progress: clampProgress(
+      event.animation
+        ? (event.animation.start +
+            ((currentTime - event.time) / duration) *
+              (event.animation.end - event.animation.start)) /
+            event.animation.duration
+        : (currentTime - event.time) / duration
+    ),
     start: event.time,
   };
 }

@@ -109,6 +109,9 @@ const expectedKeys = {
     'selection',
   ],
   timeline: [
+    'appendMaterial',
+    'insertMaterial',
+    'overlayMaterial',
     'addAssetClip',
     'addTrack',
     'addTrackLogicalLane',

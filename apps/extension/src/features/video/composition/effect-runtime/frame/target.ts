@@ -1,4 +1,5 @@
 import type { VideoProjectEffectInstance } from '../../../project/effect-instance/types';
+import { isEffectInstanceTimingEqual } from '../../../project/effect-instance/timing';
 import type { VideoProject, VideoProjectTransitionSegment } from '../../../project/types/index';
 import type { EffectRuntimeFramePlacement } from '../runtime/types';
 import { resolveEffectTargetTrackAvailability } from './target-availability';
@@ -25,7 +26,12 @@ export function resolveEffectRuntimeFrameTarget(
     const host = project.clips.find(
       (clip) => clip.type === 'EFFECT' && clip.effectInstanceId === instance.id
     );
-    if (!host) return undefined;
+    if (
+      !host ||
+      !isEffectInstanceTimingEqual(host.startTime, instance.startTime) ||
+      !isEffectInstanceTimingEqual(host.duration, instance.duration)
+    )
+      return undefined;
     if (projectTime < host.startTime || projectTime >= host.startTime + host.duration) return null;
     const track = project.tracks.find(({ id }) => id === host.trackId);
     return track?.visible === true

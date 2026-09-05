@@ -17,6 +17,7 @@ interface SourceBoundObjectTrackReconciliationParams {
   previousClips: SourceTimedClip[];
   previousProject: VideoProject;
   recordingId: string;
+  splitLineage?: ReadonlyMap<string, string>;
 }
 
 export function reconcileSourceBoundObjectTracks(
@@ -38,7 +39,8 @@ export function reconcileSourceBoundObjectTracks(
       analysis,
       params.nextClips,
       params.previousClips,
-      params.recordingId
+      params.recordingId,
+      params.splitLineage
     );
     if (!projector) {
       return [track];
@@ -53,7 +55,8 @@ function createObjectTrackTimeProjector(
   analysis: VideoObjectTrackAnalysisMetadata,
   nextClips: SourceTimedClip[],
   previousClips: SourceTimedClip[],
-  recordingId: string
+  recordingId: string,
+  splitLineage?: ReadonlyMap<string, string>
 ) {
   const previousAssetClips = previousClips.filter(
     (clip) => clip.assetId === analysis.sourceAssetId
@@ -62,11 +65,12 @@ function createObjectTrackTimeProjector(
     return null;
   }
 
-  return (time: number) => {
+  return (value: { time: number; sourceClipId?: string }) => {
     const previousPoint = mapProjectTimeToSourcePoint(
-      previousAssetClips,
-      time,
-      analysis.sourceClipId
+      previousAssetClips.filter(
+        (clip) => clip.id === (value.sourceClipId ?? analysis.sourceClipId)
+      ),
+      value.time
     );
     if (!previousPoint) {
       return null;
@@ -81,7 +85,8 @@ function createObjectTrackTimeProjector(
       },
       recordingId,
       previousClips,
-      nextClips
+      nextClips,
+      splitLineage
     );
     return projection
       ? { sourceClipId: projection.anchor.sourceClipId, time: projection.time }
@@ -92,7 +97,10 @@ function createObjectTrackTimeProjector(
 function projectSourceBoundObjectTrack(
   track: VideoObjectTrack,
   analysis: VideoObjectTrackAnalysisMetadata,
-  projectTime: (time: number) => ObjectTrackSourceProjection | null
+  projectTime: (value: {
+    time: number;
+    sourceClipId?: string;
+  }) => ObjectTrackSourceProjection | null
 ): VideoObjectTrack | null {
   const projectedSamples = projectTimedValues(track.samples, projectTime);
   if (projectedSamples.length === 0) {
@@ -116,15 +124,23 @@ function projectSourceBoundObjectTrack(
   };
 }
 
-function projectTimedValues<T extends { time: number }>(
+function projectTimedValues<T extends { time: number; sourceClipId?: string }>(
   values: T[],
-  projectTime: (time: number) => ObjectTrackSourceProjection | null
+  projectTime: (value: {
+    time: number;
+    sourceClipId?: string;
+  }) => ObjectTrackSourceProjection | null
 ) {
   return values
     .flatMap((value) => {
-      const projection = projectTime(value.time);
+      const projection = projectTime(value);
       return projection
-        ? [{ sourceClipId: projection.sourceClipId, value: { ...value, time: projection.time } }]
+        ? [
+            {
+              sourceClipId: projection.sourceClipId,
+              value: { ...value, sourceClipId: projection.sourceClipId, time: projection.time },
+            },
+          ]
         : [];
     })
     .sort((left, right) => left.value.time - right.value.time);

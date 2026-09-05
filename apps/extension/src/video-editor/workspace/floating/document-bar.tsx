@@ -16,7 +16,7 @@ const DOCUMENT_BAR_CLASS_NAME = floatingChromeClassNames(
 );
 
 const PROJECT_TITLE_CLASS_NAME = [
-  'h-9 min-w-[12rem] max-w-[18rem] rounded-[8px] border border-transparent bg-transparent',
+  'h-9 min-w-0 w-full rounded-[8px] border border-transparent bg-transparent',
   'px-2 text-sm font-semibold text-[var(--sniptale-color-text-primary)] outline-none transition',
   'hover:border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_76%,transparent)]',
   'focus:border-[color:var(--sniptale-color-border-accent-strong)]',
@@ -33,7 +33,7 @@ function VideoEditorProjectTitle({
   projectName,
 }: Pick<VideoEditorDocumentBarProps['header'], 'onRenameProject' | 'projectName'>) {
   return (
-    <label className="flex min-w-0 items-center gap-1.5">
+    <label className="flex min-w-[8rem] max-w-[18rem] flex-1 items-center gap-1.5">
       <input
         aria-label={translate('videoEditor.app.title')}
         value={projectName}
@@ -78,7 +78,11 @@ function VideoEditorSaveStateBadge({
   );
 }
 
-export function VideoEditorFloatingDocumentBar() {
+export function VideoEditorFloatingDocumentBar({
+  inspector,
+}: {
+  inspector?: { isOpen: boolean; onToggle: () => void };
+} = {}) {
   const header = useVideoEditorHeaderController();
   const history = useVideoEditorHistoryController();
   if (!header) return null;
@@ -119,15 +123,16 @@ export function VideoEditorFloatingDocumentBar() {
           </span>
         ) : null}
         <EditorDivider className="mx-1 h-7" />
-        <span className="min-w-0 flex-1" />
         <ContentToolbarButton
+          className="ml-auto"
           title={translate(
-            header.leftSidebarCollapsed
+            !(inspector?.isOpen ?? !header.leftSidebarCollapsed)
               ? 'videoEditor.app.expandInspector'
               : 'videoEditor.app.collapseInspector'
           )}
-          active={!header.leftSidebarCollapsed}
-          onClick={header.onToggleSidebar}
+          active={inspector?.isOpen ?? !header.leftSidebarCollapsed}
+          aria-pressed={inspector?.isOpen ?? !header.leftSidebarCollapsed}
+          onClick={inspector?.onToggle ?? header.onToggleSidebar}
           dataUi="video-editor.floating.document-bar.inspector"
         >
           <PanelRight size={17} strokeWidth={2.1} />

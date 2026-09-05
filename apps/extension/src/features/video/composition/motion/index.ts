@@ -1,4 +1,5 @@
 import { getMotionFocusAreaCenter, resolveMotionOverlayZoomMode } from '../../project/motion/index';
+import { getMotionAnimationTime } from '../../project/motion/timing';
 import {
   VideoMotionCameraMode,
   VideoMotionFocusMode,
@@ -21,7 +22,7 @@ function resolveActiveMotionRegion(
 ): VideoProjectMotionRegion | null {
   let activeRegion: VideoProjectMotionRegion | null = null;
   for (const region of project.motionRegions ?? []) {
-    if (currentTime < region.startTime || currentTime > region.startTime + region.duration) {
+    if (currentTime < region.startTime || currentTime >= region.startTime + region.duration) {
       continue;
     }
     if (!activeRegion || region.startTime > activeRegion.startTime) {
@@ -32,13 +33,14 @@ function resolveActiveMotionRegion(
 }
 
 function resolveMotionProgress(region: VideoProjectMotionRegion, currentTime: number): number {
-  const localTime = currentTime - region.startTime;
-  const zoomInDuration = Math.min(region.zoomInDuration, region.duration);
+  const localTime = getMotionAnimationTime(region, currentTime - region.startTime);
+  const animationDuration = region.animation?.duration ?? region.duration;
+  const zoomInDuration = Math.min(region.zoomInDuration, animationDuration);
   if (zoomInDuration > 0 && localTime < zoomInDuration) {
     return applyTemporalEasing(localTime / zoomInDuration, region.easing);
   }
 
-  const zoomOutStart = Math.max(0, region.duration - region.zoomOutDuration);
+  const zoomOutStart = Math.max(0, animationDuration - region.zoomOutDuration);
   if (region.zoomOutDuration > 0 && localTime > zoomOutStart) {
     const progress = (localTime - zoomOutStart) / region.zoomOutDuration;
     return 1 - applyTemporalEasing(progress, region.easing);

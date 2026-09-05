@@ -22,7 +22,6 @@ import {
   areClipTracksEditable,
   ensureTrackForKind,
   isTrackCompatibleWithClip,
-  pruneUnusedProjectAssets,
 } from './helpers';
 import { resetVideoEditorProjectHistory } from '../history';
 
@@ -89,7 +88,7 @@ function createAsset(id: string): VideoProjectAsset {
   };
 }
 
-it('checks helper compatibility guards and asset pruning branches', () => {
+it('checks helper compatibility guards', () => {
   const project = createProject();
   const [videoClip, audioClip] = project.clips as [VideoProjectClip, VideoProjectClip];
   const subtitleResult = ensureTrackForKind(project, VideoTrackKind.SUBTITLE, null);
@@ -130,28 +129,6 @@ it('checks helper compatibility guards and asset pruning branches', () => {
   };
   expect(areClipTracksEditable(lockedLinkedProject, ['video-1', 'audio-1'])).toBe(false);
   expect(areClipTracksEditable(project, ['missing'])).toBe(false);
-
-  const shapeClip = {
-    ...videoClip,
-    embeddedAsset: {
-      assetId: 'asset-embedded',
-      placement: { height: 10, width: 10, x: 0, y: 0 },
-    },
-    id: 'shape-1',
-    shapeType: 'RECTANGLE',
-    style: { borderRadius: 0, fillColor: '#000', strokeColor: '#fff', strokeWidth: 1 },
-    type: VideoProjectClipType.SHAPE,
-  } as VideoProjectClip;
-  const withAssets = {
-    ...project,
-    assets: [createAsset('asset-1'), createAsset('asset-embedded'), createAsset('asset-2')],
-    clips: [...project.clips, shapeClip],
-  };
-  expect(pruneUnusedProjectAssets(withAssets).assets.map((asset) => asset.id)).toEqual([
-    'asset-1',
-    'asset-embedded',
-  ]);
-  expect(pruneUnusedProjectAssets(project)).toBe(project);
 });
 
 it('records source-anchor reprojection in the same project history action', () => {

@@ -140,6 +140,8 @@ export type VideoProjectInteractionTimeBasis =
   (typeof VideoProjectInteractionTimeBasis)[keyof typeof VideoProjectInteractionTimeBasis];
 
 export interface VideoProjectCursorSample {
+  /** Retained normalized interval of the easing curve toward the following key. */
+  interpolationRange?: { start: number; end: number };
   id: string;
   interpolation?: VideoTemporalEasing;
   skinOverride?: VideoProjectCursorSkin | null;
@@ -172,6 +174,8 @@ export interface VideoProjectActionPoint {
 }
 
 export interface VideoProjectActionEvent {
+  /** Retained authored effect clock, mapped onto this event's visible duration. */
+  animation?: { start: number; end: number; duration: number };
   id: string;
   kind: VideoProjectActionEventKind;
   time: number;
@@ -251,6 +255,8 @@ export interface VideoProjectMotionPath {
 }
 
 export interface VideoProjectMotionRegion {
+  /** Retained interval within the original zoom animation, independent of timeline placement. */
+  animation?: { start: number; end: number; duration: number };
   cameraMode?: VideoMotionCameraMode;
   duration: number;
   easing: VideoTemporalEasing;

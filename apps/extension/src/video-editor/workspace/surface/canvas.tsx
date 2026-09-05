@@ -6,7 +6,11 @@ import {
   useVideoEditorPreviewController,
   useVideoEditorTimelineController,
 } from '../../runtime/controller/composition/hooks';
-import { useVideoEditorEffectEditingPort } from '../../runtime/controller/store';
+import {
+  useVideoEditorEffectEditingPort,
+  useVideoEditorTimelineEditingPort,
+} from '../../runtime/controller/store';
+import { VideoEditorMaterials } from './materials';
 import type { VideoPreviewCanvasInsertKind } from '../../preview/stage/types';
 import { VideoEditorWorkspaceEffectsLibrary } from './effects-library';
 import type { WorkspaceEffectBundlesState } from './effect-bundles';
@@ -27,6 +31,7 @@ export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProp
           className="flex min-h-0 shrink-0 gap-0"
           style={props.previewHeightStyle}
         >
+          {props.materialsOpen && <VideoEditorWorkspaceMaterials />}
           <VideoEditorWorkspaceEffectsLibrary
             effectBundles={props.effectBundles}
             effectOperations={props.effectOperations}
@@ -44,6 +49,7 @@ export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProp
 }
 
 interface VideoEditorWorkspaceCanvasProps {
+  materialsOpen?: boolean;
   inspector: React.ReactNode;
   activeInsertKind: VideoPreviewCanvasInsertKind | null;
   effectBundles: WorkspaceEffectBundlesState;
@@ -52,6 +58,24 @@ interface VideoEditorWorkspaceCanvasProps {
   previewHeightStyle: React.CSSProperties;
   onClearActiveInsertKind: () => void;
   onEffectsLibraryDockOpenChange: (open: boolean) => void;
+}
+
+function VideoEditorWorkspaceMaterials() {
+  const preview = useVideoEditorPreviewController();
+  const appendMaterial = useVideoEditorTimelineEditingPort((port) => port.appendMaterial);
+  const insertMaterial = useVideoEditorTimelineEditingPort((port) => port.insertMaterial);
+  const overlayMaterial = useVideoEditorTimelineEditingPort((port) => port.overlayMaterial);
+  if (!preview) return null;
+  return (
+    <VideoEditorMaterials
+      key={preview.project.id}
+      project={preview.project}
+      onImport={preview.onImport}
+      onAppend={(asset) => appendMaterial(asset.id)}
+      onInsert={(asset) => insertMaterial(asset.id)}
+      onOverlay={(asset) => overlayMaterial(asset.id)}
+    />
+  );
 }
 
 function VideoEditorWorkspacePreview(props: VideoEditorWorkspaceCanvasProps): React.JSX.Element {

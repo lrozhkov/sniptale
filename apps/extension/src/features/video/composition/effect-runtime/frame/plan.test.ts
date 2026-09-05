@@ -22,6 +22,25 @@ import { resolveVideoCompositionFrame } from '../../timeline/frame/index';
 import { resolveEffectRuntimeFramePlans } from './plan';
 
 describe('shared EffectV1 preview/export frame plan', () => {
+  it('continues a standalone document subrange at its retained phase', () => {
+    const project = createProject();
+    const instance = project.effectInstances!.find(({ id }) => id === 'standalone-1')!;
+    Object.assign(instance, { sourceStart: 2, startTime: 9, duration: 1 });
+    Object.assign(
+      project.clips.find(({ id }) => id === 'standalone-host')!,
+      { startTime: 9, duration: 1 }
+    );
+    expect(resolveEffectRuntimeFramePlans(project, 9.5)).toEqual([
+      expect.objectContaining({ effectInstanceId: instance.id, time: 2.5 }),
+    ]);
+  });
+  it.each([-1, NaN, Infinity, 3])('rejects invalid retained frame range %s', (sourceStart) => {
+    const project = createProject();
+    Object.assign(project.effectInstances![0]!, { sourceStart, duration: 1 });
+    expect(() => resolveEffectRuntimeFramePlans(project, 0.5)).toThrow(
+      expect.objectContaining({ code: 'effectPlanIntegrityFailure' })
+    );
+  });
   it('owns standalone, stable target chains, and transition timing without fallback', () => {
     const plans = resolveEffectRuntimeFramePlans(createProject(), 2.5);
 

@@ -165,6 +165,7 @@ function isEffectInstance(value: unknown): value is VideoProjectEffectInstance {
     isNonNegativeFinite(value['startTime']) &&
     isPositiveFinite(value['duration']) &&
     isPositiveFinite(value['playbackRate']) &&
+    (value['sourceStart'] === undefined || isNonNegativeFinite(value['sourceStart'])) &&
     isEffectTarget(value['target']) &&
     isControls(value['controls'])
   );

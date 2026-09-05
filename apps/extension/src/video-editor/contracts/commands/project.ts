@@ -18,6 +18,7 @@ import type { VideoEditorObjectTrackActions } from './object-tracks';
 import type { VideoEditorTemporalActions } from './temporal';
 import type { VideoEditorEffectInstanceActions } from './effect-instance';
 import type { VideoEditorMoveClipAction, VideoEditorTrimClipAction } from './timeline';
+import type { VideoEditorMaterialPlacementResult } from '../insertion';
 
 export interface VideoEditorProjectActions
   extends
@@ -37,6 +38,10 @@ export interface VideoEditorProjectActions
   toggleUtilityLaneLock: (lane: keyof VideoProjectUtilityLanes) => void;
   clearUtilityLane: (lane: keyof VideoProjectUtilityLanes) => void;
   upsertAsset: (asset: VideoProjectAsset) => void;
+  appendMaterial: (assetId: string) => VideoEditorMaterialPlacementResult;
+  /** Inserts at the playhead and opens an equal gap across the montage. */
+  insertMaterial: (assetId: string) => VideoEditorMaterialPlacementResult;
+  overlayMaterial: (assetId: string) => VideoEditorMaterialPlacementResult;
   addAssetClip: (
     asset: VideoProjectAsset,
     trackId?: string | null,

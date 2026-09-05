@@ -65,6 +65,7 @@ async function importProjectAssetFile(
   }
 
   port.upsertAsset(asset);
+  if (placement?.destination === 'materials') return;
   port.addAssetClip(
     asset,
     placement?.trackId ?? null,

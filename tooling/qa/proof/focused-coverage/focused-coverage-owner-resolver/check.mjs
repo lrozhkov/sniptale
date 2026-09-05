@@ -22,7 +22,9 @@ function isRuntimeCoverageEligible(file) {
 function splitCoverageFiles({ codeFiles = [], newFiles = [] }) {
   const newFileSet = new Set(newFiles);
   const eligibleFiles = codeFiles.filter(isRuntimeCoverageEligible);
-  const rolloutFiles = eligibleFiles.filter((file) => resolveCoverageThreshold(file) !== null);
+  const rolloutFiles = eligibleFiles.filter(
+    (file) => resolveCoverageThreshold(file, { isNew: newFileSet.has(file) }) !== null
+  );
   return {
     newEligibleFiles: eligibleFiles.filter((file) => newFileSet.has(file)),
     outsideExistingFiles: eligibleFiles.filter(

@@ -204,25 +204,3 @@ export function detachLinkedClips(project: VideoProject, clipId: string): VideoP
     ),
   });
 }
-
-export function pruneUnusedProjectAssets(project: VideoProject): VideoProject {
-  const referencedAssetIds = new Set(project.clips.flatMap(collectClipAssetIds));
-  const nextAssets = project.assets.filter((asset) => referencedAssetIds.has(asset.id));
-
-  if (nextAssets.length === project.assets.length) {
-    return project;
-  }
-
-  return applyVideoProjectMutationPatch(project, {
-    assets: nextAssets,
-  });
-}
-
-function collectClipAssetIds(clip: VideoProjectClip): string[] {
-  const assetIds = 'assetId' in clip ? [clip.assetId] : [];
-  if (clip.type === VideoProjectClipType.SHAPE && clip.embeddedAsset) {
-    assetIds.push(clip.embeddedAsset.assetId);
-  }
-
-  return assetIds;
-}

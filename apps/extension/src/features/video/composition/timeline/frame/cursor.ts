@@ -4,7 +4,8 @@ import { VideoCursorCaptureMode, VideoTemporalEasing } from '../../../project/ty
 import { applyTemporalEasing } from '../../motion/index';
 import type { VideoCompositionActionState, VideoCompositionCursorState } from '../../types';
 
-function interpolateSample(
+/** Evaluates the retained easing curve between two cursor keys. */
+export function interpolateCursorSample(
   previousSample: VideoProjectCursorSample,
   nextSample: VideoProjectCursorSample,
   currentTime: number
@@ -14,15 +15,20 @@ function interpolateSample(
     return previousSample;
   }
 
-  const progress = applyTemporalEasing(
-    (currentTime - previousSample.time) / duration,
-    previousSample.interpolation ?? VideoTemporalEasing.LINEAR
+  const easing = previousSample.interpolation ?? VideoTemporalEasing.LINEAR;
+  const range = previousSample.interpolationRange ?? { start: 0, end: 1 };
+  const start = applyTemporalEasing(range.start, easing);
+  const end = applyTemporalEasing(range.end, easing);
+  const value = applyTemporalEasing(
+    range.start + ((currentTime - previousSample.time) / duration) * (range.end - range.start),
+    easing
   );
+  const progress = end > start ? (value - start) / (end - start) : 0;
 
   return {
     ...previousSample,
     time: currentTime,
-    visible: previousSample.visible && nextSample.visible,
+    visible: previousSample.visible,
     x: previousSample.x + (nextSample.x - previousSample.x) * progress,
     y: previousSample.y + (nextSample.y - previousSample.y) * progress,
   };
@@ -37,7 +43,7 @@ export function resolveCursorSample(
     return null;
   }
 
-  let previousSample = samples[0] ?? null;
+  let previousSample: VideoProjectCursorSample | null = null;
   let nextSample: VideoProjectCursorSample | null = null;
 
   for (const sample of samples) {
@@ -53,12 +59,19 @@ export function resolveCursorSample(
   if (!previousSample) {
     return null;
   }
+  if (previousSample.sourceAnchor) {
+    const owner = project.clips.find(({ id }) => id === previousSample.sourceAnchor?.sourceClipId);
+    if (!owner || currentTime < owner.startTime || currentTime >= owner.startTime + owner.duration)
+      return null;
+  }
 
   if (project.cursorTrack?.captureMode === VideoCursorCaptureMode.EMBEDDED_FALLBACK) {
     return previousSample;
   }
 
-  return nextSample ? interpolateSample(previousSample, nextSample, currentTime) : previousSample;
+  return nextSample
+    ? interpolateCursorSample(previousSample, nextSample, currentTime)
+    : previousSample;
 }
 
 function getCursorScaleBoost(actions: VideoCompositionActionState[]): number {

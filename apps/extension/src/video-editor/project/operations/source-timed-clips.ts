@@ -178,7 +178,8 @@ function hasSourceTimelineChanged(
 function reconcileActionEvents(
   previousProject: VideoProject,
   nextProject: VideoProject,
-  timelines: Map<string, RecordingClipTimeline>
+  timelines: Map<string, RecordingClipTimeline>,
+  splitLineage?: ReadonlyMap<string, string>
 ): {
   events: VideoProjectActionEvent[];
   projections: Map<string, AnchorProjection>;
@@ -206,7 +207,8 @@ function reconcileActionEvents(
         event.sourceAnchor,
         recordingId,
         previousClips,
-        nextClips
+        nextClips,
+        splitLineage
       );
       if (!projection) {
         return [];
@@ -230,7 +232,8 @@ function reconcileActionEvents(
 function reconcileCursorTrack(
   previousProject: VideoProject,
   nextProject: VideoProject,
-  timelines: Map<string, RecordingClipTimeline>
+  timelines: Map<string, RecordingClipTimeline>,
+  splitLineage?: ReadonlyMap<string, string>
 ): VideoProject['cursorTrack'] {
   if (nextProject.cursorTrack !== previousProject.cursorTrack || nextProject.cursorTrack === null) {
     return nextProject.cursorTrack;
@@ -254,7 +257,8 @@ function reconcileCursorTrack(
         sample.sourceAnchor,
         recordingId,
         previousClips,
-        nextClips
+        nextClips,
+        splitLineage
       );
       return projection
         ? [{ ...sample, sourceAnchor: projection.anchor, time: projection.time }]
@@ -300,8 +304,12 @@ function reconcileMotionRegions(
         ...region,
         duration: region.duration * projection.timeScale,
         startTime: projection.time + (region.startTime - previousEvent.time) * projection.timeScale,
-        zoomInDuration: region.zoomInDuration * projection.timeScale,
-        zoomOutDuration: region.zoomOutDuration * projection.timeScale,
+        zoomInDuration: region.animation
+          ? region.zoomInDuration
+          : region.zoomInDuration * projection.timeScale,
+        zoomOutDuration: region.animation
+          ? region.zoomOutDuration
+          : region.zoomOutDuration * projection.timeScale,
       },
     ];
   });
@@ -336,7 +344,8 @@ function collectRecordingClipTimelines(previousProject: VideoProject, nextProjec
 
 export function reconcileRecordingInteractionAnchors(
   previousProject: VideoProject,
-  nextProject: VideoProject
+  nextProject: VideoProject,
+  splitLineage?: ReadonlyMap<string, string>
 ): VideoProject {
   if (previousProject.id !== nextProject.id) return nextProject;
   const timelines = collectRecordingClipTimelines(previousProject, nextProject);
@@ -347,7 +356,12 @@ export function reconcileRecordingInteractionAnchors(
   ) {
     return nextProject;
   }
-  const { events, projections } = reconcileActionEvents(previousProject, nextProject, timelines);
+  const { events, projections } = reconcileActionEvents(
+    previousProject,
+    nextProject,
+    timelines,
+    splitLineage
+  );
   const motionRegions = reconcileMotionRegions(previousProject, nextProject, events, projections);
   let objectTracks = nextProject.objectTracks;
   if (objectTracks !== undefined && objectTracks === previousProject.objectTracks) {
@@ -360,13 +374,14 @@ export function reconcileRecordingInteractionAnchors(
           previousClips,
           previousProject: { ...previousProject, objectTracks },
           recordingId,
+          ...(splitLineage === undefined ? {} : { splitLineage }),
         }) ?? [];
     }
   }
   return {
     ...nextProject,
     actionEvents: events,
-    cursorTrack: reconcileCursorTrack(previousProject, nextProject, timelines),
+    cursorTrack: reconcileCursorTrack(previousProject, nextProject, timelines, splitLineage),
     ...(objectTracks === undefined ? {} : { objectTracks }),
     ...(motionRegions === undefined ? {} : { motionRegions }),
   };

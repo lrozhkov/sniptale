@@ -22,6 +22,7 @@ import {
   resolveMotionScale,
   resolveMotionStartTime,
 } from './normalization';
+import { isMotionAnimation } from './timing';
 
 export const DEFAULT_VIDEO_MOTION_OVERLAY_ZOOM_MODE = VideoMotionOverlayZoomMode.LOCK_OVERLAYS;
 
@@ -126,6 +127,8 @@ export function normalizeVideoProjectMotionRegion(
   region: VideoProjectMotionRegion
 ): VideoProjectMotionRegion {
   const duration = resolveMotionDuration(project, region.duration);
+  const animation = isMotionAnimation(region.animation) ? region.animation : undefined;
+  const animationDuration = animation?.duration ?? duration;
   const focusArea = normalizeMotionFocusArea(project, region.focusArea);
   const focusPoint = resolveMotionFocusPoint(project, region);
   const targetActionEventId = resolveMotionTargetActionId(project, region.targetActionEventId);
@@ -141,6 +144,7 @@ export function normalizeVideoProjectMotionRegion(
   });
 
   return {
+    ...(animation ? { animation } : {}),
     cameraMode,
     duration,
     easing: Object.values(VideoTemporalEasing).includes(region.easing)
@@ -159,12 +163,12 @@ export function normalizeVideoProjectMotionRegion(
     zoomInDuration: clampNumber(
       Number.isFinite(region.zoomInDuration) ? region.zoomInDuration : 0,
       0,
-      duration
+      animationDuration
     ),
     zoomOutDuration: clampNumber(
       Number.isFinite(region.zoomOutDuration) ? region.zoomOutDuration : 0,
       0,
-      duration
+      animationDuration
     ),
   };
 }

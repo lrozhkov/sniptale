@@ -55,8 +55,8 @@ describe('video editor project track groups', () => {
     verifyTrackDeleteSelectionCleanup
   );
   it(
-    'prunes orphaned assets when deleting a removable track with clip-backed media',
-    verifyTrackDeleteAssetPrune
+    'retains reusable materials when deleting a removable track with media',
+    verifyTrackDeleteRetainsMaterials
   );
 });
 
@@ -225,13 +225,14 @@ function seedRemovableOverlayTrack(runtime: ReturnType<typeof createMutableState
   return { removableTrackId, structure };
 }
 
-function verifyTrackDeleteAssetPrune() {
+function verifyTrackDeleteRetainsMaterials() {
   const runtime = createMutableState();
   const { removableTrackId, structure } = seedRemovableOverlayTrack(runtime);
+  const materials = runtime.getState().project?.assets;
   structure.deleteTrack(removableTrackId);
 
   expect(runtime.getState().project?.tracks.some((track) => track.id === removableTrackId)).toBe(
     false
   );
-  expect(runtime.getState().project?.assets).toEqual([]);
+  expect(runtime.getState().project?.assets).toEqual(materials);
 }

@@ -27,6 +27,14 @@ import {
 } from './effect-instances';
 
 describe('EffectV1 project branch boundary', () => {
+  it('admits source offsets and refuses malformed offset fields in persisted instances', async () => {
+    const snapshot = await createSnapshot('neutral-standalone.sniptale-effect.json');
+    const instance = createInstance(snapshot, { kind: 'scene' });
+    expect(isEffectProjectBranches([snapshot], [{ ...instance, sourceStart: 1 }])).toBe(true);
+    for (const sourceStart of [-1, NaN, Infinity, '1', null]) {
+      expect(isEffectProjectBranches([snapshot], [{ ...instance, sourceStart }])).toBe(false);
+    }
+  });
   it('accepts absent or exact snapshot and instance branches', async () => {
     const snapshot = await createSnapshot('neutral-standalone.sniptale-effect.json');
     const instance = createInstance(snapshot, { kind: 'scene' });

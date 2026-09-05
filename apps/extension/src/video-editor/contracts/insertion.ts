@@ -1,10 +1,18 @@
 export interface VideoEditorImportPlacement {
+  destination?: 'materials' | 'timeline';
   startTime?: number;
   timelineLaneId?: string | null;
   trackId?: string | null;
 }
 
 export type VideoEditorImportKind = 'audio' | 'image' | 'video';
+
+export type VideoEditorMaterialPlacementResult =
+  | { status: 'placed'; clipId: string }
+  | {
+      status: 'rejected';
+      reason: 'no-project' | 'missing-material' | 'locked-track' | 'invalid-cut';
+    };
 
 type VideoEditorImportHandler = (
   file: File,

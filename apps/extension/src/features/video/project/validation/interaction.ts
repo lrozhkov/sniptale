@@ -1,3 +1,4 @@
+import { isMotionAnimation } from '../motion/timing';
 import {
   VideoCursorAnimationPreset,
   VideoCursorCaptureMode,
@@ -53,6 +54,11 @@ function isSourceTimeAnchor(value: unknown): boolean {
 function isCursorSample(value: unknown): boolean {
   return (
     isRecord(value) &&
+    (value['interpolationRange'] === undefined ||
+      (isRecord(value['interpolationRange']) &&
+        isBoundedNumber(value['interpolationRange']['start'], 0, 1) &&
+        isBoundedNumber(value['interpolationRange']['end'], 0, 1) &&
+        value['interpolationRange']['end'] > value['interpolationRange']['start'])) &&
     isString(value['id']) &&
     isBoundedNumber(value['time'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
     isCoordinate(value['x']) &&
@@ -79,6 +85,13 @@ export function isCursorTrack(value: unknown): boolean {
 export function isActionEvent(value: unknown): boolean {
   return (
     isRecord(value) &&
+    (value['animation'] === undefined ||
+      (isRecord(value['animation']) &&
+        isBoundedNumber(value['animation']['start'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
+        isBoundedNumber(value['animation']['end'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
+        isBoundedNumber(value['animation']['duration'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
+        value['animation']['end'] > value['animation']['start'] &&
+        value['animation']['duration'] >= value['animation']['end'])) &&
     isString(value['id']) &&
     isEnumValue(value['kind'], VideoProjectActionEventKind) &&
     isBoundedNumber(value['time'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
@@ -97,6 +110,9 @@ export function isMotionRegion(value: unknown): boolean {
   return (
     isRecord(value) &&
     isString(value['id']) &&
+    (value['animation'] === undefined ||
+      (isMotionAnimation(value['animation']) &&
+        value['animation'].duration <= MAX_VIDEO_PROJECT_DURATION_SECONDS)) &&
     isBoundedNumber(value['startTime'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
     isBoundedNumber(value['duration'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
     isEnumValue(value['easing'], VideoTemporalEasing) &&

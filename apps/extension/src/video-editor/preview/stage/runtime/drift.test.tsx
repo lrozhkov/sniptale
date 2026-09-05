@@ -49,6 +49,8 @@ function createVideoElement() {
   } as unknown as HTMLVideoElement;
 }
 
+const EMPTY_ASSET_URLS: Record<string, string> = {};
+
 function PreviewStageVideoSyncHarness(props: {
   activeClips: VideoProjectVideoClip[];
   currentTime: number;
@@ -56,7 +58,7 @@ function PreviewStageVideoSyncHarness(props: {
   syncedClips: VideoProjectVideoClip[];
   videoRefs: PreviewStageVideoRefs;
 }) {
-  usePreviewStageVideoSync(props);
+  usePreviewStageVideoSync({ ...props, assetUrls: EMPTY_ASSET_URLS });
   return null;
 }
 

@@ -1,6 +1,6 @@
 import { AudioRecordingModal } from '../../recording/audio-modal';
 import { VideoEditorLibraryPanel } from '../../library/panel';
-import React, { useState } from 'react';
+import React, { useRef, useState, useSyncExternalStore } from 'react';
 import { VideoEditorFloatingWorkspace } from '../floating';
 import { VideoEditorFloatingInspectorStack } from '../floating/inspector-stack';
 import {
@@ -34,7 +34,14 @@ export function VideoEditorWorkspaceMain({
   const [activeInsertKind, setActiveInsertKind] = useState<VideoPreviewCanvasInsertKind | null>(
     null
   );
-  const [effectsLibraryDockOpen, setEffectsLibraryDockOpen] = useState(false);
+  const {
+    inspectorSuppressed,
+    effectsLibraryDockOpen,
+    materialsOpen,
+    changeEffectsOpen,
+    toggleMaterials,
+    inspector,
+  } = useWorkspacePanels();
   const [inspectorGroupFocus] = useState<InspectorGroupFocusIntent | null>(null);
   const effectBundles = useWorkspaceEffectBundles();
   const effectOperations = useEffectLibraryOperations();
@@ -51,19 +58,24 @@ export function VideoEditorWorkspaceMain({
     <InspectorGroupFocusContext.Provider value={inspectorGroupFocus}>
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden" style={workspaceStyle}>
         <VideoEditorFloatingWorkspace
+          inspector={inspector}
+          materials={{ isOpen: materialsOpen, onToggle: toggleMaterials }}
           activeInsertKind={activeInsertKind}
           effectsLibraryDock={{
             isOpen: effectsLibraryDockOpen,
-            onToggle: () => setEffectsLibraryDockOpen((value) => !value),
+            onToggle: () => changeEffectsOpen(!effectsLibraryDockOpen),
           }}
           onActiveInsertKindChange={setActiveInsertKind}
         />
         <VideoEditorWorkspaceCanvas
+          materialsOpen={materialsOpen}
           inspector={
-            <VideoEditorFloatingInspectorStack
-              diagnosticsContent={diagnosticsContent}
-              resize={inspectorResize}
-            />
+            !inspectorSuppressed && (
+              <VideoEditorFloatingInspectorStack
+                diagnosticsContent={diagnosticsContent}
+                resize={inspectorResize}
+              />
+            )
           }
           activeInsertKind={activeInsertKind}
           effectBundles={effectBundles}
@@ -71,12 +83,64 @@ export function VideoEditorWorkspaceMain({
           effectsLibraryDockOpen={effectsLibraryDockOpen}
           previewHeightStyle={previewHeightStyle}
           onClearActiveInsertKind={() => setActiveInsertKind(null)}
-          onEffectsLibraryDockOpenChange={setEffectsLibraryDockOpen}
+          onEffectsLibraryDockOpenChange={changeEffectsOpen}
         />
         <VideoEditorWorkspaceOverlays diagnosticsContent={diagnosticsContent} />
       </div>
     </InspectorGroupFocusContext.Provider>
   );
+}
+
+function useWorkspacePanels() {
+  const compact = useSyncExternalStore(subscribeCompactWorkspace, isCompactWorkspace, () => false);
+  const header = useVideoEditorHeaderController();
+  const [activeLibrary, setActiveLibrary] = useState<'materials' | 'effects' | null>(() =>
+    isCompactWorkspace() ? null : 'materials'
+  );
+  const inspectorSuppressed = compact && activeLibrary !== null;
+  const effectsLibraryDockOpen = activeLibrary === 'effects';
+  const materialsOpen = activeLibrary === 'materials';
+  const libraryBeforeEffects = useRef<'materials' | null>(null);
+  const changeEffectsOpen = (open: boolean) => {
+    if (open) {
+      libraryBeforeEffects.current = activeLibrary === 'materials' ? 'materials' : null;
+      setActiveLibrary('effects');
+    } else {
+      setActiveLibrary(libraryBeforeEffects.current);
+    }
+  };
+  return {
+    inspectorSuppressed,
+    effectsLibraryDockOpen,
+    materialsOpen,
+    changeEffectsOpen,
+    toggleMaterials: () => setActiveLibrary(materialsOpen ? null : 'materials'),
+    inspector: {
+      isOpen: Boolean(header && !header.leftSidebarCollapsed && !inspectorSuppressed),
+      onToggle: () => {
+        if (inspectorSuppressed) {
+          setActiveLibrary(null);
+          if (header?.leftSidebarCollapsed) header.onToggleSidebar();
+        } else {
+          header?.onToggleSidebar();
+        }
+      },
+    },
+  };
+}
+
+const COMPACT_WORKSPACE_QUERY = '(max-width: 959px)';
+
+function isCompactWorkspace(): boolean {
+  return (
+    typeof window !== 'undefined' && Boolean(window.matchMedia?.(COMPACT_WORKSPACE_QUERY).matches)
+  );
+}
+
+function subscribeCompactWorkspace(onChange: () => void): () => void {
+  const query = window.matchMedia?.(COMPACT_WORKSPACE_QUERY);
+  query?.addEventListener('change', onChange);
+  return () => query?.removeEventListener('change', onChange);
 }
 
 function VideoEditorWorkspaceOverlays(props: {

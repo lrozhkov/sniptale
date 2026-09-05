@@ -2,12 +2,7 @@ import { applyVideoProjectMutationPatch } from '../../../../features/video/proje
 import type { VideoEditorProjectState, VideoEditorProjectSliceSet } from '../contracts';
 import type { VideoEditorClipTimingResult } from '../../../contracts/commands/timeline';
 import { VideoEditorSelectionKind } from '../../../contracts/selection';
-import {
-  applyProjectUpdate,
-  detachLinkedClips,
-  pruneUnusedProjectAssets,
-  resolveEditableClipOperation,
-} from '../helpers';
+import { applyProjectUpdate, detachLinkedClips, resolveEditableClipOperation } from '../helpers';
 import {
   closeProjectTrackGap,
   moveProjectClip,
@@ -139,11 +134,9 @@ function createDeleteClipAction(set: VideoEditorStoreSet): VideoEditorProjectSta
       }
 
       return applyProjectUpdate(state, () =>
-        pruneUnusedProjectAssets(
-          applyVideoProjectMutationPatch(project, {
-            clips: project.clips.filter((item) => !operation.clipIdSet.has(item.id)),
-          })
-        )
+        applyVideoProjectMutationPatch(project, {
+          clips: project.clips.filter((item) => !operation.clipIdSet.has(item.id)),
+        })
       );
     });
 }

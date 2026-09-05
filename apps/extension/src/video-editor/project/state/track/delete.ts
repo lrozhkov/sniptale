@@ -4,7 +4,6 @@ import { applyVideoProjectMutationPatch } from '../../../../features/video/proje
 import { normalizeTrackOrder } from '../../../../features/video/project/timeline';
 import type { VideoProject } from '../../../../features/video/project/types/index';
 import type { VideoEditorProjectState } from '../contracts';
-import { pruneUnusedProjectAssets } from '../helpers';
 
 function canDeleteProjectTrack(project: VideoProject, trackId: string): boolean {
   const track = project.tracks.find((item) => item.id === trackId);
@@ -20,13 +19,11 @@ export function deleteProjectTrack(project: VideoProject, trackId: string): Vide
     return project;
   }
 
-  return pruneUnusedProjectAssets(
-    normalizeTrackOrder(
-      applyVideoProjectMutationPatch(project, {
-        clips: project.clips.filter((clip) => clip.trackId !== trackId),
-        tracks: project.tracks.filter((track) => track.id !== trackId),
-      })
-    )
+  return normalizeTrackOrder(
+    applyVideoProjectMutationPatch(project, {
+      clips: project.clips.filter((clip) => clip.trackId !== trackId),
+      tracks: project.tracks.filter((track) => track.id !== trackId),
+    })
   );
 }
 

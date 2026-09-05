@@ -17,6 +17,8 @@ export function canSplitProjectClipAtTime(
     if (!clip) return false;
     const startOffset = splitTime - clip.startTime;
     const endOffset = clip.duration - startOffset;
+    // A shorter linked stream belongs wholly to one side when it does not cross the cut.
+    if (affectedClipId !== clipId && (startOffset <= 0 || endOffset <= 0)) return true;
     const tolerance =
       Number.EPSILON *
       16 *

@@ -314,6 +314,7 @@ async function verifyVideoEditorTimelineBoundaries(
     name: translate('videoEditor.timeline.seekToStart', 'ru'),
   });
   const seekToEnd = page.getByRole('button', {
+    exact: true,
     name: translate('videoEditor.timeline.seekToEnd', 'ru'),
   });
   const previousFrame = page.getByRole('button', {
@@ -354,6 +355,52 @@ async function verifyVideoEditorTimelineBoundaries(
     await page.locator('[data-ui="video-editor.timeline.toolbar.add-track.primary"]').click();
   }
   await page.setViewportSize({ width: 700, height: 900 });
+  const materialsToggle = page.getByRole('button', {
+    name: translate('videoEditor.app.materialsTitle', 'ru'),
+    exact: true,
+  });
+  const materials = page.locator('[data-ui="video-editor.materials"]');
+  const inspector = page.locator('[data-ui="video-editor.floating.context-inspector"]');
+  const inspectorToggle = page.locator('[data-ui="video-editor.floating.document-bar.inspector"]');
+  await expect(materials).toBeVisible();
+  await page.setViewportSize({ width: 700, height: 720 });
+  const materialSource = materials.locator('button[aria-pressed]').first();
+  await expect(materialSource).toBeVisible();
+  await expect
+    .poll(() =>
+      materialSource.evaluate((element) => {
+        const bounds = element.getBoundingClientRect();
+        return element.contains(
+          document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)
+        );
+      })
+    )
+    .toBe(true);
+  await page.setViewportSize({ width: 700, height: 900 });
+  await expect(inspector).toHaveCount(0);
+  await expect(inspectorToggle).toHaveAttribute('aria-pressed', 'false');
+  const projectTitle = page.locator('[data-ui="video-editor.floating.document-bar"] input');
+  const exportButton = page.locator('[data-ui="video-editor.floating.document-bar.export"]');
+  await expect(exportButton).toBeVisible();
+  expect(
+    Math.abs((await projectTitle.boundingBox())!.y - (await exportButton.boundingBox())!.y)
+  ).toBeLessThan(4);
+  await expect
+    .poll(() =>
+      page.locator('[data-ui="video.preview.viewport"]').evaluate((element) => element.clientWidth)
+    )
+    .toBeGreaterThan(350);
+  await inspectorToggle.click();
+  await expect(materials).toHaveCount(0);
+  await expect(inspector).toBeVisible();
+  await expect(inspectorToggle).toHaveAttribute('aria-pressed', 'true');
+  await materialsToggle.click();
+  await expect(inspector).toHaveCount(0);
+  await materialsToggle.click();
+  await expect(inspector).toBeVisible();
+  await materialsToggle.click();
+  await expect(materials).toBeVisible();
+  await expect(inspector).toHaveCount(0);
   await expect(seekToStart).toBeVisible();
   await expect(seekToEnd).toBeVisible();
   await expect(previousFrame).toBeVisible();

@@ -86,7 +86,7 @@ export function splitStandaloneEffectHostWithResult(
   if (localOffset <= 0.05 || localOffset >= sourceHost.duration - 0.05) return null;
 
   const secondDuration = sourceHost.duration - localOffset;
-  const sourcePlaybackDuration = sourceInstance.duration * sourceInstance.playbackRate;
+  const sourceStart = sourceInstance.sourceStart ?? 0;
   const instanceId = crypto.randomUUID();
   const secondHost: VideoProjectEffectClip = {
     ...sourceHost,
@@ -101,14 +101,14 @@ export function splitStandaloneEffectHostWithResult(
     ...sourceInstance,
     controls: { ...sourceInstance.controls },
     duration: localOffset,
-    playbackRate: sourcePlaybackDuration / localOffset,
+    sourceStart,
   };
   const secondInstance = {
     ...sourceInstance,
     controls: { ...sourceInstance.controls },
     duration: secondDuration,
     id: instanceId,
-    playbackRate: sourcePlaybackDuration / secondDuration,
+    sourceStart: sourceStart + localOffset * sourceInstance.playbackRate,
     startTime: splitTime,
   };
   const nextProject = applyVideoProjectMutationPatch(project, {

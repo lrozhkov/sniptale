@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { hydrateVideoProject } from '../../../features/video/project/hydration';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import {
   VideoClipLinkMode,
@@ -161,3 +162,61 @@ function getVisualObjectSampleTimes(project: VideoProject): number[] | undefined
     ?.find((track) => track.id === 'visual-object')
     ?.samples.map((sample) => sample.time);
 }
+
+it('keeps each tracked point on its actual split owner when the same source is overlaid twice', () => {
+  const project = createSourceBoundObjectProject();
+  const original = project.clips[0] as VideoProjectVideoClip;
+  const duplicate = { ...original, id: 'other-use', trackId: 'other-track' };
+  project.tracks.push({ ...project.tracks[0]!, id: 'other-track', order: 1, isRoot: false });
+  project.clips.push(duplicate);
+  const left = { ...original, duration: 2, sourceDuration: 2 };
+  const tail = {
+    ...original,
+    id: 'original-tail',
+    startTime: 6,
+    sourceStart: 2,
+    sourceDuration: 2,
+    duration: 2,
+  };
+  const otherLeft = { ...duplicate, duration: 2, sourceDuration: 2 };
+  const otherTail = {
+    ...duplicate,
+    id: 'other-tail',
+    startTime: 6,
+    sourceStart: 2,
+    sourceDuration: 2,
+    duration: 2,
+  };
+  const split = reconcileRecordingInteractionAnchors(
+    project,
+    { ...project, clips: [otherLeft, otherTail, left, tail] },
+    new Map([
+      [original.id, tail.id],
+      [duplicate.id, otherTail.id],
+    ])
+  );
+  const tracked = split.objectTracks!.find((track) => track.id === 'visual-object')!;
+  expect(tracked.samples).toMatchObject([
+    { time: 0.5, sourceClipId: original.id },
+    { time: 7, sourceClipId: tail.id },
+  ]);
+  expect(tracked.correctionAnchors).toMatchObject([{ time: 7, sourceClipId: tail.id }]);
+  expect(hydrateVideoProject(JSON.parse(JSON.stringify(split))).objectTracks).toEqual(
+    split.objectTracks
+  );
+  const removedLeft = reconcileRecordingInteractionAnchors(split, {
+    ...split,
+    clips: [otherLeft, otherTail, tail],
+  });
+  expect(
+    removedLeft.objectTracks!.find((track) => track.id === 'visual-object')!.samples
+  ).toMatchObject([{ time: 7, sourceClipId: tail.id }]);
+  expect(
+    removedLeft.objectTracks!.find((track) => track.id === 'visual-object')!.samples
+  ).toHaveLength(1);
+  const removedSource = reconcileRecordingInteractionAnchors(removedLeft, {
+    ...removedLeft,
+    clips: [otherLeft, otherTail],
+  });
+  expect(removedSource.objectTracks!.map((track) => track.id)).toEqual(['manual-object']);
+});

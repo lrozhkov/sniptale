@@ -1,6 +1,35 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorAppMessages = defineMessageSource({
+  materialsTitle: { ru: 'Материалы', en: 'Materials' },
+  materialsLocked: {
+    ru: 'Дорожка заблокирована. Разблокируйте её и повторите добавление.',
+    en: 'A destination track is locked. Unlock it and try again.',
+  },
+  materialsUnavailable: {
+    ru: 'Материал больше недоступен в этом проекте. Выберите другой исходник.',
+    en: 'This material is no longer available in this project. Select another source.',
+  },
+  materialsHint: {
+    ru: 'Импортируйте исходники, затем добавьте их в монтаж.',
+    en: 'Import sources, then add them to your timeline.',
+  },
+  materialsVideo: { ru: 'Видео', en: 'Video' },
+  materialsImage: { ru: 'Изображение', en: 'Image' },
+  materialsAudio: { ru: 'Аудио', en: 'Audio' },
+  materialsLoading: { ru: 'Импортируем материал…', en: 'Importing material…' },
+  materialsAppend: { ru: 'Добавить в конец', en: 'Append to timeline' },
+  materialsInsert: { ru: 'Вставить со сдвигом', en: 'Insert at playhead' },
+  materialsInsertHint: {
+    ru: 'Вставка раздвинет монтаж в текущий момент. Наложение добавит отдельный слой.',
+    en: 'Insert makes room at the playhead. Overlay adds a separate layer.',
+  },
+  materialsInvalidCut: {
+    ru: 'Недостаточно места для разреза. Переместите указатель дальше от края клипа.',
+    en: 'Not enough room to split here. Move the playhead farther from the clip edge.',
+  },
+  materialsOverlay: { ru: 'Наложить в текущий момент', en: 'Overlay at playhead' },
+  materialsEmpty: { ru: 'В проекте пока нет материалов.', en: 'No materials in this project yet.' },
   documentTitle: {
     ru: 'Sniptale — Видео-редактор',
     en: 'Sniptale — Video editor',

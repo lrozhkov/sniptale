@@ -1,3 +1,4 @@
+import { getMotionAnimationTime } from '../../project/motion/timing';
 import {
   DEFAULT_VIDEO_MOTION_OVERLAY_ZOOM_MODE,
   resolveMotionOverlayZoomMode,
@@ -101,14 +102,15 @@ function resolvePathWindowCamera(
 }
 
 function resolvePathWindow(region: VideoProjectMotionRegion, currentTime: number) {
-  const introDuration = Math.min(region.zoomInDuration, region.duration);
-  const outroDuration = Math.min(region.zoomOutDuration, region.duration);
+  const animationDuration = region.animation?.duration ?? region.duration;
+  const introDuration = Math.min(region.zoomInDuration, animationDuration);
+  const outroDuration = Math.min(region.zoomOutDuration, animationDuration);
   const travelStart = introDuration;
   return {
     introDuration,
-    localTime: currentTime - region.startTime,
+    localTime: getMotionAnimationTime(region, currentTime - region.startTime),
     outroDuration,
-    travelEnd: Math.max(travelStart, region.duration - outroDuration),
+    travelEnd: Math.max(travelStart, animationDuration - outroDuration),
     travelStart,
   };
 }

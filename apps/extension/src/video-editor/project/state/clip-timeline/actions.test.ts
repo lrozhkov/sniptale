@@ -103,6 +103,18 @@ function seedSingleClipState(runtime: ReturnType<typeof createMutableState>, loc
   return { asset, project, trackId };
 }
 
+it('keeps project materials when their last timeline instance is deleted', () => {
+  const runtime = createMutableState();
+  const { asset } = seedSingleClipState(runtime);
+  const unused = { ...createVideoAsset(), id: 'unused-material' };
+  const project = runtime.getState().project!;
+  runtime.set({ project: { ...project, assets: [asset, unused] } });
+  createVideoEditorProjectClipTimelineActions(runtime.set).deleteClip('clip-1');
+  expect(runtime.getState().project?.clips).toEqual([]);
+  expect(runtime.getState().project?.assets).toEqual([asset, unused]);
+  expect(runtime.getState().projectHistory.past).toHaveLength(1);
+});
+
 function createLinkedVideoClip(trackId: string, assetId: string) {
   return {
     ...createVideoClip(trackId, assetId),
@@ -153,9 +165,9 @@ function seedLinkedClipState(runtime: ReturnType<typeof createMutableState>) {
   });
 }
 
-function expectClipDeletionPrunesAssets(runtime: ReturnType<typeof createMutableState>) {
+function expectClipDeletionKeepsMaterials(runtime: ReturnType<typeof createMutableState>) {
   expect(runtime.getState().project?.clips).toEqual([]);
-  expect(runtime.getState().project?.assets).toEqual([]);
+  expect(runtime.getState().project?.assets).toHaveLength(1);
   expect(runtime.getState().selection).toEqual({ kind: 'scene' });
 }
 
@@ -180,7 +192,7 @@ function expectTimelineMutationSequence(runtime: ReturnType<typeof createMutable
   ).toBeGreaterThan(2);
 }
 
-it('deletes editable clips and prunes orphaned assets from the project state', () => {
+it('deletes editable clips while retaining project materials', () => {
   vi.spyOn(Date, 'now').mockReturnValue(700);
   const runtime = createMutableState();
   const actions = createVideoEditorProjectClipTimelineActions(runtime.set);
@@ -188,7 +200,7 @@ it('deletes editable clips and prunes orphaned assets from the project state', (
 
   actions.deleteClip('clip-1');
 
-  expectClipDeletionPrunesAssets(runtime);
+  expectClipDeletionKeepsMaterials(runtime);
 });
 
 it('keeps state unchanged when deleting a missing or locked clip target', () => {

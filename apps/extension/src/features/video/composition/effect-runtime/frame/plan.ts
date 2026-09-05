@@ -1,6 +1,7 @@
 import { buildProjectTransitionSegments } from '../../../project/transition/project';
 import {
   isEffectInstanceTimingEqual,
+  isEffectInstanceSourceRangeValid,
   resolveEffectInstanceTime,
 } from '../../../project/effect-instance/timing';
 import type { VideoProject } from '../../../project/types/index';
@@ -105,7 +106,7 @@ function assertSnapshotDocument(
   if (
     document.id !== snapshot.documentId ||
     document.kind !== snapshot.kind ||
-    !isEffectInstanceTimingEqual(document.duration, instance.duration * instance.playbackRate)
+    !isEffectInstanceSourceRangeValid(instance, document.duration)
   ) {
     fail('effectPlanIntegrityFailure');
   }

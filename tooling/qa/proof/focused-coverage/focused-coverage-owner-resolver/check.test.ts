@@ -342,3 +342,25 @@ it('defers existing outside-registry files instead of failing', async () => {
     verdict: 'defer-ambiguous-existing',
   });
 });
+
+it('instruments new UI files outside rollout when their local tests run', async () => {
+  const root = createTempRoot('focused-new-ui-coverage-');
+  const productionFile = 'apps/extension/src/video-editor/workspace/surface/materials.tsx';
+  const testFile = 'apps/extension/src/video-editor/workspace/surface/materials.test.tsx';
+  writeFile(root, productionFile, 'export const view = 1;\n');
+  writeFile(root, testFile, 'export const test = 1;\n');
+  const scope = await withCwd(root, async () => {
+    const module = await importResolver();
+    return module.resolveFocusedCoverageOwnerScope({
+      codeFiles: [productionFile],
+      newFiles: [productionFile],
+      directTestFiles: [testFile],
+      mappingOptions: { mappings: [] },
+    });
+  });
+  expect(scope).toMatchObject({
+    coverageTargetFiles: [productionFile],
+    testFiles: [testFile],
+    verdict: 'run-local-coverage',
+  });
+});
