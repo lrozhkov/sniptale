@@ -106,6 +106,7 @@ interface VideoEditorSidebarProjectActions {
 
 interface VideoEditorSidebarClipActions {
   onConvertTextClipToAnnotation: VideoEditorSidebarCommands['convertTextClipToAnnotation'];
+  onSwapClip: VideoEditorSidebarCommands['swapClip'];
   onDetachClipGroup: VideoEditorSidebarCommands['detachClipGroup'];
   onUpdateClipAudioEnvelope: VideoEditorSidebarCommands['updateClipAudioEnvelope'];
   onUpdateClipFades: VideoEditorSidebarCommands['updateClipFades'];

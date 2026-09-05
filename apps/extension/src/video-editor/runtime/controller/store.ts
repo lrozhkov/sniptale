@@ -76,6 +76,7 @@ function selectTimelineEditingPort(state: VideoEditorState): TimelineEditingPort
     duplicateClip: state.duplicateClip,
     insertCursorSample: state.insertCursorSample,
     moveClip: state.moveClip,
+    swapClip: state.swapClip,
     moveTrack: state.moveTrack,
     pixelsPerSecond: state.pixelsPerSecond,
     renameTrack: state.renameTrack,

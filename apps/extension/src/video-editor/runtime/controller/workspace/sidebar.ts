@@ -60,6 +60,7 @@ function createWorkspaceSidebarClipActions(store: EditorStore) {
     onApplyMediaClipVisualsToTrack: store.applyMediaClipVisualsToTrack,
     onConvertTextClipToAnnotation: store.convertTextClipToAnnotation,
     onDetachClipGroup: store.detachClipGroup,
+    onSwapClip: store.swapClip,
     onUpdateAnnotationClipContent: store.updateAnnotationClipContent,
     onUpdateAnnotationClipStyle: store.updateAnnotationClipStyle,
     onUpdateAnnotationClipTemplate: store.updateAnnotationClipTemplate,

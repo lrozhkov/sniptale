@@ -1,6 +1,31 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorAppMessages = defineMessageSource({
+  clipOrder: { ru: 'Порядок клипа', en: 'Clip order' },
+  clipEarlier: { ru: 'Раньше', en: 'Earlier' },
+  clipLater: { ru: 'Позже', en: 'Later' },
+  clipSwapNeighbor: { ru: 'Поменять местами с «{name}»', en: 'Swap with “{name}”' },
+  clipSwapNoNeighbor: {
+    ru: 'Нет соседнего клипа в этом направлении',
+    en: 'No neighboring clip in this direction',
+  },
+  clipSwapOverlap: {
+    ru: 'Сначала устраните пересечение связанных фрагментов',
+    en: 'Resolve overlapping linked groups first',
+  },
+  clipSwapLocked: {
+    ru: 'Связанная дорожка или интервал заблокированы',
+    en: 'A linked track or interval is locked',
+  },
+  clipSwapCollision: {
+    ru: 'На связанной дорожке занято место назначения',
+    en: 'The destination is occupied on a linked track',
+  },
+  clipSwapLinkedHint: {
+    ru: 'Камера и звук, связанные по времени, перемещаются вместе с клипом.',
+    en: 'Temporally linked camera and audio move with the clip.',
+  },
+
   panelFullHeight: { ru: 'Развернуть панель по высоте', en: 'Expand panel to full height' },
   panelRestoreHeight: {
     ru: 'Вернуть панель к высоте просмотра',

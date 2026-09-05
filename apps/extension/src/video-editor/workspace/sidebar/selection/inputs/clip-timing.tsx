@@ -1,3 +1,4 @@
+import { ClipOrderControls } from './clip-order';
 import { translate } from '../../../../../platform/i18n';
 import { isAudioClip, isVideoClip } from '../../../../../features/video/project/timeline';
 import {
@@ -20,6 +21,13 @@ type ClipTimingControlsProps = WorkspaceSidebarSelectionPanelProps & {
 export function ClipTimingControls(props: ClipTimingControlsProps) {
   return (
     <>
+      {props.onSwapClip ? (
+        <ClipOrderControls
+          project={props.project}
+          clipId={props.clip.id}
+          onSwapClip={props.onSwapClip}
+        />
+      ) : null}
       <ClipFadeFields
         clipId={props.clip.id}
         fadeInMs={props.clip.fadeInMs}

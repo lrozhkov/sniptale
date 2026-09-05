@@ -181,6 +181,7 @@ type WorkspaceSidebarClipActionProps = Pick<
   | 'onApplyMediaClipVisualsToTrack'
   | 'onConvertTextClipToAnnotation'
   | 'onDetachClipGroup'
+  | 'onSwapClip'
   | 'onUpdateAnnotationClipContent'
   | 'onUpdateAnnotationClipStyle'
   | 'onUpdateAnnotationClipTemplate'
@@ -208,6 +209,7 @@ function getWorkspaceSidebarClipActionProps(
     onApplyMediaClipVisualsToTrack: actions.onApplyMediaClipVisualsToTrack,
     onConvertTextClipToAnnotation: actions.onConvertTextClipToAnnotation,
     onDetachClipGroup: actions.onDetachClipGroup,
+    onSwapClip: actions.onSwapClip,
     onUpdateAnnotationClipContent: actions.onUpdateAnnotationClipContent,
     onUpdateAnnotationClipStyle: actions.onUpdateAnnotationClipStyle,
     onUpdateAnnotationClipTemplate: actions.onUpdateAnnotationClipTemplate,

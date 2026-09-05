@@ -101,6 +101,7 @@ function createSelectionBodyActionProps(props: WorkspaceSidebarSelectionPanelPro
     onUpdateTransitionDuration: props.onUpdateTransitionDuration,
     onUpdateTransitionEasing: props.onUpdateTransitionEasing,
     onUpdateTransitionTemplate: props.onUpdateTransitionTemplate,
+    ...(props.onSwapClip ? { onSwapClip: props.onSwapClip } : {}),
     onDetachClipGroup: props.onDetachClipGroup,
     onUpdateClipTransform: props.onUpdateClipTransform,
     onUpdateClipMuted: props.onUpdateClipMuted,
@@ -174,6 +175,7 @@ function createSelectionPanelUpdateProps(
   WorkspaceSidebarSelectionPanelProps,
   | 'onClearCursorSampleSkinOverride'
   | 'onConvertTextClipToAnnotation'
+  | 'onSwapClip'
   | 'onDetachClipGroup'
   | 'onResizeProject'
   | 'onPreviewSceneBackground'

@@ -7,6 +7,10 @@ describe('workspace/sidebar-props', () => {
     const controller = createFloatingWorkspaceController().sidebar;
     const props = getWorkspaceSidebarProps(controller);
 
+    expect(props.onSwapClip).toBe(controller.clipActions.onSwapClip);
+    props.onSwapClip?.('clip-1', 'right');
+    expect(controller.clipActions.onSwapClip).toHaveBeenCalledWith('clip-1', 'right');
+
     expect(props.onRenameTrack).toBe(controller.projectActions.onRenameTrack);
     expect(props.onToggleTrackLock).toBe(controller.projectActions.onToggleTrackLock);
     expect(props.onToggleTrackVisibility).toBe(controller.projectActions.onToggleTrackVisibility);

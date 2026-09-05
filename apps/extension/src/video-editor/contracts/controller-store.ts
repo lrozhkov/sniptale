@@ -44,6 +44,7 @@ type TimelineClipAction =
   | 'upsertAsset'
   | 'addAssetClip'
   | 'addVideoBlock'
+  | 'swapClip'
   | 'moveClip'
   | 'trimClipStart'
   | 'trimClipEnd'

@@ -1,3 +1,4 @@
+import { swapProjectClips } from './reorder';
 import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
 import type { VideoEditorProjectState, VideoEditorProjectSliceSet } from '../contracts';
 import type { VideoEditorClipTimingResult } from '../../../contracts/commands/timeline';
@@ -14,6 +15,7 @@ import { duplicateProjectClipsWithResult, splitProjectClipsAtTimeWithResult } fr
 type VideoEditorStoreSet = VideoEditorProjectSliceSet;
 
 type VideoEditorProjectClipTimelineActionKeys =
+  | 'swapClip'
   | 'moveClip'
   | 'trimClipStart'
   | 'trimClipEnd'
@@ -28,6 +30,10 @@ export function createVideoEditorProjectClipTimelineActions(
 ): Pick<VideoEditorProjectState, VideoEditorProjectClipTimelineActionKeys> {
   return {
     moveClip: createMoveClipAction(set),
+    swapClip: (clipId, direction) =>
+      set((state) =>
+        applyProjectUpdate(state, (project) => swapProjectClips(project, clipId, direction))
+      ),
     closeTrackGap: createCloseTrackGapAction(set),
     trimClipStart: createClipTimingAction(set, trimProjectClipStart),
     trimClipEnd: createClipTimingAction(set, trimProjectClipEnd),

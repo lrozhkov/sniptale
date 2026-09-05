@@ -1,3 +1,4 @@
+import type { VideoEditorProjectActions } from '../../../contracts/commands/project';
 import type { ReactNode } from 'react';
 import type {
   VideoProjectAnnotationStylePatch,
@@ -54,6 +55,7 @@ export interface WorkspaceSidebarProps {
   onGenerateMotionPathFromCursor?: (motionRegionId: string) => void;
   onDeleteProject: (projectId: string) => void | Promise<void>;
   onDeleteTrack?: (trackId: string) => void;
+  onSwapClip?: VideoEditorProjectActions['swapClip'];
   onDetachClipGroup: (clipId: string) => void;
   onEnableCursorTrack: () => void;
   onImportAudio: (file: File) => void;

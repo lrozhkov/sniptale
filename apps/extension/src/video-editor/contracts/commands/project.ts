@@ -73,6 +73,7 @@ export interface VideoEditorProjectActions
     startTime?: number
   ) => string | null;
   moveClip: VideoEditorMoveClipAction;
+  swapClip: (clipId: string, direction: 'left' | 'right') => void;
   trimClipStart: VideoEditorTrimClipAction;
   trimClipEnd: VideoEditorTrimClipAction;
   splitClipAt: (clipId: string, splitTime: number) => void;

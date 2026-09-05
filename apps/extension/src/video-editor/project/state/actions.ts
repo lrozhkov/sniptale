@@ -44,6 +44,7 @@ type VideoEditorProjectActionKeys =
   | 'addTextOverlay'
   | 'addSubtitleOverlay'
   | 'addShapeOverlay'
+  | 'swapClip'
   | 'moveClip'
   | 'closeTrackGap'
   | 'trimClipStart'
