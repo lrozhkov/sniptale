@@ -70,7 +70,7 @@ export function ProjectTimelineToolbarLeadingControls({
   | 'onSplitSelectedClip'
 >) {
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-2 max-[720px]:gap-1">
+    <div className="flex min-w-0 flex-nowrap items-center gap-2">
       <ProjectTimelineAddControls insertion={insertion} canAddMotionRegion={canAddMotionRegion} />
       {canAutoTransformRecording && onAutoTransformRecording ? (
         <ProjectTimelineAutoTransformButton onAutoTransformRecording={onAutoTransformRecording} />

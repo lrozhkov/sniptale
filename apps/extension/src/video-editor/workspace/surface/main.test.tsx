@@ -261,8 +261,8 @@ function expectWorkspaceMarkup(markup: string) {
   expect(markup).toContain('px-3 pb-3');
   expect(markup).not.toContain('pr-[21.75rem]');
   expect(markup).not.toContain('max-[860px]:pt-[11.75rem]');
-  expect(markup).toContain('flex-col gap-0');
-  expect(markup).toContain('flex min-h-0 shrink-0 gap-0');
+  expect(markup).toContain('data-inspector-dock="viewer"');
+  expect(markup).toContain('grid-template-rows:');
   expect(markup).toContain('video-editor.workspace.timeline-resize-zone');
   expect(markup).toContain('h-2 shrink-0 cursor-row-resize');
   expect(markup).not.toContain('h-1.5 w-full rounded-full');

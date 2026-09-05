@@ -3,9 +3,9 @@ import { clampInspectorWidth, INSPECTOR_MAX_WIDTH, INSPECTOR_MIN_WIDTH } from '.
 
 afterEach(() => vi.unstubAllGlobals());
 
-it('leaves room for effects and preview when the viewport narrows', () => {
-  vi.stubGlobal('window', { innerWidth: 1100 });
-  expect(clampInspectorWidth(520)).toBe(440);
+it('preserves inspector width when the workspace scrolls below HD', () => {
+  vi.stubGlobal('window', { innerWidth: 700 });
+  expect(clampInspectorWidth(520)).toBe(520);
   expect(clampInspectorWidth(320)).toBe(320);
   vi.stubGlobal('window', { innerWidth: 1600 });
   expect(clampInspectorWidth(520)).toBe(520);

@@ -154,6 +154,22 @@ async function expectBuiltVideoEditorGeometry(
   expect(geometry.preview.right).toBeLessThanOrEqual(geometry.inspector.left);
   expect(geometry.timeline.right).toBeGreaterThanOrEqual(geometry.inspector.right);
   expect(geometry.inspector.bottom).toBeLessThanOrEqual(geometry.timeline.top);
+  const dock = inspector.locator('[data-ui="video-editor.inspector.dock-toggle"]');
+  await dock.click();
+  await expect(dock).toHaveAttribute('aria-pressed', 'true');
+  const fullInspector = await inspector.boundingBox();
+  const fullTimeline = await page
+    .locator('[data-ui="video-editor.timeline.surface"]')
+    .boundingBox();
+  if (!fullInspector || !fullTimeline) throw new Error('Missing full-height workspace bounds');
+  expect(fullTimeline.x + fullTimeline.width).toBeLessThanOrEqual(fullInspector.x);
+  expect(fullInspector.y + fullInspector.height).toBeCloseTo(
+    fullTimeline.y + fullTimeline.height,
+    0
+  );
+  await dock.click();
+  await expect(dock).toHaveAttribute('aria-pressed', 'false');
+
   expect(geometry.preview.right - geometry.preview.left).toBeLessThan(defaultPreviewWidth);
 
   const divider = page.locator('[data-ui="video-editor.floating.context-inspector.resize"]');
@@ -193,7 +209,7 @@ async function expectBuiltVideoEditorGeometry(
     fullPage: true,
     path: effectsDockScreenshotPath.replace('.png', '-dark.png'),
   });
-  await page.setViewportSize({ width: 1100, height: 900 });
+  await page.setViewportSize({ width: 1280, height: 720 });
   await expect(inspector).toBeVisible();
   await expect(divider).toBeVisible();
   await expect(canvasShell).toHaveCSS('padding-right', '12px');
@@ -354,7 +370,7 @@ async function verifyVideoEditorTimelineBoundaries(
     await page.locator('[data-ui="video-editor.timeline.toolbar.add-track"]').click();
     await page.locator('[data-ui="video-editor.timeline.toolbar.add-track.primary"]').click();
   }
-  await page.setViewportSize({ width: 700, height: 900 });
+  await page.setViewportSize({ width: 1280, height: 720 });
   const materialsToggle = page.getByRole('button', {
     name: translate('videoEditor.app.materialsTitle', 'ru'),
     exact: true,
@@ -362,8 +378,10 @@ async function verifyVideoEditorTimelineBoundaries(
   const materials = page.locator('[data-ui="video-editor.materials"]');
   const inspector = page.locator('[data-ui="video-editor.floating.context-inspector"]');
   const inspectorToggle = page.locator('[data-ui="video-editor.floating.document-bar.inspector"]');
+  const workspace = page.locator('[data-ui="video-editor.workspace.root"]');
   await expect(materials).toBeVisible();
-  await page.setViewportSize({ width: 700, height: 720 });
+  await expect(inspector).toBeVisible();
+  const inspectorNode = await inspector.elementHandle();
   const materialSource = materials.locator('button[aria-pressed]').first();
   await expect(materialSource).toBeVisible();
   await expect
@@ -376,31 +394,35 @@ async function verifyVideoEditorTimelineBoundaries(
       })
     )
     .toBe(true);
-  await page.setViewportSize({ width: 700, height: 900 });
-  await expect(inspector).toHaveCount(0);
-  await expect(inspectorToggle).toHaveAttribute('aria-pressed', 'false');
-  const projectTitle = page.locator('[data-ui="video-editor.floating.document-bar"] input');
-  const exportButton = page.locator('[data-ui="video-editor.floating.document-bar.export"]');
-  await expect(exportButton).toBeVisible();
-  expect(
-    Math.abs((await projectTitle.boundingBox())!.y - (await exportButton.boundingBox())!.y)
-  ).toBeLessThan(4);
-  await expect
-    .poll(() =>
-      page.locator('[data-ui="video.preview.viewport"]').evaluate((element) => element.clientWidth)
-    )
-    .toBeGreaterThan(350);
-  await inspectorToggle.click();
-  await expect(materials).toHaveCount(0);
-  await expect(inspector).toBeVisible();
+  await page.setViewportSize({ width: 900, height: 720 });
+  await expect(workspace).toHaveCSS('overflow-x', 'auto');
+  expect(await workspace.evaluate((element) => element.scrollWidth)).toBe(1280);
   await expect(inspectorToggle).toHaveAttribute('aria-pressed', 'true');
-  await materialsToggle.click();
+  expect(await inspector.evaluate((element, original) => element === original, inspectorNode)).toBe(
+    true
+  );
+  await workspace.evaluate((element) => {
+    element.scrollLeft = element.scrollWidth;
+  });
+  await expect.poll(() => workspace.evaluate((element) => element.scrollLeft)).toBe(380);
+  expect(
+    (await inspector.boundingBox())!.x + (await inspector.boundingBox())!.width
+  ).toBeLessThanOrEqual(900);
+  await workspace.evaluate((element) => {
+    element.scrollLeft = 0;
+  });
+  await page.setViewportSize({ width: 1280, height: 720 });
+  await inspectorToggle.click();
   await expect(inspector).toHaveCount(0);
+  await expect(materials).toBeVisible();
+  await inspectorToggle.click();
+  await expect(inspector).toBeVisible();
   await materialsToggle.click();
+  await expect(materials).toHaveCount(0);
   await expect(inspector).toBeVisible();
   await materialsToggle.click();
   await expect(materials).toBeVisible();
-  await expect(inspector).toHaveCount(0);
+  await expect(inspector).toBeVisible();
   await expect(seekToStart).toBeVisible();
   await expect(seekToEnd).toBeVisible();
   await expect(previousFrame).toBeVisible();
@@ -659,15 +681,17 @@ test('video editor keeps webcam independent with camera timeline and inspector c
   await timelineClip.click();
 
   const inspector = page.locator('[data-ui="video-editor.floating.context-inspector"]');
-  const cameraGroup = inspector.locator(
-    `details:has(> summary[title="${translate('videoEditor.sidebar.inspectorGroupCamera', 'ru')}"])`
-  );
-  await expect(cameraGroup).toHaveAttribute('open', '');
-  await cameraGroup.locator('summary').focus();
-  await page.keyboard.press('Space');
-  await expect(cameraGroup).not.toHaveAttribute('open');
+  const cameraGroup = inspector.getByRole('button', {
+    name: translate('videoEditor.sidebar.inspectorGroupCamera', 'ru'),
+    exact: true,
+  });
+  await expect(cameraGroup).toHaveAttribute('aria-pressed', 'true');
+  await cameraGroup.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(cameraGroup).toHaveAttribute('aria-pressed', 'false');
+  await cameraGroup.focus();
   await page.keyboard.press('Enter');
-  await expect(cameraGroup).toHaveAttribute('open', '');
+  await expect(cameraGroup).toHaveAttribute('aria-pressed', 'true');
   await expect(
     inspector.getByText(translate('videoEditor.sidebar.cameraPlacementDescription', 'ru'))
   ).toBeVisible();
@@ -693,6 +717,47 @@ test('video editor keeps webcam independent with camera timeline and inspector c
   expect(geometry.preview.right).toBeLessThanOrEqual(geometry.inspector.left);
   expect(geometry.timeline.right).toBeGreaterThanOrEqual(geometry.inspector.right);
   expect(geometry.inspector.bottom).toBeLessThanOrEqual(geometry.timeline.top);
+  const dock = inspector.getByRole('button', {
+    name: translate('videoEditor.sidebar.fullHeightInspector', 'ru'),
+    exact: true,
+  });
+  await dock.click();
+  await expect(dock).toHaveAttribute('aria-pressed', 'true');
+  await expect(cameraGroup).toHaveAttribute('aria-pressed', 'true');
+  await page.setViewportSize({ width: 1280, height: 720 });
+  const divider = page.locator('[data-ui="video-editor.floating.context-inspector.resize"]');
+  await divider.focus();
+  for (let step = 0; step < 12; step++) await page.keyboard.press('ArrowLeft');
+  await expect(divider).toHaveAttribute('aria-valuenow', '520');
+  const zoomButtonBounds = await page
+    .locator('[data-ui="video-editor.timeline.toolbar.add-zoom"]')
+    .evaluate((element) => {
+      const button = element.getBoundingClientRect();
+      const label = element.querySelector('span')?.getBoundingClientRect();
+      const icon = element.querySelector('svg')?.getBoundingClientRect();
+      return {
+        left: button.left,
+        right: button.right,
+        labelLeft: label?.left,
+        labelRight: label?.right,
+        iconWidth: icon?.width,
+      };
+    });
+  expect(zoomButtonBounds.labelLeft).toBeGreaterThanOrEqual(zoomButtonBounds.left);
+  expect(zoomButtonBounds.labelRight).toBeLessThanOrEqual(zoomButtonBounds.right);
+  expect(zoomButtonBounds.iconWidth).toBeGreaterThanOrEqual(12);
+  const fullInspector = await inspector.boundingBox();
+  const fullTimeline = await page
+    .locator('[data-ui="video-editor.timeline.surface"]')
+    .boundingBox();
+  if (!fullInspector || !fullTimeline) throw new Error('Missing full-height workspace bounds');
+  expect(fullTimeline.x + fullTimeline.width).toBeLessThanOrEqual(fullInspector.x);
+  expect(fullInspector.y + fullInspector.height).toBeCloseTo(
+    fullTimeline.y + fullTimeline.height,
+    0
+  );
+  await dock.click();
+  await expect(dock).toHaveAttribute('aria-pressed', 'false');
 
   await mkdir(testInfo.outputDir, { recursive: true });
   await page.screenshot({
@@ -724,7 +789,7 @@ test('video editor keeps webcam independent with camera timeline and inspector c
   await expect(addZoomButton).toBeEnabled();
   await addZoomButton.click();
   await expect(page.locator('[data-ui="video-editor.timeline.add-zoom"]')).toBeVisible();
-  const groupLabels = inspector.locator('[data-ui="video-editor.inspector.sections"] summary');
+  const groupLabels = inspector.locator('[data-ui="video-editor.inspector.sections"] nav button');
   await expect(groupLabels).not.toHaveCount(0);
   expect(
     await groupLabels.evaluateAll((nodes) =>

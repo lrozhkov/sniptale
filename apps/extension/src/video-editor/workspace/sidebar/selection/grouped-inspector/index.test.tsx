@@ -28,44 +28,49 @@ const groups: InspectorGroupDefinition<string>[] = [
 function render(items = groups) {
   act(() => root.render(<InspectorGroupedPanel groups={items} />));
 }
-function toggle(id: string) {
-  act(() => container.querySelector<HTMLElement>(`[data-section="${id}"] summary`)!.click());
+function select(label: string) {
+  act(() =>
+    container.querySelector<HTMLButtonElement>(`nav button[aria-label="${label}"]`)!.click()
+  );
 }
-it('shows all section headings and opens the default controls', () => {
+it('uses shared icon categories with one exposed default section', () => {
   render();
-  expect(container.querySelectorAll('summary')).toHaveLength(3);
-  expect(container.querySelector('[data-section="general"]')?.hasAttribute('open')).toBe(true);
-  expect(container.querySelector('[data-section="info"]')?.hasAttribute('open')).toBe(false);
+  expect(container.querySelectorAll('nav button')).toHaveLength(3);
+  expect(container.querySelector('details')).toBeNull();
+  expect(container.querySelector('[data-section="general"]')).not.toBeNull();
   expect(container.querySelector('[aria-label="Position"]')).not.toBeNull();
+  expect(container.textContent).not.toContain('Summary body');
 });
-it('opens multiple groups without losing the active parameter input', () => {
+it('preserves a live draft on ordinary rerender and unmounts inactive controls', () => {
   render();
   const input = container.querySelector<HTMLInputElement>('input')!;
   input.value = '27';
-  toggle('audio');
-  expect(container.textContent).toContain('Audio body');
+  render();
   expect(container.querySelector('input')).toBe(input);
   expect(input.value).toBe('27');
-  toggle('audio');
-  expect(container.textContent).not.toContain('Audio body');
-  expect(container.querySelector('input')).toBe(input);
-});
-it('allows all sections to be collapsed without reopening on ordinary rerender', () => {
-  render();
-  toggle('general');
-  render();
-  expect(container.querySelectorAll('details[open]')).toHaveLength(0);
-});
-it('removes hidden content and opens the available group if the open group disappears', () => {
-  render();
-  render([{ ...groups[0]!, visible: false }, { ...groups[1]!, visible: false }, groups[2]!]);
-  expect(container.querySelectorAll('summary')).toHaveLength(1);
+  select('Audio');
   expect(container.textContent).toContain('Audio body');
   expect(container.querySelector('input')).toBeNull();
 });
-it('supports an empty selection and an info-only selection', () => {
+it('supports shared keyboard category navigation and focus', () => {
+  render();
+  const button = container.querySelector<HTMLButtonElement>('nav button[aria-label="Transform"]')!;
+  act(() => {
+    button.focus();
+    button.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+  });
+  expect(container.textContent).toContain('Audio body');
+  expect(document.activeElement?.getAttribute('aria-label')).toBe('Audio');
+});
+it('removes hidden controls and chooses an available section', () => {
+  render();
+  render([{ ...groups[0]!, visible: false }, { ...groups[1]!, visible: false }, groups[2]!]);
+  expect(container.querySelectorAll('nav button')).toHaveLength(1);
+  expect(container.textContent).toContain('Audio body');
+});
+it('supports empty and info-only selections', () => {
   render([]);
-  expect(container.querySelector('details')).toBeNull();
+  expect(container.querySelector('nav')).toBeNull();
   render([groups[0]!]);
   expect(container.textContent).toContain('Summary body');
 });

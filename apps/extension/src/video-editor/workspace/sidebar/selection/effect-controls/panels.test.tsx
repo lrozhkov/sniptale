@@ -143,7 +143,11 @@ describe('effect-panels', () => {
     renderPanel(<InspectActionPanel {...props} />);
     clickGroup('videoEditor.sidebar.inspectorGroupInfo');
     expect(container?.textContent).toContain('videoEditor.timeline.actionsLane');
-    expect(container?.textContent).toContain('videoEditor.sidebar.inspectorGroupPlacement');
+    expect(
+      container?.querySelector(
+        'nav button[aria-label="videoEditor.sidebar.inspectorGroupPlacement"]'
+      )
+    ).not.toBeNull();
   });
 });
 
@@ -154,7 +158,7 @@ function renderPanel(node: ReactNode) {
 }
 
 function clickGroup(title: string) {
-  const button = container?.querySelector<HTMLElement>(`summary[title="${title}"]`);
+  const button = container?.querySelector<HTMLElement>(`nav button[title="${title}"]`);
   act(() => {
     if (!button?.parentElement?.hasAttribute('open'))
       button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));

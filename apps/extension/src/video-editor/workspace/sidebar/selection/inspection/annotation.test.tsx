@@ -123,11 +123,21 @@ describe('workspace-sidebar/selection/inspect-annotation', () => {
   it('renders grouped annotation inspector metadata for template overlays', () => {
     renderInspectPanel();
 
-    expect(container?.textContent).toContain('videoEditor.sidebar.inspectorGroupSummary');
-    expect(container?.textContent).toContain('videoEditor.sidebar.inspectorGroupGeneral');
-    expect(container?.textContent).toContain('videoEditor.sidebar.inspectorGroupContent');
-    expect(container?.textContent).toContain('videoEditor.sidebar.inspectorGroupTarget');
-    expect(container?.textContent).toContain('videoEditor.sidebar.inspectorGroupMotion');
+    expect(
+      container?.querySelector('nav button[aria-label="videoEditor.sidebar.inspectorGroupSummary"]')
+    ).not.toBeNull();
+    expect(
+      container?.querySelector('nav button[aria-label="videoEditor.sidebar.inspectorGroupGeneral"]')
+    ).not.toBeNull();
+    expect(
+      container?.querySelector('nav button[aria-label="videoEditor.sidebar.inspectorGroupContent"]')
+    ).not.toBeNull();
+    expect(
+      container?.querySelector('nav button[aria-label="videoEditor.sidebar.inspectorGroupTarget"]')
+    ).not.toBeNull();
+    expect(
+      container?.querySelector('nav button[aria-label="videoEditor.sidebar.inspectorGroupMotion"]')
+    ).not.toBeNull();
     expect(container?.textContent).toContain('videoEditor.sidebar.annotationTemplatePointerLabel');
 
     clickGroup('videoEditor.sidebar.inspectorGroupGeneral');
@@ -150,7 +160,7 @@ function renderInspectPanel() {
 }
 
 function clickGroup(title: string) {
-  const button = container?.querySelector<HTMLElement>(`summary[title="${title}"]`);
+  const button = container?.querySelector<HTMLElement>(`nav button[title="${title}"]`);
   act(() => {
     if (!button?.parentElement?.hasAttribute('open'))
       button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));

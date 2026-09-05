@@ -89,7 +89,7 @@ it('wraps all effect pointer moves in one history transaction', () => {
   expect(historyTransaction.endProjectHistoryTransaction).toHaveBeenCalledOnce();
 });
 
-it('supersedes a clip pointer session before starting an effect transaction', () => {
+it('discards the clip draft before starting an effect transaction', () => {
   const project = createEmptyVideoProject('Superseded interaction');
   project.duration = 20;
   const clip = createTextClip(project.tracks[0]!.id, project.width, project.height, 2);
@@ -97,6 +97,7 @@ it('supersedes a clip pointer session before starting an effect transaction', ()
   const historyTransaction = createHistoryTransactionMocks();
   const onMoveClip = vi.fn();
   const onMoveActionEvent = vi.fn();
+  let clipGhost: ReturnType<typeof useProjectTimelineDrag>['dragGhost'] = null;
   let beginClipInteraction:
     | ReturnType<typeof useProjectTimelineDrag>['beginClipInteraction']
     | null = null;
@@ -134,6 +135,7 @@ it('supersedes a clip pointer session before starting an effect transaction', ()
       onResizeMotionRegion: vi.fn(),
       onUpdateEffectInstance: vi.fn(),
     });
+    clipGhost = clipInteraction.dragGhost;
     beginClipInteraction = clipInteraction.beginClipInteraction;
     beginEffectInteraction = effectInteraction.beginEffectInteraction;
     return null;
@@ -142,13 +144,16 @@ it('supersedes a clip pointer session before starting an effect transaction', ()
   act(() => root.render(<Harness />));
   act(() => beginClipInteraction?.(createClipPointerEvent(100, 40), clip, 'move'));
   act(() => dispatchPointerMove(120));
+  expect(clipGhost).not.toBeNull();
+  expect(onMoveClip).not.toHaveBeenCalled();
   act(() => beginEffectInteraction?.(createPointerEvent(100), createActionTarget()));
   act(() => {
     dispatchPointerMove(130);
     window.dispatchEvent(new Event('pointerup'));
   });
 
-  expect(onMoveClip).toHaveBeenCalledOnce();
+  expect(clipGhost).toBeNull();
+  expect(onMoveClip).not.toHaveBeenCalled();
   expect(onMoveActionEvent).toHaveBeenCalledOnce();
   expect(historyTransaction.beginProjectHistoryTransaction).toHaveBeenCalledTimes(2);
   expect(historyTransaction.endProjectHistoryTransaction).toHaveBeenCalledTimes(2);

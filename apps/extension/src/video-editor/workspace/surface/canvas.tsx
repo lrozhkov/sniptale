@@ -23,13 +23,20 @@ import type { EffectEditingPort } from '../../contracts/controller-store';
 
 export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProps) {
   const layout = useVideoEditorLayoutController();
+  const previewHeight = props.previewHeightStyle.height ?? '60%';
   return (
     <div data-ui="video-editor.workspace.canvas-shell" className="min-h-0 min-w-0 flex-1 px-3 pb-3">
-      <div ref={layout.workspaceSplitRef} className="flex h-full min-h-0 flex-col gap-0">
+      <div
+        ref={layout.workspaceSplitRef}
+        className="grid h-full min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-0"
+        data-inspector-dock={props.inspectorFullHeight ? 'full' : 'viewer'}
+        style={{
+          gridTemplateRows: `minmax(0, min(${previewHeight}, calc(100% - 228px))) 8px minmax(220px, 1fr)`,
+        }}
+      >
         <div
           data-ui="video-editor.workspace.upper"
-          className="flex min-h-0 shrink-0 gap-0"
-          style={props.previewHeightStyle}
+          className="col-start-1 row-start-1 flex min-h-0 min-w-0 gap-0"
         >
           {props.materialsOpen && <VideoEditorWorkspaceMaterials />}
           <VideoEditorWorkspaceEffectsLibrary
@@ -39,16 +46,32 @@ export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProp
             onOpenChange={props.onEffectsLibraryDockOpenChange}
           />
           <VideoEditorWorkspacePreview {...props} />
+        </div>
+        <div
+          className="col-start-2 row-start-1 flex min-h-0 min-w-0"
+          style={{ gridRowEnd: props.inspectorFullHeight ? 4 : 2 }}
+        >
           {props.inspector}
         </div>
-        <VideoEditorWorkspaceResizeHandle onPointerDown={layout.handleStartVerticalResize} />
-        <VideoEditorWorkspaceTimeline {...props} />
+        <div
+          className="col-start-1 row-start-2"
+          style={{ gridColumnEnd: props.inspectorFullHeight ? 2 : 3 }}
+        >
+          <VideoEditorWorkspaceResizeHandle onPointerDown={layout.handleStartVerticalResize} />
+        </div>
+        <div
+          className="col-start-1 row-start-3 flex min-h-0 min-w-0"
+          style={{ gridColumnEnd: props.inspectorFullHeight ? 2 : 3 }}
+        >
+          <VideoEditorWorkspaceTimeline {...props} />
+        </div>
       </div>
     </div>
   );
 }
 
 interface VideoEditorWorkspaceCanvasProps {
+  inspectorFullHeight?: boolean;
   materialsOpen?: boolean;
   inspector: React.ReactNode;
   activeInsertKind: VideoPreviewCanvasInsertKind | null;

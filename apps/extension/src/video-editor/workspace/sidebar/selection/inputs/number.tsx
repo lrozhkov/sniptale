@@ -30,6 +30,8 @@ export function NumberInput({
 
   return (
     <NumericRow
+      appearance="plain"
+      className="min-h-8! py-0! grid-cols-[minmax(0,1fr)_auto]!"
       label={label}
       value={numericValue}
       min={min}

@@ -1,8 +1,46 @@
 import { useEffect, useRef, useState } from 'react';
+import {
+  AudioLines,
+  Clock3,
+  Info,
+  Layers3,
+  Move,
+  MousePointer2,
+  Paintbrush,
+  Scan,
+  Settings2,
+  Sparkles,
+  Video,
+  ZoomIn,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { CategorizedInspector } from '@sniptale/ui/categorized-inspector';
+import { translate } from '../../../../../platform/i18n';
 import { InspectorGroupSection } from './section';
 import { useInspectorGroupFocusIntent } from './focus';
 import { resolveVisibleInspectorGroups } from './visibility';
 import type { InspectorGroupDefinition } from './types';
+
+const SECTION_ICONS: Readonly<Record<string, LucideIcon>> = {
+  info: Info,
+  timing: Clock3,
+  transform: Move,
+  audio: AudioLines,
+  canvas: Scan,
+  background: Paintbrush,
+  style: Paintbrush,
+  appearance: Paintbrush,
+  camera: Video,
+  zoom: ZoomIn,
+  motion: ZoomIn,
+  path: Move,
+  placement: Move,
+  'object-tracks': Layers3,
+  'effect-v1': Sparkles,
+  'transition-stack': Layers3,
+  samples: MousePointer2,
+  correction: Scan,
+};
 
 export function InspectorGroupedPanel<TId extends string>(props: {
   groups: readonly InspectorGroupDefinition<TId>[];
@@ -12,77 +50,44 @@ export function InspectorGroupedPanel<TId extends string>(props: {
     groups.find((group) => group.defaultActive && group.id !== 'info')?.id ??
     groups.find((group) => group.id !== 'info')?.id ??
     groups[0]?.id;
-  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set(defaultId ? [defaultId] : []));
-  const summaries = useRef(new Map<string, HTMLElement>());
+  const surface = useRef<HTMLDivElement>(null);
   const consumedIntent = useRef<string | null>(null);
   const focusIntent = useInspectorGroupFocusIntent();
-  const visibleIds = groups.map((group) => group.id).join('\u0000');
-
-  const previousVisibleIds = useRef(visibleIds);
-  useEffect(() => {
-    const wasEmpty = previousVisibleIds.current === '';
-    previousVisibleIds.current = visibleIds;
-    const visible = new Set(visibleIds.split('\u0000'));
-    setOpenIds((current) => {
-      const remaining = [...current].filter((id) => visible.has(id));
-      if (wasEmpty && defaultId && current.size === 0) return new Set([defaultId]);
-      if (remaining.length === current.size) return current;
-      return new Set(remaining.length ? remaining : defaultId ? [defaultId] : []);
-    });
-  }, [defaultId, visibleIds]);
+  const [request, setRequest] = useState<{ id: TId; token: number }>();
+  const requestedGroup = groups.find((group) => group.id === focusIntent?.groupId);
 
   useEffect(() => {
-    if (!focusIntent || consumedIntent.current === focusIntent.token) return;
-    const summary = summaries.current.get(focusIntent.groupId);
-    if (!summary) return;
+    if (!focusIntent || !requestedGroup || consumedIntent.current === focusIntent.token) return;
     consumedIntent.current = focusIntent.token;
-    setOpenIds((current) => new Set([...current, focusIntent.groupId]));
-    summary.focus();
-    summary.scrollIntoView?.({ block: 'nearest' });
-  }, [focusIntent, visibleIds]);
+    setRequest((previous) => ({ id: requestedGroup.id, token: (previous?.token ?? 0) + 1 }));
+    const button = [
+      ...(surface.current?.querySelectorAll<HTMLButtonElement>('nav button') ?? []),
+    ].find((candidate) => candidate.getAttribute('aria-label') === requestedGroup.label);
+    button?.focus();
+  }, [focusIntent, requestedGroup]);
 
+  if (!defaultId) return null;
   return (
-    <div className="space-y-2" data-ui="video-editor.inspector.sections">
-      {groups.map((group) => (
-        <details
-          key={group.id}
-          open={openIds.has(group.id)}
-          data-section={group.id}
-          className={[
-            'rounded-lg border border-[var(--sniptale-color-border-soft)]',
-            'bg-[var(--sniptale-color-surface-panel)]',
-          ].join(' ')}
-        >
-          <summary
-            ref={(node) => {
-              if (node) summaries.current.set(group.id, node);
-              else summaries.current.delete(group.id);
-            }}
-            title={group.label}
-            className={[
-              'cursor-pointer rounded-lg px-3 py-2 text-sm font-medium',
-              'text-[var(--sniptale-color-text-primary)] focus-visible:outline focus-visible:outline-2',
-              'focus-visible:outline-[var(--sniptale-color-accent)]',
-            ].join(' ')}
-            onClick={(event) => {
-              event.preventDefault();
-              setOpenIds((current) => {
-                const next = new Set(current);
-                if (next.has(group.id)) next.delete(group.id);
-                else next.add(group.id);
-                return next;
-              });
-            }}
-          >
-            {group.label}
-          </summary>
-          {openIds.has(group.id) ? (
-            <div className="px-3 pb-3">
+    <div ref={surface} data-ui="video-editor.inspector.sections">
+      <CategorizedInspector
+        ariaLabel={translate('videoEditor.sidebar.projectInspector')}
+        initialSection={defaultId}
+        {...(request ? { activeSectionRequest: request } : {})}
+        showSectionHeading
+        sections={groups.map((group) => ({
+          id: group.id,
+          label: group.label,
+          icon: SECTION_ICONS[group.id] ?? Settings2,
+        }))}
+        renderSection={(id) => {
+          const group = groups.find((candidate) => candidate.id === id);
+          return group ? (
+            <div key={id} data-section={id}>
               <InspectorGroupSection meta={group.meta}>{group.content}</InspectorGroupSection>
             </div>
-          ) : null}
-        </details>
-      ))}
+          ) : null;
+        }}
+      />
     </div>
   );
 }

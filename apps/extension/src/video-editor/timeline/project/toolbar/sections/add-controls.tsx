@@ -39,7 +39,7 @@ export function ProjectTimelineAddControls(props: {
   const trackChoices = useTrackChoicesMenuState();
 
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-1">
+    <div className="flex min-w-0 shrink-0 flex-nowrap items-center gap-1">
       <ContentToolbarButton
         type="button"
         disabled={!props.canAddMotionRegion}

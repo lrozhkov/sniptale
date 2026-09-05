@@ -14,7 +14,7 @@ export function renderTransformFields(
 ) {
   if (!selectedClip || isAudioClip(selectedClip)) return null;
   return (
-    <div className="space-y-3">
+    <div className="space-y-1">
       <TransformGeometryFields
         clip={selectedClip}
         disabled={selectedTrackLocked}

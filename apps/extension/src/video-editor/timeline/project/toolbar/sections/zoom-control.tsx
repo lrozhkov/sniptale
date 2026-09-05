@@ -35,14 +35,19 @@ export function ProjectTimelineZoomControl({
   };
 
   return (
-    <div className="flex h-10 min-w-max items-center gap-2 px-1 text-[var(--sniptale-color-text-secondary)]">
-      <span className="whitespace-nowrap text-[11px] font-medium text-[var(--sniptale-color-text-muted)]">
+    <div className="flex h-10 min-w-0 items-center gap-1 px-1 text-[var(--sniptale-color-text-secondary)]">
+      <span
+        className={[
+          '@max-[1360px]/timeline:hidden whitespace-nowrap text-[11px] font-medium',
+          'text-[var(--sniptale-color-text-muted)]',
+        ].join(' ')}
+      >
         {translate('videoEditor.timeline.zoom')}
       </span>
       <TimelineZoomIcon direction="out" />
       <CompactRange
         aria-label={translate('videoEditor.timeline.zoom')}
-        className="min-w-[112px] flex-1"
+        className="w-[112px] min-w-[72px] flex-1 "
         min={TIMELINE_ZOOM_SLIDER_MIN}
         max={TIMELINE_ZOOM_SLIDER_MAX}
         step={1}
@@ -57,7 +62,12 @@ export function ProjectTimelineZoomControl({
         onPointerUp={(event) => commitZoomValue(Number(event.currentTarget.value))}
       />
       <TimelineZoomIcon direction="in" />
-      <span className="min-w-[5.5rem] text-right text-[11px] font-medium text-[var(--sniptale-color-text-primary)]">
+      <span
+        className={[
+          '@max-[1360px]/timeline:hidden min-w-[3rem] text-right text-[11px] font-medium',
+          'text-[var(--sniptale-color-text-primary)]',
+        ].join(' ')}
+      >
         {visibleRangeSummary}
       </span>
     </div>

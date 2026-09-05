@@ -45,6 +45,7 @@ export function SelectInput<T extends string>({
   if (label !== undefined) {
     return (
       <CompactInspectorSelectField
+        className="min-h-8! border-transparent! bg-transparent! px-0! py-0!"
         label={label}
         value={value}
         onChange={onChange}

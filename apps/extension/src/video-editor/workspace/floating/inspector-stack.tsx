@@ -1,4 +1,6 @@
 import { type ReactNode } from 'react';
+import { PanelRight } from 'lucide-react';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import {
   useVideoEditorSidebarController,
@@ -18,12 +20,16 @@ const INSPECTOR_STACK_CLASS_NAME = [
 ].join(' ');
 
 type VideoEditorInspectorStackProps = {
+  fullHeight?: boolean;
+  onToggleFullHeight?: () => void;
   diagnosticsContent: ReactNode;
   resize: ReturnType<typeof useInspectorResize>;
 };
 
 export function VideoEditorFloatingInspectorStack({
   diagnosticsContent,
+  fullHeight = false,
+  onToggleFullHeight,
   resize,
 }: VideoEditorInspectorStackProps) {
   const controller = useVideoEditorSidebarController(diagnosticsContent);
@@ -35,11 +41,15 @@ export function VideoEditorFloatingInspectorStack({
       controller={controller}
       leftSidebarCollapsed={layout.leftSidebarCollapsed}
       resize={resize}
+      fullHeight={fullHeight}
+      {...(onToggleFullHeight ? { onToggleFullHeight } : {})}
     />
   );
 }
 
 type VideoEditorFloatingInspectorContentProps = {
+  fullHeight: boolean;
+  onToggleFullHeight?: () => void;
   controller: NonNullable<ReturnType<typeof useVideoEditorSidebarController>>;
   leftSidebarCollapsed: boolean;
   resize: ReturnType<typeof useInspectorResize>;
@@ -47,6 +57,8 @@ type VideoEditorFloatingInspectorContentProps = {
 
 function VideoEditorFloatingInspectorContent({
   controller,
+  fullHeight,
+  onToggleFullHeight,
   leftSidebarCollapsed,
   resize,
 }: VideoEditorFloatingInspectorContentProps) {
@@ -88,12 +100,32 @@ function VideoEditorFloatingInspectorContent({
         className={INSPECTOR_STACK_CLASS_NAME}
         style={{ width: `${resize.width}px` }}
       >
-        <WorkspaceSidebarHeader
-          inspectorMode={sidebarProps.inspectorMode}
-          selectionIcon={sidebarState.selectionIcon}
-          selectionTitle={sidebarState.selectionTitle}
-          selectedTrack={sidebarProps.selectedTrack}
-        />
+        <div className="flex min-w-0 items-center">
+          <div className="min-w-0 flex-1">
+            <WorkspaceSidebarHeader
+              inspectorMode={sidebarProps.inspectorMode}
+              selectionIcon={sidebarState.selectionIcon}
+              selectionTitle={sidebarState.selectionTitle}
+              selectedTrack={sidebarProps.selectedTrack}
+            />
+          </div>
+          {onToggleFullHeight && (
+            <ProductActionButton
+              compact
+              tone="toggle"
+              active={fullHeight}
+              aria-pressed={fullHeight}
+              aria-label={translate('videoEditor.sidebar.fullHeightInspector')}
+              title={translate('videoEditor.sidebar.fullHeightInspector')}
+              className="mr-2 shrink-0"
+              onPointerDown={(event) => event.preventDefault()}
+              onClick={onToggleFullHeight}
+              data-ui="video-editor.inspector.dock-toggle"
+            >
+              <PanelRight size={16} aria-hidden="true" />
+            </ProductActionButton>
+          )}
+        </div>
         <WorkspaceSidebarPanelContent
           {...sidebarProps}
           diagnosticsMeta={sidebarState.diagnosticsMeta}

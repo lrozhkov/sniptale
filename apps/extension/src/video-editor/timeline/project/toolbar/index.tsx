@@ -90,14 +90,14 @@ export function ProjectTimelineToolbar({
 }: ProjectTimelineToolbarProps) {
   return (
     <div
+      data-ui="video-editor.timeline.toolbar"
       className={[
         'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border-b',
         'border-[color:var(--sniptale-color-border-soft)] px-3 py-1.5',
-        'max-[1360px]:grid-cols-[minmax(0,1fr)_auto] max-[1360px]:gap-y-0',
-        'max-[720px]:grid-cols-1 max-[720px]:gap-1.5',
+        '@max-[1360px]/timeline:grid-cols-[minmax(0,1fr)_auto] @max-[1360px]/timeline:gap-y-0',
       ].join(' ')}
     >
-      <div className="flex min-w-0 items-center justify-start">
+      <div className="flex min-w-0 items-center justify-start @max-[1120px]/timeline:col-span-2">
         <ProjectTimelineToolbarLeadingControls
           {...createToolbarLeadingControlsProps(controlsProps)}
         />

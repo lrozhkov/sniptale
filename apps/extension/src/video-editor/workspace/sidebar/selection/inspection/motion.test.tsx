@@ -102,7 +102,7 @@ function renderPanel(props: ReturnType<typeof createMotionPanelProps>) {
 }
 
 function clickGroup(title: string) {
-  const button = container?.querySelector<HTMLElement>(`summary[title="${title}"]`);
+  const button = container?.querySelector<HTMLElement>(`nav button[title="${title}"]`);
   act(() => {
     if (!button?.parentElement?.hasAttribute('open'))
       button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));

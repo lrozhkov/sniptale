@@ -112,5 +112,39 @@ export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
       'apps/extension/src/video-editor/timeline/project/tracks/list.test.tsx',
     ],
   },
+  {
+    owner: 'video-editor-timeline-add-controls',
+    productionFile:
+      'apps/extension/src/video-editor/timeline/project/toolbar/sections/add-controls.tsx',
+    reason:
+      'Leading toolbar tests exercise add commands, disabled admission, menu dismissal and focus restoration.',
+    testFiles: [
+      'apps/extension/src/video-editor/timeline/project/toolbar/sections/leading.test.tsx',
+      'apps/extension/src/video-editor/timeline/project/toolbar/index.test.tsx',
+    ],
+  },
+  {
+    owner: 'video-editor-timeline-zoom-control',
+    productionFile:
+      'apps/extension/src/video-editor/timeline/project/toolbar/sections/zoom-control.tsx',
+    reason:
+      'Trailing and complete toolbar tests render the real zoom control alongside timeline view actions.',
+    testFiles: [
+      'apps/extension/src/video-editor/timeline/project/toolbar/sections/trailing.test.tsx',
+      'apps/extension/src/video-editor/timeline/project/toolbar/index.test.tsx',
+    ],
+  },
+  {
+    owner: 'video-editor-inspector-slider-fields',
+    productionFile:
+      'apps/extension/src/video-editor/workspace/sidebar/selection/shared/sliders.tsx',
+    reason:
+      'Shared controls prove display mapping and commit deduplication; timing and media-frame tests exercise consumers.',
+    testFiles: [
+      'apps/extension/src/video-editor/workspace/sidebar/selection/shared/controls.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inputs/clip-timing.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inputs/media-frame.test.tsx',
+    ],
+  },
   ...sidebarContractMappings,
 ];

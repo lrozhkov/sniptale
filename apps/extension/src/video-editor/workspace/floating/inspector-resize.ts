@@ -7,14 +7,7 @@ const INSPECTOR_DEFAULT_WIDTH = 320;
 const INSPECTOR_KEYBOARD_STEP = 24;
 
 export function clampInspectorWidth(width: number): number {
-  const viewportMaximum =
-    typeof window === 'undefined'
-      ? INSPECTOR_MAX_WIDTH
-      : Math.max(INSPECTOR_MIN_WIDTH, Math.floor(window.innerWidth * 0.4));
-  return Math.min(
-    Math.max(width, INSPECTOR_MIN_WIDTH),
-    Math.min(INSPECTOR_MAX_WIDTH, viewportMaximum)
-  );
+  return Math.min(Math.max(width, INSPECTOR_MIN_WIDTH), INSPECTOR_MAX_WIDTH);
 }
 
 export function useInspectorResize() {
@@ -22,13 +15,6 @@ export function useInspectorResize() {
   const cleanupRef = useRef<(() => void) | null>(null);
 
   useEffect(() => () => cleanupRef.current?.(), []);
-
-  useEffect(() => {
-    const constrain = () => setWidth((current) => clampInspectorWidth(current));
-    constrain();
-    window.addEventListener('resize', constrain);
-    return () => window.removeEventListener('resize', constrain);
-  }, []);
 
   const onPointerDown = useCallback(
     (event: React.PointerEvent) => {

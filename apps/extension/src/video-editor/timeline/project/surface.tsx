@@ -45,7 +45,7 @@ export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
     <FloatingChromePanel
       dataUi="video-editor.timeline.surface"
       className={[
-        'flex h-full min-h-0 flex-col overflow-hidden rounded-[12px] p-0',
+        '@container/timeline flex h-full min-h-0 flex-col overflow-hidden rounded-[12px] p-0',
         'backdrop-blur-[10px]',
       ].join(' ')}
     >

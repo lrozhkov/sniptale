@@ -27,8 +27,8 @@ export function ProjectTimelineToolbarTrailingActions({
   return (
     <div
       className={[
-        'flex min-w-0 flex-wrap items-center justify-end gap-2',
-        'max-[1360px]:col-span-2 max-[720px]:col-span-1 max-[720px]:justify-start',
+        'flex min-w-0 flex-nowrap items-center justify-end gap-1',
+        '@max-[1360px]/timeline:col-span-2 @max-[1120px]/timeline:col-span-1',
       ].join(' ')}
     >
       <ProjectTimelineTrackViewControls trackView={trackView} />

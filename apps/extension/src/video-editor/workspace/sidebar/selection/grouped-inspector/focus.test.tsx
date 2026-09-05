@@ -37,13 +37,13 @@ describe('grouped-inspector focus intent', () => {
     renderFocusedPanel({ groupId: 'effect-v1', token: 'effect-1' });
 
     expect(container?.textContent).toContain('Template controls');
-    expect(container?.textContent).toContain('General controls');
-    expect(document.activeElement?.textContent).toBe('Templates');
+    expect(container?.textContent).not.toContain('General controls');
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Templates');
   });
 
   it('does not override a manual group switch for the same intent token', () => {
     renderFocusedPanel({ groupId: 'effect-v1', token: 'effect-1' });
-    clickGroup('Templates');
+    clickGroup('General');
 
     expect(container?.textContent).toContain('General controls');
 
@@ -79,7 +79,7 @@ function renderFocusedPanel(focusIntent: InspectorGroupFocusIntent) {
 }
 
 function clickGroup(title: string) {
-  const button = container?.querySelector<HTMLButtonElement>(`summary[title="${title}"]`);
+  const button = container?.querySelector<HTMLButtonElement>(`nav button[title="${title}"]`);
   act(() => {
     button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });

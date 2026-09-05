@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { Film, Image, Music } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { translate } from '../../../platform/i18n';
@@ -6,6 +7,12 @@ import { VideoEditorFileInputNodes } from '../../chrome/file-inputs';
 import type { PreviewStageImportHandlers, VideoEditorImportKind } from '../../contracts/insertion';
 import type { VideoProject, VideoProjectAsset } from '../../../features/video/project/types';
 import type { VideoEditorMaterialPlacementResult } from '../../contracts/insertion';
+
+const MATERIAL_IMPORT_OPTIONS = [
+  { kind: 'video', icon: Film, labelKey: 'videoEditor.app.materialsVideo' },
+  { kind: 'image', icon: Image, labelKey: 'videoEditor.app.materialsImage' },
+  { kind: 'audio', icon: Music, labelKey: 'videoEditor.app.materialsAudio' },
+] as const;
 
 export function VideoEditorMaterials(props: {
   project: VideoProject;
@@ -21,6 +28,7 @@ export function VideoEditorMaterials(props: {
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const audioInputRef = useRef<HTMLInputElement | null>(null);
+  const inputRefs = { video: videoInputRef, image: imageInputRef, audio: audioInputRef };
   const selected = props.project.assets.find(({ id }) => id === selectedId) ?? null;
   const place = (action: typeof props.onAppend) => {
     if (!selected) return;
@@ -49,13 +57,15 @@ export function VideoEditorMaterials(props: {
     }
   };
   return (
-    <aside data-ui="video-editor.materials" className="h-full w-60 min-w-0 shrink-0 pr-2">
+    <aside data-ui="video-editor.materials" className="h-full w-52 min-w-0 shrink-0 pr-2">
       <FloatingChromePanel className="h-full overflow-hidden">
         <div
-          className="flex h-full min-h-0 flex-col gap-1.5 overflow-y-auto p-3"
+          className="flex h-full min-h-0 flex-col gap-1.5 overflow-y-auto p-2.5"
           aria-busy={pending}
         >
-          <h2 className="font-semibold">{translate('videoEditor.app.materialsTitle')}</h2>
+          <h2 className="text-[13px] font-semibold">
+            {translate('videoEditor.app.materialsTitle')}
+          </h2>
           {props.project.assets.length === 0 && (
             <p className="text-xs text-[var(--sniptale-color-text-muted)]">
               {translate('videoEditor.app.materialsHint')}
@@ -70,30 +80,19 @@ export function VideoEditorMaterials(props: {
             onImportVideo={(file) => void importFile('video', file)}
           />
           <div className="flex flex-wrap gap-1">
-            <ProductActionButton
-              compact
-              tone="secondary"
-              disabled={pending}
-              onClick={() => videoInputRef.current?.click()}
-            >
-              {translate('videoEditor.app.materialsVideo')}
-            </ProductActionButton>
-            <ProductActionButton
-              compact
-              tone="secondary"
-              disabled={pending}
-              onClick={() => imageInputRef.current?.click()}
-            >
-              {translate('videoEditor.app.materialsImage')}
-            </ProductActionButton>
-            <ProductActionButton
-              compact
-              tone="secondary"
-              disabled={pending}
-              onClick={() => audioInputRef.current?.click()}
-            >
-              {translate('videoEditor.app.materialsAudio')}
-            </ProductActionButton>
+            {MATERIAL_IMPORT_OPTIONS.map(({ kind, icon: Icon, labelKey }) => (
+              <ProductActionButton
+                key={kind}
+                compact
+                tone="secondary"
+                disabled={pending}
+                title={translate(labelKey)}
+                onClick={() => inputRefs[kind].current?.click()}
+              >
+                <Icon size={16} aria-hidden="true" />
+                <span className="sr-only">{translate(labelKey)}</span>
+              </ProductActionButton>
+            ))}
           </div>
           {pending && <p role="status">{translate('videoEditor.app.materialsLoading')}</p>}
           <div className="min-h-10 flex-1 space-y-1 overflow-y-auto">
@@ -106,7 +105,7 @@ export function VideoEditorMaterials(props: {
                 compact
                 tone="toggle"
                 active={selected?.id === asset.id}
-                className="w-full min-w-0 justify-start"
+                className="w-full min-w-0 justify-start text-left"
                 aria-pressed={selected?.id === asset.id}
                 onClick={() => {
                   setSelectedId(asset.id);

@@ -19,8 +19,7 @@ const WORKSPACE_STACK_CLASS_NAME = floatingChromeClassNames(
 const TOP_PANEL_CLASS_NAME = floatingChromeClassNames(
   'flex-row items-center overflow-visible',
   '!bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_99%,var(--sniptale-color-surface-canvas)_1%)]',
-  '!backdrop-blur-none',
-  'max-[860px]:w-full max-[860px]:flex-wrap max-[860px]:gap-1'
+  '!backdrop-blur-none'
 );
 
 export function VideoEditorFloatingInsertPanel(props: {

@@ -130,21 +130,23 @@ function PlaybackSummaryMeta(props: {
   const loopRange = formatToolbarLoopRange(props.playbackRange);
 
   return (
-    <div className="min-w-0 text-center max-[720px]:text-left">
+    <div className="min-w-0 text-center">
       <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--sniptale-color-text-muted)]">
         {translate('videoEditor.timeline.title')}
       </p>
       <p
         data-playback-counter="true"
         className={[
-          'min-w-[176px] text-[12px] font-semibold tabular-nums',
-          'text-[var(--sniptale-color-text-primary)] max-[720px]:min-w-0',
+          'min-w-[112px] text-[12px] font-semibold tabular-nums',
+          'text-[var(--sniptale-color-text-primary)]',
         ].join(' ')}
       >
         {loopRange ? (
-          <span className="mr-2 text-[var(--sniptale-color-accent-emphasis)]">{loopRange}</span>
+          <span className="block whitespace-nowrap text-[10px] leading-3 text-[var(--sniptale-color-accent-emphasis)]">
+            {loopRange}
+          </span>
         ) : null}
-        <span>
+        <span className="block whitespace-nowrap">
           {formatPlaybackCounterTime(props.currentTime)} /{' '}
           {formatPlaybackCounterTime(props.duration)}
         </span>
@@ -178,12 +180,7 @@ export function ProjectTimelinePlaybackSummary({
   | 'onTogglePlay'
 >) {
   return (
-    <div
-      className={[
-        'flex min-w-0 flex-wrap items-center justify-center gap-2.5',
-        'max-[720px]:justify-start max-[720px]:gap-1.5',
-      ].join(' ')}
-    >
+    <div className="flex min-w-0 flex-nowrap items-center justify-center gap-2.5">
       <PlaybackSeekToStartButton onSeekToStart={onSeekToStart} />
       <PlaybackFrameStepButton direction="previous" onStep={onStepToPreviousFrame} />
       <PlaybackToggleButton isPlaying={isPlaying} onTogglePlay={onTogglePlay} />

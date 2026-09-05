@@ -103,10 +103,6 @@ it('keeps add actions left, playback center, and zoom on the right', () => {
 
   const toolbar = renderedContainer.firstElementChild as HTMLDivElement | null;
   const regions = toolbar ? Array.from(toolbar.children) : [];
-  expect(toolbar?.className).toContain('max-[720px]:grid-cols-1');
-  expect(regions[0]?.querySelector('div')?.className).toContain('max-[720px]:gap-1');
-  expect(regions[1]?.className).toContain('max-[720px]:justify-start');
-  expect(regions[2]?.className).toContain('max-[720px]:justify-start');
   expect(regions[0]?.textContent).not.toContain('videoEditor.timeline.addButton');
   expect(regions[0]?.textContent).toContain('videoEditor.timeline.addTrack');
   expect(regions[0]?.textContent).toContain('videoEditor.timeline.addZoomRegion');
