@@ -6,7 +6,6 @@ import { translate } from '../../../platform/i18n';
 import { VideoEditorFileInputNodes } from '../../chrome/file-inputs';
 import type { PreviewStageImportHandlers, VideoEditorImportKind } from '../../contracts/insertion';
 import type { VideoProject, VideoProjectAsset } from '../../../features/video/project/types';
-import type { VideoEditorMaterialPlacementResult } from '../../contracts/insertion';
 
 const MATERIAL_IMPORT_OPTIONS = [
   { kind: 'video', icon: Film, labelKey: 'videoEditor.app.materialsVideo' },
@@ -17,34 +16,15 @@ const MATERIAL_IMPORT_OPTIONS = [
 export function VideoEditorMaterials(props: {
   project: VideoProject;
   onImport: PreviewStageImportHandlers;
-  onAppend: (asset: VideoProjectAsset) => VideoEditorMaterialPlacementResult;
-  onInsert: (asset: VideoProjectAsset) => VideoEditorMaterialPlacementResult;
-  onOverlay: (asset: VideoProjectAsset) => VideoEditorMaterialPlacementResult;
+  selectedAssetId: string | null;
+  onSelect: (asset: VideoProjectAsset) => void;
 }) {
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [placementError, setPlacementError] = useState<string | null>(null);
   const pendingRef = useRef(false);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const audioInputRef = useRef<HTMLInputElement | null>(null);
   const inputRefs = { video: videoInputRef, image: imageInputRef, audio: audioInputRef };
-  const selected = props.project.assets.find(({ id }) => id === selectedId) ?? null;
-  const place = (action: typeof props.onAppend) => {
-    if (!selected) return;
-    const result = action(selected);
-    setPlacementError(
-      result.status === 'placed'
-        ? null
-        : translate(
-            result.reason === 'locked-track'
-              ? 'videoEditor.app.materialsLocked'
-              : result.reason === 'invalid-cut'
-                ? 'videoEditor.app.materialsInvalidCut'
-                : 'videoEditor.app.materialsUnavailable'
-          )
-    );
-  };
   const importFile = async (kind: VideoEditorImportKind, file: File) => {
     if (pendingRef.current) return;
     pendingRef.current = true;
@@ -59,10 +39,7 @@ export function VideoEditorMaterials(props: {
   return (
     <aside data-ui="video-editor.materials" className="h-full w-52 min-w-0 shrink-0 pr-2">
       <FloatingChromePanel className="h-full overflow-hidden">
-        <div
-          className="flex h-full min-h-0 flex-col gap-1.5 overflow-y-auto p-2.5"
-          aria-busy={pending}
-        >
+        <div className="flex h-full min-h-0 flex-col gap-1.5 p-2.5" aria-busy={pending}>
           <h2 className="text-[13px] font-semibold">
             {translate('videoEditor.app.materialsTitle')}
           </h2>
@@ -104,13 +81,10 @@ export function VideoEditorMaterials(props: {
                 key={asset.id}
                 compact
                 tone="toggle"
-                active={selected?.id === asset.id}
+                active={props.selectedAssetId === asset.id}
                 className="w-full min-w-0 justify-start text-left"
-                aria-pressed={selected?.id === asset.id}
-                onClick={() => {
-                  setSelectedId(asset.id);
-                  setPlacementError(null);
-                }}
+                aria-pressed={props.selectedAssetId === asset.id}
+                onClick={() => props.onSelect(asset)}
               >
                 <span className="truncate" title={asset.name}>
                   {asset.name}
@@ -118,36 +92,6 @@ export function VideoEditorMaterials(props: {
               </ProductActionButton>
             ))}
           </div>
-          {placementError && (
-            <p role="alert" className="text-sm text-[var(--sniptale-color-danger)]">
-              {placementError}
-            </p>
-          )}
-          <ProductActionButton
-            compact
-            disabled={!selected || pending}
-            onClick={() => place(props.onAppend)}
-          >
-            {translate('videoEditor.app.materialsAppend')}
-          </ProductActionButton>
-          <ProductActionButton
-            compact
-            disabled={!selected || pending}
-            onClick={() => place(props.onInsert)}
-            aria-describedby="material-insert-hint"
-          >
-            {translate('videoEditor.app.materialsInsert')}
-          </ProductActionButton>
-          <p id="material-insert-hint" className="text-xs text-[var(--sniptale-color-text-muted)]">
-            {translate('videoEditor.app.materialsInsertHint')}
-          </p>
-          <ProductActionButton
-            compact
-            disabled={!selected || pending}
-            onClick={() => place(props.onOverlay)}
-          >
-            {translate('videoEditor.app.materialsOverlay')}
-          </ProductActionButton>
         </div>
       </FloatingChromePanel>
     </aside>

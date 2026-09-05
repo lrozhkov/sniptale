@@ -59,15 +59,11 @@ export interface ProjectTimelineProps {
   selectedTrackId: string | null;
   telemetryLaneVisible: boolean;
   timelinePreviews: TimelineClipPreviewMap;
-  onSeek: (time: number) => void;
-  onSeekToEnd: () => void;
-  onSeekToStart: () => void;
   onStepToNextFrame: () => void;
   onStepToPreviousFrame: () => void;
+  onSeek: (time: number) => void;
   onZoomChange: (value: number) => void;
-  onTogglePlay: () => void;
   onSetPlaybackRange: (range: VideoEditorPlaybackRange | null) => void;
-  onClearPlaybackRange: () => void;
   onToggleTelemetryLaneVisibility: () => void;
   onSelectScene: () => void;
   onSelectClip: (clipId: string | null) => void;

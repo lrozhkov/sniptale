@@ -1,6 +1,32 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorAppMessages = defineMessageSource({
+  sourceInLabel: { ru: 'In', en: 'In' },
+  sourceOutLabel: { ru: 'Out', en: 'Out' },
+  sourceViewer: { ru: 'Исходник', en: 'Source' },
+  montageViewer: { ru: 'Монтаж', en: 'Timeline' },
+  viewerSwitch: { ru: 'Просмотр', en: 'Viewer' },
+  sourcePosition: { ru: 'Позиция в исходнике', en: 'Source position' },
+  sourceMarkIn: { ru: 'Начало фрагмента (I)', en: 'Mark In (I)' },
+  sourceMarkOut: { ru: 'Последний кадр фрагмента (O)', en: 'Mark Out (O)' },
+  sourceReset: { ru: 'Выбрать исходник целиком', en: 'Use entire source' },
+  sourceLoading: { ru: 'Загружаем исходник…', en: 'Loading source…' },
+  sourceMediaFailed: {
+    ru: 'Не удалось прочитать исходник. Повторите загрузку или выберите другой материал.',
+    en: 'Could not read this source. Reload it or select another material.',
+  },
+  sourcePlayFailed: {
+    ru: 'Не удалось начать воспроизведение. Нажмите Play ещё раз.',
+    en: 'Could not start playback. Press Play to try again.',
+  },
+  sourceInvalidRange: {
+    ru: 'Выберите фрагмент длиной хотя бы в один кадр.',
+    en: 'Select a range of at least one frame.',
+  },
+  sourceRetry: { ru: 'Повторить', en: 'Retry' },
+  sourceAppend: { ru: 'В конец', en: 'Append' },
+  sourceInsert: { ru: 'Вставить', en: 'Insert' },
+  sourceOverlay: { ru: 'Наложить', en: 'Overlay' },
   materialsTitle: { ru: 'Материалы', en: 'Materials' },
   materialsLocked: {
     ru: 'Дорожка заблокирована. Разблокируйте её и повторите добавление.',

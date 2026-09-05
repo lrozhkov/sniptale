@@ -1,3 +1,6 @@
+// @vitest-environment jsdom
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { VideoEditorWorkspaceMain } from './main';
@@ -9,7 +12,11 @@ const floatingWorkspaceSpy = vi.fn();
 const inspectorSpy = vi.fn();
 const previewSpy = vi.fn();
 const timelineSpy = vi.fn();
-const hookMocks = vi.hoisted(() => ({ controller: null as unknown }));
+const hookMocks = vi.hoisted(() => ({
+  controller: null as unknown,
+  sourceActive: false,
+  setSourceActive: vi.fn(),
+}));
 
 function getHookController() {
   return hookMocks.controller as ReturnType<typeof createWorkspaceController>;
@@ -17,6 +24,11 @@ function getHookController() {
 
 vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../runtime/controller/composition/hooks')>()),
+  useWorkspacePreviewContext: () => ({
+    sourceViewerActive: hookMocks.sourceActive,
+    setSourceViewerActive: hookMocks.setSourceActive,
+  }),
+  useVideoEditorBlockingOverlayContext: () => false,
   useVideoEditorHeaderController: () => getHookController().header,
   useVideoEditorLayoutController: () => getHookController().layout,
   useVideoEditorPreviewController: () => getHookController().preview,
@@ -316,4 +328,21 @@ describe('VideoEditorWorkspaceMain', () => {
     'routes header, sidebar, preview, and timeline props through workspace slices',
     verifyWorkspaceMainRouting
   );
+});
+
+it('releases Source input ownership when Undo removes its source asset', async () => {
+  hookMocks.controller = createWorkspaceController();
+  hookMocks.sourceActive = true;
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  try {
+    await act(async () => {
+      root.render(<VideoEditorWorkspaceMain diagnosticsContent={null} previewHeightStyle={{}} />);
+    });
+    expect(hookMocks.setSourceActive).toHaveBeenCalledWith(false);
+  } finally {
+    act(() => root.unmount());
+    hookMocks.sourceActive = false;
+    hookMocks.setSourceActive.mockClear();
+  }
 });

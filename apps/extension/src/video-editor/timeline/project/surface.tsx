@@ -9,26 +9,17 @@ import { isRecordingTelemetryEligibleForAutoProcessing } from '../../project/ope
 type ProjectTimelineSurfaceProps = Pick<
   ProjectTimelineProps & ReturnType<typeof useProjectTimelineState>,
   | 'canEditSelectedClip'
-  | 'currentTime'
   | 'canSplitSelectedClip'
   | 'fitSelectionDuration'
   | 'insertion'
-  | 'isPlaying'
-  | 'onClearPlaybackRange'
   | 'onAutoTransformRecording'
   | 'onDeleteSelectedClip'
   | 'onDuplicateSelectedClip'
   | 'onFitProject'
   | 'onFitSelection'
-  | 'onSeekToEnd'
-  | 'onSeekToStart'
-  | 'onStepToNextFrame'
-  | 'onStepToPreviousFrame'
   | 'onSplitSelectedClip'
   | 'onTimelinePreviewSuspendedChange'
-  | 'onTogglePlay'
   | 'onZoomChange'
-  | 'playbackRange'
   | 'pixelsPerSecond'
   | 'project'
   | 'recordingTelemetry'
@@ -53,13 +44,9 @@ export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
         canAddMotionRegion={props.project.duration > 0 && motionLane.visible && !motionLane.locked}
         canEditSelectedClip={props.canEditSelectedClip}
         canSplitSelectedClip={props.canSplitSelectedClip}
-        currentTime={props.currentTime}
-        duration={props.project.duration}
         fitSelectionDuration={props.fitSelectionDuration}
         insertion={props.insertion}
-        isPlaying={props.isPlaying}
         pixelsPerSecond={props.pixelsPerSecond}
-        playbackRange={props.playbackRange}
         selectedClip={Boolean(props.selectedClip)}
         trackView={{
           compactRows: props.panelPrefs.prefs.compactRows,
@@ -72,17 +59,11 @@ export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
           props.project,
           props.recordingTelemetry
         )}
-        onClearPlaybackRange={props.onClearPlaybackRange}
-        onSeekToEnd={props.onSeekToEnd}
-        onSeekToStart={props.onSeekToStart}
-        onStepToNextFrame={props.onStepToNextFrame}
-        onStepToPreviousFrame={props.onStepToPreviousFrame}
         onAutoTransformRecording={props.onAutoTransformRecording}
         onFitProject={props.onFitProject}
         onFitSelection={props.onFitSelection}
         onTimelinePreviewSuspendedChange={props.onTimelinePreviewSuspendedChange}
         onZoomChange={props.onZoomChange}
-        onTogglePlay={props.onTogglePlay}
         onSplitSelectedClip={props.onSplitSelectedClip}
         onDuplicateSelectedClip={props.onDuplicateSelectedClip}
         onDeleteSelectedClip={props.onDeleteSelectedClip}

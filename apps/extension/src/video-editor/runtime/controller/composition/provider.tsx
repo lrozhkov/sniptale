@@ -94,7 +94,7 @@ function useVideoEditorRuntimeComposition(
       playbackRange: workspace.playbackRange,
       placementMode: session.placementMode,
       projectHistoryTransactionActive: history.projectHistoryTransactionActive,
-      shortcutsEnabled: !blockingOverlayOpen,
+      shortcutsEnabled: !blockingOverlayOpen && !workspace.preview.sourceViewerActive,
       selection: selection.selection,
       selectedActionEvent: selections.selectedActionEvent,
       selectedClipId: selection.selectedClipId,
@@ -136,7 +136,7 @@ function useVideoEditorRuntimeComposition(
 
   useVideoEditorOverlayPlayback({
     blockingOverlayOpen,
-    enabled: lifecycle.project !== null,
+    enabled: lifecycle.project !== null && !workspace.preview.sourceViewerActive,
     isPlaying: playback.isPlaying,
     setPlaybackPlaying: runtime.setPlaybackPlaying,
   });

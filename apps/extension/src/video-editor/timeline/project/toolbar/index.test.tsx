@@ -53,27 +53,17 @@ function createToolbarProps(): ProjectTimelineToolbarTestProps {
     canAddMotionRegion: true,
     canEditSelectedClip: true,
     canSplitSelectedClip: true,
-    currentTime: 12,
-    duration: 45,
     fitSelectionDuration: 8,
     insertion: createInsertionActions(),
-    isPlaying: false,
     onAutoTransformRecording: vi.fn(),
-    onClearPlaybackRange: vi.fn(),
     onDeleteSelectedClip: vi.fn(),
     onDuplicateSelectedClip: vi.fn(),
     onFitProject: vi.fn(),
     onFitSelection: vi.fn(),
-    onSeekToEnd: vi.fn(),
-    onSeekToStart: vi.fn(),
-    onStepToNextFrame: vi.fn(),
-    onStepToPreviousFrame: vi.fn(),
     onSplitSelectedClip: vi.fn(),
     onTimelinePreviewSuspendedChange: vi.fn(),
-    onTogglePlay: vi.fn(),
     onZoomChange: vi.fn(),
     pixelsPerSecond: 120,
-    playbackRange: null,
     selectedClip: true,
     trackView: {
       compactRows: false,
@@ -98,7 +88,7 @@ function renderToolbar() {
   return nextContainer;
 }
 
-it('keeps add actions left, playback center, and zoom on the right', () => {
+it('keeps timeline tools in two regions without duplicating viewer transport', () => {
   const renderedContainer = renderToolbar();
 
   const toolbar = renderedContainer.firstElementChild as HTMLDivElement | null;
@@ -107,10 +97,11 @@ it('keeps add actions left, playback center, and zoom on the right', () => {
   expect(regions[0]?.textContent).toContain('videoEditor.timeline.addTrack');
   expect(regions[0]?.textContent).toContain('videoEditor.timeline.addZoomRegion');
   expect(regions[0]?.textContent).toContain('videoEditor.timeline.split');
-  expect(regions[1]?.textContent).toContain('0:12.0 / 0:45.0');
-  expect(regions[2]?.textContent).not.toContain('videoEditor.timeline.telemetryToggle');
+  expect(regions).toHaveLength(2);
+  expect(toolbar?.querySelector('[data-playback-counter]')).toBeNull();
+  expect(regions[1]?.textContent).not.toContain('videoEditor.timeline.telemetryToggle');
   expect(
-    regions[2]?.querySelector('[data-ui="video-editor.timeline.toolbar.fit-project"]')
+    regions[1]?.querySelector('[data-ui="video-editor.timeline.toolbar.fit-project"]')
   ).not.toBeNull();
-  expect(regions[2]?.querySelector('input[aria-label="videoEditor.timeline.zoom"]')).not.toBeNull();
+  expect(regions[1]?.querySelector('input[aria-label="videoEditor.timeline.zoom"]')).not.toBeNull();
 });

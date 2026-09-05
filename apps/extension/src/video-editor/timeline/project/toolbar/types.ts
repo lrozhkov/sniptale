@@ -1,18 +1,13 @@
 import type { ProjectTimelineInsertionActions } from '../types';
-import type { VideoEditorPlaybackRange } from '../../../interaction/playback/range';
 import type { VideoAutoProcessingSettings } from '@sniptale/runtime-contracts/video/types/types';
 
 export interface ProjectTimelineToolbarProps {
   canAddMotionRegion: boolean;
   canEditSelectedClip: boolean;
   canSplitSelectedClip: boolean;
-  currentTime: number;
-  duration: number;
   fitSelectionDuration: number | null;
   insertion: ProjectTimelineInsertionActions;
-  isPlaying: boolean;
   pixelsPerSecond: number;
-  playbackRange: VideoEditorPlaybackRange | null;
   selectedClip: boolean;
   trackView: {
     compactRows: boolean;
@@ -22,15 +17,9 @@ export interface ProjectTimelineToolbarProps {
   };
   visibleRangeSeconds: number;
   canAutoTransformRecording?: boolean;
-  onClearPlaybackRange: () => void;
   onFitProject: () => void;
   onFitSelection: () => void;
   onZoomChange: (value: number) => void;
-  onSeekToEnd: () => void;
-  onSeekToStart: () => void;
-  onStepToNextFrame: () => void;
-  onStepToPreviousFrame: () => void;
-  onTogglePlay: () => void;
   onSplitSelectedClip: () => void;
   onDuplicateSelectedClip: () => void;
   onDeleteSelectedClip: () => void;

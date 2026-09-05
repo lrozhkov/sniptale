@@ -38,27 +38,18 @@ function renderSurface(
     <ProjectTimelineSurface
       canEditSelectedClip={false}
       canSplitSelectedClip={false}
-      currentTime={0}
       fitSelectionDuration={null}
       insertion={createInsertionActions()}
-      isPlaying={false}
       onAutoTransformRecording={vi.fn()}
-      onClearPlaybackRange={vi.fn()}
       onDeleteSelectedClip={vi.fn()}
       onDuplicateSelectedClip={vi.fn()}
       onFitProject={vi.fn()}
       onFitSelection={vi.fn()}
-      onSeekToEnd={vi.fn()}
-      onSeekToStart={vi.fn()}
-      onStepToNextFrame={vi.fn()}
-      onStepToPreviousFrame={vi.fn()}
       onSplitSelectedClip={vi.fn()}
       onTimelinePreviewSuspendedChange={vi.fn()}
-      onTogglePlay={vi.fn()}
       onZoomChange={vi.fn()}
       panelPrefs={createPanelPrefs()}
       pixelsPerSecond={90}
-      playbackRange={null}
       project={project}
       recordingTelemetry={recordingTelemetry}
       selectedClip={null}

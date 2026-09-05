@@ -2,7 +2,7 @@ import { Pause, Play, RotateCcw, SkipBack, SkipForward, StepBack, StepForward } 
 
 import { translate } from '../../../../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import type { ProjectTimelineToolbarProps } from '../types';
+import type { VideoEditorPlaybackRange } from '../../../../interaction/playback/range';
 import { toolbarIconButtonClassName } from './constants/button';
 
 export function formatPlaybackCounterTime(value: number): string {
@@ -110,9 +110,7 @@ function PlaybackFrameStepButton(props: { direction: 'next' | 'previous'; onStep
   );
 }
 
-function formatToolbarLoopRange(
-  playbackRange: ProjectTimelineToolbarProps['playbackRange']
-): string | null {
+function formatToolbarLoopRange(playbackRange: VideoEditorPlaybackRange | null): string | null {
   if (!playbackRange) {
     return null;
   }
@@ -125,7 +123,7 @@ function formatToolbarLoopRange(
 function PlaybackSummaryMeta(props: {
   currentTime: number;
   duration: number;
-  playbackRange: ProjectTimelineToolbarProps['playbackRange'];
+  playbackRange: VideoEditorPlaybackRange | null;
 }) {
   const loopRange = formatToolbarLoopRange(props.playbackRange);
 
@@ -166,19 +164,18 @@ export function ProjectTimelinePlaybackSummary({
   onStepToNextFrame,
   onStepToPreviousFrame,
   onTogglePlay,
-}: Pick<
-  ProjectTimelineToolbarProps,
-  | 'currentTime'
-  | 'duration'
-  | 'isPlaying'
-  | 'playbackRange'
-  | 'onClearPlaybackRange'
-  | 'onSeekToEnd'
-  | 'onSeekToStart'
-  | 'onStepToNextFrame'
-  | 'onStepToPreviousFrame'
-  | 'onTogglePlay'
->) {
+}: {
+  currentTime: number;
+  duration: number;
+  isPlaying: boolean;
+  playbackRange: VideoEditorPlaybackRange | null;
+  onClearPlaybackRange: () => void;
+  onSeekToEnd: () => void;
+  onSeekToStart: () => void;
+  onStepToNextFrame: () => void;
+  onStepToPreviousFrame: () => void;
+  onTogglePlay: () => void;
+}) {
   return (
     <div className="flex min-w-0 flex-nowrap items-center justify-center gap-2.5">
       <PlaybackSeekToStartButton onSeekToStart={onSeekToStart} />

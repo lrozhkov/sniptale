@@ -25,6 +25,7 @@ function beginVerticalResize(
 }
 
 export function useVideoEditorWorkspacePreviewState() {
+  const [sourceViewerActive, setSourceViewerActive] = useState(false);
   const [paneHeight, setPaneHeight] = useState<number | null>(null);
   const workspaceSplitRef = useRef<HTMLDivElement>(null);
   const resizeCleanupRef = useRef<(() => void) | null>(null);
@@ -53,5 +54,12 @@ export function useVideoEditorWorkspacePreviewState() {
     [paneHeight]
   );
 
-  return { handleStartVerticalResize, paneHeight, preferences, workspaceSplitRef };
+  return {
+    handleStartVerticalResize,
+    paneHeight,
+    preferences,
+    workspaceSplitRef,
+    sourceViewerActive,
+    setSourceViewerActive,
+  };
 }
