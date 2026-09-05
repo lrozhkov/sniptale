@@ -24,8 +24,6 @@ import {
 import { VideoEditorSelectionKind, type VideoEditorSelection } from '../../contracts/selection';
 import type { WorkspaceSidebarPanelContentSharedProps } from './contracts/panel-content';
 import type { WorkspaceSidebarProps } from './contracts/props';
-import type { InspectorGroupHeaderSlot } from './selection/grouped-inspector';
-import { InspectorGroupSwitch } from './selection/grouped-inspector';
 import { getClipTypeLabel } from '../../chrome/display';
 import { getVideoTrackKindLabel } from './track-kind-label';
 
@@ -112,12 +110,9 @@ export function getSelectionMeta(
 type WorkspaceSidebarHeaderProps = Pick<
   WorkspaceSidebarPanelContentProps,
   'inspectorMode' | 'selectionIcon' | 'selectionTitle' | 'selectedTrack'
-> & {
-  inspectorHeaderSlot: InspectorGroupHeaderSlot | null;
-};
+>;
 
 export function WorkspaceSidebarHeader({
-  inspectorHeaderSlot,
   inspectorMode,
   selectionIcon,
   selectionTitle,
@@ -136,9 +131,6 @@ export function WorkspaceSidebarHeader({
         selectionIcon={selectionIcon}
         selectionTitle={selectionTitle}
       />
-      {inspectorMode === 'selection' && inspectorHeaderSlot ? (
-        <WorkspaceSidebarHeaderGroupsRow inspectorHeaderSlot={inspectorHeaderSlot} />
-      ) : null}
     </div>
   );
 }
@@ -174,28 +166,6 @@ function WorkspaceSidebarHeaderTitleRow({
           {getInspectorHeaderSubtitle(inspectorMode, selectedTrack)}
         </div>
       </div>
-    </div>
-  );
-}
-
-function WorkspaceSidebarHeaderGroupsRow({
-  inspectorHeaderSlot,
-}: Pick<WorkspaceSidebarHeaderProps, 'inspectorHeaderSlot'>) {
-  if (!inspectorHeaderSlot) {
-    return null;
-  }
-
-  return (
-    <div
-      className="w-full min-w-0 border-t border-[color:var(--sniptale-color-border-subtle)] px-3 py-2"
-      data-ui="video-editor.workspace.sidebar-header-groups-row"
-    >
-      <InspectorGroupSwitch
-        activeGroupId={inspectorHeaderSlot.activeGroupId}
-        ariaLabel={inspectorHeaderSlot.ariaLabel}
-        groups={inspectorHeaderSlot.groups}
-        onChange={inspectorHeaderSlot.onChange}
-      />
     </div>
   );
 }

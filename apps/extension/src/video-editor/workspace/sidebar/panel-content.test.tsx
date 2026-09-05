@@ -94,9 +94,7 @@ describe('workspace-sidebar/panel-content', () => {
   });
 
   it('keeps the selection body inside a flex-column surface so inner scroll owners can grow', () => {
-    const markup = renderToStaticMarkup(
-      <WorkspaceSidebarPanelContent {...createProps()} onSetInspectorHeaderSlot={vi.fn()} />
-    );
+    const markup = renderToStaticMarkup(<WorkspaceSidebarPanelContent {...createProps()} />);
 
     expect(markup).toContain('flex min-h-0 flex-1 flex-col overflow-hidden');
     expect(selectionBodyMock).toHaveBeenCalledOnce();
@@ -106,9 +104,7 @@ describe('workspace-sidebar/panel-content', () => {
     const props = createProps();
     props.onConvertTextClipToAnnotation = vi.fn();
 
-    renderToStaticMarkup(
-      <WorkspaceSidebarPanelContent {...props} onSetInspectorHeaderSlot={vi.fn()} />
-    );
+    renderToStaticMarkup(<WorkspaceSidebarPanelContent {...props} />);
 
     expect(selectionBodyMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -131,11 +127,7 @@ describe('workspace-sidebar/panel-content alternate modes', () => {
 
   it('renders grid settings mode inside the sidebar surface', () => {
     const gridMarkup = renderToStaticMarkup(
-      <WorkspaceSidebarPanelContent
-        {...createProps()}
-        inspectorMode="grid"
-        onSetInspectorHeaderSlot={vi.fn()}
-      />
+      <WorkspaceSidebarPanelContent {...createProps()} inspectorMode="grid" />
     );
     expect(gridMarkup).toContain('Сетка помогает выравнивать');
     expect(gridMarkup).toContain('Привязка к сетке');

@@ -172,9 +172,12 @@ function createProps(): WorkspaceSidebarSelectionPanelProps {
 }
 
 describe('workspace-sidebar/selection/inspect-core', () => {
-  it('opens the clip summary group by default', () => {
+  it('opens editable clip content before file metadata', () => {
     renderInspectPanel(createProps());
 
+    expect(container?.textContent).toContain('videoEditor.sidebar.textLabel');
+    expect(container?.textContent).not.toContain('videoEditor.sidebar.clipTypeText');
+    clickGroup('videoEditor.sidebar.inspectorGroupSummary');
     expect(container?.textContent).toContain('videoEditor.sidebar.clipTypeText');
   });
 
@@ -322,8 +325,9 @@ function renderInspectPanel(props: WorkspaceSidebarSelectionPanelProps) {
 }
 
 function clickGroup(title: string) {
-  const button = container?.querySelector<HTMLButtonElement>(`button[title="${title}"]`);
+  const button = container?.querySelector<HTMLElement>(`summary[title="${title}"]`);
   act(() => {
-    button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    if (!button?.parentElement?.hasAttribute('open'))
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 }

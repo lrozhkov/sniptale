@@ -260,7 +260,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('owns Space on focused non-text controls before target handlers run', async () => {
+it('leaves Space with focused controls before their target handlers run', async () => {
   const togglePlayback = vi.fn();
   renderShortcutHarness(root!, togglePlayback);
   const buttonKeyDown = vi.fn();
@@ -281,13 +281,13 @@ it('owns Space on focused non-text controls before target handlers run', async (
   const optionEvent = dispatchSpaceKeyDownInAct(option);
   const triggerEvent = dispatchSpaceKeyDownInAct(selectTrigger);
 
-  expect(buttonEvent.defaultPrevented).toBe(true);
-  expect(optionEvent.defaultPrevented).toBe(true);
-  expect(triggerEvent.defaultPrevented).toBe(true);
-  expect(togglePlayback).toHaveBeenCalledTimes(3);
-  expect(buttonKeyDown).not.toHaveBeenCalled();
-  expect(optionKeyDown).not.toHaveBeenCalled();
-  expect(triggerKeyDown).not.toHaveBeenCalled();
+  expect(buttonEvent.defaultPrevented).toBe(false);
+  expect(optionEvent.defaultPrevented).toBe(false);
+  expect(triggerEvent.defaultPrevented).toBe(false);
+  expect(togglePlayback).not.toHaveBeenCalled();
+  expect(buttonKeyDown).toHaveBeenCalledOnce();
+  expect(optionKeyDown).toHaveBeenCalledOnce();
+  expect(triggerKeyDown).toHaveBeenCalledOnce();
   button.remove();
   option.remove();
   selectTrigger.remove();
@@ -496,4 +496,20 @@ it('leaves Space ownership with text-entry targets', async () => {
   input.remove();
   textArea.remove();
   editable.remove();
+});
+
+it('leaves Space with a nested summary target and keeps playback on the workspace', () => {
+  const togglePlayback = vi.fn();
+  renderShortcutHarness(root!, togglePlayback);
+  const details = document.createElement('details');
+  const summary = document.createElement('summary');
+  const label = document.createElement('span');
+  summary.append(label);
+  details.append(summary);
+  document.body.append(details);
+  expect(dispatchSpaceKeyDownInAct(label).defaultPrevented).toBe(false);
+  expect(togglePlayback).not.toHaveBeenCalled();
+  expect(dispatchSpaceKeyDownInAct(document.body).defaultPrevented).toBe(true);
+  expect(togglePlayback).toHaveBeenCalledOnce();
+  details.remove();
 });

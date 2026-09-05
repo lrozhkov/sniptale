@@ -152,6 +152,21 @@ function handlePlaybackBoundaryShortcut(
 
 function handlePlaybackToggleShortcut(event: KeyboardEvent, togglePlayback: () => void): boolean {
   if (event.code === 'Space') {
+    const controlSelector = [
+      'button',
+      'summary',
+      'input',
+      'select',
+      'a[href]',
+      '[role="button"]',
+      '[role="option"]',
+      '[role="checkbox"]',
+      '[role="switch"]',
+      '[role="radio"]',
+      '[role="tab"]',
+      '[role="menuitem"]',
+    ].join(',');
+    if (event.target instanceof Element && event.target.closest(controlSelector)) return false;
     event.preventDefault();
     event.stopPropagation();
     togglePlayback();

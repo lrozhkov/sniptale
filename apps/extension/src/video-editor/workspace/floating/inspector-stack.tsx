@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import {
   useVideoEditorSidebarController,
@@ -8,7 +8,6 @@ import { getWorkspaceSidebarProps } from '../surface/sidebar-props';
 import { WorkspaceSidebarPanelContent } from '../sidebar/panel-content';
 import { useWorkspaceSidebarState } from '../sidebar/state';
 import { WorkspaceSidebarHeader } from '../sidebar/view';
-import type { InspectorGroupHeaderSlot } from '../sidebar/selection/grouped-inspector';
 import { translate } from '../../../platform/i18n';
 import { INSPECTOR_MAX_WIDTH, INSPECTOR_MIN_WIDTH } from './inspector-resize';
 import type { useInspectorResize } from './inspector-resize';
@@ -60,9 +59,6 @@ function VideoEditorFloatingInspectorContent({
     sidebarProps.onToggleDiagnostics,
     sidebarProps.selectedTrack
   );
-  const [inspectorHeaderSlot, setInspectorHeaderSlot] = useState<InspectorGroupHeaderSlot | null>(
-    null
-  );
 
   if (leftSidebarCollapsed) {
     return null;
@@ -93,7 +89,6 @@ function VideoEditorFloatingInspectorContent({
         style={{ width: `${resize.width}px` }}
       >
         <WorkspaceSidebarHeader
-          inspectorHeaderSlot={inspectorHeaderSlot}
           inspectorMode={sidebarProps.inspectorMode}
           selectionIcon={sidebarState.selectionIcon}
           selectionTitle={sidebarState.selectionTitle}
@@ -109,7 +104,6 @@ function VideoEditorFloatingInspectorContent({
           onToggleDiagnosticsSection={sidebarState.toggleDiagnosticsSection}
           onToggleProjectsOpen={sidebarState.toggleProjectsOpen}
           onToggleRecordingsOpen={sidebarState.toggleRecordingsOpen}
-          onSetInspectorHeaderSlot={setInspectorHeaderSlot}
         />
       </FloatingChromePanel>
     </>

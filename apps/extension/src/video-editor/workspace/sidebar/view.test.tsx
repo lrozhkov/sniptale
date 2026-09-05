@@ -9,20 +9,10 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 
-it('renders the inspector group switch below the title row', () => {
+it('keeps the inspector header focused on the selected object', () => {
   const markup = renderToStaticMarkup(
     <WorkspaceSidebarHeader
       inspectorMode="selection"
-      inspectorHeaderSlot={{
-        activeGroupId: 'canvas',
-        ariaLabel: 'Groups',
-        groups: [
-          { id: 'info', label: 'Сведения', content: null },
-          { id: 'canvas', label: 'Холст', content: null },
-          { id: 'background', label: 'Фон', content: null },
-        ],
-        onChange: vi.fn(),
-      }}
       selectedTrack={{
         id: 'track-1',
         isRoot: true,
@@ -38,12 +28,9 @@ it('renders the inspector group switch below the title row', () => {
   );
 
   expect(markup).toContain('data-ui="video-editor.workspace.sidebar-header-title-row"');
-  expect(markup).toContain('data-ui="video-editor.workspace.sidebar-header-groups-row"');
+  expect(markup).not.toContain('data-ui="video-editor.workspace.sidebar-header-groups-row"');
   expect(markup).toContain('videoEditor.timeline.trackKindPrimary');
   expect(markup).not.toContain('videoEditor.sidebar.trackPrefix Primary');
-  expect(markup).toContain('Сведения');
-  expect(markup).toContain('Холст');
-  expect(markup).toContain('Фон');
 });
 
 it('resolves static and empty clip selection metadata through descriptor helpers', () => {

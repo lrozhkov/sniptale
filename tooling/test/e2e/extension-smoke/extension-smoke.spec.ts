@@ -612,10 +612,15 @@ test('video editor keeps webcam independent with camera timeline and inspector c
   await timelineClip.click();
 
   const inspector = page.locator('[data-ui="video-editor.floating.context-inspector"]');
-  const cameraGroupButton = inspector.locator(
-    `button[title="${translate('videoEditor.sidebar.inspectorGroupCamera', 'ru')}"]`
+  const cameraGroup = inspector.locator(
+    `details:has(> summary[title="${translate('videoEditor.sidebar.inspectorGroupCamera', 'ru')}"])`
   );
-  await expect(cameraGroupButton).toHaveAttribute('aria-pressed', 'true');
+  await expect(cameraGroup).toHaveAttribute('open', '');
+  await cameraGroup.locator('summary').focus();
+  await page.keyboard.press('Space');
+  await expect(cameraGroup).not.toHaveAttribute('open');
+  await page.keyboard.press('Enter');
+  await expect(cameraGroup).toHaveAttribute('open', '');
   await expect(
     inspector.getByText(translate('videoEditor.sidebar.cameraPlacementDescription', 'ru'))
   ).toBeVisible();
@@ -672,7 +677,7 @@ test('video editor keeps webcam independent with camera timeline and inspector c
   await expect(addZoomButton).toBeEnabled();
   await addZoomButton.click();
   await expect(page.locator('[data-ui="video-editor.timeline.add-zoom"]')).toBeVisible();
-  const groupLabels = inspector.locator('[role="group"]').first().locator('button span');
+  const groupLabels = inspector.locator('[data-ui="video-editor.inspector.sections"] summary');
   await expect(groupLabels).not.toHaveCount(0);
   expect(
     await groupLabels.evaluateAll((nodes) =>
