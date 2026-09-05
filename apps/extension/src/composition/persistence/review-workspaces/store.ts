@@ -123,11 +123,17 @@ async function mutate<T>(
 /** Opens the single session, retaining its complete history and recovery field on re-entry. */
 export async function openVideoWorkspace(
   aggregateId: string,
-  sourceValue: ReviewSource
+  sourceValue: ReviewSource,
+  expectedSourceAssetId?: string
 ): Promise<VideoWorkspaceSnapshot> {
   const source = parseReviewSource(sourceValue);
   if (!source) throw new VideoWorkspaceError('invalid');
   return mutate(aggregateId, async (tx) => {
+    if (
+      expectedSourceAssetId !== undefined &&
+      expectedSourceAssetId !== (await readSourceAssetId(tx, aggregateId))
+    )
+      throw new VideoWorkspaceError('changed-source');
     const existing = await readSnapshot(tx, aggregateId);
     if (existing) {
       if (JSON.stringify(existing.workspace.source) !== JSON.stringify(source))

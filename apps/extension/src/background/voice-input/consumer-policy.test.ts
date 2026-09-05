@@ -117,3 +117,16 @@ describe('voice input consumer policy', () => {
     ).toBeNull();
   });
 });
+
+it('authorizes only the exact gallery extension document with a document identity', () => {
+  const path = 'chrome-extension://extension-id/apps/extension/src/gallery/index.html';
+  expect(authorizeVoiceInputPortSender({ documentId: 'gallery-document', url: path })).toEqual({
+    consumerId: 'gallery-video-review',
+    documentId: 'gallery-document',
+    maxDurationMs: null,
+  });
+  for (const url of [path + '.evil', path.replace('extension-id', 'other-extension')]) {
+    expect(authorizeVoiceInputPortSender({ documentId: 'forged', url })).toBeNull();
+  }
+  expect(authorizeVoiceInputPortSender({ url: path })).toBeNull();
+});

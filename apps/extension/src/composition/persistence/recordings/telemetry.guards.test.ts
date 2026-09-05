@@ -120,3 +120,23 @@ describe('shared recording telemetry db guards', () => {
     );
   });
 });
+
+it('retains verified native provenance and legacy rows without inventing time semantics', () => {
+  const entry = createTelemetryEntry();
+  const provenance = {
+    source: 'native',
+    normalizationVersion: 1,
+    timeUnit: 'seconds',
+    coordinateSpace: 'desktop',
+  };
+  expect(parseRecordingTelemetryEntry(entry)).not.toHaveProperty('provenance');
+  expect(parseRecordingTelemetryEntry({ ...entry, provenance })?.provenance).toEqual(provenance);
+  for (const patch of [
+    { timeUnit: 'milliseconds' },
+    { normalizationVersion: 2 },
+    { secret: 'unexpected' },
+  ])
+    expect(
+      parseRecordingTelemetryEntry({ ...entry, provenance: { ...provenance, ...patch } })
+    ).toBeNull();
+});

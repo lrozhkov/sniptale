@@ -326,3 +326,10 @@ it('rejects a stale tab after restore even when imported history has the same nu
   ).rejects.toMatchObject({ code: 'conflict' });
   expect((await readVideoWorkspace(id))?.workspace.history).toEqual([]);
 });
+
+it('refuses to create a session for a replaced file loaded before opening the editor', async () => {
+  await expect(openVideoWorkspace(id, source, 'previous-file')).rejects.toMatchObject({
+    code: 'changed-source',
+  });
+  expect(await readVideoWorkspace(id)).toBeNull();
+});

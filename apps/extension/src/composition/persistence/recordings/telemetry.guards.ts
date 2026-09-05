@@ -7,9 +7,24 @@ type StoredRecordingTelemetryEntry = Omit<RecordingTelemetryEntry, 'signals'> & 
   signals?: RecordingTelemetryEntry['signals'];
 };
 
+function isTelemetryProvenance(value: unknown): boolean {
+  return (
+    value === undefined ||
+    (isRecord(value) &&
+      value['source'] === 'native' &&
+      value['normalizationVersion'] === 1 &&
+      value['timeUnit'] === 'seconds' &&
+      value['coordinateSpace'] === 'desktop' &&
+      Object.keys(value).every((key) =>
+        ['source', 'normalizationVersion', 'timeUnit', 'coordinateSpace'].includes(key)
+      ))
+  );
+}
+
 function isRecordingTelemetryEntry(value: unknown): value is StoredRecordingTelemetryEntry {
   return (
     isRecord(value) &&
+    isTelemetryProvenance(value['provenance']) &&
     isString(value['recordingId']) &&
     value['recordingId'].trim().length > 0 &&
     isNumber(value['createdAt']) &&

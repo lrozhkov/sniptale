@@ -141,6 +141,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/workflows/scenario-video`
 - `apps/extension/src/workflows/settings-transfer`
 - `apps/extension/src/workflows/video`
+- `apps/extension/src/workflows/video-review`
 - `apps/extension/src/workflows/voice-input`
 
 ## Manifest capabilities

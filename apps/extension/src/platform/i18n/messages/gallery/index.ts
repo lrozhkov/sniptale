@@ -1,3 +1,4 @@
+import { galleryVideoReviewMessages } from './video-review';
 import { defineMessageSource } from '../source';
 import { galleryAppMessages } from './app';
 import { galleryBackupExportModalMessages } from './backup-export-modal';
@@ -10,6 +11,7 @@ export const galleryMessages = defineMessageSource({
   app: galleryAppMessages,
   backupExportModal: galleryBackupExportModalMessages,
   preview: galleryPreviewMessages,
+  videoReview: galleryVideoReviewMessages,
   recovery: galleryRecoveryMessages,
   storageErrors: galleryStorageErrorMessages,
   importModal: galleryImportModalMessages,

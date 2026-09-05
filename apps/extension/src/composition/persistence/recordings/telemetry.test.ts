@@ -107,3 +107,28 @@ describe('shared recording telemetry db', () => {
     );
   });
 });
+
+it('roundtrips native time provenance without changing existing event times', async () => {
+  const db = createDb();
+  initDbMock.mockResolvedValue(db);
+  const { saveRecordingTelemetry, getRecordingTelemetry } = await import('./telemetry');
+  const entry: RecordingTelemetryEntry = {
+    recordingId: 'native',
+    createdAt: 1,
+    updatedAt: 1,
+    captureMode: 'SCREEN',
+    viewport: null,
+    cursorTrack: null,
+    actionEvents: [],
+    signals: [],
+    provenance: {
+      source: 'native',
+      normalizationVersion: 1,
+      timeUnit: 'seconds',
+      coordinateSpace: 'desktop',
+    },
+  };
+  await saveRecordingTelemetry(entry);
+  db.get.mockResolvedValue(structuredClone(db.put.mock.calls.at(-1)![1]));
+  expect(await getRecordingTelemetry('native')).toEqual(entry);
+});

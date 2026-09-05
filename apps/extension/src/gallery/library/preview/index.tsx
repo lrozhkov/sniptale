@@ -1,4 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { VideoReview } from '../../video-review';
+import { ReviewButton } from '../../video-review/controls';
 import { translate } from '../../../platform/i18n';
 import { createSafeExternalHref } from '@sniptale/platform/security/safe-url';
 import {
@@ -132,13 +134,22 @@ function PreviewSourceField(props: Pick<PreviewPanelProps, 'item'>) {
   );
 }
 
-function PreviewPanelSidebar(props: PreviewPanelProps) {
+function PreviewPanelSidebar(props: PreviewPanelProps & { onReview?: () => void }) {
   return (
     <aside
       className="min-h-0 w-full overflow-y-auto border-l border-[var(--sniptale-color-border-soft)]
         bg-[var(--sniptale-color-surface-panel)] p-4 text-[var(--sniptale-color-text-primary)]"
     >
       <PreviewPanelHeader item={props.item} />
+      {props.onReview ? (
+        <div className="mt-4">
+          <ReviewButton
+            data-ui="gallery.videoReview.enter"
+            label={translate('gallery.videoReview.enter')}
+            onClick={props.onReview}
+          />
+        </div>
+      ) : null}
       <PreviewPromotionAction
         item={props.item}
         {...(props.onPromote ? { onPromote: props.onPromote } : {})}
@@ -199,16 +210,35 @@ function handlePreviewKeyDown(
 
 export function PreviewPanel(props: PreviewPanelProps) {
   const { item, previewUrl } = props;
+  const [review, setReview] = useState(false);
+  const opener = useRef<HTMLElement | null>(null);
   const navigation = props.navigation;
   const onClose = props.onClose;
 
   useEffect(() => {
+    if (review) return;
     const handleKeyDown = (event: KeyboardEvent) =>
       handlePreviewKeyDown(event, navigation, onClose);
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [navigation, onClose]);
+  }, [navigation, onClose, review]);
+
+  if (review)
+    return (
+      <VideoReview
+        aggregateId={item.id}
+        onBack={() => {
+          setReview(false);
+          requestAnimationFrame(() => {
+            const button = document.querySelector<HTMLButtonElement>(
+              '[data-ui="gallery.videoReview.enter"]'
+            );
+            (button ?? opener.current)?.focus();
+          });
+        }}
+      />
+    );
 
   return (
     <div
@@ -237,7 +267,22 @@ export function PreviewPanel(props: PreviewPanelProps) {
             onInspectorToggle={props.onInspectorToggle}
             onClose={props.onClose}
           />
-          {props.inspectorCollapsed ? null : <PreviewPanelSidebar {...props} />}
+          {props.inspectorCollapsed ? null : (
+            <PreviewPanelSidebar
+              {...props}
+              {...(isGalleryMediaItem(item) && item.mimeType.startsWith('video/') && previewUrl
+                ? {
+                    onReview: () => {
+                      opener.current =
+                        document.activeElement instanceof HTMLElement
+                          ? document.activeElement
+                          : null;
+                      setReview(true);
+                    },
+                  }
+                : {})}
+            />
+          )}
         </div>
       </div>
     </div>
