@@ -1,4 +1,4 @@
-import { Focus, Maximize2, PanelLeftClose, PanelLeftOpen, Rows3 } from 'lucide-react';
+import { Focus, Maximize2, MousePointer2, Activity, Rows3 } from 'lucide-react';
 import { translate } from '../../../../../platform/i18n';
 import { TimelineIconButton } from '../../controls/icon-button';
 import type { ProjectTimelineToolbarProps } from '../types';
@@ -25,12 +25,7 @@ export function ProjectTimelineToolbarTrailingActions({
   | 'onZoomChange'
 >) {
   return (
-    <div
-      className={[
-        'flex min-w-0 flex-nowrap items-center justify-end gap-1',
-        '@max-[1360px]/timeline:col-span-2 @max-[1120px]/timeline:col-span-1',
-      ].join(' ')}
-    >
+    <div className={['flex min-w-0 flex-nowrap items-center justify-end gap-1'].join(' ')}>
       <ProjectTimelineTrackViewControls trackView={trackView} />
       <ProjectTimelineFitControls
         fitSelectionDuration={fitSelectionDuration}
@@ -51,7 +46,7 @@ function ProjectTimelineTrackViewControls({
   trackView,
 }: Pick<ProjectTimelineToolbarProps, 'trackView'>) {
   return (
-    <div className="flex h-10 items-center gap-1">
+    <div className="flex h-7 items-center gap-1">
       <TimelineIconButton
         active={trackView.compactRows}
         dataUi="video-editor.timeline.toolbar.compact-tracks"
@@ -60,17 +55,20 @@ function ProjectTimelineTrackViewControls({
         title={translate('videoEditor.timeline.trackPanelCompactToggle')}
       />
       <TimelineIconButton
-        active={trackView.panelExpanded}
-        dataUi="video-editor.timeline.toolbar.expand-track-panel"
-        icon={
-          trackView.panelExpanded ? (
-            <PanelLeftClose size={13} strokeWidth={2.2} />
-          ) : (
-            <PanelLeftOpen size={13} strokeWidth={2.2} />
-          )
-        }
-        onClick={() => trackView.onPanelExpandedChange(!trackView.panelExpanded)}
-        title={translate('videoEditor.timeline.trackPanelToggle')}
+        active={trackView.cursorLaneVisible}
+        disabled={!trackView.canShowCursorLane}
+        dataUi="video-editor.timeline.toolbar.cursor-lane"
+        icon={<MousePointer2 size={14} />}
+        onClick={() => trackView.onCursorLaneVisibleChange(!trackView.cursorLaneVisible)}
+        title={translate('videoEditor.timeline.cursorLane')}
+      />
+      <TimelineIconButton
+        active={trackView.telemetryLaneVisible}
+        disabled={!trackView.canShowTelemetryLane}
+        dataUi="video-editor.timeline.toolbar.telemetry-lane"
+        icon={<Activity size={14} />}
+        onClick={() => trackView.onTelemetryLaneVisibleChange(!trackView.telemetryLaneVisible)}
+        title={translate('videoEditor.timeline.telemetryLane')}
       />
     </div>
   );
@@ -82,7 +80,7 @@ function ProjectTimelineFitControls({
   onFitSelection,
 }: Pick<ProjectTimelineToolbarProps, 'fitSelectionDuration' | 'onFitProject' | 'onFitSelection'>) {
   return (
-    <div className="flex h-10 items-center gap-1">
+    <div className="flex h-7 items-center gap-1">
       <TimelineIconButton
         dataUi="video-editor.timeline.toolbar.fit-project"
         icon={<Maximize2 size={13} strokeWidth={2.2} />}

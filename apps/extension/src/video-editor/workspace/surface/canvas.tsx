@@ -1,8 +1,13 @@
+import { useWorkspaceTrackPresentation } from './track-presentation';
+import {
+  WorkspacePanelDockToggle,
+  WorkspacePanelResizeHandle,
+  type WorkspacePanelResize,
+} from '../floating/panel-layout';
 import React, { useEffect, useState } from 'react';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { translate } from '../../../platform/i18n';
 import { VideoEditorSourceViewer } from './source-viewer';
-import { ProjectTimelinePlaybackSummary } from '../../timeline/project/toolbar/sections/playback-summary';
 import { ProjectTimeline } from '../../timeline/project';
 import { PreviewStage } from '../../preview/stage';
 import {
@@ -36,35 +41,43 @@ export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProp
     <div data-ui="video-editor.workspace.canvas-shell" className="min-h-0 min-w-0 flex-1 px-3 pb-3">
       <div
         ref={layout.workspaceSplitRef}
-        className="grid h-full min-h-0 min-w-0 grid-cols-[minmax(0,1fr)_auto] gap-0"
+        className="grid h-full min-h-0 min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] gap-0"
+        data-materials-dock={props.materialsPanel.fullHeight ? 'full' : 'viewer'}
         data-inspector-dock={props.inspectorFullHeight ? 'full' : 'viewer'}
         style={{
           gridTemplateRows: `minmax(0, min(${previewHeight}, calc(100% - 228px))) 8px minmax(220px, 1fr)`,
         }}
       >
-        <div
-          data-ui="video-editor.workspace.upper"
-          className="col-start-1 row-start-1 flex min-h-0 min-w-0 gap-0"
-        >
+        <div data-ui="video-editor.workspace.upper" className="contents">
           <VideoEditorWorkspaceUpper key={preview?.project.id ?? 'empty'} {...props} />
         </div>
         <div
-          className="col-start-2 row-start-1 flex min-h-0 min-w-0"
+          className="col-start-3 row-start-1 flex min-h-0 min-w-0"
           style={{ gridRowEnd: props.inspectorFullHeight ? 4 : 2 }}
         >
           {props.inspector}
         </div>
         <div
           className="col-start-1 row-start-2"
-          style={{ gridColumnEnd: props.inspectorFullHeight ? 2 : 3 }}
+          style={{
+            gridColumnStart: props.materialsPanel.fullHeight ? 2 : 1,
+            gridColumnEnd: props.inspectorFullHeight ? 3 : 4,
+          }}
         >
-          <VideoEditorWorkspaceResizeHandle onPointerDown={layout.handleStartVerticalResize} />
+          <VideoEditorWorkspaceResizeHandle
+            onPointerDown={layout.handleStartVerticalResize}
+            onDoubleClick={viewer.resetPaneHeight}
+            onKeyDown={viewer.handleVerticalResizeKeyDown}
+          />
         </div>
         <div
           className="col-start-1 row-start-3 flex min-h-0 min-w-0"
           onPointerDownCapture={() => viewer.setSourceViewerActive(false)}
           onFocusCapture={() => viewer.setSourceViewerActive(false)}
-          style={{ gridColumnEnd: props.inspectorFullHeight ? 2 : 3 }}
+          style={{
+            gridColumnStart: props.materialsPanel.fullHeight ? 2 : 1,
+            gridColumnEnd: props.inspectorFullHeight ? 3 : 4,
+          }}
         >
           <VideoEditorWorkspaceTimeline {...props} />
         </div>
@@ -74,6 +87,7 @@ export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProp
 }
 
 interface VideoEditorWorkspaceCanvasProps {
+  materialsPanel: { resize: WorkspacePanelResize; fullHeight: boolean; onToggle: () => void };
   inspectorFullHeight?: boolean;
   materialsOpen?: boolean;
   inspector: React.ReactNode;
@@ -108,25 +122,53 @@ function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
   };
   return (
     <>
-      {props.materialsOpen && (
-        <VideoEditorMaterials
-          project={preview.project}
-          onImport={preview.onImport}
-          selectedAssetId={selectedAssetId}
-          onSelect={(asset) => {
-            setSelectedAssetId(asset.id);
-            showSource();
-          }}
-        />
+      {(props.materialsOpen || props.effectsLibraryDockOpen) && (
+        <div
+          className="col-start-1 row-start-1 flex min-h-0 min-w-0"
+          style={{ gridRowEnd: props.materialsPanel.fullHeight ? 4 : 2 }}
+        >
+          <div className="min-h-0 min-w-0" style={{ width: props.materialsPanel.resize.width }}>
+            {props.materialsOpen && (
+              <VideoEditorMaterials
+                project={preview.project}
+                onImport={preview.onImport}
+                selectedAssetId={selectedAssetId}
+                headerAction={
+                  <WorkspacePanelDockToggle
+                    fullHeight={props.materialsPanel.fullHeight}
+                    onToggle={props.materialsPanel.onToggle}
+                    dataUi="video-editor.materials.dock-toggle"
+                  />
+                }
+                onSelect={(asset) => {
+                  setSelectedAssetId(asset.id);
+                  showSource();
+                }}
+              />
+            )}
+            <VideoEditorWorkspaceEffectsLibrary
+              effectBundles={props.effectBundles}
+              effectOperations={props.effectOperations}
+              isOpen={props.effectsLibraryDockOpen}
+              onOpenChange={props.onEffectsLibraryDockOpenChange}
+              headerAction={
+                <WorkspacePanelDockToggle
+                  fullHeight={props.materialsPanel.fullHeight}
+                  onToggle={props.materialsPanel.onToggle}
+                  dataUi="video-editor.materials.dock-toggle"
+                />
+              }
+            />
+          </div>
+          <WorkspacePanelResizeHandle
+            resize={props.materialsPanel.resize}
+            label={translate('videoEditor.app.resizeMaterials')}
+            dataUi="video-editor.materials.resize"
+          />
+        </div>
       )}
-      <VideoEditorWorkspaceEffectsLibrary
-        effectBundles={props.effectBundles}
-        effectOperations={props.effectOperations}
-        isOpen={props.effectsLibraryDockOpen}
-        onOpenChange={props.onEffectsLibraryDockOpenChange}
-      />
       <div
-        className="flex min-h-0 min-w-0 flex-1 flex-col"
+        className="col-start-2 row-start-1 flex min-h-0 min-w-0 flex-col"
         data-ui="video-editor.workspace.viewer"
         data-viewer={sourceActive ? 'source' : 'montage'}
       >
@@ -153,34 +195,8 @@ function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
             />
           </div>
         </div>
-        <div
-          hidden={sourceActive}
-          className="shrink-0 pt-1"
-          data-ui="video-editor.viewer.transport"
-        >
-          <VideoEditorWorkspaceTransport />
-        </div>
       </div>
     </>
-  );
-}
-
-function VideoEditorWorkspaceTransport() {
-  const controller = useVideoEditorTimelineController();
-  if (!controller) return null;
-  return (
-    <ProjectTimelinePlaybackSummary
-      currentTime={controller.state.currentTime}
-      duration={controller.state.project.duration}
-      isPlaying={controller.state.isPlaying}
-      playbackRange={controller.state.playbackRange}
-      onClearPlaybackRange={controller.actions.onClearPlaybackRange}
-      onSeekToEnd={controller.actions.onSeekToEnd}
-      onSeekToStart={controller.actions.onSeekToStart}
-      onStepToNextFrame={controller.actions.onStepToNextFrame}
-      onStepToPreviousFrame={controller.actions.onStepToPreviousFrame}
-      onTogglePlay={controller.actions.onTogglePlay}
-    />
   );
 }
 
@@ -249,11 +265,13 @@ function createWorkspacePreviewActions(
 
 function VideoEditorWorkspaceTimeline(props: VideoEditorWorkspaceCanvasProps): React.JSX.Element {
   const controller = useVideoEditorTimelineController();
+  const presentation = useWorkspaceTrackPresentation();
   const onApplyEffectDocument = useVideoEditorEffectEditingPort((port) => port.applyEffectDocument);
-  if (!controller) return <div className="min-h-[220px] min-w-0 flex-1" />;
+  if (!controller || !presentation) return <div className="min-h-[220px] min-w-0 flex-1" />;
   return (
     <div className="min-h-[220px] min-w-0 flex-1">
       <ProjectTimeline
+        panelPrefs={presentation.panelPrefs}
         {...getProjectTimelineProps(
           controller,
           (payload, target, startTime) =>
@@ -317,14 +335,22 @@ function doesEffectKindMatchTarget(
 
 function VideoEditorWorkspaceResizeHandle({
   onPointerDown,
+  onDoubleClick,
+  onKeyDown,
 }: {
   onPointerDown: React.PointerEventHandler<HTMLDivElement>;
+  onDoubleClick: () => void;
+  onKeyDown: React.KeyboardEventHandler<HTMLDivElement>;
 }): React.JSX.Element {
   return (
     <div
       data-ui="video-editor.workspace.timeline-resize-zone"
       role="separator"
       aria-orientation="horizontal"
+      aria-label={translate('videoEditor.app.resizeTimeline')}
+      tabIndex={0}
+      onDoubleClick={onDoubleClick}
+      onKeyDown={onKeyDown}
       onPointerDown={onPointerDown}
       className="h-2 shrink-0 cursor-row-resize"
     />

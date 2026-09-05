@@ -1,3 +1,4 @@
+import { expectVideoEditorPanelLayout } from './video-editor-layout';
 import { mkdir } from 'node:fs/promises';
 import { CONTENT_APP_CONTAINER_ID, CONTENT_ROOT_ID } from '@sniptale/ui/branding';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
@@ -121,6 +122,8 @@ async function expectBuiltVideoEditorGeometry(
       paddingTop: '0px',
     });
 
+  await expectVideoEditorPanelLayout(page);
+
   const defaultPreviewWidth = await preview.evaluate(
     (element) => element.getBoundingClientRect().width
   );
@@ -170,7 +173,7 @@ async function expectBuiltVideoEditorGeometry(
   await dock.click();
   await expect(dock).toHaveAttribute('aria-pressed', 'false');
 
-  expect(geometry.preview.right - geometry.preview.left).toBeLessThan(defaultPreviewWidth);
+  expect(geometry.preview.right - geometry.preview.left).toBeCloseTo(defaultPreviewWidth, 0);
 
   const divider = page.locator('[data-ui="video-editor.floating.context-inspector.resize"]');
   await divider.focus();
@@ -717,10 +720,7 @@ test('video editor keeps webcam independent with camera timeline and inspector c
   expect(geometry.preview.right).toBeLessThanOrEqual(geometry.inspector.left);
   expect(geometry.timeline.right).toBeGreaterThanOrEqual(geometry.inspector.right);
   expect(geometry.inspector.bottom).toBeLessThanOrEqual(geometry.timeline.top);
-  const dock = inspector.getByRole('button', {
-    name: translate('videoEditor.sidebar.fullHeightInspector', 'ru'),
-    exact: true,
-  });
+  const dock = inspector.locator('[data-ui="video-editor.inspector.dock-toggle"]');
   await dock.click();
   await expect(dock).toHaveAttribute('aria-pressed', 'true');
   await expect(cameraGroup).toHaveAttribute('aria-pressed', 'true');
@@ -728,7 +728,10 @@ test('video editor keeps webcam independent with camera timeline and inspector c
   const divider = page.locator('[data-ui="video-editor.floating.context-inspector.resize"]');
   await divider.focus();
   for (let step = 0; step < 12; step++) await page.keyboard.press('ArrowLeft');
-  await expect(divider).toHaveAttribute('aria-valuenow', '520');
+  await expect(divider).toHaveAttribute(
+    'aria-valuenow',
+    (await divider.getAttribute('aria-valuemax'))!
+  );
   const zoomButtonBounds = await page
     .locator('[data-ui="video-editor.timeline.toolbar.add-zoom"]')
     .evaluate((element) => {

@@ -49,6 +49,18 @@ function createInsertionActions() {
 
 function createToolbarProps(): ProjectTimelineToolbarTestProps {
   return {
+    playback: {
+      currentTime: 0,
+      duration: 8,
+      isPlaying: false,
+      playbackRange: null,
+      onClearPlaybackRange: vi.fn(),
+      onSeekToEnd: vi.fn(),
+      onSeekToStart: vi.fn(),
+      onTogglePlay: vi.fn(),
+      onStepToNextFrame: vi.fn(),
+      onStepToPreviousFrame: vi.fn(),
+    },
     canAutoTransformRecording: true,
     canAddMotionRegion: true,
     canEditSelectedClip: true,
@@ -67,9 +79,13 @@ function createToolbarProps(): ProjectTimelineToolbarTestProps {
     selectedClip: true,
     trackView: {
       compactRows: false,
-      panelExpanded: false,
+      cursorLaneVisible: false,
+      telemetryLaneVisible: false,
+      canShowCursorLane: true,
+      canShowTelemetryLane: true,
       onCompactRowsChange: vi.fn(),
-      onPanelExpandedChange: vi.fn(),
+      onCursorLaneVisibleChange: vi.fn(),
+      onTelemetryLaneVisibleChange: vi.fn(),
     },
     visibleRangeSeconds: 8,
   };
@@ -88,20 +104,20 @@ function renderToolbar() {
   return nextContainer;
 }
 
-it('keeps timeline tools in two regions without duplicating viewer transport', () => {
+it('keeps editing, playback and view controls together in the timeline header', () => {
   const renderedContainer = renderToolbar();
 
   const toolbar = renderedContainer.firstElementChild as HTMLDivElement | null;
   const regions = toolbar ? Array.from(toolbar.children) : [];
   expect(regions[0]?.textContent).not.toContain('videoEditor.timeline.addButton');
-  expect(regions[0]?.textContent).toContain('videoEditor.timeline.addTrack');
+  expect(regions[0]?.textContent).not.toContain('videoEditor.timeline.addTrack');
   expect(regions[0]?.textContent).toContain('videoEditor.timeline.addZoomRegion');
   expect(regions[0]?.textContent).toContain('videoEditor.timeline.split');
-  expect(regions).toHaveLength(2);
-  expect(toolbar?.querySelector('[data-playback-counter]')).toBeNull();
-  expect(regions[1]?.textContent).not.toContain('videoEditor.timeline.telemetryToggle');
+  expect(regions).toHaveLength(3);
+  expect(toolbar?.querySelector('[data-playback-counter]')).not.toBeNull();
+  expect(regions[2]?.textContent).not.toContain('videoEditor.timeline.telemetryToggle');
   expect(
-    regions[1]?.querySelector('[data-ui="video-editor.timeline.toolbar.fit-project"]')
+    regions[2]?.querySelector('[data-ui="video-editor.timeline.toolbar.fit-project"]')
   ).not.toBeNull();
-  expect(regions[1]?.querySelector('input[aria-label="videoEditor.timeline.zoom"]')).not.toBeNull();
+  expect(regions[2]?.querySelector('input[aria-label="videoEditor.timeline.zoom"]')).not.toBeNull();
 });

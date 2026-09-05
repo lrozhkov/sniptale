@@ -42,7 +42,7 @@ export function VideoEditorLibraryPanel({
       role="presentation"
       backdropClassName="!bg-[color:color-mix(in_srgb,var(--sniptale-color-overlay)_48%,transparent)]"
       dialogClassName={[
-        '!bottom-0 !left-0 !top-0 !h-screen !translate-x-0 !translate-y-0 !rounded-none',
+        '!bottom-0 !left-0 !top-0 !h-screen !transform-none !rounded-none',
         '!border-l-0 !bg-[color:var(--sniptale-color-surface-canvas)]',
       ].join(' ')}
     >

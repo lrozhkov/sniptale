@@ -25,7 +25,6 @@ import { VideoEditorSelectionKind, type VideoEditorSelection } from '../../contr
 import type { WorkspaceSidebarPanelContentSharedProps } from './contracts/panel-content';
 import type { WorkspaceSidebarProps } from './contracts/props';
 import { getClipTypeLabel } from '../../chrome/display';
-import { getVideoTrackKindLabel } from './track-kind-label';
 
 interface WorkspaceSidebarPanelContentProps extends WorkspaceSidebarPanelContentSharedProps {
   selectionTitle: string;
@@ -116,10 +115,9 @@ export function WorkspaceSidebarHeader({
   inspectorMode,
   selectionIcon,
   selectionTitle,
-  selectedTrack,
 }: WorkspaceSidebarHeaderProps) {
   const headerClassName = [
-    'flex shrink-0 flex-col border-b border-[color:var(--sniptale-color-border-soft)]',
+    'flex shrink-0 flex-col',
     'bg-[color:var(--sniptale-color-surface-panel)]',
   ].join(' ');
 
@@ -127,7 +125,6 @@ export function WorkspaceSidebarHeader({
     <div className={headerClassName}>
       <WorkspaceSidebarHeaderTitleRow
         inspectorMode={inspectorMode}
-        selectedTrack={selectedTrack}
         selectionIcon={selectionIcon}
         selectionTitle={selectionTitle}
       />
@@ -137,33 +134,25 @@ export function WorkspaceSidebarHeader({
 
 function WorkspaceSidebarHeaderTitleRow({
   inspectorMode,
-  selectedTrack,
   selectionIcon,
   selectionTitle,
-}: Pick<
-  WorkspaceSidebarHeaderProps,
-  'inspectorMode' | 'selectedTrack' | 'selectionIcon' | 'selectionTitle'
->) {
+}: Pick<WorkspaceSidebarHeaderProps, 'inspectorMode' | 'selectionIcon' | 'selectionTitle'>) {
   return (
     <div
-      className="flex min-h-14 w-full min-w-0 items-center gap-3 px-3"
+      className="flex h-9 w-full min-w-0 items-center gap-2 px-2.5"
       data-ui="video-editor.workspace.sidebar-header-title-row"
     >
       <span
         className={[
-          'flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px]',
-          'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_88%,transparent)]',
+          'flex shrink-0 items-center justify-center',
           'text-[var(--sniptale-color-text-primary)]',
         ].join(' ')}
       >
         {selectionIcon}
       </span>
       <div className="min-w-0">
-        <div className="truncate text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
+        <div className="truncate text-[13px] font-semibold text-[var(--sniptale-color-text-primary)]">
           {getInspectorHeaderTitle(inspectorMode, selectionTitle)}
-        </div>
-        <div className="truncate text-xs uppercase tracking-[0.12em] text-[var(--sniptale-color-text-dim)]">
-          {getInspectorHeaderSubtitle(inspectorMode, selectedTrack)}
         </div>
       </div>
     </div>
@@ -179,19 +168,5 @@ function getInspectorHeaderTitle(
       return translate('videoEditor.sidebar.gridSettingsTitle');
     case 'selection':
       return selectionTitle;
-  }
-}
-
-function getInspectorHeaderSubtitle(
-  inspectorMode: WorkspaceSidebarProps['inspectorMode'],
-  selectedTrack: WorkspaceSidebarProps['selectedTrack']
-) {
-  switch (inspectorMode) {
-    case 'grid':
-      return translate('videoEditor.sidebar.gridSettingsSubtitle');
-    case 'selection':
-      return selectedTrack
-        ? `${translate('videoEditor.sidebar.trackPrefix')} ${getVideoTrackKindLabel(selectedTrack.kind)}`
-        : translate('videoEditor.sidebar.projectInspector');
   }
 }

@@ -53,7 +53,14 @@ it('hides the context inspector when the inspector rail state is collapsed', () 
   const markup = renderToStaticMarkup(
     <VideoEditorFloatingInspectorStack
       diagnosticsContent={null}
-      resize={{ width: 344, onPointerDown: vi.fn(), onKeyDown: vi.fn() }}
+      resize={{
+        width: 344,
+        min: 280,
+        max: 520,
+        onDoubleClick: vi.fn(),
+        onPointerDown: vi.fn(),
+        onKeyDown: vi.fn(),
+      }}
     />
   );
 
@@ -66,7 +73,14 @@ it('renders a context inspector surface without introducing a layers panel', () 
   const markup = renderToStaticMarkup(
     <VideoEditorFloatingInspectorStack
       diagnosticsContent={null}
-      resize={{ width: 344, onPointerDown: vi.fn(), onKeyDown: vi.fn() }}
+      resize={{
+        width: 344,
+        min: 280,
+        max: 520,
+        onDoubleClick: vi.fn(),
+        onPointerDown: vi.fn(),
+        onKeyDown: vi.fn(),
+      }}
     />
   );
 

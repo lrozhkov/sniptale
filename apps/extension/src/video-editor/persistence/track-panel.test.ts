@@ -29,7 +29,6 @@ function createTrackPanelPrefs(): VideoEditorTrackPanelPrefs {
     collapsedCursorLaneVisible: true,
     collapsedTelemetryLaneVisible: true,
     compactRows: true,
-    panelExpanded: false,
     trackHeightByTrackId: { 'track-a': 3 },
   };
 }
@@ -41,7 +40,6 @@ describe('video editor track panel ui-state storage reads', () => {
     localGetMock.mockResolvedValueOnce({
       'sniptale_video_editor_track_panel_prefs:project-a': {
         collapsedCursorLaneVisible: false,
-        panelExpanded: true,
         trackHeightByTrackId: {
           'track-a': 2,
           'track-old': 3,
@@ -55,7 +53,6 @@ describe('video editor track panel ui-state storage reads', () => {
       collapsedCursorLaneVisible: false,
       collapsedTelemetryLaneVisible: false,
       compactRows: false,
-      panelExpanded: true,
       trackHeightByTrackId: {
         'track-a': 2,
       },
@@ -71,7 +68,6 @@ describe('video editor track panel ui-state storage reads', () => {
       collapsedCursorLaneVisible: true,
       collapsedTelemetryLaneVisible: false,
       compactRows: false,
-      panelExpanded: false,
       trackHeightByTrackId: {},
     });
   });
@@ -92,7 +88,6 @@ describe('video editor track panel invalid storage reads', () => {
       collapsedCursorLaneVisible: true,
       collapsedTelemetryLaneVisible: false,
       compactRows: false,
-      panelExpanded: false,
       trackHeightByTrackId: {},
     });
     expect(warnSpy).toHaveBeenCalledWith(
@@ -118,7 +113,6 @@ describe('video editor track panel ui-state storage writes', () => {
         collapsedCursorLaneVisible: true,
         collapsedTelemetryLaneVisible: false,
         compactRows: false,
-        panelExpanded: true,
         trackHeightByTrackId: {},
       })
     ).resolves.toBeUndefined();

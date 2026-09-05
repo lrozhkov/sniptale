@@ -100,6 +100,7 @@ it('updates the preview pane height while vertical resize listeners are active',
 
   act(() => {
     workspaceState!.preview.handleStartVerticalResize({
+      button: 0,
       clientY: 100,
       preventDefault: vi.fn(),
     } as unknown as React.PointerEvent<HTMLDivElement>);
@@ -109,7 +110,7 @@ it('updates the preview pane height while vertical resize listeners are active',
     dispatchResizeMove(180);
   });
 
-  expect(workspaceState!.preview.paneHeight).toBe(380);
+  expect(workspaceState!.preview.paneHeight).toBe(372);
 
   act(() => {
     window.dispatchEvent(new Event('pointerup'));
@@ -119,7 +120,7 @@ it('updates the preview pane height while vertical resize listeners are active',
     dispatchResizeMove(220);
   });
 
-  expect(workspaceState!.preview.paneHeight).toBe(380);
+  expect(workspaceState!.preview.paneHeight).toBe(372);
 });
 
 it('cleans up resize listeners when the workspace unmounts mid-drag', () => {
@@ -130,6 +131,7 @@ it('cleans up resize listeners when the workspace unmounts mid-drag', () => {
   mockWorkspaceBounds(workspaceState!);
   act(() => {
     workspaceState!.preview.handleStartVerticalResize({
+      button: 0,
       clientY: 100,
       preventDefault: vi.fn(),
     } as unknown as React.PointerEvent<HTMLDivElement>);

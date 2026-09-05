@@ -5,17 +5,30 @@ import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 
 import { translate } from '../../../platform/i18n';
 
-export function EffectsLibraryHeader(props: { onClose(): void }): React.JSX.Element {
+export function EffectsLibraryHeader(props: {
+  onClose(): void;
+  action?: React.ReactNode;
+}): React.JSX.Element {
   return (
-    <header className="flex items-start justify-between gap-3">
-      <div>
-        <h2 className="text-base font-semibold">{translate('videoEditor.effectsLibrary.title')}</h2>
-        <p className="text-xs text-[var(--sniptale-color-text-muted)]">
-          {translate('videoEditor.effectsLibrary.description')}
-        </p>
-      </div>
-      <EditorIconButton title={translate('common.actions.close')} onClick={props.onClose}>
-        <X size={16} strokeWidth={2} />
+    <header
+      className={[
+        'flex h-9 shrink-0 items-center justify-between gap-1 border-b',
+        'border-[color:var(--sniptale-color-border-soft)] px-2.5',
+      ].join(' ')}
+    >
+      <h2
+        className="min-w-0 flex-1 truncate text-[13px] font-semibold"
+        title={translate('videoEditor.effectsLibrary.description')}
+      >
+        {translate('videoEditor.effectsLibrary.title')}
+      </h2>
+      {props.action}
+      <EditorIconButton
+        className="!h-6 !w-6"
+        title={translate('common.actions.close')}
+        onClick={props.onClose}
+      >
+        <X size={14} strokeWidth={2} />
       </EditorIconButton>
     </header>
   );

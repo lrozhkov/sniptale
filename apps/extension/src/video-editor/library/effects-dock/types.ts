@@ -7,6 +7,7 @@ export type VideoEditorEffectCatalogItem =
   | { packId: string; status: 'invalid' };
 
 export interface VideoEditorEffectsLibraryDockProps {
+  headerAction?: React.ReactNode;
   catalogs: readonly VideoEditorEffectCatalogItem[];
   currentTime: number;
   errorCode: string | null;

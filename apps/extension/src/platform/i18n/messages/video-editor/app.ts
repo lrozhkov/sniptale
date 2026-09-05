@@ -1,6 +1,14 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorAppMessages = defineMessageSource({
+  panelFullHeight: { ru: 'Развернуть панель по высоте', en: 'Expand panel to full height' },
+  panelRestoreHeight: {
+    ru: 'Вернуть панель к высоте просмотра',
+    en: 'Restore panel to viewer height',
+  },
+  trackOrder: { ru: 'Порядок дорожки', en: 'Track order' },
+  resizeMaterials: { ru: 'Ширина материалов', en: 'Materials width' },
+  resizeTimeline: { ru: 'Высота просмотра', en: 'Viewer height' },
   sourceInLabel: { ru: 'In', en: 'In' },
   sourceOutLabel: { ru: 'Out', en: 'Out' },
   sourceViewer: { ru: 'Исходник', en: 'Source' },

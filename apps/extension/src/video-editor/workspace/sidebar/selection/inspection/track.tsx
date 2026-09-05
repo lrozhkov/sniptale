@@ -1,7 +1,7 @@
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { SelectionEmptyState } from './helpers';
 import { PANEL_SECTION_CLASS_NAME } from '../shared/panel';
-import { TrackGeneralFields, TrackPanelDeleteButton } from '../track/sections';
+import { TrackGeneralFields, TrackLayoutFields, TrackPanelDeleteButton } from '../track/sections';
 import { isVideoEditorPresentedTrack } from '../../../../project/operations/presented-tracks';
 
 export function InspectTrackPanel({
@@ -42,6 +42,7 @@ function TrackInspectorContent(props: {
         onToggleTrackLock={props.onToggleTrackLock}
         onToggleTrackVisibility={props.onToggleTrackVisibility}
       />
+      <TrackLayoutFields track={props.selectedTrack} />
       <TrackPanelDeleteButton
         canDeleteTrack={!props.selectedTrack.isRoot}
         trackId={props.selectedTrack.id}

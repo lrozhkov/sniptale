@@ -36,7 +36,7 @@ export function ProjectTimelineTrackRow({
     <div
       className={[
         'relative flex items-center border-b border-[color:var(--sniptale-color-border-subtle)] transition',
-        compactRows ? 'justify-center px-1' : 'gap-2 px-3',
+        compactRows ? 'gap-1 px-2' : 'gap-2 px-3',
         isSelected
           ? 'bg-[color:var(--sniptale-color-surface-panel)]'
           : 'hover:bg-[color:var(--sniptale-color-surface-panel)]',
@@ -50,13 +50,11 @@ export function ProjectTimelineTrackRow({
         trackLabel={trackLabel}
         onSelectTrack={onSelectTrack}
       />
-      {compactRows ? null : (
-        <ProjectTimelineTrackStateControls
-          track={track}
-          onToggleTrackLock={onToggleTrackLock}
-          onToggleTrackVisibility={onToggleTrackVisibility}
-        />
-      )}
+      <ProjectTimelineTrackStateControls
+        track={track}
+        onToggleTrackLock={onToggleTrackLock}
+        onToggleTrackVisibility={onToggleTrackVisibility}
+      />
     </div>
   );
 }
@@ -78,22 +76,20 @@ function ProjectTimelineTrackMeta({
       data-ui="video-editor.timeline.track-select"
       className={[
         'flex min-w-0 items-center',
-        compactRows ? '' : 'flex-1 gap-2 text-left',
+        compactRows ? 'flex-1 gap-1 text-left' : 'flex-1 gap-2 text-left',
         TRACK_SELECT_FOCUS_CLASS_NAME,
       ].join(' ')}
       onClick={() => onSelectTrack(track.id)}
     >
       <TimelineLaneIconFrame>{getTrackIcon(track)}</TimelineLaneIconFrame>
-      {compactRows ? null : (
-        <>
-          <span className="shrink-0 text-[10px] font-semibold tabular-nums text-[var(--sniptale-color-text-dim)]">
-            {trackLabel}
-          </span>
-          <span className="truncate text-xs font-semibold text-[var(--sniptale-color-text-primary)]">
-            {track.name || getTrackKindLabel(track.kind)}
-          </span>
-        </>
-      )}
+      <>
+        <span className="shrink-0 text-[10px] font-semibold tabular-nums text-[var(--sniptale-color-text-dim)]">
+          {trackLabel}
+        </span>
+        <span className="truncate text-xs font-semibold text-[var(--sniptale-color-text-primary)]">
+          {track.name || getTrackKindLabel(track.kind)}
+        </span>
+      </>
     </button>
   );
 }

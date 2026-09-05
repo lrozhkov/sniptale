@@ -10,6 +10,7 @@ import { VideoProjectClipType } from '../../../features/video/project/types';
 import type { EffectLibraryOperations } from '../../library/effects-dock/operations';
 
 export function VideoEditorWorkspaceEffectsLibrary(props: {
+  headerAction?: React.ReactNode;
   effectBundles: WorkspaceEffectBundlesState;
   effectOperations: EffectLibraryOperations;
   isOpen: boolean;
@@ -29,6 +30,7 @@ export function VideoEditorWorkspaceEffectsLibrary(props: {
   );
   return (
     <VideoEditorEffectsLibraryDock
+      headerAction={props.headerAction}
       catalogs={props.effectBundles.catalogs}
       currentTime={preview.transport.currentTime}
       errorCode={props.effectBundles.errorCode}

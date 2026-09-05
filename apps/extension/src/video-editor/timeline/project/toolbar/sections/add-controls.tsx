@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { useGlassSelectOverlay } from '@sniptale/ui/glass-select/overlay-state';
+import {
+  resolveThemeSafePortalTarget,
+  useResolvedPortalTheme,
+} from '@sniptale/ui/theme/safe-portal';
 import { ChevronDown, Music, Plus, StickyNote, Video, ZoomIn } from 'lucide-react';
 import { translate } from '../../../../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -36,8 +42,6 @@ export function ProjectTimelineAddControls(props: {
   insertion: ProjectTimelineInsertionActions;
   canAddMotionRegion: boolean;
 }) {
-  const trackChoices = useTrackChoicesMenuState();
-
   return (
     <div className="flex min-w-0 shrink-0 flex-nowrap items-center gap-1">
       <ContentToolbarButton
@@ -49,31 +53,46 @@ export function ProjectTimelineAddControls(props: {
         dataUi="video-editor.timeline.toolbar.add-zoom"
       >
         <ZoomIn size={14} strokeWidth={2} />
-        <span>{translate('videoEditor.timeline.addZoomRegion')}</span>
+        <span className="@max-[1100px]/timeline:sr-only">
+          {translate('videoEditor.timeline.addZoomRegion')}
+        </span>
       </ContentToolbarButton>
-      <div ref={trackChoices.menuRootRef} className="relative">
-        <ContentToolbarButton
-          ref={trackChoices.triggerRef}
-          type="button"
-          onClick={trackChoices.toggle}
-          className={toolbarButtonClassName}
-          title={translate('videoEditor.timeline.addTrack')}
-          aria-expanded={trackChoices.visible}
-          dataUi="video-editor.timeline.toolbar.add-track"
-        >
-          <Plus size={14} strokeWidth={2} />
-          <span>{translate('videoEditor.timeline.addTrack')}</span>
-          <ChevronDown size={12} strokeWidth={2.2} />
-        </ContentToolbarButton>
-        {trackChoices.visible ? (
-          <div
-            className="absolute left-0 top-[calc(100%+6px)] z-40 min-w-[14rem]"
-            data-ui="video-editor.timeline.toolbar.add-track.choices"
-          >
-            <TrackKindChoiceGroup insertion={props.insertion} onClose={trackChoices.close} />
-          </div>
-        ) : null}
-      </div>
+    </div>
+  );
+}
+
+export function ProjectTimelineAddTrackControl(props: {
+  onAddTrack: ProjectTimelineInsertionActions['onAddTrack'];
+}) {
+  const trackChoices = useTrackChoicesMenuState();
+  return (
+    <div ref={trackChoices.menuRootRef} className="relative">
+      <ContentToolbarButton
+        ref={trackChoices.triggerRef}
+        type="button"
+        onClick={trackChoices.toggle}
+        className={toolbarButtonClassName}
+        title={translate('videoEditor.timeline.addTrack')}
+        aria-expanded={trackChoices.visible}
+        dataUi="video-editor.timeline.toolbar.add-track"
+      >
+        <Plus size={14} strokeWidth={2} />
+        <span className="sr-only">{translate('videoEditor.timeline.addTrack')}</span>
+        <ChevronDown size={12} strokeWidth={2.2} />
+      </ContentToolbarButton>
+      {trackChoices.visible
+        ? createPortal(
+            <div
+              ref={trackChoices.menuRef}
+              style={{ ...trackChoices.portalStyle, width: 280 }}
+              data-theme={trackChoices.theme ?? undefined}
+              data-ui="video-editor.timeline.toolbar.add-track.choices"
+            >
+              <TrackKindChoiceGroup onAddTrack={props.onAddTrack} onClose={trackChoices.close} />
+            </div>,
+            resolveThemeSafePortalTarget(trackChoices.triggerRef.current)
+          )
+        : null}
     </div>
   );
 }
@@ -81,68 +100,72 @@ export function ProjectTimelineAddControls(props: {
 function useTrackChoicesMenuState() {
   const [visible, setVisible] = useState(false);
   const menuRootRef = useRef<HTMLDivElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
-
   const close = useCallback((restoreFocus = false) => {
     setVisible(false);
-    if (restoreFocus) {
-      triggerRef.current?.focus();
-    }
+    if (restoreFocus) triggerRef.current?.focus();
   }, []);
-
+  const setOpen = useCallback((next: boolean | ((current: boolean) => boolean)) => {
+    setVisible(next);
+    if (next === false) triggerRef.current?.focus();
+  }, []);
+  const { portalStyle } = useGlassSelectOverlay({
+    portal: true,
+    isOpen: visible,
+    setIsOpen: setOpen,
+    containerRef: menuRootRef,
+    menuRef,
+  });
+  const theme = useResolvedPortalTheme(triggerRef.current);
   useEffect(() => {
-    if (!visible) {
-      return;
-    }
-
-    return bindTrackChoicesDismissHandlers(menuRootRef, close);
-  }, [close, visible]);
-
+    if (!visible) return;
+    const timeline = menuRootRef.current?.closest('[data-ui="video-editor.timeline.surface"]');
+    if (!timeline) return;
+    const width = timeline.getBoundingClientRect().width;
+    const observer = new ResizeObserver(() => {
+      if (timeline.getBoundingClientRect().width !== width) close(true);
+    });
+    observer.observe(timeline);
+    return () => observer.disconnect();
+  }, [visible, close]);
   return {
     close,
     menuRootRef,
+    menuRef,
+    portalStyle,
+    theme,
     triggerRef,
     toggle: () => setVisible((open) => !open),
     visible,
   };
 }
 
-function bindTrackChoicesDismissHandlers(
-  menuRootRef: RefObject<HTMLDivElement | null>,
-  close: (restoreFocus?: boolean) => void
-) {
-  const closeMenu = (event: PointerEvent) => {
-    if (!menuRootRef.current?.contains(event.target as Node)) {
-      close();
-    }
-  };
-  const closeOnEscape = (event: KeyboardEvent) => {
-    if (event.key === 'Escape') {
-      close(true);
-    }
-  };
-
-  document.addEventListener('pointerdown', closeMenu);
-  document.addEventListener('keydown', closeOnEscape);
-  return () => {
-    document.removeEventListener('pointerdown', closeMenu);
-    document.removeEventListener('keydown', closeOnEscape);
-  };
-}
-
 function TrackKindChoiceGroup(props: {
-  insertion: ProjectTimelineInsertionActions;
+  onAddTrack: ProjectTimelineInsertionActions['onAddTrack'];
   onClose: (restoreFocus?: boolean) => void;
 }) {
   return (
-    <ProductToolbarMenu compact title={translate('videoEditor.timeline.addTrackMenuTitle')}>
+    <ProductToolbarMenu
+      compact
+      className="overflow-hidden rounded-xl"
+      style={{
+        position: 'relative',
+        top: 'auto',
+        left: 'auto',
+        width: '100%',
+        minWidth: 0,
+        animation: 'none',
+      }}
+      title={translate('videoEditor.timeline.addTrackMenuTitle')}
+    >
       {TRACK_MENU_OPTIONS.map((option) => (
         <ProductToolbarMenuItem
           key={option.kind}
           type="button"
           dataUi={`video-editor.timeline.toolbar.add-track.${option.kind.toLowerCase()}`}
           onClick={() => {
-            props.insertion.onAddTrack(option.kind);
+            props.onAddTrack(option.kind);
             props.onClose(true);
           }}
         >

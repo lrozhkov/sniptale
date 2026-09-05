@@ -14,6 +14,7 @@ const MATERIAL_IMPORT_OPTIONS = [
 ] as const;
 
 export function VideoEditorMaterials(props: {
+  headerAction?: React.ReactNode;
   project: VideoProject;
   onImport: PreviewStageImportHandlers;
   selectedAssetId: string | null;
@@ -37,17 +38,20 @@ export function VideoEditorMaterials(props: {
     }
   };
   return (
-    <aside data-ui="video-editor.materials" className="h-full w-52 min-w-0 shrink-0 pr-2">
+    <aside data-ui="video-editor.materials" className="h-full min-w-0">
       <FloatingChromePanel className="h-full overflow-hidden">
-        <div className="flex h-full min-h-0 flex-col gap-1.5 p-2.5" aria-busy={pending}>
-          <h2 className="text-[13px] font-semibold">
-            {translate('videoEditor.app.materialsTitle')}
-          </h2>
-          {props.project.assets.length === 0 && (
-            <p className="text-xs text-[var(--sniptale-color-text-muted)]">
-              {translate('videoEditor.app.materialsHint')}
-            </p>
-          )}
+        <div className="flex h-full min-h-0 flex-col" aria-busy={pending}>
+          <div
+            className={[
+              'flex h-9 shrink-0 items-center justify-between gap-2 border-b',
+              'border-[color:var(--sniptale-color-border-soft)] px-2.5',
+            ].join(' ')}
+          >
+            <h2 className="text-[13px] font-semibold">
+              {translate('videoEditor.app.materialsTitle')}
+            </h2>
+            {props.headerAction}
+          </div>
           <VideoEditorFileInputNodes
             audioInputRef={audioInputRef}
             imageInputRef={imageInputRef}
@@ -56,7 +60,12 @@ export function VideoEditorMaterials(props: {
             onImportImage={(file) => void importFile('image', file)}
             onImportVideo={(file) => void importFile('video', file)}
           />
-          <div className="flex flex-wrap gap-1">
+          <div
+            className={[
+              'flex shrink-0 items-center gap-1 border-b',
+              'border-[color:var(--sniptale-color-border-soft)] px-2 py-1',
+            ].join(' ')}
+          >
             {MATERIAL_IMPORT_OPTIONS.map(({ kind, icon: Icon, labelKey }) => (
               <ProductActionButton
                 key={kind}
@@ -72,9 +81,14 @@ export function VideoEditorMaterials(props: {
             ))}
           </div>
           {pending && <p role="status">{translate('videoEditor.app.materialsLoading')}</p>}
-          <div className="min-h-10 flex-1 space-y-1 overflow-y-auto">
+          <div className="min-h-10 flex-1 space-y-1 overflow-y-auto p-2">
             {props.project.assets.length === 0 && (
-              <p className="text-sm">{translate('videoEditor.app.materialsEmpty')}</p>
+              <div className="px-1 py-4 text-center">
+                <p className="text-xs font-medium">{translate('videoEditor.app.materialsEmpty')}</p>
+                <p className="mt-2 text-xs text-[var(--sniptale-color-text-muted)]">
+                  {translate('videoEditor.app.materialsHint')}
+                </p>
+              </div>
             )}
             {props.project.assets.map((asset) => (
               <ProductActionButton

@@ -59,6 +59,10 @@ export interface ProjectTimelineProps {
   selectedTrackId: string | null;
   telemetryLaneVisible: boolean;
   timelinePreviews: TimelineClipPreviewMap;
+  onClearPlaybackRange: () => void;
+  onSeekToEnd: () => void;
+  onSeekToStart: () => void;
+  onTogglePlay: () => void;
   onStepToNextFrame: () => void;
   onStepToPreviousFrame: () => void;
   onSeek: (time: number) => void;
@@ -90,8 +94,6 @@ export interface ProjectTimelineProps {
   onUpdateSelectedClipPlaybackRate: (playbackRate: number) => void;
   onAutoTransformRecording: (settings: VideoAutoProcessingSettings) => void;
   onDeleteSelectedTimelineObject: () => void;
-  onDeleteTrack: (trackId: string) => void;
-  onMoveTrack: (trackId: string, direction: 'up' | 'down') => void;
   onToggleUtilityLaneVisibility: (lane: VideoProjectUtilityLaneKind) => void;
   onToggleUtilityLaneLock: (lane: VideoProjectUtilityLaneKind) => void;
   onClearUtilityLane: (lane: VideoProjectUtilityLaneKind) => void;

@@ -1,8 +1,9 @@
+import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoEditorWorkspaceMain } from './main';
 import { createHeaderController, createPreviewController } from './main.test-support';
 
@@ -181,7 +182,7 @@ function createSidebarState() {
       onSetSnapEnabled: vi.fn(),
     },
     inspectorMode: 'selection',
-    project: { id: 'project-1' },
+    project: { ...createEmptyVideoProject('Workspace'), id: 'project-1' },
     projects: [],
     recordingId: 'recording-1',
     recordings: [],
@@ -257,7 +258,7 @@ function createTimelineState() {
     magnetEnabled: true,
     pixelsPerSecond: 110,
     playbackRange: null,
-    project: { id: 'project-1' },
+    project: { ...createEmptyVideoProject('Workspace'), id: 'project-1' },
     selection: { kind: 'scene' },
     selectedClipId: 'clip-1',
     selectedTrackId: 'track-1',
@@ -314,6 +315,17 @@ function verifyWorkspaceMainRouting() {
   expectWorkspaceMarkup(markup);
 }
 
+beforeEach(() => {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
+});
+afterEach(() => vi.unstubAllGlobals());
+
 describe('VideoEditorWorkspaceMain', () => {
   afterEach(() => {
     floatingWorkspaceSpy.mockReset();
@@ -344,5 +356,74 @@ it('releases Source input ownership when Undo removes its source asset', async (
     act(() => root.unmount());
     hookMocks.sourceActive = false;
     hookMocks.setSourceActive.mockClear();
+  }
+});
+
+it('continues measuring the visible frame after switching projects', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  let frameWidth = 1280;
+  const observers: Array<{ target: Element | null; notify: () => void }> = [];
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      entry: { target: Element | null; notify: () => void };
+      constructor(notify: () => void) {
+        this.entry = { target: null, notify };
+        observers.push(this.entry);
+      }
+      observe(target: Element) {
+        this.entry.target = target;
+      }
+      disconnect() {
+        this.entry.target = null;
+      }
+    }
+  );
+  const bounds = vi
+    .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+    .mockImplementation(() => ({
+      width: frameWidth,
+      height: 720,
+      top: 0,
+      bottom: 720,
+      left: 0,
+      right: frameWidth,
+      x: 0,
+      y: 0,
+      toJSON() {},
+    }));
+  const container = document.createElement('div');
+  document.body.append(container);
+  const root = createRoot(container);
+  const render = () =>
+    root.render(<VideoEditorWorkspaceMain diagnosticsContent={null} previewHeightStyle={{}} />);
+  try {
+    hookMocks.controller = createWorkspaceController();
+    await act(async () => render());
+    expect(inspectorSpy.mock.lastCall?.[0].resize.max).toBe(360);
+    const next = createWorkspaceController();
+    (
+      next.timeline as unknown as { state: ReturnType<typeof createTimelineState> }
+    ).state.project.id = 'project-2';
+    hookMocks.controller = next;
+    await act(async () => render());
+    frameWidth = 1920;
+    act(() =>
+      observers.forEach(({ target, notify }) => {
+        if (target?.isConnected) notify();
+      })
+    );
+    expect(inspectorSpy.mock.lastCall?.[0].resize.max).toBe(520);
+    frameWidth = 1280;
+    act(() =>
+      observers.forEach(({ target, notify }) => {
+        if (target?.isConnected) notify();
+      })
+    );
+    expect(inspectorSpy.mock.lastCall?.[0].resize.max).toBe(360);
+  } finally {
+    act(() => root.unmount());
+    container.remove();
+    bounds.mockRestore();
   }
 });

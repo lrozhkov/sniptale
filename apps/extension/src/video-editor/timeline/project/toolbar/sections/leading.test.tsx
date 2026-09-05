@@ -1,3 +1,4 @@
+import { ProjectTimelineAddTrackControl } from './add-controls';
 // @vitest-environment jsdom
 
 import { act } from 'react';
@@ -18,6 +19,13 @@ let root: Root | null = null;
 
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
 });
 
 afterEach(() => {
@@ -52,31 +60,34 @@ function renderLeadingControls(options?: {
 
   act(() => {
     root?.render(
-      <ProjectTimelineToolbarLeadingControls
-        canAddMotionRegion={options?.canAddMotionRegion ?? true}
-        canAutoTransformRecording={options?.canAutoTransformRecording ?? false}
-        canEditSelectedClip={options?.canEditSelectedClip ?? options?.selectedClip ?? false}
-        canSplitSelectedClip={options?.canSplitSelectedClip ?? options?.selectedClip ?? false}
-        insertion={{
-          onAddActionEvent: vi.fn(),
-          onAddMotionRegion: handlers.onAddMotionRegion,
-          onAddShapeOverlay: vi.fn(),
-          onAddTextOverlay: vi.fn(),
-          onAddTrack: handlers.onAddTrack,
-          onEnableCursorTrack: vi.fn(),
-          onImport: {
-            audio: vi.fn(),
-            image: vi.fn(),
-            video: vi.fn(),
-          },
-          onUnsupportedFileDrop: vi.fn(),
-        }}
-        selectedClip={options?.selectedClip ?? false}
-        onAutoTransformRecording={handlers.onToggleTelemetryLaneVisibility}
-        onDeleteSelectedClip={vi.fn()}
-        onDuplicateSelectedClip={vi.fn()}
-        onSplitSelectedClip={handlers.onZoomChange}
-      />
+      <>
+        <ProjectTimelineAddTrackControl onAddTrack={handlers.onAddTrack} />
+        <ProjectTimelineToolbarLeadingControls
+          canAddMotionRegion={options?.canAddMotionRegion ?? true}
+          canAutoTransformRecording={options?.canAutoTransformRecording ?? false}
+          canEditSelectedClip={options?.canEditSelectedClip ?? options?.selectedClip ?? false}
+          canSplitSelectedClip={options?.canSplitSelectedClip ?? options?.selectedClip ?? false}
+          insertion={{
+            onAddActionEvent: vi.fn(),
+            onAddMotionRegion: handlers.onAddMotionRegion,
+            onAddShapeOverlay: vi.fn(),
+            onAddTextOverlay: vi.fn(),
+            onAddTrack: handlers.onAddTrack,
+            onEnableCursorTrack: vi.fn(),
+            onImport: {
+              audio: vi.fn(),
+              image: vi.fn(),
+              video: vi.fn(),
+            },
+            onUnsupportedFileDrop: vi.fn(),
+          }}
+          selectedClip={options?.selectedClip ?? false}
+          onAutoTransformRecording={handlers.onToggleTelemetryLaneVisibility}
+          onDeleteSelectedClip={vi.fn()}
+          onDuplicateSelectedClip={vi.fn()}
+          onSplitSelectedClip={handlers.onZoomChange}
+        />
+      </>
     );
   });
 
@@ -84,7 +95,7 @@ function renderLeadingControls(options?: {
 }
 
 function getButtonByText(label: string): HTMLButtonElement {
-  const button = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+  const button = Array.from(document.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
     (item) => item.textContent?.includes(label)
   );
 
@@ -193,7 +204,7 @@ it('wires clip actions from the leading side', () => {
   expect(handlers.onZoomChange).toHaveBeenCalledTimes(1);
 });
 
-it('wires track creation from the leading side', () => {
+it('wires track creation from the track header control', () => {
   const handlers = renderLeadingControls();
   const trigger = getButtonByText('videoEditor.timeline.addTrack');
 
@@ -202,16 +213,16 @@ it('wires track creation from the leading side', () => {
   });
 
   expect(handlers.onAddTrack).not.toHaveBeenCalled();
-  expect(container?.querySelector('.sniptale-toolbar-menu')).not.toBeNull();
-  expect(container?.textContent).toContain('videoEditor.timeline.addVideoTrack');
-  expect(container?.textContent).toContain('videoEditor.timeline.addVideoTrackNote');
-  expect(container?.textContent).toContain('videoEditor.timeline.addAudioTrack');
-  expect(container?.textContent).toContain('videoEditor.timeline.addAudioTrackNote');
-  expect(container?.textContent).toContain('videoEditor.timeline.addOverlayTrack');
-  expect(container?.textContent).toContain('videoEditor.timeline.addOverlayTrackNote');
-  expect(container?.textContent).not.toContain('videoEditor.timeline.addSubtitleTrack');
+  expect(document.querySelector('.sniptale-toolbar-menu')).not.toBeNull();
+  expect(document.body.textContent).toContain('videoEditor.timeline.addVideoTrack');
+  expect(document.body.textContent).toContain('videoEditor.timeline.addVideoTrackNote');
+  expect(document.body.textContent).toContain('videoEditor.timeline.addAudioTrack');
+  expect(document.body.textContent).toContain('videoEditor.timeline.addAudioTrackNote');
+  expect(document.body.textContent).toContain('videoEditor.timeline.addOverlayTrack');
+  expect(document.body.textContent).toContain('videoEditor.timeline.addOverlayTrackNote');
+  expect(document.body.textContent).not.toContain('videoEditor.timeline.addSubtitleTrack');
   expect(
-    container?.querySelectorAll(
+    document.querySelectorAll(
       '.sniptale-toolbar-menu-item[data-ui^="video-editor.timeline.toolbar.add-track."]'
     )
   ).toHaveLength(3);
@@ -221,7 +232,7 @@ it('wires track creation from the leading side', () => {
   });
 
   expect(handlers.onAddTrack).toHaveBeenCalledWith(VideoTrackKind.AUDIO);
-  expect(container?.querySelector('.sniptale-toolbar-menu')).toBeNull();
+  expect(document.querySelector('.sniptale-toolbar-menu')).toBeNull();
   expect(document.activeElement).toBe(trigger);
 });
 
@@ -237,7 +248,7 @@ it('restores focus to the add-track trigger when Escape dismisses the menu', () 
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
   });
 
-  expect(container?.querySelector('.sniptale-toolbar-menu')).toBeNull();
+  expect(document.querySelector('.sniptale-toolbar-menu')).toBeNull();
   expect(document.activeElement).toBe(trigger);
 });
 

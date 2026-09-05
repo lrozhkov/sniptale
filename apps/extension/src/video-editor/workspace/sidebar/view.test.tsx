@@ -29,7 +29,8 @@ it('keeps the inspector header focused on the selected object', () => {
 
   expect(markup).toContain('data-ui="video-editor.workspace.sidebar-header-title-row"');
   expect(markup).not.toContain('data-ui="video-editor.workspace.sidebar-header-groups-row"');
-  expect(markup).toContain('videoEditor.timeline.trackKindPrimary');
+  expect(markup).toContain('Свойства дорожки');
+  expect(markup).not.toContain('videoEditor.sidebar.trackPrefix');
   expect(markup).not.toContain('videoEditor.sidebar.trackPrefix Primary');
 });
 

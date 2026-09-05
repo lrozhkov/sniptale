@@ -129,13 +129,10 @@ function PlaybackSummaryMeta(props: {
 
   return (
     <div className="min-w-0 text-center">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--sniptale-color-text-muted)]">
-        {translate('videoEditor.timeline.title')}
-      </p>
       <p
         data-playback-counter="true"
         className={[
-          'min-w-[112px] text-[12px] font-semibold tabular-nums',
+          'min-w-[96px] text-[11px] font-semibold tabular-nums',
           'text-[var(--sniptale-color-text-primary)]',
         ].join(' ')}
       >
@@ -177,7 +174,7 @@ export function ProjectTimelinePlaybackSummary({
   onTogglePlay: () => void;
 }) {
   return (
-    <div className="flex min-w-0 flex-nowrap items-center justify-center gap-2.5">
+    <div className="flex shrink-0 flex-nowrap items-center justify-center gap-0.5">
       <PlaybackSeekToStartButton onSeekToStart={onSeekToStart} />
       <PlaybackFrameStepButton direction="previous" onStep={onStepToPreviousFrame} />
       <PlaybackToggleButton isPlaying={isPlaying} onTogglePlay={onTogglePlay} />

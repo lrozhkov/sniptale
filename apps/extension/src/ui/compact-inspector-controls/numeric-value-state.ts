@@ -19,6 +19,7 @@ import {
 interface NumericValueStateParams {
   max?: number | undefined;
   min?: number | undefined;
+  normalizeValue?: ((value: number) => number) | undefined;
   onCommitValue: (value: number) => void;
   onPreviewValue: (value: number) => void;
   precision?: number | undefined;
@@ -82,6 +83,7 @@ function useNumericFieldActions({
   draftState,
   max,
   min,
+  normalizeValue,
   onCommitValue,
   onPreviewValue,
   precision,
@@ -89,7 +91,7 @@ function useNumericFieldActions({
   unit,
 }: NumericValueStateParams & { draftState: NumericDraftState }) {
   const commitDraft = () => {
-    commitNumericDraft({ draftState, max, min, onCommitValue, precision, unit });
+    commitNumericDraft({ draftState, max, min, normalizeValue, onCommitValue, precision, unit });
   };
   const applyStep = (direction: 1 | -1) => {
     applyNumericStep({
@@ -97,6 +99,7 @@ function useNumericFieldActions({
       draftState,
       max,
       min,
+      normalizeValue,
       onCommitValue,
       onPreviewValue,
       precision,
@@ -123,10 +126,14 @@ function commitNumericDraft({
   draftState,
   max,
   min,
+  normalizeValue,
   onCommitValue,
   precision,
   unit,
-}: Pick<NumericValueStateParams, 'max' | 'min' | 'onCommitValue' | 'precision' | 'unit'> & {
+}: Pick<
+  NumericValueStateParams,
+  'max' | 'min' | 'normalizeValue' | 'onCommitValue' | 'precision' | 'unit'
+> & {
   draftState: NumericDraftState;
 }) {
   if (!draftState.editingRef.current) {
@@ -138,7 +145,7 @@ function commitNumericDraft({
     cancelNumericEditing(draftState);
     return;
   }
-  const next = clampNumber(parsed, min, max);
+  const next = clampNumber(normalizeValue?.(parsed) ?? parsed, min, max);
   draftState.stepValueRef.current = next;
   draftState.setEditing(false);
   draftState.setDraft(formatCompactEditNumber(next, { precision }));
@@ -150,18 +157,20 @@ function applyNumericStep({
   draftState,
   max,
   min,
+  normalizeValue,
   onCommitValue,
   onPreviewValue,
   precision,
   step,
 }: Pick<
   NumericValueStateParams,
-  'max' | 'min' | 'onCommitValue' | 'onPreviewValue' | 'precision' | 'step'
+  'max' | 'min' | 'normalizeValue' | 'onCommitValue' | 'onPreviewValue' | 'precision' | 'step'
 > & {
   direction: 1 | -1;
   draftState: NumericDraftState;
 }) {
-  const next = clampNumber(draftState.stepValueRef.current + step * direction, min, max);
+  const stepped = draftState.stepValueRef.current + step * direction;
+  const next = clampNumber(normalizeValue?.(stepped) ?? stepped, min, max);
   draftState.stepValueRef.current = next;
   draftState.setEditing(draftState.editingRef.current);
   draftState.setDraft(formatCompactEditNumber(next, { precision }));

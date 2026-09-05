@@ -8,6 +8,15 @@ import { isRecordingTelemetryEligibleForAutoProcessing } from '../../project/ope
 
 type ProjectTimelineSurfaceProps = Pick<
   ProjectTimelineProps & ReturnType<typeof useProjectTimelineState>,
+  | 'onClearPlaybackRange'
+  | 'onSeekToEnd'
+  | 'onSeekToStart'
+  | 'onTogglePlay'
+  | 'currentTime'
+  | 'isPlaying'
+  | 'playbackRange'
+  | 'onStepToNextFrame'
+  | 'onStepToPreviousFrame'
   | 'canEditSelectedClip'
   | 'canSplitSelectedClip'
   | 'fitSelectionDuration'
@@ -41,6 +50,18 @@ export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
       ].join(' ')}
     >
       <ProjectTimelineToolbar
+        playback={{
+          onClearPlaybackRange: props.onClearPlaybackRange,
+          onSeekToEnd: props.onSeekToEnd,
+          onSeekToStart: props.onSeekToStart,
+          onTogglePlay: props.onTogglePlay,
+          currentTime: props.currentTime,
+          isPlaying: props.isPlaying,
+          playbackRange: props.playbackRange,
+          onStepToNextFrame: props.onStepToNextFrame,
+          onStepToPreviousFrame: props.onStepToPreviousFrame,
+          duration: props.project.duration,
+        }}
         canAddMotionRegion={props.project.duration > 0 && motionLane.visible && !motionLane.locked}
         canEditSelectedClip={props.canEditSelectedClip}
         canSplitSelectedClip={props.canSplitSelectedClip}
@@ -50,9 +71,13 @@ export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
         selectedClip={Boolean(props.selectedClip)}
         trackView={{
           compactRows: props.panelPrefs.prefs.compactRows,
-          panelExpanded: props.panelPrefs.prefs.panelExpanded,
+          cursorLaneVisible: props.panelPrefs.prefs.collapsedCursorLaneVisible,
+          telemetryLaneVisible: props.panelPrefs.prefs.collapsedTelemetryLaneVisible,
+          canShowCursorLane: props.project.cursorTrack !== null,
+          canShowTelemetryLane: props.recordingTelemetry !== null,
           onCompactRowsChange: props.panelPrefs.setCompactRows,
-          onPanelExpandedChange: props.panelPrefs.setPanelExpanded,
+          onCursorLaneVisibleChange: props.panelPrefs.setCollapsedCursorLaneVisible,
+          onTelemetryLaneVisibleChange: props.panelPrefs.setCollapsedTelemetryLaneVisible,
         }}
         visibleRangeSeconds={props.visibleRangeSeconds}
         canAutoTransformRecording={isRecordingTelemetryEligibleForAutoProcessing(

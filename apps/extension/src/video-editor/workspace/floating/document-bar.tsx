@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Clapperboard, FolderKanban, PanelRight, Pencil, Redo2, Undo2 } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { EditorDivider, ValueBadge } from '@sniptale/ui/editor-chrome';
@@ -33,7 +34,7 @@ function VideoEditorProjectTitle({
   projectName,
 }: Pick<VideoEditorDocumentBarProps['header'], 'onRenameProject' | 'projectName'>) {
   return (
-    <label className="flex min-w-[8rem] max-w-[18rem] flex-1 items-center gap-1.5">
+    <label className="flex min-w-[6rem] max-w-[16rem] flex-1 items-center gap-1.5">
       <input
         aria-label={translate('videoEditor.app.title')}
         value={projectName}
@@ -80,7 +81,9 @@ function VideoEditorSaveStateBadge({
 
 export function VideoEditorFloatingDocumentBar({
   inspector,
+  children,
 }: {
+  children?: ReactNode;
   inspector?: { isOpen: boolean; onToggle: () => void };
 } = {}) {
   const header = useVideoEditorHeaderController();
@@ -90,7 +93,7 @@ export function VideoEditorFloatingDocumentBar({
     <div data-ui="video-editor.floating.document-bar" className={DOCUMENT_BAR_CLASS_NAME}>
       <FloatingChromeToolbar
         dataUi="video-editor.floating.document-bar.surface"
-        className="w-full flex-wrap items-center gap-1.5"
+        className="w-full flex-nowrap items-center gap-1"
       >
         <VideoEditorProjectTitle
           projectName={header.projectName}
@@ -123,8 +126,9 @@ export function VideoEditorFloatingDocumentBar({
           </span>
         ) : null}
         <EditorDivider className="mx-1 h-7" />
+        {children}
+        <EditorDivider className="mx-1 h-7" />
         <ContentToolbarButton
-          className="ml-auto"
           title={translate(
             !(inspector?.isOpen ?? !header.leftSidebarCollapsed)
               ? 'videoEditor.app.expandInspector'

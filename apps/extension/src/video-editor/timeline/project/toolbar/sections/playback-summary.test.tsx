@@ -141,7 +141,7 @@ it('uses the shared content toolbar button chrome', () => {
   const button = container?.querySelector<HTMLButtonElement>('button');
   expect(button?.dataset['ui']).toBe('shared.ui.content-toolbar-button');
   expect(button?.className).toContain('sniptale-glass-toolbar-button');
-  expect(button?.className).toContain('!w-9');
+  expect(button?.className).toContain('!w-6');
 });
 
 it('renders the active loop range when playback range is selected', () => {

@@ -21,8 +21,6 @@ type ProjectTimelineBodyProps = Pick<
   | 'insertion'
   | 'onCloseTrackGap'
   | 'onDropEffectDocument'
-  | 'onDeleteTrack'
-  | 'onMoveTrack'
   | 'onClearUtilityLane'
   | 'onSelectActionSegment'
   | 'onSelectClip'
@@ -73,23 +71,13 @@ export function ProjectTimelineBody(props: ProjectTimelineBodyProps) {
     <div
       className="grid min-h-0 flex-1 overflow-hidden"
       style={{
-        gridTemplateColumns: resolveTrackPanelGridColumns(props.trackPanelPrefs.prefs),
+        gridTemplateColumns: '220px minmax(0,1fr)',
       }}
     >
       <ProjectTimelineBodyTrackList {...props} />
       <ProjectTimelineBodyCanvas {...props} />
     </div>
   );
-}
-
-function resolveTrackPanelGridColumns(
-  prefs: ReturnType<typeof useProjectTimelinePanelPrefs>['prefs']
-): string {
-  if (prefs.compactRows) {
-    return '56px minmax(0,1fr)';
-  }
-
-  return prefs.panelExpanded ? '440px minmax(0,1fr)' : '220px minmax(0,1fr)';
 }
 
 function ProjectTimelineBodyTrackList(props: ProjectTimelineBodyProps) {
@@ -110,10 +98,9 @@ function createTrackListProps(props: ProjectTimelineBodyProps): ProjectTimelineB
     trackListRef: props.trackListRef,
     trackPanelPrefs: props.trackPanelPrefs,
     tracks: props.tracks,
+    onAddTrack: props.insertion.onAddTrack,
     onAddMotionRegion: () => props.insertion.onAddMotionRegion(),
     onClearUtilityLane: props.onClearUtilityLane,
-    onDeleteTrack: props.onDeleteTrack,
-    onMoveTrack: props.onMoveTrack,
     onScroll: () => props.syncTracksScroll('tracks'),
     onSelectTrack: props.onSelectTrack,
     onToggleTrackLock: props.onToggleTrackLock,

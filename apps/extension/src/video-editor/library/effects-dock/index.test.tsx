@@ -52,8 +52,8 @@ it('uses the compact tokenized dock and user-facing EffectV1 target labels', () 
   );
   const documentRows = container?.querySelectorAll<HTMLElement>('[draggable="true"]');
 
-  expect(dock?.className).toContain('w-[clamp(15rem,24vw,20rem)]');
-  expect(dock?.className).toContain('max-w-[calc(100vw-1.5rem)]');
+  expect(dock?.className).toContain('h-full');
+  expect(dock?.className).not.toContain('absolute');
   expect(documentRows).toHaveLength(3);
   expect(documentRows?.[0]?.className).toContain('var(--sniptale-color-surface-overlay)');
   expect(container?.textContent).toContain(

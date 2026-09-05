@@ -8,10 +8,7 @@ import { EffectImportControl, EffectsLibraryHeader } from './header';
 import type { EffectLibraryOperationError } from './operations';
 import type { VideoEditorEffectsLibraryDockProps } from './types';
 
-const EFFECT_LIBRARY_DOCK_CLASS_NAME = [
-  'relative z-20 flex h-full w-[clamp(15rem,24vw,20rem)] max-w-[calc(100vw-1.5rem)] shrink-0',
-  'max-[980px]:absolute max-[980px]:bottom-3 max-[980px]:left-3 max-[980px]:top-[4.75rem]',
-].join(' ');
+const EFFECT_LIBRARY_DOCK_CLASS_NAME = 'relative flex h-full min-h-0 min-w-0';
 
 export function VideoEditorEffectsLibraryDock(
   props: VideoEditorEffectsLibraryDockProps
@@ -25,9 +22,15 @@ export function VideoEditorEffectsLibraryDock(
         style={VIDEO_EDITOR_PANEL_STYLE}
         dataUi="video-editor.effects-library.panel"
       >
-        <div className="flex h-full min-h-0 flex-col gap-3 p-3">
-          <EffectsLibraryHeader onClose={props.onClose} />
-          <EffectImportControl disabled={disabled} onImport={props.onImportEffectFile} run={run} />
+        <div className="flex h-full min-h-0 flex-col gap-2">
+          <EffectsLibraryHeader onClose={props.onClose} action={props.headerAction} />
+          <div className="px-2">
+            <EffectImportControl
+              disabled={disabled}
+              onImport={props.onImportEffectFile}
+              run={run}
+            />
+          </div>
 
           {props.errorCode && (
             <p role="alert" className="text-xs text-[var(--sniptale-color-danger)]">
@@ -44,7 +47,7 @@ export function VideoEditorEffectsLibraryDock(
           )}
 
           <div
-            className="min-h-0 flex-1 space-y-4 overflow-y-auto"
+            className="min-h-0 flex-1 space-y-3 overflow-y-auto px-2 pb-2"
             aria-busy={disabled || props.isLoading}
           >
             <CatalogSection {...props} disabled={disabled} run={run} />
