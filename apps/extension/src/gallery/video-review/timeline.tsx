@@ -2,7 +2,7 @@ import { ReviewRuler, ReviewToolbar } from './timeline-chrome';
 import { ReviewSourceLane, ReviewRangeFields } from './timeline-selection';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { translate } from '../../platform/i18n';
-import type { ReviewAnchor, ReviewAnnotation } from '../../features/video/review/types';
+import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/video/review/types';
 import type { ReviewTelemetryMarker } from '../../features/video/review/telemetry';
 import { reviewEventLabel, reviewTimeLabel } from './controls';
 
@@ -12,6 +12,8 @@ type TimelineProps = {
   playing: boolean;
   selection: ReviewAnchor;
   annotations: readonly ReviewAnnotation[];
+  edits?: readonly ReviewEdit[];
+  onEdit?(edit: ReviewEdit): void;
   markers: readonly ReviewTelemetryMarker[];
   onSeek(time: number): void;
   onSelect(value: ReviewAnchor): void;

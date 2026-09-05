@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   open: vi.fn(),
   dispose: vi.fn(),
   duration: vi.fn(),
+  metadataDuration: vi.fn(),
 }));
 vi.mock('../../composition/persistence/media-library', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../composition/persistence/media-library')>()),
@@ -43,6 +44,7 @@ vi.mock('mediabunny', () => ({
   Input: class {
     dispose = mocks.dispose;
     computeDuration = mocks.duration;
+    getDurationFromMetadata = mocks.metadataDuration;
     async getPrimaryVideoTrack() {
       return { getDisplayWidth: async () => 360, getDisplayHeight: async () => 640 };
     }
@@ -65,6 +67,7 @@ beforeEach(() => {
     file: new File(['video'], 'clip.webm', { type: 'video/webm' }),
   });
   mocks.duration.mockResolvedValue(12);
+  mocks.metadataDuration.mockResolvedValue(null);
   mocks.telemetry.mockResolvedValue(undefined);
   mocks.open.mockResolvedValue({ workspace: {}, draft: null });
 });
@@ -136,4 +139,12 @@ it('rejects unavailable, non-video and invalid-duration sources before persistin
     'metadata'
   );
   expect(mocks.open).not.toHaveBeenCalled();
+});
+
+it('uses declared container duration when the last WebM packet has no inferred duration', async () => {
+  mocks.metadataDuration.mockResolvedValue(8);
+  mocks.duration.mockResolvedValue(7.98);
+  const result = await loadVideoReviewSource('recording:r', new AbortController().signal);
+  expect(result.source.duration).toBe(8);
+  expect(mocks.duration).not.toHaveBeenCalled();
 });

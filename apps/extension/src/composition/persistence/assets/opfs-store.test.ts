@@ -5,6 +5,7 @@ import {
   countAssetStorageRoots,
   collectQuiescentWritingObjects,
   createAssetObjectWriter,
+  createSeekableAssetObjectWriter,
   deleteAssetObject,
   deleteReadyJournal,
   discardPreparedAsset,
@@ -37,24 +38,37 @@ class MemoryFileHandle {
 
   async createWritable(): Promise<FileSystemWritableFileStream> {
     await this.createWritableEffect();
-    const chunks: BlobPart[] = [];
+    let bytes = new Uint8Array(0);
+    let position = 0;
     return {
       abort: async () => this.abortEffect(),
       close: async () => {
         await this.closeEffect();
-        this.bytes = new Blob(chunks);
+        this.bytes = new Blob([bytes]);
+      },
+      seek: async (offset: number) => {
+        position = offset;
       },
       write: async (value: FileSystemWriteChunkType) => {
         await this.writeEffect();
+        let data: BlobPart;
         if (
           typeof value === 'object' &&
           value !== null &&
           !(value instanceof Blob) &&
           'type' in value
         ) {
-          throw new Error('Structured writes are unsupported by the test double.');
-        }
-        chunks.push(value as BlobPart);
+          if (value.type !== 'write' || value.data == null)
+            throw new Error('Unsupported write command.');
+          position = value.position ?? position;
+          data = value.data;
+        } else data = value;
+        const chunk = new Uint8Array(await new Blob([data]).arrayBuffer());
+        const next = new Uint8Array(Math.max(bytes.length, position + chunk.length));
+        next.set(bytes);
+        next.set(chunk, position);
+        bytes = next;
+        position += chunk.length;
       },
     } as FileSystemWritableFileStream;
   }
@@ -706,4 +720,29 @@ it('collects only writing objects whose cross-context writer lock is free', asyn
       requestExclusiveLock: async (_name, _options, callback) => callback(true),
     })
   ).resolves.toBe(1);
+});
+
+it('finalizes positioned header rewrites and keeps append at the maximum extent', async () => {
+  const harness = createHarness();
+  const writer = await createSeekableAssetObjectWriter({ mimeType: 'video/webm' }, harness.options);
+  await writer.writeAt(0, new Blob(['0000body']));
+  await writer.writeAt(0, new Blob(['HEAD']));
+  await writer.append(new Blob(['tail']));
+  const prepared = await writer.finalize();
+  expect(prepared.ref.size).toBe(12);
+  const file = await readAssetFile(prepared.ref, 'test.webm', harness.options);
+  expect(await file.text()).toBe('HEADbodytail');
+  await expect(writer.writeAt(0, new Blob(['x']))).rejects.toThrow('finalized');
+  await discardPreparedAsset(prepared.ref.assetId, harness.options);
+});
+
+it('rejects invalid write positions and aborts the same protected staging object', async () => {
+  const harness = createHarness();
+  const writer = await createSeekableAssetObjectWriter({ mimeType: 'video/webm' }, harness.options);
+  for (const position of [-1, NaN, Infinity, 0.5, Number.MAX_SAFE_INTEGER])
+    await expect(writer.writeAt(position, new Blob(['xx']))).rejects.toThrow('position');
+  await writer.writeAt(4, new Blob(['body']));
+  await writer.abort();
+  expect(await listAssetObjectIds(harness.options)).toEqual([]);
+  expect(await listWritingAssetIds(harness.options)).toEqual([]);
 });

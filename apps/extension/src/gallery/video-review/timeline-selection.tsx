@@ -1,7 +1,7 @@
 import { useRef, type PointerEvent } from 'react';
-import { Film, MessageSquare, GripVertical } from 'lucide-react';
+import { Film, MessageSquare, GripVertical, Scissors } from 'lucide-react';
 import { translate } from '../../platform/i18n';
-import type { ReviewAnchor, ReviewAnnotation } from '../../features/video/review/types';
+import type { ReviewAnchor, ReviewAnnotation, ReviewEdit } from '../../features/video/review/types';
 import { reviewTimeLabel } from './controls';
 
 type SelectionProps = {
@@ -9,6 +9,8 @@ type SelectionProps = {
   time: number;
   selection: ReviewAnchor;
   annotations: readonly ReviewAnnotation[];
+  edits?: readonly ReviewEdit[];
+  onEdit?(edit: ReviewEdit): void;
   onSeek(time: number): void;
   onSelect(value: ReviewAnchor): void;
   onComment(annotation: ReviewAnnotation): void;
@@ -103,6 +105,29 @@ export function ReviewSourceLane(props: SelectionProps) {
           ))}
         </div>
       ) : null}
+      {props.edits?.map((edit) => (
+        <button
+          key={edit.id}
+          type="button"
+          onClick={() => props.onEdit?.(edit)}
+          aria-label={[
+            translate('gallery.videoReview.cutLabel'),
+            `${reviewTimeLabel(edit.start)} – ${reviewTimeLabel(edit.end)}`,
+          ].join(' ')}
+          style={{
+            left: percent(edit.start, props.duration),
+            width: percent(edit.end - edit.start, props.duration),
+            backgroundColor: `color-mix(in srgb, var(--sniptale-color-danger) 25%,
+              var(--sniptale-color-surface-canvas))`,
+          }}
+          className="absolute inset-y-1 z-[5] flex items-center justify-center gap-1 overflow-hidden rounded
+            border border-[var(--sniptale-color-danger)]
+            text-xs text-[var(--sniptale-color-text-primary)]"
+        >
+          <Scissors size={12} />
+          <span>{translate('gallery.videoReview.cutLabel')}</span>
+        </button>
+      ))}
       <ReviewCommentMarkers
         annotations={props.annotations}
         duration={props.duration}

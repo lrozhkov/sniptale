@@ -1,5 +1,6 @@
 export type {
   AssetObjectWriter,
+  SeekableAssetObjectWriter,
   ArchiveRestoreSession,
   ArchiveRestoreStrategy,
   AssetOperation,
@@ -24,6 +25,7 @@ export {
   countAssetStorageRoots,
   collectQuiescentWritingObjects,
   createAssetObjectWriter,
+  createSeekableAssetObjectWriter,
   deleteAssetObject,
   discardPreparedAsset,
   deleteReadyJournal,

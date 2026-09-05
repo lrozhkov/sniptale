@@ -23,6 +23,7 @@ export function ReviewInspector(props: {
   onDelete(value: ReviewAnnotation): void;
   onReport(action: 'copy' | 'download'): void;
   children: ReactNode;
+  actions?: ReactNode;
 }) {
   return (
     <aside
@@ -64,6 +65,7 @@ export function ReviewInspector(props: {
           {props.message}
         </p>
       ) : null}
+      {props.actions}
       <div className="min-h-48 flex-1 space-y-3 overflow-y-auto">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="text-sm font-semibold">{translate('gallery.videoReview.comments')}</h3>

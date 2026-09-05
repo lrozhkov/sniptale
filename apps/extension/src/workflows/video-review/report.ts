@@ -1,3 +1,4 @@
+import type { ReviewExportReceipt } from './export-lifecycle';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import type { RecordingTelemetryEntry } from '../../composition/persistence/recordings/contracts';
 import { replayReviewHistory } from '../../features/video/review/document';
@@ -105,6 +106,7 @@ export function createVideoReviewReport(args: {
   filename: string;
   telemetry: RecordingTelemetryEntry | null;
   labels: ReviewReportLabels;
+  exportReceipt?: ReviewExportReceipt;
 }): string {
   const { workspace } = args.snapshot;
   const document = replayReviewHistory(workspace.history, workspace.cursor, workspace.source);
@@ -136,8 +138,30 @@ export function createVideoReviewReport(args: {
     schemaVersion: 'sniptale.video-review.v1',
     timeUnit: 'us',
     revision: workspace.revision,
-    editsState: 'intent',
-    exported: false,
+    editsState: args.exportReceipt?.revision === workspace.revision ? 'exported' : 'intent',
+    exported: args.exportReceipt?.revision === workspace.revision,
+    ...(args.exportReceipt
+      ? {
+          export: {
+            revision: args.exportReceipt.revision,
+            matchesCurrentRevision: args.exportReceipt.revision === workspace.revision,
+            mediaId: args.exportReceipt.mediaId,
+            filename: args.exportReceipt.filename,
+            createdAt: new Date(args.exportReceipt.createdAt).toISOString(),
+            resultDurationUs: microseconds(args.exportReceipt.resultDuration),
+            videoReencoded: false,
+            audioReencoded: false,
+            videoPackets: args.exportReceipt.videoPackets,
+            audioPackets: args.exportReceipt.audioPackets,
+            audioRanges: args.exportReceipt.audioRanges.map((range) => ({
+              sourceStartUs: microseconds(range.sourceStart),
+              sourceEndUs: microseconds(range.sourceEnd),
+              resultStartUs: microseconds(range.resultStart),
+              resultEndUs: microseconds(range.resultEnd),
+            })),
+          },
+        }
+      : {}),
     source: {
       mediaId: workspace.aggregateId,
       filename: args.filename,

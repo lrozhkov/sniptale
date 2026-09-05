@@ -1,14 +1,20 @@
+import type { ReviewExportReceipt } from '../../workflows/video-review/export-lifecycle';
 import { translate } from '../../platform/i18n';
 import { createVideoReviewReport } from '../../workflows/video-review/report';
 import { downloadBlob } from '../library/actions/shared';
 import type { LoadedReview } from './use-session';
 
 /** Copy and download share the exact committed revision and complete telemetry payload. */
-export async function exportReviewReport(resource: LoadedReview, action: 'copy' | 'download') {
+export async function exportReviewReport(
+  resource: LoadedReview,
+  action: 'copy' | 'download',
+  exportReceipt?: ReviewExportReceipt
+) {
   const report = createVideoReviewReport({
     snapshot: resource.session.getSnapshot().snapshot,
     filename: resource.filename,
     telemetry: resource.telemetry,
+    ...(exportReceipt ? { exportReceipt } : {}),
     labels: {
       title: translate('gallery.videoReview.reportTitle'),
       source: translate('gallery.videoReview.reportSource'),

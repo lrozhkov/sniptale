@@ -274,7 +274,7 @@ describe('source-driven live recording flow', () => {
         bitrateMode: 'variable',
         codec: 'avc',
         contentHint: 'detail',
-        keyFrameInterval: 4,
+        keyFrameInterval: 2,
         latencyMode: 'quality',
       })
     );

@@ -1,4 +1,16 @@
 {
   "$schemaVersion": 1,
-  "allowances": []
+  "allowances": [
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/index.tsx",
+      "symbol": "useReviewEditorState",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: the cohesive gallery coordinator has 15 classified calls split between its own UI owner, React and DOM UI effects (dominant ratio 0.47). It coordinates one review session through existing hooks; the session actor retains durable writes and the export workflow retains staging/publication recovery. Its 143 lines, cyclomatic 5, cognitive 4, nesting 1 and recovery 0 do not evidence mixed runtime or persistence authority. Moving playback into its own UI hook lowered complexity while changing this call ratio.",
+      "removalCondition": "Remove when this exact body or signature changes, or when classification models React and DOM effects within their owning UI coordinator; reassess any new runtime, writer or recovery authority.",
+      "reviewDate": "2026-09-06",
+      "astHash": "072bb9123eb115cda6592ac173c3e8ca0b0aa9ab15408129e543211b58452977",
+      "signatureHash": "aa8395b968a4de086ec5295b79085c7841c81a7d03ab5706fda13cdac89cd542"
+    }
+  ]
 }

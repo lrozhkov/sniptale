@@ -1,6 +1,32 @@
 import { defineMessageSource } from '../source';
 
 export const galleryVideoReviewMessages = defineMessageSource({
+  cutLabel: { ru: 'Вырезано', en: 'Cut' },
+  cutMode: { ru: 'Вырезание', en: 'Cut mode' },
+  applyCut: { ru: 'Вырезать диапазон', en: 'Cut range' },
+  removeEdit: { ru: 'Убрать вырезание', en: 'Remove cut' },
+  indexing: { ru: 'Ищем безопасные границы…', en: 'Finding safe boundaries…' },
+  cutsUnavailable: {
+    ru: 'Для этого видео безопасное вырезание недоступно. Разметка работает.',
+    en: 'Safe cutting is unavailable for this video. Annotations remain available.',
+  },
+  selectSafeRange: {
+    ru: 'Выделите непустой диапазон по ключевым кадрам. Вырезания не должны пересекаться или удалять всё видео.',
+    en: 'Select a range between keyframes. Cuts cannot overlap or remove the entire video.',
+  },
+  exportVideo: { ru: 'Сохранить копию в галерею', en: 'Save copy to gallery' },
+  downloadVideo: { ru: 'Скачать готовую копию', en: 'Download exported copy' },
+  cancelExport: { ru: 'Отменить экспорт', en: 'Cancel export' },
+  publishing: { ru: 'Добавляем копию в галерею…', en: 'Adding copy to gallery…' },
+  exporting: { ru: 'Экспорт', en: 'Export' },
+  exportFailed: {
+    ru: 'Не удалось завершить экспорт. Исходник и правки сохранены. Проверьте галерею перед повтором.',
+    en: 'Export could not finish. The original and edits are preserved. Check the gallery before retrying.',
+  },
+  exportAdded: {
+    ru: 'Готовая копия добавлена в галерею.',
+    en: 'Exported copy added to the gallery.',
+  },
   eventClick: { ru: 'Щелчок', en: 'Click' },
   eventDoubleClick: { ru: 'Двойной щелчок', en: 'Double click' },
   eventScroll: { ru: 'Прокрутка', en: 'Scroll' },

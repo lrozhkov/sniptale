@@ -213,3 +213,72 @@ it('serializes full native telemetry and speed intent in microseconds, retaining
   });
   expect(empty).toContain('Empty');
 });
+
+it('binds actual export timing to its revision without claiming later edits were exported', () => {
+  const snapshot: VideoWorkspaceSnapshot = {
+    workspace: {
+      aggregateId: 'recording:r',
+      sourceAssetId: 'private',
+      formatVersion: 1,
+      source: { duration: 8, width: 160, height: 90, size: 100, mimeType: 'video/webm' },
+      revision: 2,
+      cursor: 1,
+      createdAt: 1,
+      updatedAt: 2,
+      history: [
+        {
+          id: 'op',
+          at: 2,
+          target: 'edit',
+          before: null,
+          after: {
+            id: 'cut',
+            kind: 'cut',
+            start: 2,
+            end: 4,
+            requestedStart: 1.9,
+            requestedEnd: 4.1,
+          },
+        },
+      ],
+    },
+    draft: null,
+  };
+  const args = {
+    snapshot,
+    filename: 'source.webm',
+    telemetry: null,
+    labels: {
+      title: 'Review',
+      source: 'Source',
+      timeline: 'Timeline',
+      machineData: 'Data',
+      comment: 'Comment',
+      cut: 'Cut',
+      speed: 'Speed',
+      telemetry: 'Telemetry',
+      excluded: 'Excluded',
+      empty: 'Empty',
+    },
+    exportReceipt: {
+      revision: 2,
+      mediaId: 'recording:copy',
+      filename: 'copy.webm',
+      createdAt: 1000,
+      videoPackets: 60,
+      audioPackets: 300,
+      resultDuration: 6,
+      audioRanges: [{ sourceStart: 4.001, sourceEnd: 8.001, resultStart: 2, resultEnd: 6 }],
+    },
+  };
+  const report = createVideoReviewReport(args);
+  expect(report).toContain('"exported": true');
+  expect(report).toContain('"sourceStartUs": 4001000');
+  expect(report).toContain('"resultDurationUs": 6000000');
+  expect(report).not.toContain('private');
+  snapshot.workspace.revision = 3;
+  const later = createVideoReviewReport(args);
+  expect(later).toContain('"exported": false');
+  expect(later).toContain('"matchesCurrentRevision": false');
+  expect(later).toContain('"mediaId": "recording:copy"');
+});

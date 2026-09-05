@@ -26,8 +26,11 @@ async function inspectVideo(file: File, signal: AbortSignal) {
   try {
     const track = await input.getPrimaryVideoTrack();
     if (!track) throw new Error('Video track is unavailable.');
+    const declaredDuration = await input.getDurationFromMetadata();
     const [duration, width, height, mimeType] = await Promise.all([
-      input.computeDuration(),
+      declaredDuration !== null && Number.isFinite(declaredDuration) && declaredDuration > 0
+        ? Promise.resolve(declaredDuration)
+        : input.computeDuration(),
       track.getDisplayWidth(),
       track.getDisplayHeight(),
       input.getMimeType(),

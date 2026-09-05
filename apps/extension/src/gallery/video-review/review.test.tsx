@@ -135,11 +135,15 @@ it('hover highlights without seeking; comment selection and edit are distinct ex
 
 const integration = vi.hoisted(() => ({
   load: vi.fn(),
+  index: vi.fn(),
   draft: vi.fn(),
   commit: vi.fn(),
   history: vi.fn(),
   read: vi.fn(),
   download: vi.fn(),
+}));
+vi.mock('../../workflows/video-review/media-index', () => ({
+  inspectReviewMedia: integration.index,
 }));
 vi.mock('../../workflows/video-review/source', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../workflows/video-review/source')>()),
@@ -171,6 +175,7 @@ import type {
 } from '../../composition/persistence/review-workspaces/store';
 
 function createEditorFixture() {
+  integration.index.mockRejectedValue(new Error('No safe index'));
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.stubGlobal(
     'ResizeObserver',
@@ -577,6 +582,70 @@ it('drags a source range and both edges, rejects invalid numeric bounds, and pre
       pointer(slider, 'pointercancel', 200);
     });
     expect(seek).not.toHaveBeenCalled();
+  } finally {
+    await fixture.cleanup();
+  }
+});
+
+it('commits safe cuts, skips excluded playback and preserves exact comment navigation', async () => {
+  const fixture = createEditorFixture();
+  const { root, host, back, click } = fixture;
+  integration.index.mockResolvedValue({
+    duration: 4,
+    boundaries: [0, 1, 2, 3, 4],
+    videoCodec: 'vp8',
+    audioCodec: null,
+    container: 'webm',
+    rotation: 0,
+  });
+  const key = async (key: string) =>
+    act(async () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key }));
+    });
+  try {
+    await act(async () => root.render(<VideoReview aggregateId="recording:r" onBack={back} />));
+    const video = host.querySelector('video')!;
+    await click('cutMode');
+    await key('ArrowLeft');
+    expect(video.currentTime).toBe(0);
+    await key('ArrowRight');
+    expect(video.currentTime).toBe(1);
+    await key('ArrowLeft');
+    expect(video.currentTime).toBe(0);
+    await click('applyCut');
+    expect(fixture.snapshot.workspace.history.at(-1)?.after).toMatchObject({
+      kind: 'cut',
+      start: 0,
+      end: 1,
+    });
+    await click('play');
+    expect(video.currentTime).toBe(1);
+    await act(async () => {
+      video.currentTime = 0.5;
+      video.dispatchEvent(new Event('timeupdate'));
+    });
+    expect(video.currentTime).toBe(1);
+    await act(async () => video.dispatchEvent(new Event('pause')));
+    await click('undo');
+    await click('redo');
+    const cut = host.querySelector<HTMLButtonElement>(
+      '[aria-label="gallery.videoReview.cutLabel 0:00.000 – 0:01.000"]'
+    )!;
+    await act(async () => cut.click());
+    expect(video.currentTime).toBe(0);
+    await click('removeEdit');
+    expect(fixture.snapshot.workspace.history.at(-1)?.after).toBeNull();
+    await click('undo');
+    await click('cutMode');
+    await click('point');
+    await click('addComment');
+    await fixture.fill('Exact annotation');
+    await click('save');
+    await click('cutMode');
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>('[title="Exact annotation"]')!.click()
+    );
+    expect(fixture.button('cutMode').getAttribute('aria-pressed')).toBe('false');
   } finally {
     await fixture.cleanup();
   }
