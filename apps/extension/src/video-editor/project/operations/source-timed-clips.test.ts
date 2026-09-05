@@ -342,3 +342,132 @@ it('transfers split-boundary action and cursor anchors before the leading half i
     'anchored-cursor'
   );
 });
+
+it.each([
+  ['recording-1', 0, 1],
+  [null, 0, 1],
+  ['recording-1', 3, 2],
+] as const)(
+  'projects sources independently with base %s, offset %s and rate %s',
+  (base, firstOffset, rate) => {
+    const project = createAnchoredInteractionProject();
+    project.baseRecordingId = base;
+    const firstClip = project.clips[0] as VideoProjectVideoClip;
+    project.assets.push({
+      ...project.assets[0]!,
+      id: 'asset-b',
+      source: {
+        kind: 'project-asset',
+        projectAssetId: 'bytes-b',
+        originRecordingId: 'recording-b',
+      },
+    });
+    project.clips.push({
+      ...firstClip,
+      id: 'clip-b',
+      assetId: 'asset-b',
+      groupId: null,
+      startTime: 10,
+    });
+    const anchor = {
+      kind: 'recording-source' as const,
+      recordingId: 'recording-b',
+      sourceClipId: 'clip-b',
+      sourceTime: 2,
+    };
+    project.actionEvents.push({
+      ...project.actionEvents[0]!,
+      id: 'action-b',
+      sourceAnchor: anchor,
+      time: 12,
+    });
+    project.cursorTrack!.samples.push({
+      ...project.cursorTrack!.samples[0]!,
+      id: 'cursor-b',
+      sourceAnchor: anchor,
+      time: 12,
+    });
+    project.motionRegions!.push({
+      ...project.motionRegions![0]!,
+      id: 'zoom-b',
+      targetActionEventId: 'action-b',
+      startTime: 11,
+    });
+    project.objectTracks = [
+      {
+        id: 'object-a',
+        kind: 'object',
+        source: 'visualDetection',
+        analysis: {
+          sourceAssetId: firstClip.assetId,
+          sourceClipId: firstClip.id,
+          sampleFps: 1,
+          projectStartTime: 2,
+          projectEndTime: 2,
+        },
+        samples: [{ time: 2, x: 10, y: 20, visible: true, confidence: 1 }],
+      },
+      {
+        id: 'object-b',
+        kind: 'object',
+        source: 'visualDetection',
+        analysis: {
+          sourceAssetId: 'asset-b',
+          sourceClipId: 'clip-b',
+          sampleFps: 1,
+          projectStartTime: 12,
+          projectEndTime: 12,
+        },
+        samples: [{ time: 12, x: 10, y: 20, visible: true, confidence: 1 }],
+      },
+    ];
+    const next = reconcileRecordingInteractionAnchors(project, {
+      ...project,
+      clips: project.clips.map((clip) =>
+        clip.id === 'clip-b'
+          ? { ...clip, startTime: 20, playbackRate: rate, duration: 4 / rate }
+          : { ...clip, startTime: clip.startTime + firstOffset }
+      ),
+    });
+    expect(next.objectTracks?.find((track) => track.id === 'object-a')?.samples[0]?.time).toBe(
+      2 + firstOffset
+    );
+    expect(next.objectTracks?.find((track) => track.id === 'object-b')?.samples[0]?.time).toBe(
+      20 + 2 / rate
+    );
+    expect(next.actionEvents.find((event) => event.id === 'action-b')).toMatchObject({
+      time: 20 + 2 / rate,
+      sourceAnchor: anchor,
+    });
+    expect(next.cursorTrack!.samples.find((sample) => sample.id === 'cursor-b')).toMatchObject({
+      time: 20 + 2 / rate,
+      sourceAnchor: anchor,
+    });
+    expect(next.motionRegions!.find((region) => region.id === 'zoom-b')?.startTime).toBe(
+      20 + 1 / rate
+    );
+    expect(next.actionEvents.find((event) => event.id === 'anchored-action')).toEqual({
+      ...project.actionEvents[0],
+      time: 2 + firstOffset,
+    });
+  }
+);
+
+it('keeps explicit interaction edits and project replacement authoritative', () => {
+  const project = createAnchoredInteractionProject();
+  const replacement = { ...project, id: 'another-project', clips: [] };
+  expect(reconcileRecordingInteractionAnchors(project, replacement)).toBe(replacement);
+  const edited = {
+    ...project,
+    clips: project.clips.map((clip) => ({ ...clip, startTime: 3 })),
+    actionEvents: [],
+    cursorTrack: null,
+    motionRegions: [],
+    objectTracks: [],
+  };
+  const next = reconcileRecordingInteractionAnchors(project, edited);
+  expect(next.actionEvents).toBe(edited.actionEvents);
+  expect(next.cursorTrack).toBeNull();
+  expect(next.motionRegions).toBe(edited.motionRegions);
+  expect(next.objectTracks).toBe(edited.objectTracks);
+});

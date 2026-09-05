@@ -178,9 +178,7 @@ function hasSourceTimelineChanged(
 function reconcileActionEvents(
   previousProject: VideoProject,
   nextProject: VideoProject,
-  recordingId: string,
-  previousClips: SourceTimedClip[],
-  nextClips: SourceTimedClip[]
+  timelines: Map<string, RecordingClipTimeline>
 ): {
   events: VideoProjectActionEvent[];
   projections: Map<string, AnchorProjection>;
@@ -195,6 +193,11 @@ function reconcileActionEvents(
       if (!event.sourceAnchor) {
         return [event];
       }
+      const recordingId = event.sourceAnchor.recordingId;
+      const { previousClips, nextClips } = timelines.get(recordingId) ?? {
+        previousClips: [],
+        nextClips: [],
+      };
       if (!isValidPreviousAnchor(event.sourceAnchor, recordingId, previousClips)) {
         return [withoutSourceAnchor(event)];
       }
@@ -227,9 +230,7 @@ function reconcileActionEvents(
 function reconcileCursorTrack(
   previousProject: VideoProject,
   nextProject: VideoProject,
-  recordingId: string,
-  previousClips: SourceTimedClip[],
-  nextClips: SourceTimedClip[]
+  timelines: Map<string, RecordingClipTimeline>
 ): VideoProject['cursorTrack'] {
   if (nextProject.cursorTrack !== previousProject.cursorTrack || nextProject.cursorTrack === null) {
     return nextProject.cursorTrack;
@@ -240,6 +241,11 @@ function reconcileCursorTrack(
       if (!sample.sourceAnchor) {
         return [sample];
       }
+      const recordingId = sample.sourceAnchor.recordingId;
+      const { previousClips, nextClips } = timelines.get(recordingId) ?? {
+        previousClips: [],
+        nextClips: [],
+      };
       if (!isValidPreviousAnchor(sample.sourceAnchor, recordingId, previousClips)) {
         return [withoutSourceAnchor(sample)];
       }
@@ -301,47 +307,66 @@ function reconcileMotionRegions(
   });
 }
 
+interface RecordingClipTimeline {
+  previousClips: SourceTimedClip[];
+  nextClips: SourceTimedClip[];
+}
+
+function collectRecordingClipTimelines(previousProject: VideoProject, nextProject: VideoProject) {
+  const recordingIds = new Set<string>();
+  for (const asset of previousProject.assets) {
+    const recordingId =
+      asset.source.kind === 'recording'
+        ? asset.source.recordingId
+        : asset.source.kind === 'project-asset'
+          ? asset.source.originRecordingId
+          : null;
+    if (recordingId) recordingIds.add(recordingId);
+  }
+  return new Map(
+    [...recordingIds].map((recordingId) => [
+      recordingId,
+      {
+        previousClips: collectRepresentativeRecordingSourceClips(previousProject, recordingId),
+        nextClips: collectRepresentativeRecordingSourceClips(nextProject, recordingId),
+      },
+    ])
+  );
+}
+
 export function reconcileRecordingInteractionAnchors(
   previousProject: VideoProject,
   nextProject: VideoProject
 ): VideoProject {
-  const recordingId = previousProject.baseRecordingId;
-  if (!recordingId || nextProject.baseRecordingId !== recordingId) {
+  if (previousProject.id !== nextProject.id) return nextProject;
+  const timelines = collectRecordingClipTimelines(previousProject, nextProject);
+  if (
+    ![...timelines.values()].some(({ previousClips, nextClips }) =>
+      hasSourceTimelineChanged(previousClips, nextClips)
+    )
+  ) {
     return nextProject;
   }
-
-  const previousClips = collectRepresentativeRecordingSourceClips(previousProject, recordingId);
-  const nextClips = collectRepresentativeRecordingSourceClips(nextProject, recordingId);
-  if (!hasSourceTimelineChanged(previousClips, nextClips)) {
-    return nextProject;
-  }
-
-  const { events, projections } = reconcileActionEvents(
-    previousProject,
-    nextProject,
-    recordingId,
-    previousClips,
-    nextClips
-  );
+  const { events, projections } = reconcileActionEvents(previousProject, nextProject, timelines);
   const motionRegions = reconcileMotionRegions(previousProject, nextProject, events, projections);
-  const objectTracks = reconcileSourceBoundObjectTracks({
-    nextClips,
-    nextProject,
-    previousClips,
-    previousProject,
-    recordingId,
-  });
-
+  let objectTracks = nextProject.objectTracks;
+  if (objectTracks !== undefined && objectTracks === previousProject.objectTracks) {
+    for (const [recordingId, { previousClips, nextClips }] of timelines) {
+      if (!hasSourceTimelineChanged(previousClips, nextClips)) continue;
+      objectTracks =
+        reconcileSourceBoundObjectTracks({
+          nextClips,
+          nextProject: { ...nextProject, objectTracks },
+          previousClips,
+          previousProject: { ...previousProject, objectTracks },
+          recordingId,
+        }) ?? [];
+    }
+  }
   return {
     ...nextProject,
     actionEvents: events,
-    cursorTrack: reconcileCursorTrack(
-      previousProject,
-      nextProject,
-      recordingId,
-      previousClips,
-      nextClips
-    ),
+    cursorTrack: reconcileCursorTrack(previousProject, nextProject, timelines),
     ...(objectTracks === undefined ? {} : { objectTracks }),
     ...(motionRegions === undefined ? {} : { motionRegions }),
   };
