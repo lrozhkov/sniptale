@@ -19,45 +19,49 @@ import {
 import { getMp4CodecOptions } from './codec-options';
 import type { ExportDialogFieldParams } from './field-contract';
 
-const EXPORT_QUALITY_OPTIONS = [
-  {
-    value: VideoExportQualityPreset.LOW,
-    label: translate('videoEditor.exportDialog.qualityLow'),
-  },
-  {
-    value: VideoExportQualityPreset.MEDIUM,
-    label: translate('videoEditor.exportDialog.qualityMedium'),
-  },
-  {
-    value: VideoExportQualityPreset.HIGH,
-    label: translate('videoEditor.exportDialog.qualityHigh'),
-  },
-  {
-    value: VideoExportQualityPreset.ULTRA,
-    label: translate('videoEditor.exportDialog.qualityUltra'),
-  },
-] as const;
+function getExportQualityOptions() {
+  return [
+    {
+      value: VideoExportQualityPreset.LOW,
+      label: translate('videoEditor.exportDialog.qualityLow'),
+    },
+    {
+      value: VideoExportQualityPreset.MEDIUM,
+      label: translate('videoEditor.exportDialog.qualityMedium'),
+    },
+    {
+      value: VideoExportQualityPreset.HIGH,
+      label: translate('videoEditor.exportDialog.qualityHigh'),
+    },
+    {
+      value: VideoExportQualityPreset.ULTRA,
+      label: translate('videoEditor.exportDialog.qualityUltra'),
+    },
+  ] as const;
+}
 
-const EXPORT_RESOLUTION_OPTIONS = [
-  VideoResolutionPreset.SOURCE,
-  VideoResolutionPreset.P240,
-  VideoResolutionPreset.P360,
-  VideoResolutionPreset.P480,
-  VideoResolutionPreset.P720,
-  VideoResolutionPreset.P1080,
-  VideoResolutionPreset.P1440,
-  VideoResolutionPreset.P2160,
-].map((value) => ({
-  value,
-  label:
-    value === VideoResolutionPreset.SOURCE
-      ? translate('videoEditor.exportDialog.resolutionSource')
-      : value === VideoResolutionPreset.P1440
-        ? '1440p (2K)'
-        : value === VideoResolutionPreset.P2160
-          ? '2160p (4K)'
-          : value.toLowerCase(),
-}));
+function getExportResolutionOptions() {
+  return [
+    VideoResolutionPreset.SOURCE,
+    VideoResolutionPreset.P240,
+    VideoResolutionPreset.P360,
+    VideoResolutionPreset.P480,
+    VideoResolutionPreset.P720,
+    VideoResolutionPreset.P1080,
+    VideoResolutionPreset.P1440,
+    VideoResolutionPreset.P2160,
+  ].map((value) => ({
+    value,
+    label:
+      value === VideoResolutionPreset.SOURCE
+        ? translate('videoEditor.exportDialog.resolutionSource')
+        : value === VideoResolutionPreset.P1440
+          ? '1440p (2K)'
+          : value === VideoResolutionPreset.P2160
+            ? '2160p (4K)'
+            : value.toLowerCase(),
+  }));
+}
 
 const WEBM_CODEC_OPTIONS = [
   { value: VideoWebmCodec.VP9, label: 'VP9' },
@@ -206,13 +210,13 @@ export function ExportDialogSelectFields(params: ExportDialogFieldParams) {
           );
           onChange({ resolution, ...dimensions });
         }}
-        options={EXPORT_RESOLUTION_OPTIONS}
+        options={getExportResolutionOptions()}
       />
       <SelectField
         label={translate('videoEditor.exportDialog.qualityLabel')}
         value={settings.quality}
         onChange={(quality) => onChange({ quality })}
-        options={EXPORT_QUALITY_OPTIONS}
+        options={getExportQualityOptions()}
       />
     </>
   );
