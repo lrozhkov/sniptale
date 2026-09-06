@@ -4,7 +4,7 @@ import type { VideoProject } from '../../../../../features/video/project/types';
 import { buildVideoEditorTrackGapCandidates } from '../../../../project/operations/timeline-gaps';
 import { getTimelineTransitionSummary } from '../../effect-lanes/transition-summary';
 
-export interface TimelineZone {
+interface TimelineZone {
   end: number;
   id: string;
   start: number;
@@ -79,7 +79,12 @@ export function buildTrackJunctionZones(
   return (project.transitions ?? []).flatMap((transition) => {
     const leadingClip = project.clips.find((clip) => clip.id === transition.leadingClipId);
     const trailingClip = project.clips.find((clip) => clip.id === transition.trailingClipId);
-    if (!leadingClip || !trailingClip || leadingClip.trackId !== trackId) {
+    if (
+      !leadingClip ||
+      !trailingClip ||
+      leadingClip.trackId !== trackId ||
+      trailingClip.trackId !== trackId
+    ) {
       return [];
     }
 
@@ -108,58 +113,4 @@ export function buildTrackJunctionZones(
       },
     ];
   });
-}
-
-export function buildTrackStackedOverlapZones(
-  project: VideoProject,
-  trackId: string
-): TimelineZone[] {
-  const currentTrack = project.tracks.find((track) => track.id === trackId);
-  if (!currentTrack || currentTrack.kind !== VideoTrackKind.PRIMARY) {
-    return [];
-  }
-
-  const currentTrackClips = getTrackClips(project, trackId);
-  const otherTrackClips = project.tracks
-    .filter((track) => track.id !== trackId && track.kind === VideoTrackKind.PRIMARY)
-    .flatMap((track) => getTrackClips(project, track.id));
-
-  const overlapZones = currentTrackClips.flatMap((clip) =>
-    otherTrackClips.flatMap((otherClip) => {
-      const start = Math.max(clip.startTime, otherClip.startTime);
-      const end = Math.min(
-        clip.startTime + clip.duration,
-        otherClip.startTime + otherClip.duration
-      );
-      if (end <= start) {
-        return [];
-      }
-
-      return [{ end, id: `${clip.id}:${otherClip.id}`, start }];
-    })
-  );
-
-  return mergeTimelineZones(overlapZones);
-}
-
-function mergeTimelineZones(zones: TimelineZone[]): TimelineZone[] {
-  const sortedZones = [...zones].sort(compareTimelineZones);
-  const mergedZones: TimelineZone[] = [];
-
-  for (const zone of sortedZones) {
-    const previousZone = mergedZones.at(-1);
-    if (!previousZone || zone.start > previousZone.end + 0.0001) {
-      mergedZones.push(zone);
-      continue;
-    }
-
-    previousZone.end = Math.max(previousZone.end, zone.end);
-    previousZone.id = `${previousZone.id}|${zone.id}`;
-  }
-
-  return mergedZones;
-}
-
-function compareTimelineZones(left: TimelineZone, right: TimelineZone): number {
-  return left.start - right.start || left.end - right.end || left.id.localeCompare(right.id);
 }

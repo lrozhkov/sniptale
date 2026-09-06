@@ -15,6 +15,7 @@ import { createTimelineDragDraft } from './drag-move';
 import {
   moveProjectClip,
   trimProjectClipEnd,
+  trimProjectClipStart,
 } from '../../../project/state/clip-timeline/mutations';
 
 function fixture() {
@@ -206,4 +207,112 @@ it('does not expose locked or colliding swaps as usable slots', () => {
   project.tracks[1]!.locked = false;
   project.clips.push({ ...project.clips[1]!, id: 'blocker', groupId: null, startTime: 9 });
   expect(getTimelineReorderSlots(project, project.clips[0]!)).toEqual([]);
+});
+
+it('holds both source limits past the pointer boundary and allows reversing before release', () => {
+  const project = fixture();
+  const base = project.clips[0]!;
+  if (base.type !== 'VIDEO') throw new Error('Expected video fixture');
+  project.clips = [
+    {
+      ...base,
+      groupId: null,
+      startTime: 5,
+      duration: 1,
+      sourceStart: 4,
+      sourceDuration: 2,
+      playbackRate: 2,
+    },
+  ];
+  const onTrimClipEnd = vi.fn();
+  const draft = createTimelineDragDraft({
+    project,
+    onSwapClip: vi.fn(),
+    onMoveClip: vi.fn(),
+    onTrimClipStart: vi.fn(),
+    onTrimClipEnd,
+  });
+  expect(draft.onTrimClipEnd('screen', 100)?.endTime).toBe(9);
+  expect(draft.onTrimClipEnd('screen', 101)?.endTime).toBe(9);
+  expect(draft.onTrimClipEnd('screen', 7)?.endTime).toBe(7);
+  expect(onTrimClipEnd).not.toHaveBeenCalled();
+  draft.commit();
+  expect(onTrimClipEnd).toHaveBeenCalledExactlyOnceWith('screen', 7);
+  expect(draft.onTrimClipStart('screen', -100)?.startTime).toBe(3);
+  expect(draft.onTrimClipStart('screen', 4)?.startTime).toBe(4);
+});
+
+it('clamps aligned linked ends to the most restrictive media source at its own playback rate', () => {
+  const project = fixture();
+  project.clips = project.clips
+    .filter((clip) => clip.id === 'screen' || clip.id === 'mic')
+    .map((clip) =>
+      clip.id === 'mic'
+        ? { ...clip, startTime: 5, duration: 3, sourceStart: 2, sourceDuration: 6, playbackRate: 2 }
+        : clip
+    );
+  const result = trimProjectClipEnd(project, 'screen', 100);
+  expect(result.clips.map((clip) => clip.startTime + clip.duration)).toEqual([10, 10]);
+  expect(result.clips.find((clip) => clip.id === 'mic')).toMatchObject({
+    sourceStart: 2,
+    sourceDuration: 10,
+    playbackRate: 2,
+  });
+  project.tracks.find((track) => track.id === project.clips[1]!.trackId)!.locked = true;
+  expect(trimProjectClipEnd(project, 'screen', 100)).toBe(project);
+});
+
+it('preserves opposite linked edges and source bounds when shrinking a slow clip to its minimum', () => {
+  const project = fixture();
+  project.assets[0]!.metadata.duration = 1;
+  project.assets.push({
+    ...project.assets[0]!,
+    id: 'audio-source',
+    metadata: { ...project.assets[0]!.metadata, duration: 2 },
+  });
+  project.clips = project.clips
+    .filter((clip) => clip.id === 'screen' || clip.id === 'mic')
+    .map((clip) => {
+      if (clip.type !== 'VIDEO' && clip.type !== 'AUDIO') throw new Error('Expected media fixture');
+      return {
+        ...clip,
+        startTime: 0,
+        duration: 2,
+        sourceStart: 0,
+        sourceDuration: clip.id === 'screen' ? 1 : 2,
+        playbackRate: clip.id === 'screen' ? 0.5 : 1,
+        assetId: clip.id === 'screen' ? project.assets[0]!.id : 'audio-source',
+      };
+    });
+  const start = trimProjectClipStart(project, 'screen', 100);
+  for (const clip of start.clips) {
+    expect(clip.startTime + clip.duration).toBeCloseTo(2);
+    expect(clip.startTime).toBeCloseTo(1.8);
+  }
+  expect(start.clips[0]).toMatchObject({ sourceStart: 0.9, sourceDuration: expect.closeTo(0.1) });
+  const end = trimProjectClipEnd(project, 'screen', -100);
+  for (const clip of end.clips) {
+    expect(clip.startTime).toBe(0);
+    expect(clip.duration).toBeCloseTo(0.2);
+  }
+});
+
+it('keeps the opposite edge fixed when an imported clip starts below the source timing minimum', () => {
+  const project = fixture();
+  const base = project.clips[0]!;
+  if (base.type !== 'VIDEO') throw new Error('Expected video fixture');
+  project.clips = [
+    {
+      ...base,
+      groupId: null,
+      startTime: 1,
+      duration: 0.05,
+      sourceStart: 0.5,
+      sourceDuration: 0.05,
+    },
+  ];
+  const result = trimProjectClipStart(project, 'screen', 0.99).clips[0]!;
+  expect(result.startTime + result.duration).toBeCloseTo(1.05);
+  expect(trimProjectClipStart(project, 'screen', 1.02)).toBe(project);
+  expect(trimProjectClipStart(project, 'screen', 1)).toBe(project);
 });

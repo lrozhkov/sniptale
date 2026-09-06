@@ -2,31 +2,14 @@ import { Trash2 } from 'lucide-react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { translate } from '../../../../../platform/i18n';
 import { TIMELINE_OBJECT_MARKER_PROPS } from '../../canvas/hover-preview';
-import type { TimelineCutZone, TimelineGapZone, TimelineJunctionZone, TimelineZone } from './model';
+import type { TimelineCutZone, TimelineGapZone, TimelineJunctionZone } from './model';
 import {
   hasVideoEditorEffectDocumentDragType,
   readVideoEditorEffectDocumentDragPayload,
 } from '../../../../contracts/effect-document-drag';
 import type { ProjectTimelineProps } from '../../types';
 export type { TimelineJunctionZone } from './model';
-export {
-  buildTrackCutZones,
-  buildTrackGapZones,
-  buildTrackJunctionZones,
-  buildTrackStackedOverlapZones,
-} from './model';
-
-const STACKED_OVERLAP_ZONE_CLASS_NAME = [
-  'pointer-events-none absolute inset-y-2 z-0 rounded-[12px] border',
-  'border-[color:color-mix(in_srgb,var(--sniptale-color-info)_40%,transparent)]',
-  'shadow-[inset_0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent)_16%,transparent)]',
-  [
-    'bg-[linear-gradient(',
-    '90deg,',
-    'color-mix(in_srgb,var(--sniptale-color-info)_28%,transparent),',
-    'color-mix(in_srgb,var(--sniptale-color-accent-soft)_58%,transparent))]',
-  ].join(''),
-].join(' ');
+export { buildTrackCutZones, buildTrackGapZones, buildTrackJunctionZones } from './model';
 
 export function ProjectTimelineTrackZones(props: {
   cutZones: TimelineCutZone[];
@@ -34,7 +17,6 @@ export function ProjectTimelineTrackZones(props: {
   junctionZones?: TimelineJunctionZone[];
   pixelsPerSecond: number;
   selectedTransitionId?: string | null;
-  stackedOverlapZones: TimelineZone[];
   onCloseTrackGap: (trackId: string, gapStart: number, gapEnd: number) => void;
   onDropEffectDocument?: ProjectTimelineProps['onDropEffectDocument'];
   onSelectTransition?: (transitionId: string) => void;
@@ -46,10 +28,6 @@ export function ProjectTimelineTrackZones(props: {
         gapZones={props.gapZones}
         onCloseTrackGap={props.onCloseTrackGap}
         pixelsPerSecond={props.pixelsPerSecond}
-      />
-      <TrackStackedOverlapLayer
-        pixelsPerSecond={props.pixelsPerSecond}
-        stackedOverlapZones={props.stackedOverlapZones}
       />
       <TrackJunctionZoneLayer
         junctionZones={props.junctionZones ?? []}
@@ -96,9 +74,12 @@ function TrackJunctionZoneButton(props: {
       data-ui="timeline.track-transition-zone"
       title={props.zone.title}
       className={[
-        'absolute inset-y-2 z-30 flex min-w-[28px] items-center justify-center overflow-hidden',
-        'rounded-[10px] border px-1 text-[10px] font-semibold transition-[border-color,filter]',
-        props.selected ? props.zone.zoneSelectedClassName : props.zone.zoneClassName,
+        'absolute bottom-2 z-30 flex h-5 items-center justify-center overflow-hidden',
+        'rounded-sm outline outline-1 -outline-offset-1 px-0 text-[10px] font-semibold',
+        'bg-[var(--sniptale-color-surface-overlay)] text-[var(--sniptale-color-text-secondary)]',
+        props.selected
+          ? 'outline-[var(--sniptale-color-border-accent-strong)]'
+          : 'outline-[var(--sniptale-color-border-strong)]',
       ].join(' ')}
       style={getJunctionZoneStyle(props.zone, props.pixelsPerSecond)}
       onClick={(event) => {
@@ -125,7 +106,25 @@ function TrackJunctionZoneButton(props: {
         props.onSelectTransition?.(props.zone.id);
       }}
     >
-      <span className="pointer-events-none truncate">{props.zone.label}</span>
+      <svg
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 h-full w-full opacity-60"
+        viewBox="0 0 100 20"
+        preserveAspectRatio="none"
+      >
+        <path
+          d="M0 0 L100 20 M0 20 L100 0"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+      {(props.zone.end - props.zone.start) * props.pixelsPerSecond >= 64 ? (
+        <span className="pointer-events-none relative truncate px-1 bg-[var(--sniptale-color-surface-overlay)]">
+          {props.zone.label}
+        </span>
+      ) : null}
     </button>
   );
 }
@@ -137,7 +136,7 @@ function stopPointerPropagation(event: ReactPointerEvent): void {
 function getJunctionZoneStyle(zone: TimelineJunctionZone, pixelsPerSecond: number) {
   return {
     left: zone.start * pixelsPerSecond,
-    width: Math.max(28, (zone.end - zone.start) * pixelsPerSecond),
+    width: (zone.end - zone.start) * pixelsPerSecond,
   };
 }
 
@@ -162,7 +161,7 @@ function TrackGapZoneLayer(props: {
   pixelsPerSecond: number;
 }) {
   return props.gapZones.map((zone) => {
-    const width = Math.max(18, (zone.end - zone.start) * props.pixelsPerSecond);
+    const width = (zone.end - zone.start) * props.pixelsPerSecond;
 
     return (
       <button
@@ -177,20 +176,28 @@ function TrackGapZoneLayer(props: {
         }}
         onPointerDown={(event) => event.stopPropagation()}
         className={[
-          'group absolute inset-y-2 z-10 overflow-hidden rounded-[12px] border border-dashed',
-          'border-[color:color-mix(in_srgb,var(--sniptale-color-warning)_28%,transparent)]',
-          'bg-[color:color-mix(in_srgb,var(--sniptale-color-warning-soft)_0%,transparent)]',
-          'transition-[background-color,border-color]',
-          'hover:border-[color:color-mix(in_srgb,var(--sniptale-color-warning)_62%,transparent)]',
-          'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-warning-soft)_28%,transparent)]',
+          'group absolute inset-y-2 z-10 overflow-hidden rounded-sm outline outline-1 -outline-offset-1 outline-dashed',
+          'outline-[color:color-mix(in_srgb,var(--sniptale-color-text-muted)_28%,transparent)]',
+          'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_0%,transparent)]',
+          'transition-[background-color,outline-color]',
+          'hover:outline-[color:color-mix(in_srgb,var(--sniptale-color-text-muted)_62%,transparent)]',
+          'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_28%,transparent)]',
         ].join(' ')}
-        style={{ left: zone.start * props.pixelsPerSecond, width }}
+        style={{
+          left: zone.start * props.pixelsPerSecond,
+          width,
+          backgroundImage: [
+            'repeating-linear-gradient(135deg, transparent, transparent 5px,',
+            'color-mix(in srgb, var(--sniptale-color-text-muted) 8%, transparent) 5px,',
+            'color-mix(in srgb, var(--sniptale-color-text-muted) 8%, transparent) 6px)',
+          ].join(' '),
+        }}
       >
         <span
           className={[
             'pointer-events-none absolute left-1/2 top-1/2 flex h-6 w-6',
             '-translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full',
-            'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-warning)]',
+            'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-muted)]',
             'opacity-0 shadow-sm transition-opacity group-hover:opacity-100',
           ].join(' ')}
         >
@@ -199,21 +206,4 @@ function TrackGapZoneLayer(props: {
       </button>
     );
   });
-}
-
-function TrackStackedOverlapLayer(props: {
-  pixelsPerSecond: number;
-  stackedOverlapZones: TimelineZone[];
-}) {
-  return props.stackedOverlapZones.map((zone) => (
-    <div
-      key={zone.id}
-      data-ui="timeline.track-overlap-zone"
-      className={STACKED_OVERLAP_ZONE_CLASS_NAME}
-      style={{
-        left: zone.start * props.pixelsPerSecond,
-        width: Math.max(10, (zone.end - zone.start) * props.pixelsPerSecond),
-      }}
-    />
-  ));
 }

@@ -138,7 +138,7 @@ function verifyMoveAndTrimMutations(): void {
   const project = createTimelineProject();
 
   expect(moveProjectClip(project, 'missing', 2)).toBe(project);
-  expect(trimProjectClipStart(project, 'clip-1', 4.99)).toBe(project);
+  expect(trimProjectClipStart(project, 'clip-1', 4.99).clips[0]?.duration).toBeCloseTo(0.1);
 
   const movedProject = moveProjectClip(project, 'clip-1', 3);
   const movedClip = movedProject.clips.find((clip) => clip.id === 'clip-1');

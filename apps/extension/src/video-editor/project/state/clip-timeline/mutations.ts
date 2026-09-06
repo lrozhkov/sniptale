@@ -6,7 +6,7 @@ import {
   isMatchingTrackGapCandidate,
 } from '../../operations/timeline-gaps';
 import {
-  getSourceTimedClipSourceOffset,
+  normalizeClipPlaybackRate,
   getAssetById,
 } from '../../../../features/video/project/timeline/basics';
 import type { VideoProject } from '../../../../features/video/project/types/index';
@@ -108,31 +108,21 @@ export function trimProjectClipStart(
     return project;
   }
 
-  const clipEnd = operation.clip.startTime + operation.clip.duration;
-  const clampedStart = clampNumber(nextStartTime, 0, clipEnd - 0.1);
-  const delta = clampedStart - operation.clip.startTime;
-  if (
-    operation.affectedClips.some((item) => {
-      if (!isSourceTimedClip(item)) {
-        return item.duration - delta < 0.1;
-      }
-
-      const sourceDelta = getSourceTimedClipSourceOffset(item, delta);
-      return (
-        item.sourceStart + sourceDelta < -TIMELINE_GAP_EPSILON ||
-        item.sourceDuration - sourceDelta < 0.1
-      );
-    })
-  ) {
-    return project;
-  }
+  if (!Number.isFinite(nextStartTime)) return project;
+  const delta = clampClipTrimDelta(
+    project,
+    operation.affectedClips,
+    'start',
+    nextStartTime - operation.clip.startTime
+  );
+  if (delta === 0) return project;
 
   const nextProject = updateOperationClips(project, operation, (item) => {
     if (!isSourceTimedClip(item)) {
       return { ...item, startTime: item.startTime + delta, duration: item.duration - delta };
     }
 
-    const sourceDelta = getSourceTimedClipSourceOffset(item, delta);
+    const sourceDelta = delta * normalizeClipPlaybackRate(item.playbackRate ?? 1);
     return updateSourceTimedClipTiming(item, {
       startTime: item.startTime + delta,
       sourceStart: item.sourceStart + sourceDelta,
@@ -142,35 +132,39 @@ export function trimProjectClipStart(
   return nextProject;
 }
 
-function hasInvalidClipEndTrim(
-  affectedClips: EditableClipOperation['affectedClips'],
-  deltaDuration: number
-): boolean {
-  return affectedClips.some((item) => {
-    if (!isSourceTimedClip(item)) {
-      return item.duration + deltaDuration < 0.1;
-    }
-
-    return item.sourceDuration + getSourceTimedClipSourceOffset(item, deltaDuration) < 0.1;
-  });
-}
-
-function exceedsSourceAssetDuration(
+/** One shared feasible delta keeps aligned linked edges and their source bounds together. */
+function clampClipTrimDelta(
   project: VideoProject,
-  affectedClips: EditableClipOperation['affectedClips'],
-  deltaDuration: number
-): boolean {
-  return affectedClips.some((item) => {
-    if (!isSourceTimedClip(item)) {
-      return false;
+  clips: EditableClipOperation['affectedClips'],
+  edge: 'start' | 'end',
+  requestedDelta: number
+): number {
+  if (requestedDelta === 0) return 0;
+  let minimum = -Infinity;
+  let maximum = Infinity;
+  for (const clip of clips) {
+    const sourceTimed = isSourceTimedClip(clip);
+    const rate = sourceTimed ? normalizeClipPlaybackRate(clip.playbackRate ?? 1) : 1;
+    const minimumDuration = Math.max(0.1, 0.1 / rate);
+    if (edge === 'start') {
+      minimum = Math.max(minimum, -clip.startTime);
+      maximum = Math.min(maximum, clip.duration - minimumDuration);
+    } else {
+      minimum = Math.max(minimum, minimumDuration - clip.duration);
     }
-
-    const assetDuration =
-      getAssetById(project, item.assetId)?.metadata.duration ??
-      item.sourceStart + item.sourceDuration;
-    const sourceDelta = getSourceTimedClipSourceOffset(item, deltaDuration);
-    return item.sourceStart + item.sourceDuration + sourceDelta > assetDuration + 0.0001;
-  });
+    if (!sourceTimed) continue;
+    if (edge === 'start') {
+      minimum = Math.max(minimum, -clip.sourceStart / rate);
+    } else {
+      const assetDuration =
+        getAssetById(project, clip.assetId)?.metadata.duration ??
+        clip.sourceStart + clip.sourceDuration;
+      maximum = Math.min(maximum, (assetDuration - clip.sourceStart - clip.sourceDuration) / rate);
+    }
+  }
+  if (minimum > maximum) return 0;
+  const delta = clampNumber(requestedDelta, minimum, maximum);
+  return delta * requestedDelta < 0 ? 0 : delta;
 }
 
 export function trimProjectClipEnd(
@@ -183,19 +177,15 @@ export function trimProjectClipEnd(
     return project;
   }
 
+  if (!Number.isFinite(nextEndTime)) return project;
   const currentEnd = operation.clip.startTime + operation.clip.duration;
-  const clampedEnd = clampNumber(
-    nextEndTime,
-    operation.clip.startTime + 0.1,
-    Number.MAX_SAFE_INTEGER
+  const deltaDuration = clampClipTrimDelta(
+    project,
+    operation.affectedClips,
+    'end',
+    nextEndTime - currentEnd
   );
-  const deltaDuration = clampedEnd - currentEnd;
-  if (hasInvalidClipEndTrim(operation.affectedClips, deltaDuration)) {
-    return project;
-  }
-  if (exceedsSourceAssetDuration(project, operation.affectedClips, deltaDuration)) {
-    return project;
-  }
+  if (deltaDuration === 0) return project;
 
   const nextProject = updateOperationClips(project, operation, (item) => {
     if (!isSourceTimedClip(item)) {
@@ -203,7 +193,8 @@ export function trimProjectClipEnd(
     }
 
     return updateSourceTimedClipTiming(item, {
-      sourceDuration: item.sourceDuration + getSourceTimedClipSourceOffset(item, deltaDuration),
+      sourceDuration:
+        item.sourceDuration + deltaDuration * normalizeClipPlaybackRate(item.playbackRate ?? 1),
     });
   });
   return nextProject;

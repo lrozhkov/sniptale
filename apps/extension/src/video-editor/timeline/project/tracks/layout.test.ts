@@ -33,7 +33,7 @@ it('collapses persisted logical lanes into one physical track row', () => {
   expect(primaryLayout?.transitionRowCount).toBe(0);
   expect(primaryLayout?.logicalRows).toBe(1);
   expect(primaryLayout?.logicalLaneMetrics.size).toBe(1);
-  expect(primaryLayout?.rowHeight).toBe(TRACK_ROW_HEIGHT + 18);
+  expect(primaryLayout?.rowHeight).toBe(TRACK_ROW_HEIGHT);
   expect(primaryLayout?.junctionZones).toEqual([]);
   expect(audioLayout?.rowHeight).toBe(TRACK_ROW_HEIGHT);
 });

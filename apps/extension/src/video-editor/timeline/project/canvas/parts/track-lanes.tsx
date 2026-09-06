@@ -10,7 +10,6 @@ import {
   buildTrackGapZones,
   buildTrackCutZones,
   buildTrackJunctionZones,
-  buildTrackStackedOverlapZones,
   ProjectTimelineTrackZones,
 } from '../../tracks/zones/index';
 import type {
@@ -211,7 +210,6 @@ function createTrackZoneProps(props: {
     gapZones: buildTrackGapZones(props.project, props.track.id),
     junctionZones: buildTrackJunctionZones(props.project, props.track.id),
     pixelsPerSecond: props.pixelsPerSecond,
-    stackedOverlapZones: buildTrackStackedOverlapZones(props.project, props.track.id),
     selectedTransitionId:
       props.selection.kind === VideoEditorSelectionKind.TRANSITION_JUNCTION
         ? props.selection.transitionId

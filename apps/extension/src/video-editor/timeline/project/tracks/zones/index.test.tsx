@@ -8,12 +8,7 @@ import { createVideoClipFromAsset } from '../../../../../features/video/project/
 import { splitProjectClipsAtTime } from '../../../../project/state/clip-timeline/mutations';
 import { VideoTrackKind } from '../../../../../features/video/project/types';
 import { writeVideoEditorEffectDocumentDragPayload } from '../../../../contracts/effect-document-drag';
-import {
-  buildTrackCutZones,
-  buildTrackGapZones,
-  buildTrackJunctionZones,
-  buildTrackStackedOverlapZones,
-} from './index';
+import { buildTrackCutZones, buildTrackGapZones, buildTrackJunctionZones } from './index';
 import { createTimelineZoneAsset, createTimelineZoneProject } from './test-support';
 import {
   createEffectDocumentDataTransfer,
@@ -98,11 +93,10 @@ function verifyTrackZoneRendering() {
   expect(buttons).toHaveLength(2);
   expect(gapButton?.style.left).toBe('40px');
   expect(gapButton?.style.width).toBe('20px');
-  expect(stackedCue?.getAttribute('style')).toContain('left: 70px');
-  expect(stackedCue?.getAttribute('style')).toContain('width: 20px');
-  expect(stackedCue?.className).toContain('inset-y-2');
   expect(transitionButton?.style.left).toBe('80px');
-  expect(transitionButton?.style.width).toBe('28px');
+  expect(transitionButton?.style.width).toBe('20px');
+  expect(stackedCue).toBeNull();
+  expect(transitionButton?.querySelector('svg path')).not.toBeNull();
 
   act(() => transitionButton?.click());
   expect(onSelectTransition).toHaveBeenCalledWith('transition-zone');
@@ -151,13 +145,6 @@ function expectPrimaryTrackZones(
       zoneSelectedClassName: expect.stringContaining('var(--sniptale-color-border-accent-strong)'),
     },
   ]);
-  expect(buildTrackStackedOverlapZones(project, trackId)).toEqual([
-    {
-      end: 6,
-      id: 'clip-a:clip-c|clip-b:clip-c',
-      start: 2,
-    },
-  ]);
 }
 
 function expectSecondaryTrackZones(
@@ -166,13 +153,6 @@ function expectSecondaryTrackZones(
 ) {
   expect(buildTrackCutZones(project, trackId)).toEqual([]);
   expect(buildTrackGapZones(project, trackId)).toEqual([]);
-  expect(buildTrackStackedOverlapZones(project, trackId)).toEqual([
-    {
-      end: 6,
-      id: 'clip-c:clip-a|clip-c:clip-b',
-      start: 2,
-    },
-  ]);
 }
 
 function expectCutTrackZones(
@@ -187,7 +167,6 @@ function expectCutTrackZones(
   ]);
   expect(buildTrackGapZones(project, trackId)).toEqual([]);
   expect(buildTrackJunctionZones(project, trackId)).toEqual([]);
-  expect(buildTrackStackedOverlapZones(project, trackId)).toEqual([]);
 }
 
 function verifySplitCutZone() {

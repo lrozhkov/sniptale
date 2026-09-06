@@ -14,14 +14,14 @@ const MIN_CLIP_HEIGHT = 22;
 const CLIP_VERTICAL_PADDING = 18;
 const LABEL_BASE_INSET = 12;
 const MIN_LABEL_READABLE_WIDTH = 24;
-const MIN_PREVIEW_TILE_WIDTH = 48;
+const MIN_PREVIEW_TILE_WIDTH = 1;
 const MAX_PREVIEW_TILE_WIDTH = 160;
 const SELECTED_CLIP_SHADOW_CLASS_NAME = [
   'shadow-[0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent-emphasis)_28%,transparent),',
   '0_2px_8px_color-mix(in_srgb,var(--sniptale-color-text-primary)_8%,transparent)]',
 ].join('');
 const TRIM_HANDLE_CLASS_NAME = [
-  'absolute inset-y-0 z-30 w-[min(8px,25%)] cursor-ew-resize',
+  'absolute inset-y-0 z-30 w-[min(10px,25%)] !cursor-ew-resize',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_20%,transparent)]',
   'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_32%,transparent)]',
 ].join(' ');
@@ -159,7 +159,7 @@ function getTimelineClipClassName({
           'brightness-110',
         ].join(' ')
       : '',
-    trackLocked ? 'opacity-55' : '',
+    trackLocked ? 'opacity-55 cursor-default' : 'cursor-grab',
   ].join(' ');
 }
 
@@ -239,6 +239,8 @@ function getTimelineClipWaveformPeaks({
 
 function getPreviewTileWidth(trackClipRowHeight: number): number {
   const clipHeight = Math.max(MIN_CLIP_HEIGHT, trackClipRowHeight - CLIP_VERTICAL_PADDING);
-  const aspectWidth = Math.round((clipHeight * 16) / 9);
+  const pictureHeight = clipHeight - 20;
+  if (pictureHeight < 16) return 0;
+  const aspectWidth = Math.round((pictureHeight * 16) / 9);
   return Math.min(MAX_PREVIEW_TILE_WIDTH, Math.max(MIN_PREVIEW_TILE_WIDTH, aspectWidth));
 }

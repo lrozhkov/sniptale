@@ -226,7 +226,8 @@ it('grows visual clip height with tall track rows and keeps previews as fixed ti
 
   expect(clip?.style.height).toBe('106px');
   expect(image?.className).not.toContain('flex-1');
-  expect(image?.style.width).toBe('160px');
+  expect(image?.style.width).toBe('153px');
+  expect(image?.className).toContain('object-contain');
 });
 
 it('keeps audio clip labels focused on the clip name', () => {

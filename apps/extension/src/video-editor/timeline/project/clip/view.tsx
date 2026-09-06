@@ -117,17 +117,18 @@ function ProjectTimelineVisualClipPreview({
   preview: TimelineClipPreview | undefined;
   tileWidth: number;
 }) {
+  if (tileWidth === 0) return null;
   const urls = preview?.urls ?? [];
 
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 top-5 z-0 flex gap-1 overflow-hidden opacity-90">
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 top-5 z-0 flex overflow-hidden opacity-90">
       {urls.map((url, index) => (
         <img
           key={`${url}:${index}`}
           src={url}
           alt=""
           aria-hidden="true"
-          className="h-full shrink-0 object-cover"
+          className="h-full shrink-0 object-contain"
           style={{ width: tileWidth }}
           draggable={false}
         />
@@ -150,18 +151,6 @@ function ProjectTimelineClipVisualOverlays({
         align="right"
         title={translate('videoEditor.sidebar.fadeOutLabel')}
         width={viewModel.fadeOutOverlayWidth}
-      />
-      <ProjectTimelineCrossfadeOverlay
-        align="left"
-        title={viewModel.incomingCrossfadeTitle}
-        visible={viewModel.hasIncomingCrossfade}
-        width={viewModel.incomingCrossfadeOverlayWidth}
-      />
-      <ProjectTimelineCrossfadeOverlay
-        align="right"
-        title={viewModel.outgoingCrossfadeTitle}
-        visible={viewModel.hasOutgoingCrossfade}
-        width={viewModel.outgoingCrossfadeOverlayWidth}
       />
       <span className={`${viewModel.edgeClassName} left-0`} aria-hidden="true" />
       <span className={`${viewModel.edgeClassName} right-0`} aria-hidden="true" />
@@ -223,36 +212,6 @@ function ProjectTimelineFadeOverlay({
         align === 'left' ? 'bg-gradient-to-r' : 'bg-gradient-to-l',
         'from-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_58%,transparent)]',
         'via-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_24%,transparent)]',
-        'to-transparent',
-      ].join(' ')}
-      style={{ width }}
-    />
-  );
-}
-
-function ProjectTimelineCrossfadeOverlay({
-  align,
-  title,
-  visible,
-  width,
-}: {
-  align: 'left' | 'right';
-  title: string;
-  visible: boolean;
-  width: number;
-}) {
-  if (!visible || width <= 0) {
-    return null;
-  }
-
-  return (
-    <div
-      title={title}
-      className={[
-        `pointer-events-none absolute inset-y-0 ${align}-0`,
-        align === 'left' ? 'bg-gradient-to-r' : 'bg-gradient-to-l',
-        'from-[color:color-mix(in_srgb,#7c3aed_26%,transparent)]',
-        'via-[color:color-mix(in_srgb,#7c3aed_12%,transparent)]',
         'to-transparent',
       ].join(' ')}
       style={{ width }}
