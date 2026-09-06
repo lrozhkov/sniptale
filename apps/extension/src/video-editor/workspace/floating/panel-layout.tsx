@@ -6,8 +6,8 @@ import { startWindowPointerSession } from '../../interaction/pointer-session';
 
 type PanelSide = 'materials' | 'inspector';
 const PANEL_WIDTHS = {
-  materials: { default: 240, min: 200, max: 360 },
-  inspector: { default: 320, min: 280, max: 520 },
+  materials: { min: 200 },
+  inspector: { min: 280 },
 };
 
 export interface WorkspacePanelResize {
@@ -24,7 +24,10 @@ export function useWorkspacePanelSizes(materialsOpen: boolean) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
   const [frameWidth, setFrameWidth] = useState(1280);
-  const [widths, setWidths] = useState({ materials: 240, inspector: 320 });
+  const [widths, setWidths] = useState<Record<PanelSide, number | null>>({
+    materials: null,
+    inspector: null,
+  });
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -37,21 +40,23 @@ export function useWorkspacePanelSizes(materialsOpen: boolean) {
       cleanupRef.current?.();
     };
   }, []);
+  const extraWidth = Math.min(120, Math.max(0, frameWidth - 1280) / 8);
+  const defaults = { materials: Math.min(360, 240 + extraWidth), inspector: 320 + extraWidth };
   const materialsMax = Math.min(360, frameWidth - 40 - 640 - 280);
-  const materialsWidth = Math.min(widths.materials, materialsMax);
+  const materialsWidth = Math.min(widths.materials ?? defaults.materials, materialsMax);
   const inspectorMax = Math.min(520, frameWidth - 40 - 640 - (materialsOpen ? materialsWidth : 0));
   const dimension = (side: PanelSide): WorkspacePanelResize => {
     const limits = PANEL_WIDTHS[side];
     const max = side === 'inspector' ? inspectorMax : materialsMax;
     const clamp = (value: number) => Math.max(limits.min, Math.min(max, value));
-    const width = clamp(widths[side]);
+    const width = clamp(widths[side] ?? defaults[side]);
     const update = (value: number) =>
       setWidths((current) => ({ ...current, [side]: clamp(value) }));
     const direction = side === 'materials' ? 1 : -1;
     const reset = () => {
       cleanupRef.current?.();
       cleanupRef.current = null;
-      update(limits.default);
+      setWidths((current) => ({ ...current, [side]: null }));
     };
     return {
       width,
@@ -65,7 +70,7 @@ export function useWorkspacePanelSizes(materialsOpen: boolean) {
         const startX = event.clientX;
         cleanupRef.current = startWindowPointerSession({
           onMove: (move) => update(width + (move.clientX - startX) * direction),
-          onCancel: () => update(width),
+          onCancel: () => setWidths((current) => ({ ...current, [side]: widths[side] })),
           onEnd: () => {
             cleanupRef.current = null;
           },

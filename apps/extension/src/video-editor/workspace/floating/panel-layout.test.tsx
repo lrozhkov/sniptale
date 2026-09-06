@@ -100,3 +100,42 @@ it('restores the starting width on Escape and stops the cancelled pointer sessio
   pointer(window, 'pointermove', 310);
   expect(width('materials')).toBe(240);
 });
+
+function resizeFrame(value: number) {
+  act(() => {
+    frameWidth = value;
+    measure();
+  });
+}
+
+it('uses roomier automatic pane proportions on Full HD and wide displays', () => {
+  resizeFrame(1920);
+  expect(width('materials')).toBe(320);
+  expect(width('inspector')).toBe(400);
+  resizeFrame(2560);
+  expect(width('materials')).toBe(360);
+  expect(width('inspector')).toBe(440);
+  resizeFrame(1280);
+  expect(width('materials')).toBe(240);
+  expect(width('inspector')).toBe(320);
+});
+
+it('preserves manual dimensions until reset resumes automatic sizing', () => {
+  resizeFrame(1920);
+  key('materials', 'ArrowLeft');
+  expect(width('materials')).toBe(296);
+  resizeFrame(2560);
+  expect(width('materials')).toBe(296);
+  key('materials', 'Home');
+  expect(width('materials')).toBe(360);
+  resizeFrame(1920);
+  expect(width('materials')).toBe(320);
+});
+
+it('restores automatic sizing when a resize gesture is cancelled', () => {
+  pointer(pane('materials'), 'pointerdown', 200);
+  pointer(window, 'pointermove', 240);
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  resizeFrame(1920);
+  expect(width('materials')).toBe(320);
+});

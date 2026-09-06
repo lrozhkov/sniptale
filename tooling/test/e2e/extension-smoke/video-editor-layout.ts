@@ -34,8 +34,7 @@ export async function expectVideoEditorPanelLayout(page: Page): Promise<void> {
     if (right)
       expect(rightBox.y + rightBox.height).toBeCloseTo(timelineBox.y + timelineBox.height, 0);
   }
-  await expectWidthReset(page, 'video-editor.materials.resize', 'ArrowRight', 240);
-  await expectWidthReset(page, 'video-editor.floating.context-inspector.resize', 'ArrowLeft', 320);
+  await expectAdaptivePaneDefaults(page);
   const separator = page.locator('[data-ui="video-editor.workspace.timeline-resize-zone"]');
   const viewer = page.locator('[data-ui="video-editor.workspace.viewer"]');
   const initialHeight = (await viewer.boundingBox())!.height;
@@ -45,6 +44,26 @@ export async function expectVideoEditorPanelLayout(page: Page): Promise<void> {
   expect((await viewer.boundingBox())!.height).toBeCloseTo(initialHeight, 0);
 }
 
+async function expectAdaptivePaneDefaults(page: Page): Promise<void> {
+  const originalViewport = page.viewportSize()!;
+  for (const [width, height, materialsWidth, inspectorWidth] of [
+    [1280, 720, 240, 320],
+    [1920, 1080, 320, 400],
+    [2560, 1440, 360, 440],
+  ] as const) {
+    await page.setViewportSize({ width, height });
+    await expectWidthReset(page, 'video-editor.materials.resize', 'ArrowLeft', materialsWidth);
+    await expectWidthReset(
+      page,
+      'video-editor.floating.context-inspector.resize',
+      'ArrowRight',
+      inspectorWidth
+    );
+    await expectTimelineToolbarControls(page);
+  }
+  await page.setViewportSize(originalViewport);
+}
+
 async function expectWidthReset(
   page: Page,
   selector: string,
@@ -52,8 +71,9 @@ async function expectWidthReset(
   width: number
 ): Promise<void> {
   const separator = page.locator(`[data-ui="${selector}"]`);
+  await expect(separator).toHaveAttribute('aria-valuenow', String(width));
   await separator.press(key);
-  await expect(separator).toHaveAttribute('aria-valuenow', String(width + 24));
+  await expect(separator).toHaveAttribute('aria-valuenow', String(width - 24));
   await separator.hover();
   expect(await separator.evaluate((node) => getComputedStyle(node).backgroundColor)).toBe(
     'rgba(0, 0, 0, 0)'

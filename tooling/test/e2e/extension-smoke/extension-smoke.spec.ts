@@ -178,7 +178,7 @@ async function expectBuiltVideoEditorGeometry(
   const divider = page.locator('[data-ui="video-editor.floating.context-inspector.resize"]');
   await divider.focus();
   await divider.press('ArrowLeft');
-  await expect(divider).toHaveAttribute('aria-valuenow', '344');
+  await expect(divider).toHaveAttribute('aria-valuenow', '384');
   await expect
     .poll(() => preview.evaluate((element) => element.getBoundingClientRect().right))
     .toBe(geometry.preview.right - 24);
@@ -186,7 +186,7 @@ async function expectBuiltVideoEditorGeometry(
     .poll(() => timeline.evaluate((element) => element.getBoundingClientRect().right))
     .toBe(geometry.timeline.right);
   await divider.press('ArrowRight');
-  await expect(divider).toHaveAttribute('aria-valuenow', '320');
+  await expect(divider).toHaveAttribute('aria-valuenow', '360');
   const dividerBox = await divider.boundingBox();
   if (!dividerBox) throw new Error('Missing inspector divider');
   expect(dividerBox.x).toBeGreaterThanOrEqual(geometry.preview.right);
@@ -195,7 +195,7 @@ async function expectBuiltVideoEditorGeometry(
   await page.mouse.down();
   await page.mouse.move(dividerBox.x + dividerBox.width / 2 - 80, dividerBox.y + 100);
   await page.mouse.up();
-  await expect(divider).toHaveAttribute('aria-valuenow', '400');
+  await expect(divider).toHaveAttribute('aria-valuenow', '440');
   await expect
     .poll(() => timeline.evaluate((element) => element.getBoundingClientRect().right))
     .toBe(geometry.timeline.right);
@@ -222,7 +222,7 @@ async function expectBuiltVideoEditorGeometry(
     path: effectsDockScreenshotPath.replace('.png', '-compact.png'),
   });
   await page.setViewportSize({ width: 1600, height: 1100 });
-  await expect(divider).toHaveAttribute('aria-valuenow', '400');
+  await expect(divider).toHaveAttribute('aria-valuenow', '440');
   await expect
     .poll(() => timeline.evaluate((element) => element.getBoundingClientRect().right))
     .toBe(geometry.timeline.right);
@@ -235,7 +235,7 @@ async function expectBuiltVideoEditorGeometry(
   await page.mouse.down();
   await page.mouse.move(resizedBox.x + resizedBox.width / 2 + 80, resizedBox.y + 100);
   await page.mouse.up();
-  await expect(divider).toHaveAttribute('aria-valuenow', '320');
+  await expect(divider).toHaveAttribute('aria-valuenow', '360');
 
   await effectsToggle.click();
   await expect(effectsDock).toHaveCount(0);
