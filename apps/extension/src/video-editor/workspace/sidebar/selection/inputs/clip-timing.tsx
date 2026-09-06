@@ -1,3 +1,4 @@
+import { ClipSourceRangeControls } from './source-range';
 import { ClipOrderControls } from './clip-order';
 import { translate } from '../../../../../platform/i18n';
 import { isAudioClip, isVideoClip } from '../../../../../features/video/project/timeline';
@@ -21,6 +22,18 @@ type ClipTimingControlsProps = WorkspaceSidebarSelectionPanelProps & {
 export function ClipTimingControls(props: ClipTimingControlsProps) {
   return (
     <>
+      {(isVideoClip(props.clip) || isAudioClip(props.clip)) &&
+      props.onTrimClipStart &&
+      props.onTrimClipEnd ? (
+        <ClipSourceRangeControls
+          key={props.clip.id}
+          project={props.project}
+          clip={props.clip}
+          locked={props.locked}
+          onTrimClipStart={props.onTrimClipStart}
+          onTrimClipEnd={props.onTrimClipEnd}
+        />
+      ) : null}
       {props.onSwapClip ? (
         <ClipOrderControls
           project={props.project}

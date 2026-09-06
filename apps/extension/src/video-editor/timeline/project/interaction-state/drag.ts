@@ -118,7 +118,6 @@ function beginTimelineClipInteraction(
   if (args.mode !== 'move') {
     args.event.preventDefault();
     params.onSelectClip(args.clip.id);
-    params.onSelectTrack(args.clip.trackId);
   }
 
   params.cleanupRef.current?.();

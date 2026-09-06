@@ -257,6 +257,7 @@ it.each([false, true])(
   (trackLocked) => {
     const project = createEmptyVideoProject('Edge hit');
     const onBeginClipInteraction = vi.fn();
+    const onSelectClip = vi.fn();
     act(() =>
       root?.render(
         <ProjectTimelineClip
@@ -267,7 +268,7 @@ it.each([false, true])(
           project={project}
           trackLocked={trackLocked}
           onClipHoverChange={vi.fn()}
-          onSelectClip={vi.fn()}
+          onSelectClip={onSelectClip}
           onBeginClipInteraction={onBeginClipInteraction}
         />
       )
@@ -275,6 +276,12 @@ it.each([false, true])(
     const handle = container!.querySelector('button')!;
     act(() => handle.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
     expect(onBeginClipInteraction).toHaveBeenCalledTimes(trackLocked ? 0 : 1);
-    if (!trackLocked) expect(onBeginClipInteraction.mock.calls[0]?.[2]).toBe('trim-start');
+    if (!trackLocked) {
+      expect(onBeginClipInteraction.mock.calls[0]?.[2]).toBe('trim-start');
+      expect(onSelectClip).toHaveBeenCalledWith('clip-1');
+      expect(onSelectClip.mock.invocationCallOrder[0]).toBeLessThan(
+        onBeginClipInteraction.mock.invocationCallOrder[0]!
+      );
+    }
   }
 );

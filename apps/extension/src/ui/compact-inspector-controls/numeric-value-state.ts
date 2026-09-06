@@ -69,6 +69,7 @@ function useNumericDraftState({
     editing,
     editingRef,
     editValue: formatCompactEditNumber(value, { precision }),
+    appliedValue: value ?? 0,
     inputRef,
     setDraft,
     setEditing,
@@ -224,6 +225,7 @@ function beginNumericEditing({
 }
 
 function cancelNumericEditing(draftState: NumericDraftState) {
+  draftState.stepValueRef.current = draftState.appliedValue;
   draftState.editingRef.current = false;
   draftState.setEditing(false);
   draftState.setDraft(draftState.editValue);

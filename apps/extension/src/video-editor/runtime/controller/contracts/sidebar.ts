@@ -107,6 +107,8 @@ interface VideoEditorSidebarProjectActions {
 interface VideoEditorSidebarClipActions {
   onConvertTextClipToAnnotation: VideoEditorSidebarCommands['convertTextClipToAnnotation'];
   onSwapClip: VideoEditorSidebarCommands['swapClip'];
+  onTrimClipStart: VideoEditorSidebarCommands['trimClipStart'];
+  onTrimClipEnd: VideoEditorSidebarCommands['trimClipEnd'];
   onDetachClipGroup: VideoEditorSidebarCommands['detachClipGroup'];
   onUpdateClipAudioEnvelope: VideoEditorSidebarCommands['updateClipAudioEnvelope'];
   onUpdateClipFades: VideoEditorSidebarCommands['updateClipFades'];

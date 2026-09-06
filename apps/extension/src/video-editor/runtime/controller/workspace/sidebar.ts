@@ -61,6 +61,8 @@ function createWorkspaceSidebarClipActions(store: EditorStore) {
     onConvertTextClipToAnnotation: store.convertTextClipToAnnotation,
     onDetachClipGroup: store.detachClipGroup,
     onSwapClip: store.swapClip,
+    onTrimClipStart: store.trimClipStart,
+    onTrimClipEnd: store.trimClipEnd,
     onUpdateAnnotationClipContent: store.updateAnnotationClipContent,
     onUpdateAnnotationClipStyle: store.updateAnnotationClipStyle,
     onUpdateAnnotationClipTemplate: store.updateAnnotationClipTemplate,

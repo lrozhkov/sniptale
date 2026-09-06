@@ -22,6 +22,8 @@ type WorkspaceSidebarPanelContentPropKeys =
   | 'onDeleteProject'
   | 'onDeleteTrack'
   | 'onSwapClip'
+  | 'onTrimClipStart'
+  | 'onTrimClipEnd'
   | 'onDetachClipGroup'
   | 'onEnableCursorTrack'
   | 'onInsertCursorSample'

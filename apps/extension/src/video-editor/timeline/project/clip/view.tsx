@@ -39,8 +39,9 @@ export function ProjectTimelineClipLayout({
       onClick={(event) => selectTimelineClip(event, clip.id, onSelectClip)}
       onPointerEnter={() => onClipHoverChange(clip.id)}
       onPointerLeave={() => onClipHoverChange(null)}
+      onPointerDownCapture={() => onSelectClip(clip.id)}
       onPointerDown={(event) => {
-        selectTimelineClip(event, clip.id, onSelectClip);
+        event.stopPropagation();
         if (!trackLocked) {
           onBeginClipInteraction(event, clip, 'move');
         }

@@ -30,6 +30,8 @@ type SelectionAnnotationUpdateDefaults = {
 type SelectionSceneClipUpdateSource = Pick<
   WorkspaceSidebarProps,
   | 'onSwapClip'
+  | 'onTrimClipStart'
+  | 'onTrimClipEnd'
   | 'onDetachClipGroup'
   | 'onResizeProject'
   | 'onSetSceneBackground'
@@ -50,6 +52,8 @@ type SelectionSceneClipUpdateSource = Pick<
 type SelectionSceneClipUpdateDefaults = Pick<
   WorkspaceSidebarProps,
   | 'onSwapClip'
+  | 'onTrimClipStart'
+  | 'onTrimClipEnd'
   | 'onDetachClipGroup'
   | 'onResizeProject'
   | 'onSetSceneBackground'
@@ -86,6 +90,8 @@ export function createSelectionSceneClipUpdateDefaults(
 ): SelectionSceneClipUpdateDefaults {
   return {
     ...(props.onSwapClip ? { onSwapClip: props.onSwapClip } : {}),
+    ...(props.onTrimClipStart ? { onTrimClipStart: props.onTrimClipStart } : {}),
+    ...(props.onTrimClipEnd ? { onTrimClipEnd: props.onTrimClipEnd } : {}),
     onDetachClipGroup: props.onDetachClipGroup,
     onPreviewSceneBackground: props.onPreviewSceneBackground ?? noop,
     onRememberRecentColor: props.onRememberRecentColor ?? noopAsync,

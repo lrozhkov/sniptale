@@ -113,6 +113,8 @@ function createClipActions(): VideoEditorSidebarController['clipActions'] {
     onApplyMediaClipVisualsToTrack: noop(),
     onConvertTextClipToAnnotation: noop(),
     onSwapClip: vi.fn(),
+    onTrimClipStart: vi.fn(),
+    onTrimClipEnd: vi.fn(),
     onDetachClipGroup: noop(),
     onUpdateAnnotationClipContent: noop(),
     onUpdateAnnotationClipStyle: noop(),

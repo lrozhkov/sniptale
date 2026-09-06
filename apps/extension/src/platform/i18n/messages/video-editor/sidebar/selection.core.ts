@@ -3,6 +3,12 @@ import { videoEditorSidebarSelectionAnnotationMessages } from './selection.annot
 import { videoEditorSidebarSelectionStyleMessages } from './selection.core-style.ts';
 
 export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
+  sourceIn: { ru: 'In исходника', en: 'Source In' },
+  sourceOut: { ru: 'Out исходника', en: 'Source Out' },
+  sourceRangeHint: {
+    ru: 'Время в исходнике. Out — граница окончания фрагмента.',
+    en: 'Source time. Out is the boundary after the selected range.',
+  },
   nothingSelected: {
     ru: 'Ничего не выбрано',
     en: 'Nothing selected',

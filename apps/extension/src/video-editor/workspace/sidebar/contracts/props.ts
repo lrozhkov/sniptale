@@ -56,6 +56,8 @@ export interface WorkspaceSidebarProps {
   onDeleteProject: (projectId: string) => void | Promise<void>;
   onDeleteTrack?: (trackId: string) => void;
   onSwapClip?: VideoEditorProjectActions['swapClip'];
+  onTrimClipStart?: VideoEditorProjectActions['trimClipStart'];
+  onTrimClipEnd?: VideoEditorProjectActions['trimClipEnd'];
   onDetachClipGroup: (clipId: string) => void;
   onEnableCursorTrack: () => void;
   onImportAudio: (file: File) => void;

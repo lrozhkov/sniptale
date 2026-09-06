@@ -347,6 +347,39 @@ it('preserves redo when an activated drag is clamped to its original position', 
   expect(useVideoEditorStore.getState().projectHistory.future).toHaveLength(1);
 });
 
+it.each(['trim-start', 'trim-end'] as const)('keeps the clip selected when starting %s', (mode) => {
+  const project = createEmptyVideoProject('Edge selection');
+  project.clips = [createClip(project.tracks[0]!.id)];
+  project.duration = 8;
+  useVideoEditorStore.getState().setProject(project);
+  useVideoEditorStore.getState().selectTrack(project.tracks[0]!.id);
+  let begin: ReturnType<typeof useProjectTimelineDrag>['beginClipInteraction'] | undefined;
+  function Harness() {
+    const state = useVideoEditorStore();
+    begin = useProjectTimelineDrag({
+      project: state.project!,
+      currentTime: 0,
+      pixelsPerSecond: 10,
+      magnetEnabled: false,
+      historyTransaction: state,
+      onSwapClip: state.swapClip,
+      onMoveClip: state.moveClip,
+      onSelectClip: state.selectClip,
+      onSelectTrack: state.selectTrack,
+      onTimelinePreviewSuspendedChange: vi.fn(),
+      onTrimClipStart: state.trimClipStart,
+      onTrimClipEnd: state.trimClipEnd,
+    }).beginClipInteraction;
+    return null;
+  }
+  act(() => root?.render(<Harness />));
+  act(() => begin?.(createPointerEvent(100, 40), project.clips[0]!, mode));
+  expect(resolveSelectedClipId(useVideoEditorStore.getState().selection)).toBe('clip-1');
+  act(() => window.dispatchEvent(new Event('pointerup')));
+  expect(resolveSelectedClipId(useVideoEditorStore.getState().selection)).toBe('clip-1');
+  expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(0);
+});
+
 it('keeps an independent delete shortcut outside an active drag transaction', () => {
   const project = createEmptyVideoProject('Interrupted drag');
   project.clips = [createClip(project.tracks[0]!.id)];

@@ -26,6 +26,8 @@ export interface WorkspaceSidebarSelectionPanelProps {
   onGenerateMotionPathFromCursor?: WorkspaceSidebarProps['onGenerateMotionPathFromCursor'];
   onDeleteTrack?: WorkspaceSidebarProps['onDeleteTrack'];
   onSwapClip?: WorkspaceSidebarProps['onSwapClip'];
+  onTrimClipStart?: WorkspaceSidebarProps['onTrimClipStart'];
+  onTrimClipEnd?: WorkspaceSidebarProps['onTrimClipEnd'];
   onDetachClipGroup: WorkspaceSidebarProps['onDetachClipGroup'];
   onEnableCursorTrack: NonNullable<WorkspaceSidebarProps['onEnableCursorTrack']>;
   onInsertCursorSample: NonNullable<WorkspaceSidebarProps['onInsertCursorSample']>;
