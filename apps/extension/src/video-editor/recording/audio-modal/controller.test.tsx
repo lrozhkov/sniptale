@@ -19,7 +19,7 @@ let root: Root | null = null;
 let latestController: AudioRecordingControllerState | null = null;
 
 function ControllerHarness() {
-  latestController = useAudioRecordingController(true, vi.fn());
+  latestController = useAudioRecordingController(true);
   return null;
 }
 

@@ -1,11 +1,6 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { translate } from '../../../platform/i18n';
-import {
-  ProductModal,
-  ProductModalBody,
-  ProductModalFooter,
-  ProductModalHeader,
-} from '@sniptale/ui/product-modal';
+import { ProductModal, ProductModalBody, ProductModalFooter } from '@sniptale/ui/product-modal';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useAudioRecordingController } from './controller';
 import {
@@ -29,13 +24,14 @@ export function AudioRecordingModal({
   onClose,
   onSave,
 }: AudioRecordingModalProps): React.JSX.Element | null {
+  const titleId = useId();
   const savingRef = useRef(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const requestClose = useCallback(() => {
     if (!savingRef.current) onClose();
   }, [onClose]);
-  const controller = useAudioRecordingController(isOpen, requestClose);
+  const controller = useAudioRecordingController(isOpen);
   useEffect(() => {
     if (isOpen) setSaveError(null);
   }, [isOpen]);
@@ -65,13 +61,14 @@ export function AudioRecordingModal({
   return (
     <ProductModal
       onClose={requestClose}
-      closeOnBackdrop
+      closeOnBackdrop={false}
+      labelledBy={titleId}
       width="min(720px, calc(100vw - 32px))"
       maxHeight="min(760px, calc(100vh - 32px))"
       scrollable
     >
-      <ProductModalHeader title={<AudioRecordingModalHeader />} onClose={requestClose} />
-      <ProductModalBody className="gap-5">
+      <AudioRecordingModalHeader titleId={titleId} onClose={requestClose} disabled={isSaving} />
+      <ProductModalBody compact className="gap-4">
         <fieldset disabled={isSaving} className="contents">
           <AudioRecordingTransport
             durationLabel={controller.transport.durationLabel}
@@ -90,7 +87,7 @@ export function AudioRecordingModal({
           {renderAudioRecordingTrimPanel(controller.trim)}
         </fieldset>
       </ProductModalBody>
-      <ProductModalFooter>
+      <ProductModalFooter compact>
         <AudioRecordingCancelButton onClose={requestClose} />
         <AudioRecordingSaveButton
           audioBlob={controller.save.audioBlob}

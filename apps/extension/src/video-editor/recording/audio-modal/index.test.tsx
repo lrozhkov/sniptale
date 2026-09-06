@@ -4,10 +4,9 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { AudioRecordingModal } from './index';
 
-const controller = vi.hoisted(() => ({ reset: vi.fn(), close: null as (() => void) | null }));
+const controller = vi.hoisted(() => ({ reset: vi.fn() }));
 vi.mock('./controller', () => ({
-  useAudioRecordingController: (_open: boolean, close: () => void) => {
-    controller.close = close;
+  useAudioRecordingController: () => {
     return {
       transport: {
         durationLabel: '00:04',
@@ -64,7 +63,10 @@ it('retains failed recording for retry and blocks duplicate saves and dismissal'
   act(() => {
     save().click();
     save().click();
-    controller.close!();
+    document.querySelector<HTMLButtonElement>('.sniptale-modal-close')!.click();
+    Array.from(document.querySelectorAll('button'))
+      .find((button) => button.textContent === 'common.actions.cancel')!
+      .click();
   });
   expect(onSave).toHaveBeenCalledTimes(1);
   expect(onClose).not.toHaveBeenCalled();

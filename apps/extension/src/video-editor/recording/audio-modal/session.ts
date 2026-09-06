@@ -8,26 +8,6 @@ import type {
   AudioRecordingState,
 } from './session-types';
 
-function useEscapeClose(isOpen: boolean, onClose: () => void) {
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') {
-        return;
-      }
-
-      event.preventDefault();
-      onClose();
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-}
-
 function useAudioRecordingState(): AudioRecordingState {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -143,7 +123,6 @@ function useTrimPlaybackLifecycle(state: AudioRecordingState) {
 
 function useRecordingLifecycle(
   isOpen: boolean,
-  onClose: () => void,
   resetSession: () => void,
   state: AudioRecordingState
 ) {
@@ -160,7 +139,6 @@ function useRecordingLifecycle(
   }, [isOpen, resetSession]);
 
   useEffect(() => () => resetSessionOnUnmountRef.current(), []);
-  useEscapeClose(isOpen, onClose);
   useTrimPlaybackLifecycle(state);
 }
 
@@ -221,14 +199,11 @@ function useRecordingCaptureControls(
   return { startRecording, stopRecording };
 }
 
-export function useAudioRecordingSession(
-  isOpen: boolean,
-  onClose: () => void
-): AudioRecordingControllerState {
+export function useAudioRecordingSession(isOpen: boolean): AudioRecordingControllerState {
   const state = useAudioRecordingState();
   const refs = useAudioRecordingRefs();
   const resetSession = useRecordingReset(state, refs);
-  useRecordingLifecycle(isOpen, onClose, resetSession, state);
+  useRecordingLifecycle(isOpen, resetSession, state);
   const playbackControls = useRecordingPlaybackControls(state);
   const captureControls = useRecordingCaptureControls(state, refs, resetSession);
   const recordedDuration = useMemo(

@@ -1,4 +1,5 @@
 import type React from 'react';
+import { ProductModalHeader } from '@sniptale/ui/product-modal';
 import { Mic, Save, Square } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -42,16 +43,19 @@ export function AudioRecordingSaveButton(props: {
   );
 }
 
-export function AudioRecordingModalHeader() {
+export function AudioRecordingModalHeader(props: {
+  titleId: string;
+  onClose: () => void;
+  disabled: boolean;
+}) {
   return (
-    <div>
-      <div className="text-lg font-semibold text-[var(--sniptale-color-text-primary)]">
-        {translate('videoEditor.app.recordAudioTitle')}
-      </div>
-      <p className="mt-2 max-w-2xl text-sm text-[var(--sniptale-color-text-muted)]">
-        {translate('videoEditor.app.recordAudioDescription')}
-      </p>
-    </div>
+    <ProductModalHeader
+      compact
+      title={<span id={props.titleId}>{translate('videoEditor.app.recordAudioTitle')}</span>}
+      onClose={props.onClose}
+      disabled={props.disabled}
+      closeTitle={translate('common.actions.close')}
+    />
   );
 }
 
@@ -63,38 +67,43 @@ export function AudioRecordingTransport(props: {
   status: AudioRecordingStatus;
 }) {
   return (
-    <InspectorPanel data-ui="video-editor.audio-recording.transport" className="grid gap-3 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--sniptale-color-text-muted)]">
-            {translate('videoEditor.app.recordAudioDurationLabel')}
-          </p>
-          <p className="mt-2 text-3xl font-semibold text-[var(--sniptale-color-text-primary)]">
-            {props.durationLabel}
-          </p>
+    <>
+      <p className="mb-4 text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
+        {translate('videoEditor.app.recordAudioDescription')}
+      </p>
+      <InspectorPanel data-ui="video-editor.audio-recording.transport" className="grid gap-3 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs font-medium text-[var(--sniptale-color-text-muted)]">
+              {translate('videoEditor.app.recordAudioDurationLabel')}
+            </p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums text-[var(--sniptale-color-text-primary)]">
+              {props.durationLabel}
+            </p>
+          </div>
+          {props.status === 'recording' ? (
+            <RecordingActionButton
+              icon={<Square size={16} strokeWidth={2.1} />}
+              label={translate('videoEditor.app.recordAudioStop')}
+              onClick={props.onStopRecording}
+            />
+          ) : (
+            <RecordingActionButton
+              icon={<Mic size={16} strokeWidth={2.1} />}
+              label={translate('videoEditor.app.recordAudioStart')}
+              onClick={props.onStartRecording}
+            />
+          )}
         </div>
-        {props.status === 'recording' ? (
-          <RecordingActionButton
-            icon={<Square size={16} strokeWidth={2.1} />}
-            label={translate('videoEditor.app.recordAudioStop')}
-            onClick={props.onStopRecording}
-          />
-        ) : (
-          <RecordingActionButton
-            icon={<Mic size={16} strokeWidth={2.1} />}
-            label={translate('videoEditor.app.recordAudioStart')}
-            onClick={props.onStartRecording}
-          />
-        )}
-      </div>
-      {props.status === 'recorded' ? (
-        <p className="text-sm text-[var(--sniptale-color-text-muted)]">
-          {translate('videoEditor.app.recordAudioReadyHint')}
-        </p>
-      ) : null}
-      {props.error ? (
-        <p className="text-sm text-[var(--sniptale-color-danger-text)]">{props.error}</p>
-      ) : null}
-    </InspectorPanel>
+        {props.status === 'recorded' ? (
+          <p className="text-sm text-[var(--sniptale-color-text-muted)]">
+            {translate('videoEditor.app.recordAudioReadyHint')}
+          </p>
+        ) : null}
+        {props.error ? (
+          <p className="text-sm text-[var(--sniptale-color-danger-text)]">{props.error}</p>
+        ) : null}
+      </InspectorPanel>
+    </>
   );
 }
