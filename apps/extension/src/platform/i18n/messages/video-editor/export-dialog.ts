@@ -98,32 +98,24 @@ export const videoEditorExportDialogMessages = defineMessageSource({
     en: 'FPS',
   },
   capabilityLoading: {
-    ru: 'Проверяем, какие MP4-кодеки реально доступны в текущем браузере и системе.',
-    en: 'Checking which MP4 codecs are actually available in the current browser and system.',
+    ru: 'Проверяем доступные кодеки MP4…',
+    en: 'Checking available MP4 codecs…',
   },
   capabilityFallbackNote: {
     ru: 'Проверка доступных кодеков завершилась с ошибкой:',
     en: 'Codec capability probing failed:',
   },
   mp4HintSingleCodec: {
-    ru:
-      'MP4 использует frame-driven render через WebCodecs и offline audio mix. ' +
-      'Доступный кодек определяется системой.',
-    en:
-      'MP4 uses frame-driven rendering via WebCodecs and offline audio mixing. ' +
-      'The available codec is determined by the system.',
+    ru: 'Для MP4 будет использован кодек, доступный на этом устройстве.',
+    en: 'MP4 will use the codec available on this device.',
   },
   mp4HintSelectable: {
-    ru:
-      'MP4 использует frame-driven render через WebCodecs и offline audio mix. ' +
-      'Если система поддерживает несколько кодеков, здесь можно выбрать нужный.',
-    en:
-      'MP4 uses frame-driven rendering via WebCodecs and offline audio mixing. ' +
-      'If the system supports multiple codecs, you can choose one here.',
+    ru: 'Выберите кодек для MP4. В списке — варианты, доступные на этом устройстве.',
+    en: 'Choose an MP4 codec from the options available on this device.',
   },
   webmHint: {
-    ru: 'WebM остаётся резервным браузерным путём и сильнее зависит от поведения браузера в реальном времени.',
-    en: 'WebM remains a browser-native fallback path and depends more on the browser’s realtime behavior.',
+    ru: 'Выберите разрешение, качество и частоту кадров для файла WebM.',
+    en: 'Choose the resolution, quality and frame rate for your WebM file.',
   },
   burnInSubtitles: {
     ru: 'Вшить субтитры в экспортируемое видео',

@@ -198,16 +198,16 @@ export const videoEditorSidebarLibraryMessages = defineMessageSource({
     en: 'Recordings',
   },
   recordingsInDbSuffix: {
-    ru: 'в базе',
-    en: 'in database',
+    ru: 'в библиотеке',
+    en: 'in library',
   },
   recordingsEmpty: {
-    ru: 'В локальном хранилище пока нет сохранённых записей.',
-    en: 'There are no saved recordings in IndexedDB yet.',
+    ru: 'В библиотеке пока нет записей.',
+    en: 'There are no recordings in the library yet.',
   },
   libraryRecordingsDescription: {
-    ru: 'Записи из библиотеки добавляются в текущий проект как отдельные копии.',
-    en: 'Library recordings are added into the current project as separate project-owned copies.',
+    ru: 'Добавьте запись в материалы, затем выберите фрагмент для монтажа. Исходная запись останется в библиотеке.',
+    en: 'Add a recording to materials, then choose a range for your edit. The original stays in the library.',
   },
   libraryMediaPreviewTitle: {
     ru: 'Превью медиа',

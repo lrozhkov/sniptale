@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  Camera,
   Film,
   ImageIcon,
   MousePointer2,
@@ -25,6 +26,7 @@ import { VideoEditorSelectionKind, type VideoEditorSelection } from '../../contr
 import type { WorkspaceSidebarPanelContentSharedProps } from './contracts/panel-content';
 import type { WorkspaceSidebarProps } from './contracts/props';
 import { getClipTypeLabel } from '../../chrome/display';
+import { VideoProjectTrackRole, VideoTrackKind } from '../../../features/video/project/types';
 
 interface WorkspaceSidebarPanelContentProps extends WorkspaceSidebarPanelContentSharedProps {
   selectionTitle: string;
@@ -88,7 +90,13 @@ export function getSelectionMeta(
     case VideoEditorSelectionKind.TRACK:
       return selectedTrack
         ? {
-            icon: renderSidebarIcon(Film),
+            icon: renderSidebarIcon(
+              selectedTrack.role === VideoProjectTrackRole.CAMERA
+                ? Camera
+                : selectedTrack.kind === VideoTrackKind.AUDIO
+                  ? Volume2
+                  : Film
+            ),
             label: selectedTrack.name,
             title: selectedTrack.name,
           }

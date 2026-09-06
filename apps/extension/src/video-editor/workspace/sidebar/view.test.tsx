@@ -1,8 +1,32 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { expect, it, vi } from 'vitest';
-import { VideoTrackKind } from '../../../features/video/project/types';
+import { VideoProjectTrackRole, VideoTrackKind } from '../../../features/video/project/types';
 import { VideoEditorSelectionKind } from '../../contracts/selection';
 import { getSelectionMeta, WorkspaceSidebarHeader } from './view';
+
+it.each([
+  [VideoTrackKind.AUDIO, undefined, 'lucide-volume-2'],
+  [VideoTrackKind.PRIMARY, VideoProjectTrackRole.CAMERA, 'lucide-camera'],
+  [VideoTrackKind.PRIMARY, undefined, 'lucide-film'],
+])('identifies selected %s / %s tracks by their media icon', (kind, role, icon) => {
+  const track = {
+    id: 'selected-track',
+    kind,
+    ...(role ? { role } : {}),
+    isRoot: false,
+    locked: false,
+    name: 'Selected track',
+    order: 1,
+    visible: true,
+  };
+  const meta = getSelectionMeta(
+    { kind: VideoEditorSelectionKind.TRACK, trackId: track.id },
+    null,
+    track
+  );
+  expect(renderToStaticMarkup(<>{meta.icon}</>)).toContain(icon);
+  expect(meta.title).toBe(track.name);
+});
 
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
