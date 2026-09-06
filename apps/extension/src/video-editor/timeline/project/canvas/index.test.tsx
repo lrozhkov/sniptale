@@ -53,7 +53,8 @@ it('adds and removes utility rows and playhead height with authored data', () =>
   expect(parseFloat(line()?.style.height ?? '0')).toBe(parseFloat(emptyHeight ?? '0') + 46);
   project.motionRegions = [];
   render();
-  expect(container?.querySelectorAll('[data-project-timeline-effect-lane-row]')).toHaveLength(1);
+  expect(container?.querySelectorAll('[data-project-timeline-effect-lane-row]')).toHaveLength(0);
+  expect(line()?.style.height).toBe(emptyHeight);
   project.utilityLanes.camera = { visible: true, locked: false };
   render();
   expect(container?.querySelectorAll('[data-project-timeline-effect-lane-row]')).toHaveLength(0);

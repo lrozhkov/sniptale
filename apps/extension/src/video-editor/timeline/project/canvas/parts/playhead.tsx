@@ -40,7 +40,7 @@ export function ProjectTimelinePlayheadHandle(props: {
         'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
         'focus-visible:outline-[var(--sniptale-color-focus-ring)]',
       ].join(' ')}
-      style={{ left: props.left, transform: props.left <= 6 ? undefined : 'translateX(-50%)' }}
+      style={{ left: props.left, transform: 'translateX(-50%)' }}
       onPointerDown={(event) => props.onBeginScrub(event, props.currentTime)}
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => {

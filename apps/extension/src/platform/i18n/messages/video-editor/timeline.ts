@@ -215,6 +215,14 @@ export const videoEditorTimelineMessages = defineMessageSource({
     ru: 'Высота дорожки',
     en: 'Track height',
   },
+  trackAudioEnabled: {
+    ru: 'Выключить звук дорожки',
+    en: 'Mute track',
+  },
+  trackAudioMuted: {
+    ru: 'Включить звук дорожки',
+    en: 'Unmute track',
+  },
   trackVisible: {
     ru: 'видна',
     en: 'visible',

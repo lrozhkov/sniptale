@@ -4,7 +4,7 @@ import {
   getCurrentVideoEditorProjectSnapshot,
   getCurrentVideoEditorCurrentTime,
 } from '../../../runtime/controller/store';
-import { Eye, EyeOff, Lock, Unlock, Mic } from 'lucide-react';
+import { Eye, EyeOff, Lock, Unlock, Mic, Volume2, VolumeX } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import type { VideoProject } from '../../../../features/video/project/types';
 import { getTrackKindLabel } from '../interaction-state/helpers';
@@ -105,20 +105,35 @@ function ProjectTimelineTrackStateControls({
   onToggleTrackLock,
   onToggleTrackVisibility,
 }: Pick<ProjectTimelineTrackRowProps, 'track' | 'onToggleTrackLock' | 'onToggleTrackVisibility'>) {
+  const isAudio = track.kind === VideoTrackKind.AUDIO;
+  const EnabledIcon = isAudio ? Volume2 : Eye;
+  const DisabledIcon = isAudio ? VolumeX : EyeOff;
   return (
     <div className="flex gap-1">
       {track.kind === VideoTrackKind.AUDIO && <AudioTrackRecordingButton track={track} />}
       <TimelineIconButton
         active={track.visible}
         icon={
-          track.visible ? <Eye size={13} strokeWidth={2} /> : <EyeOff size={13} strokeWidth={2} />
+          track.visible ? (
+            <EnabledIcon size={13} strokeWidth={2} />
+          ) : (
+            <DisabledIcon size={13} strokeWidth={2} />
+          )
         }
         onClick={() => onToggleTrackVisibility(track.id)}
         stopPropagation
         title={
           track.visible
-            ? translate('videoEditor.timeline.trackVisible')
-            : translate('videoEditor.timeline.trackHidden')
+            ? translate(
+                isAudio
+                  ? 'videoEditor.timeline.trackAudioEnabled'
+                  : 'videoEditor.timeline.trackVisible'
+              )
+            : translate(
+                isAudio
+                  ? 'videoEditor.timeline.trackAudioMuted'
+                  : 'videoEditor.timeline.trackHidden'
+              )
         }
       />
       <TimelineIconButton

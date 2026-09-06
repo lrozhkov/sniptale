@@ -123,3 +123,41 @@ it('offers recording only on audio rows, freezing its destination and honoring l
   act(() => button()!.click());
   expect(recordingMocks.open).toHaveBeenCalledTimes(1);
 });
+
+it('uses speaker state for audio while retaining visibility eyes for video', () => {
+  const project = createEmptyVideoProject('Track state');
+  const track = project.tracks[0]!;
+  const toggle = vi.fn();
+  const render = () =>
+    act(() =>
+      root?.render(
+        <ProjectTimelineTrackRow
+          compactRows={false}
+          isSelected={false}
+          track={track}
+          trackLabel="A1"
+          trackLayout={undefined}
+          onSelectTrack={vi.fn()}
+          onToggleTrackLock={vi.fn()}
+          onToggleTrackVisibility={toggle}
+        />
+      )
+    );
+  render();
+  expect(container!.querySelector('.lucide-eye')).not.toBeNull();
+  track.kind = VideoTrackKind.AUDIO;
+  render();
+  const speaker = container!.querySelector(
+    '[data-ui="video-editor.timeline.icon-button"] .lucide-volume-2'
+  );
+  expect(speaker).not.toBeNull();
+  expect(container!.querySelector('.lucide-eye')).toBeNull();
+  act(() => speaker!.closest('button')!.click());
+  expect(toggle).toHaveBeenCalledWith(track.id);
+  track.visible = false;
+  render();
+  expect(container!.querySelector('.lucide-volume-x')).not.toBeNull();
+  expect(
+    container!.querySelector('.lucide-volume-x')!.closest('button')!.getAttribute('aria-pressed')
+  ).toBe('false');
+});
