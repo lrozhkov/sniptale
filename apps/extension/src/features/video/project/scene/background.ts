@@ -2,7 +2,6 @@ import { DEFAULT_VIDEO_PROJECT_BACKGROUND } from '../defaults';
 import {
   drawGradientSceneBackground,
   getSceneGradientLegacyColor,
-  getSceneGradientStyle,
   normalizeGradientSceneBackground,
   resolveGradientSceneBackgroundFrame,
 } from './background-gradient';
@@ -31,7 +30,7 @@ function normalizeSceneBackground(
     case VideoSceneBackgroundKind.SOLID:
       return createFallbackSolidBackground(sceneBackground.color || fallbackColor);
     case VideoSceneBackgroundKind.GRADIENT:
-      return normalizeGradientSceneBackground(sceneBackground, fallbackColor);
+      return normalizeGradientSceneBackground(sceneBackground);
     case VideoSceneBackgroundKind.IMAGE:
       return sceneBackground.assetId
         ? sceneBackground
@@ -123,34 +122,6 @@ export function getProjectSceneBackgroundImageAssetId(
 ): string | null {
   const sceneBackground = getProjectSceneBackground(project);
   return sceneBackground.kind === VideoSceneBackgroundKind.IMAGE ? sceneBackground.assetId : null;
-}
-
-export function getSceneBackgroundStyle(
-  sceneBackground: VideoProjectSceneBackground,
-  assetUrl?: string,
-  frameParams?: { audioEnvelope?: number; time?: number }
-) {
-  switch (sceneBackground.kind) {
-    case VideoSceneBackgroundKind.SOLID:
-      return {
-        background: sceneBackground.color,
-      };
-    case VideoSceneBackgroundKind.GRADIENT: {
-      return getSceneGradientStyle(sceneBackground, frameParams);
-    }
-    case VideoSceneBackgroundKind.IMAGE:
-      return assetUrl
-        ? {
-            backgroundColor: DEFAULT_VIDEO_PROJECT_BACKGROUND,
-            backgroundImage: `url("${assetUrl}")`,
-            backgroundPosition: 'center',
-            backgroundRepeat: 'no-repeat',
-            backgroundSize: 'cover',
-          }
-        : {
-            background: DEFAULT_VIDEO_PROJECT_BACKGROUND,
-          };
-  }
 }
 
 export function drawSceneBackground(params: {

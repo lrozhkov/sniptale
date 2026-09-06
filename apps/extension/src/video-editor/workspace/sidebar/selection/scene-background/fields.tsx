@@ -1,3 +1,4 @@
+import { createSceneGradientBackground } from '../../../../../features/video/project/scene/background-gradient';
 import { translate } from '../../../../../platform/i18n';
 import { VideoSceneBackgroundKind } from '../../../../../features/video/project/types';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
@@ -91,23 +92,9 @@ function resolveSolidSceneBackground(sceneBackground: SceneBackground) {
 }
 
 function resolveGradientSceneBackground(sceneBackground: SceneBackground) {
-  const from =
-    sceneBackground.kind === VideoSceneBackgroundKind.GRADIENT ? sceneBackground.from : '#111111';
-  const to =
-    sceneBackground.kind === VideoSceneBackgroundKind.GRADIENT ? sceneBackground.to : '#334155';
-  return {
-    kind: VideoSceneBackgroundKind.GRADIENT,
-    from,
-    to,
-    angle: sceneBackground.kind === VideoSceneBackgroundKind.GRADIENT ? sceneBackground.angle : 135,
-    stops:
-      sceneBackground.kind === VideoSceneBackgroundKind.GRADIENT
-        ? sceneBackground.stops
-        : [
-            { color: from, offset: 0 },
-            { color: to, offset: 1 },
-          ],
-  } as const;
+  return sceneBackground.kind === VideoSceneBackgroundKind.GRADIENT
+    ? sceneBackground
+    : createSceneGradientBackground();
 }
 
 function commitSceneBackgroundImage(
@@ -158,14 +145,7 @@ export function getSceneBackgroundSummaryLabel(
     case VideoSceneBackgroundKind.SOLID:
       return sceneBackground.color;
     case VideoSceneBackgroundKind.GRADIENT:
-      return (
-        sceneBackground.stops ?? [
-          { color: sceneBackground.from, offset: 0 },
-          { color: sceneBackground.to, offset: 1 },
-        ]
-      )
-        .map((stop) => stop.color)
-        .join(' -> ');
+      return sceneBackground.gradient.stops.map((stop) => stop.color).join(' → ');
     case VideoSceneBackgroundKind.IMAGE:
       return (
         project.assets.find((asset) => asset.id === sceneBackground.assetId)?.name ??

@@ -398,3 +398,44 @@ it('allows persisted hydration with missing references but rejects export-ready 
   expect(isHydratableVideoProject(missingActionReference)).toBe(true);
   expect(isExportReadyVideoProject(missingActionReference)).toBe(false);
 });
+
+it('accepts canonical gradient presets and rejects malformed or superseded gradient payloads', async () => {
+  const { getShowcaseGradient } = await import('../../../highlighter/showcase-resources');
+  const project = createEmptyVideoProject('Paint');
+  for (const id of ['system-ocean', 'system-radial-glow', 'system-conic-spectrum'] as const) {
+    project.sceneBackground = { kind: 'gradient', gradient: getShowcaseGradient(id) };
+    expect(parseHydratableVideoProject(project)?.sceneBackground).toEqual(project.sceneBackground);
+  }
+  expect(
+    isHydratableVideoProject({
+      ...project,
+      sceneBackground: {
+        kind: 'gradient',
+        from: '#000',
+        to: '#fff',
+        angle: 90,
+      },
+    })
+  ).toBe(false);
+  const gradient = getShowcaseGradient('system-ocean');
+  for (const invalid of [
+    null,
+    {},
+    { ...gradient, stops: [] },
+    {
+      ...gradient,
+      stops: [gradient.stops[0], gradient.stops[0]],
+    },
+    {
+      ...gradient,
+      stops: gradient.stops.map((stop) => ({ ...stop, color: 'url(https://example.com)' })),
+    },
+  ]) {
+    expect(
+      isHydratableVideoProject({
+        ...project,
+        sceneBackground: { kind: 'gradient', gradient: invalid },
+      })
+    ).toBe(false);
+  }
+});

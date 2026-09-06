@@ -1,11 +1,5 @@
 import type React from 'react';
 
-import {
-  getProjectSceneBackground,
-  getProjectSceneBackgroundImageAssetId,
-  getSceneBackgroundStyle,
-} from '../../../../features/video/project/scene/background';
-import { resolveSceneBackgroundAudioEnvelope } from '../../../../features/video/project/scene/background-audio';
 import { handleStageAreaPlacement, PreviewStageMotionAreaOverlay } from '../area-overlay/index';
 import { PreviewStageCanvasBanks } from '../media/banks';
 import { PreviewStageMotionPathOverlay } from '../motion-path/index';
@@ -22,12 +16,13 @@ export function PreviewStageFrame({ children }: { children: React.ReactNode }) {
   return <div className={PREVIEW_STAGE_FRAME_CLASS_NAME}>{children}</div>;
 }
 
-function PreviewStageCanvasContent(params: PreviewStageCanvasLayerProps): React.ReactNode {
+export function PreviewStageCanvasLayer(params: PreviewStageCanvasLayerProps): React.ReactNode {
   return (
     <>
       <canvas
         ref={params.canvasRef}
         data-preview-stage-canvas
+        style={{ backgroundColor: '#000' }}
         className="absolute inset-0 h-full w-full"
       />
       <PreviewStageCachedVideo
@@ -43,26 +38,6 @@ function PreviewStageCanvasContent(params: PreviewStageCanvasLayerProps): React.
         videoBankClips={params.videoBankClips}
         videoRefs={params.videoRefs}
       />
-    </>
-  );
-}
-
-export function PreviewStageCanvasLayer(params: PreviewStageCanvasLayerProps) {
-  const backgroundAssetId = getProjectSceneBackgroundImageAssetId(params.project);
-  const backgroundAssetUrl = backgroundAssetId ? params.assetUrls[backgroundAssetId] : undefined;
-  const audioEnvelope = resolveSceneBackgroundAudioEnvelope(params.project, params.currentTime);
-
-  return (
-    <>
-      <div
-        className="pointer-events-none absolute inset-0"
-        style={getSceneBackgroundStyle(
-          getProjectSceneBackground(params.project),
-          backgroundAssetUrl,
-          { audioEnvelope, time: params.currentTime }
-        )}
-      />
-      <PreviewStageCanvasContent {...params} />
     </>
   );
 }

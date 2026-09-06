@@ -100,8 +100,7 @@ function interpolateColor(
 }
 
 function midpointAmount(amount: number, midpoint: number): number {
-  if (amount <= midpoint) return (0.5 * amount) / midpoint;
-  return 0.5 + (0.5 * (amount - midpoint)) / (1 - midpoint);
+  return amount ** (Math.log(0.5) / Math.log(midpoint));
 }
 
 export function sampleGradient(gradient: Gradient, position: number): string {

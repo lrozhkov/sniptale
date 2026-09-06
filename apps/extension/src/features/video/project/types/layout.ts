@@ -1,3 +1,5 @@
+import type { Gradient } from '@sniptale/foundation/paint';
+
 export const VideoTrackKind = {
   PRIMARY: 'PRIMARY',
   AUDIO: 'AUDIO',
@@ -46,12 +48,6 @@ export interface VideoSceneGradientAnimation {
   mode: VideoSceneGradientAnimationMode;
   speed: number;
   intensity: number;
-}
-
-export interface VideoSceneGradientColorStop {
-  color: string;
-  offset: number;
-  opacity?: number | undefined;
 }
 
 export interface VideoProjectTransform {
@@ -154,10 +150,7 @@ export interface VideoProjectSolidBackground {
 
 export interface VideoProjectGradientBackground {
   kind: typeof VideoSceneBackgroundKind.GRADIENT;
-  from: string;
-  to: string;
-  angle: number;
-  stops?: readonly VideoSceneGradientColorStop[] | undefined;
+  gradient: Gradient;
   animation?: VideoSceneGradientAnimation;
 }
 

@@ -1,3 +1,4 @@
+import { parsePaint } from '@sniptale/foundation/paint';
 import type { VideoProject, VideoProjectClip, VideoProjectSourceTimeAnchor } from '../types/index';
 import {
   VideoProjectClipType,
@@ -47,9 +48,7 @@ function isSceneBackground(value: unknown): boolean {
     isRecord(value) &&
     ((value['kind'] === VideoSceneBackgroundKind.SOLID && isColorString(value['color'])) ||
       (value['kind'] === VideoSceneBackgroundKind.GRADIENT &&
-        isColorString(value['from']) &&
-        isColorString(value['to']) &&
-        isBoundedNumber(value['angle'], -3600, 3600)) ||
+        parsePaint({ kind: 'gradient', gradient: value['gradient'] }) !== null) ||
       (value['kind'] === VideoSceneBackgroundKind.IMAGE && isString(value['assetId'])))
   );
 }
