@@ -305,3 +305,34 @@ it('advances repeated steps and marks when native media rounds seeks to microsec
   expect(marks().start).toBe(1);
   expect(container.querySelector('[data-source-counter]')?.textContent).toBe('0:01:00');
 });
+
+it('owns Space globally while active, preserves text input, and releases it when inactive', async () => {
+  ready();
+  const outside = document.createElement('button');
+  const text = document.createElement('input');
+  document.body.append(outside, text);
+  const dispatch = (target: Element) => {
+    const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, code: 'Space' });
+    target.dispatchEvent(event);
+    return event;
+  };
+  try {
+    await act(async () => {
+      expect(dispatch(outside).defaultPrevented).toBe(true);
+    });
+    expect(play).toHaveBeenCalledOnce();
+    expect(props.onAppend).not.toHaveBeenCalled();
+    await act(async () => {
+      expect(dispatch(text).defaultPrevented).toBe(false);
+    });
+    expect(play).toHaveBeenCalledOnce();
+    render({ active: false });
+    await act(async () => {
+      expect(dispatch(outside).defaultPrevented).toBe(false);
+    });
+    expect(play).toHaveBeenCalledOnce();
+  } finally {
+    outside.remove();
+    text.remove();
+  }
+});

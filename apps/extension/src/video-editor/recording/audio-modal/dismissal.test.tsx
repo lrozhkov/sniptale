@@ -41,3 +41,21 @@ it.each(['backdrop', 'Escape'])(
     expect(onClose).toHaveBeenCalledOnce();
   }
 );
+
+it('consumes Space without activating Cancel when there is no audio to audition', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  host = document.createElement('div');
+  document.body.append(host);
+  root = createRoot(host);
+  const onClose = vi.fn();
+  act(() => root.render(<AudioRecordingModal isOpen onClose={onClose} onSave={vi.fn()} />));
+  const cancel = Array.from(host.querySelectorAll('button')).find(
+    (button) => button.textContent === 'common.actions.cancel'
+  )!;
+  const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, code: 'Space' });
+  act(() => {
+    cancel.dispatchEvent(event);
+  });
+  expect(event.defaultPrevented).toBe(true);
+  expect(onClose).not.toHaveBeenCalled();
+});

@@ -3,6 +3,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { createTextClip } from '../../../features/video/project/factories/overlay-clip';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import { VideoEditorSelectionKind } from '../../contracts/selection';
 import { usePlaybackShortcuts } from './playback/shortcuts';
@@ -260,7 +261,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('leaves Space with focused controls before their target handlers run', async () => {
+it('routes Space from focused controls to playback before their target handlers run', async () => {
   const togglePlayback = vi.fn();
   renderShortcutHarness(root!, togglePlayback);
   const buttonKeyDown = vi.fn();
@@ -281,13 +282,13 @@ it('leaves Space with focused controls before their target handlers run', async 
   const optionEvent = dispatchSpaceKeyDownInAct(option);
   const triggerEvent = dispatchSpaceKeyDownInAct(selectTrigger);
 
-  expect(buttonEvent.defaultPrevented).toBe(false);
-  expect(optionEvent.defaultPrevented).toBe(false);
-  expect(triggerEvent.defaultPrevented).toBe(false);
-  expect(togglePlayback).not.toHaveBeenCalled();
-  expect(buttonKeyDown).toHaveBeenCalledOnce();
-  expect(optionKeyDown).toHaveBeenCalledOnce();
-  expect(triggerKeyDown).toHaveBeenCalledOnce();
+  expect(buttonEvent.defaultPrevented).toBe(true);
+  expect(optionEvent.defaultPrevented).toBe(true);
+  expect(triggerEvent.defaultPrevented).toBe(true);
+  expect(togglePlayback).toHaveBeenCalledTimes(3);
+  expect(buttonKeyDown).not.toHaveBeenCalled();
+  expect(optionKeyDown).not.toHaveBeenCalled();
+  expect(triggerKeyDown).not.toHaveBeenCalled();
   button.remove();
   option.remove();
   selectTrigger.remove();
@@ -498,7 +499,7 @@ it('leaves Space ownership with text-entry targets', async () => {
   editable.remove();
 });
 
-it('leaves Space with a nested summary target and keeps playback on the workspace', () => {
+it('routes Space from a nested summary and the workspace to playback', () => {
   const togglePlayback = vi.fn();
   renderShortcutHarness(root!, togglePlayback);
   const details = document.createElement('details');
@@ -507,9 +508,146 @@ it('leaves Space with a nested summary target and keeps playback on the workspac
   summary.append(label);
   details.append(summary);
   document.body.append(details);
-  expect(dispatchSpaceKeyDownInAct(label).defaultPrevented).toBe(false);
-  expect(togglePlayback).not.toHaveBeenCalled();
-  expect(dispatchSpaceKeyDownInAct(document.body).defaultPrevented).toBe(true);
+  expect(dispatchSpaceKeyDownInAct(label).defaultPrevented).toBe(true);
   expect(togglePlayback).toHaveBeenCalledOnce();
+  expect(dispatchSpaceKeyDownInAct(document.body).defaultPrevented).toBe(true);
+  expect(togglePlayback).toHaveBeenCalledTimes(2);
   details.remove();
+});
+
+it.each([
+  ['range', 'Home'],
+  ['range', 'End'],
+  ['range', 'ArrowRight'],
+  ['navigation-button', 'Home'],
+  ['navigation-button', 'ArrowDown'],
+  ['separator', 'Home'],
+  ['separator', 'ArrowLeft'],
+  ['select', 'End'],
+])(
+  'leaves %s %s navigation with the focused control and preserves the selected clip',
+  (kind, code) => {
+    const handlers = createHandlers();
+    const seekTo = vi.fn();
+    const latestState = createLatestState();
+    const project = latestState.project!;
+    const clip = createTextClip(project.tracks[0]!.id, project.width, project.height, 0);
+    project.clips = [clip];
+    latestState.selectedClipId = clip.id;
+    latestState.selection = { kind: VideoEditorSelectionKind.CLIP, clipId: clip.id };
+    act(() => {
+      root!.render(
+        <ShortcutHarness
+          handlers={handlers}
+          latestState={latestState}
+          seekTo={seekTo}
+          stepByFrames={vi.fn()}
+          togglePlayback={vi.fn()}
+        />
+      );
+    });
+    const control = document.createElement(
+      kind === 'range'
+        ? 'input'
+        : kind === 'separator'
+          ? 'div'
+          : kind === 'navigation-button'
+            ? 'button'
+            : kind
+    );
+    if (control instanceof HTMLInputElement) control.type = 'range';
+    if (kind === 'separator') control.setAttribute('role', 'separator');
+    const target =
+      kind === 'navigation-button' ? control.appendChild(document.createElement('span')) : control;
+    const owner = kind === 'navigation-button' ? document.createElement('nav') : control;
+    if (owner !== control) owner.append(control);
+    document.body.append(owner);
+    try {
+      const event = new KeyboardEvent('keydown', {
+        bubbles: true,
+        cancelable: true,
+        code,
+        key: code,
+      });
+      act(() => {
+        target.dispatchEvent(event);
+      });
+      expect(event.defaultPrevented).toBe(false);
+      expect(seekTo).not.toHaveBeenCalled();
+      expect(handlers.updateClipTransform).not.toHaveBeenCalled();
+    } finally {
+      owner.remove();
+    }
+  }
+);
+
+it('keeps montage shortcuts available from ordinary action buttons', () => {
+  const seekTo = vi.fn();
+  const togglePlayback = vi.fn();
+  renderShortcutHarness(root!, togglePlayback, seekTo);
+  const button = document.createElement('button');
+  document.body.append(button);
+  try {
+    act(() => {
+      button.dispatchEvent(
+        new KeyboardEvent('keydown', { bubbles: true, cancelable: true, code: 'KeyK' })
+      );
+    });
+    expect(togglePlayback).toHaveBeenCalledOnce();
+    act(() => {
+      button.dispatchEvent(
+        new KeyboardEvent('keydown', { bubbles: true, cancelable: true, code: 'Home' })
+      );
+    });
+    expect(seekTo).toHaveBeenCalledExactlyOnceWith(0);
+  } finally {
+    button.remove();
+  }
+});
+
+it('consumes held Space repeats without toggling playback again', () => {
+  const togglePlayback = vi.fn();
+  renderShortcutHarness(root!, togglePlayback);
+  const event = new KeyboardEvent('keydown', {
+    bubbles: true,
+    cancelable: true,
+    code: 'Space',
+    repeat: true,
+  });
+  document.body.dispatchEvent(event);
+  expect(event.defaultPrevented).toBe(true);
+  expect(togglePlayback).not.toHaveBeenCalled();
+});
+
+it('keeps split and delete explicit while Space preserves the selected clip', () => {
+  const handlers = createHandlers();
+  const togglePlayback = vi.fn();
+  const latestState = createLatestState();
+  latestState.currentTime = 2;
+  latestState.selectedClipId = 'selected-clip';
+  latestState.selection = { kind: VideoEditorSelectionKind.CLIP, clipId: 'selected-clip' };
+  act(() => {
+    root!.render(
+      <ShortcutHarness
+        handlers={handlers}
+        latestState={latestState}
+        seekTo={vi.fn()}
+        stepByFrames={vi.fn()}
+        togglePlayback={togglePlayback}
+      />
+    );
+  });
+
+  dispatchSpaceKeyDownInAct(document.body);
+  expect(togglePlayback).toHaveBeenCalledOnce();
+  expect(handlers.splitClipAt).not.toHaveBeenCalled();
+  expect(handlers.deleteClip).not.toHaveBeenCalled();
+  act(() => {
+    document.body.dispatchEvent(
+      new KeyboardEvent('keydown', { bubbles: true, cancelable: true, code: 'KeyS' })
+    );
+    dispatchDeleteKeyDown(document.body);
+  });
+  expect(handlers.splitClipAt).toHaveBeenCalledExactlyOnceWith('selected-clip', 2);
+  expect(handlers.deleteClip).toHaveBeenCalledExactlyOnceWith('selected-clip');
 });

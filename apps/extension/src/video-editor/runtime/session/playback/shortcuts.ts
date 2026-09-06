@@ -47,7 +47,7 @@ function handlePlaybackShortcutKeyDown(
   togglePlayback: () => void
 ): void {
   const latestState = latestStateRef.current;
-  if (!latestState.project || isEditableTarget(event.target)) {
+  if (!latestState.project || isEditableTarget(event.target) || isControlNavigation(event)) {
     return;
   }
 
@@ -87,6 +87,30 @@ function handlePlaybackShortcutKeyDown(
 
   event.preventDefault();
   handleSelectionDelete(latestState, handlersRef);
+}
+
+function isControlNavigation(event: KeyboardEvent): boolean {
+  const navigationKey =
+    event.code.startsWith('Arrow') || ['Home', 'End', 'PageUp', 'PageDown'].includes(event.code);
+  if (!navigationKey || !(event.target instanceof Element)) return false;
+  return (
+    event.target.closest(
+      [
+        'input',
+        'select',
+        'nav button',
+        'button[aria-haspopup]',
+        '[role="option"]',
+        '[role="listbox"]',
+        '[role="checkbox"]',
+        '[role="switch"]',
+        '[role="radio"]',
+        '[role="tab"]',
+        '[role="menuitem"]',
+        '[role="separator"]',
+      ].join(',')
+    ) !== null
+  );
 }
 
 function handleSelectedClipShortcut(
@@ -152,28 +176,6 @@ function handlePlaybackBoundaryShortcut(
 }
 
 function handlePlaybackToggleShortcut(event: KeyboardEvent, togglePlayback: () => void): boolean {
-  if (event.code === 'Space') {
-    const controlSelector = [
-      'button',
-      'summary',
-      'input',
-      'select',
-      'a[href]',
-      '[role="button"]',
-      '[role="option"]',
-      '[role="checkbox"]',
-      '[role="switch"]',
-      '[role="radio"]',
-      '[role="tab"]',
-      '[role="menuitem"]',
-    ].join(',');
-    if (event.target instanceof Element && event.target.closest(controlSelector)) return false;
-    event.preventDefault();
-    event.stopPropagation();
-    togglePlayback();
-    return true;
-  }
-
   if (
     event.code === 'KeyK' &&
     !event.altKey &&
@@ -216,6 +218,18 @@ function handlePlaybackNudgeShortcut(
   return false;
 }
 
+/** Registers Space for one active transport; the context owner releases it on deactivation. */
+export function registerPlaybackSpaceShortcut(togglePlayback: () => void): () => void {
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.code !== 'Space' || isEditableTarget(event.target)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (!event.repeat) togglePlayback();
+  };
+  window.addEventListener('keydown', onKeyDown, KEYDOWN_LISTENER_OPTIONS);
+  return () => window.removeEventListener('keydown', onKeyDown, KEYDOWN_LISTENER_OPTIONS);
+}
+
 export function usePlaybackShortcuts(
   latestStateRef: MutableRefObject<PlaybackLatestState>,
   handlersRef: MutableRefObject<PlaybackHandlers>,
@@ -243,9 +257,13 @@ export function usePlaybackShortcuts(
       );
     };
 
+    const releaseSpace = registerPlaybackSpaceShortcut(() => {
+      if (latestStateRef.current.project) togglePlayback();
+    });
     window.addEventListener('keydown', handleKeyDown, KEYDOWN_LISTENER_OPTIONS);
     document.addEventListener('keydown', handleKeyDown, KEYDOWN_LISTENER_OPTIONS);
     return () => {
+      releaseSpace();
       window.removeEventListener('keydown', handleKeyDown, KEYDOWN_LISTENER_OPTIONS);
       document.removeEventListener('keydown', handleKeyDown, KEYDOWN_LISTENER_OPTIONS);
     };

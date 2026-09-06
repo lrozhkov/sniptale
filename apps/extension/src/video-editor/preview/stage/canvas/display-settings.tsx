@@ -27,6 +27,7 @@ interface PreviewDisplaySettingsProps {
 export function PreviewDisplaySettings(props: PreviewDisplaySettingsProps) {
   const id = useId();
   const [open, setOpen] = useState(false);
+  const keyboardOpenRef = useRef(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -43,7 +44,11 @@ export function PreviewDisplaySettings(props: PreviewDisplaySettingsProps) {
   });
   const theme = useResolvedPortalTheme(triggerRef.current);
   useEffect(() => {
-    if (open) menuRef.current?.querySelector<HTMLInputElement>('input:checked')?.focus();
+    if (!open) return;
+    const target = keyboardOpenRef.current
+      ? menuRef.current?.querySelector<HTMLInputElement>('input:checked')
+      : menuRef.current;
+    target?.focus({ preventScroll: true });
   }, [open]);
   const modeLabel = translate(
     props.mode === 'live'
@@ -63,7 +68,10 @@ export function PreviewDisplaySettings(props: PreviewDisplaySettingsProps) {
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-controls={open ? id : undefined}
-        onClick={() => setVisible(!open)}
+        onClick={(event) => {
+          keyboardOpenRef.current = event.detail === 0;
+          setVisible(!open);
+        }}
       >
         <span>
           {modeLabel} · {props.rasterPreset} · {zoomLabel}
@@ -75,7 +83,8 @@ export function PreviewDisplaySettings(props: PreviewDisplaySettingsProps) {
             <div
               ref={menuRef}
               id={id}
-              className="rounded-xl bg-[var(--sniptale-color-surface-canvas)]"
+              className="rounded-xl bg-[var(--sniptale-color-surface-canvas)] outline-none"
+              tabIndex={-1}
               role="dialog"
               aria-label={translate('videoEditor.stage.displaySettings')}
               data-theme={theme ?? undefined}
@@ -130,8 +139,8 @@ function DisplayChoiceSection<T extends string>(props: {
           className={[
             'flex min-h-7 cursor-pointer items-center gap-2 rounded-md px-2 text-xs',
             'text-[var(--sniptale-color-text-primary)] hover:bg-[var(--sniptale-color-surface-panel)]',
-            'focus-within:outline focus-within:outline-1',
-            'focus-within:outline-[var(--sniptale-color-focus-ring)]',
+            'has-[:focus-visible]:outline has-[:focus-visible]:outline-1',
+            'has-[:focus-visible]:outline-[var(--sniptale-color-focus-ring)]',
           ].join(' ')}
         >
           <input

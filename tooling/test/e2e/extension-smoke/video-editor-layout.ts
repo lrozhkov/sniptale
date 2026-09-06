@@ -53,6 +53,8 @@ export async function expectVideoEditorPanelLayout(page: Page): Promise<void> {
       expect(rightBox.y + rightBox.height).toBeCloseTo(timelineBox.y + timelineBox.height, 0);
   }
   await expectAdaptivePaneDefaults(page);
+  await expectTimelineZoomKeyboard(page);
+  await expectDisplayFocusModality(page);
   const separator = page.locator('[data-ui="video-editor.workspace.timeline-resize-zone"]');
   const viewer = page.locator('[data-ui="video-editor.workspace.viewer"]');
   const initialHeight = (await viewer.boundingBox())!.height;
@@ -272,4 +274,40 @@ async function expectTimelineScaleGeometry(page: Page): Promise<void> {
       return (await ruler.boundingBox())!.width - viewportWidth;
     })
     .toBeGreaterThanOrEqual(-1);
+}
+
+async function expectTimelineZoomKeyboard(page: Page): Promise<void> {
+  const zoom = page.locator('[data-ui="video-editor.timeline.toolbar"] input[type="range"]');
+  const initial = Number(await zoom.inputValue());
+  const playhead = page.locator('[data-ui="video-editor.timeline.playhead-handle"]');
+  const time = await playhead.getAttribute('aria-valuenow');
+  await zoom.press('End');
+  await expect(zoom).toHaveValue('100');
+  await expect(playhead).toHaveAttribute('aria-valuenow', time!);
+  await zoom.press('Home');
+  await expect(zoom).toHaveValue('0');
+  await expect(playhead).toHaveAttribute('aria-valuenow', time!);
+  await zoom.press('End');
+  for (let value = 100; value > initial; value -= 1) await zoom.press('ArrowLeft');
+  await expect(zoom).toHaveValue(String(initial));
+}
+
+async function expectDisplayFocusModality(page: Page): Promise<void> {
+  const trigger = page.locator('[data-ui="video.preview.display-settings"]');
+  if (!(await trigger.isVisible())) return;
+  await trigger.click();
+  const panel = page.locator('[data-ui="video.preview.display-settings.panel"]');
+  const selected = panel.locator('input:checked').first();
+  await expect(panel).toBeFocused();
+  expect(
+    await selected.evaluate((node) => getComputedStyle(node.parentElement!).outlineStyle)
+  ).toBe('none');
+  await panel.press('Tab');
+  const focused = panel.locator('input:focus');
+  await expect(focused).toHaveCount(1);
+  expect(await focused.evaluate((node) => getComputedStyle(node.parentElement!).outlineStyle)).toBe(
+    'solid'
+  );
+  await page.keyboard.press('Escape');
+  await expect(trigger).toBeFocused();
 }

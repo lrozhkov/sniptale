@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { registerPlaybackSpaceShortcut } from '../../runtime/session/playback/shortcuts';
+import { useEffect, useState } from 'react';
 import {
   Music,
   Pause,
@@ -52,8 +53,25 @@ function sourceTime(value: number, fps: number): string {
 
 function SourceMediaViewer(props: SourceMediaViewerProps) {
   const viewer = useSourceMediaViewer(props);
-  const { viewerRef, ready, error, image, duration, validRange, usable, place, onKeyDown, retry } =
-    viewer;
+  const {
+    viewerRef,
+    ready,
+    error,
+    image,
+    duration,
+    validRange,
+    usable,
+    place,
+    onKeyDown,
+    retry,
+    toggle,
+  } = viewer;
+  useEffect(() => {
+    if (!props.active) return;
+    return registerPlaybackSpaceShortcut(() => {
+      if (!image) toggle();
+    });
+  }, [props.active, image, toggle]);
   const canPlace = usable && (image || validRange);
   return (
     <div

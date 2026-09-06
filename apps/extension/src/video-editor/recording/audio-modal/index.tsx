@@ -31,7 +31,7 @@ export function AudioRecordingModal({
   const requestClose = useCallback(() => {
     if (!savingRef.current) onClose();
   }, [onClose]);
-  const controller = useAudioRecordingController(isOpen);
+  const controller = useAudioRecordingController(isOpen, isSaving);
   useEffect(() => {
     if (isOpen) setSaveError(null);
   }, [isOpen]);

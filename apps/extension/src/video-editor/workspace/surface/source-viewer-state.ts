@@ -92,6 +92,7 @@ export function useSourceMediaViewer(props: SourceMediaViewerProps) {
       setError(translate('videoEditor.app.sourcePlayFailed'));
     });
   };
+
   const mark = (edge: 'in' | 'out') => {
     pause();
     const markAt = currentFrame();
@@ -158,7 +159,6 @@ export function useSourceMediaViewer(props: SourceMediaViewerProps) {
     place,
     onKeyDown: (event: KeyboardEvent<HTMLDivElement>) =>
       handleSourceShortcut(event, usable && !image, {
-        Space: toggle,
         KeyK: toggle,
         KeyI: () => mark('in'),
         KeyO: () => mark('out'),
@@ -210,7 +210,7 @@ function getSourcePlacementError(
   );
 }
 
-/** Source focus retains native text/range editing and button activation before transport shortcuts. */
+/** Non-Space source shortcuts stay local to the source viewer. */
 function handleSourceShortcut(
   event: KeyboardEvent<HTMLDivElement>,
   enabled: boolean,
@@ -221,8 +221,6 @@ function handleSourceShortcut(
     event.target instanceof Element &&
     event.target.closest('input, textarea, select, [role="slider"], [contenteditable="true"]')
   )
-    return;
-  if (event.code === 'Space' && event.target instanceof Element && event.target.closest('button'))
     return;
   const action = actions[event.code];
   if (!action) return;

@@ -86,6 +86,7 @@ it('changes each display setting independently and restores focus when dismissed
     act(() => trigger.click());
     expect(document.querySelectorAll('fieldset')).toHaveLength(3);
     expect(document.querySelectorAll('input:checked')).toHaveLength(3);
+    expect(document.activeElement).toBe(document.querySelector('input:checked'));
     for (const value of ['1080p', '75%', 'cache']) {
       act(() => document.querySelector<HTMLInputElement>(`input[value="${value}"]`)!.click());
       expect(trigger.getAttribute('aria-expanded')).toBe('true');
@@ -101,7 +102,8 @@ it('changes each display setting independently and restores focus when dismissed
     );
     expect(document.querySelector('[role="dialog"]')).toBeNull();
     expect(document.activeElement).toBe(trigger);
-    act(() => trigger.click());
+    act(() => trigger.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 })));
+    expect(document.activeElement).toBe(document.querySelector('[role="dialog"]'));
     expect(document.querySelector<HTMLInputElement>('input[value="1080p"]')!.checked).toBe(true);
     act(() => document.body.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
     expect(document.querySelector('[role="dialog"]')).toBeNull();
