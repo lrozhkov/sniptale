@@ -3,10 +3,14 @@ import { deleteProjectAsset } from '../../../composition/persistence/projects/in
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   VideoProjectAssetType,
+  VideoTrackKind,
   type VideoProjectAsset,
 } from '../../../features/video/project/types/index';
 import { ensureRecordingAsset, importProjectAsset } from '../../project/operations/ops';
-import type { VideoEditorImportPlacement } from '../../contracts/insertion';
+import type {
+  VideoEditorImportPlacement,
+  VideoEditorAudioRecordingTarget,
+} from '../../contracts/insertion';
 import { toErrorMessage } from './helpers';
 import type { AssetHandlerPort, VideoEditorActionHandlers } from './types';
 
@@ -74,42 +78,66 @@ async function importProjectAssetFile(
   );
 }
 
+function isRecordingDestinationAvailable(
+  port: AssetHandlerPort,
+  target: VideoEditorAudioRecordingTarget | null | undefined
+): boolean {
+  const project = port.getCurrentProject();
+  if (!project || project.id !== port.getCurrentProjectId()) return false;
+  if (!target) return true;
+  const track = project.tracks.find(({ id }) => id === target.trackId);
+  return (
+    project.id === target.projectId &&
+    Number.isFinite(target.startTime) &&
+    target.startTime >= 0 &&
+    track?.kind === VideoTrackKind.AUDIO &&
+    !track.locked
+  );
+}
+
 async function importRecordedAudioFile(
   file: File,
   trim: { trimEnd: number; trimStart: number },
-  port: AssetHandlerPort
+  port: AssetHandlerPort,
+  target?: VideoEditorAudioRecordingTarget | null
 ): Promise<void> {
-  const project = port.getCurrentProject();
-  if (!project) {
-    return;
-  }
-
-  const targetProjectId = project.id;
+  if (!isRecordingDestinationAvailable(port, target))
+    throw new Error('Recording destination unavailable');
+  const targetProjectId = port.getCurrentProjectId()!;
+  const insertionTime = target?.startTime ?? port.getCurrentTime();
   const asset = await importProjectAsset(file, VideoProjectAssetType.AUDIO);
   if (await isStaleImportedAsset({ asset, port, targetProjectId })) {
-    return;
+    throw new Error('Recording project changed');
   }
-
-  port.upsertAsset(asset);
-  const insertionTime = port.getCurrentTime();
-  const clipId = port.addAssetClip(asset, null, insertionTime);
-  if (!clipId) {
-    return;
+  if (!isRecordingDestinationAvailable(port, target)) {
+    await cleanupStaleImportedAsset(asset);
+    throw new Error('Recording destination unavailable');
   }
-
-  const assetDuration = Math.max(0.1, asset.metadata.duration ?? trim.trimEnd);
-  const normalizedTrimStart = Math.max(0, Math.min(trim.trimStart, assetDuration - 0.1));
-  const normalizedTrimEnd = Math.max(
-    normalizedTrimStart + 0.1,
-    Math.min(trim.trimEnd, assetDuration)
-  );
-
-  if (normalizedTrimStart > 0) {
-    port.trimClipStart(clipId, insertionTime + normalizedTrimStart);
-    port.moveClip(clipId, insertionTime);
+  const lease = port.beginProjectHistoryTransaction();
+  if (lease === null) {
+    await cleanupStaleImportedAsset(asset);
+    throw new Error('Recording history unavailable');
   }
+  try {
+    port.upsertAsset(asset);
+    const clipId = port.addAssetClip(asset, target?.trackId ?? null, insertionTime);
+    if (!clipId) throw new Error('Recording insertion failed');
+    const assetDuration = Math.max(0.1, asset.metadata.duration ?? trim.trimEnd);
+    const normalizedTrimStart = Math.max(0, Math.min(trim.trimStart, assetDuration - 0.1));
+    const normalizedTrimEnd = Math.max(
+      normalizedTrimStart + 0.1,
+      Math.min(trim.trimEnd, assetDuration)
+    );
 
-  port.trimClipEnd(clipId, insertionTime + normalizedTrimEnd - normalizedTrimStart);
+    if (normalizedTrimStart > 0) {
+      port.trimClipStart(clipId, insertionTime + normalizedTrimStart);
+      port.moveClip(clipId, insertionTime);
+    }
+
+    port.trimClipEnd(clipId, insertionTime + normalizedTrimEnd - normalizedTrimStart);
+  } finally {
+    port.endProjectHistoryTransaction(lease);
+  }
 }
 
 function useRecordingAssetHandler(port: AssetHandlerPort) {
@@ -187,12 +215,16 @@ export function useAssetHandlers(
     port
   );
   const handleImportRecordedAudio = useCallback(
-    async (file: File, trim: { trimEnd: number; trimStart: number }) => {
+    async (
+      file: File,
+      trim: { trimEnd: number; trimStart: number },
+      target?: VideoEditorAudioRecordingTarget | null
+    ) => {
       try {
-        await importRecordedAudioFile(file, trim, port);
+        await importRecordedAudioFile(file, trim, port, target);
       } catch (assetError) {
         logger.error('Failed to import recorded audio', assetError);
-        port.setError(toErrorMessage(assetError, 'common.errors.actionFailed'));
+        throw assetError;
       }
     },
     [port]

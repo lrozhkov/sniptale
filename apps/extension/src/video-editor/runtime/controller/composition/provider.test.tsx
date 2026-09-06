@@ -41,6 +41,8 @@ const mocks = vi.hoisted(() => {
     projectHistoryTransactionActive: false,
     redoProject: action,
     undoProject: action,
+    beginProjectHistoryTransaction: action,
+    endProjectHistoryTransaction: action,
   };
   const exportPort = {
     cancelExport: action,
@@ -66,6 +68,8 @@ const mocks = vi.hoisted(() => {
   };
   const workspace = {
     audioRecordingDialogOpen: false,
+    audioRecordingTarget: null,
+    openTrackAudioRecordingDialog: action,
     clearPlaybackRange: action,
     closeAudioRecordingDialog: action,
     closeLibraryPanel: action,

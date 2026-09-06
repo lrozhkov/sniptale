@@ -145,7 +145,7 @@ function useVideoEditorRuntimeComposition(
     telemetry.setRecordingTelemetry
   );
 
-  return { blockingOverlayOpen, exportPort, lifecycle, runtime, selections, timeline };
+  return { blockingOverlayOpen, exportPort, history, lifecycle, runtime, selections, timeline };
 }
 
 function useVideoEditorCommandComposition(
@@ -153,9 +153,11 @@ function useVideoEditorCommandComposition(
   libraries: ReturnType<typeof useVideoEditorLibraries>,
   workspace: ReturnType<typeof useVideoEditorWorkspaceState>
 ) {
-  const { exportPort, lifecycle, runtime, timeline } = composition;
+  const { exportPort, history, lifecycle, runtime, timeline } = composition;
   const assetCommandPort = useMemo(
     () => ({
+      beginProjectHistoryTransaction: history.beginProjectHistoryTransaction,
+      endProjectHistoryTransaction: history.endProjectHistoryTransaction,
       getCurrentProject: getCurrentVideoEditorProjectSnapshot,
       getCurrentProjectId: getCurrentVideoEditorProjectId,
       getCurrentTime: getCurrentVideoEditorCurrentTime,
@@ -167,6 +169,8 @@ function useVideoEditorCommandComposition(
       trimClipStart: timeline.trimClipStart,
     }),
     [
+      history.beginProjectHistoryTransaction,
+      history.endProjectHistoryTransaction,
       lifecycle.setError,
       timeline.addAssetClip,
       timeline.moveClip,
@@ -227,6 +231,8 @@ function useVideoEditorContextProjections(
   const workspaceDialogs = useMemo(
     () => ({
       audioRecordingDialogOpen: workspace.audioRecordingDialogOpen,
+      audioRecordingTarget: workspace.audioRecordingTarget,
+      openTrackAudioRecordingDialog: workspace.openTrackAudioRecordingDialog,
       closeAudioRecordingDialog: workspace.closeAudioRecordingDialog,
       closeLibraryPanel: workspace.closeLibraryPanel,
       confirm: workspace.confirm,
@@ -237,6 +243,8 @@ function useVideoEditorContextProjections(
     }),
     [
       workspace.audioRecordingDialogOpen,
+      workspace.audioRecordingTarget,
+      workspace.openTrackAudioRecordingDialog,
       workspace.closeAudioRecordingDialog,
       workspace.closeLibraryPanel,
       workspace.confirm,

@@ -181,7 +181,9 @@ function VideoEditorAudioRecordingModal({
     <AudioRecordingModal
       isOpen={layout.audioRecordingDialogOpen}
       onClose={layout.closeAudioRecordingDialog}
-      onSave={sidebar.projectActions.onImportRecordedAudio}
+      onSave={(file, trim) =>
+        sidebar.projectActions.onImportRecordedAudio(file, trim, layout.audioRecordingTarget)
+      }
     />
   );
 }

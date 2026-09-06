@@ -112,6 +112,8 @@ function createWorkspaceController() {
 function createLayoutController() {
   return {
     audioRecordingDialogOpen: false,
+    audioRecordingTarget: null as { projectId: string; trackId: string; startTime: number } | null,
+    openTrackAudioRecordingDialog: vi.fn(),
     closeAudioRecordingDialog: vi.fn(),
     handleStartVerticalResize: vi.fn(),
     leftSidebarCollapsed: true,
@@ -447,4 +449,25 @@ it('routes every library file import into materials', () => {
   for (const callback of [actions.onImportVideo, actions.onImportAudio, actions.onImportImage]) {
     expect(callback).toHaveBeenCalledWith(file, { destination: 'materials' });
   }
+});
+
+it('binds the recording modal save to the captured track destination', async () => {
+  const controller = createWorkspaceController();
+  const target = { projectId: 'project', trackId: 'voice', startTime: 7 };
+  controller.layout.audioRecordingTarget = target;
+  hookMocks.controller = controller;
+  renderToStaticMarkup(
+    <VideoEditorWorkspaceMain diagnosticsContent={null} previewHeightStyle={{}} />
+  );
+  const props = audioRecordingModalSpy.mock.lastCall![0];
+  const file = new File(['voice'], 'voice.webm');
+  const trim = { trimStart: 1, trimEnd: 4 };
+  await props.onSave(file, trim);
+  expect(
+    (
+      controller.sidebar as unknown as {
+        projectActions: ReturnType<typeof createSidebarProjectActions>;
+      }
+    ).projectActions.onImportRecordedAudio
+  ).toHaveBeenCalledWith(file, trim, target);
 });

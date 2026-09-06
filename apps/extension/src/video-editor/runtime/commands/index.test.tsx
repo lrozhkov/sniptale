@@ -24,6 +24,8 @@ afterEach(() => {
 it('keeps each command family stable across unrelated parent renders', () => {
   const initial = useVideoEditorStore.getInitialState();
   const assets: AssetHandlerPort = {
+    beginProjectHistoryTransaction: initial.beginProjectHistoryTransaction,
+    endProjectHistoryTransaction: initial.endProjectHistoryTransaction,
     addAssetClip: initial.addAssetClip,
     getCurrentProject: () => null,
     getCurrentProjectId: () => null,

@@ -1,3 +1,9 @@
+import {
+  createWorkspaceLayoutController,
+  createWorkspaceHeaderController,
+  createWorkspacePreviewController,
+} from './workspace/core';
+import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 // @vitest-environment jsdom
 
 import type React from 'react';
@@ -162,4 +168,71 @@ it('stores and clears the local playback loop range without touching project sta
   });
 
   expect(workspaceState!.playbackRange).toBeNull();
+});
+
+it('freezes the audio destination and clears it on close or global recording entry', () => {
+  renderWorkspaceHarness(root, (state) => {
+    workspaceState = state;
+  });
+  const target = { projectId: 'project', trackId: 'voice', startTime: 7 };
+  act(() => createWorkspaceLayoutController(workspaceState!).openTrackAudioRecordingDialog(target));
+  target.startTime = 20;
+  expect(createWorkspaceLayoutController(workspaceState!).audioRecordingTarget?.startTime).toBe(7);
+  expect(workspaceState!.audioRecordingDialogOpen).toBe(true);
+  act(() => workspaceState!.closeAudioRecordingDialog());
+  expect(workspaceState!.audioRecordingTarget).toBeNull();
+  expect(workspaceState!.audioRecordingDialogOpen).toBe(false);
+  act(() => createWorkspaceLayoutController(workspaceState!).openTrackAudioRecordingDialog(target));
+  act(() => workspaceState!.openAudioRecordingDialog());
+  expect(workspaceState!.audioRecordingTarget).toBeNull();
+  expect(workspaceState!.audioRecordingDialogOpen).toBe(true);
+});
+
+it('keeps the recording destination independent of viewer selection, transport and preferences', () => {
+  renderWorkspaceHarness(root, (state) => {
+    workspaceState = state;
+  });
+  const project = createEmptyVideoProject('Voice');
+  const target = { projectId: project.id, trackId: 'voice', startTime: 7 };
+  act(() => workspaceState!.openTrackAudioRecordingDialog(target));
+  const store = { selectClip: vi.fn(), selectScene: vi.fn(), currentTime: 20, isPlaying: false };
+  const runtime = { seekTo: vi.fn(), togglePlayback: vi.fn(), pausePlayback: vi.fn() };
+  const preview = createWorkspacePreviewController(
+    {
+      workspace: workspaceState!,
+      store,
+      selections: { selectedActionEvent: null, selectedMotionRegion: null },
+      actions: {
+        handleImportAudio: vi.fn(),
+        handleImportImage: vi.fn(),
+        handleImportVideo: vi.fn(),
+      },
+    } as unknown as Parameters<typeof createWorkspacePreviewController>[0],
+    runtime as unknown as Parameters<typeof createWorkspacePreviewController>[1],
+    project,
+    { addActionEvent: vi.fn(), addMotionRegion: vi.fn(), enableCursorTrack: vi.fn() }
+  );
+  const header = createWorkspaceHeaderController(
+    {
+      workspace: workspaceState!,
+      store: { ...store, openExportDialog: vi.fn(), renameProject: vi.fn() },
+      libraries: { projectExports: [] },
+      saveStateMeta: {} as never,
+    },
+    project
+  );
+  act(() => {
+    preview.selection.onSelectClip('another-clip');
+    preview.selection.onSelectScene();
+    header.onSelectScene();
+    preview.transport.onSeek(20);
+    preview.preferences.onZoomChange('fit');
+    preview.preferences.onModeChange(preview.preferences.mode);
+    preview.preferences.onRasterPresetChange(preview.preferences.rasterPreset);
+  });
+  expect(store.selectClip).toHaveBeenCalledWith('another-clip');
+  expect(runtime.seekTo).toHaveBeenCalledWith(20);
+  expect(createWorkspaceLayoutController(workspaceState!).audioRecordingTarget).toEqual(target);
+  act(() => header.onOpenAudioRecordingDialog());
+  expect(createWorkspaceLayoutController(workspaceState!).audioRecordingTarget).toBeNull();
 });

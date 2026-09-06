@@ -1,3 +1,4 @@
+import type { VideoEditorAudioRecordingTarget } from '../../contracts/insertion';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { loadRecentColors, pushRecentColor } from '../../../composition/persistence/recent-colors';
 import type { VideoProjectSceneBackground } from '../../../features/video/project/types/index';
@@ -36,6 +37,8 @@ interface VideoEditorWorkspaceInspectorState {
 
 export interface VideoEditorWorkspaceState {
   audioRecordingDialogOpen: boolean;
+  audioRecordingTarget: VideoEditorAudioRecordingTarget | null;
+  openTrackAudioRecordingDialog: (target: VideoEditorAudioRecordingTarget) => void;
   confirm: VideoEditorWorkspaceConfirmState;
   inspector: VideoEditorWorkspaceInspectorState;
   libraryPanelOpen: boolean;
@@ -102,11 +105,25 @@ function useVideoEditorLibraryPanelState() {
 function useAudioRecordingDialogState() {
   const [audioRecordingDialogOpen, setAudioRecordingDialogOpen] = useState(false);
 
-  const closeAudioRecordingDialog = useCallback(() => setAudioRecordingDialogOpen(false), []);
-  const openAudioRecordingDialog = useCallback(() => setAudioRecordingDialogOpen(true), []);
+  const [audioRecordingTarget, setAudioRecordingTarget] =
+    useState<VideoEditorAudioRecordingTarget | null>(null);
+  const closeAudioRecordingDialog = useCallback(() => {
+    setAudioRecordingDialogOpen(false);
+    setAudioRecordingTarget(null);
+  }, []);
+  const openAudioRecordingDialog = useCallback(() => {
+    setAudioRecordingTarget(null);
+    setAudioRecordingDialogOpen(true);
+  }, []);
+  const openTrackAudioRecordingDialog = useCallback((target: VideoEditorAudioRecordingTarget) => {
+    setAudioRecordingTarget({ ...target });
+    setAudioRecordingDialogOpen(true);
+  }, []);
 
   return {
     audioRecordingDialogOpen,
+    audioRecordingTarget,
+    openTrackAudioRecordingDialog,
     closeAudioRecordingDialog,
     openAudioRecordingDialog,
   };
@@ -217,6 +234,8 @@ export function useVideoEditorWorkspaceState(): VideoEditorWorkspaceState {
   return useMemo(
     () => ({
       audioRecordingDialogOpen: audioRecordingDialog.audioRecordingDialogOpen,
+      audioRecordingTarget: audioRecordingDialog.audioRecordingTarget,
+      openTrackAudioRecordingDialog: audioRecordingDialog.openTrackAudioRecordingDialog,
       confirm,
       inspector,
       libraryPanelOpen: libraryPanel.libraryPanelOpen,
@@ -236,6 +255,8 @@ export function useVideoEditorWorkspaceState(): VideoEditorWorkspaceState {
     }),
     [
       audioRecordingDialog.audioRecordingDialogOpen,
+      audioRecordingDialog.audioRecordingTarget,
+      audioRecordingDialog.openTrackAudioRecordingDialog,
       audioRecordingDialog.closeAudioRecordingDialog,
       audioRecordingDialog.openAudioRecordingDialog,
       clearPlaybackRange,

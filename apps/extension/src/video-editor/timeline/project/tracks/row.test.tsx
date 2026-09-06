@@ -3,9 +3,21 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { VideoTrackKind } from '../../../../features/video/project/types';
 import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import { buildTimelineTrackLayoutModel } from './layout';
 import { ProjectTimelineTrackRow } from './row';
+
+const recordingMocks = vi.hoisted(() => ({ open: vi.fn(), project: vi.fn() }));
+vi.mock('../../../runtime/controller/composition/hooks', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../runtime/controller/composition/hooks')>()),
+  useWorkspaceDialogsContext: () => ({ openTrackAudioRecordingDialog: recordingMocks.open }),
+}));
+vi.mock('../../../runtime/controller/store', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../runtime/controller/store')>()),
+  getCurrentVideoEditorProjectSnapshot: recordingMocks.project,
+  getCurrentVideoEditorCurrentTime: () => 7,
+}));
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -56,7 +68,7 @@ it('blurs track state icon buttons after pointer activation', () => {
   const button = buttons?.[0];
 
   expect(buttons).toHaveLength(2);
-  expect(buttons?.[0]?.className).toContain('!h-6');
+  expect(buttons?.[0]?.className).toContain('--timeline-control-height');
   expect(buttons?.[0]?.getAttribute('data-active')).toBe('true');
   expect(buttons?.[1]?.getAttribute('data-active')).toBe('false');
   expect(
@@ -71,4 +83,43 @@ it('blurs track state icon buttons after pointer activation', () => {
   });
 
   expect(document.activeElement).not.toBe(button);
+});
+
+it('offers recording only on audio rows, freezing its destination and honoring lock', () => {
+  const project = createEmptyVideoProject('Voice');
+  const track = project.tracks[0]!;
+  recordingMocks.project.mockReturnValue(project);
+  recordingMocks.open.mockClear();
+  const render = () =>
+    act(() => {
+      root?.render(
+        <ProjectTimelineTrackRow
+          compactRows
+          isSelected={false}
+          track={track}
+          trackLabel="A1"
+          trackLayout={undefined}
+          onSelectTrack={vi.fn()}
+          onToggleTrackLock={vi.fn()}
+          onToggleTrackVisibility={vi.fn()}
+        />
+      );
+    });
+  render();
+  const button = () =>
+    container!.querySelector<HTMLButtonElement>('[data-ui="video-editor.timeline.record-audio"]');
+  expect(button()).toBeNull();
+  track.kind = VideoTrackKind.AUDIO;
+  render();
+  act(() => button()!.click());
+  expect(recordingMocks.open).toHaveBeenCalledWith({
+    projectId: project.id,
+    trackId: track.id,
+    startTime: 7,
+  });
+  track.locked = true;
+  render();
+  expect(button()!.disabled).toBe(true);
+  act(() => button()!.click());
+  expect(recordingMocks.open).toHaveBeenCalledTimes(1);
 });

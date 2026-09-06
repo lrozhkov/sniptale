@@ -8,6 +8,8 @@ import type { VideoEditorWorkspaceState } from '../workspace-state';
 type WorkspaceDialogsContextValue = Pick<
   VideoEditorWorkspaceState,
   | 'audioRecordingDialogOpen'
+  | 'audioRecordingTarget'
+  | 'openTrackAudioRecordingDialog'
   | 'closeAudioRecordingDialog'
   | 'closeLibraryPanel'
   | 'confirm'

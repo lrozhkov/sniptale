@@ -34,3 +34,10 @@ export interface PreviewStageImportHandlers {
 export type VideoEditorImportDispatchResult =
   | { status: 'dispatched'; kind: VideoEditorImportKind }
   | { status: 'unsupported'; reason: 'unsupported-media-type' };
+
+/** Immutable placement selected when an audio-track recording dialog opens. */
+export interface VideoEditorAudioRecordingTarget {
+  projectId: string;
+  trackId: string;
+  startTime: number;
+}

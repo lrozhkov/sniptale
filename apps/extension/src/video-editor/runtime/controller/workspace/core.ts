@@ -115,6 +115,8 @@ export function createWorkspaceLayoutController(
   workspace: Pick<
     VideoEditorWorkspaceState,
     | 'audioRecordingDialogOpen'
+    | 'audioRecordingTarget'
+    | 'openTrackAudioRecordingDialog'
     | 'closeAudioRecordingDialog'
     | 'leftSidebarCollapsed'
     | 'openAudioRecordingDialog'
@@ -124,6 +126,8 @@ export function createWorkspaceLayoutController(
 ) {
   return {
     audioRecordingDialogOpen: workspace.audioRecordingDialogOpen,
+    audioRecordingTarget: workspace.audioRecordingTarget,
+    openTrackAudioRecordingDialog: workspace.openTrackAudioRecordingDialog,
     closeAudioRecordingDialog: workspace.closeAudioRecordingDialog,
     handleStartVerticalResize: workspace.preview.handleStartVerticalResize,
     leftSidebarCollapsed: workspace.leftSidebarCollapsed,

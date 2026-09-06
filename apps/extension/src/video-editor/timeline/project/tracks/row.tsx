@@ -1,4 +1,10 @@
-import { Eye, EyeOff, Lock, Unlock } from 'lucide-react';
+import { VideoTrackKind } from '../../../../features/video/project/types';
+import { useWorkspaceDialogsContext } from '../../../runtime/controller/composition/hooks';
+import {
+  getCurrentVideoEditorProjectSnapshot,
+  getCurrentVideoEditorCurrentTime,
+} from '../../../runtime/controller/store';
+import { Eye, EyeOff, Lock, Unlock, Mic } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import type { VideoProject } from '../../../../features/video/project/types';
 import { getTrackKindLabel } from '../interaction-state/helpers';
@@ -101,6 +107,7 @@ function ProjectTimelineTrackStateControls({
 }: Pick<ProjectTimelineTrackRowProps, 'track' | 'onToggleTrackLock' | 'onToggleTrackVisibility'>) {
   return (
     <div className="flex gap-1">
+      {track.kind === VideoTrackKind.AUDIO && <AudioTrackRecordingButton track={track} />}
       <TimelineIconButton
         active={track.visible}
         icon={
@@ -128,5 +135,34 @@ function ProjectTimelineTrackStateControls({
         }
       />
     </div>
+  );
+}
+
+function AudioTrackRecordingButton({ track }: Pick<ProjectTimelineTrackRowProps, 'track'>) {
+  const dialogs = useWorkspaceDialogsContext();
+  return (
+    <TimelineIconButton
+      dataUi="video-editor.timeline.record-audio"
+      icon={<Mic size={13} strokeWidth={2} />}
+      title={translate('videoEditor.app.recordAudioButton')}
+      disabled={track.locked}
+      stopPropagation
+      onClick={() => {
+        const project = getCurrentVideoEditorProjectSnapshot();
+        const destination = project?.tracks.find((item) => item.id === track.id);
+        if (
+          !project ||
+          !destination ||
+          destination.locked ||
+          destination.kind !== VideoTrackKind.AUDIO
+        )
+          return;
+        dialogs.openTrackAudioRecordingDialog({
+          projectId: project.id,
+          trackId: track.id,
+          startTime: getCurrentVideoEditorCurrentTime(),
+        });
+      }}
+    />
   );
 }

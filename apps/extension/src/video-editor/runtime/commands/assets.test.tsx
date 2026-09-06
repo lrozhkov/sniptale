@@ -3,8 +3,11 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
-import { VideoProjectAssetType } from '../../../features/video/project/types';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../features/video/project/factories/creation';
+import { VideoProjectAssetType, VideoTrackKind } from '../../../features/video/project/types';
 import { useAssetHandlers } from './assets';
 import { ensureRecordingAsset } from '../../project/operations/ops';
 
@@ -54,6 +57,8 @@ function createParams(): TestAssetHandlerPort {
   const project = createEmptyVideoProject('Recorded audio');
   const params: TestAssetHandlerPort = {
     currentTime: 5,
+    beginProjectHistoryTransaction: vi.fn(() => Symbol()),
+    endProjectHistoryTransaction: vi.fn(),
     getCurrentProject: () => project,
     getCurrentProjectId: () => project.id,
     getCurrentTime: () => params.currentTime,
@@ -235,4 +240,89 @@ describe('library material import', () => {
     expect(params.upsertAsset).not.toHaveBeenCalled();
     expect(deleteProjectAssetMock).not.toHaveBeenCalled();
   });
+});
+
+describe('recording into an explicit audio track', () => {
+  function setupTarget() {
+    const params = createParams();
+    const project = params.getCurrentProject()!;
+    const track = createVideoProjectTrack('Voice', 1, VideoTrackKind.AUDIO);
+    project.tracks.push(track);
+    return { params, track, target: { projectId: project.id, trackId: track.id, startTime: 7 } };
+  }
+
+  it('preserves the opening track and playhead through asynchronous import in one history lease', async () => {
+    const { params, target } = setupTarget();
+    renderHook(params);
+    const pending = latestHandlers!.handleImportRecordedAudio(
+      new File(['voice'], 'voice.webm'),
+      { trimStart: 1, trimEnd: 4 },
+      target
+    );
+    params.currentTime = 20;
+    await act(async () => pending);
+    expect(params.addAssetClip).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'asset-1' }),
+      target.trackId,
+      7
+    );
+    expect(params.beginProjectHistoryTransaction).toHaveBeenCalledTimes(1);
+    expect(params.endProjectHistoryTransaction).toHaveBeenCalledTimes(1);
+    expect(params.trimClipEnd).toHaveBeenCalledWith('clip-1', 10);
+  });
+
+  it.each(['missing', 'locked', 'video', 'project'])(
+    'rejects a %s target without importing or placing',
+    async (reason) => {
+      const { params, track, target } = setupTarget();
+      if (reason === 'missing') params.getCurrentProject()!.tracks = [];
+      if (reason === 'locked') track.locked = true;
+      if (reason === 'video') track.kind = VideoTrackKind.PRIMARY;
+      if (reason === 'project') params.getCurrentProjectId = () => 'another';
+      renderHook(params);
+      await expect(
+        latestHandlers!.handleImportRecordedAudio(
+          new File(['voice'], 'voice.webm'),
+          { trimStart: 0, trimEnd: 4 },
+          target
+        )
+      ).rejects.toThrow();
+      expect(importProjectAssetMock).not.toHaveBeenCalled();
+      expect(params.addAssetClip).not.toHaveBeenCalled();
+    }
+  );
+
+  it('cleans the copy and rejects if the destination is locked during import', async () => {
+    const { params, track, target } = setupTarget();
+    renderHook(params);
+    const pending = latestHandlers!.handleImportRecordedAudio(
+      new File(['voice'], 'voice.webm'),
+      { trimStart: 0, trimEnd: 4 },
+      target
+    );
+    track.locked = true;
+    await expect(pending).rejects.toThrow();
+    expect(deleteProjectAssetMock).toHaveBeenCalledWith('asset-1');
+    expect(params.addAssetClip).not.toHaveBeenCalled();
+  });
+  it.each(['project', 'history'])(
+    'cleans the imported copy when %s admission fails',
+    async (reason) => {
+      const { params, target } = setupTarget();
+      if (reason === 'history')
+        vi.mocked(params.beginProjectHistoryTransaction).mockReturnValue(null);
+      renderHook(params);
+      const pending = latestHandlers!.handleImportRecordedAudio(
+        new File(['voice'], 'voice.webm'),
+        { trimStart: 0, trimEnd: 4 },
+        target
+      );
+      if (reason === 'project') params.getCurrentProjectId = () => 'other';
+      await expect(pending).rejects.toThrow();
+      expect(deleteProjectAssetMock).toHaveBeenCalledWith('asset-1');
+      expect(params.upsertAsset).not.toHaveBeenCalled();
+      expect(params.addAssetClip).not.toHaveBeenCalled();
+      expect(params.endProjectHistoryTransaction).not.toHaveBeenCalled();
+    }
+  );
 });
