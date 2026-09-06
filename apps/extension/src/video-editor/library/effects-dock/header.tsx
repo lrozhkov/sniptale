@@ -12,7 +12,7 @@ export function EffectsLibraryHeader(props: {
   return (
     <header
       className={[
-        'flex h-[52px] shrink-0 items-center justify-between gap-1 border-b',
+        'flex h-[52px] shrink-0 items-center justify-between gap-2 border-b',
         'border-[color:var(--sniptale-color-border-soft)] px-3',
       ].join(' ')}
     >
@@ -55,13 +55,12 @@ export function EffectImportControl(props: {
         }}
       />
       <ProductActionButton
-        compact
         disabled={props.disabled}
         tone="secondary"
-        className="w-full gap-2"
+        className="w-full justify-start"
         onClick={() => inputRef.current?.click()}
       >
-        <Upload size={14} strokeWidth={2} />
+        <Upload size={16} aria-hidden="true" />
         {translate('videoEditor.effectsLibrary.importPack')}
       </ProductActionButton>
     </div>

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act } from 'react';
+import { readFileSync } from 'node:fs';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
@@ -56,7 +57,7 @@ it('uses the compact tokenized dock and user-facing EffectV1 target labels', () 
   expect(dock?.className).toContain('h-full');
   expect(dock?.className).not.toContain('absolute');
   expect(documentRows).toHaveLength(3);
-  expect(documentRows?.[0]?.className).toContain('var(--sniptale-color-surface-overlay)');
+  expect(documentRows?.[0]?.className).toContain('var(--sniptale-color-surface-panel)');
   expect(container?.textContent).toContain(
     translate('videoEditor.effectsLibrary.documentKindScene')
   );
@@ -312,10 +313,10 @@ function createDocument(
 }
 
 function findDocumentButton(id: string): HTMLButtonElement {
-  const label = [...(container?.querySelectorAll('p') ?? [])].find(
-    (element) => element.textContent === id
+  const row = [...(container?.querySelectorAll('[data-effect-document]') ?? [])].find(
+    (element) => element.getAttribute('data-effect-document') === id
   );
-  const button = label?.parentElement?.parentElement?.querySelector('button');
+  const button = row?.querySelector('button');
   if (!(button instanceof HTMLButtonElement)) throw new Error(`Missing button for ${id}`);
   return button;
 }
@@ -343,4 +344,42 @@ it('opens the picker, ignores its cancellation and resets it after a selected pa
   expect(input.value).toBe('');
   act(() => root?.render(<EffectImportControl disabled onImport={onImport} run={run} />));
   expect(container!.querySelector('button')!.disabled).toBe(true);
+});
+
+it('presents the imported document label instead of its internal identifier', () => {
+  const catalog = createCatalog();
+  catalog.documents[1]!.source = readFileSync(
+    'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-target-effect.sniptale-effect.json',
+    'utf8'
+  );
+  renderDock({ catalogs: [{ catalog, status: 'ready' }] });
+  expect(container?.textContent).toContain('Neutral Target Effect');
+  expect(container?.textContent).not.toContain('effect-pack');
+  expect(container?.textContent).not.toContain('EffectV1');
+});
+
+it('filters document names and restores the catalog after an empty search', () => {
+  const catalog = createCatalog();
+  catalog.documents[1]!.source = readFileSync(
+    'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-target-effect.sniptale-effect.json',
+    'utf8'
+  );
+  renderDock({ catalogs: [{ catalog, status: 'ready' }] });
+  const input = container!.querySelector<HTMLInputElement>('input:not([type="file"])')!;
+  const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+  const search = (value: string) =>
+    act(() => {
+      setValue.call(input, value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  search('Neutral');
+  expect(container?.querySelectorAll('[data-effect-document]')).toHaveLength(1);
+  expect(container?.textContent).toContain('Neutral Target Effect');
+  search('not-in-this-catalog');
+  expect(container?.querySelectorAll('[data-effect-document]')).toHaveLength(0);
+  expect(container?.querySelector('[role="status"]')?.textContent).toBe(
+    translate('videoEditor.effectsLibrary.noSearchResults')
+  );
+  search('');
+  expect(container?.querySelectorAll('[data-effect-document]')).toHaveLength(3);
 });

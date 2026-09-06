@@ -92,6 +92,7 @@ function DisabledColorPreview(props: { label: string; value: string }) {
 }
 
 export function ColorField({
+  className,
   disabled = false,
   label,
   onChange,
@@ -99,6 +100,7 @@ export function ColorField({
   recentColors,
   value,
 }: {
+  className?: string;
   disabled?: boolean;
   label: string;
   onChange: (value: string) => void;
@@ -122,7 +124,9 @@ export function ColorField({
     ...(recentColors ? { recentColors } : {}),
   };
 
-  return <CompactInspectorColorField {...colorSelectorProps} />;
+  return (
+    <CompactInspectorColorField {...colorSelectorProps} {...(className ? { className } : {})} />
+  );
 }
 
 export function ToggleField(props: {

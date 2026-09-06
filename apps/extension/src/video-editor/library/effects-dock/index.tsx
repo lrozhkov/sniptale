@@ -1,8 +1,7 @@
-import { InspectorShellPanel } from '@sniptale/ui/inspector-shell';
+import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 
 import { translate } from '../../../platform/i18n';
 import { getUserFacingErrorDetail } from '../../../platform/i18n/user-facing-error';
-import { VIDEO_EDITOR_PANEL_STYLE } from '../../chrome/styles';
 import { CatalogSection } from './catalog-section';
 import { EffectImportControl, EffectsLibraryHeader } from './header';
 import type { EffectLibraryOperationError } from './operations';
@@ -18,13 +17,13 @@ export function VideoEditorEffectsLibraryDock(
 
   return (
     <aside data-ui="video-editor.effects-library.dock" className={EFFECT_LIBRARY_DOCK_CLASS_NAME}>
-      <InspectorShellPanel
-        style={VIDEO_EDITOR_PANEL_STYLE}
+      <FloatingChromePanel
+        className="h-full w-full overflow-hidden"
         dataUi="video-editor.effects-library.panel"
       >
-        <div className="flex h-full min-h-0 flex-col gap-2">
+        <div className="flex h-full min-h-0 flex-col">
           <EffectsLibraryHeader onClose={props.onClose} action={props.headerAction} />
-          <div className="px-2">
+          <div className="shrink-0 border-b border-[var(--sniptale-color-border-soft)] px-2 py-1">
             <EffectImportControl
               disabled={disabled}
               onImport={props.onImportEffectFile}
@@ -47,13 +46,13 @@ export function VideoEditorEffectsLibraryDock(
           )}
 
           <div
-            className="min-h-0 flex-1 space-y-3 overflow-y-auto px-2 pb-2"
+            className="min-h-0 flex-1 space-y-3 overflow-y-auto p-2"
             aria-busy={disabled || props.isLoading}
           >
             <CatalogSection {...props} disabled={disabled} run={run} />
           </div>
         </div>
-      </InspectorShellPanel>
+      </FloatingChromePanel>
     </aside>
   );
 }

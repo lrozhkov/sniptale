@@ -50,7 +50,7 @@ test('EffectV1 catalog enable toggle stays live in Chromium IndexedDB', async ({
   });
   await expect(enableButton).toBeVisible();
   await enableButton.click();
-  await expect(page.getByText('neutral-standalone', { exact: true })).toBeVisible();
+  await expect(page.locator('[data-effect-document="neutral-standalone"]')).toBeVisible();
   await expect(
     page.getByRole('button', { name: VIDEO_EDITOR_EFFECT_DISABLE_LABEL, exact: true })
   ).toBeVisible();

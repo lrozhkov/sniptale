@@ -49,6 +49,10 @@ function createSelectionPanelOptionalActionProps(props: WorkspaceSidebarSelectio
     ...(props.onDeleteEffectInstance
       ? { onDeleteEffectInstance: props.onDeleteEffectInstance }
       : {}),
+    ...(props.onDuplicateEffectInstance
+      ? { onDuplicateEffectInstance: props.onDuplicateEffectInstance }
+      : {}),
+    ...(props.onMoveEffectInstance ? { onMoveEffectInstance: props.onMoveEffectInstance } : {}),
     ...(props.onUpsertObjectTrackCorrectionAnchor
       ? { onUpsertObjectTrackCorrectionAnchor: props.onUpsertObjectTrackCorrectionAnchor }
       : {}),

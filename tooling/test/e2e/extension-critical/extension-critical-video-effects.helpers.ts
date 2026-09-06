@@ -106,8 +106,8 @@ export async function importAndApplyEffect(
 ): Promise<void> {
   await importEffectFile(page, args);
 
-  const documentLabel = page.getByText(args.documentId, { exact: true });
-  const addButton = documentLabel.locator('..').locator('..').getByRole('button');
+  const documentLabel = page.locator(`[data-effect-document="${args.documentId}"]`);
+  const addButton = documentLabel.getByRole('button');
   await expect(addButton).toBeEnabled();
   await addButton.click();
 }
@@ -129,7 +129,7 @@ export async function importEffectFile(
   await importControl.click();
   await (await chooserPromise).setFiles(args.fixturePath);
 
-  const documentLabel = page.getByText(args.documentId, { exact: true });
+  const documentLabel = page.locator(`[data-effect-document="${args.documentId}"]`);
   await expect(documentLabel).toBeVisible();
 }
 

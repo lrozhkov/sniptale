@@ -82,6 +82,7 @@ type WorkspaceSidebarSelectionBodyProps = Partial<
     | 'onUpdateTransitionTemplate'
     | 'onDeleteEffectInstance'
     | 'onDuplicateEffectInstance'
+    | 'onMoveEffectInstance'
     | 'onUpdateEffectInstance'
     | 'onUpsertObjectTrackCorrectionAnchor'
   >
@@ -191,6 +192,7 @@ function createInspectPanelEffectProps(props: WorkspaceSidebarSelectionBodyProps
     onUpdateTransitionTemplate: props.onUpdateTransitionTemplate ?? (() => undefined),
     onDeleteEffectInstance: props.onDeleteEffectInstance ?? (() => undefined),
     onDuplicateEffectInstance: props.onDuplicateEffectInstance ?? (() => null),
+    onMoveEffectInstance: props.onMoveEffectInstance ?? (() => undefined),
     onUpdateEffectInstance: props.onUpdateEffectInstance ?? (() => undefined),
     onUpsertObjectTrackCorrectionAnchor:
       props.onUpsertObjectTrackCorrectionAnchor ?? (() => undefined),

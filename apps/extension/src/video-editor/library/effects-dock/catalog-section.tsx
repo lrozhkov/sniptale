@@ -1,3 +1,8 @@
+import { useState } from 'react';
+import { Search, Trash2 } from 'lucide-react';
+import { parseEffectV1Source } from '@sniptale/runtime-contracts/effect-v1';
+import { ProductGlassInput, ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
+import { EditorIconButton } from '@sniptale/ui/editor-chrome';
 import type { EffectBundleCatalogEntry } from '../../../features/video/project/effect-bundle/catalog';
 import type { VideoProjectEffectTarget } from '../../../features/video/project/effect-instance/types';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -6,36 +11,70 @@ import { getCurrentLocale, translate } from '../../../platform/i18n';
 import type { EffectLibraryOperations } from './operations';
 import type { VideoEditorEffectsLibraryDockProps } from './types';
 
-const CATALOG_CARD_CLASS_NAME = [
-  'space-y-3 rounded-[12px] border p-3',
-  'border-[var(--sniptale-color-border-soft)]',
-  'bg-[var(--sniptale-color-surface-panel)]',
-].join(' ');
-
+const CATALOG_CARD_CLASS_NAME =
+  'space-y-2 border-b border-[var(--sniptale-color-border-soft)] pb-3';
 const DOCUMENT_CARD_CLASS_NAME = [
-  'flex min-w-0 flex-col items-stretch gap-3 rounded-[10px] border p-3',
-  'border-[var(--sniptale-color-border-subtle)]',
-  'bg-[var(--sniptale-color-surface-overlay)]',
+  'flex min-w-0 flex-col gap-2 rounded-[8px] border p-2',
+  'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]',
 ].join(' ');
 
 export function CatalogSection(
-  props: VideoEditorEffectsLibraryDockProps & {
-    disabled: boolean;
-  } & Pick<EffectLibraryOperations, 'run'>
+  props: VideoEditorEffectsLibraryDockProps & { disabled: boolean } & Pick<
+      EffectLibraryOperations,
+      'run'
+    >
 ): React.JSX.Element {
+  const [query, setQuery] = useState('');
+  const search = query.trim().toLocaleLowerCase(getCurrentLocale());
+  const matches = (value: string) => value.toLocaleLowerCase(getCurrentLocale()).includes(search);
+  const visibleCatalogs = props.catalogs.filter((item) =>
+    item.status === 'invalid'
+      ? matches(translate('videoEditor.effectsLibrary.invalidPack'))
+      : matches(readLocalized(item.catalog.label)) ||
+        item.catalog.documents.some((document) => matches(readDocumentLabel(document)))
+  );
   return (
-    <section aria-labelledby="effect-v1-catalog-heading" className="space-y-2">
-      <h3 id="effect-v1-catalog-heading" className="text-sm font-semibold">
-        {translate('videoEditor.effectsLibrary.effectV1Label')}
-      </h3>
+    <section
+      aria-label={translate('videoEditor.effectsLibrary.effectV1Label')}
+      className="space-y-3"
+    >
+      {props.catalogs.length > 0 && (
+        <div className="relative">
+          <Search
+            size={15}
+            aria-hidden="true"
+            className={[
+              'pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2',
+              'text-[var(--sniptale-color-text-muted)]',
+            ].join(' ')}
+          />
+          <ProductGlassInput
+            className="!h-9 w-full !pl-8"
+            aria-label={translate('videoEditor.effectsLibrary.searchPlaceholder')}
+            placeholder={translate('videoEditor.effectsLibrary.searchPlaceholder')}
+            value={query}
+            onChange={(event) => setQuery(event.currentTarget.value)}
+          />
+        </div>
+      )}
       {!props.isLoading && props.catalogs.length === 0 && (
-        <p className="text-xs text-[var(--sniptale-color-text-muted)]">
+        <p className="px-1 text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
           {translate('videoEditor.effectsLibrary.noImportedPacks')}
         </p>
       )}
-      {props.catalogs.map((item) =>
+      {props.catalogs.length > 0 && visibleCatalogs.length === 0 && (
+        <p role="status" className="px-1 text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
+          {translate('videoEditor.effectsLibrary.noSearchResults')}
+        </p>
+      )}
+      {visibleCatalogs.map((item) =>
         item.status === 'ready' ? (
-          <CatalogEntry key={item.catalog.packId} catalog={item.catalog} {...props} />
+          <CatalogEntry
+            key={item.catalog.packId}
+            catalog={item.catalog}
+            {...props}
+            search={search}
+          />
         ) : (
           <InvalidCatalogEntry key={item.packId} packId={item.packId} {...props} />
         )
@@ -73,55 +112,69 @@ function CatalogEntry(
   props: VideoEditorEffectsLibraryDockProps & {
     catalog: EffectBundleCatalogEntry;
     disabled: boolean;
+    search: string;
   } & Pick<EffectLibraryOperations, 'run'>
 ): React.JSX.Element {
   const { catalog } = props;
+  const packMatches = readLocalized(catalog.label)
+    .toLocaleLowerCase(getCurrentLocale())
+    .includes(props.search);
+  const documents = catalog.documents.filter(
+    (document) =>
+      packMatches ||
+      readDocumentLabel(document).toLocaleLowerCase(getCurrentLocale()).includes(props.search)
+  );
   return (
     <article className={CATALOG_CARD_CLASS_NAME}>
-      <div className="flex min-w-0 flex-col gap-2">
-        <div>
-          <h4 className="break-words text-sm font-medium">{readLocalized(catalog.label)}</h4>
-          <p className="text-xs text-[var(--sniptale-color-text-muted)]">
-            {catalog.packId} · {catalog.version}
-          </p>
-        </div>
+      <div className="flex min-w-0 items-center justify-between gap-2 px-1">
+        <h3 className="min-w-0 break-words text-[13px] font-semibold">
+          {readLocalized(catalog.label)}
+        </h3>
         <CatalogActions {...props} />
       </div>
-      {catalog.enabled &&
-        catalog.documents.map((document) => (
+      {catalog.enabled ? (
+        documents.map((document) => (
           <CatalogDocument key={document.id} document={document} {...props} />
-        ))}
+        ))
+      ) : (
+        <p className="px-1 text-xs text-[var(--sniptale-color-text-muted)]">
+          {translate('videoEditor.effectsLibrary.disabledPack')}
+        </p>
+      )}
     </article>
   );
 }
 
 function CatalogActions(props: Parameters<typeof CatalogEntry>[0]): React.JSX.Element {
+  const toggleLabel = translate(
+    props.catalog.enabled
+      ? 'videoEditor.effectsLibrary.disablePack'
+      : 'videoEditor.effectsLibrary.enablePack'
+  );
   return (
-    <div className="flex flex-wrap gap-1">
-      <ProductActionButton
-        compact
-        tone="secondary"
+    <div className="flex shrink-0 items-center gap-2">
+      <ProductGlassSwitch
+        on={props.catalog.enabled}
+        aria-pressed={props.catalog.enabled}
+        aria-label={toggleLabel}
+        title={toggleLabel}
         disabled={props.disabled}
         onClick={() =>
           void props.run('update', () =>
             props.onSetEffectBundleEnabled(props.catalog.packId, !props.catalog.enabled)
           )
         }
-      >
-        {props.catalog.enabled
-          ? translate('videoEditor.effectsLibrary.disablePack')
-          : translate('videoEditor.effectsLibrary.enablePack')}
-      </ProductActionButton>
-      <ProductActionButton
-        compact
-        tone="danger"
+      />
+      <EditorIconButton
+        className="!h-8 !w-8 text-[var(--sniptale-color-danger)]"
+        title={translate('videoEditor.effectsLibrary.deletePack')}
         disabled={props.disabled}
         onClick={() =>
           void props.run('delete', () => props.onDeleteEffectBundle(props.catalog.packId))
         }
       >
-        {translate('videoEditor.effectsLibrary.deletePack')}
-      </ProductActionButton>
+        <Trash2 size={15} aria-hidden="true" />
+      </EditorIconButton>
     </div>
   );
 }
@@ -135,6 +188,7 @@ function CatalogDocument(
   return (
     <div
       className={DOCUMENT_CARD_CLASS_NAME}
+      data-effect-document={props.document.id}
       draggable={!props.disabled}
       onDragStart={(event) =>
         writeVideoEditorEffectDocumentDragPayload(event.dataTransfer, {
@@ -145,8 +199,15 @@ function CatalogDocument(
       }
     >
       <div>
-        <p className="break-all text-sm font-medium text-[var(--sniptale-color-text-primary)]">
-          {props.document.id}
+        <p
+          className={
+            props.catalog.documents.length === 1 &&
+            readDocumentLabel(props.document) === readLocalized(props.catalog.label)
+              ? 'sr-only'
+              : 'break-words text-[13px] font-medium text-[var(--sniptale-color-text-primary)]'
+          }
+        >
+          {readDocumentLabel(props.document)}
         </p>
         <p className="text-xs text-[var(--sniptale-color-text-muted)]">
           {getDocumentKindLabel(props.document.kind)}
@@ -209,4 +270,11 @@ function resolveDocumentTarget(
 
 function readLocalized(value: { en: string; ru: string }): string {
   return getCurrentLocale() === 'ru' ? value.ru : value.en;
+}
+
+function readDocumentLabel(document: EffectBundleCatalogEntry['documents'][number]): string {
+  const parsed = parseEffectV1Source(document.source).document;
+  return parsed
+    ? (parsed.label[getCurrentLocale()] ?? parsed.label.en ?? getDocumentKindLabel(document.kind))
+    : getDocumentKindLabel(document.kind);
 }
