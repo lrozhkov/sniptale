@@ -213,6 +213,22 @@ export const videoEditorSidebarLibraryMessages = defineMessageSource({
     ru: 'Превью медиа',
     en: 'Media preview',
   },
+  mediaPreviewSeek: {
+    ru: 'Позиция просмотра',
+    en: 'Preview position',
+  },
+  mediaPreviewMute: {
+    ru: 'Выключить звук превью',
+    en: 'Mute preview',
+  },
+  mediaPreviewUnmute: {
+    ru: 'Включить звук превью',
+    en: 'Unmute preview',
+  },
+  mediaPreviewActionFailed: {
+    ru: 'Не удалось выполнить действие с превью. Попробуйте ещё раз.',
+    en: 'The preview action failed. Please try again.',
+  },
   libraryMediaPreviewEmpty: {
     ru: 'Выберите запись в списке, чтобы увидеть превью и параметры.',
     en: 'Select a recording to preview it and inspect its settings.',
