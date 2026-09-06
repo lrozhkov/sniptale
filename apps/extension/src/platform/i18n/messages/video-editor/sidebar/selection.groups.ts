@@ -59,8 +59,12 @@ export const videoEditorSidebarSelectionGroupMessages = {
     ru: 'Трекинг',
     en: 'Tracking',
   },
-  inspectorGroupTransform: {
+  inspectorGroupFraming: {
     ru: 'Кадр',
+    en: 'Framing',
+  },
+  inspectorGroupTransform: {
+    ru: 'Трансформация',
     en: 'Transform',
   },
   inspectorGroupAudio: {

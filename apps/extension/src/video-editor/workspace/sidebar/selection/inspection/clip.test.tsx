@@ -99,12 +99,14 @@ function createSelectionHandlers() {
   };
 }
 
-function createVideoProps(): WorkspaceSidebarSelectionPanelProps {
+function createVideoProps(
+  assetType: 'VIDEO' | 'IMAGE' = VideoProjectAssetType.VIDEO
+): WorkspaceSidebarSelectionPanelProps {
   const project = createEmptyVideoProject('Video frame controls');
   const trackId = project.tracks.find((track) => track.kind === VideoTrackKind.PRIMARY)?.id;
   const asset = createVideoProjectAsset(
     'Video',
-    VideoProjectAssetType.VIDEO,
+    assetType,
     { kind: 'project-asset', projectAssetId: 'asset-video' },
     {
       audioPeaks: null,
@@ -176,6 +178,9 @@ describe('workspace-sidebar/selection/inspect-core', () => {
     renderInspectPanel(createProps());
 
     expect(container?.textContent).toContain('videoEditor.sidebar.textLabel');
+    expect(
+      container?.querySelector('[aria-label="videoEditor.sidebar.inspectorGroupFraming"]')
+    ).toBeNull();
     expect(container?.textContent).not.toContain('videoEditor.sidebar.clipTypeText');
     clickGroup('videoEditor.sidebar.inspectorGroupSummary');
     expect(container?.textContent).toContain('videoEditor.sidebar.clipTypeText');
@@ -203,23 +208,48 @@ describe('workspace-sidebar/selection/inspect-core', () => {
     expect(container?.textContent).toContain('videoEditor.sidebar.lockedTrackDescription');
   });
 
-  it('keeps media frame controls in the frame group instead of timing', () => {
-    renderInspectPanel(createVideoProps());
+  it.each(['VIDEO', 'IMAGE'] as const)(
+    'opens framing for %s and separates geometry and timing',
+    (assetType) => {
+      renderInspectPanel(createVideoProps(assetType));
 
-    clickGroup('videoEditor.sidebar.inspectorGroupTiming');
+      expect(container?.textContent).toContain('videoEditor.sidebar.fitModeLabel');
+      expect(container?.textContent).not.toContain('videoEditor.sidebar.rotationLabel');
 
-    expect(container?.textContent).toContain('videoEditor.sidebar.fadeInLabel');
-    expect(container?.textContent).toContain('videoEditor.sidebar.playbackRateLabel');
-    expect(container?.textContent).not.toContain('videoEditor.sidebar.fitModeLabel');
-    expect(container?.textContent).not.toContain('videoEditor.sidebar.fitScalePercentLabel');
-    expect(container?.textContent).not.toContain('videoEditor.sidebar.mediaShadowIntensityLabel');
+      clickGroup('videoEditor.sidebar.inspectorGroupTiming');
 
-    clickGroup('videoEditor.sidebar.inspectorGroupTransform');
+      expect(container?.textContent).toContain('videoEditor.sidebar.fadeInLabel');
+      if (assetType === VideoProjectAssetType.VIDEO) {
+        expect(container?.textContent).toContain('videoEditor.sidebar.playbackRateLabel');
+      } else {
+        expect(container?.textContent).not.toContain('videoEditor.sidebar.playbackRateLabel');
+      }
+      expect(container?.textContent).not.toContain('videoEditor.sidebar.fitModeLabel');
+      expect(container?.textContent).not.toContain('videoEditor.sidebar.fitScalePercentLabel');
+      expect(container?.textContent).not.toContain('videoEditor.sidebar.mediaShadowIntensityLabel');
 
-    expect(container?.textContent).toContain('videoEditor.sidebar.fitModeLabel');
-    expect(container?.textContent).toContain('videoEditor.sidebar.fitScalePercentLabel');
-    expect(container?.textContent).toContain('videoEditor.sidebar.mediaShadowIntensityLabel');
-  });
+      clickGroup('videoEditor.sidebar.inspectorGroupTransform');
+      expect(container?.textContent).toContain('videoEditor.sidebar.rotationLabel');
+      expect(container?.textContent).not.toContain('videoEditor.sidebar.fitModeLabel');
+
+      clickGroup('videoEditor.sidebar.inspectorGroupFraming');
+
+      expect(container?.textContent).toContain('videoEditor.sidebar.fitModeLabel');
+      expect(container?.textContent).toContain('videoEditor.sidebar.fitScalePercentLabel');
+      expect(container?.textContent).toContain('videoEditor.sidebar.mediaShadowIntensityLabel');
+    }
+  );
+
+  it.each(['VIDEO', 'IMAGE'] as const)(
+    'opens framing after switching from text to %s',
+    (assetType) => {
+      renderInspectPanel(createProps());
+      expect(container?.textContent).toContain('videoEditor.sidebar.textLabel');
+      renderInspectPanel(createVideoProps(assetType));
+      expect(container?.textContent).toContain('videoEditor.sidebar.fitModeLabel');
+      expect(container?.textContent).not.toContain('videoEditor.sidebar.projectTitle');
+    }
+  );
 
   it('keeps cursor-recognition controls out of video clip inspection', () => {
     renderInspectPanel(createVideoProps());
@@ -254,10 +284,10 @@ describe('workspace-sidebar/selection/inspect-core', () => {
 
     renderInspectPanel(props);
     clickGroup('videoEditor.sidebar.inspectorGroupTransform');
-    expect(container?.textContent).toContain('videoEditor.sidebar.fitModeLabel');
+    expect(container?.textContent).toContain('videoEditor.sidebar.rotationLabel');
 
     renderInspectPanel({ ...props });
-    expect(container?.textContent).toContain('videoEditor.sidebar.fitModeLabel');
+    expect(container?.textContent).toContain('videoEditor.sidebar.rotationLabel');
 
     props.project.tracks = props.project.tracks.map((track) =>
       track.id === props.selectedClip?.trackId
@@ -267,7 +297,7 @@ describe('workspace-sidebar/selection/inspect-core', () => {
     renderInspectPanel({ ...props });
 
     expect(container?.textContent).toContain('videoEditor.sidebar.cameraPlacementDescription');
-    expect(container?.textContent).not.toContain('videoEditor.sidebar.fitModeLabel');
+    expect(container?.textContent).not.toContain('videoEditor.sidebar.rotationLabel');
   });
 
   it('keeps camera-specific controls out of ordinary video inspection', () => {

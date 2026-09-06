@@ -65,7 +65,7 @@ export function InspectClipPanel(props: WorkspaceSidebarSelectionPanelProps) {
   return (
     <section className={PANEL_SECTION_CLASS_NAME}>
       <InspectorGroupedPanel
-        key={cameraRoleClip ? 'camera' : 'standard'}
+        key={cameraRoleClip ? 'camera' : isMediaFrameClip(clip) ? 'media' : 'standard'}
         groups={createClipGroups(props, clip, runtime, cameraRoleClip)}
       />
     </section>
@@ -151,7 +151,6 @@ function createStandardClipGroups(
     runtime.selectedTrackLocked,
     props.onUpdateClipTransform
   );
-  const frameContent = createFrameContent(props, clip, runtime, transformContent);
   const audioContent = renderAudioFields(
     clip,
     runtime.linkedAudioClip,
@@ -167,8 +166,9 @@ function createStandardClipGroups(
   return [
     createGeneralGroup(contentFields),
     createCameraPlacementGroup(props, clip, runtime.selectedTrackLocked),
+    createFramingGroup(props, clip, runtime.selectedTrackLocked),
     createTimingGroup(props, clip, runtime.selectedTrackLocked),
-    createTransformGroup(clip, frameContent),
+    createTransformGroup(clip, transformContent),
     {
       id: 'audio',
       label: translate('videoEditor.sidebar.inspectorGroupAudio'),
@@ -262,26 +262,19 @@ function CameraPlacementControls(props: {
   );
 }
 
-function createFrameContent(
+function createFramingGroup(
   props: WorkspaceSidebarSelectionPanelProps,
   clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>,
-  runtime: ReturnType<typeof createSelectionRuntime>,
-  transformContent: React.ReactNode
+  locked: boolean
 ) {
-  const mediaFrameContent = isMediaFrameClip(clip) ? (
-    <MediaFrameControls {...props} clip={clip} locked={runtime.selectedTrackLocked} />
-  ) : null;
-
-  if (transformContent === null && mediaFrameContent === null) {
-    return null;
-  }
-
-  return (
-    <div className="space-y-4">
-      {transformContent}
-      {mediaFrameContent}
-    </div>
-  );
+  const visible = isMediaFrameClip(clip);
+  return {
+    id: 'framing',
+    label: translate('videoEditor.sidebar.inspectorGroupFraming'),
+    defaultActive: visible && !isCameraRoleVideoClip(props.project, clip),
+    visible,
+    content: visible ? <MediaFrameControls {...props} clip={clip} locked={locked} /> : null,
+  } as const;
 }
 
 function isMediaFrameClip(clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>) {

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   AudioLines,
   Clock3,
+  Frame,
   Info,
   Layers3,
   Move,
@@ -25,6 +26,7 @@ const SECTION_ICONS: Readonly<Record<string, LucideIcon>> = {
   info: Info,
   timing: Clock3,
   transform: Move,
+  framing: Frame,
   audio: AudioLines,
   canvas: Scan,
   background: Paintbrush,

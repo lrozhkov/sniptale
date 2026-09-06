@@ -137,19 +137,14 @@ describe('workspace-sidebar/selection/inspect-track', () => {
       'input[aria-label="videoEditor.sidebar.trackNameLabel"]'
     );
     expect(input).not.toBeNull();
-    expect(
-      container.querySelectorAll('[data-ui="shared.ui.compact-inspector.option-row"]')
-    ).toHaveLength(2);
-    const visibilityToggle = Array.from(
-      container.querySelectorAll<HTMLButtonElement>(
-        '[data-ui="shared.ui.compact-inspector.option-row"]'
-      )
-    ).find((button) => button.textContent?.includes('videoEditor.sidebar.trackVisibilityLabel'));
-    const lockToggle = Array.from(
-      container.querySelectorAll<HTMLButtonElement>(
-        '[data-ui="shared.ui.compact-inspector.option-row"]'
-      )
-    ).find((button) => button.textContent?.includes('videoEditor.sidebar.trackLockLabel'));
+    const visibilityToggle = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="videoEditor.sidebar.trackVisibilityLabel"]'
+    );
+    const lockToggle = container.querySelector<HTMLButtonElement>(
+      'button[aria-label="videoEditor.sidebar.trackLockLabel"]'
+    );
+    expect(visibilityToggle?.getAttribute('aria-pressed')).toBe('true');
+    expect(lockToggle?.getAttribute('aria-pressed')).toBe('false');
 
     act(() => {
       visibilityToggle?.click();
