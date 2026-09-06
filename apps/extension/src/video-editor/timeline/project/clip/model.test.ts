@@ -33,7 +33,7 @@ function createVideoClip(trackId: string): VideoProjectClip {
   };
 }
 
-it('builds clip timeline view models with crossfade metadata and minimum width', () => {
+it('builds clip timeline view models with crossfade metadata and temporal width', () => {
   const project = createEmptyVideoProject('Timeline');
   const clip = createVideoClip(project.tracks[0]!.id);
   const previousClip = {
@@ -55,7 +55,7 @@ it('builds clip timeline view models with crossfade metadata and minimum width',
     trackLocked: true,
   });
 
-  expect(viewModel.width).toBe(52);
+  expect(viewModel.width).toBe(30);
   expect(viewModel.left).toBe(10);
   expect(viewModel.hasIncomingCrossfade).toBe(true);
   expect(viewModel.hasOutgoingCrossfade).toBe(false);
@@ -138,3 +138,20 @@ it('reserves crossfade overlap space outside readable clip labels', () => {
   expect(firstModel.labelStyle).toMatchObject({ left: 12, right: 112 });
   expect(secondModel.labelStyle).toMatchObject({ left: 112, right: 12 });
 });
+
+it.each([0.1, 0.01])(
+  'keeps a %ss clip within its temporal span with only a one-pixel floor',
+  (duration) => {
+    const project = createEmptyVideoProject('Short edits');
+    const clip = { ...createVideoClip(project.tracks[0]!.id), duration };
+    const model = buildProjectTimelineClipViewModel({
+      clip,
+      project,
+      pixelsPerSecond: 90,
+      isSelected: false,
+      isHovered: false,
+      trackLocked: false,
+    });
+    expect(model.width).toBe(Math.max(1, duration * 90));
+  }
+);

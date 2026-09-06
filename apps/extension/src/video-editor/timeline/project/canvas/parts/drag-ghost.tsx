@@ -106,21 +106,22 @@ function ClipPlacementGhost({
       data-clip-id={dragGhost.clipId}
       data-related={related}
       className={[
-        'pointer-events-none absolute z-30 overflow-hidden rounded-[8px] border border-dashed',
-        'border-[color:var(--sniptale-color-accent-emphasis)]',
+        'pointer-events-none absolute z-30 overflow-hidden rounded-sm',
+        'outline outline-1 -outline-offset-1 outline-dashed',
+        'outline-[color:var(--sniptale-color-accent-emphasis)]',
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_94%,transparent)]',
-        'px-2 text-xs font-semibold text-[var(--sniptale-color-text-primary)] shadow-sm',
+        'text-xs font-semibold text-[var(--sniptale-color-text-primary)] shadow-sm',
         'shadow-[0_4px_14px_color-mix(in_srgb,var(--sniptale-color-text-primary)_14%,transparent)]',
       ].join(' ')}
       style={{
         height,
         left: dragGhost.startTime * pixelsPerSecond,
         top,
-        width: Math.max(52, dragGhost.duration * pixelsPerSecond),
+        width: Math.max(1, dragGhost.duration * pixelsPerSecond),
         opacity: related ? 0.8 : 1,
       }}
     >
-      <span className="block truncate leading-[22px]">{dragGhost.name}</span>
+      <span className="block truncate px-2 leading-[22px]">{dragGhost.name}</span>
     </div>
   );
 }

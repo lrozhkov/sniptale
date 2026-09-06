@@ -51,7 +51,7 @@ it('renders a clip drag ghost on the target logical lane', () => {
       <ProjectTimelineCanvas
         {...createCanvasProps(project, {
           clipId: 'clip-1',
-          duration: 2,
+          duration: 0.1,
           name: 'Dragged clip',
           startTime: 1,
           timelineLaneId: 'line-2',
@@ -65,6 +65,7 @@ it('renders a clip drag ghost on the target logical lane', () => {
     '[data-ui="video-editor.timeline.clip-drag-ghost"]'
   );
   expect(ghost?.textContent).toContain('Dragged clip');
+  expect(ghost?.style.width).toBe('9px');
   expect(ghost?.style.top).not.toBe('');
   expect(ghost?.style.backgroundColor).not.toBe('rgb(24, 24, 27)');
   expect(ghost?.className).toContain('var(--sniptale-color-surface-panel)');

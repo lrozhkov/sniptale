@@ -251,3 +251,30 @@ it('keeps audio clip labels focused on the clip name', () => {
   expect(container?.textContent).toContain('Clip 1');
   expect(container?.textContent).not.toContain('0:01');
 });
+
+it.each([false, true])(
+  'routes an edge gesture only to trim and respects locked=%s',
+  (trackLocked) => {
+    const project = createEmptyVideoProject('Edge hit');
+    const onBeginClipInteraction = vi.fn();
+    act(() =>
+      root?.render(
+        <ProjectTimelineClip
+          clip={createClip(project.tracks[0]!.id)}
+          isHovered={false}
+          isSelected={true}
+          pixelsPerSecond={10}
+          project={project}
+          trackLocked={trackLocked}
+          onClipHoverChange={vi.fn()}
+          onSelectClip={vi.fn()}
+          onBeginClipInteraction={onBeginClipInteraction}
+        />
+      )
+    );
+    const handle = container!.querySelector('button')!;
+    act(() => handle.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+    expect(onBeginClipInteraction).toHaveBeenCalledTimes(trackLocked ? 0 : 1);
+    if (!trackLocked) expect(onBeginClipInteraction.mock.calls[0]?.[2]).toBe('trim-start');
+  }
+);

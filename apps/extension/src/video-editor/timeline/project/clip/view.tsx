@@ -33,6 +33,7 @@ export function ProjectTimelineClipLayout({
     <div
       {...TIMELINE_OBJECT_MARKER_PROPS}
       data-project-timeline-clip={clip.id}
+      title={clip.name?.trim() || buildClipLabel(project, clip)}
       className={viewModel.clipClassName}
       style={{ ...viewModel.style, left: viewModel.left, width: viewModel.width }}
       onClick={(event) => selectTimelineClip(event, clip.id, onSelectClip)}
@@ -118,7 +119,7 @@ function ProjectTimelineVisualClipPreview({
   const urls = preview?.urls ?? [];
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-0 flex gap-1 overflow-hidden opacity-90">
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 top-5 z-0 flex gap-1 overflow-hidden opacity-90">
       {urls.map((url, index) => (
         <img
           key={`${url}:${index}`}
@@ -180,13 +181,22 @@ function ProjectTimelineTrimHandle({
   mode: DragMode;
   onBeginClipInteraction: ProjectTimelineClipProps['onBeginClipInteraction'];
 }) {
+  const edgeLabel = translate(
+    mode === 'trim-start' ? 'videoEditor.app.sourceInLabel' : 'videoEditor.app.sourceOutLabel'
+  );
   return (
     <button
       {...TIMELINE_OBJECT_MARKER_PROPS}
       type="button"
       className={className}
+      disabled={disabled}
+      tabIndex={-1}
+      aria-label={`${clip.name} ${edgeLabel}`}
       onClick={(event) => event.stopPropagation()}
-      onPointerDown={(event) => !disabled && onBeginClipInteraction(event, clip, mode)}
+      onPointerDown={(event) => {
+        event.stopPropagation();
+        if (!disabled) onBeginClipInteraction(event, clip, mode);
+      }}
     />
   );
 }
@@ -257,12 +267,14 @@ function ProjectTimelineClipLabel({
   const label = clip.name?.trim() || buildClipLabel(project, clip);
   return (
     <div
-      className="pointer-events-none absolute inset-y-0 z-10 flex min-w-0 items-center gap-2 overflow-hidden"
+      className={[
+        'pointer-events-none absolute inset-x-0 top-0 z-10 h-5 overflow-hidden',
+        'bg-[var(--sniptale-color-surface-canvas)] text-[var(--sniptale-color-text-primary-strong)]',
+      ].join(' ')}
       data-project-timeline-clip-label={clip.id}
-      style={viewModel.labelStyle}
     >
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold">{label}</p>
+      <div className="absolute inset-y-0 flex min-w-0 items-center" style={viewModel.labelStyle}>
+        <p className="truncate text-xs font-medium">{label}</p>
       </div>
     </div>
   );

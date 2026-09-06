@@ -21,7 +21,7 @@ const SELECTED_CLIP_SHADOW_CLASS_NAME = [
   '0_2px_8px_color-mix(in_srgb,var(--sniptale-color-text-primary)_8%,transparent)]',
 ].join('');
 const TRIM_HANDLE_CLASS_NAME = [
-  'absolute inset-y-0 w-2 cursor-ew-resize',
+  'absolute inset-y-0 z-30 w-[min(8px,25%)] cursor-ew-resize',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_20%,transparent)]',
   'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_32%,transparent)]',
 ].join(' ');
@@ -61,7 +61,7 @@ export function buildProjectTimelineClipViewModel({
   | 'trackClipRowHeight'
   | 'trackLocked'
 >): ProjectTimelineClipViewModel {
-  const width = Math.max(52, clip.duration * pixelsPerSecond);
+  const width = Math.max(1, clip.duration * pixelsPerSecond);
   const transitionViewModel = getTimelineClipTransitionViewModel({
     clip,
     pixelsPerSecond,
@@ -144,10 +144,11 @@ function getTimelineClipClassName({
   const visualEmphasis = isHovered || isSelected;
 
   return [
-    'pointer-events-auto absolute flex items-center overflow-hidden rounded-[8px]',
-    'border border-[color:color-mix(in_srgb,var(--sniptale-color-text-primary)_11%,transparent)]',
+    'pointer-events-auto absolute flex items-center overflow-hidden rounded-sm',
+    'outline outline-1 -outline-offset-1',
+    'outline-[color:color-mix(in_srgb,var(--sniptale-color-text-primary)_24%,transparent)]',
     'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_92%,transparent)]',
-    'px-2 text-xs text-[var(--sniptale-color-text-primary-strong)]',
+    'text-xs text-[var(--sniptale-color-text-primary-strong)]',
     'shadow-[0_1px_3px_color-mix(in_srgb,var(--sniptale-color-text-primary)_8%,transparent)]',
     'transition-[border-color,box-shadow,filter]',
     visualEmphasis
