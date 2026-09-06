@@ -8,8 +8,6 @@ const DEFAULT_CLIP_ROW_HEIGHT = 62;
 const MIN_CLIP_HEIGHT = 22;
 const CLIP_VERTICAL_PADDING = 18;
 const LABEL_BASE_INSET = 12;
-const MIN_PREVIEW_TILE_WIDTH = 1;
-const MAX_PREVIEW_TILE_WIDTH = 160;
 const SELECTED_CLIP_SHADOW_CLASS_NAME = [
   'shadow-[0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent-emphasis)_28%,transparent),',
   '0_2px_8px_color-mix(in_srgb,var(--sniptale-color-text-primary)_8%,transparent)]',
@@ -168,6 +166,5 @@ function getPreviewTileWidth(trackClipRowHeight: number): number {
   const clipHeight = Math.max(MIN_CLIP_HEIGHT, trackClipRowHeight - CLIP_VERTICAL_PADDING);
   const pictureHeight = clipHeight - 20;
   if (pictureHeight < 16) return 0;
-  const aspectWidth = Math.round((pictureHeight * 16) / 9);
-  return Math.min(MAX_PREVIEW_TILE_WIDTH, Math.max(MIN_PREVIEW_TILE_WIDTH, aspectWidth));
+  return (pictureHeight * 16) / 9;
 }

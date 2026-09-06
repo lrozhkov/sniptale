@@ -65,7 +65,7 @@ it('does not republish identical preview viewports across idle rerenders', () =>
   renderHarness(2, reportedViewports);
   renderHarness(3, reportedViewports);
 
-  expect(reportedViewports).toEqual([{ endTime: 4, startTime: 0 }]);
+  expect(reportedViewports).toEqual([{ endTime: 4, startTime: 0, pixelsPerSecond: 100 }]);
 });
 
 it('publishes when the resolved preview viewport changes', () => {
@@ -75,8 +75,8 @@ it('publishes when the resolved preview viewport changes', () => {
   renderHarness(2, reportedViewports, 200);
 
   expect(reportedViewports).toEqual([
-    { endTime: 4, startTime: 0 },
-    { endTime: 2, startTime: 0 },
+    { endTime: 4, startTime: 0, pixelsPerSecond: 100 },
+    { endTime: 2, startTime: 0, pixelsPerSecond: 200 },
   ]);
 });
 

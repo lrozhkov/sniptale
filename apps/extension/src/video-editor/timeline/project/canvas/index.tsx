@@ -1,3 +1,4 @@
+import type { TimelinePreviewViewport } from '../../../contracts/timeline-preview';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
 import type { MutableRefObject } from 'react';
 import type { VideoProject } from '../../../../features/video/project/types';
@@ -86,7 +87,7 @@ interface ProjectTimelineCanvasProps {
   onSelectTrack: (trackId: string) => void;
   onSelectTransition: (transitionId: string) => void;
   onSetHoveredClipId: (clipId: string | null) => void;
-  onTimelinePreviewViewportChange: (viewport: { endTime: number; startTime: number }) => void;
+  onTimelinePreviewViewportChange: (viewport: TimelinePreviewViewport) => void;
   onUnsupportedTimelineFileDrop: () => void;
   onResizeActionEvent: (actionEventId: string, duration: number) => void;
   onResizeMotionRegion: (motionRegionId: string, startTime: number, duration: number) => void;

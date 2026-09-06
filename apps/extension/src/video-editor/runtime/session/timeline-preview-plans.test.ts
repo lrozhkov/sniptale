@@ -1,4 +1,10 @@
-import { expect, it } from 'vitest';
+import {
+  createTimelinePreviewMap,
+  pruneUnusedTimelineFrames,
+  type TimelinePreviewFrame,
+  type TimelinePreviewPlan,
+} from './timeline-preview-cache';
+import { expect, it, vi } from 'vitest';
 import {
   VideoProjectAssetType,
   type VideoProjectVideoClip,
@@ -12,7 +18,7 @@ import { createProjectWithVisualClip } from './timeline-previews.test-support';
 function samplesFor(
   sourceStart: number,
   sourceDuration: number,
-  viewport: { startTime: number; endTime: number } | null = null
+  viewport: { startTime: number; endTime: number; pixelsPerSecond: number } | null = null
 ) {
   const base = createProjectWithVisualClip(VideoProjectAssetType.VIDEO, { duration: 300 });
   const clip = base.clips[0] as VideoProjectVideoClip;
@@ -47,11 +53,81 @@ it('preserves fractional In without rounding a sample outside a short source ran
   expect(samplesFor(2.006, 0.001)).toEqual([2.006]);
 });
 
-it('projects the buffered viewport through playback rate before selecting source frames', () => {
-  expect(samplesFor(2, 200, { startTime: 50, endTime: 51 })).toEqual([42, 48, 60, 72, 84, 96]);
+it('loads visible source frames before buffered frames at the current playback rate', () => {
+  expect(samplesFor(2, 200, { startTime: 50, endTime: 51, pixelsPerSecond: 64 })).toEqual([
+    82, 81, 84,
+  ]);
 });
 
 it('clips samples to the available asset and does not sample its terminal boundary', () => {
   expect(samplesFor(299.5, 2)).toEqual([299.5]);
   expect(samplesFor(300, 2)).toEqual([]);
+});
+
+it('samples a short visible clip at timeline density instead of one twelve-second frame', () => {
+  const project = createProjectWithVisualClip(VideoProjectAssetType.VIDEO);
+  const plans = buildTimelinePreviewPlans(
+    project,
+    { 'asset-video': 'blob:video' },
+    {
+      startTime: 0,
+      endTime: 4,
+      pixelsPerSecond: 64,
+    }
+  );
+  expect(
+    getNextTimelinePreviewFrameBatch(plans, new Map())?.samples.map((sample) => sample.sourceTime)
+  ).toEqual([2, 3, 4, 5]);
+});
+
+it('retains source intervals when only a later frame has finished loading', () => {
+  const plan: TimelinePreviewPlan = {
+    kind: 'video',
+    assetId: 'asset',
+    assetUrl: 'blob:video',
+    clipId: 'clip',
+    slots: [
+      { cacheKey: 'first', sourceStart: 20, sourceEnd: 21 },
+      { cacheKey: 'second', sourceStart: 21, sourceEnd: 22 },
+    ],
+  };
+  const cache = new Map([
+    ['second', { assetId: 'asset', assetUrl: 'blob:video', sourceTime: 21, url: 'blob:second' }],
+  ]);
+  expect(createTimelinePreviewMap([plan], cache)).toEqual({
+    clip: { kind: 'video', frames: [{ sourceStart: 21, sourceEnd: 22, url: 'blob:second' }] },
+  });
+});
+
+it('bounds unused decoded frames while retaining every active viewport sample', () => {
+  const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+  try {
+    const cache = new Map<string, TimelinePreviewFrame>();
+    for (let index = 0; index < 200; index++)
+      cache.set(String(index), {
+        assetId: 'asset',
+        assetUrl: 'blob:video',
+        sourceTime: index,
+        url: `blob:${index}`,
+      });
+    const plan: TimelinePreviewPlan = {
+      kind: 'video',
+      assetId: 'asset',
+      assetUrl: 'blob:video',
+      clipId: 'clip',
+      slots: Array.from({ length: 50 }, (_, index) => ({
+        cacheKey: String(index),
+        sourceStart: index,
+        sourceEnd: index + 1,
+      })),
+    };
+    pruneUnusedTimelineFrames(cache, [plan]);
+    expect(cache.size).toBe(170);
+    expect(plan.slots.every((slot) => cache.has(slot.cacheKey))).toBe(true);
+    expect(revoke).toHaveBeenCalledTimes(30);
+    expect(revoke).toHaveBeenCalledWith('blob:50');
+    expect(revoke).not.toHaveBeenCalledWith('blob:0');
+  } finally {
+    revoke.mockRestore();
+  }
 });

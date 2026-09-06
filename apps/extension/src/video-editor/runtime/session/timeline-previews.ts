@@ -17,6 +17,7 @@ import {
 } from './timeline-preview-plans';
 import {
   cleanupRemovedPreviewAssets,
+  pruneUnusedTimelineFrames,
   createTimelinePreviewMap,
   revokeCachedPreviewUrls,
   revokePreviewUrls,
@@ -133,6 +134,7 @@ function setTimelinePreviewMap(params: {
   plans: readonly TimelinePreviewPlan[];
   setPreviews: SetTimelinePreviews;
 }): void {
+  pruneUnusedTimelineFrames(params.generatedUrlCacheRef.current, params.plans);
   params.setPreviews((currentPreviews) =>
     replaceTimelinePreviewMapIfChanged(
       currentPreviews,
@@ -255,10 +257,20 @@ function areTimelinePreviewMapsEqual(
       return false;
     }
 
+    if (leftPreview.kind === 'image' && rightPreview.kind === 'image') {
+      return leftPreview.url === rightPreview.url;
+    }
+    if (leftPreview.kind !== 'video' || rightPreview.kind !== 'video') return false;
     return (
-      leftPreview.kind === rightPreview.kind &&
-      leftPreview.urls.length === rightPreview.urls.length &&
-      leftPreview.urls.every((url, index) => url === rightPreview.urls[index])
+      leftPreview.frames.length === rightPreview.frames.length &&
+      leftPreview.frames.every((frame, index) => {
+        const next = rightPreview.frames[index];
+        return (
+          next?.url === frame.url &&
+          next.sourceStart === frame.sourceStart &&
+          next.sourceEnd === frame.sourceEnd
+        );
+      })
     );
   });
 }

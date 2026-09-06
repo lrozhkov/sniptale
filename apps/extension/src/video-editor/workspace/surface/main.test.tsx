@@ -263,7 +263,7 @@ function createTimelineState() {
     selectedClipId: 'clip-1',
     selectedTrackId: 'track-1',
     timelinePreviews: {
-      'clip-1': { kind: 'image', urls: ['blob:image'] },
+      'clip-1': { kind: 'image', url: 'blob:image' },
     },
   };
 }
@@ -309,7 +309,7 @@ function verifyWorkspaceMainRouting() {
     selectedClipId: 'clip-1',
     selectedTrackId: 'track-1',
     timelinePreviews: {
-      'clip-1': { kind: 'image', urls: ['blob:image'] },
+      'clip-1': { kind: 'image', url: 'blob:image' },
     },
   });
   expectWorkspaceMarkup(markup);

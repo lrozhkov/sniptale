@@ -38,18 +38,22 @@ function resolveTimelinePreviewViewport(
   pixelsPerSecond: number
 ): TimelinePreviewViewport {
   if (!timelineElement) {
-    return { endTime: 0, startTime: 0 };
+    return { endTime: 0, startTime: 0, pixelsPerSecond };
   }
 
   const pixelsPerSecondSafe = Math.max(1, pixelsPerSecond);
   const startTime = timelineElement.scrollLeft / pixelsPerSecondSafe;
   const endTime = (timelineElement.scrollLeft + timelineElement.clientWidth) / pixelsPerSecondSafe;
-  return { endTime: Math.max(startTime, endTime), startTime };
+  return { endTime: Math.max(startTime, endTime), startTime, pixelsPerSecond: pixelsPerSecondSafe };
 }
 
 function areTimelinePreviewViewportsEqual(
   first: TimelinePreviewViewport,
   second: TimelinePreviewViewport
 ): boolean {
-  return first.endTime === second.endTime && first.startTime === second.startTime;
+  return (
+    first.endTime === second.endTime &&
+    first.startTime === second.startTime &&
+    first.pixelsPerSecond === second.pixelsPerSecond
+  );
 }

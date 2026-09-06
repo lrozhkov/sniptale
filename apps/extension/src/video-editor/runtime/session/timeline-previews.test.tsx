@@ -52,7 +52,7 @@ it('reuses image asset urls without owning their cleanup', async () => {
     project: createProjectWithVisualClip(VideoProjectAssetType.IMAGE),
   });
   expect(onPreviewsChange).toHaveBeenLastCalledWith({
-    'clip-1': { kind: 'image', urls: ['blob:image'] },
+    'clip-1': { kind: 'image', url: 'blob:image' },
   });
   expect(loader).not.toHaveBeenCalled();
   act(() => {
@@ -75,7 +75,7 @@ it('loads video preview frames from source-anchored asset slots', async () => {
 
   expect(getLoadedSourceTimes(loader)).toEqual([2]);
   expect(onPreviewsChange).toHaveBeenLastCalledWith({
-    'clip-1': { kind: 'video', urls: ['blob:frame-2'] },
+    'clip-1': { kind: 'video', frames: [{ url: 'blob:frame-2', sourceStart: 2, sourceEnd: 6 }] },
   });
 });
 
@@ -89,14 +89,14 @@ it('does not regenerate previews when zoom changes but source slots stay unchang
     loadVideoFrames: loader,
     onPreviewsChange,
     project,
-    viewport: { endTime: 10, startTime: 0 },
+    viewport: { endTime: 10, startTime: 0, pixelsPerSecond: 64 },
   });
   await renderHarness({
     assetUrls: { 'asset-video': 'blob:video' },
     loadVideoFrames: loader,
     onPreviewsChange,
     project,
-    viewport: { endTime: 10, startTime: 0 },
+    viewport: { endTime: 10, startTime: 0, pixelsPerSecond: 64 },
   });
 
   expect(loader).toHaveBeenCalledTimes(1);
@@ -122,9 +122,12 @@ it('reuses moved and duplicate frames while sampling the split tail at its own I
 
   expect(getLoadedSourceTimes(loader)).toEqual([2, 3]);
   expect(onPreviewsChange).toHaveBeenLastCalledWith({
-    'clip-1-a': { kind: 'video', urls: ['blob:frame-2'] },
-    'clip-1-b': { kind: 'video', urls: ['blob:frame-3'] },
-    'clip-1-copy': { kind: 'video', urls: ['blob:frame-2'] },
+    'clip-1-a': { kind: 'video', frames: [{ url: 'blob:frame-2', sourceStart: 2, sourceEnd: 3 }] },
+    'clip-1-b': { kind: 'video', frames: [{ url: 'blob:frame-3', sourceStart: 3, sourceEnd: 6 }] },
+    'clip-1-copy': {
+      kind: 'video',
+      frames: [{ url: 'blob:frame-2', sourceStart: 2, sourceEnd: 6 }],
+    },
   });
 });
 
@@ -169,7 +172,7 @@ it('hides inward-trimmed source slots without regenerating overlapping previews'
 
   expect(loader).toHaveBeenCalledTimes(1);
   expect(onPreviewsChange).toHaveBeenLastCalledWith({
-    'clip-1': { kind: 'video', urls: ['blob:frame-2'] },
+    'clip-1': { kind: 'video', frames: [{ url: 'blob:frame-2', sourceStart: 2, sourceEnd: 6 }] },
   });
 });
 
@@ -234,7 +237,7 @@ it('does not let stale video preview runs overwrite the current asset url', asyn
     await Promise.resolve();
   });
   expect(onPreviewsChange).not.toHaveBeenLastCalledWith({
-    'clip-1': { kind: 'video', urls: ['blob:old-frame'] },
+    'clip-1': { kind: 'video', frames: [{ url: 'blob:old-frame', sourceStart: 2, sourceEnd: 6 }] },
   });
   expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:old-frame');
 
@@ -243,7 +246,7 @@ it('does not let stale video preview runs overwrite the current asset url', asyn
     await Promise.resolve();
   });
   expect(onPreviewsChange).toHaveBeenLastCalledWith({
-    'clip-1': { kind: 'video', urls: ['blob:new-frame'] },
+    'clip-1': { kind: 'video', frames: [{ url: 'blob:new-frame', sourceStart: 2, sourceEnd: 6 }] },
   });
 });
 

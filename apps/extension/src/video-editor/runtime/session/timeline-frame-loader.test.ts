@@ -96,3 +96,16 @@ it.each(['abort', 'error'] as const)(
     expect(media.drawImage).toHaveBeenCalledTimes(1);
   }
 );
+
+it('keeps portrait pixels proportional inside a sufficiently detailed filmstrip cell', async () => {
+  const media = mediaHarness(true);
+  Object.defineProperty(media.video, 'videoWidth', { value: 720 });
+  Object.defineProperty(media.video, 'videoHeight', { value: 1280 });
+  const outcome = loadTimelineVideoPreviewFrames({
+    assetUrl: 'blob:portrait',
+    samples: [{ cacheKey: 'portrait', sourceTime: 0 }],
+  });
+  media.video.dispatchEvent(new Event('loadeddata'));
+  await outcome;
+  expect(media.drawImage).toHaveBeenCalledWith(media.video, 109.375, 0, 101.25, 180);
+});

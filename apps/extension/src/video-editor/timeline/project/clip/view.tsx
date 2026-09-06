@@ -1,6 +1,7 @@
 import type React from 'react';
 
 import { translate } from '../../../../platform/i18n';
+import { normalizeClipPlaybackRate } from '../../../../features/video/project/timeline/basics';
 import { buildClipLabel } from '../../../../features/video/project/timeline';
 import { VideoProjectClipType } from '../../../../features/video/project/types';
 import type { VideoProjectClip } from '../../../../features/video/project/types';
@@ -88,6 +89,8 @@ function ProjectTimelineClipContent({
       {shouldRenderVisualPreview ? (
         <ProjectTimelineVisualClipPreview
           preview={preview}
+          clip={clip}
+          width={viewModel.width}
           tileWidth={viewModel.previewTileWidth}
         />
       ) : viewModel.waveformPeaks.length > 0 ? (
@@ -112,27 +115,50 @@ function isVisualPreviewClip(clip: VideoProjectClip): boolean {
 
 function ProjectTimelineVisualClipPreview({
   preview,
+  clip,
+  width,
   tileWidth,
 }: {
   preview: TimelineClipPreview | undefined;
+  clip: VideoProjectClip;
+  width: number;
   tileWidth: number;
 }) {
-  if (tileWidth === 0) return null;
-  const urls = preview?.urls ?? [];
-
+  if (!preview || tileWidth === 0 || clip.duration <= 0) return null;
+  const rate =
+    clip.type === VideoProjectClipType.VIDEO
+      ? normalizeClipPlaybackRate(clip.playbackRate ?? 1)
+      : 1;
+  const sourceStart = clip.type === VideoProjectClipType.VIDEO ? clip.sourceStart : 0;
+  const frames =
+    preview.kind === 'video'
+      ? preview.frames
+      : [{ url: preview.url, sourceStart: 0, sourceEnd: clip.duration }];
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 top-5 z-0 flex overflow-hidden opacity-90">
-      {urls.map((url, index) => (
-        <img
-          key={`${url}:${index}`}
-          src={url}
-          alt=""
-          aria-hidden="true"
-          className="h-full shrink-0 object-contain"
-          style={{ width: tileWidth }}
-          draggable={false}
-        />
-      ))}
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 top-5 z-0 overflow-hidden opacity-90">
+      {frames.map((frame) => {
+        const start = Math.max(0, (frame.sourceStart - sourceStart) / rate);
+        const end = Math.min(clip.duration, (frame.sourceEnd - sourceStart) / rate);
+        const firstCell = Math.ceil(((start / clip.duration) * width) / tileWidth);
+        const lastCell = Math.ceil(((end / clip.duration) * width) / tileWidth);
+        const left = firstCell * tileWidth;
+        const right = Math.min(width, lastCell * tileWidth);
+        if (right <= left) return null;
+        return (
+          <div
+            key={`${frame.sourceStart}:${frame.url}`}
+            aria-hidden="true"
+            data-timeline-frame-source={frame.sourceStart}
+            className="absolute inset-y-0 bg-repeat-x"
+            style={{
+              left,
+              width: right - left,
+              backgroundImage: `url(${JSON.stringify(frame.url)})`,
+              backgroundSize: 'auto 100%',
+            }}
+          />
+        );
+      })}
     </div>
   );
 }
