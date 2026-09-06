@@ -7,10 +7,16 @@ it('projects track metadata actions into the sidebar without adding another stat
     renameTrack: vi.fn(),
     toggleTrackLock: vi.fn(),
     toggleTrackVisibility: vi.fn(),
+    toggleUtilityLaneVisibility: vi.fn(),
+    toggleUtilityLaneLock: vi.fn(),
+    clearUtilityLane: vi.fn(),
   };
 
   const actions = createWorkspaceSidebarTrackActions(store);
 
+  expect(actions.onToggleUtilityLaneVisibility).toBe(store.toggleUtilityLaneVisibility);
+  expect(actions.onToggleUtilityLaneLock).toBe(store.toggleUtilityLaneLock);
+  expect(actions.onClearUtilityLane).toBe(store.clearUtilityLane);
   expect(actions.onRenameTrack).toBe(store.renameTrack);
   expect(actions.onToggleTrackLock).toBe(store.toggleTrackLock);
   expect(actions.onToggleTrackVisibility).toBe(store.toggleTrackVisibility);

@@ -11,6 +11,11 @@ describe('workspace/sidebar-props', () => {
     props.onSwapClip?.('clip-1', 'right');
     expect(controller.clipActions.onSwapClip).toHaveBeenCalledWith('clip-1', 'right');
 
+    expect(props.onToggleUtilityLaneVisibility).toBe(
+      controller.projectActions.onToggleUtilityLaneVisibility
+    );
+    expect(props.onToggleUtilityLaneLock).toBe(controller.projectActions.onToggleUtilityLaneLock);
+    expect(props.onClearUtilityLane).toBe(controller.projectActions.onClearUtilityLane);
     expect(props.onRenameTrack).toBe(controller.projectActions.onRenameTrack);
     expect(props.onToggleTrackLock).toBe(controller.projectActions.onToggleTrackLock);
     expect(props.onToggleTrackVisibility).toBe(controller.projectActions.onToggleTrackVisibility);

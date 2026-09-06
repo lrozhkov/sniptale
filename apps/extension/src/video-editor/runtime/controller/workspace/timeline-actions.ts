@@ -155,6 +155,7 @@ function deleteSelectedTimelineObject(
   selectedClipActions: Pick<SelectedClipActions, 'deleteSelectedClip'>
 ) {
   switch (selection.kind) {
+    case VideoEditorSelectionKind.MOTION_LANE:
     case VideoEditorSelectionKind.SCENE:
     case VideoEditorSelectionKind.TRACK:
     case VideoEditorSelectionKind.TRANSITION_JUNCTION:
@@ -252,6 +253,7 @@ export function createWorkspaceTimelineSelectionActions(
     onSelectClip: selectWithInspector(store.selectClip),
     onSelectCursorSegment: selectWithInspector(store.selectCursorSegment),
     onSelectMotionRegion: selectWithInspector(store.selectMotionRegion),
+    onSelectMotionLane: selectWithInspector(store.selectMotionLane),
     onSelectObjectTrack: selectWithInspector(store.selectObjectTrack),
     onSelectScene: selectWithInspector(store.selectScene),
     onSelectTrack: selectWithInspector(store.selectTrack),

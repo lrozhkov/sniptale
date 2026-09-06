@@ -8,6 +8,7 @@ import { InspectMotionPanel } from './inspection/motion';
 import { InspectObjectTrackPanel } from './inspection/object-track';
 import { InspectScenePanel } from './inspection/scene';
 import { InspectTrackPanel } from './inspection/track';
+import { InspectMotionLanePanel } from './inspection/motion-lane';
 
 const PANEL_STACK_CLASS_NAME = 'space-y-3';
 
@@ -23,6 +24,8 @@ export function WorkspaceSidebarInspectPanel(props: WorkspaceSidebarSelectionPan
 
 function SelectionBody(props: WorkspaceSidebarSelectionPanelProps) {
   switch (props.selection.kind) {
+    case VideoEditorSelectionKind.MOTION_LANE:
+      return <InspectMotionLanePanel {...props} />;
     case VideoEditorSelectionKind.SCENE:
       return <InspectScenePanel {...props} />;
     case VideoEditorSelectionKind.CLIP:

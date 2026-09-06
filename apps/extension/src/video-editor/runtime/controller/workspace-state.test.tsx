@@ -237,7 +237,7 @@ it('keeps the recording destination independent of viewer selection, transport a
   expect(createWorkspaceLayoutController(workspaceState!).audioRecordingTarget).toBeNull();
 });
 
-it('reveals a collapsed inspector only for the explicit Scene command', () => {
+it('reveals a collapsed inspector for the explicit Scene command', () => {
   renderWorkspaceHarness(root, (state) => {
     workspaceState = state;
   });
@@ -255,5 +255,24 @@ it('reveals a collapsed inspector only for the explicit Scene command', () => {
   );
   act(() => header.onSelectScene());
   expect(selectScene).toHaveBeenCalledOnce();
+  expect(workspaceState!.leftSidebarCollapsed).toBe(false);
+});
+
+it('opens a collapsed inspector for selection without changing the library or playback range', () => {
+  renderWorkspaceHarness(root, (state) => {
+    workspaceState = state;
+  });
+  act(() => {
+    workspaceState!.toggleSidebarCollapsed();
+    workspaceState!.openLibraryPanel();
+    workspaceState!.setPlaybackRange({ start: 1, end: 2 });
+  });
+  expect(workspaceState!.leftSidebarCollapsed).toBe(true);
+  act(() => workspaceState!.inspector.openSelection());
+  expect(workspaceState!.leftSidebarCollapsed).toBe(false);
+  expect(workspaceState!.inspector.mode).toBe('selection');
+  expect(workspaceState!.libraryPanelOpen).toBe(true);
+  expect(workspaceState!.playbackRange).toEqual({ start: 1, end: 2 });
+  act(() => workspaceState!.inspector.openSelection());
   expect(workspaceState!.leftSidebarCollapsed).toBe(false);
 });

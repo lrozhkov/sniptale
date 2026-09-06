@@ -13,6 +13,7 @@ function handleSelectionDelete(
   handlersRef: MutableRefObject<PlaybackHandlers>
 ): void {
   switch (latestState.selection.kind) {
+    case VideoEditorSelectionKind.MOTION_LANE:
     case VideoEditorSelectionKind.SCENE:
     case VideoEditorSelectionKind.TRACK:
     case VideoEditorSelectionKind.TRANSITION_JUNCTION:

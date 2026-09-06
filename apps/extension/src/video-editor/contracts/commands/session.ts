@@ -21,6 +21,7 @@ export interface VideoEditorSessionActions {
   selectCursorSegment: (sampleId: string) => void;
   selectObjectTrack: (objectTrackId: string) => void;
   selectActionSegment: (actionEventId: string) => void;
+  selectMotionLane: () => void;
   selectMotionRegion: (motionRegionId: string) => void;
   startActionPointPlacement: (actionEventId: string) => void;
   startMotionFocusPlacement: (motionRegionId: string) => void;

@@ -53,6 +53,7 @@ function createTimelineSelectionActions(): Pick<
   | 'onSelectActionSegment'
   | 'onSelectClip'
   | 'onSelectCursorSegment'
+  | 'onSelectMotionLane'
   | 'onSelectMotionRegion'
   | 'onSelectObjectTrack'
   | 'onSelectScene'
@@ -63,6 +64,7 @@ function createTimelineSelectionActions(): Pick<
     onSelectActionSegment: noop(),
     onSelectClip: noop(),
     onSelectCursorSegment: noop(),
+    onSelectMotionLane: noop(),
     onSelectMotionRegion: noop(),
     onSelectObjectTrack: noop(),
     onSelectScene: noop(),

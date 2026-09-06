@@ -72,6 +72,9 @@ export interface WorkspaceSidebarProps {
   onResetSceneBackgroundPreview?: () => void;
   onResizeProject: (width: number, height: number) => void;
   onRenameTrack?: (trackId: string, name: string) => void;
+  onToggleUtilityLaneVisibility?: VideoEditorProjectActions['toggleUtilityLaneVisibility'];
+  onToggleUtilityLaneLock?: VideoEditorProjectActions['toggleUtilityLaneLock'];
+  onClearUtilityLane?: VideoEditorProjectActions['clearUtilityLane'];
   onToggleTrackLock?: (trackId: string) => void;
   onToggleTrackVisibility?: (trackId: string) => void;
   onSetCursorCaptureMode: (mode: VideoCursorCaptureMode) => void;

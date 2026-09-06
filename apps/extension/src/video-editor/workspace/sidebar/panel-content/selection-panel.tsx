@@ -28,6 +28,13 @@ function createSelectionPanelOptionalActionProps(props: WorkspaceSidebarSelectio
     ...(props.onSelectObjectTrack ? { onSelectObjectTrack: props.onSelectObjectTrack } : {}),
     ...(props.onRenameTrack ? { onRenameTrack: props.onRenameTrack } : {}),
     ...(props.onToggleTrackLock ? { onToggleTrackLock: props.onToggleTrackLock } : {}),
+    ...(props.onToggleUtilityLaneVisibility
+      ? { onToggleUtilityLaneVisibility: props.onToggleUtilityLaneVisibility }
+      : {}),
+    ...(props.onToggleUtilityLaneLock
+      ? { onToggleUtilityLaneLock: props.onToggleUtilityLaneLock }
+      : {}),
+    ...(props.onClearUtilityLane ? { onClearUtilityLane: props.onClearUtilityLane } : {}),
     ...(props.onToggleTrackVisibility
       ? { onToggleTrackVisibility: props.onToggleTrackVisibility }
       : {}),

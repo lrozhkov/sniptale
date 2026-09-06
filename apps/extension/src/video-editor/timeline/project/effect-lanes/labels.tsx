@@ -17,6 +17,8 @@ export function ProjectTimelineEffectLaneLabelRows({
   onClearUtilityLane,
   onToggleUtilityLaneVisibility,
   onAddMotionRegion,
+  onSelectMotionLane,
+  motionLaneSelected,
   project,
 }: {
   compactRows: boolean;
@@ -25,6 +27,8 @@ export function ProjectTimelineEffectLaneLabelRows({
   onToggleUtilityLaneLock: (lane: VideoProjectUtilityLaneKind) => void;
   onToggleUtilityLaneVisibility: (lane: VideoProjectUtilityLaneKind) => void;
   onAddMotionRegion: () => void;
+  onSelectMotionLane?: (() => void) | undefined;
+  motionLaneSelected?: boolean | undefined;
   project: VideoProject;
 }) {
   const utilityLanes = getVideoProjectUtilityLanes(project);
@@ -53,6 +57,8 @@ export function ProjectTimelineEffectLaneLabelRows({
           compactRows={compactRows}
           label={translate('videoEditor.timeline.motionLane')}
           lane="camera"
+          onSelect={onSelectMotionLane}
+          isSelected={motionLaneSelected}
           state={utilityLanes.camera}
           onAdd={() => onAddMotionRegion()}
           onClearUtilityLane={onClearUtilityLane}
@@ -85,6 +91,8 @@ function ProjectTimelineCoreLaneLabelRows(props: {
 function ProjectTimelineUtilityLaneLabelRow(props: {
   compactRows: boolean;
   label: string;
+  onSelect?: (() => void) | undefined;
+  isSelected?: boolean | undefined;
   lane: VideoProjectUtilityLaneKind;
   state: VideoProjectUtilityLanes[VideoProjectUtilityLaneKind];
   onAdd?: (() => void) | undefined;
@@ -97,6 +105,8 @@ function ProjectTimelineUtilityLaneLabelRow(props: {
       compactRows={props.compactRows}
       icon={getUtilityLaneIcon(props.lane)}
       title={props.label}
+      onSelect={props.onSelect}
+      isSelected={props.isSelected}
       trailingControls={
         <UtilityLaneStateControls
           lane={props.lane}

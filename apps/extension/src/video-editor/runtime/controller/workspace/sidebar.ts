@@ -129,11 +129,22 @@ function createWorkspaceSidebarProjectActions(args: {
 }
 
 export function createWorkspaceSidebarTrackActions(
-  store: Pick<EditorStore, 'renameTrack' | 'toggleTrackLock' | 'toggleTrackVisibility'>
+  store: Pick<
+    EditorStore,
+    | 'renameTrack'
+    | 'toggleTrackLock'
+    | 'toggleTrackVisibility'
+    | 'toggleUtilityLaneVisibility'
+    | 'toggleUtilityLaneLock'
+    | 'clearUtilityLane'
+  >
 ) {
   return {
     onRenameTrack: store.renameTrack,
     onToggleTrackLock: store.toggleTrackLock,
+    onToggleUtilityLaneVisibility: store.toggleUtilityLaneVisibility,
+    onToggleUtilityLaneLock: store.toggleUtilityLaneLock,
+    onClearUtilityLane: store.clearUtilityLane,
     onToggleTrackVisibility: store.toggleTrackVisibility,
   };
 }

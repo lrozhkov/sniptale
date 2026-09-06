@@ -89,7 +89,8 @@ type SelectionAction =
   | 'selectCursorSegment'
   | 'selectObjectTrack'
   | 'selectActionSegment'
-  | 'selectMotionRegion';
+  | 'selectMotionRegion'
+  | 'selectMotionLane';
 
 /** Selection state and selection mutations. */
 export interface ClipSelectionPort extends Pick<VideoEditorSessionActions, SelectionAction> {

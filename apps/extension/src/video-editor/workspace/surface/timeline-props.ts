@@ -111,6 +111,7 @@ function getTimelineInteractionActionProps(controller: VideoEditorTimelineContro
     onSelectActionSegment: controller.actions.onSelectActionSegment,
     onSelectClip: controller.actions.onSelectClip,
     onSelectCursorSegment: controller.actions.onSelectCursorSegment,
+    onSelectMotionLane: controller.actions.onSelectMotionLane,
     onSelectMotionRegion: controller.actions.onSelectMotionRegion,
     onSelectObjectTrack: controller.actions.onSelectObjectTrack,
     onSelectScene: controller.actions.onSelectScene,

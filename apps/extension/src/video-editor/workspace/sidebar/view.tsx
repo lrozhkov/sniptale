@@ -101,6 +101,7 @@ export function getSelectionMeta(
       return createStaticSelectionMeta(CircleDot, 'videoEditor.sidebar.objectTracksTitle');
     case VideoEditorSelectionKind.ACTION_SEGMENT:
       return createStaticSelectionMeta(Sparkles, 'videoEditor.timeline.actionsLane');
+    case VideoEditorSelectionKind.MOTION_LANE:
     case VideoEditorSelectionKind.MOTION_REGION:
       return createStaticSelectionMeta(Search, 'videoEditor.timeline.motionLane');
   }

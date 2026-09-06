@@ -99,6 +99,7 @@ const expectedKeys = {
     'selectActionSegment',
     'selectClip',
     'selectCursorSegment',
+    'selectMotionLane',
     'selectMotionRegion',
     'selectObjectTrack',
     'selectScene',

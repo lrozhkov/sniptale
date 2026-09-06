@@ -27,6 +27,16 @@ export function createSelectionStateActions(set: VideoEditorStoreSet) {
     selectObjectTrack: createSelectObjectTrackAction(set),
     selectActionSegment: createSelectActionSegmentAction(set),
     selectMotionRegion: createSelectMotionRegionAction(set),
+    selectMotionLane: () =>
+      set((state) =>
+        (state.project?.motionRegions?.length ?? 0) > 0
+          ? {
+              selection: { kind: VideoEditorSelectionKind.MOTION_LANE },
+              selectedTrackId: null,
+              placementMode: null,
+            }
+          : state
+      ),
     ...createPlacementStateActions(set),
     setDiagnosticsOpen: (diagnosticsOpen: boolean) => set({ diagnosticsOpen }),
   };

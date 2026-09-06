@@ -72,6 +72,9 @@ interface VideoEditorSidebarProjectActions {
   onInsertCursorSample: VideoEditorSidebarCommands['insertCursorSample'];
   onOpenProject: VideoEditorActionHandlers['handleOpenProject'];
   onRenameTrack: VideoEditorSidebarCommands['renameTrack'];
+  onToggleUtilityLaneVisibility: VideoEditorProjectActions['toggleUtilityLaneVisibility'];
+  onToggleUtilityLaneLock: VideoEditorProjectActions['toggleUtilityLaneLock'];
+  onClearUtilityLane: VideoEditorProjectActions['clearUtilityLane'];
   onToggleTrackLock: VideoEditorSidebarCommands['toggleTrackLock'];
   onToggleTrackVisibility: VideoEditorSidebarCommands['toggleTrackVisibility'];
   onResizeProject: (width: number, height: number) => void;

@@ -35,6 +35,9 @@ export interface WorkspaceSidebarSelectionPanelProps {
   onInsertCursorSample: NonNullable<WorkspaceSidebarProps['onInsertCursorSample']>;
   onRenameTrack?: WorkspaceSidebarProps['onRenameTrack'];
   onToggleTrackLock?: WorkspaceSidebarProps['onToggleTrackLock'];
+  onToggleUtilityLaneVisibility?: WorkspaceSidebarProps['onToggleUtilityLaneVisibility'];
+  onToggleUtilityLaneLock?: WorkspaceSidebarProps['onToggleUtilityLaneLock'];
+  onClearUtilityLane?: WorkspaceSidebarProps['onClearUtilityLane'];
   onToggleTrackVisibility?: WorkspaceSidebarProps['onToggleTrackVisibility'];
   onResizeProject: WorkspaceSidebarProps['onResizeProject'];
   onPreviewSceneBackground: NonNullable<WorkspaceSidebarProps['onPreviewSceneBackground']>;

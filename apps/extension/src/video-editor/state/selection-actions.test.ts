@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createVideoProjectMotionRegion } from '../../features/video/project/motion';
 import { createEmptyVideoProject } from '../../features/video/project/factories/creation';
 import {
   VideoCursorAnimationPreset,
@@ -256,3 +257,18 @@ function createSeedMotionRegion() {
     zoomOutDuration: 0.2,
   };
 }
+
+it('selects the authored Zoom lane without selecting a region or media track', () => {
+  const store = createSelectionStore();
+  store.actions.selectMotionLane();
+  expect(store.getState().selection.kind).toBe('scene');
+  const project = store.getState().project!;
+  project.motionRegions = [createVideoProjectMotionRegion(project, 0)];
+  store.actions.selectTrack(project.tracks[0]!.id);
+  store.actions.startMotionAreaPlacement(project.motionRegions[0]!.id);
+  store.actions.selectMotionLane();
+  expect(store.getState().selection).toEqual({ kind: 'motion-lane' });
+  expect(store.getState().selectedTrackId).toBeNull();
+  expect(store.getState().placementMode).toBeNull();
+  expect(store.getState().project).toBe(project);
+});

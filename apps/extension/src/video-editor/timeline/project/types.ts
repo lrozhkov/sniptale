@@ -80,6 +80,7 @@ export interface ProjectTimelineProps {
   ) => void;
   onSelectCursorSegment: (sampleId: string) => void;
   onSelectActionSegment: (actionEventId: string) => void;
+  onSelectMotionLane?: (() => void) | undefined;
   onSelectMotionRegion: (motionRegionId: string) => void;
   onSelectObjectTrack: (objectTrackId: string) => void;
   onSwapClip: (clipId: string, direction: 'left' | 'right') => void;

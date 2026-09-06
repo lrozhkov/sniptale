@@ -10,6 +10,8 @@ export function resolveSelectionAfterProjectUpdate(
   switch (selection.kind) {
     case VideoEditorSelectionKind.SCENE:
       return selection;
+    case VideoEditorSelectionKind.MOTION_LANE:
+      return (project.motionRegions?.length ?? 0) > 0 ? selection : createSceneSelection();
     case VideoEditorSelectionKind.CLIP:
       return project.clips.some((clip) => clip.id === selection.clipId)
         ? selection
@@ -49,6 +51,7 @@ export function resolveSelectedTrackIdFromSelection(
 ): string | null {
   switch (selection.kind) {
     case VideoEditorSelectionKind.SCENE:
+    case VideoEditorSelectionKind.MOTION_LANE:
     case VideoEditorSelectionKind.CURSOR_SEGMENT:
     case VideoEditorSelectionKind.OBJECT_TRACK:
     case VideoEditorSelectionKind.ACTION_SEGMENT:

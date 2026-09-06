@@ -231,12 +231,16 @@ function renderTrackList(
     cursorLaneVisible?: boolean;
     showTelemetryLane: boolean;
     onAddMotionRegion?: () => void;
+    onSelectMotionLane?: () => void;
+    motionLaneSelected?: boolean;
   }
 ) {
   const trackPanelPrefs = createTrackPanelPrefs({ compactRows: options.compactRows ?? false });
   act(() => {
     root?.render(
       <ProjectTimelineTrackList
+        onSelectMotionLane={options.onSelectMotionLane}
+        motionLaneSelected={options.motionLaneSelected}
         canShowTelemetryLane={options.showTelemetryLane}
         cursorLaneVisible={options.cursorLaneVisible ?? true}
         project={project}
@@ -312,4 +316,31 @@ it('routes compact rows and action history from the track header and disables un
     !prefs.prefs.collapsedTelemetryLaneVisible
   );
   expect(prefs.setCollapsedCursorLaneVisible).not.toHaveBeenCalled();
+});
+
+it('exposes a separate selected Zoom lane button and keeps Add region independent', () => {
+  const project = createEmptyVideoProject('Zoom lane');
+  project.motionRegions = [createVideoProjectMotionRegion(project, 0)];
+  const onSelectMotionLane = vi.fn();
+  const onAddMotionRegion = vi.fn();
+  renderTrackList(project, {
+    showTelemetryLane: false,
+    compactRows: true,
+    motionLaneSelected: true,
+    onSelectMotionLane,
+    onAddMotionRegion,
+  });
+  const label = container!.querySelector<HTMLButtonElement>(
+    '[data-ui="video-editor.timeline.motion-lane-select"]'
+  )!;
+  expect(label.getAttribute('aria-pressed')).toBe('true');
+  act(() => label.click());
+  expect(onSelectMotionLane).toHaveBeenCalledOnce();
+  act(() =>
+    container!
+      .querySelector<HTMLButtonElement>('[data-ui="video-editor.timeline.add-zoom"]')!
+      .click()
+  );
+  expect(onAddMotionRegion).toHaveBeenCalledOnce();
+  expect(onSelectMotionLane).toHaveBeenCalledOnce();
 });

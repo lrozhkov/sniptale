@@ -70,6 +70,7 @@ interface VideoEditorTimelineActions {
   onSelectClip: VideoEditorSessionActions['selectClip'];
   onSelectCursorSegment: VideoEditorSessionActions['selectCursorSegment'];
   onSelectMotionRegion: VideoEditorSessionActions['selectMotionRegion'];
+  onSelectMotionLane: VideoEditorSessionActions['selectMotionLane'];
   onSelectObjectTrack: VideoEditorSessionActions['selectObjectTrack'];
   onSelectScene: VideoEditorSessionActions['selectScene'];
   onSelectTrack: VideoEditorSessionActions['selectTrack'];

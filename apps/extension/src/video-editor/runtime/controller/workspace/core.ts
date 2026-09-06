@@ -94,7 +94,6 @@ export function createWorkspaceHeaderController(
     onSelectScene: () => {
       args.store.selectScene();
       args.workspace.inspector.openSelection();
-      if (args.workspace.leftSidebarCollapsed) args.workspace.toggleSidebarCollapsed();
     },
     onToggleLibraryPanel: args.workspace.toggleLibraryPanel,
     onToggleSidebar: args.workspace.toggleSidebarCollapsed,

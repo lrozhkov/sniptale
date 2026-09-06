@@ -1,4 +1,5 @@
 import type { ComponentProps } from 'react';
+import { VideoEditorSelectionKind } from '../../contracts/selection';
 import { ProjectTimelineCanvas } from './canvas';
 import { ProjectTimelineTrackList } from './tracks/list';
 import type { ProjectTimelineProps } from './types';
@@ -26,6 +27,7 @@ type ProjectTimelineBodyProps = Pick<
   | 'onSelectClip'
   | 'onSelectCursorSegment'
   | 'onSelectMotionRegion'
+  | 'onSelectMotionLane'
   | 'onSelectObjectTrack'
   | 'onSelectScene'
   | 'onSelectTrack'
@@ -91,6 +93,8 @@ function ProjectTimelineBodyCanvas(props: ProjectTimelineBodyProps) {
 function createTrackListProps(props: ProjectTimelineBodyProps): ProjectTimelineBodyTrackListProps {
   return {
     canShowTelemetryLane: props.recordingTelemetry !== null,
+    onSelectMotionLane: props.onSelectMotionLane,
+    motionLaneSelected: props.selection?.kind === VideoEditorSelectionKind.MOTION_LANE,
     cursorLaneVisible: props.cursorLaneVisible,
     project: props.project,
     selectedTrackId: props.selectedTrackId,

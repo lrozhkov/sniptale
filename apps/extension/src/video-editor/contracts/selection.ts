@@ -7,6 +7,7 @@ export const VideoEditorSelectionKind = {
   OBJECT_TRACK: 'object-track',
   ACTION_SEGMENT: 'action-segment',
   MOTION_REGION: 'motion-region',
+  MOTION_LANE: 'motion-lane',
 } as const;
 
 export type VideoEditorSelectionKind =
@@ -14,6 +15,7 @@ export type VideoEditorSelectionKind =
 
 export type VideoEditorSelection =
   | { kind: typeof VideoEditorSelectionKind.SCENE }
+  | { kind: typeof VideoEditorSelectionKind.MOTION_LANE }
   | { kind: typeof VideoEditorSelectionKind.CLIP; clipId: string }
   | { kind: typeof VideoEditorSelectionKind.TRACK; trackId: string }
   | {

@@ -59,30 +59,42 @@ export function ProjectTimelineEffectLaneLabelRow({
   icon,
   trailingControls,
   title,
+  onSelect,
+  isSelected,
 }: {
   compactRows?: boolean;
   icon: React.ReactNode;
   trailingControls?: React.ReactNode;
   title: string;
+  onSelect?: (() => void) | undefined;
+  isSelected?: boolean | undefined;
 }) {
   return (
     <ProjectTimelineEffectLaneRow>
       <div
-        className={
-          compactRows ? 'flex h-full items-center justify-center' : EFFECT_LANE_LABEL_CLASS_NAME
-        }
+        className={[
+          compactRows ? 'flex h-full items-center justify-center' : EFFECT_LANE_LABEL_CLASS_NAME,
+          isSelected ? 'bg-[var(--sniptale-color-accent-soft)]' : '',
+        ].join(' ')}
       >
-        <span
-          className="flex h-7 w-7 items-center justify-center rounded-[10px] border
-            border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]"
-        >
-          {icon}
-        </span>
-        {compactRows ? null : (
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] font-semibold text-[var(--sniptale-color-text-primary)]">
-              {title}
-            </div>
+        {onSelect ? (
+          <button
+            type="button"
+            data-ui="video-editor.timeline.motion-lane-select"
+            aria-pressed={isSelected ?? false}
+            aria-label={title}
+            onClick={onSelect}
+            className={[
+              'flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left',
+              'focus-visible:outline focus-visible:outline-2',
+              'focus-visible:outline-[var(--sniptale-color-focus-ring)]',
+            ].join(' ')}
+          >
+            <LaneIdentity icon={icon} title={title} compactRows={compactRows} />
+          </button>
+        ) : (
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+            <LaneIdentity icon={icon} title={title} compactRows={compactRows} />
           </div>
         )}
         {trailingControls && !compactRows ? (
@@ -90,5 +102,33 @@ export function ProjectTimelineEffectLaneLabelRow({
         ) : null}
       </div>
     </ProjectTimelineEffectLaneRow>
+  );
+}
+
+function LaneIdentity({
+  icon,
+  title,
+  compactRows,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  compactRows: boolean;
+}) {
+  return (
+    <>
+      <span
+        className="flex h-7 w-7 items-center justify-center rounded-[10px] border
+            border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]"
+      >
+        {icon}
+      </span>
+      {compactRows ? null : (
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[13px] font-semibold text-[var(--sniptale-color-text-primary)]">
+            {title}
+          </div>
+        </div>
+      )}
+    </>
   );
 }

@@ -123,6 +123,7 @@ function selectClipSelectionPort(state: VideoEditorState): ClipSelectionPort {
     selectClip: state.selectClip,
     selectCursorSegment: state.selectCursorSegment,
     selectMotionRegion: state.selectMotionRegion,
+    selectMotionLane: state.selectMotionLane,
     selectObjectTrack: state.selectObjectTrack,
     selectScene: state.selectScene,
     selectTrack: state.selectTrack,

@@ -211,3 +211,12 @@ it('resolves selected tracks from clip and transition selections and clears non-
     })
   ).toBeNull();
 });
+
+it('keeps Zoom lane selection across updates and clears it when the last region disappears', () => {
+  const project = createSelectionProject();
+  const selection = { kind: 'motion-lane' } as const;
+  expect(resolveSelectionAfterProjectUpdate(project, selection)).toBe(selection);
+  expect(resolveSelectedTrackIdFromSelection(project, selection)).toBeNull();
+  project.motionRegions = [];
+  expect(resolveSelectionAfterProjectUpdate(project, selection)).toEqual({ kind: 'scene' });
+});

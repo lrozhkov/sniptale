@@ -184,10 +184,15 @@ function useSceneBackgroundColorState(): VideoEditorWorkspaceColorState {
   );
 }
 
-function useVideoEditorInspectorState(): VideoEditorWorkspaceInspectorState {
+function useVideoEditorInspectorState(
+  setCollapsed: (collapsed: boolean) => void
+): VideoEditorWorkspaceInspectorState {
   const [mode, setMode] = useState<VideoEditorInspectorMode>('selection');
 
-  const openSelection = useCallback(() => setMode('selection'), []);
+  const openSelection = useCallback(() => {
+    setMode('selection');
+    setCollapsed(false);
+  }, [setCollapsed]);
 
   return useMemo(() => ({ mode, openSelection }), [mode, openSelection]);
 }
@@ -201,7 +206,7 @@ export function useVideoEditorWorkspaceState(): VideoEditorWorkspaceState {
   const audioRecordingDialog = useAudioRecordingDialogState();
   const sceneBackgroundColors = useSceneBackgroundColorState();
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
-  const inspector = useVideoEditorInspectorState();
+  const inspector = useVideoEditorInspectorState(setLeftSidebarCollapsed);
   const [playbackRange, setPlaybackRange] = useState<VideoEditorPlaybackRange | null>(null);
   const preview = useVideoEditorWorkspacePreviewState();
   const grid = useWorkspaceGridState();

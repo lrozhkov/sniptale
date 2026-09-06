@@ -31,6 +31,8 @@ interface ProjectTimelineTrackListProps {
   onClearUtilityLane: (lane: VideoProjectUtilityLaneKind) => void;
   onScroll: () => void;
   onSelectTrack: (trackId: string) => void;
+  onSelectMotionLane?: (() => void) | undefined;
+  motionLaneSelected?: boolean | undefined;
   onToggleTrackLock: (trackId: string) => void;
   onToggleTrackVisibility: (trackId: string) => void;
   onToggleUtilityLaneLock: (lane: VideoProjectUtilityLaneKind) => void;
@@ -136,6 +138,8 @@ function ProjectTimelineRailRows(props: {
   onAddMotionRegion: () => void;
   onClearUtilityLane: (lane: VideoProjectUtilityLaneKind) => void;
   onSelectTrack: (trackId: string) => void;
+  onSelectMotionLane?: (() => void) | undefined;
+  motionLaneSelected?: boolean | undefined;
   onToggleTrackLock: (trackId: string) => void;
   onToggleTrackVisibility: (trackId: string) => void;
   onToggleUtilityLaneLock: (lane: VideoProjectUtilityLaneKind) => void;
@@ -160,6 +164,8 @@ function ProjectTimelineRailRows(props: {
         />
       ))}
       <ProjectTimelineEffectLaneLabelRows
+        onSelectMotionLane={props.onSelectMotionLane}
+        motionLaneSelected={props.motionLaneSelected}
         compactRows={false}
         onClearUtilityLane={props.onClearUtilityLane}
         cursorLaneVisible={props.cursorLaneVisible}

@@ -68,6 +68,9 @@ function getWorkspaceSidebarProjectActionProps(
   | 'onImportVideo'
   | 'onOpenProject'
   | 'onRenameTrack'
+  | 'onToggleUtilityLaneVisibility'
+  | 'onToggleUtilityLaneLock'
+  | 'onClearUtilityLane'
   | 'onToggleTrackLock'
   | 'onToggleTrackVisibility'
   | 'onResizeProject'
@@ -91,6 +94,9 @@ function getWorkspaceSidebarProjectActionProps(
     onImportVideo: controller.projectActions.onImportVideo,
     onOpenProject: controller.projectActions.onOpenProject,
     onRenameTrack: controller.projectActions.onRenameTrack,
+    onToggleUtilityLaneVisibility: controller.projectActions.onToggleUtilityLaneVisibility,
+    onToggleUtilityLaneLock: controller.projectActions.onToggleUtilityLaneLock,
+    onClearUtilityLane: controller.projectActions.onClearUtilityLane,
     onToggleTrackLock: controller.projectActions.onToggleTrackLock,
     onToggleTrackVisibility: controller.projectActions.onToggleTrackVisibility,
     onResizeProject: controller.projectActions.onResizeProject,
