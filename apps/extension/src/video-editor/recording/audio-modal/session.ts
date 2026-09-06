@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { translate } from '../../../platform/i18n';
 import { beginRecordingSession } from './capture';
 import { formatDurationLabel, resolveRecordingMimeType, type AudioRecordingStatus } from './shared';
@@ -102,19 +102,28 @@ function useTrimPlaybackLifecycle(state: AudioRecordingState) {
       return;
     }
 
+    let frame = 0;
     const handleTimeUpdate = () => {
-      if (audio.currentTime < state.trimEnd - 0.02) {
-        return;
-      }
-
+      if (audio.paused || audio.currentTime < state.trimEnd) return;
       audio.pause();
+      audio.currentTime = state.trimEnd;
       state.setIsPlayingSelection(false);
     };
-    const handlePause = () => state.setIsPlayingSelection(false);
-
+    const monitor = () => {
+      handleTimeUpdate();
+      if (!audio.paused) frame = requestAnimationFrame(monitor);
+    };
+    const handlePause = () => {
+      cancelAnimationFrame(frame);
+      state.setIsPlayingSelection(false);
+    };
+    audio.addEventListener('play', monitor);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('pause', handlePause);
+    if (!audio.paused) monitor();
     return () => {
+      cancelAnimationFrame(frame);
+      audio.removeEventListener('play', monitor);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('pause', handlePause);
     };
@@ -149,9 +158,16 @@ function useRecordingPlaybackControls(state: AudioRecordingState) {
       return;
     }
 
-    audio.currentTime = state.trimStart;
-    await audio.play();
-    state.setIsPlayingSelection(true);
+    if (audio.currentTime < state.trimStart || audio.currentTime >= state.trimEnd)
+      audio.currentTime = state.trimStart;
+    state.setError(null);
+    try {
+      await audio.play();
+      if (state.audioRef.current === audio) state.setIsPlayingSelection(!audio.paused);
+    } catch {
+      if (state.audioRef.current === audio)
+        state.setError(translate('videoEditor.app.sourcePlayFailed'));
+    }
   }, [state]);
 
   const pauseSelection = useCallback(() => {
@@ -159,6 +175,20 @@ function useRecordingPlaybackControls(state: AudioRecordingState) {
   }, [state]);
 
   return { pauseSelection, playSelection };
+}
+
+function createRecordingRangeControls(state: AudioRecordingState) {
+  const selectRange = (range: { start: number; end: number }) => {
+    state.setTrimStart(range.start);
+    state.setTrimEnd(range.end);
+  };
+  const resolveDuration = (duration: number) => {
+    if (!Number.isFinite(duration) || duration <= 0) return;
+    state.setRecordedDuration(duration);
+    state.setTrimEnd((end) => Math.min(end, duration));
+    state.setTrimStart((start) => Math.min(start, Math.max(0, duration - 0.01)));
+  };
+  return { selectRange, resolveDuration };
 }
 
 function useRecordingCaptureControls(
@@ -205,11 +235,9 @@ export function useAudioRecordingSession(isOpen: boolean): AudioRecordingControl
   const resetSession = useRecordingReset(state, refs);
   useRecordingLifecycle(isOpen, resetSession, state);
   const playbackControls = useRecordingPlaybackControls(state);
+  const rangeControls = createRecordingRangeControls(state);
   const captureControls = useRecordingCaptureControls(state, refs, resetSession);
-  const recordedDuration = useMemo(
-    () => Math.max(0, state.trimEnd || state.recordedDuration || state.durationSeconds),
-    [state.durationSeconds, state.recordedDuration, state.trimEnd]
-  );
+  const recordedDuration = Math.max(0, state.recordedDuration || state.durationSeconds);
 
   return {
     save: {
@@ -225,19 +253,21 @@ export function useAudioRecordingSession(isOpen: boolean): AudioRecordingControl
       status: state.status,
       stopRecording: captureControls.stopRecording,
     },
-    trim: state.audioUrl
-      ? {
-          audioRef: state.audioRef,
-          audioUrl: state.audioUrl,
-          isPlayingSelection: state.isPlayingSelection,
-          pauseSelection: playbackControls.pauseSelection,
-          playSelection: playbackControls.playSelection,
-          recordedDuration,
-          setTrimEnd: state.setTrimEnd,
-          setTrimStart: state.setTrimStart,
-          trimEnd: state.trimEnd,
-          trimStart: state.trimStart,
-        }
-      : null,
+    trim:
+      state.audioUrl && state.audioBlob
+        ? {
+            audioRef: state.audioRef,
+            audioUrl: state.audioUrl,
+            audioBlob: state.audioBlob,
+            resolveDuration: rangeControls.resolveDuration,
+            selectRange: rangeControls.selectRange,
+            isPlayingSelection: state.isPlayingSelection,
+            pauseSelection: playbackControls.pauseSelection,
+            playSelection: playbackControls.playSelection,
+            recordedDuration,
+            trimEnd: state.trimEnd,
+            trimStart: state.trimStart,
+          }
+        : null,
   };
 }

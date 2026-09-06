@@ -1,175 +1,92 @@
-import type React from 'react';
-import { PauseCircle, PlayCircle } from 'lucide-react';
+import { useState } from 'react';
+import { Pause, Play, RotateCcw } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
-import { InspectorPanel, NumericRow } from '../../../ui/compact-inspector-controls';
+import { InspectorPanel } from '../../../ui/compact-inspector-controls';
+import { EditorIconButton } from '@sniptale/ui/editor-chrome';
+import { SourceRangeTimeline } from '../../chrome/source-range-timeline';
+import { useRecordedAudioPeaks } from './waveform';
+import { formatPreciseTime } from '../../contracts/time-format';
 import type { AudioRecordingTrimController } from './session-types';
-import { RecordingActionButton } from './controls';
 
-function AudioRecordingRangeInput(props: {
-  label: string;
-  max: number;
-  min: number;
-  onChange: (value: number) => void;
-  value: number;
-}) {
-  const commitChange = (nextValue: number) => props.onChange(nextValue);
-
+function AudioRecordingTrimPanel(props: AudioRecordingTrimController & { disabled: boolean }) {
+  const [cursor, setCursor] = useState(0);
+  const peaks = useRecordedAudioPeaks(props.audioBlob, props.recordedDuration);
+  const seek = (time: number) => {
+    if (props.disabled) return;
+    props.pauseSelection();
+    const next = Math.max(0, Math.min(time, props.recordedDuration));
+    if (props.audioRef.current) props.audioRef.current.currentTime = next;
+    setCursor(next);
+  };
+  const select = (range: { start: number; end: number }) => {
+    if (props.disabled) return;
+    props.selectRange(range);
+    seek(range.start);
+  };
   return (
-    <NumericRow
-      label={props.label}
-      min={props.min}
-      max={props.max}
-      step={0.1}
-      value={props.value}
-      precision={1}
-      onPreviewValue={commitChange}
-      onCommitValue={commitChange}
-    />
-  );
-}
-
-function clampTrimStart(nextStart: number, maxTrimStart: number) {
-  return Math.max(0, Math.min(nextStart, maxTrimStart));
-}
-
-function clampTrimEnd(nextEnd: number, minTrimEnd: number, recordedDuration: number) {
-  return Math.max(minTrimEnd, Math.min(nextEnd, recordedDuration));
-}
-
-function AudioRecordingTrimPlayer(props: {
-  audioRef: React.RefObject<HTMLAudioElement | null>;
-  audioUrl: string;
-  onTrimEndChange: (trimEnd: number) => void;
-}) {
-  return (
-    <audio
-      ref={props.audioRef}
-      controls
-      src={props.audioUrl}
-      className="w-full"
-      onLoadedMetadata={(event) => {
-        const duration = event.currentTarget.duration;
-        if (!Number.isFinite(duration) || duration <= 0) {
-          return;
-        }
-
-        props.onTrimEndChange(duration);
-      }}
-    />
-  );
-}
-
-function AudioRecordingTrimInputs(props: {
-  onTrimEndChange: (trimEnd: number) => void;
-  onTrimStartChange: (trimStart: number) => void;
-  recordedDuration: number;
-  trimEnd: number;
-  trimStart: number;
-}) {
-  const minTrimEnd = Math.max(0.1, props.trimStart + 0.1);
-  const maxTrimStart = Math.max(0, props.trimEnd - 0.1);
-
-  return (
-    <div className="grid gap-3 md:grid-cols-2">
-      <AudioRecordingRangeInput
-        label={translate('videoEditor.app.recordAudioTrimStartLabel')}
-        min={0}
-        max={maxTrimStart}
-        value={props.trimStart}
-        onChange={(nextStart) => props.onTrimStartChange(clampTrimStart(nextStart, maxTrimStart))}
+    <InspectorPanel data-ui="video-editor.audio-recording.trim-panel" className="grid gap-3 p-4">
+      <audio
+        ref={props.audioRef}
+        src={props.audioUrl}
+        hidden
+        onTimeUpdate={(event) => setCursor(event.currentTarget.currentTime)}
+        onLoadedMetadata={(event) => {
+          props.resolveDuration(event.currentTarget.duration);
+        }}
       />
-      <AudioRecordingRangeInput
-        label={translate('videoEditor.app.recordAudioTrimEndLabel')}
-        min={minTrimEnd}
-        max={props.recordedDuration}
-        value={props.trimEnd}
-        onChange={(nextEnd) =>
-          props.onTrimEndChange(clampTrimEnd(nextEnd, minTrimEnd, props.recordedDuration))
-        }
+      <SourceRangeTimeline
+        duration={props.recordedDuration}
+        fps={100}
+        cursor={cursor}
+        range={{ start: props.trimStart, end: props.trimEnd }}
+        disabled={props.disabled}
+        peaks={peaks ?? []}
+        onSeek={seek}
+        onRange={select}
       />
-    </div>
-  );
-}
-
-function AudioRecordingTrimButton(props: {
-  isPlayingSelection: boolean;
-  onPauseSelection: () => void;
-  onPlaySelection: () => Promise<void>;
-}) {
-  return (
-    <RecordingActionButton
-      icon={
-        props.isPlayingSelection ? (
-          <PauseCircle size={16} strokeWidth={2.1} />
-        ) : (
-          <PlayCircle size={16} strokeWidth={2.1} />
-        )
-      }
-      label={translate('videoEditor.app.recordAudioPlaySelection')}
-      onClick={() => {
-        if (props.isPlayingSelection) {
-          props.onPauseSelection();
-          return;
-        }
-
-        void props.onPlaySelection();
-      }}
-    />
-  );
-}
-
-function AudioRecordingTrimPanel(props: {
-  audioRef: React.RefObject<HTMLAudioElement | null>;
-  audioUrl: string;
-  isPlayingSelection: boolean;
-  onPauseSelection: () => void;
-  onPlaySelection: () => Promise<void>;
-  onTrimEndChange: (trimEnd: number) => void;
-  onTrimStartChange: (trimStart: number) => void;
-  recordedDuration: number;
-  trimEnd: number;
-  trimStart: number;
-}) {
-  return (
-    <InspectorPanel data-ui="video-editor.audio-recording.trim-panel" className="grid gap-4 p-4">
-      <AudioRecordingTrimPlayer
-        audioRef={props.audioRef}
-        audioUrl={props.audioUrl}
-        onTrimEndChange={props.onTrimEndChange}
-      />
-      <AudioRecordingTrimInputs
-        onTrimEndChange={props.onTrimEndChange}
-        onTrimStartChange={props.onTrimStartChange}
-        recordedDuration={props.recordedDuration}
-        trimEnd={props.trimEnd}
-        trimStart={props.trimStart}
-      />
-      <AudioRecordingTrimButton
-        isPlayingSelection={props.isPlayingSelection}
-        onPauseSelection={props.onPauseSelection}
-        onPlaySelection={props.onPlaySelection}
-      />
+      <div className="flex items-center gap-3" data-ui="video-editor.audio-recording.playback">
+        <EditorIconButton
+          disabled={props.disabled}
+          title={translate(
+            props.isPlayingSelection ? 'videoEditor.timeline.pause' : 'videoEditor.timeline.play'
+          )}
+          onClick={() => {
+            if (props.isPlayingSelection) props.pauseSelection();
+            else void props.playSelection();
+          }}
+        >
+          {props.isPlayingSelection ? <Pause size={16} /> : <Play size={16} />}
+        </EditorIconButton>
+        <span className="text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
+          {formatPreciseTime(cursor)} / {formatPreciseTime(props.recordedDuration)}
+        </span>
+        <span className="ml-auto text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
+          {formatPreciseTime(props.trimStart)} — {formatPreciseTime(props.trimEnd)}
+        </span>
+        <EditorIconButton
+          disabled={
+            props.disabled || (props.trimStart === 0 && props.trimEnd === props.recordedDuration)
+          }
+          title={translate('videoEditor.app.sourceReset')}
+          onClick={() => select({ start: 0, end: props.recordedDuration })}
+        >
+          <RotateCcw size={15} />
+        </EditorIconButton>
+      </div>
+      {peaks === null && (
+        <p className="text-xs text-[var(--sniptale-color-text-muted)]">
+          {translate('videoEditor.app.recordAudioWaveformUnavailable')}
+        </p>
+      )}
     </InspectorPanel>
   );
 }
 
-export function renderAudioRecordingTrimPanel(controller: AudioRecordingTrimController | null) {
-  if (!controller) {
-    return null;
-  }
-
-  return (
-    <AudioRecordingTrimPanel
-      audioRef={controller.audioRef}
-      audioUrl={controller.audioUrl}
-      isPlayingSelection={controller.isPlayingSelection}
-      onPauseSelection={controller.pauseSelection}
-      onPlaySelection={controller.playSelection}
-      onTrimEndChange={controller.setTrimEnd}
-      onTrimStartChange={controller.setTrimStart}
-      recordedDuration={controller.recordedDuration}
-      trimEnd={controller.trimEnd}
-      trimStart={controller.trimStart}
-    />
-  );
+export function renderAudioRecordingTrimPanel(
+  controller: AudioRecordingTrimController | null,
+  disabled = false
+) {
+  return controller ? (
+    <AudioRecordingTrimPanel key={controller.audioUrl} {...controller} disabled={disabled} />
+  ) : null;
 }

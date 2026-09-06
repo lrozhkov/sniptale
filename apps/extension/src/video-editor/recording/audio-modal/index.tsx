@@ -84,7 +84,7 @@ export function AudioRecordingModal({
           </p>
         )}
         <fieldset disabled={isSaving} className="contents">
-          {renderAudioRecordingTrimPanel(controller.trim)}
+          {renderAudioRecordingTrimPanel(controller.trim, isSaving)}
         </fieldset>
       </ProductModalBody>
       <ProductModalFooter compact>

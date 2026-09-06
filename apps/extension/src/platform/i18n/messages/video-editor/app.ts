@@ -279,8 +279,13 @@ export const videoEditorAppMessages = defineMessageSource({
     en: 'Record audio',
   },
   recordAudioDescription: {
-    ru: 'Запишите голос прямо из проекта, сразу прослушайте результат и обрежьте нужный фрагмент перед вставкой на таймлайн.',
-    en: 'Record voice directly from the project, audition it immediately, and trim the desired segment before adding it to the timeline.',
+    ru: 'Запишите звук и выделите на шкале фрагмент, который хотите добавить в монтаж.',
+    en: 'Record audio and select the range you want to add to the project.',
+  },
+  recordAudioAgain: { ru: 'Записать заново', en: 'Record again' },
+  recordAudioWaveformUnavailable: {
+    ru: 'Аудиопики недоступны. Выбор и сохранение фрагмента работают.',
+    en: 'Waveform unavailable. You can still select and save a range.',
   },
   recordAudioStart: {
     ru: 'Начать запись',

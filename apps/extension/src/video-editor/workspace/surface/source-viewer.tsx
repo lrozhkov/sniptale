@@ -10,7 +10,7 @@ import {
   StepForward,
 } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { SourceRangeTimeline } from './source-timeline';
+import { SourceRangeTimeline } from '../../chrome/source-range-timeline';
 import { translate } from '../../../platform/i18n';
 import {
   VideoProjectAssetType,

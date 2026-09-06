@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
-import { translate } from '../../../platform/i18n';
-import type { VideoEditorMaterialSourceRange } from '../../contracts/insertion';
+import { translate } from '../../platform/i18n';
+import type { VideoEditorMaterialSourceRange } from '../contracts/insertion';
 
 interface SourceTimelineProps {
+  peaks?: readonly number[] | undefined;
   duration: number;
   fps: number;
   cursor: number;
@@ -209,9 +210,13 @@ export function SourceRangeTimeline(props: SourceTimelineProps) {
           ))}
       </div>
       <div
-        className="relative h-10 cursor-crosshair rounded bg-[var(--sniptale-color-surface-hover)]"
+        className={[
+          'relative cursor-crosshair rounded bg-[var(--sniptale-color-surface-hover)]',
+          props.peaks ? 'h-16' : 'h-10',
+        ].join(' ')}
         data-ui="video-editor.source-lane"
       >
+        {props.peaks && <SourceWaveform peaks={props.peaks} />}
         <div
           className="absolute inset-y-0 bg-[var(--sniptale-color-accent-soft)]"
           style={{ left: percent(range.start), width: percent(range.end - range.start) }}
@@ -311,4 +316,25 @@ function sourceRulerMarkers(duration: number, width: number) {
     const label = `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}${fraction ? `.${fraction}` : ''}`;
     return { id: index, second, label };
   });
+}
+
+function SourceWaveform({ peaks }: { peaks: readonly number[] }) {
+  const path = peaks
+    .map((peak, index) => {
+      const x = ((index + 0.5) * 100) / Math.max(1, peaks.length);
+      const height = Math.max(0.5, Math.min(1, Math.max(0, peak)) * 45);
+      return `M ${x} ${50 - height} V ${50 + height}`;
+    })
+    .join(' ');
+  return (
+    <svg
+      data-ui="video-editor.source-waveform"
+      aria-hidden="true"
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      className="pointer-events-none absolute inset-0 h-full w-full text-[var(--sniptale-color-text-muted)]"
+    >
+      <path d={path} stroke="currentColor" strokeWidth={0.35} />
+    </svg>
+  );
 }

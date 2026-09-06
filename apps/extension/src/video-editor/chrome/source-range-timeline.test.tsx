@@ -2,7 +2,7 @@
 import { act, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { SourceRangeTimeline } from './source-timeline';
+import { SourceRangeTimeline } from './source-range-timeline';
 let host: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
 let plane: HTMLDivElement;

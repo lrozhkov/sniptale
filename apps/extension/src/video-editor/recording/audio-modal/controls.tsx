@@ -66,6 +66,7 @@ export function AudioRecordingTransport(props: {
   onStopRecording: () => void;
   status: AudioRecordingStatus;
 }) {
+  if (props.status === 'recorded') return <RecordedAudioSummary {...props} />;
   return (
     <>
       <p className="mb-4 text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
@@ -95,15 +96,36 @@ export function AudioRecordingTransport(props: {
             />
           )}
         </div>
-        {props.status === 'recorded' ? (
-          <p className="text-sm text-[var(--sniptale-color-text-muted)]">
-            {translate('videoEditor.app.recordAudioReadyHint')}
-          </p>
-        ) : null}
         {props.error ? (
           <p className="text-sm text-[var(--sniptale-color-danger-text)]">{props.error}</p>
         ) : null}
       </InspectorPanel>
     </>
+  );
+}
+
+function RecordedAudioSummary(props: {
+  durationLabel: string;
+  error: string | null;
+  onStartRecording: () => void;
+}) {
+  return (
+    <div data-ui="video-editor.audio-recording.transport" className="grid gap-2">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm tabular-nums text-[var(--sniptale-color-text-muted)]">
+          {translate('videoEditor.app.recordAudioDurationLabel')}: {props.durationLabel}
+        </span>
+        <RecordingActionButton
+          icon={<Mic size={16} />}
+          label={translate('videoEditor.app.recordAudioAgain')}
+          onClick={props.onStartRecording}
+        />
+      </div>
+      {props.error && (
+        <p role="alert" className="text-sm text-[var(--sniptale-color-danger-text)]">
+          {props.error}
+        </p>
+      )}
+    </div>
   );
 }
