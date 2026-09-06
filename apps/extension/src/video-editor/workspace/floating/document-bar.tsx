@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Clapperboard, FolderKanban, PanelRight, Pencil } from 'lucide-react';
+import { Clapperboard, PanelRight, Pencil } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { EditorDivider, ValueBadge } from '@sniptale/ui/editor-chrome';
 import { translate } from '../../../platform/i18n';
@@ -112,14 +112,6 @@ export function VideoEditorFloatingDocumentBar({
           dataUi="video-editor.floating.document-bar.inspector"
         >
           <PanelRight size={17} strokeWidth={2.1} />
-        </ContentToolbarButton>
-        <ContentToolbarButton
-          title={translate('videoEditor.app.libraryButton')}
-          active={header.libraryPanelOpen}
-          onClick={header.onToggleLibraryPanel}
-          dataUi="video-editor.floating.document-bar.library"
-        >
-          <FolderKanban size={17} strokeWidth={2.1} />
         </ContentToolbarButton>
         <ContentToolbarButton
           title={translate('videoEditor.app.exportButton')}

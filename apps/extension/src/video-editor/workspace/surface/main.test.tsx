@@ -5,10 +5,11 @@ import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoEditorWorkspaceMain } from './main';
+import type { VideoEditorLibraryPanelProps } from '../../library/contracts/panel';
 import { createHeaderController, createPreviewController } from './main.test-support';
 
 const audioRecordingModalSpy = vi.fn();
-const libraryPanelSpy = vi.fn();
+const libraryPanelSpy = vi.fn<(props: VideoEditorLibraryPanelProps) => void>();
 const floatingWorkspaceSpy = vi.fn();
 const inspectorSpy = vi.fn();
 const previewSpy = vi.fn();
@@ -62,7 +63,7 @@ vi.mock('../floating/inspector-stack', () => ({
 }));
 
 vi.mock('../../library/panel', () => ({
-  VideoEditorLibraryPanel: (props: unknown) => {
+  VideoEditorLibraryPanel: (props: VideoEditorLibraryPanelProps) => {
     libraryPanelSpy(props);
     return <div data-testid="library-panel" />;
   },
@@ -425,5 +426,25 @@ it('continues measuring the visible frame after switching projects', async () =>
     act(() => root.unmount());
     container.remove();
     bounds.mockRestore();
+  }
+});
+
+it('routes every library file import into materials', () => {
+  const actions = createSidebarProjectActions();
+  hookMocks.controller = {
+    ...createWorkspaceController(),
+    sidebar: createSidebarController(actions),
+  };
+  libraryPanelSpy.mockClear();
+  renderToStaticMarkup(
+    <VideoEditorWorkspaceMain diagnosticsContent={null} previewHeightStyle={{}} />
+  );
+  const props = libraryPanelSpy.mock.calls[0]![0];
+  const file = new File(['source'], 'source.webm');
+  props.onImportVideo(file);
+  props.onImportAudio(file);
+  props.onImportImage(file);
+  for (const callback of [actions.onImportVideo, actions.onImportAudio, actions.onImportImage]) {
+    expect(callback).toHaveBeenCalledWith(file, { destination: 'materials' });
   }
 });

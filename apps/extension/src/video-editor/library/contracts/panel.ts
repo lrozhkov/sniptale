@@ -15,7 +15,6 @@ export interface VideoEditorLibraryPanelProps {
   onImportAudio: (file: File) => void;
   onImportImage: (file: File) => void;
   onImportVideo: (file: File) => void;
-  onOpenAudioRecordingDialog: () => void;
   onOpenProject: (projectId: string) => void | Promise<void>;
   onToggleDiagnostics: (open: boolean) => void;
   projects: ProjectListItem[];

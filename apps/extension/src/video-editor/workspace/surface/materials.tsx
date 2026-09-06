@@ -7,7 +7,7 @@ import {
   useResolvedPortalTheme,
 } from '@sniptale/ui/theme/safe-portal';
 import { ProductToolbarMenu, ProductToolbarMenuItem } from '@sniptale/ui/product-menus/toolbar';
-import { ChevronDown, Film, Image, Music, Upload } from 'lucide-react';
+import { ChevronDown, Film, FolderKanban, Image, Music, Upload } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { translate } from '../../../platform/i18n';
@@ -23,6 +23,7 @@ const MATERIAL_IMPORT_OPTIONS = [
 
 export function VideoEditorMaterials(props: {
   headerAction?: React.ReactNode;
+  onOpenLibrary: () => void;
   project: VideoProject;
   onImport: PreviewStageImportHandlers;
   selectedAssetId: string | null;
@@ -46,7 +47,7 @@ export function VideoEditorMaterials(props: {
     }
   };
   return (
-    <aside data-ui="video-editor.materials" className="h-full min-w-0">
+    <aside data-ui="video-editor.materials" className="@container/materials h-full min-w-0">
       <FloatingChromePanel className="h-full overflow-hidden">
         <div className="flex h-full min-h-0 flex-col" aria-busy={pending}>
           <div
@@ -70,10 +71,19 @@ export function VideoEditorMaterials(props: {
           />
           <div
             className={[
-              'flex shrink-0 items-center gap-1 border-b',
+              'grid shrink-0 grid-cols-1 @min-[300px]/materials:grid-cols-2 items-center gap-1 border-b',
               'border-[color:var(--sniptale-color-border-soft)] px-2 py-1',
             ].join(' ')}
           >
+            <ProductActionButton
+              tone="secondary"
+              className="min-w-0 justify-start !px-2"
+              onClick={props.onOpenLibrary}
+              data-ui="video-editor.materials.library"
+            >
+              <FolderKanban size={16} aria-hidden="true" />
+              <span className="truncate">{translate('videoEditor.app.materialsFromLibrary')}</span>
+            </ProductActionButton>
             <MaterialsImportMenu
               disabled={pending}
               onChoose={(kind) => inputRefs[kind].current?.click()}
@@ -135,14 +145,14 @@ function MaterialsImportMenu(props: {
     <div ref={containerRef} className="w-full">
       <ProductActionButton
         tone="secondary"
-        className="w-full justify-start"
+        className="w-full min-w-0 justify-start !px-2"
         disabled={props.disabled}
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
         data-ui="video-editor.materials.import"
       >
         <Upload size={16} aria-hidden="true" />
-        <span className="flex-1 text-left">{translate('videoEditor.app.materialsImport')}</span>
+        <span className="flex-1 text-left">{translate('videoEditor.app.materialsFromDisk')}</span>
         <ChevronDown size={14} aria-hidden="true" />
       </ProductActionButton>
       {open
@@ -155,7 +165,7 @@ function MaterialsImportMenu(props: {
             >
               <ProductToolbarMenu
                 compact
-                title={translate('videoEditor.app.materialsImport')}
+                title={translate('videoEditor.app.materialsFromDisk')}
                 style={{
                   position: 'relative',
                   top: 'auto',

@@ -126,8 +126,13 @@ function useRecordingAssetHandler(port: AssetHandlerPort) {
           return;
         }
 
+        if (port.getCurrentProjectId() !== project.id) {
+          if (!project.assets.some(({ id }) => id === asset.id)) {
+            await cleanupStaleImportedAsset(asset);
+          }
+          return;
+        }
         port.upsertAsset(asset);
-        port.addAssetClip(asset, null, port.getCurrentTime());
       } catch (assetError) {
         logger.error('Failed to add recording', assetError);
         port.setError(toErrorMessage(assetError, 'common.errors.actionFailed'));

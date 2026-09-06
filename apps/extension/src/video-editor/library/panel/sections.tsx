@@ -181,7 +181,6 @@ export function ImportSection(props: {
   onImportAudio: () => void;
   onImportImage: () => void;
   onImportVideo: () => void;
-  onRecordAudio: () => void;
 }) {
   return (
     <div className="grid gap-3" data-ui="video-editor.library.import-tab">
@@ -194,7 +193,6 @@ export function ImportSection(props: {
         onImportImage={props.onImportImage}
         onImportVideo={props.onImportVideo}
         onImportAudio={props.onImportAudio}
-        onRecordAudio={props.onRecordAudio}
         presentation="panel"
       />
     </div>

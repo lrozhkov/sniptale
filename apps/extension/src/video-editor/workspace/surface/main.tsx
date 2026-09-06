@@ -153,10 +153,15 @@ function VideoEditorWorkspaceLibraryPanel({
       onClose={header.onCloseLibraryPanel}
       onCreateProject={sidebar.projectActions.onCreateProject}
       onDeleteProject={sidebar.projectActions.onDeleteProject}
-      onImportAudio={sidebar.projectActions.onImportAudio}
-      onImportImage={sidebar.projectActions.onImportImage}
-      onOpenAudioRecordingDialog={header.onOpenAudioRecordingDialog}
-      onImportVideo={sidebar.projectActions.onImportVideo}
+      onImportAudio={(file) =>
+        sidebar.projectActions.onImportAudio(file, { destination: 'materials' })
+      }
+      onImportImage={(file) =>
+        sidebar.projectActions.onImportImage(file, { destination: 'materials' })
+      }
+      onImportVideo={(file) =>
+        sidebar.projectActions.onImportVideo(file, { destination: 'materials' })
+      }
       onOpenProject={sidebar.projectActions.onOpenProject}
       onToggleDiagnostics={sidebar.projectActions.onToggleDiagnostics}
       projects={sidebar.state.projects}

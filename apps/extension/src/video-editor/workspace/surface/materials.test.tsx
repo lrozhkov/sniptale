@@ -12,6 +12,7 @@ import { VideoEditorMaterials } from './materials';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { translate } from '../../../platform/i18n';
 
+const onOpenLibrary = vi.fn();
 const container = document.createElement('div');
 let root = createRoot(container);
 afterEach(() => {
@@ -44,6 +45,7 @@ function renderMaterials() {
   act(() =>
     root.render(
       <VideoEditorMaterials
+        onOpenLibrary={onOpenLibrary}
         project={project}
         selectedAssetId={null}
         onSelect={onSelect}
@@ -104,6 +106,7 @@ it('dismisses Import before the armed canvas insertion and restores its trigger'
       <>
         <ArmedInsertion onCancel={onCancel} />
         <VideoEditorMaterials
+          onOpenLibrary={onOpenLibrary}
           project={project}
           onImport={onImport}
           onSelect={onSelect}
@@ -152,6 +155,7 @@ it('yields focus to an inspector select without retaining a competing menu layer
           ]}
         />
         <VideoEditorMaterials
+          onOpenLibrary={onOpenLibrary}
           project={project}
           onImport={onImport}
           onSelect={onSelect}
@@ -186,4 +190,16 @@ it('yields focus to an inspector select without retaining a competing menu layer
   expect(document.querySelector('[role="listbox"]')).toBeNull();
   expect(document.activeElement).toBe(select);
   expect(onCancel).not.toHaveBeenCalled();
+});
+
+it('opens the library independently from the local file import menu', () => {
+  const { onImport } = renderMaterials();
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>('[data-ui="video-editor.materials.library"]')!
+      .click()
+  );
+  expect(onOpenLibrary).toHaveBeenCalled();
+  expect(onImport.video).not.toHaveBeenCalled();
+  expect(container.querySelector('[data-ui="video-editor.materials.import-menu"]')).toBeNull();
 });

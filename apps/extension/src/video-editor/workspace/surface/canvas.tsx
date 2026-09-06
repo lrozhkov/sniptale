@@ -11,6 +11,7 @@ import { VideoEditorSourceViewer } from './source-viewer';
 import { ProjectTimeline } from '../../timeline/project';
 import { PreviewStage } from '../../preview/stage';
 import {
+  useVideoEditorHeaderController,
   useWorkspacePreviewContext,
   useVideoEditorBlockingOverlayContext,
   useVideoEditorLayoutController,
@@ -101,6 +102,7 @@ interface VideoEditorWorkspaceCanvasProps {
 }
 
 function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
+  const header = useVideoEditorHeaderController();
   const preview = useVideoEditorPreviewController();
   const viewer = useWorkspacePreviewContext();
   const blocking = useVideoEditorBlockingOverlayContext();
@@ -137,6 +139,7 @@ function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
           <div className="min-h-0 min-w-0" style={{ width: props.materialsPanel.resize.width }}>
             {props.materialsOpen && (
               <VideoEditorMaterials
+                onOpenLibrary={() => header?.onOpenLibraryPanel()}
                 project={preview.project}
                 onImport={preview.onImport}
                 selectedAssetId={selectedAssetId}

@@ -22,7 +22,6 @@ type LibraryPanelContentProps = Pick<
   | 'onClose'
   | 'onCreateProject'
   | 'onDeleteProject'
-  | 'onOpenAudioRecordingDialog'
   | 'onOpenProject'
   | 'onToggleDiagnostics'
   | 'projects'
@@ -105,7 +104,6 @@ function LibraryPanelImportTab(
       onImportAudio={() => props.inputRefs.audioInputRef.current?.click()}
       onImportImage={() => props.inputRefs.imageInputRef.current?.click()}
       onImportVideo={() => props.inputRefs.videoInputRef.current?.click()}
-      onRecordAudio={props.onOpenAudioRecordingDialog}
     />
   );
 }

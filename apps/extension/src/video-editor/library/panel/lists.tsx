@@ -138,7 +138,7 @@ export function RecordingsSection(props: RecordingsSectionProps) {
         title={translate('videoEditor.sidebar.recordingsTitle')}
         meta={`${props.recordings.length} ${translate('videoEditor.sidebar.recordingsInDbSuffix')}`}
       />
-      <div className="grid min-h-0 gap-3 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid min-h-0 gap-3 lg:grid-cols-[minmax(260px,0.8fr)_minmax(0,1.2fr)]">
         <RecordingListContent
           {...props}
           selectedRecordingId={selectedRecording?.id ?? null}

@@ -36,7 +36,7 @@ export function VideoEditorLibraryPanel({
   return (
     <ProductModal
       onClose={onClose}
-      width="min(860px, calc(100vw - 24px))"
+      width="min(1600px, calc(100vw - 48px))"
       maxWidth="calc(100vw - 24px)"
       maxHeight="100vh"
       role="presentation"

@@ -86,7 +86,6 @@ function createProps(
     onImportAudio: vi.fn(),
     onImportImage: vi.fn(),
     onImportVideo: vi.fn(),
-    onOpenAudioRecordingDialog: vi.fn(),
     onOpenProject: vi.fn().mockResolvedValue(undefined),
     onToggleDiagnostics: vi.fn(),
     projects: [

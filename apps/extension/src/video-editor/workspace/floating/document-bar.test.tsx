@@ -55,7 +55,7 @@ it('reflects the visible compact inspector state without changing the saved pref
   expect(header.onToggleSidebar).not.toHaveBeenCalled();
 });
 
-it('renders project identity and keeps export/library actions in the floating document bar', () => {
+it('renders project identity and keeps export action in the floating document bar', () => {
   hookMocks.header.mockReturnValue(createHeaderProps());
   hookMocks.history.mockReturnValue({
     canUndo: false,
@@ -69,7 +69,7 @@ it('renders project identity and keeps export/library actions in the floating do
   expect(markup).toContain('data-ui="video-editor.floating.document-bar"');
   expect(markup).toContain('Product Demo Recording');
   expect(markup).not.toContain('Saved');
-  expect(markup).toContain('videoEditor.app.libraryButton');
+  expect(markup).not.toContain('videoEditor.app.libraryButton');
   expect(markup).toContain('videoEditor.app.exportButton');
   expect(markup).not.toContain('video-editor.floating.document-bar.undo');
   expect(markup).not.toContain('video-editor.floating.document-bar.redo');

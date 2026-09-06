@@ -242,8 +242,8 @@ export const videoEditorSidebarLibraryMessages = defineMessageSource({
     en: 'Frame',
   },
   addToTimeline: {
-    ru: 'Добавить в проект',
-    en: 'Add to project',
+    ru: 'Добавить в материалы',
+    en: 'Add to materials',
   },
   libraryDiagnosticsDescription: {
     ru: 'Диагностика относится только к текущей записи и не меняет содержимое проекта.',

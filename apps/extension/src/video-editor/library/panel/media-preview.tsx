@@ -38,6 +38,12 @@ export function MediaPreviewPane(props: {
         thumbnailUrl={props.thumbnailUrl}
         zoom={zoom}
       />
+      <AddRecordingAction
+        fullWidth
+        onAddRecording={props.onAddRecording}
+        recordingId={props.recording.id}
+        variant="card"
+      />
       <label className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 text-xs">
         <Search size={14} aria-hidden />
         <span className="sr-only">{translate('videoEditor.sidebar.mediaPreviewZoomLabel')}</span>
@@ -67,12 +73,6 @@ export function MediaPreviewPane(props: {
           ))}
         </dl>
       </div>
-      <AddRecordingAction
-        fullWidth
-        onAddRecording={props.onAddRecording}
-        recordingId={props.recording.id}
-        variant="card"
-      />
     </aside>
   );
 }

@@ -185,7 +185,7 @@ async function expectLibraryDrawerPlacement(page: Page): Promise<void> {
   const longTitle =
     'Library layout proof — a long project title that must not overlap navigation or search';
   await title.fill(longTitle);
-  const trigger = page.locator('[data-ui="video-editor.floating.document-bar.library"]');
+  const trigger = page.locator('[data-ui="video-editor.materials.library"]');
   await trigger.click();
   const drawer = page.locator('[data-ui="video-editor.library.drawer"]');
   await expect(drawer).toBeVisible();

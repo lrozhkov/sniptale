@@ -52,7 +52,6 @@ it('renders library panel sections through shared editor primitives', () => {
         onImportAudio={() => undefined}
         onImportImage={() => undefined}
         onImportVideo={() => undefined}
-        onRecordAudio={() => undefined}
       />
       <DiagnosticsSection
         diagnosticsContent={<div>diagnostics</div>}
@@ -67,7 +66,8 @@ it('renders library panel sections through shared editor primitives', () => {
   expect(countDataUi(markup, 'video-editor.library.import-tab')).toBe(1);
   expect(countDataUi(markup, 'video-editor.library.diagnostics-tab')).toBe(1);
   expect(countDataUi(markup, 'shared.ui.compact-inspector.option-row')).toBe(1);
-  expect(countDataUi(markup, 'video-editor.sidebar.library-action')).toBe(5);
+  expect(countDataUi(markup, 'video-editor.sidebar.library-action')).toBe(4);
+  expect(markup).not.toContain('videoEditor.sidebar.toolbarRecord');
   expect(markup).toContain('inline-flex h-10 min-h-10');
   expect(markup).not.toContain('border-b border-[color:var(--sniptale-color-border-subtle)]');
   expect(markup).not.toContain('rounded-[16px]');

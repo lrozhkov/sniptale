@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import { VideoProjectAssetType } from '../../../features/video/project/types';
 import { useAssetHandlers } from './assets';
+import { ensureRecordingAsset } from '../../project/operations/ops';
 
 const { deleteProjectAssetMock, importProjectAssetMock } = vi.hoisted(() => ({
   deleteProjectAssetMock: vi.fn(),
@@ -189,3 +190,49 @@ async function verifyStaleImportCleanup() {
   expect(params.upsertAsset).not.toHaveBeenCalled();
   expect(params.addAssetClip).not.toHaveBeenCalled();
 }
+
+describe('library material import', () => {
+  it('adds the recording to materials without placing any clip', async () => {
+    const params = createParams();
+    const asset = await importProjectAssetMock();
+    vi.mocked(ensureRecordingAsset).mockResolvedValue(asset);
+    renderHook(params);
+    await act(async () => latestHandlers!.handleAddRecording('recording'));
+    expect(params.upsertAsset).toHaveBeenCalledWith(asset);
+    expect(params.addAssetClip).not.toHaveBeenCalled();
+  });
+
+  it('discards a newly copied recording when the project changes while loading', async () => {
+    const params = createParams();
+    const asset = await importProjectAssetMock();
+    let resolve!: (value: typeof asset) => void;
+    vi.mocked(ensureRecordingAsset).mockReturnValue(
+      new Promise((done) => {
+        resolve = done;
+      })
+    );
+    renderHook(params);
+    const pending = latestHandlers!.handleAddRecording('recording');
+    params.getCurrentProjectId = () => 'another-project';
+    await act(async () => {
+      resolve(asset);
+      await pending;
+    });
+    expect(params.upsertAsset).not.toHaveBeenCalled();
+    expect(params.addAssetClip).not.toHaveBeenCalled();
+    expect(deleteProjectAssetMock).toHaveBeenCalledWith('asset-1');
+  });
+
+  it('does not delete an existing recording asset if its project was switched', async () => {
+    const params = createParams();
+    const asset = await importProjectAssetMock();
+    params.getCurrentProject()!.assets.push(asset);
+    vi.mocked(ensureRecordingAsset).mockResolvedValue(asset);
+    renderHook(params);
+    const pending = latestHandlers!.handleAddRecording('recording');
+    params.getCurrentProjectId = () => 'another-project';
+    await act(async () => pending);
+    expect(params.upsertAsset).not.toHaveBeenCalled();
+    expect(deleteProjectAssetMock).not.toHaveBeenCalled();
+  });
+});
