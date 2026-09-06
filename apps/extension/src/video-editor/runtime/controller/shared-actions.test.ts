@@ -9,7 +9,10 @@ import {
 } from '../../../features/video/project/timeline/project-meta.test.helpers.ts';
 import type { VideoProject } from '../../../features/video/project/types';
 import { useVideoEditorStore } from '../../state/store';
-import { createWorkspaceProjectUpdaters } from './shared-actions';
+import {
+  createWorkspaceProjectUpdaters,
+  createWorkspacePreviewProjectUpdaters,
+} from './shared-actions';
 
 it('generates a camera path from a hidden detected cursor track that needs anchors', () => {
   const project = createEmptyVideoProject('Cursor camera');
@@ -95,3 +98,20 @@ function createCameraCursorTrack(
     source: 'visualDetection',
   };
 }
+
+it.each([createWorkspaceProjectUpdaters, createWorkspacePreviewProjectUpdaters])(
+  'recreates the first zoom as visible and editable in the same project update (%#)',
+  (createActions) => {
+    const project = createEmptyVideoProject('Zoom');
+    project.utilityLanes = {
+      actions: { visible: true, locked: false },
+      camera: { visible: false, locked: true },
+    };
+    const store = createStore(project);
+    const update = vi.spyOn(store, 'updateProject');
+    createActions(store).addMotionRegion(0);
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(project.motionRegions).toHaveLength(1);
+    expect(project.utilityLanes?.camera).toEqual({ visible: true, locked: false });
+  }
+);

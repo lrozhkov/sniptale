@@ -40,6 +40,7 @@ afterEach(() => {
 
 function renderLeadingControls(options?: {
   canAddMotionRegion?: boolean;
+  hasMotionRegions?: boolean;
   canAutoTransformRecording?: boolean;
   canEditSelectedClip?: boolean;
   canSplitSelectedClip?: boolean;
@@ -64,6 +65,7 @@ function renderLeadingControls(options?: {
         <ProjectTimelineAddTrackControl onAddTrack={handlers.onAddTrack} />
         <ProjectTimelineToolbarLeadingControls
           canAddMotionRegion={options?.canAddMotionRegion ?? true}
+          hasMotionRegions={options?.hasMotionRegions ?? false}
           canAutoTransformRecording={options?.canAutoTransformRecording ?? false}
           canEditSelectedClip={options?.canEditSelectedClip ?? options?.selectedClip ?? false}
           canSplitSelectedClip={options?.canSplitSelectedClip ?? options?.selectedClip ?? false}
@@ -112,12 +114,12 @@ it('renders timeline-specific actions on the leading side without the shared ins
   expect(container?.textContent).not.toContain('videoEditor.timeline.addButton');
   expect(container?.textContent).toContain('videoEditor.timeline.addTrack');
   expect(container?.textContent).toContain('videoEditor.timeline.autoTransform');
-  expect(container?.textContent).not.toContain('videoEditor.timeline.split');
+  expect(getButtonByText('videoEditor.timeline.split').disabled).toBe(true);
 });
 
 it('reveals clip actions only for an active clip selection', () => {
   renderLeadingControls({ selectedClip: false });
-  expect(container?.textContent).not.toContain('videoEditor.timeline.split');
+  expect(getButtonByText('videoEditor.timeline.split').disabled).toBe(true);
 
   renderLeadingControls({ selectedClip: true });
   expect(container?.textContent).toContain('videoEditor.timeline.split');
@@ -264,4 +266,13 @@ it('does not add zoom while its lane is unavailable for editing', () => {
   expect(button.disabled).toBe(true);
   act(() => button.click());
   expect(handlers.onAddMotionRegion).not.toHaveBeenCalled();
+});
+
+it('moves zoom creation from the toolbar to the authored zoom lane', () => {
+  renderLeadingControls({ hasMotionRegions: true });
+  expect(container?.querySelector('[data-ui="video-editor.timeline.toolbar.add-zoom"]')).toBeNull();
+  renderLeadingControls({ hasMotionRegions: false });
+  expect(
+    container?.querySelector('[data-ui="video-editor.timeline.toolbar.add-zoom"]')
+  ).not.toBeNull();
 });

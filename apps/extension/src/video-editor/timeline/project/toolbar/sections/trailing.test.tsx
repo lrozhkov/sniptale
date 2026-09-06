@@ -49,17 +49,6 @@ function renderTrailingActions() {
       <ProjectTimelineToolbarTrailingActions
         fitSelectionDuration={4}
         pixelsPerSecond={120}
-        trackView={{
-          compactRows: false,
-          cursorLaneVisible: false,
-          telemetryLaneVisible: false,
-          canShowCursorLane: true,
-          canShowTelemetryLane: true,
-          onCompactRowsChange: handlers.onCompactRowsChange,
-          onCursorLaneVisibleChange: handlers.onCursorLaneVisibleChange,
-          onTelemetryLaneVisibleChange: handlers.onTelemetryLaneVisibleChange,
-        }}
-        visibleRangeSeconds={8}
         onFitProject={handlers.onFitProject}
         onFitSelection={handlers.onFitSelection}
         onTimelinePreviewSuspendedChange={vi.fn()}
@@ -85,7 +74,7 @@ it('renders zoom without the removed speed and telemetry controls', () => {
   ).not.toBeNull();
   expect(
     container?.querySelector('[data-ui="video-editor.timeline.toolbar.compact-tracks"]')
-  ).not.toBeNull();
+  ).toBeNull();
 });
 
 it('routes timeline view actions from the trailing side', () => {
@@ -98,16 +87,10 @@ it('routes timeline view actions from the trailing side', () => {
     container
       ?.querySelector<HTMLButtonElement>('[data-ui="video-editor.timeline.toolbar.fit-selection"]')
       ?.click();
-    container
-      ?.querySelector<HTMLButtonElement>('[data-ui="video-editor.timeline.toolbar.compact-tracks"]')
-      ?.click();
-    container
-      ?.querySelector<HTMLButtonElement>('[data-ui="video-editor.timeline.toolbar.cursor-lane"]')
-      ?.click();
   });
 
   expect(handlers.onFitProject).toHaveBeenCalledTimes(1);
   expect(handlers.onFitSelection).toHaveBeenCalledTimes(1);
-  expect(handlers.onCompactRowsChange).toHaveBeenCalledWith(true);
-  expect(handlers.onCursorLaneVisibleChange).toHaveBeenCalledWith(true);
+  expect(handlers.onCompactRowsChange).not.toHaveBeenCalled();
+  expect(handlers.onCursorLaneVisibleChange).not.toHaveBeenCalled();
 });

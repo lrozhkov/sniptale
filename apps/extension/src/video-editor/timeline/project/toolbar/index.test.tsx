@@ -74,6 +74,7 @@ function createToolbarProps(): ProjectTimelineToolbarTestProps {
     },
     canAutoTransformRecording: true,
     canAddMotionRegion: true,
+    hasMotionRegions: false,
     canEditSelectedClip: true,
     canSplitSelectedClip: true,
     fitSelectionDuration: 8,
@@ -88,17 +89,6 @@ function createToolbarProps(): ProjectTimelineToolbarTestProps {
     onZoomChange: vi.fn(),
     pixelsPerSecond: 120,
     selectedClip: true,
-    trackView: {
-      compactRows: false,
-      cursorLaneVisible: false,
-      telemetryLaneVisible: false,
-      canShowCursorLane: true,
-      canShowTelemetryLane: true,
-      onCompactRowsChange: vi.fn(),
-      onCursorLaneVisibleChange: vi.fn(),
-      onTelemetryLaneVisibleChange: vi.fn(),
-    },
-    visibleRangeSeconds: 8,
   };
 }
 

@@ -33,7 +33,6 @@ type ProjectTimelineSurfaceProps = Pick<
   | 'project'
   | 'recordingTelemetry'
   | 'selectedClip'
-  | 'visibleRangeSeconds'
 > & {
   children: React.ReactNode;
   panelPrefs: ReturnType<typeof useProjectTimelinePanelPrefs>;
@@ -41,6 +40,7 @@ type ProjectTimelineSurfaceProps = Pick<
 
 export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
   const motionLane = getVideoProjectUtilityLanes(props.project).camera;
+  const hasMotionRegions = (props.project.motionRegions?.length ?? 0) > 0;
   return (
     <FloatingChromePanel
       dataUi="video-editor.timeline.surface"
@@ -62,24 +62,17 @@ export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
           onStepToPreviousFrame: props.onStepToPreviousFrame,
           duration: props.project.duration,
         }}
-        canAddMotionRegion={props.project.duration > 0 && motionLane.visible && !motionLane.locked}
+        hasMotionRegions={hasMotionRegions}
+        canAddMotionRegion={
+          props.project.duration > 0 &&
+          (!hasMotionRegions || (motionLane.visible && !motionLane.locked))
+        }
         canEditSelectedClip={props.canEditSelectedClip}
         canSplitSelectedClip={props.canSplitSelectedClip}
         fitSelectionDuration={props.fitSelectionDuration}
         insertion={props.insertion}
         pixelsPerSecond={props.pixelsPerSecond}
         selectedClip={Boolean(props.selectedClip)}
-        trackView={{
-          compactRows: props.panelPrefs.prefs.compactRows,
-          cursorLaneVisible: props.panelPrefs.prefs.collapsedCursorLaneVisible,
-          telemetryLaneVisible: props.panelPrefs.prefs.collapsedTelemetryLaneVisible,
-          canShowCursorLane: props.project.cursorTrack !== null,
-          canShowTelemetryLane: props.recordingTelemetry !== null,
-          onCompactRowsChange: props.panelPrefs.setCompactRows,
-          onCursorLaneVisibleChange: props.panelPrefs.setCollapsedCursorLaneVisible,
-          onTelemetryLaneVisibleChange: props.panelPrefs.setCollapsedTelemetryLaneVisible,
-        }}
-        visibleRangeSeconds={props.visibleRangeSeconds}
         canAutoTransformRecording={isRecordingTelemetryEligibleForAutoProcessing(
           props.project,
           props.recordingTelemetry

@@ -12,20 +12,6 @@ export function formatTimelineRulerLabel(value: number): string {
   return formatTime(Math.max(0, Math.floor(value)));
 }
 
-export function formatTimelineVisibleRange(seconds: number): string {
-  if (seconds >= 60) {
-    const minutes = Math.floor(seconds / 60);
-    const remainderSeconds = Math.round(seconds % 60);
-    if (remainderSeconds === 0) {
-      return `${minutes} мин`;
-    }
-
-    return `${minutes} мин ${remainderSeconds} с`;
-  }
-
-  return `${Math.max(1, Math.round(seconds))} с`;
-}
-
 export function getTrackKindLabel(kind: string): string {
   switch (kind) {
     case 'PRIMARY':

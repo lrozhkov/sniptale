@@ -25,7 +25,9 @@ export function TimelineIconButton(props: {
       }}
       className={TIMELINE_ICON_BUTTON_CLASS_NAME}
       data-ui={props.dataUi ?? 'video-editor.timeline.icon-button'}
-      {...(props.active === undefined ? {} : { active: props.active })}
+      {...(props.active === undefined
+        ? {}
+        : { active: props.active, 'aria-pressed': props.active })}
       {...(props.danger === undefined ? {} : { danger: props.danger })}
       {...(props.disabled === undefined ? {} : { disabled: props.disabled })}
     >

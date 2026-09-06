@@ -13,12 +13,11 @@ export function buildTimelineMotionSegments(project: VideoProject) {
   return buildVideoCompositionMotionSegmentsFromRegions(project.motionRegions ?? []);
 }
 
-/** Keep authored data and non-default lane controls reachable, even after clearing or trimming. */
+/** Zoom rows follow authored regions; action controls remain reachable when configured. */
 export function getTimelineUtilityRowPresence(project: VideoProject) {
   const lanes = getVideoProjectUtilityLanes(project);
   return {
     actions: project.actionEvents.length > 0 || !lanes.actions.visible || lanes.actions.locked,
-    motion:
-      (project.motionRegions?.length ?? 0) > 0 || !lanes.camera.visible || lanes.camera.locked,
+    motion: (project.motionRegions?.length ?? 0) > 0,
   };
 }

@@ -62,7 +62,6 @@ function renderSurface(
       project={project}
       recordingTelemetry={recordingTelemetry}
       selectedClip={null}
-      visibleRangeSeconds={10}
     >
       <div>Timeline</div>
     </ProjectTimelineSurface>

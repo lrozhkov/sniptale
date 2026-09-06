@@ -1,3 +1,4 @@
+import { getVideoProjectUtilityLanes } from '../../../features/video/project/utility-lanes';
 import { createVideoProjectMotionRegion } from '../../../features/video/project/motion';
 import { createVideoProjectCursorTrack } from '../../../features/video/project/defaults';
 import { syncProjectSceneBackground } from '../../../features/video/project/scene/background';
@@ -221,20 +222,7 @@ function createCursorTrackUpdaters(store: CursorUpdaterStore) {
 
 function createMotionRegionUpdaters(store: WorkspaceProjectUpdaterStore) {
   return {
-    addMotionRegion(startTime?: number) {
-      store.updateProject((project) => {
-        const region = createVideoProjectMotionRegion(project, startTime ?? store.getCurrentTime());
-
-        queueMicrotask(() => {
-          store.selectMotionRegion(region.id);
-        });
-
-        return {
-          ...project,
-          motionRegions: [...(project.motionRegions ?? []), region],
-        };
-      });
-    },
+    addMotionRegion: createMotionRegionAdder(store),
     deleteMotionRegion(motionRegionId: string) {
       store.deleteMotionRegion(motionRegionId);
     },
@@ -264,6 +252,14 @@ function createMotionRegionAdder(store: PreviewProjectUpdaterStore) {
       return {
         ...project,
         motionRegions: [...(project.motionRegions ?? []), region],
+        ...((project.motionRegions?.length ?? 0) === 0
+          ? {
+              utilityLanes: {
+                ...getVideoProjectUtilityLanes(project),
+                camera: { visible: true, locked: false },
+              },
+            }
+          : {}),
       };
     });
   };

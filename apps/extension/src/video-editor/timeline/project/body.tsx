@@ -90,6 +90,7 @@ function ProjectTimelineBodyCanvas(props: ProjectTimelineBodyProps) {
 
 function createTrackListProps(props: ProjectTimelineBodyProps): ProjectTimelineBodyTrackListProps {
   return {
+    canShowTelemetryLane: props.recordingTelemetry !== null,
     cursorLaneVisible: props.cursorLaneVisible,
     project: props.project,
     selectedTrackId: props.selectedTrackId,

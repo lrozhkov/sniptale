@@ -148,8 +148,8 @@ export const videoEditorTimelineMessages = defineMessageSource({
     en: 'Select a clip on the timeline to split, duplicate, or delete it.',
   },
   zoom: {
-    ru: 'Масштаб таймлайна',
-    en: 'Timeline zoom',
+    ru: 'Масштаб',
+    en: 'Zoom',
   },
   fitProject: {
     ru: 'Вместить проект',

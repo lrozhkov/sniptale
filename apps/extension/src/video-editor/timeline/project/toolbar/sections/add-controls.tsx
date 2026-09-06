@@ -5,7 +5,7 @@ import {
   resolveThemeSafePortalTarget,
   useResolvedPortalTheme,
 } from '@sniptale/ui/theme/safe-portal';
-import { ChevronDown, Music, Plus, StickyNote, Video, ZoomIn } from 'lucide-react';
+import { Music, Plus, StickyNote, Video, ZoomIn } from 'lucide-react';
 import { translate } from '../../../../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
@@ -71,14 +71,13 @@ export function ProjectTimelineAddTrackControl(props: {
         ref={trackChoices.triggerRef}
         type="button"
         onClick={trackChoices.toggle}
-        className={toolbarButtonClassName}
+        className="!h-6 !w-6 !min-w-6 !p-0"
         title={translate('videoEditor.timeline.addTrack')}
         aria-expanded={trackChoices.visible}
         dataUi="video-editor.timeline.toolbar.add-track"
       >
         <Plus size={14} strokeWidth={2} />
         <span className="sr-only">{translate('videoEditor.timeline.addTrack')}</span>
-        <ChevronDown size={12} strokeWidth={2.2} />
       </ContentToolbarButton>
       {trackChoices.visible
         ? createPortal(

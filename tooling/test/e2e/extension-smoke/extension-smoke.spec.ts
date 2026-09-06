@@ -499,7 +499,7 @@ test('background service worker boots', async ({ context, extensionId }) => {
   await page.close();
 });
 
-test('video editor focused timeline reveals contextual clip actions', async ({
+test('video editor keeps clip actions stable and disables them without an editable selection', async ({
   page,
   hostOrigin,
 }, testInfo) => {
@@ -529,7 +529,15 @@ test('video editor focused timeline reveals contextual clip actions', async ({
   await expect(page.getByText('Titles', { exact: true })).toBeVisible();
   await expect(timelineClip).toBeVisible();
   await sceneButton.click();
-  await expect(timeline.getByText(translate('videoEditor.timeline.split', 'ru'))).toHaveCount(0);
+  const idleSplit = timeline.getByRole('button', {
+    name: translate('videoEditor.timeline.split', 'ru'),
+  });
+  await expect(idleSplit).toBeVisible();
+  await expect(idleSplit).toBeDisabled();
+  await expect(
+    timeline.getByRole('button', { name: translate('videoEditor.timeline.duplicate', 'ru') })
+  ).toBeDisabled();
+  const idleCounter = (await timeline.locator('[data-playback-counter]').boundingBox())!;
 
   await timelineClip.click();
 
@@ -537,6 +545,10 @@ test('video editor focused timeline reveals contextual clip actions', async ({
     name: translate('videoEditor.timeline.split', 'ru'),
   });
   await expect(splitButton).toBeVisible();
+  expect((await timeline.locator('[data-playback-counter]').boundingBox())!.x).toBeCloseTo(
+    idleCounter.x,
+    0
+  );
   await expect(splitButton).toBeDisabled();
   await expect(splitButton).toHaveAttribute(
     'title',

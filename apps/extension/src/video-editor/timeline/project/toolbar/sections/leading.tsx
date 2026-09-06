@@ -57,6 +57,7 @@ function ProjectTimelineAutoTransformButton(props: {
 export function ProjectTimelineToolbarLeadingControls({
   canAutoTransformRecording,
   canAddMotionRegion,
+  hasMotionRegions,
   canEditSelectedClip,
   canSplitSelectedClip,
   insertion,
@@ -69,6 +70,7 @@ export function ProjectTimelineToolbarLeadingControls({
   ProjectTimelineToolbarProps,
   | 'canAutoTransformRecording'
   | 'canAddMotionRegion'
+  | 'hasMotionRegions'
   | 'canEditSelectedClip'
   | 'canSplitSelectedClip'
   | 'insertion'
@@ -80,7 +82,9 @@ export function ProjectTimelineToolbarLeadingControls({
 >) {
   return (
     <div className="flex min-w-0 flex-nowrap items-center gap-1">
-      <ProjectTimelineAddControls insertion={insertion} canAddMotionRegion={canAddMotionRegion} />
+      {!hasMotionRegions && (
+        <ProjectTimelineAddControls insertion={insertion} canAddMotionRegion={canAddMotionRegion} />
+      )}
       {canAutoTransformRecording && onAutoTransformRecording ? (
         <ProjectTimelineAutoTransformButton onAutoTransformRecording={onAutoTransformRecording} />
       ) : null}
@@ -90,16 +94,14 @@ export function ProjectTimelineToolbarLeadingControls({
           'border-[color:var(--sniptale-color-border-soft)] pl-1',
         ].join(' ')}
       >
-        {selectedClip ? (
-          <ProjectTimelineClipActions
-            canEditSelectedClip={canEditSelectedClip}
-            canSplitSelectedClip={canSplitSelectedClip}
-            selectedClip
-            onDeleteSelectedClip={onDeleteSelectedClip}
-            onDuplicateSelectedClip={onDuplicateSelectedClip}
-            onSplitSelectedClip={onSplitSelectedClip}
-          />
-        ) : null}
+        <ProjectTimelineClipActions
+          canEditSelectedClip={canEditSelectedClip}
+          canSplitSelectedClip={canSplitSelectedClip}
+          selectedClip={selectedClip}
+          onDeleteSelectedClip={onDeleteSelectedClip}
+          onDuplicateSelectedClip={onDuplicateSelectedClip}
+          onSplitSelectedClip={onSplitSelectedClip}
+        />
       </div>
     </div>
   );

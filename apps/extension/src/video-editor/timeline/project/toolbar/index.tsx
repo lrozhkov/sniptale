@@ -12,8 +12,6 @@ type ToolbarTrailingControlsInput = Pick<
   ProjectTimelineToolbarProps,
   | 'fitSelectionDuration'
   | 'pixelsPerSecond'
-  | 'trackView'
-  | 'visibleRangeSeconds'
   | 'onFitProject'
   | 'onFitSelection'
   | 'onTimelinePreviewSuspendedChange'
@@ -22,6 +20,7 @@ type ToolbarTrailingControlsInput = Pick<
 
 function createToolbarLeadingControlsProps({
   canAddMotionRegion,
+  hasMotionRegions,
   canEditSelectedClip,
   insertion,
   canSplitSelectedClip,
@@ -34,6 +33,7 @@ function createToolbarLeadingControlsProps({
 }: Pick<
   ProjectTimelineToolbarProps,
   | 'canAddMotionRegion'
+  | 'hasMotionRegions'
   | 'canEditSelectedClip'
   | 'insertion'
   | 'canSplitSelectedClip'
@@ -46,6 +46,7 @@ function createToolbarLeadingControlsProps({
 >) {
   return {
     canAddMotionRegion,
+    hasMotionRegions,
     canEditSelectedClip,
     insertion,
     canSplitSelectedClip,
@@ -61,8 +62,6 @@ function createToolbarLeadingControlsProps({
 function createToolbarTrailingControlsProps({
   fitSelectionDuration,
   pixelsPerSecond,
-  trackView,
-  visibleRangeSeconds,
   onFitProject,
   onFitSelection,
   onTimelinePreviewSuspendedChange,
@@ -71,8 +70,6 @@ function createToolbarTrailingControlsProps({
   return {
     fitSelectionDuration,
     pixelsPerSecond,
-    trackView,
-    visibleRangeSeconds,
     onFitProject,
     onFitSelection,
     onTimelinePreviewSuspendedChange,
@@ -86,7 +83,7 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
     <div
       data-ui="video-editor.timeline.toolbar"
       className={[
-        'flex items-center justify-between gap-2 border-b',
+        'grid grid-cols-[minmax(max-content,1fr)_auto_minmax(max-content,1fr)] items-center gap-2 border-b',
         'border-[color:var(--sniptale-color-border-soft)] px-3 py-2',
         '@max-[1000px]/timeline:px-2 @max-[1000px]/timeline:py-1',
         '[--timeline-control-height:36px] [--timeline-control-width:36px] [--timeline-control-gap:6px]',

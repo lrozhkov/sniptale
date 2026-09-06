@@ -233,9 +233,11 @@ function renderTrackList(
     onAddMotionRegion?: () => void;
   }
 ) {
+  const trackPanelPrefs = createTrackPanelPrefs({ compactRows: options.compactRows ?? false });
   act(() => {
     root?.render(
       <ProjectTimelineTrackList
+        canShowTelemetryLane={options.showTelemetryLane}
         cursorLaneVisible={options.cursorLaneVisible ?? true}
         project={project}
         selectedTrackId={project.tracks[0]?.id ?? null}
@@ -246,9 +248,7 @@ function renderTrackList(
           tracks: project.tracks,
         })}
         trackListRef={{ current: null }}
-        trackPanelPrefs={createTrackPanelPrefs({
-          compactRows: options.compactRows ?? false,
-        })}
+        trackPanelPrefs={trackPanelPrefs}
         tracks={project.tracks}
         onAddTrack={vi.fn()}
         onAddMotionRegion={options.onAddMotionRegion ?? vi.fn()}
@@ -262,6 +262,7 @@ function renderTrackList(
       />
     );
   });
+  return trackPanelPrefs;
 }
 
 function createTrackPanelPrefs(options: { compactRows: boolean }) {
@@ -289,3 +290,26 @@ function createEffectInstance() {
     target: { kind: 'scene' as const },
   };
 }
+
+it('routes compact rows and action history from the track header and disables unavailable cursor', () => {
+  const project = createEmptyVideoProject('Tracks');
+  const prefs = renderTrackList(project, { showTelemetryLane: true });
+  const header = container!.querySelector(
+    '[data-ui="video-editor.timeline.track-header-controls"]'
+  )!;
+  const button = (id: string) =>
+    header.querySelector<HTMLButtonElement>(`[data-ui="video-editor.timeline.toolbar.${id}"]`)!;
+  expect(button('compact-tracks').getAttribute('aria-pressed')).toBe('false');
+  expect(button('cursor-lane').disabled).toBe(true);
+  expect(button('cursor-lane').getAttribute('aria-pressed')).toBe('false');
+  act(() => {
+    button('compact-tracks').click();
+    button('telemetry-lane').click();
+    button('cursor-lane').click();
+  });
+  expect(prefs.setCompactRows).toHaveBeenCalledWith(true);
+  expect(prefs.setCollapsedTelemetryLaneVisible).toHaveBeenCalledWith(
+    !prefs.prefs.collapsedTelemetryLaneVisible
+  );
+  expect(prefs.setCollapsedCursorLaneVisible).not.toHaveBeenCalled();
+});

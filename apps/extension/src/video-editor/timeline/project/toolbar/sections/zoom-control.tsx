@@ -2,7 +2,6 @@ import { Minus, Plus } from 'lucide-react';
 
 import { translate } from '../../../../../platform/i18n';
 import { CompactRange } from '../../../../../ui/compact-inspector-controls';
-import { formatTimelineVisibleRange } from '../../interaction-state/helpers';
 import {
   mapTimelinePixelsPerSecondToSliderValue,
   mapTimelineZoomSliderToPixelsPerSecond,
@@ -22,30 +21,27 @@ function TimelineZoomIcon({ direction }: { direction: 'in' | 'out' }) {
 export function ProjectTimelineZoomControl({
   onPreviewSuspendedChange,
   pixelsPerSecond,
-  visibleRangeSeconds,
   onZoomChange,
 }: Pick<ProjectTimelineToolbarProps, 'pixelsPerSecond' | 'onZoomChange'> & {
   onPreviewSuspendedChange: (suspended: boolean) => void;
-  visibleRangeSeconds: number;
 }) {
-  const visibleRangeSummary = formatTimelineVisibleRange(visibleRangeSeconds);
   const commitZoomValue = (value: number) => {
     onZoomChange(mapTimelineZoomSliderToPixelsPerSecond(value));
     onPreviewSuspendedChange(false);
   };
 
   return (
-    <div className="flex min-w-0 items-center gap-1 px-1 text-[var(--sniptale-color-text-secondary)]">
+    <div className="flex shrink-0 items-center gap-1 px-1 text-[var(--sniptale-color-text-secondary)]">
       <span
         className={[
-          '@max-[1360px]/timeline:hidden whitespace-nowrap text-[12px] font-medium',
+          'whitespace-nowrap text-[12px] font-medium',
           'text-[var(--sniptale-color-text-muted)]',
         ].join(' ')}
       >
         {translate('videoEditor.timeline.zoom')}
       </span>
       <TimelineZoomIcon direction="out" />
-      <span className="flex w-28 shrink-0 @max-[900px]/timeline:w-14">
+      <span className="flex w-24 shrink-0 @max-[1000px]/timeline:w-14">
         <CompactRange
           aria-label={translate('videoEditor.timeline.zoom')}
           className="w-full"
@@ -64,14 +60,6 @@ export function ProjectTimelineZoomControl({
         />
       </span>
       <TimelineZoomIcon direction="in" />
-      <span
-        className={[
-          '@max-[1360px]/timeline:hidden min-w-[3rem] text-right text-[12px] font-medium',
-          'text-[var(--sniptale-color-text-primary)]',
-        ].join(' ')}
-      >
-        {visibleRangeSummary}
-      </span>
     </div>
   );
 }

@@ -6,23 +6,13 @@ import type { VideoAutoProcessingSettings } from '@sniptale/runtime-contracts/vi
 export interface ProjectTimelineToolbarProps {
   playback: ComponentProps<typeof ProjectTimelinePlaybackSummary>;
   canAddMotionRegion: boolean;
+  hasMotionRegions: boolean;
   canEditSelectedClip: boolean;
   canSplitSelectedClip: boolean;
   fitSelectionDuration: number | null;
   insertion: ProjectTimelineInsertionActions;
   pixelsPerSecond: number;
   selectedClip: boolean;
-  trackView: {
-    compactRows: boolean;
-    cursorLaneVisible: boolean;
-    telemetryLaneVisible: boolean;
-    canShowCursorLane: boolean;
-    canShowTelemetryLane: boolean;
-    onCompactRowsChange: (compactRows: boolean) => void;
-    onCursorLaneVisibleChange: (visible: boolean) => void;
-    onTelemetryLaneVisibleChange: (visible: boolean) => void;
-  };
-  visibleRangeSeconds: number;
   canAutoTransformRecording?: boolean;
   onFitProject: () => void;
   onFitSelection: () => void;
