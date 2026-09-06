@@ -60,6 +60,13 @@ async function expectAdaptivePaneDefaults(page: Page): Promise<void> {
       inspectorWidth
     );
     await expectTimelineToolbarControls(page);
+    const docks = [
+      page.locator('[data-ui="video-editor.materials.dock-toggle"]'),
+      page.locator('[data-ui="video-editor.inspector.dock-toggle"]'),
+    ];
+    for (const dock of docks) await dock.click();
+    await expectTimelineToolbarControls(page);
+    for (const dock of docks) await dock.click();
   }
   await page.setViewportSize(originalViewport);
 }
@@ -86,6 +93,21 @@ async function expectTimelineToolbarControls(page: Page): Promise<void> {
   const toolbar = page.locator('[data-ui="video-editor.timeline.toolbar"]');
   await expect(toolbar.locator('[data-playback-counter]')).toHaveCount(1);
   await expect(page.locator('[data-ui="video-editor.viewer.transport"]')).toHaveCount(0);
+  const width = (await toolbar.boundingBox())!.width;
+  if (width >= 1000) {
+    const minimum = width >= 1400 ? 36 : 32;
+    const buttons = toolbar.locator('button:visible');
+    for (const button of await buttons.all()) {
+      if ((await button.evaluate((node) => getComputedStyle(node).visibility)) === 'hidden')
+        continue;
+      const box = (await button.boundingBox())!;
+      expect(
+        box.height,
+        (await button.getAttribute('title')) ?? 'toolbar button'
+      ).toBeGreaterThanOrEqual(minimum);
+      expect(box.width).toBeGreaterThanOrEqual(minimum);
+    }
+  }
   const controls = await toolbar.evaluate((node) => {
     const bounds = node.getBoundingClientRect();
     return [...node.querySelectorAll<HTMLElement>('button, input')]

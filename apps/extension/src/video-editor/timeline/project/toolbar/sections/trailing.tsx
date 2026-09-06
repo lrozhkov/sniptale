@@ -25,7 +25,11 @@ export function ProjectTimelineToolbarTrailingActions({
   | 'onZoomChange'
 >) {
   return (
-    <div className={['flex min-w-0 flex-nowrap items-center justify-end gap-1'].join(' ')}>
+    <div
+      className={[
+        'flex min-w-0 flex-nowrap items-center justify-end gap-[var(--timeline-control-gap)]',
+      ].join(' ')}
+    >
       <ProjectTimelineTrackViewControls trackView={trackView} />
       <ProjectTimelineFitControls
         fitSelectionDuration={fitSelectionDuration}
@@ -46,7 +50,7 @@ function ProjectTimelineTrackViewControls({
   trackView,
 }: Pick<ProjectTimelineToolbarProps, 'trackView'>) {
   return (
-    <div className="flex h-7 items-center gap-1">
+    <div className="flex items-center gap-[var(--timeline-control-gap)]">
       <TimelineIconButton
         active={trackView.compactRows}
         dataUi="video-editor.timeline.toolbar.compact-tracks"
@@ -80,7 +84,7 @@ function ProjectTimelineFitControls({
   onFitSelection,
 }: Pick<ProjectTimelineToolbarProps, 'fitSelectionDuration' | 'onFitProject' | 'onFitSelection'>) {
   return (
-    <div className="flex h-7 items-center gap-1">
+    <div className="flex items-center gap-[var(--timeline-control-gap)]">
       <TimelineIconButton
         dataUi="video-editor.timeline.toolbar.fit-project"
         icon={<Maximize2 size={13} strokeWidth={2.2} />}

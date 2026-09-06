@@ -86,7 +86,7 @@ export function ProjectTimelineToolbarLeadingControls({
       ) : null}
       <div
         className={[
-          'flex h-7 shrink-0 items-center gap-0.5 border-l',
+          'flex shrink-0 items-center gap-[var(--timeline-control-gap)] border-l',
           'border-[color:var(--sniptale-color-border-soft)] pl-1',
         ].join(' ')}
       >

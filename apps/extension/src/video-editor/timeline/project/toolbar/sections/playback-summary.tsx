@@ -132,12 +132,18 @@ function PlaybackSummaryMeta(props: {
       <p
         data-playback-counter="true"
         className={[
-          'min-w-[96px] text-[11px] font-semibold tabular-nums',
+          'min-w-[96px] text-[13px] font-semibold tabular-nums',
+          '@max-[1400px]/timeline:text-[12px] @max-[1000px]/timeline:text-[11px]',
           'text-[var(--sniptale-color-text-primary)]',
         ].join(' ')}
       >
         {loopRange ? (
-          <span className="block whitespace-nowrap text-[10px] leading-3 text-[var(--sniptale-color-accent-emphasis)]">
+          <span
+            className={[
+              'block whitespace-nowrap text-[11px] @max-[1000px]/timeline:text-[10px] leading-3',
+              'text-[var(--sniptale-color-accent-emphasis)]',
+            ].join(' ')}
+          >
             {loopRange}
           </span>
         ) : null}
@@ -174,7 +180,7 @@ export function ProjectTimelinePlaybackSummary({
   onTogglePlay: () => void;
 }) {
   return (
-    <div className="flex shrink-0 flex-nowrap items-center justify-center gap-0.5">
+    <div className="flex shrink-0 flex-nowrap items-center justify-center gap-[var(--timeline-control-gap)]">
       <PlaybackSeekToStartButton onSeekToStart={onSeekToStart} />
       <PlaybackFrameStepButton direction="previous" onStep={onStepToPreviousFrame} />
       <PlaybackToggleButton isPlaying={isPlaying} onTogglePlay={onTogglePlay} />

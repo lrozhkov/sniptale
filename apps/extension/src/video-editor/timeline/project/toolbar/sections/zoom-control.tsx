@@ -35,10 +35,10 @@ export function ProjectTimelineZoomControl({
   };
 
   return (
-    <div className="flex h-7 min-w-0 items-center gap-1 px-1 text-[var(--sniptale-color-text-secondary)]">
+    <div className="flex min-w-0 items-center gap-1 px-1 text-[var(--sniptale-color-text-secondary)]">
       <span
         className={[
-          '@max-[1360px]/timeline:hidden whitespace-nowrap text-[11px] font-medium',
+          '@max-[1360px]/timeline:hidden whitespace-nowrap text-[12px] font-medium',
           'text-[var(--sniptale-color-text-muted)]',
         ].join(' ')}
       >
@@ -66,7 +66,7 @@ export function ProjectTimelineZoomControl({
       <TimelineZoomIcon direction="in" />
       <span
         className={[
-          '@max-[1360px]/timeline:hidden min-w-[3rem] text-right text-[11px] font-medium',
+          '@max-[1360px]/timeline:hidden min-w-[3rem] text-right text-[12px] font-medium',
           'text-[var(--sniptale-color-text-primary)]',
         ].join(' ')}
       >
