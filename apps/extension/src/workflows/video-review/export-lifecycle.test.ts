@@ -128,6 +128,37 @@ it('prepares a temporary download without publishing and releases it only when t
   expect(writer.abort).toHaveBeenCalledOnce();
 });
 
+it('downloads only the selected kept fragment without mutating history or publishing a gallery row', async () => {
+  const { args, deps, writer } = fixture();
+  const before = structuredClone(args.snapshot);
+  const exported = await exportReviewedVideo(
+    { ...args, destination: 'download', selection: { kind: 'range', start: 0.1, end: 2.1 } },
+    deps
+  );
+  expect(exported.receipt.filename).toBe('clip-fragment-0.000-2.000.webm');
+  expect(deps.writeReviewPackets).toHaveBeenCalledWith(
+    expect.objectContaining({ edits: [expect.objectContaining({ kind: 'cut', start: 2, end: 6 })] })
+  );
+  expect(args.snapshot).toEqual(before);
+  expect(deps.saveRecordingsBatchSafely).not.toHaveBeenCalled();
+  await exported.release?.();
+  expect(writer.abort).toHaveBeenCalledOnce();
+});
+
+it('rejects a removed fragment or gallery destination before allocating storage', async () => {
+  const { args, deps } = fixture();
+  await expect(
+    exportReviewedVideo(
+      { ...args, destination: 'download', selection: { kind: 'range', start: 2, end: 4 } },
+      deps
+    )
+  ).rejects.toThrow('nonempty fragment');
+  await expect(
+    exportReviewedVideo({ ...args, selection: { kind: 'range', start: 0, end: 2 } }, deps)
+  ).rejects.toThrow('temporary download');
+  expect(deps.createSeekableAssetObjectWriter).not.toHaveBeenCalled();
+});
+
 it('rejects unsupported speed audio before allocating any temporary or published asset', async () => {
   const { args, deps } = fixture();
   args.snapshot.workspace.history[0]!.after = {

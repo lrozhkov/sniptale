@@ -63,6 +63,6 @@ export const videoEditorTimelineAutoTransformMessages = defineMessageSource({
   },
   autoTransformUnavailable: {
     ru: 'Телеметрия записи недоступна для автообработки',
-    en: 'Recording telemetry is unavailable for auto transform',
+    en: 'Recording action history is unavailable for auto transform',
   },
 });

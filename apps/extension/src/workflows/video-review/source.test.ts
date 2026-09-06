@@ -56,6 +56,7 @@ vi.mock('mediabunny', () => ({
   },
 }));
 import { loadVideoReviewSource } from './source';
+import { projectReviewTelemetry } from '../../features/video/review/telemetry';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -80,6 +81,37 @@ it('binds the decoded oriented source to the immutable file identity before open
   expect(result.source).toMatchObject({ duration: 12, width: 360, height: 640, size: 5 });
   expect(mocks.open).toHaveBeenCalledWith('recording:r', result.source, 'immutable-file');
   expect(mocks.dispose).toHaveBeenCalledOnce();
+});
+
+it('loads saved action history using the recording identity and exposes its source-time markers', async () => {
+  const telemetry = {
+    recordingId: 'r',
+    captureMode: 'TAB',
+    createdAt: 1,
+    updatedAt: 1,
+    viewport: null,
+    cursorTrack: null,
+    signals: [],
+    actionEvents: [
+      {
+        id: 'click',
+        kind: 'CLICK' as const,
+        time: 2,
+        duration: 0.2,
+        point: { x: 50, y: 60 },
+        label: '',
+        data: {},
+        preset: 'NONE' as const,
+      },
+    ],
+  };
+  mocks.telemetry.mockResolvedValueOnce(telemetry);
+  const result = await loadVideoReviewSource('recording:r', new AbortController().signal);
+  expect(mocks.telemetry).toHaveBeenCalledWith('r');
+  expect(result.telemetry).toEqual(telemetry);
+  expect(projectReviewTelemetry(result.telemetry!, result.source.duration).markers).toEqual([
+    { ref: { kind: 'action', id: 'click' }, eventType: 'CLICK', start: 2, end: 2.2 },
+  ]);
 });
 
 it('aborts loading without creating a session and releases the parser', async () => {

@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { installBackgroundRuntimeMessagingMock } from '../../../../routing-contracts/runtime-messaging/mock';
 
 const {
   getVideoRecordingTabIdMock,
+  getVideoRecordingRuntimeStateMock,
   isControlledCursorCaptureEnabledMock,
   resetVideoRecordingRuntimeStateMock,
   setVideoRecordingRuntimeStateMock,
@@ -19,6 +21,7 @@ const {
   runBestEffortMock,
 } = vi.hoisted(() => ({
   getVideoRecordingTabIdMock: vi.fn(),
+  getVideoRecordingRuntimeStateMock: vi.fn(),
   isControlledCursorCaptureEnabledMock: vi.fn(),
   resetVideoRecordingRuntimeStateMock: vi.fn(),
   setVideoRecordingRuntimeStateMock: vi.fn(),
@@ -60,6 +63,7 @@ vi.mock('../../../../../platform/runtime-messaging', async (importOriginal) => (
 
 vi.mock('../session-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../session-state')>()),
+  getVideoRecordingRuntimeState: getVideoRecordingRuntimeStateMock,
   resetVideoRecordingRuntimeState: resetVideoRecordingRuntimeStateMock,
   setVideoRecordingRuntimeState: setVideoRecordingRuntimeStateMock,
 }));
@@ -86,6 +90,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   getVideoRecordingTabIdMock.mockReturnValue(7);
   getVideoRecordingIdMock.mockReturnValue('recording-1');
+  getVideoRecordingRuntimeStateMock.mockReturnValue({ captureMode: CaptureMode.SCREEN });
   isControlledCursorCaptureEnabledMock.mockReturnValue(false);
   sendRuntimeMessageMock.mockResolvedValue(undefined);
   sendTabMessageMock.mockResolvedValue(undefined);
@@ -112,6 +117,27 @@ beforeEach(() => {
     }
   );
 });
+
+it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
+  'retires ordinary %s collection after activation failure before resetting authority',
+  async (captureMode) => {
+    getVideoRecordingRuntimeStateMock.mockReturnValue({ captureMode });
+    let collecting = true;
+    sendTabMessageMock.mockImplementation(async (_tabId, message) => {
+      if (message.type === VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE) collecting = false;
+    });
+    await notifyRecordingStartFailed('activation persistence failed', {
+      recordingId: 'recording-1',
+    });
+    expect(collecting).toBe(false);
+    expect(sendTabMessageMock).toHaveBeenNthCalledWith(1, 7, {
+      type: VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE,
+    });
+    expect(sendTabMessageMock.mock.invocationCallOrder[0]).toBeLessThan(
+      resetVideoRecordingStartSessionMock.mock.invocationCallOrder[0]!
+    );
+  }
+);
 
 async function flushPromises(): Promise<void> {
   await Promise.resolve();
@@ -208,10 +234,14 @@ async function verifyNoRecordingTabReset(): Promise<void> {
 }
 
 it('preserves recording authority when the capture surface cannot be restored', async () => {
+  getVideoRecordingRuntimeStateMock.mockReturnValue({ captureMode: CaptureMode.TAB });
   releaseVideoCaptureSurfaceMock.mockRejectedValueOnce(new Error('restore-conflict'));
 
   await expect(notifyRecordingStartFailed('permission denied')).rejects.toThrow('restore-conflict');
 
+  expect(sendTabMessageMock).toHaveBeenCalledWith(7, {
+    type: VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE,
+  });
   expect(setVideoRecordingIdMock).not.toHaveBeenCalled();
   expect(resetVideoRecordingStartSessionMock).not.toHaveBeenCalled();
   expect(resetVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
@@ -219,8 +249,12 @@ it('preserves recording authority when the capture surface cannot be restored', 
 });
 
 it('reports a cleanup failure without releasing durable session authority', async () => {
+  getVideoRecordingRuntimeStateMock.mockReturnValue({ captureMode: CaptureMode.TAB });
   await notifyRecordingStartFailed('offscreen unavailable', { retainAuthority: true });
 
+  expect(sendTabMessageMock).toHaveBeenCalledWith(7, {
+    type: VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE,
+  });
   expect(releaseVideoCaptureSurfaceMock).not.toHaveBeenCalled();
   expect(setVideoRecordingIdMock).not.toHaveBeenCalled();
   expect(resetVideoRecordingStartSessionMock).not.toHaveBeenCalled();
@@ -232,6 +266,7 @@ it('reports a cleanup failure without releasing durable session authority', asyn
 });
 
 it('does not let delayed start-failure cleanup for A reset current recording B', async () => {
+  getVideoRecordingRuntimeStateMock.mockReturnValue({ captureMode: CaptureMode.TAB });
   let resolveRelease!: () => void;
   releaseVideoCaptureSurfaceMock.mockReturnValueOnce(
     new Promise<void>((resolve) => {
@@ -245,6 +280,10 @@ it('does not let delayed start-failure cleanup for A reset current recording B',
   await vi.waitFor(() =>
     expect(releaseVideoCaptureSurfaceMock).toHaveBeenCalledWith('recording-1')
   );
+  expect(sendTabMessageMock).toHaveBeenCalledOnce();
+  expect(sendTabMessageMock).toHaveBeenCalledWith(7, {
+    type: VideoMessageType.DISABLE_CONTROLLED_CURSOR_CAPTURE,
+  });
   getVideoRecordingIdMock.mockReturnValue('recording-2');
   resolveRelease();
   await cleanupA;
@@ -252,6 +291,13 @@ it('does not let delayed start-failure cleanup for A reset current recording B',
   expect(setVideoRecordingIdMock).not.toHaveBeenCalled();
   expect(resetVideoRecordingStartSessionMock).not.toHaveBeenCalled();
   expect(resetVideoRecordingRuntimeStateMock).not.toHaveBeenCalled();
-  expect(sendTabMessageMock).not.toHaveBeenCalled();
+  expect(sendTabMessageMock).toHaveBeenCalledOnce();
   expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
+});
+
+it('ignores an already stale failure before disabling current collection', async () => {
+  getVideoRecordingRuntimeStateMock.mockReturnValue({ captureMode: CaptureMode.TAB });
+  await notifyRecordingStartFailed('old failure', { recordingId: 'old-recording' });
+  expect(sendTabMessageMock).not.toHaveBeenCalled();
+  expect(releaseVideoCaptureSurfaceMock).not.toHaveBeenCalled();
 });

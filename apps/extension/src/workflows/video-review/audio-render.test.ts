@@ -242,6 +242,28 @@ it('bounds accelerated windows and emits a short final chunk without a whole-sou
   }
 });
 
+it.each([0.0625, 0.125, 8, 16])('bounds source and output buffers at rate %s', async (rate) => {
+  const fixture = await audioFixture();
+  try {
+    let frames = 0;
+    for await (const sample of renderReviewAudio(
+      fixture.track,
+      { sourceStart: 0, sourceEnd: 2, resultStart: 0, resultEnd: 2 / rate, rate, kind: 'speed' },
+      false,
+      new AbortController().signal
+    )) {
+      expect(sample.numberOfFrames).toBeLessThanOrEqual(48_000);
+      frames += sample.numberOfFrames;
+    }
+    expect(frames).toBe(Math.round(96_000 / rate));
+    expect(Math.max(...fixture.windows.map((window) => window.input!.length))).toBeLessThanOrEqual(
+      222_722
+    );
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 it('does not decode muted ranges and rejects a render completed after cancellation', async () => {
   const fixture = await audioFixture();
   const controller = new AbortController();

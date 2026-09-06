@@ -6,6 +6,7 @@ import {
 import { exportReviewedVideo } from '../../workflows/video-review/export-lifecycle';
 import { downloadBlob } from '../library/actions/shared';
 import type { LoadedReview } from './use-session';
+import type { ReviewAnchor } from '../../features/video/review/types';
 
 type ExportResult = Awaited<ReturnType<typeof exportReviewedVideo>>;
 /** Adapts page lifetime to workflow cancellation; the workflow owns publication and cleanup. */
@@ -39,7 +40,10 @@ export function useReviewExport(resource: LoadedReview) {
       active.current?.abort();
     };
   }, [resource.file]);
-  const start = async (destination: 'gallery' | 'download' = 'gallery') => {
+  const start = async (
+    destination: 'gallery' | 'download' = 'gallery',
+    selection?: Extract<ReviewAnchor, { kind: 'range' }>
+  ) => {
     if (active.current || !index) return;
     const controller = new AbortController();
     active.current = controller;
@@ -53,6 +57,7 @@ export function useReviewExport(resource: LoadedReview) {
         index,
         signal: controller.signal,
         destination,
+        ...(selection ? { selection } : {}),
         onProgress: (fraction) => {
           if (mounted.current) setProgress(Math.round(fraction * 100));
         },
@@ -67,7 +72,7 @@ export function useReviewExport(resource: LoadedReview) {
           downloadBlob(value.file, value.receipt.filename, value.release, () => {
             if (mounted.current) setFailed(true);
           });
-        setResult(value);
+        if (!selection) setResult(value);
       }
     } catch {
       if (mounted.current && !controller.signal.aborted) setFailed(true);
@@ -85,6 +90,8 @@ export function useReviewExport(resource: LoadedReview) {
     failed,
     result,
     start,
+    downloadSelection: (selection: Extract<ReviewAnchor, { kind: 'range' }>) =>
+      start('download', selection),
     cancel: () => {
       if (!publishing.current) active.current?.abort();
     },

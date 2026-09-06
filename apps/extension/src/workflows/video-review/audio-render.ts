@@ -24,7 +24,7 @@ export async function chooseReviewAudioCodec(track: InputAudioTrack, container: 
   return (await canEncodeAudio('opus', options)) ? ('opus' as const) : null;
 }
 
-/** At most one second of result PCM per yield; encoder lifetime belongs to the media output. */
+/** At most one second of output and four seconds of source PCM per yield, plus resampler context. */
 export async function* renderReviewAudio(
   track: InputAudioTrack,
   segment: Segment,
@@ -38,7 +38,7 @@ export async function* renderReviewAudio(
   const end = Math.round(segment.resultEnd * outputRate);
   while (frame < end) {
     signal.throwIfAborted();
-    const count = Math.min(outputRate, end - frame);
+    const count = Math.min(outputRate, Math.floor((4 * outputRate) / segment.rate), end - frame);
     const buffer = await renderWindow({
       sink,
       track,

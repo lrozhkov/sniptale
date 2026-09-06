@@ -27,6 +27,7 @@ const logger = createLogger({ namespace: 'BackgroundVideoTabNavigationPageEffect
 
 export type TabNavigationPageEffects = {
   contentSurface?: boolean;
+  telemetry?: boolean;
   controlledCursor: boolean;
   cropOverlay: boolean;
 };
@@ -51,22 +52,27 @@ type TabNavigationPageEffectsResult = {
 };
 
 export function resolveTabNavigationPageEffects(): TabNavigationPageEffects {
+  const mode = getVideoRecordingRuntimeState().captureMode;
   return {
     contentSurface: getVideoRecordingSurfaceLeaseSnapshot() !== null,
     controlledCursor: isControlledCursorCaptureEnabled(),
+    telemetry: mode === CaptureMode.TAB || mode === CaptureMode.TAB_CROP,
     cropOverlay: getVideoRecordingRuntimeState().captureMode === CaptureMode.TAB_CROP,
   };
 }
 
 export function beginTabNavigationPageEffects(effects: TabNavigationPageEffects): number | null {
-  return effects.controlledCursor ? beginControlledCursorNavigationEffects() : null;
+  return effects.controlledCursor || effects.telemetry
+    ? beginControlledCursorNavigationEffects()
+    : null;
 }
 
 export function abandonTabNavigationPageEffects(
   effects: TabNavigationPageEffects,
   binding: TabNavigationEffectBinding
 ): void {
-  if (effects.controlledCursor) abandonControlledCursorNavigationEffects(binding);
+  if (effects.controlledCursor || effects.telemetry)
+    abandonControlledCursorNavigationEffects(binding);
 }
 
 export async function suspendTabNavigationPageEffects(
@@ -92,13 +98,18 @@ export async function suspendTabNavigationPageEffects(
     // coupled to retirement of an optional camera peer.
     await beginVideoRecordingSurfaceRebind(binding.tabId, { isCurrent: binding.isCurrent });
   }
-  if (effects.controlledCursor) {
+  if (effects.controlledCursor || effects.telemetry) {
     await suspendControlledCursorEffects(binding);
   }
 }
 
 function hasRestorablePageEffects(effects: TabNavigationPageEffects): boolean {
-  return effects.contentSurface || effects.controlledCursor || effects.cropOverlay;
+  return !!(
+    effects.contentSurface ||
+    effects.controlledCursor ||
+    effects.telemetry ||
+    effects.cropOverlay
+  );
 }
 
 async function restoreContentSurfaceEffect(
@@ -227,6 +238,7 @@ export async function restoreTabNavigationPageEffects(
     return { controlledCursorRestored: true, liveViewport: null };
   }
   if (!(await ensurePageEffectsAccess(effects, binding, ensurePageAccess))) {
+    abandonTabNavigationPageEffects(effects, binding);
     return { controlledCursorRestored: !effects.controlledCursor, liveViewport: null };
   }
   if (!binding.isCurrent()) {
@@ -240,10 +252,11 @@ export async function restoreTabNavigationPageEffects(
   if (!binding.isCurrent()) {
     return { controlledCursorRestored: true, liveViewport: null };
   }
-  const controlledCursorRestored = await restoreControlledCursorPageEffect(
-    effects.controlledCursor,
+  const historyRestored = await restoreControlledCursorPageEffect(
+    effects.controlledCursor || effects.telemetry === true,
     binding
   );
+  const controlledCursorRestored = !effects.controlledCursor || historyRestored;
   if (!binding.isCurrent()) return { controlledCursorRestored, liveViewport };
   await restoreCropOverlayPageEffect(effects.cropOverlay, binding);
   return { controlledCursorRestored, liveViewport };

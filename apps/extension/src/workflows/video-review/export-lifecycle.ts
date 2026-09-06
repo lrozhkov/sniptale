@@ -7,6 +7,8 @@ import {
 } from '../../composition/persistence/assets';
 import type { VideoWorkspaceSnapshot } from '../../composition/persistence/review-workspaces/contracts';
 import { replayReviewHistory } from '../../features/video/review/document';
+import { createReviewFragment } from '../../features/video/review/fragment';
+import type { ReviewAnchor } from '../../features/video/review/types';
 import { saveRecordingsBatchSafely } from '../media-hub/store';
 import { loadVideoReviewSource } from './source';
 import { writeReviewPackets, type ReviewPacketReceipt } from './packet-export';
@@ -36,6 +38,7 @@ export async function exportReviewedVideo(
     index: ReviewMediaIndex;
     signal: AbortSignal;
     destination?: 'gallery' | 'download';
+    selection?: Extract<ReviewAnchor, { kind: 'range' }>;
     onProgress?(fraction: number): void;
     onPublishing?(): void;
   },
@@ -53,7 +56,18 @@ export async function exportReviewedVideo(
   )
     throw new Error('Review source or committed revision changed.');
   const document = replayReviewHistory(workspace.history, workspace.cursor, workspace.source);
-  const audioReencoded = !!index.audioCodec && document.edits.some((edit) => edit.kind === 'speed');
+  const fragment = args.selection
+    ? createReviewFragment({
+        selection: args.selection,
+        duration: index.duration,
+        boundaries: index.boundaries,
+        edits: document.edits,
+      })
+    : null;
+  if (args.selection && (!fragment || args.destination !== 'download'))
+    throw new Error('A nonempty fragment requires a temporary download.');
+  const edits = fragment?.edits ?? document.edits;
+  const audioReencoded = !!index.audioCodec && edits.some((edit) => edit.kind === 'speed');
   if (audioReencoded && !index.processedAudioCodec)
     throw new Error('Audio processing is unavailable.');
   const createdAt = Date.now();
@@ -63,11 +77,14 @@ export async function exportReviewedVideo(
     source: { ...workspace.source, filename: original.filename },
     revision: workspace.revision,
     exportedAt: createdAt,
-    edits: document.edits,
+    edits,
     audioReencoded,
   });
   const id = crypto.randomUUID();
-  const candidate = `${original.filename.replace(/\.[^.]+$/, '')}-edited.${index.container}`;
+  const suffix = fragment
+    ? `fragment-${fragment.start.toFixed(3)}-${fragment.end.toFixed(3)}`
+    : 'edited';
+  const candidate = `${original.filename.replace(/\.[^.]+$/, '')}-${suffix}.${index.container}`;
   const filename = isSafeArchiveEntryLeafFilename(candidate)
     ? candidate
     : `video-edited.${index.container}`;
@@ -81,7 +98,7 @@ export async function exportReviewedVideo(
     const packetReceipt = await deps.writeReviewPackets({
       file: original.file,
       index,
-      edits: document.edits,
+      edits,
       writer,
       signal,
       provenance,

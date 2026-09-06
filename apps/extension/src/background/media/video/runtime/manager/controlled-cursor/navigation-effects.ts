@@ -1,4 +1,5 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
+import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import {
   appendControlledCursorTelemetry,
   beginControlledCursorNavigation,
@@ -33,9 +34,14 @@ function wait(delayMs: number): Promise<void> {
 
 function isControlledCursorEffectActive(binding: NavigationEffectBinding): boolean {
   return (
-    binding.isCurrent() &&
-    isControlledCursorCaptureEnabled() &&
-    getVideoRecordingTabId() === binding.tabId
+    binding.isCurrent() && collectsActionHistory() && getVideoRecordingTabId() === binding.tabId
+  );
+}
+
+function collectsActionHistory(): boolean {
+  const mode = getVideoRecordingRuntimeState().captureMode;
+  return (
+    isControlledCursorCaptureEnabled() || mode === CaptureMode.TAB || mode === CaptureMode.TAB_CROP
   );
 }
 
@@ -62,7 +68,7 @@ export function abandonControlledCursorNavigationEffects(binding: NavigationEffe
 export async function suspendControlledCursorEffects(
   binding: NavigationEffectBinding
 ): Promise<void> {
-  if (!isControlledCursorCaptureEnabled() || getVideoRecordingTabId() !== binding.tabId) return;
+  if (!isControlledCursorEffectActive(binding)) return;
   setControlledCursorAutoPaused(binding.shouldResume);
   setControlledCursorOffsetSeconds(getVideoRecordingRuntimeState().duration);
   try {
@@ -76,7 +82,7 @@ export async function suspendControlledCursorEffects(
 export async function restoreControlledCursorEffects(
   binding: NavigationEffectBinding
 ): Promise<void> {
-  if (!isControlledCursorCaptureEnabled() || getVideoRecordingTabId() !== binding.tabId) {
+  if (!isControlledCursorEffectActive(binding)) {
     clearControlledCursorEffects(binding);
     return;
   }
@@ -88,7 +94,8 @@ export async function restoreControlledCursorEffects(
       await enableControlledCursorCapture(
         binding.tabId,
         binding.recordingId,
-        getControlledCursorOffsetSeconds()
+        // The tab stream continues recording while the document is replaced.
+        Math.max(getControlledCursorOffsetSeconds(), getVideoRecordingRuntimeState().duration)
       );
       if (!isControlledCursorEffectActive(binding)) return;
       await syncControlledCursorCapture(binding.tabId, binding.shouldResume ? 'resume' : 'pause');

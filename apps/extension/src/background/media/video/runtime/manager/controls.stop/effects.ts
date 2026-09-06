@@ -1,6 +1,6 @@
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { VideoCursorCaptureMode } from '../../../../../../features/video/project/types';
-import type { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
+import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { awaitBestEffort, runBestEffort } from '@sniptale/foundation/best-effort';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { saveRecordingTelemetrySafely } from '../../../../../../workflows/media-hub/store';
@@ -77,7 +77,7 @@ async function disableAnnotationsAndPersistTelemetry(
   }
 
   const recordingId = getVideoRecordingId();
-  const telemetry = await collectTelemetrySnapshot(tabId, failureLogger);
+  const telemetry = await collectTelemetrySnapshot(tabId, mode, failureLogger);
 
   if (!recordingId || telemetry === null) {
     return;
@@ -100,9 +100,14 @@ async function disableAnnotationsAndPersistTelemetry(
 
 async function collectTelemetrySnapshot(
   tabId: number,
+  mode: CaptureMode | null,
   failureLogger: StopFailureLogger
 ): Promise<ReturnType<typeof getControlledCursorTelemetry> | null> {
-  if (!isControlledCursorCaptureEnabled()) {
+  if (
+    !isControlledCursorCaptureEnabled() &&
+    mode !== CaptureMode.TAB &&
+    mode !== CaptureMode.TAB_CROP
+  ) {
     return null;
   }
 

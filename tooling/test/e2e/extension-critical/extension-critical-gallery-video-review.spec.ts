@@ -21,12 +21,13 @@ async function seedReviewVideo(
   page: Page,
   filename: string,
   dimensions: { width: number; height: number; duration: number },
-  gaps = false
+  gaps = false,
+  history = false
 ) {
   let bytes = await readFile(new URL(`../fixtures/${filename}`, import.meta.url));
   if (gaps) bytes = await withAudioGaps(bytes);
   await page.evaluate(
-    async ({ fixture, encoded, dimensions, mimeType }) => {
+    async ({ fixture, encoded, dimensions, mimeType, history }) => {
       const body = Uint8Array.from(atob(encoded), (char) => char.charCodeAt(0));
       const directory = await (
         await navigator.storage.getDirectory()
@@ -42,7 +43,7 @@ async function seedReviewVideo(
         request.onerror = () => reject(request.error);
       });
       const transaction = db.transaction(
-        ['recordings', 'media_library', 'asset_refs', 'asset_owners'],
+        ['recordings', 'media_library', 'asset_refs', 'asset_owners', 'recording_telemetry'],
         'readwrite'
       );
       const done = new Promise<void>((resolve, reject) => {
@@ -62,6 +63,28 @@ async function seedReviewVideo(
         .objectStore('asset_refs')
         .put({ ...fixture.records.asset_refs[0], size: body.length, mimeType });
       transaction.objectStore('asset_owners').put(fixture.records.asset_owners[0]);
+      if (history)
+        transaction.objectStore('recording_telemetry').put({
+          recordingId: fixture.records.recordings[0].id,
+          captureMode: 'TAB',
+          createdAt: 1,
+          updatedAt: 1,
+          viewport: null,
+          cursorTrack: null,
+          signals: [],
+          actionEvents: [
+            {
+              id: 'click-1',
+              kind: 'CLICK',
+              time: 1,
+              duration: 0.2,
+              point: { x: 40, y: 30 },
+              label: '',
+              data: {},
+              preset: 'NONE',
+            },
+          ],
+        });
       await done;
       db.close();
     },
@@ -69,6 +92,7 @@ async function seedReviewVideo(
       fixture: betaV1Fixture,
       encoded: bytes.toString('base64'),
       dimensions,
+      history,
       mimeType: filename.endsWith('.mp4') ? 'video/mp4' : 'video/webm',
     }
   );
@@ -109,7 +133,7 @@ async function withAudioGaps(bytes: Uint8Array) {
 
 async function timelineGesture(page: Page, start: number, end?: number) {
   const plane = page.locator('[data-ui="gallery.videoReview.timePlane"]');
-  const box = (await plane.boundingBox())!;
+  const box = (await plane.locator('[data-ui="gallery.videoReview.ruler"]').boundingBox())!;
   const duration = Number(await plane.getAttribute('aria-valuemax'));
   const x = (time: number) => box.x + (box.width * time) / duration;
   await page.mouse.move(x(start), box.y + 12);
@@ -177,7 +201,13 @@ for (const variant of [
       });
       await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`);
       await page.locator('[data-ui="gallery.page.root"]').waitFor();
-      await seedReviewVideo(page, 'review-vp8-opus.webm', { width: 160, height: 90, duration: 12 });
+      await seedReviewVideo(
+        page,
+        'review-vp8-opus.webm',
+        { width: 160, height: 90, duration: 12 },
+        false,
+        true
+      );
       await page.reload();
       await page.getByRole('button', { name: 'beta-v1.webm', exact: true }).first().click();
       await page.locator('[data-ui="gallery.videoReview.enter"]').click();
@@ -186,6 +216,15 @@ for (const variant of [
       const button = (key: Parameters<typeof translate>[0]) =>
         dialog.getByRole('button', { name: label(key), exact: true });
       await expect(button('gallery.videoReview.cutMode')).toBeEnabled();
+      await expect(button('gallery.videoReview.telemetry')).toBeVisible();
+      const historyMarker = dialog.getByRole('button', {
+        name: new RegExp(`^${label('gallery.videoReview.telemetry')} ·`),
+      });
+      await expect(historyMarker).toHaveCount(1);
+      await button('gallery.videoReview.telemetry').click();
+      await expect(historyMarker).toHaveCount(0);
+      await button('gallery.videoReview.telemetry').click();
+      await expect(historyMarker).toHaveCount(1);
       await expect(dialog.locator('input[type="number"]')).toHaveCount(0);
       await expect(button('gallery.videoReview.point')).toHaveCount(0);
       await expect(
@@ -396,6 +435,23 @@ test('gallery scissors drag, resize and undo preserve original media and indepen
     await expect(dialog.getByRole('button', { name: 'Cut 2.0 – 6.0', exact: true })).toBeVisible();
     await page.keyboard.press('Control+z');
     await expect(cut).toBeVisible();
+    await button('gallery.videoReview.pointerTool').click();
+    await timelineGesture(page, 4.1, 8.1);
+    const fragmentDownload = page.waitForEvent('download');
+    await button('gallery.videoReview.downloadSelection').click();
+    const fragment = await fragmentDownload;
+    expect(fragment.suggestedFilename()).toBe('beta-v1-fragment-4.000-8.000.webm');
+    const fragmentInput = new Input({
+      source: new BlobSource(new Blob([Uint8Array.from(await readFile(await fragment.path()))])),
+      formats: ALL_FORMATS,
+    });
+    try {
+      expect(await fragmentInput.getDurationFromMetadata()).toBeCloseTo(4, 2);
+    } finally {
+      fragmentInput.dispose();
+    }
+    expect(await recordingCount(page)).toBe(1);
+    await expect(button('gallery.videoReview.redo')).toBeEnabled();
     const downloading = page.waitForEvent('download');
     await button('gallery.videoReview.downloadVideo').click();
     const download = await downloading;
@@ -439,7 +495,7 @@ for (const { container, gaps } of [
   { container: 'mp4', gaps: false },
   { container: 'webm', gaps: true },
 ]) {
-  for (const rate of [1.25, 1.5, 2, 4]) {
+  for (const rate of [0.0625, 0.125, 0.5, 1.25, 1.5, 2, 4, 8, 16]) {
     for (const audio of ['speed', 'mute']) {
       if (gaps && (rate !== 2 || audio !== 'speed')) continue;
       test(`gallery exports ${rate}x with ${audio} audio and durable provenance (${container}${gaps ? ' gaps' : ''})`, async ({
@@ -482,7 +538,7 @@ for (const { container, gaps } of [
             .selectOption(audio);
           await timelineGesture(page, 6, 10);
           const speed = dialog.getByRole('button', {
-            name: `Speed ${rate}× 6.0 – 10.0`,
+            name: `Speed ${rate < 0.25 ? `1/${1 / rate}` : rate}× 6.0 – 10.0`,
             exact: true,
           });
           await expect(speed).toBeVisible();
@@ -505,9 +561,9 @@ for (const { container, gaps } of [
               try {
                 const buffer = await context.decodeAudioData(data.buffer);
                 const channel = buffer.getChannelData(0);
-                const measure = (time: number) => {
+                const measure = (time: number, window = 0.2) => {
                   const start = Math.round(time * buffer.sampleRate);
-                  const end = start + Math.round(0.2 * buffer.sampleRate);
+                  const end = start + Math.round(window * buffer.sampleRate);
                   let crossings = 0;
                   let sum = 0;
                   for (let index = start; index < end; index++) {
@@ -515,14 +571,14 @@ for (const { container, gaps } of [
                     sum += value * value;
                     if (index > start && (channel[index - 1] ?? 0) <= 0 && value > 0) crossings++;
                   }
-                  return { frequency: crossings / 0.2, rms: Math.sqrt(sum / (end - start)) };
+                  return { frequency: crossings / window, rms: Math.sqrt(sum / (end - start)) };
                 };
                 return {
                   duration: buffer.duration,
                   origin: measure(0.3),
                   gap: measure(4 + 2.3 / rate),
                   before: measure(1.5),
-                  during: measure(4 + 1 / rate),
+                  during: measure(4 + 1 / rate, Math.min(0.2, 1 / rate)),
                   after: measure(4 + 4 / rate + 0.5),
                 };
               } finally {

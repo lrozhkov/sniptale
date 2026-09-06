@@ -46,8 +46,8 @@ export const videoEditorTimelineLaneMessages = defineMessageSource({
     en: 'Captured events',
   },
   telemetryLaneEmpty: {
-    ru: 'Полезные сигналы записи появятся здесь, когда для проекта доступна телеметрия.',
-    en: 'Useful recording signals will appear here when telemetry is available for the project.',
+    ru: 'Полезные сигналы записи появятся здесь, когда для проекта доступна история действий.',
+    en: 'Useful recording signals will appear here when action history is available for the project.',
   },
   telemetryToggle: {
     ru: 'История действий',

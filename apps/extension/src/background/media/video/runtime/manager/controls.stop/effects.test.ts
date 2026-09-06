@@ -161,9 +161,12 @@ it('skips tab side effects when no tab is available', () => {
   expect(sendTabMessageMock).not.toHaveBeenCalled();
 });
 
-it('does not persist annotation telemetry when cursor telemetry capture is disabled', async () => {
+it('persists action history for a plain tab with controlled cursor disabled', async () => {
   vi.spyOn(Date, 'now').mockReturnValue(1234);
   getVideoRecordingIdMock.mockReturnValue('recording-1');
+  const telemetry = createControlledCursorTelemetry();
+  disableControlledCursorCaptureMock.mockResolvedValue(telemetry);
+  getControlledCursorTelemetryMock.mockReturnValue(telemetry);
 
   runStopSideEffects({
     mode: CaptureMode.TAB,
@@ -172,7 +175,10 @@ it('does not persist annotation telemetry when cursor telemetry capture is disab
 
   await flushStopSideEffects();
 
-  expect(saveRecordingTelemetrySafelyMock).not.toHaveBeenCalled();
+  expect(disableControlledCursorCaptureMock).toHaveBeenCalledWith(7);
+  expect(saveRecordingTelemetrySafelyMock).toHaveBeenCalledWith(
+    expect.objectContaining({ recordingId: 'recording-1', actionEvents: telemetry.actionEvents })
+  );
 });
 
 it('persists merged controlled cursor telemetry when the dedicated cursor path is active', async () => {

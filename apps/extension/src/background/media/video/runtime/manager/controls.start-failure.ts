@@ -1,6 +1,7 @@
 import { runBestEffort } from '@sniptale/foundation/best-effort';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import {
   getVideoRecordingTabId,
   getVideoRecordingId,
@@ -9,7 +10,11 @@ import {
   resetVideoRecordingStartSession,
   setVideoRecordingId,
 } from '../../session-state';
-import { resetVideoRecordingRuntimeState, setVideoRecordingRuntimeState } from '../session-state';
+import {
+  getVideoRecordingRuntimeState,
+  resetVideoRecordingRuntimeState,
+  setVideoRecordingRuntimeState,
+} from '../session-state';
 import { getBackgroundRuntimeMessaging } from '../../../../routing-contracts/runtime-messaging/services';
 import { cancelVideoSourceReadyWait, releaseVideoCaptureSurface } from '../../capture-surface';
 
@@ -48,6 +53,18 @@ export async function notifyRecordingStartFailed(
     return;
   }
   const recordingTabId = getVideoRecordingTabId();
+  // Collection ends even if restoring the capture surface fails and authority must remain.
+  if (recordingTabId !== null) {
+    const mode = getVideoRecordingRuntimeState().captureMode;
+    if (
+      isControlledCursorCaptureEnabled() ||
+      mode === CaptureMode.TAB ||
+      mode === CaptureMode.TAB_CROP
+    ) {
+      disableControlledCursorCapture(recordingTabId);
+    }
+  }
+
   if (options.retainAuthority !== true) {
     if (recordingId) cancelVideoSourceReadyWait(recordingId, new Error(error));
     await releaseVideoCaptureSurface(recordingId);
@@ -59,12 +76,7 @@ export async function notifyRecordingStartFailed(
     }
   }
 
-  if (recordingTabId !== null) {
-    if (isControlledCursorCaptureEnabled()) {
-      disableControlledCursorCapture(recordingTabId);
-    }
-    hideRecordingOverlay(recordingTabId);
-  }
+  if (recordingTabId !== null) hideRecordingOverlay(recordingTabId);
 
   if (options.retainAuthority !== true) {
     setVideoRecordingId(null);

@@ -84,7 +84,7 @@ function ReviewEditBlock(props: SelectionProps & { edit: ReviewEdit }) {
   const label =
     edit.kind === 'cut'
       ? translate('gallery.videoReview.cutLabel')
-      : `${translate('gallery.videoReview.speedMode')} ${edit.rate}×`;
+      : `${translate('gallery.videoReview.speedMode')} ${edit.rate < 0.25 ? `1/${1 / edit.rate}` : edit.rate}×`;
   const tone = edit.kind === 'cut' ? '--sniptale-color-danger' : '--sniptale-color-accent';
   return (
     <div

@@ -1,3 +1,5 @@
+import type { ReviewSpeedRate } from './speed';
+
 /** Immutable media facts. All review times are seconds on the original video. */
 export interface ReviewSource {
   duration: number;
@@ -36,7 +38,7 @@ interface ReviewEditRange {
 }
 
 export type ReviewEdit = ReviewEditRange &
-  ({ kind: 'cut' } | { kind: 'speed'; rate: 1.25 | 1.5 | 2 | 4; audio: 'speed' | 'mute' });
+  ({ kind: 'cut' } | { kind: 'speed'; rate: ReviewSpeedRate; audio: 'speed' | 'mute' });
 
 export interface ReviewDocument {
   annotations: ReviewAnnotation[];

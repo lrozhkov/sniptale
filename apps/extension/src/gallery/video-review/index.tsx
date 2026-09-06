@@ -18,7 +18,7 @@ import {
 } from './use-session';
 import { exportReviewReport } from './report-actions';
 import { useReviewExport } from './use-export';
-import { ReviewEditActions, ReviewTimelineTools } from './edit-actions';
+import { ReviewEditActions, ReviewTimelineTools, ReviewFragmentAction } from './edit-actions';
 import { Activity, MessageSquarePlus } from 'lucide-react';
 import { nearestReviewBoundary } from '../../features/video/review/cuts';
 import { useReviewPlayback } from './use-playback';
@@ -556,6 +556,13 @@ function ReviewEditor({ resource, onBack }: { resource: LoadedReview; onBack(): 
                   )}
                 </span>
               </ReviewButton>
+              <ReviewFragmentAction
+                selection={selection}
+                index={editing.exporter.index}
+                edits={snapshot.document.edits}
+                busy={busy || !!composer.annotation || editing.exporter.phase !== 'idle'}
+                onDownload={editing.exporter.downloadSelection}
+              />
               {resource.telemetry ? (
                 <ReviewButton
                   label={translate('gallery.videoReview.telemetry')}

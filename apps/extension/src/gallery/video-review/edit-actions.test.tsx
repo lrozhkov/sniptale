@@ -1,9 +1,50 @@
+import { REVIEW_SPEED_RATES } from '../../features/video/review/speed';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import { ReviewEditActions, ReviewTimelineTools } from './edit-actions';
+import { ReviewEditActions, ReviewTimelineTools, ReviewFragmentAction } from './edit-actions';
 import { translate } from '../../platform/i18n';
+
+it('offers a fragment only for a retained range and blocks it during pending edits', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const onDownload = vi.fn();
+  const index = {
+    duration: 6,
+    boundaries: [0, 2, 4, 6],
+    videoCodec: 'vp8' as const,
+    audioCodec: null,
+    container: 'webm' as const,
+    rotation: 0 as const,
+  };
+  const selection = { kind: 'range' as const, start: 2, end: 4 };
+  const props = { index, selection, edits: [], busy: false, onDownload };
+  try {
+    act(() =>
+      root.render(<ReviewFragmentAction {...props} selection={{ kind: 'point', time: 2 }} />)
+    );
+    expect(host.querySelector('button')).toBeNull();
+    act(() => root.render(<ReviewFragmentAction {...props} />));
+    act(() => host.querySelector('button')!.click());
+    expect(onDownload).toHaveBeenCalledWith(selection);
+    act(() => root.render(<ReviewFragmentAction {...props} busy />));
+    expect(host.querySelector('button')?.disabled).toBe(true);
+    act(() =>
+      root.render(
+        <ReviewFragmentAction
+          {...props}
+          edits={[{ id: 'cut', kind: 'cut', start: 2, end: 4, requestedStart: 2, requestedEnd: 4 }]}
+        />
+      )
+    );
+    expect(host.querySelector('button')?.disabled).toBe(true);
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
 it('prevents invalid cuts and keeps cancellation reachable only before publication', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
@@ -73,12 +114,12 @@ it('edits selected speed properties and blocks unavailable editing tools', () =>
     act(() => button('gallery.videoReview.speedMode').click());
     expect(props.onToggle).toHaveBeenLastCalledWith('speed');
     const [rate, audio] = Array.from(host.querySelectorAll('select'));
-    for (const value of ['1.25', '1.5', '2', '4'])
+    for (const value of REVIEW_SPEED_RATES.map(String))
       act(() => {
         rate!.value = value;
         rate!.dispatchEvent(new Event('change', { bubbles: true }));
       });
-    expect(props.onRate.mock.calls.map(([rate]) => rate)).toEqual([1.25, 1.5, 2, 4]);
+    expect(props.onRate.mock.calls.map(([rate]) => rate)).toEqual([...REVIEW_SPEED_RATES]);
     act(() => {
       audio!.value = 'mute';
       audio!.dispatchEvent(new Event('change', { bubbles: true }));

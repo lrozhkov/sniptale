@@ -1,6 +1,15 @@
+import { useMemo } from 'react';
+import { createReviewFragment } from '../../features/video/review/fragment';
+import type { ReviewAnchor, ReviewEdit } from '../../features/video/review/types';
+import type { ReviewMediaIndex } from '../../workflows/video-review/media-index';
+import {
+  REVIEW_SPEED_RATES,
+  isReviewSpeedRate,
+  type ReviewSpeedRate,
+} from '../../features/video/review/speed';
 import { Scissors, Download, FileVideo, Gauge, MousePointer2, Trash2 } from 'lucide-react';
 import { translate } from '../../platform/i18n';
-import { ReviewButton } from './controls';
+import { ReviewButton, reviewTimeLabel } from './controls';
 
 const plain =
   '!border-0 !bg-transparent !shadow-none !h-8 !w-8 aria-pressed:!bg-[var(--sniptale-color-accent-soft)]';
@@ -16,7 +25,7 @@ export function ReviewTimelineTools(props: {
   onPointer(): void;
   onToggle(kind: 'cut' | 'speed'): void;
   onRemove(): void;
-  onRate(value: 1.25 | 1.5 | 2 | 4): void;
+  onRate(value: ReviewSpeedRate): void;
   onAudio(value: 'speed' | 'mute'): void;
 }) {
   return (
@@ -57,13 +66,12 @@ export function ReviewTimelineTools(props: {
             className="h-7 rounded bg-[var(--sniptale-color-surface-panel)] text-xs"
             onChange={(event) => {
               const value = Number(event.currentTarget.value);
-              if (value === 1.25 || value === 1.5 || value === 2 || value === 4)
-                props.onRate(value);
+              if (isReviewSpeedRate(value)) props.onRate(value);
             }}
           >
-            {[1.25, 1.5, 2, 4].map((rate) => (
+            {REVIEW_SPEED_RATES.map((rate) => (
               <option key={rate} value={rate}>
-                {rate}×
+                {rate < 0.25 ? `1/${1 / rate}` : rate}×
               </option>
             ))}
           </select>
@@ -162,5 +170,48 @@ export function ReviewEditActions(props: {
         </p>
       ) : null}
     </div>
+  );
+}
+
+/** A range-only download affordance; unavailable or fully removed intervals cannot be exported. */
+export function ReviewFragmentAction(props: {
+  selection: ReviewAnchor;
+  index: ReviewMediaIndex | null;
+  edits: readonly ReviewEdit[];
+  busy: boolean;
+  onDownload(selection: Extract<ReviewAnchor, { kind: 'range' }>): void;
+}) {
+  const { selection, index, edits } = props;
+  const fragment = useMemo(
+    () =>
+      index
+        ? createReviewFragment({
+            selection,
+            duration: index.duration,
+            boundaries: index.boundaries,
+            edits,
+          })
+        : null,
+    [selection, index, edits]
+  );
+  if (selection.kind !== 'range') return null;
+  const audioUnavailable =
+    !!index?.audioCodec &&
+    !index.processedAudioCodec &&
+    fragment?.edits.some((edit) => edit.kind === 'speed');
+  const hint = translate('gallery.videoReview.downloadSelectionHint');
+  const rangeLabel = fragment
+    ? `${reviewTimeLabel(fragment.start)} – ${reviewTimeLabel(fragment.end)}. `
+    : '';
+  return (
+    <ReviewButton
+      label={translate('gallery.videoReview.downloadSelection')}
+      title={rangeLabel + hint}
+      disabled={!fragment || props.busy || audioUnavailable}
+      className={plain}
+      onClick={() => props.onDownload(selection)}
+    >
+      <Download size={16} />
+    </ReviewButton>
   );
 }

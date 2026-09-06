@@ -134,3 +134,36 @@ it('does not cancel publication and reuses the completed copy for repeated downl
     await fixture.cleanup();
   }
 });
+
+it('downloads a selection without replacing the full-result report receipt', async () => {
+  const fixture = setup();
+  const full = {
+    file: new File(['full'], 'full.webm'),
+    receipt: { filename: 'full.webm', mediaId: 'recording:copy' },
+  };
+  const fragment = {
+    file: new File(['part'], 'part.webm'),
+    receipt: { filename: 'part.webm', mediaId: null },
+    release: vi.fn(),
+  };
+  mocks.export.mockResolvedValueOnce(full).mockResolvedValueOnce(fragment);
+  try {
+    await act(async () => fixture.root.render(<fixture.Harness />));
+    await act(async () => fixture.hook.start());
+    const selection = { kind: 'range' as const, start: 2, end: 4 };
+    await act(async () => fixture.hook.downloadSelection(selection));
+    expect(mocks.export).toHaveBeenLastCalledWith(
+      expect.objectContaining({ destination: 'download', selection })
+    );
+    expect(mocks.download).toHaveBeenCalledWith(
+      fragment.file,
+      'part.webm',
+      fragment.release,
+      expect.any(Function)
+    );
+    expect(fixture.hook.result).toBe(full);
+    expect(fixture.hook.phase).toBe('idle');
+  } finally {
+    await fixture.cleanup();
+  }
+});

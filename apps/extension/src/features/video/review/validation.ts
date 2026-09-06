@@ -1,3 +1,4 @@
+import { isReviewSpeedRate } from './speed';
 import { isRecord } from '@sniptale/runtime-contracts/validation/primitives';
 import type {
   ReviewAnchor,
@@ -140,7 +141,7 @@ function parseEdit(value: unknown, duration: number): ReviewEdit | null {
   const audio = value['audio'];
   if (
     value['kind'] !== 'speed' ||
-    (rate !== 1.25 && rate !== 1.5 && rate !== 2 && rate !== 4) ||
+    !isReviewSpeedRate(rate) ||
     (audio !== 'speed' && audio !== 'mute')
   )
     return null;

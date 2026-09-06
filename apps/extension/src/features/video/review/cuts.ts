@@ -1,3 +1,4 @@
+import { isReviewSpeedRate } from './speed';
 import type { ReviewAnchor, ReviewEdit } from './types';
 
 /** The supplied index, not a nominal GOP interval, owns selectable cut boundaries. */
@@ -33,7 +34,7 @@ export function createReviewSpeed(
   args: Parameters<typeof createReviewCut>[0] &
     Pick<Extract<ReviewEdit, { kind: 'speed' }>, 'rate' | 'audio'>
 ): ReviewEdit | null {
-  if (![1.25, 1.5, 2, 4].includes(args.rate) || (args.audio !== 'speed' && args.audio !== 'mute'))
+  if (!isReviewSpeedRate(args.rate) || (args.audio !== 'speed' && args.audio !== 'mute'))
     return null;
   const range = reviewRange(args);
   return range ? { ...range, kind: 'speed', rate: args.rate, audio: args.audio } : null;

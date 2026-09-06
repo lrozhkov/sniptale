@@ -114,8 +114,8 @@ export const videoEditorSidebarSelectionCursorMessages = defineMessageSource({
     en: 'Manual markup',
   },
   objectTrackSourceTelemetry: {
-    ru: 'Телеметрия',
-    en: 'Telemetry',
+    ru: 'История действий',
+    en: 'Action history',
   },
   objectTrackSourceVisualDetection: {
     ru: 'По пикселям',

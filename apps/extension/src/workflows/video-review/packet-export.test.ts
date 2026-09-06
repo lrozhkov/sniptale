@@ -1,3 +1,4 @@
+import { REVIEW_SPEED_RATES } from '../../features/video/review/speed';
 import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import {
@@ -50,7 +51,7 @@ it.each(['avc-aac.mp4', 'hevc-aac.mp4', 'vp8-opus.webm', 'vp9-opus.webm', 'av1-o
     const signal = new AbortController().signal;
     const index = await inspectReviewMedia(file, signal);
     const expected = await videoHashes(file);
-    for (const rate of [1.25, 1.5, 2, 4] as const) {
+    for (const rate of REVIEW_SPEED_RATES) {
       let bytes = new Uint8Array(0);
       const receipt = await writeReviewPackets({
         file,
