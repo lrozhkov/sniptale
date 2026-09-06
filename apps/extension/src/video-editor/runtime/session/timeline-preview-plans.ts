@@ -122,11 +122,17 @@ function buildVideoPreviewSourceSlots(
     return [];
   }
 
-  const firstSlot = Math.floor(sourceRange.start / STORYBOARD_SLOT_SECONDS);
-  const lastSlot = Math.max(
-    firstSlot,
-    Math.ceil(Math.max(sourceRange.start, sourceRange.end) / STORYBOARD_SLOT_SECONDS) - 1
-  );
+  const start = Math.max(0, sourceRange.start);
+  const end =
+    assetDuration !== null && Number.isFinite(assetDuration)
+      ? Math.min(sourceRange.end, assetDuration)
+      : sourceRange.end;
+  if (end <= start) {
+    return [];
+  }
+
+  const firstSlot = Math.floor(start / STORYBOARD_SLOT_SECONDS);
+  const lastSlot = Math.max(firstSlot, Math.ceil(end / STORYBOARD_SLOT_SECONDS) - 1);
   const slots: number[] = [];
   const totalSlots = Math.max(1, lastSlot - firstSlot + 1);
   const stride = Math.max(1, Math.ceil(totalSlots / MAX_ASSET_STORYBOARD_FRAMES));
@@ -136,7 +142,7 @@ function buildVideoPreviewSourceSlots(
     slot <= lastSlot && slots.length < MAX_ASSET_STORYBOARD_FRAMES;
     slot += stride
   ) {
-    pushUniqueSourceTime(slots, clampSourceTime(slot * STORYBOARD_SLOT_SECONDS, assetDuration));
+    slots.push(Math.max(start, slot * STORYBOARD_SLOT_SECONDS));
   }
 
   slots.sort((left, right) => left - right);
@@ -187,20 +193,5 @@ function parseTimelinePreviewFrameCacheKey(cacheKey: string): { sourceTime: numb
 }
 
 function normalizeSourceTimeKey(sourceTime: number): string {
-  return sourceTime.toFixed(2);
-}
-
-function clampSourceTime(sourceTime: number, assetDuration: number | null): number {
-  const upperBound =
-    assetDuration !== null && Number.isFinite(assetDuration)
-      ? Math.max(0, assetDuration)
-      : sourceTime;
-  return Math.min(upperBound, Math.max(0, sourceTime));
-}
-
-function pushUniqueSourceTime(sourceTimes: number[], sourceTime: number): void {
-  const normalized = Number(normalizeSourceTimeKey(sourceTime));
-  if (!sourceTimes.some((value) => Math.abs(value - normalized) <= 0.01)) {
-    sourceTimes.push(normalized);
-  }
+  return String(sourceTime);
 }

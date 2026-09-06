@@ -73,9 +73,9 @@ it('loads video preview frames from source-anchored asset slots', async () => {
     project: createProjectWithVisualClip(VideoProjectAssetType.VIDEO),
   });
 
-  expect(getLoadedSourceTimes(loader)).toEqual([0]);
+  expect(getLoadedSourceTimes(loader)).toEqual([2]);
   expect(onPreviewsChange).toHaveBeenLastCalledWith({
-    'clip-1': { kind: 'video', urls: ['blob:frame-0'] },
+    'clip-1': { kind: 'video', urls: ['blob:frame-2'] },
   });
 });
 
@@ -102,7 +102,7 @@ it('does not regenerate previews when zoom changes but source slots stay unchang
   expect(loader).toHaveBeenCalledTimes(1);
 });
 
-it('reuses generated source slots when clips are moved split or duplicated', async () => {
+it('reuses moved and duplicate frames while sampling the split tail at its own In', async () => {
   const onPreviewsChange = vi.fn();
   const loader = vi.fn<TimelineVideoFrameLoader>().mockImplementation(resolveLoadedFrames);
   const project = createProjectWithVisualClip(VideoProjectAssetType.VIDEO, { duration: 30 });
@@ -120,11 +120,11 @@ it('reuses generated source slots when clips are moved split or duplicated', asy
     project: createMovedSplitDuplicateProject(project),
   });
 
-  expect(loader).toHaveBeenCalledTimes(1);
+  expect(getLoadedSourceTimes(loader)).toEqual([2, 3]);
   expect(onPreviewsChange).toHaveBeenLastCalledWith({
-    'clip-1-a': { kind: 'video', urls: ['blob:frame-0'] },
-    'clip-1-b': { kind: 'video', urls: ['blob:frame-0'] },
-    'clip-1-copy': { kind: 'video', urls: ['blob:frame-0'] },
+    'clip-1-a': { kind: 'video', urls: ['blob:frame-2'] },
+    'clip-1-b': { kind: 'video', urls: ['blob:frame-3'] },
+    'clip-1-copy': { kind: 'video', urls: ['blob:frame-2'] },
   });
 });
 
@@ -146,7 +146,7 @@ it('loads only newly exposed source slots after an outward trim', async () => {
     project: createTrimmedProject(project, { sourceDuration: 26 }),
   });
 
-  expect(getLoadedSourceTimes(loader)).toEqual([0, 12, 24]);
+  expect(getLoadedSourceTimes(loader)).toEqual([2, 12, 24]);
 });
 
 it('hides inward-trimmed source slots without regenerating overlapping previews', async () => {
@@ -169,7 +169,7 @@ it('hides inward-trimmed source slots without regenerating overlapping previews'
 
   expect(loader).toHaveBeenCalledTimes(1);
   expect(onPreviewsChange).toHaveBeenLastCalledWith({
-    'clip-1': { kind: 'video', urls: ['blob:frame-0'] },
+    'clip-1': { kind: 'video', urls: ['blob:frame-2'] },
   });
 });
 
@@ -264,7 +264,7 @@ it('revokes hook-owned video preview urls when the asset url is removed', async 
     project: createProjectWithVisualClip(VideoProjectAssetType.VIDEO),
   });
 
-  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:frame-0');
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:frame-2');
   expect(onPreviewsChange).toHaveBeenLastCalledWith({});
 });
 
