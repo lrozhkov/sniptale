@@ -89,16 +89,22 @@ it.each([
   }
 );
 
-it('restores unsupported source values and Escape without a project edit', () => {
+it('clamps source values to available handles and cancels an Escape draft without another edit', () => {
   const h = harness();
   try {
-    const before = h.store.getState();
     h.type(0, '-1');
-    expect(h.inputs()[0]!.value).toBe('1');
+    h.render();
+    expect(h.inputs()[0]!.value).toBe('0');
     h.type(1, '7');
-    expect(h.inputs()[1]!.value).toBe('5');
+    h.render();
+    expect(h.inputs()[1]!.value).toBe('6');
+    const before = h.store.getState();
+    const clip = before.project!.clips[0]!;
+    expect(clip.startTime).toBe(1.5);
+    expect(clip.duration).toBe(3);
+    expect(before.projectHistory.past).toHaveLength(2);
     h.type(0, '2', 'Escape');
-    expect(h.inputs()[0]!.value).toBe('1');
+    expect(h.inputs()[0]!.value).toBe('0');
     expect(h.store.getState().project).toBe(before.project);
     expect(h.store.getState().projectHistory).toBe(before.projectHistory);
   } finally {

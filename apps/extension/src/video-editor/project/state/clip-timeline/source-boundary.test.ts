@@ -48,13 +48,26 @@ function recording(rate = 1, cameraStart = 2) {
 }
 
 it.each([1, 2])(
-  'rejects a linked start trim beyond camera source handles at %sx without changing history',
+  'clamps a linked start trim to camera source zero at %sx and records only one action',
   (rate) => {
     const { store, project } = recording(rate);
-    const before = store.getState();
     store.getState().trimClipStart(project.clips[0]!.id, 1.5);
-    expect(store.getState().project).toBe(project);
-    expect(store.getState().projectHistory).toBe(before.projectHistory);
+    const clamped = store.getState();
+    const clips = clamped.project!.clips as VideoProjectVideoClip[];
+    clips.forEach((clip, index) => {
+      const before = project.clips[index] as VideoProjectVideoClip;
+      expect(clip.startTime).toBe(2 - 0.25 / rate);
+      expect(clip.startTime + clip.duration).toBe(before.startTime + before.duration);
+      expect(clip.sourceStart + clip.sourceDuration).toBe(
+        before.sourceStart + before.sourceDuration
+      );
+    });
+    expect(clips[1]!.sourceStart).toBe(0);
+    expect(clamped.projectHistory.past).toHaveLength(1);
+    expect(clamped.projectHistory.past[0]!.clips).toEqual(project.clips);
+    store.getState().trimClipStart(project.clips[0]!.id, 1.5);
+    expect(store.getState().project).toBe(clamped.project);
+    expect(store.getState().projectHistory).toBe(clamped.projectHistory);
   }
 );
 

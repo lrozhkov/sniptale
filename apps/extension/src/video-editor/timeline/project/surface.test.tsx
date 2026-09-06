@@ -14,6 +14,20 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 
+vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../runtime/controller/composition/hooks')>()),
+  useVideoEditorHistoryController: () => ({
+    canUndo: false,
+    canRedo: false,
+    onUndo: vi.fn(),
+    onRedo: vi.fn(),
+  }),
+  useVideoEditorHeaderController: () => ({
+    grid: { magnetEnabled: true, onToggleMagnet: vi.fn() },
+    onOpenExportDialog: vi.fn(),
+  }),
+}));
+
 it('shows auto-processing only for eligible telemetry on the base recording', () => {
   const project = createProject(
     [createVideoClip({ assetId: 'asset-video', trackId: 'track-video' })],
