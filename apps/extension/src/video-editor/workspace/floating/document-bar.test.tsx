@@ -71,9 +71,8 @@ it('renders project identity and keeps export/library actions in the floating do
   expect(markup).not.toContain('Saved');
   expect(markup).toContain('videoEditor.app.libraryButton');
   expect(markup).toContain('videoEditor.app.exportButton');
-  expect(markup).toContain('video-editor.floating.document-bar.undo');
-  expect(markup).toContain('video-editor.floating.document-bar.redo');
-  expect(markup.match(/disabled/g)).toHaveLength(2);
+  expect(markup).not.toContain('video-editor.floating.document-bar.undo');
+  expect(markup).not.toContain('video-editor.floating.document-bar.redo');
   expect(markup).not.toContain('data-ui="video-editor.floating.document-bar.menu"');
   expect(markup).not.toContain('title="videoEditor.app.title"');
   expect(markup).not.toContain('Sniptale');

@@ -1,8 +1,7 @@
 import type { ReactNode } from 'react';
-import { Clapperboard, FolderKanban, PanelRight, Pencil, Redo2, Undo2 } from 'lucide-react';
+import { Clapperboard, FolderKanban, PanelRight, Pencil } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { EditorDivider, ValueBadge } from '@sniptale/ui/editor-chrome';
-import { FloatingChromeToolbar, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
 import { translate } from '../../../platform/i18n';
 import {
   useVideoEditorHeaderController,
@@ -12,9 +11,7 @@ import type { VideoEditorHeaderController } from '../../runtime/controller/contr
 import { VideoProjectStorageStatus } from './storage-status';
 import { requestVideoEditorSaveRetry } from '../../runtime/session/save-retry';
 
-const DOCUMENT_BAR_CLASS_NAME = floatingChromeClassNames(
-  'relative z-50 flex min-w-0 w-full items-center'
-);
+const DOCUMENT_BAR_CLASS_NAME = 'relative z-50 flex min-w-0 w-full items-center';
 
 const PROJECT_TITLE_CLASS_NAME = [
   'h-9 min-w-0 w-full rounded-[8px] border border-transparent bg-transparent',
@@ -83,9 +80,9 @@ export function VideoEditorFloatingDocumentBar({
   if (!header) return null;
   return (
     <div data-ui="video-editor.floating.document-bar" className={DOCUMENT_BAR_CLASS_NAME}>
-      <FloatingChromeToolbar
-        dataUi="video-editor.floating.document-bar.surface"
-        className="w-full flex-nowrap items-center gap-1"
+      <div
+        data-ui="video-editor.floating.document-bar.surface"
+        className="sniptale-toolbar-root flex w-full flex-nowrap items-center gap-1.5"
       >
         <VideoEditorProjectTitle
           projectName={header.projectName}
@@ -93,23 +90,6 @@ export function VideoEditorFloatingDocumentBar({
         />
         <VideoEditorSaveStateBadge saveStateMeta={header.saveStateMeta} />
         <VideoProjectStorageStatus />
-        <EditorDivider className="mx-1 h-7" />
-        <ContentToolbarButton
-          title={`${translate('videoEditor.app.undo')} (${translate('videoEditor.app.undoShortcut')})`}
-          disabled={!history.canUndo}
-          onClick={history.onUndo}
-          dataUi="video-editor.floating.document-bar.undo"
-        >
-          <Undo2 size={17} strokeWidth={2.1} />
-        </ContentToolbarButton>
-        <ContentToolbarButton
-          title={`${translate('videoEditor.app.redo')} (${translate('videoEditor.app.redoShortcut')})`}
-          disabled={!history.canRedo}
-          onClick={history.onRedo}
-          dataUi="video-editor.floating.document-bar.redo"
-        >
-          <Redo2 size={17} strokeWidth={2.1} />
-        </ContentToolbarButton>
         {history.error ? (
           <span role="alert">
             <ValueBadge className="text-[var(--sniptale-color-danger)]">
@@ -148,7 +128,7 @@ export function VideoEditorFloatingDocumentBar({
         >
           <Clapperboard size={17} strokeWidth={2.1} />
         </ContentToolbarButton>
-      </FloatingChromeToolbar>
+      </div>
     </div>
   );
 }

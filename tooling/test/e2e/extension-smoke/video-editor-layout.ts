@@ -13,7 +13,10 @@ export async function expectVideoEditorPanelLayout(page: Page): Promise<void> {
   await expect(importMenu).toHaveCount(0);
   await expect(importTrigger).toBeFocused();
   const chrome = page.locator('[data-ui="video-editor.floating-workspace"]');
-  expect((await chrome.boundingBox())!.height).toBeLessThanOrEqual(70);
+  expect((await chrome.boundingBox())!.height).toBeLessThanOrEqual(52);
+  await expect(page.locator('[data-ui="video-editor.timeline.toolbar.undo"]')).toHaveCount(1);
+  await expect(page.locator('[data-ui="video-editor.timeline.toolbar.redo"]')).toHaveCount(1);
+  await expect(chrome.locator('[data-ui$=".undo"], [data-ui$=".redo"]')).toHaveCount(0);
   const materials = page.locator('[data-ui="video-editor.materials"]');
   const inspector = page.locator('[data-ui="video-editor.floating.context-inspector"]');
   const timeline = page.locator('[data-ui="video-editor.timeline.surface"]');
@@ -175,10 +178,29 @@ async function expectTrackMenuPlacement(page: Page): Promise<void> {
 }
 
 async function expectLibraryDrawerPlacement(page: Page): Promise<void> {
+  const title = page.locator(
+    '[data-ui="video-editor.floating.document-bar"] input:not([type="file"])'
+  );
+  const previousTitle = await title.inputValue();
+  const longTitle =
+    'Library layout proof — a long project title that must not overlap navigation or search';
+  await title.fill(longTitle);
   const trigger = page.locator('[data-ui="video-editor.floating.document-bar.library"]');
   await trigger.click();
   const drawer = page.locator('[data-ui="video-editor.library.drawer"]');
   await expect(drawer).toBeVisible();
+  await expect(drawer.locator('[data-ui="video-editor.library.current-project"]')).toContainText(
+    longTitle
+  );
+  await expect
+    .poll(() =>
+      drawer.evaluate((node) => {
+        const strip = node.querySelector('[data-ui="video-editor.library.current-project"]')!;
+        const main = node.querySelector('main')!;
+        return main.getBoundingClientRect().left - strip.getBoundingClientRect().right;
+      })
+    )
+    .toBeGreaterThanOrEqual(0);
   const bounds = (await drawer.boundingBox())!;
   const viewport = page.viewportSize()!;
   expect(bounds.x).toBeGreaterThanOrEqual(0);
@@ -187,7 +209,24 @@ async function expectLibraryDrawerPlacement(page: Page): Promise<void> {
   expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height);
   await drawer.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(drawer.getByRole('button', { name: 'New', exact: true })).toBeInViewport();
+  await page.evaluate(() => chrome.storage.local.set({ 'sniptale-locale-preference': 'ru' }));
+  await expect(drawer.getByRole('button', { name: 'Добавить', exact: true })).toBeVisible();
+  await expect
+    .poll(() =>
+      drawer
+        .locator('aside button span.truncate')
+        .evaluateAll((nodes) =>
+          nodes
+            .filter((node) => node.scrollWidth > node.clientWidth)
+            .map((node) => node.textContent)
+        )
+    )
+    .toEqual([]);
+  await page.evaluate(() => chrome.storage.local.set({ 'sniptale-locale-preference': 'en' }));
+  await expect(drawer.getByRole('button', { name: 'Add', exact: true })).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(drawer).toHaveCount(0);
   await expect(trigger).toBeFocused();
+  await title.fill(previousTitle);
+  await trigger.focus();
 }

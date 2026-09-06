@@ -144,7 +144,7 @@ function LibraryPanelMediaTab(
 export function LibraryPanelDrawerContent(props: LibraryPanelContentProps) {
   return (
     <ProductModalBody compact className="min-h-0 flex-1 !gap-0 !p-0 overflow-hidden">
-      <div className="grid min-h-0 flex-1 grid-cols-[144px_minmax(0,1fr)] overflow-hidden">
+      <div className="grid min-h-0 flex-1 grid-cols-[176px_minmax(0,1fr)] overflow-hidden">
         <LibraryPanelRail {...props} />
         <LibraryPanelMain {...props} />
       </div>
@@ -156,7 +156,7 @@ function LibraryPanelRail(props: LibraryPanelContentProps) {
   return (
     <aside
       className={[
-        'grid min-h-0 grid-rows-[auto_1fr] gap-3 border-r p-3',
+        'grid min-h-0 min-w-0 grid-cols-1 grid-rows-[auto_1fr] gap-3 border-r p-3',
         'border-[color:var(--sniptale-color-border-soft)]',
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_58%,transparent)]',
       ].join(' ')}
@@ -175,7 +175,7 @@ function LibraryPanelRail(props: LibraryPanelContentProps) {
 
 function LibraryPanelMain(props: LibraryPanelContentProps) {
   return (
-    <main className="grid min-h-0 grid-rows-[auto_1fr] overflow-hidden">
+    <main className="grid min-h-0 min-w-0 grid-rows-[auto_1fr] overflow-hidden">
       <div className="border-b border-[color:var(--sniptale-color-border-soft)] p-3">
         <LibraryPanelSearch query={props.query} onQueryChange={props.onQueryChange} />
       </div>

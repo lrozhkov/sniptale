@@ -9,6 +9,17 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 
+const history = vi.hoisted(() => ({
+  canUndo: true,
+  canRedo: false,
+  onUndo: vi.fn(),
+  onRedo: vi.fn(),
+}));
+vi.mock('../../../runtime/controller/composition/hooks', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../runtime/controller/composition/hooks')>()),
+  useVideoEditorHistoryController: () => history,
+}));
+
 import { ProjectTimelineToolbar } from './index';
 
 type ProjectTimelineToolbarTestProps = ComponentProps<typeof ProjectTimelineToolbar>;
@@ -120,4 +131,24 @@ it('keeps editing, playback and view controls together in the timeline header', 
     regions[2]?.querySelector('[data-ui="video-editor.timeline.toolbar.fit-project"]')
   ).not.toBeNull();
   expect(regions[2]?.querySelector('input[aria-label="videoEditor.timeline.zoom"]')).not.toBeNull();
+});
+
+it('routes available history actions from the timeline and disables unavailable redo', () => {
+  const rendered = renderToolbar();
+  const undo = rendered.querySelector<HTMLButtonElement>(
+    '[data-ui="video-editor.timeline.toolbar.undo"]'
+  );
+  const redo = rendered.querySelector<HTMLButtonElement>(
+    '[data-ui="video-editor.timeline.toolbar.redo"]'
+  );
+  expect(undo).not.toBeNull();
+  expect(redo).not.toBeNull();
+  expect(undo?.disabled).toBe(false);
+  expect(redo?.disabled).toBe(true);
+  act(() => {
+    undo?.click();
+    redo?.click();
+  });
+  expect(history.onUndo).toHaveBeenCalledTimes(1);
+  expect(history.onRedo).not.toHaveBeenCalled();
 });

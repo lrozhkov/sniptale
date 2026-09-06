@@ -1,3 +1,8 @@
+import { Redo2, Undo2 } from 'lucide-react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { translate } from '../../../../platform/i18n';
+import { useVideoEditorHistoryController } from '../../../runtime/controller/composition/hooks';
+import { toolbarIconButtonClassName } from './sections/constants/button';
 import { ProjectTimelinePlaybackSummary } from './sections/playback-summary';
 import { ProjectTimelineToolbarLeadingControls } from './sections/leading';
 import { ProjectTimelineToolbarTrailingActions } from './sections/trailing';
@@ -76,6 +81,7 @@ function createToolbarTrailingControlsProps({
 }
 
 export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProps) {
+  const history = useVideoEditorHistoryController();
   return (
     <div
       data-ui="video-editor.timeline.toolbar"
@@ -93,7 +99,25 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
         '[&_svg]:size-[18px] @max-[1400px]/timeline:[&_svg]:size-4 @max-[1000px]/timeline:[&_svg]:size-[14px]',
       ].join(' ')}
     >
-      <div className="flex shrink-0 items-center justify-start">
+      <div className="flex shrink-0 items-center justify-start gap-[var(--timeline-control-gap)]">
+        <ContentToolbarButton
+          className={toolbarIconButtonClassName}
+          title={`${translate('videoEditor.app.undo')} (${translate('videoEditor.app.undoShortcut')})`}
+          disabled={!history.canUndo}
+          onClick={history.onUndo}
+          dataUi="video-editor.timeline.toolbar.undo"
+        >
+          <Undo2 aria-hidden="true" />
+        </ContentToolbarButton>
+        <ContentToolbarButton
+          className={toolbarIconButtonClassName}
+          title={`${translate('videoEditor.app.redo')} (${translate('videoEditor.app.redoShortcut')})`}
+          disabled={!history.canRedo}
+          onClick={history.onRedo}
+          dataUi="video-editor.timeline.toolbar.redo"
+        >
+          <Redo2 aria-hidden="true" />
+        </ContentToolbarButton>
         <ProjectTimelineToolbarLeadingControls
           {...createToolbarLeadingControlsProps(controlsProps)}
         />

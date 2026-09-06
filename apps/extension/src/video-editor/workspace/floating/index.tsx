@@ -24,7 +24,7 @@ export function VideoEditorFloatingWorkspace({
   onActiveInsertKindChange,
 }: VideoEditorFloatingWorkspaceProps) {
   return (
-    <div data-ui="video-editor.floating-workspace" className="shrink-0 px-3 py-2">
+    <div data-ui="video-editor.floating-workspace" className="shrink-0 px-4 py-2">
       <VideoEditorFloatingDocumentBar {...(inspector ? { inspector } : {})}>
         {materials && (
           <ContentToolbarButton
