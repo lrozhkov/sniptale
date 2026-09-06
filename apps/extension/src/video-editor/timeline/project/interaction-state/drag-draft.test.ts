@@ -1,3 +1,5 @@
+import { getTimelineReorderSlots } from './drag-reorder';
+import { swapProjectClips } from '../../../project/state/clip-timeline/reorder';
 import { expect, it, vi } from 'vitest';
 import {
   createEmptyVideoProject,
@@ -71,6 +73,7 @@ it('previews every changed linked destination without publishing before release'
   const onMoveClip = vi.fn();
   const draft = createTimelineDragDraft({
     project,
+    onSwapClip: vi.fn(),
     onMoveClip,
     onTrimClipStart: vi.fn(),
     onTrimClipEnd: vi.fn(),
@@ -106,6 +109,7 @@ it('derives trimmed companions from the mutation result and omits unchanged inde
   const onTrimClipEnd = vi.fn();
   const draft = createTimelineDragDraft({
     project,
+    onSwapClip: vi.fn(),
     onMoveClip: vi.fn(),
     onTrimClipStart: vi.fn(),
     onTrimClipEnd,
@@ -130,9 +134,76 @@ it('does not propose companion moves when a linked track is locked', () => {
   project.tracks[1]!.locked = true;
   const draft = createTimelineDragDraft({
     project,
+    onSwapClip: vi.fn(),
     onMoveClip: vi.fn(),
     onTrimClipStart: vi.fn(),
     onTrimClipEnd: vi.fn(),
   });
   expect(draft.onMoveClip('screen', 10)?.relatedClips).toEqual([]);
+});
+
+function reorderFixture() {
+  const project = fixture();
+  const first = project.clips[0]!;
+  project.clips.push({ ...first, id: 'neighbor', groupId: null, startTime: 9, duration: 2 });
+  return project;
+}
+
+it('offers canonical leading-edge reorder slots and previews both groups including unequal camera offsets', () => {
+  const project = reorderFixture();
+  const camera = project.clips.find((clip) => clip.id === 'camera')!;
+  expect(getTimelineReorderSlots(project, camera)).toEqual([
+    { direction: 'right', startTime: 9, neighborName: project.clips.at(-1)!.name },
+  ]);
+  const onSwapClip = vi.fn();
+  const draft = createTimelineDragDraft({
+    project,
+    onSwapClip,
+    onMoveClip: vi.fn(),
+    onTrimClipStart: vi.fn(),
+    onTrimClipEnd: vi.fn(),
+  });
+  const preview = draft.onSwapClip('camera', 'right')!;
+  expect(preview.startTime).toBe(9);
+  expect(preview.relatedClips.map((clip) => [clip.clipId, clip.startTime])).toEqual([
+    ['screen', 8],
+    ['mic', 8.25],
+    ['neighbor', 5],
+  ]);
+  const after = swapProjectClips(project, 'camera', 'right');
+  for (const ghost of [preview, ...preview.relatedClips])
+    expect(after.clips.find((clip) => clip.id === ghost.clipId)).toMatchObject({
+      startTime: ghost.startTime,
+      duration: ghost.duration,
+    });
+  expect(onSwapClip).not.toHaveBeenCalled();
+  draft.commit();
+  expect(onSwapClip).toHaveBeenCalledExactlyOnceWith('camera', 'right');
+});
+
+it('replaces a pending reorder with free placement when the pointer leaves its slot', () => {
+  const project = reorderFixture();
+  const onSwapClip = vi.fn();
+  const onMoveClip = vi.fn();
+  const draft = createTimelineDragDraft({
+    project,
+    onSwapClip,
+    onMoveClip,
+    onTrimClipStart: vi.fn(),
+    onTrimClipEnd: vi.fn(),
+  });
+  draft.onSwapClip('screen', 'right');
+  draft.onMoveClip('screen', 14);
+  draft.commit();
+  expect(onSwapClip).not.toHaveBeenCalled();
+  expect(onMoveClip).toHaveBeenCalledExactlyOnceWith('screen', 14);
+});
+
+it('does not expose locked or colliding swaps as usable slots', () => {
+  const project = reorderFixture();
+  project.tracks[1]!.locked = true;
+  expect(getTimelineReorderSlots(project, project.clips[0]!)).toEqual([]);
+  project.tracks[1]!.locked = false;
+  project.clips.push({ ...project.clips[1]!, id: 'blocker', groupId: null, startTime: 9 });
+  expect(getTimelineReorderSlots(project, project.clips[0]!)).toEqual([]);
 });

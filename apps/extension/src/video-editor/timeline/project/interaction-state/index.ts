@@ -35,6 +35,7 @@ function useProjectTimelineInteractions(
       pixelsPerSecond: props.pixelsPerSecond,
       project: props.project,
       trackHeightByTrackId,
+      onSwapClip: props.onSwapClip,
       onMoveClip: props.onMoveClip,
       onSelectClip: props.onSelectClip,
       onSelectTrack: props.onSelectTrack,

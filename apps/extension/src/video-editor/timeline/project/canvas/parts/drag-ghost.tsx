@@ -1,3 +1,4 @@
+import { translate } from '../../../../../platform/i18n';
 import type { TimelineTrackLayout } from '../../tracks/layout';
 import { resolveClipLogicalLaneId } from '../../../../../features/video/project/timeline';
 import type { TimelineClipDragGhost, TimelineClipDragPlacement } from '../../types';
@@ -16,7 +17,14 @@ export function ProjectTimelineClipDragGhost({
   if (!dragGhost) return null;
   return (
     <>
-      {[dragGhost, ...(dragGhost.relatedClips ?? [])]
+      {dragGhost.trackId === trackId && (
+        <ReorderSlots
+          dragGhost={dragGhost}
+          pixelsPerSecond={pixelsPerSecond}
+          trackLayout={trackLayout}
+        />
+      )}
+      {(dragGhost.activeReorder ? [] : [dragGhost, ...(dragGhost.relatedClips ?? [])])
         .filter((clip) => clip.trackId === trackId)
         .map((clip) => (
           <ClipPlacementGhost
@@ -29,6 +37,53 @@ export function ProjectTimelineClipDragGhost({
         ))}
     </>
   );
+}
+
+function ReorderSlots({
+  dragGhost,
+  pixelsPerSecond,
+  trackLayout,
+}: {
+  dragGhost: TimelineClipDragGhost;
+  pixelsPerSecond: number;
+  trackLayout: TimelineTrackLayout | undefined;
+}) {
+  const metrics = resolveDragGhostLaneMetrics(trackLayout, dragGhost.timelineLaneId);
+  return dragGhost.reorderSlots?.map((slot) => {
+    const active = slot.direction === dragGhost.activeReorder;
+    return (
+      <div
+        key={slot.direction}
+        data-ui="video-editor.timeline.reorder-slot"
+        data-direction={slot.direction}
+        data-active={active}
+        className={[
+          'pointer-events-none absolute z-40 border-l-2 border-dashed',
+          'border-[color:var(--sniptale-color-accent-emphasis)]',
+        ].join(' ')}
+        style={{
+          left: slot.startTime * pixelsPerSecond,
+          top: metrics?.clipTop ?? 0,
+          height: metrics?.clipRowHeight ?? 40,
+        }}
+      >
+        <span
+          className={[
+            'absolute left-1 top-0 whitespace-nowrap rounded px-1 text-[10px] font-semibold shadow-sm',
+            'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-primary)]',
+          ].join(' ')}
+        >
+          {active
+            ? translate('videoEditor.app.clipSwapNeighbor').replace('{name}', slot.neighborName)
+            : translate(
+                slot.direction === 'left'
+                  ? 'videoEditor.app.clipEarlier'
+                  : 'videoEditor.app.clipLater'
+              )}
+        </span>
+      </div>
+    );
+  });
 }
 
 function ClipPlacementGhost({

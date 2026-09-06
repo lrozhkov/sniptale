@@ -137,6 +137,7 @@ function renderStatefulDragHarness(project: VideoProject, onMove: MoveClipCallba
   function StatefulHarness() {
     const [currentProject, setCurrentProject] = useState(project);
     const timelineDrag = useProjectTimelineDrag({
+      onSwapClip: vi.fn(),
       currentTime: 0,
       historyTransaction: {
         beginProjectHistoryTransaction: () => TEST_HISTORY_LEASE,
@@ -171,6 +172,7 @@ function createTimelineHarness(props: {
 }) {
   return function TimelineHarness() {
     const timelineDrag = useProjectTimelineDrag({
+      onSwapClip: vi.fn(),
       currentTime: 0,
       historyTransaction: {
         beginProjectHistoryTransaction: () => TEST_HISTORY_LEASE,

@@ -1,3 +1,5 @@
+import { swapProjectClips } from '../../../project/state/clip-timeline/reorder';
+import { getTimelineReorderSlots } from './drag-reorder';
 import type React from 'react';
 import {
   moveProjectClip,
@@ -32,6 +34,7 @@ interface TimelineDragMoveParams {
   moveEvent: PointerEvent;
   pixelsPerSecond: number;
   trackLayoutModel: ReturnType<typeof buildTimelineTrackLayoutModel>;
+  onSwapClip: (clipId: string, direction: 'left' | 'right') => DragTimingResult | null | void;
   onMoveClip: MoveClipHandler;
   setDragGhost: React.Dispatch<React.SetStateAction<TimelineClipDragGhost | null>>;
   onTrimClipEnd: TrimClipHandler;
@@ -46,7 +49,7 @@ const CLIP_LANE_CHANGE_INTENT_THRESHOLD_PX = 24;
 export function createTimelineDragDraft(
   params: Pick<
     TimelineDragMoveParams,
-    'project' | 'onMoveClip' | 'onTrimClipStart' | 'onTrimClipEnd'
+    'project' | 'onMoveClip' | 'onSwapClip' | 'onTrimClipStart' | 'onTrimClipEnd'
   >
 ) {
   let commit: (() => void) | null = null;
@@ -67,6 +70,10 @@ export function createTimelineDragDraft(
   };
   return {
     commit: () => commit?.(),
+    onSwapClip: (clipId: string, direction: 'left' | 'right') =>
+      preview(swapProjectClips(params.project, clipId, direction), clipId, () =>
+        params.onSwapClip(clipId, direction)
+      ),
     onMoveClip: (...args: Parameters<MoveClipHandler>) =>
       preview(moveProjectClip(params.project, ...args), args[0], () => params.onMoveClip(...args)),
     onTrimClipStart: (...args: Parameters<TrimClipHandler>) =>
@@ -115,6 +122,7 @@ export function applyTimelineDragMove({
   moveEvent,
   pixelsPerSecond,
   trackLayoutModel,
+  onSwapClip,
   onMoveClip,
   setDragGhost,
   onTrimClipEnd,
@@ -131,6 +139,7 @@ export function applyTimelineDragMove({
       currentTime,
       magnetEnabled: magnetEnabled && !moveEvent.altKey,
       moveEvent,
+      onSwapClip,
       onMoveClip,
       pixelsPerSecond,
       project,
@@ -178,6 +187,7 @@ function applyTimelineClipMove({
   currentTime,
   magnetEnabled,
   moveEvent,
+  onSwapClip,
   onMoveClip,
   pixelsPerSecond,
   project,
@@ -190,6 +200,7 @@ function applyTimelineClipMove({
   | 'interaction'
   | 'magnetEnabled'
   | 'moveEvent'
+  | 'onSwapClip'
   | 'onMoveClip'
   | 'pixelsPerSecond'
   | 'project'
@@ -215,6 +226,36 @@ function applyTimelineClipMove({
     project,
     rawStartTime,
   });
+  const sameLane =
+    targetPlacement?.trackId === clip.trackId &&
+    targetPlacement.timelineLaneId === resolveClipLogicalLaneId(clip);
+  const reorderSlots = sameLane && !moveEvent.altKey ? getTimelineReorderSlots(project, clip) : [];
+  const requestedStart = interaction.originalStart + deltaSeconds;
+  const slot = reorderSlots
+    .filter((candidate) => {
+      const distance = Math.abs(candidate.startTime - requestedStart);
+      return (
+        distance * pixelsPerSecond <= 10 &&
+        (snapResult.targetTime === null || distance <= Math.abs(snapResult.time - requestedStart))
+      );
+    })
+    .sort(
+      (left, right) =>
+        Math.abs(left.startTime - requestedStart) - Math.abs(right.startTime - requestedStart)
+    )[0];
+  if (slot) {
+    const applied = onSwapClip(clip.id, slot.direction);
+    if (applied) {
+      setSnapGuideTime(null);
+      setDragGhost({
+        ...applied,
+        name: clip.name,
+        reorderSlots,
+        activeReorder: slot.direction,
+      });
+      return;
+    }
+  }
   const applied = onMoveClip(
     clip.id,
     snapResult.time,
@@ -235,6 +276,7 @@ function applyTimelineClipMove({
   );
   setDragGhost({
     clipId: clip.id,
+    reorderSlots,
     duration,
     name: clip.name,
     startTime,

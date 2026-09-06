@@ -108,6 +108,7 @@ it('discards the clip draft before starting an effect transaction', () => {
   function Harness() {
     const pointerSessionCleanupRef = useRef<(() => void) | null>(null);
     const clipInteraction = useProjectTimelineDrag({
+      onSwapClip: vi.fn(),
       currentTime: 0,
       historyTransaction,
       magnetEnabled: false,

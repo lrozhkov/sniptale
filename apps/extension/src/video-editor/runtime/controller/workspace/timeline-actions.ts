@@ -200,6 +200,7 @@ export function createWorkspaceTimelineEditingActions(
     onMoveActionEvent: createActionEventMover(store),
     onResizeActionEvent: createActionEventResizer(store),
     onCloseTrackGap: store.closeTrackGap,
+    onSwapClip: store.swapClip,
     onMoveClip: store.moveClip,
     onRenameTrack: store.renameTrack,
     onMoveCursorSegment: createCursorSegmentMover(store),

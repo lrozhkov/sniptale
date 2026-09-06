@@ -46,6 +46,7 @@ interface VideoEditorTimelineActions {
   onAutoTransformRecording: (settings: VideoAutoProcessingSettings) => void;
   onMoveActionEvent: (actionEventId: string, time: number) => void;
   onCloseTrackGap: VideoEditorProjectActions['closeTrackGap'];
+  onSwapClip: VideoEditorProjectActions['swapClip'];
   onMoveClip: VideoEditorProjectActions['moveClip'];
   onRenameTrack: VideoEditorProjectActions['renameTrack'];
   onMoveCursorSegment: (

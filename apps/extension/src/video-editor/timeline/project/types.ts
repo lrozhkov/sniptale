@@ -82,6 +82,7 @@ export interface ProjectTimelineProps {
   onSelectActionSegment: (actionEventId: string) => void;
   onSelectMotionRegion: (motionRegionId: string) => void;
   onSelectObjectTrack: (objectTrackId: string) => void;
+  onSwapClip: (clipId: string, direction: 'left' | 'right') => void;
   onMoveClip: VideoEditorMoveClipAction;
   onCloseTrackGap: (trackId: string, gapStart: number, gapEnd: number) => void;
   onAddTrackLogicalLane: (trackId: string) => void;
@@ -187,7 +188,15 @@ export interface TimelineClipDragPlacement {
   trackId: string;
 }
 
+export interface TimelineClipReorderSlot {
+  direction: 'left' | 'right';
+  startTime: number;
+  neighborName: string;
+}
+
 export interface TimelineClipDragGhost extends TimelineClipDragPlacement {
+  reorderSlots?: TimelineClipReorderSlot[];
+  activeReorder?: 'left' | 'right';
   relatedClips?: TimelineClipDragPlacement[];
 }
 

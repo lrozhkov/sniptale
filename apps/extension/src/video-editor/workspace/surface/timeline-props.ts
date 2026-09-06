@@ -79,6 +79,7 @@ function getTimelineMutationActionProps(controller: VideoEditorTimelineControlle
     onClearUtilityLane: controller.actions.onClearUtilityLane,
     onDuplicateSelectedClip: controller.actions.onDuplicateSelectedClip,
     onMoveActionEvent: controller.actions.onMoveActionEvent,
+    onSwapClip: controller.actions.onSwapClip,
     onMoveClip: controller.actions.onMoveClip,
     onRenameTrack: controller.actions.onRenameTrack,
     onSplitSelectedClip: controller.actions.onSplitSelectedClip,

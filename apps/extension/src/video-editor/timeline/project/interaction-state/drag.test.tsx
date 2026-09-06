@@ -74,6 +74,7 @@ function createTimelineHarness(props: {
   return function TimelineHarness() {
     const fallbackLease = Symbol('test-history-transaction');
     const timelineDrag = useProjectTimelineDrag({
+      onSwapClip: vi.fn(),
       currentTime: props.currentTime ?? 0,
       historyTransaction: props.historyTransaction ?? {
         beginProjectHistoryTransaction: () => fallbackLease,
@@ -364,6 +365,7 @@ it('keeps an independent delete shortcut outside an active drag transaction', ()
     handlersRef.current = createPlaybackShortcutHandlers(state);
     usePlaybackShortcuts(latestStateRef, handlersRef, vi.fn(), vi.fn(), vi.fn());
     const timelineDrag = useProjectTimelineDrag({
+      onSwapClip: vi.fn(),
       currentTime: state.currentTime,
       historyTransaction: {
         beginProjectHistoryTransaction: state.beginProjectHistoryTransaction,
@@ -416,6 +418,7 @@ it('rejects stale pointer movement after same-id project replacement', () => {
   function Harness() {
     const state = useVideoEditorStore();
     const timelineDrag = useProjectTimelineDrag({
+      onSwapClip: vi.fn(),
       currentTime: state.currentTime,
       historyTransaction: {
         beginProjectHistoryTransaction: state.beginProjectHistoryTransaction,

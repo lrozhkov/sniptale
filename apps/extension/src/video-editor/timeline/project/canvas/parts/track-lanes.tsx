@@ -101,6 +101,7 @@ export function ProjectTimelineTrackLanes(props: ProjectTimelineTrackLanesProps)
 }
 
 function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
+  const displayProject = getReorderDisplayProject(props.project, props.dragGhost);
   return (
     <div
       className={getTrackLaneClassName(
@@ -114,7 +115,7 @@ function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
       {...createTrackLaneEventProps(props)}
     >
       <ProjectTimelineLogicalLaneGuides trackLayout={props.trackLayout} />
-      <ProjectTimelineTrackZones {...createTrackZoneProps(props)} />
+      <ProjectTimelineTrackZones {...createTrackZoneProps({ ...props, project: displayProject })} />
       <ProjectTimelineClipDragGhost
         dragGhost={props.dragGhost}
         pixelsPerSecond={props.pixelsPerSecond}
@@ -123,9 +124,11 @@ function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
       />
       <ProjectTimelineTrackClipStack
         pixelsPerSecond={props.pixelsPerSecond}
-        project={props.project}
-        hoveredClipId={props.hoveredClipId}
-        selectedClipId={props.selectedClipId}
+        project={displayProject}
+        hoveredClipId={props.dragGhost?.activeReorder ? null : props.hoveredClipId}
+        selectedClipId={
+          props.dragGhost?.activeReorder ? props.dragGhost.clipId : props.selectedClipId
+        }
         selectedEffectSelection={props.selectedEffectSelection}
         timelinePreviews={props.timelinePreviews}
         trackId={props.track.id}
@@ -138,6 +141,21 @@ function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
       />
     </div>
   );
+}
+
+/** Presentation-only geometry; the gesture owner publishes the command on release. */
+function getReorderDisplayProject(project: VideoProject, ghost: TimelineClipDragGhost | null) {
+  if (!ghost?.activeReorder) return project;
+  const placements = new Map(
+    [ghost, ...(ghost.relatedClips ?? [])].map((clip) => [clip.clipId, clip])
+  );
+  return {
+    ...project,
+    clips: project.clips.map((clip) => {
+      const placement = placements.get(clip.id);
+      return placement ? { ...clip, startTime: placement.startTime } : clip;
+    }),
+  };
 }
 
 function createTrackLaneEventProps(props: ProjectTimelineTrackLaneProps) {

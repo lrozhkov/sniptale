@@ -88,6 +88,7 @@ function createHarness(options: {
   const onTrimClipStart = options.onTrimClipStart ?? vi.fn();
   function Harness(props: { currentTime: number }) {
     const drag = useProjectTimelineDrag({
+      onSwapClip: vi.fn(),
       currentTime: props.currentTime,
       historyTransaction: history,
       magnetEnabled: options.magnetEnabled ?? true,

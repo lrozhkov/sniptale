@@ -1,3 +1,4 @@
+import { createVideoClipFromAsset } from '../../../../features/video/project/factories/clip';
 // @vitest-environment jsdom
 
 import type React from 'react';
@@ -6,6 +7,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   createEmptyVideoProject,
+  createVideoProjectAsset,
   createVideoProjectTrack,
 } from '../../../../features/video/project/factories/creation';
 import { VideoTrackKind } from '../../../../features/video/project/types';
@@ -214,3 +216,63 @@ function createImportHandlers(
     ...overrides,
   };
 }
+
+it('renders a single labeled reorder slot on the manipulated track and clears it with the proposal', () => {
+  const project = createEmptyVideoProject('Reorder marker');
+  const trackId = project.tracks[0]!.id;
+  const camera = createVideoProjectTrack('Camera', -1, VideoTrackKind.PRIMARY);
+  project.tracks.push(camera);
+  const asset = createVideoProjectAsset(
+    'Screen',
+    'VIDEO',
+    { kind: 'recording', recordingId: 'rec' },
+    {
+      duration: 2,
+      width: 1280,
+      height: 720,
+      size: 1,
+      mimeType: 'video/webm',
+      hasAudio: false,
+      audioPeaks: null,
+    }
+  );
+  project.assets = [asset];
+  project.clips = [{ ...createVideoClipFromAsset(trackId, asset, 1280, 720, 0), id: 'selected' }];
+  const props = createCanvasProps(project, {
+    clipId: 'selected',
+    name: 'Screen',
+    trackId,
+    timelineLaneId: null,
+    startTime: 3,
+    duration: 2,
+    activeReorder: 'right',
+    reorderSlots: [{ direction: 'right', startTime: 3, neighborName: 'Next recording' }],
+    relatedClips: [
+      {
+        clipId: 'camera',
+        name: 'Camera',
+        trackId: camera.id,
+        timelineLaneId: null,
+        startTime: 3,
+        duration: 2,
+      },
+    ],
+  });
+  act(() => root?.render(<ProjectTimelineCanvas {...props} />));
+  const markers = container!.querySelectorAll<HTMLElement>(
+    '[data-ui="video-editor.timeline.reorder-slot"]'
+  );
+  expect(markers).toHaveLength(1);
+  expect(markers[0]!.style.left).toBe('270px');
+  expect(markers[0]!.dataset['active']).toBe('true');
+  expect(markers[0]!.textContent).toContain('videoEditor.app.clipSwapNeighbor');
+  expect(markers[0]!.className).toContain('pointer-events-none');
+  const clipNode = () =>
+    container!.querySelector<HTMLElement>('[data-project-timeline-clip="selected"]')!;
+  expect(clipNode().style.left).toBe('270px');
+  expect(container!.querySelector('[data-ui="video-editor.timeline.clip-drag-ghost"]')).toBeNull();
+  expect(project.clips[0]!.startTime).toBe(0);
+  act(() => root?.render(<ProjectTimelineCanvas {...props} dragGhost={null} />));
+  expect(container!.querySelector('[data-ui="video-editor.timeline.reorder-slot"]')).toBeNull();
+  expect(clipNode().style.left).toBe('0px');
+});

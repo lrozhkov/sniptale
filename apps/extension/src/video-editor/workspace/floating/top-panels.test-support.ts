@@ -92,6 +92,7 @@ function createTimelineEditActions(): Omit<
     onDeleteTrack: noop(),
     onDuplicateSelectedClip: noop(),
     onMoveActionEvent: noop(),
+    onSwapClip: vi.fn(),
     onMoveClip: noop(),
     onMoveCursorSegment: noop(),
     onMoveMotionRegion: noop(),
