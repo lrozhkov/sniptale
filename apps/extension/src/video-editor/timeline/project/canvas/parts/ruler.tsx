@@ -18,7 +18,7 @@ export function ProjectTimelineRuler(props: {
     <div
       data-ui="video-editor.timeline.ruler"
       className={[
-        'sticky top-0 z-40 flex h-[30px] items-end border-b',
+        'sticky top-0 z-40 flex h-[30px] items-end overflow-hidden border-b',
         'border-[var(--sniptale-color-border-soft)]',
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent)]',
         'relative px-0',
@@ -35,7 +35,7 @@ export function ProjectTimelineRuler(props: {
         <div
           key={marker.id}
           className={[
-            'relative h-full border-l',
+            'relative h-full shrink-0 border-l',
             marker.isMajor
               ? 'border-[var(--sniptale-color-border-soft)]'
               : 'border-[var(--sniptale-color-border-subtle)]',

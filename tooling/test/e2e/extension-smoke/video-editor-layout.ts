@@ -38,6 +38,7 @@ export async function expectVideoEditorPanelLayout(page: Page): Promise<void> {
     if (((await rightDock.getAttribute('aria-pressed')) === 'true') !== right)
       await rightDock.click();
     await expectTimelineToolbarControls(page);
+    await expectTimelineScaleGeometry(page);
     if (left && right) await expectTrackMenuPlacement(page);
     const leftBox = (await materials.boundingBox())!;
     const rightBox = (await inspector.boundingBox())!;
@@ -77,6 +78,7 @@ async function expectAdaptivePaneDefaults(page: Page): Promise<void> {
       inspectorWidth
     );
     await expectTimelineToolbarControls(page);
+    await expectTimelineScaleGeometry(page);
     const title = (await page
       .locator('[data-ui="video-editor.workspace.sidebar-header-title-row"]')
       .boundingBox())!;
@@ -88,6 +90,7 @@ async function expectAdaptivePaneDefaults(page: Page): Promise<void> {
     ];
     for (const dock of docks) await dock.click();
     await expectTimelineToolbarControls(page);
+    await expectTimelineScaleGeometry(page);
     for (const dock of docks) await dock.click();
   }
   await page.setViewportSize(originalViewport);
@@ -244,4 +247,29 @@ async function expectLibraryDrawerPlacement(page: Page): Promise<void> {
   await expect(trigger).toBeFocused();
   await title.fill(previousTitle);
   await trigger.focus();
+}
+
+async function expectTimelineScaleGeometry(page: Page): Promise<void> {
+  const canvas = page.locator('[data-ui="video-editor.timeline.canvas-scroll"]');
+  const ruler = page.locator('[data-ui="video-editor.timeline.ruler"]');
+  const markers = ruler.locator(':scope > div[style*="width"]');
+  const geometry = await markers.evaluateAll((nodes) =>
+    nodes.slice(0, 5).map((node) => ({
+      left: node.getBoundingClientRect().left,
+      declaredWidth: Number.parseFloat(node instanceof HTMLElement ? node.style.width : '0'),
+    }))
+  );
+  expect(geometry.length).toBeGreaterThan(1);
+  for (let index = 1; index < geometry.length; index += 1) {
+    expect(geometry[index]!.left - geometry[index - 1]!.left).toBeCloseTo(
+      geometry[index - 1]!.declaredWidth,
+      0
+    );
+  }
+  await expect
+    .poll(async () => {
+      const viewportWidth = await canvas.evaluate((node) => node.clientWidth);
+      return (await ruler.boundingBox())!.width - viewportWidth;
+    })
+    .toBeGreaterThanOrEqual(-1);
 }

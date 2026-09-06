@@ -152,11 +152,12 @@ function useProjectTimelinePlaybackState(props: TimelineRangeSelectionProps) {
 function useProjectTimelineDerivedState(
   project: ProjectTimelineProps['project'],
   pixelsPerSecond: number,
-  selectedClipId: string | null
+  selectedClipId: string | null,
+  viewportWidth: number
 ) {
   const timelineWidth = useMemo(
-    () => Math.max(project.duration + 5, 10) * pixelsPerSecond,
-    [pixelsPerSecond, project.duration]
+    () => Math.max(Math.max(project.duration + 5, 10) * pixelsPerSecond, viewportWidth - 120),
+    [pixelsPerSecond, project.duration, viewportWidth]
   );
   const selectedClip = project.clips.find((clip) => clip.id === selectedClipId) ?? null;
 
@@ -170,9 +171,8 @@ function useProjectTimelineViewState(
     project,
   }: Pick<ProjectTimelineProps, 'onZoomChange' | 'pixelsPerSecond' | 'project'>,
   selectedClip: ReturnType<typeof useProjectTimelineDerivedState>['selectedClip'],
-  timelineRef: React.MutableRefObject<HTMLDivElement | null>
+  viewportWidth: number
 ) {
-  const viewportWidth = useTimelineViewportWidth(timelineRef);
   const fitSelectionDuration = selectedClip?.duration ?? null;
   const visibleRangeSeconds = viewportWidth / Math.max(1, pixelsPerSecond);
   const onFitProject = useCallback(() => {
@@ -201,12 +201,14 @@ export function useProjectTimelineState(
   const { pixelsPerSecond, project, selectedClipId } = props;
   const interactions = useProjectTimelineInteractions(props, trackHeightByTrackId);
   const playback = useProjectTimelinePlaybackState(props);
+  const viewportWidth = useTimelineViewportWidth(playback.timelineRef);
   const { selectedClip, timelineWidth } = useProjectTimelineDerivedState(
     project,
     pixelsPerSecond,
-    selectedClipId
+    selectedClipId,
+    viewportWidth
   );
-  const viewState = useProjectTimelineViewState(props, selectedClip, playback.timelineRef);
+  const viewState = useProjectTimelineViewState(props, selectedClip, viewportWidth);
   const [hoveredClipId, setHoveredClipId] = useState<string | null>(null);
   useTimelineSelectedTrackAutoScroll({
     selectedTrackId: props.selectedTrackId,
