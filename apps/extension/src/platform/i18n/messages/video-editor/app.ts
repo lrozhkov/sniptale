@@ -37,6 +37,7 @@ export const videoEditorAppMessages = defineMessageSource({
   resizeTimeline: { ru: 'Высота просмотра', en: 'Viewer height' },
   sourceInLabel: { ru: 'In', en: 'In' },
   sourceOutLabel: { ru: 'Out', en: 'Out' },
+  closeSource: { ru: 'Закрыть исходник', en: 'Close source' },
   sourceViewer: { ru: 'Исходник', en: 'Source' },
   montageViewer: { ru: 'Монтаж', en: 'Timeline' },
   viewerSwitch: { ru: 'Просмотр', en: 'Viewer' },

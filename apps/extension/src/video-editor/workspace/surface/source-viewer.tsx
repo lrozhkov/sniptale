@@ -10,7 +10,7 @@ import {
   StepForward,
 } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { CompactRange } from '../../../ui/compact-inspector-controls';
+import { SourceRangeTimeline } from './source-timeline';
 import { translate } from '../../../platform/i18n';
 import {
   VideoProjectAssetType,
@@ -70,15 +70,6 @@ function SourceMediaViewer(props: SourceMediaViewerProps) {
     >
       <SourceMediaSurface asset={props.asset} assetUrl={props.assetUrl} media={viewer} />
       <div className="shrink-0 space-y-1 pt-1.5">
-        {!image && (
-          <SourceTimingControls
-            playback={viewer}
-            fps={props.fps}
-            onReset={() =>
-              props.onDraftChange({ ...props.draft, range: { start: 0, end: duration } })
-            }
-          />
-        )}
         {ready && !image && !validRange && !error && (
           <p role="alert" className="text-xs text-[var(--sniptale-color-danger)]">
             {translate('videoEditor.app.sourceInvalidRange')}
@@ -95,9 +86,18 @@ function SourceMediaViewer(props: SourceMediaViewerProps) {
           </p>
         )}
         <div
-          className="flex flex-wrap items-center justify-center gap-1"
+          className="flex min-w-0 items-center justify-center gap-1"
           data-ui="video-editor.source-placement"
         >
+          {!image && (
+            <SourceTimingControls
+              playback={viewer}
+              fps={props.fps}
+              onReset={() =>
+                props.onDraftChange({ ...props.draft, range: { start: 0, end: duration } })
+              }
+            />
+          )}
           <ProductActionButton
             compact
             disabled={!canPlace}
@@ -125,6 +125,20 @@ function SourceMediaViewer(props: SourceMediaViewerProps) {
             {translate('videoEditor.app.sourceOverlay')}
           </ProductActionButton>
         </div>
+        {!image && (
+          <SourceRangeTimeline
+            duration={duration}
+            fps={props.fps}
+            cursor={viewer.cursor}
+            range={viewer.range}
+            disabled={!usable || duration <= 0}
+            onSeek={viewer.seek}
+            onRange={(range) => {
+              viewer.pause();
+              props.onDraftChange({ ...props.draft, range });
+            }}
+          />
+        )}
       </div>
     </div>
   );
@@ -238,51 +252,14 @@ function SourceTimingControls({
     | 'seek'
     | 'step'
     | 'toggle'
-    | 'mark'
   >;
   fps: number;
   onReset: () => void;
 }) {
-  const { range, cursor, duration, frame, lastFrame, usable, playing, seek, step, toggle, mark } =
-    playback;
+  const { cursor, lastFrame, usable, playing, seek, step, toggle } = playback;
   return (
     <>
-      <div
-        className="relative px-1"
-        data-ui="video-editor.source-range"
-        data-in={range.start}
-        data-out={range.end}
-      >
-        <div
-          aria-hidden="true"
-          className={[
-            'pointer-events-none mb-0.5 h-2 overflow-hidden rounded-sm',
-            'bg-[var(--sniptale-color-border-soft)]',
-          ].join(' ')}
-        >
-          <div
-            className={[
-              'h-full border-x-2 border-[var(--sniptale-color-accent)]',
-              'bg-[var(--sniptale-color-accent-soft-strong)]',
-            ].join(' ')}
-            style={{
-              marginLeft: `${duration ? (range.start / duration) * 100 : 0}%`,
-              width: `${duration ? ((range.end - range.start) / duration) * 100 : 0}%`,
-            }}
-          />
-        </div>
-        <CompactRange
-          className="relative w-full"
-          aria-label={translate('videoEditor.app.sourcePosition')}
-          min={0}
-          max={lastFrame}
-          step={frame}
-          value={cursor}
-          disabled={!usable}
-          onChange={(event) => seek(Number(event.currentTarget.value))}
-        />
-      </div>
-      <div className="flex flex-wrap items-center justify-center gap-1">
+      <div className="flex shrink-0 items-center gap-1">
         <SourceTransportButton
           label={translate('videoEditor.timeline.seekToStart')}
           disabled={!usable}
@@ -321,25 +298,6 @@ function SourceTimingControls({
         <output data-source-counter="true" className="px-1 text-xs tabular-nums">
           {sourceTime(cursor, fps)}
         </output>
-        <ProductActionButton
-          compact
-          tone="secondary"
-          disabled={!usable}
-          title={translate('videoEditor.app.sourceMarkIn')}
-          onClick={() => mark('in')}
-        >
-          {translate('videoEditor.app.sourceInLabel')} · {sourceTime(range.start, fps)}
-        </ProductActionButton>
-        <ProductActionButton
-          compact
-          tone="secondary"
-          disabled={!usable}
-          title={translate('videoEditor.app.sourceMarkOut')}
-          onClick={() => mark('out')}
-        >
-          {translate('videoEditor.app.sourceOutLabel')} ·{' '}
-          {sourceTime(Math.max(range.start, range.end - frame), fps)}
-        </ProductActionButton>
         <SourceTransportButton
           label={translate('videoEditor.app.sourceReset')}
           disabled={!usable}

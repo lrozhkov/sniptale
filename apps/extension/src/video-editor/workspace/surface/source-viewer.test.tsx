@@ -32,6 +32,13 @@ function asset(name = 'Screen.webm', type: VideoProjectAssetType = VideoProjectA
 }
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
   vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(pause);
   vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(play);
   vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(load);
@@ -239,7 +246,7 @@ it('lets native range controls own their keyboard input and ignores inactive vie
   ready();
   act(() =>
     container
-      .querySelector('input')!
+      .querySelector('[role="slider"]')!
       .dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyI', bubbles: true }))
   );
   expect(marks().start).toBe(0);

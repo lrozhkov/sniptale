@@ -154,7 +154,7 @@ export function useSourceMediaViewer(props: SourceMediaViewerProps) {
     seek,
     step,
     toggle,
-    mark,
+    pause,
     place,
     onKeyDown: (event: KeyboardEvent<HTMLDivElement>) =>
       handleSourceShortcut(event, usable && !image, {
@@ -219,7 +219,7 @@ function handleSourceShortcut(
   if (!enabled || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
   if (
     event.target instanceof Element &&
-    event.target.closest('input, textarea, select, [contenteditable="true"]')
+    event.target.closest('input, textarea, select, [role="slider"], [contenteditable="true"]')
   )
     return;
   if (event.code === 'Space' && event.target instanceof Element && event.target.closest('button'))

@@ -14,6 +14,7 @@ import React, { useEffect, useState } from 'react';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { translate } from '../../../platform/i18n';
 import { VideoEditorSourceViewer } from './source-viewer';
+import type { VideoProjectAsset } from '../../../features/video/project/types';
 import { ProjectTimeline } from '../../timeline/project';
 import { PreviewStage } from '../../preview/stage';
 import {
@@ -137,7 +138,16 @@ function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
     >
       {source && (
         <WorkspaceViewerHeading
-          sourceName={source?.name ?? null}
+          source={source}
+          onClose={() => {
+            setSourceActive(false);
+            setSelectedAssetId(null);
+            requestAnimationFrame(() =>
+              document
+                .querySelector<HTMLElement>('[data-ui="video-editor.workspace.viewer"]')
+                ?.focus()
+            );
+          }}
           sourceActive={sourceActive}
           onChange={(active) => (active ? showSource() : setSourceActive(false))}
         />
@@ -211,6 +221,7 @@ function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
       )}
       <div
         className="col-start-2 row-start-1 flex min-h-0 min-w-0 flex-col"
+        tabIndex={-1}
         data-ui="video-editor.workspace.viewer"
         data-viewer={sourceActive ? 'source' : 'montage'}
       >
@@ -402,17 +413,19 @@ function VideoEditorWorkspaceResizeHandle({
 }
 
 function WorkspaceViewerHeading({
-  sourceName,
+  source,
+  onClose,
   sourceActive,
   onChange,
 }: {
-  sourceName: string | null;
+  source: VideoProjectAsset;
+  onClose: () => void;
   sourceActive: boolean;
   onChange: (source: boolean) => void;
 }) {
   return (
     <div className="flex h-9 min-w-0 items-center gap-2">
-      {sourceName !== null ? (
+      {source ? (
         <SegmentedSwitch
           density="compact"
           ariaLabel={translate('videoEditor.app.viewerSwitch')}
@@ -426,14 +439,24 @@ function WorkspaceViewerHeading({
       ) : (
         <span className="text-xs font-semibold">{translate('videoEditor.app.montageViewer')}</span>
       )}
-      {sourceActive && sourceName ? (
+      {sourceActive ? (
         <span
           className="min-w-0 truncate text-xs text-[var(--sniptale-color-text-muted)]"
-          title={sourceName}
+          title={source.name}
         >
-          {sourceName}
+          {source.name}
+          <span className="ml-2">
+            {source.metadata.width && source.metadata.height
+              ? `${source.metadata.width} × ${source.metadata.height}`
+              : source.metadata.mimeType}
+          </span>
         </span>
       ) : null}
+      <WorkspacePanelCloseButton
+        dataUi="video-editor.source.close"
+        title={translate('videoEditor.app.closeSource')}
+        onClose={onClose}
+      />
     </div>
   );
 }
