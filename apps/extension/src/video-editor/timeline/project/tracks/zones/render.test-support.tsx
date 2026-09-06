@@ -21,9 +21,10 @@ const JUNCTION_ZONES = [
   },
 ];
 
-export function renderTrackZones(root: Root | null) {
+export function renderTrackZones(root: Root | null, locked = false) {
   const onDropEffectDocument = vi.fn();
   const onSelectTransition = vi.fn();
+  const onBeginTransitionTrim = vi.fn();
   act(() => {
     root?.render(
       <div className="relative h-20">
@@ -36,11 +37,12 @@ export function renderTrackZones(root: Root | null) {
           onCloseTrackGap={vi.fn()}
           onDropEffectDocument={onDropEffectDocument}
           onSelectTransition={onSelectTransition}
+          onBeginTransitionTrim={locked ? undefined : onBeginTransitionTrim}
         />
       </div>
     );
   });
-  return { onDropEffectDocument, onSelectTransition };
+  return { onDropEffectDocument, onSelectTransition, onBeginTransitionTrim };
 }
 
 export function createEffectDocumentDataTransfer(): VideoEditorEffectDocumentDataTransfer {

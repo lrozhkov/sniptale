@@ -1,3 +1,4 @@
+import { getTrackJunctions } from '../../../../features/video/project/transition/junctions';
 import { clampNumber } from '../../../../features/video/project/timeline/basics';
 import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
 import { getLinkedClipIds, getTrackClips } from '../../../../features/video/project/timeline';
@@ -132,6 +133,28 @@ export function trimProjectClipStart(
   return nextProject;
 }
 
+/** Preserve the ordering of existing overlaps without moving an untouched neighbor. */
+function getTrimJunctionBounds(
+  project: VideoProject,
+  clips: EditableClipOperation['affectedClips'],
+  edge: 'start' | 'end'
+) {
+  let minimum = -Infinity;
+  let maximum = Infinity;
+  const affectedIds = new Set(clips.map((clip) => clip.id));
+  for (const { leadingClip, trailingClip } of getTrackJunctions(project)) {
+    const leadingMoves = affectedIds.has(leadingClip.id);
+    const trailingMoves = affectedIds.has(trailingClip.id);
+    if (leadingMoves === trailingMoves) continue;
+    const leadingEdge = leadingClip.startTime + (edge === 'end' ? leadingClip.duration : 0);
+    const trailingEdge = trailingClip.startTime + (edge === 'end' ? trailingClip.duration : 0);
+    const availableDelta = Math.max(0, trailingEdge - leadingEdge - 0.1);
+    if (leadingMoves) maximum = Math.min(maximum, availableDelta);
+    else minimum = Math.max(minimum, -availableDelta);
+  }
+  return { minimum, maximum };
+}
+
 /** One shared feasible delta keeps aligned linked edges and their source bounds together. */
 function clampClipTrimDelta(
   project: VideoProject,
@@ -140,8 +163,7 @@ function clampClipTrimDelta(
   requestedDelta: number
 ): number {
   if (requestedDelta === 0) return 0;
-  let minimum = -Infinity;
-  let maximum = Infinity;
+  let { minimum, maximum } = getTrimJunctionBounds(project, clips, edge);
   for (const clip of clips) {
     const sourceTimed = isSourceTimedClip(clip);
     const rate = sourceTimed ? normalizeClipPlaybackRate(clip.playbackRate ?? 1) : 1;

@@ -1,19 +1,13 @@
 import type React from 'react';
-import { translate } from '../../../../platform/i18n';
-import {
-  getClipTransitionOverlapDurations,
-  getClipWaveformPeaks,
-  isAudioClip,
-} from '../../../../features/video/project/timeline';
+import { getClipWaveformPeaks, isAudioClip } from '../../../../features/video/project/timeline';
 import { getClipGainRange } from '../../../../features/video/project/timeline/basics';
-import { VideoClipTransitionKind } from '../../../../features/video/project/types';
+import { getTrackJunctions } from '../../../../features/video/project/transition/junctions';
 import type { ProjectTimelineClipProps, ProjectTimelineClipViewModel } from './types';
 
 const DEFAULT_CLIP_ROW_HEIGHT = 62;
 const MIN_CLIP_HEIGHT = 22;
 const CLIP_VERTICAL_PADDING = 18;
 const LABEL_BASE_INSET = 12;
-const MIN_LABEL_READABLE_WIDTH = 24;
 const MIN_PREVIEW_TILE_WIDTH = 1;
 const MAX_PREVIEW_TILE_WIDTH = 160;
 const SELECTED_CLIP_SHADOW_CLASS_NAME = [
@@ -25,21 +19,6 @@ const TRIM_HANDLE_CLASS_NAME = [
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_20%,transparent)]',
   'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_32%,transparent)]',
 ].join(' ');
-
-function getCrossfadeTitles(transitionOverlap: { incomingMs: number; outgoingMs: number }) {
-  return {
-    incoming: [
-      translate('videoEditor.timeline.crossfadeIncomingPrefix'),
-      transitionOverlap.incomingMs,
-      translate('videoEditor.timeline.crossfadeMsSuffix'),
-    ].join(' '),
-    outgoing: [
-      translate('videoEditor.timeline.crossfadeOutgoingPrefix'),
-      transitionOverlap.outgoingMs,
-      translate('videoEditor.timeline.crossfadeMsSuffix'),
-    ].join(' '),
-  };
-}
 
 export function buildProjectTimelineClipViewModel({
   clip,
@@ -79,7 +58,10 @@ export function buildProjectTimelineClipViewModel({
     fadeOutOverlayWidth: getFadeOverlayWidth(clip.fadeOutMs, clip.duration, width),
     left: clip.startTime * pixelsPerSecond,
     previewTileWidth: getPreviewTileWidth(trackClipRowHeight),
-    style: getTimelineClipStyle(trackClipRowHeight, trackClipTop ?? 0),
+    style: {
+      ...getTimelineClipStyle(trackClipRowHeight, trackClipTop ?? 0),
+      clipPath: `inset(0 ${transitionViewModel.bodyInsetRight}px 0 ${transitionViewModel.bodyInsetLeft}px)`,
+    },
     ...transitionViewModel,
     trimHandleClassName: TRIM_HANDLE_CLASS_NAME,
     waveformPeaks,
@@ -96,43 +78,21 @@ function getTimelineClipTransitionViewModel({
   project,
   width,
 }: Pick<ProjectTimelineClipProps, 'clip' | 'pixelsPerSecond' | 'project'> &
-  Pick<ProjectTimelineClipViewModel, 'width'>): Pick<
-  ProjectTimelineClipViewModel,
-  | 'hasIncomingCrossfade'
-  | 'hasOutgoingCrossfade'
-  | 'incomingCrossfadeOverlayWidth'
-  | 'incomingCrossfadeTitle'
-  | 'labelStyle'
-  | 'outgoingCrossfadeOverlayWidth'
-  | 'outgoingCrossfadeTitle'
-> {
-  const transitionOverlap = getClipTransitionOverlapDurations(project, clip);
-  const incomingCrossfadeOverlayWidth = getCrossfadeOverlayWidth(
-    transitionOverlap.incomingMs,
-    pixelsPerSecond,
-    width
-  );
-  const outgoingCrossfadeOverlayWidth = getCrossfadeOverlayWidth(
-    transitionOverlap.outgoingMs,
-    pixelsPerSecond,
-    width
-  );
-  const crossfadeTitles = getCrossfadeTitles(transitionOverlap);
-
+  Pick<ProjectTimelineClipViewModel, 'width'>) {
+  let bodyInsetLeft = 0;
+  let bodyInsetRight = 0;
+  for (const junction of getTrackJunctions(project)) {
+    const halfOverlap = Math.min(width, junction.duration * pixelsPerSecond) / 2;
+    if (junction.trailingClip.id === clip.id) bodyInsetLeft = halfOverlap;
+    if (junction.leadingClip.id === clip.id) bodyInsetRight = halfOverlap;
+  }
   return {
-    hasIncomingCrossfade:
-      clip.transitionIn === VideoClipTransitionKind.CROSSFADE && transitionOverlap.incomingMs > 0,
-    hasOutgoingCrossfade:
-      clip.transitionOut === VideoClipTransitionKind.CROSSFADE && transitionOverlap.outgoingMs > 0,
-    incomingCrossfadeOverlayWidth,
-    incomingCrossfadeTitle: crossfadeTitles.incoming,
-    labelStyle: getTimelineClipLabelStyle({
-      incomingCrossfadeOverlayWidth,
-      outgoingCrossfadeOverlayWidth,
-      width,
-    }),
-    outgoingCrossfadeOverlayWidth,
-    outgoingCrossfadeTitle: crossfadeTitles.outgoing,
+    bodyInsetLeft,
+    bodyInsetRight,
+    labelStyle: {
+      left: LABEL_BASE_INSET + bodyInsetLeft,
+      right: LABEL_BASE_INSET + bodyInsetRight,
+    },
   };
 }
 
@@ -179,39 +139,6 @@ function getFadeOverlayWidth(fadeMs: number, durationSeconds: number, width: num
 
   const fadeSeconds = fadeMs / 1000;
   return Math.min(width / 2, Math.max(0, fadeSeconds * (width / durationSeconds)));
-}
-
-function getCrossfadeOverlayWidth(
-  overlapMs: number,
-  pixelsPerSecond: number,
-  width: number
-): number {
-  if (overlapMs <= 0 || pixelsPerSecond <= 0) {
-    return 0;
-  }
-
-  return Math.min(width, Math.max(0, (overlapMs / 1000) * pixelsPerSecond));
-}
-
-function getTimelineClipLabelStyle({
-  incomingCrossfadeOverlayWidth,
-  outgoingCrossfadeOverlayWidth,
-  width,
-}: Pick<
-  ProjectTimelineClipViewModel,
-  'incomingCrossfadeOverlayWidth' | 'outgoingCrossfadeOverlayWidth' | 'width'
->): React.CSSProperties {
-  const totalOverlapReserve = incomingCrossfadeOverlayWidth + outgoingCrossfadeOverlayWidth;
-  const maxOverlapReserve = Math.max(0, width - LABEL_BASE_INSET * 2 - MIN_LABEL_READABLE_WIDTH);
-  const reserveScale =
-    totalOverlapReserve > maxOverlapReserve && totalOverlapReserve > 0
-      ? maxOverlapReserve / totalOverlapReserve
-      : 1;
-
-  return {
-    left: Math.round(LABEL_BASE_INSET + incomingCrossfadeOverlayWidth * reserveScale),
-    right: Math.round(LABEL_BASE_INSET + outgoingCrossfadeOverlayWidth * reserveScale),
-  };
 }
 
 function getTimelineClipStyle(

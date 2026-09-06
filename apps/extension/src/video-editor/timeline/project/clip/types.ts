@@ -23,18 +23,14 @@ export interface ProjectTimelineClipProps {
 }
 
 export interface ProjectTimelineClipViewModel {
+  bodyInsetLeft: number;
+  bodyInsetRight: number;
   clipClassName: string;
   edgeClassName: string;
   fadeInOverlayWidth: number;
   fadeOutOverlayWidth: number;
-  hasIncomingCrossfade: boolean;
-  hasOutgoingCrossfade: boolean;
-  incomingCrossfadeOverlayWidth: number;
-  incomingCrossfadeTitle: string;
   labelStyle: React.CSSProperties;
   left: number;
-  outgoingCrossfadeOverlayWidth: number;
-  outgoingCrossfadeTitle: string;
   style: React.CSSProperties;
   previewTileWidth: number;
   trimHandleClassName: string;

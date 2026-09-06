@@ -57,9 +57,8 @@ it('builds clip timeline view models with crossfade metadata and temporal width'
 
   expect(viewModel.width).toBe(30);
   expect(viewModel.left).toBe(10);
-  expect(viewModel.hasIncomingCrossfade).toBe(true);
-  expect(viewModel.hasOutgoingCrossfade).toBe(false);
-  expect(viewModel.incomingCrossfadeTitle).toContain('1000');
+  expect(viewModel.bodyInsetLeft).toBe(5);
+  expect(viewModel.bodyInsetRight).toBe(0);
   expect(viewModel.clipClassName).toContain('ring-2');
   expect(viewModel.clipClassName).toContain('opacity-55');
 });
@@ -133,10 +132,10 @@ it('reserves crossfade overlap space outside readable clip labels', () => {
     trackLocked: false,
   });
 
-  expect(firstModel.outgoingCrossfadeOverlayWidth).toBe(100);
-  expect(secondModel.incomingCrossfadeOverlayWidth).toBe(100);
-  expect(firstModel.labelStyle).toMatchObject({ left: 12, right: 112 });
-  expect(secondModel.labelStyle).toMatchObject({ left: 112, right: 12 });
+  expect(firstModel.bodyInsetRight).toBe(50);
+  expect(secondModel.bodyInsetLeft).toBe(50);
+  expect(firstModel.labelStyle).toMatchObject({ left: 12, right: 62 });
+  expect(secondModel.labelStyle).toMatchObject({ left: 62, right: 12 });
 });
 
 it.each([0.1, 0.01])(
@@ -155,3 +154,44 @@ it.each([0.1, 0.01])(
     expect(model.width).toBe(Math.max(1, duration * 90));
   }
 );
+
+it('gives both almost coincident clips half the overlap for body hit testing', () => {
+  const project = createEmptyVideoProject('Reachable overlap');
+  const first = { ...createVideoClip(project.tracks[0]!.id), startTime: 0, duration: 10 };
+  const second = { ...first, id: 'clip-2', startTime: 0.1 };
+  project.clips = [first, second];
+  const models = project.clips.map((clip) =>
+    buildProjectTimelineClipViewModel({
+      clip,
+      project,
+      pixelsPerSecond: 100,
+      isSelected: false,
+      isHovered: false,
+      trackLocked: false,
+    })
+  );
+  expect(models[0]?.style.clipPath).toBe('inset(0 495px 0 0px)');
+  expect(models[1]?.style.clipPath).toBe('inset(0 0px 0 495px)');
+  expect(models[0]?.width).toBe(1000);
+  expect(models[1]?.left).toBe(10);
+});
+
+it('does not divide clip bodies across logical lanes', () => {
+  const project = createEmptyVideoProject('Separate lanes');
+  const first = {
+    ...createVideoClip(project.tracks[0]!.id),
+    startTime: 0,
+    duration: 10,
+    timelineLaneId: 'one',
+  };
+  project.clips = [first, { ...first, id: 'second', startTime: 0.1, timelineLaneId: 'two' }];
+  const model = buildProjectTimelineClipViewModel({
+    clip: first,
+    project,
+    pixelsPerSecond: 100,
+    isHovered: false,
+    isSelected: false,
+    trackLocked: false,
+  });
+  expect(model.style.clipPath).toBe('inset(0 0px 0 0px)');
+});

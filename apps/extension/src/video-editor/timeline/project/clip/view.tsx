@@ -152,6 +152,13 @@ function ProjectTimelineClipVisualOverlays({
         title={translate('videoEditor.sidebar.fadeOutLabel')}
         width={viewModel.fadeOutOverlayWidth}
       />
+      {viewModel.bodyInsetLeft > 0 ? (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 z-20 w-px bg-[var(--sniptale-color-border-strong)]"
+          style={{ left: viewModel.bodyInsetLeft }}
+        />
+      ) : null}
       <span className={`${viewModel.edgeClassName} left-0`} aria-hidden="true" />
       <span className={`${viewModel.edgeClassName} right-0`} aria-hidden="true" />
     </>

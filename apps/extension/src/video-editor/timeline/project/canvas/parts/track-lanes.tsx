@@ -114,7 +114,12 @@ function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
       {...createTrackLaneEventProps(props)}
     >
       <ProjectTimelineLogicalLaneGuides trackLayout={props.trackLayout} />
-      <ProjectTimelineTrackZones {...createTrackZoneProps({ ...props, project: displayProject })} />
+      <ProjectTimelineTrackZones
+        {...createTrackZoneProps({
+          ...props,
+          project: getDragDisplayProject(props.project, props.dragGhost),
+        })}
+      />
       <ProjectTimelineClipDragGhost
         dragGhost={props.dragGhost}
         pixelsPerSecond={props.pixelsPerSecond}
@@ -145,6 +150,11 @@ function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
 /** Presentation-only geometry; the gesture owner publishes the command on release. */
 function getReorderDisplayProject(project: VideoProject, ghost: TimelineClipDragGhost | null) {
   if (!ghost?.activeReorder) return project;
+  return getDragDisplayProject(project, ghost);
+}
+
+function getDragDisplayProject(project: VideoProject, ghost: TimelineClipDragGhost | null) {
+  if (!ghost) return project;
   const placements = new Map(
     [ghost, ...(ghost.relatedClips ?? [])].map((clip) => [clip.clipId, clip])
   );
@@ -152,7 +162,15 @@ function getReorderDisplayProject(project: VideoProject, ghost: TimelineClipDrag
     ...project,
     clips: project.clips.map((clip) => {
       const placement = placements.get(clip.id);
-      return placement ? { ...clip, startTime: placement.startTime } : clip;
+      return placement
+        ? {
+            ...clip,
+            startTime: placement.startTime,
+            duration: placement.duration,
+            trackId: placement.trackId,
+            timelineLaneId: placement.timelineLaneId,
+          }
+        : clip;
     }),
   };
 }
@@ -197,6 +215,7 @@ function resolveTimelineLaneIdFromDropEvent(
 }
 
 function createTrackZoneProps(props: {
+  onBeginClipInteraction: ProjectTimelineTrackLanesProps['onBeginClipInteraction'];
   pixelsPerSecond: number;
   project: VideoProject;
   track: VideoProject['tracks'][number];
@@ -206,6 +225,16 @@ function createTrackZoneProps(props: {
   selection: VideoEditorSelection;
 }): React.ComponentProps<typeof ProjectTimelineTrackZones> {
   return {
+    onBeginTransitionTrim: props.track.locked
+      ? undefined
+      : (event, transitionId, edge) => {
+          const transition = props.project.transitions?.find((item) => item.id === transitionId);
+          const clipId = edge === 'start' ? transition?.trailingClipId : transition?.leadingClipId;
+          const clip = props.project.clips.find((item) => item.id === clipId);
+          if (!clip) return;
+          props.onBeginClipInteraction(event, clip, edge === 'start' ? 'trim-start' : 'trim-end');
+          props.onSelectTransition(transitionId);
+        },
     cutZones: buildTrackCutZones(props.project, props.track.id),
     gapZones: buildTrackGapZones(props.project, props.track.id),
     junctionZones: buildTrackJunctionZones(props.project, props.track.id),

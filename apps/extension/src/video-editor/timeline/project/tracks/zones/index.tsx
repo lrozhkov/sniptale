@@ -11,7 +11,14 @@ import type { ProjectTimelineProps } from '../../types';
 export type { TimelineJunctionZone } from './model';
 export { buildTrackCutZones, buildTrackGapZones, buildTrackJunctionZones } from './model';
 
+type TransitionTrimHandler = (
+  event: ReactPointerEvent,
+  transitionId: string,
+  edge: 'start' | 'end'
+) => void;
+
 export function ProjectTimelineTrackZones(props: {
+  onBeginTransitionTrim?: TransitionTrimHandler | undefined;
   cutZones: TimelineCutZone[];
   gapZones: TimelineGapZone[];
   junctionZones?: TimelineJunctionZone[];
@@ -35,12 +42,14 @@ export function ProjectTimelineTrackZones(props: {
         selectedTransitionId={props.selectedTransitionId ?? null}
         onDropEffectDocument={props.onDropEffectDocument}
         onSelectTransition={props.onSelectTransition}
+        onBeginTransitionTrim={props.onBeginTransitionTrim}
       />
     </>
   );
 }
 
 function TrackJunctionZoneLayer(props: {
+  onBeginTransitionTrim: TransitionTrimHandler | undefined;
   junctionZones: TimelineJunctionZone[];
   pixelsPerSecond: number;
   selectedTransitionId: string | null;
@@ -55,11 +64,13 @@ function TrackJunctionZoneLayer(props: {
       selected={props.selectedTransitionId === zone.id}
       onDropEffectDocument={props.onDropEffectDocument}
       onSelectTransition={props.onSelectTransition}
+      onBeginTransitionTrim={props.onBeginTransitionTrim}
     />
   ));
 }
 
 function TrackJunctionZoneButton(props: {
+  onBeginTransitionTrim: TransitionTrimHandler | undefined;
   onDropEffectDocument: ProjectTimelineProps['onDropEffectDocument'] | undefined;
   onSelectTransition: ((transitionId: string) => void) | undefined;
   pixelsPerSecond: number;
@@ -67,14 +78,12 @@ function TrackJunctionZoneButton(props: {
   zone: TimelineJunctionZone;
 }) {
   return (
-    <button
+    <div
       {...TIMELINE_OBJECT_MARKER_PROPS}
-      type="button"
-      aria-label={props.zone.title}
       data-ui="timeline.track-transition-zone"
       title={props.zone.title}
       className={[
-        'absolute bottom-2 z-30 flex h-5 items-center justify-center overflow-hidden',
+        'group absolute bottom-2 z-30 flex h-5 items-center justify-center overflow-hidden',
         'rounded-sm outline outline-1 -outline-offset-1 px-0 text-[10px] font-semibold',
         'bg-[var(--sniptale-color-surface-overlay)] text-[var(--sniptale-color-text-secondary)]',
         props.selected
@@ -106,6 +115,11 @@ function TrackJunctionZoneButton(props: {
         props.onSelectTransition?.(props.zone.id);
       }}
     >
+      <button
+        type="button"
+        aria-label={props.zone.title}
+        className="absolute inset-0 w-full h-full"
+      />
       <svg
         aria-hidden="true"
         className="pointer-events-none absolute inset-0 h-full w-full opacity-60"
@@ -125,7 +139,36 @@ function TrackJunctionZoneButton(props: {
           {props.zone.label}
         </span>
       ) : null}
-    </button>
+      {props.onBeginTransitionTrim
+        ? (['start', 'end'] as const).map((edge) => (
+            <button
+              key={edge}
+              {...TIMELINE_OBJECT_MARKER_PROPS}
+              type="button"
+              tabIndex={-1}
+              aria-label={[
+                props.zone.title,
+                translate(
+                  edge === 'start'
+                    ? 'videoEditor.app.sourceInLabel'
+                    : 'videoEditor.app.sourceOutLabel'
+                ),
+              ].join(' ')}
+              data-transition-trim={edge}
+              className={[
+                'absolute inset-y-0 z-10 w-[min(8px,25%)] !cursor-ew-resize',
+                'bg-[var(--sniptale-color-border-strong)] opacity-40 hover:opacity-100',
+                edge === 'start' ? 'left-0' : 'right-0',
+              ].join(' ')}
+              onClick={(event) => event.stopPropagation()}
+              onPointerDown={(event) => {
+                event.stopPropagation();
+                props.onBeginTransitionTrim?.(event, props.zone.id, edge);
+              }}
+            />
+          ))
+        : null}
+    </div>
   );
 }
 

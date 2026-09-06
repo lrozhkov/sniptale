@@ -90,7 +90,7 @@ function verifyTrackZoneRendering() {
   const buttons = container?.querySelectorAll('button');
 
   expect(cutZone?.getAttribute('style')).toContain('left: 60px');
-  expect(buttons).toHaveLength(2);
+  expect(buttons).toHaveLength(4);
   expect(gapButton?.style.left).toBe('40px');
   expect(gapButton?.style.width).toBe('20px');
   expect(transitionButton?.style.left).toBe('80px');
@@ -226,3 +226,25 @@ function verifyGapZoneDerivation() {
   expect(buildTrackGapZones(project, audioTrack)).toEqual([]);
   expect(buildTrackGapZones(project, overlayTrack)).toEqual([]);
 }
+
+it('routes each transition boundary to its own trim without selecting the clip behind it', () => {
+  const { onBeginTransitionTrim } = renderTrackZones(root);
+  const start = container?.querySelector('[data-transition-trim="start"]');
+  const end = container?.querySelector('[data-transition-trim="end"]');
+  expect(start).not.toBeNull();
+  expect(end).not.toBeNull();
+  act(() => start?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  act(() => end?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  expect(onBeginTransitionTrim.mock.calls.map((call) => call.slice(1))).toEqual([
+    ['transition-zone', 'start'],
+    ['transition-zone', 'end'],
+  ]);
+});
+
+it('keeps transition selection available without trim handles on locked tracks', () => {
+  const { onSelectTransition } = renderTrackZones(root, true);
+  expect(container?.querySelector('[data-transition-trim]')).toBeNull();
+  const button = container?.querySelector<HTMLButtonElement>('[aria-label="transition title"]');
+  act(() => button?.click());
+  expect(onSelectTransition).toHaveBeenCalledWith('transition-zone');
+});

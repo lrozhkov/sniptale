@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   createEmptyVideoProject,
+  createVideoProjectAsset,
   createVideoProjectTrack,
 } from '../../../../features/video/project/factories/creation';
 import {
@@ -257,3 +258,47 @@ function verifyLinkedMutationOwnership(): void {
     duplicatedProject.clips.filter((clip) => clip.linkMode === VideoClipLinkMode.LINKED)
   ).toHaveLength(4);
 }
+
+it('holds transition trims before they engulf either adjacent clip', () => {
+  const project = createTimelineProject();
+  const first = project.clips[0]!;
+  const second = project.clips[1]!;
+  if (first.type !== VideoProjectClipType.VIDEO || second.type !== VideoProjectClipType.VIDEO)
+    throw new Error('Video fixture');
+  first.sourceStart = 5;
+  second.startTime = 4;
+  second.sourceStart = 5;
+  const start = trimProjectClipStart(project, second.id, -10).clips[1]!;
+  expect(start.startTime).toBeCloseTo(1.1);
+  const asset = createVideoProjectAsset(
+    'Source',
+    'VIDEO',
+    { kind: 'project-asset', projectAssetId: 'asset-1' },
+    {
+      duration: 20,
+      width: 1280,
+      height: 720,
+      mimeType: 'video/webm',
+      size: 1,
+      hasAudio: false,
+      audioPeaks: null,
+    }
+  );
+  asset.id = first.assetId;
+  project.assets = [asset];
+  const end = trimProjectClipEnd(project, first.id, 20).clips[0]!;
+  expect(end.startTime + end.duration).toBeCloseTo(5.9);
+});
+
+it('keeps outer trims from moving an overlapping clip inside its neighbor', () => {
+  const project = createTimelineProject();
+  const first = project.clips[0]!;
+  const second = project.clips[1]!;
+  second.startTime = 4;
+  const shortenedLeading = trimProjectClipStart(project, first.id, 4.5).clips[0]!;
+  expect(shortenedLeading.startTime).toBeCloseTo(3.9);
+  expect(shortenedLeading.startTime + shortenedLeading.duration).toBeCloseTo(5);
+  const shortenedTrailing = trimProjectClipEnd(project, second.id, 4.5).clips[1]!;
+  expect(shortenedTrailing.startTime + shortenedTrailing.duration).toBeCloseTo(5.1);
+  expect(shortenedTrailing.startTime).toBe(4);
+});
