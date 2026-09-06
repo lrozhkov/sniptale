@@ -31,6 +31,8 @@ export const PreviewStageFrame = React.forwardRef<HTMLDivElement, PreviewStageFr
         }}
       >
         <PreviewStageShellLayout
+          alternateView={props.alternateView}
+          headerContent={props.headerContent}
           {...resolvePreviewStageControls(props)}
           currentTime={props.currentTime ?? 0}
           duration={props.duration ?? 0}

@@ -117,7 +117,15 @@ export interface PreviewStageCanvasProps {
   videoRefs: PreviewStageVideoRefs;
 }
 
+/** A workspace-owned alternate viewer kept mounted alongside the montage canvas. */
+export interface PreviewStageAlternateView {
+  active: boolean;
+  content: React.ReactNode;
+}
+
 export interface PreviewStageSurfaceProps extends PreviewStageCanvasProps {
+  alternateView?: PreviewStageAlternateView | undefined;
+  headerContent?: React.ReactNode;
   isPlaying: boolean;
   playbackRange: VideoEditorPlaybackRange | null;
   onAddActionEvent: (preset: VideoProjectActionPreset) => void;

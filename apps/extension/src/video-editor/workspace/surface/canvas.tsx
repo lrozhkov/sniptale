@@ -120,6 +120,13 @@ function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
     preview.transport.onPausePlayback();
     setSourceActive(true);
   };
+  const viewerHeading = (
+    <WorkspaceViewerHeading
+      sourceName={source?.name ?? null}
+      sourceActive={sourceActive}
+      onChange={(active) => (active ? showSource() : setSourceActive(false))}
+    />
+  );
   return (
     <>
       {(props.materialsOpen || props.effectsLibraryDockOpen) && (
@@ -172,29 +179,25 @@ function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
         data-ui="video-editor.workspace.viewer"
         data-viewer={sourceActive ? 'source' : 'montage'}
       >
-        <WorkspaceViewerHeading
-          sourceName={source?.name ?? null}
-          projectName={preview.project.name}
-          sourceActive={sourceActive}
-          onChange={(active) => (active ? showSource() : setSourceActive(false))}
+        <PreviewStage
+          headerContent={viewerHeading}
+          alternateView={{
+            active: sourceActive,
+            content: (
+              <VideoEditorSourceViewer
+                asset={source}
+                assetUrl={source ? preview.assetUrls[source.id] : undefined}
+                active={sourceActive && !blocking}
+                fps={preview.project.fps}
+                onAppend={appendMaterial}
+                onInsert={insertMaterial}
+                onOverlay={overlayMaterial}
+                onPlaced={() => setSourceActive(false)}
+              />
+            ),
+          }}
+          {...createWorkspacePreviewProps(props, preview)}
         />
-        <div className="relative min-h-0 flex-1">
-          <div className="h-full min-h-0" hidden={sourceActive}>
-            <PreviewStage {...createWorkspacePreviewProps(props, preview)} />
-          </div>
-          <div className="absolute inset-0 min-h-0" hidden={!sourceActive}>
-            <VideoEditorSourceViewer
-              asset={source}
-              assetUrl={source ? preview.assetUrls[source.id] : undefined}
-              active={sourceActive && !blocking}
-              fps={preview.project.fps}
-              onAppend={appendMaterial}
-              onInsert={insertMaterial}
-              onOverlay={overlayMaterial}
-              onPlaced={() => setSourceActive(false)}
-            />
-          </div>
-        </div>
       </div>
     </>
   );
@@ -359,17 +362,15 @@ function VideoEditorWorkspaceResizeHandle({
 
 function WorkspaceViewerHeading({
   sourceName,
-  projectName,
   sourceActive,
   onChange,
 }: {
   sourceName: string | null;
-  projectName: string;
   sourceActive: boolean;
   onChange: (source: boolean) => void;
 }) {
   return (
-    <div className="flex h-8 min-w-0 shrink-0 items-center gap-2 px-1">
+    <div className="flex h-9 min-w-0 flex-1 items-center gap-2">
       {sourceName !== null ? (
         <SegmentedSwitch
           density="compact"
@@ -384,12 +385,14 @@ function WorkspaceViewerHeading({
       ) : (
         <span className="text-xs font-semibold">{translate('videoEditor.app.montageViewer')}</span>
       )}
-      <span
-        className="min-w-0 truncate text-xs text-[var(--sniptale-color-text-muted)]"
-        title={sourceActive ? (sourceName ?? undefined) : projectName}
-      >
-        {sourceActive ? sourceName : projectName}
-      </span>
+      {sourceActive && sourceName ? (
+        <span
+          className="min-w-0 truncate text-xs text-[var(--sniptale-color-text-muted)]"
+          title={sourceName}
+        >
+          {sourceName}
+        </span>
+      ) : null}
     </div>
   );
 }

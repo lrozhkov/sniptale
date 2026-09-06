@@ -21,6 +21,8 @@ function buildPreviewStageSurfaceProps(
   runtime: ReturnType<typeof usePreviewStageRuntime>
 ): PreviewStageSurfaceProps {
   return {
+    alternateView: props.alternateView,
+    headerContent: props.headerContent,
     activeClips: runtime.surface.activeClips,
     activeInsertKind: props.activeInsertKind,
     audioBankClips: runtime.media.audioBankClips,

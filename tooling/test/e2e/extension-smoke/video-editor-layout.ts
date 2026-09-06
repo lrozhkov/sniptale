@@ -93,6 +93,12 @@ async function expectTimelineToolbarControls(page: Page): Promise<void> {
   const toolbar = page.locator('[data-ui="video-editor.timeline.toolbar"]');
   await expect(toolbar.locator('[data-playback-counter]')).toHaveCount(1);
   await expect(page.locator('[data-ui="video-editor.viewer.transport"]')).toHaveCount(0);
+  const settings = page.locator('[data-ui="video.preview.controls"]');
+  if (await settings.isVisible()) {
+    const controlsBox = (await settings.boundingBox())!;
+    const viewportBox = (await page.locator('[data-ui="video.preview.viewport"]').boundingBox())!;
+    expect(controlsBox.y + controlsBox.height).toBeLessThanOrEqual(viewportBox.y);
+  }
   const width = (await toolbar.boundingBox())!.width;
   if (width >= 1000) {
     const minimum = width >= 1400 ? 36 : 32;

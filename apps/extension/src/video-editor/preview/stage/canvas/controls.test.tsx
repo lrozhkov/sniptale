@@ -33,5 +33,7 @@ it('presents cache preparation failure separately from unavailable capability', 
   expect(markup).not.toContain('videoEditor.stage.previewCacheUnavailable');
   expect(markup).toContain('!w-[92px]');
   expect(markup).toContain('!w-[88px]');
-  expect(markup).toContain('absolute right-0 top-11');
+  expect(markup).toContain('data-ui="video.preview.feedback"');
+  expect(markup).not.toContain('absolute right-0 top-11');
+  expect(markup).toContain('!w-[112px]');
 });

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { VideoProjectAnnotationTemplatePatch } from '../../../../features/video/project/annotation/contract';
 import type {
   VideoProject,
@@ -18,9 +19,16 @@ import type {
   VideoEditorPreviewRasterPreset,
   VideoEditorPreviewZoom,
 } from '../../../contracts/preview-runtime';
-import type { PreviewStageGridSettings, VideoPreviewCanvasInsertKind } from '../types';
+import type {
+  PreviewStageAlternateView,
+  PreviewStageGridSettings,
+  VideoPreviewCanvasInsertKind,
+} from '../types';
 
 export interface PreviewStageProps {
+  alternateView?: PreviewStageAlternateView | undefined;
+  /** Workspace context for the stage header; hidden during native fullscreen. */
+  headerContent?: ReactNode;
   project: VideoProject;
   assetUrls: Record<string, string>;
   currentTime: number;

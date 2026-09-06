@@ -15,7 +15,8 @@ function verifyPreviewFrameHostsZoomableStageContent() {
   );
 
   expect(markup).toContain('absolute inset-4 min-h-0');
-  expect(markup).toContain('absolute right-4 top-4');
+  expect(markup).toContain('data-ui="video.preview.header"');
+  expect(markup).not.toContain('absolute right-4 top-4');
   expect(markup).toContain('data-ui="video.preview.viewport"');
   expect(markup).toContain('[container-type:size]');
   expect(markup).toContain('flex h-full w-full items-center justify-center');
