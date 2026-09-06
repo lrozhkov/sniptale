@@ -12,8 +12,8 @@ export function EffectsLibraryHeader(props: {
   return (
     <header
       className={[
-        'flex h-9 shrink-0 items-center justify-between gap-1 border-b',
-        'border-[color:var(--sniptale-color-border-soft)] px-2.5',
+        'flex h-[52px] shrink-0 items-center justify-between gap-1 border-b',
+        'border-[color:var(--sniptale-color-border-soft)] px-3',
       ].join(' ')}
     >
       <h2

@@ -2,7 +2,7 @@ import { ArrowUp, ArrowDown } from 'lucide-react';
 import { useWorkspaceTrackPresentation } from '../../../surface/track-presentation';
 import { translate } from '../../../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { StatusRow, TextField, NumericRow } from '../../../../../ui/compact-inspector-controls';
+import { TextField, NumericRow } from '../../../../../ui/compact-inspector-controls';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { ToggleField } from '../shared/controls';
 import { getVideoTrackKindLabel } from '../../track-kind-label';
@@ -18,6 +18,7 @@ export function TrackGeneralFields(props: {
   return (
     <>
       <TextField
+        className="!min-h-9 !bg-transparent !px-0 !py-0 data-[editing=false]:!border-transparent"
         key={`${props.selectedTrack.id}:${props.selectedTrack.name}`}
         defaultValue={props.selectedTrack.name}
         label={translate('videoEditor.sidebar.trackNameLabel')}
@@ -25,7 +26,15 @@ export function TrackGeneralFields(props: {
         onValueCommit={(name) => props.onRenameTrack?.(props.selectedTrack.id, name)}
       />
       <div className="mt-3 space-y-2">
-        <StatusRow label={translate('videoEditor.sidebar.trackTypeLabel')} value={kindLabel} />
+        <div
+          className={[
+            'flex min-h-9 items-center justify-between gap-3',
+            'text-[length:var(--sniptale-compact-font-size,12px)]',
+          ].join(' ')}
+        >
+          <span>{translate('videoEditor.sidebar.trackTypeLabel')}</span>
+          <span className="text-[var(--sniptale-color-text-muted)]">{kindLabel}</span>
+        </div>
         <ToggleField
           checked={props.selectedTrack.visible}
           disabled={!props.onToggleTrackVisibility}
@@ -99,7 +108,7 @@ export function TrackLayoutFields({
           <ProductActionButton
             compact
             tone="secondary"
-            className="!h-7 !min-w-7 !px-1.5"
+            className="!h-8 !min-w-8 !px-1.5"
             disabled={position <= 0}
             onClick={() => onMoveTrack(track.id, 'up')}
           >
@@ -109,7 +118,7 @@ export function TrackLayoutFields({
           <ProductActionButton
             compact
             tone="secondary"
-            className="!h-7 !min-w-7 !px-1.5"
+            className="!h-8 !min-w-8 !px-1.5"
             disabled={position < 0 || position === tracks.length - 1}
             onClick={() => onMoveTrack(track.id, 'down')}
           >

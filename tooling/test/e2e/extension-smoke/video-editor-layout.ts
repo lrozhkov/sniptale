@@ -3,6 +3,15 @@ import { expect, type Page } from '@playwright/test';
 /** Actual extension geometry: pane docking changes available timeline space without a second toolbar. */
 export async function expectVideoEditorPanelLayout(page: Page): Promise<void> {
   await expectLibraryDrawerPlacement(page);
+  const importTrigger = page.locator('[data-ui="video-editor.materials.import"]');
+  await importTrigger.click();
+  const importMenu = page.locator('[data-ui="video-editor.materials.import-menu"]');
+  await expect(importMenu).toBeVisible();
+  const menuBox = (await importMenu.boundingBox())!;
+  expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  await page.keyboard.press('Escape');
+  await expect(importMenu).toHaveCount(0);
+  await expect(importTrigger).toBeFocused();
   const chrome = page.locator('[data-ui="video-editor.floating-workspace"]');
   expect((await chrome.boundingBox())!.height).toBeLessThanOrEqual(70);
   const materials = page.locator('[data-ui="video-editor.materials"]');
@@ -60,6 +69,11 @@ async function expectAdaptivePaneDefaults(page: Page): Promise<void> {
       inspectorWidth
     );
     await expectTimelineToolbarControls(page);
+    const title = (await page
+      .locator('[data-ui="video-editor.workspace.sidebar-header-title-row"]')
+      .boundingBox())!;
+    const viewerHeader = (await page.locator('[data-ui="video.preview.header"]').boundingBox())!;
+    expect(title.y + title.height).toBeCloseTo(viewerHeader.y + viewerHeader.height - 1, 0);
     const docks = [
       page.locator('[data-ui="video-editor.materials.dock-toggle"]'),
       page.locator('[data-ui="video-editor.inspector.dock-toggle"]'),
@@ -106,12 +120,12 @@ async function expectTimelineToolbarControls(page: Page): Promise<void> {
     for (const button of await buttons.all()) {
       if ((await button.evaluate((node) => getComputedStyle(node).visibility)) === 'hidden')
         continue;
-      const box = (await button.boundingBox())!;
-      expect(
-        box.height,
-        (await button.getAttribute('title')) ?? 'toolbar button'
-      ).toBeGreaterThanOrEqual(minimum);
-      expect(box.width).toBeGreaterThanOrEqual(minimum);
+      await expect
+        .poll(async () => (await button.boundingBox())!.height)
+        .toBeGreaterThanOrEqual(minimum);
+      await expect
+        .poll(async () => (await button.boundingBox())!.width)
+        .toBeGreaterThanOrEqual(minimum);
     }
   }
   const controls = await toolbar.evaluate((node) => {

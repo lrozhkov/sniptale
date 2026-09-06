@@ -60,6 +60,7 @@ export const videoEditorAppMessages = defineMessageSource({
   sourceAppend: { ru: 'В конец', en: 'Append' },
   sourceInsert: { ru: 'Вставить', en: 'Insert' },
   sourceOverlay: { ru: 'Наложить', en: 'Overlay' },
+  materialsImport: { ru: 'Импорт', en: 'Import' },
   materialsTitle: { ru: 'Материалы', en: 'Materials' },
   materialsLocked: {
     ru: 'Дорожка заблокирована. Разблокируйте её и повторите добавление.',

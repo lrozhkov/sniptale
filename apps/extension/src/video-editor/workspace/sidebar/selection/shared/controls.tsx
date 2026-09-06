@@ -1,9 +1,9 @@
+import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { CompactSelect } from '../../../../../ui/compact-inspector-controls';
 import type { CompactSelectOption } from '../../../../../ui/compact-inspector-controls';
 import { translate } from '../../../../../platform/i18n';
 import {
   ColorField as CompactInspectorColorField,
-  OptionRow,
   SelectField as CompactInspectorSelectField,
   StatusRow,
 } from '../../../../../ui/compact-inspector-controls';
@@ -132,11 +132,17 @@ export function ToggleField(props: {
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <OptionRow
-      active={props.checked}
-      disabled={props.disabled}
-      label={props.label}
-      onToggle={() => props.onChange(!props.checked)}
-    />
+    <div className="flex min-h-9 items-center justify-between gap-3">
+      <span className="min-w-0 text-[length:var(--sniptale-compact-font-size,12px)]">
+        {props.label}
+      </span>
+      <ProductGlassSwitch
+        aria-label={props.label}
+        on={props.checked}
+        aria-pressed={props.checked}
+        disabled={props.disabled}
+        onClick={() => props.onChange(!props.checked)}
+      />
+    </div>
   );
 }

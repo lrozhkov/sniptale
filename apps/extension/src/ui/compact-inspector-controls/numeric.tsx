@@ -51,7 +51,9 @@ function NumericValueFieldView({
     <div
       data-ui="shared.ui.compact-inspector.numeric-value-field"
       className={cx(
-        'group/compact-numeric relative flex h-8 w-[6.25rem] shrink-0 items-center gap-0',
+        'group/compact-numeric relative flex',
+        'h-[var(--sniptale-compact-control-height,32px)] w-[6.25rem] shrink-0 items-center',
+        'gap-0',
         'rounded-[7px] px-2 transition-[border-color,background-color]',
         'border border-transparent bg-transparent',
         'focus-within:border-[color:var(--sniptale-color-border-accent-strong)]',
@@ -92,7 +94,7 @@ function NumericValueInput({
       onPointerDown={state.handlePointerDown}
       className={cx(
         'h-full min-w-0 flex-1 border-0 bg-transparent p-0 text-right',
-        'text-[12px] font-semibold text-inherit outline-none'
+        'text-[length:var(--sniptale-compact-font-size,12px)] font-semibold text-inherit outline-none'
       )}
     />
   );
@@ -106,12 +108,18 @@ function NumericUnitLabel({ state }: { state: ReturnType<typeof useNumericValueF
   }
 
   return (
-    <span className="shrink-0 text-[12px] font-semibold text-[color:var(--sniptale-color-text-primary)]">
+    <span
+      className={[
+        'shrink-0 text-[length:var(--sniptale-compact-font-size,12px)] font-semibold',
+        'text-[color:var(--sniptale-color-text-primary)]',
+      ].join(' ')}
+    >
       {state.unitLabel}
     </span>
   );
 }
 
+/** Hosts may inherit compact font/height CSS variables; unset values retain shared defaults. */
 export interface NumericRowProps extends NumericValueFieldProps {
   appearance?: 'surface' | 'plain';
   className?: string;
@@ -203,7 +211,9 @@ function NumericRowLabel({
     <TextWithOverflowHint
       className={cx(
         'min-w-0 truncate font-semibold text-[color:var(--sniptale-color-text-secondary)]',
-        appearance === 'plain' ? 'text-[11px]' : 'flex-1 text-[12px]'
+        appearance === 'plain'
+          ? 'text-[length:var(--sniptale-compact-font-size,11px)]'
+          : 'flex-1 text-[length:var(--sniptale-compact-font-size,12px)]'
       )}
       text={label}
     />

@@ -6,7 +6,8 @@ import { CompactSegmentedSelector } from './control-renderers';
 import { cx } from './shared';
 
 const FIELD_LABEL_CLASS_NAME = [
-  'flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] font-semibold',
+  'flex-1 overflow-hidden text-ellipsis whitespace-nowrap',
+  'text-[length:var(--sniptale-compact-font-size,12px)] font-semibold',
   'text-[color:var(--sniptale-color-text-secondary)]',
 ].join(' ');
 

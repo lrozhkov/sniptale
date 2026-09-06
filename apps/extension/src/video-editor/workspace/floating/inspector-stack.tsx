@@ -16,7 +16,7 @@ import {
 } from './panel-layout';
 
 const INSPECTOR_STACK_CLASS_NAME = [
-  'relative flex min-h-0 shrink-0',
+  '@container/inspector relative flex min-h-0 shrink-0',
   'flex-col overflow-hidden p-0',
 ].join(' ');
 

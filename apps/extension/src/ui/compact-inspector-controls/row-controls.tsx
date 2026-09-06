@@ -30,7 +30,10 @@ export function OptionRow(props: {
       )}
     >
       <span
-        className="min-w-0 text-[12px] font-semibold text-[color:var(--sniptale-color-text-secondary)]"
+        className={[
+          'min-w-0 text-[length:var(--sniptale-compact-font-size,12px)] font-semibold',
+          'text-[color:var(--sniptale-color-text-secondary)]',
+        ].join(' ')}
         title={getNodeTitle(props.label)}
       >
         {props.label}
@@ -55,7 +58,7 @@ export function StatusRow(props: { label: React.ReactNode; value: React.ReactNod
     >
       <span
         className={[
-          'min-w-0 truncate text-[12px] font-semibold',
+          'min-w-0 truncate text-[length:var(--sniptale-compact-font-size,12px)] font-semibold',
           'text-[color:var(--sniptale-color-text-secondary)]',
         ].join(' ')}
         title={getNodeTitle(props.label)}
@@ -64,7 +67,7 @@ export function StatusRow(props: { label: React.ReactNode; value: React.ReactNod
       </span>
       <span
         className={[
-          'shrink-0 text-right text-[12px] font-semibold',
+          'shrink-0 text-right text-[length:var(--sniptale-compact-font-size,12px)] font-semibold',
           'text-[color:var(--sniptale-color-text-muted)]',
         ].join(' ')}
         title={getNodeTitle(props.value)}
@@ -98,7 +101,7 @@ export function SearchField(props: {
         placeholder={props.placeholder}
         onChange={(event) => props.onChange(event.currentTarget.value)}
         className={cx(
-          'min-w-0 flex-1 border-0 bg-transparent p-0 text-[12px] font-medium',
+          'min-w-0 flex-1 border-0 bg-transparent p-0 text-[length:var(--sniptale-compact-font-size,12px)] font-medium',
           'text-[color:var(--sniptale-color-text-primary)] outline-none',
           'placeholder:text-[color:var(--sniptale-color-text-muted)]'
         )}

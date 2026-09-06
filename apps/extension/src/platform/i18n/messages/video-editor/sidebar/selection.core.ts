@@ -230,16 +230,16 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
     en: 'Stretch',
   },
   fadeInLabel: {
-    ru: 'Плавное появление, мс',
-    en: 'Fade in, ms',
+    ru: 'Плавное появление',
+    en: 'Fade in',
   },
   playbackRateLabel: {
     ru: 'Скорость, x',
     en: 'Speed, x',
   },
   fadeOutLabel: {
-    ru: 'Плавное исчезание, мс',
-    en: 'Fade out, ms',
+    ru: 'Плавное исчезание',
+    en: 'Fade out',
   },
   transitionInLabel: {
     ru: 'Переход входа',

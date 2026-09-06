@@ -149,15 +149,21 @@ function registerSelectInputTest() {
 }
 
 function registerToggleTest() {
-  it('renders canonical toggle controls through the shared compact option row', () => {
+  it('preserves toggle state, commands and disabled behavior with the shared highlighter switch', () => {
+    const onChange = vi.fn();
     act(() => {
-      root?.render(<ToggleField checked label="Visible" onChange={vi.fn()} />);
+      root?.render(<ToggleField checked label="Visible" onChange={onChange} />);
     });
 
-    const option = container?.querySelector('[data-ui="shared.ui.compact-inspector.option-row"]');
+    const option = container?.querySelector<HTMLButtonElement>('button[aria-label="Visible"]');
     expect(option?.getAttribute('aria-pressed')).toBe('true');
     expect(container?.querySelector('input[type="checkbox"]')).toBeNull();
     expect(container?.textContent).toContain('Visible');
+    act(() => option?.click());
+    expect(onChange).toHaveBeenCalledExactlyOnceWith(false);
+    act(() => root?.render(<ToggleField checked disabled label="Visible" onChange={onChange} />));
+    act(() => option?.click());
+    expect(onChange).toHaveBeenCalledTimes(1);
   });
 }
 

@@ -48,7 +48,8 @@ export function CompactSelectTrigger<T extends string>({
             'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]',
           ].join(' '),
         appearance === 'plain' && 'border-transparent bg-transparent',
-        'text-left text-[12px] font-semibold text-[color:var(--sniptale-color-text-primary)]',
+        'text-left text-[length:var(--sniptale-compact-font-size,12px)] font-semibold',
+        'text-[color:var(--sniptale-color-text-primary)]',
         'transition hover:border-[color:var(--sniptale-color-border-strong)]',
         'focus-visible:outline-none focus-visible:border-[color:var(--sniptale-color-border-accent-strong)]',
         open && 'border-[color:var(--sniptale-color-border-accent-strong)]',
@@ -80,7 +81,10 @@ function CompactSelectTriggerContent<T extends string>({
         <TextWithOverflowHint className="block truncate" text={label} />
         {selectedOption?.description ? (
           <TextWithOverflowHint
-            className="block truncate text-[11px] font-medium text-[color:var(--sniptale-color-text-muted)]"
+            className={[
+              'block truncate text-[length:var(--sniptale-compact-font-size,11px)] font-medium',
+              'text-[color:var(--sniptale-color-text-muted)]',
+            ].join(' ')}
             text={selectedOption.description}
           />
         ) : null}

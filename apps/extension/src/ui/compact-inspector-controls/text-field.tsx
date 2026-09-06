@@ -5,7 +5,8 @@ import { focusNextCompactInput } from '@sniptale/ui/compact-inspector-controls/f
 import { cx } from './shared';
 
 const TEXT_FIELD_LABEL_CLASS_NAME = [
-  'flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[12px] font-semibold',
+  'flex-1 overflow-hidden text-ellipsis whitespace-nowrap',
+  'text-[length:var(--sniptale-compact-font-size,12px)] font-semibold',
   'text-[color:var(--sniptale-color-text-secondary)]',
 ].join(' ');
 
@@ -97,8 +98,10 @@ function TextFieldInput({
         handleTextFieldKeyDown(event, lastCommittedValueRef, onKeyDown, onValueCommit)
       }
       className={cx(
-        'h-8 min-w-0 flex-1 border-0 bg-transparent p-0 text-right outline-none',
-        'text-[12px] font-semibold text-[color:var(--sniptale-color-text-primary)]',
+        'h-[var(--sniptale-compact-control-height,32px)]',
+        'min-w-0 flex-1 border-0 bg-transparent p-0 text-right outline-none',
+        'text-[length:var(--sniptale-compact-font-size,12px)] font-semibold',
+        'text-[color:var(--sniptale-color-text-primary)]',
         'placeholder:text-[color:var(--sniptale-color-text-muted)]',
         inputClassName
       )}
