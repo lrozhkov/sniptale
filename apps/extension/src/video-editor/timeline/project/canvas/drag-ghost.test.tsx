@@ -4,7 +4,11 @@ import type React from 'react';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../features/video/project/factories/creation';
+import { VideoTrackKind } from '../../../../features/video/project/types';
 import { createSceneSelection } from '../../../project/selection/model';
 import { ProjectTimelineCanvas } from './';
 import type { ProjectTimelineInsertionActions } from '../types';
@@ -91,6 +95,53 @@ it('renders a clip drag ghost on a newly previewed third logical lane', () => {
     '[data-ui="video-editor.timeline.clip-drag-ghost"]'
   );
   expect(Number.parseFloat(ghost?.style.top ?? '0')).toBeGreaterThan(80);
+});
+
+it('renders linked destinations on their own tracks and removes every proposal together', () => {
+  const project = createEmptyVideoProject('Linked destinations');
+  const trackId = project.tracks[0]!.id;
+  const camera = createVideoProjectTrack('Camera', -1, VideoTrackKind.PRIMARY);
+  project.tracks.push(camera);
+  const ghost = {
+    clipId: 'screen',
+    duration: 3,
+    name: 'Screen',
+    startTime: 5,
+    timelineLaneId: null,
+    trackId,
+    relatedClips: [
+      {
+        clipId: 'camera',
+        duration: 1,
+        name: 'Camera',
+        startTime: 6,
+        timelineLaneId: 'line-1',
+        trackId: camera.id,
+      },
+    ],
+  };
+  act(() => root?.render(<ProjectTimelineCanvas {...createCanvasProps(project, ghost)} />));
+  const ghosts = container!.querySelectorAll<HTMLElement>(
+    '[data-ui="video-editor.timeline.clip-drag-ghost"]'
+  );
+  expect(ghosts).toHaveLength(2);
+  const main = container!.querySelector<HTMLElement>(
+    '[data-clip-id="screen"][data-related="false"]'
+  );
+  const sidecar = container!.querySelector<HTMLElement>(
+    '[data-clip-id="camera"][data-related="true"]'
+  );
+  expect(main?.style.left).toBe('450px');
+  expect(main?.style.width).toBe('270px');
+  expect(sidecar?.style.left).toBe('540px');
+  expect(sidecar?.style.width).toBe('90px');
+  expect(main?.style.height).toBe(sidecar?.style.height);
+  expect(sidecar?.parentElement).not.toBe(main?.parentElement);
+  expect(sidecar?.className).toContain('pointer-events-none');
+  act(() => root?.render(<ProjectTimelineCanvas {...createCanvasProps(project, null)} />));
+  expect(
+    container!.querySelectorAll('[data-ui="video-editor.timeline.clip-drag-ghost"]')
+  ).toHaveLength(0);
 });
 
 function createCanvasProps(

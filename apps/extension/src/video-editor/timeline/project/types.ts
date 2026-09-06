@@ -178,13 +178,17 @@ export interface TimelineInteraction {
   startClientY: number;
 }
 
-export interface TimelineClipDragGhost {
+export interface TimelineClipDragPlacement {
   clipId: string;
   duration: number;
   name: string;
   startTime: number;
   timelineLaneId: string | null;
   trackId: string;
+}
+
+export interface TimelineClipDragGhost extends TimelineClipDragPlacement {
+  relatedClips?: TimelineClipDragPlacement[];
 }
 
 export interface AudioClipWaveformProps {

@@ -4,12 +4,16 @@ import type React from 'react';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../features/video/project/factories/creation';
 import {
   VideoClipLinkMode,
   VideoClipTransitionKind,
   VideoMediaFitMode,
   VideoProjectClipType,
+  VideoTrackKind,
   type VideoProjectClip,
 } from '../../../../features/video/project/types';
 import { useProjectTimelineDrag } from './drag';
@@ -87,7 +91,14 @@ afterEach(() => {
 it('keeps the draft visible through rerenders and publishes only on release', () => {
   const project = createEmptyVideoProject('Rerender');
   const clip = createClip(project.tracks[0]!.id);
-  project.clips = [clip];
+  clip.groupId = 'linked';
+  clip.linkMode = VideoClipLinkMode.LINKED;
+  const cameraTrack = createVideoProjectTrack('Camera', -1, VideoTrackKind.PRIMARY);
+  project.tracks.push(cameraTrack);
+  project.clips = [
+    clip,
+    { ...clip, id: 'camera', trackId: cameraTrack.id, startTime: 6, duration: 1 },
+  ];
   const onMoveClip =
     vi.fn<
       (clipId: string, startTime: number, trackId?: string, timelineLaneId?: string | null) => void
@@ -123,6 +134,7 @@ it('keeps the draft visible through rerenders and publishes only on release', ()
       <div
         data-ghost-lane={timelineDrag.dragGhost?.timelineLaneId ?? ''}
         data-revision={revision}
+        data-related-count={timelineDrag.dragGhost?.relatedClips?.length ?? 0}
       />
     );
   }
@@ -141,7 +153,16 @@ it('keeps the draft visible through rerenders and publishes only on release', ()
   act(() => rerender?.());
   expect(container?.firstElementChild?.getAttribute('data-revision')).toBe('1');
   expect(container?.firstElementChild?.getAttribute('data-ghost-lane')).toBe('line-1');
+  expect(container?.firstElementChild?.getAttribute('data-related-count')).toBe('1');
   act(() => window.dispatchEvent(new Event('pointerup')));
   expect(onMoveClip).toHaveBeenCalledOnce();
   expect(onMoveClip).toHaveBeenCalledWith('clip-1', 10, project.tracks[0]!.id, 'line-1');
+  expect(container?.firstElementChild?.getAttribute('data-related-count')).toBe('0');
+  act(() => beginClipInteraction?.(createPointerEvent(100, 40), clip, 'move'));
+  act(() => dispatchTimelinePointerMove(160, 40));
+  expect(container?.firstElementChild?.getAttribute('data-related-count')).toBe('1');
+  act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(container?.firstElementChild?.getAttribute('data-related-count')).toBe('0');
+  act(() => window.dispatchEvent(new Event('pointerup')));
+  expect(onMoveClip).toHaveBeenCalledOnce();
 });

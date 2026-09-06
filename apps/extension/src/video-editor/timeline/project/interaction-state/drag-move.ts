@@ -12,15 +12,18 @@ import type { TimelineClipDragGhost, TimelineInteraction } from '../types';
 import { resolveTimelineSnap } from '../effect-lanes/snap';
 import type {
   VideoEditorMoveClipAction,
+  VideoEditorClipTimingResult,
   VideoEditorTrimClipAction,
 } from '../../../contracts/commands/timeline';
 
+type DragTimingResult = VideoEditorClipTimingResult & Pick<TimelineClipDragGhost, 'relatedClips'>;
+
 export type MoveClipHandler = (
   ...args: Parameters<VideoEditorMoveClipAction>
-) => ReturnType<VideoEditorMoveClipAction> | void;
+) => DragTimingResult | null | void;
 export type TrimClipHandler = (
   ...args: Parameters<VideoEditorTrimClipAction>
-) => ReturnType<VideoEditorTrimClipAction> | void;
+) => DragTimingResult | null | void;
 
 interface TimelineDragMoveParams {
   interaction: TimelineInteraction;
@@ -58,6 +61,7 @@ export function createTimelineDragDraft(
           endTime: clip.startTime + clip.duration,
           trackId: clip.trackId,
           timelineLaneId: clip.timelineLaneId ?? null,
+          relatedClips: getChangedCompanionPreviews(params.project, project, clipId),
         }
       : null;
   };
@@ -74,6 +78,34 @@ export function createTimelineDragDraft(
         params.onTrimClipEnd(...args)
       ),
   };
+}
+
+function getChangedCompanionPreviews(
+  before: VideoProject,
+  after: VideoProject,
+  selectedId: string
+) {
+  const original = new Map(before.clips.map((clip) => [clip.id, clip]));
+  return after.clips
+    .filter((clip) => {
+      const previous = original.get(clip.id);
+      return (
+        clip.id !== selectedId &&
+        previous &&
+        (clip.startTime !== previous.startTime ||
+          clip.duration !== previous.duration ||
+          clip.trackId !== previous.trackId ||
+          resolveClipLogicalLaneId(clip) !== resolveClipLogicalLaneId(previous))
+      );
+    })
+    .map((clip) => ({
+      clipId: clip.id,
+      duration: clip.duration,
+      name: clip.name,
+      startTime: clip.startTime,
+      trackId: clip.trackId,
+      timelineLaneId: clip.timelineLaneId ?? null,
+    }));
 }
 
 export function applyTimelineDragMove({
@@ -208,6 +240,7 @@ function applyTimelineClipMove({
     startTime,
     timelineLaneId,
     trackId,
+    ...(applied?.relatedClips ? { relatedClips: applied.relatedClips } : {}),
   });
 }
 
