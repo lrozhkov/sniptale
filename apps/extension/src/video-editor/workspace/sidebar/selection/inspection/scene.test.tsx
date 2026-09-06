@@ -1,3 +1,4 @@
+import { WorkspaceSidebarSelectionBody } from './body';
 // @vitest-environment jsdom
 
 import { act } from 'react';
@@ -228,3 +229,34 @@ function clickGroup(title: string) {
       button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 }
+
+it('shows grid as a Canvas parameter through the complete selection body', () => {
+  const gridSettings = {
+    enabled: false,
+    snapEnabled: true,
+    size: 80,
+    color: '#94a3b8',
+    onSetEnabled: vi.fn(),
+    onSetSnapEnabled: vi.fn(),
+    onSetSize: vi.fn(),
+    onSetColor: vi.fn(),
+  };
+  const render = () =>
+    act(() =>
+      root?.render(<WorkspaceSidebarSelectionBody {...createProps()} gridSettings={gridSettings} />)
+    );
+  render();
+  const grid = () => container!.querySelector('[data-ui="video-editor.scene.grid-settings"]')!;
+  expect(grid()).not.toBeNull();
+  expect(grid().textContent).not.toContain('videoEditor.app.gridSizeLabel');
+  act(() =>
+    grid()
+      .querySelector<HTMLButtonElement>('[aria-label="videoEditor.app.gridVisibleToggle"]')!
+      .click()
+  );
+  expect(gridSettings.onSetEnabled).toHaveBeenCalledWith(true);
+  gridSettings.enabled = true;
+  render();
+  expect(grid().textContent).toContain('videoEditor.app.gridSizeLabel');
+  expect(grid().textContent).toContain('videoEditor.app.gridColorLabel');
+});

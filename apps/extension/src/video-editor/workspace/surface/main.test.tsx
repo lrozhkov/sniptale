@@ -10,7 +10,6 @@ import { createHeaderController, createPreviewController } from './main.test-sup
 
 const audioRecordingModalSpy = vi.fn();
 const libraryPanelSpy = vi.fn<(props: VideoEditorLibraryPanelProps) => void>();
-const floatingWorkspaceSpy = vi.fn();
 const inspectorSpy = vi.fn();
 const previewSpy = vi.fn();
 const timelineSpy = vi.fn();
@@ -32,6 +31,7 @@ vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => 
   }),
   useVideoEditorBlockingOverlayContext: () => false,
   useVideoEditorHeaderController: () => getHookController().header,
+  useVideoEditorHistoryController: () => getHookController().history,
   useVideoEditorLayoutController: () => getHookController().layout,
   useVideoEditorPreviewController: () => getHookController().preview,
   useVideoEditorSidebarController: () => getHookController().sidebar,
@@ -46,13 +46,6 @@ vi.mock('../../runtime/controller/store', async (importOriginal) => ({
 
 vi.mock('./effects-library', () => ({
   VideoEditorWorkspaceEffectsLibrary: () => <div data-testid="effects-library" />,
-}));
-
-vi.mock('../floating', () => ({
-  VideoEditorFloatingWorkspace: (props: unknown) => {
-    floatingWorkspaceSpy(props);
-    return <div data-testid="floating-workspace" />;
-  },
 }));
 
 vi.mock('../floating/inspector-stack', () => ({
@@ -77,9 +70,14 @@ vi.mock('../../recording/audio-modal', () => ({
 }));
 
 vi.mock('../../preview/stage', () => ({
-  PreviewStage: (props: unknown) => {
+  PreviewStage: (props: { headerContent?: React.ReactNode; headerActions?: React.ReactNode }) => {
     previewSpy(props);
-    return <div data-testid="preview" />;
+    return (
+      <div data-testid="preview">
+        {props.headerContent}
+        {props.headerActions}
+      </div>
+    );
   },
 }));
 
@@ -274,7 +272,7 @@ function createTimelineState() {
 function expectWorkspaceMarkup(markup: string) {
   expect(markup).toContain('video-editor.workspace.canvas-shell');
   expect(markup).not.toContain('pt-[4.75rem]');
-  expect(markup).toContain('px-3 pb-3');
+  expect(markup).toContain('flex-1 p-3');
   expect(markup).not.toContain('pr-[21.75rem]');
   expect(markup).not.toContain('max-[860px]:pt-[11.75rem]');
   expect(markup).toContain('data-inspector-dock="viewer"');
@@ -294,9 +292,8 @@ function verifyWorkspaceMainRouting() {
     />
   );
 
-  expect(floatingWorkspaceSpy.mock.calls[0]?.[0]).toMatchObject({
-    effectsLibraryDock: { isOpen: false },
-  });
+  expect(markup).not.toContain('data-ui="video-editor.floating-workspace"');
+  expect(markup).toContain('video-editor.library-tab.effects');
   expect(inspectorSpy.mock.calls[0]?.[0]).toMatchObject({ diagnosticsContent: 'diagnostics' });
   expect(markup).toContain('data-ui="video-editor.workspace.upper"');
   expect(markup).not.toContain('pr-[calc(var(--video-editor-inspector-width)');
@@ -331,7 +328,6 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('VideoEditorWorkspaceMain', () => {
   afterEach(() => {
-    floatingWorkspaceSpy.mockReset();
     inspectorSpy.mockReset();
     previewSpy.mockReset();
     timelineSpy.mockReset();

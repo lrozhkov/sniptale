@@ -236,3 +236,24 @@ it('keeps the recording destination independent of viewer selection, transport a
   act(() => header.onOpenAudioRecordingDialog());
   expect(createWorkspaceLayoutController(workspaceState!).audioRecordingTarget).toBeNull();
 });
+
+it('reveals a collapsed inspector only for the explicit Scene command', () => {
+  renderWorkspaceHarness(root, (state) => {
+    workspaceState = state;
+  });
+  act(() => workspaceState!.toggleSidebarCollapsed());
+  expect(workspaceState!.leftSidebarCollapsed).toBe(true);
+  const selectScene = vi.fn();
+  const header = createWorkspaceHeaderController(
+    {
+      workspace: workspaceState!,
+      store: { selectScene, openExportDialog: vi.fn(), renameProject: vi.fn() },
+      libraries: { projectExports: [] },
+      saveStateMeta: {} as never,
+    },
+    createEmptyVideoProject('Scene')
+  );
+  act(() => header.onSelectScene());
+  expect(selectScene).toHaveBeenCalledOnce();
+  expect(workspaceState!.leftSidebarCollapsed).toBe(false);
+});

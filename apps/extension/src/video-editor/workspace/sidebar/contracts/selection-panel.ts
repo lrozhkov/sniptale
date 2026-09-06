@@ -12,6 +12,8 @@ import type {
 import type { WorkspaceSidebarProps } from './props';
 
 export interface WorkspaceSidebarSelectionPanelProps {
+  /** Workspace grid controls apply only to scene inspection. */
+  gridSettings?: WorkspaceSidebarProps['gridSettings'];
   onAddActionEvent: WorkspaceSidebarProps['onAddActionEvent'];
   onAddMotionRegion: NonNullable<WorkspaceSidebarProps['onAddMotionRegion']>;
   onClearCursorSampleSkinOverride: NonNullable<
@@ -107,5 +109,6 @@ type WorkspaceSidebarSelectionPanelSourcePropKeys = Extract<
 
 export type WorkspaceSidebarSelectionPanelSourceProps = Pick<
   WorkspaceSidebarProps,
-  WorkspaceSidebarSelectionPanelSourcePropKeys
->;
+  Exclude<WorkspaceSidebarSelectionPanelSourcePropKeys, 'gridSettings'>
+> &
+  Pick<WorkspaceSidebarSelectionPanelProps, 'gridSettings'>;

@@ -373,7 +373,7 @@ async function verifyProductionExportMedia(page: Page, file: string) {
   };
 }
 
-test('real video export completes after Library promotion, repeats and survives reopen', async ({
+test('real video export completes after automatic library save, repeats and survives reopen', async ({
   page,
   extensionId,
 }, testInfo) => {
@@ -381,13 +381,20 @@ test('real video export completes after Library promotion, repeats and survives 
   await page.setViewportSize({ width: 1600, height: 1100 });
   await page.goto(`chrome-extension://${extensionId}/apps/extension/src/video-editor/index.html`);
   await expect(page.locator('[data-ui="video-editor.workspace.root"]')).toBeVisible();
-  await page.locator('[data-ui="video-editor.floating.insert-panel.media"]').click();
   await page
     .locator('input[type=file][accept*="video/"]')
     .first()
     .setInputFiles(fileURLToPath(new URL('../fixtures/cache-source.webm', import.meta.url)));
+  await page
+    .locator('[data-ui="video-editor.materials"]')
+    .getByRole('button', { name: 'cache-source.webm', exact: true })
+    .click();
+  await page
+    .locator('[data-ui="video-editor.source-viewer"]')
+    .getByRole('button', { name: /^Append$|^В конец$/ })
+    .click();
   await expect(page.locator('[data-project-timeline-clip]')).toHaveCount(1);
-  await page.getByRole('button', { name: /Save to library|Сохранить в библиотеку/ }).click();
+  await expectProductionProjectInLibrary(page);
   const projectUrl = page.url();
   const jobs = new Set<string>();
   const results = [];
@@ -398,7 +405,7 @@ test('real video export completes after Library promotion, repeats and survives 
     }
     const previousDownloads = await page.evaluate(() => chrome.downloads.search({}));
     const previousIds = previousDownloads.map((download) => download.id);
-    await page.locator('[data-ui="video-editor.floating.document-bar.export"]').click();
+    await page.locator('[data-ui="video-editor.timeline.toolbar.export"]').click();
     await page.getByRole('button', { name: /^Start export$|^Начать экспорт$/ }).click();
     await expect
       .poll(
@@ -429,7 +436,8 @@ test('real video export completes after Library promotion, repeats and survives 
     await copyFile(download.filename, destination);
     results.push(await verifyProductionExportMedia(page, destination));
   }
-  await expect(page.getByText(/In library|В библиотеке/, { exact: true })).toBeVisible();
+  await expectProductionProjectInLibrary(page);
+  await expect(page.getByText(/In library|В библиотеке/, { exact: true })).toHaveCount(0);
   await page.screenshot({
     path: testInfo.outputPath('saved-project-export.png'),
     animations: 'disabled',
@@ -440,3 +448,29 @@ test('real video export completes after Library promotion, repeats and survives 
     JSON.stringify(results, null, 2)
   );
 });
+
+async function expectProductionProjectInLibrary(page: Page) {
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          new Promise<string | null>((resolve, reject) => {
+            const request = indexedDB.open('sniptale-db');
+            request.onsuccess = () => {
+              const db = request.result;
+              const rows = db.transaction('video_projects').objectStore('video_projects').getAll();
+              rows.onsuccess = () => {
+                db.close();
+                resolve(
+                  rows.result.find((row) => row.project.clips.length === 1)?.lifecycle
+                    ?.storageClass ?? null
+                );
+              };
+              rows.onerror = () => reject(rows.error);
+            };
+            request.onerror = () => reject(request.error);
+          })
+      )
+    )
+    .toBe('library');
+}

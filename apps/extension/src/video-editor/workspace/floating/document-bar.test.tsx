@@ -24,7 +24,6 @@ function createHeaderProps() {
     onCloseLibraryPanel: vi.fn(),
     onOpenAudioRecordingDialog: vi.fn(),
     onOpenExportDialog: vi.fn(),
-    onOpenGridSettings: vi.fn(),
     onOpenLibraryPanel: vi.fn(),
     onRenameProject: vi.fn(),
     onSelectScene: vi.fn(),
@@ -36,26 +35,7 @@ function createHeaderProps() {
   };
 }
 
-it('reflects the visible compact inspector state without changing the saved preference', () => {
-  const header = createHeaderProps();
-  hookMocks.header.mockReturnValue(header);
-  hookMocks.history.mockReturnValue({
-    canUndo: false,
-    canRedo: false,
-    error: null,
-    onUndo: vi.fn(),
-    onRedo: vi.fn(),
-  });
-  const markup = renderToStaticMarkup(
-    <VideoEditorFloatingDocumentBar inspector={{ isOpen: false, onToggle: vi.fn() }} />
-  );
-  expect(markup).toContain('videoEditor.app.expandInspector');
-  expect(markup).not.toContain('videoEditor.app.collapseInspector');
-  expect(header.leftSidebarCollapsed).toBe(false);
-  expect(header.onToggleSidebar).not.toHaveBeenCalled();
-});
-
-it('renders project identity and keeps export action in the floating document bar', () => {
+it('renders editable project identity without duplicated workspace commands', () => {
   hookMocks.header.mockReturnValue(createHeaderProps());
   hookMocks.history.mockReturnValue({
     canUndo: false,
@@ -70,7 +50,8 @@ it('renders project identity and keeps export action in the floating document ba
   expect(markup).toContain('Product Demo Recording');
   expect(markup).not.toContain('Saved');
   expect(markup).not.toContain('videoEditor.app.libraryButton');
-  expect(markup).toContain('videoEditor.app.exportButton');
+  expect(markup).not.toContain('videoEditor.app.exportButton');
+  expect(markup).not.toContain('lucide-pencil');
   expect(markup).not.toContain('video-editor.floating.document-bar.undo');
   expect(markup).not.toContain('video-editor.floating.document-bar.redo');
   expect(markup).not.toContain('data-ui="video-editor.floating.document-bar.menu"');

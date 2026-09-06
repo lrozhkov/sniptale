@@ -11,6 +11,7 @@ import type { EffectLibraryOperations } from '../../library/effects-dock/operati
 
 export function VideoEditorWorkspaceEffectsLibrary(props: {
   headerAction?: React.ReactNode;
+  headerTitle?: React.ReactNode;
   effectBundles: WorkspaceEffectBundlesState;
   effectOperations: EffectLibraryOperations;
   isOpen: boolean;
@@ -31,6 +32,7 @@ export function VideoEditorWorkspaceEffectsLibrary(props: {
   return (
     <VideoEditorEffectsLibraryDock
       headerAction={props.headerAction}
+      headerTitle={props.headerTitle}
       catalogs={props.effectBundles.catalogs}
       currentTime={preview.transport.currentTime}
       errorCode={props.effectBundles.errorCode}

@@ -1,7 +1,10 @@
-import { Redo2, Undo2 } from 'lucide-react';
+import { Redo2, Undo2, Magnet, Clapperboard } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { translate } from '../../../../platform/i18n';
-import { useVideoEditorHistoryController } from '../../../runtime/controller/composition/hooks';
+import {
+  useVideoEditorHistoryController,
+  useVideoEditorHeaderController,
+} from '../../../runtime/controller/composition/hooks';
 import { toolbarIconButtonClassName } from './sections/constants/button';
 import { ProjectTimelinePlaybackSummary } from './sections/playback-summary';
 import { ProjectTimelineToolbarLeadingControls } from './sections/leading';
@@ -79,6 +82,7 @@ function createToolbarTrailingControlsProps({
 
 export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProps) {
   const history = useVideoEditorHistoryController();
+  const header = useVideoEditorHeaderController();
   return (
     <div
       data-ui="video-editor.timeline.toolbar"
@@ -115,14 +119,38 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
         >
           <Redo2 aria-hidden="true" />
         </ContentToolbarButton>
+        {header && (
+          <ContentToolbarButton
+            className={toolbarIconButtonClassName}
+            title={translate('videoEditor.app.magnetButton')}
+            active={header.grid.magnetEnabled}
+            aria-pressed={header.grid.magnetEnabled}
+            onClick={header.grid.onToggleMagnet}
+            dataUi="video-editor.timeline.toolbar.magnet"
+          >
+            <Magnet aria-hidden="true" />
+          </ContentToolbarButton>
+        )}
         <ProjectTimelineToolbarLeadingControls
           {...createToolbarLeadingControlsProps(controlsProps)}
         />
       </div>
       <ProjectTimelinePlaybackSummary {...controlsProps.playback} />
-      <ProjectTimelineToolbarTrailingActions
-        {...createToolbarTrailingControlsProps(controlsProps)}
-      />
+      <div className="flex items-center justify-end gap-[var(--timeline-control-gap)]">
+        <ProjectTimelineToolbarTrailingActions
+          {...createToolbarTrailingControlsProps(controlsProps)}
+        />
+        {header && (
+          <ContentToolbarButton
+            className={toolbarIconButtonClassName}
+            title={translate('videoEditor.app.exportButton')}
+            onClick={header.onOpenExportDialog}
+            dataUi="video-editor.timeline.toolbar.export"
+          >
+            <Clapperboard aria-hidden="true" />
+          </ContentToolbarButton>
+        )}
+      </div>
     </div>
   );
 }

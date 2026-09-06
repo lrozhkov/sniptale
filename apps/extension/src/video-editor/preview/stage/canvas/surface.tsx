@@ -14,6 +14,7 @@ export function PreviewStageSurface(params: PreviewStageSurfaceProps) {
       <PreviewStageFrame
         alternateView={params.alternateView}
         headerContent={params.headerContent}
+        headerActions={params.headerActions}
         currentTime={params.currentTime}
         duration={params.project.duration}
         isFullscreen={isFullscreen}

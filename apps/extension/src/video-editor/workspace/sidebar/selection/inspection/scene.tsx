@@ -1,3 +1,4 @@
+import { GridSettingsPanel } from '../../settings';
 import { translate } from '../../../../../platform/i18n';
 import { getProjectSceneBackground } from '../../../../../features/video/project/scene/background';
 import { VideoProjectAssetType } from '../../../../../features/video/project/types';
@@ -45,11 +46,20 @@ function createSceneGroups(
       label: translate('videoEditor.sidebar.inspectorGroupCanvas'),
       defaultActive: true,
       content: (
-        <SceneProjectSizeFields
-          height={props.project.height}
-          onResizeProject={props.onResizeProject}
-          width={props.project.width}
-        />
+        <>
+          <SceneProjectSizeFields
+            height={props.project.height}
+            onResizeProject={props.onResizeProject}
+            width={props.project.width}
+          />
+          {props.gridSettings && (
+            <GridSettingsPanel
+              grid={props.gridSettings}
+              recentColors={props.recentColors}
+              onRememberRecentColor={props.onRememberRecentColor}
+            />
+          )}
+        </>
       ),
     },
     {

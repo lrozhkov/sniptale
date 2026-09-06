@@ -18,6 +18,10 @@ const history = vi.hoisted(() => ({
 vi.mock('../../../runtime/controller/composition/hooks', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../runtime/controller/composition/hooks')>()),
   useVideoEditorHistoryController: () => history,
+  useVideoEditorHeaderController: () => ({
+    grid: { magnetEnabled: true, onToggleMagnet: vi.fn() },
+    onOpenExportDialog: vi.fn(),
+  }),
 }));
 
 import { ProjectTimelineToolbar } from './index';

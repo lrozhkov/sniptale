@@ -22,7 +22,11 @@ export function VideoEditorEffectsLibraryDock(
         dataUi="video-editor.effects-library.panel"
       >
         <div className="flex h-full min-h-0 flex-col">
-          <EffectsLibraryHeader onClose={props.onClose} action={props.headerAction} />
+          <EffectsLibraryHeader
+            onClose={props.onClose}
+            action={props.headerAction}
+            title={props.headerTitle}
+          />
           <div className="shrink-0 border-b border-[var(--sniptale-color-border-soft)] px-2 py-1">
             <EffectImportControl
               disabled={disabled}

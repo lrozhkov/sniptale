@@ -1,8 +1,8 @@
 import { WorkspaceTrackPresentation } from './track-presentation';
 import { AudioRecordingModal } from '../../recording/audio-modal';
 import { VideoEditorLibraryPanel } from '../../library/panel';
-import React, { useRef, useState } from 'react';
-import { VideoEditorFloatingWorkspace } from '../floating';
+import React, { useState } from 'react';
+import { VideoProjectStorageStatus } from '../floating/storage-status';
 import { VideoEditorFloatingInspectorStack } from '../floating/inspector-stack';
 import {
   InspectorGroupFocusContext,
@@ -59,17 +59,10 @@ export function VideoEditorWorkspaceMain({
         ref={panelSizes.containerRef}
       >
         <WorkspaceTrackPresentation>
-          <VideoEditorFloatingWorkspace
-            inspector={inspector}
-            materials={{ isOpen: materialsOpen, onToggle: toggleMaterials }}
-            activeInsertKind={activeInsertKind}
-            effectsLibraryDock={{
-              isOpen: effectsLibraryDockOpen,
-              onToggle: () => changeEffectsOpen(!effectsLibraryDockOpen),
-            }}
-            onActiveInsertKindChange={setActiveInsertKind}
-          />
+          <VideoProjectStorageStatus />
           <VideoEditorWorkspaceCanvas
+            inspectorPanel={inspector}
+            onMaterialsOpenChange={toggleMaterials}
             inspectorFullHeight={inspectorFullHeight}
             materialsPanel={{
               resize: panelSizes.materials,
@@ -79,6 +72,7 @@ export function VideoEditorWorkspaceMain({
             materialsOpen={materialsOpen}
             inspector={
               <VideoEditorFloatingInspectorStack
+                onClose={inspector.onToggle}
                 diagnosticsContent={diagnosticsContent}
                 resize={panelSizes.inspector}
                 fullHeight={inspectorFullHeight}
@@ -105,23 +99,32 @@ function useWorkspacePanels() {
   const [activeLibrary, setActiveLibrary] = useState<'materials' | 'effects' | null>('materials');
   const effectsLibraryDockOpen = activeLibrary === 'effects';
   const materialsOpen = activeLibrary === 'materials';
-  const libraryBeforeEffects = useRef<'materials' | null>(null);
   const changeEffectsOpen = (open: boolean) => {
-    if (open) {
-      libraryBeforeEffects.current = activeLibrary === 'materials' ? 'materials' : null;
-      setActiveLibrary('effects');
-    } else {
-      setActiveLibrary(libraryBeforeEffects.current);
-    }
+    setActiveLibrary(open ? 'effects' : null);
+    focusWorkspaceButton(
+      open ? 'video-editor.library-tab.effects' : 'video-editor.viewer.open-materials'
+    );
   };
   return {
     effectsLibraryDockOpen,
     materialsOpen,
     changeEffectsOpen,
-    toggleMaterials: () => setActiveLibrary(materialsOpen ? null : 'materials'),
+    toggleMaterials: (open: boolean) => {
+      setActiveLibrary(open ? 'materials' : null);
+      focusWorkspaceButton(
+        open ? 'video-editor.library-tab.materials' : 'video-editor.viewer.open-materials'
+      );
+    },
     inspector: {
       isOpen: Boolean(header && !header.leftSidebarCollapsed),
-      onToggle: () => header?.onToggleSidebar(),
+      onToggle: () => {
+        header?.onToggleSidebar();
+        focusWorkspaceButton(
+          header?.leftSidebarCollapsed
+            ? 'video-editor.inspector.close'
+            : 'video-editor.viewer.open-inspector'
+        );
+      },
     },
   };
 }
@@ -185,5 +188,11 @@ function VideoEditorAudioRecordingModal({
         sidebar.projectActions.onImportRecordedAudio(file, trim, layout.audioRecordingTarget)
       }
     />
+  );
+}
+
+function focusWorkspaceButton(dataUi: string) {
+  requestAnimationFrame(() =>
+    document.querySelector<HTMLButtonElement>(`[data-ui="${dataUi}"]`)?.focus()
   );
 }

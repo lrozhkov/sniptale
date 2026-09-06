@@ -23,6 +23,7 @@ const MATERIAL_IMPORT_OPTIONS = [
 
 export function VideoEditorMaterials(props: {
   headerAction?: React.ReactNode;
+  headerTitle?: React.ReactNode;
   onOpenLibrary: () => void;
   project: VideoProject;
   onImport: PreviewStageImportHandlers;
@@ -56,9 +57,11 @@ export function VideoEditorMaterials(props: {
               'border-[color:var(--sniptale-color-border-soft)] px-3',
             ].join(' ')}
           >
-            <h2 className="text-[13px] font-semibold">
-              {translate('videoEditor.app.materialsTitle')}
-            </h2>
+            {props.headerTitle ?? (
+              <h2 className="text-[13px] font-semibold">
+                {translate('videoEditor.app.materialsTitle')}
+              </h2>
+            )}
             {props.headerAction}
           </div>
           <VideoEditorFileInputNodes

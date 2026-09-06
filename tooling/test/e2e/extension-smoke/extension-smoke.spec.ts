@@ -94,7 +94,7 @@ async function expectBuiltVideoEditorGeometry(
   const canvasShell = page.locator('[data-ui="video-editor.workspace.canvas-shell"]');
   const documentBar = page.locator('[data-ui="video-editor.floating.document-bar"]');
   const effectsDock = page.locator('[data-ui="video-editor.effects-library.dock"]');
-  const effectsToggle = page.locator('[data-ui="video-editor.floating.insert-panel.templates"]');
+  const effectsToggle = page.locator('[data-ui="video-editor.library-tab.effects"]');
   const inspector = page.locator('[data-ui="video-editor.floating.context-inspector"]');
   const preview = page.locator('[data-ui="video.preview.viewport"]');
   const timeline = page.locator('[data-ui="video-editor.timeline.surface"]');
@@ -119,7 +119,7 @@ async function expectBuiltVideoEditorGeometry(
     )
     .toEqual({
       paddingRight: '12px',
-      paddingTop: '0px',
+      paddingTop: '12px',
     });
 
   await expectVideoEditorPanelLayout(page);
@@ -152,7 +152,8 @@ async function expectBuiltVideoEditorGeometry(
     };
   });
 
-  expect(geometry.effectsDock.top).toBeGreaterThanOrEqual(geometry.documentBar.bottom);
+  expect(geometry.effectsDock.top).toBeLessThan(geometry.documentBar.bottom);
+  expect(geometry.effectsDock.top).toBeCloseTo(geometry.inspector.top, 0);
   expect(geometry.effectsDock.right - geometry.effectsDock.left).toBeLessThanOrEqual(448);
   expect(geometry.preview.right).toBeLessThanOrEqual(geometry.inspector.left);
   expect(geometry.timeline.right).toBeGreaterThanOrEqual(geometry.inspector.right);
@@ -237,7 +238,7 @@ async function expectBuiltVideoEditorGeometry(
   await page.mouse.up();
   await expect(divider).toHaveAttribute('aria-valuenow', '360');
 
-  await effectsToggle.click();
+  await page.locator('[data-ui="video-editor.library-tab.materials"]').click();
   await expect(effectsDock).toHaveCount(0);
   await expect
     .poll(() => preview.evaluate((element) => element.getBoundingClientRect().width))
@@ -374,13 +375,12 @@ async function verifyVideoEditorTimelineBoundaries(
     await page.locator('[data-ui="video-editor.timeline.toolbar.add-track.primary"]').click();
   }
   await page.setViewportSize({ width: 1280, height: 720 });
-  const materialsToggle = page.getByRole('button', {
-    name: translate('videoEditor.app.materialsTitle', 'ru'),
-    exact: true,
-  });
+  const materialsClose = page.locator('[data-ui="video-editor.materials.close"]');
+  const materialsOpen = page.locator('[data-ui="video-editor.viewer.open-materials"]');
   const materials = page.locator('[data-ui="video-editor.materials"]');
   const inspector = page.locator('[data-ui="video-editor.floating.context-inspector"]');
-  const inspectorToggle = page.locator('[data-ui="video-editor.floating.document-bar.inspector"]');
+  const inspectorClose = page.locator('[data-ui="video-editor.inspector.close"]');
+  const inspectorOpen = page.locator('[data-ui="video-editor.viewer.open-inspector"]');
   const workspace = page.locator('[data-ui="video-editor.workspace.root"]');
   await expect(materials).toBeVisible();
   await expect(inspector).toBeVisible();
@@ -400,7 +400,7 @@ async function verifyVideoEditorTimelineBoundaries(
   await page.setViewportSize({ width: 900, height: 720 });
   await expect(workspace).toHaveCSS('overflow-x', 'auto');
   expect(await workspace.evaluate((element) => element.scrollWidth)).toBe(1280);
-  await expect(inspectorToggle).toHaveAttribute('aria-pressed', 'true');
+  await expect(inspectorOpen).toHaveCount(0);
   expect(await inspector.evaluate((element, original) => element === original, inspectorNode)).toBe(
     true
   );
@@ -415,15 +415,17 @@ async function verifyVideoEditorTimelineBoundaries(
     element.scrollLeft = 0;
   });
   await page.setViewportSize({ width: 1280, height: 720 });
-  await inspectorToggle.click();
+  await inspectorClose.click();
   await expect(inspector).toHaveCount(0);
+  await expect(inspectorOpen).toBeFocused();
   await expect(materials).toBeVisible();
-  await inspectorToggle.click();
+  await inspectorOpen.click();
   await expect(inspector).toBeVisible();
-  await materialsToggle.click();
+  await materialsClose.click();
   await expect(materials).toHaveCount(0);
+  await expect(materialsOpen).toBeFocused();
   await expect(inspector).toBeVisible();
-  await materialsToggle.click();
+  await materialsOpen.click();
   await expect(materials).toBeVisible();
   await expect(inspector).toBeVisible();
   await expect(seekToStart).toBeVisible();
@@ -484,8 +486,10 @@ async function verifyVideoEditorMinimalInsertTools(
   for (const kind of ['select-move', 'media', 'templates']) {
     await expect(
       page.locator(`[data-ui="video-editor.floating.insert-panel.${kind}"]`)
-    ).toBeVisible();
+    ).toHaveCount(0);
   }
+  await expect(page.locator('[data-ui="video-editor.library-tab.effects"]')).toBeVisible();
+  await expect(page.locator('[data-ui="video-editor.materials.import"]')).toBeVisible();
   await page.screenshot({ fullPage: true, path: screenshotPath });
 }
 
@@ -524,7 +528,7 @@ test('video editor keeps clip actions stable and disables them without an editab
 
   const timeline = page.locator('[data-ui="video-editor.timeline.surface"]');
   const timelineClip = page.locator(`[data-project-timeline-clip="${clip.id}"]`);
-  const sceneButton = page.locator('[data-ui="video-editor.floating.workspace-panel.scene"]');
+  const sceneButton = page.locator('[data-ui="video-editor.viewer.scene"]');
   await expect(timeline).toBeVisible();
   await expect(page.getByText('Titles', { exact: true })).toBeVisible();
   await expect(timelineClip).toBeVisible();

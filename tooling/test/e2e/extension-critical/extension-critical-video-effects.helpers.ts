@@ -1,3 +1,4 @@
+import { basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, type Page } from '@playwright/test';
 import {
@@ -118,7 +119,9 @@ export async function importEffectFile(
 ): Promise<void> {
   const dock = page.locator('[data-ui="video-editor.effects-library.dock"]');
   if (!(await dock.isVisible())) {
-    await page.locator('[data-ui="video-editor.floating.insert-panel.templates"]').click();
+    const openMaterials = page.locator('[data-ui="video-editor.viewer.open-materials"]');
+    if (await openMaterials.isVisible()) await openMaterials.click();
+    await page.locator('[data-ui="video-editor.library-tab.effects"]').click();
   }
   const importControl = dock.getByRole('button', {
     name: VIDEO_EDITOR_EFFECT_IMPORT_LABEL,
@@ -136,12 +139,14 @@ export async function importEffectFile(
 export async function importVisualInput(page: Page): Promise<void> {
   const visualInput = page.locator('input[type="file"][accept*="image/png"]').first();
   await visualInput.setInputFiles(VISUAL_INPUT_FIXTURE);
+  await appendImportedMaterial(page, VISUAL_INPUT_FIXTURE);
   await expect(page.locator('[data-playback-counter="true"]')).not.toContainText('/ 0:00.0');
 }
 
 export async function importVideoInput(page: Page): Promise<void> {
   const videoInput = page.locator('input[type="file"][accept*="video"]').first();
   await videoInput.setInputFiles(VIDEO_INPUT_FIXTURE);
+  await appendImportedMaterial(page, VIDEO_INPUT_FIXTURE);
   await expect(page.locator('[data-playback-counter="true"]')).not.toContainText('/ 0:00.0');
 }
 
@@ -214,4 +219,15 @@ export async function countPersistedEffectInstances(page: Page): Promise<number>
         };
       })
   );
+}
+
+async function appendImportedMaterial(page: Page, fixturePath: string): Promise<void> {
+  await page
+    .locator('[data-ui="video-editor.materials"]')
+    .getByRole('button', { name: basename(fixturePath), exact: true })
+    .click();
+  await page
+    .locator('[data-ui="video-editor.source-viewer"]')
+    .getByTitle(/^Append to timeline$|^Добавить в конец$/)
+    .click();
 }

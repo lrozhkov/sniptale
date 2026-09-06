@@ -31,7 +31,6 @@ interface VideoEditorWorkspaceConfirmState {
 
 interface VideoEditorWorkspaceInspectorState {
   mode: VideoEditorInspectorMode;
-  openGridSettings: () => void;
   openSelection: () => void;
 }
 
@@ -188,13 +187,9 @@ function useSceneBackgroundColorState(): VideoEditorWorkspaceColorState {
 function useVideoEditorInspectorState(): VideoEditorWorkspaceInspectorState {
   const [mode, setMode] = useState<VideoEditorInspectorMode>('selection');
 
-  const openGridSettings = useCallback(() => setMode('grid'), []);
   const openSelection = useCallback(() => setMode('selection'), []);
 
-  return useMemo(
-    () => ({ mode, openGridSettings, openSelection }),
-    [mode, openGridSettings, openSelection]
-  );
+  return useMemo(() => ({ mode, openSelection }), [mode, openSelection]);
 }
 
 /**

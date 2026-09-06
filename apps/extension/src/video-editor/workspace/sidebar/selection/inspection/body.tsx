@@ -9,6 +9,7 @@ import {
 type WorkspaceSidebarSelectionBodyProps = Partial<
   Pick<
     WorkspaceSidebarProps,
+    | 'gridSettings'
     | 'project'
     | 'selection'
     | 'selectedClip'
@@ -123,6 +124,7 @@ export function WorkspaceSidebarSelectionBody(props: WorkspaceSidebarSelectionBo
 
 function createInspectPanelProps(props: WorkspaceSidebarSelectionBodyProps) {
   return {
+    ...(props.gridSettings ? { gridSettings: props.gridSettings } : {}),
     project: props.project,
     selection: props.selection ?? createSceneSelection(),
     selectedClip: props.selectedClip ?? null,

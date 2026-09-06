@@ -34,7 +34,7 @@ export function ProjectTimelineZoomControl({
     <div className="flex shrink-0 items-center gap-1 px-1 text-[var(--sniptale-color-text-secondary)]">
       <span
         className={[
-          'whitespace-nowrap text-[12px] font-medium',
+          'whitespace-nowrap text-[12px] font-medium @max-[800px]/timeline:hidden',
           'text-[var(--sniptale-color-text-muted)]',
         ].join(' ')}
       >

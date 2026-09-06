@@ -128,12 +128,12 @@ describe('workspace-sidebar/panel-content alternate modes', () => {
     selectionBodyMock.mockClear();
   });
 
-  it('renders grid settings mode inside the sidebar surface', () => {
+  it('forwards grid settings to the selection inspector', () => {
     const gridMarkup = renderToStaticMarkup(
-      <WorkspaceSidebarPanelContent {...createProps()} inspectorMode="grid" />
+      <WorkspaceSidebarPanelContent {...createProps()} inspectorMode="selection" />
     );
-    expect(gridMarkup).toContain('Сетка помогает выравнивать');
-    expect(gridMarkup).toContain('Привязка к сетке');
+    expect(gridMarkup).not.toContain('Сетка помогает выравнивать');
+    expect(selectionBodyMock.mock.lastCall?.[0]).toHaveProperty('gridSettings');
   });
 });
 

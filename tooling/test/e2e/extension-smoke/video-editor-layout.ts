@@ -13,7 +13,12 @@ export async function expectVideoEditorPanelLayout(page: Page): Promise<void> {
   await expect(importMenu).toHaveCount(0);
   await expect(importTrigger).toBeFocused();
   const chrome = page.locator('[data-ui="video-editor.floating-workspace"]');
-  expect((await chrome.boundingBox())!.height).toBeLessThanOrEqual(52);
+  await expect(chrome).toHaveCount(0);
+  const viewerHeader = page.locator('[data-ui="video.preview.header"]');
+  expect((await viewerHeader.boundingBox())!.y).toBeLessThan(20);
+  await expect(
+    viewerHeader.locator('[data-ui="video-editor.floating.document-bar"]')
+  ).toBeVisible();
   await expect(page.locator('[data-ui="video-editor.timeline.toolbar.undo"]')).toHaveCount(1);
   await expect(page.locator('[data-ui="video-editor.timeline.toolbar.redo"]')).toHaveCount(1);
   await expect(chrome.locator('[data-ui$=".undo"], [data-ui$=".redo"]')).toHaveCount(0);
@@ -115,6 +120,16 @@ async function expectTimelineToolbarControls(page: Page): Promise<void> {
     const controlsBox = (await settings.boundingBox())!;
     const viewportBox = (await page.locator('[data-ui="video.preview.viewport"]').boundingBox())!;
     expect(controlsBox.y + controlsBox.height).toBeLessThanOrEqual(viewportBox.y);
+  }
+  const inspector = page.locator('[data-ui="video-editor.floating.context-inspector"]');
+  const rail = inspector.locator('nav').first();
+  if (await rail.isVisible()) {
+    const panelBox = (await inspector.boundingBox())!;
+    const railBox = (await rail.boundingBox())!;
+    const iconBox = (await rail.locator('button').first().boundingBox())!;
+    const left = iconBox.x - panelBox.x - 1;
+    const right = railBox.x + railBox.width - iconBox.x - iconBox.width - 1;
+    expect(Math.abs(left - right)).toBeLessThanOrEqual(2);
   }
   const width = (await toolbar.boundingBox())!.width;
   if (width >= 1000) {

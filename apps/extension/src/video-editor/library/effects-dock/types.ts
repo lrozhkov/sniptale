@@ -8,6 +8,7 @@ export type VideoEditorEffectCatalogItem =
 
 export interface VideoEditorEffectsLibraryDockProps {
   headerAction?: React.ReactNode;
+  headerTitle?: React.ReactNode;
   catalogs: readonly VideoEditorEffectCatalogItem[];
   currentTime: number;
   errorCode: string | null;

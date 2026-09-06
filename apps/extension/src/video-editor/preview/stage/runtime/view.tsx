@@ -23,6 +23,7 @@ function buildPreviewStageSurfaceProps(
   return {
     alternateView: props.alternateView,
     headerContent: props.headerContent,
+    headerActions: props.headerActions,
     activeClips: runtime.surface.activeClips,
     activeInsertKind: props.activeInsertKind,
     audioBankClips: runtime.media.audioBankClips,

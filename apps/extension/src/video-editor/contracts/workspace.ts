@@ -1,1 +1,1 @@
-export type VideoEditorInspectorMode = 'grid' | 'selection';
+export type VideoEditorInspectorMode = 'selection';

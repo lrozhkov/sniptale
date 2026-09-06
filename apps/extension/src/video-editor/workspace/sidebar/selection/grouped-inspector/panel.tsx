@@ -68,7 +68,7 @@ export function InspectorGroupedPanel<TId extends string>(props: {
 
   if (!defaultId) return null;
   return (
-    <div ref={surface} data-ui="video-editor.inspector.sections">
+    <div ref={surface} className="-mx-3" data-ui="video-editor.inspector.sections">
       <CategorizedInspector
         ariaLabel={translate('videoEditor.sidebar.projectInspector')}
         initialSection={defaultId}

@@ -8,7 +8,6 @@ export function createHeaderController() {
     onCloseLibraryPanel: vi.fn(),
     onOpenAudioRecordingDialog: vi.fn(),
     onOpenExportDialog: vi.fn(),
-    onOpenGridSettings: vi.fn(),
     onOpenLibraryPanel: vi.fn(),
     onRenameProject: vi.fn(),
     onSelectScene: vi.fn(),

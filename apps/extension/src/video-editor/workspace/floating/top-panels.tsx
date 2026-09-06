@@ -1,66 +1,32 @@
-import { CanvasToolButtons } from '@sniptale/ui/canvas-tools';
-import {
-  useVideoEditorTimelineController,
-  useWorkspaceDialogsContext,
-  useWorkspaceGridContext,
-  useWorkspaceInspectorContext,
-} from '../../runtime/controller/composition/hooks';
-import { useVideoEditorClipSelectionPort } from '../../runtime/controller/store';
-import type { VideoPreviewCanvasInsertKind } from '../../preview/stage/types';
-import { buildVideoInsertActions, buildVideoWorkspaceActions } from './actions';
+import { MonitorCog, PanelRight } from 'lucide-react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { translate } from '../../../platform/i18n';
+import { useVideoEditorHeaderController } from '../../runtime/controller/composition/hooks';
 
-export function VideoEditorFloatingInsertPanel(props: {
-  activeInsertKind: VideoPreviewCanvasInsertKind | null;
-  effectsLibraryDock: {
-    isOpen: boolean;
-    onToggle: () => void;
-  };
-  onActiveInsertKindChange: (kind: VideoPreviewCanvasInsertKind | null) => void;
+export function VideoEditorWorkspaceHeaderActions(props: {
+  inspectorOpen: boolean;
+  onOpenInspector: () => void;
 }) {
-  const timeline = useVideoEditorTimelineController();
-  if (!timeline) return null;
-  const insertion = timeline.actions.insertion;
-
+  const header = useVideoEditorHeaderController();
+  if (!header) return null;
   return (
-    <div data-ui="video-editor.floating.insert-panel.stack" className="flex shrink-0 items-center">
-      <CanvasToolButtons
-        actions={buildVideoInsertActions({
-          activeInsertKind: props.activeInsertKind,
-          effectsLibraryDock: props.effectsLibraryDock,
-          insertion,
-          onActiveInsertKindChange: props.onActiveInsertKindChange,
-        })}
-        dataUi="video-editor.floating.insert-panel"
-      />
-    </div>
-  );
-}
-
-export function VideoEditorFloatingWorkspacePanel() {
-  const grid = useWorkspaceGridContext();
-  const inspector = useWorkspaceInspectorContext();
-  const dialogs = useWorkspaceDialogsContext();
-  const selection = useVideoEditorClipSelectionPort((port) => port.selection);
-  const selectScene = useVideoEditorClipSelectionPort((port) => port.selectScene);
-  return (
-    <div
-      data-ui="video-editor.floating.workspace-panel.stack"
-      className="ml-auto flex shrink-0 items-center"
-    >
-      <CanvasToolButtons
-        actions={buildVideoWorkspaceActions({
-          grid: { magnetEnabled: grid.magnetEnabled, onToggleMagnet: grid.toggleMagnet },
-          inspectorMode: inspector.mode,
-          onOpenAudioRecordingDialog: dialogs.openAudioRecordingDialog,
-          onOpenGridSettings: inspector.openGridSettings,
-          onSelectScene: () => {
-            selectScene();
-            inspector.openSelection();
-          },
-          selection,
-        })}
-        dataUi="video-editor.floating.workspace-panel"
-      />
+    <div className="flex shrink-0 items-center gap-1">
+      <ContentToolbarButton
+        dataUi="video-editor.viewer.scene"
+        title={translate('videoEditor.sidebar.sceneProperties')}
+        onClick={header.onSelectScene}
+      >
+        <MonitorCog size={17} />
+      </ContentToolbarButton>
+      {!props.inspectorOpen && (
+        <ContentToolbarButton
+          dataUi="video-editor.viewer.open-inspector"
+          title={translate('videoEditor.app.expandInspector')}
+          onClick={props.onOpenInspector}
+        >
+          <PanelRight size={17} />
+        </ContentToolbarButton>
+      )}
     </div>
   );
 }

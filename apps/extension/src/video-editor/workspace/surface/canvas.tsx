@@ -1,3 +1,9 @@
+import {
+  VideoEditorWorkspaceHeader,
+  VideoEditorLibraryNavigation,
+  WorkspacePanelCloseButton,
+} from '../floating';
+import { VideoEditorWorkspaceHeaderActions } from '../floating/top-panels';
 import { useWorkspaceTrackPresentation } from './track-presentation';
 import {
   WorkspacePanelDockToggle,
@@ -39,7 +45,7 @@ export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProp
   const viewer = useWorkspacePreviewContext();
   const previewHeight = props.previewHeightStyle.height ?? '60%';
   return (
-    <div data-ui="video-editor.workspace.canvas-shell" className="min-h-0 min-w-0 flex-1 px-3 pb-3">
+    <div data-ui="video-editor.workspace.canvas-shell" className="min-h-0 min-w-0 flex-1 p-3">
       <div
         ref={layout.workspaceSplitRef}
         className="grid h-full min-h-0 min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] gap-0"
@@ -88,6 +94,8 @@ export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProp
 }
 
 interface VideoEditorWorkspaceCanvasProps {
+  inspectorPanel: { isOpen: boolean; onToggle: () => void };
+  onMaterialsOpenChange: (open: boolean) => void;
   materialsPanel: { resize: WorkspacePanelResize; fullHeight: boolean; onToggle: () => void };
   inspectorFullHeight?: boolean;
   materialsOpen?: boolean;
@@ -123,11 +131,42 @@ function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
     setSourceActive(true);
   };
   const viewerHeading = (
-    <WorkspaceViewerHeading
-      sourceName={source?.name ?? null}
-      sourceActive={sourceActive}
-      onChange={(active) => (active ? showSource() : setSourceActive(false))}
+    <VideoEditorWorkspaceHeader
+      libraryOpen={Boolean(props.materialsOpen || props.effectsLibraryDockOpen)}
+      onOpenLibraryPanel={() => props.onMaterialsOpenChange(true)}
+    >
+      {source && (
+        <WorkspaceViewerHeading
+          sourceName={source?.name ?? null}
+          sourceActive={sourceActive}
+          onChange={(active) => (active ? showSource() : setSourceActive(false))}
+        />
+      )}
+    </VideoEditorWorkspaceHeader>
+  );
+  const libraryNavigation = (
+    <VideoEditorLibraryNavigation
+      active={props.effectsLibraryDockOpen ? 'effects' : 'materials'}
+      onChange={(active) =>
+        active === 'effects'
+          ? props.onEffectsLibraryDockOpenChange(true)
+          : props.onMaterialsOpenChange(true)
+      }
     />
+  );
+  const libraryActions = (
+    <div className="flex shrink-0 items-center gap-1">
+      <WorkspacePanelDockToggle
+        fullHeight={props.materialsPanel.fullHeight}
+        onToggle={props.materialsPanel.onToggle}
+        dataUi="video-editor.materials.dock-toggle"
+      />
+      <WorkspacePanelCloseButton
+        dataUi="video-editor.materials.close"
+        title={translate('common.actions.close')}
+        onClose={() => props.onMaterialsOpenChange(false)}
+      />
+    </div>
   );
   return (
     <>
@@ -136,20 +175,18 @@ function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
           className="col-start-1 row-start-1 flex min-h-0 min-w-0"
           style={{ gridRowEnd: props.materialsPanel.fullHeight ? 4 : 2 }}
         >
-          <div className="min-h-0 min-w-0" style={{ width: props.materialsPanel.resize.width }}>
+          <div
+            className="@container/library min-h-0 min-w-0"
+            style={{ width: props.materialsPanel.resize.width }}
+          >
             {props.materialsOpen && (
               <VideoEditorMaterials
                 onOpenLibrary={() => header?.onOpenLibraryPanel()}
                 project={preview.project}
                 onImport={preview.onImport}
                 selectedAssetId={selectedAssetId}
-                headerAction={
-                  <WorkspacePanelDockToggle
-                    fullHeight={props.materialsPanel.fullHeight}
-                    onToggle={props.materialsPanel.onToggle}
-                    dataUi="video-editor.materials.dock-toggle"
-                  />
-                }
+                headerTitle={libraryNavigation}
+                headerAction={libraryActions}
                 onSelect={(asset) => {
                   setSelectedAssetId(asset.id);
                   showSource();
@@ -161,13 +198,8 @@ function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
               effectOperations={props.effectOperations}
               isOpen={props.effectsLibraryDockOpen}
               onOpenChange={props.onEffectsLibraryDockOpenChange}
-              headerAction={
-                <WorkspacePanelDockToggle
-                  fullHeight={props.materialsPanel.fullHeight}
-                  onToggle={props.materialsPanel.onToggle}
-                  dataUi="video-editor.materials.dock-toggle"
-                />
-              }
+              headerTitle={libraryNavigation}
+              headerAction={libraryActions}
             />
           </div>
           <WorkspacePanelResizeHandle
@@ -184,6 +216,12 @@ function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
       >
         <PreviewStage
           headerContent={viewerHeading}
+          headerActions={
+            <VideoEditorWorkspaceHeaderActions
+              inspectorOpen={props.inspectorPanel.isOpen}
+              onOpenInspector={props.inspectorPanel.onToggle}
+            />
+          }
           alternateView={{
             active: sourceActive,
             content: (
@@ -373,7 +411,7 @@ function WorkspaceViewerHeading({
   onChange: (source: boolean) => void;
 }) {
   return (
-    <div className="flex h-9 min-w-0 flex-1 items-center gap-2">
+    <div className="flex h-9 min-w-0 items-center gap-2">
       {sourceName !== null ? (
         <SegmentedSwitch
           density="compact"

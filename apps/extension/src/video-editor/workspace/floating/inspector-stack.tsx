@@ -1,3 +1,4 @@
+import { WorkspacePanelCloseButton } from './index';
 import { type ReactNode } from 'react';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import {
@@ -21,6 +22,7 @@ const INSPECTOR_STACK_CLASS_NAME = [
 ].join(' ');
 
 type VideoEditorInspectorStackProps = {
+  onClose: () => void;
   fullHeight?: boolean;
   onToggleFullHeight?: () => void;
   diagnosticsContent: ReactNode;
@@ -29,6 +31,7 @@ type VideoEditorInspectorStackProps = {
 
 export function VideoEditorFloatingInspectorStack({
   diagnosticsContent,
+  onClose,
   fullHeight = false,
   onToggleFullHeight,
   resize,
@@ -39,6 +42,7 @@ export function VideoEditorFloatingInspectorStack({
 
   return (
     <VideoEditorFloatingInspectorContent
+      onClose={onClose}
       controller={controller}
       leftSidebarCollapsed={layout.leftSidebarCollapsed}
       resize={resize}
@@ -49,6 +53,7 @@ export function VideoEditorFloatingInspectorStack({
 }
 
 type VideoEditorFloatingInspectorContentProps = {
+  onClose: () => void;
   fullHeight: boolean;
   onToggleFullHeight?: () => void;
   controller: NonNullable<ReturnType<typeof useVideoEditorSidebarController>>;
@@ -58,6 +63,7 @@ type VideoEditorFloatingInspectorContentProps = {
 
 function VideoEditorFloatingInspectorContent({
   controller,
+  onClose,
   fullHeight,
   onToggleFullHeight,
   leftSidebarCollapsed,
@@ -107,6 +113,13 @@ function VideoEditorFloatingInspectorContent({
               />
             </div>
           )}
+          <div className="mr-2">
+            <WorkspacePanelCloseButton
+              onClose={onClose}
+              dataUi="video-editor.inspector.close"
+              title={translate('videoEditor.app.collapseInspector')}
+            />
+          </div>
         </div>
         <WorkspaceSidebarPanelContent
           {...sidebarProps}

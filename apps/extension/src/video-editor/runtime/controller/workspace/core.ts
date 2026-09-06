@@ -89,12 +89,12 @@ export function createWorkspaceHeaderController(
     onOpenAudioRecordingDialog: args.workspace.openAudioRecordingDialog,
     onCloseLibraryPanel: args.workspace.closeLibraryPanel,
     onOpenExportDialog: args.store.openExportDialog,
-    onOpenGridSettings: args.workspace.inspector.openGridSettings,
     onOpenLibraryPanel: args.workspace.openLibraryPanel,
     onRenameProject: args.store.renameProject,
     onSelectScene: () => {
       args.store.selectScene();
       args.workspace.inspector.openSelection();
+      if (args.workspace.leftSidebarCollapsed) args.workspace.toggleSidebarCollapsed();
     },
     onToggleLibraryPanel: args.workspace.toggleLibraryPanel,
     onToggleSidebar: args.workspace.toggleSidebarCollapsed,

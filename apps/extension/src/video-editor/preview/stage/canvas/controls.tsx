@@ -1,4 +1,4 @@
-import { CompactSelect } from '../../../../ui/compact-inspector-controls/select';
+import { PreviewDisplaySettings } from './display-settings';
 import { translate } from '../../../../platform/i18n';
 import type {
   VideoEditorPreviewMode,
@@ -19,7 +19,6 @@ interface PreviewStageControlsProps {
   status: VideoEditorPreviewStatus;
 }
 
-const CONTROL_CLASS_NAME = '!h-9 !min-w-20 !bg-[color:var(--sniptale-color-surface-panel)]';
 const RETRY_CLASS_NAME = [
   'h-9 rounded-[8px] border px-2 text-[11px] font-semibold',
   'border-[color:color-mix(in_srgb,var(--sniptale-color-danger)_38%,var(--sniptale-color-border-soft)_62%)]',
@@ -40,32 +39,7 @@ export function PreviewStageControls(props: PreviewStageControlsProps) {
       data-ui="video.preview.controls"
       onPointerDown={(event) => event.stopPropagation()}
     >
-      <div className="flex items-center gap-2">
-        <PreviewModeControl {...props} />
-        <CompactSelect
-          aria-label={translate('videoEditor.stage.previewRaster')}
-          className={CONTROL_CLASS_NAME}
-          containerClassName="!w-[88px]"
-          onChange={props.onRasterPresetChange}
-          options={['360p', '540p', '720p', '1080p', '1440p', '2160p'].map((value) => ({
-            label: value,
-            value: value as VideoEditorPreviewRasterPreset,
-          }))}
-          value={props.rasterPreset}
-        />
-        <CompactSelect
-          aria-label={translate('videoEditor.stage.previewZoom')}
-          className={CONTROL_CLASS_NAME}
-          containerClassName="!w-[112px]"
-          onChange={props.onZoomChange}
-          options={[
-            { label: translate('videoEditor.stage.previewZoomFit'), value: 'fit' },
-            { label: '75%', value: '75%' },
-            { label: '100%', value: '100%' },
-          ]}
-          value={props.zoom}
-        />
-      </div>
+      <PreviewDisplaySettings {...props} />
       <div
         className="flex max-w-[308px] flex-wrap justify-end gap-1 empty:hidden"
         data-ui="video.preview.feedback"
@@ -74,23 +48,6 @@ export function PreviewStageControls(props: PreviewStageControlsProps) {
         <PreviewPreferencesRetry {...props} />
       </div>
     </div>
-  );
-}
-
-function PreviewModeControl(props: PreviewStageControlsProps) {
-  return (
-    <CompactSelect
-      aria-label={translate('videoEditor.stage.previewMode')}
-      className={CONTROL_CLASS_NAME}
-      containerClassName="!w-[92px]"
-      onChange={props.onModeChange}
-      options={[
-        { label: translate('videoEditor.stage.previewModeLive'), value: 'live' },
-        { label: translate('videoEditor.stage.previewModeCache'), value: 'cache' },
-      ]}
-      title={translate('videoEditor.stage.previewCacheRetentionDisclosure')}
-      value={props.mode}
-    />
   );
 }
 

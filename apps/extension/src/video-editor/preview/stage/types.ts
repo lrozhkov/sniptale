@@ -126,6 +126,7 @@ export interface PreviewStageAlternateView {
 export interface PreviewStageSurfaceProps extends PreviewStageCanvasProps {
   alternateView?: PreviewStageAlternateView | undefined;
   headerContent?: React.ReactNode;
+  headerActions?: React.ReactNode;
   isPlaying: boolean;
   playbackRange: VideoEditorPlaybackRange | null;
   onAddActionEvent: (preset: VideoProjectActionPreset) => void;

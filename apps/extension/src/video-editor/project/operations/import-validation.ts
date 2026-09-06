@@ -34,11 +34,6 @@ const PROJECT_ASSET_ACCEPT_ATTRIBUTE = {
     IMPORTABLE_PROJECT_ASSET_MIME_TYPES[VideoProjectAssetType.AUDIO].join(','),
 } as const satisfies Record<ImportableProjectAssetType, string>;
 
-export const PROJECT_MEDIA_ACCEPT_ATTRIBUTE = [
-  PROJECT_ASSET_ACCEPT_ATTRIBUTE[VideoProjectAssetType.IMAGE],
-  PROJECT_ASSET_ACCEPT_ATTRIBUTE[VideoProjectAssetType.VIDEO],
-  PROJECT_ASSET_ACCEPT_ATTRIBUTE[VideoProjectAssetType.AUDIO],
-].join(',');
 export const PROJECT_IMAGE_ACCEPT_ATTRIBUTE =
   PROJECT_ASSET_ACCEPT_ATTRIBUTE[VideoProjectAssetType.IMAGE];
 export const PROJECT_VIDEO_ACCEPT_ATTRIBUTE =

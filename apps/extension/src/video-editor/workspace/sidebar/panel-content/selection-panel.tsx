@@ -61,6 +61,7 @@ function createSelectionPanelOptionalActionProps(props: WorkspaceSidebarSelectio
 
 function createSelectionBodyStateProps(props: WorkspaceSidebarSelectionPanelProps) {
   return {
+    ...(props.gridSettings ? { gridSettings: props.gridSettings } : {}),
     project: props.project,
     selection: props.selection,
     selectedClip: props.selectedClip,
@@ -148,6 +149,7 @@ function createSelectionPanelStateProps(
   props: WorkspaceSidebarSelectionPanelSourceProps
 ): Pick<
   WorkspaceSidebarSelectionPanelProps,
+  | 'gridSettings'
   | 'placementMode'
   | 'project'
   | 'recentColors'
@@ -161,6 +163,7 @@ function createSelectionPanelStateProps(
   | 'selection'
 > {
   return {
+    ...(props.gridSettings ? { gridSettings: props.gridSettings } : {}),
     selection: props.selection ?? createSceneSelection(),
     project: props.project,
     recentColors: props.recentColors ?? [],

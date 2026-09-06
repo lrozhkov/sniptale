@@ -18,13 +18,14 @@ const PREVIEW_STAGE_CONTENT_BOX_CLASS_NAME = 'absolute inset-4 min-h-0';
 
 const STAGE_CONTROL_BUTTON_CLASS_NAME = '!h-9 !w-9 !min-w-9 !px-0';
 const STAGE_HEADER_CLASS_NAME = [
-  'flex shrink-0 items-start justify-end gap-2 border-b px-3 py-2',
+  'flex shrink-0 items-center justify-end gap-2 border-b px-3 py-2',
   'border-[color:var(--sniptale-color-border-soft)]',
 ].join(' ');
 
 export interface PreviewStageShellLayoutProps {
   alternateView?: PreviewStageAlternateView | undefined;
   headerContent?: React.ReactNode;
+  headerActions?: React.ReactNode;
   children: React.ReactNode;
   currentTime: number;
   duration: number;
@@ -145,6 +146,7 @@ function PreviewStageFullscreenButton(props: {
 function PreviewStageShellControls(
   props: ResolvedPreviewStageControls & {
     headerContent?: React.ReactNode;
+    headerActions?: React.ReactNode;
     alternateActive?: boolean | undefined;
     isFullscreen: boolean;
     onCloseFullscreen?: () => void;
@@ -169,6 +171,7 @@ function PreviewStageShellControls(
           status={props.previewStatus}
         />
       </div>
+      {!props.isFullscreen && props.headerActions}
       <div hidden={props.alternateActive}>
         <PreviewStageFullscreenButton {...props} />
       </div>
@@ -180,6 +183,7 @@ type StageShellMainPaneProps = Pick<
   PreviewStageShellLayoutProps,
   | 'children'
   | 'headerContent'
+  | 'headerActions'
   | 'alternateView'
   | 'currentTime'
   | 'duration'
@@ -206,6 +210,7 @@ function StageShellMainPane(props: StageShellMainPaneProps) {
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       <PreviewStageShellControls
         headerContent={props.headerContent}
+        headerActions={props.headerActions}
         alternateActive={props.alternateView?.active}
         {...resolvePreviewStageControls(props)}
         isFullscreen={props.isFullscreen}

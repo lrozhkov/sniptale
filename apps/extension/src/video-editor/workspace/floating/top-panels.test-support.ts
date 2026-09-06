@@ -31,13 +31,12 @@ function createInsertionActions(): VideoEditorTimelineController['actions']['ins
 function createHeaderController(): VideoEditorHeaderController {
   return {
     grid: { magnetEnabled: true, onToggleMagnet: noop() },
-    inspectorMode: 'grid',
+    inspectorMode: 'selection',
     leftSidebarCollapsed: false,
     libraryPanelOpen: false,
     onCloseLibraryPanel: noop(),
     onOpenAudioRecordingDialog: noop(),
     onOpenExportDialog: noop(),
-    onOpenGridSettings: noop(),
     onOpenLibraryPanel: noop(),
     onRenameProject: noop(),
     onSelectScene: noop(),

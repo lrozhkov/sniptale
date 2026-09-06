@@ -8,6 +8,7 @@ import { translate } from '../../../platform/i18n';
 export function EffectsLibraryHeader(props: {
   onClose(): void;
   action?: React.ReactNode;
+  title?: React.ReactNode;
 }): React.JSX.Element {
   return (
     <header
@@ -16,20 +17,24 @@ export function EffectsLibraryHeader(props: {
         'border-[color:var(--sniptale-color-border-soft)] px-3',
       ].join(' ')}
     >
-      <h2
-        className="min-w-0 flex-1 truncate text-[13px] font-semibold"
-        title={translate('videoEditor.effectsLibrary.description')}
-      >
-        {translate('videoEditor.effectsLibrary.title')}
-      </h2>
+      {props.title ?? (
+        <h2
+          className="min-w-0 flex-1 truncate text-[13px] font-semibold"
+          title={translate('videoEditor.effectsLibrary.description')}
+        >
+          {translate('videoEditor.effectsLibrary.title')}
+        </h2>
+      )}
       {props.action}
-      <EditorIconButton
-        className="!h-6 !w-6"
-        title={translate('common.actions.close')}
-        onClick={props.onClose}
-      >
-        <X size={14} strokeWidth={2} />
-      </EditorIconButton>
+      {!props.action && (
+        <EditorIconButton
+          className="!h-6 !w-6"
+          title={translate('common.actions.close')}
+          onClick={props.onClose}
+        >
+          <X size={14} strokeWidth={2} />
+        </EditorIconButton>
+      )}
     </header>
   );
 }

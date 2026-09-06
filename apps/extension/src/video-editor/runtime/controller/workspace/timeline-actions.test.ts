@@ -40,13 +40,13 @@ function createWorkspace(): Pick<
 > {
   return {
     clearPlaybackRange: vi.fn(),
+    inspector: { mode: 'selection', openSelection: vi.fn() },
     confirm: {
       dialog: null,
       onCancel: vi.fn(),
       onConfirm: vi.fn(),
       request: vi.fn(),
     },
-    inspector: { mode: 'selection', openGridSettings: vi.fn(), openSelection: vi.fn() },
     setPlaybackRange: vi.fn(),
   };
 }

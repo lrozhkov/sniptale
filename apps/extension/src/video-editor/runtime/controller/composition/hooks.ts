@@ -66,9 +66,9 @@ export const useWorkspaceDialogsContext = () =>
   useRequiredContext(WorkspaceDialogsContext, 'Workspace dialogs context');
 export const useWorkspaceLayoutContext = () =>
   useRequiredContext(WorkspaceLayoutContext, 'Workspace layout context');
-export const useWorkspaceGridContext = () =>
+const useWorkspaceGridContext = () =>
   useRequiredContext(WorkspaceGridContext, 'Workspace grid context');
-export const useWorkspaceInspectorContext = () =>
+const useWorkspaceInspectorContext = () =>
   useRequiredContext(WorkspaceInspectorContext, 'Workspace inspector context');
 const useWorkspacePlaybackRangeContext = () =>
   useRequiredContext(WorkspacePlaybackRangeContext, 'Workspace playback-range context');

@@ -164,8 +164,6 @@ function getInspectorHeaderTitle(
   selectionTitle: string
 ) {
   switch (inspectorMode) {
-    case 'grid':
-      return translate('videoEditor.sidebar.gridSettingsTitle');
     case 'selection':
       return selectionTitle;
   }

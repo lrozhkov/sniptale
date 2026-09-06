@@ -29,6 +29,7 @@ export interface PreviewStageProps {
   alternateView?: PreviewStageAlternateView | undefined;
   /** Workspace context for the stage header; hidden during native fullscreen. */
   headerContent?: ReactNode;
+  headerActions?: ReactNode;
   project: VideoProject;
   assetUrls: Record<string, string>;
   currentTime: number;
