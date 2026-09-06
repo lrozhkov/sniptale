@@ -48,7 +48,7 @@ export async function loadTimelineVideoPreviewFrames(
 
 function createTimelinePreviewVideoElement(assetUrl: string) {
   const video = document.createElement('video');
-  video.preload = 'metadata';
+  video.preload = 'auto';
   video.muted = true;
   video.playsInline = true;
   video.src = assetUrl;
@@ -61,12 +61,10 @@ async function seekTimelinePreviewVideo(
   signal: AbortSignal | undefined
 ) {
   const safeTime = Number.isFinite(sampleTime) ? Math.max(0, sampleTime) : 0;
-  if (Math.abs(video.currentTime - safeTime) <= 0.01) {
-    return;
-  }
-
+  // Metadata readiness can precede usable pixels at time zero in Chromium.
+  const seeked = waitForVideoEvent(video, 'seeked', signal);
   video.currentTime = safeTime;
-  await waitForVideoEvent(video, 'seeked', signal);
+  await seeked;
 }
 
 function drawTimelinePreviewFrame(video: HTMLVideoElement): HTMLCanvasElement {
