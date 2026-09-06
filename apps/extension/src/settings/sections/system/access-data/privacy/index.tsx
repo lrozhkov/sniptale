@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { RotateCcw, Trash2 } from 'lucide-react';
 
 import { translate } from '../../../../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../../../../platform/i18n/user-facing-error';
 import type { LocalExtensionDataErasureOptions } from '../../../../../composition/persistence/privacy-erasure';
 import {
   getControlSecondaryButtonClassName,
@@ -108,7 +109,11 @@ function usePrivacyErasureActions() {
     } catch (error) {
       setStatus({
         kind: 'error',
-        message: error instanceof Error ? error.message : translate('settings.privacy.error'),
+        message: createUserFacingErrorMessage({
+          cause: error,
+          detail: 'storage',
+          summaryKey: 'settings.privacy.error',
+        }),
       });
     } finally {
       setRunningAction(null);

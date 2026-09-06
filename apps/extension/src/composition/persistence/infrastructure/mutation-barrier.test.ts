@@ -5,15 +5,19 @@ import {
   acquirePersistenceMutationTransition,
   isActivePersistenceMutationPermit,
   installPersistenceLockManagerForTests,
+  runWithDurableAssetLifecycleLock,
   runWithDurableAssetOperation,
   runWithDurableAssetOperationRecovery,
   runWithPersistenceMutationPermit,
   runWithPersistenceMutationTransition,
+  runWithPersistenceMutationTransitionRecovery,
   runWithExclusivePersistenceMutationPermit,
   runWithPersistenceDomainMutationLock,
   runWithPersistenceDomainMutationLocks,
   runWithPersistentDataErasureBarrier,
+  type DurableAssetOperationPermit,
   type PersistenceLockManager,
+  type PersistenceMutationTransitionPermit,
 } from './mutation-barrier';
 
 interface PendingLock {
@@ -372,4 +376,166 @@ it('prevents a private-browsing writer from escaping the shared Web Lock authori
   >;
 
   expect(manifest['incognito']).toBe('not_allowed');
+});
+
+it('routes every persistence operation through its exact named lock and mode', async () => {
+  const requests: Array<{ mode: 'exclusive' | 'shared'; name: string }> = [];
+  installPersistenceLockManagerForTests({
+    async request(name, options, operation) {
+      requests.push({ mode: options.mode, name });
+      return operation();
+    },
+  });
+
+  await runWithPersistenceMutationPermit(async () => undefined);
+  await runWithExclusivePersistenceMutationPermit(async () => undefined);
+  await runWithPersistenceMutationTransition(async () => undefined);
+  const transition = await acquirePersistenceMutationTransition();
+  await transition.release();
+  await runWithDurableAssetLifecycleLock(async () => undefined);
+  await runWithDurableAssetOperation(async () => undefined);
+  await runWithDurableAssetOperationRecovery(undefined, async () => undefined);
+  await runWithPersistentDataErasureBarrier(async () => undefined);
+  await runWithPersistenceDomainMutationLocks(
+    ['video-settings', 'callout-presets', 'video-settings'],
+    async () => undefined
+  );
+
+  expect(requests).toEqual([
+    { mode: 'shared', name: 'sniptale:persistence:privacy-erasure' },
+    { mode: 'shared', name: 'sniptale:persistence:privacy-erasure:transition' },
+    { mode: 'exclusive', name: 'sniptale:persistence:privacy-erasure' },
+    { mode: 'shared', name: 'sniptale:persistence:privacy-erasure:transition' },
+    { mode: 'shared', name: 'sniptale:persistence:privacy-erasure:transition' },
+    { mode: 'exclusive', name: 'sniptale:persistence:privacy-erasure:durable-assets' },
+    { mode: 'exclusive', name: 'sniptale:persistence:privacy-erasure:durable-asset-operations' },
+    { mode: 'exclusive', name: 'sniptale:persistence:privacy-erasure:durable-asset-operations' },
+    { mode: 'exclusive', name: 'sniptale:persistence:privacy-erasure:transition' },
+    { mode: 'exclusive', name: 'sniptale:persistence:privacy-erasure' },
+    { mode: 'shared', name: 'sniptale:persistence:privacy-erasure' },
+    { mode: 'exclusive', name: 'sniptale:persistence:privacy-erasure:callout-presets' },
+    { mode: 'exclusive', name: 'sniptale:persistence:privacy-erasure:video-settings' },
+  ]);
+});
+
+it('uses the fallback lock queue outside extension runtimes and clears it on reset', async () => {
+  installPersistenceLockManagerForTests(null);
+  vi.stubGlobal('navigator', {});
+  vi.stubGlobal('chrome', undefined);
+  const calls: string[] = [];
+  let releaseFirst!: () => void;
+  const firstGate = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+
+  const first = runWithPersistenceMutationPermit(async () => {
+    calls.push('first');
+    await firstGate;
+  });
+  const second = runWithPersistenceMutationPermit(async () => {
+    calls.push('second');
+  });
+  await vi.waitFor(() => expect(calls).toEqual(['first']));
+  releaseFirst();
+  await Promise.all([first, second]);
+  expect(calls).toEqual(['first', 'second']);
+
+  installPersistenceLockManagerForTests(null);
+  await expect(runWithPersistenceMutationPermit(async () => 'reset')).resolves.toBe('reset');
+  vi.unstubAllGlobals();
+});
+
+it('fails closed when an extension runtime has no persistent lock manager', async () => {
+  installPersistenceLockManagerForTests(null);
+  vi.stubGlobal('navigator', {});
+  vi.stubGlobal('chrome', {});
+
+  expect(() => runWithPersistenceMutationPermit(async () => undefined)).toThrow(
+    'Persistent mutation coordination is unavailable'
+  );
+  vi.unstubAllGlobals();
+});
+
+it('uses the browser Web Locks manager when no test manager is installed', async () => {
+  installPersistenceLockManagerForTests(null);
+  const requests: Array<{ mode: 'exclusive' | 'shared'; name: string }> = [];
+  const locks: PersistenceLockManager = {
+    async request(name, options, operation) {
+      requests.push({ mode: options.mode, name });
+      return operation();
+    },
+  };
+  vi.stubGlobal('navigator', { locks });
+  vi.stubGlobal('chrome', {});
+
+  await expect(runWithPersistenceMutationPermit(async () => 'locked')).resolves.toBe('locked');
+  expect(requests).toEqual([{ mode: 'shared', name: 'sniptale:persistence:privacy-erasure' }]);
+  vi.unstubAllGlobals();
+});
+
+it('uses the fallback lock manager when navigator is unavailable', async () => {
+  installPersistenceLockManagerForTests(null);
+  vi.stubGlobal('navigator', undefined);
+  vi.stubGlobal('chrome', undefined);
+
+  await expect(runWithPersistenceMutationPermit(async () => 'fallback')).resolves.toBe('fallback');
+  vi.unstubAllGlobals();
+});
+
+it('clears an active fallback queue when the lock manager is reset', async () => {
+  installPersistenceLockManagerForTests(null);
+  vi.stubGlobal('navigator', {});
+  vi.stubGlobal('chrome', undefined);
+  let releaseFirst!: () => void;
+  const firstGate = new Promise<void>((resolve) => {
+    releaseFirst = resolve;
+  });
+  const first = runWithPersistenceMutationPermit(async () => firstGate);
+  await Promise.resolve();
+
+  installPersistenceLockManagerForTests(null);
+  const replacement = vi.fn(async () => 'replacement');
+  await expect(runWithPersistenceMutationPermit(replacement)).resolves.toBe('replacement');
+  expect(replacement).toHaveBeenCalledOnce();
+
+  releaseFirst();
+  await first;
+  vi.unstubAllGlobals();
+});
+
+it('rejects forged and expired recovery permits by reacquiring their owner locks', async () => {
+  const requests: string[] = [];
+  installPersistenceLockManagerForTests({
+    async request(name, _options, operation) {
+      requests.push(name);
+      return operation();
+    },
+  });
+  let expiredTransition: PersistenceMutationTransitionPermit | undefined;
+  let expiredDurable: DurableAssetOperationPermit | undefined;
+  await runWithPersistenceMutationTransition(async (permit) => {
+    expiredTransition = permit;
+  });
+  await runWithDurableAssetOperation(async (permit) => {
+    expiredDurable = permit;
+  });
+  requests.length = 0;
+
+  await runWithPersistenceMutationTransitionRecovery(
+    {} as PersistenceMutationTransitionPermit,
+    async () => undefined
+  );
+  await runWithPersistenceMutationTransitionRecovery(expiredTransition, async () => undefined);
+  await runWithDurableAssetOperationRecovery(
+    {} as DurableAssetOperationPermit,
+    async () => undefined
+  );
+  await runWithDurableAssetOperationRecovery(expiredDurable, async () => undefined);
+
+  expect(requests).toEqual([
+    'sniptale:persistence:privacy-erasure:transition',
+    'sniptale:persistence:privacy-erasure:transition',
+    'sniptale:persistence:privacy-erasure:durable-asset-operations',
+    'sniptale:persistence:privacy-erasure:durable-asset-operations',
+  ]);
 });

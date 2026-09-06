@@ -81,6 +81,40 @@ beforeEach(() => {
 });
 
 describe('createAreaSelectionController completion', () => {
+  it('continues the drag before a host document guard can cancel mouse events', () => {
+    const updateSelectionBox = vi.fn();
+    const hostGuard = (event: Event) => event.stopImmediatePropagation();
+    document.addEventListener('mousedown', hostGuard, { capture: true });
+    document.addEventListener('mousemove', hostGuard, { capture: true });
+    const controller = createSelectionController({
+      surface: {
+        createSelectionElement: appendSelectionElement,
+        hideSelectionElement: vi.fn(),
+        removeSelectionElement: (element) => element.remove(),
+        removeSelectionTooltip: vi.fn(),
+        showSelectionElement: vi.fn(),
+        showSelectionTooltip: vi.fn(),
+        updateSelectionBox,
+      },
+    });
+
+    try {
+      void controller.startAreaSelection();
+      document.body.dispatchEvent(
+        new MouseEvent('mousedown', { bubbles: true, clientX: 10, clientY: 12 })
+      );
+      document.body.dispatchEvent(
+        new MouseEvent('mousemove', { bubbles: true, clientX: 80, clientY: 92 })
+      );
+    } finally {
+      controller.stopAreaSelection();
+      document.removeEventListener('mousedown', hostGuard, { capture: true });
+      document.removeEventListener('mousemove', hostGuard, { capture: true });
+    }
+
+    expect(updateSelectionBox).toHaveBeenCalledOnce();
+  });
+
   it('resolves a selection and clears listeners after mouseup', async () => {
     const updateSelectionBox = vi.fn();
     const createSelectionResult = createSelectionResultMock();

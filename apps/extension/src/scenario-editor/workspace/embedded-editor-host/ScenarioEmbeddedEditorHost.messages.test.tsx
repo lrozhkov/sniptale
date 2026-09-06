@@ -246,7 +246,8 @@ it('shows host save failures and handles explicit close messages from the iframe
     await flushEffects();
   });
 
-  expect(container?.textContent).toContain('save failed');
+  expect(container?.textContent).toContain('common.errors.storageDetail');
+  expect(container?.textContent).not.toContain('save failed');
   expect(failedHost.onClose).not.toHaveBeenCalled();
 
   const { onClose } = await renderHost();

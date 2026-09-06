@@ -5,16 +5,20 @@ import { createSelectionModeSession } from '../../session';
 
 const {
   addEventListenerToAllWindowsDynamicMock,
+  addWindowEventListenerToAllWindowsDynamicMock,
   addScrollListenersToAllWindowsMock,
   logSelectionModeRuntimeMock,
 } = vi.hoisted(() => ({
   addEventListenerToAllWindowsDynamicMock: vi.fn(),
+  addWindowEventListenerToAllWindowsDynamicMock: vi.fn(),
   addScrollListenersToAllWindowsMock: vi.fn(),
   logSelectionModeRuntimeMock: vi.fn(),
 }));
 
-vi.mock('../../../../platform/frame', () => ({
+vi.mock('../../../../platform/frame', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/frame')>()),
   addEventListenerToAllWindowsDynamic: addEventListenerToAllWindowsDynamicMock,
+  addWindowEventListenerToAllWindowsDynamic: addWindowEventListenerToAllWindowsDynamicMock,
   addScrollListenersToAllWindows: addScrollListenersToAllWindowsMock,
 }));
 
@@ -71,45 +75,44 @@ function createRuntimeListenerScenario() {
 function expectListenerCleanupLifecycle() {
   const cleanupFns = [vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn(), vi.fn()];
   const scrollCleanup = vi.fn();
-  addEventListenerToAllWindowsDynamicMock
+  addWindowEventListenerToAllWindowsDynamicMock
     .mockReturnValueOnce(cleanupFns[0])
     .mockReturnValueOnce(cleanupFns[1])
     .mockReturnValueOnce(cleanupFns[2])
     .mockReturnValueOnce(cleanupFns[3])
     .mockReturnValueOnce(cleanupFns[4])
-    .mockReturnValueOnce(cleanupFns[5])
-    .mockReturnValueOnce(cleanupFns[6]);
+    .mockReturnValueOnce(cleanupFns[5]);
+  addEventListenerToAllWindowsDynamicMock.mockReturnValueOnce(cleanupFns[6]);
   addScrollListenersToAllWindowsMock.mockReturnValue(scrollCleanup);
   const scenario = createRuntimeListenerScenario();
 
-  expect(addEventListenerToAllWindowsDynamicMock.mock.calls.map(([event]) => event)).toEqual([
+  expect(addWindowEventListenerToAllWindowsDynamicMock.mock.calls.map(([event]) => event)).toEqual([
     'dragstart',
     'mousemove',
     'mousedown',
     'mouseup',
     'click',
     'keydown',
+  ]);
+  expect(addEventListenerToAllWindowsDynamicMock.mock.calls.map(([event]) => event)).toEqual([
     'mouseleave',
   ]);
-  expect(addEventListenerToAllWindowsDynamicMock.mock.calls[0]?.[1]).toBe(
-    scenario.handlers.handleDragStart
+  const windowHandlers = addWindowEventListenerToAllWindowsDynamicMock.mock.calls.map(
+    ([, handler]) => handler
   );
-  expect(addEventListenerToAllWindowsDynamicMock.mock.calls[1]?.[1]).toBe(
-    scenario.handlers.handleMouseMove
-  );
-  expect(addEventListenerToAllWindowsDynamicMock.mock.calls[2]?.[1]).toBe(
-    scenario.handlers.handleMouseDown
-  );
-  expect(addEventListenerToAllWindowsDynamicMock.mock.calls[3]?.[1]).toBe(
-    scenario.handlers.handleMouseUp
-  );
-  expect(addEventListenerToAllWindowsDynamicMock.mock.calls[4]?.[1]).toBe(
-    scenario.handlers.handleClick
-  );
-  expect(addEventListenerToAllWindowsDynamicMock.mock.calls[5]?.[1]).toBe(
-    scenario.handlers.handleKeyDown
-  );
-  addEventListenerToAllWindowsDynamicMock.mock.calls[6]?.[1](new MouseEvent('mouseleave'));
+  windowHandlers[0]?.(new Event('dragstart'), window);
+  windowHandlers[1]?.(new MouseEvent('mousemove'), window);
+  windowHandlers[2]?.(new MouseEvent('mousedown'), window);
+  windowHandlers[3]?.(new MouseEvent('mouseup'), window);
+  windowHandlers[4]?.(new MouseEvent('click'), window);
+  windowHandlers[5]?.(new KeyboardEvent('keydown'), window);
+  expect(scenario.handlers.handleDragStart).toHaveBeenCalledOnce();
+  expect(scenario.handlers.handleMouseMove).toHaveBeenCalledOnce();
+  expect(scenario.handlers.handleMouseDown).toHaveBeenCalledOnce();
+  expect(scenario.handlers.handleMouseUp).toHaveBeenCalledOnce();
+  expect(scenario.handlers.handleClick).toHaveBeenCalledOnce();
+  expect(scenario.handlers.handleKeyDown).toHaveBeenCalledOnce();
+  addEventListenerToAllWindowsDynamicMock.mock.calls[0]?.[1](new MouseEvent('mouseleave'));
   expect(scenario.handlers.handleMouseLeave).toHaveBeenCalledOnce();
 
   scenario.session.cleanupEventListeners?.();
@@ -142,6 +145,27 @@ function expectHoverFrameScrollLifecycle() {
 
 describe('selection-mode listener cleanup', () => {
   it('registers dynamic listeners and exposes a cleanup callback', expectListenerCleanupLifecycle);
+
+  it('claims crop drag and resize gestures at window capture before GWT modal preview', () => {
+    addEventListenerToAllWindowsDynamicMock.mockReturnValue(vi.fn());
+    addWindowEventListenerToAllWindowsDynamicMock.mockReturnValue(vi.fn());
+
+    createRuntimeListenerScenario();
+
+    expect(
+      addWindowEventListenerToAllWindowsDynamicMock.mock.calls.map(([event, , options]) => [
+        event,
+        options,
+      ])
+    ).toEqual([
+      ['dragstart', { capture: true }],
+      ['mousemove', { capture: true }],
+      ['mousedown', { capture: true }],
+      ['mouseup', { capture: true }],
+      ['click', { capture: true }],
+      ['keydown', { capture: true }],
+    ]);
+  });
 });
 
 describe('selection-mode listener scroll handling', () => {

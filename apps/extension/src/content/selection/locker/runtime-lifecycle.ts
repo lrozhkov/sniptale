@@ -1,7 +1,7 @@
 import type { Logger } from '@sniptale/platform/observability/logger/types';
 import type { addEventListenerToAllWindowsDynamic, walkAllDocuments } from '../../platform/frame';
 import type { removeNavigationLockOverlay, syncNavigationLockOverlay } from './overlay';
-import { isPageElementPickerActive } from './routing';
+import { isPageElementPickerActive, isSelectionDelegatedMode } from './routing';
 
 type BeforeUnloadHandler = (this: Window, ev: BeforeUnloadEvent) => string | void;
 
@@ -29,6 +29,7 @@ export type NavigationLockerState = {
   cleanupMouseDownHandler: (() => void) | null;
   cleanupPointerDownHandler: (() => void) | null;
   isFullLockMode: boolean;
+  isInputShieldSuspended: boolean;
   isNavigationLocked: boolean;
   isTextSelectionBlocked: boolean;
   isUIHidden: boolean;
@@ -50,6 +51,7 @@ export function createNavigationLockerState(): NavigationLockerState {
     cleanupMouseDownHandler: null,
     cleanupPointerDownHandler: null,
     isFullLockMode: false,
+    isInputShieldSuspended: false,
     isNavigationLocked: false,
     isTextSelectionBlocked: false,
     isUIHidden: false,
@@ -68,8 +70,11 @@ export function syncNavigationLockSurfaces(
   state: NavigationLockerState
 ): void {
   toggleNavigationLockClass(deps, state.isNavigationLocked);
+  const domPickerNeedsInputShield = isSelectionDelegatedMode() || isPageElementPickerActive();
   deps.syncNavigationLockOverlay(
-    state.isNavigationLocked && !state.isFullLockMode && !isPageElementPickerActive()
+    state.isNavigationLocked &&
+      !state.isInputShieldSuspended &&
+      (!state.isFullLockMode || domPickerNeedsInputShield)
   );
 }
 

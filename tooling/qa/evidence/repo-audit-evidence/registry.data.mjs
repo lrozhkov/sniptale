@@ -1,4 +1,4 @@
-export const ADVISORY_SCRIPT_IDS = new Set(['qa:advisory']);
+export const ADVISORY_SCRIPT_IDS = new Set();
 export const STRUCTURAL_AUDIT_SCRIPT_IDS = new Set(['qa:structural-audit']);
 
 export const REPO_AUDIT_REPORT_DEFINITIONS = [

@@ -32,6 +32,7 @@ vi.mock('../../ui/final-elements/capture-menu', () => ({
 
 vi.mock('../../../locker', () => ({
   disableNavigationLock: vi.fn(),
+  setNavigationInputShieldSuspended: vi.fn(),
 }));
 
 vi.mock('../../diag', () => ({

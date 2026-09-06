@@ -6,6 +6,7 @@ import {
   resetSettingsRuntimeState,
   updateSettingsRuntimeState,
 } from './runtime';
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 
 interface SettingsStore {
   settings: NormalizedSettings;
@@ -79,7 +80,11 @@ async function loadSettingsIntoStore(
     }
 
     set({
-      error: error instanceof Error ? error.message : 'Failed to load settings',
+      error: createUserFacingErrorMessage({
+        cause: error,
+        detail: 'storage',
+        summaryKey: 'common.errors.loadFailed',
+      }),
       isLoading: false,
     });
   }
@@ -101,9 +106,13 @@ function createUpdateSettingsAction(
       syncSettingsWriteQueue(state, updatedSettings);
       finishSettingsWrite(state, set, { settings: updatedSettings, error: null });
     } catch (error) {
-      const resolvedError = error instanceof Error ? error.message : 'Failed to save settings';
+      const resolvedError = createUserFacingErrorMessage({
+        cause: error,
+        detail: 'storage',
+        summaryKey: 'common.errors.saveFailed',
+      });
       finishSettingsWrite(state, set, { error: resolvedError });
-      throw error instanceof Error ? error : new Error(resolvedError);
+      throw new Error(resolvedError, { cause: error });
     }
   };
 }
@@ -124,9 +133,13 @@ function createClearSettingsAction(
       syncSettingsWriteQueue(state, settings);
       finishSettingsWrite(state, set, { settings, error: null });
     } catch (error) {
-      const resolvedError = error instanceof Error ? error.message : 'Failed to clear settings';
+      const resolvedError = createUserFacingErrorMessage({
+        cause: error,
+        detail: 'storage',
+        summaryKey: 'common.errors.actionFailed',
+      });
       finishSettingsWrite(state, set, { error: resolvedError });
-      throw error instanceof Error ? error : new Error(resolvedError);
+      throw new Error(resolvedError, { cause: error });
     }
   };
 }

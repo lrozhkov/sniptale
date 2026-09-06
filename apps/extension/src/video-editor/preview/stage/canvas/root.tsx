@@ -26,7 +26,10 @@ export function PreviewStageRootSurface(params: PreviewStageRootSurfaceProps) {
     <div
       ref={params.stageRef as React.RefObject<HTMLDivElement>}
       data-ui="video.preview.stage.root"
-      className="relative m-auto shrink-0 overflow-hidden bg-[color:var(--sniptale-color-surface-panel)]"
+      className={[
+        'relative m-auto shrink-0 overflow-hidden bg-[color:var(--sniptale-color-surface-panel)]',
+        params.activeInsertKind ? 'cursor-crosshair' : 'cursor-default',
+      ].join(' ')}
       style={params.stageSizeStyle}
       onPointerDownCapture={insertPointerHandlers.onPointerDownCapture}
       onPointerDown={insertPointerHandlers.onPointerDown}

@@ -71,7 +71,7 @@ function readPrePushInput() {
 }
 
 export function resolvePrePushCommands() {
-  return ['qa:checkpoint'];
+  return ['qa:release-harness', 'qa:checkpoint'];
 }
 
 export function resolvePrePushNodeOptions(

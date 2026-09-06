@@ -56,6 +56,7 @@ type WorkspaceSidebarSelectionBodyProps = Partial<
     | 'onUpdateMotionRegion'
     | 'onUpdateTransitionDuration'
     | 'onUpdateTransitionEasing'
+    | 'onSwapClip'
     | 'onDetachClipGroup'
     | 'onUpdateClipTransform'
     | 'onUpdateClipMuted'
@@ -70,6 +71,8 @@ type WorkspaceSidebarSelectionBodyProps = Partial<
     | 'onApplyMediaClipVisualsToTrack'
     | 'onConvertTextClipToAnnotation'
     | 'onRenameTrack'
+    | 'onToggleTrackLock'
+    | 'onToggleTrackVisibility'
     | 'onUpdateTextContent'
     | 'onUpdateTextStyle'
     | 'onUpdateSubtitleTrackStyle'
@@ -90,6 +93,7 @@ type WorkspaceSidebarSelectionBodyProps = Partial<
     | 'onResetSceneBackgroundPreview'
     | 'onSetSceneBackground'
     | 'onResizeProject'
+    | 'onSwapClip'
     | 'onDetachClipGroup'
     | 'onUpdateClipTransform'
     | 'onUpdateClipMuted'
@@ -132,6 +136,8 @@ function createInspectPanelProps(props: WorkspaceSidebarSelectionBodyProps) {
     onApplyMediaClipVisualsToTrack: props.onApplyMediaClipVisualsToTrack,
     ...createSelectionAnnotationUpdateDefaults(props),
     onRenameTrack: props.onRenameTrack,
+    onToggleTrackLock: props.onToggleTrackLock,
+    onToggleTrackVisibility: props.onToggleTrackVisibility,
     onUpdateShapeStyle: props.onUpdateShapeStyle,
     onUpdateSubtitleTrackStyle: props.onUpdateSubtitleTrackStyle,
     onUpdateTextContent: props.onUpdateTextContent,

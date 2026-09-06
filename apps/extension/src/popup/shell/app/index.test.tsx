@@ -21,6 +21,7 @@ vi.mock('../startup/resource', async (importOriginal) => ({
   preloadPopupPage: mocks.preload,
 }));
 vi.mock('../../../platform/i18n/locale/state', () => ({
+  ensureLocaleHydrated: vi.fn().mockResolvedValue(undefined),
   getCurrentLocale: () => 'ru',
   subscribeToLocaleChanges: () => () => undefined,
 }));

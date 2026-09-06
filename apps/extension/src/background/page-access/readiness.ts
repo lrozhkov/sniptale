@@ -33,6 +33,7 @@ function hasViewportProbePayload(response: unknown): boolean {
   }
 
   return (
+    response['success'] === true &&
     response['contentRuntimeProtocolVersion'] === CONTENT_RUNTIME_PROTOCOL_VERSION &&
     (isObject(response['coords']) || isObject(response['viewport']))
   );
@@ -75,6 +76,10 @@ export async function injectContentRuntimeAndAwaitReady(
   target: SupportedPageTarget,
   options: { allFrames: boolean }
 ): Promise<void> {
+  if (await waitForContentRuntimeReadyAttempt(target.tabId, defaultReadinessDeps)) {
+    return;
+  }
+
   await injectContentRuntime(target, options);
   await waitForContentRuntimeReady(target.tabId);
 }

@@ -57,11 +57,11 @@ export function useFeedbackPanelLifecycle(args: {
 
     document.addEventListener('pointerdown', handlePointerDown, true);
     document.addEventListener('focusin', handleFocusIn, true);
-    document.addEventListener('keydown', handleKeyDown, true);
+    window.addEventListener('keydown', handleKeyDown, true);
     return () => {
       document.removeEventListener('pointerdown', handlePointerDown, true);
       document.removeEventListener('focusin', handleFocusIn, true);
-      document.removeEventListener('keydown', handleKeyDown, true);
+      window.removeEventListener('keydown', handleKeyDown, true);
     };
   }, [closePanel, filterOpen, filterRootRef, filterTriggerRef, onFilterOpenChange, open]);
 

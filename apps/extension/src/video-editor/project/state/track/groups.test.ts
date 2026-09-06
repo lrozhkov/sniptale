@@ -55,8 +55,8 @@ describe('video editor project track groups', () => {
     verifyTrackDeleteSelectionCleanup
   );
   it(
-    'prunes orphaned assets when deleting a removable track with clip-backed media',
-    verifyTrackDeleteAssetPrune
+    'retains reusable materials when deleting a removable track with media',
+    verifyTrackDeleteRetainsMaterials
   );
 });
 
@@ -82,8 +82,8 @@ function verifyTrackGroupMutations() {
   const subtitleTrack = nextProject.tracks.find((track) => track.id === subtitleTrackId);
 
   expect(nextProject.name).toBe('Edited');
-  expect(nextProject.tracks).toHaveLength(5);
-  expect(nextProject.tracks[0]?.isRoot).toBe(true);
+  expect(nextProject.tracks).toHaveLength(3);
+  expect(primaryTrack?.isRoot).toBe(true);
   expect(primaryTrack).toEqual(
     expect.objectContaining({
       locked: true,
@@ -151,7 +151,7 @@ function verifyTrackDeleteSelectionCleanup() {
 
   const rootPrimaryTrackId = runtime.getState().project!.tracks[0]!.id;
   structure.deleteTrack(rootPrimaryTrackId);
-  expect(runtime.getState().project?.tracks).toHaveLength(3);
+  expect(runtime.getState().project?.tracks).toHaveLength(1);
   expect(runtime.getState().project?.tracks.some((track) => track.id === rootPrimaryTrackId)).toBe(
     true
   );
@@ -225,13 +225,14 @@ function seedRemovableOverlayTrack(runtime: ReturnType<typeof createMutableState
   return { removableTrackId, structure };
 }
 
-function verifyTrackDeleteAssetPrune() {
+function verifyTrackDeleteRetainsMaterials() {
   const runtime = createMutableState();
   const { removableTrackId, structure } = seedRemovableOverlayTrack(runtime);
+  const materials = runtime.getState().project?.assets;
   structure.deleteTrack(removableTrackId);
 
   expect(runtime.getState().project?.tracks.some((track) => track.id === removableTrackId)).toBe(
     false
   );
-  expect(runtime.getState().project?.assets).toEqual([]);
+  expect(runtime.getState().project?.assets).toEqual(materials);
 }

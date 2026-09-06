@@ -2,7 +2,8 @@
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-vi.mock('../i18n', () => ({
+vi.mock('../i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../i18n')>()),
   translate: (key: string) => key,
 }));
 

@@ -38,17 +38,40 @@ afterEach(() => {
 });
 
 describe('workspace-sidebar/selection/inspect-motion', () => {
-  it('renders motion fields as slider-driven single-column controls', () => {
+  it('keeps the default zoom workflow together and moves timing and behavior to focused groups', () => {
     renderPanel(createMotionPanelProps());
 
+    expect(container?.textContent).toContain('videoEditor.sidebar.motionScaleLabel');
+    expect(container?.textContent).toContain('videoEditor.sidebar.motionFocusLabel');
+    expect(container?.textContent).toContain('videoEditor.sidebar.selectPointOnStage');
+    expect(container?.textContent).not.toContain('videoEditor.sidebar.motionDurationLabel');
+    expect(container?.querySelector('input[type="range"]')).not.toBeNull();
+
+    clickGroup('videoEditor.sidebar.inspectorGroupTiming');
     expect(container?.textContent).toContain('videoEditor.sidebar.motionDurationLabel');
+    expect(container?.textContent).toContain('videoEditor.sidebar.motionZoomInLabel');
+    expect(container?.textContent).not.toContain('videoEditor.sidebar.motionBlurLabel');
+
+    clickGroup('videoEditor.sidebar.inspectorGroupBehavior');
     expect(container?.textContent).toContain('videoEditor.sidebar.motionBlurLabel');
     expect(container?.textContent).toContain('videoEditor.sidebar.motionOverlayZoomLabel');
-    expect(container?.textContent).toContain('videoEditor.sidebar.motionZoomInLabel');
-    expect(container?.querySelector('input[type="range"]')).not.toBeNull();
+  });
+
+  it('keeps zoom inspector actions read-only while the utility lane is locked', () => {
+    const props = createMotionPanelProps();
+    props.project.utilityLanes = {
+      actions: { locked: false, visible: true },
+      camera: { locked: true, visible: true },
+    };
+    renderPanel(props);
+
     expect(
-      container?.querySelectorAll('[data-ui="shared.ui.compact-inspector.segmented-field"].grid')
-    ).toHaveLength(2);
+      container?.querySelector<HTMLFieldSetElement>('[data-video-editor-motion-controls]')?.disabled
+    ).toBe(true);
+    const deleteButton = Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
+      button.textContent?.includes('common.actions.delete')
+    );
+    expect(deleteButton?.disabled).toBe(true);
   });
 
   it('renders moving zoom path controls for editable stops and segments', () => {
@@ -79,9 +102,10 @@ function renderPanel(props: ReturnType<typeof createMotionPanelProps>) {
 }
 
 function clickGroup(title: string) {
-  const button = container?.querySelector<HTMLButtonElement>(`button[title="${title}"]`);
+  const button = container?.querySelector<HTMLElement>(`nav button[title="${title}"]`);
   act(() => {
-    button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    if (!button?.parentElement?.hasAttribute('open'))
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 }
 

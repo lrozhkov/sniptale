@@ -13,11 +13,6 @@ import {
   TOP_LEVEL_SLICE_SET,
 } from './config.mjs';
 import { repoRoot, toRelativePath } from '../../../analysis/repository/shared-paths.mjs';
-import {
-  isExecutedAsScript,
-  parseFilesArgument,
-  printViolations,
-} from '../../../runtime/process/shared-cli.mjs';
 import { resolveFocusedFiles } from '../../../composition/checkpoint/focused-qa-helpers.mjs';
 import { isThinFacadeSource } from '../naming/facades.mjs';
 
@@ -193,19 +188,4 @@ export function runRootScatterCheck({ files, root = repoRoot, scope = 'workspace
       ),
     violations: collectRootScatterViolations(normalizedFiles, { root }),
   };
-}
-
-if (isExecutedAsScript(import.meta.url)) {
-  const argv = process.argv.slice(2);
-  const files = parseFilesArgument(argv);
-  const scope = argv.includes('--repo-wide') ? 'repo-wide' : 'workspace';
-  const reportOnly = argv.includes('--report-only');
-  const result = runRootScatterCheck({ files: files.length > 0 ? files : undefined, scope });
-
-  if (result.violations.length > 0) {
-    printViolations('Root scatter violations found:', result.violations);
-    process.exit(reportOnly ? 0 : 1);
-  }
-
-  process.stdout.write('Root scatter check passed\n');
 }

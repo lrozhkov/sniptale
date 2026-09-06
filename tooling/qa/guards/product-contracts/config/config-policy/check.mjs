@@ -34,15 +34,10 @@ const REQUIRED_TSCONFIG_NODE_FLAGS = {
 };
 
 const REQUIRED_TSCONFIG_LIB = ['ES2024', 'DOM', 'DOM.Iterable'];
-const REQUIRED_BUILD_TARGET = 'chrome140';
 const REQUIRED_NODE_VERSION = '24.18.0';
 const REQUIRED_NODE_ENGINE = '>=24.18.0 <25';
 const REQUIRED_PACKAGE_MANAGER = 'npm@11.19.1';
-const REQUIRED_NPM_CONFIG = Object.freeze([
-  'legacy-peer-deps=true',
-  'loglevel=error',
-  'min-release-age=7',
-]);
+const REQUIRED_NPM_CONFIG = Object.freeze(['loglevel=error', 'min-release-age=7']);
 const REQUIRED_PACKAGE_DEPENDENCY_BASELINES = {
   react: /^\^19\.2\.\d+$/u,
   'react-dom': /^\^19\.2\.\d+$/u,
@@ -132,7 +127,7 @@ function collectRuntimeBaselineViolations({ compilerOptions, manifest, viteConfi
     violations.push(
       createViolation(
         VITE_CONFIG_PATH,
-        `build.target must be ${JSON.stringify(REQUIRED_BUILD_TARGET)}`
+        'build.target must derive from manifest.minimum_chrome_version'
       )
     );
   }

@@ -12,6 +12,8 @@ import type { VideoEditorWorkspaceState } from '../workspace-state';
 import type { VideoEditorInsertionActions } from './insertion';
 
 interface VideoEditorTimelineState {
+  canEditSelectedClip: boolean;
+  canSplitSelectedClip: boolean;
   currentTime: number;
   isPlaying: boolean;
   magnetEnabled: boolean;
@@ -59,7 +61,10 @@ interface VideoEditorTimelineActions {
   onResizeMotionRegion: (motionRegionId: string, startTime: number, duration: number) => void;
   onUpdateEffectInstance: VideoEditorProjectActions['updateEffectInstance'];
   onSeek: VideoEditorRuntimeController['seekTo'];
+  onSeekToEnd: () => void;
   onSeekToStart: () => void;
+  onStepToNextFrame: () => void;
+  onStepToPreviousFrame: () => void;
   onSelectActionSegment: VideoEditorSessionActions['selectActionSegment'];
   onSelectClip: VideoEditorSessionActions['selectClip'];
   onSelectCursorSegment: VideoEditorSessionActions['selectCursorSegment'];

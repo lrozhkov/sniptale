@@ -5,6 +5,7 @@ import type {
 } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { WebSnapshotViewerPorts } from '../../capture/lifecycle';
 import type { ViewportOwnerState, ViewportState } from '../../routing-contracts/tab-mode-state';
+import type { PreauthorizedContentActionBinding } from '../../routing-contracts/capabilities/content-action/route';
 
 type HighlighterModeMessage =
   | Extract<TabModeMessage, { type: 'ENABLE_HIGHLIGHTER_MODE' }>
@@ -48,6 +49,7 @@ export function isScreenshotModeMessage(message: TabModeMessage): message is Scr
 }
 
 export type RouteTabModeMessageArgs = {
+  contentPreauthorization?: PreauthorizedContentActionBinding | undefined;
   message: TabModeMessage;
   resolvedTabId: number;
   senderDocumentId?: string | null;
@@ -63,6 +65,7 @@ export type RouteTabModeMessageArgs = {
 export type TabModeContext = Pick<
   RouteTabModeMessageArgs,
   | 'resolvedTabId'
+  | 'contentPreauthorization'
   | 'senderDocumentId'
   | 'sendResponse'
   | 'screenshotModeState'

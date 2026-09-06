@@ -6,40 +6,30 @@ import type {
   NativeRecordingTimebase,
 } from '../../../contracts/native-app';
 
-function normalizeNativeTime(value: number, timebase: NativeRecordingTimebase | undefined): number {
-  if (!timebase) {
-    return value;
-  }
-  const startedAt = Number(timebase.startedAtMonotonicNs);
-  if (!Number.isFinite(startedAt)) {
-    return value;
-  }
-  return Math.max(0, value - startedAt);
-}
-
 function normalizeTelemetrySnapshot(
-  telemetry: NativeRecordingTelemetrySnapshot,
-  timebase: NativeRecordingTimebase | undefined
+  telemetry: NativeRecordingTelemetrySnapshot
 ): NativeRecordingTelemetrySnapshot {
+  // Native media_time_ms already removes pauses and the monotonic origin.
   return {
     ...telemetry,
     actionEvents: telemetry.actionEvents.map((event) => ({
       ...event,
-      time: normalizeNativeTime(event.time, timebase),
+      time: event.time / 1000,
+      duration: event.duration / 1000,
     })),
     cursorTrack: telemetry.cursorTrack
       ? {
           ...telemetry.cursorTrack,
           samples: telemetry.cursorTrack.samples.map((sample) => ({
             ...sample,
-            time: normalizeNativeTime(sample.time, timebase),
+            time: sample.time / 1000,
           })),
         }
       : null,
     signals: telemetry.signals.map((signal) => ({
       ...signal,
-      endTime: normalizeNativeTime(signal.endTime, timebase),
-      startTime: normalizeNativeTime(signal.startTime, timebase),
+      startTime: signal.startTime / 1000,
+      endTime: signal.endTime / 1000,
     })),
   };
 }
@@ -55,7 +45,7 @@ export function mapNativeRecordingTelemetry(params: {
   if (!params.telemetry) {
     return null;
   }
-  const telemetry = normalizeTelemetrySnapshot(params.telemetry, params.timebase);
+  const telemetry = normalizeTelemetrySnapshot(params.telemetry);
 
   return parseRecordingTelemetryEntry({
     actionEvents: telemetry.actionEvents,
@@ -67,6 +57,12 @@ export function mapNativeRecordingTelemetry(params: {
         ? VideoDisplaySurface.WINDOW
         : VideoDisplaySurface.MONITOR,
     recordingId: params.recordingId,
+    provenance: {
+      source: 'native',
+      normalizationVersion: 1,
+      timeUnit: 'seconds',
+      coordinateSpace: 'desktop',
+    },
     signals: telemetry.signals,
     updatedAt: params.updatedAt,
     viewport: telemetry.viewport,

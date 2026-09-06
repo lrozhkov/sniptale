@@ -1,7 +1,7 @@
 import { getDefaultPopupExportRuntimeDeps } from '../default-deps';
 import type { PopupExportRuntimeDeps } from '../types';
 import type { PopupExportRuntimeContract } from '../state';
-import { reportStartExportFailure } from './failure';
+import { PopupExportPublicStartError, reportStartExportFailure } from './failure';
 import { getPopupExportSelection } from '../../session/selectors';
 import { buildPopupExportOptions } from '../options';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
@@ -10,7 +10,7 @@ import {
   MAX_POPUP_EXPORT_JOB_TABS,
   normalizePopupExportTabTitle,
 } from '@sniptale/runtime-contracts/export';
-import { translate } from '../../../../../platform/i18n/popup';
+import { getCurrentLocale, translate } from '../../../../../platform/i18n/popup';
 import { DEFAULT_PAGE_PACKAGE_CAPTURE_TIMING } from '@sniptale/runtime-contracts/page-package';
 
 export async function startPopupExport(
@@ -34,6 +34,7 @@ export async function startPopupExport(
     return;
   }
 
+  const locale = getCurrentLocale();
   try {
     const jobId = deps.createRequestId();
     const selectedIds = new Set(state.selectedTabIdsInOrder);
@@ -75,11 +76,13 @@ export async function startPopupExport(
       const granted = await (deps.requestAllUrlsPermission?.() ?? Promise.resolve(true));
       if (!granted) {
         if (state.activeSourceMode === 'urls')
-          throw new Error(translate('popup.export.urlPermissionDenied'));
+          throw new PopupExportPublicStartError(
+            translate('popup.export.urlPermissionDenied', locale)
+          );
         else {
           options.includeFullPageScreenshot = false;
           options.includeViewportScreenshot = false;
-          warnings.push(translate('popup.export.screenshotPermissionDeniedWarning'));
+          warnings.push(translate('popup.export.screenshotPermissionDeniedWarning', locale));
         }
       }
     }
@@ -91,6 +94,7 @@ export async function startPopupExport(
     state.terminalRequestIdRef.current = null;
     state.cancelRetryRef.current = {
       exportRunId: jobId,
+      locale,
       owner: 'job',
       tabIds: state.activeSourceMode === 'urls' ? [] : orderedTabs.map((tab) => tab.tabId),
     };
@@ -106,7 +110,7 @@ export async function startPopupExport(
       current: 0,
       total: sources.length,
       errors: [],
-      message: translate('popup.export.preparingPreview'),
+      message: translate('popup.export.preparingPreview', locale),
       phase: 'scanning',
     });
     if (!deps.sendStartJobMessage) throw new Error('Popup export job transport is unavailable');
@@ -115,15 +119,16 @@ export async function startPopupExport(
       includeWebCopy: effectivePlan.includeWebCopy,
       intent,
       jobId,
+      locale,
       captureTiming,
       sources,
       options,
       warnings,
     });
     if (!response?.success || !response.status) {
-      throw new Error(response?.error || translate('popup.export.startExportError'));
+      throw new Error(response?.error || translate('popup.export.startExportError', locale));
     }
   } catch (error) {
-    reportStartExportFailure(state, error);
+    reportStartExportFailure(state, error, locale);
   }
 }

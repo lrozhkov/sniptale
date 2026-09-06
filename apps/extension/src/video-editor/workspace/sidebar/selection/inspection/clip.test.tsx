@@ -13,7 +13,11 @@ import {
   createTextClip,
 } from '../../../../../features/video/project/factories/overlay-clip';
 import { createVideoClipFromAsset } from '../../../../../features/video/project/factories/clip';
-import { VideoProjectAssetType, VideoTrackKind } from '../../../../../features/video/project/types';
+import {
+  VideoProjectAssetType,
+  VideoProjectTrackRole,
+  VideoTrackKind,
+} from '../../../../../features/video/project/types';
 import { VideoEditorSelectionKind } from '../../../../contracts/selection';
 import { WorkspaceSidebarInspectPanel } from '../inspect';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
@@ -143,6 +147,7 @@ function createVideoProps(): WorkspaceSidebarSelectionPanelProps {
 
 function createProps(): WorkspaceSidebarSelectionPanelProps {
   const project = createEmptyVideoProject('Text template upgrade');
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
   const overlayTrackId = project.tracks.find((track) => track.kind === 'OVERLAY')?.id ?? 'overlay';
   const clip = createTextClip(overlayTrackId, project.width, project.height, 0);
   project.clips.push(clip);
@@ -167,9 +172,12 @@ function createProps(): WorkspaceSidebarSelectionPanelProps {
 }
 
 describe('workspace-sidebar/selection/inspect-core', () => {
-  it('opens the clip summary group by default', () => {
+  it('opens editable clip content before file metadata', () => {
     renderInspectPanel(createProps());
 
+    expect(container?.textContent).toContain('videoEditor.sidebar.textLabel');
+    expect(container?.textContent).not.toContain('videoEditor.sidebar.clipTypeText');
+    clickGroup('videoEditor.sidebar.inspectorGroupSummary');
     expect(container?.textContent).toContain('videoEditor.sidebar.clipTypeText');
   });
 
@@ -220,6 +228,75 @@ describe('workspace-sidebar/selection/inspect-core', () => {
     expect(container?.textContent).not.toContain('videoEditor.sidebar.cursorDetectionRun');
   });
 
+  it('opens camera placement by default for a camera-role clip and reuses the transform command', () => {
+    const props = createVideoProps();
+    props.project.tracks = props.project.tracks.map((track) =>
+      track.id === props.selectedClip?.trackId
+        ? { ...track, role: VideoProjectTrackRole.CAMERA }
+        : track
+    );
+
+    renderInspectPanel(props);
+
+    expect(container?.textContent).toContain('videoEditor.sidebar.cameraPlacementDescription');
+    const bottomLeft = Array.from(container?.querySelectorAll('button') ?? []).find(
+      (button) => button.textContent === 'videoEditor.sidebar.cameraPlacementBottomLeft'
+    );
+    act(() => bottomLeft?.click());
+    expect(props.onUpdateClipTransform).toHaveBeenCalledWith(
+      props.selectedClip?.id,
+      expect.objectContaining({ height: expect.any(Number), width: expect.any(Number) })
+    );
+  });
+
+  it('preserves a manual group within one clip context and resets when it becomes a camera', () => {
+    const props = createVideoProps();
+
+    renderInspectPanel(props);
+    clickGroup('videoEditor.sidebar.inspectorGroupTransform');
+    expect(container?.textContent).toContain('videoEditor.sidebar.fitModeLabel');
+
+    renderInspectPanel({ ...props });
+    expect(container?.textContent).toContain('videoEditor.sidebar.fitModeLabel');
+
+    props.project.tracks = props.project.tracks.map((track) =>
+      track.id === props.selectedClip?.trackId
+        ? { ...track, role: VideoProjectTrackRole.CAMERA }
+        : track
+    );
+    renderInspectPanel({ ...props });
+
+    expect(container?.textContent).toContain('videoEditor.sidebar.cameraPlacementDescription');
+    expect(container?.textContent).not.toContain('videoEditor.sidebar.fitModeLabel');
+  });
+
+  it('keeps camera-specific controls out of ordinary video inspection', () => {
+    renderInspectPanel(createVideoProps());
+
+    expect(container?.textContent).not.toContain('videoEditor.sidebar.inspectorGroupCamera');
+  });
+
+  it('disables camera placement actions on a locked camera track', () => {
+    const props = createVideoProps();
+    props.project.tracks = props.project.tracks.map((track) =>
+      track.id === props.selectedClip?.trackId
+        ? { ...track, locked: true, role: VideoProjectTrackRole.CAMERA }
+        : track
+    );
+
+    renderInspectPanel(props);
+    clickGroup('videoEditor.sidebar.inspectorGroupCamera');
+
+    const placementControls = container?.querySelector(
+      '[data-ui="video-editor.camera-placement-controls"]'
+    );
+    expect(
+      Array.from(placementControls?.querySelectorAll('button') ?? []).every(
+        (button) => button.disabled
+      )
+    ).toBe(true);
+  });
+
   it('keeps persisted subtitle clips out of clip inspection', () => {
     const props = createProps();
     const subtitleTrack = createVideoProjectTrack('Legacy subtitles', 4, VideoTrackKind.SUBTITLE);
@@ -248,8 +325,9 @@ function renderInspectPanel(props: WorkspaceSidebarSelectionPanelProps) {
 }
 
 function clickGroup(title: string) {
-  const button = container?.querySelector<HTMLButtonElement>(`button[title="${title}"]`);
+  const button = container?.querySelector<HTMLElement>(`nav button[title="${title}"]`);
   act(() => {
-    button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    if (!button?.parentElement?.hasAttribute('open'))
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 }

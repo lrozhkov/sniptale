@@ -23,6 +23,11 @@ type ContentPinToTabSessionMutation = {
 const logger = createLogger({ namespace: 'ContentPinToTabSessionState' });
 let pinToTabWriteChain: Promise<void> = Promise.resolve();
 
+function isExtensionContextInvalidatedError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+  return message.includes('Extension context invalidated');
+}
+
 export function readContentPinToTabSessionState(): boolean {
   return false;
 }
@@ -56,7 +61,9 @@ export async function loadContentPinToTabSessionState(): Promise<ContentPinToTab
   try {
     return await requestPinToTabSessionState();
   } catch (error) {
-    logger.warn('Failed to load authoritative pin-to-tab session state', error);
+    if (!isExtensionContextInvalidatedError(error)) {
+      logger.warn('Failed to load authoritative pin-to-tab session state', error);
+    }
     return { pinToTab: false, pinToTabAvailable: false, toolbarVisible: true };
   }
 }

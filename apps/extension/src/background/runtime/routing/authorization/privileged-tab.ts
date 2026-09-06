@@ -1,12 +1,10 @@
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { TabModeMessage } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { VideoRecordingSurfaceMessage } from '../message-guards/guards/shared';
-import {
-  markPreauthorizedContentActionRouteMessage,
-  type RouteCaptureMessage,
-} from '../../../capture/routes';
+import { type RouteCaptureMessage } from '../../../capture/routes';
 import {
   AUTHORIZED,
+  authorize,
   reject,
   type IpcAuthorizationResult,
 } from '../../../routing-contracts/authorization-result';
@@ -53,7 +51,7 @@ function authorizePrivilegedTabCapabilityRoute(
     if (!senderBinding) {
       return reject('Unauthorized content action capability');
     }
-    markPreauthorizedContentActionRouteMessage(message, senderBinding);
+    return authorize({ kind: 'privileged-tab-route', senderBinding });
   }
   return AUTHORIZED;
 }

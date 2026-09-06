@@ -1,7 +1,16 @@
-import { Activity, Film, MousePointer2, Search, Sparkles, Type, Volume2 } from 'lucide-react';
+import {
+  Activity,
+  Camera,
+  Film,
+  MousePointer2,
+  Search,
+  Sparkles,
+  Type,
+  Volume2,
+} from 'lucide-react';
 import type React from 'react';
 import type { VideoProjectUtilityLaneKind } from '../../../../features/video/project/utility-lanes';
-import { VideoTrackKind } from '../../../../features/video/project/types';
+import { VideoProjectTrackRole, VideoTrackKind } from '../../../../features/video/project/types';
 import type { VideoProjectTrack } from '../../../../features/video/project/types';
 
 const TRACK_ICON_CLASS_NAME = 'h-4 w-4';
@@ -20,7 +29,7 @@ export function TimelineLaneIconFrame({ children }: { children: React.ReactNode 
   );
 }
 
-export function getTrackKindIcon(kind: VideoProjectTrack['kind']) {
+function getTrackKindIcon(kind: VideoProjectTrack['kind']) {
   switch (kind) {
     case VideoTrackKind.PRIMARY:
       return <Film className={TRACK_ICON_CLASS_NAME} />;
@@ -31,6 +40,14 @@ export function getTrackKindIcon(kind: VideoProjectTrack['kind']) {
     case VideoTrackKind.SUBTITLE:
       return <Type className={TRACK_ICON_CLASS_NAME} />;
   }
+}
+
+export function getTrackIcon(track: Pick<VideoProjectTrack, 'kind' | 'role'>) {
+  return track.role === VideoProjectTrackRole.CAMERA ? (
+    <Camera className={TRACK_ICON_CLASS_NAME} data-camera-track-icon />
+  ) : (
+    getTrackKindIcon(track.kind)
+  );
 }
 
 export function getUtilityLaneIcon(lane: VideoProjectUtilityLaneKind) {

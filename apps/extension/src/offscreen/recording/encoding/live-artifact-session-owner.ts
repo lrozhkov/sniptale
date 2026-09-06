@@ -358,13 +358,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
     if (this.phase === 'finalized') return Promise.resolve();
     if (this.phase === 'aborted') return this.abortPromise ?? Promise.resolve();
     if (this.phase === 'failed') {
-      this.videoFrameBuffer.abort();
-      this.abortPromise ??= Promise.allSettled([
-        this.videoReader.cancel(),
-        this.output.cancel(),
-        this.input.coordinator.abort(),
-      ]).then(() => undefined);
-      return this.abortPromise;
+      return this.abortEncoderResources();
     }
     this.phase = 'aborted';
     const abortError = new Error(`Recording artifact ${this.input.artifactId} was aborted.`);
@@ -372,12 +366,18 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
     this.rejectTerminalOnce(abortError);
     this.videoFrameBuffer.abort();
     this.nativeVideoSource?.close();
+    const abortPromise = this.abortEncoderResources();
+    void abortPromise.catch(() => undefined);
+    return abortPromise;
+  }
+
+  private abortEncoderResources(): Promise<void> {
+    this.videoFrameBuffer.abort();
     this.abortPromise ??= Promise.allSettled([
       this.videoReader.cancel(),
       this.output.cancel(),
       this.input.coordinator.abort(),
     ]).then(() => undefined);
-    void this.abortPromise.catch(() => undefined);
     return this.abortPromise;
   }
 
@@ -652,14 +652,9 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
         'Recording failure handling also failed.'
       );
     }
-    this.videoFrameBuffer.abort();
     this.nativeVideoSource?.close();
-    this.abortPromise ??= Promise.allSettled([
-      this.videoReader.cancel(),
-      this.output.cancel(),
-      this.input.coordinator.abort(),
-    ]).then(() => undefined);
-    void this.abortPromise.catch(() => undefined);
+    const abortPromise = this.abortEncoderResources();
+    void abortPromise.catch(() => undefined);
     this.rejectTerminalOnce(terminalError);
   }
 

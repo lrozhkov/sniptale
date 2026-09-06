@@ -4,7 +4,16 @@ import { assertQaResultContract } from '../composition/catalog/contract.mjs';
 import { collectCurrentDiffContext } from '../runtime/scope/current-diff.helpers.mjs';
 import { assertFreshCheckpointState } from '../composition/checkpoint/verify-checkpoint.state.helpers.mjs';
 import { readAdvisoryState } from '../composition/advisory/execution/state.mjs';
-import { formatAdvisoryReport } from '../composition/advisory/execution/report.mjs';
+import {
+  formatAdvisoryLog,
+  formatAdvisoryReport,
+} from '../composition/advisory/execution/report.mjs';
+import {
+  classifyAdvisoryFindings,
+  createAdvisoryAnalysis,
+} from '../composition/advisory/advisory-catalog.data.mjs';
+import { collectChangeRisks } from '../composition/change-risk/collector.mjs';
+import { createChangeRiskAnalysis } from '../composition/change-risk/render.mjs';
 import {
   PRODUCT_QA_SUITE,
   createScopedQaContext,
@@ -60,8 +69,15 @@ function createFreshCheckpointReuseResult(context) {
     advisoryState.diffFingerprint === context.fingerprint
       ? advisoryState.findings
       : [];
+  const advisoryBuckets = classifyAdvisoryFindings(findings, { mode: 'checkpoint' });
+  const riskFindings = collectChangeRisks({
+    targetFiles: context.allQualityTargetFiles ?? context.qualityTargetFiles ?? context.targetFiles,
+    mode: 'checkpoint',
+  });
   return {
     context,
+    changeRisk: createChangeRiskAnalysis(riskFindings),
+    advisory: createAdvisoryAnalysis(advisoryBuckets),
     executionMode:
       context.targetFiles.length > 0
         ? 'product'
@@ -73,8 +89,9 @@ function createFreshCheckpointReuseResult(context) {
     steps: [
       {
         ...createSkippedStep('QA checkpoint', 'fresh green checkpoint state'),
-        consoleOutput: formatAdvisoryReport({ findings }),
-        advisories: findings,
+        consoleOutput: formatAdvisoryReport({ buckets: advisoryBuckets }),
+        stdout: formatAdvisoryLog({ buckets: advisoryBuckets }),
+        advisories: [...advisoryBuckets.introduced, ...advisoryBuckets.worsened],
       },
     ],
   };

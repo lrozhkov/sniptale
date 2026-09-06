@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import { translate } from '../../../../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../../../../platform/i18n/user-facing-error';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { isWritableLocalHtmlPage } from '../eligibility';
 import { savePreparedLocalHtml } from '../service';
@@ -63,11 +64,11 @@ function getSaveErrorMessage(result: SavePreparedLocalHtmlResult): string {
     return translate('content.toolbar.localHtmlSaveUnsupported');
   }
 
-  if (result.kind === PagePreparationLocalSaveResultKind.Error && result.message) {
-    return `${translate('content.toolbar.localHtmlSaveError')} ${result.message}`;
-  }
-
-  return translate('content.toolbar.localHtmlSaveError');
+  return createUserFacingErrorMessage({
+    cause: result.kind === PagePreparationLocalSaveResultKind.Error ? result.message : undefined,
+    detail: 'storage',
+    summaryKey: 'content.toolbar.localHtmlSaveError',
+  });
 }
 
 function getSaveStatusTitle(status: PagePreparationLocalSaveStatus): string {

@@ -3,6 +3,7 @@ import { APPLE_GLASS_ANNOTATION_PACK } from '../../../features/video/project/ann
 import {
   createEmptyVideoProject,
   createVideoProjectAsset,
+  createVideoProjectTrack,
 } from '../../../features/video/project/factories/creation';
 import {
   VideoBlockKind,
@@ -65,12 +66,10 @@ function registerTemplateRefAnnotationInsertionTests() {
 }
 
 function registerLegacyAnnotationInsertionTests() {
-  it('keeps legacy insertion on the preferred overlay track', () => {
+  it('inserts on the explicitly preferred overlay track', () => {
     const project = createEmptyVideoProject('Assets');
-    const preferredTrack = project.tracks.find((track) => track.kind === VideoTrackKind.OVERLAY);
-    if (!preferredTrack) {
-      throw new Error('Expected overlay track');
-    }
+    const preferredTrack = createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY);
+    project.tracks.push(preferredTrack);
 
     const result = addAnnotationOverlayToProject(project, preferredTrack.id, 2.25);
 

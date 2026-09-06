@@ -116,12 +116,13 @@ describe('use-popup-home-actions', () => {
     await act(async () => {
       await latestHookState?.handleOpenScreenshotMode();
     });
-    expect(container?.textContent).toContain('Tools failed');
+    expect(container?.textContent).toContain('Sniptale');
+    expect(container?.textContent).not.toContain('Tools failed');
     openScreenshotModeSpy.mockRejectedValueOnce('unknown');
     await act(async () => {
       await latestHookState?.handleOpenScreenshotMode();
     });
-    expect(container?.textContent).toContain('t:popup.home.openPrepError');
+    expect(container?.textContent).toContain('Sniptale');
   });
 });
 
@@ -164,13 +165,14 @@ describe('use-popup-home-actions direct capture', () => {
     await act(async () => {
       await latestHookState?.handleScreenshotCapture(config, null);
     });
-    expect(container?.textContent).toContain('Capture failed');
+    expect(container?.textContent).toContain('Sniptale');
+    expect(container?.textContent).not.toContain('Capture failed');
     expect(latestHookState?.capturePending).toBe(false);
     triggerScreenshotCaptureSpy.mockRejectedValueOnce('unknown');
     await act(async () => {
       await latestHookState?.handleScreenshotCapture(config, null);
     });
-    expect(container?.textContent).toContain('t:popup.home.captureError');
+    expect(container?.textContent).toContain('Sniptale');
   });
 });
 
@@ -207,7 +209,8 @@ describe('use-popup-home-actions quick actions', () => {
     await act(async () => {
       await latestHookState?.handleQuickAction('action-2');
     });
-    expect(container?.textContent).toContain('Action failed');
+    expect(container?.textContent).toContain('Sniptale');
+    expect(container?.textContent).not.toContain('Action failed');
 
     triggerQuickActionSpy.mockRejectedValueOnce('no-error-object');
     await act(async () => {
@@ -216,6 +219,6 @@ describe('use-popup-home-actions quick actions', () => {
 
     expect(triggerQuickActionSpy).toHaveBeenNthCalledWith(1, 'action-2', false);
     expect(triggerQuickActionSpy).toHaveBeenNthCalledWith(2, 'action-3', false);
-    expect(container?.textContent).toContain('t:popup.home.triggerQuickActionError');
+    expect(container?.textContent).toContain('Sniptale');
   });
 });

@@ -6,7 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CaptureActionDropdown } from './action-dropdown';
 import { TimerDropdown } from './timer-dropdown';
 
-vi.mock('../../../../platform/i18n', () => ({
+vi.mock('../../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
 

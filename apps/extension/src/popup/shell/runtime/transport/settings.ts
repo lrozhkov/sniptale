@@ -19,31 +19,33 @@ export function useUpdateRecordingSettingsHandler(
     async (settings: Partial<VideoRecordingSettings>) => {
       setRecordingError(null);
 
-      try {
-        if (!recordingControlCapability) {
-          const error = new Error(
-            getPopupRuntimeErrorMessage(null, 'popup.video.updateRecordingError')
-          );
-          setRecordingError(error.message);
-          throw error;
-        }
+      if (!recordingControlCapability) {
+        const message = getPopupRuntimeErrorMessage(null, 'popup.video.updateRecordingError');
+        setRecordingError(message);
+        throw new Error(message);
+      }
 
-        const response = await getPopupRuntimeServices().messaging.sendRuntimeMessage({
+      let response: Awaited<
+        ReturnType<ReturnType<typeof getPopupRuntimeServices>['messaging']['sendRuntimeMessage']>
+      >;
+      try {
+        response = await getPopupRuntimeServices().messaging.sendRuntimeMessage({
           type: VideoMessageType.UPDATE_SETTINGS,
           settings,
           ...recordingControlCapability,
         });
-
-        if (response?.success === false) {
-          const error = new Error(
-            getPopupResponseErrorMessage(response, 'popup.video.updateRecordingError')
-          );
-          setRecordingError(error.message);
-          throw error;
-        }
       } catch (error) {
         logger.error('Failed to update recording settings', error);
-        setRecordingError(getPopupRuntimeErrorMessage(error, 'popup.video.updateRecordingError'));
+        const message = getPopupRuntimeErrorMessage(error, 'popup.video.updateRecordingError');
+        setRecordingError(message);
+        throw new Error(message, { cause: error });
+      }
+
+      if (response?.success === false) {
+        const message = getPopupResponseErrorMessage(response, 'popup.video.updateRecordingError');
+        const error = new Error(message, { cause: response.error });
+        logger.error('Failed to update recording settings', error);
+        setRecordingError(message);
         throw error;
       }
     },

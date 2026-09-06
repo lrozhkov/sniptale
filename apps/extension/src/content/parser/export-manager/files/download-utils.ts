@@ -5,6 +5,7 @@ import { stripAsciiControlCharacters } from '@sniptale/platform/security/sanitiz
 const URL_PARSE_BASE = 'https://sniptale.invalid';
 const SAFE_CREDENTIALED_PROTOCOLS = new Set(['http:', 'https:']);
 const PATH_SEGMENT_SEPARATOR_PATTERN = /[/\\]+/;
+const TERMINAL_EXTENSION_PATTERN = /\.([a-zA-Z0-9]+)$/;
 
 function resolveParsedUrl(url: string, baseUrl = URL_PARSE_BASE): URL | null {
   try {
@@ -45,7 +46,20 @@ export function getFileExtension(url: string): string | null {
   return extension ? extension.toLowerCase() : null;
 }
 
-export function extractFilenameFromContentDisposition(header: string | null): string | null {
+function getExplicitFilenameExtension(filename: string): string | null {
+  const extension = filename.match(TERMINAL_EXTENSION_PATTERN)?.[1];
+  return extension ? extension.toLowerCase() : null;
+}
+
+function getExplicitUrlPathExtension(url: string): string | null {
+  try {
+    return getExplicitFilenameExtension(new URL(url, URL_PARSE_BASE).pathname);
+  } catch {
+    return null;
+  }
+}
+
+function extractDecodedFilenameFromContentDisposition(header: string | null): string | null {
   if (!header) {
     return null;
   }
@@ -54,14 +68,13 @@ export function extractFilenameFromContentDisposition(header: string | null): st
   if (encodedFilenameMatch?.[1]) {
     const decodedFilename = decodeContentDispositionFilenameValue(encodedFilenameMatch[1]);
     if (decodedFilename) {
-      return sanitizeArchiveEntryFilename(decodedFilename);
+      return decodedFilename;
     }
   }
 
   const quotedFilenameMatch = header.match(/filename\s*=\s*"([^"]+)"/i);
   if (quotedFilenameMatch?.[1]) {
-    const decodedFilename = decodeContentDispositionFilenameValue(quotedFilenameMatch[1]);
-    return decodedFilename ? sanitizeArchiveEntryFilename(decodedFilename) : null;
+    return decodeContentDispositionFilenameValue(quotedFilenameMatch[1]);
   }
 
   const plainFilenameMatch = header.match(/filename\s*=\s*([^;]+)/i);
@@ -69,16 +82,33 @@ export function extractFilenameFromContentDisposition(header: string | null): st
     return null;
   }
 
-  const decodedFilename = decodeContentDispositionFilenameValue(plainFilenameMatch[1]);
-  return decodedFilename ? sanitizeArchiveEntryFilename(decodedFilename) : null;
+  return decodeContentDispositionFilenameValue(plainFilenameMatch[1]);
 }
 
-export function sanitizeArchiveEntryFilename(filename: string): string | null {
+function normalizeArchiveEntryFilename(filename: string): string {
   const normalized = stripAsciiControlCharacters(
     decodeFilenamePathSeparators(filename),
     ' '
   ).trim();
-  const leafName = normalized.split(PATH_SEGMENT_SEPARATOR_PATTERN).filter(Boolean).pop() ?? '';
+  return normalized.split(PATH_SEGMENT_SEPARATOR_PATTERN).filter(Boolean).pop() ?? '';
+}
+
+export function extractFilenameFromContentDisposition(header: string | null): string | null {
+  const decodedFilename = extractDecodedFilenameFromContentDisposition(header);
+  return decodedFilename ? sanitizeArchiveEntryFilename(decodedFilename) : null;
+}
+
+export function extractFilenameExtensionFromContentDisposition(
+  header: string | null
+): string | null {
+  const decodedFilename = extractDecodedFilenameFromContentDisposition(header);
+  return decodedFilename
+    ? getExplicitFilenameExtension(normalizeArchiveEntryFilename(decodedFilename))
+    : null;
+}
+
+export function sanitizeArchiveEntryFilename(filename: string): string | null {
+  const leafName = normalizeArchiveEntryFilename(filename);
   const sanitized = sanitizeFilename(leafName, 120);
 
   return sanitized.length > 0 && sanitized.replace(/\./g, '').length > 0 ? sanitized : null;
@@ -172,26 +202,25 @@ export function shouldSkipHtmlDownloadResponse(params: {
   url: string;
   contentType: string | null;
   filename: string;
+  resourceFilename: string;
+  responseFilenameExtension: string | null;
 }): boolean {
   if (!params.contentType?.toLowerCase().startsWith('text/html')) {
     return false;
   }
 
-  const explicitExtension = getFileExtension(params.filename) || getFileExtension(params.url);
-  if (explicitExtension === 'html' || explicitExtension === 'htm') {
-    return false;
+  const explicitExtensions = [
+    params.responseFilenameExtension,
+    getExplicitFilenameExtension(params.filename),
+    getExplicitFilenameExtension(params.resourceFilename),
+    getExplicitUrlPathExtension(params.url),
+  ].filter((extension): extension is string => extension !== null);
+
+  if (explicitExtensions.some((extension) => extension !== 'html' && extension !== 'htm')) {
+    return true;
   }
 
-  try {
-    const parsed = new URL(params.url, URL_PARSE_BASE);
-    return (
-      isIntermediateDownloadPageUrl(params.url) ||
-      parsed.pathname.endsWith('.php') ||
-      !explicitExtension
-    );
-  } catch {
-    return isIntermediateDownloadPageUrl(params.url) || !explicitExtension;
-  }
+  return explicitExtensions.length === 0;
 }
 
 export function generateFilename(url: string, fallback: string, index: number): string {

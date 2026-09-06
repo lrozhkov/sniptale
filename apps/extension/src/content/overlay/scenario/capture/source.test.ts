@@ -155,9 +155,12 @@ async function expectSelectionCaptureSaveFailureSurfacesError() {
   });
 
   await expect(saveSelectionCapture('data:image/png;base64,1', 'visible')).rejects.toThrow(
-    'save failed'
+    'scenario.content.captureSaveError. common.errors.storageDetail'
   );
-  expect(showToastMock).toHaveBeenCalledWith('save failed', 'error');
+  expect(showToastMock).toHaveBeenCalledWith(
+    'scenario.content.captureSaveError. common.errors.storageDetail',
+    'error'
+  );
 }
 
 async function expectStaleSelectionCaptureSkipsScenarioResponseApplication() {

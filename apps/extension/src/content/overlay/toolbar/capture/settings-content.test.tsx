@@ -14,7 +14,8 @@ vi.mock('../../../application/privileged-action-intent', async (importOriginal) 
   createTrustedContentActionIntentSource,
 }));
 
-vi.mock('../../../../platform/i18n', () => ({
+vi.mock('../../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
 

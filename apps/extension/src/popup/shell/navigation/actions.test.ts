@@ -311,13 +311,11 @@ async function verifiesRuntimeErrors() {
     success: false,
     error: 'explicit failure',
   });
-  await expect(openScreenshotMode()).rejects.toThrow('explicit failure');
+  await expect(openScreenshotMode()).rejects.toThrow('t:common.errors.unexpectedDetail');
   expect(closeSpy).not.toHaveBeenCalled();
 
   mocks.sendRuntimeMessageMock.mockResolvedValueOnce({ success: false });
-  await expect(triggerQuickAction('action-2')).rejects.toThrow(
-    't:popup.home.triggerQuickActionError'
-  );
+  await expect(triggerQuickAction('action-2')).rejects.toThrow('t:common.errors.unexpectedDetail');
   expect(closeSpy).not.toHaveBeenCalled();
 }
 

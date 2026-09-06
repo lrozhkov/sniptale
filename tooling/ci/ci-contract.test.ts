@@ -274,16 +274,14 @@ it('binds the Dockerfile base and tool versions to the machine lock', () => {
   }
 });
 
-it('keeps the residual ESLint TypeScript peer exception explicit and diagnosable', () => {
+it('keeps npm install policy strict after retiring the residual typed ESLint lane', () => {
   const npmrc = fs.readFileSync('.npmrc', 'utf8').trim().split('\n').sort();
   const projectPackage = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-  const projectLock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
-  expect(npmrc).toEqual(['legacy-peer-deps=true', 'loglevel=error', 'min-release-age=7']);
+  expect(npmrc).toEqual(['loglevel=error', 'min-release-age=7']);
   expect(projectPackage.devDependencies.typescript).toMatch(/^npm:@typescript\/typescript6@/u);
-  expect(projectPackage.devDependencies).toHaveProperty('typescript-eslint');
-  expect(projectLock.packages['node_modules/typescript-eslint'].peerDependencies.typescript).toBe(
-    '>=4.8.4 <6.1.0'
-  );
+  expect(projectPackage.devDependencies).not.toHaveProperty('typescript-eslint');
+  expect(projectPackage.devDependencies).not.toHaveProperty('globals');
+  expect(projectPackage.devDependencies).toHaveProperty('eslint-plugin-sonarjs');
 });
 
 it('binds the CodeQL audit suite to the locked query suite and production-only scope', () => {

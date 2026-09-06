@@ -15,12 +15,10 @@ export interface VideoEditorTrackPanelPrefs {
   collapsedCursorLaneVisible: boolean;
   collapsedTelemetryLaneVisible: boolean;
   compactRows: boolean;
-  panelExpanded: boolean;
   trackHeightByTrackId: Record<string, VideoEditorTrackHeightMultiplier>;
 }
 
 const TRACK_PANEL_BOOLEAN_FIELDS = [
-  'panelExpanded',
   'compactRows',
   'collapsedCursorLaneVisible',
   'collapsedTelemetryLaneVisible',
@@ -30,7 +28,6 @@ export const DEFAULT_VIDEO_EDITOR_TRACK_PANEL_PREFS: VideoEditorTrackPanelPrefs 
   collapsedCursorLaneVisible: true,
   collapsedTelemetryLaneVisible: false,
   compactRows: false,
-  panelExpanded: false,
   trackHeightByTrackId: {},
 };
 

@@ -102,7 +102,7 @@ it('hydrates from local storage once and reuses the in-flight browser hydration 
   });
 
   await ensureLocalHydrated();
-  expect(applyCurrentValue).toHaveBeenCalledWith('local');
+  expect(applyCurrentValue).toHaveBeenCalledWith('local', { markNewer: false });
   expect(cleanupStorageListenerIfUnused).toHaveBeenCalledOnce();
 
   const browserState = createStorageBackedPreferenceState<string | null>(null);
@@ -131,6 +131,39 @@ it('hydrates from local storage once and reuses the in-flight browser hydration 
   await Promise.all([first, second]);
 
   expect(readBrowserStoredPreferenceMock).toHaveBeenCalledTimes(1);
+});
+
+it('does not let an older hydration read overwrite a newer storage change', async () => {
+  const args = {
+    ...createArgs(),
+    initialCurrentValue: 'fallback',
+    isBrowserStorageAvailable: () => true,
+  };
+  const state = createStorageBackedPreferenceState('fallback');
+  const { applyCurrentValue } = createPreferenceAppliers(state, args);
+  const handlers = createStorageChangeHandlers({ args, applyCurrentValue, state });
+  let resolveRead: ((value: Record<string, string>) => void) | null = null;
+  readBrowserStoredPreferenceMock.mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        resolveRead = resolve;
+      })
+  );
+  const ensureHydrated = createPreferenceHydrator({
+    args,
+    applyCurrentValue,
+    cleanupStorageListenerIfUnused: vi.fn(),
+    ensureStorageListenerRegistered: vi.fn(),
+    state,
+  });
+
+  const hydration = ensureHydrated();
+  handlers.handleBrowserStorageChange({ theme: { newValue: 'new' } }, 'local');
+  requireResolver(resolveRead, 'Expected browser hydration resolver')({ theme: 'old' });
+  await hydration;
+
+  expect(state.currentValue).toBe('new');
+  expect(state.hydrated).toBe(true);
 });
 
 it('applies current and stored preferences with optional notifications', () => {

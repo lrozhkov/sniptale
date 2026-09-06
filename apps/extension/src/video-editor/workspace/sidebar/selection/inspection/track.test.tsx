@@ -1,3 +1,7 @@
+// @vitest-environment jsdom
+
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -13,9 +17,6 @@ vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
   useAppLocale: () => 'en',
 }));
-
-vi.stubGlobal('HTMLElement', class HTMLElement {});
-vi.stubGlobal('ShadowRoot', class ShadowRoot {});
 
 function createSharedCallbacks() {
   return {
@@ -40,6 +41,8 @@ function createSharedCallbacks() {
     onStartActionPointPlacement: vi.fn(),
     onStartMotionAreaPlacement: vi.fn(),
     onStartMotionFocusPlacement: vi.fn(),
+    onToggleTrackLock: vi.fn(),
+    onToggleTrackVisibility: vi.fn(),
     onUpdateActionEventDetails: vi.fn(),
     onUpdateClipAudioEnvelope: vi.fn(),
     onUpdateClipFades: vi.fn(),
@@ -100,6 +103,8 @@ describe('workspace-sidebar/selection/inspect-track', () => {
       <WorkspaceSidebarInspectPanel {...createProps(VideoTrackKind.OVERLAY)} />
     );
 
+    expect(markup).not.toContain('videoEditor.sidebar.inspectorGroupInfo');
+    expect(markup).not.toContain('videoEditor.sidebar.inspectorGroupGeneral');
     expect(markup).toContain('videoEditor.timeline.deleteTrackTitle');
     expect(markup).toContain('hover:text-[var(--sniptale-color-danger)]');
     expect(markup).toContain('rounded-[12px]');
@@ -110,9 +115,79 @@ describe('workspace-sidebar/selection/inspect-track', () => {
       <WorkspaceSidebarInspectPanel {...createProps(VideoTrackKind.PRIMARY, true)} />
     );
 
-    expect(markup).not.toContain('videoEditor.sidebar.trackNameLabel');
+    expect(markup).toContain('videoEditor.sidebar.trackNameLabel');
     expect(markup).not.toContain('videoEditor.sidebar.inspectorGroupLayout');
     expect(markup).not.toContain('videoEditor.sidebar.inspectorGroupStyle');
     expect(markup).not.toContain('videoEditor.timeline.deleteTrackTitle');
+  });
+
+  it('commits a localized track name without exposing the internal kind enum', () => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    const props = createProps(VideoTrackKind.OVERLAY);
+    const container = document.createElement('div');
+    const root = createRoot(container);
+
+    act(() => {
+      root.render(<WorkspaceSidebarInspectPanel {...props} />);
+    });
+
+    expect(container.textContent).toContain('videoEditor.timeline.trackKindOverlay');
+    expect(container.textContent).not.toContain(VideoTrackKind.OVERLAY);
+    const input = container.querySelector<HTMLInputElement>(
+      'input[aria-label="videoEditor.sidebar.trackNameLabel"]'
+    );
+    expect(input).not.toBeNull();
+    expect(
+      container.querySelectorAll('[data-ui="shared.ui.compact-inspector.option-row"]')
+    ).toHaveLength(2);
+    const visibilityToggle = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(
+        '[data-ui="shared.ui.compact-inspector.option-row"]'
+      )
+    ).find((button) => button.textContent?.includes('videoEditor.sidebar.trackVisibilityLabel'));
+    const lockToggle = Array.from(
+      container.querySelectorAll<HTMLButtonElement>(
+        '[data-ui="shared.ui.compact-inspector.option-row"]'
+      )
+    ).find((button) => button.textContent?.includes('videoEditor.sidebar.trackLockLabel'));
+
+    act(() => {
+      visibilityToggle?.click();
+      lockToggle?.click();
+    });
+    expect(props.onToggleTrackVisibility).toHaveBeenCalledWith(props.selectedTrack.id);
+    expect(props.onToggleTrackLock).toHaveBeenCalledWith(props.selectedTrack.id);
+
+    if (input) {
+      input.value = 'Callouts';
+      act(() => {
+        input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+      });
+    }
+
+    expect(props.onRenameTrack).toHaveBeenCalledWith(props.selectedTrack.id, 'Callouts');
+
+    const restoredProps = {
+      ...props,
+      selectedTrack: {
+        ...props.selectedTrack,
+        locked: true,
+        name: 'Restored overlays',
+        visible: false,
+      },
+    };
+    act(() => {
+      root.render(<WorkspaceSidebarInspectPanel {...restoredProps} />);
+    });
+    expect(
+      container.querySelector<HTMLInputElement>(
+        'input[aria-label="videoEditor.sidebar.trackNameLabel"]'
+      )?.value
+    ).toBe('Restored overlays');
+    expect(visibilityToggle?.getAttribute('aria-pressed')).toBe('false');
+    expect(lockToggle?.getAttribute('aria-pressed')).toBe('true');
+
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
   });
 });

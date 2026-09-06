@@ -1,8 +1,8 @@
 import { expect, it } from 'vitest';
 import { normalizeClip } from './clip';
 import { createAnnotationClip } from '../annotation/template';
-import { createEmptyVideoProject } from '../factories/creation';
-import { VideoMediaShadowMode, VideoProjectClipType } from '../types/index';
+import { createEmptyVideoProject, createVideoProjectTrack } from '../factories/creation';
+import { VideoTrackKind, VideoMediaShadowMode, VideoProjectClipType } from '../types/index';
 
 function createVideoClipFixture() {
   return {
@@ -59,7 +59,8 @@ it('normalizes grouped media clips with fit, playback, and legacy names', () => 
 
 it('keeps annotation clip normalization wired through the shared clip hydration seam', () => {
   const project = createEmptyVideoProject('Hydration clip', 1280, 720);
-  const clip = createAnnotationClip(project.tracks[2]!.id, project.width, project.height, 0);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  const clip = createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 0);
   clip.target = 'invalid' as never;
   clip.targetPoint = { x: 120, y: 240 };
 

@@ -31,6 +31,22 @@ export const videoEditorTimelineMessages = defineMessageSource({
     ru: 'В начало',
     en: 'Go to start',
   },
+  seekToEnd: {
+    ru: 'В конец',
+    en: 'Go to end',
+  },
+  previousFrame: {
+    ru: 'Предыдущий кадр',
+    en: 'Previous frame',
+  },
+  nextFrame: {
+    ru: 'Следующий кадр',
+    en: 'Next frame',
+  },
+  playhead: {
+    ru: 'Позиция воспроизведения',
+    en: 'Playhead position',
+  },
   title: {
     ru: 'Таймлайн',
     en: 'Timeline',
@@ -47,12 +63,32 @@ export const videoEditorTimelineMessages = defineMessageSource({
     ru: 'Разрезать',
     en: 'Split',
   },
+  splitShortcut: {
+    ru: 'S',
+    en: 'S',
+  },
+  splitUnavailableTitle: {
+    ru: 'Переместите позицию воспроизведения внутрь выбранного клипа',
+    en: 'Move the playhead inside the selected clip',
+  },
+  clipLockedTitle: {
+    ru: 'Разблокируйте дорожку, чтобы редактировать выбранный клип',
+    en: 'Unlock the track to edit the selected clip',
+  },
   duplicate: {
     ru: 'Копия',
     en: 'Duplicate',
   },
+  duplicateShortcut: {
+    ru: 'Ctrl/⌘+D',
+    en: 'Ctrl/⌘+D',
+  },
   delete: {
     ru: 'Удалить',
+    en: 'Delete',
+  },
+  deleteShortcut: {
+    ru: 'Delete',
     en: 'Delete',
   },
   addTrack: {
@@ -67,13 +103,25 @@ export const videoEditorTimelineMessages = defineMessageSource({
     ru: 'Видео-дорожка',
     en: 'Video track',
   },
+  addVideoTrackNote: {
+    ru: 'Дополнительные видео и визуальные слои',
+    en: 'Extra footage and visual layers',
+  },
   addAudioTrack: {
     ru: 'Аудио-дорожка',
     en: 'Audio track',
   },
+  addAudioTrackNote: {
+    ru: 'Музыка, голос и другие аудиослои',
+    en: 'Music, voice, and other audio layers',
+  },
   addOverlayTrack: {
     ru: 'Дорожка аннотаций',
     en: 'Annotation track',
+  },
+  addOverlayTrackNote: {
+    ru: 'Текст, фигуры и экранные пометки',
+    en: 'Text, shapes, and on-screen callouts',
   },
   addSubtitleTrack: {
     ru: 'Дорожка субтитров',
@@ -232,6 +280,10 @@ export const videoEditorTimelineMessages = defineMessageSource({
   emptyLaneLabel: {
     ru: 'Сегменты появятся здесь, когда в проекте появятся данные.',
     en: 'Segments will appear here when the project contains data.',
+  },
+  emptyZoomLaneLabel: {
+    ru: 'Нажмите + или наведите на дорожку, чтобы добавить зум.',
+    en: 'Press + or point at the lane to add a zoom.',
   },
   fileDropUnsupported: {
     ru: 'Этот файл нельзя добавить на таймлайн.',

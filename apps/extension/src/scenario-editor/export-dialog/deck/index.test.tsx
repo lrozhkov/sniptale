@@ -94,7 +94,8 @@ async function verifyExportDiagnostics(): Promise<void> {
   expect(container?.textContent).toContain(translate('scenario.editor.exportFailed'));
 
   await clickButtonText(translate('scenario.editor.exportAction'));
-  expect(container?.textContent).toContain('Asset backend unavailable');
+  expect(container?.textContent).toContain(translate('common.errors.unexpectedDetail'));
+  expect(container?.textContent).not.toContain('Asset backend unavailable');
 
   await clickButtonText(translate('scenario.editor.exportAction'));
   expect(container?.textContent).toContain(

@@ -381,6 +381,14 @@ function resolveFirstCandidate(context, candidates) {
     .find(Boolean);
 }
 
+function recordUnresolvedInvocation(context, node) {
+  context.unresolved.push({
+    authority: context.authority,
+    expression: node.getText(context.sourceFile),
+    ordinal: context.ordinal,
+  });
+}
+
 function collectProcessCall(context, node, name, isExecutableDynamicImport) {
   if (!PROCESS_CALLS.has(name) && !isExecutableDynamicImport) return;
   context.ordinal += 1;
@@ -394,11 +402,7 @@ function collectProcessCall(context, node, name, isExecutableDynamicImport) {
       target,
     });
   } else if (candidates.some((candidate) => looksLikeRepositoryExpression(context, candidate))) {
-    context.unresolved.push({
-      authority: context.authority,
-      expression: node.getText(context.sourceFile),
-      ordinal: context.ordinal,
-    });
+    recordUnresolvedInvocation(context, node);
   }
 }
 
@@ -420,11 +424,7 @@ function collectContainerInvocation(context, node, name) {
   } else if (
     node.arguments.some((candidate) => looksLikeRepositoryExpression(context, candidate))
   ) {
-    context.unresolved.push({
-      authority: context.authority,
-      expression: node.getText(context.sourceFile),
-      ordinal: context.ordinal,
-    });
+    recordUnresolvedInvocation(context, node);
   }
 }
 
@@ -453,11 +453,7 @@ function collectLaneWorkerInvocation(context, node, name) {
   if (target) {
     addInvocationOrigin(context, { label: 'worker-url', target });
   } else if (looksLikeRepositoryExpression(context, candidate)) {
-    context.unresolved.push({
-      authority: context.authority,
-      expression: node.getText(context.sourceFile),
-      ordinal: context.ordinal,
-    });
+    recordUnresolvedInvocation(context, node);
   }
 }
 
@@ -487,11 +483,7 @@ function collectWorkerConstruction(context, node) {
   if (target) {
     addInvocationOrigin(context, { label: 'Worker', target });
   } else if (candidates.some((candidate) => looksLikeRepositoryExpression(context, candidate))) {
-    context.unresolved.push({
-      authority: context.authority,
-      expression: node.getText(context.sourceFile),
-      ordinal: context.ordinal,
-    });
+    recordUnresolvedInvocation(context, node);
   }
 }
 

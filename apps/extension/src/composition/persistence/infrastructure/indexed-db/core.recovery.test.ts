@@ -1,6 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { CURRENT_SCHEMA_CONTRACTS } from './schema-contracts';
-import { EXPECTED_INDEXES, EXPECTED_STORES } from './core.stores';
+import { DB_VERSION, EXPECTED_INDEXES, EXPECTED_STORES } from './core.stores';
 
 const mocks = vi.hoisted(() => ({
   inspect: vi.fn(),
@@ -49,12 +49,12 @@ it('lets Gallery resume the alpha reset and returns typed admission failures', a
       reason: 'alpha-reset-required',
       status: 'blocked',
     })
-    .mockResolvedValueOnce({ databaseVersion: 1, status: 'ready' })
-    .mockResolvedValueOnce({ databaseVersion: 1, status: 'ready' });
+    .mockResolvedValueOnce({ databaseVersion: DB_VERSION, status: 'ready' })
+    .mockResolvedValueOnce({ databaseVersion: DB_VERSION, status: 'ready' });
   const module = await import('./core');
 
   await expect(module.prepareDatabaseForRecovery()).resolves.toEqual({
-    databaseVersion: 1,
+    databaseVersion: DB_VERSION,
     status: 'ready',
   });
   expect(mocks.resetAlpha).toHaveBeenCalledOnce();
@@ -75,11 +75,11 @@ it('lets Gallery resume the alpha reset and returns typed admission failures', a
 it('resets all local persistence before preparing a fresh database', async () => {
   const database = createDatabase();
   mocks.openDB.mockResolvedValue(database);
-  mocks.inspect.mockResolvedValue({ databaseVersion: 1, status: 'ready' });
+  mocks.inspect.mockResolvedValue({ databaseVersion: DB_VERSION, status: 'ready' });
   const module = await import('./core');
 
   await expect(module.resetDatabaseFromRecovery()).resolves.toEqual({
-    databaseVersion: 1,
+    databaseVersion: DB_VERSION,
     status: 'ready',
   });
   expect(mocks.resetRecovery).toHaveBeenCalledOnce();
@@ -95,12 +95,12 @@ it('resumes a journaled recovery reset before creating the fresh database', asyn
       reason: 'recovery-reset-required',
       status: 'blocked',
     })
-    .mockResolvedValueOnce({ databaseVersion: 1, status: 'ready' })
-    .mockResolvedValueOnce({ databaseVersion: 1, status: 'ready' });
+    .mockResolvedValueOnce({ databaseVersion: DB_VERSION, status: 'ready' })
+    .mockResolvedValueOnce({ databaseVersion: DB_VERSION, status: 'ready' });
   const module = await import('./core');
 
   await expect(module.prepareDatabaseForRecovery()).resolves.toEqual({
-    databaseVersion: 1,
+    databaseVersion: DB_VERSION,
     status: 'ready',
   });
   expect(mocks.resetRecovery).toHaveBeenCalledOnce();

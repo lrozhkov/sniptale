@@ -56,6 +56,7 @@ it('inserts fallback samples into an empty cursor track and deletes the last sam
     expect.objectContaining({
       interpolation: VideoTemporalEasing.LINEAR,
       time: 1.5,
+      timeBasis: 'project',
       visible: true,
       x: project.width / 2,
       y: project.height / 2,
@@ -110,4 +111,62 @@ it('stores and clears per-sample cursor style overrides without mutating track s
   store.getState().clearCursorSampleSkinOverride('sample-1');
 
   expect(store.getState().project?.cursorTrack?.samples[0]?.skinOverride).toBeNull();
+});
+
+it('inserts between existing samples and updates the inserted project-time segment', () => {
+  const store = createStoreState();
+  const project = createEmptyVideoProject('Cursor segments');
+  project.duration = 4;
+  project.cursorTrack = createCursorTrack([
+    {
+      id: 'sample-1',
+      interpolation: VideoTemporalEasing.EASE_OUT,
+      skinOverride: {
+        animationPreset: VideoCursorAnimationPreset.PULSE,
+        color: '#00ff88',
+        hidden: false,
+        preset: VideoCursorVisualPreset.DOT,
+        scale: 1.2,
+        shadow: false,
+      },
+      time: 1,
+      visible: false,
+      x: 200,
+      y: 300,
+    },
+    { id: 'sample-2', time: 3, visible: true, x: 400, y: 500 },
+  ]);
+  store.getState().setProject(project);
+
+  store.getState().insertCursorSample(2);
+  const inserted = store
+    .getState()
+    .project?.cursorTrack?.samples.find((sample) => !['sample-1', 'sample-2'].includes(sample.id));
+  expect(inserted).toEqual(
+    expect.objectContaining({
+      interpolation: VideoTemporalEasing.EASE_OUT,
+      skinOverride: expect.objectContaining({ preset: VideoCursorVisualPreset.DOT }),
+      time: 2,
+      timeBasis: 'project',
+      visible: false,
+      x: 200,
+      y: 300,
+    })
+  );
+
+  store.getState().updateCursorSampleVisibility(inserted!.id, true);
+  store.getState().updateCursorSampleInterpolation(inserted!.id, VideoTemporalEasing.INSTANT);
+  store.getState().updateCursorSampleSkinOverride(inserted!.id, { scale: 1.5 });
+  store.getState().clearCursorSampleSkinOverride('missing');
+  store.getState().deleteCursorSample('sample-1');
+
+  expect(store.getState().project?.cursorTrack?.samples).toEqual([
+    expect.objectContaining({
+      id: inserted!.id,
+      interpolation: VideoTemporalEasing.INSTANT,
+      skinOverride: expect.objectContaining({ scale: 1.5 }),
+      visible: true,
+    }),
+    expect.objectContaining({ id: 'sample-2' }),
+  ]);
 });

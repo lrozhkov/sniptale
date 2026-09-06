@@ -4,16 +4,19 @@ import { runPersistenceOwnershipCheck } from '../../../guards/lifecycle/persiste
 import { runReadPathSideEffectCheck } from '../../../guards/lifecycle/read-path-side-effects/check.mjs';
 import { runAppCoreOwnerCheck } from '../../../guards/architecture/app-core/verify-app-core-owners.mjs';
 import { runArchitectureGuardrailCheck } from '../../../guards/architecture/architecture-guardrails/check.mjs';
-import { runHeavyRuntimeImportOwnershipCheck } from '../../../guards/architecture/imports/verify-heavy-runtime-import-ownership.mjs';
 import { runManifestPermissionsCheck } from '../../../guards/architecture/manifest-permissions/check.mjs';
 import { runInstanceOwnershipCheck } from '../../../guards/architecture/ownership/instance-ownership/check.mjs';
 import { runRuntimeTopologyCheck } from '../../../guards/architecture/runtime-topology/check.mjs';
-import { runChangedUiAutomationSeamCheck } from '../../../guards/product-contracts/ui-automation/verify-ui-automation-seams.mjs';
+import { runForwardingModuleDriftCheck } from '../../../guards/architecture/forwarding-module-drift/check.mjs';
+import { runUiAutomationSeamCheck } from '../../../guards/product-contracts/ui-automation/verify-ui-automation-seams.mjs';
+import { runConfigPolicyCheck } from '../../../guards/product-contracts/config/config-policy/check.mjs';
+import { runExtensionBuildLayoutCheck } from '../../../guards/product-contracts/extension-build/verify-extension-build-layout.mjs';
+import { runDetachedControllerMethodCheck } from '../../../guards/quality/detached-controller-methods/check.mjs';
+import { runDomainFixtureRealismCheck } from '../../../guards/product-contracts/verify-domain-fixture-realism.mjs';
 import { runManifestIntegrityCheck } from '../../../guards/product-contracts/manifest-integrity/check.mjs';
 import { runPackageBoundaryCheck } from '../../../guards/product-contracts/package-boundaries/check.mjs';
 import { runParserSnapshotPurityCheck } from '../../../guards/product-contracts/verify-parser-snapshot-purity.mjs';
 import { runSharedStyleOwnershipCheck } from '../../../guards/product-contracts/verify-shared-style-ownership.mjs';
-import { runRootScatterCheck } from '../../../guards/quality/root-scatter/check.mjs';
 import { runRepoWideRootSideEffectCheck } from '../../../guards/quality/root-side-effects/check.mjs';
 import { runSuppressionDirectiveCheck } from '../../../guards/quality/verify-suppression-directives.mjs';
 import { runDependencyAdmissionCheck } from '../../../guards/security/verify-dependency-admission.mjs';
@@ -42,6 +45,16 @@ const releaseGuardrailAdapterDefinitions = [
   NETWORK_POLICY_VIOLATION_STEP,
   ...SHARED_OWNER_PROOF_VIOLATION_STEPS,
   ...SHARED_ENTRYPOINT_LOGGING_VIOLATION_STEPS,
+  [
+    'Config policy',
+    'Config policy violations found:',
+    () => ({ ...runConfigPolicyCheck(), populationKind: 'repository-state' }),
+  ],
+  [
+    'Extension build layout',
+    'Extension build layout violations found:',
+    () => ({ ...runExtensionBuildLayoutCheck(), populationKind: 'repository-state' }),
+  ],
   ['Dependency admission', 'Dependency admission violations found:', runDependencyAdmissionCheck],
   ['Secret storage', 'Secret storage violations found:', runSecretStorageCheck],
   ['Sensitive retention', 'Sensitive retention violations found:', runSensitiveRetentionCheck],
@@ -57,7 +70,11 @@ const releaseGuardrailAdapterDefinitions = [
     () => runSuppressionDirectiveCheck({ scope: 'production' }),
   ],
   ['Messaging', 'Messaging guardrail violations found:', runMessagingCheck],
-  ['Root scatter', 'Root scatter violations found:', runRootScatterCheck],
+  [
+    'Forwarding module drift',
+    'Forwarding module drift violations found:',
+    runForwardingModuleDriftCheck,
+  ],
   ['Read path side effects', 'Read-path side-effect violations found:', runReadPathSideEffectCheck],
   [
     'Persistence ownership',
@@ -78,22 +95,27 @@ const releaseGuardrailAdapterDefinitions = [
   ['Target-only paths', 'Target-only path violations found:', runTargetOnlyPathCheck],
   ['OSS release surface', 'OSS release surface violations found:', runOssReleaseSurfaceCheck],
   ['Browser adapters', 'Browser adapter guardrail violations found:', runBrowserAdapterCheck],
-  [
-    'Heavy runtime imports',
-    'Heavy runtime import ownership violations found:',
-    runHeavyRuntimeImportOwnershipCheck,
-  ],
   ['Root side effects', 'Root side-effect violations found:', runRepoWideRootSideEffectCheck],
   [
     'Shared style ownership',
     'Shared style ownership guardrail violations found:',
     runSharedStyleOwnershipCheck,
   ],
-  ['UI automation seams', 'UI automation seam violations found:', runChangedUiAutomationSeamCheck],
+  ['UI automation seams', 'UI automation seam violations found:', runUiAutomationSeamCheck],
   [
     'Interactive controller ownership',
     'Interactive controller ownership violations found:',
     runInstanceOwnershipCheck,
+  ],
+  [
+    'Detached controller methods',
+    'Detached controller method violations found:',
+    runDetachedControllerMethodCheck,
+  ],
+  [
+    'Domain fixture realism',
+    'Domain fixture realism violations found:',
+    runDomainFixtureRealismCheck,
   ],
 ];
 

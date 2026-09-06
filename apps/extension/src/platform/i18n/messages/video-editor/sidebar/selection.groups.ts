@@ -107,6 +107,10 @@ export const videoEditorSidebarSelectionGroupMessages = {
     ru: 'Камера',
     en: 'Camera',
   },
+  inspectorGroupZoom: {
+    ru: 'Зум',
+    en: 'Zoom',
+  },
   inspectorGroupPath: {
     ru: 'Путь',
     en: 'Path',

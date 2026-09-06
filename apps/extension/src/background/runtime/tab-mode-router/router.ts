@@ -3,6 +3,7 @@ import { routeScreenshotModeMessage, routeViewportMessage } from './screenshot';
 import type { RouteTabModeMessageArgs } from './shared';
 
 export function routeTabModeMessage({
+  contentPreauthorization,
   message,
   resolvedTabId,
   senderDocumentId,
@@ -15,6 +16,7 @@ export function routeTabModeMessage({
   webSnapshotViewerPorts,
 }: RouteTabModeMessageArgs): boolean {
   const context = {
+    ...(contentPreauthorization ? { contentPreauthorization } : {}),
     resolvedTabId,
     ...(senderDocumentId ? { senderDocumentId } : {}),
     sendResponse,

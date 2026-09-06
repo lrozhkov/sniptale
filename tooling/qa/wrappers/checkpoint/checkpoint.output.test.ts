@@ -15,7 +15,8 @@ function okStep(label: string, consoleOutput?: string) {
 it('renders structural watches only through the checkpoint advisory block', async () => {
   const root = createTempRoot('qa-checkpoint-output-');
   writeJson(root, 'tooling/configs/qa/quality-baseline.json', {
-    schemaVersion: 1,
+    schemaVersion: 2,
+    rationales: [],
     allowances: [],
   });
 
@@ -43,13 +44,25 @@ it('renders structural watches only through the checkpoint advisory block', asyn
     });
 
     expect(result.steps.find((step) => step.label === 'Advisory report')).toMatchObject({
-      consoleOutput: 'Advisory: attention=0, watch=1\n',
+      consoleOutput: expect.stringContaining('No classified change seams detected'),
+      stdout: expect.stringMatching(/No classified change seams detected[\s\S]*Advisory log:/u),
     });
+    expect(result.steps.find((step) => step.label === 'Advisory report')?.consoleOutput).toContain(
+      'Inspect the implementation against architecture and security review triggers'
+    );
+    expect(
+      result.steps.find((step) => step.label === 'Advisory report')?.consoleOutput
+    ).not.toContain('LOW');
+    expect(result.steps.find((step) => step.label === 'Advisory report')?.consoleOutput).toContain(
+      'Advisory: attention=0, watch=1'
+    );
     expect(result.steps.find((step) => step.label === 'Structural risk')).not.toHaveProperty(
       'consoleOutput'
     );
     expect(result.steps.find((step) => step.label === 'Focused diagnostics')).toMatchObject({
       consoleOutput: 'unique focused diagnostics\n',
     });
+    expect(result.changeRisk).toMatchObject({ level: null, seams: [] });
+    expect(result.advisory).toEqual({ introduced: [], worsened: [], existing: [] });
   });
 });

@@ -7,8 +7,9 @@ import {
 } from '../../../../page-access/service';
 import { waitForContentToolbarReady } from '../../../../page-access/readiness';
 import { routeWithVerifiedPageAccess } from './page-access-guard';
-import { rejectUnauthorizedRouteSender } from './sender-rejection';
+import { authorizeRouteSender } from './sender-rejection';
 import type { ResolvedTabRouteArgs } from './types';
+import type { PreauthorizedContentActionBinding } from '../../../../routing-contracts/capabilities/content-action/route';
 
 export function routeResolvedCaptureMessage(args: ResolvedTabRouteArgs): boolean {
   const message = args.message;
@@ -16,6 +17,7 @@ export function routeResolvedCaptureMessage(args: ResolvedTabRouteArgs): boolean
     return false;
   }
 
+  let contentPreauthorization: PreauthorizedContentActionBinding | undefined;
   const route = () =>
     routeCaptureMessage({
       message,
@@ -31,18 +33,27 @@ export function routeResolvedCaptureMessage(args: ResolvedTabRouteArgs): boolean
       },
       scenarioSessionService: args.deps.scenarioSessionService,
       sender: args.sender,
+      ...(contentPreauthorization ? { contentPreauthorization } : {}),
       webSnapshotViewerPorts: args.deps.webSnapshotViewerPorts,
     });
 
+  const authorize = () => {
+    const authorization = authorizeRouteSender(args, 'capture');
+    if (!authorization.authorized) {
+      return false;
+    }
+    contentPreauthorization =
+      authorization.preauthorization?.kind === 'privileged-tab-route'
+        ? authorization.preauthorization.senderBinding
+        : undefined;
+    return true;
+  };
+
   if (authorizeContentSender(args.sender, args.resolvedTabId).allowed) {
-    return routeWithVerifiedPageAccess(
-      args,
-      () => !rejectUnauthorizedRouteSender(args, 'capture'),
-      route
-    );
+    return routeWithVerifiedPageAccess(args, authorize, route);
   }
 
-  if (rejectUnauthorizedRouteSender(args, 'capture')) {
+  if (!authorize()) {
     return true;
   }
 

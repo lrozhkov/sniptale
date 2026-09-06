@@ -1,4 +1,5 @@
 import { betaV1Fixture } from './beta-v1';
+import { betaV2Fixture } from './beta-v2';
 
 export interface BetaDatabaseFixtureContract {
   databaseName: string;
@@ -16,4 +17,5 @@ export interface BetaDatabaseFixtureContract {
 
 export const SUPPORTED_BETA_DATABASE_FIXTURES: readonly BetaDatabaseFixtureContract[] = [
   betaV1Fixture,
+  betaV2Fixture,
 ];

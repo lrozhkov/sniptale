@@ -30,7 +30,9 @@ export function createProjectStateActions(set: VideoEditorStoreSet) {
       project: Parameters<VideoEditorState['setProject']>[0],
       recordingId: Parameters<VideoEditorState['setProject']>[1] = null
     ) => {
-      const hydratedProject = hydrateVideoProject(project);
+      const hydratedProject = hydrateVideoProject(project, {
+        inferLegacyInteractionAnchors: true,
+      });
       const selection = resolveInitialVideoEditorSelection(hydratedProject);
       const selectedClip =
         selection.kind === VideoEditorSelectionKind.CLIP

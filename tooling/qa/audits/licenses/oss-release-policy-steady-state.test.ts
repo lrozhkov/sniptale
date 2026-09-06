@@ -16,14 +16,6 @@ function write(root: string, relativePath: string, contents: string) {
 
 function contributionFixture() {
   const root = createTempRoot('oss-release-contribution-policy-');
-  const workflow = '`implementation → qa:checkpoint → required review → qa:closeout`\n';
-  for (const relativePath of [
-    'docs/agent-tooling/AGENTS.md',
-    'docs/tooling/code-quality.md',
-    'docs/tooling/wrapper-summary.md',
-  ]) {
-    write(root, relativePath, workflow);
-  }
   write(root, 'README.md', 'Sniptale\n');
   write(root, 'CODE_OF_CONDUCT.md', 'Enforcement owner: Lev Rozhkov\n');
   write(
@@ -34,7 +26,7 @@ function contributionFixture() {
   write(
     root,
     'docs/oss/release.md',
-    'qa:release-harness qa:checkpoint qa:closeout ci:release Corresponding Source AGPL-3.0-or-later\n'
+    'qa:release-harness qa:checkpoint qa:closeout ci:proof ci:release Corresponding Source AGPL-3.0-or-later\n'
   );
   return {
     policy: {

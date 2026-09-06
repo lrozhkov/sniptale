@@ -111,7 +111,7 @@ it('closes after a completed unlock response', async () => {
   timeoutSpy.mockRestore();
 });
 
-it('shows the unlock response error when submission does not complete', async () => {
+it('redacts the unlock response error when submission does not complete', async () => {
   submitUnlockPassphraseMock.mockResolvedValueOnce({
     error: 'AI secret unlock submission state was interrupted',
     requestId: REQUEST_ID,
@@ -122,7 +122,10 @@ it('shows the unlock response error when submission does not complete', async ()
   const rendered = await renderUnlockPage();
   await submitPassphrase(rendered);
 
-  expect(rendered.textContent).toContain('AI secret unlock submission state was interrupted');
+  expect(rendered.textContent).toContain(
+    translate('settings.aiProviders.secretProtectionActionError')
+  );
+  expect(rendered.textContent).not.toContain('AI secret unlock submission state was interrupted');
 });
 
 it('requires a passphrase before submitting the unlock request', async () => {
@@ -142,13 +145,16 @@ it('requires a passphrase before submitting the unlock request', async () => {
   );
 });
 
-it('shows thrown submission errors from runtime messaging', async () => {
+it('redacts thrown submission errors from runtime messaging', async () => {
   submitUnlockPassphraseMock.mockRejectedValueOnce(new Error('runtime disconnected'));
 
   const rendered = await renderUnlockPage();
   await submitPassphrase(rendered);
 
-  expect(rendered.textContent).toContain('runtime disconnected');
+  expect(rendered.textContent).toContain(
+    translate('settings.aiProviders.secretProtectionActionError')
+  );
+  expect(rendered.textContent).not.toContain('runtime disconnected');
 });
 
 it('cancels the unlock request before closing the unlock window', async () => {

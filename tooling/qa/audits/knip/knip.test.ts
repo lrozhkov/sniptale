@@ -9,7 +9,7 @@ describe('Knip configured integrity owner', () => {
   it('keeps raw and canonical execution on the same exact policy scope', () => {
     const config = JSON.parse(fs.readFileSync('tooling/configs/qa/knip.json', 'utf8'));
     expect(config.include).toEqual(['unresolved', 'unlisted', 'binaries']);
-    expect(config.ignoreBinaries).toEqual(['codeql', 'gcc', 'printf']);
+    expect(config.ignoreBinaries).toEqual(['codeql', 'gcc', 'mkfifo', 'printf']);
     expect(config.ignore).not.toContain('tooling/test/e2e/**');
     expect(ROOT_PACKAGE.scripts['qa:raw:knip']).toBe('knip --config tooling/configs/qa/knip.json');
   });

@@ -64,6 +64,8 @@ async function verifyActiveProgressState() {
 
   await renderSection(props);
 
+  const description = container?.querySelector('[data-ui="popup.export.progress-description"]');
+  expect(description?.textContent).toBe('Файлы');
   expect(container?.textContent).toContain('Собираем материалы');
   expect(container?.textContent).toContain('JSON');
   expect(container?.textContent).toContain('Файлы');
@@ -99,6 +101,23 @@ async function verifyLocalizedProgressDescription() {
 
   expect(container?.textContent).not.toContain('Capturing full-page screenshot...');
   expect(container?.textContent).toContain('Скриншот');
+}
+
+async function verifyBatchPageProgressDescription() {
+  await renderSection(
+    createProps({
+      progress: {
+        phase: 'downloading',
+        message: 'Collecting page: Example',
+        current: 2,
+        total: 5,
+        errors: [],
+      },
+    })
+  );
+
+  const description = container?.querySelector('[data-ui="popup.export.progress-description"]');
+  expect(description?.textContent).toBe('Collecting page: Example');
 }
 
 async function verifyCompletedState() {
@@ -221,10 +240,7 @@ async function verifyErrorListLayout() {
   );
 
   const stepList = container?.querySelector('.overflow-y-auto');
-  const errorListEntry = Array.from(container?.querySelectorAll('div') ?? []).find(
-    (element) => element.textContent === '• Ошибка 1'
-  );
-  const errorList = errorListEntry?.parentElement ?? null;
+  const errorList = container?.querySelector('[data-ui="popup.export.progress-issues"]') ?? null;
 
   expect(stepList).not.toBeNull();
   expect(errorList).not.toBeNull();
@@ -239,6 +255,11 @@ describe('ExportProgressSectionView', () => {
   it(
     'uses the localized phase summary instead of raw runtime progress messages',
     verifyLocalizedProgressDescription
+  );
+
+  it(
+    'preserves the localized current-page context during batch export',
+    verifyBatchPageProgressDescription
   );
 
   it(

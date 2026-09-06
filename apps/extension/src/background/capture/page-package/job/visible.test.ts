@@ -43,6 +43,7 @@ import {
   subscribeToPopupExportManualActivation,
 } from './visible';
 import type { ActivePopupExportJob } from './runtime-state';
+import { translate } from '../../../../platform/i18n';
 
 function createJob(): ActivePopupExportJob {
   return {
@@ -57,6 +58,7 @@ function createJob(): ActivePopupExportJob {
     contentPort: { cancelPagePackage: vi.fn(), requestPagePackage: vi.fn() },
     expectedActivation: null,
     lastActivatedByWindow: new Map(),
+    locale: 'en',
     manualActivationConflict: false,
     publicationQueue: Promise.resolve(),
     status: {
@@ -141,6 +143,7 @@ it('resolves available tabs, records original active tabs, and reports unavailab
   expect(job.affectedWindowIds).toEqual(new Set([3]));
   expect(job.status.originalActiveTabs).toEqual([{ tabId: 70, windowId: 3 }]);
   expect(mocks.appendWarning).toHaveBeenCalledWith(job, expect.stringContaining('Missing'));
+  expect(mocks.appendWarning).not.toHaveBeenCalledWith(job, expect.stringContaining('gone'));
   expect(job.status.pageOutcomes).toEqual([
     { ordinal: 0, status: 'pending', tabId: 7 },
     expect.objectContaining({
@@ -302,5 +305,8 @@ it('restores only a still-job-activated window and reports restoration failure',
 
   expect(mocks.update).toHaveBeenCalledWith(70, { active: true });
   expect(mocks.update).not.toHaveBeenCalledWith(80, expect.anything());
-  expect(mocks.appendWarning).toHaveBeenCalledWith(job, expect.stringContaining('cannot restore'));
+  expect(mocks.appendWarning).toHaveBeenCalledWith(
+    job,
+    translate('popup.export.restoreOriginalTabWarningPrefix', 'en')
+  );
 });

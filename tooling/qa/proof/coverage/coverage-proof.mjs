@@ -166,6 +166,10 @@ export function materializeReusableCoverageProof(reusable, { cwd = process.cwd()
       force: false,
     });
   }
+  const materializedAt = new Date();
+  for (const report of reusable.proof.reports) {
+    fs.utimesSync(path.join(destination, report.file), materializedAt, materializedAt);
+  }
   return destination;
 }
 

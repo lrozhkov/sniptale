@@ -106,6 +106,31 @@ describe('observed wrapper lifecycle', () => {
   });
 });
 
+it('classifies denied read-only git access as an environment failure', async () => {
+  const root = createTempRoot('observed-wrapper-git-access-');
+  initGitRepo(root);
+  const output = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
+  const result = await withCwd(root, () =>
+    runObservedWrapper({
+      wrapperId: 'qa:preflight',
+      label: 'QA preflight',
+      argv: [],
+      contractValidator: ignoreStepContract,
+      environment: { ...process.env, SNIPTALE_QA_OBSERVABILITY_ROOT: root },
+      execute: async () => {
+        throw Object.assign(new Error('spawnSync git EPERM'), {
+          code: 'EPERM',
+          syscall: 'spawnSync git',
+        });
+      },
+    })
+  );
+
+  output.mockRestore();
+  expect(result.record.summary.problemIds).toEqual(['environment.git-access']);
+  expect(result.record.steps[0]?.diagnostic?.remediation).toContain('read-only git access');
+});
+
 describe('observed wrapper skip lifecycle', () => {
   it('preserves wrapper-level skip semantics for help and no-target results', async () => {
     const root = createTempRoot('observed-wrapper-skipped-');
@@ -220,8 +245,8 @@ describe('observed wrapper console output', () => {
     });
     await withCwd(root, async () => {
       const result = await runObservedWrapper({
-        wrapperId: 'qa:advisory',
-        label: 'QA advisory',
+        wrapperId: 'qa:checkpoint',
+        label: 'QA checkpoint',
         argv: [],
         contractValidator: ignoreStepContract,
         environment: createPrivateEnvironment(root),
@@ -242,7 +267,7 @@ describe('observed wrapper console output', () => {
       expect(stdout.match(/attention=0, watch=0/gu)).toHaveLength(1);
       expect(stdout.match(/console output truncated/gu)).toHaveLength(1);
       expect(stdout.indexOf('attention=0, watch=0')).toBeLessThan(
-        stdout.indexOf('QA advisory: all passed')
+        stdout.indexOf('QA checkpoint: all passed')
       );
       expect(log).toContain('[Advisory report.console]');
     });
@@ -261,14 +286,17 @@ describe('observed wrapper console output', () => {
       const advisories = Array.from({ length: 20 }, (_, index) => ({
         id: `finding-${index}`,
         file: `src/file-${index}.ts`,
+        line: null,
         reason: `reason-${index}`,
+        severity: 'watch',
       }));
       const result = await runObservedWrapper({
-        wrapperId: 'qa:advisory',
-        label: 'QA advisory',
+        wrapperId: 'qa:checkpoint',
+        label: 'QA checkpoint',
         contractValidator: ignoreStepContract,
         environment: createPrivateEnvironment(root),
         execute: async () => ({
+          advisory: { introduced: advisories, worsened: [], existing: [] },
           steps: [
             {
               label: 'Advisory report',
@@ -283,8 +311,9 @@ describe('observed wrapper console output', () => {
       const log = fs.readFileSync(`${root}/${result.record.log.path}`, 'utf8');
       expect(stdout).toContain('Advisory report: 20 advisory findings (top 6)');
       expect(stdout).not.toContain('finding-19');
-      expect(log).toContain('[Advisory report.advisories]');
+      expect(log).not.toContain('[Advisory report.advisories]');
       expect(log).toContain('finding-19');
+      expect(result.record.advisory?.introduced).toHaveLength(20);
     });
     output.mockRestore();
   });

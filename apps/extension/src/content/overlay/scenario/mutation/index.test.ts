@@ -263,9 +263,12 @@ async function expectProjectCreationSuccessAndFailure() {
       name: 'New project',
       refreshSession,
     })
-  ).rejects.toThrow('Create failed');
+  ).rejects.toThrow('scenario.content.createProjectError. common.errors.storageDetail');
 
-  expect(helperMocks.showToastMock).toHaveBeenCalledWith('Create failed', 'error');
+  expect(helperMocks.showToastMock).toHaveBeenCalledWith(
+    'scenario.content.createProjectError. common.errors.storageDetail',
+    'error'
+  );
 }
 
 describe('useScenarioController.actions', () => {

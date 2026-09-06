@@ -5,6 +5,7 @@ import { createQuickEditDocumentMode } from './document-mode';
 import { createQuickEditEditingActions } from './editing';
 import { createQuickEditRuntimeEvents } from './runtime.events';
 import { createQuickEditOverlayActions } from './overlays';
+import { setNavigationInputShieldSuspended } from '../locker';
 import type {
   QuickEditRuntimeController,
   QuickEditRuntimeEditingSurface,
@@ -41,12 +42,14 @@ function createQuickEditRuntimeParts(props: {
   overlayActions: ReturnType<typeof createQuickEditOverlayActions>;
   overlayState: ReturnType<typeof createQuickEditOverlayState>;
   setCleanupEventListeners: (cleanup: (() => void) | null) => void;
+  setInputShieldSuspended: (suspended: boolean) => void;
   setIsQuickEditMode: (value: boolean) => void;
   updateBlockingOverlayShape: (element: HTMLElement) => void;
 }) {
   const editingActions = createQuickEditEditingActions({
     editingElements: props.editingElements,
     overlayActions: props.overlayActions,
+    setInputShieldSuspended: props.setInputShieldSuspended,
     updateBlockingOverlayShape: props.updateBlockingOverlayShape,
   });
   const documentMode = createQuickEditDocumentMode({
@@ -56,6 +59,7 @@ function createQuickEditRuntimeParts(props: {
     getIsQuickEditMode: props.getIsQuickEditMode,
     hideBlockingOverlay: props.overlayActions.hideBlockingOverlay,
     hideHoverOverlay: props.overlayActions.hideHoverOverlay,
+    setInputShieldSuspended: props.setInputShieldSuspended,
   });
   const runtimeEventHandlers = createRuntimeEventHandlers(props, editingActions, documentMode);
   const modeToggles = createModeToggles(props, editingActions, documentMode, runtimeEventHandlers);
@@ -127,6 +131,7 @@ export function createQuickEditRuntimeController(
     onDisableRequested: options.onDisableRequested,
     overlayActions,
     overlayState,
+    setInputShieldSuspended: setNavigationInputShieldSuspended,
     updateBlockingOverlayShape: overlayActions.updateBlockingOverlayShape,
     ...createQuickEditCleanupSetter({
       setCleanupEventListeners: (cleanup) => {

@@ -5,6 +5,19 @@ import {
   type DrawingSessionSnapshot,
   type DrawingTextObject,
 } from '../../features/drawing/public';
+import { isTrustedKeyboardEvent } from '../platform/trusted-events';
+import { isContentOwnedEvent, resolveContentShadowRoot } from '../platform/dom-host';
+
+const DRAWING_OWNED_KEYS = new Set([
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'ArrowUp',
+  'Backspace',
+  'Delete',
+  'Enter',
+  'Escape',
+]);
 
 export function handleDrawingKeyDown(args: {
   event: {
@@ -66,6 +79,43 @@ function isDrawingEditableKeyboardTarget(event: KeyboardEvent): boolean {
     );
 }
 
+function isDrawingKeyboardSurface(event: KeyboardEvent): boolean {
+  const contentRoot = resolveContentShadowRoot();
+  if (!contentRoot) return false;
+  return event
+    .composedPath()
+    .some(
+      (target) =>
+        target instanceof Element &&
+        target.getRootNode() === contentRoot &&
+        Boolean(target.closest('.sniptale-drawing-canvas, [data-ui="shared.ui.content-toolbar"]'))
+    );
+}
+
+function hasHigherContentKeyboardLayer(event: KeyboardEvent): boolean {
+  const contentRoot = resolveContentShadowRoot();
+  if (!contentRoot) return false;
+  return event
+    .composedPath()
+    .some(
+      (target) =>
+        target instanceof Element &&
+        target.getRootNode() === contentRoot &&
+        Boolean(
+          target.closest(
+            [
+              '[aria-expanded="true"]',
+              '[aria-modal="true"]',
+              '[data-ui="shared.ui.color-selector"][data-open="true"]',
+              '[role="dialog"]',
+              '[role="listbox"]',
+              '[role="menu"]',
+            ].join(',')
+          )
+        )
+    );
+}
+
 export function useDrawingEscapeOwnership(args: {
   active: boolean;
   cancelDraft: () => void;
@@ -79,17 +129,19 @@ export function useDrawingEscapeOwnership(args: {
 }) {
   useEffect(() => {
     if (!args.active) return;
-    const handleEscape = (event: KeyboardEvent) => {
+    const handleDrawingKey = (event: KeyboardEvent) => {
+      const contentOwned = isContentOwnedEvent(event);
       if (
-        event.key !== 'Escape' ||
-        event.defaultPrevented ||
-        isDrawingEditableKeyboardTarget(event)
+        !isTrustedKeyboardEvent(event) ||
+        !DRAWING_OWNED_KEYS.has(event.key) ||
+        isDrawingEditableKeyboardTarget(event) ||
+        (contentOwned && (hasHigherContentKeyboardLayer(event) || !isDrawingKeyboardSurface(event)))
       ) {
         return;
       }
       event.stopPropagation();
       event.stopImmediatePropagation();
-      if (args.exitImmediately) {
+      if (event.key === 'Escape' && args.exitImmediately) {
         event.preventDefault();
         args.cancelDraft();
         args.cancelText();
@@ -111,7 +163,7 @@ export function useDrawingEscapeOwnership(args: {
         snapshot: args.session.getSnapshot(),
       });
     };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
+    window.addEventListener('keydown', handleDrawingKey, { capture: true });
+    return () => window.removeEventListener('keydown', handleDrawingKey, { capture: true });
   }, [args]);
 }

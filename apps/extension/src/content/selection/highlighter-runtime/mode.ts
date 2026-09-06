@@ -9,6 +9,19 @@ import { mountHighlighterCursorStyle, removeHighlighterCursorStyle } from './run
 import { applyHighlighterDocumentMode } from './runtime-document-mode';
 import { registerHighlighterRuntimeListeners } from './runtime-listeners';
 import { resetHighlighterHoverUi, type HighlighterRuntimeState } from './state';
+import { createLogger } from '@sniptale/platform/observability/logger';
+
+const logger = createLogger({ namespace: 'ContentHighlighter:EnableTiming' });
+
+function measureEnableStep(
+  timings: Record<string, number>,
+  name: string,
+  action: () => void
+): void {
+  const startedAt = performance.now();
+  action();
+  timings[name] = Math.round((performance.now() - startedAt) * 10) / 10;
+}
 
 function dispatchHighlighterModeChanged(enabled: boolean) {
   emitHighlighterModeChanged({ enabled });
@@ -22,23 +35,36 @@ export function enableHighlighterRuntime(
     return;
   }
 
-  deactivateOtherContentModes('highlighter');
-  state.isModeEnabled = true;
-  state.isCreationEnabled = true;
-  setContentModeEnabled('highlighter', true);
-  dispatchHighlighterModeChanged(true);
+  const startedAt = performance.now();
+  const timings: Record<string, number> = {};
+  measureEnableStep(timings, 'modeState', () => {
+    deactivateOtherContentModes('highlighter');
+    state.isModeEnabled = true;
+    state.isCreationEnabled = true;
+    setContentModeEnabled('highlighter', true);
+    dispatchHighlighterModeChanged(true);
+  });
 
-  hoverController.overlay.createContainer();
-  hoverController.overlay.createPreview();
-  applyHighlighterDocumentMode(true);
-  mountHighlighterCursorStyle();
-  const cleanupRuntimeListeners = registerHighlighterRuntimeListeners({
-    disableHighlighterMode: () => disableHighlighterRuntime(state, hoverController),
-    hasActivePopover: () => useFrameUIStore.getState().activePopover !== null,
-    hoverController,
-    isAnyFrameEditing: () => state.isFrameEditing,
+  measureEnableStep(timings, 'overlay', () => {
+    hoverController.overlay.createContainer();
+    hoverController.overlay.createPreview();
+  });
+  measureEnableStep(timings, 'documentMode', () => applyHighlighterDocumentMode(true));
+  measureEnableStep(timings, 'cursorStyles', mountHighlighterCursorStyle);
+  let cleanupRuntimeListeners: () => void = () => undefined;
+  measureEnableStep(timings, 'listeners', () => {
+    cleanupRuntimeListeners = registerHighlighterRuntimeListeners({
+      disableHighlighterMode: () => disableHighlighterRuntime(state, hoverController),
+      hasActivePopover: () => useFrameUIStore.getState().activePopover !== null,
+      hoverController,
+      isAnyFrameEditing: () => state.isFrameEditing,
+    });
   });
   state.cleanupEventListeners = cleanupRuntimeListeners;
+  logger.log('Highlighter enable completed', {
+    totalMs: Math.round((performance.now() - startedAt) * 10) / 10,
+    stepsMs: timings,
+  });
 }
 
 export function disableHighlighterRuntime(

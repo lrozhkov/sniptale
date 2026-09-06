@@ -12,10 +12,17 @@ export function usePopupStartupReconciliation(setLocale: (locale: 'en' | 'ru') =
       else disposeTheme = cleanup;
     });
     void import('../../../platform/i18n/locale/state').then(
-      ({ getCurrentLocale, subscribeToLocaleChanges }) => {
+      ({ ensureLocaleHydrated, getCurrentLocale, subscribeToLocaleChanges }) => {
         if (disposed) return;
-        setLocale(getCurrentLocale());
         disposeLocale = subscribeToLocaleChanges(setLocale);
+        void ensureLocaleHydrated().then(
+          () => {
+            if (!disposed) setLocale(getCurrentLocale());
+          },
+          () => {
+            if (!disposed) setLocale(getCurrentLocale());
+          }
+        );
       }
     );
     return () => {

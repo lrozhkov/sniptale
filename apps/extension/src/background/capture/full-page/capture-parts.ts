@@ -5,9 +5,11 @@ import type { FullPageRasterBackend } from './raster';
 import { createStreamingFullPageStitcher, type StreamingStitchResult } from './stitch';
 import type { FullPageCaptureOptions } from './types';
 import { throwIfFullPageCaptureAborted } from './cancellation';
+import { createLogger } from '@sniptale/platform/observability/logger';
 
 const GEOMETRY_EPSILON_CSS_PX = 1;
 export const FULL_PAGE_EXTENT_GREW_ERROR = 'Full-page capture extent grew during capture';
+const logger = createLogger({ namespace: 'BackgroundFullPageCaptureTiles' });
 
 function createTileIdentity(identity: FullPageCaptureSessionIdentity, plan: FullPageTilePlan) {
   return {
@@ -49,7 +51,13 @@ function assertTileProgress(args: {
     Math.abs(args.actualX - args.plan.targetX) > GEOMETRY_EPSILON_CSS_PX ||
     Math.abs(args.actualY - args.plan.targetY) > GEOMETRY_EPSILON_CSS_PX
   ) {
-    throw new Error('Full-page capture did not reach the planned tile position');
+    throw new Error(
+      [
+        'Full-page capture did not reach the planned tile position',
+        `actual=${args.actualX},${args.actualY}`,
+        `target=${args.plan.targetX},${args.plan.targetY}`,
+      ].join('; ')
+    );
   }
 }
 
@@ -71,17 +79,25 @@ export async function captureAndStitchFullPageTiles(args: {
   let stitcher: Awaited<ReturnType<typeof createStreamingFullPageStitcher>> | null = null;
   let previousColumnX: number | null = null;
   let previousRowY: number | null = null;
+  let activeIndex = -1;
+  let activePlan: FullPageTilePlan | null = null;
+  let activeStage = 'idle';
 
   try {
     for (let index = 0; index < args.plans.length; index += 1) {
       throwIfFullPageCaptureAborted(args.abortSignal);
       const plan = args.plans[index];
       if (!plan) continue;
+      activeIndex = index;
+      activePlan = plan;
+      activeStage = 'renew-lease';
       await args.renewLease();
       throwIfFullPageCaptureAborted(args.abortSignal);
       const identity = createTileIdentity(args.identity, plan);
+      activeStage = 'prepare-tile';
       const prepared = await args.agent.prepareTile(identity, args.abortSignal);
       throwIfFullPageCaptureAborted(args.abortSignal);
+      activeStage = 'assert-progress';
       assertTileProgress({
         actualX: prepared.actualX,
         actualY: prepared.actualY,
@@ -92,8 +108,10 @@ export async function captureAndStitchFullPageTiles(args: {
       if (prepared.frozenExtentWarning && args.restartOnExtentGrowth !== false) {
         throw new Error(FULL_PAGE_EXTENT_GREW_ERROR);
       }
+      activeStage = 'capture-frame';
       const frame = await args.raster.captureFrame(args.abortSignal);
       throwIfFullPageCaptureAborted(args.abortSignal);
+      activeStage = 'verify-tile';
       const verified = await args.agent.verifyTile(
         identity,
         args.layoutGeneration,
@@ -110,6 +128,7 @@ export async function captureAndStitchFullPageTiles(args: {
       if (verified.frozenExtentWarning && args.restartOnExtentGrowth !== false) {
         throw new Error(FULL_PAGE_EXTENT_GREW_ERROR);
       }
+      activeStage = 'stitch-tile';
       stitcher ??= await createStreamingFullPageStitcher({
         firstFrameDataUrl: frame,
         frozenExtentWarning: verified.frozenExtentWarning,
@@ -127,12 +146,33 @@ export async function captureAndStitchFullPageTiles(args: {
     }
 
     if (!stitcher) throw new Error('Full-page capture produced no raster tiles');
+    activeStage = 'finish';
     throwIfFullPageCaptureAborted(args.abortSignal);
     await args.beforeFinish?.();
     throwIfFullPageCaptureAborted(args.abortSignal);
     throwIfFullPageCaptureAborted(args.finalizationAbortSignal);
     return await stitcher.finish(args.options, args.finalizationAbortSignal);
   } catch (error) {
+    const planSummary =
+      activePlan === null
+        ? 'none'
+        : [
+            `row=${activePlan.row}`,
+            `column=${activePlan.column}`,
+            `target=${activePlan.targetX},${activePlan.targetY}`,
+          ].join(' ');
+    const failureSummary = [
+      'Full-page tile capture failed',
+      `stage=${activeStage}`,
+      `tile=${activeIndex + 1}/${args.plans.length}`,
+      planSummary,
+    ].join('; ');
+    logger.error(failureSummary, error, {
+      plan: activePlan,
+      stage: activeStage,
+      tileCount: args.plans.length,
+      tileIndex: activeIndex,
+    });
     stitcher?.dispose();
     throw error;
   }

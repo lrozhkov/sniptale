@@ -1,3 +1,4 @@
+import type { VideoEditorProjectActions } from '../../../contracts/commands/project';
 import type { ReactNode } from 'react';
 import type {
   VideoProjectAnnotationStylePatch,
@@ -54,6 +55,7 @@ export interface WorkspaceSidebarProps {
   onGenerateMotionPathFromCursor?: (motionRegionId: string) => void;
   onDeleteProject: (projectId: string) => void | Promise<void>;
   onDeleteTrack?: (trackId: string) => void;
+  onSwapClip?: VideoEditorProjectActions['swapClip'];
   onDetachClipGroup: (clipId: string) => void;
   onEnableCursorTrack: () => void;
   onImportAudio: (file: File) => void;
@@ -68,6 +70,8 @@ export interface WorkspaceSidebarProps {
   onResetSceneBackgroundPreview?: () => void;
   onResizeProject: (width: number, height: number) => void;
   onRenameTrack?: (trackId: string, name: string) => void;
+  onToggleTrackLock?: (trackId: string) => void;
+  onToggleTrackVisibility?: (trackId: string) => void;
   onSetCursorCaptureMode: (mode: VideoCursorCaptureMode) => void;
   onSetSceneBackground: (sceneBackground: NonNullable<VideoProject['sceneBackground']>) => void;
   onStartActionPointPlacement?: (actionEventId: string) => void;

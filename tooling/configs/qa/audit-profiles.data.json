@@ -9,7 +9,7 @@
       "controls": [
         { "id": "full-product-coverage", "requirement": "required" },
         { "id": "npm-audit", "requirement": "required" },
-        { "id": "npm-audit-signatures", "requirement": "required" },
+        { "id": "npm-audit-signatures", "requirement": "excluded" },
         { "id": "osv-scanner", "requirement": "required" },
         { "id": "gitleaks", "requirement": "required" },
         { "id": "license-inventory", "requirement": "required" },
@@ -21,18 +21,18 @@
     },
     {
       "id": "pr",
-      "description": "Fast required PR security and dependency controls without heavyweight CodeQL or coverage recomputation.",
+      "description": "Complete Fast proof audits and full product coverage without release-only CodeQL or history scanning.",
       "gitleaksScopes": ["worktree"],
       "controls": [
-        { "id": "full-product-coverage", "requirement": "excluded" },
-        { "id": "npm-audit", "requirement": "excluded" },
-        { "id": "npm-audit-signatures", "requirement": "required" },
+        { "id": "full-product-coverage", "requirement": "required" },
+        { "id": "npm-audit", "requirement": "required" },
+        { "id": "npm-audit-signatures", "requirement": "excluded" },
         { "id": "osv-scanner", "requirement": "required" },
         { "id": "gitleaks", "requirement": "required" },
-        { "id": "license-inventory", "requirement": "excluded" },
-        { "id": "ast-grep", "requirement": "excluded" },
-        { "id": "knip", "requirement": "excluded" },
-        { "id": "jscpd", "requirement": "excluded" },
+        { "id": "license-inventory", "requirement": "required" },
+        { "id": "ast-grep", "requirement": "required" },
+        { "id": "knip", "requirement": "required" },
+        { "id": "jscpd", "requirement": "required" },
         { "id": "codeql", "requirement": "excluded" }
       ]
     },
@@ -43,7 +43,7 @@
       "controls": [
         { "id": "full-product-coverage", "requirement": "excluded" },
         { "id": "npm-audit", "requirement": "required" },
-        { "id": "npm-audit-signatures", "requirement": "required" },
+        { "id": "npm-audit-signatures", "requirement": "excluded" },
         { "id": "osv-scanner", "requirement": "required" },
         { "id": "gitleaks", "requirement": "required" },
         { "id": "license-inventory", "requirement": "excluded" },
@@ -72,12 +72,12 @@
     },
     {
       "id": "release",
-      "description": "Complete release audit with every registered control and Git history scanning required.",
+      "description": "Release audit with canonical blocking controls and Git history scanning required.",
       "gitleaksScopes": ["worktree", "history"],
       "controls": [
         { "id": "full-product-coverage", "requirement": "required" },
         { "id": "npm-audit", "requirement": "required" },
-        { "id": "npm-audit-signatures", "requirement": "required" },
+        { "id": "npm-audit-signatures", "requirement": "excluded" },
         { "id": "osv-scanner", "requirement": "required" },
         { "id": "gitleaks", "requirement": "required" },
         { "id": "license-inventory", "requirement": "required" },

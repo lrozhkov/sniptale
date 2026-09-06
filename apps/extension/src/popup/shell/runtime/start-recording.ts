@@ -20,10 +20,7 @@ import {
   resolveWebcamDeviceId,
   type WebcamOption,
 } from '../../recording/webcam';
-import {
-  getPopupResponseErrorMessage,
-  getPopupRuntimeErrorMessage,
-} from '../../diagnostics/runtime-errors';
+import { getPopupRuntimeErrorMessage } from '../../diagnostics/runtime-errors';
 import { getPopupRuntimeServices } from '../../runtime-services';
 
 type StartRecordingArgs = {
@@ -165,7 +162,7 @@ function applyStartRecordingResponse(
   captureMode: CaptureMode
 ): void {
   if (response?.success === false) {
-    throw new Error(getPopupResponseErrorMessage(response, 'popup.video.startRecordingError'));
+    throw response.error ?? response;
   }
 
   if (response?.result !== 'accepted') {

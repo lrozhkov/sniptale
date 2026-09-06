@@ -32,6 +32,8 @@ export interface VideoProjectEffectInstance {
   id: string;
   kind: EffectV1Kind;
   playbackRate: number;
+  /** First retained document time, in seconds. Omission starts at the document beginning. */
+  sourceStart?: number;
   snapshotId: string;
   startTime: number;
   target: VideoProjectEffectTarget;

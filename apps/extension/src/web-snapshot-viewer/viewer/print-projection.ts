@@ -2,9 +2,12 @@ import type { WebSnapshotViewport } from '@sniptale/runtime-contracts/web-snapsh
 import { hydrateSnapshotDeclarativeShadowDom } from './declarative-shadow';
 import { withOfflineSnapshotPolicy } from './document-policy';
 
+const CSS_STYLE_RULE = 1;
 const CSS_IMPORT_RULE = 3;
 const CSS_MEDIA_RULE = 4;
 const PRINT_PROJECTION_TIMEOUT_MS = 15_000;
+const MAIN_SCROLL_REGION_VIEWPORT_RATIO = 0.25;
+type AuthoredPrintSelectors = Map<Document | ShadowRoot, string[]>;
 
 function getNestedRules(rule: CSSRule): CSSRuleList | null {
   const candidate = rule as CSSRule & { cssRules?: CSSRuleList };
@@ -30,6 +33,16 @@ function includesPrintMedia(mediaText: string): boolean {
 }
 
 function serializeCssRule(rule: CSSRule, targetWindow: Window): string {
+  if (rule.type === CSS_STYLE_RULE) {
+    const styleRule = rule as CSSStyleRule;
+    const nestedRules = getNestedRules(styleRule);
+    if (!nestedRules || nestedRules.length === 0) return styleRule.cssText;
+    return `${styleRule.selectorText}{${styleRule.style.cssText}${serializeCssRules(
+      nestedRules,
+      targetWindow
+    )}}`;
+  }
+
   if (rule.type === CSS_MEDIA_RULE) {
     const mediaRule = rule as CSSMediaRule;
     if (includesPrintMedia(mediaRule.conditionText)) return '';
@@ -73,6 +86,61 @@ function collectSnapshotRoots(document: Document): Array<Document | ShadowRoot> 
   return roots;
 }
 
+function collectPrintSelectors(
+  rules: CSSRuleList,
+  insidePrintMedia: boolean,
+  selectors: string[]
+): void {
+  for (const rule of rules) {
+    if (rule.type === CSS_STYLE_RULE) {
+      const styleRule = rule as CSSStyleRule;
+      if (insidePrintMedia) selectors.push(styleRule.selectorText);
+      const nestedRules = getNestedRules(rule);
+      if (nestedRules) collectPrintSelectors(nestedRules, insidePrintMedia, selectors);
+      continue;
+    }
+    if (rule.type === CSS_MEDIA_RULE) {
+      const mediaRule = rule as CSSMediaRule;
+      collectPrintSelectors(
+        mediaRule.cssRules,
+        insidePrintMedia || includesPrintMedia(mediaRule.conditionText),
+        selectors
+      );
+      continue;
+    }
+    if (rule.type === CSS_IMPORT_RULE) {
+      const importRule = rule as CSSImportRule;
+      if (importRule.styleSheet) {
+        collectPrintSelectors(
+          importRule.styleSheet.cssRules,
+          insidePrintMedia || includesPrintMedia(importRule.media.mediaText),
+          selectors
+        );
+      }
+      continue;
+    }
+    const nestedRules = getNestedRules(rule);
+    if (nestedRules) collectPrintSelectors(nestedRules, insidePrintMedia, selectors);
+  }
+}
+
+function collectAuthoredPrintSelectors(document: Document): AuthoredPrintSelectors {
+  const policies: AuthoredPrintSelectors = new Map();
+  for (const root of collectSnapshotRoots(document)) {
+    const selectors: string[] = [];
+    const styleSheets = new Set<CSSStyleSheet>();
+    for (const owner of root.querySelectorAll<HTMLStyleElement | HTMLLinkElement>(
+      'style, link[rel~="stylesheet"]'
+    )) {
+      if (owner.sheet) styleSheets.add(owner.sheet);
+    }
+    for (const sheet of root.adoptedStyleSheets ?? []) styleSheets.add(sheet);
+    for (const sheet of styleSheets) collectPrintSelectors(sheet.cssRules, false, selectors);
+    policies.set(root, selectors);
+  }
+  return policies;
+}
+
 function createProjectionStyleElement(document: Document): HTMLStyleElement {
   const namespace = document.documentElement.namespaceURI;
   return (
@@ -102,16 +170,162 @@ export function freezeSnapshotMediaQueries(document: Document, targetWindow: Win
   }
 }
 
-function appendPrintStyles(document: Document, viewport: WebSnapshotViewport | null): void {
+function getLayoutParent(element: Element): Element | null {
+  if (element.parentElement) return element.parentElement;
+  const root = element.getRootNode();
+  const shadowRootConstructor = element.ownerDocument.defaultView?.ShadowRoot;
+  return shadowRootConstructor && root instanceof shadowRootConstructor ? root.host : null;
+}
+
+function setImportantStyle(element: HTMLElement, property: string, value: string): void {
+  element.style.setProperty(property, value, 'important');
+}
+
+function isHtmlElement(element: Element): element is HTMLElement {
+  const constructor = element.ownerDocument.defaultView?.HTMLElement;
+  return constructor
+    ? element instanceof constructor
+    : element.namespaceURI === 'http://www.w3.org/1999/xhtml';
+}
+
+function normalizePrintFlow(element: HTMLElement): void {
+  setImportantStyle(element, 'display', 'block');
+  setImportantStyle(element, 'box-sizing', 'border-box');
+  setImportantStyle(element, 'width', '100%');
+  setImportantStyle(element, 'max-width', 'none');
+  setImportantStyle(element, 'margin-inline', '0');
+  setImportantStyle(element, 'position', 'relative');
+  setImportantStyle(element, 'inset', 'auto');
+  setImportantStyle(element, 'float', 'none');
+  setImportantStyle(element, 'transform', 'none');
+}
+
+function expandScrollRegion(element: HTMLElement): void {
+  element.setAttribute('data-sniptale-print-scroll-region', '');
+  setImportantStyle(element, 'max-height', 'none');
+  setImportantStyle(element, 'flex', 'none');
+  setImportantStyle(element, 'overflow', 'visible');
+  normalizePrintFlow(element);
+
+  let ancestor = getLayoutParent(element);
+  while (ancestor && isHtmlElement(ancestor)) {
+    ancestor.setAttribute('data-sniptale-print-scroll-ancestor', '');
+    setImportantStyle(ancestor, 'height', 'auto');
+    setImportantStyle(ancestor, 'max-height', 'none');
+    setImportantStyle(ancestor, 'overflow', 'visible');
+    normalizePrintFlow(ancestor);
+    ancestor = getLayoutParent(ancestor);
+  }
+
+  const expandedHeight = element.scrollHeight;
+  setImportantStyle(element, 'height', `${expandedHeight}px`);
+  setImportantStyle(element, 'min-height', `${expandedHeight}px`);
+}
+
+function collectSnapshotScrollRegions(document: Document): HTMLElement[] {
+  const targetWindow = document.defaultView;
+  if (!targetWindow) return [];
+  const candidates = collectSnapshotRoots(document).flatMap((root) =>
+    Array.from(root.querySelectorAll<HTMLElement>('*'))
+  );
+  return candidates.filter((element) => {
+    const computedStyle = targetWindow.getComputedStyle(element);
+    const overflowY =
+      element.style.overflowY ||
+      element.style.overflow ||
+      computedStyle.overflowY ||
+      computedStyle.overflow;
+    const isMainViewportRegion =
+      element.clientHeight >= targetWindow.innerHeight * MAIN_SCROLL_REGION_VIEWPORT_RATIO &&
+      element.clientWidth >= targetWindow.innerWidth * MAIN_SCROLL_REGION_VIEWPORT_RATIO;
+    return (
+      isMainViewportRegion &&
+      (overflowY === 'auto' || overflowY === 'scroll') &&
+      element.scrollHeight > element.clientHeight + 1
+    );
+  });
+}
+
+function isPrintVisible(element: HTMLElement, targetWindow: Window): boolean {
+  let current: Element | null = element;
+  while (current && isHtmlElement(current)) {
+    const style = targetWindow.getComputedStyle(current);
+    if (
+      style.display === 'none' ||
+      style.visibility === 'hidden' ||
+      style.visibility === 'collapse'
+    ) {
+      return false;
+    }
+    current = getLayoutParent(current);
+  }
+  return true;
+}
+
+function remainsClippedForPrint(element: HTMLElement, targetWindow: Window): boolean {
+  const style = targetWindow.getComputedStyle(element);
+  const overflowY =
+    element.style.overflowY || element.style.overflow || style.overflowY || style.overflow;
+  return (
+    (overflowY === 'auto' || overflowY === 'scroll') &&
+    element.scrollHeight > element.clientHeight + 1
+  );
+}
+
+function hasAuthoredPrintLayout(element: HTMLElement, policies: AuthoredPrintSelectors): boolean {
+  let current: Element | null = element;
+  while (current && isHtmlElement(current)) {
+    const root = current.getRootNode();
+    const selectors = policies.get(root as Document | ShadowRoot) ?? [];
+    for (const selector of selectors) {
+      try {
+        if (current.matches(selector) || element.querySelector(selector)) return true;
+      } catch {
+        return true;
+      }
+    }
+    current = getLayoutParent(current);
+  }
+  return false;
+}
+
+function expandScrollRegionsBeforePrint(
+  candidates: HTMLElement[],
+  authoredPrintSelectors: AuthoredPrintSelectors,
+  targetWindow: Window
+): void {
+  targetWindow.addEventListener(
+    'beforeprint',
+    () => {
+      const eligible = candidates.filter(
+        (element) =>
+          !hasAuthoredPrintLayout(element, authoredPrintSelectors) &&
+          isPrintVisible(element, targetWindow) &&
+          remainsClippedForPrint(element, targetWindow)
+      );
+      for (const element of eligible) expandScrollRegion(element);
+    },
+    { once: true }
+  );
+}
+
+export function expandSnapshotScrollRegions(document: Document): void {
+  for (const element of collectSnapshotScrollRegions(document)) {
+    expandScrollRegion(element);
+  }
+}
+
+function appendPrintStyles(document: Document): void {
   const style = createProjectionStyleElement(document);
   style.setAttribute('data-sniptale-print-policy', '');
-  const pageWidth = Math.max(1, Math.round(viewport?.width ?? 1280));
-  const pageHeight = Math.max(1, Math.round(viewport?.height ?? 720));
   style.textContent = [
-    `@page{size:${pageWidth}px ${pageHeight}px;margin:0}`,
-    `html,body{width:${pageWidth}px!important;max-width:${pageWidth}px!important;`,
-    'margin:0!important;padding:0!important;overflow-x:hidden!important;',
+    'html,body{height:auto!important;max-height:none!important;',
+    'overflow:visible!important;',
     '-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}',
+    '[data-sniptale-print-scroll-region],[data-sniptale-print-scroll-ancestor]{',
+    'width:100%!important;max-width:none!important;margin-inline:0!important;',
+    'position:relative!important;inset:auto!important;float:none!important;',
+    'transform:none!important}',
     'img,svg,canvas,video,pre,blockquote{break-inside:avoid-page}',
   ].join('');
   (document.head ?? document.documentElement).append(style);
@@ -121,13 +335,12 @@ function appendImagePrintStyles(document: Document, pageWidth: number, pageHeigh
   const style = createProjectionStyleElement(document);
   style.setAttribute('data-sniptale-image-print-policy', '');
   style.textContent = [
-    `@page{size:${pageWidth}px ${pageHeight}px;margin:0}`,
     'html,body{margin:0!important;padding:0!important;',
     '-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}',
-    `.sniptale-image-page{position:relative;width:${pageWidth}px;height:${pageHeight}px;`,
+    `.sniptale-image-page{position:relative;width:100%;aspect-ratio:${pageWidth}/${pageHeight};`,
     'overflow:hidden;break-after:page;page-break-after:always}',
     '.sniptale-image-page:last-child{break-after:auto;page-break-after:auto}',
-    `.sniptale-image-page img{position:absolute;left:0;width:${pageWidth}px;max-width:none;`,
+    '.sniptale-image-page img{position:absolute;left:0;width:100%;max-width:none;',
     'height:auto;display:block}',
   ].join('');
   (document.head ?? document.documentElement).append(style);
@@ -235,11 +448,17 @@ export async function printWebSnapshotProjection(args: {
       throw new Error('Snapshot print projection is unavailable.');
     }
     hydrateSnapshotDeclarativeShadowDom(projectionDocument);
-    freezeSnapshotMediaQueries(projectionDocument, projectionWindow);
-    appendPrintStyles(projectionDocument, args.viewport);
+    const scrollRegionCandidates = collectSnapshotScrollRegions(projectionDocument);
+    const authoredPrintSelectors = collectAuthoredPrintSelectors(projectionDocument);
+    appendPrintStyles(projectionDocument);
     await withProjectionTimeout(
       waitForProjectionLayout(projectionDocument, projectionWindow),
       hostWindow
+    );
+    expandScrollRegionsBeforePrint(
+      scrollRegionCandidates,
+      authoredPrintSelectors,
+      projectionWindow
     );
     projectionWindow.focus();
     projectionWindow.print();
@@ -254,10 +473,8 @@ function resolveImagePrintPageSize(args: {
   window: Window;
 }): { height: number; width: number } {
   const width = Math.max(1, Math.round(args.image.naturalWidth || args.viewport?.width || 1));
-  const capturedAspectHeight = args.viewport
-    ? (args.viewport.height * width) / args.viewport.width
-    : Math.min(args.image.naturalHeight || args.window.innerHeight, args.window.innerHeight);
-  return { height: Math.max(1, Math.round(capturedAspectHeight)), width };
+  const height = args.image.naturalHeight || args.viewport?.height || args.window.innerHeight;
+  return { height: Math.max(1, Math.round(height)), width };
 }
 
 function populateImagePrintPages(args: {
@@ -267,19 +484,15 @@ function populateImagePrintPages(args: {
   pageWidth: number;
   screenshotUrl: string;
 }): void {
-  const imageHeight = Math.max(1, args.image.naturalHeight || args.pageHeight);
-  const pageCount = Math.max(1, Math.ceil(imageHeight / args.pageHeight));
   args.document.body.replaceChildren();
-  for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
-    const page = args.document.createElement('div');
-    page.className = 'sniptale-image-page';
-    const image = args.document.createElement('img');
-    image.alt = '';
-    image.src = args.screenshotUrl;
-    image.style.top = `${-pageIndex * args.pageHeight}px`;
-    page.append(image);
-    args.document.body.append(page);
-  }
+  const page = args.document.createElement('div');
+  page.className = 'sniptale-image-page';
+  const image = args.document.createElement('img');
+  image.alt = '';
+  image.src = args.screenshotUrl;
+  image.style.top = '0';
+  page.append(image);
+  args.document.body.append(page);
 }
 
 export async function printWebSnapshotImageProjection(args: {

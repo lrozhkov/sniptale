@@ -1,227 +1,76 @@
 // @vitest-environment jsdom
-
-import { act, useState } from 'react';
+import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  InspectorGroupedPanel,
-  InspectorGroupHeaderSlotContext,
-  InspectorGroupSection,
-  InspectorGroupSwitch,
-  useInspectorGroups,
-} from './index';
-import type { InspectorGroupHeaderSlot } from './index';
-
-vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
-  translate: (key: string) => key,
-}));
-
-let container: HTMLDivElement | null = null;
-let root: Root | null = null;
-
+import { afterEach, beforeEach, expect, it } from 'vitest';
+import { InspectorGroupedPanel } from './index';
+import type { InspectorGroupDefinition } from './types';
+let container: HTMLDivElement;
+let root: Root;
 beforeEach(() => {
   container = document.createElement('div');
-  document.body.appendChild(container);
+  document.body.append(container);
   root = createRoot(container);
 });
-
 afterEach(() => {
+  act(() => root.unmount());
+  container.remove();
+});
+const groups: InspectorGroupDefinition<string>[] = [
+  { id: 'info', label: 'Summary', content: 'Summary body' },
+  {
+    id: 'general',
+    label: 'Transform',
+    content: <input aria-label="Position" defaultValue="10" />,
+    defaultActive: true,
+  },
+  { id: 'audio', label: 'Audio', content: 'Audio body' },
+];
+function render(items = groups) {
+  act(() => root.render(<InspectorGroupedPanel groups={items} />));
+}
+function select(label: string) {
+  act(() =>
+    container.querySelector<HTMLButtonElement>(`nav button[aria-label="${label}"]`)!.click()
+  );
+}
+it('uses shared icon categories with one exposed default section', () => {
+  render();
+  expect(container.querySelectorAll('nav button')).toHaveLength(3);
+  expect(container.querySelector('details')).toBeNull();
+  expect(container.querySelector('[data-section="general"]')).not.toBeNull();
+  expect(container.querySelector('[aria-label="Position"]')).not.toBeNull();
+  expect(container.textContent).not.toContain('Summary body');
+});
+it('preserves a live draft on ordinary rerender and unmounts inactive controls', () => {
+  render();
+  const input = container.querySelector<HTMLInputElement>('input')!;
+  input.value = '27';
+  render();
+  expect(container.querySelector('input')).toBe(input);
+  expect(input.value).toBe('27');
+  select('Audio');
+  expect(container.textContent).toContain('Audio body');
+  expect(container.querySelector('input')).toBeNull();
+});
+it('supports shared keyboard category navigation and focus', () => {
+  render();
+  const button = container.querySelector<HTMLButtonElement>('nav button[aria-label="Transform"]')!;
   act(() => {
-    root?.unmount();
+    button.focus();
+    button.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
   });
-  root = null;
-  container?.remove();
-  container = null;
+  expect(container.textContent).toContain('Audio body');
+  expect(document.activeElement?.getAttribute('aria-label')).toBe('Audio');
 });
-
-describe('grouped-inspector visibility', () => {
-  it('hides the switch when only one group remains visible', () => {
-    act(() => {
-      root?.render(
-        <TestHarness
-          groups={[
-            { id: 'general', label: 'General', content: 'General content' },
-            { id: 'style', label: 'Style', content: 'Style content', visible: false },
-          ]}
-        />
-      );
-    });
-
-    expect(container?.querySelectorAll('button')).toHaveLength(0);
-    expect(container?.textContent).toContain('General content');
-  });
-
-  it('resets the active group when the current group disappears after rerender', () => {
-    act(() => {
-      root?.render(
-        <TestHarness
-          groups={[
-            { id: 'general', label: 'General', content: 'General content' },
-            { id: 'target', label: 'Target', content: 'Target content' },
-          ]}
-        />
-      );
-    });
-
-    const targetButton = container?.querySelectorAll<HTMLButtonElement>('button')[1];
-    act(() => {
-      targetButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    });
-    expect(container?.textContent).toContain('Target content');
-
-    act(() => {
-      root?.render(
-        <TestHarness
-          groups={[
-            { id: 'general', label: 'General', content: 'General content' },
-            { id: 'target', label: 'Target', content: 'Target content', visible: false },
-          ]}
-        />
-      );
-    });
-
-    expect(container?.textContent).toContain('General content');
-    expect(container?.textContent).not.toContain('Target content');
-  });
+it('removes hidden controls and chooses an available section', () => {
+  render();
+  render([{ ...groups[0]!, visible: false }, { ...groups[1]!, visible: false }, groups[2]!]);
+  expect(container.querySelectorAll('nav button')).toHaveLength(1);
+  expect(container.textContent).toContain('Audio body');
 });
-
-describe('grouped-inspector switch', () => {
-  it('prefers the first visible defaultActive group over read-only info', () => {
-    act(() => {
-      root?.render(
-        <TestHarness
-          groups={[
-            { id: 'info', label: 'Info', content: 'Info content' },
-            { id: 'general', label: 'General', content: 'General content', defaultActive: true },
-            { id: 'target', label: 'Target', content: 'Target content' },
-          ]}
-        />
-      );
-    });
-
-    expect(container?.textContent).toContain('General content');
-    expect(container?.textContent).not.toContain('Info content');
-  });
-
-  it('uses the first editable group when no explicit default is provided', () => {
-    act(() => {
-      root?.render(
-        <TestHarness
-          groups={[
-            { id: 'info', label: 'Info', content: 'Info content' },
-            { id: 'target', label: 'Target', content: 'Target content' },
-          ]}
-        />
-      );
-    });
-
-    expect(container?.textContent).toContain('Target content');
-    expect(container?.textContent).not.toContain('Info content');
-  });
+it('supports empty and info-only selections', () => {
+  render([]);
+  expect(container.querySelector('nav')).toBeNull();
+  render([groups[0]!]);
+  expect(container.textContent).toContain('Summary body');
 });
-
-describe('grouped-inspector switch visuals', () => {
-  it('renders one-line equal group columns with moving active background vars', () => {
-    act(() => {
-      root?.render(
-        <TestHarness
-          groups={[
-            { id: 'info', label: 'Info', content: 'Info content' },
-            { id: 'general', label: 'General', content: 'General content', defaultActive: true },
-            { id: 'target', label: 'Target', content: 'Target content' },
-            { id: 'style', label: 'Style', content: 'Style content' },
-          ]}
-        />
-      );
-    });
-
-    const switchNode = container?.querySelector<HTMLElement>('[role="group"]');
-    const activeBackground = switchNode?.querySelector<HTMLElement>('span[aria-hidden="true"]');
-    const activeButton = switchNode?.querySelector<HTMLButtonElement>(
-      'button[aria-pressed="true"]'
-    );
-
-    expect(switchNode?.className).toContain('grid');
-    expect(switchNode?.style.getPropertyValue('--sniptale-group-count')).toBe('4');
-    expect(switchNode?.style.getPropertyValue('--sniptale-group-index')).toBe('1');
-    expect(switchNode?.style.gridTemplateColumns).toBe('repeat(4, minmax(0, 1fr))');
-    expect(activeBackground?.style.transform).toContain('var(--sniptale-group-index)');
-    expect(activeButton?.className).toContain('bg-transparent');
-    expect(activeButton?.className).toContain('shadow-none');
-    expect(activeButton?.className).not.toContain('hover:bg');
-  });
-
-  it('does not duplicate the active group label inside the body', () => {
-    act(() => {
-      root?.render(
-        <div>
-          <InspectorGroupSection>General content</InspectorGroupSection>
-        </div>
-      );
-    });
-
-    expect(container?.textContent).toBe('General content');
-  });
-});
-
-describe('grouped-inspector header slot', () => {
-  it('registers a stable header slot without re-rendering the parent repeatedly', () => {
-    const onRender = vi.fn();
-
-    act(() => {
-      root?.render(<HeaderSlotHarness onRender={onRender} />);
-    });
-
-    expect(container?.textContent).toContain('General content');
-    expect(container?.textContent).toContain('general');
-    expect(onRender).toHaveBeenCalledTimes(2);
-  });
-});
-
-function TestHarness(props: {
-  groups: Array<{
-    content: string;
-    defaultActive?: boolean;
-    id: 'general' | 'info' | 'target' | 'style';
-    label: string;
-    visible?: boolean;
-  }>;
-}) {
-  const { activeGroup, setActiveGroupId, visibleGroups } = useInspectorGroups(props.groups);
-
-  if (!activeGroup) {
-    return null;
-  }
-
-  return (
-    <div>
-      <InspectorGroupSwitch
-        ariaLabel="Groups"
-        activeGroupId={activeGroup.id}
-        groups={visibleGroups}
-        onChange={setActiveGroupId}
-      />
-      <InspectorGroupSection label={activeGroup.label}>{activeGroup.content}</InspectorGroupSection>
-    </div>
-  );
-}
-
-function HeaderSlotHarness({ onRender }: { onRender: () => void }) {
-  const [slot, setSlot] = useState<InspectorGroupHeaderSlot | null>(null);
-
-  onRender();
-
-  return (
-    <InspectorGroupHeaderSlotContext.Provider value={setSlot}>
-      <InspectorGroupedPanel
-        groups={[
-          { id: 'info', label: 'Info', content: 'Info content' },
-          { id: 'general', label: 'General', content: 'General content', defaultActive: true },
-          { id: 'style', label: 'Style', content: 'Style content' },
-        ]}
-      />
-      <output>{slot?.activeGroupId ?? 'none'}</output>
-    </InspectorGroupHeaderSlotContext.Provider>
-  );
-}

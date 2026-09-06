@@ -32,6 +32,11 @@ it('applies immutable content-addressed snapshots and reuses only byte-identical
   });
 
   expect(original.effectSnapshots).toEqual([]);
+  expect(original.tracks).toHaveLength(1);
+  expect(first.tracks).toHaveLength(2);
+  expect(second.tracks).toBe(first.tracks);
+  expect(second.clips.every((clip) => clip.trackId === first.tracks[1]?.id)).toBe(true);
+  expect(first.tracks[1]).toEqual(expect.objectContaining({ kind: 'OVERLAY', order: -1 }));
   expect(second.effectSnapshots).toHaveLength(1);
   expect(second.effectInstances).toHaveLength(2);
   expect(second.clips).toEqual([

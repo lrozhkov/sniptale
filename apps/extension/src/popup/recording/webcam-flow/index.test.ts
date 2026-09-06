@@ -111,7 +111,8 @@ describe('toggleWebcam disable and error flow', () => {
     });
 
     expect(setStartError).toHaveBeenCalledWith('popup.video.noWebcamsError');
-    expect(setStartError).toHaveBeenCalledWith('permission denied');
+    expect(setStartError).toHaveBeenCalledWith(expect.stringContaining('Sniptale'));
+    expect(setStartError).not.toHaveBeenCalledWith(expect.stringContaining('permission denied'));
     expect(setVideoSettings).not.toHaveBeenCalled();
   });
 });

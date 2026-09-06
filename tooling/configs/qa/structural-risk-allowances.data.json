@@ -1,4 +1,71 @@
 {
   "$schemaVersion": 1,
-  "allowances": []
+  "allowances": [
+    {
+      "rule": "structural-file-risk",
+      "file": "apps/extension/src/gallery/video-review/index.tsx",
+      "symbol": "<file>",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: The gallery entry owns one modal review interaction. State signals count the same session and UI setters again through resource/state aliases (resource.session, state.session, cuts/state.editing, setMessage/state.setMessage), plus transient hover/selection/telemetry; these are not independent durable authorities. Durable writes remain in the serialized session and export publication remains in export-lifecycle. Two effects are DOM and listener lifecycle, four imports are pure features, locale and React/icons, cohesion0.93; splitting this connected view/state contract merely to lower the647-line count would distribute the same receiver. Keyboard/export guard correction preserves this same state receiver and transaction contract; its failed-first interaction test now rejects history and edit changes during export. The shared Add guard now also rejects busy report/export activation; unchanged647/158 lines and ownership metrics confirm no added authority. Independent architecture review accepted the prior shape; this exact corrected body requires renewed review.",
+      "removalCondition": "Remove when this exact body or signature changes; reassess any new runtime, durable writer, gesture authority or independent recovery. Remove when the analyzer models the documented single-receiver aliases or JSX/transaction shape. Independent architecture review must validate this classification.",
+      "reviewDate": "2026-09-06",
+      "astHash": "03d4f1e84564598be8e4bb5bab7ed206ea81b60f06b27bf9558ebcd90c8fb344",
+      "signatureHash": "1d700bed52f5a50f5fd2221c74860dc7bdf16d453da5983409f7e51acbf334b7"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/index.tsx",
+      "symbol": "useReviewEditorState",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: The158-line gallery coordinator has19 statements, cyclomatic5, cognitive4, nesting1 and no recovery or durable state authority. The sole warning is default function line count. It wires one review session to existing playback/edit/export/composer hooks, with short gesture callbacks; it introduces no transport or persistence writer. React and DOM calls belong to this UI coordinator. Keyboard/export guard correction preserves this same state receiver and transaction contract; its failed-first interaction test now rejects history and edit changes during export. The shared Add guard now also rejects busy report/export activation; unchanged647/158 lines and ownership metrics confirm no added authority. Independent architecture review accepted the prior shape; this exact corrected body requires renewed review.",
+      "removalCondition": "Remove when this exact body or signature changes; reassess any new runtime, durable writer, gesture authority or independent recovery. Remove when the analyzer models the documented single-receiver aliases or JSX/transaction shape. Independent architecture review must validate this classification.",
+      "reviewDate": "2026-09-06",
+      "astHash": "c663c4033828aea2b15e69644c7e01820c197b56d2df8484db90f5f7e2979c94",
+      "signatureHash": "aa8395b968a4de086ec5295b79085c7841c81a7d03ab5706fda13cdac89cd542"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/index.tsx",
+      "symbol": "ReviewInspectorBinding",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: This inspector binding has3 outer statements; its121-line JSX includes availability/undo/redo flags, conflict text and conditional draft rendering. Cyclomatic15/cognitive17 count these independent visual conditions together, not mixed transaction branching. Its action callbacks delegate to the same serialized session and existing report workflow; no storage, privileged API or second recovery authority is implemented here.",
+      "removalCondition": "Remove when this exact body or signature changes; reassess any new runtime, durable writer, gesture authority or independent recovery. Remove when the analyzer models the documented single-receiver aliases or JSX/transaction shape. Independent architecture review must validate this classification.",
+      "reviewDate": "2026-09-06",
+      "astHash": "1071607405e5b1670e31676700996340ac790f44d9a90060ae1bac88acf2f2c7",
+      "signatureHash": "a78f0f3a3391d39e46cd07222d59fc871f067011de96e856d92384b17eb44b8f"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/stage.tsx",
+      "symbol": "ReviewStage",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: The182-line component owns one normalized rectangle drawing/moving/resizing gesture with pointer capture, cancellation, ResizeObserver cleanup and its video surface. It has13 statements, cyclomatic8, cognitive9, nesting2, no durable state or recovery. The sole warning is JSX length; extracting a second gesture owner would split the one capture/preview/commit lifetime. Geometry remains in the existing pure feature owner.",
+      "removalCondition": "Remove when this exact body or signature changes; reassess any new runtime, durable writer, gesture authority or independent recovery. Remove when the analyzer models the documented single-receiver aliases or JSX/transaction shape. Independent architecture review must validate this classification.",
+      "reviewDate": "2026-09-06",
+      "astHash": "929e66060cee27b6e9fcb129c2ec2af0ec17fcf439f2ee69b9563aa9dc29a642",
+      "signatureHash": "7d939ca5189416581a71392f564ed3344becb4963fd10c3165f5effa58c00f3b"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/workflows/video-review/packet-export.ts",
+      "symbol": "writeReviewPackets",
+      "owner": "extension:workflows:video-review",
+      "reason": "tool-noise: This132-line packet-output transaction has one receipt receiver, one input/output cancellation/finalization lifetime, nesting3 and cohesion0.81. Its26 branches validate codec/source identity and choose copied versus processed audio for retained segments; both paths converge on the same bounded muxer. Recovery2 is cancellation plus input cleanup, not independent rollback domains. There is no UI or publication writer; export-lifecycle exclusively publishes/aborts staged assets. Moving branch guards out only to satisfy the orchestration CC10 exemption would obscure that transaction.",
+      "removalCondition": "Remove when this exact body or signature changes; reassess any new runtime, durable writer, gesture authority or independent recovery. Remove when the analyzer models the documented single-receiver aliases or JSX/transaction shape. Independent architecture review must validate this classification.",
+      "reviewDate": "2026-09-06",
+      "astHash": "e60abe00e6bc2536856619dac6e10c472823206a547f9fbaafeb22f5e56d7931",
+      "signatureHash": "24bee0d67c1b586e0e08691218228197fe7d7d65b51eb8580c84941478e129e6"
+    },
+    {
+      "rule": "structural-function-risk",
+      "file": "apps/extension/src/gallery/video-review/timeline.tsx",
+      "symbol": "ReviewTimeline",
+      "owner": "extension:gallery:video-review",
+      "reason": "tool-noise: This154-line timeline owns one measured time plane and captured range-selection gesture, including Escape restoration, pointer release, zoom and ruler/lane composition. It has8 statements, cyclomatic3, cognitive2, nesting1 and no recovery or durable state authority. The sole attention signal is JSX/function length after adding cancellation; moving its capture or restoration into another owner only to lower line count would distribute one gesture lifetime. Existing independent toolbar/source-lane modules already separate their actual change reasons. Exact cancellation now passes snap=false to the same existing playback owner;154lines/8statements/CC3/cognitive2 and all authority boundaries remain unchanged. Prior independent architecture review accepted this shape; the exact callback correction needs renewed review.",
+      "removalCondition": "Remove when this exact body or signature changes; reassess any new gesture, durable writer, runtime boundary or independent recovery. Remove when the analyzer models the documented cohesive JSX/gesture lifetime. Independent architecture review must validate this classification.",
+      "reviewDate": "2026-09-06",
+      "astHash": "8e0fb95ad721a34198331fa05f0e3381d962ec1089a3282d379408f60636892c",
+      "signatureHash": "99bc8f53332cdb91cb2856b5f298ed8492021b86e698d8380c534924bc6d9bdc"
+    }
+  ]
 }

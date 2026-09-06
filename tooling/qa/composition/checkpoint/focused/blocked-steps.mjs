@@ -17,7 +17,7 @@ function createDeferredUnitStep(scope) {
 function createDeferredCoverageStep(scope) {
   return createSkippedStep(
     'Test coverage',
-    `deferred to ci:release; ${formatFocusedScopeDecision(scope, 'deferred')}`
+    `deferred to ci:proof; ${formatFocusedScopeDecision(scope, 'deferred')}`
   );
 }
 

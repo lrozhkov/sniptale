@@ -173,22 +173,23 @@ function isOwnedViewerQuickAction(args: QuickActionFlowArgs): boolean {
   return args.pageCapability === TabRuntimeCapability.OwnedSnapshotViewer;
 }
 
-export async function runSelectionFlow(args: QuickActionFlowArgs): Promise<QuickActionFlowResult> {
+async function runPreparedQuickActionFlow(
+  args: QuickActionFlowArgs,
+  message: QuickActionStartMessage
+): Promise<QuickActionFlowResult> {
   try {
     const surface = await applyQuickActionSurface(args);
-    const message = { autoStartSelection: true } as const;
     if (isOwnedViewerQuickAction(args)) {
       await sendViewerQuickActionMessage(args, message);
-      args.screenshotModeState.set(args.tabId, true);
-      return { result: 'accepted' };
+    } else {
+      await ensureNativeVisibleCaptureAuthorityForFlow(args, message);
+      await waitForContentToolbarReady(args.tabId);
+      await sendQuickActionMessage(
+        args,
+        message,
+        requireQuickActionSurfaceBinding(args.tabId, surface.surfaceCapabilityToken)
+      );
     }
-    await ensureNativeVisibleCaptureAuthorityForFlow(args, message);
-    await waitForContentToolbarReady(args.tabId);
-    await sendQuickActionMessage(
-      args,
-      message,
-      requireQuickActionSurfaceBinding(args.tabId, surface.surfaceCapabilityToken)
-    );
     args.screenshotModeState.set(args.tabId, true);
     return { result: 'accepted' };
   } catch (error) {
@@ -196,29 +197,14 @@ export async function runSelectionFlow(args: QuickActionFlowArgs): Promise<Quick
   }
 }
 
+export async function runSelectionFlow(args: QuickActionFlowArgs): Promise<QuickActionFlowResult> {
+  return runPreparedQuickActionFlow(args, { autoStartSelection: true });
+}
+
 export async function runCaptureFlow(
   args: QuickActionFlowArgs & {
     captureMode: Exclude<QuickActionRuntimeContext['captureMode'], 'desktop' | 'selection'>;
   }
 ): Promise<QuickActionFlowResult> {
-  try {
-    const surface = await applyQuickActionSurface(args);
-    const message = { autoStartCaptureType: args.captureMode };
-    if (isOwnedViewerQuickAction(args)) {
-      await sendViewerQuickActionMessage(args, message);
-      args.screenshotModeState.set(args.tabId, true);
-      return { result: 'accepted' };
-    }
-    await ensureNativeVisibleCaptureAuthorityForFlow(args, message);
-    await waitForContentToolbarReady(args.tabId);
-    await sendQuickActionMessage(
-      args,
-      message,
-      requireQuickActionSurfaceBinding(args.tabId, surface.surfaceCapabilityToken)
-    );
-    args.screenshotModeState.set(args.tabId, true);
-    return { result: 'accepted' };
-  } catch (error) {
-    return releaseQuickActionSurfaceAfterFailure(args.tabId, args.viewportState, error);
-  }
+  return runPreparedQuickActionFlow(args, { autoStartCaptureType: args.captureMode });
 }

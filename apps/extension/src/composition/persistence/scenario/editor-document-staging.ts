@@ -21,6 +21,17 @@ import { parseScenarioStepEditorDocumentEntry } from './editor-documents/index.g
 export const SCENARIO_EDITOR_DOCUMENT_OWNER_KIND = 'scenario-editor-document';
 type ScenarioAggregateTransaction = ReturnType<Awaited<ReturnType<typeof initDB>>['transaction']>;
 
+async function discardPreparedEditorDocumentAssets(
+  entries: readonly PreparedScenarioStepEditorDocumentEntry[]
+): Promise<unknown[]> {
+  const cleanup = await Promise.allSettled(
+    entries.flatMap((entry) => entry.assetRefs.map((ref) => discardPreparedAsset(ref.assetId)))
+  );
+  return cleanup.flatMap((result) =>
+    result.status === 'rejected' ? [result.reason as unknown] : []
+  );
+}
+
 export async function prepareScenarioEditorDocumentMutations(
   children: ScenarioAggregateChildMutation | undefined
 ): Promise<PreparedScenarioAggregateChildMutation | undefined> {
@@ -44,14 +55,7 @@ export async function prepareScenarioEditorDocumentMutations(
       ...(preparedDocuments.length > 0 ? { editorDocumentPuts: preparedDocuments } : {}),
     };
   } catch (error) {
-    const cleanup = await Promise.allSettled(
-      preparedDocuments.flatMap((entry) =>
-        entry.assetRefs.map((ref) => discardPreparedAsset(ref.assetId))
-      )
-    );
-    const failures = cleanup.flatMap((result) =>
-      result.status === 'rejected' ? [result.reason as unknown] : []
-    );
+    const failures = await discardPreparedEditorDocumentAssets(preparedDocuments);
     if (failures.length > 0) {
       throw new AggregateError(
         [error, ...failures],
@@ -66,14 +70,7 @@ export async function prepareScenarioEditorDocumentMutations(
 export async function discardPreparedScenarioEditorDocuments(
   children: PreparedScenarioAggregateChildMutation | undefined
 ): Promise<void> {
-  const cleanup = await Promise.allSettled(
-    (children?.editorDocumentPuts ?? []).flatMap((entry) =>
-      entry.assetRefs.map((ref) => discardPreparedAsset(ref.assetId))
-    )
-  );
-  const failures = cleanup.flatMap((result) =>
-    result.status === 'rejected' ? [result.reason as unknown] : []
-  );
+  const failures = await discardPreparedEditorDocumentAssets(children?.editorDocumentPuts ?? []);
   if (failures.length > 0) {
     throw new AggregateError(failures, 'Failed to discard scenario editor document assets.');
   }

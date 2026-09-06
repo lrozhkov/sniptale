@@ -11,6 +11,10 @@ export function createSelectionPanelOptionalUpdateProps(
       ? { onApplyMediaClipVisualsToTrack: props.onApplyMediaClipVisualsToTrack }
       : {}),
     ...(props.onRenameTrack ? { onRenameTrack: props.onRenameTrack } : {}),
+    ...(props.onToggleTrackLock ? { onToggleTrackLock: props.onToggleTrackLock } : {}),
+    ...(props.onToggleTrackVisibility
+      ? { onToggleTrackVisibility: props.onToggleTrackVisibility }
+      : {}),
     ...(props.onUpdateMediaClipFitScalePercent
       ? { onUpdateMediaClipFitScalePercent: props.onUpdateMediaClipFitScalePercent }
       : {}),

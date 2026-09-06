@@ -6,7 +6,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import { createScenarioCaptureStep } from '../../../features/scenario/project/public';
 
-vi.mock('../../../platform/i18n', () => ({
+vi.mock('../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
 

@@ -145,14 +145,14 @@ function shouldSubscribeListenersWhileLockIsActive(): void {
   expect(harness.listeners.syncNavigationLockOverlay).toHaveBeenLastCalledWith(false);
 }
 
-function shouldKeepDesignReviewListenersWithoutThePointerBlockingOverlay(): void {
+function shouldShieldDesignReviewPageInteractions(): void {
   const harness = createLockerHarness();
   modeSession.isContentModeEnabled.mockImplementation((mode) => mode === 'design-review');
 
   harness.locker.enableNavigationLock(false);
 
   expect(harness.doc.body.classList.contains('sniptale-navigation-locked')).toBe(true);
-  expect(harness.listeners.syncNavigationLockOverlay).toHaveBeenCalledWith(false);
+  expect(harness.listeners.syncNavigationLockOverlay).toHaveBeenCalledWith(true);
   expect(harness.deps.addEventListenerToAllWindowsDynamic).toHaveBeenCalledTimes(5);
   expect(harness.listeners.subscribeBeforeUnload).toHaveBeenCalledOnce();
   expect(() =>
@@ -160,26 +160,49 @@ function shouldKeepDesignReviewListenersWithoutThePointerBlockingOverlay(): void
   ).not.toThrow();
 }
 
-function shouldKeepAnnotationListenersWithoutThePointerBlockingOverlay(): void {
+function shouldShieldAnnotationPageInteractions(): void {
   const harness = createLockerHarness();
   modeSession.isContentModeEnabled.mockImplementation((mode) => mode === 'highlighter');
 
   harness.locker.enableNavigationLock(false);
 
-  expect(harness.listeners.syncNavigationLockOverlay).toHaveBeenCalledWith(false);
+  expect(harness.listeners.syncNavigationLockOverlay).toHaveBeenCalledWith(true);
   const auxClickListener = getRegisteredEventListener(harness, 'auxclick');
   expect(() => auxClickListener(new Event('auxclick'))).not.toThrow();
 }
 
-function shouldKeepQuickEditListenersWithoutThePointerBlockingOverlay(): void {
+function shouldShieldQuickEditPageInteractions(): void {
   const harness = createLockerHarness();
   modeSession.isContentModeEnabled.mockImplementation((mode) => mode === 'quick-edit');
 
   harness.locker.enableNavigationLock(false);
 
-  expect(harness.listeners.syncNavigationLockOverlay).toHaveBeenCalledWith(false);
+  expect(harness.listeners.syncNavigationLockOverlay).toHaveBeenCalledWith(true);
   const auxClickListener = getRegisteredEventListener(harness, 'auxclick');
   expect(() => auxClickListener(new Event('auxclick'))).not.toThrow();
+}
+
+function shouldShieldFullLockDomPickerInteractions(): void {
+  for (const activeMode of ['ai-pick', 'selection-mode']) {
+    const harness = createLockerHarness();
+    modeSession.isContentModeEnabled.mockImplementation((mode) => mode === activeMode);
+
+    harness.locker.enableNavigationLock(true);
+
+    expect(harness.listeners.syncNavigationLockOverlay).toHaveBeenCalledWith(true);
+  }
+}
+
+function shouldRestoreTheInputShieldAfterQuickEditInteraction(): void {
+  const harness = createLockerHarness();
+  modeSession.isContentModeEnabled.mockImplementation((mode) => mode === 'quick-edit');
+  harness.locker.enableNavigationLock(false);
+
+  harness.locker.setInputShieldSuspended(true);
+  expect(harness.listeners.syncNavigationLockOverlay).toHaveBeenLastCalledWith(false);
+
+  harness.locker.setInputShieldSuspended(false);
+  expect(harness.listeners.syncNavigationLockOverlay).toHaveBeenLastCalledWith(true);
 }
 
 function shouldCleanUpRuntimeListenersWhenDisabled(): void {
@@ -323,16 +346,21 @@ describe('createNavigationLocker', () => {
     shouldSubscribeListenersWhileLockIsActive
   );
   it(
-    'keeps Design Review listeners without the pointer-blocking overlay',
-    shouldKeepDesignReviewListenersWithoutThePointerBlockingOverlay
+    'shields Design Review page interactions while retaining picker listeners',
+    shouldShieldDesignReviewPageInteractions
   );
   it(
-    'keeps Annotation listeners without the pointer-blocking overlay',
-    shouldKeepAnnotationListenersWithoutThePointerBlockingOverlay
+    'shields Annotation page interactions while retaining picker listeners',
+    shouldShieldAnnotationPageInteractions
   );
   it(
-    'keeps Quick Edit listeners without the pointer-blocking overlay',
-    shouldKeepQuickEditListenersWithoutThePointerBlockingOverlay
+    'shields Quick Edit page interactions while retaining picker listeners',
+    shouldShieldQuickEditPageInteractions
+  );
+  it('shields full-lock DOM picker interactions', shouldShieldFullLockDomPickerInteractions);
+  it(
+    'restores the input shield after intentional Quick Edit interaction',
+    shouldRestoreTheInputShieldAfterQuickEditInteraction
   );
   it(
     'cleans up all runtime listeners and removes the overlay when disabled',

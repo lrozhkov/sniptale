@@ -7,7 +7,7 @@ import {
   type SetStateAction,
 } from 'react';
 import { isBrowserClipboardImageFormatSupported } from '@sniptale/platform/browser/clipboard';
-import { translate } from '../../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 import {
   loadEditorExportSettings,
   patchEditorExportSettings,
@@ -85,9 +85,11 @@ function useLoadEditorExportSettings(args: LoadEditorExportSettingsArgs) {
 }
 
 function createPersistFailureMessage(error: unknown) {
-  return error instanceof Error && error.message.trim().length > 0
-    ? error.message
-    : translate('common.states.error');
+  return createUserFacingErrorMessage({
+    cause: error,
+    detail: 'storage',
+    summaryKey: 'common.errors.saveFailed',
+  });
 }
 
 function useExportSettingFailureState() {

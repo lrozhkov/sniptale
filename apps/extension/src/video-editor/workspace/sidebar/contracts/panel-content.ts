@@ -21,6 +21,7 @@ type WorkspaceSidebarPanelContentPropKeys =
   | 'onGenerateMotionPathFromCursor'
   | 'onDeleteProject'
   | 'onDeleteTrack'
+  | 'onSwapClip'
   | 'onDetachClipGroup'
   | 'onEnableCursorTrack'
   | 'onInsertCursorSample'

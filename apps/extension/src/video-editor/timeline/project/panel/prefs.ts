@@ -24,7 +24,6 @@ interface ProjectTimelinePanelPrefsState {
   setCollapsedCursorLaneVisible: (visible: boolean) => void;
   setCollapsedTelemetryLaneVisible: (visible: boolean) => void;
   setCompactRows: (compactRows: boolean) => void;
-  setPanelExpanded: (expanded: boolean) => void;
   setTrackHeight: (trackId: string, multiplier: VideoEditorTrackHeightMultiplier) => void;
 }
 
@@ -45,16 +44,18 @@ export function useProjectTimelinePanelPrefs(
   );
 
   return {
-    cursorLaneVisible:
-      project.cursorTrack !== null && (prefs.panelExpanded || prefs.collapsedCursorLaneVisible),
+    cursorLaneVisible: project.cursorTrack !== null && prefs.collapsedCursorLaneVisible,
     prefs,
-    telemetryLaneVisible: prefs.panelExpanded || prefs.collapsedTelemetryLaneVisible,
+    telemetryLaneVisible: prefs.collapsedTelemetryLaneVisible,
     ...actions,
   };
 }
 
 function useCurrentTrackIds(project: VideoProject): ReadonlySet<string> {
-  const trackIdsKey = project.tracks.map((track) => track.id).join('\n');
+  const trackIdsKey = project.tracks
+    .map((track) => track.id)
+    .sort()
+    .join('\n');
   return useMemo(() => new Set(trackIdsKey === '' ? [] : trackIdsKey.split('\n')), [trackIdsKey]);
 }
 
@@ -103,7 +104,6 @@ function useTrackPanelPrefsActions(
       'collapsedTelemetryLaneVisible'
     ),
     setCompactRows: useTrackPanelBooleanSetter(updatePrefs, 'compactRows'),
-    setPanelExpanded: useTrackPanelBooleanSetter(updatePrefs, 'panelExpanded'),
     setTrackHeight: useTrackHeightSetter(updatePrefs),
   };
 }
@@ -131,11 +131,7 @@ function useTrackPanelBooleanSetter(
   updatePrefs: (
     updater: (currentPrefs: VideoEditorTrackPanelPrefs) => VideoEditorTrackPanelPrefs
   ) => void,
-  key:
-    | 'collapsedCursorLaneVisible'
-    | 'collapsedTelemetryLaneVisible'
-    | 'compactRows'
-    | 'panelExpanded'
+  key: 'collapsedCursorLaneVisible' | 'collapsedTelemetryLaneVisible' | 'compactRows'
 ) {
   return useCallback(
     (visible: boolean) => updatePrefs((currentPrefs) => ({ ...currentPrefs, [key]: visible })),

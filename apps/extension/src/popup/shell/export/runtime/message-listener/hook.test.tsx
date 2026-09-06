@@ -45,6 +45,7 @@ function createState() {
       current: { exportRunId: 'req-1', owner: 'job', tabIds: [42] } as {
         cancellationPending?: true;
         exportRunId: string;
+        locale?: 'en' | 'ru';
         owner: 'job' | 'snapshot';
         tabIds: number[];
       } | null,
@@ -99,7 +100,7 @@ beforeEach(() => {
   mocks.sendGetJobStatusMessage.mockReset();
   mocks.unsubscribe.mockReset();
   mocks.subscribeToMessages.mockReturnValue(mocks.unsubscribe);
-  mocks.sendGetJobStatusMessage.mockResolvedValue({ success: true, status: null });
+  mocks.sendGetJobStatusMessage.mockResolvedValue({ locale: null, success: true, status: null });
 });
 
 it('reconnects to a running background job after the popup is reopened', async () => {
@@ -107,7 +108,7 @@ it('reconnects to a running background job after the popup is reopened', async (
   state.requestIdRef.current = null;
   state.cancelRetryRef.current = null;
   const status = createStatus();
-  mocks.sendGetJobStatusMessage.mockResolvedValue({ success: true, status });
+  mocks.sendGetJobStatusMessage.mockResolvedValue({ locale: 'en', success: true, status });
 
   await renderNode(<MessageListenerHarness state={state} />);
 
@@ -117,6 +118,7 @@ it('reconnects to a running background job after the popup is reopened', async (
   expect(state.requestIdRef.current).toBe('job-reconnected');
   expect(state.cancelRetryRef.current).toEqual({
     exportRunId: 'job-reconnected',
+    locale: 'en',
     owner: 'job',
     tabIds: [42],
   });
@@ -137,6 +139,7 @@ it('does not let a late cancelling broadcast reclaim a terminal request', async 
   });
   const status = { ...createStatus('req-finished'), phase: 'cancelling' as const };
   mocks.parsePopupExportRuntimeMessage.mockReturnValue({
+    locale: 'ru',
     status,
     type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED,
   });
@@ -185,6 +188,7 @@ it('passes parsed runtime messages to the apply seam and exposes request clearin
   };
   const handlerRef: { current: ((message: unknown) => void) | null } = { current: null };
   const parsedMessage = {
+    locale: 'en' as const,
     status: createStatus('req-1'),
     type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED,
   } as const;
@@ -201,12 +205,17 @@ it('passes parsed runtime messages to the apply seam and exposes request clearin
   expect(mocks.applyPopupExportRuntimeMessage).toHaveBeenCalledTimes(1);
   expect(mocks.applyPopupExportRuntimeMessage).toHaveBeenCalledWith(
     expect.objectContaining({
-      message: parsedMessage,
+      message: {
+        locale: parsedMessage.locale,
+        status: parsedMessage.status,
+        type: parsedMessage.type,
+      },
       requestId: 'req-1',
       setProgress: state.setProgress,
       setResult: state.setResult,
     })
   );
+  expect(state.cancelRetryRef.current).toMatchObject({ locale: 'en' });
 
   const [{ clearRequestId }] = mocks.applyPopupExportRuntimeMessage.mock.calls[0] as [
     { clearRequestId: () => void },
@@ -232,6 +241,7 @@ it('keeps a newer broadcast when an older reconnect response resolves afterward'
   const newerStatus = createStatus('req-1', 6);
   const olderStatus = createStatus('req-1', 5);
   mocks.parsePopupExportRuntimeMessage.mockReturnValue({
+    locale: 'ru',
     status: newerStatus,
     type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED,
   });
@@ -239,7 +249,7 @@ it('keeps a newer broadcast when an older reconnect response resolves afterward'
   await renderNode(<MessageListenerHarness state={state} />);
   act(() => handlerRef.current?.({ type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED }));
   await act(async () => {
-    resolveStatus({ success: true, status: olderStatus });
+    resolveStatus({ locale: 'en', success: true, status: olderStatus });
     await Promise.resolve();
   });
 

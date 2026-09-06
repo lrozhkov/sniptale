@@ -1,3 +1,4 @@
+import { parsePortableVideoProjectMetadata } from '../root-codecs/projects';
 import { describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ readAssetFile: vi.fn() }));
@@ -40,105 +41,141 @@ function ref(assetId: string, mimeType: string) {
 }
 
 describe('readable project archive paths', () => {
-  it('places video project assets and exports in named user directories', async () => {
-    const project = createVideoProjectEntryWithMediaClip({ name: 'Demo/Project' });
-    project.project.effectSnapshots = [
-      {
-        id: 'snapshot-1',
-        assets: [
-          {
-            blob: new Blob(['effect'], { type: 'image/png' }),
-            byteLength: 6,
-            id: 'effect-asset',
-            kind: 'image',
-            mimeType: 'image/png',
-            sha256: 'a'.repeat(64),
-          },
-        ],
-        documentId: 'document-1',
-        kind: 'standalone',
-        retainedByteLength: 8,
-        schemaVersion: 'sniptale.effect.v1',
-        sha256: 'b'.repeat(64),
-        source: '{}',
-      },
-    ];
-    const asset = createProjectAssetEntry({
-      assetId: 'project-asset-object',
-      id: 'project-asset-1',
-      mimeType: 'video/webm',
-    });
-    const projectExport = createProjectExportEntry({
-      assetId: 'project-export-object',
-      filename: 'Final?.webm',
-      projectId: project.id,
-    });
-    mocks.readAssetFile.mockImplementation(
-      async (_ref, filename: string) =>
-        new File(['x'], filename, {
-          type: filename.includes('Final') ? 'video/webm' : asset.mimeType,
-        })
-    );
-    const db = {
-      get: vi.fn(async (store: string, key: unknown) => {
-        if (store === 'project_assets') return asset;
-        if (store === 'media_library') {
-          return createMediaLibraryEntry({
-            filename: 'Camera clip.webm',
-            id: 'project-asset:project-asset-1',
-            mimeType: 'video/webm',
-          });
-        }
-        if (store === 'asset_refs') {
-          return ref(String(key), key === 'project-export-object' ? 'video/webm' : asset.mimeType);
-        }
-        if (store === 'thumbnails') {
-          if (String(key).startsWith('export:')) return undefined;
-          return {
-            assetId: `video-project:${project.id}`,
-            blob: new Blob(['thumbnail'], { type: 'image/png' }),
-            createdAt: 1,
-            height: 90,
-            updatedAt: 2,
-            width: 160,
-          };
-        }
-        if (store === 'aggregate_presentations') {
-          return {
-            aggregateId: project.id,
-            aggregateKind: 'video-project',
-            presentationRevision: 1,
-            previewBlob: new Blob(['preview'], { type: 'image/png' }),
-            thumbnailBlob: new Blob(['presentation-thumbnail'], { type: 'image/png' }),
-            updatedAt: 2,
-          };
-        }
-        return undefined;
-      }),
-      getAll: vi.fn(async () => [project]),
-      getAllFromIndex: vi.fn(async (store: string) =>
-        store === 'project_exports' ? [projectExport] : []
-      ),
-    };
-    const [root] = await buildVideoProjectRootInventory({
-      db,
-      options: createMediaHubBackupExportOptions(),
-      paths: createArchivePathAllocator(),
-    });
-    const payload = await root!.load();
-    expect(payload.objects.map((object) => object.ref.filename)).toEqual([
-      'Camera clip.webm',
-      'Final?.webm',
-      'snapshot-1-effect-asset',
-      `${project.id}-thumbnail`,
-      `${project.id}-preview`,
-      `${project.id}-presentation-thumbnail`,
-    ]);
-    expect(payload.objects.slice(0, 2).map((object) => object.ref.path)).toEqual([
-      'Recordings/Projects/Demo-Project/Assets/Camera clip.webm',
-      'Exports/Demo-Project/Final-.webm',
-    ]);
-  });
+  it.each([true, false])(
+    'backs up project video reviews with explicit MIME=%s',
+    async (explicitMime) => {
+      const project = createVideoProjectEntryWithMediaClip({ name: 'Demo/Project' });
+      project.project.effectSnapshots = [
+        {
+          id: 'snapshot-1',
+          assets: [
+            {
+              blob: new Blob(['effect'], { type: 'image/png' }),
+              byteLength: 6,
+              id: 'effect-asset',
+              kind: 'image',
+              mimeType: 'image/png',
+              sha256: 'a'.repeat(64),
+            },
+          ],
+          documentId: 'document-1',
+          kind: 'standalone',
+          retainedByteLength: 8,
+          schemaVersion: 'sniptale.effect.v1',
+          sha256: 'b'.repeat(64),
+          source: '{}',
+        },
+      ];
+      const asset = createProjectAssetEntry({
+        assetId: 'project-asset-object',
+        id: 'project-asset-1',
+        mimeType: 'video/webm',
+      });
+      const projectExport = createProjectExportEntry({
+        assetId: 'project-export-object',
+        filename: 'Final?.webm',
+        projectId: project.id,
+      });
+      if (!explicitMime) delete projectExport.mimeType;
+      const review = {
+        aggregateId: `export:${projectExport.id}`,
+        formatVersion: 1,
+        sourceAssetId: projectExport.assetId,
+        source: {
+          duration: 2,
+          width: 640,
+          height: 360,
+          size: projectExport.size,
+          mimeType: 'video/webm',
+        },
+        revision: 1,
+        cursor: 0,
+        history: [],
+        createdAt: 1,
+        updatedAt: 1,
+      };
+      mocks.readAssetFile.mockImplementation(
+        async (_ref, filename: string) =>
+          new File(['x'], filename, {
+            type: filename.includes('Final') ? 'video/webm' : asset.mimeType,
+          })
+      );
+      const db = {
+        transaction: () => ({
+          objectStore: (store: string) => ({
+            get: async (key: string) =>
+              store === 'video_workspaces' && key === review.aggregateId ? review : undefined,
+          }),
+          done: Promise.resolve(),
+        }),
+        get: vi.fn(async (store: string, key: unknown) => {
+          if (store === 'project_assets') return asset;
+          if (store === 'media_library') {
+            return createMediaLibraryEntry({
+              filename: 'Camera clip.webm',
+              id: 'project-asset:project-asset-1',
+              mimeType: 'video/webm',
+            });
+          }
+          if (store === 'asset_refs') {
+            return ref(
+              String(key),
+              key === 'project-export-object' ? 'video/webm' : asset.mimeType
+            );
+          }
+          if (store === 'thumbnails') {
+            if (String(key).startsWith('export:')) return undefined;
+            return {
+              assetId: `video-project:${project.id}`,
+              blob: new Blob(['thumbnail'], { type: 'image/png' }),
+              createdAt: 1,
+              height: 90,
+              updatedAt: 2,
+              width: 160,
+            };
+          }
+          if (store === 'aggregate_presentations') {
+            return {
+              aggregateId: project.id,
+              aggregateKind: 'video-project',
+              presentationRevision: 1,
+              previewBlob: new Blob(['preview'], { type: 'image/png' }),
+              thumbnailBlob: new Blob(['presentation-thumbnail'], { type: 'image/png' }),
+              updatedAt: 2,
+            };
+          }
+          return undefined;
+        }),
+        getAll: vi.fn(async () => [project]),
+        getAllFromIndex: vi.fn(async (store: string) =>
+          store === 'project_exports' ? [projectExport] : []
+        ),
+      };
+      const [root] = await buildVideoProjectRootInventory({
+        db,
+        options: createMediaHubBackupExportOptions(),
+        paths: createArchivePathAllocator(),
+      });
+      const payload = await root!.load();
+      const portable = parsePortableVideoProjectMetadata(payload.metadata);
+      expect(portable.projectExports[0]?.videoReview?.workspace.aggregateId).toBe(
+        review.aggregateId
+      );
+      expect(portable.projectExports[0]?.videoReview?.workspace.history).toEqual([]);
+      expect(payload.objects.map((object) => object.ref.filename)).toEqual([
+        'Camera clip.webm',
+        'Final?.webm',
+        'snapshot-1-effect-asset',
+        `${project.id}-thumbnail`,
+        `${project.id}-preview`,
+        `${project.id}-presentation-thumbnail`,
+      ]);
+      expect(payload.objects.slice(0, 2).map((object) => object.ref.path)).toEqual([
+        'Recordings/Projects/Demo-Project/Assets/Camera clip.webm',
+        'Exports/Demo-Project/Final-.webm',
+      ]);
+    }
+  );
 
   it('places temporary scenario assets below Drafts with a sanitized project name', async () => {
     const scenario = createScenarioProjectV3('Scenario: One');
@@ -163,6 +200,7 @@ describe('readable project archive paths', () => {
     };
     mocks.readAssetFile.mockResolvedValue(new File(['x'], asset.id, { type: asset.mimeType }));
     const db = {
+      transaction: emptyReviewTransaction,
       get: vi.fn(async (store: string) => {
         if (store === 'asset_refs') return ref(asset.assetId, asset.mimeType);
         if (store === 'thumbnails') {
@@ -207,3 +245,7 @@ describe('readable project archive paths', () => {
     );
   });
 });
+
+function emptyReviewTransaction() {
+  return { objectStore: () => ({ get: async () => undefined }), done: Promise.resolve() };
+}

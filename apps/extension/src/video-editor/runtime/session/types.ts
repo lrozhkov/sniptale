@@ -22,6 +22,7 @@ export interface UseVideoEditorRuntimeParams {
     isPlaying: boolean;
     playbackRange: VideoEditorPlaybackRange | null;
     projectHistoryTransactionActive: boolean;
+    shortcutsEnabled: boolean;
     placementMode: VideoEditorPlacementMode | null;
     selection: VideoEditorSelection;
     selectedActionEvent: VideoProjectActionEvent | null;
@@ -37,6 +38,7 @@ export interface UseVideoEditorRuntimeParams {
     clearPlacementMode: VideoEditorSessionActions['clearPlacementMode'];
     setCurrentTime: VideoEditorSessionActions['setCurrentTime'];
     setPlaying: VideoEditorSessionActions['setPlaying'];
+    duplicateClip: VideoEditorProjectActions['duplicateClip'];
     splitClipAt: VideoEditorProjectActions['splitClipAt'];
     updateActionEventDetails: VideoEditorProjectActions['updateActionEventDetails'];
     updateClipTransform: VideoEditorProjectActions['updateClipTransform'];

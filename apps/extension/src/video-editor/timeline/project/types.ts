@@ -20,6 +20,10 @@ import type { VideoProjectEffectInstancePatch } from '../../contracts/commands/p
 import type { VideoProjectEffectTarget } from '../../../features/video/project/effect-instance/types';
 import type { VideoEditorEffectDocumentDragPayload } from '../../contracts/effect-document-drag';
 import type { VideoEditorProjectHistoryTransactionActions } from '../../contracts/commands/history';
+import type {
+  VideoEditorMoveClipAction,
+  VideoEditorTrimClipAction,
+} from '../../contracts/commands/timeline';
 
 export interface ProjectTimelineInsertionActions {
   onAddActionEvent: (preset: VideoProjectActionPreset) => void;
@@ -39,6 +43,8 @@ export interface ProjectTimelineInsertionActions {
 }
 
 export interface ProjectTimelineProps {
+  canEditSelectedClip: boolean;
+  canSplitSelectedClip: boolean;
   historyTransaction: VideoEditorProjectHistoryTransactionActions;
   project: VideoProject;
   currentTime: number;
@@ -53,12 +59,15 @@ export interface ProjectTimelineProps {
   selectedTrackId: string | null;
   telemetryLaneVisible: boolean;
   timelinePreviews: TimelineClipPreviewMap;
-  onSeek: (time: number) => void;
-  onSeekToStart: () => void;
-  onZoomChange: (value: number) => void;
-  onTogglePlay: () => void;
-  onSetPlaybackRange: (range: VideoEditorPlaybackRange | null) => void;
   onClearPlaybackRange: () => void;
+  onSeekToEnd: () => void;
+  onSeekToStart: () => void;
+  onTogglePlay: () => void;
+  onStepToNextFrame: () => void;
+  onStepToPreviousFrame: () => void;
+  onSeek: (time: number) => void;
+  onZoomChange: (value: number) => void;
+  onSetPlaybackRange: (range: VideoEditorPlaybackRange | null) => void;
   onToggleTelemetryLaneVisibility: () => void;
   onSelectScene: () => void;
   onSelectClip: (clipId: string | null) => void;
@@ -73,25 +82,18 @@ export interface ProjectTimelineProps {
   onSelectActionSegment: (actionEventId: string) => void;
   onSelectMotionRegion: (motionRegionId: string) => void;
   onSelectObjectTrack: (objectTrackId: string) => void;
-  onMoveClip: (
-    clipId: string,
-    startTime: number,
-    trackId?: string,
-    timelineLaneId?: string | null
-  ) => void;
+  onMoveClip: VideoEditorMoveClipAction;
   onCloseTrackGap: (trackId: string, gapStart: number, gapEnd: number) => void;
   onAddTrackLogicalLane: (trackId: string) => void;
   onRenameTrack: (trackId: string, name: string) => void;
-  onTrimClipStart: (clipId: string, nextStartTime: number) => void;
-  onTrimClipEnd: (clipId: string, nextEndTime: number) => void;
+  onTrimClipStart: VideoEditorTrimClipAction;
+  onTrimClipEnd: VideoEditorTrimClipAction;
   onSplitSelectedClip: () => void;
   onDuplicateSelectedClip: () => void;
   onDeleteSelectedClip: () => void;
   onUpdateSelectedClipPlaybackRate: (playbackRate: number) => void;
   onAutoTransformRecording: (settings: VideoAutoProcessingSettings) => void;
   onDeleteSelectedTimelineObject: () => void;
-  onDeleteTrack: (trackId: string) => void;
-  onMoveTrack: (trackId: string, direction: 'up' | 'down') => void;
   onToggleUtilityLaneVisibility: (lane: VideoProjectUtilityLaneKind) => void;
   onToggleUtilityLaneLock: (lane: VideoProjectUtilityLaneKind) => void;
   onClearUtilityLane: (lane: VideoProjectUtilityLaneKind) => void;

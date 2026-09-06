@@ -1,13 +1,14 @@
-import { FloatingChromeRoot } from '@sniptale/ui/floating-chrome';
-import type React from 'react';
 import type { VideoPreviewCanvasInsertKind } from '../../preview/stage/types';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { FolderOpen } from 'lucide-react';
+import { translate } from '../../../platform/i18n';
 import { VideoEditorFloatingDocumentBar } from './document-bar';
-import { VideoEditorFloatingInspectorStack } from './inspector-stack';
 import { VideoEditorFloatingInsertPanel, VideoEditorFloatingWorkspacePanel } from './top-panels';
 
 type VideoEditorFloatingWorkspaceProps = {
+  inspector?: { isOpen: boolean; onToggle: () => void };
+  materials?: { isOpen: boolean; onToggle: () => void };
   activeInsertKind: VideoPreviewCanvasInsertKind | null;
-  diagnosticsContent: React.ReactNode;
   effectsLibraryDock: {
     isOpen: boolean;
     onToggle: () => void;
@@ -16,21 +17,34 @@ type VideoEditorFloatingWorkspaceProps = {
 };
 
 export function VideoEditorFloatingWorkspace({
+  inspector,
+  materials,
   activeInsertKind,
-  diagnosticsContent,
   effectsLibraryDock,
   onActiveInsertKindChange,
 }: VideoEditorFloatingWorkspaceProps) {
   return (
-    <FloatingChromeRoot dataUi="video-editor.floating-workspace">
-      <VideoEditorFloatingDocumentBar />
-      <VideoEditorFloatingInsertPanel
-        activeInsertKind={activeInsertKind}
-        effectsLibraryDock={effectsLibraryDock}
-        onActiveInsertKindChange={onActiveInsertKindChange}
-      />
-      <VideoEditorFloatingWorkspacePanel />
-      <VideoEditorFloatingInspectorStack diagnosticsContent={diagnosticsContent} />
-    </FloatingChromeRoot>
+    <div data-ui="video-editor.floating-workspace" className="shrink-0 px-3 py-2">
+      <VideoEditorFloatingDocumentBar {...(inspector ? { inspector } : {})}>
+        {materials && (
+          <ContentToolbarButton
+            className="!w-auto gap-2 !px-2"
+            title={translate('videoEditor.app.materialsTitle')}
+            active={materials.isOpen}
+            aria-pressed={materials.isOpen}
+            onClick={materials.onToggle}
+          >
+            <FolderOpen size={17} aria-hidden="true" />
+            {translate('videoEditor.app.materialsTitle')}
+          </ContentToolbarButton>
+        )}
+        <VideoEditorFloatingInsertPanel
+          activeInsertKind={activeInsertKind}
+          effectsLibraryDock={effectsLibraryDock}
+          onActiveInsertKindChange={onActiveInsertKindChange}
+        />
+        <VideoEditorFloatingWorkspacePanel />
+      </VideoEditorFloatingDocumentBar>
+    </div>
   );
 }

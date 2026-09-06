@@ -20,14 +20,20 @@ export function createEffectRuntimeAudioClipPlan(args: {
   targetInterval?: { end: number; start: number };
 }): EffectRuntimeAudioPlan | null {
   if (args.clip.enabled === false || !args.sceneEnabled) return null;
-  const localStart = Math.max(0, args.clip.start);
-  const localEnd = Math.min(args.documentDuration, args.clip.start + args.clip.duration);
+  const sourceStart = args.instance.sourceStart ?? 0;
+  const localStart = Math.max(sourceStart, args.clip.start);
+  const localEnd = Math.min(
+    args.documentDuration,
+    args.clip.start + args.clip.duration,
+    sourceStart + args.instance.duration * args.instance.playbackRate
+  );
   if (localEnd <= localStart) return null;
-  const startTime = args.instance.startTime + localStart / args.instance.playbackRate;
+  const startTime =
+    args.instance.startTime + (localStart - sourceStart) / args.instance.playbackRate;
   const instanceEnd = args.instance.startTime + args.instance.duration;
   const endTime = Math.min(
     instanceEnd,
-    args.instance.startTime + localEnd / args.instance.playbackRate
+    args.instance.startTime + (localEnd - sourceStart) / args.instance.playbackRate
   );
   if (endTime <= startTime) return null;
   const boundedStartTime = Math.max(startTime, args.targetInterval?.start ?? startTime);

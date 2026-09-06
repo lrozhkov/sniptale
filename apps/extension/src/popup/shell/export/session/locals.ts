@@ -4,6 +4,7 @@ import type { PopupPagePackageSelection } from '../../../../composition/persiste
 import type { PreviewFormat } from '../selection/utils';
 import { IDLE_PROGRESS } from '../selection/utils';
 import type { PopupExportSessionState } from './types';
+import type { AppLocale } from '../../../../platform/i18n/popup';
 
 export function usePopupExportSessionState(): PopupExportSessionState {
   const [copiedFormat, setCopiedFormat] = useState<PreviewFormat | null>(null);
@@ -18,6 +19,7 @@ export function usePopupExportSessionState(): PopupExportSessionState {
   const cancelRetryRef = useRef<{
     cancellationPending?: true;
     exportRunId: string;
+    locale?: AppLocale;
     owner: 'job';
     tabIds: number[];
   } | null>(null);

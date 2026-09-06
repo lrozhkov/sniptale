@@ -26,7 +26,8 @@ export function useWorkspaceSidebarState(
   selectedClip: WorkspaceSidebarProps['selectedClip'],
   recordingId: string | null,
   diagnosticsOpen: boolean,
-  onToggleDiagnostics: (open: boolean) => void = () => undefined
+  onToggleDiagnostics: (open: boolean) => void = () => undefined,
+  selectedTrack?: WorkspaceSidebarProps['selectedTrack']
 ): WorkspaceSidebarViewState {
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
@@ -34,7 +35,11 @@ export function useWorkspaceSidebarState(
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [recordingsOpen, setRecordingsOpen] = useState(true);
 
-  const selectionMeta = getSelectionMeta(selection ?? createSceneSelection(), selectedClip);
+  const selectionMeta = getSelectionMeta(
+    selection ?? createSceneSelection(),
+    selectedClip,
+    selectedTrack
+  );
 
   return {
     inputRefs: {

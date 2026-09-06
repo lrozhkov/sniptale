@@ -13,6 +13,12 @@ type ActiveAreaSelection = {
   timeoutId: ReturnType<typeof setTimeout>;
 };
 
+const AREA_GESTURE_LISTENER_OPTIONS: AddEventListenerOptions = { capture: true };
+
+function getAreaGestureTarget(targetDocument: Document): Document | Window {
+  return targetDocument.defaultView ?? targetDocument;
+}
+
 type AreaSelectionState = {
   activeSelection: ActiveAreaSelection | null;
   isSelecting: boolean;
@@ -50,9 +56,22 @@ function clearActiveAreaSelection(
     return;
   }
 
-  deps.targetDocument.removeEventListener('mousedown', state.activeSelection.onMouseDown);
-  deps.targetDocument.removeEventListener('mousemove', state.activeSelection.onMouseMove);
-  deps.targetDocument.removeEventListener('mouseup', state.activeSelection.onMouseUp);
+  const gestureTarget = getAreaGestureTarget(deps.targetDocument);
+  gestureTarget.removeEventListener(
+    'mousedown',
+    state.activeSelection.onMouseDown as EventListener,
+    AREA_GESTURE_LISTENER_OPTIONS
+  );
+  gestureTarget.removeEventListener(
+    'mousemove',
+    state.activeSelection.onMouseMove as EventListener,
+    AREA_GESTURE_LISTENER_OPTIONS
+  );
+  gestureTarget.removeEventListener(
+    'mouseup',
+    state.activeSelection.onMouseUp as EventListener,
+    AREA_GESTURE_LISTENER_OPTIONS
+  );
   deps.clearScheduledTimeout(state.activeSelection.timeoutId);
   state.activeSelection = null;
   state.isSelecting = false;
@@ -195,9 +214,22 @@ export function createStartAreaSelection(
       }, 30000);
 
       state.activeSelection = { onMouseDown, onMouseMove, onMouseUp, timeoutId };
-      deps.targetDocument.addEventListener('mousedown', onMouseDown);
-      deps.targetDocument.addEventListener('mousemove', onMouseMove);
-      deps.targetDocument.addEventListener('mouseup', onMouseUp);
+      const gestureTarget = getAreaGestureTarget(deps.targetDocument);
+      gestureTarget.addEventListener(
+        'mousedown',
+        onMouseDown as EventListener,
+        AREA_GESTURE_LISTENER_OPTIONS
+      );
+      gestureTarget.addEventListener(
+        'mousemove',
+        onMouseMove as EventListener,
+        AREA_GESTURE_LISTENER_OPTIONS
+      );
+      gestureTarget.addEventListener(
+        'mouseup',
+        onMouseUp as EventListener,
+        AREA_GESTURE_LISTENER_OPTIONS
+      );
     });
 }
 

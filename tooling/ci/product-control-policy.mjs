@@ -1,20 +1,20 @@
 import { createReleaseControlOccurrences } from '../qa/composition/catalog/release-occurrences.mjs';
 
-export const CI_DIFF_ONLY_CONTROL_IDS = Object.freeze([
-  'qa.rule.changed-line-readability',
-  'qa.rule.structural-risk',
-  'qa.rule.ui-automation-seams',
-]);
+export const CI_DIFF_ONLY_CONTROL_IDS = Object.freeze(['qa.rule.changed-line-readability']);
 
 const CI_EXCLUDED_CONTROL_IDS = Object.freeze({
   proof: new Set([
     ...CI_DIFF_ONLY_CONTROL_IDS,
-    'qa.rule.sonarjs',
     'qa.rule.test-coverage',
     'qa.rule.build',
     'qa.rule.release-archive',
   ]),
-  release: new Set([...CI_DIFF_ONLY_CONTROL_IDS, 'qa.rule.unit-tests', 'qa.rule.test-coverage']),
+  release: new Set([
+    ...CI_DIFF_ONLY_CONTROL_IDS,
+    'qa.rule.unit-tests',
+    'qa.rule.harness-unit-tests',
+    'qa.rule.test-coverage',
+  ]),
 });
 
 export function createCiProductControlOccurrences(lane) {

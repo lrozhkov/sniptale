@@ -166,6 +166,19 @@ function registerKeyboardCommandTest() {
     expect(options.cancelSelection).not.toHaveBeenCalled();
   });
 
+  it('cancels crop selection when a hostile page already prevented Escape', () => {
+    const pageTarget = document.createElement('div');
+    const state = createState({ currentState: 'confirmed' });
+    const options = createOptions();
+    const event = new KeyboardEvent('keydown', { cancelable: true, key: 'Escape' });
+    Object.defineProperty(event, 'target', { value: pageTarget });
+    event.preventDefault();
+
+    handleSelectionModeKeyDown(event, state, options);
+
+    expect(options.cancelSelection).toHaveBeenCalledOnce();
+  });
+
   it('ignores editor inputs and maps Escape and Enter to cancel and confirm', () => {
     const input = document.createElement('input');
     const inputEvent = {

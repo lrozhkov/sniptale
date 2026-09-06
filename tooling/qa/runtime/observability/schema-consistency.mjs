@@ -10,8 +10,10 @@ function assertSummaryConsistency(record) {
     throw new TypeError('summary.problemCount does not match problemIds');
   }
   const expectedCounts = {
-    passed: record.steps.filter((step) => step.outcome === 'passed').length,
-    problemsFound: record.steps.filter((step) => step.outcome === 'problems-found').length,
+    passed: record.steps.filter((step) => ['passed', 'inherited'].includes(step.outcome)).length,
+    problemsFound: record.steps.filter((step) =>
+      ['problems-found', 'blocked'].includes(step.outcome)
+    ).length,
     skipped: record.steps.filter((step) => step.outcome === 'skipped').length,
     errors: record.steps.filter((step) => step.outcome === 'error').length,
     interrupted: record.steps.filter((step) => step.outcome === 'interrupted').length,

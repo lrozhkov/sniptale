@@ -1,12 +1,13 @@
 import { expect, it } from 'vitest';
 import { createAnnotationClip } from './template';
 import { resolveTemplateStyle } from './presentation';
-import { createEmptyVideoProject } from '../factories/creation';
-import { VideoOverlayTemplateKind } from '../types/index';
+import { createEmptyVideoProject, createVideoProjectTrack } from '../factories/creation';
+import { VideoTrackKind, VideoOverlayTemplateKind } from '../types/index';
 
 function createClip() {
   const project = createEmptyVideoProject('Style floors', 1280, 720);
-  return createAnnotationClip(project.tracks[2]!.id, project.width, project.height, 1);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  return createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 1);
 }
 
 it('applies template-specific style floors for core annotation variants', () => {

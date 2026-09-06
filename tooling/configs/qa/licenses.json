@@ -39,7 +39,7 @@
       "dependencyScope": "direct-development",
       "artifactInclusion": "development-only",
       "licenseExpression": "LGPL-3.0-only",
-      "reason": "Reviewed tooling-only audit dependency; it is not bundled into the extension release artifact.",
+      "reason": "Reviewed tooling-only Oxlint plugin dependency; it is not bundled into the extension release artifact.",
       "approvalOwner": "repository-owner",
       "expiresOn": "2027-07-12",
       "debtId": "accepted.license.eslint-plugin-sonarjs"

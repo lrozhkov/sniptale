@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { getDiagnostics } from '../../../composition/persistence/diagnostics/index';
 import { translate } from '../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 import type {
   DiagnosticEvent,
   DiagnosticsEntry,
@@ -34,7 +35,11 @@ function applyDiagnosticsPanelLoadError(
 ) {
   logger.error('Failed to load diagnostics', loadError);
   setError(
-    loadError instanceof Error ? loadError.message : translate('videoEditor.diagnostics.loadError')
+    createUserFacingErrorMessage({
+      cause: loadError,
+      detail: 'storage',
+      summaryKey: 'videoEditor.diagnostics.loadError',
+    })
   );
 }
 

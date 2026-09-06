@@ -20,6 +20,7 @@ interface QuickEditDocumentModeProps {
   getIsQuickEditMode: () => boolean;
   hideBlockingOverlay: () => void;
   hideHoverOverlay: () => void;
+  setInputShieldSuspended: (suspended: boolean) => void;
 }
 
 interface QuickEditDocumentModeState {
@@ -54,7 +55,7 @@ export function createQuickEditDocumentMode(props: QuickEditDocumentModeProps) {
   }
 
   return {
-    disable: () => disableDocumentMode(state, historyTracker),
+    disable: () => disableDocumentMode(props, state, historyTracker),
     enable: () => enableDocumentMode(props, state, historyTracker),
     isEnabled,
   };
@@ -99,6 +100,7 @@ function handleDocumentModeCaptureFailure(
   }
 
   cleanupDocumentModeState(state);
+  props.setInputShieldSuspended(props.editingElements.size > 0);
   logger.error('Document mode disabled after history capture failure', error);
   requestDisableAfterDocumentModeFailure(props);
   return true;
@@ -141,9 +143,11 @@ function enableDocumentMode(
   props.hideHoverOverlay();
   props.hideBlockingOverlay();
   historyTracker.begin();
+  props.setInputShieldSuspended(true);
   try {
     applyDocumentModeEnable(state, readDesignMode());
   } catch (error) {
+    props.setInputShieldSuspended(false);
     historyTracker.cancel();
     throw error;
   }
@@ -171,6 +175,7 @@ function applyDocumentModeEnable(state: QuickEditDocumentModeState, originalDesi
 }
 
 function disableDocumentMode(
+  props: QuickEditDocumentModeProps,
   state: QuickEditDocumentModeState,
   historyTracker: ReturnType<typeof createQuickEditDocumentModeHistoryTracker>
 ): void {
@@ -192,8 +197,10 @@ function disableDocumentMode(
     if (!(error instanceof QuickEditDocumentModeRecoveryPendingError)) {
       cleanupDocumentModeState(state);
     }
+    props.setInputShieldSuspended(false);
     throw error;
   }
   cleanupDocumentModeState(state);
+  props.setInputShieldSuspended(false);
   logger.log('Quick edit document mode disabled');
 }

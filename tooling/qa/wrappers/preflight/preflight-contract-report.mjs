@@ -1,6 +1,8 @@
 import { getRuntimeRoots } from '../../guards/architecture/runtime-topology/model.mjs';
 
 const BOUNDARY_TARGET_PATTERN = /^(?:apps\/extension\/src|packages\/[^/]+\/src)\//u;
+const OBSERVABILITY_RECORD_CONTRACT_PATTERN =
+  /^tooling\/qa\/runtime\/observability\/(?:analysis-schema|constants|run|run-controller|run-record|schema|schema-parts)\.mjs$/u;
 const RUNTIME_ROOTS = getRuntimeRoots();
 const BOUNDARY_ROLE_TOKENS = [
   'contracts',
@@ -25,6 +27,16 @@ function isBoundaryTarget(file) {
   );
 }
 
+function collectContextCodeFiles(context) {
+  return context.allQualityCodeFiles ?? context.codeFiles ?? [];
+}
+
+function changesObservabilityRecordContract(context) {
+  return collectContextCodeFiles(context).some((file) =>
+    OBSERVABILITY_RECORD_CONTRACT_PATTERN.test(file)
+  );
+}
+
 export function collectContractChecklist(context) {
   if (!context.codeFiles.some(isBoundaryTarget)) {
     return [];
@@ -44,18 +56,29 @@ export function collectContractChecklist(context) {
 
   return [
     'owner seam / boundary: name the runtime or import owner before editing',
-    `public/shared contracts touched: ${sharedContracts.join(', ') || 'none detected'}`,
-    `runtime/import boundary files: ${[...runtimeBoundaries, ...importBoundaries].join(', ') || 'none detected'}`,
+    ...describeBoundaryFiles('public/shared contracts touched', sharedContracts),
+    ...describeBoundaryFiles('runtime/import boundary files', [
+      ...runtimeBoundaries,
+      ...importBoundaries,
+    ]),
     'negative/failure proof: malformed, stale/replay/duplicate, cancellation, rollback if applicable',
     'user-visible acceptance proof: roundtrip or UI workflow for the changed owner seam',
   ];
 }
 
+function describeBoundaryFiles(label, files) {
+  const uniqueFiles = [...new Set(files)];
+  return uniqueFiles.length > 0
+    ? uniqueFiles.map((file) => `${label}: ${file}`)
+    : [`${label}: none detected`];
+}
+
 export function collectTransitiveConsumerHints(context) {
   const hints = [];
+  const codeFiles = collectContextCodeFiles(context);
 
   if (
-    context.codeFiles.some((file) =>
+    codeFiles.some((file) =>
       /^(?:apps\/extension\/src\/contracts\/messaging|packages\/runtime-contracts\/src\/messaging)\//u.test(
         file
       )
@@ -69,15 +92,21 @@ export function collectTransitiveConsumerHints(context) {
       'consumer discovery is a planning prompt only; pin a bounded manifest before claiming a complete consumer set'
     );
   }
+  if (changesObservabilityRecordContract(context)) {
+    hints.push(
+      'observability record consumer: tooling/ci/admit-candidate-proof.mjs',
+      'observability record proof consumer: tooling/ci/admit-candidate-proof.test.ts'
+    );
+  }
   if (
-    context.codeFiles.some((file) =>
+    codeFiles.some((file) =>
       /^apps\/extension\/src\/composition\/persistence\/(?:storage|db)\//u.test(file)
     )
   ) {
     hints.push('storage/db contracts: check bootstrap, clone/delete, backup/restore, settings UI');
   }
   if (
-    context.codeFiles.some((file) =>
+    codeFiles.some((file) =>
       /^apps\/extension\/src\/(?:effect-runtime-sandbox|features\/video\/project\/effect-bundle)\//u.test(
         file
       )
@@ -87,22 +116,24 @@ export function collectTransitiveConsumerHints(context) {
       'EffectV1 contracts: check bundle import, snapshot materialization, preview, audio, and export'
     );
   }
-  if (
-    context.codeFiles.some((file) =>
-      /^apps\/extension\/src\/editor\/lib\/file-actions\//u.test(file)
-    )
-  ) {
+  if (codeFiles.some((file) => /^apps\/extension\/src\/editor\/lib\/file-actions\//u.test(file))) {
     hints.push('editor file-actions: check sidebar/action-rail callers and import roundtrip tests');
   }
   if (
-    context.codeFiles.some((file) =>
-      /^apps\/extension\/src\/content\/logic\/web-snapshot\//u.test(file)
-    )
+    codeFiles.some((file) => /^apps\/extension\/src\/content\/logic\/web-snapshot\//u.test(file))
   ) {
     hints.push('web-snapshot: check popup export, staged transfer, background save, viewer tests');
   }
 
   return [...new Set(hints)];
+}
+
+export function collectContractProofRequirements(context) {
+  return changesObservabilityRecordContract(context)
+    ? [
+        'observability record contract: run candidate-proof admission tests for proof and release fixtures',
+      ]
+    : [];
 }
 
 export function collectTypecheckBlastRadius(context) {

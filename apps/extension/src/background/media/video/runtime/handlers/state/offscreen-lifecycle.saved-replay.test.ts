@@ -6,6 +6,7 @@ const {
   finalizeRecordingDiagnosticsMock,
   getVideoRecordingIdMock,
   loadActiveProjectExportJobLedgerEntryMock,
+  upsertProjectExportJobLedgerEntryMock,
   markOffscreenDocumentReadyMock,
   openVideoEditorPageMock,
   resetCompletedVideoRecordingSessionMock,
@@ -24,6 +25,7 @@ const {
   finalizeRecordingDiagnosticsMock: vi.fn(),
   getVideoRecordingIdMock: vi.fn(),
   loadActiveProjectExportJobLedgerEntryMock: vi.fn(),
+  upsertProjectExportJobLedgerEntryMock: vi.fn(),
   markOffscreenDocumentReadyMock: vi.fn(),
   openVideoEditorPageMock: vi.fn(),
   resetCompletedVideoRecordingSessionMock: vi.fn(),
@@ -79,6 +81,7 @@ vi.mock('../../../../../../composition/persistence/export-ledger', async (import
     typeof import('../../../../../../composition/persistence/export-ledger')
   >()),
   loadActiveProjectExportJobLedgerEntry: loadActiveProjectExportJobLedgerEntryMock,
+  upsertProjectExportJobLedgerEntry: upsertProjectExportJobLedgerEntryMock,
 }));
 vi.mock('../../../session-state', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../session-state')>()),
@@ -155,7 +158,9 @@ beforeEach(() => {
   readStoredVideoPostRecordResultMock.mockResolvedValue(null);
   removeVideoRecordingCompletionOutboxMock.mockResolvedValue(true);
   clearActiveVideoRecordingLeaseMock.mockResolvedValue(undefined);
+  upsertProjectExportJobLedgerEntryMock.mockResolvedValue({ status: 'running' });
   loadActiveProjectExportJobLedgerEntryMock.mockResolvedValue({
+    status: 'running',
     abortController: new AbortController(),
     jobId: 'job-1',
     ownerDocumentId: 'editor-doc-1',
@@ -480,6 +485,12 @@ it('covers adjacent lifecycle routes used by the saved-recording owner module', 
   await flushAsyncRoute();
 
   expect(markOffscreenDocumentReadyMock).toHaveBeenCalledWith('startup-1');
+  expect(upsertProjectExportJobLedgerEntryMock).toHaveBeenCalledWith({
+    jobId: 'job-1',
+    projectId: 'project-1',
+    phase: 'RENDERING',
+    progress: 25,
+  });
   expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
     type: VideoMessageType.PROJECT_EXPORT_PROGRESS,
     jobId: 'job-1',

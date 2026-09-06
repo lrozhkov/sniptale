@@ -14,6 +14,7 @@ const {
   registerVoiceInputTelemetryPorts,
   registerSecurityE2EControl,
   initializeNativeAppPermissionLifecycle,
+  subscribeToLocaleChanges,
 } = vi.hoisted(() => ({
   configureDownloadPort: vi.fn(),
   configureNativeIngestionPrivacyErasureCleanupPort: vi.fn(),
@@ -28,6 +29,11 @@ const {
   registerVoiceInputTelemetryPorts: vi.fn(),
   registerSecurityE2EControl: vi.fn(),
   initializeNativeAppPermissionLifecycle: vi.fn(),
+  subscribeToLocaleChanges: vi.fn(() => vi.fn()),
+}));
+vi.mock('../../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
+  subscribeToLocaleChanges,
 }));
 vi.mock('../../native-app/permission-lifecycle', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../native-app/permission-lifecycle')>()),
@@ -117,6 +123,7 @@ it('registers all background listeners through the runtime-wiring owner', () => 
   expect(registerVoiceInputTelemetryPorts).toHaveBeenCalledOnce();
   expect(registerAggregateEditorPresencePorts).toHaveBeenCalledOnce();
   expect(registerExtensionCommandListener).toHaveBeenCalledWith(state);
+  expect(subscribeToLocaleChanges).toHaveBeenCalledOnce();
   expect(nativeAppConnect).toHaveBeenCalledTimes(1);
   expect(registerWebSnapshotViewerPorts).toHaveBeenCalledWith(state.webSnapshotViewerPorts);
   expect(initializeBackgroundContextMenus).toHaveBeenCalledWith({

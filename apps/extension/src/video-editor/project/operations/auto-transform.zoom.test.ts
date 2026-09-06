@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import {
+  createProject,
+  createTrack,
+  createVideoClip,
+} from '../../../features/video/project/timeline/project-meta.test.helpers';
 import {
   RecordingTelemetrySignalKind,
   VideoProjectActionEventKind,
@@ -9,14 +13,12 @@ import {
 const {
   applyAutoTransformClipTimelineMock,
   getRecordingTelemetryMock,
-  mapSourceTimeToProjectTimeMock,
   normalizeRecordingActionEventsToProjectSpaceMock,
   normalizeRecordingCursorTrackToProjectSpaceMock,
   telemetryEligibilityMock,
 } = vi.hoisted(() => ({
   applyAutoTransformClipTimelineMock: vi.fn(),
   getRecordingTelemetryMock: vi.fn(),
-  mapSourceTimeToProjectTimeMock: vi.fn(),
   normalizeRecordingActionEventsToProjectSpaceMock: vi.fn(),
   normalizeRecordingCursorTrackToProjectSpaceMock: vi.fn(),
   telemetryEligibilityMock: vi.fn(),
@@ -29,9 +31,9 @@ vi.mock('../../../composition/persistence/recordings/telemetry', async (importOr
   getRecordingTelemetry: getRecordingTelemetryMock,
 }));
 
-vi.mock('./auto-transform.clip-timeline', () => ({
+vi.mock('./auto-transform.clip-timeline', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./auto-transform.clip-timeline')>()),
   applyAutoTransformClipTimeline: applyAutoTransformClipTimelineMock,
-  mapSourceTimeToProjectTime: mapSourceTimeToProjectTimeMock,
 }));
 
 vi.mock('./telemetry-eligibility', () => ({
@@ -53,8 +55,13 @@ vi.mock('./telemetry', () => ({
 import { autoTransformRecordingProject } from './auto-transform';
 
 function createMotionProject() {
-  const project = createEmptyVideoProject('Auto transform');
+  const project = createProject(
+    [createVideoClip({ duration: 12, sourceDuration: 12 })],
+    [createTrack('track-video', 0)]
+  );
+  project.baseRecordingId = 'rec-asset-video';
   project.duration = 12;
+  project.source = { kind: 'recording', recordingId: 'rec-asset-video' };
   return project;
 }
 
@@ -89,9 +96,6 @@ function resetZoomHeuristicsMocks() {
   vi.clearAllMocks();
   telemetryEligibilityMock.mockReturnValue(true);
   applyAutoTransformClipTimelineMock.mockImplementation((project) => project);
-  mapSourceTimeToProjectTimeMock.mockImplementation(
-    (_project: unknown, _recordingId: unknown, sourceTime: number) => sourceTime
-  );
   normalizeRecordingActionEventsToProjectSpaceMock.mockReturnValue([createTelemetryActionEvent()]);
   normalizeRecordingCursorTrackToProjectSpaceMock.mockImplementation(
     (cursorTrack: unknown) => cursorTrack
@@ -117,7 +121,7 @@ async function verifyTypingAwareZoomProfile() {
   });
   normalizeRecordingActionEventsToProjectSpaceMock.mockReturnValue(actionEvents);
 
-  const result = await autoTransformRecordingProject(project, 'recording-1');
+  const result = await autoTransformRecordingProject(project, 'rec-asset-video');
 
   expect(result).not.toBeNull();
   expect(result!.motionRegions).toEqual([
@@ -148,7 +152,7 @@ async function verifyNearbyClickReuse() {
   });
   normalizeRecordingActionEventsToProjectSpaceMock.mockReturnValue(actionEvents);
 
-  const result = await autoTransformRecordingProject(project, 'recording-1');
+  const result = await autoTransformRecordingProject(project, 'rec-asset-video');
 
   expect(result).not.toBeNull();
   const motionRegions = result!.motionRegions ?? [];
@@ -179,7 +183,7 @@ async function verifyTailZoomSkip() {
   });
   normalizeRecordingActionEventsToProjectSpaceMock.mockReturnValue(actionEvents);
 
-  const result = await autoTransformRecordingProject(project, 'recording-1');
+  const result = await autoTransformRecordingProject(project, 'rec-asset-video');
 
   expect(result?.motionRegions ?? []).toEqual([]);
 }

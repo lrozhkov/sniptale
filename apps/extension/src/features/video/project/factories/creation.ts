@@ -85,7 +85,12 @@ export function createEmptyVideoProject(
   width = 1920,
   height = 1080
 ): VideoProject {
-  const { audioTrack, overlayTrack, primaryTrack } = createDefaultProjectTracks();
+  const primaryTrack = createVideoProjectTrack(
+    getDefaultTrackName(VideoTrackKind.PRIMARY, 1),
+    1,
+    VideoTrackKind.PRIMARY,
+    true
+  );
   const now = getVideoProjectMutationTimestamp();
 
   return {
@@ -103,7 +108,7 @@ export function createEmptyVideoProject(
     createdAt: now,
     updatedAt: now,
     assets: [],
-    tracks: [primaryTrack, audioTrack, overlayTrack],
+    tracks: [primaryTrack],
     clips: [],
     transitions: [],
     effectInstances: [],
@@ -113,33 +118,6 @@ export function createEmptyVideoProject(
     motionRegions: [],
     cursorTrack: null,
     actionEvents: [],
-  };
-}
-
-function createDefaultProjectTracks(): {
-  audioTrack: VideoProjectTrack;
-  overlayTrack: VideoProjectTrack;
-  primaryTrack: VideoProjectTrack;
-} {
-  return {
-    overlayTrack: createVideoProjectTrack(
-      getDefaultTrackName(VideoTrackKind.OVERLAY, 1),
-      0,
-      VideoTrackKind.OVERLAY,
-      true
-    ),
-    primaryTrack: createVideoProjectTrack(
-      getDefaultTrackName(VideoTrackKind.PRIMARY, 1),
-      1,
-      VideoTrackKind.PRIMARY,
-      true
-    ),
-    audioTrack: createVideoProjectTrack(
-      getDefaultTrackName(VideoTrackKind.AUDIO, 1),
-      2,
-      VideoTrackKind.AUDIO,
-      true
-    ),
   };
 }
 

@@ -138,7 +138,19 @@ it('surfaces both publication and transition-release failures', async () => {
   await expect(publishReadyJournalWithRetry(journal, publish)).rejects.toMatchObject({
     cause: publicationError,
     errors: [publicationError, releaseError],
+    message: 'Asset publication failed and persistence admission could not be released.',
   });
+});
+
+it('surfaces a transition-release failure after a successful publication', async () => {
+  const journal = createJournal();
+  const releaseError = new Error('transition release failed');
+  const publish = vi.fn().mockResolvedValue(undefined);
+  releaseTransitionsMock.mockRejectedValueOnce(releaseError);
+
+  await expect(publishReadyJournalWithRetry(journal, publish)).rejects.toBe(releaseError);
+  expect(publish).toHaveBeenCalledOnce();
+  expect(deleteReadyJournalMock).toHaveBeenCalledWith(journal.journalId);
 });
 
 it('keeps a successful publication successful when ready cleanup must be replayed', async () => {

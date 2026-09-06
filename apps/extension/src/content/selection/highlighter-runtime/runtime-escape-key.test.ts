@@ -92,7 +92,7 @@ function focusCalloutActiveElement() {
 }
 
 describe('createHighlighterRuntimeEscapeKeyHandler ignored events', () => {
-  it('ignores an Escape already claimed by toolbar UI', () => {
+  it('handles an Escape pre-cancelled by a host page when no content UI owns it', () => {
     const disableHighlighterMode = vi.fn();
     const handler = createHighlighterRuntimeEscapeKeyHandler({
       disableHighlighterMode,
@@ -100,10 +100,12 @@ describe('createHighlighterRuntimeEscapeKeyHandler ignored events', () => {
       isAnyFrameEditing: () => false,
     });
 
-    handler({ defaultPrevented: true, key: 'Escape' } as KeyboardEvent);
+    const event = new KeyboardEvent('keydown', { cancelable: true, key: 'Escape' });
+    event.preventDefault();
+    handler(event);
 
-    expect(disableHighlighterMode).not.toHaveBeenCalled();
-    expect(contentModeEventsMocks.dispatchContentModeDisabledMock).not.toHaveBeenCalled();
+    expect(disableHighlighterMode).toHaveBeenCalledOnce();
+    expect(contentModeEventsMocks.dispatchContentModeDisabledMock).toHaveBeenCalledOnce();
   });
 
   it('leaves Escape from an extension-owned modal to the modal dismissal owner', () => {

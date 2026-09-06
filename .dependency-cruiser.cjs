@@ -38,6 +38,51 @@ module.exports = {
   forbidden: [
     ...createRuntimeIsolationRules(),
     {
+      name: 'heavy-runtime-fabric-owner',
+      severity: 'error',
+      comment: 'Runtime fabric value imports belong only to the editor owner.',
+      from: {
+        path: '^(?:apps/extension/src|packages/)',
+        pathNot: [
+          '^apps/extension/src/editor/',
+          '(?:^|/)(?:__tests__|test|tests)/|[.](?:test|spec)[.]',
+        ],
+      },
+      to: {
+        path: '^node_modules/fabric/',
+        dependencyTypesNot: ['type-only'],
+      },
+    },
+    {
+      name: 'heavy-runtime-jszip-content',
+      severity: 'error',
+      comment: 'Content runtime must not statically own the JSZip bundle.',
+      from: {
+        path: '^apps/extension/src/content/',
+        pathNot: '(?:^|/)(?:__tests__|test|tests)/|[.](?:test|spec)[.]',
+      },
+      to: {
+        path: '^node_modules/jszip/',
+        dependencyTypesNot: ['type-only', 'dynamic-import'],
+      },
+    },
+    {
+      name: 'heavy-runtime-dompurify-owner',
+      severity: 'error',
+      comment: 'DOMPurify value imports belong only to the platform sanitizer owner.',
+      from: {
+        path: '^(?:apps/extension/src|packages/)',
+        pathNot: [
+          '^packages/platform/src/security/sanitizers/html[.]ts$',
+          '(?:^|/)(?:__tests__|test|tests)/|[.](?:test|spec)[.]',
+        ],
+      },
+      to: {
+        path: '^node_modules/dompurify/',
+        dependencyTypesNot: ['type-only'],
+      },
+    },
+    {
       name: 'web-snapshot-viewer-content-reuse-scope',
       severity: 'error',
       comment: 'Only viewer preparation may reuse content runtime behavior.',

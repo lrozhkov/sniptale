@@ -31,7 +31,6 @@ const ALWAYS_FOCUSED_TRIGGERED_LABELS = new Set([
   'App-core owners',
   'OSS release surface',
   'Package boundaries',
-  'Root scatter',
   'Root side effects',
   'Target-only paths',
 ]);
@@ -43,7 +42,6 @@ const SCHEDULER_LANE_BY_ID = new Map([
   ['qa.rule.test-coverage', 'tests'],
   ['qa.rule.oxlint', 'lint'],
   ['qa.rule.logging-policy', 'lint'],
-  ['qa.rule.sonarjs', 'lint'],
   ['qa.rule.security', 'lint'],
   ['qa.rule.dead-exports', 'graph'],
 ]);
@@ -59,6 +57,34 @@ function resolveSchedulerDependencyProfile(lane) {
   if (['graph', 'light'].includes(lane)) return 'after-lint-and-typecheck';
   if (lane === 'tests') return 'after-lint-and-typecheck-unless-release';
   return 'independent';
+}
+
+const CI_SATISFIED_BY = new Map([
+  ['qa.rule.changed-line-readability', 'qa.rule.repository-readability'],
+  ['qa.rule.test-coverage', 'qa.rule.full-product-coverage'],
+  ['qa.rule.qa-composition-integrity', 'qa.rule.harness-unit-tests'],
+]);
+const CI_RELEASE_ONLY = new Set(['qa.rule.build', 'qa.rule.release-archive', 'qa.rule.codeql']);
+const CHECKPOINT_LANES = new Set([
+  'focused-direct',
+  'focused-guardrail',
+  'focused-triggered',
+  'harness',
+]);
+
+function resolveCiDisposition(record) {
+  const replacement = CI_SATISFIED_BY.get(record.id);
+  if (replacement) return Object.freeze({ kind: 'satisfied-by', controlId: replacement });
+  if (CI_RELEASE_ONLY.has(record.id)) return Object.freeze({ kind: 'release-only' });
+  if (
+    record.lanes.some((lane) => ['release-direct', 'release-guardrail', 'audit'].includes(lane))
+  ) {
+    return Object.freeze({ kind: 'executed-in-proof' });
+  }
+  if (!record.lanes.some((lane) => CHECKPOINT_LANES.has(lane))) {
+    return Object.freeze({ kind: 'local-lifecycle-only' });
+  }
+  return null;
 }
 
 function fromTuple(tuple, lane, kind = 'tool') {
@@ -202,6 +228,7 @@ function completeCatalogRecord(record) {
     label: record.label,
   });
   const schedulerLane = resolveSchedulerLane(record, category);
+  const ciDisposition = resolveCiDisposition(record);
   return Object.freeze({
     ...record,
     category,
@@ -209,7 +236,7 @@ function completeCatalogRecord(record) {
     semanticClass,
     engineProfile: engineDecision.profile,
     engineDecision,
-    scopeProfile: resolveQaScopeProfile({ lanes: record.lanes, category }),
+    scopeProfile: resolveQaScopeProfile({ lanes: record.lanes, category, label: record.label }),
     triggerProfile: record.lanes.includes('focused-triggered') ? 'catalog-trigger' : 'mode-scope',
     supportedModes: Object.freeze([...record.runsIn]),
     adapterProfiles: Object.freeze(
@@ -222,6 +249,7 @@ function completeCatalogRecord(record) {
     resourceProfile: resolveQaResourceProfile(category),
     schedulerLane,
     schedulerDependencyProfile: resolveSchedulerDependencyProfile(schedulerLane),
+    ciDisposition,
     dependencyProfiles:
       category === 'preparation'
         ? []
@@ -276,6 +304,25 @@ function validateCatalog(catalog) {
 }
 
 export const QA_CONTROL_CATALOG = Object.freeze(validateCatalog(buildCatalog()));
+
+export function collectCiClosureReport(catalog = QA_CONTROL_CATALOG) {
+  const checkpointControls = catalog.filter((control) =>
+    control.lanes.some((lane) => CHECKPOINT_LANES.has(lane))
+  );
+  return {
+    schemaVersion: 1,
+    artifactKind: 'sniptale-ci-closure-report',
+    blocking: false,
+    controls: checkpointControls.map(({ ciDisposition, id, label }) => ({
+      id,
+      label,
+      ciDisposition,
+    })),
+    gaps: checkpointControls
+      .filter(({ ciDisposition }) => ciDisposition === null)
+      .map(({ id, label }) => ({ id, label })),
+  };
+}
 
 export function selectQaControls({ lane, runsIn, semanticClass } = {}) {
   return QA_CONTROL_CATALOG.filter(

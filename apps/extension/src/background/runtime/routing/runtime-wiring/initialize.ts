@@ -26,12 +26,15 @@ import { registerVoiceInputTelemetryPorts } from '../../../voice-input/telemetry
 import { registerAggregateEditorPresencePorts } from '../../../application/aggregate-promotion/ports';
 import { registerExtensionCommandListener } from '../../commands';
 import { registerSecurityE2EControl } from '../../../../platform/security-e2e-control';
+import { subscribeToLocaleChanges } from '../../../../platform/i18n';
 
 const logger = createLogger({ namespace: 'BackgroundRuntimeWiring' });
 
 export function initializeBackgroundRuntime(state: BackgroundModeState): void {
   logger.log('Background service worker loaded');
 
+  // The service worker has no localStorage paint hint, so keep its translation state hydrated.
+  subscribeToLocaleChanges(() => undefined);
   configureDownloadPort({ executeDownloadBlob });
   runStartupMaintenance(state, logger);
   registerInstallListener(logger);

@@ -6,19 +6,21 @@ import {
   VideoAutoProcessingAction,
   type VideoAutoProcessingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
-import { VideoProjectActionEventKind } from '../../../features/video/project/types/interaction';
+import {
+  VideoProjectActionEventKind,
+  VideoProjectInteractionTimeBasis,
+} from '../../../features/video/project/types/interaction';
 import { buildAutoTransformCandidates } from './auto-transform.candidates';
 import { buildAutoZoomRegions } from './auto-transform.zoom';
-import {
-  applyAutoTransformClipTimeline,
-  mapSourceTimeToProjectTime,
-} from './auto-transform.clip-timeline';
+import { applyAutoTransformClipTimeline } from './auto-transform.clip-timeline';
 import {
   createRecordingTelemetryNormalizationParams,
   normalizeRecordingActionEventsToProjectSpace,
   normalizeRecordingCursorTrackToProjectSpace,
 } from './telemetry';
 import { isRecordingTelemetryEligibleForAutoProcessing } from './telemetry-eligibility';
+import { mapSourceTimeToProjectPoint } from '../../../features/video/project/timeline/source-time';
+import { collectRepresentativeRecordingSourceClips } from './source-timed-clips';
 
 function resolveAutoTransformSettings(
   settings: VideoAutoProcessingSettings | undefined
@@ -40,14 +42,25 @@ function rebuildRecordingActionEvents(params: {
     params.telemetry.actionEvents,
     createRecordingTelemetryNormalizationParams(params.telemetry, params.project)
   );
+  const sourceClips = collectRepresentativeRecordingSourceClips(params.project, params.recordingId);
   const recordingActions = normalizedActions
     .map<VideoProjectActionEvent | null>((event) => {
-      const time = mapSourceTimeToProjectTime(params.project, params.recordingId, event.time);
-      return time === null
+      const point = mapSourceTimeToProjectPoint(sourceClips, event.time);
+      return point === null
         ? null
         : {
             ...event,
-            time,
+            ...(point
+              ? {
+                  sourceAnchor: {
+                    kind: 'recording-source' as const,
+                    recordingId: params.recordingId,
+                    sourceClipId: point.clipId,
+                    sourceTime: event.time,
+                  },
+                }
+              : {}),
+            time: point.time,
             data: {
               ...event.data,
               recordingTelemetry: true,
@@ -57,11 +70,16 @@ function rebuildRecordingActionEvents(params: {
     .filter((event): event is VideoProjectActionEvent => event !== null);
   const manualEvents = params.project.actionEvents.filter(
     (event) =>
+      event.timeBasis === VideoProjectInteractionTimeBasis.PROJECT ||
       event.kind === VideoProjectActionEventKind.PAUSE ||
       event.kind === VideoProjectActionEventKind.CALLOUT
   );
+  const manualEventIds = new Set(manualEvents.map((event) => event.id));
 
-  return [...manualEvents, ...recordingActions].sort((left, right) => left.time - right.time);
+  return [
+    ...manualEvents,
+    ...recordingActions.filter((event) => !manualEventIds.has(event.id)),
+  ].sort((left, right) => left.time - right.time);
 }
 
 function rebuildRecordingCursorTrack(params: {
@@ -78,14 +96,36 @@ function rebuildRecordingCursorTrack(params: {
     return params.project.cursorTrack;
   }
 
+  const sourceClips = collectRepresentativeRecordingSourceClips(params.project, params.recordingId);
+  const manualSamples =
+    params.project.cursorTrack?.samples.filter(
+      (sample) => sample.timeBasis === VideoProjectInteractionTimeBasis.PROJECT
+    ) ?? [];
+  const manualSampleIds = new Set(manualSamples.map((sample) => sample.id));
+
   return {
     ...normalizedTrack,
-    samples: normalizedTrack.samples
-      .map((sample) => {
-        const time = mapSourceTimeToProjectTime(params.project, params.recordingId, sample.time);
-        return time === null ? null : { ...sample, time };
-      })
-      .filter((sample): sample is NonNullable<typeof sample> => sample !== null),
+    samples: [
+      ...manualSamples,
+      ...normalizedTrack.samples
+        .filter((sample) => !manualSampleIds.has(sample.id))
+        .map((sample) => {
+          const point = mapSourceTimeToProjectPoint(sourceClips, sample.time);
+          return point === null
+            ? null
+            : {
+                ...sample,
+                sourceAnchor: {
+                  kind: 'recording-source' as const,
+                  recordingId: params.recordingId,
+                  sourceClipId: point.clipId,
+                  sourceTime: sample.time,
+                },
+                time: point.time,
+              };
+        })
+        .filter((sample): sample is NonNullable<typeof sample> => sample !== null),
+    ].sort((left, right) => left.time - right.time),
   };
 }
 

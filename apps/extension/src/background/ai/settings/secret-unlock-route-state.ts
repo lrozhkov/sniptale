@@ -48,6 +48,14 @@ export async function readUnlockRequest(
   return records.get(requestId) ?? null;
 }
 
+function applyUnlockTransition<
+  T extends { transitioned: boolean; record: StoredAISecretUnlockRequest | null },
+>(unlockRequests: UnlockRequestMemoryDomain, requestId: string, transition: T): T {
+  if (transition.record) unlockRequests.set(requestId, transition.record);
+  else unlockRequests.delete(requestId);
+  return transition;
+}
+
 export async function transitionUnlockRequest(
   unlockRequests: UnlockRequestMemoryDomain,
   args: {
@@ -57,16 +65,7 @@ export async function transitionUnlockRequest(
   }
 ): Promise<ReturnType<typeof transitionStoredAISecretUnlockRequest>> {
   const transition = await transitionStoredAISecretUnlockRequest(args);
-  if (transition.transitioned) {
-    unlockRequests.set(args.requestId, transition.record);
-    return transition;
-  }
-  if (transition.record) {
-    unlockRequests.set(args.requestId, transition.record);
-  } else {
-    unlockRequests.delete(args.requestId);
-  }
-  return transition;
+  return applyUnlockTransition(unlockRequests, args.requestId, transition);
 }
 
 export async function transitionUnlockRequestFromStatuses(
@@ -78,14 +77,5 @@ export async function transitionUnlockRequestFromStatuses(
   }
 ): Promise<ReturnType<typeof transitionStoredAISecretUnlockRequestFromStatuses>> {
   const transition = await transitionStoredAISecretUnlockRequestFromStatuses(args);
-  if (transition.transitioned) {
-    unlockRequests.set(args.requestId, transition.record);
-    return transition;
-  }
-  if (transition.record) {
-    unlockRequests.set(args.requestId, transition.record);
-  } else {
-    unlockRequests.delete(args.requestId);
-  }
-  return transition;
+  return applyUnlockTransition(unlockRequests, args.requestId, transition);
 }

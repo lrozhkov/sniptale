@@ -1,6 +1,7 @@
 // policyStateIds: [] - selectable target catalogs are immutable DOM policy, not authority state.
 import { isContentOwnedElement } from '../../platform/dom-host';
 import { resolvePagePreparationElement } from '../../parser/page-preparation/target';
+import { NAVIGATION_LOCK_OVERLAY_ID } from '../locker/constants';
 
 const HTML_NAMESPACE = 'http://www.w3.org/1999/xhtml';
 const SVG_NAMESPACE = 'http://www.w3.org/2000/svg';
@@ -141,9 +142,80 @@ function getComposedParentElement(element: Element): Element | null {
   return isElementNode(host) ? host : null;
 }
 
+type PointHitTestRoot = Document | ShadowRoot;
+
+function getPointHitTestTargets(root: PointHitTestRoot, x: number, y: number): Element[] {
+  if (typeof root.elementsFromPoint === 'function') {
+    return root.elementsFromPoint(x, y);
+  }
+
+  const target = root.elementFromPoint(x, y);
+  return target ? [target] : [];
+}
+
+function getAccessibleIframeDocument(element: Element): Document | null {
+  if (element.namespaceURI !== HTML_NAMESPACE || element.localName.toLowerCase() !== 'iframe') {
+    return null;
+  }
+
+  try {
+    return (element as HTMLIFrameElement).contentDocument;
+  } catch {
+    return null;
+  }
+}
+
+function resolvePagePointTarget(
+  root: PointHitTestRoot,
+  x: number,
+  y: number,
+  depth = 0
+): Element | null {
+  if (depth > 12) return null;
+
+  const target = getPointHitTestTargets(root, x, y).find(
+    (candidate) => !isContentOwnedElement(candidate)
+  );
+  if (!target) return null;
+
+  const iframeDocument = getAccessibleIframeDocument(target);
+  if (iframeDocument) {
+    const iframe = target as HTMLIFrameElement;
+    const rect = iframe.getBoundingClientRect();
+    const nestedTarget = resolvePagePointTarget(
+      iframeDocument,
+      x - rect.left - iframe.clientLeft,
+      y - rect.top - iframe.clientTop,
+      depth + 1
+    );
+    if (nestedTarget) return nestedTarget;
+  }
+
+  const shadowRoot = target.shadowRoot;
+  if (shadowRoot) {
+    const nestedTarget = resolvePagePointTarget(shadowRoot, x, y, depth + 1);
+    if (nestedTarget) return nestedTarget;
+  }
+
+  return target;
+}
+
+export function resolveShieldedPageElement(event: Event): Element | null {
+  const composedTargets = event.composedPath().filter(isElementNode);
+  if (!composedTargets.some((candidate) => candidate.id === NAVIGATION_LOCK_OVERLAY_ID)) {
+    return null;
+  }
+
+  if (!(event instanceof MouseEvent)) return null;
+  const shield = composedTargets.find((candidate) => candidate.id === NAVIGATION_LOCK_OVERLAY_ID);
+  return shield ? resolvePagePointTarget(shield.ownerDocument, event.clientX, event.clientY) : null;
+}
+
 function resolveComposedPageElement(event: Event, iframe?: HTMLIFrameElement): Element | null {
   const composedTargets = event.composedPath().filter(isElementNode);
-  if (composedTargets.some((candidate) => isContentOwnedElement(candidate))) return null;
+  if (composedTargets.some((candidate) => isContentOwnedElement(candidate))) {
+    return resolveShieldedPageElement(event);
+  }
 
   const composedTarget = composedTargets[0];
   const resolved =
@@ -205,6 +277,46 @@ function isAnnotationHtmlTarget(element: SelectablePageElement): element is HTML
   });
 }
 
+const ANNOTATION_INTERACTIVE_TAGS = new Set(['button', 'input', 'select', 'summary', 'textarea']);
+const ANNOTATION_INTERACTIVE_ROLES = new Set([
+  'button',
+  'checkbox',
+  'link',
+  'menuitem',
+  'menuitemcheckbox',
+  'menuitemradio',
+  'option',
+  'radio',
+  'switch',
+  'tab',
+  'treeitem',
+]);
+
+function isAnnotationInteractiveOwner(element: Element): element is HTMLElement {
+  if (element.namespaceURI !== HTML_NAMESPACE) return false;
+  const htmlElement = element as HTMLElement;
+  const localName = htmlElement.localName.toLowerCase();
+  if (ANNOTATION_INTERACTIVE_TAGS.has(localName)) return true;
+  if (localName === 'a' && htmlElement.hasAttribute('href')) return true;
+  const role = htmlElement.getAttribute('role')?.toLowerCase();
+  return Boolean(role && ANNOTATION_INTERACTIVE_ROLES.has(role));
+}
+
+function resolveAnnotationInteractionOwner(element: SelectablePageElement): HTMLElement | null {
+  let current: Element | null = element;
+  while (current) {
+    if (
+      isAnnotationInteractiveOwner(current) &&
+      isSelectablePageElement(current) &&
+      isAnnotationHtmlTarget(current)
+    ) {
+      return current;
+    }
+    current = getComposedParentElement(current);
+  }
+  return null;
+}
+
 function isHtmlTarget(element: SelectablePageElement): element is HTMLElement {
   return element.namespaceURI === HTML_NAMESPACE;
 }
@@ -226,7 +338,9 @@ export function resolveSelectablePageHtmlElement(
 ): HTMLElement | null {
   return resolveSelectablePageProjection(
     event,
-    (element) => (isAnnotationHtmlTarget(element) ? element : null),
+    (element) =>
+      resolveAnnotationInteractionOwner(element) ??
+      (isAnnotationHtmlTarget(element) ? element : null),
     iframe
   );
 }

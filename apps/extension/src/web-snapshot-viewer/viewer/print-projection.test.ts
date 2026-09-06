@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
+  expandSnapshotScrollRegions,
   freezeSnapshotMediaQueries,
   printWebSnapshotImageProjection,
   printWebSnapshotProjection,
@@ -16,6 +17,18 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
+
+function appendLargeScroller(parent: HTMLElement): HTMLElement {
+  const scroller = parent.ownerDocument.createElement('section');
+  scroller.style.cssText = 'height:300px;width:600px;overflow:auto';
+  Object.defineProperties(scroller, {
+    clientHeight: { configurable: true, value: 300 },
+    clientWidth: { configurable: true, value: 600 },
+    scrollHeight: { configurable: true, value: 600 },
+  });
+  parent.append(scroller);
+  return scroller;
+}
 
 it('freezes screen media branches for the captured viewport and removes page-authored print CSS', () => {
   const style = document.createElement('style');
@@ -44,7 +57,24 @@ it('freezes screen media branches for the captured viewport and removes page-aut
   expect(frozenCss).not.toContain('@media screen');
 });
 
-it('prints a disposable offline projection and removes it after the print dialog returns', async () => {
+it('preserves declarations when Chromium exposes an empty nested-rule list on a style rule', () => {
+  const style = document.createElement('style');
+  style.textContent = '.snapshot-layout { display: flex; position: absolute; }';
+  document.head.append(style);
+  const rule = style.sheet?.cssRules[0];
+  if (!rule) throw new Error('Expected a parsed snapshot style rule.');
+  Object.defineProperty(rule, 'cssRules', { configurable: true, value: [] });
+
+  freezeSnapshotMediaQueries(document, window);
+
+  const frozenCss = document.querySelector<HTMLStyleElement>(
+    '[data-sniptale-print-frozen-styles]'
+  )?.textContent;
+  expect(frozenCss).toContain('display: flex');
+  expect(frozenCss).toContain('position: absolute');
+});
+
+it('preserves authored print layout before expanding still-clipped scroll regions', async () => {
   const projection = printWebSnapshotProjection({
     documentUrl: null,
     hostDocument: document,
@@ -61,8 +91,63 @@ it('prints a disposable offline projection and removes it after the print dialog
     Object.defineProperty(image, 'decode', { configurable: true, value: decode });
     frame.contentDocument.body.append(image);
   }
+  const authoredPrintStyle = frame.contentDocument?.createElement('style');
+  if (authoredPrintStyle && frame.contentDocument?.head) {
+    authoredPrintStyle.textContent = [
+      '@media print {',
+      '.article { display: block; max-width: 42rem; }',
+      '.hide-in-print { display: none; }',
+      '.reflow-in-print { display: grid; width: 42rem; grid-template-columns: 1fr; }',
+      '}',
+    ].join('\n');
+    frame.contentDocument.head.append(authoredPrintStyle);
+  }
+  const printShell = frame.contentDocument?.createElement('main');
+  const reflowedPrintShell = frame.contentDocument?.createElement('main');
+  const sharedPrintShell = frame.contentDocument?.createElement('main');
+  let printScroller: HTMLElement | null = null;
+  let reflowedPrintScroller: HTMLElement | null = null;
+  let siblingPrintScrollers: HTMLElement[] = [];
+  if (printShell && frame.contentDocument?.body) {
+    printShell.className = 'hide-in-print';
+    printScroller = appendLargeScroller(printShell);
+    frame.contentDocument.body.append(printShell);
+  }
+  if (reflowedPrintShell && frame.contentDocument?.body) {
+    reflowedPrintShell.className = 'reflow-in-print';
+    reflowedPrintScroller = appendLargeScroller(reflowedPrintShell);
+    frame.contentDocument.body.append(reflowedPrintShell);
+  }
+  if (sharedPrintShell && frame.contentDocument?.body) {
+    siblingPrintScrollers = [
+      appendLargeScroller(sharedPrintShell),
+      appendLargeScroller(sharedPrintShell),
+    ];
+    frame.contentDocument.body.append(sharedPrintShell);
+  }
+  let authoredPrintCss = '';
+  let hiddenPrintScrollerExpanded = false;
+  let reflowedPrintScrollerExpanded = false;
+  let siblingPrintScrollersExpanded: boolean[] = [];
   let printPolicy = '';
   const printWithPolicy = vi.fn(() => {
+    if (printShell) printShell.style.display = 'none';
+    if (reflowedPrintShell) {
+      reflowedPrintShell.style.display = 'grid';
+      reflowedPrintShell.style.width = '42rem';
+    }
+    frameWindow.dispatchEvent(new Event('beforeprint'));
+    hiddenPrintScrollerExpanded =
+      printScroller?.hasAttribute('data-sniptale-print-scroll-region') ?? false;
+    reflowedPrintScrollerExpanded =
+      reflowedPrintScroller?.hasAttribute('data-sniptale-print-scroll-region') ?? false;
+    siblingPrintScrollersExpanded = siblingPrintScrollers.map((scroller) =>
+      scroller.hasAttribute('data-sniptale-print-scroll-region')
+    );
+    authoredPrintCss = Array.from(frame.contentDocument?.styleSheets ?? [])
+      .flatMap((sheet) => Array.from(sheet.cssRules))
+      .map((rule) => rule.cssText)
+      .join('\n');
     printPolicy =
       frame.contentDocument?.querySelector<HTMLStyleElement>('[data-sniptale-print-policy]')
         ?.textContent ?? '';
@@ -89,14 +174,92 @@ it('prints a disposable offline projection and removes it after the print dialog
   expect(frame.style.height).toBe('900px');
   expect(image?.loading).toBe('eager');
   expect(decode).toHaveBeenCalledOnce();
-  expect(printPolicy).toContain('@page{size:1440px 900px;margin:0}');
-  expect(printPolicy).toContain('width:1440px!important');
-  expect(printPolicy).toContain('overflow-x:hidden!important');
+  expect(authoredPrintCss).toContain('@media print');
+  expect(authoredPrintCss).toContain('max-width: 42rem');
+  expect(printPolicy).not.toContain('@page');
+  expect(printPolicy).not.toContain('width:1440px!important');
+  expect(printPolicy).toContain('overflow:visible!important');
+  expect(printPolicy).toContain('[data-sniptale-print-scroll-region]');
+  expect(printPolicy).toContain('width:100%!important');
+  expect(hiddenPrintScrollerExpanded).toBe(false);
+  expect(reflowedPrintScrollerExpanded).toBe(false);
+  expect(siblingPrintScrollersExpanded).toEqual([true, true]);
   expect(printWithPolicy).toHaveBeenCalledOnce();
   expect(document.querySelector('iframe')).toBeNull();
 });
 
-it('prints the original screenshot as viewport-sized slices without rasterizing it again', async () => {
+it('expands an internal scroll region and its positioned ancestors before printing', () => {
+  const frame = document.createElement('iframe');
+  document.body.append(frame);
+  const projectionDocument = frame.contentDocument;
+  if (!projectionDocument) throw new Error('Expected projection document.');
+  const host = projectionDocument.createElement('div');
+  const shadow = host.attachShadow({ mode: 'open' });
+  const shell = projectionDocument.createElement('main');
+  shell.id = 'shell';
+  shell.style.cssText = 'position:absolute;height:300px;overflow:hidden';
+  const scroll = projectionDocument.createElement('section');
+  scroll.id = 'scroll';
+  scroll.style.cssText = 'position:absolute;inset:0;height:300px;overflow:auto';
+  scroll.append(projectionDocument.createElement('p'), projectionDocument.createElement('p'));
+  shell.append(scroll);
+  shadow.append(shell);
+  projectionDocument.body.append(host);
+  Object.defineProperties(scroll, {
+    clientHeight: { configurable: true, value: 300 },
+    clientWidth: { configurable: true, value: 600 },
+    scrollHeight: { configurable: true, value: 600 },
+  });
+  expect({
+    clientHeight: scroll.clientHeight,
+    overflow: getComputedStyle(scroll).overflow,
+    overflowY: getComputedStyle(scroll).overflowY,
+    scrollHeight: scroll.scrollHeight,
+  }).toEqual({ clientHeight: 300, overflow: 'auto', overflowY: 'visible', scrollHeight: 600 });
+
+  expandSnapshotScrollRegions(projectionDocument);
+
+  expect({
+    scrollHeight: scroll.style.getPropertyValue('height'),
+    scrollMinHeight: scroll.style.getPropertyValue('min-height'),
+    scrollOverflow: scroll.style.getPropertyValue('overflow'),
+    scrollPosition: scroll.style.getPropertyValue('position'),
+    scrollWidth: scroll.style.getPropertyValue('width'),
+    shellHeight: shell.style.getPropertyValue('height'),
+    shellPosition: shell.style.getPropertyValue('position'),
+    shellWidth: shell.style.getPropertyValue('width'),
+    shadowHostHeight: host.style.getPropertyValue('height'),
+  }).toEqual({
+    scrollHeight: '600px',
+    scrollMinHeight: '600px',
+    scrollOverflow: 'visible',
+    scrollPosition: 'relative',
+    scrollWidth: '100%',
+    shellHeight: 'auto',
+    shellPosition: 'relative',
+    shellWidth: '100%',
+    shadowHostHeight: 'auto',
+  });
+});
+
+it('leaves compact dropdown scroll regions to authored print CSS', () => {
+  const dropdown = document.createElement('div');
+  dropdown.style.cssText = 'height:32px;width:220px;overflow:auto';
+  document.body.append(dropdown);
+  Object.defineProperties(dropdown, {
+    clientHeight: { configurable: true, value: 32 },
+    clientWidth: { configurable: true, value: 220 },
+    scrollHeight: { configurable: true, value: 1000 },
+  });
+
+  expandSnapshotScrollRegions(document);
+
+  expect(dropdown.hasAttribute('data-sniptale-print-scroll-region')).toBe(false);
+  expect(dropdown.style.height).toBe('32px');
+  expect(dropdown.style.overflow).toBe('auto');
+});
+
+it('prints the complete original screenshot as one scalable image without rasterizing it again', async () => {
   const projection = printWebSnapshotImageProjection({
     hostDocument: document,
     screenshotUrl: 'blob:snapshot-screenshot',
@@ -145,9 +308,10 @@ it('prints the original screenshot as viewport-sized slices without rasterizing 
   )?.textContent;
   expect(frame.getAttribute('sandbox')).toBe('allow-same-origin allow-modals');
   expect(frame.getAttribute('srcdoc')).toContain("default-src 'none'");
-  expect(policy).toContain('@page{size:1000px 625px;margin:0}');
-  expect(printedPageCount).toBe(3);
-  expect(printedPageOffsets).toEqual(['0px', '-625px', '-1250px']);
+  expect(policy).not.toContain('@page');
+  expect(policy).toContain('aspect-ratio:1000/1600');
+  expect(printedPageCount).toBe(1);
+  expect(printedPageOffsets).toEqual(['0px']);
   expect(print).toHaveBeenCalledOnce();
   expect(document.querySelector('iframe')).toBeNull();
 });

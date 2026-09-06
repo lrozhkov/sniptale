@@ -50,7 +50,7 @@ vi.mock('../../parser/page-preparation/history', async (importOriginal) => ({
 
 import { createQuickEditDocumentMode } from './document-mode';
 
-function createDocumentMode(disableRequested = vi.fn()) {
+function createDocumentMode(disableRequested = vi.fn(), setInputShieldSuspended = vi.fn()) {
   return createQuickEditDocumentMode({
     disableRequested,
     editingElements: new Map(),
@@ -58,6 +58,7 @@ function createDocumentMode(disableRequested = vi.fn()) {
     getIsQuickEditMode: () => true,
     hideBlockingOverlay: vi.fn(),
     hideHoverOverlay: vi.fn(),
+    setInputShieldSuspended,
   });
 }
 
@@ -179,7 +180,8 @@ it('keeps document mode active when designMode restore fails', () => {
 
 it('prevents the input and disables through the owner when before-state capture fails', () => {
   const disableRequested = vi.fn();
-  const documentMode = createDocumentMode(disableRequested);
+  const setInputShieldSuspended = vi.fn();
+  const documentMode = createDocumentMode(disableRequested, setInputShieldSuspended);
   const paragraph = document.createElement('p');
   paragraph.textContent = 'Before';
   document.body.append(paragraph);
@@ -206,6 +208,7 @@ it('prevents the input and disables through the owner when before-state capture 
   expect(documentMode.isEnabled()).toBe(false);
   expect(document.body.classList.contains('sniptale-quick-edit-document-mode')).toBe(false);
   expect(disableRequested).toHaveBeenCalledOnce();
+  expect(setInputShieldSuspended).toHaveBeenLastCalledWith(false);
   expect(historyMocks.cancelTransaction).toHaveBeenCalledWith('quick-edit-document-mode');
 });
 

@@ -19,3 +19,23 @@ export function resolvePlaybackFrameTime(time: number, duration: number, fps: nu
   const frameIndex = Math.max(0, Math.round(Math.max(0, time) * normalizedFps));
   return Math.min(normalizedDuration, frameIndex / normalizedFps);
 }
+
+export function resolvePlaybackFrameStepTime(
+  time: number,
+  duration: number,
+  fps: number,
+  frameDelta: number
+): number {
+  const normalizedFps = Number.isFinite(fps) ? Math.max(1, fps) : MAX_UI_FPS;
+  const normalizedDuration = Math.max(0, Number(duration) || 0);
+  const normalizedTime = Math.min(normalizedDuration, Math.max(0, time));
+  const currentFrame = Math.max(0, Math.round(normalizedTime * normalizedFps));
+  const terminalOffset =
+    frameDelta < 0 &&
+    normalizedTime === normalizedDuration &&
+    currentFrame / normalizedFps < normalizedDuration
+      ? 1
+      : 0;
+  const targetFrame = Math.max(0, currentFrame + Math.trunc(frameDelta) + terminalOffset);
+  return Math.min(normalizedDuration, targetFrame / normalizedFps);
+}

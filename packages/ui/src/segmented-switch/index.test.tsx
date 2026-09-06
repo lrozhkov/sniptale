@@ -39,7 +39,26 @@ it('wraps long dense switch groups when requested', () => {
   );
 
   expect(markup).toContain('flex-wrap');
-  expect(markup).toContain('min-w-[4.25rem]');
+  expect(markup).toContain('min-w-fit max-w-full flex-auto');
   expect(markup).toContain('whitespace-normal');
   expect(markup).not.toContain('gridTemplateColumns');
+});
+
+it('keeps compact segments usable when the active item was removed', () => {
+  const markup = renderToStaticMarkup(
+    <SegmentedSwitch
+      activeId="removed"
+      ariaLabel="Groups"
+      density="compact"
+      options={[
+        { id: 'first', label: 'First' },
+        { id: 'second', label: 'Second' },
+      ]}
+      onChange={vi.fn()}
+    />
+  );
+  expect(markup).toContain('!h-7');
+  expect(markup).toContain('First');
+  expect(markup).toContain('Second');
+  expect(markup).not.toContain('NaN');
 });

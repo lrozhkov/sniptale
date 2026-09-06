@@ -12,6 +12,7 @@ export interface NumericValueFieldProps {
   label: string;
   max?: number | undefined;
   min?: number | undefined;
+  normalizeValue?: ((value: number) => number) | undefined;
   onCommitValue: (value: number) => void;
   onPreviewValue: (value: number) => void;
   precision?: number | undefined;
@@ -27,6 +28,7 @@ export function NumericValueField(props: NumericValueFieldProps) {
   const state = useNumericValueFieldState({
     max: props.max,
     min: props.min,
+    normalizeValue: props.normalizeValue,
     onCommitValue: props.onCommitValue,
     onPreviewValue: props.onPreviewValue,
     precision: props.precision,

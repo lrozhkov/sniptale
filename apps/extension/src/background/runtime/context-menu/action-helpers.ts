@@ -5,7 +5,7 @@ import {
   openVideoEditorPage,
 } from '../../../platform/navigation/extension-pages';
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
-import { translate } from '../../../platform/i18n';
+import { ensureLocaleHydrated, getCurrentLocale, translate } from '../../../platform/i18n';
 import { loadPopupExportPreferences } from '../../../composition/persistence/popup-export-preferences';
 import { loadSettings } from '../../../composition/persistence/settings';
 import { loadVideoSettings } from '../../../composition/persistence/capture-settings';
@@ -123,34 +123,47 @@ export async function startContextMenuVideoRecording(
 }
 
 export async function startContextMenuExport(tabId: number): Promise<void> {
-  const options = await buildContextMenuExportOptions();
-  const warnings: string[] = [];
-  if (options.includeFullPageScreenshot) {
-    const granted = await browserPermissions.request({ origins: ['<all_urls>'] });
-    if (!granted) {
-      options.includeFullPageScreenshot = false;
-      warnings.push(translate('popup.export.screenshotPermissionDeniedWarning'));
+  await ensureLocaleHydrated().catch(() => undefined);
+  const locale = getCurrentLocale();
+  try {
+    const options = await buildContextMenuExportOptions();
+    const warnings: string[] = [];
+    if (options.includeFullPageScreenshot) {
+      const granted = await browserPermissions.request({ origins: ['<all_urls>'] });
+      if (!granted) {
+        options.includeFullPageScreenshot = false;
+        warnings.push(translate('popup.export.screenshotPermissionDeniedWarning', locale));
+      }
     }
+    const tab = await browserTabs.get(tabId);
+    await startPagePackageJob({
+      contentPort: {
+        cancelPagePackage: cancelPopupExportPagePackage,
+        requestPagePackage: requestPopupExportPagePackage,
+      },
+      includeWebCopy: false,
+      intent: 'export',
+      jobId: crypto.randomUUID(),
+      locale,
+      orderedTabs: [
+        { tabId, title: normalizePopupExportTabTitle(tab.title ?? tab.url ?? `Tab ${tabId}`) },
+      ],
+      options,
+      warnings,
+    });
+  } catch (error) {
+    throw new Error(
+      `${translate('popup.export.startExportError', locale)}. ${translate(
+        'popup.export.exportProcessingErrorDetail',
+        locale
+      )}`,
+      { cause: error }
+    );
   }
-  const tab = await browserTabs.get(tabId);
-  await startPagePackageJob({
-    contentPort: {
-      cancelPagePackage: cancelPopupExportPagePackage,
-      requestPagePackage: requestPopupExportPagePackage,
-    },
-    includeWebCopy: false,
-    intent: 'export',
-    jobId: crypto.randomUUID(),
-    orderedTabs: [
-      { tabId, title: normalizePopupExportTabTitle(tab.title ?? tab.url ?? `Tab ${tabId}`) },
-    ],
-    options,
-    warnings,
-  });
 
   await showContextMenuToast(tabId, {
-    message: translate('popup.export.startProgressMessage'),
-    title: translate('popup.export.exportButton'),
+    message: translate('popup.export.startProgressMessage', locale),
+    title: translate('popup.export.exportButton', locale),
     type: 'info',
   });
 }
@@ -164,7 +177,11 @@ export async function copyContextMenuExportPreview(
   });
 
   if (!previewResponse?.success || !previewResponse.preview) {
-    throw new Error(previewResponse?.error || translate('popup.export.prepareExportError'));
+    throw new Error(
+      `${translate('popup.export.prepareExportError')}. ${translate(
+        'popup.export.pagePreparationErrorDetail'
+      )}`
+    );
   }
 
   const text =
@@ -177,7 +194,7 @@ export async function copyContextMenuExportPreview(
   });
 
   if (!copyResponse?.success) {
-    throw new Error(copyResponse?.error || translate('popup.export.prepareExportError'));
+    throw new Error(translate('content.runtime.copyTextFailed'));
   }
 
   await showContextMenuToast(tabId, {

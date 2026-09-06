@@ -25,7 +25,9 @@ export function summarizeSteps(steps) {
   const summary = emptySummary();
   const outcomeFields = {
     passed: 'passed',
+    inherited: 'passed',
     'problems-found': 'problemsFound',
+    blocked: 'problemsFound',
     skipped: 'skipped',
     error: 'errors',
     interrupted: 'interrupted',
@@ -60,13 +62,17 @@ export function createStep(input, clock) {
     problemIds: [...new Set(input.problemIds ?? [])].sort(),
     skipReasonId: input.skipReasonId ?? null,
     diagnostic: input.diagnostic ?? null,
+    population: input.population ?? null,
+    inheritance: input.inheritance ?? null,
   });
 }
 
 export function resolveFinalStatus(steps, requestedStatus) {
   if (requestedStatus === 'interrupted') return 'interrupted';
   if (requestedStatus && requestedStatus !== 'running') return requestedStatus;
-  return steps.some((step) => ['problems-found', 'error', 'interrupted'].includes(step.outcome))
+  return steps.some((step) =>
+    ['problems-found', 'blocked', 'error', 'interrupted'].includes(step.outcome)
+  )
     ? 'problems-found'
     : 'all-passed';
 }

@@ -6,6 +6,7 @@ import '@sniptale/ui/styles/ai-modal';
 import '@sniptale/ui/styles/glass';
 import '@sniptale/ui/styles/toolbar';
 import '@sniptale/ui/styles/overlays';
+import './styles/spacing-compatibility.css';
 
 // Инициализация трассировщика (только в dev/build режимах)
 initTracer('video-editor');

@@ -38,6 +38,7 @@ const EXPECTED_POLICY_STATE_IDS = [
   'popup-tab-route-capabilities',
   'project-export-capabilities',
   'project-export-job-ledger',
+  'recent-capture-editor-asset-binding',
   'surface-style-preset-mutation-queue',
   'tab-mode-runtime-state',
   'video-camera-recorder-grant',
@@ -114,6 +115,7 @@ it('marks delete-on-consume capability states as one-shot', () => {
     'offscreen-command-capability-generations',
     'popup-tab-route-capabilities',
     'project-export-capabilities',
+    'recent-capture-editor-asset-binding',
   ]);
 });
 

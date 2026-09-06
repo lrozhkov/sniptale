@@ -218,7 +218,8 @@ it('reports setup failures inline without a duplicate toast', async () => {
     'Failed to enable Chrome AI',
     expect.any(Error)
   );
-  expect(latestState?.error).toBe('setup failed');
+  expect(latestState?.error).toContain('Внешний сервис');
+  expect(latestState?.error).not.toContain('setup failed');
 });
 
 it.each([

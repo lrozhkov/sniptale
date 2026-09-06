@@ -10,7 +10,61 @@ import type {
   VideoProjectCursorTrack,
   VideoProjectTrack,
 } from '../types/index';
-import { VideoTimelinePlacementMode } from '../types/index';
+import { VideoProjectInteractionTimeBasis, VideoTimelinePlacementMode } from '../types/index';
+import { VideoProjectClipType } from '../types/index';
+
+function createRecordingSourceAnchor(
+  recordingId: string,
+  sourceClipId: string,
+  sourceTime: number
+) {
+  return {
+    kind: 'recording-source' as const,
+    recordingId,
+    sourceClipId,
+    sourceTime,
+  };
+}
+
+function anchorRecordingInteractions(params: {
+  actionEvents: VideoProjectActionEvent[];
+  clips: VideoProjectClip[];
+  cursorTrack: VideoProjectCursorTrack | null;
+  recordingId: string;
+}) {
+  const sourceClip = params.clips.find((clip) => clip.type === VideoProjectClipType.VIDEO);
+  if (!sourceClip) {
+    return { actionEvents: params.actionEvents, cursorTrack: params.cursorTrack };
+  }
+
+  return {
+    actionEvents: params.actionEvents.map((event) =>
+      event.timeBasis === VideoProjectInteractionTimeBasis.PROJECT
+        ? event
+        : {
+            ...event,
+            sourceAnchor:
+              event.sourceAnchor ??
+              createRecordingSourceAnchor(params.recordingId, sourceClip.id, event.time),
+          }
+    ),
+    cursorTrack: params.cursorTrack
+      ? {
+          ...params.cursorTrack,
+          samples: params.cursorTrack.samples.map((sample) =>
+            sample.timeBasis === VideoProjectInteractionTimeBasis.PROJECT
+              ? sample
+              : {
+                  ...sample,
+                  sourceAnchor:
+                    sample.sourceAnchor ??
+                    createRecordingSourceAnchor(params.recordingId, sourceClip.id, sample.time),
+                }
+          ),
+        }
+      : null,
+  };
+}
 
 export function createRecordingProjectDocument(params: {
   actionEvents: VideoProjectActionEvent[];
@@ -28,6 +82,12 @@ export function createRecordingProjectDocument(params: {
   tracks: VideoProjectTrack[];
 }): VideoProject {
   const now = getVideoProjectMutationTimestamp();
+  const interactions = anchorRecordingInteractions({
+    actionEvents: params.actionEvents,
+    clips: params.clips,
+    cursorTrack: params.cursorTrack,
+    recordingId: params.options.recordingId,
+  });
   return {
     version: 2,
     id: crypto.randomUUID(),
@@ -48,8 +108,8 @@ export function createRecordingProjectDocument(params: {
     transitions: [],
     utilityLanes: createDefaultVideoProjectUtilityLanes(),
     ...(params.motionRegions === undefined ? {} : { motionRegions: params.motionRegions }),
-    cursorTrack: params.cursorTrack,
-    actionEvents: params.actionEvents,
+    cursorTrack: interactions.cursorTrack,
+    actionEvents: interactions.actionEvents,
   };
 }
 

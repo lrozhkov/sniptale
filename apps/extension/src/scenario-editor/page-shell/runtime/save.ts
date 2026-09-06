@@ -1,4 +1,4 @@
-import { translate } from '../../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 import { saveScenarioProjectRecordV3 } from '../../../composition/persistence/scenario/store/v3';
 import type { ScenarioProjectV3 } from '@sniptale/runtime-contracts/scenario/types/v3';
 
@@ -7,7 +7,11 @@ interface SaveScenarioV3EditorProjectOptions {
 }
 
 export function getScenarioV3RuntimeErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : translate('scenario.editor.v3OperationFailed');
+  return createUserFacingErrorMessage({
+    cause: error,
+    detail: 'storage',
+    summaryKey: 'scenario.editor.v3OperationFailed',
+  });
 }
 
 export function saveScenarioV3EditorProject(

@@ -289,23 +289,13 @@ export async function hydratePersistedEditorDocument(args: {
       : undefined;
     return {
       assetsByRuntimeUrl,
-      document: {
-        version: 2,
-        sourceImageData,
-        sourceName: args.document.sourceName,
-        sourceWidth: args.document.sourceWidth,
-        sourceHeight: args.document.sourceHeight,
-        canvasWidth: args.document.canvasWidth,
-        canvasHeight: args.document.canvasHeight,
-        sourceLeft: args.document.sourceLeft,
-        sourceTop: args.document.sourceTop,
-        sourceDisplayWidth: args.document.sourceDisplayWidth,
-        sourceDisplayHeight: args.document.sourceDisplayHeight,
-        frame: { ...frame, backgroundImageData },
-        ...(browserFrame ? { browserFrame } : {}),
+      document: projectEditorDocumentV2(args.document, {
+        backgroundImageData,
+        browserFrame,
         canvasJson,
-        ...(args.document.richShapes === undefined ? {} : { richShapes: args.document.richShapes }),
-      },
+        frame,
+        sourceImageData,
+      }),
       release() {
         for (const url of urls.values()) URL.revokeObjectURL(url);
         urls.clear();
@@ -316,6 +306,35 @@ export async function hydratePersistedEditorDocument(args: {
     for (const url of urls.values()) URL.revokeObjectURL(url);
     throw error;
   }
+}
+
+function projectEditorDocumentV2(
+  document: PersistedEditorDocumentV3,
+  hydrated: {
+    backgroundImageData: string | null;
+    browserFrame: EditorDocument['browserFrame'];
+    canvasJson: string;
+    frame: Omit<PersistedEditorDocumentV3['frame'], 'backgroundImage'>;
+    sourceImageData: string;
+  }
+): EditorDocument {
+  return {
+    version: 2,
+    sourceImageData: hydrated.sourceImageData,
+    sourceName: document.sourceName,
+    sourceWidth: document.sourceWidth,
+    sourceHeight: document.sourceHeight,
+    canvasWidth: document.canvasWidth,
+    canvasHeight: document.canvasHeight,
+    sourceLeft: document.sourceLeft,
+    sourceTop: document.sourceTop,
+    sourceDisplayWidth: document.sourceDisplayWidth,
+    sourceDisplayHeight: document.sourceDisplayHeight,
+    frame: { ...hydrated.frame, backgroundImageData: hydrated.backgroundImageData },
+    ...(hydrated.browserFrame ? { browserFrame: hydrated.browserFrame } : {}),
+    canvasJson: hydrated.canvasJson,
+    ...(document.richShapes === undefined ? {} : { richShapes: document.richShapes }),
+  };
 }
 
 export async function materializePersistedEditorDocumentForLegacyTransfer(args: {
@@ -348,28 +367,15 @@ export async function materializePersistedEditorDocumentForLegacyTransfer(args: 
         };
       })()
     : undefined;
-  return {
-    version: 2,
-    sourceImageData,
-    sourceName: args.document.sourceName,
-    sourceWidth: args.document.sourceWidth,
-    sourceHeight: args.document.sourceHeight,
-    canvasWidth: args.document.canvasWidth,
-    canvasHeight: args.document.canvasHeight,
-    sourceLeft: args.document.sourceLeft,
-    sourceTop: args.document.sourceTop,
-    sourceDisplayWidth: args.document.sourceDisplayWidth,
-    sourceDisplayHeight: args.document.sourceDisplayHeight,
-    frame: {
-      ...frame,
-      backgroundImageData: args.document.frame.backgroundImage
-        ? (dataUrls.get(args.document.frame.backgroundImage.assetId) ?? null)
-        : null,
-    },
-    ...(browserFrame ? { browserFrame } : {}),
+  return projectEditorDocumentV2(args.document, {
+    backgroundImageData: args.document.frame.backgroundImage
+      ? (dataUrls.get(args.document.frame.backgroundImage.assetId) ?? null)
+      : null,
+    browserFrame,
     canvasJson: JSON.stringify(
       await hydrateCanvasValue(JSON.parse(args.document.canvasJson) as unknown, dataUrls)
     ),
-    ...(args.document.richShapes === undefined ? {} : { richShapes: args.document.richShapes }),
-  };
+    frame,
+    sourceImageData,
+  });
 }

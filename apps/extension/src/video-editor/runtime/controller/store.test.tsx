@@ -109,6 +109,9 @@ const expectedKeys = {
     'selection',
   ],
   timeline: [
+    'appendMaterial',
+    'insertMaterial',
+    'overlayMaterial',
     'addAssetClip',
     'addTrack',
     'addTrackLogicalLane',
@@ -132,6 +135,7 @@ const expectedKeys = {
     'renameTrack',
     'setPixelsPerSecond',
     'splitClipAt',
+    'swapClip',
     'toggleTrackLock',
     'toggleTrackVisibility',
     'toggleUtilityLaneLock',

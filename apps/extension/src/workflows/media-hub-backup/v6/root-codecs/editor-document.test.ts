@@ -58,4 +58,30 @@ describe('portable editor document codec', () => {
       })
     ).toThrow('missing from archive inventory');
   });
+
+  it('returns the exact restored projection without portable unknown keys', () => {
+    const portable = encodePortableEditorDocument({
+      document,
+      objectsByAssetId: new Map([
+        ['source-local', 'object-source'],
+        ['canvas-local', 'object-canvas'],
+      ]),
+    });
+    const hostilePortable = {
+      ...portable,
+      ignoredDocumentField: true,
+      frame: { ...portable.frame, ignoredFrameField: true },
+    };
+
+    const decoded = decodePortableEditorDocument({
+      document: hostilePortable,
+      assetsByObjectId: new Map([
+        ['object-source', 'restored-source'],
+        ['object-canvas', 'restored-canvas'],
+      ]),
+    });
+
+    expect(decoded).not.toHaveProperty('ignoredDocumentField');
+    expect(decoded.frame).not.toHaveProperty('ignoredFrameField');
+  });
 });

@@ -71,7 +71,8 @@ it('surfaces bootstrap errors in the deck AI state', async () => {
 
   await renderHarness();
 
-  expect(latestState?.error).toBe('load failed');
+  expect(latestState?.error).toContain(translate('common.errors.externalServiceDetail'));
+  expect(latestState?.error).not.toContain('load failed');
 });
 
 it('uses the generic AI error label for unknown bootstrap failures', async () => {
@@ -79,7 +80,8 @@ it('uses the generic AI error label for unknown bootstrap failures', async () =>
 
   await renderHarness();
 
-  expect(latestState?.error).toBe(translate('scenario.editor.aiEditorRequestFailed'));
+  expect(latestState?.error).toContain(translate('scenario.editor.aiEditorRequestFailed'));
+  expect(latestState?.error).toContain(translate('common.errors.externalServiceDetail'));
 });
 
 it('ignores model bootstrap results after the deck AI hook unmounts', async () => {

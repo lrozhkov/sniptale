@@ -39,7 +39,10 @@ it('leaves text clips unchanged when their track is locked', () => {
 
   store.getState().setProject(project);
   const textClipId = store.getState().addTextOverlay(overlayTrackId, 0.5);
-  store.getState().toggleTrackLock(overlayTrackId);
+  const createdTrackId = store
+    .getState()
+    .project!.clips.find((clip) => clip.id === textClipId)!.trackId;
+  store.getState().toggleTrackLock(createdTrackId);
   store
     .getState()
     .convertTextClipToAnnotation(textClipId!, VideoOverlayTemplateKind.LOWER_THIRD_ACCENT);

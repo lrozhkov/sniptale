@@ -1,4 +1,4 @@
-import type { VideoProject, VideoProjectClip } from '../types/index';
+import type { VideoProject, VideoProjectClip, VideoProjectSourceTimeAnchor } from '../types/index';
 import {
   VideoProjectClipType,
   VideoProjectSourceKind,
@@ -117,7 +117,62 @@ function hasValidVideoProjectBaseReferences(project: VideoProject): boolean {
     (project.motionRegions ?? []).every(
       (region) =>
         region.targetActionEventId === null || actionEventIds.has(region.targetActionEventId)
+    ) &&
+    hasValidInteractionAnchorReferences(project)
+  );
+}
+
+function hasValidInteractionAnchorReferences(project: VideoProject): boolean {
+  if (
+    project.actionEvents.some((event) => event.sourceAnchor && event.timeBasis === 'project') ||
+    project.cursorTrack?.samples.some(
+      (sample) => sample.sourceAnchor && sample.timeBasis === 'project'
     )
+  ) {
+    return false;
+  }
+
+  const anchors = [
+    ...project.actionEvents.flatMap((event) =>
+      event.sourceAnchor ? [{ anchor: event.sourceAnchor, time: event.time }] : []
+    ),
+    ...(project.cursorTrack?.samples.flatMap((sample) =>
+      sample.sourceAnchor ? [{ anchor: sample.sourceAnchor, time: sample.time }] : []
+    ) ?? []),
+  ];
+  return anchors.every(({ anchor, time }) =>
+    hasValidInteractionAnchorReference(project, anchor, time)
+  );
+}
+
+function hasValidInteractionAnchorReference(
+  project: VideoProject,
+  anchor: VideoProjectSourceTimeAnchor,
+  time: number
+): boolean {
+  if (!project.baseRecordingId || anchor.recordingId !== project.baseRecordingId) {
+    return false;
+  }
+
+  const clip = project.clips.find((item) => item.id === anchor.sourceClipId);
+  if (!clip || clip.type !== VideoProjectClipType.VIDEO) {
+    return false;
+  }
+
+  const asset = project.assets.find((item) => item.id === clip.assetId);
+  const matchesRecording = Boolean(
+    asset &&
+    ((asset.source.kind === 'recording' && asset.source.recordingId === anchor.recordingId) ||
+      (asset.source.kind === 'project-asset' &&
+        asset.source.originRecordingId === anchor.recordingId))
+  );
+  return (
+    matchesRecording &&
+    anchor.sourceTime >= clip.sourceStart &&
+    anchor.sourceTime <= clip.sourceStart + clip.sourceDuration &&
+    Math.abs(
+      clip.startTime + (anchor.sourceTime - clip.sourceStart) / (clip.playbackRate ?? 1) - time
+    ) <= 0.000_001
   );
 }
 

@@ -10,6 +10,7 @@ import {
   openRealExtensionPage,
   POPUP_PATH,
   revokeAllSitesAccessFromSettings,
+  sendRuntimeMessage,
   SETTINGS_PATH,
   startPagePackageSave,
   waitForPagePackageSave,
@@ -34,7 +35,7 @@ test('optional all-sites access is absent, grantable by gesture, and revoked dur
   await expect(
     settings.evaluate(() => chrome.permissions.contains({ origins: ['<all_urls>'] }))
   ).resolves.toBe(true);
-  await expect(allSites).toBeDisabled();
+  await expect(allSites).toHaveAttribute('aria-pressed', 'true');
 
   await settings.getByRole('button', { name: /^(Ask per site|Спрашивать)$/u }).click();
   await expect(
@@ -82,14 +83,18 @@ test('revoking all-sites access during persistence prevents a late snapshot comm
   const baseline = await collectRetentionText(popup);
   const control = await openSecurityControl(context, extensionId);
   await controlCheckpoint(control, 'pause', 'persistence-before-commit');
-  await expect(startPagePackageSave({ popup, requestId, tabId })).resolves.toMatchObject({
-    success: true,
-  });
+  const savePromise = startPagePackageSave({ popup, requestId, tabId });
   await controlCheckpoint(control, 'waitUntilPaused', 'persistence-before-commit');
   await revokeAllSitesAccessFromSettings(settings);
   await controlCheckpoint(control, 'release', 'persistence-before-commit');
+  await expect(savePromise).resolves.toMatchObject({
+    success: true,
+  });
   const result = await waitForPagePackageSave(popup, requestId);
   expect(result).toMatchObject({ success: false });
+  await expect(
+    sendRuntimeMessage(popup, { jobId: requestId, type: 'ACK_PAGE_PACKAGE_JOB_STATUS' })
+  ).resolves.toMatchObject({ success: true, status: null });
   expect(await collectRetentionText(popup)).toBe(baseline);
   await expect(
     settings.evaluate(async () =>

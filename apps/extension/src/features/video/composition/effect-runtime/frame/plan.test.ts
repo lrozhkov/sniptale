@@ -2,9 +2,13 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
-import { createEmptyVideoProject } from '../../../project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../project/factories/creation';
 import { createEffectHostClip } from '../../../project/factories/overlay-clip';
 import {
+  VideoTrackKind,
   VideoClipLinkMode,
   VideoClipTransitionKind,
   VideoMediaFitMode,
@@ -18,6 +22,25 @@ import { resolveVideoCompositionFrame } from '../../timeline/frame/index';
 import { resolveEffectRuntimeFramePlans } from './plan';
 
 describe('shared EffectV1 preview/export frame plan', () => {
+  it('continues a standalone document subrange at its retained phase', () => {
+    const project = createProject();
+    const instance = project.effectInstances!.find(({ id }) => id === 'standalone-1')!;
+    Object.assign(instance, { sourceStart: 2, startTime: 9, duration: 1 });
+    Object.assign(
+      project.clips.find(({ id }) => id === 'standalone-host')!,
+      { startTime: 9, duration: 1 }
+    );
+    expect(resolveEffectRuntimeFramePlans(project, 9.5)).toEqual([
+      expect.objectContaining({ effectInstanceId: instance.id, time: 2.5 }),
+    ]);
+  });
+  it.each([-1, NaN, Infinity, 3])('rejects invalid retained frame range %s', (sourceStart) => {
+    const project = createProject();
+    Object.assign(project.effectInstances![0]!, { sourceStart, duration: 1 });
+    expect(() => resolveEffectRuntimeFramePlans(project, 0.5)).toThrow(
+      expect.objectContaining({ code: 'effectPlanIntegrityFailure' })
+    );
+  });
   it('owns standalone, stable target chains, and transition timing without fallback', () => {
     const plans = resolveEffectRuntimeFramePlans(createProject(), 2.5);
 
@@ -102,6 +125,7 @@ function expectTransitionPlan(plan: unknown): void {
 
 function createProject(): VideoProject {
   const project = createEmptyVideoProject('Effect runtime', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
   const trackId = project.tracks[0]!.id;
   project.duration = 5;
   project.clips = [createClip('clip-a', trackId, 0), createClip('clip-b', trackId, 2)];

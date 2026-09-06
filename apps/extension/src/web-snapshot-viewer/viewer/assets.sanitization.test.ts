@@ -103,6 +103,7 @@ it('re-sanitizes restored static HTML before returning Viewer content', async ()
 
   const loaded = await loadWebSnapshotPackage('snapshot-1');
 
+  expect(loaded.documentUrl).toBeNull();
   expect(loaded.html).toContain('src="blob:snapshot-image"');
   expect(loaded.html).not.toContain('<script');
   expect(loaded.html).not.toContain('http-equiv="refresh"');

@@ -85,6 +85,11 @@ export function PageStyleCommentField(props: {
           onCompositionEnd={(event) => props.actions.endComposition(event.currentTarget.value)}
           onCompositionStart={props.actions.startComposition}
           onKeyDown={(event) => {
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              props.actions.close();
+              return;
+            }
             if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
               event.preventDefault();
               props.actions.close();

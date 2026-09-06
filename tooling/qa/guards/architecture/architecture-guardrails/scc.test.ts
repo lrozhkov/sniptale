@@ -16,8 +16,8 @@ async function loadModule(root: string) {
 
 function writeRuntimeTopology(root: string) {
   writeJson(root, 'tooling/qa/guards/architecture/runtime-topology/runtime-topology.data.json', [
-    { id: 'content', root: 'apps/extension/src/content', docsMarkers: [], entrypointFiles: [] },
-    { id: 'popup', root: 'apps/extension/src/popup', docsMarkers: [], entrypointFiles: [] },
+    { id: 'content', root: 'apps/extension/src/content', entrypointFiles: [] },
+    { id: 'popup', root: 'apps/extension/src/popup', entrypointFiles: [] },
   ]);
   writeJson(root, 'package.json', { name: 'architecture-guardrails-scc-temp', type: 'module' });
 }

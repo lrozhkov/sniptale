@@ -2,6 +2,7 @@ import { useRef, useState, type ChangeEvent } from 'react';
 import { getMediaAssetBlob } from '../../../composition/persistence/media-library/index.library.ts';
 import type { MediaLibraryItem } from '../../../composition/persistence/media-library/contracts';
 import { translate } from '../../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 import type { ScenarioEditorInsertImagePayload } from '../../project/state/types';
 import { buildLibraryImagePayload, createFileImagePayload } from './payload';
 import { useScenarioImageStepLibrary } from './useScenarioImageStepLibrary';
@@ -79,7 +80,11 @@ function useScenarioImageStepInsertAction(
       await onInsertImage(payload);
     } catch (nextError) {
       setError(
-        nextError instanceof Error ? nextError.message : translate('shared.runtime.readBlobFailed')
+        createUserFacingErrorMessage({
+          cause: nextError,
+          detail: 'storage',
+          summaryKey: 'shared.runtime.readBlobFailed',
+        })
       );
       setPending(false);
     }

@@ -6,6 +6,7 @@ import '@sniptale/ui/styles/ai-modal';
 import '@sniptale/ui/styles/glass';
 import '@sniptale/ui/styles/toolbar';
 import '@sniptale/ui/styles/overlays';
+import '../../../apps/extension/src/video-editor/styles/spacing-compatibility.css';
 import { initializeAppTheme } from '../../../apps/extension/src/ui/theme/index';
 
 initializeAppTheme();

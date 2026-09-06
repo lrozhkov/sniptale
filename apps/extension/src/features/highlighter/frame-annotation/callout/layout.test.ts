@@ -29,16 +29,33 @@ describe('getCalloutLayoutState', () => {
     expect(editing.editableStyle.minWidth).toBe('1ch');
   });
 
-  it('caps a viewing callout at the annotation-content layer', () => {
+  it('keeps a viewing callout and its connector above every frame layer', () => {
     const layout = getCalloutLayoutState({
       dimensions: { width: 160, height: 48 },
       frameRect: { x: 200, y: 200, width: 120, height: 80 },
       isEditing: false,
       settings,
-      zIndex: FRAME_ANNOTATION_Z_INDEX.stepBadge,
+      zIndex: 20,
     });
 
-    expect(layout.effectiveZIndex).toBeLessThanOrEqual(FRAME_ANNOTATION_Z_INDEX.stepBadge);
+    expect(layout.effectiveZIndex).toBe(FRAME_ANNOTATION_Z_INDEX.calloutViewing);
+    expect(layout.effectiveZIndex).toBeGreaterThan(FRAME_ANNOTATION_Z_INDEX.frameActive);
+    expect(layout.wrapperStyle.zIndex).toBe(layout.effectiveZIndex);
+  });
+
+  it('uses fallback dimensions until both measured dimensions are available', () => {
+    const layout = getCalloutLayoutState({
+      dimensions: { width: 160, height: 0 },
+      frameRect: { x: 200, y: 200, width: 120, height: 80 },
+      isEditing: false,
+      settings,
+      zIndex: 20,
+    });
+
+    expect(layout.calloutDimensions).toEqual({
+      width: Math.min(settings.style.typography.maxWidth, 200),
+      height: Math.max(24, settings.style.typography.fontSize * 2.5),
+    });
   });
 
   it('keeps elevation out of the placement and content layout owners', () => {

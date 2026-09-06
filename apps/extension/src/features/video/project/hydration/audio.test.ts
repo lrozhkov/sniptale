@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
-import { createEmptyVideoProject } from '../factories/creation';
+import { createEmptyVideoProject, createVideoProjectTrack } from '../factories/creation';
 import {
+  VideoTrackKind,
   VideoClipLinkMode,
   VideoClipTransitionKind,
   VideoCursorAnimationPreset,
@@ -64,7 +65,8 @@ function createEnvelopeProject() {
 
 function createMixedHydrationProject() {
   const project = createEmptyVideoProject('Hydration mixed');
-  const [primaryTrack, , overlayTrack] = project.tracks;
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
+  const [primaryTrack, overlayTrack] = project.tracks;
 
   project.source = { kind: VideoProjectSourceKind.RECORDING, recordingId: 'recording-source' };
   project.baseRecordingId = 'recording-base';

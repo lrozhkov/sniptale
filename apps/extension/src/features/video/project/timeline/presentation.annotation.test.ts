@@ -1,12 +1,14 @@
+import { VideoTrackKind } from '../types';
 import { expect, it } from 'vitest';
 import { createAnnotationClip } from '../factories/overlay-clip';
-import { createEmptyVideoProject } from '../factories/creation';
+import { createEmptyVideoProject, createVideoProjectTrack } from '../factories/creation';
 import * as timelinePresentation from './presentation';
 
 it('treats annotation clips as visual overlays in the timeline seam', () => {
   const project = createEmptyVideoProject('Timeline');
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
   const annotationClip = createAnnotationClip(
-    project.tracks[2]!.id,
+    project.tracks[1]!.id,
     project.width,
     project.height,
     0

@@ -2,9 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createVideoProjectMotionRegion } from '../../../features/video/project/motion';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import {
+  createAudioClip,
+  createProject,
+  createTrack,
+  createVideoClip,
+} from '../../../features/video/project/timeline/project-meta.test.helpers.ts';
+import {
   VideoMotionFocusMode,
   VideoProjectActionEventKind,
 } from '../../../features/video/project/types/interaction';
+import { isExportReadyVideoProject } from '../../../features/video/project/validation';
+import type { VideoProject } from '../../../features/video/project/types';
 
 const {
   applyAutoTransformClipTimelineMock,
@@ -85,6 +93,17 @@ function createMotionProject(name: string) {
   return project;
 }
 
+function createRecordingMotionProject() {
+  const project = createProject(
+    [createVideoClip({ duration: 12, sourceDuration: 12 })],
+    [createTrack('track-video', 0)]
+  );
+  project.baseRecordingId = 'rec-asset-video';
+  project.duration = 12;
+  project.source = { kind: 'recording', recordingId: 'rec-asset-video' };
+  return project;
+}
+
 function registerFailureHandlingTests() {
   it('returns null when recording telemetry is unavailable', async () => {
     getRecordingTelemetryMock.mockResolvedValue(null);
@@ -137,7 +156,7 @@ function createThrottledTelemetryActionEvents() {
 
 function registerAutoMotionRebuildTest() {
   it('rebuilds auto-motion zooms instead of dropping existing auto-generated targets', async () => {
-    const project = createMotionProject('Auto transform');
+    const project = createRecordingMotionProject();
     project.motionRegions = [
       {
         ...createVideoProjectMotionRegion(project, 1),
@@ -149,7 +168,7 @@ function registerAutoMotionRebuildTest() {
     ];
     getRecordingTelemetryMock.mockResolvedValue(createTelemetryEntry());
 
-    const result = await autoTransformRecordingProject(project, 'recording-1');
+    const result = await autoTransformRecordingProject(project, 'rec-asset-video');
 
     expect(result?.motionRegions).toEqual([
       expect.objectContaining({
@@ -158,11 +177,32 @@ function registerAutoMotionRebuildTest() {
       }),
     ]);
   });
+
+  it('uses the detached video projection for actions and their auto-motion regions', async () => {
+    const project = createProject(
+      [
+        createAudioClip({ startTime: 0 }),
+        createVideoClip({ duration: 7, sourceDuration: 7, startTime: 5 }),
+      ],
+      [createTrack('track-video', 0), createTrack('track-audio', 1)]
+    );
+    project.baseRecordingId = 'rec-asset-video';
+    project.duration = 12;
+    project.source = { kind: 'recording', recordingId: 'rec-asset-video' };
+    getRecordingTelemetryMock.mockResolvedValue(createTelemetryEntry());
+
+    const result = await autoTransformRecordingProject(project, 'rec-asset-video');
+
+    expect(result?.actionEvents[0]).toEqual(expect.objectContaining({ id: 'click-1', time: 6 }));
+    expect(result?.motionRegions).toEqual([
+      expect.objectContaining({ id: 'auto-motion:click-1', startTime: 6 }),
+    ]);
+  });
 }
 
 function registerZoomThrottleTests() {
   it('throttles auto zooms, skips click events without points, and preserves manual targets', async () => {
-    const project = createMotionProject('Auto transform');
+    const project = createRecordingMotionProject();
     project.motionRegions = [createManualMotionRegion(project)];
     const actionEvents = createThrottledTelemetryActionEvents();
     getRecordingTelemetryMock.mockResolvedValue({
@@ -171,7 +211,7 @@ function registerZoomThrottleTests() {
     });
     normalizeRecordingActionEventsToProjectSpaceMock.mockReturnValue(actionEvents);
 
-    const result = await autoTransformRecordingProject(project, 'recording-1');
+    const result = await autoTransformRecordingProject(project, 'rec-asset-video');
     expect(result).not.toBeNull();
     const motionRegions = result!.motionRegions ?? [];
 
@@ -208,7 +248,15 @@ function registerMotionRegionTests() {
 
 function registerCursorRemapTests() {
   it('remaps cursor samples into compacted project time and drops samples from removed ranges', async () => {
-    const project = createMotionProject('Auto transform');
+    const project = createRecordingMotionProject();
+    applyAutoTransformClipTimelineMock.mockImplementationOnce((currentProject: VideoProject) => ({
+      ...currentProject,
+      clips: currentProject.clips.map((clip) => ({
+        ...clip,
+        duration: 2,
+        sourceDuration: 2,
+      })),
+    }));
     getRecordingTelemetryMock.mockResolvedValue({
       ...createTelemetryEntry(),
       cursorTrack: {
@@ -227,16 +275,62 @@ function registerCursorRemapTests() {
         },
       },
     });
-    mapSourceTimeToProjectTimeMock.mockImplementation(
-      (_project: unknown, _recordingId: unknown, sourceTime: number) =>
-        sourceTime === 3 ? null : sourceTime + 0.5
-    );
-
-    const result = await autoTransformRecordingProject(project, 'recording-1');
+    const result = await autoTransformRecordingProject(project, 'rec-asset-video');
 
     expect(result?.cursorTrack?.samples).toEqual([
-      { id: 'cursor-1', time: 1.5, x: 10, y: 20, visible: true },
+      {
+        id: 'cursor-1',
+        sourceAnchor: {
+          kind: 'recording-source',
+          recordingId: 'rec-asset-video',
+          sourceClipId: 'clip-video',
+          sourceTime: 1,
+        },
+        time: 1,
+        visible: true,
+        x: 10,
+        y: 20,
+      },
     ]);
+  });
+
+  it('emits stable action and cursor anchors when auto-transform is applied again', async () => {
+    const project = createRecordingMotionProject();
+    getRecordingTelemetryMock.mockResolvedValue({
+      ...createTelemetryEntry(),
+      recordingId: 'rec-asset-video',
+      cursorTrack: {
+        captureMode: 'separate',
+        samples: [{ id: 'cursor-1', time: 1, x: 10, y: 20, visible: true }],
+        skin: {
+          animationPreset: 'NONE',
+          color: '#fff',
+          hidden: false,
+          preset: 'ARROW',
+          scale: 1,
+          shadow: true,
+        },
+      },
+    });
+
+    const first = await autoTransformRecordingProject(project, 'rec-asset-video');
+    const second = await autoTransformRecordingProject(first!, 'rec-asset-video');
+
+    expect(first?.actionEvents[0]?.sourceAnchor).toEqual({
+      kind: 'recording-source',
+      recordingId: 'rec-asset-video',
+      sourceClipId: 'clip-video',
+      sourceTime: 1,
+    });
+    expect(first?.cursorTrack?.samples[0]?.sourceAnchor).toEqual({
+      kind: 'recording-source',
+      recordingId: 'rec-asset-video',
+      sourceClipId: 'clip-video',
+      sourceTime: 1,
+    });
+    expect(second?.actionEvents).toEqual(first?.actionEvents);
+    expect(second?.cursorTrack).toEqual(first?.cursorTrack);
+    expect(isExportReadyVideoProject(first)).toBe(true);
   });
 }
 

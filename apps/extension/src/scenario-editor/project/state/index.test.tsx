@@ -286,7 +286,8 @@ it('surfaces bootstrap errors and clears the loading flag', async () => {
   await renderHarness();
 
   expect(getHarness().state.loading).toBe(false);
-  expect(getHarness().state.error).toBe('Failed to load scenarios');
+  expect(getHarness().state.error).toContain('Sniptale');
+  expect(getHarness().state.error).not.toContain('Failed to load scenarios');
   expect(getHarness().state.project).toBeNull();
   expect(getHarness().state.projects).toEqual([]);
 });

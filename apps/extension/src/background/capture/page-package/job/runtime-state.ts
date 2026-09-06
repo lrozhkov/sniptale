@@ -5,6 +5,7 @@ import {
 } from '@sniptale/runtime-contracts/export';
 import { estimateUtf8Bytes } from '@sniptale/runtime-contracts/validation/base64';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { translate, type AppLocale, type TranslationKey } from '../../../../platform/i18n';
 import { getBackgroundRuntimeMessaging } from '../../../routing-contracts/runtime-messaging/services';
 import { writePagePackageJobStatus } from './storage';
 import {
@@ -36,6 +37,7 @@ export type ActivePopupExportJob = {
   captureTiming?: import('@sniptale/runtime-contracts/page-package').PagePackageCaptureTimingPolicy;
   expectedActivation: { tabId: number; windowId: number } | null;
   lastActivatedByWindow: Map<number, number>;
+  locale: AppLocale;
   manualActivationConflict: boolean;
   publicationQueue: Promise<void>;
   status: PagePackageJobStatusV1;
@@ -44,6 +46,10 @@ export type ActivePopupExportJob = {
   unsubscribeActivation: (() => void) | null;
   temporaryTabIds?: number[];
 };
+
+export function translatePopupExportJob(job: ActivePopupExportJob, key: TranslationKey): string {
+  return translate(key, job.locale);
+}
 
 const durableStatuses = new WeakMap<ActivePopupExportJob, PagePackageJobStatusV1>();
 
@@ -58,12 +64,13 @@ async function commitStatusPublication(
   job: ActivePopupExportJob,
   status: PagePackageJobStatusV1
 ): Promise<void> {
-  await writePagePackageJobStatus(status);
+  await writePagePackageJobStatus(status, job.locale);
   job.status = status;
   durableStatuses.set(job, status);
   await getBackgroundRuntimeMessaging()
     .sendRuntimeMessage({
       type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED,
+      locale: job.locale,
       status: clonePagePackageJobStatus(status),
     })
     .catch(() => undefined);
@@ -123,6 +130,10 @@ export function admitPopupExportJobCancellation(job: ActivePopupExportJob): Prom
       await commitStatusPublication(job, {
         ...current,
         phase: 'cancelling',
+        progress: {
+          ...current.progress,
+          message: translatePopupExportJob(job, 'popup.export.cancellingMessage'),
+        },
         revision: current.revision + 1,
       });
     }

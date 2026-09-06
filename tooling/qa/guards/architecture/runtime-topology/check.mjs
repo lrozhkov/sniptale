@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { loadAgentToolingArchive } from '../../../../agent-tooling/agent-tooling.mjs';
 import { repoRoot } from '../../../analysis/repository/shared-paths.mjs';
 import { isExecutedAsScript, printViolations } from '../../../runtime/process/shared-cli.mjs';
 import { getValidatedRuntimeTopology } from './model.mjs';
@@ -13,12 +14,9 @@ import { collectContentRuntimeReferenceViolations } from './content-runtime.mjs'
 
 const MANIFEST_PATH = 'apps/extension/manifest.json';
 const BUILD_LAYOUT_PATH = 'apps/extension/build/layout.data.json';
-const RUNTIME_CONTEXTS_DOC_PATH = 'docs/architecture/runtime-contexts.md';
 const DYNAMIC_CONTENT_RUNTIME_ROOT = 'apps/extension/src/content';
 const TOPOLOGY_PATH = 'tooling/qa/guards/architecture/runtime-topology/runtime-topology.data.json';
 const ACTIVE_TOPOLOGY_FILES = [
-  'docs/agent-tooling/AGENTS.md',
-  'docs/agent-tooling/DESIGN.md',
   'docs/architecture/code-organization.md',
   'docs/architecture/runtime-contexts.md',
   'docs/tooling/code-quality.md',
@@ -26,6 +24,7 @@ const ACTIVE_TOPOLOGY_FILES = [
   '.dependency-cruiser.cjs',
   'tooling/qa/guards/architecture/runtime-topology/runtime-topology.data.json',
 ];
+const AGENT_TOOLING_ARCHIVE = 'docs/agent-tooling/agent-tooling.zip';
 const RETIRED_RUNTIME_IDS = ['sidepanel'];
 const STATIC_CONTENT_SCRIPTS_MESSAGE = [
   'Top-level manifest content_scripts are intentionally forbidden;',
@@ -165,20 +164,6 @@ function collectStaticContentScriptViolations(manifest, manifestPath) {
   ];
 }
 
-function collectDocsCoverageViolations(rootDir, docsPath, topology) {
-  const docsText = fs.readFileSync(toAbsolutePath(rootDir, docsPath), 'utf8');
-
-  return topology
-    .filter((runtime) => !runtime.docsMarkers.some((marker) => docsText.includes(marker)))
-    .map((runtime) =>
-      createViolation(
-        'runtime-topology-docs-drift',
-        docsPath,
-        `Runtime "${runtime.id}" is missing from ${docsPath}.`
-      )
-    );
-}
-
 function loadBuildRuntimeInputs(rootDir, buildLayoutPath) {
   const layout = JSON.parse(fs.readFileSync(toAbsolutePath(rootDir, buildLayoutPath), 'utf8'));
   if (
@@ -251,7 +236,8 @@ function collectRegistryBuildCoverageViolations(rootDir, buildLayoutPath, topolo
         createViolation(
           'runtime-topology-unregistered-build-runtime',
           buildLayoutPath,
-          `Build ${input.mode} input "${input.sourcePath}" → "${input.outputPath}" is not owned by one registered runtime.`
+          `Build ${input.mode} input "${input.sourcePath}" → "${input.outputPath}" ` +
+            'is not owned by one registered runtime.'
         )
       );
       continue;
@@ -262,7 +248,8 @@ function collectRegistryBuildCoverageViolations(rootDir, buildLayoutPath, topolo
         createViolation(
           'runtime-topology-build-entrypoint-missing',
           buildLayoutPath,
-          `Runtime "${sourceRuntime.id}" does not register build ${input.mode} input "${input.sourcePath}" as an entrypoint.`
+          `Runtime "${sourceRuntime.id}" does not register build ${input.mode} input ` +
+            `"${input.sourcePath}" as an entrypoint.`
         )
       );
     }
@@ -317,6 +304,35 @@ function collectRetiredRuntimeViolations(rootDir, retiredRuntimeIds = RETIRED_RU
     }
   }
 
+  const archivePath = toAbsolutePath(rootDir, AGENT_TOOLING_ARCHIVE);
+  if (fs.existsSync(archivePath)) {
+    try {
+      const archivedFiles = loadAgentToolingArchive(archivePath);
+      for (const relativePath of ['AGENTS.md', 'DESIGN.md']) {
+        const text = archivedFiles.get(relativePath).contents.toString('utf8');
+        for (const runtimeId of retiredRuntimeIds) {
+          if (text.includes(runtimeId)) {
+            violations.push(
+              createViolation(
+                'runtime-topology-retired-runtime',
+                AGENT_TOOLING_ARCHIVE,
+                `Retired runtime "${runtimeId}" still appears in archived ${relativePath}.`
+              )
+            );
+          }
+        }
+      }
+    } catch (error) {
+      violations.push(
+        createViolation(
+          'runtime-topology-agent-tooling-archive-invalid',
+          AGENT_TOOLING_ARCHIVE,
+          error instanceof Error ? error.message : String(error)
+        )
+      );
+    }
+  }
+
   return violations;
 }
 
@@ -324,7 +340,6 @@ export function collectRuntimeTopologyViolations({
   rootDir = repoRoot,
   manifestPath = MANIFEST_PATH,
   buildLayoutPath = BUILD_LAYOUT_PATH,
-  docsPath = RUNTIME_CONTEXTS_DOC_PATH,
   retiredRuntimeIds = RETIRED_RUNTIME_IDS,
 } = {}) {
   let topology;
@@ -346,7 +361,6 @@ export function collectRuntimeTopologyViolations({
     ...collectRegistryManifestCoverageViolations(rootDir, manifestPath, topology),
     ...collectRegistryBuildCoverageViolations(rootDir, buildLayoutPath, topology),
     ...collectContentRuntimeReferenceViolations(rootDir),
-    ...collectDocsCoverageViolations(rootDir, docsPath, topology),
     ...collectRetiredRuntimeViolations(rootDir, retiredRuntimeIds),
   ];
 }

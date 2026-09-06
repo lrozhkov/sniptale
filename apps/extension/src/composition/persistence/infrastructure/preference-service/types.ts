@@ -8,10 +8,12 @@ export type StorageBackedPreferenceState<TCurrent> = {
   hydrated: boolean;
   hydrationPromise: Promise<void> | null;
   listeners: Set<PreferenceChangeListener<TCurrent>>;
+  revision: number;
   storageListenerCleanup: (() => void) | null;
 };
 
 export type ApplyPreferenceOptions = {
+  markNewer?: boolean;
   notify?: boolean;
 };
 

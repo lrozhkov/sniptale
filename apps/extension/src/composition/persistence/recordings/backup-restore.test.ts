@@ -58,6 +58,12 @@ it('publishes optional recording telemetry in the same caller transaction', asyn
     size: 4,
   };
   const telemetry = {
+    provenance: {
+      source: 'native',
+      normalizationVersion: 1,
+      timeUnit: 'seconds',
+      coordinateSpace: 'desktop',
+    },
     actionEvents: [],
     captureMode: null,
     createdAt: 1,

@@ -7,7 +7,7 @@ export const HARNESS_QA_SUITE = 'harness';
 export const ALL_QA_SUITE = 'all';
 export const HARNESS_QA_GUIDANCE = [
   'run npm run qa:release-harness for executable tooling/**, QA-affecting root configuration,',
-  'hooks, docs/agent-tooling/**, or active tooling guidance; machine-owned inventory-only changes',
+  'hooks, the docs/agent-tooling archive, or active tooling guidance; machine-owned inventory-only changes',
   'use their owner validators without a fresh harness stamp',
 ].join(' ');
 
@@ -18,6 +18,8 @@ const HARNESS_INVENTORY_ONLY_FILES = new Set([
   'tooling/configs/qa/instance-ownership.data.json',
   'tooling/qa/proof/coverage/test-coverage/rollout-files.data.mjs',
 ]);
+const QA_EXCEPTION_INVENTORY_PATTERN =
+  /^tooling\/configs\/qa\/[^/]*(?:baseline|allowlist|allowances|debt|registry)[^/]*\.json$/u;
 const FOCUSED_COVERAGE_OWNER_MAP_PREFIX = 'tooling/qa/proof/focused-coverage/maps/';
 const FOCUSED_COVERAGE_OWNER_MAP_INVENTORIES = new Set([
   'ai.mjs',
@@ -93,7 +95,11 @@ export function isHarnessQaFile(file) {
 }
 
 export function isHarnessInventoryOnlyFile(file) {
-  return HARNESS_INVENTORY_ONLY_FILES.has(file) || isFocusedCoverageOwnerMapInventoryFile(file);
+  return (
+    HARNESS_INVENTORY_ONLY_FILES.has(file) ||
+    QA_EXCEPTION_INVENTORY_PATTERN.test(file) ||
+    isFocusedCoverageOwnerMapInventoryFile(file)
+  );
 }
 
 export function isFocusedCoverageOwnerMapInventoryFile(file) {

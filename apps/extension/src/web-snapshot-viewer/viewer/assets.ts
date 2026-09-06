@@ -1,4 +1,4 @@
-import JSZip from 'jszip';
+import type JSZip from 'jszip';
 import {
   isWebSnapshotManifest,
   WEB_SNAPSHOT_PACKAGE_PATHS,
@@ -26,6 +26,7 @@ import {
   type PagePackageScreenshotCoverage,
 } from '@sniptale/runtime-contracts/page-package';
 import { assertZipPackageInflationProfile } from '@sniptale/platform/data/zip-profile';
+import { loadVerifiedZip } from '@sniptale/platform/data/zip-profile/verified-loader';
 import { createViewerAssetObjectUrls } from './asset-objects';
 import type { LoadedWebSnapshotAsset } from './asset-objects';
 import { validateRetainedWebSnapshotScreenshot } from '../../features/web-snapshot/screenshot-validation';
@@ -350,7 +351,14 @@ export async function loadWebSnapshotPackage(
   }
 
   assertCompressedViewerPackageSize(record.packageFile);
-  const zip = await JSZip.loadAsync(record.packageFile);
+  const zip = await loadVerifiedZip(record.packageFile, {
+    assertPath: assertSafeArchivePath,
+    maxArchiveBytes: WEB_SNAPSHOT_PACKAGE_POLICY.maxArchiveBytes,
+    maxCompressionRatio: 1000,
+    maxEntryBytes: WEB_SNAPSHOT_PACKAGE_POLICY.maxScreenshotBytes,
+    maxFileCount: MAX_VIEWER_FILE_COUNT,
+    maxTotalInflatedBytes: WEB_SNAPSHOT_PACKAGE_POLICY.maxTotalInflatedBytes,
+  });
   const filesByPath = inspectViewerPackageEntries(zip);
   const packageManifest = parseViewerPackageManifest(
     await readViewerEntry(filesByPath, WEB_SNAPSHOT_PACKAGE_PATHS.manifest)
@@ -397,12 +405,14 @@ export async function loadWebSnapshotPackage(
           allowedObjectUrls: objectUrls,
           offlineOnly: true,
         });
-    const documentUrl = URL.createObjectURL(
-      new Blob([withOfflineSnapshotPolicy(sanitizedDocument, xhtml)], {
-        type: xhtml ? 'application/xhtml+xml' : 'text/html',
-      })
-    );
-    objectUrls.push(documentUrl);
+    const documentUrl = xhtml
+      ? URL.createObjectURL(
+          new Blob([withOfflineSnapshotPolicy(sanitizedDocument, true)], {
+            type: 'application/xhtml+xml',
+          })
+        )
+      : null;
+    if (documentUrl) objectUrls.push(documentUrl);
     const screenshotUrl = URL.createObjectURL(screenshot);
     objectUrls.push(screenshotUrl);
     const archiveUrl = URL.createObjectURL(record.packageFile);

@@ -49,6 +49,16 @@ function isAssetMetadata(value: unknown): boolean {
   );
 }
 
+function isRecordingPart(value: unknown, assetType: unknown): boolean {
+  if (!isRecord(value) || !isString(value['recordingId']) || value['recordingId'].length === 0) {
+    return false;
+  }
+  return assetType === VideoProjectAssetType.AUDIO
+    ? value['role'] === 'audio'
+    : assetType === VideoProjectAssetType.RECORDING &&
+        (value['role'] === 'primary' || value['role'] === 'camera' || value['role'] === 'video');
+}
+
 export function isVideoProjectAsset(value: unknown): boolean {
   return (
     isRecord(value) &&
@@ -57,6 +67,8 @@ export function isVideoProjectAsset(value: unknown): boolean {
     isString(value['name']) &&
     isAssetSource(value['source']) &&
     isAssetMetadata(value['metadata']) &&
+    (value['recordingPart'] === undefined ||
+      isRecordingPart(value['recordingPart'], value['type'])) &&
     isFiniteNumber(value['createdAt'])
   );
 }

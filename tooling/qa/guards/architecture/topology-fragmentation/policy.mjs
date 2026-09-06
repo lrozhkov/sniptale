@@ -134,18 +134,25 @@ export function decideForwardingEdgeCandidate(candidate) {
       reasons: ['production-to-proof-dependency'],
     };
   }
-  if (candidate.forwarderIsPublicOrContract) {
+  if (candidate.automaticKeep?.reason === 'public-contract') {
     return {
       decision: 'Keep',
       confidence: 'high',
-      reasons: ['proven-public-or-contract-forwarder'],
+      reasons: ['proven-public-contract-forwarder'],
     };
   }
-  if (candidate.forwarderOwner !== candidate.consumerOwner) {
+  if (candidate.automaticKeep?.reason === 'runtime-boundary') {
     return {
       decision: 'Keep',
       confidence: 'high',
-      reasons: ['cross-owner-forwarding-edge'],
+      reasons: ['runtime-boundary-forwarding-edge'],
+    };
+  }
+  if (candidate.automaticKeep?.reason === 'cross-owner') {
+    return {
+      decision: 'Keep',
+      confidence: 'high',
+      reasons: ['canonical-cross-owner-forwarding-edge'],
     };
   }
   if (candidate.forwarderUnresolvedEdges > 0 || candidate.targetFiles.length === 0) {

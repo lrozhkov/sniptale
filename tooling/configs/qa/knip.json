@@ -14,7 +14,7 @@
     "tooling/**/*.{ts,tsx,js,mjs,cjs}"
   ],
   "include": ["unresolved", "unlisted", "binaries"],
-  "ignoreBinaries": ["codeql", "gcc", "printf"],
+  "ignoreBinaries": ["codeql", "gcc", "mkfifo", "printf"],
   "ignoreDependencies": ["@fontsource/marck-script", "@fontsource-variable/manrope"],
   "ignore": [".tmp/**", "coverage/**", "dist/**", "docs/**", "cases/**"]
 }

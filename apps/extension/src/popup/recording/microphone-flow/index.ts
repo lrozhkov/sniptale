@@ -62,7 +62,7 @@ export async function toggleMicrophone(params: ToggleMicrophoneParams): Promise<
     enabledKey: 'microphoneEnabled',
     deviceIdKey: 'microphoneDeviceId',
     noDevicesError: translate('popup.video.noMicrophonesError'),
-    accessError: translate('popup.video.microphoneAccessError'),
+    accessErrorKey: 'popup.video.microphoneAccessError',
     resolveDeviceId: resolveMicrophoneDeviceId,
   });
 }

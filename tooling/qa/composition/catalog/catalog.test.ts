@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   QA_CONTROL_CATALOG,
   assertAdapterClosure,
+  collectCiClosureReport,
   collectQaOccurrences,
   orderQaResultSteps,
   projectExecutionLabels,
@@ -40,7 +41,32 @@ describe('canonical QA control catalog', () => {
       expect(control.engineDecision.rationale, control.id).not.toBe('');
       expect(control.resourceProfile, control.id).not.toBe('');
       expect(control.normalizationProfile, control.id).toBe('qa-step-result-v1');
+      expect(control).toHaveProperty('ciDisposition');
     }
+  });
+
+  it('reports checkpoint controls without a CI disposition without blocking catalog loading', () => {
+    const report = collectCiClosureReport();
+    expect(report).toMatchObject({
+      artifactKind: 'sniptale-ci-closure-report',
+      blocking: false,
+    });
+    expect(report.controls.length).toBeGreaterThan(0);
+    expect(report.gaps).toEqual(
+      report.controls
+        .filter(({ ciDisposition }) => ciDisposition === null)
+        .map(({ id, label }) => ({ id, label }))
+    );
+    expect(
+      collectCiClosureReport([
+        {
+          id: 'qa.rule.new-control',
+          label: 'New control',
+          lanes: ['focused-triggered'],
+          ciDisposition: null,
+        },
+      ]).gaps
+    ).toEqual([{ id: 'qa.rule.new-control', label: 'New control' }]);
   });
 
   it('requires manual reports to name one exact canonical control identity', async () => {
@@ -93,18 +119,6 @@ describe('canonical QA control catalog', () => {
     expect(
       guards.every(({ dependencyProfiles }) => dependencyProfiles.includes('scope-and-admission'))
     ).toBe(true);
-  });
-
-  it('projects SonarJS as the typed residual without changing its control identity or membership', () => {
-    const sonarjs = QA_CONTROL_CATALOG.find(({ id }) => id === 'qa.rule.sonarjs');
-
-    expect(sonarjs).toMatchObject({
-      category: 'single-file-semantics',
-      engineProfile: 'eslint-typed-residual',
-      label: 'SonarJS',
-      tool: 'verify-sonarjs.mjs',
-    });
-    expect(sonarjs?.lanes).toEqual(expect.arrayContaining(['release-direct', 'focused-direct']));
   });
 
   it('rejects missing and unknown executable adapters', () => {

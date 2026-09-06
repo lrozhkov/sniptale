@@ -22,8 +22,10 @@ import {
 } from '../../../analysis/repository/src-production-targets.mjs';
 import { hasAmbiguousSameNameFacadeSource, isThinFacadeSource } from './facades.mjs';
 import { collectChangedTargets } from '../../../runtime/scope/changed-targets.helpers.mjs';
+import { applyRepositoryFindingBaseline } from '../../../policy/baselines/repository-finding-baseline.mjs';
 
 const REPEATED_CHILD_PREFIX_MIN_COUNT = 3;
+const REPOSITORY_BASELINE_PATH = 'tooling/configs/qa/naming-repository-baseline.json';
 const REPEATED_PREFIX_ENTRYPOINT_EXCEPTIONS = new Set([
   'apps/extension/src/offscreen/offscreen.ts',
 ]);
@@ -196,6 +198,10 @@ function collectWorkspaceNamingDelta() {
   };
 }
 
+function findingKey({ file, rule }) {
+  return `${rule}\u0000${file}`;
+}
+
 function getLeadingToken(value) {
   return value.split('-')[0];
 }
@@ -317,16 +323,36 @@ export function runNamingCheck({ files = [], repoWide = false, scope = 'workspac
   };
 }
 
+export function runChangedNamingCheck({ files = [] } = {}) {
+  return runNamingCheck({ files, scope: 'workspace' });
+}
+
+export function runRepositoryNamingCheck() {
+  const namingFiles = collectCodeFiles();
+  const findings = collectNamingViolations(namingFiles, { includeRepeatedPrefix: true });
+  const baseline = applyRepositoryFindingBaseline({
+    baselinePath: REPOSITORY_BASELINE_PATH,
+    controlId: 'qa.rule.naming',
+    findingKey,
+    findings,
+    isAcceptedFinding: (current, accepted) => findingKey(current) === findingKey(accepted),
+  });
+  return {
+    files: namingFiles.map(toRelativePath),
+    scope: 'repo-wide',
+    violations: baseline.violations,
+    advisories: baseline.advisories,
+  };
+}
+
 if (isExecutedAsScript(import.meta.url)) {
   const argv = process.argv.slice(2);
   const files = parseFilesArgument(argv);
   const reportOnly = argv.includes('--report-only');
   const repoWide = argv.includes('--repo-wide');
-  const result = runNamingCheck({
-    files,
-    repoWide,
-    scope: files.length > 0 && !repoWide ? 'explicit' : 'workspace',
-  });
+  const result = repoWide
+    ? runRepositoryNamingCheck()
+    : runNamingCheck({ files, scope: files.length > 0 ? 'explicit' : 'workspace' });
 
   if (result.violations.length > 0) {
     printViolations('Naming violations found:', result.violations);

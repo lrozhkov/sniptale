@@ -7,6 +7,7 @@ import {
 import { translate } from '../../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { toast } from '@sniptale/ui/product-feedback/toast-service';
+import { getUserFacingErrorDetail } from '../../../../platform/i18n/user-facing-error';
 
 const logger = createLogger({ namespace: 'SettingsAiPromptsSave' });
 
@@ -18,6 +19,7 @@ export async function saveAiProvidersGlobalPrompt(globalPrompt: string): Promise
     const message = [
       translate('common.states.error'),
       translate('settings.aiProviders.globalPromptSaveErrorSuffix'),
+      ` ${getUserFacingErrorDetail('storage')}`,
     ].join('');
     logger.error('Failed to save global AI prompt', error);
     toast.error(message);
@@ -33,6 +35,7 @@ export async function saveAiProvidersScenarioEditorPrompt(prompt: string): Promi
     const message = [
       translate('common.states.error'),
       translate('settings.aiProviders.scenarioEditorPromptSaveErrorSuffix'),
+      ` ${getUserFacingErrorDetail('storage')}`,
     ].join('');
     logger.error('Failed to save scenario editor AI prompt', error);
     toast.error(message);
@@ -52,7 +55,11 @@ async function resetPrompt(args: {
     await args.reset();
     return { error: null };
   } catch (error) {
-    const message = [translate('common.states.error'), translate(args.errorSuffixKey)].join('');
+    const message = [
+      translate('common.states.error'),
+      translate(args.errorSuffixKey),
+      ` ${getUserFacingErrorDetail('storage')}`,
+    ].join('');
     logger.error('Failed to reset AI prompt', error);
     toast.error(message);
     return { error: message };

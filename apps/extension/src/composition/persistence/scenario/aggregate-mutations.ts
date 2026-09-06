@@ -581,13 +581,7 @@ async function discardSupersededScenarioPublication(
   children: PreparedScenarioAggregateChildMutation
 ): Promise<boolean> {
   for (const prepared of children.assetPuts ?? []) {
-    const stored = parseScenarioAssetEntry(await db.get(SCENARIO_ASSETS_STORE, prepared.id));
-    const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, prepared.assetId));
-    const owner: unknown = await db.get(ASSET_OWNERS_STORE, [
-      SCENARIO_ASSET_OWNER_KIND,
-      prepared.id,
-      SCENARIO_ASSET_ROLE,
-    ]);
+    const { owner, ref, stored } = await readPreparedScenarioAssetState(db, prepared);
     if (
       stored?.assetId === prepared.assetId ||
       ref?.assetId === prepared.assetId ||
@@ -627,6 +621,21 @@ async function discardSupersededScenarioPublication(
   return true;
 }
 
+async function readPreparedScenarioAssetState(
+  db: Awaited<ReturnType<typeof initDB>>,
+  prepared: NonNullable<PreparedScenarioAggregateChildMutation['assetPuts']>[number]
+) {
+  return {
+    stored: parseScenarioAssetEntry(await db.get(SCENARIO_ASSETS_STORE, prepared.id)),
+    ref: parseAssetRef(await db.get(ASSET_REFS_STORE, prepared.assetId)),
+    owner: (await db.get(ASSET_OWNERS_STORE, [
+      SCENARIO_ASSET_OWNER_KIND,
+      prepared.id,
+      SCENARIO_ASSET_ROLE,
+    ])) as unknown,
+  };
+}
+
 async function isScenarioPublicationAlreadyCommitted(
   db: Awaited<ReturnType<typeof initDB>>,
   existing: ScenarioProjectEntry,
@@ -641,13 +650,7 @@ async function isScenarioPublicationAlreadyCommitted(
   )
     return false;
   for (const prepared of payload.children.assetPuts ?? []) {
-    const stored = parseScenarioAssetEntry(await db.get(SCENARIO_ASSETS_STORE, prepared.id));
-    const ref = parseAssetRef(await db.get(ASSET_REFS_STORE, prepared.assetId));
-    const owner: unknown = await db.get(ASSET_OWNERS_STORE, [
-      SCENARIO_ASSET_OWNER_KIND,
-      prepared.id,
-      SCENARIO_ASSET_ROLE,
-    ]);
+    const { owner, ref, stored } = await readPreparedScenarioAssetState(db, prepared);
     if (
       stored?.assetId !== prepared.assetId ||
       ref?.assetId !== prepared.assetId ||

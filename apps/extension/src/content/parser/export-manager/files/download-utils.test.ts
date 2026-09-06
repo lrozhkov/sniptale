@@ -53,6 +53,35 @@ it('detects invalid or intermediate download urls', () => {
       url: 'https://example.com/export.php',
       contentType: 'text/html; charset=utf-8',
       filename: 'report',
+      resourceFilename: 'report',
+      responseFilenameExtension: null,
+    })
+  ).toBe(true);
+  expect(
+    shouldSkipHtmlDownloadResponse({
+      url: 'https://example.com/wiki/File:Panorama.jpg',
+      contentType: 'text/html; charset=utf-8',
+      filename: 'page.html',
+      resourceFilename: 'FilePanorama.jpg',
+      responseFilenameExtension: 'html',
+    })
+  ).toBe(true);
+  expect(
+    shouldSkipHtmlDownloadResponse({
+      url: 'https://example.com/help.html',
+      contentType: 'text/html; charset=utf-8',
+      filename: 'help.html',
+      resourceFilename: 'help.html',
+      responseFilenameExtension: null,
+    })
+  ).toBe(false);
+  expect(
+    shouldSkipHtmlDownloadResponse({
+      url: 'https://example.com/help.html#download',
+      contentType: 'text/html; charset=utf-8',
+      filename: 'payload.download',
+      resourceFilename: 'help.html',
+      responseFilenameExtension: 'download',
     })
   ).toBe(true);
   expect(resolveCredentialedDownloadUrl('https://user:secret@example.com/file.pdf', pageUrl)).toBe(

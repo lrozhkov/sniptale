@@ -84,7 +84,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it('keeps the drag ghost visible across parent rerenders during a move', () => {
+it('keeps the draft visible through rerenders and publishes only on release', () => {
   const project = createEmptyVideoProject('Rerender');
   const clip = createClip(project.tracks[0]!.id);
   project.clips = [clip];
@@ -93,15 +93,19 @@ it('keeps the drag ghost visible across parent rerenders during a move', () => {
       (clipId: string, startTime: number, trackId?: string, timelineLaneId?: string | null) => void
     >();
 
+  let rerender: (() => void) | null = null;
   function StatefulHarness() {
     const [revision, setRevision] = useState(0);
+    rerender = () => setRevision((current) => current + 1);
     const timelineDrag = useProjectTimelineDrag({
+      currentTime: 0,
       historyTransaction: {
         beginProjectHistoryTransaction: () => TEST_HISTORY_LEASE,
         endProjectHistoryTransaction: () => undefined,
         isProjectHistoryTransactionCurrent: (lease) => lease === TEST_HISTORY_LEASE,
       },
       pixelsPerSecond: 10,
+      magnetEnabled: false,
       project,
       onMoveClip: (...args) => {
         onMoveClip(...args);
@@ -133,7 +137,11 @@ it('keeps the drag ghost visible across parent rerenders during a move', () => {
     dispatchTimelinePointerMove(150, 40);
   });
 
-  expect(onMoveClip).toHaveBeenCalledWith('clip-1', 10, project.tracks[0]!.id, 'line-1');
+  expect(onMoveClip).not.toHaveBeenCalled();
+  act(() => rerender?.());
   expect(container?.firstElementChild?.getAttribute('data-revision')).toBe('1');
   expect(container?.firstElementChild?.getAttribute('data-ghost-lane')).toBe('line-1');
+  act(() => window.dispatchEvent(new Event('pointerup')));
+  expect(onMoveClip).toHaveBeenCalledOnce();
+  expect(onMoveClip).toHaveBeenCalledWith('clip-1', 10, project.tracks[0]!.id, 'line-1');
 });

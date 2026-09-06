@@ -7,6 +7,7 @@ import { createCanvasVideoOutput } from '../../../apps/extension/src/offscreen/r
 import { createRecordingArtifactSession } from '../../../apps/extension/src/offscreen/recording/encoding/artifact-session';
 import { createLiveRecordingArtifactSession } from '../../../apps/extension/src/offscreen/recording/encoding/live-artifact-session';
 import { LiveVideoOutputMetrics } from '../../../apps/extension/src/offscreen/recording/encoding/live-video-output-metrics';
+import { LIVE_VIDEO_KEY_FRAME_INTERVAL_SECONDS } from '../../../apps/extension/src/offscreen/recording/encoding/live-video-budget';
 import { createRecordingStagingCoordinator } from '../../../apps/extension/src/composition/persistence/recordings/staging';
 import {
   createAssetObjectWriter,
@@ -158,7 +159,7 @@ async function recordColdHighResolutionArtifact(
   const sourceContext = source.getContext('2d', { alpha: false });
   if (!sourceContext) throw new Error('The browser exposes no 2D canvas for the cold recording');
   let frameIndex = 0;
-  const stream = createCanvasVideoOutput({
+  const { stream } = createCanvasVideoOutput({
     dimensions: { height, width },
     frameRate,
     initializeDrawing: ({ context }) => ({
@@ -414,7 +415,11 @@ async function readMostlyStaticLiveMetrics(
       metrics.observe(packet);
       packet = await sink.getNextPacket(packet);
     }
-    const summary = metrics.summarize(configuredBitrate);
+    const summary = metrics.summarize({
+      configuredBitrate,
+      forcedKeyFrames: 0,
+      keyFrameInterval: LIVE_VIDEO_KEY_FRAME_INTERVAL_SECONDS,
+    });
     return {
       actualBitrate: summary.videoByteBudget.actualBitrate,
       averageInterframeBytes: summary.averageInterframeBytes,
@@ -512,7 +517,7 @@ async function recordCanvasCadence(
   const mimeType = resolveStaticCanvasRecordingMimeType();
   const chunks: Blob[] = [];
   let drawCount = 0;
-  const stream = createCanvasVideoOutput({
+  const { stream } = createCanvasVideoOutput({
     dimensions: { height, width },
     frameRate,
     initializeDrawing: ({ context }) => ({
@@ -596,8 +601,18 @@ function setMediaRecorderState(state: HarnessMediaRecorderState) {
     recordingId: 'recording-e2e-harness',
     streamInstanceId: 'stream-instance-e2e-harness',
   });
-  recordingContext.mediaRecorder = harnessMediaRecorder as unknown as MediaRecorder;
-  recordingContext.activateRecorder(harnessMediaRecorder as unknown as MediaRecorder);
+  const artifactSession = {
+    get state() {
+      return harnessMediaRecorder?.state ?? 'inactive';
+    },
+    pause: () => harnessMediaRecorder?.pause(),
+    resume: () => harnessMediaRecorder?.resume(),
+  } as unknown as Parameters<typeof recordingContext.bindStartingArtifactSession>[0];
+  recordingContext.bindStagingCoordinator(
+    {} as Awaited<ReturnType<typeof createRecordingStagingCoordinator>>
+  );
+  recordingContext.bindStartingArtifactSession(artifactSession);
+  recordingContext.activateRecorder(artifactSession);
 }
 
 window.__sniptaleOffscreenHarness = {

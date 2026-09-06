@@ -152,5 +152,6 @@ it('keeps trash entries when persisted cleanup fails', async () => {
   await harness.actions.clearTrash();
 
   expect(harness.getProject().trash).toHaveLength(1);
-  expect(harness.setError).toHaveBeenCalledWith('cleanup failed');
+  expect(harness.setError).toHaveBeenLastCalledWith(expect.stringContaining('Sniptale'));
+  expect(harness.setError).not.toHaveBeenCalledWith('cleanup failed');
 });

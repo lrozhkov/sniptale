@@ -14,12 +14,30 @@ export function readAppCoreOwnerPolicy(root = process.cwd()) {
   return policy;
 }
 
-export function classifyFinalAppCoreOwnerPath(path, policy) {
-  const matches = policy.finalOwnerRules.filter(
-    (sourcePrefix) => path === sourcePrefix || path.startsWith(`${sourcePrefix}/`)
-  );
-  const longest = Math.max(0, ...matches.map((sourcePrefix) => sourcePrefix.length));
-  const owners = matches.filter((sourcePrefix) => sourcePrefix.length === longest);
-  if (owners.length !== 1) throw new Error(`unclassified final app-core owner: ${path}`);
-  return owners[0];
+const APP_CORE_ROOTS = new Set([
+  'composition',
+  'contracts',
+  'features',
+  'foundation',
+  'platform',
+  'ui',
+  'workflows',
+]);
+
+export function deriveAppCoreOwnerPath(path) {
+  const segments = path.split('/');
+  if (
+    segments[0] !== 'apps' ||
+    segments[1] !== 'extension' ||
+    segments[2] !== 'src' ||
+    !APP_CORE_ROOTS.has(segments[3])
+  ) {
+    return null;
+  }
+  const ownerDepth = segments[3] === 'composition' && segments[4] === 'persistence' ? 6 : 5;
+  return segments.slice(0, Math.min(ownerDepth, segments.length)).join('/');
+}
+
+export function collectAppCoreOwnerProjection(files) {
+  return [...new Set(files.map(deriveAppCoreOwnerPath).filter(Boolean))].sort();
 }

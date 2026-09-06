@@ -1,7 +1,9 @@
+import { WorkspaceTrackPresentation } from './track-presentation';
 import { AudioRecordingModal } from '../../recording/audio-modal';
 import { VideoEditorLibraryPanel } from '../../library/panel';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { VideoEditorFloatingWorkspace } from '../floating';
+import { VideoEditorFloatingInspectorStack } from '../floating/inspector-stack';
 import {
   InspectorGroupFocusContext,
   type InspectorGroupFocusIntent,
@@ -16,6 +18,7 @@ import type { VideoPreviewCanvasInsertKind } from '../../preview/stage/types';
 import { VideoEditorWorkspaceCanvas } from './canvas';
 import { useWorkspaceEffectBundles } from './effect-bundles';
 import { useEffectLibraryOperations } from '../../library/effects-dock/operations';
+import { useWorkspacePanelSizes } from '../floating/panel-layout';
 
 interface VideoEditorWorkspaceMainProps {
   diagnosticsContent: React.ReactNode;
@@ -32,10 +35,17 @@ export function VideoEditorWorkspaceMain({
   const [activeInsertKind, setActiveInsertKind] = useState<VideoPreviewCanvasInsertKind | null>(
     null
   );
-  const [effectsLibraryDockOpen, setEffectsLibraryDockOpen] = useState(true);
+  const { effectsLibraryDockOpen, materialsOpen, changeEffectsOpen, toggleMaterials, inspector } =
+    useWorkspacePanels();
   const [inspectorGroupFocus] = useState<InspectorGroupFocusIntent | null>(null);
   const effectBundles = useWorkspaceEffectBundles();
   const effectOperations = useEffectLibraryOperations();
+  const panelSizes = useWorkspacePanelSizes(materialsOpen || effectsLibraryDockOpen);
+  const [materialsFullHeight, setMaterialsFullHeight] = useState(false);
+  const [inspectorFullHeight, setInspectorFullHeight] = useState(false);
+  const workspaceStyle: React.CSSProperties & { '--video-editor-inspector-width': string } = {
+    '--video-editor-inspector-width': `${panelSizes.inspector.width}px`,
+  };
   useActiveCanvasInsertEscape({
     active: activeInsertKind !== null,
     onCancel: () => setActiveInsertKind(null),
@@ -43,46 +53,84 @@ export function VideoEditorWorkspaceMain({
 
   return (
     <InspectorGroupFocusContext.Provider value={inspectorGroupFocus}>
-      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-        <VideoEditorWorkspaceCanvas
-          activeInsertKind={activeInsertKind}
-          effectBundles={effectBundles}
-          effectOperations={effectOperations}
-          effectsLibraryDockOpen={effectsLibraryDockOpen}
-          previewHeightStyle={previewHeightStyle}
-          onClearActiveInsertKind={() => setActiveInsertKind(null)}
-          onEffectsLibraryDockOpenChange={setEffectsLibraryDockOpen}
-        />
-        <VideoEditorWorkspaceOverlays
-          activeInsertKind={activeInsertKind}
-          diagnosticsContent={diagnosticsContent}
-          effectsLibraryDockOpen={effectsLibraryDockOpen}
-          onActiveInsertKindChange={setActiveInsertKind}
-          onEffectsLibraryDockOpenChange={setEffectsLibraryDockOpen}
-        />
+      <div
+        className="relative flex min-h-0 min-w-[1280px] flex-1 flex-col overflow-hidden"
+        style={workspaceStyle}
+        ref={panelSizes.containerRef}
+      >
+        <WorkspaceTrackPresentation>
+          <VideoEditorFloatingWorkspace
+            inspector={inspector}
+            materials={{ isOpen: materialsOpen, onToggle: toggleMaterials }}
+            activeInsertKind={activeInsertKind}
+            effectsLibraryDock={{
+              isOpen: effectsLibraryDockOpen,
+              onToggle: () => changeEffectsOpen(!effectsLibraryDockOpen),
+            }}
+            onActiveInsertKindChange={setActiveInsertKind}
+          />
+          <VideoEditorWorkspaceCanvas
+            inspectorFullHeight={inspectorFullHeight}
+            materialsPanel={{
+              resize: panelSizes.materials,
+              fullHeight: materialsFullHeight,
+              onToggle: () => setMaterialsFullHeight((current) => !current),
+            }}
+            materialsOpen={materialsOpen}
+            inspector={
+              <VideoEditorFloatingInspectorStack
+                diagnosticsContent={diagnosticsContent}
+                resize={panelSizes.inspector}
+                fullHeight={inspectorFullHeight}
+                onToggleFullHeight={() => setInspectorFullHeight((current) => !current)}
+              />
+            }
+            activeInsertKind={activeInsertKind}
+            effectBundles={effectBundles}
+            effectOperations={effectOperations}
+            effectsLibraryDockOpen={effectsLibraryDockOpen}
+            previewHeightStyle={previewHeightStyle}
+            onClearActiveInsertKind={() => setActiveInsertKind(null)}
+            onEffectsLibraryDockOpenChange={changeEffectsOpen}
+          />
+          <VideoEditorWorkspaceOverlays diagnosticsContent={diagnosticsContent} />
+        </WorkspaceTrackPresentation>
       </div>
     </InspectorGroupFocusContext.Provider>
   );
 }
 
+function useWorkspacePanels() {
+  const header = useVideoEditorHeaderController();
+  const [activeLibrary, setActiveLibrary] = useState<'materials' | 'effects' | null>('materials');
+  const effectsLibraryDockOpen = activeLibrary === 'effects';
+  const materialsOpen = activeLibrary === 'materials';
+  const libraryBeforeEffects = useRef<'materials' | null>(null);
+  const changeEffectsOpen = (open: boolean) => {
+    if (open) {
+      libraryBeforeEffects.current = activeLibrary === 'materials' ? 'materials' : null;
+      setActiveLibrary('effects');
+    } else {
+      setActiveLibrary(libraryBeforeEffects.current);
+    }
+  };
+  return {
+    effectsLibraryDockOpen,
+    materialsOpen,
+    changeEffectsOpen,
+    toggleMaterials: () => setActiveLibrary(materialsOpen ? null : 'materials'),
+    inspector: {
+      isOpen: Boolean(header && !header.leftSidebarCollapsed),
+      onToggle: () => header?.onToggleSidebar(),
+    },
+  };
+}
+
 function VideoEditorWorkspaceOverlays(props: {
-  activeInsertKind: VideoPreviewCanvasInsertKind | null;
   diagnosticsContent: React.ReactNode;
-  effectsLibraryDockOpen: boolean;
-  onActiveInsertKindChange: (insertKind: VideoPreviewCanvasInsertKind | null) => void;
-  onEffectsLibraryDockOpenChange: (open: boolean | ((open: boolean) => boolean)) => void;
 }): React.JSX.Element {
   return (
     <>
-      <VideoEditorFloatingWorkspace
-        activeInsertKind={props.activeInsertKind}
-        diagnosticsContent={props.diagnosticsContent}
-        effectsLibraryDock={{
-          isOpen: props.effectsLibraryDockOpen,
-          onToggle: () => props.onEffectsLibraryDockOpenChange((value) => !value),
-        }}
-        onActiveInsertKindChange={props.onActiveInsertKindChange}
-      />
       <VideoEditorWorkspaceLibraryPanel diagnosticsContent={props.diagnosticsContent} />
       <VideoEditorAudioRecordingModal diagnosticsContent={props.diagnosticsContent} />
     </>

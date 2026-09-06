@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react';
 
 import { translate } from '../../../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../../../platform/i18n/user-facing-error';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ProductField, ProductInput } from '@sniptale/ui/product-form-controls';
 import {
@@ -43,9 +44,11 @@ async function cancelUnlockRequest(requestId: string | null): Promise<void> {
 }
 
 function getUnlockSubmitError(error: unknown): string {
-  return error instanceof Error
-    ? error.message
-    : translate('settings.aiProviders.secretProtectionActionError');
+  return createUserFacingErrorMessage({
+    cause: error,
+    detail: 'browserCommunication',
+    summaryKey: 'settings.aiProviders.secretProtectionActionError',
+  });
 }
 
 function useAISecretUnlockForm(requestId: string | null) {
@@ -65,7 +68,7 @@ function useAISecretUnlockForm(requestId: string | null) {
     try {
       const response = await aiSecretUnlockRuntime.submitPassphrase({ passphrase, requestId });
       if (!response.success || response.status !== 'completed') {
-        setError(response.error ?? translate('settings.aiProviders.secretProtectionActionError'));
+        setError(getUnlockSubmitError(response.error));
         setIsSubmitting(false);
         return;
       }

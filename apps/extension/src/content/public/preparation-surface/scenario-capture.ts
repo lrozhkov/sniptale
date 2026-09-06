@@ -1,4 +1,4 @@
-import { translate } from '../../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import type { CaptureResponse } from '../../../contracts/messaging/contracts/response-types';
 import type { ScenarioRuntimeCapturePayload } from '../../../contracts/messaging/contracts/types';
@@ -21,7 +21,11 @@ export function createPreparationScenarioAutoClickCaptureTransport(
       return { success: true, dataUrl };
     }
 
-    const error = response?.error || translate('scenario.content.captureSaveError');
+    const error = createUserFacingErrorMessage({
+      cause: response?.error,
+      detail: 'storage',
+      summaryKey: 'scenario.content.captureSaveError',
+    });
     showToast(error, 'error');
     return { success: false, error };
   };

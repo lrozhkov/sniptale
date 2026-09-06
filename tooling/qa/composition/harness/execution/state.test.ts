@@ -28,6 +28,11 @@ it('accepts a fresh release-harness state for the same harness files', async () 
     );
 
     expect(() => module.assertFreshHarnessState(context, 'qa:checkpoint')).not.toThrow();
+
+    writeFile(root, 'tooling/qa/unchanged-owner.mjs', 'export const authority = 1;\n');
+    expect(() => module.assertFreshHarnessState(context, 'qa:checkpoint')).toThrow(
+      /controlDigest changed/u
+    );
   });
 });
 

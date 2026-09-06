@@ -63,6 +63,13 @@ async function flushTasks(): Promise<void> {
   await Promise.resolve();
 }
 
+function expectSafePopupExportFailure(sendResponse: ReturnType<typeof vi.fn>, raw: string[]): void {
+  const responseText = JSON.stringify(sendResponse.mock.calls);
+  expect(responseText).toContain(translate('content.runtime.exportPrepareFailed'));
+  expect(responseText).toContain(translate('common.errors.unexpectedDetail'));
+  raw.forEach((detail) => expect(responseText).not.toContain(detail));
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.extended.mockResolvedValue(extendedArtifacts);
@@ -143,7 +150,7 @@ it('returns only the staged descriptor after streaming the composed archive', as
   expect(state).toEqual({ activeExportRequestId: null, isExportRunning: false });
 });
 
-it('returns a bounded safe staging cause for popup diagnosis', async () => {
+it('keeps staging codes and raw causes out of the popup response', async () => {
   mocks.build.mockResolvedValue({
     entries: [],
     manifest: { id: 'page-1', source: { title: 'Page' }, stats: { totalBytes: 10 } },
@@ -172,11 +179,12 @@ it('returns a bounded safe staging cause for popup diagnosis', async () => {
   });
   await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
 
-  const responseText = JSON.stringify(sendResponse.mock.calls);
-  expect(responseText).toContain('ARCHIVE_STAGING');
-  expect(responseText).toContain('Archive failed');
-  expect(responseText).not.toContain('user:secret');
-  expect(responseText).not.toContain('token=private');
+  expectSafePopupExportFailure(sendResponse, [
+    'ARCHIVE_STAGING',
+    'Archive failed',
+    'user:secret',
+    'token=private',
+  ]);
 });
 
 it('normalizes the live document title before composing the package', async () => {
@@ -763,10 +771,7 @@ it('does not invoke Export Manager or staging after the retained Web Snapshot pr
   expect(buildBlobPackage).not.toHaveBeenCalled();
   expect(mocks.stage).not.toHaveBeenCalled();
   expect(mocks.write).not.toHaveBeenCalled();
-  expect(sendResponse).toHaveBeenCalledWith({
-    success: false,
-    error: `${translate('content.runtime.exportPrepareFailed')} [WEB_COPY_START]: snapshot failed`,
-  });
+  expectSafePopupExportFailure(sendResponse, ['WEB_COPY_START', 'snapshot failed']);
 });
 
 it('reports producer failure and clears cancellation authority', async () => {
@@ -789,10 +794,6 @@ it('reports producer failure and clears cancellation authority', async () => {
   await flushTasks();
   await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
 
-  expect(sendResponse).toHaveBeenCalledWith({
-    success: false,
-    error: `${translate('content.runtime.exportPrepareFailed')} [SELECTED_DATA]: build failed`,
-  });
-  expect(JSON.stringify(sendResponse.mock.calls)).toContain('build failed');
+  expectSafePopupExportFailure(sendResponse, ['SELECTED_DATA', 'build failed']);
   expect(state).toEqual({ activeExportRequestId: null, isExportRunning: false });
 });

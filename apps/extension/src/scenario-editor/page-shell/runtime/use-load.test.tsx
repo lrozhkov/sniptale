@@ -80,7 +80,8 @@ describe('useScenarioV3ProjectLoader', () => {
 
     await clickLoad();
 
-    expect(setError).toHaveBeenCalledWith('No database');
+    expect(setError).toHaveBeenCalledWith(expect.stringContaining('Sniptale'));
+    expect(setError).not.toHaveBeenCalledWith(expect.stringContaining('No database'));
     expect(setLoading).toHaveBeenLastCalledWith(false);
   });
 

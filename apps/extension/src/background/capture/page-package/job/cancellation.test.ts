@@ -38,6 +38,7 @@ function job(): ActivePopupExportJob {
     expectedActivation: null,
     finishCancellation: null,
     lastActivatedByWindow: new Map(),
+    locale: 'en',
     manualActivationConflict: false,
     publicationQueue: Promise.resolve(),
     status: {

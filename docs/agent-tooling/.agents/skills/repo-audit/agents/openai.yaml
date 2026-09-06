@@ -1,4 +1,0 @@
-interface:
-  display_name: 'Repo Audit'
-  short_description: 'Audit Sniptale architecture, security, tooling, and QA drift'
-  default_prompt: 'Use $repo-audit in a fresh auditor with fork_turns: "none" and supplied bounded scope plus QA results; inspect structural/advisory/topology drift and forwarding-edge coverage without running detectors.'

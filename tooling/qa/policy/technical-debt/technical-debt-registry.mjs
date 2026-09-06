@@ -6,15 +6,7 @@ import { repoRoot } from '../../analysis/repository/shared-paths.mjs';
 export const TECHNICAL_DEBT_REGISTRY_PATH = 'tooling/configs/qa/technical-debt.data.json';
 
 const CLASSIFICATIONS = new Set(['debt', 'accepted-architecture', 'tool-noise']);
-const SOURCE_KINDS = new Set([
-  'architecture',
-  'codeql',
-  'gitleaks',
-  'license',
-  'quality',
-  'scc',
-  'sonarjs',
-]);
+const SOURCE_KINDS = new Set(['architecture', 'codeql', 'gitleaks', 'license', 'quality', 'scc']);
 const REVIEW_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 const ENTRY_KEYS = [
   'classification',
@@ -350,26 +342,6 @@ function validateQuality(context) {
   return baseline.allowances?.length ?? 0;
 }
 
-function validateSonarjs(context) {
-  const file = 'tooling/configs/qa/sonarjs-baseline.json';
-  const baseline = parseSource(context, file);
-  for (const entry of baseline.entries ?? []) {
-    const scope = { file: entry.file, rule: entry.rule };
-    if (entry.line != null) scope.line = entry.line;
-    if (entry.messagePattern != null) scope.messagePattern = entry.messagePattern;
-    requireSourceLink(
-      context,
-      entry,
-      'tool-noise',
-      'sonarjs',
-      `${entry.rule}:${entry.file}:${entry.line ?? ''}:${entry.messagePattern ?? ''}`,
-      scope,
-      file
-    );
-  }
-  return baseline.entries?.length ?? 0;
-}
-
 function validateEnforcedSources(context) {
   return (
     validateArchitecture(context) +
@@ -377,8 +349,7 @@ function validateEnforcedSources(context) {
     validateGitleaks(context) +
     validateScc(context) +
     validateLicenses(context) +
-    validateQuality(context) +
-    validateSonarjs(context)
+    validateQuality(context)
   );
 }
 

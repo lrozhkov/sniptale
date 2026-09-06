@@ -36,6 +36,25 @@ function createHeaderProps() {
   };
 }
 
+it('reflects the visible compact inspector state without changing the saved preference', () => {
+  const header = createHeaderProps();
+  hookMocks.header.mockReturnValue(header);
+  hookMocks.history.mockReturnValue({
+    canUndo: false,
+    canRedo: false,
+    error: null,
+    onUndo: vi.fn(),
+    onRedo: vi.fn(),
+  });
+  const markup = renderToStaticMarkup(
+    <VideoEditorFloatingDocumentBar inspector={{ isOpen: false, onToggle: vi.fn() }} />
+  );
+  expect(markup).toContain('videoEditor.app.expandInspector');
+  expect(markup).not.toContain('videoEditor.app.collapseInspector');
+  expect(header.leftSidebarCollapsed).toBe(false);
+  expect(header.onToggleSidebar).not.toHaveBeenCalled();
+});
+
 it('renders project identity and keeps export/library actions in the floating document bar', () => {
   hookMocks.header.mockReturnValue(createHeaderProps());
   hookMocks.history.mockReturnValue({

@@ -140,6 +140,13 @@ export const EFFECT_V1_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/video-editor/project/state/clip-timeline/clip-shifts.test.ts'],
   },
   {
+    owner: 'effect-v1-standalone-clip-host',
+    productionFile: 'apps/extension/src/video-editor/project/state/clip-timeline/effect-host.ts',
+    reason:
+      'Standalone host lookup, duplication, split timing, and rejection paths have direct lifecycle proof.',
+    testFiles: ['apps/extension/src/video-editor/project/state/effects.effect-instance.test.ts'],
+  },
+  {
     exclusive: true,
     owner: 'effect-v1-workflow-executor',
     productionPrefix: 'apps/extension/src/workflows/video/effect-runtime-sandbox',

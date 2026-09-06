@@ -1,9 +1,10 @@
 import { useEffect, useId, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { createSolidPaint } from '@sniptale/foundation/paint';
 
 import type {
+  AppliedBorderSettings,
   BlurType,
-  BorderPreset,
   EffectMode,
   FrameData,
 } from '../../../apps/extension/src/features/highlighter/contracts';
@@ -14,7 +15,12 @@ import {
 } from '../../../apps/extension/src/content/selection/frame-runtime/effects/geometry';
 import { getResizeHandleStyle } from '../../../apps/extension/src/content/selection/interactive-frame/layout/resize-handle-position';
 import { getInteractiveFrameDisplay } from '../../../apps/extension/src/content/selection/interactive-frame/render-model/render-model';
-import { composeViewerCaptureOverlays } from '../../../apps/extension/src/web-snapshot-viewer/preparation/capture/overlays/composer';
+import { FrameAnnotationRasterizer } from '../../../apps/extension/src/offscreen/frame-annotation-rasterizer';
+import { createFrameAnnotationSnapshot } from '../../../apps/extension/src/features/highlighter/frame-annotation';
+import {
+  blobToDataUrl,
+  dataUrlToBlob,
+} from '../../../apps/extension/src/platform/media-utils/data-url';
 import {
   DynamicAnchorLifecycleHarness,
   parseDynamicAnchorScenario,
@@ -24,18 +30,16 @@ const SURFACE = { x: 30.25, y: 28.5, width: 132.5, height: 84.25 } as const;
 const CELL = { width: 194, height: 140 } as const;
 const HANDLE_SIZE = 12;
 
-const THICK_PRESET: BorderPreset = {
-  id: 'geometry-thick',
-  name: 'Geometry thick',
-  enabled: true,
-  order: 0,
+const THICK_SETTINGS: AppliedBorderSettings = {
+  sourcePresetId: 'geometry-thick',
+  sourcePresetName: 'Geometry thick',
   color: '#ff00ff',
   width: 20,
   style: 'solid',
   radius: 24,
   padding: { top: 0, right: 0, bottom: 0, left: 0 },
   shadow: 0,
-  fillColor: '#00d4ff40',
+  fillPaint: createSolidPaint('#00d4ff40'),
   inheritCustomCss: false,
   customCss: '',
 };
@@ -126,8 +130,8 @@ function createFrame(testCase: GeometryCase): FrameData {
     ...SURFACE,
     effectMode: testCase.effectMode,
     borderSettings: {
-      ...THICK_PRESET,
-      fillColor: testCase.fillVisible ? THICK_PRESET.fillColor : '#00d4ff00',
+      ...THICK_SETTINGS,
+      fillPaint: createSolidPaint(testCase.fillVisible ? '#00d4ff40' : '#00d4ff00'),
     },
     blurSettings: {
       amount: 12,
@@ -296,22 +300,23 @@ function ViewerParity() {
   useEffect(() => {
     const iframe = document.querySelector<HTMLIFrameElement>('[data-ui="geometry-viewer-source"]');
     if (!iframe) return;
-    const iframeRect = iframe.getBoundingClientRect();
     const testCase = GEOMETRY_CASES.find(({ id }) => id === 'blur-frame-fill')!;
-    const localFrame = createFrame(testCase);
-    const frame = {
-      ...localFrame,
-      x: iframeRect.left + localFrame.x,
-      y: iframeRect.top + localFrame.y,
-    };
     const scale = window.devicePixelRatio || 1;
+    const baseDataUrl = createCheckerboardDataUrl(194, 140, scale);
 
-    void composeViewerCaptureOverlays({
-      baseDataUrl: createCheckerboardDataUrl(194, 140, scale),
-      frames: [frame],
-      iframe,
-      mode: 'visible',
-    }).then(setCapture);
+    void dataUrlToBlob(baseDataUrl)
+      .then((baseImage) =>
+        new FrameAnnotationRasterizer().rasterize({
+          baseImage,
+          height: 140,
+          requestedHeight: 140 * scale,
+          requestedWidth: 194 * scale,
+          snapshots: [createFrameAnnotationSnapshot(createFrame(testCase), 0)],
+          width: 194,
+        })
+      )
+      .then(({ blob }) => blobToDataUrl(blob))
+      .then(setCapture);
   }, []);
 
   return (
@@ -332,6 +337,7 @@ function ViewerParity() {
       {capture ? (
         <img
           alt="Viewer geometry capture"
+          data-stroke-width={THICK_SETTINGS.width}
           data-surface={`${SURFACE.x},${SURFACE.y},${SURFACE.width},${SURFACE.height}`}
           data-ui="geometry-viewer-capture"
           height={140}

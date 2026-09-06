@@ -155,6 +155,7 @@ export interface PreviewStageAnnotationTargetOverlayProps {
 }
 
 export interface PreviewStageVideoSyncParams {
+  assetUrls: Record<string, string>;
   activeClips: VideoProjectClip[];
   currentTime: number;
   isPlaying: boolean;

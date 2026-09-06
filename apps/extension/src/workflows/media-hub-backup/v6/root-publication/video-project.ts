@@ -1,4 +1,9 @@
 import {
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
+} from '../../../../composition/persistence/infrastructure/indexed-db/core.stores';
+import { prepareVideoReviewRestore } from '../../../../composition/persistence/review-workspaces/backup-restore';
+import {
   appendCommittedArchiveRootInTransaction,
   buildPhysicalDeleteOperation,
   completePhysicalDeleteOperation,
@@ -144,7 +149,22 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
         size: object.ref.size,
       });
       if (!parsed) throw new Error('Restored video project asset metadata is invalid.');
-      return { entry: parsed, filename: asset.filename, ref: object.ref };
+      const videoReview = asset.videoReview
+        ? prepareVideoReviewRestore({
+            review: asset.videoReview,
+            sourceAggregateId: `project-asset:${asset.entry.id}`,
+            targetAggregateId: `project-asset:${parsed.id}`,
+            sourceAssetId: object.ref.assetId,
+          })
+        : null;
+      if (videoReview && videoReview.workspace.source.size !== object.ref.size)
+        throw new Error('Video review source bytes are inconsistent.');
+      return {
+        entry: parsed,
+        filename: asset.filename,
+        ref: object.ref,
+        ...(videoReview ? { videoReview } : {}),
+      };
     });
     const exports = await Promise.all(
       metadata.projectExports.map(async (item) => {
@@ -171,7 +191,22 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
           : null;
         if (item.thumbnail && !thumbnail)
           throw new Error('Restored project export thumbnail is invalid.');
-        return { entry: parsed, ref: object.ref, ...(thumbnail ? { thumbnail } : {}) };
+        const videoReview = item.videoReview
+          ? prepareVideoReviewRestore({
+              review: item.videoReview,
+              sourceAggregateId: `export:${item.entry.id}`,
+              targetAggregateId: `export:${exportId}`,
+              sourceAssetId: object.ref.assetId,
+            })
+          : null;
+        if (videoReview && videoReview.workspace.source.size !== object.ref.size)
+          throw new Error('Video review source bytes are inconsistent.');
+        return {
+          entry: parsed,
+          ref: object.ref,
+          ...(thumbnail ? { thumbnail } : {}),
+          ...(videoReview ? { videoReview } : {}),
+        };
       })
     );
     const thumbnail = metadata.thumbnail
@@ -202,6 +237,8 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
           PROJECT_ASSETS_STORE,
           PROJECT_EXPORTS_STORE,
           MEDIA_LIBRARY_STORE,
+          VIDEO_WORKSPACES_STORE,
+          VIDEO_WORKSPACE_DRAFTS_STORE,
           THUMBNAILS_STORE,
           AGGREGATE_PRESENTATIONS_STORE,
           ASSET_REFS_STORE,
@@ -223,6 +260,8 @@ export const videoProjectRootPublisher: ArchiveRootPublisher = {
           assets: tx.objectStore(PROJECT_ASSETS_STORE),
           exports: tx.objectStore(PROJECT_EXPORTS_STORE),
           media: tx.objectStore(MEDIA_LIBRARY_STORE),
+          videoWorkspaces: tx.objectStore(VIDEO_WORKSPACES_STORE),
+          videoDrafts: tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE),
           operations: tx.objectStore(ASSET_OPERATIONS_STORE),
           owners: tx.objectStore(ASSET_OWNERS_STORE),
           presentations: tx.objectStore(AGGREGATE_PRESENTATIONS_STORE),

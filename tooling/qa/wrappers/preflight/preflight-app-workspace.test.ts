@@ -22,5 +22,5 @@ it('routes app-workspace UI work through the same architecture and design guidan
 
   expect(result.relevantDocs).toContain('docs/architecture/code-organization.md');
   expect(result.relevantDocs).toContain('docs/architecture/runtime-contexts.md');
-  expect(result.relevantDocs).toContain('docs/agent-tooling/DESIGN.md');
+  expect(result.relevantDocs).toContain('docs/agent-tooling/agent-tooling.zip');
 });

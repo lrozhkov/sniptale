@@ -7,6 +7,12 @@ import { createEmptyVideoProject } from '../../../../features/video/project/fact
 import { DEFAULT_VIDEO_EDITOR_TRACK_PANEL_PREFS } from '../../../persistence/track-panel';
 import { buildTimelineTrackLayoutModel } from './layout';
 import { ProjectTimelineTrackList } from './list';
+import { createVideoProjectMotionRegion } from '../../../../features/video/project/motion';
+import {
+  VideoProjectActionEventKind,
+  VideoProjectActionPreset,
+  VideoProjectTrackRole,
+} from '../../../../features/video/project/types';
 
 vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
@@ -39,15 +45,17 @@ it('renders a compact track header together with track rows and effect lanes', (
 
   const header = Array.from(container?.querySelectorAll('div') ?? []).find(
     (item) =>
-      item.textContent === 'videoEditor.timeline.tracksTitle' && item.className.includes('h-[30px]')
+      item.textContent?.startsWith('videoEditor.timeline.tracksTitle') &&
+      item.className.includes('h-[30px]')
   );
 
   expect(header?.className).toContain('h-[30px]');
   expect(header?.className).not.toContain('uppercase');
   expect(container?.textContent).toContain('videoEditor.timeline.telemetryLane');
-  expect(container?.textContent).toContain('videoEditor.timeline.motionLane');
-  expect(container?.textContent).toContain('videoEditor.timeline.trackKindPrimary');
-  expect(container?.textContent).not.toContain('User custom video title');
+  expect(container?.textContent).not.toContain('videoEditor.timeline.motionLane');
+  expect(container?.textContent).toContain('User custom video title');
+  expect(container?.textContent).toContain('V1');
+  expect(container?.textContent).not.toContain('O1');
 });
 
 it('omits the telemetry label row when the read-only telemetry lane is hidden', () => {
@@ -58,26 +66,36 @@ it('omits the telemetry label row when the read-only telemetry lane is hidden', 
   expect(container?.textContent).not.toContain('videoEditor.timeline.telemetryLane');
 });
 
-it('keeps the expanded track list within the parent width without horizontal overflow', () => {
+it('keeps a single track rail without duplicate height or ordering controls', () => {
   const project = createEmptyVideoProject('Track list');
 
-  renderTrackList(project, { showTelemetryLane: true, panelExpanded: true });
+  renderTrackList(project, { showTelemetryLane: true });
 
   const scrollArea = container?.querySelector<HTMLElement>('[data-project-timeline-track-list]');
 
   expect(scrollArea?.className).toContain('overflow-x-hidden');
-  expect(scrollArea?.style.gridTemplateColumns).toBe('minmax(0, 1fr) minmax(0, 1fr)');
+  expect(scrollArea?.style.gridTemplateColumns).toBe('');
   expect(
     container?.querySelectorAll('[data-ui="video-editor.timeline.icon-button"]').length
   ).toBeGreaterThan(0);
-  expect(
-    container?.querySelector<HTMLInputElement>('[data-ui="video-editor.timeline.track-height"]')
-      ?.className
-  ).toContain('sniptale-range');
+  expect(container?.querySelector('[data-ui="video-editor.timeline.track-height"]')).toBeNull();
 });
 
 it('keeps hidden utility lanes visible in the track rail with state controls', () => {
   const project = createEmptyVideoProject('Utility lane visibility');
+  project.motionRegions = [createVideoProjectMotionRegion(project, 12)];
+  project.actionEvents = [
+    {
+      id: 'click',
+      kind: VideoProjectActionEventKind.CLICK,
+      preset: VideoProjectActionPreset.CLICK_RIPPLE,
+      time: 12,
+      duration: 1,
+      label: 'Click',
+      point: { x: 10, y: 10 },
+      data: {},
+    },
+  ];
   project.utilityLanes = {
     actions: { visible: false, locked: false },
     camera: { visible: false, locked: true },
@@ -88,6 +106,27 @@ it('keeps hidden utility lanes visible in the track rail with state controls', (
   expect(container?.textContent).toContain('videoEditor.timeline.actionsLane');
   expect(container?.textContent).toContain('videoEditor.timeline.motionLane');
   expect(container?.querySelectorAll('[data-ui="timeline.utility-lane-state"]').length).toBe(4);
+  expect(
+    container?.querySelector<HTMLButtonElement>('[data-ui="video-editor.timeline.add-zoom"]')
+      ?.disabled
+  ).toBe(true);
+});
+
+it('adds a zoom at the playhead from the persistent editable lane action', () => {
+  const project = createEmptyVideoProject('Zoom add action');
+  project.motionRegions = [createVideoProjectMotionRegion(project, 0)];
+  const onAddMotionRegion = vi.fn();
+
+  renderTrackList(project, { showTelemetryLane: false, onAddMotionRegion });
+
+  const addButton = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="video-editor.timeline.add-zoom"]'
+  );
+  expect(addButton?.disabled).toBe(false);
+
+  act(() => addButton?.click());
+
+  expect(onAddMotionRegion).toHaveBeenCalledOnce();
 });
 
 it('keeps persisted clip logical lanes inside one physical track row', () => {
@@ -110,12 +149,11 @@ it('keeps persisted clip logical lanes inside one physical track row', () => {
   expect(container?.querySelector('[data-ui="video-editor.timeline.add-logical-lane"]')).toBeNull();
 });
 
-it('omits unavailable cursor controls from both rail and expanded panel', () => {
+it('omits the unavailable cursor lane', () => {
   const project = createEmptyVideoProject('No cursor lane');
 
   renderTrackList(project, {
     cursorLaneVisible: false,
-    panelExpanded: true,
     showTelemetryLane: false,
   });
 
@@ -129,23 +167,61 @@ it('never creates a version-specific rail for effect instances', () => {
   renderTrackList(project, { showTelemetryLane: false });
 
   expect(container?.textContent).not.toContain('EffectV1');
-  expect(container?.textContent).toContain('videoEditor.timeline.trackKindPrimary');
+  expect(container?.textContent).toContain(project.tracks[0]!.name);
 });
 
-it('hides row text in compact track panel mode', () => {
+it('keeps track names and state controls readable in compact mode', () => {
   const project = createEmptyVideoProject('Compact rows');
 
-  renderTrackList(project, { compactRows: true, panelExpanded: true, showTelemetryLane: true });
+  renderTrackList(project, { compactRows: true, showTelemetryLane: true });
 
   const scrollArea = container?.querySelector<HTMLElement>('[data-project-timeline-track-list]');
 
-  expect(scrollArea?.style.gridTemplateColumns).toBe('minmax(0, 1fr)');
-  expect(container?.textContent).not.toContain('videoEditor.timeline.trackKindPrimary');
-  expect(container?.textContent).not.toContain('videoEditor.timeline.telemetryLane');
+  expect(scrollArea?.style.gridTemplateColumns).toBe('');
+  expect(container?.textContent).toContain(project.tracks[0]!.name);
+  expect(container?.textContent).toContain('videoEditor.timeline.telemetryLane');
   expect(container?.querySelectorAll('[data-ui="timeline.utility-lane-state"]')).toHaveLength(0);
   expect(
     container?.querySelectorAll('[data-ui="timeline.track-kind-icon"]').length
   ).toBeGreaterThan(0);
+});
+
+it('distinguishes a camera source track from the motion camera utility lane', () => {
+  const project = createEmptyVideoProject('Camera source');
+  const screenTrack = { ...project.tracks[0]!, id: 'screen-track', name: 'Screen' };
+  project.tracks[0] = {
+    ...project.tracks[0]!,
+    name: 'Webcam',
+    role: VideoProjectTrackRole.CAMERA,
+  };
+  project.tracks.push(screenTrack);
+
+  renderTrackList(project, { showTelemetryLane: false });
+
+  expect(container?.textContent).toContain('C1');
+  expect(container?.textContent).toContain('V1');
+  expect(container?.textContent).toContain('Webcam');
+  expect(container?.querySelector('[data-camera-track-icon]')).not.toBeNull();
+  expect(container?.textContent).not.toContain('videoEditor.timeline.motionLane');
+});
+
+it('numbers multiple explicit camera sources independently from video tracks', () => {
+  const project = createEmptyVideoProject('Multiple cameras');
+  project.tracks = [
+    { ...project.tracks[0]!, name: 'Camera A', role: VideoProjectTrackRole.CAMERA },
+    {
+      ...project.tracks[0]!,
+      id: 'camera-b',
+      name: 'Camera B',
+      order: 2,
+      role: VideoProjectTrackRole.CAMERA,
+    },
+  ];
+
+  renderTrackList(project, { showTelemetryLane: false });
+
+  expect(container?.textContent).toContain('C1');
+  expect(container?.textContent).toContain('C2');
 });
 
 function renderTrackList(
@@ -153,8 +229,8 @@ function renderTrackList(
   options: {
     compactRows?: boolean;
     cursorLaneVisible?: boolean;
-    panelExpanded?: boolean;
     showTelemetryLane: boolean;
+    onAddMotionRegion?: () => void;
   }
 ) {
   act(() => {
@@ -172,12 +248,11 @@ function renderTrackList(
         trackListRef={{ current: null }}
         trackPanelPrefs={createTrackPanelPrefs({
           compactRows: options.compactRows ?? false,
-          panelExpanded: options.panelExpanded ?? false,
         })}
         tracks={project.tracks}
+        onAddTrack={vi.fn()}
+        onAddMotionRegion={options.onAddMotionRegion ?? vi.fn()}
         onClearUtilityLane={vi.fn()}
-        onDeleteTrack={vi.fn()}
-        onMoveTrack={vi.fn()}
         onScroll={vi.fn()}
         onSelectTrack={vi.fn()}
         onToggleTrackLock={vi.fn()}
@@ -189,7 +264,7 @@ function renderTrackList(
   });
 }
 
-function createTrackPanelPrefs(options: { compactRows: boolean; panelExpanded: boolean }) {
+function createTrackPanelPrefs(options: { compactRows: boolean }) {
   return {
     cursorLaneVisible: true,
     prefs: { ...DEFAULT_VIDEO_EDITOR_TRACK_PANEL_PREFS, ...options },
@@ -197,7 +272,6 @@ function createTrackPanelPrefs(options: { compactRows: boolean; panelExpanded: b
     setCollapsedCursorLaneVisible: vi.fn(),
     setCollapsedTelemetryLaneVisible: vi.fn(),
     setCompactRows: vi.fn(),
-    setPanelExpanded: vi.fn(),
     setTrackHeight: vi.fn(),
   };
 }

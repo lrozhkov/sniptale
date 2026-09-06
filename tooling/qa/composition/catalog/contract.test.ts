@@ -145,14 +145,14 @@ it('requires fail-late CI evidence after an earlier control failure', () => {
   expect(() =>
     assertQaExecutionContract({
       wrapperId: 'ci:release',
-      mode: 'reuse-fast-proof',
+      mode: 'admitted-fast-proof',
       steps: [{ label: 'Fast proof reuse', status: 'ok' }, ...releaseSteps, ...auditSteps],
     })
   ).toThrow(/missing=.*Production build/u);
   expect(() =>
     assertQaExecutionContract({
       wrapperId: 'ci:release',
-      mode: 'reuse-fast-proof',
+      mode: 'admitted-fast-proof',
       steps: [
         { label: 'Fast proof reuse', status: 'ok' },
         ...releaseSteps,

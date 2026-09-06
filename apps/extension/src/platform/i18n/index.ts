@@ -18,6 +18,7 @@ export function translate(key: TranslationKey, locale?: AppLocale): string {
 export { compareStrings, formatDateTime, formatNumber } from '@sniptale/platform/i18n/format';
 export { usePageLocaleMetadata } from './page-metadata';
 export {
+  ensureLocaleHydrated,
   getStoredLocalePreference,
   setLocalePreference,
   subscribeToLocaleChanges,

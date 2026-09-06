@@ -1,6 +1,8 @@
+import { createVideoProjectTrack } from '../../features/video/project/factories/creation';
 import { expect, it } from 'vitest';
 
 import {
+  VideoTrackKind,
   VideoProjectClipType,
   VideoTransitionEasing,
   VideoTransitionKind,
@@ -59,7 +61,8 @@ it('projects transitions and EffectV1 references as a closed selected-clip graph
 
 it('retains a standalone EffectV1 instance only with its selected ordinary clip host', () => {
   const project = createScopeProject([createScopeClip('clip-1', VideoProjectClipType.VIDEO)]);
-  const overlayTrack = project.tracks.find(({ kind }) => kind === 'OVERLAY')!;
+  const overlayTrack = createVideoProjectTrack('Effect', 0, VideoTrackKind.OVERLAY);
+  project.tracks.push(overlayTrack);
   const host = createEffectHostClip({
     duration: 1,
     effectInstanceId: 'standalone',

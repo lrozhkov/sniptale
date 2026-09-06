@@ -3,7 +3,6 @@ import { runGuardedCapture } from './guard';
 import { createRouteErrorResponse } from '../../routing-contracts/response';
 import type { CaptureRouteContext } from './types';
 import { runPreparedCaptureAction } from './handlers.shared';
-import { getPreauthorizedContentActionRouteMessage } from './authorization/content-action';
 import { getBackgroundRuntimeMessaging } from '../../routing-contracts/runtime-messaging/services';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { translate } from '../../../platform/i18n';
@@ -33,9 +32,7 @@ async function reportFullPageCaptureWarning(
 }
 
 export function handleFullCapture(context: CaptureRouteContext): boolean {
-  const binding = context.message
-    ? getPreauthorizedContentActionRouteMessage(context.message)
-    : undefined;
+  const binding = context.contentPreauthorization;
   runGuardedCapture(context.captureGuardState, () =>
     runPreparedCaptureAction({
       context,

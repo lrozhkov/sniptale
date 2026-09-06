@@ -17,7 +17,11 @@ import type { VideoEditorAnnotationActions } from './annotation';
 import type { VideoEditorObjectTrackActions } from './object-tracks';
 import type { VideoEditorTemporalActions } from './temporal';
 import type { VideoEditorEffectInstanceActions } from './effect-instance';
-import type { VideoEditorMoveClipAction } from './timeline';
+import type { VideoEditorMoveClipAction, VideoEditorTrimClipAction } from './timeline';
+import type {
+  VideoEditorMaterialPlacementResult,
+  VideoEditorMaterialSourceRange,
+} from '../insertion';
 
 export interface VideoEditorProjectActions
   extends
@@ -37,6 +41,19 @@ export interface VideoEditorProjectActions
   toggleUtilityLaneLock: (lane: keyof VideoProjectUtilityLanes) => void;
   clearUtilityLane: (lane: keyof VideoProjectUtilityLanes) => void;
   upsertAsset: (asset: VideoProjectAsset) => void;
+  appendMaterial: (
+    assetId: string,
+    range?: VideoEditorMaterialSourceRange
+  ) => VideoEditorMaterialPlacementResult;
+  /** Inserts at the playhead and opens an equal gap across the montage. */
+  insertMaterial: (
+    assetId: string,
+    range?: VideoEditorMaterialSourceRange
+  ) => VideoEditorMaterialPlacementResult;
+  overlayMaterial: (
+    assetId: string,
+    range?: VideoEditorMaterialSourceRange
+  ) => VideoEditorMaterialPlacementResult;
   addAssetClip: (
     asset: VideoProjectAsset,
     trackId?: string | null,
@@ -56,8 +73,9 @@ export interface VideoEditorProjectActions
     startTime?: number
   ) => string | null;
   moveClip: VideoEditorMoveClipAction;
-  trimClipStart: (clipId: string, nextStartTime: number) => void;
-  trimClipEnd: (clipId: string, nextEndTime: number) => void;
+  swapClip: (clipId: string, direction: 'left' | 'right') => void;
+  trimClipStart: VideoEditorTrimClipAction;
+  trimClipEnd: VideoEditorTrimClipAction;
   splitClipAt: (clipId: string, splitTime: number) => void;
   deleteClip: (clipId: string) => void;
   duplicateClip: (clipId: string) => void;

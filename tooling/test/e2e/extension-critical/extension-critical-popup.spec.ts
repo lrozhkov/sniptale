@@ -8,11 +8,11 @@ import {
   createQuickAction,
   createRecordingRuntimeState,
   countRuntimeMessagesByType,
+  E2E_ACTIVE_PAGE_ACCESS_RESPONSE,
   E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
   emitHarnessRuntimeMessage,
   getRuntimeMessagesByType,
   POPUP_HARNESS_PATH,
-  POPUP_EXPORT_TAB_LABEL,
   POPUP_VIDEO_CANCEL_LABEL,
   POPUP_VIDEO_PAUSE_LABEL,
   POPUP_VIDEO_RESUME_LABEL,
@@ -25,6 +25,14 @@ import {
 } from '../extension-critical.helpers';
 
 const POPUP_ENABLE_FOR_TAB_LABEL = translate('popup.home.enableForTab', 'ru');
+const POPUP_IMAGE_EDITOR_LABEL = translate('popup.home.imageEditorLabel', 'ru');
+const POPUP_VISIBLE_CAPTURE_LABEL = translate('popup.home.captureVisibleLabel', 'ru');
+
+const QUICK_ACTIONS_STARTUP = {
+  selection: 'screenshots:quick-actions',
+  lastPage: 'screenshots',
+  lastExportDestination: 'export',
+} as const;
 
 async function openPopupHarness(page: Page, hostOrigin: string) {
   const runtimeErrors: string[] = [];
@@ -99,8 +107,8 @@ async function configurePageAccessActivation(page: Page) {
 async function expectPageAccessLocked(page: Page, actionName: string) {
   await expect(page.locator('button', { hasText: actionName })).toHaveCount(0);
   await expect(
-    page.getByRole('button', { name: POPUP_EXPORT_TAB_LABEL, exact: true })
-  ).toBeDisabled();
+    page.getByRole('button', { name: POPUP_ENABLE_FOR_TAB_LABEL, exact: true })
+  ).toBeVisible();
 }
 
 async function expectPageAccessActivationRequest(page: Page) {
@@ -172,8 +180,12 @@ test('popup quick action dispatches a typed runtime message', async ({ page, hos
   const actionName = 'Critical visible edit';
   await applyHarnessBootstrap(page, {
     apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
+    runtimeResponses: {
+      [MessageType.PAGE_ACCESS]: E2E_ACTIVE_PAGE_ACCESS_RESPONSE,
+    },
     storage: {
       [QUICK_ACTIONS_KEY]: [createQuickAction(actionName)],
+      sniptale_popup_startup: QUICK_ACTIONS_STARTUP,
     },
   });
   await openPopupHarness(page, hostOrigin);
@@ -194,7 +206,7 @@ test('popup page access choice hides page actions and unlocks after activation',
   page,
   hostOrigin,
 }) => {
-  const actionName = 'Page access gated action';
+  const actionName = POPUP_VISIBLE_CAPTURE_LABEL;
   await applyHarnessBootstrap(page, {
     activeTab: {
       id: 1,
@@ -208,9 +220,6 @@ test('popup page access choice hides page actions and unlocks after activation',
         status: createInactivePageAccessStatus(),
       },
     },
-    storage: {
-      [QUICK_ACTIONS_KEY]: [createQuickAction(actionName)],
-    },
   });
   await openPopupHarness(page, hostOrigin);
 
@@ -221,16 +230,13 @@ test('popup page access choice hides page actions and unlocks after activation',
 
   await expectPageAccessActivationRequest(page);
   await expect(page.locator('button', { hasText: actionName })).toBeVisible();
-  await expect(
-    page.getByRole('button', { name: POPUP_EXPORT_TAB_LABEL, exact: true })
-  ).toBeEnabled();
 });
 
 test('popup image editor action opens a new editor tab url', async ({ page, hostOrigin }) => {
   await applyHarnessBootstrap(page, {});
   await openPopupHarness(page, hostOrigin);
 
-  await page.locator('[data-ui="popup.home.image-editor-button"]').click();
+  await page.getByRole('button', { name: POPUP_IMAGE_EDITOR_LABEL, exact: true }).click();
 
   await expect
     .poll(async () => {

@@ -49,31 +49,43 @@ function createInsertionActions() {
 
 function createToolbarProps(): ProjectTimelineToolbarTestProps {
   return {
+    playback: {
+      currentTime: 0,
+      duration: 8,
+      isPlaying: false,
+      playbackRange: null,
+      onClearPlaybackRange: vi.fn(),
+      onSeekToEnd: vi.fn(),
+      onSeekToStart: vi.fn(),
+      onTogglePlay: vi.fn(),
+      onStepToNextFrame: vi.fn(),
+      onStepToPreviousFrame: vi.fn(),
+    },
     canAutoTransformRecording: true,
-    currentTime: 12,
-    duration: 45,
+    canAddMotionRegion: true,
+    canEditSelectedClip: true,
+    canSplitSelectedClip: true,
     fitSelectionDuration: 8,
     insertion: createInsertionActions(),
-    isPlaying: false,
     onAutoTransformRecording: vi.fn(),
-    onClearPlaybackRange: vi.fn(),
     onDeleteSelectedClip: vi.fn(),
     onDuplicateSelectedClip: vi.fn(),
     onFitProject: vi.fn(),
     onFitSelection: vi.fn(),
-    onSeekToStart: vi.fn(),
     onSplitSelectedClip: vi.fn(),
     onTimelinePreviewSuspendedChange: vi.fn(),
-    onTogglePlay: vi.fn(),
     onZoomChange: vi.fn(),
     pixelsPerSecond: 120,
-    playbackRange: null,
     selectedClip: true,
     trackView: {
       compactRows: false,
-      panelExpanded: false,
+      cursorLaneVisible: false,
+      telemetryLaneVisible: false,
+      canShowCursorLane: true,
+      canShowTelemetryLane: true,
       onCompactRowsChange: vi.fn(),
-      onPanelExpandedChange: vi.fn(),
+      onCursorLaneVisibleChange: vi.fn(),
+      onTelemetryLaneVisibleChange: vi.fn(),
     },
     visibleRangeSeconds: 8,
   };
@@ -92,20 +104,17 @@ function renderToolbar() {
   return nextContainer;
 }
 
-it('keeps add actions left, playback center, and zoom on the right', () => {
+it('keeps editing, playback and view controls together in the timeline header', () => {
   const renderedContainer = renderToolbar();
 
   const toolbar = renderedContainer.firstElementChild as HTMLDivElement | null;
   const regions = toolbar ? Array.from(toolbar.children) : [];
-  expect(toolbar?.className).toContain('max-[720px]:grid-cols-1');
-  expect(regions[0]?.querySelector('div')?.className).toContain('max-[720px]:gap-1');
-  expect(regions[1]?.className).toContain('max-[720px]:justify-start');
-  expect(regions[2]?.className).toContain('max-[720px]:justify-start');
   expect(regions[0]?.textContent).not.toContain('videoEditor.timeline.addButton');
-  expect(regions[0]?.textContent).toContain('videoEditor.timeline.addTrack');
-  expect(regions[0]?.textContent).not.toContain('videoEditor.timeline.addZoomRegion');
+  expect(regions[0]?.textContent).not.toContain('videoEditor.timeline.addTrack');
+  expect(regions[0]?.textContent).toContain('videoEditor.timeline.addZoomRegion');
   expect(regions[0]?.textContent).toContain('videoEditor.timeline.split');
-  expect(regions[1]?.textContent).toContain('0:12.0 / 0:45.0');
+  expect(regions).toHaveLength(3);
+  expect(toolbar?.querySelector('[data-playback-counter]')).not.toBeNull();
   expect(regions[2]?.textContent).not.toContain('videoEditor.timeline.telemetryToggle');
   expect(
     regions[2]?.querySelector('[data-ui="video-editor.timeline.toolbar.fit-project"]')

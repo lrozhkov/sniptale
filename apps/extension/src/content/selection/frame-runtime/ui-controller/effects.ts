@@ -1,6 +1,9 @@
 import { useEffect, type MutableRefObject } from 'react';
 import type { FrameData } from '../../../../features/highlighter/contracts';
-import { addEventListenerToAllWindowsDynamic } from '../../../platform/frame';
+import {
+  addEventListenerToAllWindowsDynamic,
+  addWindowEventListenerToAllWindowsDynamic,
+} from '../../../platform/frame';
 import { useFrameUIStore } from '../state/frame-ui.store';
 import { addHighlighterModeChangedListener } from '../../../platform/page-context/mode-events';
 import { createThrottledMouseMoveHandler, type FrameUiMouseTrackingParams } from './helpers';
@@ -170,10 +173,10 @@ export function useFrameUiMouseTracking(params: FrameUiMouseTrackingParams) {
       rafId,
     });
 
-    const cleanupMouseMove = addEventListenerToAllWindowsDynamic<MouseEvent>(
-      'mousemove',
-      throttledHandleMouseMove,
-      { passive: true }
+    const cleanupMouseMove = addWindowEventListenerToAllWindowsDynamic<PointerEvent>(
+      'pointermove',
+      (event, _currentWindow, iframe) => throttledHandleMouseMove(event, iframe),
+      { capture: true, passive: true }
     );
 
     return () => {

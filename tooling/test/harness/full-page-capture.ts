@@ -139,8 +139,11 @@ function buildInternalScrollerFixture(): void {
   marker(inner, 'internal-top', 100, 100, '#ff0000');
   marker(inner, 'internal-middle', 100, 700, '#00ff00');
   marker(inner, 'internal-bottom-right', 1050, 1300, '#0000ff');
+  marker(inner, 'internal-bottom', 100, 1300, '#0000ff');
   const lazy = marker(inner, 'internal-lazy', 900, 1150, '#94a3b8');
   installLazyMarker(lazy);
+  const visibleLazy = marker(inner, 'internal-visible-lazy', 500, 1150, '#94a3b8');
+  installLazyMarker(visibleLazy);
   scroller.append(inner);
   document.body.append(scroller);
 }
@@ -298,7 +301,7 @@ window.__sniptaleFullPageCaptureHarness = {
       animationPlayState: animated ? getComputedStyle(animated).animationPlayState : 'none',
       lazyLoaded:
         document
-          .querySelector('[data-marker="lazy"], [data-marker="internal-lazy"]')
+          .querySelector('[data-marker="lazy"], [data-marker="internal-visible-lazy"]')
           ?.getAttribute('data-loaded') === 'true',
       motionStylePresent: document.getElementById('sniptale-full-page-motion-freeze') !== null,
       rootStyle: document.documentElement.getAttribute('style'),

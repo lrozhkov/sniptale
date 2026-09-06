@@ -47,6 +47,7 @@ function isObjectTrackCorrectionAnchor(value: unknown): boolean {
 
 function hasValidObjectTrackGeometry(value: Record<string, unknown>): boolean {
   return (
+    (value['sourceClipId'] === undefined || isString(value['sourceClipId'])) &&
     isNonNegativeNumber(value['time']) &&
     isFiniteNumber(value['x']) &&
     isFiniteNumber(value['y']) &&

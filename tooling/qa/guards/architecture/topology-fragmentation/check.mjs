@@ -1,7 +1,14 @@
 import path from 'node:path';
 
 import { isBuildTestFile } from '../../../proof/build/build-test-file-classifier.mjs';
+import { readAppCoreOwnerPolicy } from '../app-core/app-core-owner-policy.mjs';
 import { getRuntimeTopology } from '../runtime-topology/model.mjs';
+import {
+  classifyAutomaticForwardingKeep,
+  classifyCanonicalTopologyOwner,
+  collectExactPublicContractFiles,
+  runtimeForPath,
+} from './evidence.mjs';
 import { collectTopologyModuleGraph } from './graph.mjs';
 import {
   classifyTopologyChangeReason,
@@ -10,14 +17,8 @@ import {
   isTopologyProxyPath,
 } from './policy.mjs';
 
-const APP_PUBLIC_ROOT_PATTERN =
-  /^apps\/extension\/src\/(?:composition|contracts|features|foundation|platform|ui|workflows)(?:\/|$)/u;
-function runtimeFor(file, runtimes) {
-  return runtimes.find(({ root }) => file === root || file.startsWith(`${root}/`)) ?? null;
-}
-
 function clusterKey(file, runtimes) {
-  const runtime = runtimeFor(file, runtimes);
+  const runtime = runtimeForPath(file, runtimes);
   if (runtime) return boundedOwnerKey(file, runtime.root, 3);
   if (file.startsWith('apps/extension/src/')) {
     return boundedOwnerKey(file, 'apps/extension/src', 3);
@@ -34,66 +35,6 @@ function boundedOwnerKey(file, root, depth) {
   const relativeDirectory = directory === root ? '' : directory.slice(root.length + 1);
   const segments = relativeDirectory ? relativeDirectory.split('/').slice(0, depth) : [];
   return segments.length > 0 ? `${root}/${segments.join('/')}` : root;
-}
-
-function operationOwnerKey(file, runtimes) {
-  const runtime = runtimeFor(file, runtimes);
-  if (runtime) {
-    const owner = file.slice(runtime.root.length + 1).split('/')[0] || 'root';
-    return `${runtime.root}/${owner}`;
-  }
-  const appMatch = file.match(/^apps\/extension\/src\/([^/]+)/u);
-  if (appMatch) return `apps/extension/src/${appMatch[1]}`;
-  const packageMatch = file.match(/^packages\/[^/]+\/src/u);
-  if (packageMatch) return packageMatch[0];
-  const [root = 'root', owner = 'root'] = file.split('/');
-  return `${root}/${owner}`;
-}
-
-function exactPackageExportTargets(graph, readFile) {
-  const targets = new Set();
-  const packageNames = new Set(
-    graph.files.flatMap((file) => file.match(/^packages\/([^/]+)\//u)?.slice(1, 2) ?? [])
-  );
-  function visit(value, packageRoot) {
-    if (typeof value === 'string') {
-      const target = path.posix.normalize(path.posix.join(packageRoot, value));
-      if (graph.files.includes(target)) targets.add(target);
-      return;
-    }
-    if (Array.isArray(value)) return value.forEach((item) => visit(item, packageRoot));
-    if (value && typeof value === 'object') {
-      Object.values(value).forEach((item) => visit(item, packageRoot));
-    }
-  }
-  for (const packageName of packageNames) {
-    const packagePath = `packages/${packageName}/package.json`;
-    try {
-      visit(JSON.parse(readFile(packagePath)).exports, path.posix.dirname(packagePath));
-    } catch {
-      // A missing or invalid package manifest cannot prove a public contract.
-    }
-  }
-  return targets;
-}
-
-function collectPublicContractFiles(graph, runtimes, readFile) {
-  const publicFiles = exactPackageExportTargets(graph, readFile);
-  for (const runtime of runtimes) {
-    runtime.entrypointFiles.forEach((file) => {
-      if (graph.files.includes(file)) publicFiles.add(file);
-    });
-  }
-  for (const edge of graph.codeEdges) {
-    if (isBuildTestFile(edge.importer)) continue;
-    const importerRuntime = runtimeFor(edge.importer, runtimes);
-    const targetRuntime = runtimeFor(edge.target, runtimes);
-    if (importerRuntime && APP_PUBLIC_ROOT_PATTERN.test(edge.target)) publicFiles.add(edge.target);
-    if (importerRuntime && targetRuntime && importerRuntime.id !== targetRuntime.id) {
-      publicFiles.add(edge.target);
-    }
-  }
-  return publicFiles;
 }
 
 function collectProductionIncomingConsumers(graph) {
@@ -176,8 +117,8 @@ function collectClusterTopology(files, context) {
   const crossRuntimeConsumers = new Set(
     externalConsumers
       .filter((edge) => {
-        const importerRuntime = runtimeFor(edge.importer, context.runtimes);
-        const targetRuntime = runtimeFor(edge.target, context.runtimes);
+        const importerRuntime = runtimeForPath(edge.importer, context.runtimes);
+        const targetRuntime = runtimeForPath(edge.target, context.runtimes);
         return importerRuntime && targetRuntime && importerRuntime.id !== targetRuntime.id;
       })
       .map((edge) => edge.importer)
@@ -307,9 +248,9 @@ function resolveStableMergeTarget(consumer, context) {
       };
     }
     const next = consumers[0];
-    if (
-      operationOwnerKey(next, context.runtimes) !== operationOwnerKey(current, context.runtimes)
-    ) {
+    const nextOwner = context.ownerFor(next);
+    const currentOwner = context.ownerFor(current);
+    if (!nextOwner || !currentOwner || nextOwner.id !== currentOwner.id) {
       return { blockedAt: current, blockReason: 'cross-owner-ladder', mergeTarget: null };
     }
     current = next;
@@ -340,11 +281,13 @@ function buildForwardingEdgeClusters(context, metricsByFile) {
       if (metrics.length === 0) return [];
       const base = buildCluster(`forwarding:${module.file}`, metrics, context);
       const forwardingMetric = metricsByFile.get(module.file);
-      const forwarderReason = classifyTopologyChangeReason(
-        module.file,
-        forwardingMetric,
-        context.publicFiles
-      );
+      const automaticKeep = classifyAutomaticForwardingKeep({
+        appCorePolicy: context.appCorePolicy,
+        consumer: consumerFile,
+        forwarder: module.file,
+        publicFiles: context.publicFiles,
+        runtimes: context.runtimes,
+      });
       const candidate = {
         ...base,
         clusterKind: 'forwarding-edge',
@@ -355,10 +298,9 @@ function buildForwardingEdgeClusters(context, metricsByFile) {
         mergeTarget,
         mergeTargetBlockedAt: mergeTargetResolution.blockedAt,
         mergeTargetBlockReason: mergeTargetResolution.blockReason,
-        forwarderOwner: operationOwnerKey(module.file, context.runtimes),
-        consumerOwner: operationOwnerKey(consumerFile, context.runtimes),
-        forwarderIsPublicOrContract:
-          context.publicFiles.has(module.file) || forwarderReason === 'contract',
+        forwarderOwner: context.ownerFor(module.file)?.id ?? null,
+        consumerOwner: context.ownerFor(consumerFile)?.id ?? null,
+        automaticKeep,
         forwarderUnresolvedEdges: context.graph.unresolvedEdges.filter(
           (edge) => edge.importer === module.file
         ).length,
@@ -380,7 +322,8 @@ export function collectTopologyFragmentationReport({ files, structuralReport, ro
     (left, right) => right.root.length - left.root.length
   );
   const moduleByFile = new Map(graph.modules.map((module) => [module.file, module]));
-  const publicFiles = collectPublicContractFiles(graph, runtimes, readFile);
+  const publicFiles = collectExactPublicContractFiles(graph, runtimes, readFile);
+  const appCorePolicy = readAppCoreOwnerPolicy();
   const productionIncoming = collectProductionIncomingConsumers(graph);
   const cycleFiles = collectReExportCycleFiles(graph);
   const grouped = new Map();
@@ -398,8 +341,10 @@ export function collectTopologyFragmentationReport({ files, structuralReport, ro
     runtimes,
     moduleByFile,
     publicFiles,
+    appCorePolicy,
     productionIncoming,
     cycleFiles,
+    ownerFor: (file) => classifyCanonicalTopologyOwner(file, { appCorePolicy, runtimes }),
   };
   const partitionClusters = [...grouped.entries()]
     .sort(([left], [right]) => left.localeCompare(right))

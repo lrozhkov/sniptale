@@ -215,13 +215,14 @@ function renderCalloutPortalContent(props: CalloutBodyProps) {
       <div
         ref={props.wrapperRef as Ref<HTMLDivElement>}
         className="sniptale-callout"
+        data-sniptale-activation-bridge="immediate"
         data-frame-id={props.frameId}
         data-theme={props.portalTheme ?? undefined}
         style={mergeThemeScopedStyle(props.portalTheme, props.wrapperStyle)}
         onClick={props.handleClick}
         onMouseDown={(event) => event.stopPropagation()}
-        onMouseEnter={props.handleMouseEnter}
-        onMouseLeave={props.handleMouseLeave}
+        onPointerEnter={props.handleMouseEnter}
+        onPointerLeave={props.handleMouseLeave}
       >
         {renderDynamicCalloutTail(
           props.dynamicTail,

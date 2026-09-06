@@ -41,6 +41,8 @@ function handlePlaybackShortcutKeyDown(
   event: KeyboardEvent,
   latestStateRef: MutableRefObject<PlaybackLatestState>,
   handlersRef: MutableRefObject<PlaybackHandlers>,
+  seekTo: (time: number) => void,
+  stepByFrames: (frameDelta: number) => void,
   togglePlayback: () => void
 ): void {
   const latestState = latestStateRef.current;
@@ -58,13 +60,19 @@ function handlePlaybackShortcutKeyDown(
     return;
   }
 
+  if (handlePlaybackBoundaryShortcut(event, latestState.project.duration, seekTo)) {
+    return;
+  }
+
+  if (handlePlaybackFrameStepShortcut(event, stepByFrames)) {
+    return;
+  }
+
   if (latestState.projectHistoryTransactionActive) {
     return;
   }
 
-  if (event.code === 'KeyS' && latestState.selectedClipId) {
-    event.preventDefault();
-    handlersRef.current.splitClipAt(latestState.selectedClipId, latestState.currentTime);
+  if (handleSelectedClipShortcut(event, latestState, handlersRef)) {
     return;
   }
 
@@ -80,15 +88,98 @@ function handlePlaybackShortcutKeyDown(
   handleSelectionDelete(latestState, handlersRef);
 }
 
+function handleSelectedClipShortcut(
+  event: KeyboardEvent,
+  latestState: PlaybackLatestState,
+  handlersRef: MutableRefObject<PlaybackHandlers>
+): boolean {
+  if (!latestState.selectedClipId) return false;
+
+  if (
+    event.code === 'KeyD' &&
+    event.ctrlKey !== event.metaKey &&
+    !event.altKey &&
+    !event.shiftKey
+  ) {
+    event.preventDefault();
+    handlersRef.current.duplicateClip(latestState.selectedClipId);
+    return true;
+  }
+
+  if (
+    event.code === 'KeyS' &&
+    !event.altKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.shiftKey
+  ) {
+    event.preventDefault();
+    handlersRef.current.splitClipAt(latestState.selectedClipId, latestState.currentTime);
+    return true;
+  }
+
+  return false;
+}
+
+function handlePlaybackFrameStepShortcut(
+  event: KeyboardEvent,
+  stepByFrames: (frameDelta: number) => void
+): boolean {
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return false;
+  if (event.code !== 'Comma' && event.code !== 'Period') return false;
+  event.preventDefault();
+  stepByFrames(event.code === 'Comma' ? -1 : 1);
+  return true;
+}
+
+function handlePlaybackBoundaryShortcut(
+  event: KeyboardEvent,
+  projectDuration: number,
+  seekTo: (time: number) => void
+): boolean {
+  if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) {
+    return false;
+  }
+
+  if (event.code !== 'Home' && event.code !== 'End') {
+    return false;
+  }
+
+  event.preventDefault();
+  seekTo(event.code === 'Home' ? 0 : projectDuration);
+  return true;
+}
+
 function handlePlaybackToggleShortcut(event: KeyboardEvent, togglePlayback: () => void): boolean {
   if (event.code === 'Space') {
+    const controlSelector = [
+      'button',
+      'summary',
+      'input',
+      'select',
+      'a[href]',
+      '[role="button"]',
+      '[role="option"]',
+      '[role="checkbox"]',
+      '[role="switch"]',
+      '[role="radio"]',
+      '[role="tab"]',
+      '[role="menuitem"]',
+    ].join(',');
+    if (event.target instanceof Element && event.target.closest(controlSelector)) return false;
     event.preventDefault();
     event.stopPropagation();
     togglePlayback();
     return true;
   }
 
-  if (event.code === 'KeyK') {
+  if (
+    event.code === 'KeyK' &&
+    !event.altKey &&
+    !event.ctrlKey &&
+    !event.metaKey &&
+    !event.shiftKey
+  ) {
     event.preventDefault();
     togglePlayback();
     return true;
@@ -102,6 +193,13 @@ function handlePlaybackNudgeShortcut(
   latestState: PlaybackLatestState,
   handlersRef: MutableRefObject<PlaybackHandlers>
 ): boolean {
+  if (
+    event.target instanceof Element &&
+    event.target.closest('[role="slider"]') !== null &&
+    event.code.startsWith('Arrow')
+  ) {
+    return false;
+  }
   const nudge = resolvePlaybackSelectionNudge(event.code, event.shiftKey, {
     altKey: event.altKey,
     ctrlKey: event.ctrlKey,
@@ -120,16 +218,28 @@ function handlePlaybackNudgeShortcut(
 export function usePlaybackShortcuts(
   latestStateRef: MutableRefObject<PlaybackLatestState>,
   handlersRef: MutableRefObject<PlaybackHandlers>,
-  togglePlayback: () => void
+  seekTo: (time: number) => void,
+  stepByFrames: (frameDelta: number) => void,
+  togglePlayback: () => void,
+  enabled = true
 ) {
   useEffect(() => {
+    if (!enabled) return;
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (handledKeyDownEvents.has(event)) {
         return;
       }
 
       handledKeyDownEvents.add(event);
-      handlePlaybackShortcutKeyDown(event, latestStateRef, handlersRef, togglePlayback);
+      handlePlaybackShortcutKeyDown(
+        event,
+        latestStateRef,
+        handlersRef,
+        seekTo,
+        stepByFrames,
+        togglePlayback
+      );
     };
 
     window.addEventListener('keydown', handleKeyDown, KEYDOWN_LISTENER_OPTIONS);
@@ -138,5 +248,5 @@ export function usePlaybackShortcuts(
       window.removeEventListener('keydown', handleKeyDown, KEYDOWN_LISTENER_OPTIONS);
       document.removeEventListener('keydown', handleKeyDown, KEYDOWN_LISTENER_OPTIONS);
     };
-  }, [handlersRef, latestStateRef, togglePlayback]);
+  }, [enabled, handlersRef, latestStateRef, seekTo, stepByFrames, togglePlayback]);
 }

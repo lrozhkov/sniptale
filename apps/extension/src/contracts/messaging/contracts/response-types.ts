@@ -14,6 +14,7 @@ import type {
 import type { ScenarioSessionPayload, ViewportCoordsPayload } from './types';
 import type { AppliedViewportPresetPayload } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { CONTENT_RUNTIME_PROTOCOL_VERSION } from '@sniptale/runtime-contracts/video/messages';
+import type { RecentCaptureEditorAssetCapability } from '@sniptale/runtime-contracts/protocol/content-privileged-action';
 
 export const recordingStateHealthValues = ['healthy', 'degraded', 'failed'] as const;
 
@@ -60,6 +61,7 @@ export type CaptureResponse = RuntimeMessageResponse<{
 
 export type SaveAssetResponse = RuntimeMessageResponse<{
   assetId?: string;
+  editorAssetCapability?: RecentCaptureEditorAssetCapability;
 }>;
 
 export type ScenarioSessionResponse = RuntimeMessageResponse<

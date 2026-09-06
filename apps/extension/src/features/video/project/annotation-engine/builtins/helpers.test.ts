@@ -7,8 +7,11 @@ import {
   group,
   localized,
   rectNode,
+  resolveBuiltInElementKind,
   textNode,
 } from './helpers';
+import { APPLE_GLASS_ANNOTATION_PACK } from './apple-glass';
+import { CURSOR_OPS_ANNOTATION_PACK } from './cursor-ops';
 
 const catalog = {
   accent: '#111111',
@@ -94,4 +97,12 @@ it('creates a schema-versioned annotation pack', () => {
   });
 
   expect(pack).toMatchObject({ packId: 'owner-pack', schemaVersion: 1, templates });
+});
+
+it('owns the complete built-in template key mapping used by both built-in packs', () => {
+  expect(
+    ['intro', 'lowerThird', 'title', 'focus', 'scene', 'callout'].map(resolveBuiltInElementKind)
+  ).toEqual(['intro', 'lowerThird', 'title', 'focus', 'scene', 'callout']);
+  expect(APPLE_GLASS_ANNOTATION_PACK.templates.intro[0]?.elementKind).toBe('intro');
+  expect(CURSOR_OPS_ANNOTATION_PACK.templates.callout[0]?.elementKind).toBe('callout');
 });

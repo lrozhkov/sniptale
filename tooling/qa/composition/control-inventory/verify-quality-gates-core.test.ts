@@ -17,7 +17,7 @@ function createQualityTempRoot(prefix: string) {
   writeFile(
     root,
     'tooling/configs/qa/quality-baseline.json',
-    '{"schemaVersion":1,"allowances":[]}\n'
+    '{"schemaVersion":2,"rationales":[],"allowances":[]}\n'
   );
   return root;
 }

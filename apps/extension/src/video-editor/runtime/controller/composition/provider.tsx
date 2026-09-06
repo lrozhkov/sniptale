@@ -45,7 +45,8 @@ import {
 
 function useVideoEditorRuntimeComposition(
   libraries: ReturnType<typeof useVideoEditorLibraries>,
-  workspace: ReturnType<typeof useVideoEditorWorkspaceState>
+  workspace: ReturnType<typeof useVideoEditorWorkspaceState>,
+  commandPaletteOpen: boolean
 ) {
   const lifecycle = useVideoEditorProjectLifecyclePort((port) => port);
   const playback = useVideoEditorPlaybackPort((port) => port);
@@ -62,6 +63,7 @@ function useVideoEditorRuntimeComposition(
     selection.selectedTrackId
   );
   const blockingOverlayOpen =
+    commandPaletteOpen ||
     workspace.confirm.dialog !== null ||
     workspace.audioRecordingDialogOpen ||
     workspace.libraryPanelOpen ||
@@ -92,6 +94,7 @@ function useVideoEditorRuntimeComposition(
       playbackRange: workspace.playbackRange,
       placementMode: session.placementMode,
       projectHistoryTransactionActive: history.projectHistoryTransactionActive,
+      shortcutsEnabled: !blockingOverlayOpen && !workspace.preview.sourceViewerActive,
       selection: selection.selection,
       selectedActionEvent: selections.selectedActionEvent,
       selectedClipId: selection.selectedClipId,
@@ -106,6 +109,7 @@ function useVideoEditorRuntimeComposition(
       clearPlacementMode: session.clearPlacementMode,
       setCurrentTime: playback.setCurrentTime,
       setPlaying: playback.setPlaying,
+      duplicateClip: timeline.duplicateClip,
       splitClipAt: timeline.splitClipAt,
       updateActionEventDetails: timeline.updateActionEventDetails,
       updateClipTransform: timeline.updateClipTransform,
@@ -132,7 +136,7 @@ function useVideoEditorRuntimeComposition(
 
   useVideoEditorOverlayPlayback({
     blockingOverlayOpen,
-    enabled: lifecycle.project !== null,
+    enabled: lifecycle.project !== null && !workspace.preview.sourceViewerActive,
     isPlaying: playback.isPlaying,
     setPlaybackPlaying: runtime.setPlaybackPlaying,
   });
@@ -261,10 +265,17 @@ function useVideoEditorContextProjections(
     () => ({
       pausePlayback: runtime.pausePlayback,
       seekTo: runtime.seekTo,
+      stepByFrames: runtime.stepByFrames,
       setPlaybackPlaying: runtime.setPlaybackPlaying,
       togglePlayback: runtime.togglePlayback,
     }),
-    [runtime.pausePlayback, runtime.seekTo, runtime.setPlaybackPlaying, runtime.togglePlayback]
+    [
+      runtime.pausePlayback,
+      runtime.seekTo,
+      runtime.setPlaybackPlaying,
+      runtime.stepByFrames,
+      runtime.togglePlayback,
+    ]
   );
   const runtimePreview = useMemo(
     () => ({
@@ -296,10 +307,13 @@ function useVideoEditorContextProjections(
   };
 }
 
-export function VideoEditorCompositionProvider({ children }: PropsWithChildren) {
+export function VideoEditorCompositionProvider({
+  children,
+  commandPaletteOpen = false,
+}: PropsWithChildren<{ commandPaletteOpen?: boolean }>) {
   const libraries = useVideoEditorLibraries();
   const workspace = useVideoEditorWorkspaceState();
-  const composition = useVideoEditorRuntimeComposition(libraries, workspace);
+  const composition = useVideoEditorRuntimeComposition(libraries, workspace, commandPaletteOpen);
   const commands = useVideoEditorCommandComposition(composition, libraries, workspace);
   const contexts = useVideoEditorContextProjections(composition.runtime, workspace);
 

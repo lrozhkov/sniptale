@@ -26,10 +26,15 @@ export function getRecordingStatusLabel(status: VideoRecordingStatus): string {
   }
 }
 
-export function getResponseError(response: RuntimeResponseFailure, fallback: string): string {
-  return typeof response.error === 'string' && response.error.length > 0
-    ? response.error
-    : fallback;
+export function getResponseError(
+  response: RuntimeResponseFailure,
+  fallbackKey: TranslationKey
+): string {
+  return createUserFacingErrorMessage({
+    cause: response.error,
+    detail: 'browserCommunication',
+    summaryKey: fallbackKey,
+  });
 }
 
 export function resolveDeviceName(
@@ -39,3 +44,5 @@ export function resolveDeviceName(
 ): string {
   return deviceId ? (labels.get(deviceId) ?? deviceId) : fallback;
 }
+import type { TranslationKey } from '../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../platform/i18n/user-facing-error';

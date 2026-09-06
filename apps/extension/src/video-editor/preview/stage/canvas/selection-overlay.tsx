@@ -102,6 +102,9 @@ function getTopmostClipAtPointer(
   camera: PreviewStageCanvasProps['camera']
 ): VideoProjectClip | null {
   for (const clip of [...activeClips].reverse()) {
+    if (!isClipCanvasEditable(project, clip)) {
+      continue;
+    }
     const point = mapClientPointToCompositionPoint({
       camera,
       clientX: event.clientX,
@@ -123,6 +126,11 @@ function getTopmostClipAtPointer(
   return null;
 }
 
+function isClipCanvasEditable(project: VideoProject, clip: VideoProjectClip): boolean {
+  const track = project.tracks.find((candidate) => candidate.id === clip.trackId);
+  return Boolean(track?.visible && !track.locked);
+}
+
 export function PreviewStageSelectionOverlay(
   params: Pick<
     PreviewStageCanvasProps,
@@ -130,7 +138,7 @@ export function PreviewStageSelectionOverlay(
   >
 ) {
   const stage = params.stageRef.current;
-  if (!params.selectedClip || params.selectedClipLocked || !stage) {
+  if (!params.selectedClip || !stage) {
     return null;
   }
   const transform = resolvePreviewClipTransform(params.project, params.selectedClip);
@@ -138,24 +146,33 @@ export function PreviewStageSelectionOverlay(
   return (
     <div
       className={[
-        'pointer-events-none absolute border-2 border-dashed',
-        'border-[color:var(--sniptale-color-border-accent-strong)]',
+        'pointer-events-none absolute border-2',
+        params.selectedClipLocked
+          ? 'border-dotted border-[color:var(--sniptale-color-border-strong)]'
+          : 'border-dashed border-[color:var(--sniptale-color-border-accent-strong)]',
       ].join(' ')}
+      data-preview-selection-state={params.selectedClipLocked ? 'locked' : 'editable'}
       style={getSelectionOverlayStyle(params.project, params.selectedClip, params.camera, stage)}
     >
-      {(['nw', 'ne', 'sw', 'se'] as const satisfies PreviewStageInteractionMode[]).map((handle) => (
-        <button
-          key={handle}
-          type="button"
-          className={[
-            PREVIEW_SELECTION_HANDLE_CLASS_NAME,
-            PREVIEW_SELECTION_HANDLE_SURFACE_CLASS_NAME,
-            PREVIEW_SELECTION_HANDLE_SHADOW_CLASS_NAME,
-          ].join(' ')}
-          style={getSelectionHandleStyle(handle, transform.rotation)}
-          onPointerDown={(event) => params.beginInteraction(event, params.selectedClip!, handle)}
-        />
-      ))}
+      {params.selectedClipLocked
+        ? null
+        : (['nw', 'ne', 'sw', 'se'] as const satisfies PreviewStageInteractionMode[]).map(
+            (handle) => (
+              <button
+                key={handle}
+                type="button"
+                className={[
+                  PREVIEW_SELECTION_HANDLE_CLASS_NAME,
+                  PREVIEW_SELECTION_HANDLE_SURFACE_CLASS_NAME,
+                  PREVIEW_SELECTION_HANDLE_SHADOW_CLASS_NAME,
+                ].join(' ')}
+                style={getSelectionHandleStyle(handle, transform.rotation)}
+                onPointerDown={(event) =>
+                  params.beginInteraction(event, params.selectedClip!, handle)
+                }
+              />
+            )
+          )}
     </div>
   );
 }

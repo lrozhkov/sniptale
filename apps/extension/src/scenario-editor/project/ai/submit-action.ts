@@ -12,6 +12,7 @@ import { applyScenarioEditorAIResponse } from './response-apply/response/apply';
 import type { ScenarioEditorAiAttachmentDisclosure, ScenarioEditorAiRunSummary } from './types';
 import { getScenarioMutationTimestamp } from '../mutation/timestamps';
 import type { ScenarioEditorAiState } from './use-state';
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 
 async function loadScenarioProjectAssets(project: ScenarioProject) {
   const entries = await Promise.all(
@@ -156,7 +157,13 @@ export function createScenarioEditorAiSubmitAction(args: {
         selectedStepId,
       });
     } catch (error) {
-      args.aiState.setError(error instanceof Error ? error.message : 'Scenario AI request failed');
+      args.aiState.setError(
+        createUserFacingErrorMessage({
+          cause: error,
+          detail: 'externalService',
+          summaryKey: 'scenario.editor.aiEditorRequestFailed',
+        })
+      );
     } finally {
       args.aiState.setLoading(false);
       args.aiState.setActiveAttachmentDisclosure(null);

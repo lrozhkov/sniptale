@@ -7,6 +7,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   disposeLocale: vi.fn(),
   disposeTheme: vi.fn(),
+  ensureLocaleHydrated: vi.fn(),
   initializeTheme: vi.fn(),
   setLocale: vi.fn(),
   subscribeLocale: vi.fn(),
@@ -23,6 +24,7 @@ vi.mock('../../../ui/theme', () => ({
   setAppThemePreference: vi.fn(),
 }));
 vi.mock('../../../platform/i18n/locale/state', () => ({
+  ensureLocaleHydrated: mocks.ensureLocaleHydrated,
   getCurrentLocale: () => 'en',
   getStoredLocalePreference: vi.fn(),
   setLocalePreference: vi.fn(),
@@ -31,8 +33,29 @@ vi.mock('../../../platform/i18n/locale/state', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.ensureLocaleHydrated.mockResolvedValue(undefined);
   mocks.initializeTheme.mockReturnValue(mocks.disposeTheme);
   mocks.subscribeLocale.mockReturnValue(mocks.disposeLocale);
+});
+
+it('does not replace the painted locale with a stale fallback before hydration', async () => {
+  let finishHydration!: () => void;
+  mocks.ensureLocaleHydrated.mockImplementationOnce(
+    () => new Promise<void>((resolve) => (finishHydration = resolve))
+  );
+  const { usePopupStartupReconciliation } = await import('./use-startup-reconciliation');
+  function Harness() {
+    usePopupStartupReconciliation(mocks.setLocale);
+    return null;
+  }
+  const root = createRoot(document.createElement('div'));
+  act(() => root.render(<Harness />));
+  await vi.waitFor(() => expect(mocks.subscribeLocale).toHaveBeenCalledOnce());
+  expect(mocks.setLocale).not.toHaveBeenCalled();
+
+  finishHydration();
+  await vi.waitFor(() => expect(mocks.setLocale).toHaveBeenCalledWith('en'));
+  act(() => root.unmount());
 });
 
 it('reconciles theme and locale after the shell commit and disposes both subscriptions', async () => {

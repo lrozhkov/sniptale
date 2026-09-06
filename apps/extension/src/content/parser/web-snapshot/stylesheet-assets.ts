@@ -3,17 +3,8 @@ import {
   sanitizeWebSnapshotStylesheetText,
 } from '../../../features/web-snapshot/public';
 import { collectAssetTargets } from './asset-targets';
+import { readBlobText } from './asset-fetch';
 import type { WebSnapshotAssetEntry } from './types';
-
-function readBlobText(blob: Blob): Promise<string> {
-  if (typeof blob.text === 'function') return blob.text();
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(reader.error ?? new Error('Failed to read stylesheet asset.'));
-    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
-    reader.readAsText(blob);
-  });
-}
 
 function resolveStylesheetResourceUrl(value: string, baseUrl: string): string | null {
   const trimmedValue = value.trim();

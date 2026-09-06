@@ -48,6 +48,7 @@ function createRecordingEntry(): MediaLibraryEntry {
 
 function createDatabase(entry: MediaLibraryEntry) {
   return {
+    transaction: emptyReviewTransaction,
     get: vi.fn(async (store: string) => {
       if (store === 'media_library') return entry;
       if (store === 'recordings') {
@@ -119,3 +120,7 @@ it('projects nested recording source metadata in both exported metadata copies',
     },
   });
 });
+
+function emptyReviewTransaction() {
+  return { objectStore: () => ({ get: async () => undefined }), done: Promise.resolve() };
+}

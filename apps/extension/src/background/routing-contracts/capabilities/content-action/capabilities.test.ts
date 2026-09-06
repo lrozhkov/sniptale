@@ -207,7 +207,13 @@ it('carries an explicit library destination only through its scoped one-shot cap
       resolvedTabId: 7,
       sender: contentSender(),
     })
-  ).toEqual(expect.objectContaining({ libraryDestinationAuthorized: true, tabId: 7 }));
+  ).toEqual(
+    expect.objectContaining({
+      libraryDestinationAuthorized: true,
+      requestId: 'library-save',
+      tabId: 7,
+    })
+  );
 });
 
 it('authorizes a manual trusted library save without upgrading an ordinary trusted save', () => {

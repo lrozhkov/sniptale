@@ -1,9 +1,5 @@
 import React from 'react';
 import { WorkspaceSidebarPanelBody } from './body';
-import {
-  InspectorGroupHeaderSlotContext,
-  type InspectorGroupHeaderSlot,
-} from '../selection/grouped-inspector';
 import type { WorkspaceSidebarPanelContentSharedProps } from '../contracts/panel-content';
 
 function WorkspaceSidebarPanelSurface({ children }: { children: React.ReactNode }) {
@@ -19,24 +15,10 @@ function WorkspaceSidebarPanelSurface({ children }: { children: React.ReactNode 
   );
 }
 
-export function WorkspaceSidebarPanelContent(
-  props: WorkspaceSidebarPanelContentSharedProps & {
-    onSetInspectorHeaderSlot: React.Dispatch<React.SetStateAction<InspectorGroupHeaderSlot | null>>;
-  }
-) {
-  const { inspectorMode, onSetInspectorHeaderSlot } = props;
-
-  React.useEffect(() => {
-    if (inspectorMode !== 'selection') {
-      onSetInspectorHeaderSlot(null);
-    }
-  }, [inspectorMode, onSetInspectorHeaderSlot]);
-
+export function WorkspaceSidebarPanelContent(props: WorkspaceSidebarPanelContentSharedProps) {
   return (
     <WorkspaceSidebarPanelSurface>
-      <InspectorGroupHeaderSlotContext.Provider value={onSetInspectorHeaderSlot}>
-        <WorkspaceSidebarPanelBody {...props} />
-      </InspectorGroupHeaderSlotContext.Provider>
+      <WorkspaceSidebarPanelBody {...props} />
     </WorkspaceSidebarPanelSurface>
   );
 }

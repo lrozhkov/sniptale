@@ -206,19 +206,27 @@ function createUserPresetId(): string {
   return `user-${globalThis.crypto.randomUUID()}`;
 }
 
-export function createUserCalloutPreset(input: {
+type CalloutPresetMutationInput = {
   content?: CalloutPreset['content'];
   name: string;
   placement: CalloutPreset['placement'];
   style: CalloutVisualStyle;
   tagIds?: readonly string[];
-}): Promise<CalloutPresetMutationResult> {
-  if (
-    !isValidName(input.name) ||
-    (input.content !== undefined && !parseCalloutPresetContent(input.content)) ||
-    !parseCalloutPresetPlacement(input.placement) ||
-    !parseCalloutVisualStyle(input.style)
-  ) {
+};
+
+function isValidCalloutPresetInput(input: CalloutPresetMutationInput): boolean {
+  return (
+    isValidName(input.name) &&
+    (input.content === undefined || Boolean(parseCalloutPresetContent(input.content))) &&
+    Boolean(parseCalloutPresetPlacement(input.placement)) &&
+    Boolean(parseCalloutVisualStyle(input.style))
+  );
+}
+
+export function createUserCalloutPreset(
+  input: CalloutPresetMutationInput
+): Promise<CalloutPresetMutationResult> {
+  if (!isValidCalloutPresetInput(input)) {
     return Promise.resolve({ outcome: 'rejected', reason: 'invalid-input' });
   }
   return runCommand((catalog) => {
@@ -243,20 +251,10 @@ export function createUserCalloutPreset(input: {
   }, input.tagIds);
 }
 
-export function updateCalloutPreset(input: {
-  content?: CalloutPreset['content'];
-  id: string;
-  name: string;
-  placement: CalloutPreset['placement'];
-  style: CalloutVisualStyle;
-  tagIds?: readonly string[];
-}): Promise<CalloutPresetMutationResult> {
-  if (
-    !isValidName(input.name) ||
-    (input.content !== undefined && !parseCalloutPresetContent(input.content)) ||
-    !parseCalloutPresetPlacement(input.placement) ||
-    !parseCalloutVisualStyle(input.style)
-  ) {
+export function updateCalloutPreset(
+  input: CalloutPresetMutationInput & { id: string }
+): Promise<CalloutPresetMutationResult> {
+  if (!isValidCalloutPresetInput(input)) {
     return Promise.resolve({ outcome: 'rejected', reason: 'invalid-input' });
   }
   return runCommand((catalog) => {

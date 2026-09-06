@@ -1,6 +1,7 @@
 import {
   addEventListenerToAllWindowsDynamic,
   addScrollListenersToAllWindows,
+  addWindowEventListenerToAllWindowsDynamic,
   getAccessibleIframes,
 } from '../../platform/frame';
 import type { QuickEditModeEventHandlers } from './controller.contracts';
@@ -20,9 +21,9 @@ function registerWindowListeners(
     cleanupClick: addEventListenerToAllWindowsDynamic<MouseEvent>('click', props.handleClick, {
       capture: true,
     }),
-    cleanupKeyDown: addEventListenerToAllWindowsDynamic<KeyboardEvent>(
+    cleanupKeyDown: addWindowEventListenerToAllWindowsDynamic<KeyboardEvent>(
       'keydown',
-      props.handleKeyDown,
+      (event, _currentWindow, iframe) => props.handleKeyDown(event, iframe),
       { capture: true }
     ),
     cleanupMouseMove: addEventListenerToAllWindowsDynamic<MouseEvent>(

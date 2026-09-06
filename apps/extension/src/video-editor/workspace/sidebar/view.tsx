@@ -24,8 +24,6 @@ import {
 import { VideoEditorSelectionKind, type VideoEditorSelection } from '../../contracts/selection';
 import type { WorkspaceSidebarPanelContentSharedProps } from './contracts/panel-content';
 import type { WorkspaceSidebarProps } from './contracts/props';
-import type { InspectorGroupHeaderSlot } from './selection/grouped-inspector';
-import { InspectorGroupSwitch } from './selection/grouped-inspector';
 import { getClipTypeLabel } from '../../chrome/display';
 
 interface WorkspaceSidebarPanelContentProps extends WorkspaceSidebarPanelContentSharedProps {
@@ -75,7 +73,8 @@ function createStaticSelectionMeta(Icon: LucideIcon, labelKey: TranslationKey) {
 
 export function getSelectionMeta(
   selection: VideoEditorSelection,
-  clip: WorkspaceSidebarProps['selectedClip']
+  clip: WorkspaceSidebarProps['selectedClip'],
+  selectedTrack?: WorkspaceSidebarProps['selectedTrack']
 ): { icon: React.ReactNode; label: string; title: string } {
   switch (selection.kind) {
     case VideoEditorSelectionKind.SCENE:
@@ -87,7 +86,13 @@ export function getSelectionMeta(
         title: clip?.name ?? translate('videoEditor.sidebar.sceneProperties'),
       };
     case VideoEditorSelectionKind.TRACK:
-      return createStaticSelectionMeta(Film, 'videoEditor.timeline.tracksTitle');
+      return selectedTrack
+        ? {
+            icon: renderSidebarIcon(Film),
+            label: selectedTrack.name,
+            title: selectedTrack.name,
+          }
+        : createStaticSelectionMeta(Film, 'videoEditor.timeline.tracksTitle');
     case VideoEditorSelectionKind.TRANSITION_JUNCTION:
       return createStaticSelectionMeta(Sparkles, 'videoEditor.timeline.transitionLane');
     case VideoEditorSelectionKind.CURSOR_SEGMENT:
@@ -104,19 +109,15 @@ export function getSelectionMeta(
 type WorkspaceSidebarHeaderProps = Pick<
   WorkspaceSidebarPanelContentProps,
   'inspectorMode' | 'selectionIcon' | 'selectionTitle' | 'selectedTrack'
-> & {
-  inspectorHeaderSlot: InspectorGroupHeaderSlot | null;
-};
+>;
 
 export function WorkspaceSidebarHeader({
-  inspectorHeaderSlot,
   inspectorMode,
   selectionIcon,
   selectionTitle,
-  selectedTrack,
 }: WorkspaceSidebarHeaderProps) {
   const headerClassName = [
-    'flex shrink-0 flex-col border-b border-[color:var(--sniptale-color-border-soft)]',
+    'flex shrink-0 flex-col',
     'bg-[color:var(--sniptale-color-surface-panel)]',
   ].join(' ');
 
@@ -124,70 +125,36 @@ export function WorkspaceSidebarHeader({
     <div className={headerClassName}>
       <WorkspaceSidebarHeaderTitleRow
         inspectorMode={inspectorMode}
-        selectedTrack={selectedTrack}
         selectionIcon={selectionIcon}
         selectionTitle={selectionTitle}
       />
-      {inspectorMode === 'selection' && inspectorHeaderSlot ? (
-        <WorkspaceSidebarHeaderGroupsRow inspectorHeaderSlot={inspectorHeaderSlot} />
-      ) : null}
     </div>
   );
 }
 
 function WorkspaceSidebarHeaderTitleRow({
   inspectorMode,
-  selectedTrack,
   selectionIcon,
   selectionTitle,
-}: Pick<
-  WorkspaceSidebarHeaderProps,
-  'inspectorMode' | 'selectedTrack' | 'selectionIcon' | 'selectionTitle'
->) {
+}: Pick<WorkspaceSidebarHeaderProps, 'inspectorMode' | 'selectionIcon' | 'selectionTitle'>) {
   return (
     <div
-      className="flex min-h-14 w-full min-w-0 items-center gap-3 px-3"
+      className="flex h-9 w-full min-w-0 items-center gap-2 px-2.5"
       data-ui="video-editor.workspace.sidebar-header-title-row"
     >
       <span
         className={[
-          'flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px]',
-          'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_88%,transparent)]',
+          'flex shrink-0 items-center justify-center',
           'text-[var(--sniptale-color-text-primary)]',
         ].join(' ')}
       >
         {selectionIcon}
       </span>
       <div className="min-w-0">
-        <div className="truncate text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
+        <div className="truncate text-[13px] font-semibold text-[var(--sniptale-color-text-primary)]">
           {getInspectorHeaderTitle(inspectorMode, selectionTitle)}
         </div>
-        <div className="truncate text-xs uppercase tracking-[0.12em] text-[var(--sniptale-color-text-dim)]">
-          {getInspectorHeaderSubtitle(inspectorMode, selectedTrack)}
-        </div>
       </div>
-    </div>
-  );
-}
-
-function WorkspaceSidebarHeaderGroupsRow({
-  inspectorHeaderSlot,
-}: Pick<WorkspaceSidebarHeaderProps, 'inspectorHeaderSlot'>) {
-  if (!inspectorHeaderSlot) {
-    return null;
-  }
-
-  return (
-    <div
-      className="w-full min-w-0 border-t border-[color:var(--sniptale-color-border-subtle)] px-3 py-2"
-      data-ui="video-editor.workspace.sidebar-header-groups-row"
-    >
-      <InspectorGroupSwitch
-        activeGroupId={inspectorHeaderSlot.activeGroupId}
-        ariaLabel={inspectorHeaderSlot.ariaLabel}
-        groups={inspectorHeaderSlot.groups}
-        onChange={inspectorHeaderSlot.onChange}
-      />
     </div>
   );
 }
@@ -201,34 +168,5 @@ function getInspectorHeaderTitle(
       return translate('videoEditor.sidebar.gridSettingsTitle');
     case 'selection':
       return selectionTitle;
-  }
-}
-
-function getInspectorHeaderSubtitle(
-  inspectorMode: WorkspaceSidebarProps['inspectorMode'],
-  selectedTrack: WorkspaceSidebarProps['selectedTrack']
-) {
-  switch (inspectorMode) {
-    case 'grid':
-      return translate('videoEditor.sidebar.gridSettingsSubtitle');
-    case 'selection':
-      return selectedTrack
-        ? `${translate('videoEditor.sidebar.trackPrefix')} ${getSelectedTrackKindLabel(selectedTrack.kind)}`
-        : translate('videoEditor.sidebar.projectInspector');
-  }
-}
-
-function getSelectedTrackKindLabel(
-  kind: NonNullable<WorkspaceSidebarProps['selectedTrack']>['kind']
-) {
-  switch (kind) {
-    case 'PRIMARY':
-      return translate('videoEditor.timeline.trackKindPrimary');
-    case 'AUDIO':
-      return translate('videoEditor.timeline.trackKindAudio');
-    case 'OVERLAY':
-      return translate('videoEditor.timeline.trackKindOverlay');
-    case 'SUBTITLE':
-      return translate('videoEditor.timeline.trackKindSubtitle');
   }
 }

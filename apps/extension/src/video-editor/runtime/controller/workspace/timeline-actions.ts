@@ -3,6 +3,7 @@ import { normalizeVideoProjectMotionRegion } from '../../../../features/video/pr
 import { getClipEndTime } from '../../../../features/video/project/timeline';
 import { getProjectTransitionById } from '../../../../features/video/project/transition/project';
 import { VideoEditorSelectionKind } from '../../../contracts/selection';
+import { VideoProjectInteractionTimeBasis } from '../../../../features/video/project/types';
 import type { VideoEditorRuntimeController } from '../../session';
 import type {
   ClipSelectionPort,
@@ -37,16 +38,25 @@ type TimelineActionStore = TimelineEditingPort &
   > &
   Pick<ProjectLifecyclePort, 'project' | 'setError'>;
 
+function moveInteractionToProjectTime<
+  T extends { sourceAnchor?: unknown; time: number; timeBasis?: unknown },
+>(interaction: T, time: number): T {
+  const nextInteraction = {
+    ...interaction,
+    time,
+    timeBasis: VideoProjectInteractionTimeBasis.PROJECT,
+  };
+  delete nextInteraction.sourceAnchor;
+  return nextInteraction;
+}
+
 function createActionEventMover(store: TimelineActionStore) {
   return (actionEventId: string, time: number) => {
     store.updateProject((project) => ({
       ...project,
       actionEvents: project.actionEvents.map((event) =>
         event.id === actionEventId
-          ? {
-              ...event,
-              time: clampNumber(time, 0, project.duration),
-            }
+          ? moveInteractionToProjectTime(event, clampNumber(time, 0, project.duration))
           : event
       ),
     }));
@@ -79,17 +89,11 @@ function createCursorSegmentMover(store: TimelineActionStore) {
           samples: cursorTrack.samples
             .map((sample) => {
               if (sample.id === sampleId) {
-                return {
-                  ...sample,
-                  time: startTime,
-                };
+                return moveInteractionToProjectTime(sample, startTime);
               }
 
               if (sample.id === nextSampleId && endTime !== null) {
-                return {
-                  ...sample,
-                  time: endTime,
-                };
+                return moveInteractionToProjectTime(sample, endTime);
               }
 
               return sample;
@@ -238,7 +242,10 @@ export function createWorkspaceTimelineSelectionActions(
   };
   return {
     onSeek: runtime.seekTo,
+    onSeekToEnd: () => runtime.seekTo(store.project?.duration ?? 0),
     onSeekToStart: () => runtime.seekTo(0),
+    onStepToNextFrame: () => runtime.stepByFrames(1),
+    onStepToPreviousFrame: () => runtime.stepByFrames(-1),
     onSetPlaybackRange: workspace.setPlaybackRange,
     onSelectActionSegment: selectWithInspector(store.selectActionSegment),
     onSelectClip: selectWithInspector(store.selectClip),

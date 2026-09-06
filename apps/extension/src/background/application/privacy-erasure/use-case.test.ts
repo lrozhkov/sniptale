@@ -127,6 +127,45 @@ it('converts a runtime cleanup exception into a fixed participant failure', asyn
   expect(ports.storage.cleanup).not.toHaveBeenCalled();
 });
 
+it.each([
+  ['diagnostics', 'diagnostics-runtime-state', 'diagnostics-cleanup-failed'],
+  ['nativeIngestion', 'native-ingestion-runtime-state', 'native-ingestion-cleanup-failed'],
+] as const)(
+  'converts a %s cleanup exception into its fixed participant failure',
+  async (owner, participantId, failureCode) => {
+    const ports = createPorts();
+    vi.mocked(ports[owner].cleanup).mockRejectedValueOnce(new Error('secret-bearing failure'));
+    const useCase = new PrivacyErasureUseCase(ports);
+
+    const result = await useCase.execute(createErasureRequest());
+
+    expect(result.participants).toContainEqual({
+      error: failureCode,
+      id: participantId,
+      severity: 'required',
+      status: 'failed',
+    });
+    expect(JSON.stringify(result)).not.toContain('secret-bearing');
+    expect(ports.storage.cleanup).not.toHaveBeenCalled();
+  }
+);
+
+it('converts a storage cleanup exception into its fixed participant failure', async () => {
+  const ports = createPorts();
+  vi.mocked(ports.storage.cleanup).mockRejectedValueOnce(new Error('secret-bearing failure'));
+  const useCase = new PrivacyErasureUseCase(ports);
+
+  const result = await useCase.execute(createErasureRequest());
+
+  expect(result.participants).toContainEqual({
+    error: 'storage-cleanup-failed',
+    id: 'persistent-storage',
+    severity: 'required',
+    status: 'failed',
+  });
+  expect(JSON.stringify(result)).not.toContain('secret-bearing');
+});
+
 it('retries from the first phase after a typed partial failure', async () => {
   const ports = createPorts();
   vi.mocked(ports.media.cleanup)

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { translate } from '../../../../platform/i18n/popup';
+import { createUserFacingErrorMessage } from '../../../../platform/i18n/user-facing-error';
 import {
   openScreenshotMode,
   triggerQuickAction,
@@ -34,7 +34,11 @@ export function usePopupHomeActions({
       await openScreenshotMode(workingMode);
     } catch (error) {
       setActionError(
-        error instanceof Error ? error.message : translate('popup.home.openPrepError')
+        createUserFacingErrorMessage({
+          cause: error,
+          detail: 'browserCommunication',
+          summaryKey: 'popup.home.openPrepError',
+        })
       );
     }
   };
@@ -52,7 +56,11 @@ export function usePopupHomeActions({
       await triggerQuickAction(actionId, Boolean(action && isDesktopQuickAction(action)));
     } catch (error) {
       setActionError(
-        error instanceof Error ? error.message : translate('popup.home.triggerQuickActionError')
+        createUserFacingErrorMessage({
+          cause: error,
+          detail: 'browserCommunication',
+          summaryKey: 'popup.home.triggerQuickActionError',
+        })
       );
     }
   };
@@ -70,7 +78,13 @@ export function usePopupHomeActions({
     try {
       await triggerScreenshotCapture(config);
     } catch (error) {
-      setActionError(error instanceof Error ? error.message : translate('popup.home.captureError'));
+      setActionError(
+        createUserFacingErrorMessage({
+          cause: error,
+          detail: 'browserCommunication',
+          summaryKey: 'popup.home.captureError',
+        })
+      );
       setCapturePending(false);
     }
   };

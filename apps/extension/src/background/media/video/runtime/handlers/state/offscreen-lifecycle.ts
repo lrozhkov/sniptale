@@ -1,4 +1,4 @@
-import type { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { VideoRuntimeMessage } from '../../../../../../contracts/video/types/messages';
 import { translate } from '../../../../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
@@ -10,7 +10,13 @@ import {
   isCurrentVideoRecordingId,
   resetCompletedVideoRecordingSession,
 } from '../../../session-state';
-import { loadActiveProjectExportJobLedgerEntry } from '../../../../../../composition/persistence/export-ledger';
+import {
+  loadActiveProjectExportJobLedgerEntry,
+  markProjectExportJobTerminal,
+  upsertProjectExportJobLedgerEntry,
+  type ProjectExportJobLedgerEntry,
+} from '../../../../../../composition/persistence/export-ledger';
+import { coordinateProjectExportLifecycle } from '../../../application/export/coordination';
 import {
   clearActiveVideoRecordingLease,
   restoreCurrentRecordingFromLease,
@@ -402,7 +408,7 @@ export function handleProjectExportLifecycleMessage(
   }
 
   return createAsyncLifecycleRoute(
-    forwardProjectExportLifecycleMessage(message),
+    coordinateProjectExportLifecycle(() => forwardProjectExportLifecycleMessage(message)),
     sendResponse,
     logger,
     'Failed to route project export lifecycle event'
@@ -413,12 +419,15 @@ async function forwardProjectExportLifecycleMessage(
   message: ProjectExportLifecycleMessage
 ): Promise<void> {
   const ledger = await loadActiveProjectExportJobLedgerEntry();
+  if (!ledger || ledger.jobId !== message.jobId) return;
   if (
-    !ledger ||
-    ledger.jobId !== message.jobId ||
-    !ledger.ownerDocumentId ||
-    !ledger.ownerSenderUrl
-  ) {
+    message.type === VideoMessageType.PROJECT_EXPORT_COMPLETED &&
+    message.projectId !== ledger.projectId
+  )
+    return;
+  const nextMessage = await persistProjectExportLifecycleMessage(message, ledger);
+  if (!nextMessage) return;
+  if (!ledger.ownerDocumentId || !ledger.ownerSenderUrl) {
     logger.warn('Ignoring project export lifecycle event without an active owner', {
       jobId: message.jobId,
     });
@@ -426,10 +435,43 @@ async function forwardProjectExportLifecycleMessage(
   }
 
   await sendRuntimeMessage({
-    ...message,
+    ...nextMessage,
     targetDocumentId: ledger.ownerDocumentId,
     targetSenderUrl: ledger.ownerSenderUrl,
   });
+}
+
+async function persistProjectExportLifecycleMessage(
+  message: ProjectExportLifecycleMessage,
+  ledger: ProjectExportJobLedgerEntry
+): Promise<ProjectExportLifecycleMessage | null> {
+  // Offscreen documents cannot write chrome.storage; commit the ledger before notifying the editor.
+  if (message.type === VideoMessageType.PROJECT_EXPORT_PROGRESS) {
+    if (ledger.status !== 'running') return null;
+    await upsertProjectExportJobLedgerEntry({
+      jobId: ledger.jobId,
+      projectId: ledger.projectId,
+      phase: message.status.phase,
+      progress: message.status.progress,
+    });
+    return message;
+  }
+  const status =
+    message.type === VideoMessageType.PROJECT_EXPORT_COMPLETED
+      ? 'completed'
+      : message.type === VideoMessageType.PROJECT_EXPORT_CANCELLED
+        ? 'cancelled'
+        : 'failed';
+  const terminal = await markProjectExportJobTerminal(
+    ledger.jobId,
+    status,
+    message.type === VideoMessageType.PROJECT_EXPORT_FAILED ? message.error : null
+  );
+  if (terminal?.status === status) return message;
+  if (terminal?.status === 'cancelled') {
+    return { type: VideoMessageType.PROJECT_EXPORT_CANCELLED, jobId: ledger.jobId };
+  }
+  return null;
 }
 
 export function createUnhandledRouteResult(): RouteResult {

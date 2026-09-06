@@ -143,7 +143,10 @@ it('surfaces current initial-load and import-read failures', async () => {
   mocks.loadCustomShapeLibrary.mockRejectedValueOnce(new Error('load failed'));
   await renderHarness();
 
-  expect(latestState?.importState).toEqual({ status: 'error', message: 'load failed' });
+  expect(latestState?.importState).toEqual({
+    status: 'error',
+    message: expect.stringContaining('Sniptale'),
+  });
 
   await act(async () => {
     await latestState?.importFile({
@@ -155,7 +158,10 @@ it('surfaces current initial-load and import-read failures', async () => {
     } as unknown as File);
   });
 
-  expect(latestState?.importState).toEqual({ status: 'error', message: 'read failed' });
+  expect(latestState?.importState).toEqual({
+    status: 'error',
+    message: expect.stringContaining('Sniptale'),
+  });
 });
 
 it('surfaces current invalid import diagnostics without mutating storage', async () => {
@@ -183,13 +189,19 @@ it('surfaces current delete and disable failures', async () => {
   await act(async () => {
     await latestState?.deleteShape('custom-badge');
   });
-  expect(latestState?.importState).toEqual({ status: 'error', message: 'delete failed' });
+  expect(latestState?.importState).toEqual({
+    status: 'error',
+    message: expect.stringContaining('Sniptale'),
+  });
 
   mocks.disableCustomShapeDefinition.mockRejectedValueOnce(new Error('disable failed'));
   await act(async () => {
     await latestState?.disableShape('custom-badge');
   });
-  expect(latestState?.importState).toEqual({ status: 'error', message: 'disable failed' });
+  expect(latestState?.importState).toEqual({
+    status: 'error',
+    message: expect.stringContaining('Sniptale'),
+  });
 });
 
 it('ignores initial-load results when a newer import starts first', async () => {

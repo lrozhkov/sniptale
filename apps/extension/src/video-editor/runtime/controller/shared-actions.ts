@@ -6,6 +6,7 @@ import { normalizeVideoProjectCursorSkin } from '../../../features/video/project
 import {
   VideoCursorCaptureMode,
   type VideoProject,
+  VideoProjectInteractionTimeBasis,
   VideoProjectSourceKind,
   type VideoProjectActionEvent,
   type VideoProjectCursorTrack,
@@ -116,6 +117,7 @@ function createInitialCursorTrack(store: ProjectMutationStore, project: VideoPro
     samples: [
       {
         id: crypto.randomUUID(),
+        timeBasis: VideoProjectInteractionTimeBasis.PROJECT,
         time: store.getCurrentTime(),
         visible: true,
         x: project.width / 2,
@@ -140,6 +142,7 @@ function createActionEventUpdaters(store: ActionEventUpdaterStore) {
             label: preset,
             point: resolveDefaultActionPoint(store),
             preset,
+            timeBasis: VideoProjectInteractionTimeBasis.PROJECT,
             time: store.getCurrentTime(),
           },
         ],

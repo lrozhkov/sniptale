@@ -60,6 +60,7 @@ function createWorkspaceSidebarClipActions(store: EditorStore) {
     onApplyMediaClipVisualsToTrack: store.applyMediaClipVisualsToTrack,
     onConvertTextClipToAnnotation: store.convertTextClipToAnnotation,
     onDetachClipGroup: store.detachClipGroup,
+    onSwapClip: store.swapClip,
     onUpdateAnnotationClipContent: store.updateAnnotationClipContent,
     onUpdateAnnotationClipStyle: store.updateAnnotationClipStyle,
     onUpdateAnnotationClipTemplate: store.updateAnnotationClipTemplate,
@@ -105,7 +106,7 @@ function createWorkspaceSidebarProjectActions(args: {
     onImportRecordedAudio: args.actions.handleImportRecordedAudio,
     onImportVideo: args.actions.handleImportVideo,
     onOpenProject: args.actions.handleOpenProject,
-    onRenameTrack: args.store.renameTrack,
+    ...createWorkspaceSidebarTrackActions(args.store),
     onResizeProject: args.projectUpdaters.resizeProject,
     ...createWorkspaceSidebarBackgroundActions(args),
     onToggleCollapsed: args.workspace.toggleSidebarCollapsed,
@@ -122,6 +123,16 @@ function createWorkspaceSidebarProjectActions(args: {
     onMoveEffectInstance: args.projectUpdaters.moveEffectInstance,
     onUpdateEffectInstance: args.projectUpdaters.updateEffectInstance,
     onUpsertObjectTrackCorrectionAnchor: args.projectUpdaters.upsertObjectTrackCorrectionAnchor,
+  };
+}
+
+export function createWorkspaceSidebarTrackActions(
+  store: Pick<EditorStore, 'renameTrack' | 'toggleTrackLock' | 'toggleTrackVisibility'>
+) {
+  return {
+    onRenameTrack: store.renameTrack,
+    onToggleTrackLock: store.toggleTrackLock,
+    onToggleTrackVisibility: store.toggleTrackVisibility,
   };
 }
 

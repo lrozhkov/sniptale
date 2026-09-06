@@ -71,7 +71,7 @@ function reportServiceFailure(
   warnings: string[],
   error: unknown
 ): string {
-  const errorMessage = getExportErrorMessage(error, translate('content.runtime.unknownError'));
+  const errorMessage = getExportErrorMessage(error, 'content.runtime.exportFailed');
   warnings.push(errorMessage);
 
   updateExportManagerProgress(state, {
@@ -98,24 +98,8 @@ function createExportContentRunner(
 
     try {
       if (hasOnlyBrowserAnnotations(options)) {
-        updateExportManagerProgress(state, {
-          activeStepKey: 'annotations',
-          phase: 'scanning',
-          message: translate('content.runtime.prepareAnnotations'),
-          current: 0,
-          total: 0,
-          errors: [],
-        });
-        const text = await resolvePrepareAnnotationsText(deps)();
-        if (state.isCancelled) {
-          throw new Error(translate('content.runtime.exportCancelled'));
-        }
-        const pagePackage = createBrowserAnnotationsPagePackage(
-          text,
-          resolveAnnotationsArchiveBaseName(deps)
-        );
+        const pagePackage = await prepareAnnotationsOnlyExport(state, deps);
         const result = createBrowserAnnotationsExportResult(pagePackage);
-        finishAnnotationsOnlyExport(state);
         return { success: true, ...result, errors: warnings };
       }
       const result = await runExportManagerPipeline(state, options, warnings, {
@@ -148,6 +132,30 @@ function finishAnnotationsOnlyExport(state: ReturnType<typeof createExportManage
   });
 }
 
+async function prepareAnnotationsOnlyExport(
+  state: ReturnType<typeof createExportManagerState>,
+  deps: ExportManagerServiceDeps
+) {
+  updateExportManagerProgress(state, {
+    activeStepKey: 'annotations',
+    phase: 'scanning',
+    message: translate('content.runtime.prepareAnnotations'),
+    current: 0,
+    total: 0,
+    errors: [],
+  });
+  const text = await resolvePrepareAnnotationsText(deps)();
+  if (state.isCancelled) {
+    throw new Error(translate('content.runtime.exportCancelled'));
+  }
+  const pagePackage = createBrowserAnnotationsPagePackage(
+    text,
+    resolveAnnotationsArchiveBaseName(deps)
+  );
+  finishAnnotationsOnlyExport(state);
+  return pagePackage;
+}
+
 function createBuildPackageRunner(
   state: ReturnType<typeof createExportManagerState>,
   deps: ExportManagerServiceDeps,
@@ -172,23 +180,7 @@ function createBuildPackageRunner(
 
     try {
       if (hasOnlyBrowserAnnotations(options)) {
-        updateExportManagerProgress(state, {
-          activeStepKey: 'annotations',
-          phase: 'scanning',
-          message: translate('content.runtime.prepareAnnotations'),
-          current: 0,
-          total: 0,
-          errors: [],
-        });
-        const text = await resolvePrepareAnnotationsText(deps)();
-        if (state.isCancelled) {
-          throw new Error(translate('content.runtime.exportCancelled'));
-        }
-        const pagePackage = createBrowserAnnotationsPagePackage(
-          text,
-          resolveAnnotationsArchiveBaseName(deps)
-        );
-        finishAnnotationsOnlyExport(state);
+        const pagePackage = await prepareAnnotationsOnlyExport(state, deps);
         return binaryMode === 'blob' ? createArchiveArtifact(pagePackage) : pagePackage;
       }
       const result = await runExportManagerPackagePipeline(state, options, warnings, {

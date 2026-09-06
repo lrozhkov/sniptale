@@ -97,7 +97,7 @@ it('runs worktree and Git history secret scans as one strict audit control', asy
   expect(fs.existsSync(reportPath)).toBe(true);
 });
 
-it('rejects stale reviewed Gitleaks history findings', async () => {
+it('reports stale reviewed Gitleaks history findings as advisory', async () => {
   const module = await import('./gitleaks.mjs');
   const root = createTempRoot('verify-gitleaks-stale-baseline-');
   const reportPath = path.join(root, 'gitleaks-report.json');
@@ -124,7 +124,8 @@ it('rejects stale reviewed Gitleaks history findings', async () => {
     },
   });
 
-  expect(result.violations).toEqual([
+  expect(result.violations).toEqual([]);
+  expect(result.advisories).toEqual([
     expect.objectContaining({
       rule: 'gitleaks-baseline-stale',
       file: 'src/fixture.ts',
@@ -170,6 +171,7 @@ it('matches a reviewed history finding by its complete tuple', async () => {
   });
 
   expect(result.violations).toEqual([]);
+  expect(result.advisories).toEqual([]);
   expect(result.summaryText).toContain('1/1 matched');
 });
 

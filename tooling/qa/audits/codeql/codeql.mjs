@@ -239,6 +239,7 @@ function collectFreshCodeqlResult({
     sarifPath,
     filteredSarifPath,
     summaryText: formatCodeqlBaselineSummary(filtered),
+    advisories: filtered.advisories,
     violations: filtered.violations,
   };
 }

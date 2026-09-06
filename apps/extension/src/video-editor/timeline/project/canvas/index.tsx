@@ -5,7 +5,11 @@ import type { VideoEditorImportPlacement } from '../../../contracts/insertion';
 import type { VideoEditorPlaybackRange } from '../../../interaction/playback/range';
 import type { VideoEditorSelection } from '../../../contracts/selection';
 import type { TimelineClipPreviewMap } from '../../../contracts/timeline-preview';
-import { ProjectTimelinePlayhead, ProjectTimelineTrackLanes } from './parts/index';
+import {
+  ProjectTimelinePlayheadHandle,
+  ProjectTimelinePlayheadLine,
+  ProjectTimelineTrackLanes,
+} from './parts/index';
 import { buildProjectTimelineRulerMarkers } from './render-data';
 import {
   EFFECT_LANE_ROW_HEIGHT,
@@ -27,15 +31,18 @@ import type {
 } from '../types';
 import { resolveTimelineDropTrackId, type TimelineDropImportKind } from './drop-targets';
 import { ProjectTimelineCanvasEffectRows } from './effect-rows';
+import { getTimelineUtilityRowPresence } from '../effect-lanes/segments';
 
 interface ProjectTimelineCanvasProps {
   currentTime: number;
+  consumeCompletedScrubClick: () => boolean;
   dragGhost: TimelineClipDragGhost | null;
   playbackRange: VideoEditorPlaybackRange | null;
   pixelsPerSecond: number;
   project: VideoProject;
   recordingTelemetry: RecordingTelemetryEntry | null;
   selection: VideoEditorSelection;
+  snapGuideTime: number | null;
   hoveredClipId: string | null;
   selectedClipId: string | null;
   selectedEffectSelection: TimelineEffectSelection | null;
@@ -54,6 +61,11 @@ interface ProjectTimelineCanvasProps {
     mode: DragMode
   ) => void;
   onBeginEffectInteraction: (event: React.PointerEvent, target: TimelineEffectDragTarget) => void;
+  onBeginPlayheadScrub: (
+    event: React.PointerEvent<HTMLElement>,
+    currentTime: number,
+    onComplete: () => void
+  ) => void;
   onBeginEffectRangeSelection: React.PointerEventHandler<HTMLDivElement>;
   onBeginRangeSelection: (event: React.PointerEvent<HTMLDivElement>) => void;
   onBeginTrackRangeSelection: (trackId: string) => React.PointerEventHandler<HTMLDivElement>;
@@ -62,6 +74,9 @@ interface ProjectTimelineCanvasProps {
   onDropEffectDocument?: import('../types').ProjectTimelineProps['onDropEffectDocument'];
   onImportTimelineFile: ProjectTimelineInsertionActions['onImport'];
   onSeek: (event: React.MouseEvent<HTMLDivElement>) => void;
+  onSeekTime: (time: number) => void;
+  onStepToNextFrame: () => void;
+  onStepToPreviousFrame: () => void;
   onSelectActionSegment: (actionEventId: string) => void;
   onSelectClip: (clipId: string | null) => void;
   onSelectCursorSegment: (sampleId: string) => void;
@@ -100,8 +115,13 @@ export function ProjectTimelineCanvas(props: ProjectTimelineCanvasProps) {
   return (
     <div
       ref={props.timelineRef}
+      data-ui="video-editor.timeline.canvas-scroll"
       className="relative min-w-0 overflow-auto"
-      onClick={createCanvasSeekHandler(props.onSelectScene, props.onSeek)}
+      onClick={createCanvasSeekHandler(
+        props.consumeCompletedScrubClick,
+        props.onSelectScene,
+        props.onSeek
+      )}
       onPointerDown={model.hoverPreview.clearHoverPreview}
       onPointerLeave={model.hoverPreview.clearHoverPreview}
       onPointerMove={model.hoverPreview.updateHoverPreview}
@@ -115,6 +135,7 @@ export function ProjectTimelineCanvas(props: ProjectTimelineCanvasProps) {
         cursorLaneVisible={model.cursorLaneVisible}
         telemetryLaneVisible={model.telemetryLaneVisible}
         hoverTime={model.hoverPreview.hoverTime}
+        onClearHoverPreview={model.hoverPreview.clearHoverPreview}
         playheadHeight={model.playheadHeight}
         playheadX={props.currentTime * props.pixelsPerSecond}
         rulerMarkers={model.rulerMarkers}
@@ -162,10 +183,16 @@ function useProjectTimelineCanvasModel(props: ProjectTimelineCanvasProps) {
 }
 
 function createCanvasSeekHandler(
+  consumeCompletedScrubClick: ProjectTimelineCanvasProps['consumeCompletedScrubClick'],
   onSelectScene: ProjectTimelineCanvasProps['onSelectScene'],
   onSeek: ProjectTimelineCanvasProps['onSeek']
 ) {
   return (event: React.MouseEvent<HTMLDivElement>) => {
+    if (consumeCompletedScrubClick()) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     onSelectScene();
     onSeek(event);
   };
@@ -175,6 +202,7 @@ function ProjectTimelineCanvasContent(
   props: ProjectTimelineCanvasProps & {
     cursorLaneVisible: boolean;
     hoverTime: number | null;
+    onClearHoverPreview: () => void;
     playheadHeight: number;
     playheadX: number;
     trackLayoutModel: TimelineTrackLayoutModel;
@@ -183,15 +211,34 @@ function ProjectTimelineCanvasContent(
 ) {
   return (
     <div className="relative" style={{ width: props.timelineWidth + 120 }}>
-      <ProjectTimelineCanvasChrome {...props} />
+      <ProjectTimelineCanvasChrome
+        {...props}
+        playheadHandle={
+          <ProjectTimelinePlayheadHandle
+            currentTime={props.currentTime}
+            duration={props.project.duration}
+            left={props.playheadX}
+            onBeginScrub={(event, currentTime) =>
+              props.onBeginPlayheadScrub(event, currentTime, props.onClearHoverPreview)
+            }
+            onStepToNextFrame={props.onStepToNextFrame}
+            onStepToPreviousFrame={props.onStepToPreviousFrame}
+          />
+        }
+      />
       <ProjectTimelineHoverPreview
         height={props.playheadHeight}
         hoverTime={props.hoverTime}
         pixelsPerSecond={props.pixelsPerSecond}
       />
-      <ProjectTimelinePlayhead height={props.playheadHeight} left={props.playheadX} />
+      <ProjectTimelineSnapGuide
+        height={props.playheadHeight}
+        left={props.snapGuideTime === null ? null : props.snapGuideTime * props.pixelsPerSecond}
+      />
+      <ProjectTimelinePlayheadLine height={props.playheadHeight} left={props.playheadX} />
       {props.telemetryLaneVisible ? (
         <ProjectTimelineTelemetryLane
+          onSeek={props.onSeekTime}
           pixelsPerSecond={props.pixelsPerSecond}
           project={props.project}
           recordingTelemetry={props.recordingTelemetry}
@@ -204,6 +251,22 @@ function ProjectTimelineCanvasContent(
       />
       <ProjectTimelineCanvasEffectRows {...props} />
     </div>
+  );
+}
+
+function ProjectTimelineSnapGuide(props: { height: number; left: number | null }) {
+  if (props.left === null) return null;
+  return (
+    <div
+      aria-hidden="true"
+      data-ui="video-editor.timeline.snap-guide"
+      className={[
+        'pointer-events-none absolute top-0 z-30 w-px',
+        'bg-[var(--sniptale-color-accent-emphasis)] opacity-80',
+        'shadow-[0_0_8px_var(--sniptale-color-accent-soft)]',
+      ].join(' ')}
+      style={{ height: props.height, left: props.left }}
+    />
   );
 }
 
@@ -233,6 +296,7 @@ function createTimelineFileDropHandler(props: ProjectTimelineCanvasProps) {
   };
 }
 
-function getEffectLaneCount(cursorLaneVisible: boolean, _project: VideoProject): number {
-  return 2 + (cursorLaneVisible ? 1 : 0);
+function getEffectLaneCount(cursorLaneVisible: boolean, project: VideoProject): number {
+  const rows = getTimelineUtilityRowPresence(project);
+  return Number(rows.actions) + Number(rows.motion) + Number(cursorLaneVisible);
 }

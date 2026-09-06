@@ -1,6 +1,8 @@
 import type { Dispatch, SetStateAction } from 'react';
 import type { VideoRecordingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import type { PopupMediaDeviceOption } from '../media-devices/index';
+import type { TranslationKey } from '../../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 
 type RefreshMediaDevicesParams<TDevice extends PopupMediaDeviceOption> = {
   refreshOwner: symbol;
@@ -57,7 +59,7 @@ type ToggleMediaDeviceParams<TDevice extends PopupMediaDeviceOption> = {
   enabledKey: 'microphoneEnabled' | 'webcamEnabled';
   deviceIdKey: 'microphoneDeviceId' | 'webcamDeviceId';
   noDevicesError: string;
-  accessError: string;
+  accessErrorKey: TranslationKey;
   resolveDeviceId: (currentId: string | null, devices: TDevice[]) => string | null;
 };
 
@@ -72,7 +74,7 @@ export async function togglePopupMediaDevice<TDevice extends PopupMediaDeviceOpt
     enabledKey,
     deviceIdKey,
     noDevicesError,
-    accessError,
+    accessErrorKey,
     resolveDeviceId,
   } = params;
 
@@ -99,6 +101,16 @@ export async function togglePopupMediaDevice<TDevice extends PopupMediaDeviceOpt
       [deviceIdKey]: resolveDeviceId(previous[deviceIdKey] ?? null, devices),
     }));
   } catch (error) {
-    setStartError(error instanceof Error ? error.message : accessError);
+    if (error instanceof Error && error.message === noDevicesError) {
+      setStartError(noDevicesError);
+      return;
+    }
+    setStartError(
+      createUserFacingErrorMessage({
+        cause: error,
+        detail: 'browserCommunication',
+        summaryKey: accessErrorKey,
+      })
+    );
   }
 }

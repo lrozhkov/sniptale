@@ -56,6 +56,24 @@ function clonePlacement(placement: DocumentPagePlacement): DocumentPagePlacement
   return { ...placement, iframePath: [...placement.iframePath] };
 }
 
+function retainLastGoodPlacement(
+  current: AnchorBinding | undefined,
+  preservesIdentity: boolean
+): Partial<
+  Pick<AnchorBinding, 'lastGoodPagePlacement' | 'lastGoodRect' | 'lastGoodTopPagePlacement'>
+> {
+  if (!current || !preservesIdentity) return {};
+  return {
+    ...(current.lastGoodPagePlacement
+      ? { lastGoodPagePlacement: clonePlacement(current.lastGoodPagePlacement) }
+      : {}),
+    ...(current.lastGoodRect ? { lastGoodRect: { ...current.lastGoodRect } } : {}),
+    ...(current.lastGoodTopPagePlacement
+      ? { lastGoodTopPagePlacement: clonePlacement(current.lastGoodTopPagePlacement) }
+      : {}),
+  };
+}
+
 export function isFrameRecoveryPlacementValid(placement: DocumentPagePlacement): boolean {
   return (
     Number.isFinite(placement.pageX) &&
@@ -278,15 +296,7 @@ class AnchorRegistryOwner implements AnchorRegistry {
       frameId,
       generation: this.takeGeneration(),
       lastAcceptedNode: node,
-      ...(preservesIdentity && current.lastGoodPagePlacement
-        ? { lastGoodPagePlacement: clonePlacement(current.lastGoodPagePlacement) }
-        : {}),
-      ...(preservesIdentity && current.lastGoodRect
-        ? { lastGoodRect: { ...current.lastGoodRect } }
-        : {}),
-      ...(preservesIdentity && current.lastGoodTopPagePlacement
-        ? { lastGoodTopPagePlacement: clonePlacement(current.lastGoodTopPagePlacement) }
-        : {}),
+      ...retainLastGoodPlacement(current, preservesIdentity),
       node,
       presentation: 'suspended',
       selector,
@@ -366,15 +376,7 @@ class AnchorRegistryOwner implements AnchorRegistry {
       frameId,
       generation: this.takeGeneration(),
       lastAcceptedNode: preservesIdentity ? current.lastAcceptedNode : null,
-      ...(preservesIdentity && current.lastGoodPagePlacement
-        ? { lastGoodPagePlacement: clonePlacement(current.lastGoodPagePlacement) }
-        : {}),
-      ...(preservesIdentity && current.lastGoodRect
-        ? { lastGoodRect: { ...current.lastGoodRect } }
-        : {}),
-      ...(preservesIdentity && current.lastGoodTopPagePlacement
-        ? { lastGoodTopPagePlacement: clonePlacement(current.lastGoodTopPagePlacement) }
-        : {}),
+      ...retainLastGoodPlacement(current, preservesIdentity),
       node,
       presentation: 'suspended',
       ...(!returnsToAcceptedNode ? { reacquireSample: { ready: false } } : {}),
@@ -401,13 +403,7 @@ class AnchorRegistryOwner implements AnchorRegistry {
       frameId,
       generation: this.takeGeneration(),
       lastAcceptedNode: current.lastAcceptedNode,
-      ...(current.lastGoodPagePlacement
-        ? { lastGoodPagePlacement: clonePlacement(current.lastGoodPagePlacement) }
-        : {}),
-      ...(current.lastGoodRect ? { lastGoodRect: { ...current.lastGoodRect } } : {}),
-      ...(current.lastGoodTopPagePlacement
-        ? { lastGoodTopPagePlacement: clonePlacement(current.lastGoodTopPagePlacement) }
-        : {}),
+      ...retainLastGoodPlacement(current, true),
       selector: current.selector,
     };
     this.bindings.set(frameId, retained);

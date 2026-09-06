@@ -1,12 +1,27 @@
-import type React from 'react';
+import { useWorkspaceTrackPresentation } from './track-presentation';
+import {
+  WorkspacePanelDockToggle,
+  WorkspacePanelResizeHandle,
+  type WorkspacePanelResize,
+} from '../floating/panel-layout';
+import React, { useEffect, useState } from 'react';
+import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
+import { translate } from '../../../platform/i18n';
+import { VideoEditorSourceViewer } from './source-viewer';
 import { ProjectTimeline } from '../../timeline/project';
 import { PreviewStage } from '../../preview/stage';
 import {
+  useWorkspacePreviewContext,
+  useVideoEditorBlockingOverlayContext,
   useVideoEditorLayoutController,
   useVideoEditorPreviewController,
   useVideoEditorTimelineController,
 } from '../../runtime/controller/composition/hooks';
-import { useVideoEditorEffectEditingPort } from '../../runtime/controller/store';
+import {
+  useVideoEditorEffectEditingPort,
+  useVideoEditorTimelineEditingPort,
+} from '../../runtime/controller/store';
+import { VideoEditorMaterials } from './materials';
 import type { VideoPreviewCanvasInsertKind } from '../../preview/stage/types';
 import { VideoEditorWorkspaceEffectsLibrary } from './effects-library';
 import type { WorkspaceEffectBundlesState } from './effect-bundles';
@@ -19,29 +34,63 @@ import type { EffectEditingPort } from '../../contracts/controller-store';
 
 export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProps) {
   const layout = useVideoEditorLayoutController();
+  const preview = useVideoEditorPreviewController();
+  const viewer = useWorkspacePreviewContext();
+  const previewHeight = props.previewHeightStyle.height ?? '60%';
   return (
-    <div
-      data-ui="video-editor.workspace.canvas-shell"
-      className={getWorkspaceCanvasShellClassName(layout.leftSidebarCollapsed)}
-    >
-      <div ref={layout.workspaceSplitRef} className="flex h-full min-h-0 flex-col gap-0">
-        <div className="flex min-h-0 shrink-0 gap-3" style={props.previewHeightStyle}>
-          <VideoEditorWorkspaceEffectsLibrary
-            effectBundles={props.effectBundles}
-            effectOperations={props.effectOperations}
-            isOpen={props.effectsLibraryDockOpen}
-            onOpenChange={props.onEffectsLibraryDockOpenChange}
-          />
-          <VideoEditorWorkspacePreview {...props} />
+    <div data-ui="video-editor.workspace.canvas-shell" className="min-h-0 min-w-0 flex-1 px-3 pb-3">
+      <div
+        ref={layout.workspaceSplitRef}
+        className="grid h-full min-h-0 min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] gap-0"
+        data-materials-dock={props.materialsPanel.fullHeight ? 'full' : 'viewer'}
+        data-inspector-dock={props.inspectorFullHeight ? 'full' : 'viewer'}
+        style={{
+          gridTemplateRows: `minmax(0, min(${previewHeight}, calc(100% - 228px))) 8px minmax(220px, 1fr)`,
+        }}
+      >
+        <div data-ui="video-editor.workspace.upper" className="contents">
+          <VideoEditorWorkspaceUpper key={preview?.project.id ?? 'empty'} {...props} />
         </div>
-        <VideoEditorWorkspaceResizeHandle onPointerDown={layout.handleStartVerticalResize} />
-        <VideoEditorWorkspaceTimeline {...props} />
+        <div
+          className="col-start-3 row-start-1 flex min-h-0 min-w-0"
+          style={{ gridRowEnd: props.inspectorFullHeight ? 4 : 2 }}
+        >
+          {props.inspector}
+        </div>
+        <div
+          className="col-start-1 row-start-2"
+          style={{
+            gridColumnStart: props.materialsPanel.fullHeight ? 2 : 1,
+            gridColumnEnd: props.inspectorFullHeight ? 3 : 4,
+          }}
+        >
+          <VideoEditorWorkspaceResizeHandle
+            onPointerDown={layout.handleStartVerticalResize}
+            onDoubleClick={viewer.resetPaneHeight}
+            onKeyDown={viewer.handleVerticalResizeKeyDown}
+          />
+        </div>
+        <div
+          className="col-start-1 row-start-3 flex min-h-0 min-w-0"
+          onPointerDownCapture={() => viewer.setSourceViewerActive(false)}
+          onFocusCapture={() => viewer.setSourceViewerActive(false)}
+          style={{
+            gridColumnStart: props.materialsPanel.fullHeight ? 2 : 1,
+            gridColumnEnd: props.inspectorFullHeight ? 3 : 4,
+          }}
+        >
+          <VideoEditorWorkspaceTimeline {...props} />
+        </div>
       </div>
     </div>
   );
 }
 
 interface VideoEditorWorkspaceCanvasProps {
+  materialsPanel: { resize: WorkspacePanelResize; fullHeight: boolean; onToggle: () => void };
+  inspectorFullHeight?: boolean;
+  materialsOpen?: boolean;
+  inspector: React.ReactNode;
   activeInsertKind: VideoPreviewCanvasInsertKind | null;
   effectBundles: WorkspaceEffectBundlesState;
   effectOperations: EffectLibraryOperations;
@@ -51,13 +100,103 @@ interface VideoEditorWorkspaceCanvasProps {
   onEffectsLibraryDockOpenChange: (open: boolean) => void;
 }
 
-function VideoEditorWorkspacePreview(props: VideoEditorWorkspaceCanvasProps): React.JSX.Element {
+function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
   const preview = useVideoEditorPreviewController();
+  const viewer = useWorkspacePreviewContext();
+  const blocking = useVideoEditorBlockingOverlayContext();
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const appendMaterial = useVideoEditorTimelineEditingPort((port) => port.appendMaterial);
+  const insertMaterial = useVideoEditorTimelineEditingPort((port) => port.insertMaterial);
+  const overlayMaterial = useVideoEditorTimelineEditingPort((port) => port.overlayMaterial);
+  const setSourceActive = viewer.setSourceViewerActive;
+  useEffect(() => () => setSourceActive(false), [setSourceActive]);
+  const source = preview?.project.assets.find(({ id }) => id === selectedAssetId) ?? null;
+  useEffect(() => {
+    if (!source) setSourceActive(false);
+  }, [source, setSourceActive]);
   if (!preview) return <div className="min-h-0 min-w-0 flex-1" />;
+  const sourceActive = viewer.sourceViewerActive && source !== null;
+  const showSource = () => {
+    preview.transport.onPausePlayback();
+    setSourceActive(true);
+  };
   return (
-    <div className="min-h-0 min-w-0 flex-1">
-      <PreviewStage {...createWorkspacePreviewProps(props, preview)} />
-    </div>
+    <>
+      {(props.materialsOpen || props.effectsLibraryDockOpen) && (
+        <div
+          className="col-start-1 row-start-1 flex min-h-0 min-w-0"
+          style={{ gridRowEnd: props.materialsPanel.fullHeight ? 4 : 2 }}
+        >
+          <div className="min-h-0 min-w-0" style={{ width: props.materialsPanel.resize.width }}>
+            {props.materialsOpen && (
+              <VideoEditorMaterials
+                project={preview.project}
+                onImport={preview.onImport}
+                selectedAssetId={selectedAssetId}
+                headerAction={
+                  <WorkspacePanelDockToggle
+                    fullHeight={props.materialsPanel.fullHeight}
+                    onToggle={props.materialsPanel.onToggle}
+                    dataUi="video-editor.materials.dock-toggle"
+                  />
+                }
+                onSelect={(asset) => {
+                  setSelectedAssetId(asset.id);
+                  showSource();
+                }}
+              />
+            )}
+            <VideoEditorWorkspaceEffectsLibrary
+              effectBundles={props.effectBundles}
+              effectOperations={props.effectOperations}
+              isOpen={props.effectsLibraryDockOpen}
+              onOpenChange={props.onEffectsLibraryDockOpenChange}
+              headerAction={
+                <WorkspacePanelDockToggle
+                  fullHeight={props.materialsPanel.fullHeight}
+                  onToggle={props.materialsPanel.onToggle}
+                  dataUi="video-editor.materials.dock-toggle"
+                />
+              }
+            />
+          </div>
+          <WorkspacePanelResizeHandle
+            resize={props.materialsPanel.resize}
+            label={translate('videoEditor.app.resizeMaterials')}
+            dataUi="video-editor.materials.resize"
+          />
+        </div>
+      )}
+      <div
+        className="col-start-2 row-start-1 flex min-h-0 min-w-0 flex-col"
+        data-ui="video-editor.workspace.viewer"
+        data-viewer={sourceActive ? 'source' : 'montage'}
+      >
+        <WorkspaceViewerHeading
+          sourceName={source?.name ?? null}
+          projectName={preview.project.name}
+          sourceActive={sourceActive}
+          onChange={(active) => (active ? showSource() : setSourceActive(false))}
+        />
+        <div className="relative min-h-0 flex-1">
+          <div className="h-full min-h-0" hidden={sourceActive}>
+            <PreviewStage {...createWorkspacePreviewProps(props, preview)} />
+          </div>
+          <div className="absolute inset-0 min-h-0" hidden={!sourceActive}>
+            <VideoEditorSourceViewer
+              asset={source}
+              assetUrl={source ? preview.assetUrls[source.id] : undefined}
+              active={sourceActive && !blocking}
+              fps={preview.project.fps}
+              onAppend={appendMaterial}
+              onInsert={insertMaterial}
+              onOverlay={overlayMaterial}
+              onPlaced={() => setSourceActive(false)}
+            />
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -126,11 +265,13 @@ function createWorkspacePreviewActions(
 
 function VideoEditorWorkspaceTimeline(props: VideoEditorWorkspaceCanvasProps): React.JSX.Element {
   const controller = useVideoEditorTimelineController();
+  const presentation = useWorkspaceTrackPresentation();
   const onApplyEffectDocument = useVideoEditorEffectEditingPort((port) => port.applyEffectDocument);
-  if (!controller) return <div className="min-h-[220px] min-w-0 flex-1" />;
+  if (!controller || !presentation) return <div className="min-h-[220px] min-w-0 flex-1" />;
   return (
     <div className="min-h-[220px] min-w-0 flex-1">
       <ProjectTimeline
+        panelPrefs={presentation.panelPrefs}
         {...getProjectTimelineProps(
           controller,
           (payload, target, startTime) =>
@@ -194,24 +335,61 @@ function doesEffectKindMatchTarget(
 
 function VideoEditorWorkspaceResizeHandle({
   onPointerDown,
+  onDoubleClick,
+  onKeyDown,
 }: {
   onPointerDown: React.PointerEventHandler<HTMLDivElement>;
+  onDoubleClick: () => void;
+  onKeyDown: React.KeyboardEventHandler<HTMLDivElement>;
 }): React.JSX.Element {
   return (
     <div
       data-ui="video-editor.workspace.timeline-resize-zone"
       role="separator"
       aria-orientation="horizontal"
+      aria-label={translate('videoEditor.app.resizeTimeline')}
+      tabIndex={0}
+      onDoubleClick={onDoubleClick}
+      onKeyDown={onKeyDown}
       onPointerDown={onPointerDown}
       className="h-2 shrink-0 cursor-row-resize"
     />
   );
 }
 
-function getWorkspaceCanvasShellClassName(inspectorCollapsed: boolean): string {
-  return [
-    'min-h-0 min-w-0 flex-1 p-3 pt-[4.75rem]',
-    inspectorCollapsed ? 'pr-3' : 'pr-[21.75rem] max-[1120px]:pr-3',
-    'max-[860px]:pt-[11.75rem]',
-  ].join(' ');
+function WorkspaceViewerHeading({
+  sourceName,
+  projectName,
+  sourceActive,
+  onChange,
+}: {
+  sourceName: string | null;
+  projectName: string;
+  sourceActive: boolean;
+  onChange: (source: boolean) => void;
+}) {
+  return (
+    <div className="flex h-8 min-w-0 shrink-0 items-center gap-2 px-1">
+      {sourceName !== null ? (
+        <SegmentedSwitch
+          density="compact"
+          ariaLabel={translate('videoEditor.app.viewerSwitch')}
+          activeId={sourceActive ? 'source' : 'montage'}
+          options={[
+            { id: 'source', label: translate('videoEditor.app.sourceViewer') },
+            { id: 'montage', label: translate('videoEditor.app.montageViewer') },
+          ]}
+          onChange={(id) => onChange(id === 'source')}
+        />
+      ) : (
+        <span className="text-xs font-semibold">{translate('videoEditor.app.montageViewer')}</span>
+      )}
+      <span
+        className="min-w-0 truncate text-xs text-[var(--sniptale-color-text-muted)]"
+        title={sourceActive ? (sourceName ?? undefined) : projectName}
+      >
+        {sourceActive ? sourceName : projectName}
+      </span>
+    </div>
+  );
 }

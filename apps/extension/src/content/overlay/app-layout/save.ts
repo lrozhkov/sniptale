@@ -1,4 +1,5 @@
 import { translate } from '../../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 import { getContentRuntimeServices } from '../../application/runtime-services/services';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
@@ -61,12 +62,25 @@ export async function handleContentSaveDialogSave(args: {
     }
 
     showToastMessage(
-      response?.error || translateMessage('content.interactiveFrame.screenshotSaveError'),
+      createUserFacingErrorMessage({
+        cause: response?.error,
+        detail: 'storage',
+        summaryKey: 'content.interactiveFrame.screenshotSaveError',
+        translator: translateMessage,
+      }),
       'error'
     );
     return false;
-  } catch {
-    showToastMessage(translateMessage('content.interactiveFrame.screenshotSaveError'), 'error');
+  } catch (error) {
+    showToastMessage(
+      createUserFacingErrorMessage({
+        cause: error,
+        detail: 'storage',
+        summaryKey: 'content.interactiveFrame.screenshotSaveError',
+        translator: translateMessage,
+      }),
+      'error'
+    );
     return false;
   }
 }

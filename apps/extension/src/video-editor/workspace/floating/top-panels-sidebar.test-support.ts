@@ -82,6 +82,8 @@ function createProjectEditActions(): Omit<
     onSelectObjectTrack: noop(),
     onSetCursorCaptureMode: noop(),
     onSetSceneBackground: noop(),
+    onToggleTrackLock: noop(),
+    onToggleTrackVisibility: noop(),
     onToggleCollapsed: noop(),
     onToggleDiagnostics: noop(),
     onUpdateActionEventDetails: noop(),
@@ -110,6 +112,7 @@ function createClipActions(): VideoEditorSidebarController['clipActions'] {
   return {
     onApplyMediaClipVisualsToTrack: noop(),
     onConvertTextClipToAnnotation: noop(),
+    onSwapClip: vi.fn(),
     onDetachClipGroup: noop(),
     onUpdateAnnotationClipContent: noop(),
     onUpdateAnnotationClipStyle: noop(),

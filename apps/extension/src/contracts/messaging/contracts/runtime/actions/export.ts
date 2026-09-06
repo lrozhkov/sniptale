@@ -18,7 +18,10 @@ import {
   isPopupExportJobWarnings,
 } from '../../../validators/export';
 import type { PartialRuntimeRegistry } from '../../runtime-message.registry.ts';
-import type { RuntimePopupExportRequestByType } from '@sniptale/runtime-contracts/messaging/contracts/runtime-message/popup-export';
+import type {
+  RuntimePopupExportRequestByType,
+  RuntimePopupExportResponseByType,
+} from '@sniptale/runtime-contracts/messaging/contracts/runtime-message/popup-export';
 
 const popupTabRouteOperations = new Set<string>([
   MessageType.EXPORT_POPUP_PREVIEW,
@@ -76,6 +79,24 @@ function isRuntimePopupExportBuildPackageRequest(
     : !hasAnonymousPolicy && !hasAuthenticatedPolicy;
 }
 
+const isPagePackageJobStatusResponseEnvelope = createRuntimeResponseGuard({
+  optional: {
+    locale: isNullable((value) => value === 'en' || value === 'ru'),
+    status: isNullable(isPagePackageJobStatus),
+  },
+});
+
+function isPagePackageJobStatusResponse(
+  value: unknown
+): value is RuntimePopupExportResponseByType[typeof MessageType.GET_PAGE_PACKAGE_JOB_STATUS] {
+  if (!isPagePackageJobStatusResponseEnvelope(value)) return false;
+  if ((value as { success?: boolean }).success !== true) return true;
+  return (
+    Object.prototype.hasOwnProperty.call(value, 'locale') &&
+    Object.prototype.hasOwnProperty.call(value, 'status')
+  );
+}
+
 export const runtimeActionExportMessageContracts = {
   [MessageType.START_PAGE_PACKAGE_JOB]: {
     parseRequest: createGuardParser(
@@ -86,6 +107,7 @@ export const runtimeActionExportMessageContracts = {
           includeWebCopy: (value) => typeof value === 'boolean',
           intent: (value) => value === 'export' || value === 'save',
           jobId: isPopupExportJobId,
+          locale: (value) => value === 'en' || value === 'ru',
           captureTiming: isPagePackageCaptureTiming,
           sources: isPagePackageCaptureSources,
           options: isExportOptions,
@@ -110,9 +132,7 @@ export const runtimeActionExportMessageContracts = {
     ),
     parseResponse: createGuardParser(
       'runtime GET_PAGE_PACKAGE_JOB_STATUS response',
-      createRuntimeResponseGuard({
-        optional: { status: isNullable(isPagePackageJobStatus) },
-      })
+      isPagePackageJobStatusResponse
     ),
   },
   [MessageType.CANCEL_PAGE_PACKAGE_JOB]: {
@@ -150,7 +170,10 @@ export const runtimeActionExportMessageContracts = {
       'runtime PAGE_PACKAGE_JOB_STATUS_UPDATED message',
       createMessageGuard({
         type: MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED,
-        required: { status: isPagePackageJobStatus },
+        required: {
+          locale: (value) => value === 'en' || value === 'ru',
+          status: isPagePackageJobStatus,
+        },
       })
     ),
     parseResponse: createGuardParser(

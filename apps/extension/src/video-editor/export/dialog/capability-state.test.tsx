@@ -133,7 +133,8 @@ it('falls back to WebM-only capabilities when probing fails', async () => {
   });
   await flushEffects();
 
-  expect(container?.textContent).toContain('"capabilityError":"probe failed"');
+  expect(container?.textContent).toContain('Sniptale');
+  expect(container?.textContent).not.toContain('probe failed');
   expect(container?.textContent).toContain('"format":"WEBM"');
   expect(onChange).toHaveBeenCalledWith({
     format: VideoExportFormat.WEBM,

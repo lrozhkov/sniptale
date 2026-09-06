@@ -4,7 +4,8 @@ import { BORDER_SHADOW_SOFT_INTENSITY } from './shadow';
 import type { BorderPreset } from '@sniptale/ui/highlighter-style/types';
 import { colorToRgba, resolveBorderPresetVisual } from './visual';
 
-vi.mock('../css-sanitizer/css', () => ({
+vi.mock('../css-sanitizer/css', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../css-sanitizer/css')>()),
   validateCssPolicyString: vi.fn(() => ({ blockedProps: [], properties: [], rawError: false })),
   validateCssString: vi.fn((css: string) => ({
     blockedProps: css.includes('position') ? ['position'] : [],

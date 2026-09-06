@@ -119,7 +119,7 @@ export function useActivePreviewClips(project: VideoProject, currentTime: number
 }
 
 export function usePreviewStageVideoSync(params: PreviewStageVideoSyncParams) {
-  const { activeClips, currentTime, isPlaying, syncedClips, videoRefs } = params;
+  const { activeClips, assetUrls, currentTime, isPlaying, syncedClips, videoRefs } = params;
   const mediaSyncStateRef = useRef(createPreviewMediaSyncState());
 
   useLayoutEffect(() => {
@@ -146,7 +146,7 @@ export function usePreviewStageVideoSync(params: PreviewStageVideoSyncParams) {
     }
 
     updatePreviewMediaSyncState(mediaSyncStateRef.current, currentTime, isPlaying);
-  }, [activeClips, currentTime, isPlaying, syncedClips, videoRefs]);
+  }, [activeClips, assetUrls, currentTime, isPlaying, syncedClips, videoRefs]);
 
   useEffect(() => {
     const videos = videoRefs.current;

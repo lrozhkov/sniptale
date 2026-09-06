@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 import {
   createEmptyVideoProject,
+  createVideoProjectTrack,
   createVideoProjectAsset,
 } from '../../../project/factories/creation';
 import { createVideoClipFromAsset } from '../../../project/factories/clip';
@@ -27,6 +28,7 @@ function createImageAsset(id: string) {
 
 it('resolves visual layers from a reusable timeline index without changing layer order', () => {
   const project = createEmptyVideoProject('Indexed layers', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
   const sortedTracks = getSortedTracks(project);
   const primaryTrackId = sortedTracks.find((track) => track.kind === VideoTrackKind.PRIMARY)!.id;
   const overlayTrackId = sortedTracks.find((track) => track.kind === VideoTrackKind.OVERLAY)!.id;

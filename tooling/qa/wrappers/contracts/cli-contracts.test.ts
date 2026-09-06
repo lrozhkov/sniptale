@@ -24,7 +24,6 @@ describe('canonical wrapper inventory', () => {
     expect(Object.keys(QA_WRAPPER_CLI_CONTRACTS).sort()).toEqual([
       'ci:proof',
       'ci:release',
-      'qa:advisory',
       'qa:build',
       'qa:checkpoint',
       'qa:closeout',

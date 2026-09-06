@@ -33,6 +33,13 @@ export interface RecordingEntry extends StoredRecordingEntry {
 }
 
 export interface RecordingTelemetryEntry {
+  /** Present only when source time semantics were verified at native ingestion. */
+  provenance?: {
+    source: 'native';
+    normalizationVersion: 1;
+    timeUnit: 'seconds';
+    coordinateSpace: 'desktop';
+  };
   recordingId: string;
   createdAt: number;
   updatedAt: number;

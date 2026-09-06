@@ -124,6 +124,8 @@ function assignLayerKindsClipMetadata(
 
 function createLayerKindsFrame() {
   const project = createEmptyVideoProject('Layer kinds', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
   const hiddenOverlayTrackId = 'overlay-hidden';
   const subtitleTrack = createVideoProjectTrack('Subtitles', 3, VideoTrackKind.SUBTITLE);
   const assets = createLayerKindsAssets();
@@ -250,6 +252,7 @@ it('omits subtitle layers when subtitle rendering is disabled for the frame', ()
 
 it('gives upper timeline tracks higher visual priority than lower tracks', () => {
   const project = createEmptyVideoProject('Track priority', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
   const sortedTracks = getSortedTracks(project);
   const upperTrackId = sortedTracks.find((track) => track.kind === VideoTrackKind.OVERLAY)!.id;
   const lowerTrackId = sortedTracks.find((track) => track.kind === VideoTrackKind.PRIMARY)!.id;

@@ -25,6 +25,10 @@ export function registerContentRuntimeCleanup(cleanup: ContentRuntimeCleanup): v
   };
 }
 
+export function hasRegisteredContentRuntimeCleanup(): boolean {
+  return typeof getContentRuntimeGlobal()[CONTENT_RUNTIME_CLEANUP_KEY] === 'function';
+}
+
 export function disposeExistingContentRuntime(): void {
   const runtimeGlobal = getContentRuntimeGlobal();
   const cleanup = runtimeGlobal[CONTENT_RUNTIME_CLEANUP_KEY];

@@ -81,12 +81,14 @@ it('keeps local state unchanged and returns prompt errors when persistence fails
 
   expect(defaultModelSaved).toBe(false);
   expect(setDefaultModelId).not.toHaveBeenCalled();
-  expect(globalPromptError).toBe(
-    `${translate('common.states.error')}${translate('settings.aiProviders.globalPromptSaveErrorSuffix')}`
+  const errorState = translate('common.states.error');
+  const storageErrorDetail = translate('common.errors.storageDetail');
+  const globalPromptSuffix = translate('settings.aiProviders.globalPromptSaveErrorSuffix');
+  const scenarioPromptSuffix = translate(
+    'settings.aiProviders.scenarioEditorPromptSaveErrorSuffix'
   );
-  expect(scenarioPromptError).toBe(
-    `${translate('common.states.error')}${translate('settings.aiProviders.scenarioEditorPromptSaveErrorSuffix')}`
-  );
+  expect(globalPromptError).toBe(`${errorState}${globalPromptSuffix} ${storageErrorDetail}`);
+  expect(scenarioPromptError).toBe(`${errorState}${scenarioPromptSuffix} ${storageErrorDetail}`);
   expect(loggerErrorMock).toHaveBeenCalledTimes(3);
   expect(toastErrorMock).toHaveBeenCalledWith(
     `${translate('common.states.error')}${translate('settings.aiProviders.defaultModelSaveErrorSuffix')}`

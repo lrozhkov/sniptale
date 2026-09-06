@@ -39,7 +39,8 @@ function renderTrailingActions() {
     onCompactRowsChange: vi.fn(),
     onFitProject: vi.fn(),
     onFitSelection: vi.fn(),
-    onPanelExpandedChange: vi.fn(),
+    onCursorLaneVisibleChange: vi.fn(),
+    onTelemetryLaneVisibleChange: vi.fn(),
     onZoomChange: vi.fn(),
   };
 
@@ -50,9 +51,13 @@ function renderTrailingActions() {
         pixelsPerSecond={120}
         trackView={{
           compactRows: false,
-          panelExpanded: false,
+          cursorLaneVisible: false,
+          telemetryLaneVisible: false,
+          canShowCursorLane: true,
+          canShowTelemetryLane: true,
           onCompactRowsChange: handlers.onCompactRowsChange,
-          onPanelExpandedChange: handlers.onPanelExpandedChange,
+          onCursorLaneVisibleChange: handlers.onCursorLaneVisibleChange,
+          onTelemetryLaneVisibleChange: handlers.onTelemetryLaneVisibleChange,
         }}
         visibleRangeSeconds={8}
         onFitProject={handlers.onFitProject}
@@ -97,14 +102,12 @@ it('routes timeline view actions from the trailing side', () => {
       ?.querySelector<HTMLButtonElement>('[data-ui="video-editor.timeline.toolbar.compact-tracks"]')
       ?.click();
     container
-      ?.querySelector<HTMLButtonElement>(
-        '[data-ui="video-editor.timeline.toolbar.expand-track-panel"]'
-      )
+      ?.querySelector<HTMLButtonElement>('[data-ui="video-editor.timeline.toolbar.cursor-lane"]')
       ?.click();
   });
 
   expect(handlers.onFitProject).toHaveBeenCalledTimes(1);
   expect(handlers.onFitSelection).toHaveBeenCalledTimes(1);
   expect(handlers.onCompactRowsChange).toHaveBeenCalledWith(true);
-  expect(handlers.onPanelExpandedChange).toHaveBeenCalledWith(true);
+  expect(handlers.onCursorLaneVisibleChange).toHaveBeenCalledWith(true);
 });

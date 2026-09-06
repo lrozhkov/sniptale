@@ -1,11 +1,18 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { createAnnotationClip } from '../../../../../features/video/project/factories/overlay-clip';
-import { createEmptyVideoProject } from '../../../../../features/video/project/factories/creation';
-import { VideoOverlayTemplateKind } from '../../../../../features/video/project/types';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../../features/video/project/factories/creation';
+import {
+  VideoTrackKind,
+  VideoOverlayTemplateKind,
+} from '../../../../../features/video/project/types';
 import { AnnotationTargetControls } from './target-controls';
 
-vi.mock('../../../../../platform/i18n', () => ({
+vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
   translate: (key: string) => key,
   useAppLocale: () => 'en',
 }));
@@ -15,8 +22,9 @@ vi.stubGlobal('ShadowRoot', class ShadowRoot {});
 
 function createClip(templateKind: VideoOverlayTemplateKind) {
   const project = createEmptyVideoProject('Annotation target controls');
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
   return createAnnotationClip(
-    project.tracks[2]!.id,
+    project.tracks[1]!.id,
     project.width,
     project.height,
     0,

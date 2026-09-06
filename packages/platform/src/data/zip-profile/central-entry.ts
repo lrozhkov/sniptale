@@ -1,7 +1,7 @@
 import {
   assertRange,
   checkedAdd,
-  decodeAsciiPath,
+  decodeZipPath,
   fail,
   readUint16,
   readUint32,
@@ -13,6 +13,7 @@ import type { ZipCentralDirectoryEntry } from './types.js';
 
 const CENTRAL_DIRECTORY_SIGNATURE = 0x02014b50;
 const ZIP16_MAX = 0xffff;
+const ZIP32_MAX = 0xffffffff;
 const ALLOWED_GENERAL_PURPOSE_FLAGS = 0x0006 | 0x0008 | 0x0800;
 
 interface ReadCentralDirectoryEntryArgs {
@@ -74,7 +75,10 @@ function readCentralEntryMetadata(
   const nameEnd = args.cursor + 46 + header.nameLength;
   return {
     extra: args.bytes.subarray(nameEnd, nameEnd + header.extraLength),
-    name: decodeAsciiPath(args.bytes.subarray(args.cursor + 46, nameEnd)),
+    name: decodeZipPath(
+      args.bytes.subarray(args.cursor + 46, nameEnd),
+      (header.flags & 0x0800) !== 0
+    ),
     variableLength,
   };
 }
@@ -98,6 +102,7 @@ function inspectResolvedLocalEntry(
     name,
     uncompressedSize: fields.uncompressedSize,
     view: args.view,
+    zip64Sizes: header.compressed32 === ZIP32_MAX || header.uncompressed32 === ZIP32_MAX,
   });
 }
 

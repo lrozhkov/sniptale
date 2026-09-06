@@ -17,9 +17,8 @@ export const RUNTIME_SOURCE_PATTERN = {
 export const SRC_SOURCE_PATTERN = /^(?:apps\/extension\/src|packages\/[^/]+\/src)\//u;
 
 export const RUNTIME_TOPOLOGY_TRIGGER_FILES = new Set([
-  'docs/agent-tooling/AGENTS.md',
+  'docs/agent-tooling/agent-tooling.zip',
   '.dependency-cruiser.cjs',
-  'docs/agent-tooling/DESIGN.md',
   'docs/architecture/code-organization.md',
   'docs/architecture/runtime-contexts.md',
   'docs/tooling/code-quality.md',
@@ -41,6 +40,7 @@ export const SECURITY_DATA_TRIGGER_PATTERNS = [
   /^src\/(?:editor|video-editor|offscreen|scenario-editor|web-snapshot-viewer)\//u,
   APP_RUNTIME_SOURCE_PATTERN,
   /^tooling\/configs\/qa\/security-(?:network|storage)-ownership\.data\.json$/u,
+  /^tooling\/qa\/guards\/security\/network\//u,
   /^tooling\/qa\/guards\/security\/verify-(?:secret-storage|sensitive-retention)\.mjs$/u,
   /^tooling\/qa\/guards\/security\/verify-(?:fetch-ownership|diagnostic-sanitization)\.mjs$/u,
   /^tooling\/qa\/guards\/security\/helpers\/.+\.mjs$/u,
@@ -49,15 +49,11 @@ export const SECURITY_DATA_TRIGGER_PATTERNS = [
 
 export const SECURITY_DATA_FULL_CLOSURE_TRIGGER_PATTERNS = [
   /^tooling\/configs\/qa\/security-(?:network|storage)-ownership\.data\.json$/u,
+  /^tooling\/qa\/guards\/security\/network\//u,
   /^tooling\/qa\/guards\/security\/verify-(?:secret-storage|sensitive-retention)\.mjs$/u,
   /^tooling\/qa\/guards\/security\/verify-(?:fetch-ownership|diagnostic-sanitization)\.mjs$/u,
   /^tooling\/qa\/guards\/security\/helpers\/.+\.mjs$/u,
   /^tooling\/qa\/guards\/security\/security-policy-utils\.mjs$/u,
-];
-
-export const HEAVY_RUNTIME_IMPORT_TRIGGER_PATTERNS = [
-  SRC_SOURCE_PATTERN,
-  /^tooling\/qa\/core\/verify-heavy-runtime-import-ownership\.mjs$/u,
 ];
 
 export const MANIFEST_INTEGRITY_TRIGGER_FILES = new Set([
@@ -84,6 +80,7 @@ export const DESIGN_SYSTEM_TRIGGER_PATTERNS = [
   /^tooling\/qa\/guards\/product-contracts\/verify-design-system\.mjs$/u,
   /^tooling\/qa\/guards\/product-contracts\/design-system\//u,
   /^tooling\/configs\/qa\/ast-grep\//u,
+  /^docs\/agent-tooling\/agent-tooling\.zip$/u,
 ];
 
 export const DEPENDENCY_GRAPH_TRIGGER_FILES = new Set([

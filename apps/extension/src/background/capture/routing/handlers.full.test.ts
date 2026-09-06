@@ -10,7 +10,6 @@ const {
   saveScreenshotToMediaHubFromDataUrlMock,
   sendTabMessageMock,
   transitionCaptureJobMock,
-  getPreauthorizedContentActionRouteMessageMock,
 } = vi.hoisted(() => ({
   captureFullPageTransactionMock: vi.fn(),
   executeDownloadMock: vi.fn(),
@@ -21,7 +20,6 @@ const {
   saveScreenshotToMediaHubFromDataUrlMock: vi.fn(),
   sendTabMessageMock: vi.fn(),
   transitionCaptureJobMock: vi.fn(),
-  getPreauthorizedContentActionRouteMessageMock: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/observability/logger', async (importOriginal) => ({
@@ -45,11 +43,6 @@ vi.mock('@sniptale/foundation/utils/filename', async (importOriginal) => ({
 vi.mock('../index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../index')>()),
   captureFullPageTransaction: captureFullPageTransactionMock,
-}));
-
-vi.mock('./authorization/content-action', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('./authorization/content-action')>()),
-  getPreauthorizedContentActionRouteMessage: getPreauthorizedContentActionRouteMessageMock,
 }));
 
 vi.mock('../../routing-contracts/runtime-messaging/services', async (importOriginal) => ({
@@ -124,7 +117,6 @@ beforeEach(() => {
   persistScenarioCaptureFromBackgroundMock.mockResolvedValue(undefined);
   saveScreenshotToMediaHubFromDataUrlMock.mockResolvedValue(undefined);
   transitionCaptureJobMock.mockResolvedValue(undefined);
-  getPreauthorizedContentActionRouteMessageMock.mockReturnValue(undefined);
   sendTabMessageMock.mockResolvedValue({ success: true });
 });
 
@@ -157,10 +149,13 @@ describe('capture-router-handlers.full', () => {
   it('targets the bound document and reports downscale and frozen-extent warnings', async () => {
     const context = createContext();
     context.message = { actionType: 'download_default' };
-    getPreauthorizedContentActionRouteMessageMock.mockReturnValue({
+    context.contentPreauthorization = {
       documentId: 'document-42',
+      frameId: 0,
+      requestId: 'capture-request-42',
+      senderUrl: 'https://example.test/page',
       tabId: 42,
-    });
+    };
     captureFullPageTransactionMock.mockResolvedValueOnce({
       dataUrl: 'data:image/png;base64,warned',
       jobId: 'capture-job-warned',

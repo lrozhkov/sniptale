@@ -1,3 +1,7 @@
+import {
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
+} from '../infrastructure/indexed-db/core.stores';
 import type { initDB } from '../infrastructure/indexed-db/core';
 import {
   AGGREGATE_PRESENTATIONS_STORE,
@@ -17,6 +21,8 @@ export function createProjectMutationStores(db: ProjectMutationDatabase) {
       VIDEO_PROJECTS_STORE,
       PROJECT_ASSETS_STORE,
       MEDIA_LIBRARY_STORE,
+      VIDEO_WORKSPACES_STORE,
+      VIDEO_WORKSPACE_DRAFTS_STORE,
       ASSET_OWNERS_STORE,
       ASSET_REFS_STORE,
       ASSET_OPERATIONS_STORE,
@@ -28,6 +34,8 @@ export function createProjectMutationStores(db: ProjectMutationDatabase) {
     assetOwnerStore: tx.objectStore(ASSET_OWNERS_STORE),
     assetRefStore: tx.objectStore(ASSET_REFS_STORE),
     mediaLibraryStore: tx.objectStore(MEDIA_LIBRARY_STORE),
+    videoWorkspaceStore: tx.objectStore(VIDEO_WORKSPACES_STORE),
+    videoDraftStore: tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE),
     projectAssetStore: tx.objectStore(PROJECT_ASSETS_STORE),
     projectStore: tx.objectStore(VIDEO_PROJECTS_STORE),
     tx,
@@ -40,6 +48,8 @@ export function createProjectDeletionStores(db: ProjectMutationDatabase) {
       VIDEO_PROJECTS_STORE,
       PROJECT_ASSETS_STORE,
       MEDIA_LIBRARY_STORE,
+      VIDEO_WORKSPACES_STORE,
+      VIDEO_WORKSPACE_DRAFTS_STORE,
       AGGREGATE_PRESENTATIONS_STORE,
       ASSET_OWNERS_STORE,
       ASSET_REFS_STORE,
@@ -53,6 +63,8 @@ export function createProjectDeletionStores(db: ProjectMutationDatabase) {
     assetOwnerStore: tx.objectStore(ASSET_OWNERS_STORE),
     assetRefStore: tx.objectStore(ASSET_REFS_STORE),
     mediaLibraryStore: tx.objectStore(MEDIA_LIBRARY_STORE),
+    videoWorkspaceStore: tx.objectStore(VIDEO_WORKSPACES_STORE),
+    videoDraftStore: tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE),
     projectAssetStore: tx.objectStore(PROJECT_ASSETS_STORE),
     projectStore: tx.objectStore(VIDEO_PROJECTS_STORE),
     tx,

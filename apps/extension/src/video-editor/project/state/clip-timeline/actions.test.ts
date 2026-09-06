@@ -2,8 +2,10 @@ import { expect, it, vi } from 'vitest';
 import {
   createEmptyVideoProject,
   createVideoProjectAsset,
+  createVideoProjectTrack,
 } from '../../../../features/video/project/factories/creation';
 import {
+  VideoTrackKind,
   VideoClipLinkMode,
   VideoProjectAssetType,
   VideoProjectClipType,
@@ -11,6 +13,7 @@ import {
 import { createVideoEditorProjectClipTimelineActions } from './actions';
 import type { VideoEditorProjectState } from '../contracts';
 import { resetVideoEditorProjectHistory } from '../../history';
+import { createProjectWithEffects } from '../effects.effect-instance.test-support';
 
 function createMutableState() {
   const project = createEmptyVideoProject('Timeline actions');
@@ -82,6 +85,7 @@ function createVideoClip(trackId: string, assetId: string) {
 
 function seedSingleClipState(runtime: ReturnType<typeof createMutableState>, locked = false) {
   const project = runtime.getState().project!;
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const asset = createVideoAsset();
   const trackId = project.tracks[0]!.id;
 
@@ -98,6 +102,18 @@ function seedSingleClipState(runtime: ReturnType<typeof createMutableState>, loc
 
   return { asset, project, trackId };
 }
+
+it('keeps project materials when their last timeline instance is deleted', () => {
+  const runtime = createMutableState();
+  const { asset } = seedSingleClipState(runtime);
+  const unused = { ...createVideoAsset(), id: 'unused-material' };
+  const project = runtime.getState().project!;
+  runtime.set({ project: { ...project, assets: [asset, unused] } });
+  createVideoEditorProjectClipTimelineActions(runtime.set).deleteClip('clip-1');
+  expect(runtime.getState().project?.clips).toEqual([]);
+  expect(runtime.getState().project?.assets).toEqual([asset, unused]);
+  expect(runtime.getState().projectHistory.past).toHaveLength(1);
+});
 
 function createLinkedVideoClip(trackId: string, assetId: string) {
   return {
@@ -134,6 +150,7 @@ function createLinkedAudioClip(trackId: string, assetId: string) {
 
 function seedLinkedClipState(runtime: ReturnType<typeof createMutableState>) {
   const project = runtime.getState().project!;
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const asset = createVideoAsset();
 
   runtime.set({
@@ -148,9 +165,9 @@ function seedLinkedClipState(runtime: ReturnType<typeof createMutableState>) {
   });
 }
 
-function expectClipDeletionPrunesAssets(runtime: ReturnType<typeof createMutableState>) {
+function expectClipDeletionKeepsMaterials(runtime: ReturnType<typeof createMutableState>) {
   expect(runtime.getState().project?.clips).toEqual([]);
-  expect(runtime.getState().project?.assets).toEqual([]);
+  expect(runtime.getState().project?.assets).toHaveLength(1);
   expect(runtime.getState().selection).toEqual({ kind: 'scene' });
 }
 
@@ -175,7 +192,7 @@ function expectTimelineMutationSequence(runtime: ReturnType<typeof createMutable
   ).toBeGreaterThan(2);
 }
 
-it('deletes editable clips and prunes orphaned assets from the project state', () => {
+it('deletes editable clips while retaining project materials', () => {
   vi.spyOn(Date, 'now').mockReturnValue(700);
   const runtime = createMutableState();
   const actions = createVideoEditorProjectClipTimelineActions(runtime.set);
@@ -183,7 +200,7 @@ it('deletes editable clips and prunes orphaned assets from the project state', (
 
   actions.deleteClip('clip-1');
 
-  expectClipDeletionPrunesAssets(runtime);
+  expectClipDeletionKeepsMaterials(runtime);
 });
 
 it('keeps state unchanged when deleting a missing or locked clip target', () => {
@@ -217,4 +234,204 @@ it('applies move trim split duplicate and detach actions through the timeline ac
   actions.splitClipAt('video-1', 3.5);
 
   expectTimelineMutationSequence(runtime);
+});
+
+it('returns the authoritative applied clip timing after move and trim constraints', () => {
+  const runtime = createMutableState();
+  const actions = createVideoEditorProjectClipTimelineActions(runtime.set);
+  seedSingleClipState(runtime);
+
+  expect(actions.moveClip('clip-1', 2)).toEqual({
+    clipId: 'clip-1',
+    duration: 4,
+    endTime: 6,
+    startTime: 2,
+    timelineLaneId: null,
+    trackId: expect.any(String),
+  });
+  const trimmed = actions.trimClipStart('clip-1', 5.8);
+  expect(trimmed).toMatchObject({
+    clipId: 'clip-1',
+    endTime: 6,
+    startTime: 5.8,
+    timelineLaneId: null,
+    trackId: expect.any(String),
+  });
+  expect(trimmed?.duration).toBeCloseTo(0.2);
+});
+
+it('selects the trailing half and records one history entry after a split', () => {
+  const runtime = createMutableState();
+  const actions = createVideoEditorProjectClipTimelineActions(runtime.set);
+  seedSingleClipState(runtime);
+  runtime.set({ currentTime: 3 });
+
+  actions.splitClipAt('clip-1', 3);
+
+  const state = runtime.getState();
+  expect(state.currentTime).toBe(3);
+  expect(state.projectHistory.past).toHaveLength(1);
+  expect(state.selection).toEqual({
+    kind: 'clip',
+    clipId: state.project?.clips.find((clip) => clip.id !== 'clip-1' && clip.startTime === 3)?.id,
+  });
+});
+
+it('keeps selection and history unchanged when the split point is invalid', () => {
+  const runtime = createMutableState();
+  const actions = createVideoEditorProjectClipTimelineActions(runtime.set);
+  seedSingleClipState(runtime);
+  const before = runtime.getState();
+
+  actions.splitClipAt('clip-1', 1.05);
+
+  expect(runtime.getState().project).toBe(before.project);
+  expect(runtime.getState().selection).toBe(before.selection);
+  expect(runtime.getState().projectHistory.past).toHaveLength(0);
+});
+
+it('ignores split requests while no project is loaded', () => {
+  const runtime = createMutableState();
+  runtime.set({ project: null });
+  const before = runtime.getState();
+
+  createVideoEditorProjectClipTimelineActions(runtime.set).splitClipAt('clip-1', 3);
+
+  expect(runtime.getState()).toEqual(before);
+});
+
+it('selects the trailing counterpart of the originally selected linked clip', () => {
+  const runtime = createMutableState();
+  const actions = createVideoEditorProjectClipTimelineActions(runtime.set);
+  seedLinkedClipState(runtime);
+  runtime.set({ currentTime: 3, selection: { kind: 'clip', clipId: 'video-1' } });
+
+  actions.splitClipAt('video-1', 3);
+
+  const state = runtime.getState();
+  const selectedId = state.selection.kind === 'clip' ? state.selection.clipId : null;
+  expect(state.project?.clips.find((clip) => clip.id === selectedId)).toMatchObject({
+    startTime: 3,
+    type: VideoProjectClipType.VIDEO,
+  });
+  expect(
+    state.project?.clips.filter((clip) => clip.linkMode === VideoClipLinkMode.LINKED)
+  ).toHaveLength(4);
+});
+
+it('selects the trailing standalone effect host after splitting it', () => {
+  const runtime = createMutableState();
+  const actions = createVideoEditorProjectClipTimelineActions(runtime.set);
+  const project = createProjectWithEffects();
+  const host = project.clips.find(
+    (clip) => clip.type === VideoProjectClipType.EFFECT && clip.startTime === 1
+  )!;
+  runtime.set({
+    currentTime: 2,
+    project,
+    projectHistory: resetVideoEditorProjectHistory(project.id),
+    selection: { kind: 'clip', clipId: host.id },
+  });
+
+  actions.splitClipAt(host.id, 2);
+
+  const state = runtime.getState();
+  const selectedId = state.selection.kind === 'clip' ? state.selection.clipId : null;
+  expect(state.project?.clips.find((clip) => clip.id === selectedId)).toMatchObject({
+    startTime: 2,
+    type: VideoProjectClipType.EFFECT,
+  });
+  expect(state.projectHistory.past).toHaveLength(1);
+});
+
+it('selects the created duplicate and records one history entry', () => {
+  const runtime = createMutableState();
+  const actions = createVideoEditorProjectClipTimelineActions(runtime.set);
+  seedSingleClipState(runtime);
+  runtime.set({ currentTime: 2.5 });
+
+  actions.duplicateClip('clip-1');
+
+  const state = runtime.getState();
+  const selectedId = state.selection.kind === 'clip' ? state.selection.clipId : null;
+  expect(state.currentTime).toBe(2.5);
+  expect(selectedId).not.toBe('clip-1');
+  expect(state.project?.clips.find((clip) => clip.id === selectedId)).toMatchObject({
+    name: expect.stringContaining('Clip 1'),
+    type: VideoProjectClipType.VIDEO,
+  });
+  expect(state.projectHistory.past).toHaveLength(1);
+});
+
+it('keeps project selection and history unchanged for missing or locked duplicate targets', () => {
+  const runtime = createMutableState();
+  const actions = createVideoEditorProjectClipTimelineActions(runtime.set);
+  seedSingleClipState(runtime, true);
+  const before = runtime.getState();
+
+  actions.duplicateClip('missing');
+  actions.duplicateClip('clip-1');
+
+  expect(runtime.getState().project).toBe(before.project);
+  expect(runtime.getState().selection).toBe(before.selection);
+  expect(runtime.getState().projectHistory.past).toHaveLength(0);
+});
+
+it('ignores duplicate requests while no project is loaded', () => {
+  const runtime = createMutableState();
+  runtime.set({ project: null });
+  const before = runtime.getState();
+
+  createVideoEditorProjectClipTimelineActions(runtime.set).duplicateClip('clip-1');
+
+  expect(runtime.getState()).toEqual(before);
+});
+
+it('selects the duplicated counterpart of the originally selected linked clip', () => {
+  const runtime = createMutableState();
+  const actions = createVideoEditorProjectClipTimelineActions(runtime.set);
+  seedLinkedClipState(runtime);
+  runtime.set({ selection: { kind: 'clip', clipId: 'video-1' } });
+
+  actions.duplicateClip('video-1');
+
+  const state = runtime.getState();
+  const selectedId = state.selection.kind === 'clip' ? state.selection.clipId : null;
+  const selected = state.project?.clips.find((clip) => clip.id === selectedId);
+  expect(selected).toMatchObject({ type: VideoProjectClipType.VIDEO });
+  expect(selected?.groupId).not.toBe('group-1');
+  expect(
+    state.project?.clips.some(
+      (clip) =>
+        clip.type === VideoProjectClipType.AUDIO &&
+        clip.groupId === selected?.groupId &&
+        clip.linkMode === VideoClipLinkMode.LINKED
+    )
+  ).toBe(true);
+});
+
+it('selects the duplicated standalone effect host and its paired instance', () => {
+  const runtime = createMutableState();
+  const actions = createVideoEditorProjectClipTimelineActions(runtime.set);
+  const project = createProjectWithEffects();
+  const host = project.clips.find(
+    (clip) => clip.type === VideoProjectClipType.EFFECT && clip.startTime === 1
+  )!;
+  runtime.set({
+    project,
+    projectHistory: resetVideoEditorProjectHistory(project.id),
+    selection: { kind: 'clip', clipId: host.id },
+  });
+
+  actions.duplicateClip(host.id);
+
+  const state = runtime.getState();
+  const selectedId = state.selection.kind === 'clip' ? state.selection.clipId : null;
+  const duplicate = state.project?.clips.find((clip) => clip.id === selectedId);
+  expect(duplicate).toMatchObject({ type: VideoProjectClipType.EFFECT });
+  const effectInstanceId =
+    duplicate?.type === VideoProjectClipType.EFFECT ? duplicate.effectInstanceId : null;
+  expect(state.project?.effectInstances?.some((instance) => instance.id === effectInstanceId)).toBe(
+    true
+  );
 });

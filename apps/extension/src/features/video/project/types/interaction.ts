@@ -120,10 +120,33 @@ export type VideoProjectSource =
       scenarioProjectId: string;
     };
 
+/**
+ * Immutable recording provenance for an interaction whose rendered `time` is projected into the
+ * editable project timeline. `sourceClipId` keeps duplicated uses of the same source range from
+ * stealing the interaction; split operations may migrate it to the newly created trailing clip.
+ */
+export interface VideoProjectSourceTimeAnchor {
+  kind: 'recording-source';
+  recordingId: string;
+  sourceClipId: string;
+  sourceTime: number;
+}
+
+export const VideoProjectInteractionTimeBasis = {
+  PROJECT: 'project',
+} as const;
+
+export type VideoProjectInteractionTimeBasis =
+  (typeof VideoProjectInteractionTimeBasis)[keyof typeof VideoProjectInteractionTimeBasis];
+
 export interface VideoProjectCursorSample {
+  /** Retained normalized interval of the easing curve toward the following key. */
+  interpolationRange?: { start: number; end: number };
   id: string;
   interpolation?: VideoTemporalEasing;
   skinOverride?: VideoProjectCursorSkin | null;
+  sourceAnchor?: VideoProjectSourceTimeAnchor;
+  timeBasis?: VideoProjectInteractionTimeBasis;
   time: number;
   x: number;
   y: number;
@@ -151,6 +174,8 @@ export interface VideoProjectActionPoint {
 }
 
 export interface VideoProjectActionEvent {
+  /** Retained authored effect clock, mapped onto this event's visible duration. */
+  animation?: { start: number; end: number; duration: number };
   id: string;
   kind: VideoProjectActionEventKind;
   time: number;
@@ -159,6 +184,8 @@ export interface VideoProjectActionEvent {
   label: string;
   data: Record<string, string | number | boolean | null>;
   preset: VideoProjectActionPreset;
+  sourceAnchor?: VideoProjectSourceTimeAnchor;
+  timeBasis?: VideoProjectInteractionTimeBasis;
 }
 
 export const RecordingTelemetrySignalKind = {
@@ -228,6 +255,8 @@ export interface VideoProjectMotionPath {
 }
 
 export interface VideoProjectMotionRegion {
+  /** Retained interval within the original zoom animation, independent of timeline placement. */
+  animation?: { start: number; end: number; duration: number };
   cameraMode?: VideoMotionCameraMode;
   duration: number;
   easing: VideoTemporalEasing;

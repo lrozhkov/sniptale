@@ -1,10 +1,11 @@
 import { createEmptyVideoAnnotationTemplateGroups } from '../parser';
+import { VideoAnnotationTimelineEasing, type VideoAnnotationPack } from '../types';
 import {
-  VideoAnnotationElementKind,
-  VideoAnnotationTimelineEasing,
-  type VideoAnnotationPack,
-} from '../types';
-import { createBuiltInContentTemplateFactory, createPack, localized } from './helpers';
+  createBuiltInContentTemplateFactory,
+  createPack,
+  localized,
+  resolveBuiltInElementKind,
+} from './helpers';
 import {
   arrowCardTree,
   introTree,
@@ -52,7 +53,7 @@ const template = createBuiltInContentTemplateFactory({
   },
   defaultTracks,
   resolveDefaults: (id) => defaults[id],
-  resolveElementKind: elementKind,
+  resolveElementKind: resolveBuiltInElementKind,
 });
 
 function createAppleTemplates(): VideoAnnotationPack['templates'] {
@@ -148,17 +149,3 @@ export const APPLE_GLASS_ANNOTATION_PACK = createPack({
   templates: createAppleTemplates(),
   theme: appleTheme,
 });
-
-function elementKind(key: string): VideoAnnotationElementKind {
-  return key === 'intro'
-    ? VideoAnnotationElementKind.INTRO
-    : key === 'lowerThird'
-      ? VideoAnnotationElementKind.LOWER_THIRD
-      : key === 'title'
-        ? VideoAnnotationElementKind.TITLE
-        : key === 'focus'
-          ? VideoAnnotationElementKind.FOCUS
-          : key === 'scene'
-            ? VideoAnnotationElementKind.SCENE
-            : VideoAnnotationElementKind.CALLOUT;
-}

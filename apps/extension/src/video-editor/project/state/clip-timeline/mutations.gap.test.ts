@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../features/video/project/factories/creation';
+import {
+  VideoTrackKind,
   VideoClipLinkMode,
   VideoClipTransitionKind,
   VideoMediaFitMode,
@@ -82,6 +86,7 @@ function createTimelineProject(): VideoProject {
 
 function createGapProjectWithLinkedTrailingClip(): VideoProject {
   const project = createTimelineProject();
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const audioTrackId = project.tracks[1]!.id;
   const trailingClip = project.clips.find((clip) => clip.id === 'clip-2')!;
 

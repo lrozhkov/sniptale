@@ -169,10 +169,10 @@ test('popup capability rejects replay, cross-tab reuse, and use after navigation
   const replayToken = await issuePopupTabRouteCapability({
     operation: 'EXPORT_POPUP_PREVIEW',
     popup,
+    requestId: replayRequestId,
     tabId: ownerTabId,
   });
   const replayPayload = {
-    requestId: replayRequestId,
     tabId: ownerTabId,
     tabRouteCapabilityToken: replayToken,
     tabRouteRequestId: replayRequestId,
@@ -187,11 +187,11 @@ test('popup capability rejects replay, cross-tab reuse, and use after navigation
   const navigationToken = await issuePopupTabRouteCapability({
     operation: 'EXPORT_POPUP_PREVIEW',
     popup,
+    requestId: navigationRequestId,
     tabId: ownerTabId,
   });
   await owner.goto(`${hostOrigin}/fixtures/host-page.html?navigated=1`);
   const afterNavigation = await sendRuntimeMessage(popup, {
-    requestId: navigationRequestId,
     tabId: ownerTabId,
     tabRouteCapabilityToken: navigationToken,
     tabRouteRequestId: navigationRequestId,

@@ -1,5 +1,8 @@
 import { expect, it } from 'vitest';
-import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../features/video/project/factories/creation';
 import type { VideoEditorProjectState } from './contracts';
 import {
   VideoClipLinkMode,
@@ -16,10 +19,11 @@ import {
 } from '../../../features/video/project/types';
 import {
   applyProjectUpdate,
+  areClipTracksEditable,
   ensureTrackForKind,
   isTrackCompatibleWithClip,
-  pruneUnusedProjectAssets,
 } from './helpers';
+import { resetVideoEditorProjectHistory } from '../history';
 
 function createClip(
   id: string,
@@ -56,6 +60,7 @@ function createClip(
 
 function createProject(): VideoProject {
   const project = createEmptyVideoProject('Helper coverage');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const [primaryTrack, audioTrack] = project.tracks;
   project.clips = [
     createClip('video-1', VideoProjectClipType.VIDEO, primaryTrack!.id),
@@ -83,7 +88,7 @@ function createAsset(id: string): VideoProjectAsset {
   };
 }
 
-it('checks helper compatibility guards and asset pruning branches', () => {
+it('checks helper compatibility guards', () => {
   const project = createProject();
   const [videoClip, audioClip] = project.clips as [VideoProjectClip, VideoProjectClip];
   const subtitleResult = ensureTrackForKind(project, VideoTrackKind.SUBTITLE, null);
@@ -94,12 +99,81 @@ it('checks helper compatibility guards and asset pruning branches', () => {
   expect(applyProjectUpdate({ project: null } as VideoEditorProjectState, () => project)).toEqual(
     {}
   );
+  expect(
+    applyProjectUpdate(
+      {
+        project,
+        projectHistory: resetVideoEditorProjectHistory(project.id),
+      } as VideoEditorProjectState,
+      (currentProject) => currentProject
+    )
+  ).toEqual({});
   expect(isTrackCompatibleWithClip(project.tracks[0]!, videoClip)).toBe(true);
   expect(isTrackCompatibleWithClip(project.tracks[1]!, videoClip)).toBe(false);
   expect(isTrackCompatibleWithClip(project.tracks[1]!, audioClip)).toBe(true);
+  expect(isTrackCompatibleWithClip(project.tracks[0]!, audioClip)).toBe(false);
   expect(isTrackCompatibleWithClip(subtitleTrack, videoClip)).toBe(false);
+  const subtitleClip = {
+    ...videoClip,
+    text: 'Subtitle',
+    type: VideoProjectClipType.SUBTITLE,
+  } as VideoProjectClip;
+  expect(isTrackCompatibleWithClip(subtitleTrack, subtitleClip)).toBe(true);
+  expect(isTrackCompatibleWithClip(project.tracks[0]!, subtitleClip)).toBe(false);
+  expect(areClipTracksEditable(project, ['video-1', 'audio-1'])).toBe(true);
+  const lockedLinkedProject = {
+    ...project,
+    tracks: project.tracks.map((track) =>
+      track.id === project.tracks[1]!.id ? { ...track, locked: true } : track
+    ),
+  };
+  expect(areClipTracksEditable(lockedLinkedProject, ['video-1', 'audio-1'])).toBe(false);
+  expect(areClipTracksEditable(project, ['missing'])).toBe(false);
+});
 
-  const withAssets = { ...project, assets: [createAsset('asset-1'), createAsset('asset-2')] };
-  expect(pruneUnusedProjectAssets(withAssets).assets.map((asset) => asset.id)).toEqual(['asset-1']);
-  expect(pruneUnusedProjectAssets(project)).toBe(project);
+it('records source-anchor reprojection in the same project history action', () => {
+  const project = createProject();
+  project.baseRecordingId = 'recording-1';
+  project.assets = [
+    {
+      ...createAsset('asset-1'),
+      source: { kind: 'recording', recordingId: 'recording-1' },
+      type: VideoProjectAssetType.RECORDING,
+    },
+  ];
+  project.actionEvents = [
+    {
+      data: {},
+      duration: 0,
+      id: 'anchored-action',
+      kind: 'CLICK',
+      label: 'Click',
+      point: null,
+      preset: 'CLICK_RIPPLE',
+      sourceAnchor: {
+        kind: 'recording-source',
+        recordingId: 'recording-1',
+        sourceClipId: 'video-1',
+        sourceTime: 1,
+      },
+      time: 1,
+    },
+  ];
+  const state = {
+    currentTime: 0,
+    placementMode: null,
+    project,
+    projectHistory: resetVideoEditorProjectHistory(project.id),
+    selection: { kind: 'scene' },
+    selectedTrackId: project.tracks[0]!.id,
+  } as VideoEditorProjectState;
+
+  const update = applyProjectUpdate(state, (currentProject) => ({
+    ...currentProject,
+    clips: currentProject.clips.map((clip) => ({ ...clip, startTime: 3 })),
+  }));
+
+  expect(update.project?.actionEvents[0]?.time).toBe(4);
+  expect(update.projectHistory?.past).toHaveLength(1);
+  expect(update.projectHistory?.past[0]?.actionEvents[0]?.time).toBe(1);
 });

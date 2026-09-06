@@ -3,6 +3,8 @@ import path from 'node:path';
 
 import { repoRoot } from '../../../analysis/repository/shared-paths.mjs';
 import { QA_CONTROL_CATALOG } from '../../../composition/catalog/catalog.mjs';
+import { collectRepositoryFiles } from '../../../analysis/git/git-fallback-repository.mjs';
+import { collectAppCoreOwnerProjection } from '../../../guards/architecture/app-core/app-core-owner-policy.mjs';
 
 export const DOCUMENTATION_FACTS_POLICY = 'tooling/configs/qa/documentation-facts.data.json';
 
@@ -173,6 +175,7 @@ export function collectDocumentationFacts(root = repoRoot) {
       total: QA_CONTROL_CATALOG.length,
       categories: [...qaControlCategoryCounts].map(([category, count]) => ({ category, count })),
     },
+    appCoreOwners: collectAppCoreOwnerProjection(collectRepositoryFiles(root)),
   };
 }
 
@@ -240,6 +243,12 @@ export function renderDocumentationFacts(root = repoRoot) {
     'The catalog owns control membership, order, scope, engine decision, normalized result, and ' +
       'proof metadata. Wrapper documentation must not restate an executable inventory.',
     '',
+    '## App-core owner residency',
+    '',
+    'This inventory is projected from the live source tree. It is navigation data, not an allowlist or path gate.',
+    '',
+    bullets(facts.appCoreOwners),
+    '',
     '## Manifest capabilities',
     '',
     'Required permissions:',
@@ -287,11 +296,20 @@ export function collectDocumentationFactViolations({ rootDir = repoRoot } = {}) 
       message: 'generated project facts drifted; run npm run docs:generate',
     });
   }
-  for (const assertion of facts.policy.consumerAssertions) {
+  return violations;
+}
+
+export function collectDocumentationProseAdvisories({ rootDir = repoRoot, targetFiles = [] } = {}) {
+  const facts = collectDocumentationFacts(rootDir);
+  const changedFiles = new Set(targetFiles);
+  const advisories = [];
+  for (const assertion of facts.policy.consumerAssertions.filter(({ file }) =>
+    changedFiles.has(file)
+  )) {
     const absolute = path.join(rootDir, assertion.file);
     if (!fs.existsSync(absolute) || !fs.statSync(absolute).isFile()) {
-      violations.push({
-        rule: 'documentation-facts',
+      advisories.push({
+        rule: 'documentation-prose-drift',
         file: assertion.file,
         message: `registered ${assertion.factId} documentation consumer is missing`,
       });
@@ -301,12 +319,12 @@ export function collectDocumentationFactViolations({ rootDir = repoRoot } = {}) 
     const missing = assertion.mustContain.filter((value) => !source.includes(value));
     const forbidden = assertion.forbiddenKinds.filter((kind) => matchesForbiddenFact(source, kind));
     if (missing.length > 0 || forbidden.length > 0) {
-      violations.push({
-        rule: 'documentation-facts',
+      advisories.push({
+        rule: 'documentation-prose-drift',
         file: assertion.file,
         message: `registered ${assertion.factId} consumer drifted from its machine-owned fact`,
       });
     }
   }
-  return violations;
+  return advisories;
 }

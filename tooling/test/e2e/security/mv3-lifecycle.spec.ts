@@ -188,13 +188,23 @@ test('worker termination drops admitted tab authority before any side effect', a
   expect(await collectRetentionText(popup)).toBe(baseline);
   await expect(resolveExtensionServiceWorkerUrl(context)).resolves.toContain(extensionId);
 
+  await target.reload({ waitUntil: 'domcontentloaded' });
+  await target.bringToFront();
+  await popup.waitForFunction(async (id) => (await chrome.tabs.get(id)).active === true, tabId);
+  const freshRequestId = 'security-worker-restart-fresh-capability';
   expect(
     await saveWebSnapshotThroughPopup({
       popup,
-      requestId: 'security-worker-restart-fresh-capability',
+      requestId: freshRequestId,
       tabId,
     })
   ).toMatchObject({ success: true });
+  await expect(
+    sendRuntimeMessage(popup, {
+      jobId: freshRequestId,
+      type: 'ACK_PAGE_PACKAGE_JOB_STATUS',
+    })
+  ).resolves.toMatchObject({ success: true, status: null });
 
   await revokeAllSitesAccessFromSettings(settings);
   await popup.close();

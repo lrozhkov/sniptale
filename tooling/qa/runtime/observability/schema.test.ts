@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   parseCorrelation,
   parseRunRecord,
+  parseStep,
   readCorrelationEnvironment,
   readRunIdentityEnvironment,
 } from './schema.mjs';
@@ -97,6 +98,62 @@ describe('parseRunRecord', () => {
     expect(parseRunRecord(validRecord())).toEqual(validRecord());
   });
 
+  it('accepts structured preflight, risk, and advisory data in schema v5', () => {
+    const record = {
+      ...validRecord(),
+      schemaVersion: 5,
+      steps: [
+        {
+          ...validStep(),
+          population: null,
+          inheritance: null,
+        },
+      ],
+      timeline: { events: [], activities: [] },
+      preflightContext: {
+        owners: ['extension:content'],
+        runtimes: ['extension:content'],
+        riskAreas: ['trusted-event.bridge'],
+        documents: ['docs/architecture/runtime-contexts.md'],
+        consumers: ['background route consumers'],
+        proofRequirements: ['trusted/untrusted negative proof'],
+        structuralContext: ['existing pressure'],
+      },
+      changeRisk: {
+        level: 'HIGH',
+        seams: [
+          {
+            id: 'trusted-event.bridge',
+            level: 'high',
+            evidence: [{ file: 'src/bridge.ts', detail: 'trusted event bridge' }],
+            requirements: ['Security review'],
+            reviews: ['security'],
+          },
+        ],
+        requirements: ['Security review'],
+      },
+      advisory: {
+        introduced: [],
+        worsened: [],
+        existing: [
+          {
+            id: 'advisory.structural-function',
+            file: 'src/bridge.ts',
+            line: 7,
+            reason: 'score=5, delta=0',
+            severity: 'watch',
+          },
+        ],
+      },
+    };
+
+    expect(parseRunRecord(record)).toMatchObject({
+      preflightContext: { riskAreas: ['trusted-event.bridge'] },
+      changeRisk: { level: 'HIGH' },
+      advisory: { existing: [expect.objectContaining({ file: 'src/bridge.ts' })] },
+    });
+  });
+
   it.each(['argv', 'env', 'commitMessage', 'user', 'host'])('rejects leaked %s fields', (field) => {
     expect(() => parseRunRecord({ ...validRecord(), [field]: 'must-not-persist' })).toThrow(
       /unsupported fields/u
@@ -138,6 +195,32 @@ describe('parseRunRecord', () => {
       skipReasonId: 'scope.no-targets',
     };
     expect(() => parseRunRecord(unexpectedReason)).toThrow(/skipReasonId/u);
+  });
+});
+
+describe('structured inheritance', () => {
+  const inheritedStep = () => ({
+    ...validStep(),
+    outcome: 'inherited',
+    population: null,
+    inheritance: {
+      sourceProofSemanticDigest: `sha256:${'1'.repeat(64)}`,
+      sourceProofManifestDigest: `sha256:${'2'.repeat(64)}`,
+      sourceControlId: 'typescript.typecheck',
+      sourceRunRecord: 'fast-proof/.tmp/qa-observability/runs/proof.json',
+      evidenceFiles: ['fast-proof/.tmp/qa-observability/runs/proof.json'],
+    },
+  });
+
+  it('requires inheritance evidence exactly for inherited outcomes', () => {
+    expect(parseStep(inheritedStep())).toMatchObject({ outcome: 'inherited' });
+    expect(() => parseStep({ ...inheritedStep(), inheritance: null })).toThrow(/inheritance/u);
+    expect(() =>
+      parseStep({
+        ...inheritedStep(),
+        outcome: 'passed',
+      })
+    ).toThrow(/inheritance/u);
   });
 });
 
@@ -198,6 +281,12 @@ describe('parseCorrelation', () => {
     expect(readCorrelationEnvironment({ CODEX_THREAD_ID: 'thread-17' })).toEqual({
       taskId: 'thread-17',
     });
+    expect(
+      readCorrelationEnvironment({
+        CODEX_THREAD_ID: 'thread-17',
+        CODEX_SESSION_ID: 'session-23',
+      })
+    ).toEqual({ taskId: 'thread-17' });
   });
 });
 
@@ -209,7 +298,11 @@ it('validates only explicit run lineage environment fields', () => {
       SNIPTALE_QA_PARENT_RUN_ID: 'closeout-17',
       SNIPTALE_QA_TASK_ID: 'not-lineage',
     })
-  ).toEqual({ runId: 'build-17', rootRunId: 'closeout-17', parentRunId: 'closeout-17' });
+  ).toEqual({
+    runId: 'build-17',
+    rootRunId: 'closeout-17',
+    parentRunId: 'closeout-17',
+  });
   expect(() => readRunIdentityEnvironment({ SNIPTALE_QA_RUN_ID: '../unsafe' })).toThrow(
     /stable lowercase identifier/u
   );

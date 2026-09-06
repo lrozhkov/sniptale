@@ -133,6 +133,72 @@ it('caps audit finding previews and keeps the report path', () => {
   expect(step.durationMs).toBe(30);
 });
 
+it('preserves non-blocking audit advisories in observed release output', () => {
+  const advisory = {
+    rule: 'jscpd-baseline-stale',
+    file: 'apps/example.ts:12',
+    message: 'Reviewed tool noise exact-id is absent; remove the stale allowance',
+  };
+  const step = createAuditToolStep(
+    'jscpd',
+    {
+      skipped: false,
+      reportPath: '.tmp/jscpd/report.json',
+      summaryText: 'Baseline: 1 clone(s); advisories=1',
+      violations: [],
+      advisories: [advisory],
+    },
+    24
+  );
+
+  expect(step.status).toBe('ok');
+  expect(step.advisories).toEqual([advisory]);
+  const observed = normalizeObservedStep(step).observation;
+  expect(observed.diagnostic?.locations).toEqual([
+    {
+      file: advisory.file,
+      line: null,
+      message: `${advisory.rule}: ${advisory.message}`,
+    },
+  ]);
+  expect(observed.log).toContain(
+    `- advisory ${advisory.rule}: ${advisory.file} ${advisory.message}`
+  );
+});
+
+it('preserves audit advisories when another finding blocks the release', () => {
+  const advisory = {
+    rule: 'jscpd-baseline-stale',
+    file: 'apps/old-location.ts:12',
+    message: 'Reviewed tool noise exact-id is absent; remove the stale allowance',
+  };
+  const step = createAuditToolStep(
+    'jscpd',
+    {
+      skipped: false,
+      reportPath: '.tmp/jscpd/report.json',
+      summaryText: 'Baseline violations: 1; advisories=1',
+      violations: createViolations(1),
+      advisories: [advisory],
+    },
+    25
+  );
+
+  expect(step.status).toBe('failed');
+  expect(step.advisories).toEqual([advisory]);
+  const observed = normalizeObservedStep(step).observation;
+  expect(observed.diagnostic?.locations).toEqual([
+    {
+      file: advisory.file,
+      line: null,
+      message: `${advisory.rule}: ${advisory.message}`,
+    },
+  ]);
+  expect(observed.log).toContain(
+    `- advisory ${advisory.rule}: ${advisory.file} ${advisory.message}`
+  );
+});
+
 it('keeps OSV and Gitleaks as required audit tools', () => {
   const source = fs.readFileSync('tooling/qa/wrappers/audit/execution/steps.mjs', 'utf8');
 

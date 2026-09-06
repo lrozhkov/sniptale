@@ -99,8 +99,10 @@ it('surfaces mutation failures and bypasses unlock when protection is inactive',
   await act(async () =>
     latest?.handleEnableSubmit({ passphrase: 'new', confirmPassphrase: 'new' })
   );
-  expect(latest?.dialog?.error).toBe('enable failed');
+  expect(latest?.dialog?.error).toContain('Sniptale');
+  expect(latest?.dialog?.error).not.toContain('enable failed');
   await act(async () => latest?.handleLockNow());
-  expect(toast.error).toHaveBeenCalledWith('lock failed');
+  expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Sniptale'));
+  expect(toast.error).not.toHaveBeenCalledWith(expect.stringContaining('lock failed'));
   act(() => root.unmount());
 });

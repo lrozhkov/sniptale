@@ -68,14 +68,16 @@ function getTopDirectories(trackedFiles, topCount) {
 }
 
 function readRepoLocalSkills(rootDir) {
-  const skillsDir = path.join(rootDir, 'docs', 'agent-tooling', '.agents', 'skills');
+  const skillsDir = path.join(rootDir, '.agents', 'skills');
   if (!fs.existsSync(skillsDir)) {
     return [];
   }
 
   return fs
-    .readdirSync(skillsDir)
-    .filter((file) => file.endsWith('.md'))
+    .readdirSync(skillsDir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => path.join(entry.name, 'SKILL.md'))
+    .filter((file) => fs.existsSync(path.join(skillsDir, file)))
     .sort()
     .map((file) => {
       const absolutePath = path.join(skillsDir, file);

@@ -107,6 +107,50 @@ it('flags nested JSON.parse double-casts at import boundaries', async () => {
   );
 });
 
+it('requires an exact projection from the persisted editor document parser', async () => {
+  const root = createTempRoot('qa-boundary-casts-persisted-projection-');
+  const file = writeFile(
+    root,
+    'apps/extension/src/composition/persistence/document-assets/parser.ts',
+    [
+      'type PersistedEditorDocumentV3 = { version: 3 };',
+      'declare function isPersisted(value: unknown): boolean;',
+      'export function parse(value: unknown) {',
+      '  return isPersisted(value) ? value as unknown as PersistedEditorDocumentV3 : null;',
+      '}',
+      '',
+    ].join('\n')
+  );
+
+  await expect(collectViolations(root, [file])).resolves.toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ rule: 'boundary-cast-persisted-projection' }),
+    ])
+  );
+});
+
+it('does not allow persisted projection casts through local aliases', async () => {
+  const root = createTempRoot('qa-boundary-casts-persisted-alias-');
+  const file = writeFile(
+    root,
+    'apps/extension/src/composition/persistence/document-assets/parser.ts',
+    [
+      'type PersistedEditorDocumentV3 = { version: 3 };',
+      'type StoredDocument = PersistedEditorDocumentV3;',
+      'export function parse(value: unknown) {',
+      '  return value as unknown as StoredDocument;',
+      '}',
+      '',
+    ].join('\n')
+  );
+
+  await expect(collectViolations(root, [file])).resolves.toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ rule: 'boundary-cast-persisted-projection' }),
+    ])
+  );
+});
+
 it('blocks multiline schema assertions and double-cast escapes in current contract owners', async () => {
   const root = createTempRoot('qa-boundary-casts-schema-');
   const file = writeFile(

@@ -1,6 +1,7 @@
 import {
   addEventListenerToAllWindowsDynamic,
   addScrollListenersToAllWindows,
+  addWindowEventListenerToAllWindowsDynamic,
 } from '../../../../platform/frame';
 import { logSelectionModeRuntime } from '../../diag';
 import type { SelectionModeSession } from '../../session';
@@ -18,23 +19,23 @@ interface SelectionModeRuntimeListenerArgs {
 }
 
 function attachPointerListeners(args: SelectionModeListenerArgs): Array<() => void> {
+  const addWindowGestureListener = <E extends Event>(
+    eventType: string,
+    handler: (event: E, iframe?: HTMLIFrameElement) => void
+  ) =>
+    addWindowEventListenerToAllWindowsDynamic<E>(
+      eventType,
+      (event, _currentWindow, iframe) => handler(event, iframe),
+      { capture: true }
+    );
+
   return [
-    addEventListenerToAllWindowsDynamic<DragEvent>('dragstart', args.handleDragStart, {
-      capture: true,
-    }),
-    addEventListenerToAllWindowsDynamic<MouseEvent>('mousemove', args.handleMouseMove, {
-      capture: true,
-    }),
-    addEventListenerToAllWindowsDynamic<MouseEvent>('mousedown', args.handleMouseDown, {
-      capture: true,
-    }),
-    addEventListenerToAllWindowsDynamic<MouseEvent>('mouseup', args.handleMouseUp, {
-      capture: true,
-    }),
-    addEventListenerToAllWindowsDynamic<MouseEvent>('click', args.handleClick, { capture: true }),
-    addEventListenerToAllWindowsDynamic<KeyboardEvent>('keydown', args.handleKeyDown, {
-      capture: true,
-    }),
+    addWindowGestureListener<DragEvent>('dragstart', args.handleDragStart),
+    addWindowGestureListener<MouseEvent>('mousemove', args.handleMouseMove),
+    addWindowGestureListener<MouseEvent>('mousedown', args.handleMouseDown),
+    addWindowGestureListener<MouseEvent>('mouseup', args.handleMouseUp),
+    addWindowGestureListener<MouseEvent>('click', args.handleClick),
+    addWindowGestureListener<KeyboardEvent>('keydown', args.handleKeyDown),
     addEventListenerToAllWindowsDynamic<MouseEvent>(
       'mouseleave',
       () => {

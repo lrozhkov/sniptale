@@ -10,8 +10,11 @@ import {
   type VideoAnnotationPack,
 } from '../../../../features/video/project/annotation-engine';
 import { createAnnotationClip } from '../../../../features/video/project/factories/overlay-clip';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
-import { VideoOverlayTemplateKind } from '../../../../features/video/project/types';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../features/video/project/factories/creation';
+import { VideoTrackKind, VideoOverlayTemplateKind } from '../../../../features/video/project/types';
 import { renderAnnotationPreviewClip } from './annotation';
 
 let container: HTMLDivElement | null = null;
@@ -19,8 +22,9 @@ let root: Root | null = null;
 
 function renderAnnotation(templateKind: VideoOverlayTemplateKind, currentTime = 0.7) {
   const project = createEmptyVideoProject('Preview', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
   const clip = createAnnotationClip(
-    project.tracks[2]!.id,
+    project.tracks[1]!.id,
     project.width,
     project.height,
     0,
@@ -183,13 +187,14 @@ function renderModernAnnotation(
   headline: string
 ) {
   const project = createEmptyVideoProject('Preview', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
   const template = Object.values(pack.templates)
     .flat()
     .find((candidate) => candidate.id === templateId);
   if (!template) {
     throw new Error(`Missing template ${templateId}`);
   }
-  const clip = createAnnotationClip(project.tracks[2]!.id, project.width, project.height, 0, {
+  const clip = createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 0, {
     pack,
     packLabel: pack.label,
     packTheme: pack.theme,

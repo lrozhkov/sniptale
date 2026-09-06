@@ -1,4 +1,8 @@
+// @vitest-environment jsdom
+
 import { describe, expect, it, vi } from 'vitest';
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ToolbarShellContent } from './view';
 
@@ -50,6 +54,44 @@ function renderToolbarShell(
 }
 
 describe('ToolbarShellContent', () => {
+  it('starts toolbar dragging from pointerdown', () => {
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    const handleMouseDown = vi.fn();
+
+    act(() => {
+      root.render(
+        <ToolbarShellContent
+          toolbarProps={{} as never}
+          viewModel={
+            {
+              derivedState: {
+                toolbarRef: { current: null },
+                isDragging: false,
+                displayMode: 'horizontal',
+                position: { x: 24, y: 12 },
+                positionReady: true,
+                handleMouseDown,
+              },
+              toolbarMenuState: { activeMenuType: null },
+            } as never
+          }
+          onHoverCapture={vi.fn()}
+          onViewportChange={vi.fn()}
+        />
+      );
+    });
+
+    act(() => {
+      container
+        .querySelector('[data-ui="shared.ui.content-toolbar-drag-handle"]')
+        ?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true }));
+    });
+
+    expect(handleMouseDown).toHaveBeenCalledOnce();
+    act(() => root.unmount());
+  });
+
   it('keeps the shell hidden until the drag-position owner reports readiness', () => {
     const markup = renderToolbarShell(false);
 

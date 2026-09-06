@@ -70,6 +70,7 @@ it('proxies the native popup-export job API and optional host permission', async
     jobId: 'job-1',
     includeWebCopy: false,
     intent: 'export',
+    locale: 'en',
     options,
     captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 2_000 },
     sources: [{ kind: 'tab', tabId: 7, title: 'Page' }],

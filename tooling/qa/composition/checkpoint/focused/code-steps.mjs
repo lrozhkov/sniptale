@@ -2,6 +2,7 @@ import { runBrowserAdapterCheck } from '../../../guards/boundaries/browser/brows
 import { runDetachedControllerMethodCheck } from '../../../guards/quality/detached-controller-methods/check.mjs';
 import { runDomainFixtureRealismCheck } from '../../../guards/product-contracts/verify-domain-fixture-realism.mjs';
 import { runInstanceOwnershipCheck } from '../../../guards/architecture/ownership/instance-ownership/check.mjs';
+import { runForwardingModuleDriftCheck } from '../../../guards/architecture/forwarding-module-drift/check.mjs';
 import { runNamingCheck } from '../../../guards/quality/naming/check.mjs';
 import { runParserSnapshotPurityCheck } from '../../../guards/product-contracts/verify-parser-snapshot-purity.mjs';
 import { runReadPathSideEffectCheck } from '../../../guards/lifecycle/read-path-side-effects/check.mjs';
@@ -63,6 +64,12 @@ const FOCUSED_CODE_ADAPTER_DEFINITIONS = [
     runParserSnapshotPurityCheck,
   ],
   ['Naming', 'Naming violations found:', runNamingCheck, { preserveImportOnly: true }],
+  [
+    'Forwarding module drift',
+    'Forwarding module drift violations found:',
+    runForwardingModuleDriftCheck,
+    { preserveImportOnly: true },
+  ],
   ['UI automation seams', 'UI automation seam violations found:', runUiAutomationSeamCheck],
   [
     'Interactive controller ownership',

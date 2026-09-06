@@ -39,7 +39,8 @@ function isTrivialDelegation(node) {
   return ts.isExpressionStatement(statement) && ts.isCallExpression(statement.expression);
 }
 
-function collectSyntaxSignals(file, sourceFile, source) {
+export function collectTopologySyntaxSignals(file, source) {
+  const sourceFile = createSourceFile(file, source);
   const significant = sourceFile.statements.filter(
     (statement) => !ts.isImportDeclaration(statement)
   );
@@ -75,7 +76,7 @@ export function collectTopologyModuleGraph({ files, root, readFile }) {
     const source = readFile(file);
     return {
       file,
-      ...collectSyntaxSignals(file, createSourceFile(file, source), source),
+      ...collectTopologySyntaxSignals(file, source),
     };
   });
   return {

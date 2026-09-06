@@ -1,3 +1,6 @@
+import { getVideoTrackKindLabel } from './track-kind-label';
+import { VideoTrackKind } from '../../../features/video/project/types';
+import { translate } from '../../../platform/i18n';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
@@ -94,9 +97,7 @@ describe('workspace-sidebar/panel-content', () => {
   });
 
   it('keeps the selection body inside a flex-column surface so inner scroll owners can grow', () => {
-    const markup = renderToStaticMarkup(
-      <WorkspaceSidebarPanelContent {...createProps()} onSetInspectorHeaderSlot={vi.fn()} />
-    );
+    const markup = renderToStaticMarkup(<WorkspaceSidebarPanelContent {...createProps()} />);
 
     expect(markup).toContain('flex min-h-0 flex-1 flex-col overflow-hidden');
     expect(selectionBodyMock).toHaveBeenCalledOnce();
@@ -106,9 +107,7 @@ describe('workspace-sidebar/panel-content', () => {
     const props = createProps();
     props.onConvertTextClipToAnnotation = vi.fn();
 
-    renderToStaticMarkup(
-      <WorkspaceSidebarPanelContent {...props} onSetInspectorHeaderSlot={vi.fn()} />
-    );
+    renderToStaticMarkup(<WorkspaceSidebarPanelContent {...props} />);
 
     expect(selectionBodyMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -131,13 +130,18 @@ describe('workspace-sidebar/panel-content alternate modes', () => {
 
   it('renders grid settings mode inside the sidebar surface', () => {
     const gridMarkup = renderToStaticMarkup(
-      <WorkspaceSidebarPanelContent
-        {...createProps()}
-        inspectorMode="grid"
-        onSetInspectorHeaderSlot={vi.fn()}
-      />
+      <WorkspaceSidebarPanelContent {...createProps()} inspectorMode="grid" />
     );
     expect(gridMarkup).toContain('Сетка помогает выравнивать');
     expect(gridMarkup).toContain('Привязка к сетке');
   });
+});
+
+it('labels audio and subtitle tracks distinctly in the inspector', () => {
+  expect(getVideoTrackKindLabel(VideoTrackKind.AUDIO)).toBe(
+    translate('videoEditor.timeline.trackKindAudio')
+  );
+  expect(getVideoTrackKindLabel(VideoTrackKind.SUBTITLE)).toBe(
+    translate('videoEditor.timeline.trackKindSubtitle')
+  );
 });

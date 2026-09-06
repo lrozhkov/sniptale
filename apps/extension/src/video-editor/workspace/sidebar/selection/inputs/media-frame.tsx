@@ -1,6 +1,5 @@
 import { translate } from '../../../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { SegmentedRow } from '../../../../../ui/compact-inspector-controls';
 import { isVideoClip } from '../../../../../features/video/project/timeline';
 import {
   VideoProjectClipType,
@@ -53,7 +52,7 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-1">
       <MediaFitModeSelect
         clipId={props.clip.id}
         disabled={props.locked}
@@ -129,10 +128,9 @@ function MediaShadowControls(
   >
 ) {
   return (
-    <div className="space-y-3">
-      <SegmentedRow
-        ariaLabel={translate('videoEditor.sidebar.mediaShadowModeLabel')}
-        columns={2}
+    <div className="space-y-1">
+      <SelectInput
+        disabled={props.disabled}
         label={translate('videoEditor.sidebar.mediaShadowModeLabel')}
         value={props.shadowMode}
         onChange={(value) => props.onUpdateMediaClipShadowMode?.(props.clipId, value)}

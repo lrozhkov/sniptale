@@ -72,6 +72,9 @@ export function ProjectTimelineTelemetryLaneLabelRow({ compactRows }: { compactR
           <div className="truncate text-[13px] font-semibold text-[var(--sniptale-color-text-primary)]">
             {translate('videoEditor.timeline.telemetryLane')}
           </div>
+          <div className="truncate text-[10px] text-[var(--sniptale-color-text-dim)]">
+            {translate('videoEditor.timeline.telemetryLaneMeta')}
+          </div>
         </div>
       )}
     </div>
@@ -82,11 +85,13 @@ function ProjectTimelineTelemetryMarker(props: {
   kind: 'click' | 'key';
   label: string;
   left: number;
+  onSeek: () => void;
 }) {
   const Icon = props.kind === 'key' ? Keyboard : MousePointerClick;
 
   return (
-    <div
+    <button
+      type="button"
       {...TIMELINE_OBJECT_MARKER_PROPS}
       title={props.label}
       className={[
@@ -97,9 +102,13 @@ function ProjectTimelineTelemetryMarker(props: {
         getTelemetryMarkerClassName(props.kind),
       ].join(' ')}
       style={{ left: props.left }}
+      onClick={(event) => {
+        event.stopPropagation();
+        props.onSeek();
+      }}
     >
       <Icon className="h-3.5 w-3.5 text-[var(--sniptale-color-text-secondary)]" />
-    </div>
+    </button>
   );
 }
 
@@ -125,6 +134,7 @@ function ProjectTimelineTelemetrySpan(props: {
 }
 
 export function ProjectTimelineTelemetryLane(props: {
+  onSeek: (time: number) => void;
   pixelsPerSecond: number;
   project: VideoProject;
   recordingTelemetry: RecordingTelemetryEntry | null;
@@ -162,6 +172,7 @@ export function ProjectTimelineTelemetryLane(props: {
           kind={marker.kind}
           label={marker.label}
           left={marker.time * props.pixelsPerSecond}
+          onSeek={() => props.onSeek(marker.time)}
         />
       ))}
     </div>

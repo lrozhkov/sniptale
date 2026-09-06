@@ -45,9 +45,9 @@ export function listHeadFilesUnderPath(relativePath, options = {}) {
   );
 }
 
-export function readHeadFileTexts(
+export function readRevisionFileTexts(
   relativePaths,
-  { root = process.cwd(), spawnSyncImpl = spawnSync } = {}
+  { revision = 'HEAD', root = process.cwd(), spawnSyncImpl = spawnSync } = {}
 ) {
   if (relativePaths.length === 0) {
     return new Map();
@@ -56,7 +56,7 @@ export function readHeadFileTexts(
   const sources = new Map();
   for (const relativePath of relativePaths) {
     const result = normalizeSyncProcessResult(
-      spawnSyncImpl(resolveGitExecutable(), ['show', `HEAD:${relativePath}`], {
+      spawnSyncImpl(resolveGitExecutable(), ['show', `${revision}:${relativePath}`], {
         cwd: root,
         encoding: 'utf8',
         maxBuffer: GIT_BATCH_MAX_BUFFER,
@@ -72,6 +72,14 @@ export function readHeadFileTexts(
   }
 
   return sources;
+}
+
+export function readHeadFileTexts(relativePaths, options = {}) {
+  return readRevisionFileTexts(relativePaths, { ...options, revision: 'HEAD' });
+}
+
+export function readRevisionFileText(relativePath, options = {}) {
+  return readRevisionFileTexts([relativePath], options).get(relativePath) ?? null;
 }
 
 export function readHeadFileText(relativePath, options = {}) {

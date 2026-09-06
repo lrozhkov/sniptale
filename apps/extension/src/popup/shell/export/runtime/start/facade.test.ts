@@ -1,4 +1,16 @@
-import { expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
+
+const i18nMocks = vi.hoisted(() => ({ currentLocale: 'en' as 'en' | 'ru' }));
+
+vi.mock('../../../../../platform/i18n/popup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../platform/i18n/popup')>()),
+  getCurrentLocale: () => i18nMocks.currentLocale,
+  translate: (key: string, locale?: string) => `${key}:${locale ?? i18nMocks.currentLocale}`,
+}));
+
+beforeEach(() => {
+  i18nMocks.currentLocale = 'en';
+});
 
 import { startPopupExport as startPopupExportFacade } from './';
 import { startPopupExport as startPopupExportImpl } from './execute';
@@ -89,6 +101,7 @@ it('records background job ownership for successful export cancellation', async 
 
   expect(state.cancelRetryRef.current).toEqual({
     exportRunId: 'job-1',
+    locale: 'en',
     owner: 'job',
     tabIds: [42],
   });
@@ -227,6 +240,28 @@ it('keeps the job cancellation authority when screenshot permission is declined'
   );
   expect(state.setLaunchedPlan).toHaveBeenCalledWith(
     expect.objectContaining({ includeFullPageScreenshot: false })
+  );
+});
+
+it('sends warnings and initial progress with one captured locale', async () => {
+  i18nMocks.currentLocale = 'en';
+  const state = createStartState(true);
+  const requestAllUrlsPermission = vi.fn(async () => {
+    i18nMocks.currentLocale = 'ru';
+    return false;
+  });
+  const deps = createStartDeps({ requestAllUrlsPermission });
+
+  await startPopupExportImpl(state, deps);
+
+  expect(deps.sendStartJobMessage).toHaveBeenCalledWith(
+    expect.objectContaining({
+      locale: 'en',
+      warnings: ['popup.export.screenshotPermissionDeniedWarning:en'],
+    })
+  );
+  expect(state.setProgress).toHaveBeenCalledWith(
+    expect.objectContaining({ message: 'popup.export.preparingPreview:en' })
   );
 });
 

@@ -196,7 +196,7 @@ function partitionFindings(scopedFindings, baseline, scopes) {
   return { matchedCount: history.length - unexpectedHistory, stale, unexpected };
 }
 
-function staleBaselineViolation(finding) {
+function staleBaselineAdvisory(finding) {
   return {
     rule: 'gitleaks-baseline-stale',
     file: finding.File,
@@ -226,7 +226,7 @@ export function applyGitleaksBaseline({
     ].join('\n'),
     violations: [
       ...partitioned.unexpected.map(({ finding, scope }) => toGitleaksViolation(finding, scope)),
-      ...partitioned.stale.map(staleBaselineViolation),
     ],
+    advisories: partitioned.stale.map(staleBaselineAdvisory),
   };
 }

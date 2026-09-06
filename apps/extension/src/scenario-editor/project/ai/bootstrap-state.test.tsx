@@ -96,7 +96,8 @@ it('loads bootstrap state and surfaces bootstrap failures', async () => {
   renderHookHarness();
   await flushMicrotasks();
 
-  expect(latestState?.error).toBe('bootstrap failed');
+  expect(latestState?.error).toContain('Внешний сервис');
+  expect(latestState?.error).not.toContain('bootstrap failed');
 });
 
 it('ignores late bootstrap results after the AI state hook unmounts', async () => {

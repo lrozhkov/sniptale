@@ -65,3 +65,39 @@ it('fails before spawning Stryker for an unknown profile or unsafe label', () =>
   expect(unsafe.status).not.toBe(0);
   expect(unsafe.stderr).toContain('Invalid mutation run label');
 });
+
+it('reports a controlled tool-unavailable error before spawning a missing CLI', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sniptale-mutation-missing-cli-'));
+  roots.push(root);
+  const result = spawnSync(process.execPath, [runner, 'persistence', 'fixture'], {
+    cwd: root,
+    encoding: 'utf8',
+    env: { ...process.env, SNIPTALE_MUTATION_CLI: path.join(root, 'missing-stryker.mjs') },
+  });
+
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain('Mutation CLI is unavailable at <configured-path>');
+  expect(result.stderr).not.toContain('MODULE_NOT_FOUND');
+  expect(result.stderr).not.toContain(root);
+});
+
+it('reports a controlled error when a successful mutation run omits its report', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'sniptale-mutation-missing-report-'));
+  roots.push(root);
+  const cli = path.join(root, 'fake-stryker.mjs');
+  fs.writeFileSync(cli, 'process.exitCode = 0;\n');
+
+  const result = spawnSync(process.execPath, [runner, 'persistence', 'fixture'], {
+    cwd: root,
+    encoding: 'utf8',
+    env: { ...process.env, SNIPTALE_MUTATION_CLI: cli },
+  });
+
+  expect(result.status).toBe(1);
+  expect(result.stderr).toContain('Mutation report is missing after a successful runner exit.');
+  expect(result.stderr).not.toContain(root);
+  const summary = JSON.parse(
+    fs.readFileSync(path.join(root, '.tmp/mutation/persistence/fixture/summary.json'), 'utf8')
+  );
+  expect(summary).toMatchObject({ exitCode: 1, mutationScore: null });
+});

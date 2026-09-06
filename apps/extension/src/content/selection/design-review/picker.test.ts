@@ -429,7 +429,7 @@ it('defers Escape to the highest open Design Review layer before disabling the m
   expect(onDisableRequested).toHaveBeenCalledOnce();
 });
 
-it('keeps Design Review active when toolbar UI already claimed Escape', () => {
+it('handles Escape pre-cancelled by the host page when no Design Review layer owns it', () => {
   const onDisableRequested = vi.fn();
   startPicker({ onDisableRequested });
   const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Escape' });
@@ -437,7 +437,7 @@ it('keeps Design Review active when toolbar UI already claimed Escape', () => {
 
   document.dispatchEvent(event);
 
-  expect(onDisableRequested).not.toHaveBeenCalled();
+  expect(onDisableRequested).toHaveBeenCalledOnce();
 });
 
 it('uses Escape to stop the inspector layer, then close it, before disabling Design Review', () => {

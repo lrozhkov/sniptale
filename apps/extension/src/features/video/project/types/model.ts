@@ -127,6 +127,11 @@ export interface VideoProjectAsset {
   name: string;
   source: VideoProjectAssetSource;
   metadata: VideoProjectAssetMetadata;
+  /** Source composition survives deleting montage clips; groupId belongs to each insertion. */
+  recordingPart?: {
+    recordingId: string;
+    role: 'primary' | 'camera' | 'video' | 'audio';
+  };
   createdAt: number;
 }
 

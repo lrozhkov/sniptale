@@ -34,6 +34,7 @@ import {
 } from './text-content';
 import type { PageScrollRoot } from '../platform/page-scroll';
 import { toggleContentHostClass } from '../platform/dom-host';
+import { isTrustedKeyboardEvent } from '../platform/trusted-events';
 
 export { getDrawingViewportProjection, toDrawingScenePoint } from './interaction';
 
@@ -305,6 +306,7 @@ function DrawingCanvasLayer(props: {
       }}
       onKeyDown={(event) => {
         event.stopPropagation();
+        if (!isTrustedKeyboardEvent(event.nativeEvent)) return;
         handleDrawingKeyDown({
           event,
           hasDraft: Boolean(props.pointer.draftRef.current || props.textEditor.draft),

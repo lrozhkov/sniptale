@@ -18,6 +18,7 @@ export interface VideoEditorRuntimeController {
   registerPreviewRuntime: (runtime: PlaybackPreviewRuntime | null) => void;
   pausePlayback: () => number;
   seekTo: (time: number) => void;
+  stepByFrames: (frameDelta: number) => void;
   setPlaybackPlaying: (playing: boolean) => void;
   togglePlayback: () => void;
   applyLoadedProject: ApplyLoadedProject;
@@ -39,6 +40,7 @@ function createVideoEditorRuntimeController(
     registerPreviewRuntime: playback.registerPreviewRuntime,
     pausePlayback: playback.pausePlayback,
     seekTo: playback.seekTo,
+    stepByFrames: playback.stepByFrames,
     setPlaybackPlaying: playback.setPlaybackPlaying,
     togglePlayback: playback.togglePlayback,
     applyLoadedProject,
@@ -98,6 +100,7 @@ export function useVideoEditorRuntime(
       isPlaying: params.playback.isPlaying,
       playbackRange: params.playback.playbackRange,
       projectHistoryTransactionActive: params.playback.projectHistoryTransactionActive,
+      shortcutsEnabled: params.playback.shortcutsEnabled,
       selection: params.playback.selection,
       placementMode: params.playback.placementMode,
       selectedClipId: params.playback.selectedClipId,
@@ -107,6 +110,7 @@ export function useVideoEditorRuntime(
     {
       setCurrentTime: params.playback.setCurrentTime,
       setPlaying: params.playback.setPlaying,
+      duplicateClip: params.playback.duplicateClip,
       splitClipAt: params.playback.splitClipAt,
       deleteClip: params.playback.deleteSelection.clip,
       deleteActionEvent: params.playback.deleteSelection.actionEvent,

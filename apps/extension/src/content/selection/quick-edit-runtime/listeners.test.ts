@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const iframeUtilsMocks = vi.hoisted(() => ({
   addEventListenerToAllWindowsDynamic: vi.fn(),
+  addWindowEventListenerToAllWindowsDynamic: vi.fn(),
   addScrollListenersToAllWindows: vi.fn(),
   getAccessibleIframes: vi.fn(),
 }));
@@ -14,9 +15,11 @@ import { registerQuickEditModeListeners } from './listeners';
 
 beforeEach(() => {
   iframeUtilsMocks.addEventListenerToAllWindowsDynamic.mockReset();
+  iframeUtilsMocks.addWindowEventListenerToAllWindowsDynamic.mockReset();
   iframeUtilsMocks.addScrollListenersToAllWindows.mockReset();
   iframeUtilsMocks.getAccessibleIframes.mockReset();
   iframeUtilsMocks.addEventListenerToAllWindowsDynamic.mockReturnValue(vi.fn());
+  iframeUtilsMocks.addWindowEventListenerToAllWindowsDynamic.mockReturnValue(vi.fn());
   iframeUtilsMocks.addScrollListenersToAllWindows.mockReturnValue(vi.fn());
   iframeUtilsMocks.getAccessibleIframes.mockReturnValue([document.createElement('iframe')]);
 });
@@ -38,7 +41,12 @@ describe('quick-edit-runtime listeners', () => {
       hideHoverOverlay: vi.fn(),
     });
 
-    expect(iframeUtilsMocks.addEventListenerToAllWindowsDynamic).toHaveBeenCalledTimes(5);
+    expect(iframeUtilsMocks.addEventListenerToAllWindowsDynamic).toHaveBeenCalledTimes(4);
+    expect(iframeUtilsMocks.addWindowEventListenerToAllWindowsDynamic).toHaveBeenCalledWith(
+      'keydown',
+      expect.any(Function),
+      { capture: true }
+    );
     expect(iframeUtilsMocks.addScrollListenersToAllWindows).toHaveBeenCalledOnce();
     expect(registration.iframeCount).toBe(1);
 

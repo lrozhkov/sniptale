@@ -1,3 +1,4 @@
+import { getVideoProjectUtilityLanes } from '../../../features/video/project/utility-lanes';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ProjectTimelineToolbar } from './toolbar';
 import type { ProjectTimelineProps } from './types';
@@ -7,22 +8,27 @@ import { isRecordingTelemetryEligibleForAutoProcessing } from '../../project/ope
 
 type ProjectTimelineSurfaceProps = Pick<
   ProjectTimelineProps & ReturnType<typeof useProjectTimelineState>,
+  | 'onClearPlaybackRange'
+  | 'onSeekToEnd'
+  | 'onSeekToStart'
+  | 'onTogglePlay'
   | 'currentTime'
+  | 'isPlaying'
+  | 'playbackRange'
+  | 'onStepToNextFrame'
+  | 'onStepToPreviousFrame'
+  | 'canEditSelectedClip'
+  | 'canSplitSelectedClip'
   | 'fitSelectionDuration'
   | 'insertion'
-  | 'isPlaying'
-  | 'onClearPlaybackRange'
   | 'onAutoTransformRecording'
   | 'onDeleteSelectedClip'
   | 'onDuplicateSelectedClip'
   | 'onFitProject'
   | 'onFitSelection'
-  | 'onSeekToStart'
   | 'onSplitSelectedClip'
   | 'onTimelinePreviewSuspendedChange'
-  | 'onTogglePlay'
   | 'onZoomChange'
-  | 'playbackRange'
   | 'pixelsPerSecond'
   | 'project'
   | 'recordingTelemetry'
@@ -34,42 +40,55 @@ type ProjectTimelineSurfaceProps = Pick<
 };
 
 export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
+  const motionLane = getVideoProjectUtilityLanes(props.project).camera;
   return (
     <FloatingChromePanel
       dataUi="video-editor.timeline.surface"
       className={[
-        'flex h-full min-h-0 flex-col overflow-hidden rounded-[12px] p-0',
+        '@container/timeline flex h-full min-h-0 flex-col overflow-hidden rounded-[12px] p-0',
         'backdrop-blur-[10px]',
       ].join(' ')}
     >
       <ProjectTimelineToolbar
-        currentTime={props.currentTime}
-        duration={props.project.duration}
+        playback={{
+          onClearPlaybackRange: props.onClearPlaybackRange,
+          onSeekToEnd: props.onSeekToEnd,
+          onSeekToStart: props.onSeekToStart,
+          onTogglePlay: props.onTogglePlay,
+          currentTime: props.currentTime,
+          isPlaying: props.isPlaying,
+          playbackRange: props.playbackRange,
+          onStepToNextFrame: props.onStepToNextFrame,
+          onStepToPreviousFrame: props.onStepToPreviousFrame,
+          duration: props.project.duration,
+        }}
+        canAddMotionRegion={props.project.duration > 0 && motionLane.visible && !motionLane.locked}
+        canEditSelectedClip={props.canEditSelectedClip}
+        canSplitSelectedClip={props.canSplitSelectedClip}
         fitSelectionDuration={props.fitSelectionDuration}
         insertion={props.insertion}
-        isPlaying={props.isPlaying}
         pixelsPerSecond={props.pixelsPerSecond}
-        playbackRange={props.playbackRange}
         selectedClip={Boolean(props.selectedClip)}
         trackView={{
           compactRows: props.panelPrefs.prefs.compactRows,
-          panelExpanded: props.panelPrefs.prefs.panelExpanded,
+          cursorLaneVisible: props.panelPrefs.prefs.collapsedCursorLaneVisible,
+          telemetryLaneVisible: props.panelPrefs.prefs.collapsedTelemetryLaneVisible,
+          canShowCursorLane: props.project.cursorTrack !== null,
+          canShowTelemetryLane: props.recordingTelemetry !== null,
           onCompactRowsChange: props.panelPrefs.setCompactRows,
-          onPanelExpandedChange: props.panelPrefs.setPanelExpanded,
+          onCursorLaneVisibleChange: props.panelPrefs.setCollapsedCursorLaneVisible,
+          onTelemetryLaneVisibleChange: props.panelPrefs.setCollapsedTelemetryLaneVisible,
         }}
         visibleRangeSeconds={props.visibleRangeSeconds}
         canAutoTransformRecording={isRecordingTelemetryEligibleForAutoProcessing(
           props.project,
           props.recordingTelemetry
         )}
-        onClearPlaybackRange={props.onClearPlaybackRange}
-        onSeekToStart={props.onSeekToStart}
         onAutoTransformRecording={props.onAutoTransformRecording}
         onFitProject={props.onFitProject}
         onFitSelection={props.onFitSelection}
         onTimelinePreviewSuspendedChange={props.onTimelinePreviewSuspendedChange}
         onZoomChange={props.onZoomChange}
-        onTogglePlay={props.onTogglePlay}
         onSplitSelectedClip={props.onSplitSelectedClip}
         onDuplicateSelectedClip={props.onDuplicateSelectedClip}
         onDeleteSelectedClip={props.onDeleteSelectedClip}

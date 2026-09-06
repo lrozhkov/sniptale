@@ -1,8 +1,8 @@
-import { Pause, Play, RotateCcw, SkipBack } from 'lucide-react';
+import { Pause, Play, RotateCcw, SkipBack, SkipForward, StepBack, StepForward } from 'lucide-react';
 
 import { translate } from '../../../../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import type { ProjectTimelineToolbarProps } from '../types';
+import type { VideoEditorPlaybackRange } from '../../../../interaction/playback/range';
 import { toolbarIconButtonClassName } from './constants/button';
 
 export function formatPlaybackCounterTime(value: number): string {
@@ -73,9 +73,44 @@ function PlaybackSeekToStartButton(props: { onSeekToStart: () => void }) {
   );
 }
 
-function formatToolbarLoopRange(
-  playbackRange: ProjectTimelineToolbarProps['playbackRange']
-): string | null {
+function PlaybackSeekToEndButton(props: { onSeekToEnd: () => void }) {
+  return (
+    <ContentToolbarButton
+      type="button"
+      onClick={props.onSeekToEnd}
+      className={toolbarIconButtonClassName}
+      aria-label={translate('videoEditor.timeline.seekToEnd')}
+      title={translate('videoEditor.timeline.seekToEnd')}
+    >
+      <SkipForward size={14} strokeWidth={2} />
+    </ContentToolbarButton>
+  );
+}
+
+function PlaybackFrameStepButton(props: { direction: 'next' | 'previous'; onStep: () => void }) {
+  const label = translate(
+    props.direction === 'previous'
+      ? 'videoEditor.timeline.previousFrame'
+      : 'videoEditor.timeline.nextFrame'
+  );
+  return (
+    <ContentToolbarButton
+      type="button"
+      onClick={props.onStep}
+      className={toolbarIconButtonClassName}
+      aria-label={label}
+      title={label}
+    >
+      {props.direction === 'previous' ? (
+        <StepBack size={14} strokeWidth={2} />
+      ) : (
+        <StepForward size={14} strokeWidth={2} />
+      )}
+    </ContentToolbarButton>
+  );
+}
+
+function formatToolbarLoopRange(playbackRange: VideoEditorPlaybackRange | null): string | null {
   if (!playbackRange) {
     return null;
   }
@@ -88,26 +123,25 @@ function formatToolbarLoopRange(
 function PlaybackSummaryMeta(props: {
   currentTime: number;
   duration: number;
-  playbackRange: ProjectTimelineToolbarProps['playbackRange'];
+  playbackRange: VideoEditorPlaybackRange | null;
 }) {
   const loopRange = formatToolbarLoopRange(props.playbackRange);
 
   return (
-    <div className="min-w-0 text-center max-[720px]:text-left">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--sniptale-color-text-muted)]">
-        {translate('videoEditor.timeline.title')}
-      </p>
+    <div className="min-w-0 text-center">
       <p
         data-playback-counter="true"
         className={[
-          'min-w-[176px] text-[12px] font-semibold tabular-nums',
-          'text-[var(--sniptale-color-text-primary)] max-[720px]:min-w-0',
+          'min-w-[96px] text-[11px] font-semibold tabular-nums',
+          'text-[var(--sniptale-color-text-primary)]',
         ].join(' ')}
       >
         {loopRange ? (
-          <span className="mr-2 text-[var(--sniptale-color-accent-emphasis)]">{loopRange}</span>
+          <span className="block whitespace-nowrap text-[10px] leading-3 text-[var(--sniptale-color-accent-emphasis)]">
+            {loopRange}
+          </span>
         ) : null}
-        <span>
+        <span className="block whitespace-nowrap">
           {formatPlaybackCounterTime(props.currentTime)} /{' '}
           {formatPlaybackCounterTime(props.duration)}
         </span>
@@ -122,27 +156,30 @@ export function ProjectTimelinePlaybackSummary({
   isPlaying,
   playbackRange,
   onClearPlaybackRange,
+  onSeekToEnd,
   onSeekToStart,
+  onStepToNextFrame,
+  onStepToPreviousFrame,
   onTogglePlay,
-}: Pick<
-  ProjectTimelineToolbarProps,
-  | 'currentTime'
-  | 'duration'
-  | 'isPlaying'
-  | 'playbackRange'
-  | 'onClearPlaybackRange'
-  | 'onSeekToStart'
-  | 'onTogglePlay'
->) {
+}: {
+  currentTime: number;
+  duration: number;
+  isPlaying: boolean;
+  playbackRange: VideoEditorPlaybackRange | null;
+  onClearPlaybackRange: () => void;
+  onSeekToEnd: () => void;
+  onSeekToStart: () => void;
+  onStepToNextFrame: () => void;
+  onStepToPreviousFrame: () => void;
+  onTogglePlay: () => void;
+}) {
   return (
-    <div
-      className={[
-        'flex min-w-0 flex-wrap items-center justify-center gap-2.5',
-        'max-[720px]:justify-start max-[720px]:gap-1.5',
-      ].join(' ')}
-    >
-      <PlaybackToggleButton isPlaying={isPlaying} onTogglePlay={onTogglePlay} />
+    <div className="flex shrink-0 flex-nowrap items-center justify-center gap-0.5">
       <PlaybackSeekToStartButton onSeekToStart={onSeekToStart} />
+      <PlaybackFrameStepButton direction="previous" onStep={onStepToPreviousFrame} />
+      <PlaybackToggleButton isPlaying={isPlaying} onTogglePlay={onTogglePlay} />
+      <PlaybackFrameStepButton direction="next" onStep={onStepToNextFrame} />
+      <PlaybackSeekToEndButton onSeekToEnd={onSeekToEnd} />
       <PlaybackResetButton disabled={!playbackRange} onClearPlaybackRange={onClearPlaybackRange} />
       <PlaybackSummaryMeta
         currentTime={currentTime}

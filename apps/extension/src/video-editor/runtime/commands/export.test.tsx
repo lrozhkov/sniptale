@@ -202,9 +202,7 @@ it('surfaces synchronous project handoff failures after entering export progress
   });
 
   expect(params.startExport).toHaveBeenCalledWith('job-1');
-  expect(params.failExport).toHaveBeenCalledWith(
-    'Project export input handoff failed: inputIntegrityFailure'
-  );
+  expect(params.failExport).toHaveBeenCalledWith(expect.stringContaining('Sniptale'));
 });
 
 it('keeps the active export state when cancellation fails', async () => {
@@ -219,7 +217,7 @@ it('keeps the active export state when cancellation fails', async () => {
 
   expect(cancelProjectExportMock).toHaveBeenCalledWith('job-1');
   expect(params.cancelExport).not.toHaveBeenCalled();
-  expect(params.failExportCancellation).toHaveBeenCalledWith('worker restarted');
+  expect(params.failExportCancellation).toHaveBeenCalledWith(expect.stringContaining('Sniptale'));
   expect(params.failExport).not.toHaveBeenCalled();
 });
 
@@ -239,7 +237,7 @@ it('allows cancellation to be retried after a cancel request failure', async () 
   expect(cancelProjectExportMock).toHaveBeenCalledTimes(2);
   expect(cancelProjectExportMock).toHaveBeenNthCalledWith(1, 'job-1');
   expect(cancelProjectExportMock).toHaveBeenNthCalledWith(2, 'job-1');
-  expect(params.failExportCancellation).toHaveBeenCalledWith('worker restarted');
+  expect(params.failExportCancellation).toHaveBeenCalledWith(expect.stringContaining('Sniptale'));
   expect(params.cancelExport).toHaveBeenCalledOnce();
 });
 

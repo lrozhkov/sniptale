@@ -4,6 +4,8 @@ import {
   HARNESS_QA_GUIDANCE,
   hasHarnessVerificationQaTargets,
 } from '../../composition/scope/qa-scope.mjs';
+import { formatAdvisoryReport } from '../../composition/advisory/execution/report.mjs';
+import { formatPreflightRiskSummary } from '../../composition/change-risk/render.mjs';
 
 const MAXIMUM_LIST_ITEMS = 16;
 const HEAD_LIST_ITEMS = 10;
@@ -44,21 +46,6 @@ function formatList(values, emptyText = 'none') {
     : summarizeList(values).map((value) => `- ${summarizeInlineList(value)}`);
 }
 
-function formatAdvisoryFindings(findings) {
-  const attention = findings.filter((finding) => finding.severity === 'attention').length;
-  const watch = findings.length - attention;
-  return findings.length === 0
-    ? ['attention=0, watch=0']
-    : [
-        `attention=${attention}, watch=${watch}`,
-        ...findings.map((finding) => {
-          const line = finding.line == null ? '' : `:${finding.line}`;
-          const hint = finding.hint ? ` Hint: ${finding.hint}` : '';
-          return `- ${finding.file}${line} [${finding.id}] ${finding.reason}${hint}`;
-        }),
-      ];
-}
-
 function collectScopeLines(context) {
   return [
     `Mode: ${context.mode ?? (context.fingerprint ? 'current-diff' : 'explicit-files')}`,
@@ -88,11 +75,17 @@ function collectContractLines(report) {
   ];
 }
 
+function collectRiskRequirements(report) {
+  return (report.riskFindings ?? []).flatMap((finding) => finding.requirements ?? []);
+}
+
 export function collectPreflightReportLines(report, context, guardrailReport) {
   const advisoryReasons = new Set((report.advisoryFindings ?? []).map((finding) => finding.reason));
-  const proofHints = [...(report.proofHints ?? []), ...(guardrailReport.hints ?? [])].filter(
-    (hint) => !advisoryReasons.has(hint)
-  );
+  const proofHints = [
+    ...(report.proofHints ?? []),
+    ...(guardrailReport.hints ?? []),
+    ...collectRiskRequirements(report),
+  ].filter((hint) => !advisoryReasons.has(hint));
   return [
     'QA preflight: read-only context',
     '',
@@ -101,6 +94,13 @@ export function collectPreflightReportLines(report, context, guardrailReport) {
     '',
     'Owner/runtime:',
     ...formatList(report.ownerRuntime ?? []),
+    '',
+    'Likely change risks:',
+    ...formatList(
+      (report.riskFindings ?? []).map(
+        (finding) => `${finding.id}: ${finding.evidence.map(({ file }) => file).join(', ')}`
+      )
+    ),
     '',
     'Relevant docs:',
     ...formatList(report.relevantDocs),
@@ -116,7 +116,46 @@ export function collectPreflightReportLines(report, context, guardrailReport) {
     'Build forecast:',
     ...formatList([...new Set(guardrailReport.buildScopeForecast ?? [])]),
     '',
-    'Non-blocking advisory findings:',
-    ...formatAdvisoryFindings(report.advisoryFindings ?? []),
+    'Structural context:',
+    ...formatList(
+      (report.advisoryFindings ?? []).map((finding) => {
+        const line = finding.line == null ? '' : `:${finding.line}`;
+        const hint = finding.hint ? ` Hint: ${finding.hint}` : '';
+        return `${finding.file}${line} [${finding.id}] ${finding.reason}${hint}`;
+      })
+    ),
   ];
+}
+
+function summarizeValues(values, maximum) {
+  const visible = values.slice(0, maximum);
+  const omitted = values.length - visible.length;
+  return [...visible.map((value) => `- ${value}`), ...(omitted > 0 ? [`- +${omitted} more`] : [])];
+}
+
+export function renderPreflightTerminalSummary(report, advisoryBuckets = {}) {
+  const { context } = report;
+  const ownerRuntime = report.ownerRuntime ?? [];
+  const harnessTargetCount = context.harnessTargetFiles?.length ?? 0;
+  const riskDocs = (report.riskFindings ?? []).flatMap((finding) => finding.docs ?? []);
+  const relevantDocs = [...new Set([...riskDocs, ...(report.relevantDocs ?? [])])];
+  return `${[
+    [
+      `QA preflight: ${context.targetFiles.length} product target(s)`,
+      `${harnessTargetCount} harness target(s)`,
+      `${ownerRuntime.length} owner(s)`,
+    ].join(', '),
+    '',
+    'Primary owners:',
+    ...(ownerRuntime.length === 0 ? ['- none detected'] : summarizeValues(ownerRuntime, 4)),
+    '',
+    ...formatPreflightRiskSummary(report.riskFindings ?? []),
+    '',
+    formatAdvisoryReport({ buckets: advisoryBuckets }).trimEnd(),
+    '',
+    'Read first:',
+    ...summarizeValues(relevantDocs, 4),
+    '',
+    'Full context is preserved in the run log printed below.',
+  ].join('\n')}\n`;
 }

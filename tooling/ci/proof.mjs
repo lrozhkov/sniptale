@@ -29,6 +29,13 @@ const resourceOptions = [
 ];
 const resourceEnvironment = {};
 const consumedArgumentIndexes = new Set();
+const freshInstallIndex = args.indexOf('--fresh-install');
+if (freshInstallIndex >= 0) {
+  if (args.indexOf('--fresh-install', freshInstallIndex + 1) >= 0) {
+    throw new Error('Duplicate ci:proof argument: --fresh-install');
+  }
+  consumedArgumentIndexes.add(freshInstallIndex);
+}
 for (const [flag, environmentName] of resourceOptions) {
   const index = args.indexOf(flag);
   if (index < 0) continue;
@@ -49,6 +56,7 @@ if (prIndex < 0) {
     [
       path.join(process.cwd(), 'tooling/ci/local.mjs'),
       'proof',
+      ...(freshInstallIndex >= 0 ? ['--fresh-install'] : []),
       ...Object.entries(resourceEnvironment).flatMap(([name, value]) => {
         const flag = resourceOptions.find(([, environmentName]) => environmentName === name)?.[0];
         return flag ? [flag, value] : [];
@@ -62,6 +70,9 @@ if (!prNumber || !/^\d+$/u.test(prNumber)) {
   throw new Error(
     'Usage: npm run ci:proof -- --pr <number> --reason <audit note> [--cpu N] [--memory-mib N] [--workers N]'
   );
+}
+if (freshInstallIndex >= 0) {
+  throw new Error('--fresh-install is available only for local ci:proof.');
 }
 consumedArgumentIndexes.add(prIndex);
 consumedArgumentIndexes.add(prIndex + 1);

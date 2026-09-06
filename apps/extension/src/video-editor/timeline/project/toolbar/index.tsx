@@ -1,5 +1,5 @@
-import { ProjectTimelineToolbarLeadingControls } from './sections/leading';
 import { ProjectTimelinePlaybackSummary } from './sections/playback-summary';
+import { ProjectTimelineToolbarLeadingControls } from './sections/leading';
 import { ProjectTimelineToolbarTrailingActions } from './sections/trailing';
 import type { ProjectTimelineToolbarProps } from './types';
 
@@ -16,7 +16,10 @@ type ToolbarTrailingControlsInput = Pick<
 >;
 
 function createToolbarLeadingControlsProps({
+  canAddMotionRegion,
+  canEditSelectedClip,
   insertion,
+  canSplitSelectedClip,
   selectedClip,
   canAutoTransformRecording,
   onAutoTransformRecording,
@@ -25,7 +28,10 @@ function createToolbarLeadingControlsProps({
   onSplitSelectedClip,
 }: Pick<
   ProjectTimelineToolbarProps,
+  | 'canAddMotionRegion'
+  | 'canEditSelectedClip'
   | 'insertion'
+  | 'canSplitSelectedClip'
   | 'selectedClip'
   | 'canAutoTransformRecording'
   | 'onAutoTransformRecording'
@@ -34,7 +40,10 @@ function createToolbarLeadingControlsProps({
   | 'onSplitSelectedClip'
 >) {
   return {
+    canAddMotionRegion,
+    canEditSelectedClip,
     insertion,
+    canSplitSelectedClip,
     selectedClip,
     canAutoTransformRecording: canAutoTransformRecording ?? false,
     ...(onAutoTransformRecording ? { onAutoTransformRecording } : {}),
@@ -66,38 +75,21 @@ function createToolbarTrailingControlsProps({
   };
 }
 
-export function ProjectTimelineToolbar({
-  currentTime,
-  duration,
-  isPlaying,
-  playbackRange,
-  onSeekToStart,
-  onTogglePlay,
-  onClearPlaybackRange,
-  ...controlsProps
-}: ProjectTimelineToolbarProps) {
+export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProps) {
   return (
     <div
+      data-ui="video-editor.timeline.toolbar"
       className={[
-        'grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border-b',
-        'border-[color:var(--sniptale-color-border-soft)] px-3 py-1.5',
-        'max-[720px]:grid-cols-1 max-[720px]:gap-1.5',
+        'flex items-center justify-between gap-2 border-b',
+        'border-[color:var(--sniptale-color-border-soft)] px-2 py-1',
       ].join(' ')}
     >
-      <div className="flex min-w-0 items-center justify-start">
+      <div className="flex shrink-0 items-center justify-start">
         <ProjectTimelineToolbarLeadingControls
           {...createToolbarLeadingControlsProps(controlsProps)}
         />
       </div>
-      <ProjectTimelinePlaybackSummary
-        currentTime={currentTime}
-        duration={duration}
-        isPlaying={isPlaying}
-        playbackRange={playbackRange}
-        onSeekToStart={onSeekToStart}
-        onTogglePlay={onTogglePlay}
-        onClearPlaybackRange={onClearPlaybackRange}
-      />
+      <ProjectTimelinePlaybackSummary {...controlsProps.playback} />
       <ProjectTimelineToolbarTrailingActions
         {...createToolbarTrailingControlsProps(controlsProps)}
       />

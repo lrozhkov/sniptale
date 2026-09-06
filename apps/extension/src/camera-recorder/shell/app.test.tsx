@@ -170,7 +170,9 @@ it('surfaces camera recorder registration failures', async () => {
 
   await renderApp();
 
-  expect(container?.textContent).toContain('Recording control lease is unavailable');
+  expect(container?.textContent).toContain(
+    'popup.video.loadingPopupError. common.errors.browserCommunicationDetail'
+  );
   expect(sendRuntimeMessageMock).toHaveBeenCalledWith({
     type: VideoMessageType.REGISTER_CAMERA_RECORDER_CONTROL,
     cameraRegistrationToken: 'launch-1',
@@ -221,7 +223,9 @@ it('surfaces rejected camera recorder control responses', async () => {
     controlToken: 'control-token-1',
     recordingId: 'rec-1',
   });
-  expect(container?.textContent).toContain('Pause rejected');
+  expect(container?.textContent).toContain(
+    'common.errors.actionFailed. common.errors.browserCommunicationDetail'
+  );
 });
 
 it('localizes an asynchronous camera frame-rate start failure', async () => {

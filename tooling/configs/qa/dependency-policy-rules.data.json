@@ -15,7 +15,7 @@
     },
     {
       "packageName": "canvas",
-      "resolvedVersion": "3.2.1",
+      "resolvedVersion": "3.2.3",
       "dependencyScope": "transitive-runtime",
       "artifactInclusion": "source-runtime-candidate",
       "reason": "Pinned renderer dependency may install its native binding from the locked package source.",

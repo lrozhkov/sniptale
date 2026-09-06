@@ -3,9 +3,13 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../features/video/project/factories/creation';
 import { getSortedTracks } from '../../../../features/video/project/timeline';
 import {
+  VideoTrackKind,
   VideoClipLinkMode,
   VideoClipTransitionKind,
   VideoMediaFitMode,
@@ -68,6 +72,7 @@ afterEach(() => {
 
 it('orders active preview clips from lower tracks to upper tracks', () => {
   const project = createEmptyVideoProject('Preview clip priority');
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
   const sortedTracks = getSortedTracks(project);
   const upperTrackId = sortedTracks[0]!.id;
   const lowerTrackId = sortedTracks[1]!.id;

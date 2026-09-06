@@ -56,14 +56,6 @@ export const HYBRID_WRAPPER_TOOL_COVERAGE: ToolCoverageEntry[] = [
     manualOnly: false,
   },
   {
-    tool: 'verify-root-scatter.mjs',
-    script: null,
-    entryKind: 'wrapper-only',
-    fullScope: 'repo-wide',
-    focusedScope: 'trigger-scoped',
-    manualOnly: false,
-  },
-  {
     tool: 'verify-manifest-permissions.mjs',
     script: null,
     entryKind: 'wrapper-only',

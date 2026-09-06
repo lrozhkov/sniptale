@@ -8,6 +8,8 @@ import type { RuntimeMessagingTransport } from '../../../platform/runtime-messag
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { VideoRecordingRuntimeState } from '@sniptale/runtime-contracts/video/types/types';
 import { IDLE_RECORDING_STATE } from '../../recording/video/copy';
+import { resolveVideoRecordingFailureMessage } from '../../../features/video/recording-failure';
+import { getUserFacingErrorDetail } from '../../../platform/i18n/user-facing-error';
 
 const recordingHealthSet = new Set<RecordingStateHealth>(recordingStateHealthValues);
 
@@ -52,11 +54,11 @@ function resolveRecordingResponseHealth(
 }
 
 function resolveRecordingStatusError(recordingResponse: RecordingStateResponse): string {
-  return (
-    recordingResponse.error ??
-    recordingResponse.state?.error ??
-    translate('background.runtime.recordingUnavailable')
-  );
+  const rawError = recordingResponse.error ?? recordingResponse.state?.error;
+  const summary =
+    resolveVideoRecordingFailureMessage(rawError) ??
+    translate('background.runtime.recordingUnavailable');
+  return `${summary} ${getUserFacingErrorDetail('browserCommunication')}`;
 }
 
 export function resolvePopupBootstrapRecordingState(

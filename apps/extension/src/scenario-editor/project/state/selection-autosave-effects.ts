@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 import { saveScenarioProjectRecord } from '../../../composition/persistence/scenario/store/public';
 import type { ScenarioProject } from '../../../features/scenario/contracts/types/project';
 import type { ScenarioEditorBrowserDriverPort } from '../../application/ports/browser-driver';
@@ -66,7 +67,11 @@ function applyScenarioAutosaveFailure(args: {
   }
 
   args.setError(
-    args.saveError instanceof Error ? args.saveError.message : 'Failed to save scenario'
+    createUserFacingErrorMessage({
+      cause: args.saveError,
+      detail: 'storage',
+      summaryKey: 'scenario.editor.v3SaveFailed',
+    })
   );
   args.setSaveState('error');
 }

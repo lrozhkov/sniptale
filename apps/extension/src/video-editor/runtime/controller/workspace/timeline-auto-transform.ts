@@ -1,6 +1,7 @@
 import type { VideoAutoProcessingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import type { VideoProject } from '../../../../features/video/project/types/index';
 import { translate } from '../../../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../../../platform/i18n/user-facing-error';
 import { autoTransformRecordingProject } from '../../../project/operations/auto-transform';
 
 interface TimelineAutoTransformStore {
@@ -41,7 +42,13 @@ export function createAutoTransformRecordingAction(
       })
       .catch((error) => {
         if (isCurrent()) {
-          store.setError(error instanceof Error ? error.message : String(error));
+          store.setError(
+            createUserFacingErrorMessage({
+              cause: error,
+              detail: 'storage',
+              summaryKey: 'common.errors.actionFailed',
+            })
+          );
         }
       });
   };

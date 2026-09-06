@@ -14,14 +14,21 @@ import { VideoEditorStatusScreen } from '../status-screen';
 /** Boots the single editor composition owner around a stable shell-gate child. */
 export const App: React.FC = () => {
   usePageLocaleMetadata('videoEditor.app.documentTitle');
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   return (
-    <VideoEditorCompositionProvider>
-      <VideoEditorShellGate />
+    <VideoEditorCompositionProvider commandPaletteOpen={commandPaletteOpen}>
+      <VideoEditorShellGate
+        commandPaletteOpen={commandPaletteOpen}
+        setCommandPaletteOpen={setCommandPaletteOpen}
+      />
     </VideoEditorCompositionProvider>
   );
 };
 
-export function VideoEditorShellGate(): React.JSX.Element {
+export function VideoEditorShellGate(props: {
+  commandPaletteOpen: boolean;
+  setCommandPaletteOpen: React.Dispatch<React.SetStateAction<boolean>>;
+}): React.JSX.Element {
   const shell = useVideoEditorShellController();
   if (!shell.isReady) {
     return <VideoEditorStatusScreen mode="loading" />;
@@ -29,15 +36,17 @@ export function VideoEditorShellGate(): React.JSX.Element {
   if (shell.error || !shell.project) {
     return <VideoEditorStatusScreen mode="error" error={shell.error ?? ''} />;
   }
-  return <VideoEditorReadySurface />;
+  return <VideoEditorReadySurface {...props} />;
 }
 
-function VideoEditorReadySurface(): React.JSX.Element {
-  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+function VideoEditorReadySurface(props: {
+  commandPaletteOpen: boolean;
+  setCommandPaletteOpen: React.Dispatch<React.SetStateAction<boolean>>;
+}): React.JSX.Element {
   useCommandPaletteHotkey({
-    isOpen: commandPaletteOpen,
-    onOpen: () => setCommandPaletteOpen(true),
-    onClose: () => setCommandPaletteOpen(false),
+    isOpen: props.commandPaletteOpen,
+    onOpen: () => props.setCommandPaletteOpen(true),
+    onClose: () => props.setCommandPaletteOpen(false),
     enabled: true,
   });
 
@@ -50,8 +59,8 @@ function VideoEditorReadySurface(): React.JSX.Element {
     >
       <VideoEditorWorkspace />
       <VideoEditorCommandPaletteContainer
-        isOpen={commandPaletteOpen}
-        onClose={() => setCommandPaletteOpen(false)}
+        isOpen={props.commandPaletteOpen}
+        onClose={() => props.setCommandPaletteOpen(false)}
       />
     </div>
   );

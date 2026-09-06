@@ -1,7 +1,11 @@
 import { expect, it } from 'vitest';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../features/video/project/factories/creation';
 import { createVideoClipFromAsset } from '../../../../features/video/project/factories/clip';
 import {
+  VideoTrackKind,
   VideoTransitionKind,
   VideoTransitionEasing,
   VideoTransitionRenderKind,
@@ -113,6 +117,7 @@ it('ignores empty persisted logical lines during vertical placement', () => {
 
 it('maps vertical clip drag below a row to the next physical track', () => {
   const project = createEmptyVideoProject('Single track lane drag', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const trackId = project.tracks[0]!.id;
   const nextTrackId = project.tracks[1]!.id;
   const layoutModel = buildTimelineTrackLayoutModel({
@@ -158,6 +163,7 @@ it('does not extend persisted logical lanes during a long vertical drag', () => 
 
 function createOverlappingTransitionProject() {
   const project = createEmptyVideoProject('Stacked transitions', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const trackId = project.tracks[0]!.id;
   const asset = createTimelineZoneAsset('asset-layout');
   const clips = [

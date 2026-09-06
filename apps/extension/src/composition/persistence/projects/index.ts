@@ -1,3 +1,7 @@
+import {
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
+} from '../infrastructure/indexed-db/core.stores';
 import type { VideoProject } from '../../../features/video/project/types';
 import {
   ASSET_OPERATIONS_STORE,
@@ -13,6 +17,7 @@ import { createProjectMutationStores } from './mutation-stores';
 import { createProjectAssetMediaId } from '../../../features/media-hub/media-id';
 import {
   collectProjectOwnedAssetIds,
+  deletePublishedProjectEntry,
   deleteProjectAssetsUnreferencedByOtherProjects,
   syncProjectAssetMirrorLifecycles,
 } from './asset-references';
@@ -77,6 +82,8 @@ export async function saveVideoProject(
       assetOwnerStore,
       assetRefStore,
       mediaLibraryStore,
+      videoWorkspaceStore,
+      videoDraftStore,
       projectAssetStore,
       projectStore,
       tx,
@@ -125,6 +132,8 @@ export async function saveVideoProject(
       assetOwnerStore,
       assetRefStore,
       mediaLibraryStore,
+      videoWorkspaceStore,
+      videoDraftStore,
       operation: physicalDelete,
       ownerProjectId: project.id,
       projectAssetIds: removedProjectAssetIds,
@@ -313,6 +322,8 @@ export async function deleteProjectAsset(id: string): Promise<void> {
       [
         PROJECT_ASSETS_STORE,
         MEDIA_LIBRARY_STORE,
+        VIDEO_WORKSPACES_STORE,
+        VIDEO_WORKSPACE_DRAFTS_STORE,
         ASSET_OWNERS_STORE,
         ASSET_REFS_STORE,
         ASSET_OPERATIONS_STORE,
@@ -320,17 +331,22 @@ export async function deleteProjectAsset(id: string): Promise<void> {
       'readwrite'
     );
     const entry = parseProjectAssetEntry(await tx.objectStore(PROJECT_ASSETS_STORE).get(id));
-    await tx.objectStore(PROJECT_ASSETS_STORE).delete(id);
-    await tx.objectStore(MEDIA_LIBRARY_STORE).delete(createProjectAssetMediaId(id));
-    if (entry) {
-      const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);
-      await ownerStore.delete([PROJECT_ASSET_OWNER_KIND, id, PROJECT_MEDIA_ASSET_ROLE]);
-      if ((await ownerStore.index('assetId').count(entry.assetId)) === 0) {
-        await tx.objectStore(ASSET_REFS_STORE).delete(entry.assetId);
-        physicalDelete.assetIds.push(entry.assetId);
-        await tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete);
-      }
-    }
+    const ownerStore = tx.objectStore(ASSET_OWNERS_STORE);
+    await deletePublishedProjectEntry({
+      countAssetOwners: (assetId) => ownerStore.index('assetId').count(assetId),
+      deleteAssetEntry: () => tx.objectStore(PROJECT_ASSETS_STORE).delete(id),
+      deleteAssetOwner: () =>
+        ownerStore.delete([PROJECT_ASSET_OWNER_KIND, id, PROJECT_MEDIA_ASSET_ROLE]),
+      deleteAssetRef: (assetId) => tx.objectStore(ASSET_REFS_STORE).delete(assetId),
+      deleteMediaEntry: async () => {
+        await tx.objectStore(MEDIA_LIBRARY_STORE).delete(createProjectAssetMediaId(id));
+        await tx.objectStore(VIDEO_WORKSPACES_STORE).delete(createProjectAssetMediaId(id));
+        await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(createProjectAssetMediaId(id));
+      },
+      entry,
+      operation: physicalDelete,
+      recordOperation: () => tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete),
+    });
     await tx.done;
   });
   if (physicalDelete.assetIds.length > 0) await completePhysicalDeleteOperation(physicalDelete);

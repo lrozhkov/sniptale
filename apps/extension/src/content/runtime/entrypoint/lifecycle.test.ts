@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   disposeExistingContentRuntime,
+  hasRegisteredContentRuntimeCleanup,
   registerContentRuntimeCleanup,
   runWhenContentBodyReady,
 } from './lifecycle';
@@ -32,11 +33,13 @@ describe('content entrypoint cleanup lifecycle', () => {
       expect(runtimeGlobal[CONTENT_RUNTIME_CLEANUP_KEY]).toBeUndefined();
     });
     registerContentRuntimeCleanup(cleanup);
+    expect(hasRegisteredContentRuntimeCleanup()).toBe(true);
 
     disposeExistingContentRuntime();
     disposeExistingContentRuntime();
 
     expect(cleanup).toHaveBeenCalledOnce();
+    expect(hasRegisteredContentRuntimeCleanup()).toBe(false);
     expect(runtimeGlobal[CONTENT_RUNTIME_CLEANUP_KEY]).toBeUndefined();
   });
 

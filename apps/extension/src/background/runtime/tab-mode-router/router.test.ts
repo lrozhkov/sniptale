@@ -83,6 +83,32 @@ async function verifiesEnableScreenshotModeAsyncSuccess() {
   expect(args.sendResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
 }
 
+async function verifiesExplicitScreenshotPreauthorizationHandoff() {
+  const message = { type: MessageType.ENABLE_SCREENSHOT_MODE } as const;
+  const args = {
+    ...createRouteArgs({ ...message }),
+    contentPreauthorization: {
+      documentId: 'authorized-document-7',
+      frameId: 0,
+      requestId: 'screenshot-enable-7',
+      senderUrl: 'https://example.test/page',
+      tabId: 7,
+    },
+  };
+
+  expect(routeTabModeMessage(args)).toBe(true);
+  await flushPromises();
+
+  expect(enableScreenshotModeMock).toHaveBeenCalledWith(
+    7,
+    args.screenshotModeState,
+    args.viewportState,
+    args.viewportOwnerState,
+    args.webSnapshotViewerPorts,
+    { surfaceDocumentId: 'authorized-document-7' }
+  );
+}
+
 async function verifiesDisableScreenshotModeAsyncError() {
   const args = createRouteArgs({
     type: MessageType.DISABLE_SCREENSHOT_MODE,
@@ -214,6 +240,10 @@ describe('tab-mode-router', () => {
   it(
     'routes enable screenshot mode through async success response',
     verifiesEnableScreenshotModeAsyncSuccess
+  );
+  it(
+    'passes explicit screenshot preauthorization through a cloned route message',
+    verifiesExplicitScreenshotPreauthorizationHandoff
   );
   it(
     'routes disable screenshot mode through async error response',

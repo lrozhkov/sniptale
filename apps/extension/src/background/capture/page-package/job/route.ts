@@ -5,7 +5,7 @@ import { createRouteErrorResponse } from '../../../routing-contracts/response';
 import {
   acknowledgePagePackageJobStatus,
   cancelPagePackageJob,
-  getPagePackageJobStatus,
+  getPagePackageJobSnapshot,
   startPagePackageJobFromSources,
 } from './index';
 import type { PopupExportJobContentPort } from './runtime-state';
@@ -35,7 +35,10 @@ export function routePagePackageJobMessage(
         runtimeActionExportMessageContracts[MessageType.GET_PAGE_PACKAGE_JOB_STATUS].parseRequest(
           message
         );
-      work = getPagePackageJobStatus(parsed.jobId).then((status) => ({ success: true, status }));
+      work = getPagePackageJobSnapshot(parsed.jobId).then((snapshot) => ({
+        success: true,
+        ...snapshot,
+      }));
       break;
     }
     case MessageType.CANCEL_PAGE_PACKAGE_JOB: {

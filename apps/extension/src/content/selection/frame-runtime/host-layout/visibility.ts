@@ -121,6 +121,7 @@ function localRectToTop(element: HTMLElement, rect: DOMRect): AnchorRect | null 
 
 function classifyClippingAncestors(element: HTMLElement, target: AnchorRect) {
   let current = getPresentationParent(element);
+  let visibleRect = target;
   while (current) {
     const view = current.ownerDocument.defaultView;
     const style = view?.getComputedStyle(current);
@@ -131,14 +132,13 @@ function classifyClippingAncestors(element: HTMLElement, target: AnchorRect) {
       overflow.some((value) => value === 'auto' || value === 'scroll');
     if (clipsDynamically || scrollClips) {
       const clip = getAbsolutePosition(current);
-      const visible = intersection(target, clip);
-      if (clipsDynamically && (!visible || isMateriallyClipped(target, visible))) {
+      const visible = intersection(visibleRect, clip);
+      const materiallyClipped = Boolean(visible && isMateriallyClipped(visibleRect, visible));
+      if (clipsDynamically && (!visible || materiallyClipped)) {
         return 'suspended' as const;
       }
       if (scrollClips && !visible) return 'offscreen' as const;
-      if (scrollClips && visible && isMateriallyClipped(target, visible)) {
-        return 'suspended' as const;
-      }
+      if (scrollClips && visible) visibleRect = visible;
     }
     current = getPresentationParent(current);
   }

@@ -1,6 +1,9 @@
 import { expect, it } from 'vitest';
 import type { VideoObjectTrack } from '../../../features/video/project/object-tracks';
-import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectAsset,
+} from '../../../features/video/project/factories/creation';
 import { createVideoEditorProjectTestStore } from './test-store.test-support';
 
 function createStoreState() {
@@ -181,3 +184,52 @@ function createUnsortedVisualCursorTrack(): VideoObjectTrack {
     source: 'visualDetection',
   };
 }
+
+it('keeps corrections on the trailing source instance after insertion and deleting its head', () => {
+  const store = createStoreState();
+  const project = createEmptyVideoProject('Tracked montage');
+  const asset = createVideoProjectAsset(
+    'Recording',
+    'VIDEO',
+    { kind: 'recording', recordingId: 'recording' },
+    {
+      width: 1280,
+      height: 720,
+      duration: 4,
+      mimeType: 'video/webm',
+      size: 100,
+      hasAudio: false,
+      audioPeaks: null,
+    }
+  );
+  project.assets = [asset];
+  store.getState().setProject(project);
+  store.getState().appendMaterial(asset.id);
+  const headId = store.getState().project!.clips[0]!.id;
+  store.getState().upsertObjectTrack({
+    ...createUnsortedVisualCursorTrack(),
+    analysis: {
+      sourceAssetId: asset.id,
+      sourceClipId: headId,
+      projectStartTime: 0,
+      projectEndTime: 4,
+      sampleFps: 2,
+    },
+    samples: [
+      { time: 0.5, x: 1, y: 1, visible: true, confidence: 1 },
+      { time: 3, x: 2, y: 2, visible: true, confidence: 1 },
+    ],
+  });
+  store.getState().setCurrentTime(2);
+  store.getState().insertMaterial(asset.id);
+  const tailId = store.getState().project!.objectTracks![0]!.samples[1]!.sourceClipId;
+  expect(tailId).toBeTypeOf('string');
+  store.getState().upsertObjectTrackCorrectionAnchor('visual-cursor', { time: 7, x: 30, y: 40 });
+  const corrected = store.getState().project!.objectTracks![0]!;
+  expect(corrected.correctionAnchors![0]).toMatchObject({ time: 7, sourceClipId: tailId });
+  expect(corrected.samples[1]).toMatchObject({ time: 7, sourceClipId: tailId, x: 30 });
+  store.getState().deleteClip(headId);
+  expect(store.getState().project!.objectTracks![0]!.correctionAnchors).toMatchObject([
+    { time: 7, sourceClipId: tailId },
+  ]);
+});

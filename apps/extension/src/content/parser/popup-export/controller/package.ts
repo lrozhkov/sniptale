@@ -1,4 +1,5 @@
 import { translate } from '../../../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../../../platform/i18n/user-facing-error';
 import {
   normalizePopupExportTabTitle,
   type ExportOptions,
@@ -91,12 +92,11 @@ function getSafePreparationCause(error: unknown): string {
 }
 
 function getPreparationFailureMessage(error: unknown): string {
-  const code = error instanceof PagePackagePreparationError ? error.diagnosticCode : 'UNCLASSIFIED';
-  const detail = getSafePreparationCause(error);
-  return [
-    `${translate('content.runtime.exportPrepareFailed')} [${code}]`,
-    ...(detail ? [detail] : []),
-  ].join(': ');
+  return createUserFacingErrorMessage({
+    cause: error,
+    detail: 'unexpected',
+    summaryKey: 'content.runtime.exportPrepareFailed',
+  });
 }
 
 function getPreparationFailureDiagnostic(error: unknown): string {

@@ -25,7 +25,9 @@ function addTrackToProject(project: VideoProject, kind: VideoTrackKind) {
   const sequence = project.tracks.filter((track) => track.kind === kind).length + 1;
   const track = createVideoProjectTrack(
     getDefaultTrackName(kind, sequence),
-    project.tracks.length,
+    kind === VideoTrackKind.OVERLAY || kind === VideoTrackKind.SUBTITLE
+      ? Math.min(0, ...project.tracks.map((item) => item.order)) - 1
+      : Math.max(0, ...project.tracks.map((item) => item.order)) + 1,
     kind
   );
 

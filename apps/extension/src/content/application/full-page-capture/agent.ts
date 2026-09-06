@@ -1,6 +1,7 @@
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import type { TabRequestByType, TabResponseByType } from '../../../contracts/messaging/tab';
 import type {
+  FullPageCaptureGeometry,
   FullPageCapturePrepareResult,
   FullPageCaptureSessionIdentity,
   FullPageCaptureTileState,
@@ -21,6 +22,43 @@ import type { FullPageAgentSession } from './types';
 const WATCHDOG_TIMEOUT_MS = 15_000;
 const GEOMETRY_EPSILON_CSS_PX = 1;
 const logger = createLogger({ namespace: 'ContentFullPageCapture' });
+
+function formatGeometryForLog(geometry: FullPageCaptureGeometry): string {
+  const root = geometry.rootViewport;
+  return [
+    `kind=${geometry.rootKind}`,
+    `extent=${geometry.extentWidth}x${geometry.extentHeight}`,
+    `viewport=${geometry.viewportWidth}x${geometry.viewportHeight}`,
+    `root=${root.x},${root.y},${root.width}x${root.height}`,
+    `output=${geometry.outputWidth}x${geometry.outputHeight}`,
+    `dpr=${geometry.devicePixelRatio}`,
+  ].join(' ');
+}
+
+function resolveCompatibleViewportOffset(
+  current: FullPageCaptureGeometry,
+  prepared: FullPageCaptureGeometry
+): { x: number; y: number } | null {
+  if (current.rootKind !== 'element' || prepared.rootKind !== 'element') return null;
+  const currentViewport = current.rootViewport;
+  const preparedViewport = prepared.rootViewport;
+  const currentBottom = currentViewport.y + currentViewport.height;
+  const preparedBottom = preparedViewport.y + preparedViewport.height;
+  if (
+    Math.abs(current.viewportWidth - prepared.viewportWidth) > GEOMETRY_EPSILON_CSS_PX ||
+    Math.abs(current.viewportHeight - prepared.viewportHeight) > GEOMETRY_EPSILON_CSS_PX ||
+    Math.abs(current.devicePixelRatio - prepared.devicePixelRatio) / prepared.devicePixelRatio >
+      0.005 ||
+    Math.abs(currentViewport.x - preparedViewport.x) > GEOMETRY_EPSILON_CSS_PX ||
+    Math.abs(currentViewport.width - preparedViewport.width) > GEOMETRY_EPSILON_CSS_PX ||
+    Math.abs(currentBottom - preparedBottom) > GEOMETRY_EPSILON_CSS_PX ||
+    currentViewport.y > preparedViewport.y + GEOMETRY_EPSILON_CSS_PX ||
+    currentViewport.height < preparedViewport.height - GEOMETRY_EPSILON_CSS_PX
+  ) {
+    return null;
+  }
+  return { x: 0, y: Math.max(0, preparedViewport.y - currentViewport.y) };
+}
 
 type FullPageAgentMessage =
   | TabRequestByType[typeof MessageType.PREPARE_FULL_PAGE_CAPTURE]
@@ -59,19 +97,33 @@ function requireIdentity(
 
 function createTileState(session: FullPageAgentSession): FullPageCaptureTileState {
   const currentGeometry = measureCaptureGeometry(session.root);
+  const compatibleViewportOffset = resolveCompatibleViewportOffset(
+    currentGeometry,
+    session.geometry
+  );
   if (
     currentGeometry.extentWidth < session.geometry.extentWidth - GEOMETRY_EPSILON_CSS_PX ||
     currentGeometry.extentHeight < session.geometry.extentHeight - GEOMETRY_EPSILON_CSS_PX
   ) {
+    logger.warn('Full-page capture extent shrank', {
+      current: currentGeometry,
+      prepared: session.geometry,
+    });
     throw new Error('Full-page capture extent shrank during capture');
   }
   if (
     currentGeometry.extentWidth > session.geometry.extentWidth + GEOMETRY_EPSILON_CSS_PX ||
     currentGeometry.extentHeight > session.geometry.extentHeight + GEOMETRY_EPSILON_CSS_PX
   ) {
+    if (!session.frozenExtentWarning) {
+      logger.warn('Full-page capture extent grew', {
+        current: currentGeometry,
+        prepared: session.geometry,
+      });
+    }
     session.frozenExtentWarning = true;
   }
-  if (
+  const viewportChanged =
     Math.abs(currentGeometry.viewportWidth - session.geometry.viewportWidth) >
       GEOMETRY_EPSILON_CSS_PX ||
     Math.abs(currentGeometry.viewportHeight - session.geometry.viewportHeight) >
@@ -86,28 +138,37 @@ function createTileState(session: FullPageAgentSession): FullPageCaptureTileStat
       GEOMETRY_EPSILON_CSS_PX ||
     Math.abs(currentGeometry.devicePixelRatio - session.geometry.devicePixelRatio) /
       session.geometry.devicePixelRatio >
-      0.005
-  ) {
-    logger.warn('Full-page capture viewport changed', {
-      current: {
-        devicePixelRatio: currentGeometry.devicePixelRatio,
-        rootViewport: currentGeometry.rootViewport,
-        viewportHeight: currentGeometry.viewportHeight,
-        viewportWidth: currentGeometry.viewportWidth,
-      },
-      prepared: {
-        devicePixelRatio: session.geometry.devicePixelRatio,
-        rootViewport: session.geometry.rootViewport,
-        viewportHeight: session.geometry.viewportHeight,
-        viewportWidth: session.geometry.viewportWidth,
-      },
-    });
+      0.005;
+  if (viewportChanged && compatibleViewportOffset === null) {
+    const currentSummary = formatGeometryForLog(currentGeometry);
+    const preparedSummary = formatGeometryForLog(session.geometry);
+    logger.warn(
+      [
+        'Full-page capture viewport changed',
+        `current: ${currentSummary}`,
+        `prepared: ${preparedSummary}`,
+      ].join('; '),
+      {
+        current: {
+          devicePixelRatio: currentGeometry.devicePixelRatio,
+          rootViewport: currentGeometry.rootViewport,
+          viewportHeight: currentGeometry.viewportHeight,
+          viewportWidth: currentGeometry.viewportWidth,
+        },
+        prepared: {
+          devicePixelRatio: session.geometry.devicePixelRatio,
+          rootViewport: session.geometry.rootViewport,
+          viewportHeight: session.geometry.viewportHeight,
+          viewportWidth: session.geometry.viewportWidth,
+        },
+      }
+    );
     throw new Error('Full-page capture viewport changed during capture');
   }
   const scroll = readPageScroll(session.root);
   return {
-    actualX: scroll.x,
-    actualY: scroll.y,
+    actualX: scroll.x + (compatibleViewportOffset?.x ?? 0),
+    actualY: scroll.y + (compatibleViewportOffset?.y ?? 0),
     frozenExtentWarning: session.frozenExtentWarning,
     geometry: session.geometry,
     layoutGeneration: session.layoutGeneration,
@@ -190,9 +251,19 @@ export function createFullPageCaptureAgent(): FullPageCaptureAgent {
     lastRestoredIdentity = null;
     try {
       preparePageMutations(active);
+      if (active.root.kind === 'element') {
+        writePageScroll(active.root, 0, 0);
+        await waitForCaptureStability(active.abortController.signal);
+        assertActive(active);
+        active.geometry = measureCaptureGeometry(active.root);
+      }
       active.floating = collectFloatingCandidates(active.root);
       armWatchdog(active);
-      if (active.preferences.preloadLazyContent) {
+      // A dominant internal scroller can be a paginated or virtual application list. Sweeping it
+      // before tile capture triggers application data loading, inflates the measured raster, and
+      // then repeats the same visible scrolling during capture. Tiles already visit and stabilize
+      // every admitted internal-list position, so eager warm-up is reserved for document pages.
+      if (active.preferences.preloadLazyContent && active.root.kind === 'document') {
         await warmUpLazyContent(
           active.root,
           active.geometry,
@@ -206,6 +277,33 @@ export function createFullPageCaptureAgent(): FullPageCaptureAgent {
         active.geometry = measureCaptureGeometry(active.root);
       }
       active.layoutGeneration = createLayoutGeneration(active.geometry);
+      const rootElement =
+        active.root.element === null
+          ? null
+          : {
+              clientHeight: active.root.element.clientHeight,
+              clientWidth: active.root.element.clientWidth,
+              scrollHeight: active.root.element.scrollHeight,
+              scrollWidth: active.root.element.scrollWidth,
+              tagName: active.root.element.tagName,
+            };
+      const rootElementSummary =
+        rootElement === null
+          ? 'document'
+          : [
+              rootElement.tagName,
+              `client=${rootElement.clientWidth}x${rootElement.clientHeight}`,
+              `scroll=${rootElement.scrollWidth}x${rootElement.scrollHeight}`,
+            ].join(' ');
+      const geometrySummary = formatGeometryForLog(active.geometry);
+      logger.debug(
+        `Full-page capture prepared; ${geometrySummary}; rootElement=${rootElementSummary}`,
+        {
+          geometry: active.geometry,
+          preferences: active.preferences,
+          rootElement,
+        }
+      );
       armWatchdog(active);
       const result: FullPageCapturePrepareResult = {
         ...createTileState(active),
@@ -226,10 +324,32 @@ export function createFullPageCaptureAgent(): FullPageCaptureAgent {
     writePageScroll(active.root, message.targetX, message.targetY);
     await waitForCaptureStability(active.abortController.signal);
     assertActive(active);
+    if (active.root.kind === 'element') {
+      const positioned = createTileState(active);
+      if (
+        Math.abs(positioned.actualX - message.targetX) <= GEOMETRY_EPSILON_CSS_PX &&
+        Math.abs(positioned.actualY - message.targetY) > GEOMETRY_EPSILON_CSS_PX
+      ) {
+        const physicalScroll = readPageScroll(active.root);
+        const correctedY = Math.max(0, physicalScroll.y + message.targetY - positioned.actualY);
+        writePageScroll(active.root, message.targetX, correctedY);
+        await waitForCaptureStability(active.abortController.signal);
+        assertActive(active);
+      }
+    }
     applyFloatingPolicyForTile(active, message);
     await waitForCaptureStability(active.abortController.signal);
     assertActive(active);
-    return { success: true, result: createTileState(active) };
+    const result = createTileState(active);
+    logger.debug('Full-page capture tile prepared', {
+      actualX: result.actualX,
+      actualY: result.actualY,
+      column: message.column,
+      row: message.row,
+      targetX: message.targetX,
+      targetY: message.targetY,
+    });
+    return { success: true, result };
   }
 
   async function verifyTile(

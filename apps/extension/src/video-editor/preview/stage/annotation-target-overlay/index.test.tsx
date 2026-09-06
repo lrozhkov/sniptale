@@ -11,8 +11,12 @@ import {
   type VideoAnnotationTemplate,
 } from '../../../../features/video/project/annotation-engine';
 import { createAnnotationClip } from '../../../../features/video/project/factories/overlay-clip';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../features/video/project/factories/creation';
+import {
+  VideoTrackKind,
   VideoMotionOverlayZoomMode,
   VideoOverlayTemplateKind,
 } from '../../../../features/video/project/types';
@@ -51,7 +55,8 @@ function createStage(width = 220, height = 140) {
 
 function createModernTargetProject(pack: VideoAnnotationPack, template: VideoAnnotationTemplate) {
   const project = createEmptyVideoProject('Targets', 200, 100);
-  const clip = createAnnotationClip(project.tracks[2]!.id, 200, 100, 0, {
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  const clip = createAnnotationClip(project.tracks[1]!.id, 200, 100, 0, {
     pack,
     packLabel: pack.label,
     packTheme: pack.theme,
@@ -201,13 +206,14 @@ it('shows target rect handles for bracket-style callout cards too', () => {
 
 it('uses modern template target support before legacy templateKind fallback', () => {
   const project = createEmptyVideoProject('Modern targets', 200, 100);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
   const template = Object.values(APPLE_GLASS_ANNOTATION_PACK.templates)
     .flat()
     .find((candidate) => candidate.id === 'soft-spotlight');
   if (!template) {
     throw new Error('Missing soft-spotlight template.');
   }
-  const clip = createAnnotationClip(project.tracks[2]!.id, project.width, project.height, 0, {
+  const clip = createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 0, {
     pack: APPLE_GLASS_ANNOTATION_PACK,
     packLabel: APPLE_GLASS_ANNOTATION_PACK.label,
     packTheme: APPLE_GLASS_ANNOTATION_PACK.theme,

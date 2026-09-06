@@ -52,7 +52,7 @@ function sanitizeScalar(key: string, value: string): string {
   return result;
 }
 
-function elementPath(element: Element): string {
+export function elementPath(element: Element): string {
   const segments: string[] = [];
   let current: Element | null = element;
   while (current && segments.length < 8) {

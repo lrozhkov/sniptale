@@ -7,6 +7,13 @@ import {
 } from '../../../proof/contracts/product-proof-risk-hints.mjs';
 import { printAdvisoryReport } from './report.mjs';
 import { runStructuralRiskCheck } from '../../../analysis/structural-risk/check.mjs';
+import { collectRootScatterViolations } from '../../../guards/quality/root-scatter/check.mjs';
+import {
+  collectDocumentationProseAdvisories,
+  DOCUMENTATION_FACTS_POLICY,
+} from '../../../policy/documentation/documentation-facts/check.mjs';
+import { collectOversizedInlineLiteralViolations } from '../../../guards/quality/readability/inline-literals/check.mjs';
+import { readText } from '../../../analysis/repository/shared-paths.mjs';
 
 export { printAdvisoryReport };
 
@@ -26,10 +33,57 @@ export function collectAdvisoryFindings({
 } = {}) {
   const findings = [
     ...collectStructuralFindings(codeFiles, structuralReport),
+    ...collectRootScatterFindings(targetFiles),
+    ...collectDocumentationProseFindings(targetFiles),
+    ...collectOversizedInlineLiteralFindings(codeFiles),
     ...collectUiProofGapFindings({ codeFiles, targetFiles }),
   ];
 
   return findings.sort(compareAdvisoryFindings);
+}
+
+function collectOversizedInlineLiteralFindings(codeFiles) {
+  return codeFiles
+    .filter((file) => fs.existsSync(file))
+    .flatMap((file) =>
+      collectOversizedInlineLiteralViolations(file, readText(file)).map((violation) =>
+        createAdvisoryFinding({
+          id: 'advisory.oversized-inline-literal',
+          file: violation.file,
+          line: violation.line,
+          reason: violation.message,
+          severity: 'watch',
+        })
+      )
+    );
+}
+
+function collectDocumentationProseFindings(targetFiles) {
+  if (
+    !targetFiles.some((file) => file.endsWith('.md')) ||
+    !fs.existsSync(DOCUMENTATION_FACTS_POLICY)
+  ) {
+    return [];
+  }
+  return collectDocumentationProseAdvisories({ targetFiles }).map((advisory) =>
+    createAdvisoryFinding({
+      id: 'advisory.documentation-prose',
+      file: advisory.file,
+      reason: advisory.message,
+      severity: 'watch',
+    })
+  );
+}
+
+function collectRootScatterFindings(targetFiles) {
+  return collectRootScatterViolations(targetFiles).map((violation) =>
+    createAdvisoryFinding({
+      id: 'advisory.root-scatter',
+      file: violation.file,
+      reason: violation.message,
+      severity: 'watch',
+    })
+  );
 }
 
 function collectStructuralFindings(codeFiles, structuralReport) {

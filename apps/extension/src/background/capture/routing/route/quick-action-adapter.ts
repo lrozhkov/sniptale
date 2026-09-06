@@ -2,14 +2,14 @@ import { browserTabs } from '@sniptale/platform/browser/tabs';
 import { isOwnedSnapshotViewerPage } from '../../../../features/tab-capabilities/url';
 import { createRouteErrorResponse } from '../../../routing-contracts/response';
 import { handleTriggerQuickAction } from '../actions.quick-action';
-import type { CaptureRouteAdapterContext } from './types';
+import type { CaptureRouteCommandContext } from './types';
 import {
   loadQuickActionRuntimeContext,
   loadScreenshotCaptureRuntimeContext,
 } from '../../quick-actions/flow/load';
 import { reserveDesktopQuickAction } from '../../quick-actions/desktop/workflow';
 
-export function routeQuickActionMessage(args: CaptureRouteAdapterContext): boolean {
+export function routeQuickActionMessage(args: CaptureRouteCommandContext): boolean {
   if (
     args.routeArgs.message.type !== 'TRIGGER_QUICK_ACTION' &&
     args.routeArgs.message.type !== 'PREPARE_DESKTOP_SCREENSHOT_CAPTURE' &&
@@ -64,7 +64,7 @@ export function routeQuickActionMessage(args: CaptureRouteAdapterContext): boole
 
 async function loadDesktopScreenshotPreparationContext(
   message: Extract<
-    CaptureRouteAdapterContext['routeArgs']['message'],
+    CaptureRouteCommandContext['routeArgs']['message'],
     { type: 'PREPARE_DESKTOP_SCREENSHOT_CAPTURE' }
   >
 ) {
@@ -81,7 +81,7 @@ async function loadDesktopScreenshotPreparationContext(
 }
 
 async function authorizePageAccess(
-  args: CaptureRouteAdapterContext,
+  args: CaptureRouteCommandContext,
   captureMode: string
 ): Promise<void> {
   if (captureMode === 'desktop') {

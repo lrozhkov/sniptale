@@ -8,7 +8,8 @@ const { translateMock } = vi.hoisted(() => ({
   translateMock: vi.fn((key: string) => key),
 }));
 
-vi.mock('../../../../../platform/i18n', () => ({
+vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
   translate: translateMock,
 }));
 

@@ -47,11 +47,10 @@ export function parseCorrelation(value = {}) {
 
 export function readCorrelationEnvironment(environment = process.env) {
   const taskId = environment.SNIPTALE_QA_TASK_ID ?? environment.CODEX_THREAD_ID;
+  const workflowId = environment.SNIPTALE_QA_WORKFLOW_ID;
   return parseCorrelation({
     ...(taskId === undefined ? {} : { taskId }),
-    ...(environment.SNIPTALE_QA_WORKFLOW_ID === undefined
-      ? {}
-      : { workflowId: environment.SNIPTALE_QA_WORKFLOW_ID }),
+    ...(workflowId === undefined ? {} : { workflowId }),
   });
 }
 

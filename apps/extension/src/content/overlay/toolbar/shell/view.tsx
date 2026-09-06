@@ -57,7 +57,7 @@ export function ToolbarShellContent(props: {
           data-menu-open={menuOpen ? 'true' : undefined}
           onMouseOverCapture={onHoverCapture}
         >
-          <ContentToolbarDragHandle onMouseDown={derivedState.handleMouseDown}>
+          <ContentToolbarDragHandle onPointerDown={derivedState.handleMouseDown}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeLinecap="round">
               <circle cx="9" cy="12" r="1" />
               <circle cx="9" cy="5" r="1" />

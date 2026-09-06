@@ -169,7 +169,7 @@ it('falls back to the last visible cursor sample and default NONE durations', ()
   ).toBe(0.5);
 });
 
-it('suppresses cursor output when interpolation reaches a hidden sample', () => {
+it('preserves cursor output until the hidden key time', () => {
   const project = createCompositionProject();
 
   project.cursorTrack = {
@@ -180,7 +180,9 @@ it('suppresses cursor output when interpolation reaches a hidden sample', () => 
     ],
   };
 
-  expect(resolveVideoCompositionFrame(project, 4.5).cursor).toBeNull();
+  expect(resolveVideoCompositionFrame(project, 4.5).cursor).toMatchObject({ x: 150, y: 200 });
+  expect(resolveVideoCompositionFrame(project, 5).cursor).toBeNull();
+  expect(resolveVideoCompositionFrame(project, 5.5).cursor).toBeNull();
 });
 
 it('uses the latest embedded cursor sample without smoothing when raw video already contains the cursor', () => {

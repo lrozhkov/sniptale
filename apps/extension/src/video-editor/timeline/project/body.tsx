@@ -10,17 +10,17 @@ type ProjectTimelineBodyProps = Pick<
   | 'beginClipInteraction'
   | 'beginEffectInteraction'
   | 'beginEffectRangeSelection'
+  | 'beginPlayheadScrub'
   | 'beginRangeSelection'
   | 'beginTrackRangeSelection'
   | 'currentTime'
+  | 'consumeCompletedScrubClick'
   | 'dragGhost'
   | 'handleTimelineSeek'
   | 'hoveredClipId'
   | 'insertion'
   | 'onCloseTrackGap'
   | 'onDropEffectDocument'
-  | 'onDeleteTrack'
-  | 'onMoveTrack'
   | 'onClearUtilityLane'
   | 'onSelectActionSegment'
   | 'onSelectClip'
@@ -32,6 +32,9 @@ type ProjectTimelineBodyProps = Pick<
   | 'onSelectTransition'
   | 'onResizeActionEvent'
   | 'onResizeMotionRegion'
+  | 'onSeek'
+  | 'onStepToNextFrame'
+  | 'onStepToPreviousFrame'
   | 'onToggleTrackLock'
   | 'onToggleTrackVisibility'
   | 'onToggleUtilityLaneLock'
@@ -42,6 +45,7 @@ type ProjectTimelineBodyProps = Pick<
   | 'recordingTelemetry'
   | 'selection'
   | 'seekToClientX'
+  | 'snapGuideTime'
   | 'selectedClipId'
   | 'selectedEffectSelection'
   | 'selectedTrackId'
@@ -67,23 +71,13 @@ export function ProjectTimelineBody(props: ProjectTimelineBodyProps) {
     <div
       className="grid min-h-0 flex-1 overflow-hidden"
       style={{
-        gridTemplateColumns: resolveTrackPanelGridColumns(props.trackPanelPrefs.prefs),
+        gridTemplateColumns: '220px minmax(0,1fr)',
       }}
     >
       <ProjectTimelineBodyTrackList {...props} />
       <ProjectTimelineBodyCanvas {...props} />
     </div>
   );
-}
-
-function resolveTrackPanelGridColumns(
-  prefs: ReturnType<typeof useProjectTimelinePanelPrefs>['prefs']
-): string {
-  if (prefs.compactRows) {
-    return '56px minmax(0,1fr)';
-  }
-
-  return prefs.panelExpanded ? '440px minmax(0,1fr)' : '220px minmax(0,1fr)';
 }
 
 function ProjectTimelineBodyTrackList(props: ProjectTimelineBodyProps) {
@@ -104,9 +98,9 @@ function createTrackListProps(props: ProjectTimelineBodyProps): ProjectTimelineB
     trackListRef: props.trackListRef,
     trackPanelPrefs: props.trackPanelPrefs,
     tracks: props.tracks,
+    onAddTrack: props.insertion.onAddTrack,
+    onAddMotionRegion: () => props.insertion.onAddMotionRegion(),
     onClearUtilityLane: props.onClearUtilityLane,
-    onDeleteTrack: props.onDeleteTrack,
-    onMoveTrack: props.onMoveTrack,
     onScroll: () => props.syncTracksScroll('tracks'),
     onSelectTrack: props.onSelectTrack,
     onToggleTrackLock: props.onToggleTrackLock,
@@ -119,6 +113,7 @@ function createTrackListProps(props: ProjectTimelineBodyProps): ProjectTimelineB
 function createCanvasProps(props: ProjectTimelineBodyProps): ProjectTimelineBodyCanvasProps {
   return {
     currentTime: props.currentTime,
+    consumeCompletedScrubClick: props.consumeCompletedScrubClick,
     cursorLaneVisible: props.cursorLaneVisible,
     dragGhost: props.dragGhost,
     hoveredClipId: props.hoveredClipId,
@@ -131,6 +126,7 @@ function createCanvasProps(props: ProjectTimelineBodyProps): ProjectTimelineBody
     selectedEffectSelection: props.selectedEffectSelection,
     selectedTrackId: props.selectedTrackId,
     selection: props.selection,
+    snapGuideTime: props.snapGuideTime,
     telemetryLaneVisible: props.telemetryLaneVisible,
     timelinePreviews: props.timelinePreviews,
     timelineRef: props.timelineRef,
@@ -141,6 +137,7 @@ function createCanvasProps(props: ProjectTimelineBodyProps): ProjectTimelineBody
     onBeginClipInteraction: props.beginClipInteraction,
     onBeginEffectInteraction: props.beginEffectInteraction,
     onBeginEffectRangeSelection: props.beginEffectRangeSelection,
+    onBeginPlayheadScrub: props.beginPlayheadScrub,
     onBeginRangeSelection: props.beginRangeSelection,
     onBeginTrackRangeSelection: props.beginTrackRangeSelection,
     onCloseTrackGap: props.onCloseTrackGap,
@@ -150,6 +147,9 @@ function createCanvasProps(props: ProjectTimelineBodyProps): ProjectTimelineBody
     onResizeMotionRegion: props.onResizeMotionRegion,
     onScroll: () => props.syncTracksScroll('timeline'),
     onSeek: props.handleTimelineSeek,
+    onSeekTime: props.onSeek,
+    onStepToNextFrame: props.onStepToNextFrame,
+    onStepToPreviousFrame: props.onStepToPreviousFrame,
     onSelectActionSegment: props.onSelectActionSegment,
     onSelectClip: props.onSelectClip,
     onSelectCursorSegment: props.onSelectCursorSegment,

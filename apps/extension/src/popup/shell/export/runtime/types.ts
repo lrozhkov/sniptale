@@ -44,6 +44,7 @@ export type PopupExportRuntimeDeps = {
 export type { PopupExportRuntimeContract } from './state';
 
 export type PopupExportRuntimeMessage = {
+  locale: 'en' | 'ru';
   type: typeof MessageType.PAGE_PACKAGE_JOB_STATUS_UPDATED;
   status: PagePackageJobStatusV1;
 };

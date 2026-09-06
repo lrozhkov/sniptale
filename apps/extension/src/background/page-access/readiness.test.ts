@@ -14,6 +14,7 @@ import {
 } from './readiness';
 
 const VIEWPORT_COORDS_RESPONSE = {
+  success: true,
   contentRuntimeProtocolVersion: CONTENT_RUNTIME_PROTOCOL_VERSION,
   coords: { x: 0, y: 0, width: 100, height: 100, outerWidth: 100, outerHeight: 100 },
 };
@@ -23,7 +24,25 @@ beforeEach(() => {
   sendTabMessageMock.mockResolvedValue(VIEWPORT_COORDS_RESPONSE);
 });
 
-it('waits for the top-level content runtime after injecting the runtime', async () => {
+it('does not reinject an already-current top-level content runtime', async () => {
+  await injectContentRuntimeAndAwaitReady(
+    {
+      tab: { id: 7, url: 'https://example.test/path' } as chrome.tabs.Tab,
+      tabId: 7,
+      url: new URL('https://example.test/path'),
+    },
+    { allFrames: true }
+  );
+
+  expect(browserScriptingExecuteScriptMock).not.toHaveBeenCalled();
+  expect(sendTabMessageMock).toHaveBeenCalledTimes(1);
+});
+
+it('injects and waits when the top-level content runtime is not ready', async () => {
+  sendTabMessageMock
+    .mockRejectedValueOnce(new Error('Receiving end does not exist.'))
+    .mockResolvedValueOnce(VIEWPORT_COORDS_RESPONSE);
+
   await injectContentRuntimeAndAwaitReady(
     {
       tab: { id: 7, url: 'https://example.test/path' } as chrome.tabs.Tab,
@@ -45,6 +64,25 @@ it('waits for the top-level content runtime after injecting the runtime', async 
     },
     { frameId: 0 }
   );
+  expect(sendTabMessageMock).toHaveBeenCalledTimes(2);
+});
+
+it('injects when a failed response carries otherwise current viewport data', async () => {
+  sendTabMessageMock
+    .mockResolvedValueOnce({ ...VIEWPORT_COORDS_RESPONSE, success: false })
+    .mockResolvedValueOnce(VIEWPORT_COORDS_RESPONSE);
+
+  await injectContentRuntimeAndAwaitReady(
+    {
+      tab: { id: 7, url: 'https://example.test/path' } as chrome.tabs.Tab,
+      tabId: 7,
+      url: new URL('https://example.test/path'),
+    },
+    { allFrames: true }
+  );
+
+  expect(browserScriptingExecuteScriptMock).toHaveBeenCalledOnce();
+  expect(sendTabMessageMock).toHaveBeenCalledTimes(2);
 });
 
 it('retries readiness while the newly injected runtime has not registered its bridge yet', async () => {
@@ -80,6 +118,7 @@ it('does not accept a viewport response from a stale content runtime', async () 
 it('accepts the current content runtime protocol', async () => {
   const wait = vi.fn(async () => undefined);
   const sendTabMessage = vi.fn().mockResolvedValueOnce({
+    success: true,
     contentRuntimeProtocolVersion: CONTENT_RUNTIME_PROTOCOL_VERSION,
     coords: { x: 0, y: 0, width: 100, height: 100, outerWidth: 100, outerHeight: 100 },
   });

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { VideoTrackKind } from '../../../../../features/video/project/types';
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -18,7 +19,10 @@ import {
   type VideoAnnotationTemplate,
 } from '../../../../../features/video/project/annotation-engine';
 import { createAnnotationClip } from '../../../../../features/video/project/factories/overlay-clip';
-import { createEmptyVideoProject } from '../../../../../features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../../features/video/project/factories/creation';
 import { AnnotationGeneratedControls } from './generated-controls';
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
@@ -120,7 +124,8 @@ describe('annotation generated controls', () => {
 function registerCustomGeneratedControlTests() {
   it('renders controls from a custom template snapshot', () => {
     const project = createEmptyVideoProject('Generated controls');
-    const clip = createAnnotationClip(project.tracks[2]!.id, project.width, project.height, 0);
+    project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+    const clip = createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 0);
     const template = createTemplate();
     clip.templateRef = { packId: 'custom.pack', templateId: template.id };
     clip.templateControlValues = undefined;
@@ -260,7 +265,8 @@ function registerGeneratedControlMutationTests() {
 
 function createBuiltInProps(pack: VideoAnnotationPack, template: VideoAnnotationTemplate) {
   const project = createEmptyVideoProject('Generated built-in controls');
-  const clip = createAnnotationClip(project.tracks[2]!.id, project.width, project.height, 0, {
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  const clip = createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 0, {
     pack,
     packLabel: pack.label,
     packTheme: pack.theme,

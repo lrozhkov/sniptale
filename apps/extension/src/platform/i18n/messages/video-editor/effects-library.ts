@@ -1,7 +1,14 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorEffectsLibraryMessages = defineMessageSource({
+  applyFailed: {
+    ru: 'Не удалось добавить эффект.',
+    en: 'The effect could not be added.',
+  },
   applyButton: { ru: 'Добавить', en: 'Add' },
+  applyToClip: { ru: 'Добавить к клипу', en: 'Add to clip' },
+  applyToScene: { ru: 'Добавить на сцену', en: 'Add to scene' },
+  applyToTransition: { ru: 'Добавить к переходу', en: 'Add to transition' },
   applyFailedWithDetail: {
     ru: 'Не удалось добавить эффект: {detail}',
     en: 'The effect could not be added: {detail}',
@@ -11,14 +18,18 @@ export const videoEditorEffectsLibraryMessages = defineMessageSource({
     ru: 'Не удалось загрузить каталог эффектов: {detail}',
     en: 'The effects catalog could not be loaded: {detail}',
   },
+  deleteFailed: {
+    ru: 'Не удалось удалить набор эффектов.',
+    en: 'The effects bundle could not be deleted.',
+  },
   deleteFailedWithDetail: {
     ru: 'Не удалось удалить набор эффектов: {detail}',
     en: 'The effects bundle could not be deleted: {detail}',
   },
   deletePack: { ru: 'Удалить bundle', en: 'Delete bundle' },
   description: {
-    ru: 'Декларативные EffectV1 и встроенные аннотации.',
-    en: 'Declarative EffectV1 effects and built-in annotations.',
+    ru: 'Импортируйте набор эффектов и выберите эффект для сцены, клипа или перехода.',
+    en: 'Import an effects bundle and choose an effect for the scene, a clip, or a transition.',
   },
   disablePack: { ru: 'Выключить bundle', en: 'Disable bundle' },
   enablePack: { ru: 'Включить bundle', en: 'Enable bundle' },
@@ -28,7 +39,19 @@ export const videoEditorEffectsLibraryMessages = defineMessageSource({
     ru: 'EffectV1 не импортирован: {detail}',
     en: 'EffectV1 was not imported: {detail}',
   },
+  importFailed: {
+    ru: 'Не удалось импортировать EffectV1.',
+    en: 'EffectV1 could not be imported.',
+  },
   incompatibleButton: { ru: 'Выберите цель', en: 'Select target' },
+  selectClipTarget: { ru: 'Сначала выберите клип', en: 'Select a clip first' },
+  selectTransitionTarget: {
+    ru: 'Сначала выберите переход',
+    en: 'Select a transition first',
+  },
+  documentKindScene: { ru: 'Эффект сцены', en: 'Scene effect' },
+  documentKindClip: { ru: 'Эффект клипа', en: 'Clip effect' },
+  documentKindTransition: { ru: 'Эффект перехода', en: 'Transition effect' },
   invalidPack: { ru: 'Повреждённый EffectV1 bundle', en: 'Invalid EffectV1 bundle' },
   invalidPackDescription: {
     ru: 'Bundle нельзя применить или включить. Его можно только удалить.',
@@ -50,5 +73,9 @@ export const videoEditorEffectsLibraryMessages = defineMessageSource({
   updateFailedWithDetail: {
     ru: 'Не удалось изменить набор эффектов: {detail}',
     en: 'The effects bundle could not be updated: {detail}',
+  },
+  updateFailed: {
+    ru: 'Не удалось изменить набор эффектов.',
+    en: 'The effects bundle could not be updated.',
   },
 });

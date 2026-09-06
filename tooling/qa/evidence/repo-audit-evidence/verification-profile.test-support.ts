@@ -81,24 +81,14 @@ export function expectWrapperCoverage(verification: Verification) {
 
 export function expectManualOnlySeparation(verification: Verification) {
   expect(verification.manualOnlyCheckScripts).toEqual([]);
-  expect(verification.qualityScripts).toContainEqual(
-    expect.objectContaining({
-      script: 'qa:advisory',
-      tool: 'verify-advisory.mjs',
-      entryKind: 'advisory',
-    })
+  expect(verification.qualityScripts).not.toContainEqual(
+    expect.objectContaining({ script: 'qa:advisory' })
   );
 }
 
 export function expectAdvisoryCoverage(verification: Verification) {
-  expect(verification.advisoryTools).toEqual(['verify-advisory.mjs']);
-  expect(verification.advisoryScripts).toContainEqual(
-    expect.objectContaining({
-      script: 'qa:advisory',
-      tool: 'verify-advisory.mjs',
-      entryKind: 'advisory',
-    })
-  );
+  expect(verification.advisoryTools).toEqual([]);
+  expect(verification.advisoryScripts).toEqual([]);
 }
 
 export function expectRepoAuditReportCoverage(verification: Verification) {

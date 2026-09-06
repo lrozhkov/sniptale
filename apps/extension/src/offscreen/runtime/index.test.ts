@@ -416,6 +416,33 @@ async function verifiesTerminalStopFailuresUseAnAcceptedTerminalResponse() {
   });
 }
 
+async function verifiesUnknownStopCompletionsFailClosed() {
+  const listener = await captureSubscriptionListener();
+  const sendResponse = vi.fn();
+  parseOffscreenRuntimeMessageMock.mockImplementation((message: unknown) => message);
+  stopRecordingMock.mockResolvedValueOnce(undefined);
+
+  expect(
+    emitTrustedRuntimeMessage(
+      listener,
+      {
+        type: VideoMessageType.OFFSCREEN_STOP_RECORDING,
+        generation: 9,
+        recordingId: 'recording-invalid-stop',
+        streamInstanceId: 'stream-invalid-stop',
+      },
+      sendResponse
+    )
+  ).toBe(true);
+  await flushRuntimeRouting();
+
+  expect(sendResponse).toHaveBeenCalledWith({
+    error: `Invalid ${VideoMessageType.OFFSCREEN_STOP_RECORDING} completion`,
+    success: false,
+  });
+  expect(sendResponse).not.toHaveBeenCalledWith({ success: true, result: 'accepted' });
+}
+
 describe('offscreen-runtime', () => {
   beforeEach(resetOffscreenRuntimeMocks);
   it('ignores payloads that fail runtime message parsing', verifiesInvalidParseIgnored);
@@ -438,6 +465,10 @@ describe('offscreen-runtime', () => {
   it(
     'acknowledges terminal recorder failures as one terminal stop result',
     verifiesTerminalStopFailuresUseAnAcceptedTerminalResponse
+  );
+  it(
+    'fails closed when a deferred command returns an unknown completion',
+    verifiesUnknownStopCompletionsFailClosed
   );
   it(
     'returns the camera SDP answer through the deferred runtime response channel',

@@ -253,7 +253,8 @@ it('surfaces the current save error when the latest autosave fails', async () =>
 
   expect(syncProjectSummaryMock).not.toHaveBeenCalled();
   expect(getHarness().savedProjectRef.current).toBe(project);
-  expect(getHarness().error).toBe('Save failed');
+  expect(getHarness().error).toContain('Sniptale');
+  expect(getHarness().error).not.toContain('Save failed');
   expect(getHarness().saveState).toBe('error');
 });
 

@@ -29,6 +29,16 @@ it('keeps import-only and type-only candidates visible to suppression policy', (
   expect(resolveFocusedCodeStepFiles(suppression?.[3], codeFiles, [])).toEqual(codeFiles);
 });
 
+it('keeps the complete import-only candidate set visible to forwarding drift policy', () => {
+  const codeFiles = ['apps/extension/src/content/owner/facade.ts'];
+  const forwardingDrift = FOCUSED_CODE_VIOLATION_STEPS.find(
+    ([label]) => label === 'Forwarding module drift'
+  );
+
+  expect(forwardingDrift?.[3]).toEqual({ preserveImportOnly: true });
+  expect(resolveFocusedCodeStepFiles(forwardingDrift?.[3], codeFiles, [])).toEqual(codeFiles);
+});
+
 it('excludes import-or-top-level-mock-only product test diffs from focused direct tests', async () => {
   const root = createTempRoot('focused-import-mock-only-test-');
   initGitRepo(root);

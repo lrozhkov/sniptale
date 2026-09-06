@@ -10,7 +10,8 @@ const mocks = vi.hoisted(() => ({
   useControllerMock: vi.fn(() => ({ activeTool: 'select' })),
 }));
 
-vi.mock('../../../platform/i18n', () => ({
+vi.mock('../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   useAppLocale: mocks.useAppLocaleMock,
 }));
 vi.mock('./content', () => ({ EditorToolbarContent: mocks.contentMock }));

@@ -2,8 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { toErrorMessage } from './helpers';
 
 describe('video editor action handler helpers', () => {
-  it('normalizes error-like values into readable strings', () => {
-    expect(toErrorMessage(new Error('boom'))).toBe('boom');
-    expect(toErrorMessage('fallback')).toBe('fallback');
+  it('normalizes error-like values into localized safe UI copy', () => {
+    expect(toErrorMessage(new Error('boom'), 'videoEditor.app.exportStartFailed')).not.toContain(
+      'boom'
+    );
+    expect(toErrorMessage('fallback', 'videoEditor.app.exportStartFailed')).not.toContain(
+      'fallback'
+    );
   });
 });

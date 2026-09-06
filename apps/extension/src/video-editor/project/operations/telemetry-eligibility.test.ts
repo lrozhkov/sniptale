@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createAudioClip,
   createProject,
   createTrack,
   createVideoClip,
@@ -50,6 +51,18 @@ describe('recording telemetry auto-processing eligibility', () => {
     expect(
       isRecordingTelemetryEligibleForAutoProcessing(
         detachedProject,
+        createTelemetry({ actionEvents: [createActionEvent()] })
+      )
+    ).toBe(false);
+
+    const audioOnlyProject = createProject(
+      [createAudioClip({ assetId: 'asset-video', trackId: 'track-audio' })],
+      [createTrack('track-audio', 0)]
+    );
+    audioOnlyProject.baseRecordingId = 'rec-asset-video';
+    expect(
+      isRecordingTelemetryEligibleForAutoProcessing(
+        audioOnlyProject,
         createTelemetry({ actionEvents: [createActionEvent()] })
       )
     ).toBe(false);

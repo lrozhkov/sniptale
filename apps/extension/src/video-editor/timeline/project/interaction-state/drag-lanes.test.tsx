@@ -67,10 +67,12 @@ it('moves directly to the lower physical track without creating a logical lane',
     dispatchTimelinePointerMove(120, 92);
   });
 
-  expect(onMoveClip).toHaveBeenLastCalledWith('clip-1', 7, project.tracks[1]!.id, 'line-1');
   expect(container?.querySelector('[data-ghost-lane]')?.getAttribute('data-ghost-lane')).toBe(
     'line-1'
   );
+  expect(onMoveClip).not.toHaveBeenCalled();
+  act(() => window.dispatchEvent(new Event('pointerup')));
+  expect(onMoveClip).toHaveBeenLastCalledWith('clip-1', 7, project.tracks[1]!.id, 'line-1');
 });
 
 it('keeps a long drag on a real target track instead of extending logical lanes', () => {
@@ -96,10 +98,12 @@ it('keeps a long drag on a real target track instead of extending logical lanes'
     dispatchTimelinePointerMove(120, 180);
   });
 
-  expect(moves.at(-1)).toEqual(['clip-1', 7, project.tracks.at(-1)!.id, 'line-1']);
   expect(container?.querySelector('[data-ghost-lane]')?.getAttribute('data-ghost-lane')).toBe(
     'line-1'
   );
+  expect(moves).toEqual([]);
+  act(() => window.dispatchEvent(new Event('pointerup')));
+  expect(moves).toEqual([['clip-1', 7, project.tracks.at(-1)!.id, 'line-1']]);
 });
 
 type MoveClipCallback = (
@@ -133,12 +137,14 @@ function renderStatefulDragHarness(project: VideoProject, onMove: MoveClipCallba
   function StatefulHarness() {
     const [currentProject, setCurrentProject] = useState(project);
     const timelineDrag = useProjectTimelineDrag({
+      currentTime: 0,
       historyTransaction: {
         beginProjectHistoryTransaction: () => TEST_HISTORY_LEASE,
         endProjectHistoryTransaction: () => undefined,
         isProjectHistoryTransactionCurrent: (lease) => lease === TEST_HISTORY_LEASE,
       },
       pixelsPerSecond: 10,
+      magnetEnabled: false,
       project: currentProject,
       onMoveClip: (clipId, startTime, trackId, timelineLaneId) => {
         onMove(clipId, startTime, trackId, timelineLaneId);
@@ -165,12 +171,14 @@ function createTimelineHarness(props: {
 }) {
   return function TimelineHarness() {
     const timelineDrag = useProjectTimelineDrag({
+      currentTime: 0,
       historyTransaction: {
         beginProjectHistoryTransaction: () => TEST_HISTORY_LEASE,
         endProjectHistoryTransaction: () => undefined,
         isProjectHistoryTransactionCurrent: (lease) => lease === TEST_HISTORY_LEASE,
       },
       pixelsPerSecond: 10,
+      magnetEnabled: false,
       project: props.project,
       onMoveClip: props.onMoveClip,
       onSelectClip: () => undefined,

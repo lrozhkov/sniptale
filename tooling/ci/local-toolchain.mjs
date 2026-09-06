@@ -74,6 +74,38 @@ function validateLock(lock) {
   }
 }
 
+function readLockedToolchainInputs() {
+  const lockBytes = fs.readFileSync('tooling/configs/ci/toolchain.lock.json');
+  const mutationPackageBytes = fs.readFileSync('tooling/test/mutation/package.json');
+  const mutationLockBytes = fs.readFileSync('tooling/test/mutation/package-lock.json');
+  const lock = JSON.parse(lockBytes);
+  const mutationPackage = JSON.parse(mutationPackageBytes);
+  validateLock(lock);
+  if (
+    sha256(mutationPackageBytes) !== lock.mutationRunner.packageJsonSha256 ||
+    sha256(mutationLockBytes) !== lock.mutationRunner.packageLockSha256
+  ) {
+    throw new Error('Mutation runner inputs drifted from toolchain.lock.json.');
+  }
+  return { lock, lockBytes, mutationLockBytes, mutationPackage, mutationPackageBytes };
+}
+
+export function resolveLocalExecutionEnvironmentIdentity() {
+  const { lockBytes, mutationLockBytes, mutationPackageBytes } = readLockedToolchainInputs();
+  const toolchain = sha256(Buffer.concat([lockBytes, mutationPackageBytes, mutationLockBytes]));
+  return {
+    kind: 'host-wsl',
+    digest: `sha256:${sha256(
+      JSON.stringify({
+        node: process.version,
+        platform: process.platform,
+        architecture: process.arch,
+        toolchain,
+      })
+    )}`,
+  };
+}
+
 function validateHostRuntime({ environment, lock }) {
   createRuntimeParityReceipt({
     environment: normalizedProxyEnvironment(environment),
@@ -219,20 +251,9 @@ function createToolchainEnvironment({ bin, codeql, environment, lane, lockDigest
 export async function ensureLocalToolchain({ environment = process.env, lane = 'release' } = {}) {
   if (!['proof', 'release'].includes(lane))
     throw new Error(`Unknown local toolchain lane: ${lane}`);
-  const lockBytes = fs.readFileSync('tooling/configs/ci/toolchain.lock.json');
-  const mutationPackageBytes = fs.readFileSync('tooling/test/mutation/package.json');
-  const mutationLockBytes = fs.readFileSync('tooling/test/mutation/package-lock.json');
-  const lock = JSON.parse(lockBytes);
-  const mutationPackage = JSON.parse(mutationPackageBytes);
-  validateLock(lock);
+  const { lock, lockBytes, mutationLockBytes, mutationPackage, mutationPackageBytes } =
+    readLockedToolchainInputs();
   validateHostRuntime({ environment, lock });
-  if (
-    lane === 'release' &&
-    (sha256(mutationPackageBytes) !== lock.mutationRunner.packageJsonSha256 ||
-      sha256(mutationLockBytes) !== lock.mutationRunner.packageLockSha256)
-  ) {
-    throw new Error('Mutation runner inputs drifted from toolchain.lock.json.');
-  }
   const lockDigest = sha256(
     Buffer.concat([
       Buffer.from(`${lane}\0`),

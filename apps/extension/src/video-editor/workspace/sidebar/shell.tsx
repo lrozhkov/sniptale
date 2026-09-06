@@ -1,5 +1,4 @@
 import type React from 'react';
-import { useState } from 'react';
 import {
   InspectorShellFrame,
   InspectorShellPanel,
@@ -12,7 +11,6 @@ import { VideoEditorFileInputNodes, type VideoEditorFileInputRefs } from '../../
 import type { WorkspaceSidebarProps } from './contracts/props';
 import { WorkspaceSidebarHeader } from './view';
 import { WorkspaceSidebarPanelContent } from './panel-content/index';
-import type { InspectorGroupHeaderSlot } from './selection/grouped-inspector';
 
 interface WorkspaceSidebarExpandedPanelProps extends WorkspaceSidebarProps {
   selectionIcon: React.ReactNode;
@@ -81,10 +79,6 @@ export function WorkspaceSidebarExpandedPanel({
   selectedTrack,
   ...props
 }: WorkspaceSidebarExpandedPanelProps) {
-  const [inspectorHeaderSlot, setInspectorHeaderSlot] = useState<InspectorGroupHeaderSlot | null>(
-    null
-  );
-
   return (
     <InspectorShellFrame
       expandedWidthClassName={INSPECTOR_SHELL_EXPANDED_WIDTH_CLASS}
@@ -103,17 +97,12 @@ export function WorkspaceSidebarExpandedPanel({
         dataUi="video-editor.workspace.sidebar-panel"
       >
         <WorkspaceSidebarHeader
-          inspectorHeaderSlot={inspectorHeaderSlot}
           inspectorMode={props.inspectorMode}
           selectionIcon={selectionIcon}
           selectionTitle={selectionTitle}
           selectedTrack={selectedTrack}
         />
-        <WorkspaceSidebarPanelContent
-          {...props}
-          selectedTrack={selectedTrack}
-          onSetInspectorHeaderSlot={setInspectorHeaderSlot}
-        />
+        <WorkspaceSidebarPanelContent {...props} selectedTrack={selectedTrack} />
       </InspectorShellPanel>
     </InspectorShellFrame>
   );

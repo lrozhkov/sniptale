@@ -41,7 +41,7 @@ export function VideoEditorWorkspace(): React.JSX.Element {
     <div
       data-ui="video-editor.workspace.root"
       className={[
-        'flex h-screen min-h-0 overflow-hidden',
+        'flex h-screen min-h-0 overflow-x-auto overflow-y-hidden',
         'bg-transparent',
         'text-[var(--sniptale-color-text-primary)]',
       ].join(' ')}

@@ -5,13 +5,18 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import type { EffectBundleCatalogEntry } from '../../../features/video/project/effect-bundle/catalog';
-import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import { translate } from '../../../platform/i18n';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../features/video/project/factories/creation';
 import { createTextClip } from '../../../features/video/project/factories/overlay-clip';
 import {
   VideoTrackKind,
   VideoTransitionEasing,
   VideoTransitionKind,
 } from '../../../features/video/project/types';
+import { EffectImportControl } from './header';
 import { VideoEditorEffectsLibraryDock } from './index';
 import { useEffectLibraryOperations, type EffectLibraryOperations } from './operations';
 import { resolveEffectTransitionTargetId } from '../../workspace/surface/effects-library';
@@ -40,6 +45,30 @@ it('renders nothing while the EffectV1 dock is closed', () => {
   expect(container?.querySelector('[data-ui="video-editor.effects-library.dock"]')).toBeNull();
 });
 
+it('uses the compact tokenized dock and user-facing EffectV1 target labels', () => {
+  renderDock();
+
+  const dock = container?.querySelector<HTMLElement>(
+    '[data-ui="video-editor.effects-library.dock"]'
+  );
+  const documentRows = container?.querySelectorAll<HTMLElement>('[draggable="true"]');
+
+  expect(dock?.className).toContain('h-full');
+  expect(dock?.className).not.toContain('absolute');
+  expect(documentRows).toHaveLength(3);
+  expect(documentRows?.[0]?.className).toContain('var(--sniptale-color-surface-overlay)');
+  expect(container?.textContent).toContain(
+    translate('videoEditor.effectsLibrary.documentKindScene')
+  );
+  expect(container?.textContent).toContain(
+    translate('videoEditor.effectsLibrary.documentKindClip')
+  );
+  expect(container?.textContent).toContain(
+    translate('videoEditor.effectsLibrary.selectClipTarget')
+  );
+  expect(container?.textContent).not.toContain('targetEffect');
+});
+
 it('exposes only targets that are available for each EffectV1 kind', async () => {
   const onApplyEffect = vi.fn(async () => 'instance-1');
   renderDock({ onApplyEffect, selectedClipId: null, selectedTransitionId: null });
@@ -50,6 +79,8 @@ it('exposes only targets that are available for each EffectV1 kind', async () =>
   expect(standalone.disabled).toBe(false);
   expect(target.disabled).toBe(true);
   expect(transition.disabled).toBe(true);
+  expect(standalone.textContent).toBe(translate('videoEditor.effectsLibrary.applyToScene'));
+  expect(target.textContent).toBe(translate('videoEditor.effectsLibrary.selectClipTarget'));
 
   await click(standalone);
   expect(onApplyEffect).toHaveBeenCalledWith(
@@ -96,6 +127,7 @@ it('keeps an invalid EffectV1 catalog row visible with delete-only recovery', as
 
 it('does not expose a transition that already owns an EffectV1 instance', () => {
   const project = createEmptyVideoProject('occupied transition');
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
   const track = project.tracks.find(({ kind }) => kind === VideoTrackKind.OVERLAY)!;
   const leading = { ...createTextClip(track.id, project.width, project.height, 0), id: 'leading' };
   const trailing = {
@@ -142,7 +174,8 @@ it('surfaces a rejected dropped apply through the shared operation owner', async
 
   expect(onApplyEffect).toHaveBeenCalledOnce();
   const alert = container?.querySelector('[role="alert"]')?.textContent;
-  expect(alert).toContain('EFFECT_OPERATION_FAILED');
+  expect(alert).toContain('Sniptale');
+  expect(alert).not.toContain('EFFECT_OPERATION_FAILED');
   expect(alert).not.toContain('drop-apply-rejected');
 });
 
@@ -157,7 +190,8 @@ it('surfaces only an allowlisted EffectV1 diagnostic code', async () => {
   await click(dropButton);
 
   const alert = container?.querySelector('[role="alert"]')?.textContent;
-  expect(alert).toContain('BUNDLE_ARCHIVE_INVALID');
+  expect(alert).toContain('Sniptale');
+  expect(alert).not.toContain('BUNDLE_ARCHIVE_INVALID');
   expect(alert).not.toContain('private failure detail');
 });
 
@@ -289,3 +323,24 @@ function findDocumentButton(id: string): HTMLButtonElement {
 async function click(button: HTMLButtonElement): Promise<void> {
   await act(async () => button.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 }
+
+it('opens the picker, ignores its cancellation and resets it after a selected pack', async () => {
+  const onImport = vi.fn(async () => undefined);
+  const run = vi.fn(async (_kind: 'import', action: () => Promise<unknown>) => {
+    await action();
+  });
+  act(() => root?.render(<EffectImportControl disabled={false} onImport={onImport} run={run} />));
+  const input = container!.querySelector('input')!;
+  const open = vi.spyOn(input, 'click');
+  act(() => container!.querySelector('button')!.click());
+  expect(open).toHaveBeenCalledOnce();
+  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
+  expect(run).not.toHaveBeenCalled();
+  const file = new File(['{}'], 'pack.sniptale-effect.json');
+  Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
+  expect(onImport).toHaveBeenCalledWith(file);
+  expect(input.value).toBe('');
+  act(() => root?.render(<EffectImportControl disabled onImport={onImport} run={run} />));
+  expect(container!.querySelector('button')!.disabled).toBe(true);
+});

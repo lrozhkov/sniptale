@@ -70,6 +70,7 @@ it('commits the latest clip transform once when the pointer interaction ends', (
 
 it('skips interaction setup for locked tracks', () => {
   const { camera, clip, onUpdateClipTransform, project } = createLockedStageScenario();
+  const onSelectClip = vi.fn();
 
   beginPreviewStageInteraction({
     camera,
@@ -78,7 +79,7 @@ it('skips interaction setup for locked tracks', () => {
     event: createPointerEvent(10, 10),
     interactionRef: { current: null } as never,
     mode: 'move',
-    onSelectClip: vi.fn(),
+    onSelectClip,
     onUpdateClipTransform,
     project,
     stage: document.createElement('div'),
@@ -88,6 +89,7 @@ it('skips interaction setup for locked tracks', () => {
   dispatchPointerMove(40, 40);
 
   expect(onUpdateClipTransform).not.toHaveBeenCalled();
+  expect(onSelectClip).not.toHaveBeenCalled();
 });
 
 it('clears interaction state without committing after preview cleanup runs', () => {

@@ -203,6 +203,13 @@ it('routes authorized native full-page capture messages after verifying page acc
   expect(hasActivePageAccessMock).toHaveBeenCalledWith(17);
   expect(routeCaptureMessageMock).toHaveBeenCalledWith(
     expect.objectContaining({
+      contentPreauthorization: {
+        documentId: 'document-17',
+        frameId: 0,
+        requestId: 'export-1',
+        senderUrl: 'https://example.test/page',
+        tabId: 17,
+      },
       pageAccessPort: expect.objectContaining({
         ensureActivePageAccessRuntime: expect.any(Function),
         waitForContentToolbarReady: expect.any(Function),

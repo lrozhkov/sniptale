@@ -1,4 +1,5 @@
 import { translate } from '../../../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../../../platform/i18n/user-facing-error';
 import { showToast } from '@sniptale/ui/product-feedback/toast-service';
 import type { ScenarioSessionState } from '@sniptale/runtime-contracts/scenario/types/session';
 import { buildCreatedProjectResponse } from '../session/defaults';
@@ -42,6 +43,11 @@ export async function applyScenarioProjectCreation(args: {
     return;
   }
 
-  showToast(response?.error || translate('scenario.content.createProjectError'), 'error');
-  throw new Error(response?.error || translate('scenario.content.createProjectError'));
+  const errorMessage = createUserFacingErrorMessage({
+    cause: response?.error,
+    detail: 'storage',
+    summaryKey: 'scenario.content.createProjectError',
+  });
+  showToast(errorMessage, 'error');
+  throw new Error(errorMessage, { cause: response?.error });
 }

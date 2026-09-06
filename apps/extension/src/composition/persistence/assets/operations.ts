@@ -64,29 +64,10 @@ export async function readAssetOperation(operationId: string): Promise<AssetOper
   return parseBackupAssetOperation(value) ?? undefined;
 }
 
-export async function appendAssetOperationCompensation(
-  operationId: string,
-  compensation: AssetOperationCompensation
-): Promise<void> {
-  await runWithIndexedDbMutation(async (db) => {
-    const tx = db.transaction(ASSET_OPERATIONS_STORE, 'readwrite');
-    const store = tx.objectStore(ASSET_OPERATIONS_STORE);
-    const operation = parseBackupAssetOperation(await store.get(operationId));
-    if (!operation || operation.status !== 'pending')
-      throw new Error('Restore operation is not pending.');
-    await store.put({
-      ...operation,
-      compensations: [...operation.compensations, compensation],
-      updatedAt: Date.now(),
-    });
-    await tx.done;
-  });
-}
-
-export async function transitionAssetOperation(
+async function mutateAssetOperation(
   operationId: string,
   expected: AssetOperationStatus,
-  status: AssetOperationStatus
+  update: (operation: AssetOperation) => AssetOperation
 ): Promise<void> {
   await runWithIndexedDbMutation(async (db) => {
     const tx = db.transaction(ASSET_OPERATIONS_STORE, 'readwrite');
@@ -95,9 +76,32 @@ export async function transitionAssetOperation(
     if (!operation || operation.status !== expected) {
       throw new Error(`Restore operation is not ${expected}.`);
     }
-    await store.put({ ...operation, status, updatedAt: Date.now() });
+    await store.put(update(operation));
     await tx.done;
   });
+}
+
+export async function appendAssetOperationCompensation(
+  operationId: string,
+  compensation: AssetOperationCompensation
+): Promise<void> {
+  await mutateAssetOperation(operationId, 'pending', (operation) => ({
+    ...operation,
+    compensations: [...operation.compensations, compensation],
+    updatedAt: Date.now(),
+  }));
+}
+
+export async function transitionAssetOperation(
+  operationId: string,
+  expected: AssetOperationStatus,
+  status: AssetOperationStatus
+): Promise<void> {
+  await mutateAssetOperation(operationId, expected, (operation) => ({
+    ...operation,
+    status,
+    updatedAt: Date.now(),
+  }));
 }
 
 export async function createArchiveRestoreSession(args: {

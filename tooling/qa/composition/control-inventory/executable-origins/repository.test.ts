@@ -7,7 +7,7 @@ import { getSourceSnapshotStats } from '../../../analysis/source/source-snapshot
 import { collectRepositoryExecutableOrigins } from './repository.mjs';
 
 const EXPECTED_AUTHORITY_TARGET_PAIRS = [
-  ['tooling/ci/local.mjs', 'tooling/ci/local-playwright-smoke.mjs'],
+  ['tooling/ci/local.mjs', 'tooling/ci/local-project-bootstrap.mjs'],
   ['tooling/ci/local.mjs', 'tooling/ci/proof-wrapper.mjs'],
   ['tooling/ci/local.mjs', 'tooling/ci/release-wrapper.mjs'],
   ['tooling/ci/local.mjs', 'tooling/ci/verify-project-toolchain.mjs'],
@@ -90,6 +90,11 @@ describe('repository executable origin projection', () => {
     expect(projection.origins.every(({ target }) => projection.targets.includes(target))).toBe(
       true
     );
+    expect(
+      [...projection.targets, ...projection.registrationAuthorityPaths].every(
+        (repositoryPath) => !repositoryPath.includes('/node_modules/')
+      )
+    ).toBe(true);
     expect(projection.inputs).not.toEqual(expect.arrayContaining(projection.targets));
   }, 90_000);
 });

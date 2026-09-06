@@ -1,17 +1,10 @@
-import { useState } from 'react';
-
 import { buildVideoCompositionMotionSegments } from '../../../../features/video/composition/timeline/lanes';
 import { getVideoProjectUtilityLanes } from '../../../../features/video/project/utility-lanes';
 import { translate } from '../../../../platform/i18n';
 import type { TimelineEffectDragTarget } from '../types';
 import { ProjectTimelineActionsLane } from './action-lane';
 import { ProjectTimelineCursorLane } from './cursor-lane';
-import {
-  ProjectTimelineMotionLaneAddPreview,
-  type MotionLaneAddPreview,
-} from './motion-add-preview';
-import { resolveMotionLaneAddPreview } from './motion-add-preview-model';
-import { buildTimelineMotionSegments } from './segments';
+import { buildTimelineMotionSegments, getTimelineUtilityRowPresence } from './segments';
 import type { UtilityLaneProps } from './utility-lane-types';
 import { isSelectedEffectSegment, ProjectTimelineEffectSegment } from './segment';
 import { ProjectTimelineEffectLaneEmptyLabel, ProjectTimelineEffectLaneRow } from './ui';
@@ -35,42 +28,42 @@ export function ProjectTimelineEffectCanvasRows(
   }
 ): React.JSX.Element {
   const utilityLanes = getVideoProjectUtilityLanes(props.project);
+  const rows = getTimelineUtilityRowPresence(props.project);
   return (
     <>
       {props.cursorLaneVisible !== false ? <ProjectTimelineCursorLane {...props} /> : null}
-      <ProjectTimelineActionsLane {...props} laneVisible={utilityLanes.actions.visible} />
-      <ProjectTimelineMotionLane
-        {...props}
-        laneLocked={utilityLanes.camera.locked}
-        laneVisible={utilityLanes.camera.visible}
-      />
+      {rows.actions ? (
+        <ProjectTimelineActionsLane {...props} laneVisible={utilityLanes.actions.visible} />
+      ) : null}
+      {rows.motion ? (
+        <ProjectTimelineMotionLane {...props} laneVisible={utilityLanes.camera.visible} />
+      ) : null}
     </>
   );
 }
 
-function ProjectTimelineMotionLane(
-  props: UtilityLaneProps & { laneLocked: boolean; laneVisible: boolean }
-) {
-  const [addPreview, setAddPreview] = useState<MotionLaneAddPreview | null>(null);
-  const segments = props.laneVisible
-    ? buildVideoCompositionMotionSegments(props.project)
-    : buildTimelineMotionSegments(props.project);
-  const previewHandler = createMotionLanePreviewHandler(props, setAddPreview);
+function ProjectTimelineMotionLane(props: UtilityLaneProps & { laneVisible: boolean }) {
+  const segments = resolveMotionLaneSegments(props);
   return (
-    <ProjectTimelineEffectLaneRow
-      onClick={previewHandler}
-      onMouseLeave={() => setAddPreview(null)}
-      onMouseMove={previewHandler}
-    >
-      {segments.length === 0 ? <ProjectTimelineEffectLaneEmptyLabel /> : null}
-      <ProjectTimelineMotionLaneAddPreview
-        preview={addPreview}
-        onAddMotionRegion={props.onAddMotionRegion}
-        onClearPreview={() => setAddPreview(null)}
-      />
+    <ProjectTimelineEffectLaneRow>
+      <MotionLaneEmptyState visible={segments.length === 0} />
       <MotionSegments {...props} segments={segments} />
     </ProjectTimelineEffectLaneRow>
   );
+}
+
+function resolveMotionLaneSegments(props: UtilityLaneProps & { laneVisible: boolean }) {
+  return props.laneVisible
+    ? buildVideoCompositionMotionSegments(props.project)
+    : buildTimelineMotionSegments(props.project);
+}
+
+function MotionLaneEmptyState({ visible }: { visible: boolean }) {
+  return visible ? (
+    <ProjectTimelineEffectLaneEmptyLabel
+      label={translate('videoEditor.timeline.emptyZoomLaneLabel')}
+    />
+  ) : null;
 }
 
 function MotionSegments(
@@ -119,24 +112,5 @@ function createMotionDragTarget(
     originalDuration: segment.region.duration,
     originalStart: segment.start,
     segmentId: segment.id,
-  };
-}
-
-function createMotionLanePreviewHandler(
-  props: UtilityLaneProps & { laneLocked: boolean; laneVisible: boolean },
-  setAddPreview: React.Dispatch<React.SetStateAction<MotionLaneAddPreview | null>>
-): React.MouseEventHandler<HTMLDivElement> {
-  return (event) => {
-    if (props.laneLocked || !props.laneVisible) return;
-    const timeline = props.timelineRef?.current;
-    if (!timeline) return;
-    setAddPreview((currentPreview) =>
-      resolveMotionLaneAddPreview({
-        clientX: event.clientX,
-        currentPreview,
-        pixelsPerSecond: props.pixelsPerSecond,
-        timeline,
-      })
-    );
   };
 }

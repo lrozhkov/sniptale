@@ -9,7 +9,8 @@ import {
 } from '../../../../../features/video/project/types';
 import { CursorSkinFields } from './cursor-fields';
 
-vi.mock('../../../../../platform/i18n', () => ({
+vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
   translate: (key: string) => key,
   useAppLocale: () => 'en',
 }));

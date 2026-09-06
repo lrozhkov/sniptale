@@ -85,6 +85,16 @@ describe('locale-state local storage access', () => {
 });
 
 describe('locale-state hydration', () => {
+  it('supports explicit runtime hydration before localized background work', async () => {
+    browserStorageMocks.isAvailable.mockReturnValue(true);
+    browserStorageMocks.get.mockResolvedValue({ [LOCALE_STORAGE_KEY]: 'en' });
+    const localeState = await importLocaleStateModule();
+
+    await localeState.ensureLocaleHydrated();
+
+    expect(localeState.getCurrentLocale()).toBe('en');
+  });
+
   it('seeds the pre-hydration locale from the paint hint and reconciles it to browser storage', async () => {
     browserStorageMocks.isAvailable.mockReturnValue(true);
     browserStorageMocks.get.mockResolvedValue({

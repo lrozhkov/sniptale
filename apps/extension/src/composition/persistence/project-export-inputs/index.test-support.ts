@@ -1,3 +1,4 @@
+import { VideoTrackKind } from '../../../features/video/project/types';
 import { readFileSync } from 'node:fs';
 
 import {
@@ -6,7 +7,10 @@ import {
   type EffectV1Document,
 } from '@sniptale/runtime-contracts/effect-v1';
 
-import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../features/video/project/factories/creation';
 import { createEffectHostClip } from '../../../features/video/project/factories/overlay-clip';
 import type { VideoProject } from '../../../features/video/project/types/model';
 
@@ -22,6 +26,7 @@ interface LargeEffectFixture {
 export async function createLargeEffectProject(): Promise<VideoProject> {
   const fixture = await createLargeEffectFixture();
   const project = createEmptyVideoProject('Large EffectV1 export', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
   project.id = 'project-1';
   const overlayTrack = project.tracks.find(({ kind }) => kind === 'OVERLAY');
   if (!overlayTrack) throw new Error('Expected overlay track');

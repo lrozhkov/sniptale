@@ -12,6 +12,8 @@ it('runs the canonical container owner with the exact local workspace identity',
   expect(
     runLocalContainerReproduction('release', {
       environment: { PATH: '/usr/bin' },
+      findFastProofRoot: () => '/repo/build/ci-artifacts/proof-1',
+      materializeTree: () => 'candidate-tree',
       root: '/repo',
       run,
     })
@@ -28,6 +30,7 @@ it('runs the canonical container owner with the exact local workspace identity',
         SNIPTALE_PROOF_SHA: commit,
         SNIPTALE_TRUSTED_CONTROL_SHA: commit,
         SNIPTALE_LOCAL_WORKSPACE: '1',
+        SNIPTALE_FAST_PROOF_PATH: '/repo/build/ci-artifacts/proof-1',
       }),
       stdio: 'inherit',
     })
@@ -36,4 +39,16 @@ it('runs the canonical container owner with the exact local workspace identity',
 
 it('rejects unknown lanes before starting a process', () => {
   expect(() => runLocalContainerReproduction('fast', { run: vi.fn() })).toThrow('Usage');
+});
+
+it('fails before container release when the exact local proof is absent', () => {
+  const run = vi.fn().mockReturnValueOnce({ status: 0, stdout: `${'a'.repeat(40)}\n` });
+  expect(() =>
+    runLocalContainerReproduction('release', {
+      findFastProofRoot: () => null,
+      materializeTree: () => 'candidate-tree',
+      run,
+    })
+  ).toThrow('Run npm run ci:proof:container first');
+  expect(run).toHaveBeenCalledTimes(1);
 });

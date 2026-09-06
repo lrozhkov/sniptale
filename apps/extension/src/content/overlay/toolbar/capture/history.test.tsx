@@ -7,7 +7,8 @@ import { pagePreparationHistory } from '../../../parser/page-preparation/history
 import { ToolbarHistoryControls } from './history';
 import { dispatchFrameEditingChanged } from '../../../platform/page-context/mode-events';
 
-vi.mock('../../../../platform/i18n', () => ({
+vi.mock('../../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
 

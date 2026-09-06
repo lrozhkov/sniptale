@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 
 import { isExecutedAsScript } from '../qa/runtime/process/shared-cli.mjs';
+import { findLocalFastProofRoot, materializeWorkspaceTree } from './local-fast-proof-admission.mjs';
 
 function gitHead(run) {
   const result = run('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' });
@@ -13,12 +14,33 @@ function gitHead(run) {
 
 export function runLocalContainerReproduction(
   lane,
-  { environment = process.env, run = spawnSync, root = process.cwd() } = {}
+  {
+    environment = process.env,
+    findFastProofRoot = findLocalFastProofRoot,
+    materializeTree = materializeWorkspaceTree,
+    run = spawnSync,
+    root = process.cwd(),
+  } = {}
 ) {
   if (!['proof', 'release'].includes(lane)) {
     throw new Error('Usage: local-container.mjs <proof|release>');
   }
   const commit = gitHead(run);
+  const candidateTree = materializeTree();
+  const fastProofRoot =
+    lane === 'release'
+      ? findFastProofRoot({
+          candidateTree,
+          executionEnvironmentKind: 'locked-container',
+          workspaceMode: 'local-workspace',
+        })
+      : null;
+  if (lane === 'release' && !fastProofRoot) {
+    throw new Error(
+      `CI release prerequisite failed: no exact locked-container Fast proof for candidate tree ${candidateTree}. ` +
+        'Run npm run ci:proof:container first.'
+    );
+  }
   const result = run(process.execPath, [path.join(root, 'tooling/ci/container.mjs'), lane], {
     cwd: root,
     env: {
@@ -27,6 +49,7 @@ export function runLocalContainerReproduction(
       SNIPTALE_PROOF_SHA: commit,
       SNIPTALE_TRUSTED_CONTROL_SHA: commit,
       SNIPTALE_LOCAL_WORKSPACE: '1',
+      ...(fastProofRoot ? { SNIPTALE_FAST_PROOF_PATH: fastProofRoot } : {}),
     },
     stdio: 'inherit',
   });

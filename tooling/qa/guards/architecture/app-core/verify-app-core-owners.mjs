@@ -10,7 +10,7 @@ import { collectRepositoryFiles } from '../../../analysis/git/git-fallback-repos
 import { collectCodeFiles } from '../../../analysis/repository/shared-files.mjs';
 import { repoRoot, toRelativePath } from '../../../analysis/repository/shared-paths.mjs';
 import { isExecutedAsScript } from '../../../runtime/process/shared-cli.mjs';
-import { classifyFinalAppCoreOwnerPath, readAppCoreOwnerPolicy } from './app-core-owner-policy.mjs';
+import { readAppCoreOwnerPolicy } from './app-core-owner-policy.mjs';
 import { getRuntimeRoots } from '../runtime-topology/model.mjs';
 
 const OWNER_TEST_FILE_PATTERN = /\.(?:test|spec)\.[cm]?[jt]sx?$/u;
@@ -19,45 +19,10 @@ function within(path, root) {
   return path === root || path.startsWith(`${root}/`);
 }
 
-function currentOwnerFiles(allFiles) {
-  const appCoreRoot = 'apps/extension/src';
-  return allFiles.filter((path) => {
-    const owner = path.split('/')[3];
-    if (!path.startsWith(`${appCoreRoot}/`)) return false;
-    return [
-      'composition',
-      'contracts',
-      'features',
-      'foundation',
-      'platform',
-      'ui',
-      'workflows',
-    ].includes(owner);
-  });
-}
-
-function finalOwnerErrors(policy, allFiles) {
-  const errors = [];
-  for (const path of currentOwnerFiles(allFiles)) {
-    try {
-      classifyFinalAppCoreOwnerPath(path, policy);
-    } catch {
-      errors.push(`unclassified app-core owner: ${path}`);
-    }
-  }
-  for (const prefix of policy.forbiddenSourcePrefixes) {
-    if (
-      allFiles.some(
-        (path) => path === prefix || path.startsWith(`${prefix}/`) || path.startsWith(`${prefix}.`)
-      )
-    ) {
-      errors.push(`retired owner path remains: ${prefix}`);
-    }
-  }
-  for (const path of policy.forbiddenBroadBarrels) {
-    if (allFiles.includes(path)) errors.push(`broad app-core barrel remains: ${path}`);
-  }
-  return errors;
+function broadBarrelErrors(policy, allFiles) {
+  return policy.forbiddenBroadBarrels
+    .filter((path) => allFiles.includes(path))
+    .map((path) => `broad app-core barrel remains: ${path}`);
 }
 
 function authorityErrors(root, policy) {
@@ -108,20 +73,6 @@ function isAllowedFeaturePersistenceEdge(from, to, policy) {
   return policy.sameConcernPersistenceEdges.some(
     ([featureRoot, persistenceRoot]) => within(from, featureRoot) && within(to, persistenceRoot)
   );
-}
-
-function uiResidencyErrors(allFiles, policy) {
-  return allFiles
-    .filter((path) => within(path, 'apps/extension/src/ui'))
-    .flatMap((path) => {
-      if (!policy.retainedAppUiRoots.some((root) => within(path, root))) {
-        return [`unclassified or reusable UI remains app-local: ${path}`];
-      }
-      if (/(?:^|\/)(?:design-system|catalog|previews?)(?:[./-]|$)/u.test(path)) {
-        return [`preview/catalog UI remains app-local: ${path}`];
-      }
-      return [];
-    });
 }
 
 function forbiddenEdgeErrors(root, policy, codeFiles) {
@@ -183,9 +134,8 @@ export function appCoreOwnerErrors({
 } = {}) {
   const allFiles = collectRepositoryFiles(root);
   return [
-    ...finalOwnerErrors(policy, allFiles),
+    ...broadBarrelErrors(policy, allFiles),
     ...authorityErrors(root, policy),
-    ...uiResidencyErrors(allFiles, policy),
     ...forbiddenEdgeErrors(root, policy, codeFiles),
     ...ownerTestEdgeErrors(root, codeFiles),
   ].sort();

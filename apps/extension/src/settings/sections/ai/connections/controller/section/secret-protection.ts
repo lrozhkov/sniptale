@@ -9,6 +9,7 @@ import {
   unlockAISecretPassphraseProtection,
 } from '../../../../../runtime/ai-settings/mutations';
 import { translate } from '../../../../../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../../../../../platform/i18n/user-facing-error';
 import { toast } from '@sniptale/ui/product-feedback/toast-service';
 import type { AiProvidersSectionState, AiSecretProtectionDialogMode } from '../types';
 
@@ -29,7 +30,12 @@ type CompleteDialogAction = (params: {
 }) => Promise<void>;
 
 function getErrorMessage(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
+  void fallback;
+  return createUserFacingErrorMessage({
+    cause: error,
+    detail: 'storage',
+    summaryKey: 'settings.aiProviders.secretProtectionActionError',
+  });
 }
 
 function createDialogState(

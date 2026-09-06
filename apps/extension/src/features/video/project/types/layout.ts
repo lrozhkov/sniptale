@@ -7,6 +7,14 @@ export const VideoTrackKind = {
 
 export type VideoTrackKind = (typeof VideoTrackKind)[keyof typeof VideoTrackKind];
 
+/** Optional semantic purpose for a physical track; it does not change timeline mechanics. */
+export const VideoProjectTrackRole = {
+  CAMERA: 'CAMERA',
+} as const;
+
+export type VideoProjectTrackRole =
+  (typeof VideoProjectTrackRole)[keyof typeof VideoProjectTrackRole];
+
 export const VideoSubtitlePlacement = {
   TOP: 'TOP',
   BOTTOM: 'BOTTOM',
@@ -130,6 +138,7 @@ export interface VideoProjectTrack {
   visible: boolean;
   locked: boolean;
   kind: VideoTrackKind;
+  role?: VideoProjectTrackRole;
   logicalLanes?: VideoProjectLogicalLane[];
   subtitleStyle?: VideoProjectSubtitleTrackStyle;
 }

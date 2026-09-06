@@ -1,4 +1,5 @@
 import type React from 'react';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../../../../platform/i18n';
 import {
   isAnnotationClip,
@@ -6,7 +7,10 @@ import {
   isVideoClip,
 } from '../../../../../features/video/project/timeline';
 import type { VideoProjectAnnotationClip } from '../../../../../features/video/project/types/index';
-import { VideoProjectClipType } from '../../../../../features/video/project/types';
+import {
+  VideoProjectClipType,
+  VideoProjectTrackRole,
+} from '../../../../../features/video/project/types';
 import { resolveAnnotationTemplateControls } from '../../../../../features/video/project/annotation/template-controls';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { createAnnotationGroups } from '../annotation/fields';
@@ -25,6 +29,29 @@ import { renderTransformFields } from '../inputs/transform-fields';
 import { createEffectInstanceGroup } from '../effect-instance/groups';
 import { ClipInfo, resolveClipAsset } from './clip-info';
 import { isVideoEditorPresentedClip } from '../../../../project/operations/presented-tracks';
+import {
+  resolveVideoProjectCameraPlacement,
+  VideoProjectCameraPlacement,
+} from '../../../../../features/video/project/camera/placement';
+
+const CAMERA_PLACEMENT_OPTIONS = [
+  {
+    labelKey: 'videoEditor.sidebar.cameraPlacementTopLeft',
+    placement: VideoProjectCameraPlacement.TOP_LEFT,
+  },
+  {
+    labelKey: 'videoEditor.sidebar.cameraPlacementTopRight',
+    placement: VideoProjectCameraPlacement.TOP_RIGHT,
+  },
+  {
+    labelKey: 'videoEditor.sidebar.cameraPlacementBottomLeft',
+    placement: VideoProjectCameraPlacement.BOTTOM_LEFT,
+  },
+  {
+    labelKey: 'videoEditor.sidebar.cameraPlacementBottomRight',
+    placement: VideoProjectCameraPlacement.BOTTOM_RIGHT,
+  },
+] as const;
 
 export function InspectClipPanel(props: WorkspaceSidebarSelectionPanelProps) {
   const clip = props.selectedClip;
@@ -33,10 +60,14 @@ export function InspectClipPanel(props: WorkspaceSidebarSelectionPanelProps) {
   }
 
   const runtime = createSelectionRuntime(props);
+  const cameraRoleClip = isCameraRoleVideoClip(props.project, clip);
 
   return (
     <section className={PANEL_SECTION_CLASS_NAME}>
-      <InspectorGroupedPanel groups={createClipGroups(props, clip, runtime)} />
+      <InspectorGroupedPanel
+        key={cameraRoleClip ? 'camera' : 'standard'}
+        groups={createClipGroups(props, clip, runtime, cameraRoleClip)}
+      />
     </section>
   );
 }
@@ -44,13 +75,14 @@ export function InspectClipPanel(props: WorkspaceSidebarSelectionPanelProps) {
 function createClipGroups(
   props: WorkspaceSidebarSelectionPanelProps,
   clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>,
-  runtime: ReturnType<typeof createSelectionRuntime>
+  runtime: ReturnType<typeof createSelectionRuntime>,
+  cameraRoleClip: boolean
 ) {
   const asset = resolveClipAsset(props.project, clip);
   const infoGroup = {
     id: 'info',
     label: translate('videoEditor.sidebar.inspectorGroupSummary'),
-    defaultActive: true,
+    defaultActive: !cameraRoleClip,
     content: <ClipInfo asset={asset} clip={clip} locked={runtime.selectedTrackLocked} />,
   } as const;
 
@@ -134,6 +166,7 @@ function createStandardClipGroups(
 
   return [
     createGeneralGroup(contentFields),
+    createCameraPlacementGroup(props, clip, runtime.selectedTrackLocked),
     createTimingGroup(props, clip, runtime.selectedTrackLocked),
     createTransformGroup(clip, frameContent),
     {
@@ -150,6 +183,83 @@ function createStandardClipGroups(
     },
     createClipEffectGroup(props, clip, runtime.selectedTrackLocked),
   ] as const;
+}
+
+function createCameraPlacementGroup(
+  props: WorkspaceSidebarSelectionPanelProps,
+  clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>,
+  locked: boolean
+) {
+  const isCameraClip = isCameraRoleVideoClip(props.project, clip);
+
+  return {
+    id: 'camera',
+    label: translate('videoEditor.sidebar.inspectorGroupCamera'),
+    defaultActive: isCameraClip,
+    content: isCameraClip ? (
+      <CameraPlacementControls
+        clip={clip}
+        disabled={locked}
+        project={props.project}
+        onUpdateClipTransform={props.onUpdateClipTransform}
+      />
+    ) : null,
+    visible: isCameraClip,
+  } as const;
+}
+
+function isCameraRoleVideoClip(
+  project: WorkspaceSidebarSelectionPanelProps['project'],
+  clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>
+): clip is Extract<
+  WorkspaceSidebarSelectionPanelProps['project']['clips'][number],
+  { type: 'VIDEO' }
+> {
+  const track = project.tracks.find((item) => item.id === clip.trackId);
+  return clip.type === VideoProjectClipType.VIDEO && track?.role === VideoProjectTrackRole.CAMERA;
+}
+
+function CameraPlacementControls(props: {
+  clip: Extract<WorkspaceSidebarSelectionPanelProps['project']['clips'][number], { type: 'VIDEO' }>;
+  disabled: boolean;
+  onUpdateClipTransform: WorkspaceSidebarSelectionPanelProps['onUpdateClipTransform'];
+  project: WorkspaceSidebarSelectionPanelProps['project'];
+}) {
+  const asset = props.project.assets.find((item) => item.id === props.clip.assetId);
+  const sourceWidth = asset?.metadata.width ?? props.clip.transform.width;
+  const sourceHeight = asset?.metadata.height ?? props.clip.transform.height;
+
+  return (
+    <div className="space-y-2" data-ui="video-editor.camera-placement-controls">
+      <p className="text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
+        {translate('videoEditor.sidebar.cameraPlacementDescription')}
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        {CAMERA_PLACEMENT_OPTIONS.map((option) => (
+          <ProductActionButton
+            key={option.placement}
+            compact
+            disabled={props.disabled}
+            tone="secondary"
+            onClick={() =>
+              props.onUpdateClipTransform(
+                props.clip.id,
+                resolveVideoProjectCameraPlacement({
+                  placement: option.placement,
+                  projectHeight: props.project.height,
+                  projectWidth: props.project.width,
+                  sourceHeight,
+                  sourceWidth,
+                })
+              )
+            }
+          >
+            {translate(option.labelKey)}
+          </ProductActionButton>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function createFrameContent(

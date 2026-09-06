@@ -12,6 +12,7 @@ describe('video editor playback contracts', () => {
       deleteCursorSample: vi.fn(),
       deleteMotionRegion: vi.fn(),
       deleteObjectTrack: vi.fn(),
+      duplicateClip: vi.fn(),
       setCurrentTime: vi.fn(),
       setPlaying: vi.fn(),
       splitClipAt: vi.fn(),

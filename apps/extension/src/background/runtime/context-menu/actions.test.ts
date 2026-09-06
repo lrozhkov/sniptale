@@ -243,6 +243,7 @@ async function verifyExportStartRouting() {
     includeWebCopy: false,
     intent: 'export',
     jobId: expect.any(String),
+    locale: expect.any(String),
     options: contextMenuPopupExportPreferencesFixture,
     orderedTabs: [{ tabId: 11, title: 'Tab title' }],
     warnings: [],

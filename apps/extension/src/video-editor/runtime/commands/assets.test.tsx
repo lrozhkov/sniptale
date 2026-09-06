@@ -100,6 +100,22 @@ afterEach(() => {
 });
 
 describe('useAssetHandlers', () => {
+  it.each(['handleImportAudio', 'handleImportImage', 'handleImportVideo'] as const)(
+    '%s registers a reusable material without changing the montage',
+    async (handler) => {
+      const params = createParams();
+      renderHook(params);
+      await act(async () => {
+        await latestHandlers?.[handler](new File(['media'], 'source.webm'), {
+          destination: 'materials',
+        });
+      });
+      expect(params.upsertAsset).toHaveBeenCalledTimes(1);
+      expect(params.addAssetClip).not.toHaveBeenCalled();
+      expect(params.moveClip).not.toHaveBeenCalled();
+      expect(params.trimClipStart).not.toHaveBeenCalled();
+    }
+  );
   it(
     'imports recorded audio and reapplies the trimmed selection on the timeline',
     verifyRecordedAudioImport

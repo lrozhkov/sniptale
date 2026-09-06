@@ -4,7 +4,6 @@ import { applyVideoProjectMutationPatch } from '../../../../features/video/proje
 import { normalizeTrackOrder } from '../../../../features/video/project/timeline';
 import type { VideoProject } from '../../../../features/video/project/types/index';
 import type { VideoEditorProjectState } from '../contracts';
-import { pruneUnusedProjectAssets } from '../helpers';
 
 function canDeleteProjectTrack(project: VideoProject, trackId: string): boolean {
   const track = project.tracks.find((item) => item.id === trackId);
@@ -12,22 +11,7 @@ function canDeleteProjectTrack(project: VideoProject, trackId: string): boolean 
     return false;
   }
 
-  const sameKindTracks = project.tracks.filter((item) => item.kind === track.kind);
-  if (sameKindTracks.length <= 1) {
-    return false;
-  }
-
-  return !isProtectedRootTrack(sameKindTracks, trackId);
-}
-
-function isProtectedRootTrack(sameKindTracks: VideoProject['tracks'], trackId: string): boolean {
-  const explicitRootTrack = sameKindTracks.find((track) => track.isRoot);
-  if (explicitRootTrack) {
-    return explicitRootTrack.id === trackId;
-  }
-
-  const fallbackRootTrack = [...sameKindTracks].sort((left, right) => left.order - right.order)[0];
-  return fallbackRootTrack?.id === trackId;
+  return !track.isRoot;
 }
 
 export function deleteProjectTrack(project: VideoProject, trackId: string): VideoProject {
@@ -35,13 +19,11 @@ export function deleteProjectTrack(project: VideoProject, trackId: string): Vide
     return project;
   }
 
-  return pruneUnusedProjectAssets(
-    normalizeTrackOrder(
-      applyVideoProjectMutationPatch(project, {
-        clips: project.clips.filter((clip) => clip.trackId !== trackId),
-        tracks: project.tracks.filter((track) => track.id !== trackId),
-      })
-    )
+  return normalizeTrackOrder(
+    applyVideoProjectMutationPatch(project, {
+      clips: project.clips.filter((clip) => clip.trackId !== trackId),
+      tracks: project.tracks.filter((track) => track.id !== trackId),
+    })
   );
 }
 

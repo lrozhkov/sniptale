@@ -1,36 +1,31 @@
 # Parser architecture
 
-Content parsing has one canonical flow:
+Content parsing has one flow:
 
 ```text
-resolvePageProfile() -> buildPageSnapshot() -> parseCapturedPage() -> ParsedDocument -> projectors
+buildPageSnapshot() --calls--> resolvePageProfile()
+buildPageSnapshot() -> CapturedPageSnapshot -> parseCapturedPage() -> ParsedDocument -> projectors
 ```
 
-`resolvePageProfile()` selects vendor, application family, page kind, and preferred roots. `buildPageSnapshot()` captures live and virtual DOM seams, iframe context, payload traces, and page context. `parseCapturedPage()` selects the registered pipeline. Extractors populate `ParsedDocument`, and projectors derive AI-pick, JSON, Markdown, and apply-back data from that document. Canonical types are exported by `@sniptale/runtime-contracts/dom-tree`.
+`@sniptale/runtime-contracts/dom-tree` owns the shared types.
 
 ## Owners
 
-- `apps/extension/src/content/parser/page-profile/**` owns product detection and scored detector results.
-- `apps/extension/src/content/parser/page-snapshot/**` owns snapshot capture, root selection, and payload extraction.
-- `apps/extension/src/content/parser/backends/**` owns the selected DOM parser backend contract and retained legacy TreeWalker implementation.
-- `apps/extension/src/content/parser/pipelines/**` owns pipeline registration, routing, backend orchestration, and direct extractor composition.
-- `apps/extension/src/content/parser/ir/**` owns canonical document helpers and legacy normalization.
-- `apps/extension/src/content/parser/pipelines/compatibility/live-dom.ts` adapts live DOM into the same root orchestration used by captured snapshots.
+- `apps/extension/src/content/parser/page-profile/**` owns product detection and scored results.
+- `apps/extension/src/content/parser/page-snapshot/**` owns snapshot capture, root selection, page context, and payload traces.
+- `apps/extension/src/content/parser/backends/**` owns parser backend contracts and the retained TreeWalker backend.
+- `apps/extension/src/content/parser/pipelines/**` owns registration, routing, backend orchestration, and extractor composition.
+- `apps/extension/src/content/parser/ir/**` owns parsed-document helpers and legacy normalization.
+- `apps/extension/src/content/parser/pipelines/compatibility/live-dom.ts` adapts live DOM to snapshot-root orchestration.
 
-## Invariants
+## Rules
 
-Detection occurs only in the page-profile owner. Unknown pages use the conservative safe fallback and do not guess editable fields. Direct extractors are preferred for stable vendor seams; new implicit `canParse()` routing does not extend the legacy backend.
+Keep detection in `page-profile`. Route unknown pages to the conservative fallback. Prefer direct extractors for stable vendor seams. Do not add implicit `canParse()` routing to the legacy backend. Keep shared extraction in pipelines and extractors. Derive AI-pick, JSON, Markdown, and apply-back output from `ParsedDocument`.
 
-Extraction patterns are shared across outputs. AI-pick, JSON, Markdown, and apply-back do not own separate parser heuristics; format-specific behavior stays in projectors or adapters.
+Pass page context into normalization explicitly. Do not read `window.location` from normalization. Build editable targets from `TargetRef` or a stable legacy selector. Treat low-confidence content as export-only. Reject missing or stale apply-back targets.
 
-Normalization receives page context from the snapshot, explicit extractor context, the live-DOM compatibility adapter, or legacy document metadata. It does not read `window.location` as hidden authority.
+## Diagnostics and proof
 
-Editable targets come from explicit `TargetRef` data or a stable legacy-compatible selector. Low-confidence content remains export-only, and missing or stale targets fail apply-back without broad selector guesses.
+Diagnostic export retains `page-profile.json`, `detector-trace.json`, `root-selection.json`, `payload-trace.json`, `pipeline-trace.json`, and `parser-tree.json`.
 
-## Diagnostics
-
-Diagnostic export preserves `page-profile.json`, `detector-trace.json`, `root-selection.json`, `payload-trace.json`, `pipeline-trace.json`, and `parser-tree.json`. These traces are the first evidence for classification, root selection, payload, or fallback failures.
-
-## Proof
-
-A routing change proves detector/profile and pipeline behavior, including miss and downgrade paths. A document-contract change proves all affected projectors. An editable-target change proves apply-back success and missing/stale target failure. Snapshot, facade, extractor, projector, and orchestration consumers that share a changed public contract are included transitively.
+For routing changes, prove profile selection, pipeline selection, miss, and downgrade. For document-contract changes, prove every affected projector. For editable-target changes, prove success and missing or stale target failure. Include transitive consumers of each changed parser contract.

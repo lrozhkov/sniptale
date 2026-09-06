@@ -33,13 +33,13 @@ export function collectCodeFiles(explicitFiles = []) {
 
   const result = [];
   for (const root of DEFAULT_SCAN_ROOTS) {
-    result.push(
-      ...collectRecursiveFiles(fromRelativePath(root), {
-        baseDir: process.cwd(),
-        ignoredSegments: IGNORED_ROOT_SEGMENTS,
-        predicate: isCodeFile,
-      })
-    );
+    for (const file of collectRecursiveFiles(fromRelativePath(root), {
+      baseDir: process.cwd(),
+      ignoredSegments: IGNORED_ROOT_SEGMENTS,
+      predicate: isCodeFile,
+    })) {
+      result.push(file);
+    }
   }
   return [...new Set(result)].sort();
 }
@@ -50,12 +50,12 @@ export function collectFormattableFiles(explicitFiles = []) {
   }
 
   const result = [];
-  result.push(
-    ...collectRecursiveFiles(process.cwd(), {
-      baseDir: process.cwd(),
-      ignoredSegments: IGNORED_ROOT_SEGMENTS,
-      predicate: isFormattableFile,
-    })
-  );
+  for (const file of collectRecursiveFiles(process.cwd(), {
+    baseDir: process.cwd(),
+    ignoredSegments: IGNORED_ROOT_SEGMENTS,
+    predicate: isFormattableFile,
+  })) {
+    result.push(file);
+  }
   return [...new Set(result)].sort();
 }

@@ -1,5 +1,6 @@
 import type { ProcessScenarioEditorWithLLMResponse } from '../../../contracts/ai/scenario';
 import { translate } from '../../../platform/i18n';
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 import type { ScenarioAiOperation } from '@sniptale/runtime-contracts/scenario-ai-operations';
 import { buildScenarioEditorV3LLMPayload } from './deck-payload';
 import { createScenarioAiClient, type ScenarioAiClient } from './client';
@@ -61,7 +62,11 @@ async function submitScenarioEditorDeckAiRequest(args: {
     await applyScenarioEditorDeckAiResponse({ ...args, instruction });
   } catch (error) {
     args.aiState.setError(
-      error instanceof Error ? error.message : translate('scenario.editor.aiEditorRequestFailed')
+      createUserFacingErrorMessage({
+        cause: error,
+        detail: 'externalService',
+        summaryKey: 'scenario.editor.aiEditorRequestFailed',
+      })
     );
   } finally {
     args.aiState.setLoading(false);

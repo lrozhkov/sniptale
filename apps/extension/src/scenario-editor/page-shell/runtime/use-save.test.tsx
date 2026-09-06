@@ -94,7 +94,8 @@ async function verifyLatestSaveFailureSurfaced() {
 
   await clickSave();
 
-  expect(setError).toHaveBeenCalledWith('Quota exceeded');
+  expect(setError).toHaveBeenCalledWith(expect.stringContaining('Sniptale'));
+  expect(setError).not.toHaveBeenCalledWith(expect.stringContaining('Quota exceeded'));
   expect(setSaveState).toHaveBeenLastCalledWith('error');
 }
 
@@ -204,7 +205,10 @@ async function verifyStaleSaveKeepsBaseline() {
   await clickSave();
   await clickSave();
 
-  expect(setError).toHaveBeenCalledWith('Scenario project changed before save completed');
+  expect(setError).toHaveBeenCalledWith(expect.stringContaining('Sniptale'));
+  expect(setError).not.toHaveBeenCalledWith(
+    expect.stringContaining('Scenario project changed before save completed')
+  );
   expectSaveCalledWithBaseAndName(1, 10, 'Saved');
   expectSaveCalledWithBaseAndName(2, 10, 'Saved');
 }

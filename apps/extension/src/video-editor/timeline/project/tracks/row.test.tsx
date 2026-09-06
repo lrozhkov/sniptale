@@ -41,6 +41,7 @@ it('blurs track state icon buttons after pointer activation', () => {
         compactRows={false}
         isSelected={false}
         track={project.tracks[0]!}
+        trackLabel="O1"
         trackLayout={trackLayout}
         onSelectTrack={vi.fn()}
         onToggleTrackLock={vi.fn()}
@@ -49,15 +50,18 @@ it('blurs track state icon buttons after pointer activation', () => {
     );
   });
 
-  const button = container?.querySelector<HTMLButtonElement>('button');
   const buttons = container?.querySelectorAll<HTMLButtonElement>(
     '[data-ui="video-editor.timeline.icon-button"]'
   );
+  const button = buttons?.[0];
 
   expect(buttons).toHaveLength(2);
   expect(buttons?.[0]?.className).toContain('!h-6');
   expect(buttons?.[0]?.getAttribute('data-active')).toBe('true');
   expect(buttons?.[1]?.getAttribute('data-active')).toBe('false');
+  expect(
+    container?.querySelector('[data-ui="video-editor.timeline.track-select"]')?.textContent
+  ).toContain('O1');
 
   button?.focus();
   expect(document.activeElement).toBe(button);

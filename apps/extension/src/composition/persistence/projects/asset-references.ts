@@ -34,6 +34,26 @@ type ProjectAssetMediaStore = ProjectAssetDeleteStore & {
   put(value: unknown): Promise<unknown>;
 };
 
+export async function deletePublishedProjectEntry(args: {
+  countAssetOwners(assetId: string): Promise<number>;
+  deleteAssetEntry(): Promise<unknown>;
+  deleteAssetOwner(): Promise<unknown>;
+  deleteAssetRef(assetId: string): Promise<unknown>;
+  deleteMediaEntry(): Promise<unknown>;
+  entry: { assetId: string } | null;
+  operation: PhysicalDeleteAssetOperation;
+  recordOperation(): Promise<unknown>;
+}): Promise<void> {
+  await args.deleteAssetEntry();
+  await args.deleteMediaEntry();
+  if (!args.entry) return;
+  await args.deleteAssetOwner();
+  if ((await args.countAssetOwners(args.entry.assetId)) !== 0) return;
+  await args.deleteAssetRef(args.entry.assetId);
+  args.operation.assetIds.push(args.entry.assetId);
+  await args.recordOperation();
+}
+
 export function collectProjectOwnedAssetIds(project: VideoProject | undefined): string[] {
   if (!project) {
     return [];
@@ -73,7 +93,9 @@ async function deleteUnreferencedProjectAssets(
   referencedAssetIds: ReadonlySet<string>,
   assetOwnerStore: ProjectAssetOwnerStore,
   assetRefStore: ProjectAssetRefStore,
-  operation: PhysicalDeleteAssetOperation
+  operation: PhysicalDeleteAssetOperation,
+  videoWorkspaceStore: ProjectAssetRefStore,
+  videoDraftStore: ProjectAssetRefStore
 ): Promise<string[]> {
   const deletedAssetIds: string[] = [];
 
@@ -91,6 +113,8 @@ async function deleteUnreferencedProjectAssets(
     const projectAsset = parseProjectAssetEntry(await projectAssetStore.get(projectAssetId));
     await projectAssetStore.delete(projectAssetId);
     await mediaLibraryStore.delete(mediaId);
+    await videoWorkspaceStore.delete(mediaId);
+    await videoDraftStore.delete(mediaId);
     if (projectAsset) {
       await assetOwnerStore.delete([
         PROJECT_ASSET_OWNER_KIND,
@@ -116,6 +140,8 @@ export async function deleteProjectAssetsUnreferencedByOtherProjects(args: {
   ownerProjectId: string;
   projectAssetIds: string[];
   projectAssetStore: ProjectAssetDeleteStore;
+  videoWorkspaceStore: ProjectAssetRefStore;
+  videoDraftStore: ProjectAssetRefStore;
   projectStore: ProjectAssetReferenceProjectStore;
 }): Promise<string[]> {
   const referencedAssetIds =
@@ -134,7 +160,9 @@ export async function deleteProjectAssetsUnreferencedByOtherProjects(args: {
     referencedAssetIds,
     args.assetOwnerStore,
     args.assetRefStore,
-    args.operation
+    args.operation,
+    args.videoWorkspaceStore,
+    args.videoDraftStore
   );
 }
 

@@ -3,7 +3,11 @@ function checkpointRequiredBy() {
 }
 
 const LANE_POLICY = {
-  advisory: { runsIn: ['qa:advisory'], requiredBy: [], execution: 'advisory' },
+  advisory: {
+    runsIn: ['qa:checkpoint'],
+    requiredBy: checkpointRequiredBy(),
+    execution: 'advisory',
+  },
   'structural-audit': {
     runsIn: ['qa:structural-audit'],
     requiredBy: [],

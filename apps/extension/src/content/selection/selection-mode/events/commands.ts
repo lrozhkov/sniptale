@@ -49,12 +49,19 @@ export function handleSelectionModeKeyDown(
   state: SelectionModeInteractionState,
   options: SelectionModeEventOptions
 ): void {
-  if (event.defaultPrevented || !state.isActive) {
+  if (!state.isActive) {
     return;
   }
 
   const target = getContentEventTargetElement(event);
   if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) {
+    return;
+  }
+
+  if (
+    event.defaultPrevented &&
+    (event.key !== 'Escape' || !target || options.isExtensionUIElement(target))
+  ) {
     return;
   }
 

@@ -29,7 +29,7 @@ function seedRequiredQualityBaseline(root: string) {
   writeFile(
     root,
     'tooling/configs/qa/quality-baseline.json',
-    '{"schemaVersion":1,"allowances":[]}\n'
+    '{"schemaVersion":2,"rationales":[],"allowances":[]}\n'
   );
 }
 
@@ -38,7 +38,7 @@ it('rejects explicit file scopes because focused verify is diff-only', async () 
 
   await expect(
     module.runFocusedVerification({
-      files: ['docs/agent-tooling/AGENTS.md', 'tooling/qa/wrappers/checkpoint.mjs'],
+      files: ['docs/agent-tooling/agent-tooling.zip', 'tooling/qa/wrappers/checkpoint.mjs'],
     })
   ).rejects.toThrow(/current uncommitted diff only/u);
 }, 15000);

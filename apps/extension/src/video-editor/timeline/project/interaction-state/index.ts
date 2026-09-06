@@ -26,19 +26,22 @@ function useProjectTimelineInteractions(
   trackHeightByTrackId: TrackHeightState
 ) {
   const pointerSessionCleanupRef = useRef<(() => void) | null>(null);
-  const { beginClipInteraction, dragGhost, trackLayoutModel, tracks } = useProjectTimelineDrag({
-    historyTransaction: props.historyTransaction,
-    pointerSessionCleanupRef,
-    pixelsPerSecond: props.pixelsPerSecond,
-    project: props.project,
-    trackHeightByTrackId,
-    onMoveClip: props.onMoveClip,
-    onSelectClip: props.onSelectClip,
-    onSelectTrack: props.onSelectTrack,
-    onTimelinePreviewSuspendedChange: props.onTimelinePreviewSuspendedChange,
-    onTrimClipEnd: props.onTrimClipEnd,
-    onTrimClipStart: props.onTrimClipStart,
-  });
+  const { beginClipInteraction, dragGhost, snapGuideTime, trackLayoutModel, tracks } =
+    useProjectTimelineDrag({
+      currentTime: props.currentTime,
+      historyTransaction: props.historyTransaction,
+      magnetEnabled: props.magnetEnabled,
+      pointerSessionCleanupRef,
+      pixelsPerSecond: props.pixelsPerSecond,
+      project: props.project,
+      trackHeightByTrackId,
+      onMoveClip: props.onMoveClip,
+      onSelectClip: props.onSelectClip,
+      onSelectTrack: props.onSelectTrack,
+      onTimelinePreviewSuspendedChange: props.onTimelinePreviewSuspendedChange,
+      onTrimClipEnd: props.onTrimClipEnd,
+      onTrimClipStart: props.onTrimClipStart,
+    });
   const { beginEffectInteraction, selectedEffectSelection } = useProjectTimelineEffectInteractions({
     historyTransaction: props.historyTransaction,
     pointerSessionCleanupRef,
@@ -65,6 +68,7 @@ function useProjectTimelineInteractions(
   return {
     beginClipInteraction,
     dragGhost,
+    snapGuideTime,
     beginEffectInteraction,
     selectedEffectSelection,
     trackLayoutModel,
@@ -115,11 +119,13 @@ function useTimelineRangeSelectionState(
 function useProjectTimelinePlaybackState(props: TimelineRangeSelectionProps) {
   const { onSeek, pixelsPerSecond } = props;
   const { timelineRef, trackListRef, syncTracksScroll } = useProjectTimelineScrollSync();
-  const { handleTimelineSeek, seekToClientX } = useProjectTimelineSeek({
-    pixelsPerSecond,
-    timelineRef,
-    onSeek,
-  });
+  const { beginPlayheadScrub, consumeCompletedScrubClick, handleTimelineSeek, seekToClientX } =
+    useProjectTimelineSeek({
+      pixelsPerSecond,
+      projectDuration: props.project.duration,
+      timelineRef,
+      onSeek,
+    });
   const {
     beginEffectRangeSelection,
     beginRangeSelection,
@@ -129,6 +135,8 @@ function useProjectTimelinePlaybackState(props: TimelineRangeSelectionProps) {
 
   return {
     beginEffectRangeSelection,
+    beginPlayheadScrub,
+    consumeCompletedScrubClick,
     beginRangeSelection,
     beginTrackRangeSelection,
     handleTimelineSeek,

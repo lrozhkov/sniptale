@@ -28,7 +28,7 @@ function isInteractivePointerTarget(target: EventTarget | null): boolean {
   );
 }
 
-export function useViewerZoom(contentWidth: number | null) {
+export function useViewerZoom(contentWidth: number | null, responsiveLayout = false) {
   const [surface, setSurface] = useState<HTMLElement | null>(null);
   const [availableWidth, setAvailableWidth] = useState(() => window.innerWidth);
   const [outerWidth, setOuterWidth] = useState(() => window.innerWidth);
@@ -62,9 +62,11 @@ export function useViewerZoom(contentWidth: number | null) {
     };
   }, [surface]);
 
-  const fitZoom = contentWidth === null ? 1 : resolveFitZoom(availableWidth, contentWidth);
+  const fitZoom =
+    responsiveLayout || contentWidth === null ? 1 : resolveFitZoom(availableWidth, contentWidth);
   const zoom = fitToWidth ? fitZoom : manualZoom;
-  const scaledContentWidth = contentWidth === null ? null : contentWidth * zoom;
+  const scaledContentWidth =
+    contentWidth === null ? null : responsiveLayout ? availableWidth : contentWidth * zoom;
   const scrollbarGutterWidth = Math.max(0, outerWidth - availableWidth);
   const meaningfulHorizontalOverflow =
     scaledContentWidth !== null &&
@@ -81,16 +83,21 @@ export function useViewerZoom(contentWidth: number | null) {
 
   return useMemo(
     () => ({
+      canFitToWidth: !responsiveLayout,
       canZoom: contentWidth !== null,
       availableHeight,
+      availableWidth,
       grabClassName: meaningfulHorizontalOverflow
-        ? isDragging
-          ? 'cursor-grabbing'
-          : 'cursor-grab'
+        ? responsiveLayout
+          ? ''
+          : isDragging
+            ? 'cursor-grabbing'
+            : 'cursor-grab'
         : '',
-      horizontalOverflowClassName: suppressScrollbarGutterOverflow
-        ? 'overflow-x-hidden'
-        : 'overflow-x-auto',
+      horizontalOverflowClassName:
+        responsiveLayout || suppressScrollbarGutterOverflow
+          ? 'overflow-x-hidden'
+          : 'overflow-x-auto',
       fitToWidth,
       onPointerDown: (event: React.PointerEvent<HTMLElement>) => {
         const target = event.currentTarget;
@@ -132,10 +139,12 @@ export function useViewerZoom(contentWidth: number | null) {
     }),
     [
       availableHeight,
+      availableWidth,
       contentWidth,
       fitToWidth,
       isDragging,
       meaningfulHorizontalOverflow,
+      responsiveLayout,
       setManualFrom,
       suppressScrollbarGutterOverflow,
       zoom,
@@ -144,6 +153,7 @@ export function useViewerZoom(contentWidth: number | null) {
 }
 
 export interface ViewerZoomControls {
+  canFitToWidth: boolean;
   canZoom: boolean;
   fitToWidth: boolean;
   onFitToWidth: () => void;
@@ -157,7 +167,7 @@ export function WebSnapshotZoomControls(props: ViewerZoomControls & { locale: Ap
   if (!props.canZoom) return null;
   const percent = `${Math.round(props.zoom * 100)}%`;
   const buttonClassName = [
-    'inline-flex h-8 min-w-8 items-center justify-center rounded-md px-2 text-xs font-semibold',
+    'inline-flex h-8 min-w-8 cursor-pointer items-center justify-center rounded-md px-2 text-xs font-semibold',
     'text-[var(--sniptale-color-text-muted)] transition hover:bg-[var(--sniptale-color-surface-hover)]',
     'hover:text-[var(--sniptale-color-text-primary)] focus-visible:outline-none',
     'focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]',
@@ -194,18 +204,20 @@ export function WebSnapshotZoomControls(props: ViewerZoomControls & { locale: Ap
       >
         <Plus aria-hidden="true" size={14} />
       </button>
-      <button
-        type="button"
-        aria-label={translate('webSnapshotViewer.app.fitToWidth', props.locale)}
-        aria-pressed={props.fitToWidth}
-        title={translate('webSnapshotViewer.app.fitToWidth', props.locale)}
-        className={`${buttonClassName} border-l border-[var(--sniptale-color-border-soft)] ${
-          props.fitToWidth ? 'bg-[var(--sniptale-color-surface-muted)]' : ''
-        }`}
-        onClick={props.onFitToWidth}
-      >
-        <Scan aria-hidden="true" size={14} />
-      </button>
+      {props.canFitToWidth ? (
+        <button
+          type="button"
+          aria-label={translate('webSnapshotViewer.app.fitToWidth', props.locale)}
+          aria-pressed={props.fitToWidth}
+          title={translate('webSnapshotViewer.app.fitToWidth', props.locale)}
+          className={`${buttonClassName} border-l border-[var(--sniptale-color-border-soft)] ${
+            props.fitToWidth ? 'bg-[var(--sniptale-color-surface-muted)]' : ''
+          }`}
+          onClick={props.onFitToWidth}
+        >
+          <Scan aria-hidden="true" size={14} />
+        </button>
+      ) : null}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 
 import { importFresh } from '../../test-support/test-helpers';
+import { collectProductTestInventory } from '../../../test/harness/product-test-inventory.mjs';
 
 it('uses the wrapper coverage profile when the wrapper env is set', async () => {
   process.env.SNIPTALE_VITEST_SUITE = 'product';
@@ -28,7 +29,7 @@ it('uses the wrapper coverage profile when the wrapper env is set', async () => 
   });
   expect(module.default.test?.testTimeout).toBe(15000);
   expect(module.default.test?.hookTimeout).toBe(15000);
-  expect(module.default.test?.include).toHaveLength(1954);
+  expect(module.default.test?.include).toEqual(collectProductTestInventory().jsdomVmThreadsFiles);
   expect(module.default.test?.pool).toBe('vmThreads');
   expect(module.default.test?.vmMemoryLimit).toBe('512MB');
   delete process.env.SNIPTALE_PRODUCT_VITEST_PARTITION;
@@ -70,7 +71,7 @@ it('projects exact node vmThreads and compatibility threads partitions', async (
     '../../../../vitest.config.ts',
     import.meta.url
   );
-  expect(nodeVm.default.test?.include).toHaveLength(2782);
+  expect(nodeVm.default.test?.include).toEqual(collectProductTestInventory().nodeVmThreadsFiles);
   expect(nodeVm.default.test?.pool).toBe('vmThreads');
   expect(nodeVm.default.test?.vmMemoryLimit).toBe('512MB');
 
@@ -92,6 +93,7 @@ it('uses harness includes when the harness suite is requested', async () => {
   delete process.env.SNIPTALE_VITEST_TIMEOUT_MODE;
   delete process.env.SNIPTALE_PRODUCT_VITEST_POOL;
   delete process.env.SNIPTALE_PRODUCT_VITEST_PARTITION;
+  delete process.env.SNIPTALE_HARNESS_VITEST_PARTITION;
 
   const module = await importFresh<typeof import('../../../../vitest.config.ts')>(
     '../../../../vitest.config.ts',
@@ -129,6 +131,29 @@ it('uses harness includes when the harness suite is requested', async () => {
   delete process.env.SNIPTALE_PRODUCT_VITEST_PARTITION;
 });
 
+it('projects exact harness VM and forks partitions', async () => {
+  process.env.SNIPTALE_VITEST_SUITE = 'harness';
+  process.env.SNIPTALE_QA_VITEST_MAX_WORKERS = '4';
+  process.env.SNIPTALE_HARNESS_VITEST_PARTITION = 'node-vm-a';
+  const nodeVm = await importFresh<typeof import('../../../../vitest.config.ts')>(
+    '../../../../vitest.config.ts',
+    import.meta.url
+  );
+  expect(nodeVm.default.test?.include?.length).toBeGreaterThan(0);
+  expect(nodeVm.default.test?.pool).toBe('vmThreads');
+  expect(nodeVm.default.test?.maxWorkers).toBe(4);
+
+  process.env.SNIPTALE_HARNESS_VITEST_PARTITION = 'forks';
+  const forks = await importFresh<typeof import('../../../../vitest.config.ts')>(
+    '../../../../vitest.config.ts',
+    import.meta.url
+  );
+  expect(forks.default.test?.include?.length).toBeGreaterThan(0);
+  expect(forks.default.test?.pool).toBe('forks');
+  delete process.env.SNIPTALE_HARNESS_VITEST_PARTITION;
+  delete process.env.SNIPTALE_QA_VITEST_MAX_WORKERS;
+});
+
 it('keeps the rich manual coverage profile by default', async () => {
   delete process.env.SNIPTALE_VITEST_SUITE;
   delete process.env.SNIPTALE_VITEST_COVERAGE_MODE;
@@ -136,6 +161,7 @@ it('keeps the rich manual coverage profile by default', async () => {
   delete process.env.SNIPTALE_VITEST_TIMEOUT_MODE;
   delete process.env.SNIPTALE_COVERAGE_PROFILE;
   delete process.env.SNIPTALE_PRODUCT_VITEST_POOL;
+  delete process.env.SNIPTALE_HARNESS_VITEST_PARTITION;
 
   const module = await importFresh<typeof import('../../../../vitest.config.ts')>(
     '../../../../vitest.config.ts',

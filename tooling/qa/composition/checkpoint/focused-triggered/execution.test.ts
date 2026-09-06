@@ -9,6 +9,7 @@ it('runs design-system guardrail for design-system source-only changes', () => {
   expect(shouldRunDesignSystem(['apps/extension/src/design-system/previews/layout.css'])).toBe(
     true
   );
+  expect(shouldRunDesignSystem(['docs/agent-tooling/agent-tooling.zip'])).toBe(true);
 });
 
 it('uses one graph runner result for focused dependency graph steps', async () => {

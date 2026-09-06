@@ -5,9 +5,11 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   createEmptyVideoProject,
+  createVideoProjectTrack,
   createVideoProjectAsset,
 } from '../../../../features/video/project/factories/creation';
 import {
+  VideoTrackKind,
   type VideoProject,
   type VideoProjectAudioClip,
   type VideoProjectClip,
@@ -76,6 +78,7 @@ function createProject(
   audioCapableVideoAssetIds: string[] = []
 ): VideoProject {
   const project = createEmptyVideoProject('Preview');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const audioCapableVideoSet = new Set(audioCapableVideoAssetIds);
 
   project.assets = clips.map((clip) => ({
@@ -160,6 +163,7 @@ afterEach(async () => {
 
 async function verifiesInactiveAudioCleanupDuringSync() {
   const project = createEmptyVideoProject('Preview');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const activeClip = createVideoClip(project.tracks[0]!.id, { id: 'clip-active' });
   const inactiveClip = createAudioClip(project.tracks[1]!.id, { id: 'clip-inactive' });
   const inactiveAudio = createAudioElement({ muted: false, paused: false, volume: 0.7 });
@@ -179,6 +183,7 @@ async function verifiesInactiveAudioCleanupDuringSync() {
 
 async function verifiesUnmountCleanup() {
   const project = createEmptyVideoProject('Preview');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const audioClip = createAudioClip(project.tracks[1]!.id, { id: 'clip-audio' });
   const videoClip = createVideoClip(project.tracks[0]!.id, { id: 'clip-video' });
   const audio = createAudioElement({ muted: false, volume: 0.6 });

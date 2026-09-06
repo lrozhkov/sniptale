@@ -52,7 +52,7 @@ function ModeButton(props: { active: boolean; label: string; onClick: () => void
     <button
       type="button"
       aria-pressed={props.active}
-      className={`rounded-[6px] px-3 py-1.5 text-xs font-semibold transition
+      className={`cursor-pointer rounded-[6px] px-3 py-1.5 text-xs font-semibold transition
         focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--sniptale-color-focus-ring)]
         ${
           props.active

@@ -41,3 +41,23 @@ it('runs the end handler exactly once for pointerup and pointercancel', () => {
 
   expect(onEnd).toHaveBeenCalledTimes(1);
 });
+
+it.each(['pointercancel', 'blur', 'Escape'])(
+  'routes %s to cancellation exactly once',
+  (trigger) => {
+    const onMove = vi.fn();
+    const onEnd = vi.fn();
+    const onCancel = vi.fn();
+    startWindowPointerSession({ onMove, onEnd, onCancel });
+    window.dispatchEvent(
+      trigger === 'Escape'
+        ? new KeyboardEvent('keydown', { key: 'Escape', cancelable: true })
+        : new Event(trigger)
+    );
+    window.dispatchEvent(new Event('pointerup'));
+    dispatchPointerMove(10, 20);
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(onEnd).not.toHaveBeenCalled();
+    expect(onMove).not.toHaveBeenCalled();
+  }
+);

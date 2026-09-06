@@ -26,7 +26,7 @@ it('resets the request id and reports a popup export start error', () => {
   expect(state.setProgress).toHaveBeenCalledWith(
     expect.objectContaining({
       phase: 'error',
-      message: 'boom',
+      message: 'Не удалось запустить экспорт. Не удалось связаться с компонентом экспорта.',
     })
   );
 });

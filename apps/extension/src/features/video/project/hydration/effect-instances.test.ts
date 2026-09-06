@@ -30,6 +30,7 @@ function createEffectInstance(snapshotId: string): VideoProjectEffectInstance {
     id: 'hydration-instance',
     kind: 'standalone',
     playbackRate: 1,
+    sourceStart: 0.5,
     snapshotId,
     startTime: 1,
     target: { kind: 'scene' },

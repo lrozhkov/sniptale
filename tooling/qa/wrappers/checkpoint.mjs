@@ -5,7 +5,17 @@
 import { loadBaseline } from '../policy/baselines/shared-baseline.mjs';
 import { isExecutedAsScript } from '../runtime/process/shared-cli.mjs';
 import { collectAndPersistAdvisoryReport } from '../composition/advisory/advisory-report.helpers.mjs';
-import { formatAdvisoryReport } from '../composition/advisory/execution/report.mjs';
+import {
+  formatAdvisoryLog,
+  formatAdvisoryReport,
+} from '../composition/advisory/execution/report.mjs';
+import { createAdvisoryAnalysis } from '../composition/advisory/advisory-catalog.data.mjs';
+import { collectChangeRisks } from '../composition/change-risk/collector.mjs';
+import {
+  formatCheckpointRiskSummary,
+  formatFullChangeRiskReport,
+  createChangeRiskAnalysis,
+} from '../composition/change-risk/render.mjs';
 import { collectCurrentDiffContext } from '../runtime/scope/current-diff.helpers.mjs';
 import { collectFocusedStepResults } from '../composition/checkpoint/focused/execution.mjs';
 import { FOCUSED_CODE_VIOLATION_STEPS } from '../composition/checkpoint/focused/code-steps.mjs';
@@ -97,14 +107,20 @@ function collectAdvisoryStep(context, { producerRunId } = {}) {
       printReport: false,
       producerRunId,
     });
-    const attention = report.findings.filter((finding) => finding.severity === 'attention').length;
+    const actionable = [...report.buckets.introduced, ...report.buckets.worsened];
     return {
       ...createOkStep(
         'Advisory report',
-        `attention=${attention}, watch=${report.findings.length - attention}`
+        `introduced=${report.buckets.introduced.length}, ` +
+          `worsened=${report.buckets.worsened.length}, ` +
+          `existing=${report.buckets.existing.length}`
       ),
       consoleOutput: formatAdvisoryReport(report),
-      advisories: report.findings,
+      advisories: actionable,
+      advisoryBuckets: report.buckets,
+      ...(actionable.length > 0
+        ? { advice: 'Triage only introduced or worsened advisory signals for this change.' }
+        : {}),
     };
   });
 }
@@ -136,12 +152,33 @@ async function collectCheckpointVerificationSteps({
     shouldRunManifestPermissions,
     shouldRunRuntimeTopology,
   });
+  const findings = collectChangeRisks({
+    targetFiles: context.allQualityTargetFiles ?? context.qualityTargetFiles ?? context.targetFiles,
+    mode: 'checkpoint',
+  });
+  const reportedAdvisoryStep = {
+    ...advisoryStep,
+    consoleOutput: `${formatCheckpointRiskSummary({ findings, steps: focusedSteps })}\n${
+      advisoryStep.consoleOutput ?? ''
+    }`,
+    stdout: `${formatFullChangeRiskReport({ findings, steps: focusedSteps })}\n${formatAdvisoryLog({
+      buckets: advisoryStep.advisoryBuckets,
+    })}`,
+  };
 
-  return [
-    formatStep,
-    advisoryStep,
-    ...deduplicateAdvisoryCoveredConsoleOutput(advisoryStep, focusedSteps),
-  ];
+  return {
+    steps: [
+      formatStep,
+      reportedAdvisoryStep,
+      ...deduplicateAdvisoryCoveredConsoleOutput(reportedAdvisoryStep, focusedSteps),
+    ],
+    findings,
+    advisoryBuckets: advisoryStep.advisoryBuckets ?? {
+      introduced: advisoryStep.advisories ?? [],
+      worsened: [],
+      existing: [],
+    },
+  };
 }
 
 function normalizeAdvisoryStep(advisoryStep) {
@@ -209,14 +246,18 @@ async function collectProductCheckpointResult(prerequisites, dependencies) {
     context,
     dependencies.producerRunId
   );
-  const verificationSteps = await collectCheckpointVerificationSteps({
+  const verification = await collectCheckpointVerificationSteps({
     advisoryStep,
     context,
     focusedStepCollector: dependencies.focusedStepCollector,
     formatStep,
   });
-  const steps = mergePrerequisiteSteps(formatStep, harnessFreshnessStep, verificationSteps);
-  return createCheckpointResultFromSteps(context, steps);
+  const steps = mergePrerequisiteSteps(formatStep, harnessFreshnessStep, verification.steps);
+  return {
+    ...createCheckpointResultFromSteps(context, steps),
+    changeRisk: createChangeRiskAnalysis(verification.findings),
+    advisory: createAdvisoryAnalysis(verification.advisoryBuckets),
+  };
 }
 
 export async function runCheckpoint({

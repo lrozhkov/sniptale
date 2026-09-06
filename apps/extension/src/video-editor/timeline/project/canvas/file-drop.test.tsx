@@ -1,9 +1,13 @@
 // @vitest-environment jsdom
+import { VideoTrackKind } from '../../../../features/video/project/types';
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../features/video/project/factories/creation';
 import type { VideoEditorImportPlacement } from '../../../contracts/insertion';
 import { createSceneSelection } from '../../../project/selection/model';
 import { ProjectTimelineCanvas } from './';
@@ -71,6 +75,8 @@ function renderCanvas(options: {
   onUnsupportedTimelineFileDrop?: () => void;
 }) {
   const project = createEmptyVideoProject('Canvas drop');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
 
   act(() => {
     root?.render(
@@ -95,12 +101,14 @@ function createCanvasProps(
 ): React.ComponentProps<typeof ProjectTimelineCanvas> {
   return {
     currentTime: 0,
+    consumeCompletedScrubClick: () => false,
     dragGhost: null,
     playbackRange: null,
     pixelsPerSecond: 90,
     project,
     recordingTelemetry: null,
     selection: createSceneSelection(),
+    snapGuideTime: null,
     hoveredClipId: null,
     selectedClipId: null,
     selectedEffectSelection: null,
@@ -119,6 +127,9 @@ function createCanvasActionProps(options: { onUnsupportedTimelineFileDrop?: () =
   return {
     onBeginClipInteraction: vi.fn(),
     onBeginEffectInteraction: vi.fn(),
+    onBeginPlayheadScrub: vi.fn(),
+    onStepToNextFrame: vi.fn(),
+    onStepToPreviousFrame: vi.fn(),
     onBeginEffectRangeSelection: vi.fn(),
     onBeginRangeSelection: vi.fn(),
     onBeginTrackRangeSelection: () => vi.fn(),
@@ -126,6 +137,7 @@ function createCanvasActionProps(options: { onUnsupportedTimelineFileDrop?: () =
     onCloseTrackGap: vi.fn(),
     onImportTimelineFile: createImportHandlers({}),
     onSeek: vi.fn(),
+    onSeekTime: vi.fn(),
     onSelectActionSegment: vi.fn(),
     onSelectClip: vi.fn(),
     onSelectCursorSegment: vi.fn(),

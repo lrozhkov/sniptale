@@ -14,7 +14,7 @@ const POLICY_PATH = 'tooling/configs/qa/security-network-ownership.data.json';
 const ANALYZER_PATH = 'tooling/qa/guards/security/network/verify-network-fetch-policy.mjs';
 const MESSAGE =
   'Anonymous public fetch must bind URL validation, session authority, anonymous credentials, ' +
-  'redirect policy, and final-URL revalidation to this sink.';
+  'pre-network redirect blocking, redirect policy, and final-URL revalidation to this sink.';
 
 function callName(expression) {
   return ts.isIdentifier(expression) ? expression.text : null;
@@ -253,6 +253,20 @@ function hasBoundResponsePolicy(call, scope, declarations, sourceFile, validator
   return finalUrlValidated && redirectRejected;
 }
 
+function hasPreNetworkRedirectGuard(call, scope, imports, sourceFile) {
+  let guarded = false;
+  visitSourceNodes(scope, (node) => {
+    if (!ts.isCallExpression(node) || node.getStart(sourceFile) >= call.getStart(sourceFile))
+      return;
+    const binding = imports.get(callName(node.expression));
+    if (binding?.imported !== 'ensureWebSnapshotRedirectNetworkGuard') return;
+    if (!/(?:^|\/)redirect-network-guard$/u.test(binding.module)) return;
+    if (!ts.isAwaitExpression(node.parent)) return;
+    if (functionScope(node) === scope) guarded = true;
+  });
+  return guarded;
+}
+
 function hasBoundPolicy(call, sourceFile, imports, validators) {
   const scope = functionScope(call);
   if (!scope) return false;
@@ -264,6 +278,7 @@ function hasBoundPolicy(call, sourceFile, imports, validators) {
   );
   if (!referencesAnyIdentifier(call.arguments[0], validatedVariables)) return false;
   if (!hasBoundRequestOptions(call, declarations, authorityVariables)) return false;
+  if (!hasPreNetworkRedirectGuard(call, scope, imports, sourceFile)) return false;
   return hasBoundResponsePolicy(call, scope, declarations, sourceFile, validators);
 }
 

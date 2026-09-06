@@ -2,7 +2,11 @@
 
 import { beforeEach, expect, it, vi } from 'vitest';
 
-import { VideoProjectAssetType, VideoProjectClipType } from '../../../features/video/project/types';
+import {
+  VideoProjectAssetType,
+  VideoProjectClipType,
+  VideoProjectTrackRole,
+} from '../../../features/video/project/types';
 import { loadInitialProjectFromLocation } from './workspace';
 
 const {
@@ -135,9 +139,25 @@ it('adds a saved webcam sidecar as a separate muted recording track', async () =
     expect.objectContaining({
       muted: true,
       startTime: 0,
-      transform: expect.objectContaining({ height: 360, width: 640, x: 0, y: 0 }),
+      trackId: result.project.tracks.find((track) => track.role === VideoProjectTrackRole.CAMERA)
+        ?.id,
+      transform: expect.objectContaining({
+        height: expect.any(Number),
+        width: expect.any(Number),
+        x: expect.any(Number),
+        y: expect.any(Number),
+      }),
     })
   );
-  expect(result.project.duration).toBe(7);
+  expect(videoClips[1]?.transform.width).toBeLessThan(result.project.width / 2);
+  expect(result.project.duration).toBe(5);
+  expect(videoClips[1]?.duration).toBe(5);
+  expect(videoClips[1]?.groupId).toBe(videoClips[0]?.groupId);
+  expect(videoClips[0]?.groupId).not.toBeNull();
+  expect(result.project.assets.map((asset) => asset.recordingPart)).toEqual([
+    { recordingId: 'recording-1', role: 'primary' },
+    { recordingId: 'recording-1', role: 'camera' },
+  ]);
+  expect(result.project.assets[1]?.metadata.duration).toBe(7);
   expect(saveVideoProject).toHaveBeenCalledOnce();
 });

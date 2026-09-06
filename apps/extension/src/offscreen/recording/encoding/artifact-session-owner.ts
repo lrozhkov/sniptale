@@ -1,3 +1,4 @@
+import { LIVE_VIDEO_KEY_FRAME_INTERVAL_SECONDS } from './live-video-budget';
 import type {
   FinalizedRecordingStagingArtifact,
   RecordingStagingArtifactWriter,
@@ -58,7 +59,15 @@ export class RecordingArtifactSessionOwner implements RecordingArtifactSession {
   private readonly rejectTerminal: (error: Error) => void;
 
   constructor(private readonly input: CreateRecordingArtifactSessionOwnerInput) {
-    this.recorder = new MediaRecorder(input.stream, input.recorderOptions);
+    const options = {
+      ...input.recorderOptions,
+      ...(input.stream.getVideoTracks().length
+        ? {
+            videoKeyFrameIntervalDuration: LIVE_VIDEO_KEY_FRAME_INTERVAL_SECONDS * 1000,
+          }
+        : {}),
+    };
+    this.recorder = new MediaRecorder(input.stream, options);
     let resolveTerminal!: (artifact: FinalizedRecordingStagingArtifact) => void;
     let rejectTerminal!: (error: Error) => void;
     this.terminal = new Promise((resolve, reject) => {

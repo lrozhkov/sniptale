@@ -5,6 +5,7 @@ import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { createVideoProject } from '../../../../apps/extension/src/composition/persistence/projects/index.test-support';
 import { createScenarioProjectV3 } from '../../../../apps/extension/src/features/scenario/project/v3';
 import { betaV1Fixture as betaV1PersistenceFixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
+import { betaV2Fixture as betaV2PersistenceFixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v2';
 import { test } from '../support/extension-fixture';
 import { startHostServer } from '../support/host-server';
 import {
@@ -13,13 +14,16 @@ import {
   applyHarnessBootstrap,
   countMediaLibraryEntries,
   countRuntimeMessagesByType,
+  E2E_ACTIVE_PAGE_ACCESS_RESPONSE,
   E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
   EDITOR_HARNESS_PATH,
   GALLERY_EXPORT_BACKUP_LABEL,
   GALLERY_CONFIRM_EXPORT_BACKUP_LABEL,
   GALLERY_HARNESS_PATH,
   GALLERY_IMPORT_BACKUP_LABEL,
+  GALLERY_IMPORT_CONFLICT_ACTION_LABEL,
   GALLERY_IMPORT_DUPLICATE_LABEL,
+  GALLERY_IMPORT_RESTORE_LABEL,
   GALLERY_OPEN_IN_EDITOR_LABEL,
   getHarnessStorageState,
   getRuntimeMessagesByType,
@@ -32,13 +36,69 @@ import {
   POPUP_HARNESS_PATH,
 } from '../extension-critical.helpers';
 
-const EDITOR_FRAME_LABEL = translate('editor.toolbar.frame', 'ru');
+const EDITOR_FRAME_BACKGROUND_TYPE_LABEL = translate('editor.scene.backgroundTypeSection', 'ru');
+const GALLERY_INCLUDE_DRAFTS_LABEL = translate('gallery.backupExportModal.includeDrafts', 'ru');
+const GALLERY_INCLUDE_DRAFTS_DESCRIPTION = translate(
+  'gallery.backupExportModal.includeDraftsDescription',
+  'ru'
+);
 
 browserTest(
-  'beta-v1 fixture hydrates a real IndexedDB and OPFS graph with stable domain contracts',
+  'beta-v1 upgrades to beta-v2 and preserves real IndexedDB and OPFS data through reload',
   async ({ page }) => {
     const host = await startHostServer();
     try {
+      await applyHarnessBootstrap(page, { preserveMediaLibrary: true });
+      await page.goto(host.origin);
+      await page.evaluate(async (fixture) => {
+        const keyPaths: Record<string, string | string[]> = {
+          recording_telemetry: 'recordingId',
+          diagnostics_meta: 'recordingId',
+          diagnostics_events: ['recordingId', 'chunkIndex'],
+          scenario_step_editor_documents: 'stepId',
+          thumbnails: 'assetId',
+          image_workspaces: 'aggregateId',
+          aggregate_presentations: ['aggregateKind', 'aggregateId'],
+          video_effect_bundles: 'packId',
+          project_export_inputs: 'jobId',
+          frame_annotation_raster_jobs: 'jobId',
+          state_manager: ['domain', 'key'],
+          native_transfer_chunks: ['sessionId', 'chunkIndex'],
+          asset_refs: 'assetId',
+          asset_owners: ['ownerKind', 'ownerId', 'role'],
+          asset_operations: 'operationId',
+          schema_contracts: 'domainId',
+        };
+        const database = await new Promise<IDBDatabase>((resolve, reject) => {
+          const request = indexedDB.open(fixture.databaseName, fixture.databaseVersion);
+          request.onupgradeneeded = () => {
+            for (const [name, indexes] of Object.entries(fixture.indexes)) {
+              const store = request.result.createObjectStore(name, {
+                keyPath: keyPaths[name] ?? 'id',
+              });
+              for (const index of indexes) store.createIndex(index, index);
+            }
+            const contracts = request.transaction!.objectStore('schema_contracts');
+            for (const [domainId, schemaVersion] of Object.entries(fixture.domainVersions))
+              contracts.put({ domainId, schemaVersion });
+            for (const [name, entries] of Object.entries(fixture.records)) {
+              for (const entry of entries) request.transaction!.objectStore(name).put(entry);
+            }
+          };
+          request.onerror = () => reject(request.error);
+          request.onsuccess = () => resolve(request.result);
+        });
+        database.close();
+        const root = await navigator.storage.getDirectory();
+        const assets = await root.getDirectoryHandle('sniptale-assets', { create: true });
+        const objects = await assets.getDirectoryHandle('objects', { create: true });
+        for (const object of fixture.opfsObjects) {
+          const handle = await objects.getFileHandle(object.assetId, { create: true });
+          const writable = await handle.createWritable();
+          await writable.write(object.text);
+          await writable.close();
+        }
+      }, betaV1PersistenceFixture);
       await page.goto(`${host.origin}${GALLERY_HARNESS_PATH}`, { waitUntil: 'domcontentloaded' });
       await page.locator('[data-ui="gallery.page.root"]').waitFor({ state: 'visible' });
 
@@ -57,23 +117,10 @@ browserTest(
           });
         const database = await openDatabase();
         const recordStores = Object.keys(fixture.records);
-        const write = database.transaction(recordStores, 'readwrite');
-        for (const [storeName, entries] of Object.entries(fixture.records)) {
-          const store = write.objectStore(storeName);
-          for (const entry of entries) store.put(entry);
-        }
-        await complete(write);
         database.close();
-
         const origin = await navigator.storage.getDirectory();
-        const assets = await origin.getDirectoryHandle('sniptale-assets', { create: true });
-        const objects = await assets.getDirectoryHandle('objects', { create: true });
-        for (const object of fixture.opfsObjects) {
-          const handle = await objects.getFileHandle(object.assetId, { create: true });
-          const writable = await handle.createWritable();
-          await writable.write(object.text);
-          await writable.close();
-        }
+        const assets = await origin.getDirectoryHandle('sniptale-assets');
+        const objects = await assets.getDirectoryHandle('objects');
 
         const reopened = await openDatabase();
         const read = reopened.transaction([...recordStores, 'schema_contracts'], 'readonly');
@@ -112,9 +159,9 @@ browserTest(
         };
       }, betaV1PersistenceFixture);
 
-      expect(snapshot.databaseVersion).toBe(betaV1PersistenceFixture.databaseVersion);
-      expect(snapshot.stores).toEqual([...betaV1PersistenceFixture.stores].sort());
-      expect(snapshot.contracts).toEqual(betaV1PersistenceFixture.domainVersions);
+      expect(snapshot.databaseVersion).toBe(betaV2PersistenceFixture.databaseVersion);
+      expect(snapshot.stores).toEqual([...betaV2PersistenceFixture.stores].sort());
+      expect(snapshot.contracts).toEqual(betaV2PersistenceFixture.domainVersions);
       expect(snapshot.objectText).toBe(betaV1PersistenceFixture.opfsObjects[0]?.text);
       expect(snapshot.recordKeys).toMatchObject({
         asset_owners: [['recording', 'beta-v1-recording', 'body']],
@@ -123,6 +170,26 @@ browserTest(
         recordings: ['beta-v1-recording'],
         state_manager: [['video-recording-completion-outbox', 'pending']],
       });
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.locator('[data-ui="gallery.page.root"]').waitFor({ state: 'visible' });
+      const reopened = await page.evaluate(async () => {
+        const request = indexedDB.open('sniptale-db');
+        const database = await new Promise<IDBDatabase>((resolve, reject) => {
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+        const count = database
+          .transaction('recordings')
+          .objectStore('recordings')
+          .count('beta-v1-recording');
+        const remaining = await new Promise<number>((resolve, reject) => {
+          count.onsuccess = () => resolve(count.result);
+          count.onerror = () => reject(count.error);
+        });
+        database.close();
+        return { remaining, version: database.version };
+      });
+      expect(reopened).toEqual({ remaining: 1, version: betaV2PersistenceFixture.databaseVersion });
     } finally {
       await new Promise<void>((resolve, reject) =>
         host.server.close((error) => (error ? reject(error) : resolve()))
@@ -140,11 +207,11 @@ async function openEditorHarness(page: Page, hostOrigin: string) {
 }
 
 async function openEditorFrameUtility(page: Page): Promise<void> {
-  await page.getByTitle(EDITOR_FRAME_LABEL, { exact: true }).click();
-  await expect(page.locator('[data-ui="editor.floating.utility-panel.frame"]')).toBeVisible();
-  await expect(
-    page.locator('[data-ui="editor.floating.utility-panel.close-button"]')
-  ).toBeVisible();
+  const frameMode = page.locator('[data-ui="editor.floating.layers.mode.frame"]');
+  await frameMode.click();
+  await expect(frameMode).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('[data-ui="editor.floating.layers-panel"]')).toBeVisible();
+  await expect(page.getByRole('group', { name: EDITOR_FRAME_BACKGROUND_TYPE_LABEL })).toBeVisible();
 }
 
 async function readImageWorkspaceRevision(page: Page, aggregateId: string): Promise<number | null> {
@@ -187,6 +254,14 @@ async function hasStoredQuickAction(page: Page, actionName: string): Promise<boo
   });
 }
 
+async function restoreBackupAsDuplicate(page: Page): Promise<void> {
+  await page
+    .getByRole('button', { name: GALLERY_IMPORT_CONFLICT_ACTION_LABEL, exact: true })
+    .click();
+  await page.getByRole('option', { name: GALLERY_IMPORT_DUPLICATE_LABEL, exact: true }).click();
+  await page.getByRole('button', { name: GALLERY_IMPORT_RESTORE_LABEL, exact: true }).click();
+}
+
 test('settings quick action persists into popup and dispatches from the saved state', async ({
   page,
   hostOrigin,
@@ -208,7 +283,17 @@ test('settings quick action persists into popup and dispatches from the saved st
   const popupPage = await context.newPage();
   await applyHarnessBootstrap(popupPage, {
     apiBehavior: E2E_RUNTIME_SUCCESS_API_BEHAVIOR,
-    storage: storageState,
+    runtimeResponses: {
+      PAGE_ACCESS: E2E_ACTIVE_PAGE_ACCESS_RESPONSE,
+    },
+    storage: {
+      ...storageState,
+      sniptale_popup_startup: {
+        selection: 'screenshots:quick-actions',
+        lastPage: 'screenshots',
+        lastExportDestination: 'export',
+      },
+    },
   });
 
   await popupPage.goto(`${hostOrigin}${POPUP_HARNESS_PATH}`, { waitUntil: 'domcontentloaded' });
@@ -247,7 +332,7 @@ test('gallery image asset opens the editor from preview actions', async ({ page,
 
   await page.goto(`${hostOrigin}${GALLERY_HARNESS_PATH}`, { waitUntil: 'domcontentloaded' });
   await page.locator('[data-ui="gallery.page.root"]').waitFor({ state: 'visible' });
-  await page.locator('button', { hasText: filename }).first().click();
+  await page.getByRole('button', { name: filename, exact: true }).first().click();
 
   const openInEditorButton = page.getByRole('button', {
     name: GALLERY_OPEN_IN_EDITOR_LABEL,
@@ -293,7 +378,8 @@ test('gallery backup export imports media as duplicate through the modal flow', 
   await page.locator('[data-ui="gallery.page.root"]').waitFor({ state: 'visible' });
   await expect.poll(() => countMediaLibraryEntries(page)).toBe(1);
 
-  await page.getByRole('button', { name: GALLERY_EXPORT_BACKUP_LABEL, exact: true }).click();
+  await page.locator('[data-ui="gallery.header.storage"] > button').click();
+  await page.getByRole('menuitem', { name: GALLERY_EXPORT_BACKUP_LABEL, exact: true }).click();
   await page
     .getByRole('button', { name: GALLERY_CONFIRM_EXPORT_BACKUP_LABEL, exact: true })
     .click();
@@ -310,11 +396,12 @@ test('gallery backup export imports media as duplicate through the modal flow', 
   );
   await writeFile(backupPath, Uint8Array.from(savedBackup?.bytes ?? []));
 
-  await page.getByRole('button', { name: GALLERY_IMPORT_BACKUP_LABEL, exact: true }).click();
-  await page.locator('input[type="file"]').setInputFiles(backupPath);
-  await page.locator('button', { hasText: GALLERY_IMPORT_DUPLICATE_LABEL }).click();
+  await page.locator('[data-ui="gallery.header.storage"] > button').click();
+  await page.getByRole('menuitem', { name: GALLERY_IMPORT_BACKUP_LABEL, exact: true }).click();
+  await page.locator('input[accept=".zip,application/zip"]').setInputFiles(backupPath);
+  await restoreBackupAsDuplicate(page);
 
-  await expect(page.locator('button', { hasText: GALLERY_IMPORT_DUPLICATE_LABEL })).toBeHidden();
+  await expect(page.getByRole('option', { name: GALLERY_IMPORT_DUPLICATE_LABEL })).toBeHidden();
   await expect(page.locator('[data-ui="gallery.import-progress"]')).toBeVisible();
 
   await expect.poll(() => countMediaLibraryEntries(page)).toBe(2);
@@ -324,7 +411,7 @@ test('gallery backup restores draft media and projects to a fresh Drafts retenti
   page,
   hostOrigin,
 }, testInfo) => {
-  const createdAt = 1_000;
+  const createdAt = Date.now() - 60_000;
   const videoProject = createVideoProject({
     createdAt,
     id: 'draft-video-project',
@@ -353,10 +440,17 @@ test('gallery backup restores draft media and projects to a fresh Drafts retenti
   await page.goto(`${hostOrigin}${GALLERY_HARNESS_PATH}`, { waitUntil: 'domcontentloaded' });
   await page.locator('[data-ui="gallery.page.root"]').waitFor({ state: 'visible' });
   await seedDraftProjectEntries(page, videoProject, scenarioProject, createdAt);
-  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect.poll(() => readDraftRootLifecycles(page)).toHaveLength(3);
 
-  await page.getByRole('button', { name: GALLERY_EXPORT_BACKUP_LABEL, exact: true }).click();
-  await page.getByRole('checkbox').first().check();
+  await page.locator('[data-ui="gallery.header.storage"] > button').click();
+  await page.getByRole('menuitem', { name: GALLERY_EXPORT_BACKUP_LABEL, exact: true }).click();
+  const includeDrafts = page
+    .locator('label')
+    .filter({ hasText: GALLERY_INCLUDE_DRAFTS_DESCRIPTION })
+    .getByRole('checkbox', { name: GALLERY_INCLUDE_DRAFTS_LABEL });
+  await includeDrafts.check();
+  await expect(includeDrafts).toBeChecked();
+  await expect(page.getByText('3', { exact: true }).first()).toBeVisible();
   await page
     .getByRole('button', { name: GALLERY_CONFIRM_EXPORT_BACKUP_LABEL, exact: true })
     .click();
@@ -374,9 +468,10 @@ test('gallery backup restores draft media and projects to a fresh Drafts retenti
   await writeFile(backupPath, Uint8Array.from(savedBackup?.bytes ?? []));
   await clearDraftRoots(page);
 
-  await page.getByRole('button', { name: GALLERY_IMPORT_BACKUP_LABEL, exact: true }).click();
-  await page.locator('input[type="file"]').setInputFiles(backupPath);
-  await page.locator('button', { hasText: GALLERY_IMPORT_DUPLICATE_LABEL }).click();
+  await page.locator('[data-ui="gallery.header.storage"] > button').click();
+  await page.getByRole('menuitem', { name: GALLERY_IMPORT_BACKUP_LABEL, exact: true }).click();
+  await page.locator('input[accept=".zip,application/zip"]').setInputFiles(backupPath);
+  await page.getByRole('button', { name: GALLERY_IMPORT_RESTORE_LABEL, exact: true }).click();
   await expect
     .poll(() => readDraftRootLifecycles(page))
     .toEqual([
@@ -422,7 +517,8 @@ test('recording backup round-trip keeps durable bytes in OPFS without recording 
       refCount: 1,
     });
 
-  await page.getByRole('button', { name: GALLERY_EXPORT_BACKUP_LABEL, exact: true }).click();
+  await page.locator('[data-ui="gallery.header.storage"] > button').click();
+  await page.getByRole('menuitem', { name: GALLERY_EXPORT_BACKUP_LABEL, exact: true }).click();
   await page
     .getByRole('button', { name: GALLERY_CONFIRM_EXPORT_BACKUP_LABEL, exact: true })
     .click();
@@ -431,9 +527,10 @@ test('recording backup round-trip keeps durable bytes in OPFS without recording 
   const savedBackup = await readLastSavedFile(page);
   await writeFile(backupPath, Uint8Array.from(savedBackup?.bytes ?? []));
 
-  await page.getByRole('button', { name: GALLERY_IMPORT_BACKUP_LABEL, exact: true }).click();
-  await page.locator('input[type="file"]').setInputFiles(backupPath);
-  await page.locator('button', { hasText: GALLERY_IMPORT_DUPLICATE_LABEL }).click();
+  await page.locator('[data-ui="gallery.header.storage"] > button').click();
+  await page.getByRole('menuitem', { name: GALLERY_IMPORT_BACKUP_LABEL, exact: true }).click();
+  await page.locator('input[accept=".zip,application/zip"]').setInputFiles(backupPath);
+  await restoreBackupAsDuplicate(page);
 
   await expect
     .poll(() => readDurableRecordingState(page))
@@ -691,7 +788,7 @@ test('editor promotes, closes, reopens from Gallery, and autosaves hydrated file
     async () => (await window.__sniptaleHarness?.getMediaLibraryState()) ?? []
   );
   expect(stored?.id).toBe(aggregateId);
-  await galleryPage.locator('button', { hasText: stored!.filename }).first().click();
+  await galleryPage.getByRole('button', { name: stored!.filename, exact: true }).first().click();
   const openInEditorButton = galleryPage.getByRole('button', {
     name: GALLERY_OPEN_IN_EDITOR_LABEL,
     exact: true,
@@ -783,7 +880,10 @@ test('editor exact browser-frame harness stays visually stable', async ({ page, 
   await expect(sceneSurface).toHaveScreenshot('editor-browser-frame-exact.png');
 });
 
-test('editor frame utility opens from the floating tool rail', async ({ page, hostOrigin }) => {
+test('editor frame utility opens from the floating layers navigation', async ({
+  page,
+  hostOrigin,
+}) => {
   await openEditorHarness(page, hostOrigin);
   await openEditorFrameUtility(page);
 });

@@ -34,7 +34,8 @@ const viewportSelectorMocks = vi.hoisted(() => ({
   resolveToolbarFloatingMenuStyleMock: vi.fn(() => ({ top: '10px', left: 0 })),
 }));
 
-vi.mock('../../../platform/i18n', () => ({
+vi.mock('../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../platform/i18n')>()),
   formatNumber: (value: number) => String(value),
   translate: (key: string) => key,
   useAppLocale: () => 'en',

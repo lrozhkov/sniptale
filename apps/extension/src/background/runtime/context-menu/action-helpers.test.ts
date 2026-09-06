@@ -5,6 +5,8 @@ import { installBackgroundRuntimeMessagingMock } from '../../routing-contracts/r
 
 const {
   captureSurfaceGetAvailabilityMock,
+  ensureLocaleHydratedMock,
+  getCurrentLocaleMock,
   loadPopupExportPreferencesMock,
   loadSettingsMock,
   loadVideoSettingsMock,
@@ -22,6 +24,8 @@ const {
   translateMock,
 } = vi.hoisted(() => ({
   captureSurfaceGetAvailabilityMock: vi.fn(),
+  ensureLocaleHydratedMock: vi.fn(),
+  getCurrentLocaleMock: vi.fn<() => 'en' | 'ru'>(() => 'en'),
   loadPopupExportPreferencesMock: vi.fn(),
   loadSettingsMock: vi.fn(),
   loadVideoSettingsMock: vi.fn(),
@@ -36,7 +40,7 @@ const {
   browserPermissionsRequestMock: vi.fn(),
   browserTabsGetMock: vi.fn(),
   runtimeGetUrlMock: vi.fn((path: string) => `chrome-extension://test/${path}`),
-  translateMock: vi.fn((key: string) => key),
+  translateMock: vi.fn((key: string, locale?: string) => (locale ? `${key}:${locale}` : key)),
 }));
 
 vi.mock('../../capture-surface', async (importOriginal) => ({
@@ -56,6 +60,8 @@ vi.mock('../../../platform/navigation/extension-pages', async (importOriginal) =
 
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
+  ensureLocaleHydrated: ensureLocaleHydratedMock,
+  getCurrentLocale: getCurrentLocaleMock,
   translate: translateMock,
 }));
 
@@ -150,6 +156,8 @@ function resetContextMenuActionHelperMocks(): void {
       required: { width: 1920, height: 1080 },
     })
   );
+  ensureLocaleHydratedMock.mockResolvedValue(undefined);
+  getCurrentLocaleMock.mockReturnValue('en');
   sendTabMessageMock.mockResolvedValue({ success: true });
   installBackgroundRuntimeMessagingMock({ sendTabMessage: sendTabMessageMock });
   startRecordingMock.mockResolvedValue(undefined);
@@ -277,7 +285,9 @@ it('blocks an unavailable context-menu preset before recording starts', async ()
 
 it('fails export start when the background job owner rejects', async () => {
   startPagePackageJobMock.mockRejectedValue(new Error('export-failed'));
-  await expect(startContextMenuExport(15)).rejects.toThrow('export-failed');
+  await expect(startContextMenuExport(15)).rejects.toThrow(
+    'popup.export.startExportError:en. popup.export.exportProcessingErrorDetail:en'
+  );
 });
 
 it('starts export with the full persisted popup export selection', async () => {
@@ -291,6 +301,7 @@ it('starts export with the full persisted popup export selection', async () => {
     includeWebCopy: false,
     intent: 'export',
     jobId: expect.any(String),
+    locale: 'en',
     orderedTabs: [{ tabId: 15, title: 'Example tab' }],
     options: {
       includeBasicLogs: false,
@@ -304,6 +315,54 @@ it('starts export with the full persisted popup export selection', async () => {
     },
     warnings: [],
   });
+});
+
+it('hydrates and snapshots locale before creating a context-menu export warning', async () => {
+  let finishHydration!: () => void;
+  ensureLocaleHydratedMock.mockImplementationOnce(
+    () => new Promise<void>((resolve) => (finishHydration = resolve))
+  );
+  loadPopupExportPreferencesMock.mockResolvedValueOnce({
+    ...contextMenuPopupExportPreferencesFixture,
+    includeFullPageScreenshot: true,
+  });
+  browserPermissionsRequestMock.mockResolvedValueOnce(false);
+
+  const start = startContextMenuExport(15);
+  await Promise.resolve();
+  expect(browserPermissionsRequestMock).not.toHaveBeenCalled();
+  finishHydration();
+  await start;
+
+  expect(startPagePackageJobMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      locale: 'en',
+      warnings: ['popup.export.screenshotPermissionDeniedWarning:en'],
+    })
+  );
+});
+
+it('keeps the post-admission context-menu toast in the captured locale', async () => {
+  let finishStart!: () => void;
+  startPagePackageJobMock.mockImplementationOnce(
+    () => new Promise((resolve) => (finishStart = () => resolve({ phase: 'running' })))
+  );
+
+  const start = startContextMenuExport(15);
+  await vi.waitFor(() => expect(startPagePackageJobMock).toHaveBeenCalledOnce());
+  getCurrentLocaleMock.mockReturnValue('ru');
+  finishStart();
+  await start;
+
+  expect(sendTabMessageMock).toHaveBeenCalledWith(
+    15,
+    expect.objectContaining({
+      payload: expect.objectContaining({
+        message: 'popup.export.startProgressMessage:en',
+        title: 'popup.export.exportButton:en',
+      }),
+    })
+  );
 });
 
 it('never acquires extended page evidence from context-menu Export', async () => {
@@ -378,7 +437,18 @@ it('throws a translated error when preview generation fails before copy', async 
   });
 
   await expect(copyContextMenuExportPreview(4, 'json')).rejects.toThrow(
-    'popup.export.prepareExportError'
+    'popup.export.prepareExportError. popup.export.pagePreparationErrorDetail'
+  );
+});
+
+it('does not expose a raw content error when preview generation fails before copy', async () => {
+  sendTabMessageMock.mockResolvedValue({
+    error: 'private page runtime detail',
+    success: false,
+  });
+
+  await expect(copyContextMenuExportPreview(4, 'json')).rejects.toThrow(
+    'popup.export.prepareExportError. popup.export.pagePreparationErrorDetail'
   );
 });
 

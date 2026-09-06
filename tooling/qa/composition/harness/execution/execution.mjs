@@ -130,6 +130,7 @@ export function createHarnessUnitTestRequest(context, { maxWorkers = 1 } = {}) {
   return {
     ...(directFiles.length > 0 ? { directFiles } : { relatedFiles }),
     maxWorkers,
+    requireTests: true,
     suite: HARNESS_QA_SUITE,
   };
 }

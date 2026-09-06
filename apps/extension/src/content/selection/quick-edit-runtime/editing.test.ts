@@ -102,9 +102,11 @@ it('makes an element editable and starts a quick-edit history transaction', () =
   document.body.append(element);
   const editingElements = new Map();
   const overlayActions = createOverlayActions();
+  const setInputShieldSuspended = vi.fn();
   const actions = createQuickEditEditingActions({
     editingElements,
     overlayActions,
+    setInputShieldSuspended,
     updateBlockingOverlayShape: overlayActions.updateBlockingOverlayShape,
   });
 
@@ -129,6 +131,47 @@ it('makes an element editable and starts a quick-edit history transaction', () =
   onResize();
   expect(overlayActions.updateBlockingOverlayShape).toHaveBeenCalledWith(element);
   expect(mocks.loggerLog).toHaveBeenCalledWith('Element made editable', editableId);
+  expect(setInputShieldSuspended).toHaveBeenCalledWith(true);
+});
+
+it('restores the input shield when editable activation fails', () => {
+  const element = document.createElement('div');
+  document.body.append(element);
+  const overlayActions = createOverlayActions();
+  const setInputShieldSuspended = vi.fn();
+  const activationError = new Error('activation failed');
+  mocks.activateEditableElement.mockImplementationOnce(() => {
+    throw activationError;
+  });
+  const actions = createQuickEditEditingActions({
+    editingElements: new Map(),
+    overlayActions,
+    setInputShieldSuspended,
+    updateBlockingOverlayShape: overlayActions.updateBlockingOverlayShape,
+  });
+
+  expect(() => actions.makeElementEditable(element)).toThrow(activationError);
+  expect(setInputShieldSuspended.mock.calls).toEqual([[true], [false]]);
+});
+
+it('preserves the input shield when a later editable activation fails', () => {
+  const element = document.createElement('div');
+  document.body.append(element);
+  const overlayActions = createOverlayActions();
+  const setInputShieldSuspended = vi.fn();
+  const editingElements = new Map([['existing-edit', {} as never]]);
+  mocks.activateEditableElement.mockImplementationOnce(() => {
+    throw new Error('activation failed');
+  });
+  const actions = createQuickEditEditingActions({
+    editingElements,
+    overlayActions,
+    setInputShieldSuspended,
+    updateBlockingOverlayShape: overlayActions.updateBlockingOverlayShape,
+  });
+
+  expect(() => actions.makeElementEditable(element)).toThrow('activation failed');
+  expect(setInputShieldSuspended.mock.calls).toEqual([[true], [true]]);
 });
 
 it('wires overlay callbacks and link-click suppression into editable activation', () => {
@@ -138,6 +181,7 @@ it('wires overlay callbacks and link-click suppression into editable activation'
   const actions = createQuickEditEditingActions({
     editingElements: new Map(),
     overlayActions,
+    setInputShieldSuspended: vi.fn(),
     updateBlockingOverlayShape: overlayActions.updateBlockingOverlayShape,
   });
   const event = {
@@ -171,6 +215,7 @@ it('finishes editing and commits the captured DOM mutation batch', () => {
   const actions = createQuickEditEditingActions({
     editingElements: new Map(),
     overlayActions,
+    setInputShieldSuspended: vi.fn(),
     updateBlockingOverlayShape: overlayActions.updateBlockingOverlayShape,
   });
 
@@ -207,6 +252,7 @@ it('passes clear-state callbacks that reuse owner-local overlay wiring', () => {
   const actions = createQuickEditEditingActions({
     editingElements: new Map(),
     overlayActions,
+    setInputShieldSuspended: vi.fn(),
     updateBlockingOverlayShape: overlayActions.updateBlockingOverlayShape,
   });
   const event = {
@@ -247,6 +293,7 @@ it('exposes stable editing action seams for owner-local consumers', () => {
   const actions = createQuickEditEditingActions({
     editingElements: new Map(),
     overlayActions: createOverlayActions(),
+    setInputShieldSuspended: vi.fn(),
     updateBlockingOverlayShape: vi.fn(),
   });
 
@@ -261,6 +308,7 @@ it('cancels editing and skips history cancellation when no editable id is presen
   const actions = createQuickEditEditingActions({
     editingElements: new Map(),
     overlayActions,
+    setInputShieldSuspended: vi.fn(),
     updateBlockingOverlayShape: overlayActions.updateBlockingOverlayShape,
   });
 
@@ -281,6 +329,7 @@ it('cancels and commits quick-edit history only when an editable id exists', () 
   const actions = createQuickEditEditingActions({
     editingElements: new Map(),
     overlayActions,
+    setInputShieldSuspended: vi.fn(),
     updateBlockingOverlayShape: overlayActions.updateBlockingOverlayShape,
   });
 
@@ -294,6 +343,24 @@ it('cancels and commits quick-edit history only when an editable id exists', () 
   expect(mocks.commitTransaction).not.toHaveBeenCalled();
 });
 
+it('keeps the input shield suspended while another targeted edit remains active', () => {
+  const element = document.createElement('div');
+  const overlayActions = createOverlayActions();
+  const setInputShieldSuspended = vi.fn();
+  const editingElements = new Map([['remaining-edit', {} as never]]);
+  const actions = createQuickEditEditingActions({
+    editingElements,
+    overlayActions,
+    setInputShieldSuspended,
+    updateBlockingOverlayShape: overlayActions.updateBlockingOverlayShape,
+  });
+
+  actions.finishEditing(element);
+  actions.cancelEditing(element);
+
+  expect(setInputShieldSuspended).not.toHaveBeenCalled();
+});
+
 it('reuses the same child-link suppressor for activation and clear-state callbacks', () => {
   const element = document.createElement('div');
   document.body.append(element);
@@ -301,6 +368,7 @@ it('reuses the same child-link suppressor for activation and clear-state callbac
   const actions = createQuickEditEditingActions({
     editingElements: new Map(),
     overlayActions,
+    setInputShieldSuspended: vi.fn(),
     updateBlockingOverlayShape: overlayActions.updateBlockingOverlayShape,
   });
 

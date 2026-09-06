@@ -1,4 +1,4 @@
-export const LIVE_VIDEO_KEY_FRAME_INTERVAL_SECONDS = 4;
+export const LIVE_VIDEO_KEY_FRAME_INTERVAL_SECONDS = 2;
 // WebCodecs defines bitrate as an average target and leaves fluctuation implementation-defined.
 // Judge payload-only recordings over 15+ seconds with 15% steady-state variance plus one
 // half-second startup allowance for the initial random-access frame and rate-control warm-up.

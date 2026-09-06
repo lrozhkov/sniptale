@@ -3,15 +3,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const loggerDebugMock = vi.fn();
 const loggerErrorMock = vi.fn();
+const createLoggerMock = vi.fn(() => ({
+  debug: loggerDebugMock,
+  error: loggerErrorMock,
+  info: vi.fn(),
+  log: vi.fn(),
+  warn: vi.fn(),
+}));
 
 vi.mock('@sniptale/platform/observability/logger', () => ({
-  createLogger: () => ({
-    debug: loggerDebugMock,
-    error: loggerErrorMock,
-    info: vi.fn(),
-    log: vi.fn(),
-    warn: vi.fn(),
-  }),
+  createLogger: createLoggerMock,
 }));
 
 type RecordedRequest = {
@@ -114,6 +115,43 @@ async function verifySuccessfulChatRequest() {
     ],
     model: 'llama3.2',
     temperature: 0.7,
+  });
+  expect(loggerDebugMock).toHaveBeenCalledWith('Received chat completion response', {
+    apiUrl: 'https://ollama.local/chat/completions',
+    status: 200,
+  });
+  expect(loggerDebugMock).toHaveBeenCalledWith('Parsed chat completion content', {
+    contentLength: response.length,
+  });
+  expect(createLoggerMock).toHaveBeenCalledWith({ namespace: 'BackgroundLlmHttp' });
+}
+
+async function readMaxTokensForModel(modelCode: string): Promise<number> {
+  const { requestChatCompletion } = await import('./request');
+  const requests: RecordedRequest[] = [];
+  mockFetchResponse({ body: { choices: [{ message: { content: 'ok' } }] } }, requests);
+  await requestChatCompletion({
+    apiKey: 'secret-key',
+    baseUrl: 'https://ollama.local',
+    modelCode,
+    systemPrompt: 'system',
+    userPrompt: 'user',
+  });
+  return (getOnlyRecordedRequest(requests).body as { max_tokens: number }).max_tokens;
+}
+
+async function verifyFenceExtractionContracts() {
+  const { extractJSON, extractMarkdownTables } = await import('./request');
+
+  expect(extractMarkdownTables('  ```MARKDOWN| a |\n```  ')).toBe('| a |\n');
+  expect(extractJSON('  ```JSON{"ok":true}\n```  ')).toBe('{"ok":true}\n');
+  expect(loggerDebugMock).toHaveBeenCalledWith('Extracted markdown tables', {
+    cleanedLength: 6,
+    rawLength: 24,
+  });
+  expect(loggerDebugMock).toHaveBeenCalledWith('Extracted JSON payload', {
+    cleanedLength: 12,
+    rawLength: 26,
   });
 }
 
@@ -282,6 +320,62 @@ async function verifyNetworkFailureSurface() {
   expect(JSON.stringify(loggerErrorMock.mock.calls)).not.toContain(secretCanary);
 }
 
+async function verifyMalformedResponseVariants() {
+  const { requestChatCompletion } = await import('./request');
+  const malformed = [
+    null,
+    { choices: null },
+    { choices: [null] },
+    { choices: [{ message: null }] },
+    { choices: [{ message: { content: [] } }] },
+    { choices: [{ message: { content: [null, { text: 7 }] } }] },
+    { choices: [{ message: { content: 7 } }] },
+  ];
+
+  for (const body of malformed) {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify(body), {
+        headers: { 'Content-Type': 'application/json' },
+        status: 200,
+      })
+    );
+    await expect(
+      requestChatCompletion({
+        apiKey: 'secret-key',
+        baseUrl: 'https://ollama.local',
+        modelCode: 'custom-model',
+        systemPrompt: 'system',
+        userPrompt: 'user',
+      })
+    ).rejects.toThrow(translate('background.runtime.llmUnexpectedResponse'));
+  }
+}
+
+async function verifyProviderErrorWithoutLabel() {
+  const { requestChatCompletion } = await import('./request');
+  fetchMock.mockResolvedValueOnce(
+    new Response('{}', {
+      headers: { 'Content-Type': 'application/json' },
+      status: 400,
+    })
+  );
+
+  let thrown: unknown;
+  try {
+    await requestChatCompletion({
+      apiKey: 'secret-key',
+      baseUrl: 'https://ollama.local',
+      modelCode: 'custom-model',
+      systemPrompt: 'system',
+      userPrompt: 'user',
+    });
+  } catch (error) {
+    thrown = error;
+  }
+  expect(thrown).toBeInstanceOf(Error);
+  expect((thrown as Error).message).toBe(translate('background.runtime.llmInvalidRequestPrefix'));
+}
+
 describe('transport/request', () => {
   beforeEach(resetLlmTransportRequestMocks);
 
@@ -289,6 +383,22 @@ describe('transport/request', () => {
     'posts a real chat completion request and keeps the request contract intact',
     verifySuccessfulChatRequest
   );
+  it(
+    'trims and removes case-insensitive fences with or without a newline',
+    verifyFenceExtractionContracts
+  );
+  it.each([
+    ['GPT-5-mini', 8_000],
+    ['o1-preview', 8_000],
+    ['claude-3', 6_000],
+    ['gemini-2', 6_000],
+    ['mistral-small', 4_000],
+    ['qwen-2', 4_000],
+    ['deepseek-r1', 4_000],
+    ['custom-model', 3_000],
+  ])('sets the bounded token budget for %s', async (modelCode, expected) => {
+    await expect(readMaxTokensForModel(modelCode)).resolves.toBe(expected);
+  });
   it(
     'surfaces provider-specific request errors from the API response body',
     verifyProviderErrorSurface
@@ -305,5 +415,7 @@ describe('transport/request', () => {
     'rejects successful HTTP responses without chat completion content',
     verifyUnexpectedResponseSurface
   );
+  it('rejects every malformed provider response shape', verifyMalformedResponseVariants);
+  it('omits an absent provider label from invalid-request errors', verifyProviderErrorWithoutLabel);
   it('maps secret-bearing network failures onto a fixed safe error', verifyNetworkFailureSurface);
 });

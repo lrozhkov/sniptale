@@ -78,6 +78,7 @@ function usePreviewMediaSynchronization(
   }
 ): void {
   usePreviewStageVideoSync({
+    assetUrls: params.assetUrls,
     activeClips: params.activeClips,
     currentTime: params.currentTime,
     isPlaying: params.isPlaying,

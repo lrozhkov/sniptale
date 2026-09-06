@@ -10,6 +10,10 @@ const OFFSCREEN_COMMAND_CAPABILITY_SCOPE = 'offscreen:command';
 const OFFSCREEN_COMMAND_CAPABILITY_ORIGIN = 'sniptale:offscreen-command';
 const OFFSCREEN_COMMAND_CAPABILITY_TTL_MS = 2 * 60 * 1000;
 
+// `capabilityToken` is a retained wire name. This self-contained value binds a command payload to
+// freshness and idempotency generation; its unkeyed hash does not authenticate the sender. The
+// browser-derived exact background sender policy is the offscreen authorization boundary.
+
 type OffscreenCommandCapabilityPayload = {
   binding: string;
   capabilityContext: CapabilityContext;

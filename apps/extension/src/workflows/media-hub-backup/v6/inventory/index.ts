@@ -1,3 +1,4 @@
+import { parsePortableVideoProjectMetadata } from '../root-codecs/projects';
 import {
   initDB,
   MEDIA_LIBRARY_STORE,
@@ -82,7 +83,22 @@ export async function buildMediaHubBackupExportPlanFromLibraryV6(
     .filter((entry): entry is NonNullable<typeof entry> => entry !== null)
     .map((entry) => ({ ...entry, hasThumbnail: false }));
   const paths = createArchivePathAllocator();
+  const videoProjects = await buildVideoProjectRootInventory({
+    db,
+    options: effectiveOptions,
+    paths,
+  });
+  const coveredProjectMediaIds = new Set<string>();
+  for (const root of videoProjects) {
+    const { metadata } = await root.load();
+    const project = parsePortableVideoProjectMetadata(metadata);
+    for (const asset of project.projectAssets)
+      coveredProjectMediaIds.add(`project-asset:${asset.entry.id}`);
+    for (const item of project.projectExports)
+      coveredProjectMediaIds.add(`export:${item.entry.id}`);
+  }
   const media = await buildMediaRootInventory({
+    coveredProjectMediaIds,
     db,
     items,
     options: effectiveOptions,
@@ -96,11 +112,7 @@ export async function buildMediaHubBackupExportPlanFromLibraryV6(
     );
   }
   const effects = await buildEffectBundleRootInventory(db, paths);
-  const videoProjects = await buildVideoProjectRootInventory({
-    db,
-    options: effectiveOptions,
-    paths,
-  });
+
   const scenarioProjects = await buildScenarioProjectRootInventory({
     db,
     options: effectiveOptions,

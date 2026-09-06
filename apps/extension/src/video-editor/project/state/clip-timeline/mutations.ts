@@ -86,12 +86,24 @@ function isTrackEditable(project: VideoProject, trackId: string): boolean {
   return Boolean(track && !track.locked);
 }
 
+function resolveClipEdgeOperation(project: VideoProject, clipId: string, edge: 'start' | 'end') {
+  const operation = resolveEditableClipOperation(project, clipId);
+  if (!operation) return null;
+  const edgeTime = (clip: EditableClipOperation['clip']) =>
+    edge === 'start' ? clip.startTime : clip.startTime + clip.duration;
+  const time = edgeTime(operation.clip);
+  const affectedClips = operation.affectedClips.filter(
+    (clip) => Math.abs(edgeTime(clip) - time) < TIMELINE_GAP_EPSILON
+  );
+  return { ...operation, affectedClips, clipIdSet: new Set(affectedClips.map((clip) => clip.id)) };
+}
+
 export function trimProjectClipStart(
   project: VideoProject,
   clipId: string,
   nextStartTime: number
 ): VideoProject {
-  const operation = resolveEditableClipOperation(project, clipId);
+  const operation = resolveClipEdgeOperation(project, clipId, 'start');
   if (!operation) {
     return project;
   }
@@ -162,7 +174,7 @@ export function trimProjectClipEnd(
   clipId: string,
   nextEndTime: number
 ): VideoProject {
-  const operation = resolveEditableClipOperation(project, clipId);
+  const operation = resolveClipEdgeOperation(project, clipId, 'end');
   if (!operation) {
     return project;
   }

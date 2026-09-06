@@ -1,4 +1,6 @@
 export interface VideoObjectTrackSample {
+  /** Exact timeline instance owning this source-derived point. */
+  sourceClipId?: string;
   time: number;
   x: number;
   y: number;
@@ -26,6 +28,8 @@ export interface VideoObjectTrackAnalysisMetadata {
 
 export interface VideoObjectTrackCorrectionAnchor {
   id: string;
+  /** Exact timeline instance owning this source-derived point. */
+  sourceClipId?: string;
   time: number;
   x: number;
   y: number;

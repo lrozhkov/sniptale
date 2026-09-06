@@ -5,7 +5,7 @@ import type {
   RecordingStagingCoordinator,
 } from '../../../composition/persistence/recordings/staging';
 import { createRecordingArtifactSession } from './artifact-session';
-import { TestMediaStream } from '../multi-source/media-stream.test-support';
+import { TestMediaStream, createTrackedStream } from '../multi-source/media-stream.test-support';
 import { createPreparedRecordingAssetForTest } from '../../../composition/persistence/recordings/staging/test-support';
 
 class FakeMediaRecorder {
@@ -17,7 +17,10 @@ class FakeMediaRecorder {
   onstop: ((event: Event) => void) | null = null;
   state: RecordingState = 'inactive';
 
-  constructor() {
+  constructor(
+    _stream: MediaStream,
+    readonly options: MediaRecorderOptions & { videoKeyFrameIntervalDuration?: number }
+  ) {
     if (FakeMediaRecorder.constructorError) throw FakeMediaRecorder.constructorError;
   }
 
@@ -82,6 +85,24 @@ describe('recording artifact session', () => {
   beforeEach(() => {
     FakeMediaRecorder.constructorError = null;
     vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
+  });
+
+  it('requests two-second keyframes for video without changing audio-only options', async () => {
+    for (const video of [true, false]) {
+      const harness = createHarness();
+      const session = await createRecordingArtifactSession({
+        artifactId: 'recording-1',
+        coordinator: harness.coordinator,
+        filename: 'recording.webm',
+        mimeType: 'video/webm',
+        recorderOptions: { mimeType: 'video/webm' },
+        stream: video ? createTrackedStream() : new TestMediaStream([]),
+      });
+      if (video)
+        expect(session.recorder).toHaveProperty('options.videoKeyFrameIntervalDuration', 2000);
+      else expect(session.recorder).toHaveProperty('options', { mimeType: 'video/webm' });
+      await session.abort();
+    }
   });
 
   it('includes requested and final data before resolving terminal finalization', async () => {

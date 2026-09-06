@@ -72,7 +72,7 @@ export const useWorkspaceInspectorContext = () =>
   useRequiredContext(WorkspaceInspectorContext, 'Workspace inspector context');
 const useWorkspacePlaybackRangeContext = () =>
   useRequiredContext(WorkspacePlaybackRangeContext, 'Workspace playback-range context');
-const useWorkspacePreviewContext = () =>
+export const useWorkspacePreviewContext = () =>
   useRequiredContext(WorkspacePreviewContext, 'Workspace preview context');
 const useWorkspaceSceneBackgroundContext = () =>
   useRequiredContext(WorkspaceSceneBackgroundContext, 'Workspace scene-background context');
@@ -80,7 +80,7 @@ const useVideoEditorLibrariesContext = () =>
   useRequiredContext(VideoEditorLibrariesContext, 'Video editor libraries context');
 export const useVideoEditorSelectionsContext = () =>
   useRequiredContext(VideoEditorSelectionsContext, 'Video editor selections context');
-const useVideoEditorBlockingOverlayContext = () =>
+export const useVideoEditorBlockingOverlayContext = () =>
   useRequiredContext(VideoEditorBlockingOverlayContext, 'Video editor blocking-overlay context');
 const useRuntimePlaybackContext = () =>
   useRequiredContext(RuntimePlaybackContext, 'Runtime playback context');

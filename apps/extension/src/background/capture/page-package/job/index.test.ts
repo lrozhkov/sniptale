@@ -6,10 +6,12 @@ const mocks = vi.hoisted(() => ({
   cancelCapture: vi.fn(),
   cleanupCancellation: vi.fn(),
   clearStatus: vi.fn(),
+  ensureLocaleHydrated: vi.fn(),
   execute: vi.fn(),
   hasResources: vi.fn(),
   publish: vi.fn(),
   readDurable: vi.fn(),
+  readSnapshot: vi.fn(),
   readStatus: vi.fn(),
   recover: vi.fn(),
   reconcileTemporaryTabs: vi.fn(),
@@ -17,6 +19,11 @@ const mocks = vi.hoisted(() => ({
   materialize: vi.fn(),
   closeTemporaryTabs: vi.fn(),
   containsPermission: vi.fn(),
+}));
+
+vi.mock('../../../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../platform/i18n')>()),
+  ensureLocaleHydrated: mocks.ensureLocaleHydrated,
 }));
 
 vi.mock('./execute', () => ({ executePopupExportJob: mocks.execute }));
@@ -35,6 +42,7 @@ vi.mock('./storage', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./storage')>()),
   clearPagePackageJobStatus: mocks.clearStatus,
   hasUnresolvedPagePackageResources: mocks.hasResources,
+  readPagePackageJobSnapshot: mocks.readSnapshot,
   readPagePackageJobStatus: mocks.readStatus,
 }));
 vi.mock('./recovery', () => ({ recoverInterruptedPagePackageJob: mocks.recover }));
@@ -53,6 +61,7 @@ import {
   assertActivePopupExportStageBinding,
   cancelPagePackageJob,
   erasePopupExportJobState,
+  getPagePackageJobSnapshot,
   getPagePackageJobStatus,
   startPagePackageJob,
   startPagePackageJobFromSources,
@@ -134,12 +143,14 @@ beforeEach(() => {
   mocks.clearStatus.mockResolvedValue(true);
   mocks.publish.mockResolvedValue(undefined);
   mocks.readDurable.mockReturnValue(null);
+  mocks.readSnapshot.mockResolvedValue(null);
   mocks.hasResources.mockResolvedValue(false);
   mocks.readStatus.mockResolvedValue(null);
   mocks.recover.mockResolvedValue(undefined);
   mocks.reconcileTemporaryTabs.mockResolvedValue(undefined);
   mocks.closeTemporaryTabs.mockResolvedValue(undefined);
   mocks.containsPermission.mockResolvedValue(true);
+  mocks.ensureLocaleHydrated.mockResolvedValue(undefined);
   mocks.materialize.mockResolvedValue({ orderedTabs: tabs, temporaryTabIds: [] });
   mocks.update.mockImplementation(async (job: ActivePopupExportJob, patch) => {
     job.status = { ...job.status, ...patch, revision: job.status.revision + 1 };
@@ -167,6 +178,48 @@ beforeEach(() => {
       )
     );
   });
+});
+
+it('hydrates the background locale before creating a localized export status', async () => {
+  let finishHydration!: () => void;
+  mocks.ensureLocaleHydrated.mockImplementationOnce(
+    () => new Promise<void>((resolve) => (finishHydration = resolve))
+  );
+  const start = startPagePackageJobFromSources({
+    captureTiming: { loadTimeoutMs: 30_000, settleDelayMs: 0 },
+    contentPort: { cancelPagePackage: vi.fn(), requestPagePackage: vi.fn() },
+    includeWebCopy: false,
+    intent: 'export',
+    jobId: 'locale-job',
+    options,
+    sources: [{ kind: 'url', url: 'https://example.test/' }],
+    warnings: [],
+  });
+
+  await Promise.resolve();
+  expect(mocks.reconcileTemporaryTabs).not.toHaveBeenCalled();
+  finishHydration();
+  await start;
+});
+
+it('keeps direct export available when locale hydration fails', async () => {
+  const execution = createExecutionControl();
+  mocks.ensureLocaleHydrated.mockRejectedValueOnce(new Error('locale storage unavailable'));
+
+  await expect(
+    startPagePackageJob({
+      contentPort: { cancelPagePackage: vi.fn(), requestPagePackage: vi.fn() },
+      includeWebCopy: false,
+      intent: 'export',
+      jobId: 'locale-fallback-job',
+      options,
+      orderedTabs: tabs,
+      warnings: [],
+    })
+  ).resolves.toMatchObject({ jobId: 'locale-fallback-job', phase: 'running' });
+
+  execution.finish();
+  await execution.settled;
 });
 
 it('materializes URL sources before claiming the job and retains capture timing', async () => {
@@ -532,6 +585,37 @@ it('reads an isolated status and acknowledges only matching terminal storage', a
     expect.objectContaining({ phase: 'running' })
   );
   expect(mocks.clearStatus).not.toHaveBeenCalled();
+});
+
+it('returns one persisted status-locale snapshot when a new job starts during the read', async () => {
+  const stored = createStoredStatus('running', 'stored-job');
+  let resolveSnapshot!: (value: { locale: 'en'; status: PagePackageJobStatusV1 }) => void;
+  mocks.readSnapshot.mockReturnValueOnce(
+    new Promise((resolve) => {
+      resolveSnapshot = resolve;
+    })
+  );
+
+  const snapshot = getPagePackageJobSnapshot();
+  await vi.waitFor(() => expect(mocks.readSnapshot).toHaveBeenCalledOnce());
+
+  const execution = createExecutionControl();
+  await startPagePackageJob({
+    contentPort: { cancelPagePackage: vi.fn(), requestPagePackage: vi.fn() },
+    includeWebCopy: false,
+    intent: 'export',
+    jobId: 'new-job',
+    locale: 'ru',
+    options,
+    orderedTabs: tabs,
+    warnings: [],
+  });
+  resolveSnapshot({ locale: 'en', status: stored });
+
+  await expect(snapshot).resolves.toEqual({ locale: 'en', status: stored });
+
+  execution.finish();
+  await execution.settled;
 });
 
 it('does not let a stale acknowledgement clear a replacement job', async () => {

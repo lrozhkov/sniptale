@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { chromium, type Browser, type BrowserContext, type Page } from '@playwright/test';
+import { chromium, type Browser, type BrowserContext, type Page } from 'playwright';
 
 type LaunchedBrowser = {
   browser: Browser;

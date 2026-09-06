@@ -77,7 +77,7 @@ const mocks = vi.hoisted(() => {
     openAudioRecordingDialog: action,
     openLibraryPanel: action,
     playbackRange: null,
-    preview: {},
+    preview: { sourceViewerActive: false },
     sceneBackgroundColors: {},
     setPlaybackRange: action,
     toggleLibraryPanel: action,
@@ -89,6 +89,7 @@ const mocks = vi.hoisted(() => {
     pausePlayback: action,
     registerPreviewRuntime: action,
     seekTo: action,
+    stepByFrames: action,
     setPlaybackPlaying: action,
     setTimelinePreviewSuspended: action,
     setTimelinePreviewViewport: action,
@@ -108,7 +109,7 @@ const mocks = vi.hoisted(() => {
     lifecycle,
     playback,
     runtime,
-    runtimeHook: fn(() => runtime),
+    runtimeHook: fn((_args: { playback: { shortcutsEnabled: boolean } }) => runtime),
     selection,
     session,
     telemetry,
@@ -183,6 +184,7 @@ let root: Root;
 
 beforeEach(() => {
   mocks.playback.currentTime = 0;
+  mocks.workspace.preview.sourceViewerActive = false;
   mocks.exportPort.exportState = { dialogOpen: false, error: null, isRunning: false };
   mocks.runtimeHook.mockClear();
   container = document.createElement('div');
@@ -243,4 +245,20 @@ it('keeps stable children and unrelated contexts isolated across provider update
   mocks.exportPort.exportState = { ...mocks.exportPort.exportState, dialogOpen: true };
   act(renderProvider);
   expect(blockingRender).toHaveBeenCalledTimes(2);
+});
+
+it('admits montage shortcuts only when the montage viewer is active and no overlay blocks input', () => {
+  const render = () => root.render(<VideoEditorCompositionProvider />);
+  act(render);
+  expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(true);
+  mocks.workspace.preview.sourceViewerActive = true;
+  act(render);
+  expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(false);
+  mocks.workspace.preview.sourceViewerActive = false;
+  mocks.exportPort.exportState.dialogOpen = true;
+  act(render);
+  expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(false);
+  mocks.exportPort.exportState.dialogOpen = false;
+  act(render);
+  expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(true);
 });

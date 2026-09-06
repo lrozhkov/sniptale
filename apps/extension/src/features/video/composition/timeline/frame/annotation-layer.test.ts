@@ -1,14 +1,18 @@
 import { expect, it } from 'vitest';
 import { APPLE_GLASS_ANNOTATION_PACK } from '../../../project/annotation-engine';
 import { createAnnotationClip } from '../../../project/factories/overlay-clip';
-import { createEmptyVideoProject } from '../../../project/factories/creation';
-import { VideoOverlayTemplateKind } from '../../../project/types/index';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../project/factories/creation';
+import { VideoTrackKind, VideoOverlayTemplateKind } from '../../../project/types/index';
 import { createAnnotationVisualLayer } from './annotation-layer';
 
 it('creates target-aware annotation visual layers with resolved frame bounds', () => {
   const project = createEmptyVideoProject('Annotation layer', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
   const clip = createAnnotationClip(
-    project.tracks[2]!.id,
+    project.tracks[1]!.id,
     project.width,
     project.height,
     0,
@@ -39,13 +43,14 @@ it('creates target-aware annotation visual layers with resolved frame bounds', (
 
 it('attaches a declarative scene only for modern built-in annotation packs', () => {
   const project = createEmptyVideoProject('Annotation layer', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
   const template = Object.values(APPLE_GLASS_ANNOTATION_PACK.templates)
     .flat()
     .find((candidate) => candidate.id === 'lens-pin-callout');
   if (!template) {
     throw new Error('Missing lens-pin-callout template.');
   }
-  const clip = createAnnotationClip(project.tracks[2]!.id, project.width, project.height, 0, {
+  const clip = createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 0, {
     pack: APPLE_GLASS_ANNOTATION_PACK,
     packLabel: APPLE_GLASS_ANNOTATION_PACK.label,
     packTheme: APPLE_GLASS_ANNOTATION_PACK.theme,

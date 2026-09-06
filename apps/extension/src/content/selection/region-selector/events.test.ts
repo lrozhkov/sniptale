@@ -109,6 +109,41 @@ describe('region-selector region events', () => {
 });
 
 describe('region-selector document events', () => {
+  it('continues move and resize sessions before a host document guard can cancel them', () => {
+    const state = createDefaultRegionSelectorState();
+    const updateUi = vi.fn();
+    const hostGuard = (event: Event) => event.stopImmediatePropagation();
+    document.addEventListener('pointermove', hostGuard, { capture: true });
+    state.isResizing = true;
+    state.resizeCorner = 'se';
+    mocks.updateResizingRegion.mockReturnValue({ x: 20, y: 30, width: 340, height: 210 });
+    const handlers = createRegionSelectorDocumentHandlers({
+      handleRegionCancelled: vi.fn(),
+      state,
+      updateUi,
+    });
+
+    try {
+      handlers.bindDocumentEvents();
+      document.body.dispatchEvent(
+        new MouseEvent('pointermove', { bubbles: true, clientX: 180, clientY: 190 })
+      );
+    } finally {
+      detachRegionSelectorListeners({
+        handleKeyDown: handlers.handleKeyDown,
+        handleMouseMove: handlers.handleMouseMove,
+        handleMouseUp: handlers.handleMouseUp,
+        handlePointerMove: handlers.handlePointerMove,
+        handlePointerUp: handlers.handlePointerUp,
+        state,
+      });
+      document.removeEventListener('pointermove', hostGuard, { capture: true });
+    }
+
+    expect(mocks.updateResizingRegion).toHaveBeenCalledOnce();
+    expect(updateUi).toHaveBeenCalledOnce();
+  });
+
   it('updates dragging state, handles escape, and detaches the complete listener lifecycle', () => {
     const state = createDefaultRegionSelectorState();
     const handleRegionCancelled = vi.fn();

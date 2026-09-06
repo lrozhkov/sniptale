@@ -14,7 +14,7 @@ function validateFastProofIdentity(manifest, expected) {
     manifest.artifactKind !== 'sniptale-ci-proof' ||
     manifest.lane !== 'proof' ||
     manifest.status !== 'passed' ||
-    manifest.workspaceMode !== 'committed' ||
+    manifest.workspaceMode !== expected.workspaceMode ||
     manifest.commit !== expected.commit ||
     manifest.candidateTree !== expected.candidateTree ||
     manifest.trustedControlSha !== expected.trustedControlSha ||
@@ -87,6 +87,7 @@ export function verifyReusableFastProof(
     containerDigest,
     controlDigest,
     gateInputDigest,
+    workspaceMode = 'committed',
   }
 ) {
   const resolvedRoot = path.resolve(proofRoot);
@@ -103,6 +104,7 @@ export function verifyReusableFastProof(
     containerDigest,
     controlDigest,
     gateInputDigest,
+    workspaceMode,
   });
   if (
     !Array.isArray(manifest.phases) ||

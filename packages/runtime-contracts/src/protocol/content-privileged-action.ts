@@ -24,6 +24,11 @@ export type ContentPrivilegedActionCapability = {
   token: string;
 };
 
+export type RecentCaptureEditorAssetCapability = {
+  requestId: string;
+  token: string;
+};
+
 export type ContentPrivilegedActionAutoStartGrant = {
   grantToken: string;
 };
@@ -75,6 +80,12 @@ export function isContentPrivilegedActionCapability(
     typeof value['token'] === 'string' &&
     Object.keys(value).length === 2
   );
+}
+
+export function isRecentCaptureEditorAssetCapability(
+  value: unknown
+): value is RecentCaptureEditorAssetCapability {
+  return isContentPrivilegedActionCapability(value);
 }
 
 export function isContentPrivilegedActionAutoStartGrant(

@@ -290,5 +290,6 @@ it('surfaces insert errors returned from the dialog action', async () => {
     blob: file,
     filename: 'local.png',
   });
-  expect(container?.textContent).toContain('Upload failed');
+  expect(container?.textContent).toContain('common.errors.storageDetail');
+  expect(container?.textContent).not.toContain('Upload failed');
 });

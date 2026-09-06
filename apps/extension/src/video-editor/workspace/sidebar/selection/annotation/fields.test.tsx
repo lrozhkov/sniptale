@@ -7,8 +7,14 @@ import {
   type VideoAnnotationTemplate,
 } from '../../../../../features/video/project/annotation-engine';
 import { createAnnotationClip } from '../../../../../features/video/project/factories/overlay-clip';
-import { createEmptyVideoProject } from '../../../../../features/video/project/factories/creation';
-import { VideoOverlayTemplateKind } from '../../../../../features/video/project/types';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../../features/video/project/factories/creation';
+import {
+  VideoTrackKind,
+  VideoOverlayTemplateKind,
+} from '../../../../../features/video/project/types';
 import { AnnotationFields } from './fields';
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
@@ -22,8 +28,9 @@ vi.stubGlobal('ShadowRoot', class ShadowRoot {});
 
 function createProps() {
   const project = createEmptyVideoProject('Annotation fields');
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
   const clip = createAnnotationClip(
-    project.tracks[2]!.id,
+    project.tracks[1]!.id,
     project.width,
     project.height,
     0,
@@ -104,8 +111,9 @@ function registerLegacyAnnotationFieldTests() {
 
   it('uses shared template capability controls to hide subline-only fields for pointer labels', () => {
     const project = createEmptyVideoProject('Pointer annotation fields');
+    project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
     const clip = createAnnotationClip(
-      project.tracks[2]!.id,
+      project.tracks[1]!.id,
       project.width,
       project.height,
       0,
@@ -130,7 +138,8 @@ function registerLegacyAnnotationFieldTests() {
 
 function createModernProps(pack: VideoAnnotationPack, template: VideoAnnotationTemplate) {
   const project = createEmptyVideoProject('Modern annotation fields');
-  const clip = createAnnotationClip(project.tracks[2]!.id, project.width, project.height, 0, {
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  const clip = createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 0, {
     pack,
     packLabel: pack.label,
     packTheme: pack.theme,

@@ -141,6 +141,10 @@ export function getCurrentLocale(): AppLocale {
   return defaultLocaleStateService.getOwner().getCurrentLocale();
 }
 
+export function ensureLocaleHydrated(): Promise<void> {
+  return defaultLocaleStateService.getOwner().ensureHydrated();
+}
+
 export function setLocalePreference(locale: AppLocale): Promise<void> {
   return defaultLocaleStateService.getOwner().setPreference(locale);
 }

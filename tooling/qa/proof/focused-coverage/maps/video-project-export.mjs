@@ -1,8 +1,7 @@
 export const VIDEO_PROJECT_EXPORT_OWNER_MAPPINGS = [
   {
     owner: 'video-project-export-runtime-authority',
-    productionFile:
-      'apps/extension/src/background/runtime/routing/action-kernel/handlers.ts',
+    productionFile: 'apps/extension/src/background/runtime/routing/action-kernel/handlers.ts',
     reason:
       'Descriptor-bound project export authorization and dispatch are covered by action-kernel tests.',
     testFiles: [

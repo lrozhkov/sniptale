@@ -14,7 +14,11 @@ import { resolveVideoProjectReadResult } from '../../../composition/persistence/
 import { commitVideoProjectMutation } from '../../../composition/persistence/projects/index-mutations';
 import { translate } from '../../../platform/i18n';
 import { buildWebcamRecordingId } from '@sniptale/runtime-contracts/video/types/sidecar';
-import type { VideoProject, VideoProjectAsset } from '../../../features/video/project/types';
+import {
+  VideoProjectTrackRole,
+  type VideoProject,
+  type VideoProjectAsset,
+} from '../../../features/video/project/types';
 import { importRecordingProjectAsset } from './assets';
 import { loadVideoMetadata } from '../media-metadata';
 import {
@@ -104,6 +108,7 @@ async function loadWebcamSidecarVideos(
       mimeType: asset.metadata.mimeType,
       size: entry.size,
       asset,
+      trackRole: VideoProjectTrackRole.CAMERA,
     },
   ];
 }
@@ -154,6 +159,7 @@ function mergeMigratedRecordingAsset(
     id: asset.id,
     name: asset.name,
     createdAt: asset.createdAt,
+    ...(asset.recordingPart ? { recordingPart: asset.recordingPart } : {}),
   };
 }
 

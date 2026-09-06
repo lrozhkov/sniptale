@@ -4,8 +4,14 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAnnotationClip } from '../../../../../features/video/project/factories/overlay-clip';
-import { createEmptyVideoProject } from '../../../../../features/video/project/factories/creation';
-import { VideoOverlayTemplateKind } from '../../../../../features/video/project/types';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../../features/video/project/factories/creation';
+import {
+  VideoTrackKind,
+  VideoOverlayTemplateKind,
+} from '../../../../../features/video/project/types';
 import { VideoEditorSelectionKind } from '../../../../contracts/selection';
 import { WorkspaceSidebarInspectPanel } from '../inspect';
 
@@ -84,6 +90,7 @@ function createSelectionHandlers() {
 
 function createProps() {
   const project = createEmptyVideoProject('Annotation');
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
   const overlayTrackId = project.tracks.find((track) => track.kind === 'OVERLAY')?.id ?? 'overlay';
   const clip = createAnnotationClip(
     overlayTrackId,
@@ -116,11 +123,21 @@ describe('workspace-sidebar/selection/inspect-annotation', () => {
   it('renders grouped annotation inspector metadata for template overlays', () => {
     renderInspectPanel();
 
-    expect(container?.textContent).toContain('videoEditor.sidebar.inspectorGroupSummary');
-    expect(container?.textContent).toContain('videoEditor.sidebar.inspectorGroupGeneral');
-    expect(container?.textContent).toContain('videoEditor.sidebar.inspectorGroupContent');
-    expect(container?.textContent).toContain('videoEditor.sidebar.inspectorGroupTarget');
-    expect(container?.textContent).toContain('videoEditor.sidebar.inspectorGroupMotion');
+    expect(
+      container?.querySelector('nav button[aria-label="videoEditor.sidebar.inspectorGroupSummary"]')
+    ).not.toBeNull();
+    expect(
+      container?.querySelector('nav button[aria-label="videoEditor.sidebar.inspectorGroupGeneral"]')
+    ).not.toBeNull();
+    expect(
+      container?.querySelector('nav button[aria-label="videoEditor.sidebar.inspectorGroupContent"]')
+    ).not.toBeNull();
+    expect(
+      container?.querySelector('nav button[aria-label="videoEditor.sidebar.inspectorGroupTarget"]')
+    ).not.toBeNull();
+    expect(
+      container?.querySelector('nav button[aria-label="videoEditor.sidebar.inspectorGroupMotion"]')
+    ).not.toBeNull();
     expect(container?.textContent).toContain('videoEditor.sidebar.annotationTemplatePointerLabel');
 
     clickGroup('videoEditor.sidebar.inspectorGroupGeneral');
@@ -143,8 +160,9 @@ function renderInspectPanel() {
 }
 
 function clickGroup(title: string) {
-  const button = container?.querySelector<HTMLButtonElement>(`button[title="${title}"]`);
+  const button = container?.querySelector<HTMLElement>(`nav button[title="${title}"]`);
   act(() => {
-    button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    if (!button?.parentElement?.hasAttribute('open'))
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 }

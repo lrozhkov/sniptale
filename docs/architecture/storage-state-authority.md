@@ -1,36 +1,34 @@
 # Storage state authority
 
-This document defines the ownership rules for state that can outlive one runtime instance. Live service-worker maps under `apps/extension/src/background/application/runtime-state/**` describe runtime authority; persistence owners describe durable, session, advisory, and disposable state.
+This document owns state classifications and persistence authority. [Persistence contracts](persistence-contracts.md) owns database admission, versions, migration, and recovery.
 
 ## State classes
 
-- Authoritative state drives user-visible or privileged behavior and must have one persistence owner, explicit mutation APIs, ordering rules, failure behavior, and recovery proof.
-- Session state coordinates a bounded browser or extension lifetime and must define expiry, stale-entry handling, and storage-unavailable behavior.
-- Advisory state may be rebuilt or dropped and must not become a hidden prerequisite for product correctness.
-- Disposable state belongs to a page or runtime instance and becomes durable only through an explicit persistence mutation.
+Classify state by the first matching rule for its declared lifetime:
 
-Browser storage, IndexedDB, in-memory caches, and React state must not act as parallel authorities. A fallback cache is allowed only when its owner defines which backend wins, how it is reconciled, and what is lost on restart.
+- Advisory state may be rebuilt or discarded during that lifetime without changing correctness. Do not make it a prerequisite for correctness.
+- Disposable state is non-advisory state needed only by one page or runtime instance. It has no contract after that instance ends.
+- Session state is non-advisory state that must span runtime instances within one bounded browser or extension lifetime and expires at that boundary. Define expiry, stale-entry handling, and storage-unavailable behavior.
+- Authoritative state is the accepted source of truth for a domain outcome that does not match a shorter-lived class. Give it one authority, mutation API, ordering rule, failure behavior, and recovery proof. Persist it only when its declared lifetime crosses a restart or storage boundary.
+
+User visibility and privileged use are not state classes. Give every class one mutation authority and explicit failure behavior appropriate to its lifetime.
+
+Do not use browser storage, IndexedDB, memory, or React state as parallel authorities. A fallback cache must identify the winning backend, reconciliation rule, and restart loss.
 
 ## Owners
 
-`apps/extension/src/composition/persistence/infrastructure/browser-storage/index.ts` owns the shared browser-storage adapter and state-domain registration. Named concerns under `apps/extension/src/composition/persistence/**` own cross-runtime settings, projects, media, browser-storage, IndexedDB, backup, export-ledger, and sensitive AI persistence. The shared database admission, logical domain versions, migration policy, and alpha cut are defined by [persistence contracts](persistence-contracts.md).
+`apps/extension/src/composition/persistence/infrastructure/browser-storage/index.ts` owns browser-storage adaptation and state-domain registration. Named owners under `apps/extension/src/composition/persistence/**` own cross-runtime state.
 
-`apps/extension/src/background/storage/**` owns background-only activation caches, diagnostics recovery, metadata history, recording/export leases, route capabilities, and scenario session recovery that must not become shared app contracts.
+`apps/extension/src/background/storage/**` owns background-only activation caches, recovery records, history, leases, route capabilities, and scenario sessions. Keep each persisted DTO and codec with its named storage concern. Storage concerns must not import feature implementations.
 
-Persisted DTOs and codecs for those background-only records stay under their named background storage concern. Feature runtimes may depend inward on that narrow contract; storage concerns must not import feature implementations to obtain persisted types, validation, or logging.
+Keep runtime-intrinsic project and workspace adapters in their runtime. Keep durable schemas, beta fixtures, and upgrade paths under composition persistence.
 
-Runtime-local project and workspace adapters stay with the editor, video editor, scenario editor, content runtime, or native-transfer owner when their lifecycle is intrinsic to that runtime. Durable schemas, retained beta fixtures, and the supported upgrade graph remain composition-owned.
+## Mutation rules
 
-## Mutation invariants
+Keep `get`, `list`, `load`, and `read` operations write-free. Put repair, migration, reconciliation, expiry cleanup, and backfill in explicit mutation or maintenance owners.
 
-Reads named `get`, `list`, `load`, or `read` are read-only. They may parse, normalize returned values, drop invalid fields, and report warnings, but repair, migration, reconciliation, expiry cleanup, and backfill writes require explicit mutation or maintenance owners.
+Serialize read-modify-write through the state owner and reload the authoritative value before mutation. Reject stale writes in revisioned domains. Reject invalid security capabilities and leases before side effects.
 
-Read-modify-write flows serialize through their owner and reload the latest authoritative value before mutation. Revisioned domains reject stale generations. Security capabilities and leases validate scope, sender or owner, purpose, freshness, expiry, and replay state before side effects.
+Propagate authoritative write failure to the recovery owner. Apply fail-soft behavior only to advisory state with a documented policy. Restore previous visible state after a failed optimistic mutation.
 
-Write failure must either reject to the workflow that owns recovery or follow a documented fail-soft policy for advisory state. A UI cache must not claim success after an authoritative write fails, and rollback or compensation must restore the previous visible state when optimistic mutation was exposed.
-
-## StateManager adoption
-
-Use `StateManager` only when the domain needs registered adapters, explicit key revisions, and durable stale-write rejection. Moving an owner requires domain registration, adapter ownership, migration and reconciliation behavior, negative stale-revision proof, transitive consumer proof, and removal of the previous authority in the same change.
-
-Do not move security-specific secret transitions, temporary capabilities, bounded advisory history, or page-local state into a generic manager merely for consistency. Their current narrow owners retain authority until their invariants require a different backend.
+Use `StateManager` only for a domain that needs registered adapters, key revisions, and durable stale-write rejection. Move a domain and remove its previous authority in the same change. Do not move secrets, temporary capabilities, bounded advisory history, or page-local state into `StateManager` for consistency alone.

@@ -150,6 +150,26 @@ function registerRejectedFrameDocumentTests() {
         },
       })
     ).toBe(false);
+
+    expect(
+      isEditorDocument({
+        ...createEditorDocumentFixture(),
+        frame: {
+          ...createEditorDocumentFixture().frame,
+          backgroundImageFit: { toString: () => 'cover' },
+        },
+      })
+    ).toBe(false);
+
+    expect(
+      isEditorDocument({
+        ...createEditorDocumentFixture(),
+        frame: {
+          ...createEditorDocumentFixture().frame,
+          sourceImage: { opacity: 1 },
+        },
+      })
+    ).toBe(false);
   });
 }
 
@@ -170,6 +190,30 @@ function registerRejectedBrowserFrameDocumentTests() {
         browserFrame: {
           ...createEditorDocumentFixture().browserFrame,
           canvasMode: 'stretch',
+        },
+      })
+    ).toBe(false);
+    expect(
+      isEditorDocument({
+        ...createEditorDocumentFixture(),
+        browserFrame: {
+          title: 'Page',
+          url: 'https://example.test',
+          canvasMode: 'resize',
+          contentMode: 'push-down',
+          enabled: 'yes',
+        },
+      })
+    ).toBe(false);
+    expect(
+      isEditorDocument({
+        ...createEditorDocumentFixture(),
+        browserFrame: {
+          title: 'Page',
+          url: 'https://example.test',
+          canvasMode: 'resize',
+          contentMode: 'push-down',
+          appearance: 'dialog',
         },
       })
     ).toBe(false);

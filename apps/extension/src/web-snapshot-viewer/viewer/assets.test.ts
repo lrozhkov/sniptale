@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import JSZip from 'jszip';
+import { installSnapshotFrameLayoutPolicy } from './frame-layout';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
 import {
@@ -284,7 +285,6 @@ it('loads a valid package and rewrites captured asset references to object URLs'
     'blob:snapshot-asset',
     'blob:snapshot-asset',
     'blob:snapshot-asset',
-    'blob:snapshot-asset',
   ]);
   expect(loaded.archiveFilename).toBe('Snapshot.sniptale-page-package.zip');
   expect(loaded.archiveSize).toBeGreaterThan(0);
@@ -297,7 +297,7 @@ it('loads a valid package and rewrites captured asset references to object URLs'
   );
   expect(loaded.html).not.toContain(' href=');
   expect(loaded.html).toContain('srcset="blob:snapshot-asset 1x"');
-  expect(URL.createObjectURL).toHaveBeenCalledTimes(5);
+  expect(URL.createObjectURL).toHaveBeenCalledTimes(4);
 });
 
 it('lists exported images and attachments lazily and verifies only the selected download', async () => {
@@ -515,12 +515,16 @@ it('rejects oversized entry metadata before inflating viewer package entries', a
     throw new Error('Rejected ZIP entry was inflated.');
   });
   const recordManifest = createManifest();
+  const { packageBlob } = await createPackageBlob({});
+  const packageFile = new File([packageBlob], 'snapshot.sniptale-page-package.zip', {
+    type: packageBlob.type,
+  });
   mocks.getWebSnapshotRecord.mockResolvedValue({
     createdAt: 1,
     id: 'snapshot-1',
     manifest: recordManifest,
-    packageFile: new File(['zip'], 'snapshot.sniptale-page-package.zip'),
-    size: 1,
+    packageFile,
+    size: packageFile.size,
     updatedAt: 1,
   } satisfies WebSnapshotRecord);
   const loadAsyncSpy = mockLargeViewerZip(recordManifest, readLargeEntry);
@@ -554,12 +558,16 @@ it('rejects aggregate inflated metadata above 250 MiB before inflating viewer en
       ];
     })
   );
+  const { packageBlob } = await createPackageBlob({});
+  const packageFile = new File([packageBlob], 'snapshot.sniptale-page-package.zip', {
+    type: packageBlob.type,
+  });
   mocks.getWebSnapshotRecord.mockResolvedValue({
     createdAt: 1,
     id: 'snapshot-1',
     manifest: createManifest(),
-    packageFile: new File(['zip'], 'snapshot.sniptale-page-package.zip'),
-    size: 1,
+    packageFile,
+    size: packageFile.size,
     updatedAt: 1,
   } satisfies WebSnapshotRecord);
   const loadAsyncSpy = vi
@@ -599,4 +607,20 @@ it('rejects package manifests that do not match the saved record authority', asy
   );
 
   expect(URL.createObjectURL).not.toHaveBeenCalled();
+});
+
+it('keeps frame layout installation safe before attachment and cleans its own policy', () => {
+  expect(installSnapshotFrameLayoutPolicy(null)).not.toThrow();
+  const frame = document.createElement('iframe');
+  expect(installSnapshotFrameLayoutPolicy(frame)).not.toThrow();
+  document.body.appendChild(frame);
+  const dispose = installSnapshotFrameLayoutPolicy(frame);
+  expect(
+    frame.contentDocument!.querySelectorAll('[data-sniptale-viewer-layout-policy]')
+  ).toHaveLength(1);
+  dispose();
+  expect(
+    frame.contentDocument!.querySelectorAll('[data-sniptale-viewer-layout-policy]')
+  ).toHaveLength(0);
+  frame.remove();
 });

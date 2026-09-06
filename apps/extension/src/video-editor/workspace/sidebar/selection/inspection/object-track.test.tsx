@@ -50,6 +50,7 @@ describe('workspace-sidebar/selection/inspect-object-track', () => {
     project.objectTracks = [objectTrack];
 
     renderInspectPanel(project, objectTrack);
+    clickGroup('videoEditor.sidebar.inspectorGroupSummary');
     expect(container?.textContent).toContain('videoEditor.sidebar.objectTrackKindVisualCursor');
     expect(container?.textContent).not.toContain(
       'videoEditor.sidebar.inspectorGroupFollowInstances'
@@ -63,6 +64,7 @@ describe('workspace-sidebar/selection/inspect-object-track', () => {
 
     renderSelectionPanel(project, objectTrack);
 
+    clickGroup('videoEditor.sidebar.inspectorGroupSummary');
     expect(container?.textContent).toContain('videoEditor.sidebar.objectTrackKindVisualCursor');
   });
 });
@@ -190,8 +192,9 @@ function createSelectionPanelSource(args: {
 }
 
 function clickGroup(title: string) {
-  const button = container?.querySelector<HTMLButtonElement>(`button[title="${title}"]`);
+  const button = container?.querySelector<HTMLElement>(`nav button[title="${title}"]`);
   act(() => {
-    button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    if (!button?.parentElement?.hasAttribute('open'))
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 }

@@ -68,4 +68,22 @@ describe('scenario step editor document guards', () => {
       })
     ).toBeNull();
   });
+
+  it('returns the exact document projection instead of the hostile stored object', () => {
+    const entry = createEntry();
+    const parsed = parseScenarioStepEditorDocumentEntry({
+      ...entry,
+      ignoredEntryField: true,
+      document: {
+        ...entry.document,
+        ignoredDocumentField: true,
+        frame: { ...entry.document.frame, ignoredFrameField: true },
+      },
+    });
+
+    expect(parsed).toEqual(entry);
+    expect(parsed?.document).not.toHaveProperty('ignoredDocumentField');
+    expect(parsed?.document.frame).not.toHaveProperty('ignoredFrameField');
+    expect(parsed).not.toHaveProperty('ignoredEntryField');
+  });
 });

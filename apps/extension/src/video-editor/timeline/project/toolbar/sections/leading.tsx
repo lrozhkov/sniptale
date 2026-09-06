@@ -1,3 +1,4 @@
+import { WandSparkles } from 'lucide-react';
 import { useState } from 'react';
 import { translate } from '../../../../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -30,8 +31,16 @@ function ProjectTimelineAutoTransformButton(props: {
 
   return (
     <>
-      <ContentToolbarButton type="button" onClick={openWizard} className={toolbarButtonClassName}>
-        {translate('videoEditor.timeline.autoTransform')}
+      <ContentToolbarButton
+        type="button"
+        onClick={openWizard}
+        className={toolbarButtonClassName}
+        title={translate('videoEditor.timeline.autoTransform')}
+      >
+        <WandSparkles size={14} aria-hidden="true" />
+        <span className="@max-[1100px]/timeline:sr-only">
+          {translate('videoEditor.timeline.autoTransform')}
+        </span>
       </ContentToolbarButton>
       {wizardOpen ? (
         <AutoTransformWizard
@@ -47,6 +56,9 @@ function ProjectTimelineAutoTransformButton(props: {
 
 export function ProjectTimelineToolbarLeadingControls({
   canAutoTransformRecording,
+  canAddMotionRegion,
+  canEditSelectedClip,
+  canSplitSelectedClip,
   insertion,
   selectedClip,
   onAutoTransformRecording,
@@ -56,6 +68,9 @@ export function ProjectTimelineToolbarLeadingControls({
 }: Pick<
   ProjectTimelineToolbarProps,
   | 'canAutoTransformRecording'
+  | 'canAddMotionRegion'
+  | 'canEditSelectedClip'
+  | 'canSplitSelectedClip'
   | 'insertion'
   | 'selectedClip'
   | 'onAutoTransformRecording'
@@ -64,17 +79,28 @@ export function ProjectTimelineToolbarLeadingControls({
   | 'onSplitSelectedClip'
 >) {
   return (
-    <div className="flex min-w-0 flex-wrap items-center gap-2 max-[720px]:gap-1">
-      <ProjectTimelineAddControls insertion={insertion} />
+    <div className="flex min-w-0 flex-nowrap items-center gap-1">
+      <ProjectTimelineAddControls insertion={insertion} canAddMotionRegion={canAddMotionRegion} />
       {canAutoTransformRecording && onAutoTransformRecording ? (
         <ProjectTimelineAutoTransformButton onAutoTransformRecording={onAutoTransformRecording} />
       ) : null}
-      <ProjectTimelineClipActions
-        selectedClip={selectedClip}
-        onDeleteSelectedClip={onDeleteSelectedClip}
-        onDuplicateSelectedClip={onDuplicateSelectedClip}
-        onSplitSelectedClip={onSplitSelectedClip}
-      />
+      <div
+        className={[
+          'flex h-7 shrink-0 items-center gap-0.5 border-l',
+          'border-[color:var(--sniptale-color-border-soft)] pl-1',
+        ].join(' ')}
+      >
+        {selectedClip ? (
+          <ProjectTimelineClipActions
+            canEditSelectedClip={canEditSelectedClip}
+            canSplitSelectedClip={canSplitSelectedClip}
+            selectedClip
+            onDeleteSelectedClip={onDeleteSelectedClip}
+            onDuplicateSelectedClip={onDuplicateSelectedClip}
+            onSplitSelectedClip={onSplitSelectedClip}
+          />
+        ) : null}
+      </div>
     </div>
   );
 }

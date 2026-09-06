@@ -1,10 +1,18 @@
 import type { CSSProperties } from 'react';
-import { containsUnsafeCssSyntax } from '@sniptale/platform/security/css-safety';
-import { validateCssString } from './css-sanitizer/css';
-import { validateCssPolicyString } from './css-sanitizer/css';
+import {
+  parseAdmittedCustomCssSections,
+  prepareCustomCssResolution,
+  resolveRestrictedCssSections,
+  validateCssPolicyString,
+} from './css-sanitizer/css';
 import { canonicalizeSurfaceCss, projectCanonicalSurfaceCss } from './surface-style/surface-css';
 
 const CALLOUT_CSS_TARGETS = ['card', 'title', 'body', 'connector', 'accent'] as const;
+const CALLOUT_CSS_GRAMMAR = {
+  defaultTarget: 'card',
+  maxLength: 8_000,
+  targets: CALLOUT_CSS_TARGETS,
+} as const;
 
 type CalloutCssTarget = (typeof CALLOUT_CSS_TARGETS)[number];
 
@@ -71,28 +79,6 @@ const ALLOWED_PROPERTIES: Record<CalloutCssTarget, ReadonlySet<string>> = {
   title: new Set(TEXT_PROPERTIES),
 };
 
-function createEmptySections(): Record<CalloutCssTarget, string[]> {
-  return { accent: [], body: [], card: [], connector: [], title: [] };
-}
-
-function parseSections(value: string): Record<CalloutCssTarget, string[]> | null {
-  const sections = createEmptySections();
-  let target: CalloutCssTarget = 'card';
-  for (const line of value.split('\n')) {
-    const trimmed = line.trim();
-    const sectionMatch = /^\[([a-z]+)\]$/u.exec(trimmed);
-    if (sectionMatch) {
-      const nextTarget = sectionMatch[1];
-      if (!CALLOUT_CSS_TARGETS.some((candidate) => candidate === nextTarget)) return null;
-      target = nextTarget as CalloutCssTarget;
-      continue;
-    }
-    if (trimmed.startsWith('[') || trimmed.includes('{') || trimmed.includes('}')) return null;
-    sections[target].push(line);
-  }
-  return sections;
-}
-
 function fail(
   error: Exclude<CalloutCustomCssValidation['error'], null>,
   blockedProperties: string[] = []
@@ -103,12 +89,9 @@ function fail(
 export function validateCalloutCustomCss(
   value: string
 ): Pick<CalloutCustomCssValidation, 'blockedProperties' | 'error'> {
-  if (!value.trim()) return { blockedProperties: [], error: null };
-  if (value.length > 8_000 || value.includes('@') || containsUnsafeCssSyntax(value)) {
-    return { blockedProperties: [], error: 'unsafe' };
-  }
-  const sections = parseSections(value);
-  if (!sections) return { blockedProperties: [], error: 'syntax' };
+  const admitted = parseAdmittedCustomCssSections(value, CALLOUT_CSS_GRAMMAR);
+  if (admitted.result) return admitted.result;
+  const { sections } = admitted;
   const blockedProperties: string[] = [];
   for (const target of CALLOUT_CSS_TARGETS) {
     if (target === 'card') {
@@ -143,39 +126,26 @@ export function validateCalloutCustomCss(
 
 export function resolveCalloutCustomCss(value: string): CalloutCustomCssValidation {
   const policy = validateCalloutCustomCss(value);
-  if (policy.error) return fail(policy.error, policy.blockedProperties);
-  if (!value.trim()) return { blockedProperties: [], error: null, styles: EMPTY_STYLES };
-  const sections = parseSections(value);
-  if (!sections) return fail('syntax');
+  const prepared = prepareCustomCssResolution(value, policy.error, CALLOUT_CSS_GRAMMAR);
+  if (prepared.error) return fail(prepared.error, policy.blockedProperties);
+  if (prepared.empty) return { blockedProperties: [], error: null, styles: EMPTY_STYLES };
+  const { sections } = prepared;
 
   const styles = { ...EMPTY_STYLES };
-  for (const target of CALLOUT_CSS_TARGETS) {
-    const declarations = sections[target].join('\n').trim();
-    if (!declarations) continue;
-    if (target === 'card') {
-      const projected = projectCanonicalSurfaceCss(declarations);
-      if (!projected) return fail('syntax');
-      styles.card = projected;
-      continue;
-    }
-    const validation = validateCssString(declarations);
-    if (validation.rawError) return fail('syntax');
-    if (
-      Object.values(validation.styles).some(
-        (styleValue) => typeof styleValue === 'string' && containsUnsafeCssSyntax(styleValue)
-      )
-    ) {
-      return fail('unsafe');
-    }
-    const blockedProperties = [
-      ...validation.blockedProps,
-      ...Object.keys(validation.styles).filter(
-        (property) => !ALLOWED_PROPERTIES[target].has(property)
-      ),
-    ];
-    if (blockedProperties.length > 0) return fail('blocked', [...new Set(blockedProperties)]);
-    styles[target] = validation.styles;
+  const cardDeclarations = sections.card.join('\n').trim();
+  if (cardDeclarations) {
+    const projected = projectCanonicalSurfaceCss(cardDeclarations);
+    if (!projected) return fail('syntax');
+    styles.card = projected;
   }
+  const targets = CALLOUT_CSS_TARGETS.filter((target) => target !== 'card');
+  const resolved = resolveRestrictedCssSections({
+    allowedProperties: ALLOWED_PROPERTIES,
+    sections,
+    targets,
+  });
+  if (resolved.error) return fail(resolved.error, resolved.blockedProps);
+  Object.assign(styles, resolved.styles);
   return { blockedProperties: [], error: null, styles };
 }
 

@@ -4,19 +4,66 @@ import {
   createTrustedControlMatrix,
   validateTrustedControlResults,
 } from './trusted-control-matrix.mjs';
+import { expectedProofPopulationKind } from './proof-population-policy.mjs';
+
+function populationFor(stepId: string) {
+  const populationKind = expectedProofPopulationKind(stepId);
+  return populationKind === 'repository-files'
+    ? { scope: 'repo-wide', populationKind, scannedFileCount: 1 }
+    : { scope: 'repo-wide', populationKind };
+}
 
 function recordFor(lane: 'proof' | 'release') {
   const matrix = createTrustedControlMatrix(lane);
+  const admission = {
+    proofSemanticDigest: `sha256:${'1'.repeat(64)}`,
+    proofManifestDigest: `sha256:${'2'.repeat(64)}`,
+    sourceRunRecord: '.tmp/qa-observability/runs/proof.json',
+    sourceRunLog: '.tmp/qa-logs/proof.log',
+  };
   return {
+    admission,
     steps: [
-      ...matrix.requiredPassed.map((stepId) => ({ stepId, outcome: 'passed' })),
+      ...matrix.requiredPassed.map((stepId) => ({
+        stepId,
+        outcome: 'passed',
+        population: populationFor(stepId),
+      })),
+      ...matrix.requiredInherited.map((stepId) => ({
+        stepId,
+        outcome: 'inherited',
+        inheritance: {
+          sourceProofSemanticDigest: admission.proofSemanticDigest,
+          sourceProofManifestDigest: admission.proofManifestDigest,
+          sourceControlId: stepId,
+          sourceRunRecord: `fast-proof/${admission.sourceRunRecord}`,
+          evidenceFiles: [
+            `fast-proof/${admission.sourceRunRecord}`,
+            `fast-proof/${admission.sourceRunLog}`,
+          ],
+        },
+      })),
       ...matrix.allowedSkipped.map((stepId) => ({
         stepId,
         outcome: 'skipped',
         skipReasonId: matrix.allowedSkippedReasons[stepId],
+        population: populationFor(stepId),
       })),
     ],
   };
+}
+
+function validate(record: ReturnType<typeof recordFor>, lane: 'proof' | 'release') {
+  return validateTrustedControlResults(record, lane, process.cwd(), {
+    admission: record.admission,
+    sourceRecord: {
+      steps: createTrustedControlMatrix(lane).requiredInherited.map((stepId) => ({
+        stepId,
+        outcome: 'passed',
+        population: populationFor(stepId),
+      })),
+    },
+  });
 }
 
 it('requires base-owned fast and release control matrices while permitting declared exclusions', () => {
@@ -32,71 +79,136 @@ it('requires base-owned fast and release control matrices while permitting decla
   );
   expect(proof.requiredPassed).not.toContain('qa.rule.build');
   expect(proof.requiredPassed).not.toContain('qa.rule.release-archive');
-  expect(proof.allowedSkipped).toEqual(
-    expect.arrayContaining([
-      'qa.rule.parser-snapshot-purity',
-      'qa.rule.codeql',
-      'qa.rule.full-product-coverage',
-      'qa.rule.npm-audit',
-    ])
-  );
+  expect(proof.allowedSkipped).toEqual(expect.arrayContaining(['qa.rule.codeql']));
   expect(release.requiredPassed).toEqual(
     expect.arrayContaining([
-      'qa.rule.sonarjs',
       'qa.rule.build',
       'qa.rule.release-archive',
       'qa.rule.codeql',
-      'qa.rule.full-product-coverage',
       'qa.rule.npm-audit',
-      'qa.rule.production-build',
     ])
   );
+  expect(release.requiredInherited).toEqual(
+    expect.arrayContaining(['qa.rule.full-product-coverage', 'qa.rule.production-build'])
+  );
   expect(release.requiredPassed).not.toContain('qa.rule.unit-tests');
-  for (const id of [
-    'qa.rule.changed-line-readability',
-    'qa.rule.structural-risk',
-    'qa.rule.ui-automation-seams',
-  ]) {
+  for (const id of ['qa.rule.changed-line-readability']) {
     expect(proof.requiredPassed).not.toContain(id);
     expect(proof.allowedSkipped).not.toContain(id);
     expect(release.requiredPassed).not.toContain(id);
     expect(release.allowedSkipped).not.toContain(id);
   }
-  expect(() => validateTrustedControlResults(recordFor('proof'), 'proof')).not.toThrow();
-  expect(() => validateTrustedControlResults(recordFor('release'), 'release')).not.toThrow();
+  expect(proof.allowedSkipped).toContain('qa.rule.structural-risk');
+  expect(proof.allowedSkippedReasons['qa.rule.structural-risk']).toBe('no-applicable-targets');
+  expect(proof.requiredPassed).toContain('qa.rule.ui-automation-seams');
+  for (const id of ['qa.rule.structural-risk', 'qa.rule.ui-automation-seams'])
+    expect(release.requiredInherited).toContain(id);
+  expect(() => validate(recordFor('proof'), 'proof')).not.toThrow();
+  expect(() => validate(recordFor('release'), 'release')).not.toThrow();
 });
 
 it('rejects missing, skipped, failed, or duplicated mandatory candidate results', () => {
   const missing = recordFor('proof');
   missing.steps = missing.steps.filter(({ stepId }) => stepId !== 'qa.rule.osv-scanner');
-  expect(() => validateTrustedControlResults(missing, 'proof')).toThrow(
+  expect(() => validate(missing, 'proof')).toThrow(
     'did not pass mandatory trusted control: qa.rule.osv-scanner'
   );
   const skipped = recordFor('proof');
   skipped.steps.find(({ stepId }) => stepId === 'qa.rule.unit-tests')!.outcome = 'skipped';
-  expect(() => validateTrustedControlResults(skipped, 'proof')).toThrow(
+  expect(() => validate(skipped, 'proof')).toThrow(
     'did not pass mandatory trusted control: qa.rule.unit-tests'
   );
   const skippedCoverageAudit = recordFor('release');
   skippedCoverageAudit.steps.find(
     ({ stepId }) => stepId === 'qa.rule.full-product-coverage'
   )!.outcome = 'skipped';
-  expect(() => validateTrustedControlResults(skippedCoverageAudit, 'release')).toThrow(
-    'did not pass mandatory trusted control: qa.rule.full-product-coverage'
+  expect(() => validate(skippedCoverageAudit, 'release')).toThrow(
+    'did not bind inherited trusted control: qa.rule.full-product-coverage'
   );
   const duplicated = recordFor('proof');
   duplicated.steps.push({ stepId: 'qa.rule.osv-scanner', outcome: 'passed' });
-  expect(() => validateTrustedControlResults(duplicated, 'proof')).toThrow(
+  expect(() => validate(duplicated, 'proof')).toThrow(
     'repeats a trusted control result: qa.rule.osv-scanner'
   );
 });
 
-it('accepts only the declared reason for a commit-inapplicable control', () => {
+it('admits an inapplicable diff-only structural result in proof and release inheritance', () => {
+  const proof = recordFor('proof');
+  expect(() => validate(proof, 'proof')).not.toThrow();
+
+  const release = recordFor('release');
+  const matrix = createTrustedControlMatrix('release');
+  const sourceSteps: Array<{
+    stepId: string;
+    outcome: string;
+    population: ReturnType<typeof populationFor>;
+    skipReasonId?: string;
+  }> = matrix.requiredInherited.map((stepId) => ({
+    stepId,
+    outcome: 'passed',
+    population: populationFor(stepId),
+  }));
+  const structural = sourceSteps.find(({ stepId }) => stepId === 'qa.rule.structural-risk')!;
+  structural.outcome = 'skipped';
+  structural.skipReasonId = 'no-applicable-targets';
+  expect(() =>
+    validateTrustedControlResults(release, 'release', process.cwd(), {
+      admission: release.admission,
+      sourceRecord: { steps: sourceSteps },
+    })
+  ).not.toThrow();
+
+  structural.skipReasonId = 'unexpected-reason';
+  expect(() =>
+    validateTrustedControlResults(release, 'release', process.cwd(), {
+      admission: release.admission,
+      sourceRecord: { steps: sourceSteps },
+    })
+  ).toThrow('did not bind inherited trusted control: qa.rule.structural-risk');
+});
+
+it('requires formerly inapplicable parser controls after repo-wide activation', () => {
   const valid = recordFor('proof');
-  expect(() => validateTrustedControlResults(valid, 'proof')).not.toThrow();
+  expect(() => validate(valid, 'proof')).not.toThrow();
   const parser = valid.steps.find(({ stepId }) => stepId === 'qa.rule.parser-snapshot-purity')!;
-  parser.skipReasonId = 'audit.profile-not-selected';
-  expect(() => validateTrustedControlResults(valid, 'proof')).toThrow(
-    'inadmissible skip reason for trusted control: qa.rule.parser-snapshot-purity'
+  parser.outcome = 'skipped';
+  parser.skipReasonId = 'no-applicable-targets';
+  expect(() => validate(valid, 'proof')).toThrow(
+    'did not pass mandatory trusted control: qa.rule.parser-snapshot-purity'
   );
+});
+
+it('rejects inherited status for fresh controls and mismatched inherited evidence', () => {
+  const freshAsInherited = recordFor('release');
+  freshAsInherited.steps.find(({ stepId }) => stepId === 'qa.rule.npm-audit')!.outcome =
+    'inherited';
+  expect(() => validate(freshAsInherited, 'release')).toThrow(
+    'did not pass mandatory trusted control: qa.rule.npm-audit'
+  );
+
+  const mismatched = recordFor('release');
+  const inherited = mismatched.steps.find(
+    ({ stepId }) => stepId === 'qa.rule.full-product-coverage'
+  )!;
+  inherited.inheritance!.sourceProofSemanticDigest = `sha256:${'9'.repeat(64)}`;
+  expect(() => validate(mismatched, 'release')).toThrow(
+    'did not bind inherited trusted control: qa.rule.full-product-coverage'
+  );
+});
+
+it('rejects a missing or empty mandatory repository-file population', () => {
+  for (const population of [
+    null,
+    {
+      scope: 'repo-wide',
+      populationKind: 'repository-files',
+      scannedFileCount: 0,
+    },
+  ]) {
+    const record = recordFor('proof');
+    record.steps.find(({ stepId }) => stepId === 'qa.rule.oxlint')!.population = population;
+    expect(() => validate(record, 'proof')).toThrow(
+      'invalid trusted control population: qa.rule.oxlint'
+    );
+  }
 });

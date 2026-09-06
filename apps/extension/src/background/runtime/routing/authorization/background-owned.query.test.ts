@@ -10,7 +10,13 @@ vi.mock('../../../routing-contracts/capabilities/content-action/route', async (i
   >()),
   consumeContentPrivilegedActionCapabilityBinding: vi.fn((args) =>
     args.contentIntent?.token === 'valid-token'
-      ? { documentId: 'document-7', frameId: 0, senderUrl: 'https://page.test', tabId: 7 }
+      ? {
+          documentId: 'document-7',
+          frameId: 0,
+          requestId: args.contentIntent.requestId,
+          senderUrl: 'https://page.test',
+          tabId: 7,
+        }
       : null
   ),
 }));

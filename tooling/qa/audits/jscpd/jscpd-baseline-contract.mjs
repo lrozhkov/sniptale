@@ -98,85 +98,151 @@ export function readJscpdBaseline(baselinePath, { root = repoRoot } = {}) {
   } catch (error) {
     throw new Error(`Required jscpd baseline is malformed: ${absolutePath}`, { cause: error });
   }
-  if (
-    baseline?.version !== 3 ||
-    !Array.isArray(baseline.families) ||
-    baseline.families.some(
-      (entry) =>
-        typeof entry?.family !== 'string' ||
-        !Number.isInteger(entry.count) ||
-        !Number.isInteger(entry.lines) ||
-        !/^[a-f0-9]{64}$/u.test(entry.sampleFingerprint)
-    )
-  ) {
-    throw new Error('Required jscpd baseline must contain the complete version 3 family inventory');
+  if (baseline?.version !== 4 || !Array.isArray(baseline.allowances)) {
+    throw new Error('Required jscpd baseline must contain version 4 exact tool-noise allowances');
+  }
+  const allowedRootKeys = new Set(['$comment', 'allowances', 'description', 'version']);
+  if (Object.keys(baseline).some((key) => !allowedRootKeys.has(key))) {
+    throw new Error('Required jscpd baseline contains unsupported root metadata');
+  }
+  const ids = new Set();
+  for (const allowance of baseline.allowances) {
+    const keys = Object.keys(allowance ?? {})
+      .sort()
+      .join(',');
+    const requiredKeys =
+      'classification,firstFile,id,owner,reason,removalCondition,reviewBy,secondFile';
+    if (
+      (keys !== requiredKeys && keys !== `${requiredKeys},targetAction`) ||
+      allowance.classification !== 'tool-noise' ||
+      !/^[a-f0-9]{64}$/u.test(allowance.id ?? '') ||
+      !isNonEmptyString(allowance.owner) ||
+      !isNonEmptyString(allowance.reason) ||
+      !isNonEmptyString(allowance.removalCondition) ||
+      !isReviewDate(allowance.reviewBy) ||
+      (allowance.targetAction !== undefined && !isNonEmptyString(allowance.targetAction)) ||
+      !isBaselineEndpoint(allowance.firstFile) ||
+      !isBaselineEndpoint(allowance.secondFile)
+    ) {
+      throw new Error('Required jscpd baseline contains a malformed tool-noise allowance');
+    }
+    if (ids.has(allowance.id)) {
+      throw new Error(`Required jscpd baseline contains duplicate finding id: ${allowance.id}`);
+    }
+    ids.add(allowance.id);
   }
   return baseline;
 }
 
-function violation(entry, rule, message) {
-  return { rule, file: entry.family, message };
+function isNonEmptyString(value) {
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
-export function collectJscpdBaselineViolations(familySummary, baseline) {
+function isReviewDate(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(value ?? '')) return false;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function isBaselineEndpoint(value) {
+  return (
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.keys(value).sort().join(',') === 'end,path,start' &&
+    isNonEmptyString(value.path) &&
+    !path.isAbsolute(value.path) &&
+    !value.path.replaceAll('\\', '/').split('/').includes('..') &&
+    Number.isInteger(value.start) &&
+    value.start > 0 &&
+    Number.isInteger(value.end) &&
+    value.end >= value.start
+  );
+}
+
+function findingFile(entry) {
+  return `${entry.firstFile.path}:${entry.firstFile.start} <-> ${entry.secondFile.path}:${entry.secondFile.start}`;
+}
+
+function compactEndpoint(endpoint) {
+  return { path: endpoint.path, start: endpoint.start, end: endpoint.end };
+}
+
+function allowanceMatchesFinding(allowance, finding) {
+  return (
+    endpointMatches(allowance.firstFile, finding.firstFile) &&
+    endpointMatches(allowance.secondFile, finding.secondFile)
+  );
+}
+
+function endpointMatches(allowanceEndpoint, findingEndpoint) {
+  const finding = compactEndpoint(findingEndpoint);
+  return (
+    allowanceEndpoint.path === finding.path &&
+    allowanceEndpoint.start === finding.start &&
+    allowanceEndpoint.end === finding.end
+  );
+}
+
+export function collectJscpdBaselineViolations(
+  findings,
+  baseline,
+  { today = new Date().toISOString().slice(0, 10) } = {}
+) {
   if (!baseline) {
-    return familySummary.map((entry) =>
-      violation(
-        entry,
-        'jscpd-duplicate',
-        `${entry.count} clone(s), ${entry.lines} duplicated lines`
-      )
-    );
+    return findings.map((entry) => ({
+      rule: 'jscpd-duplicate',
+      file: findingFile(entry),
+      message: `${entry.lines} duplicated lines`,
+    }));
   }
-  const expected = new Map(baseline.families.map((entry) => [entry.family, entry]));
-  const live = new Set(familySummary.map((entry) => entry.family));
-  const violations = familySummary.flatMap((entry) => {
-    const admitted = expected.get(entry.family);
-    if (!admitted) {
-      return [violation(entry, 'jscpd-baseline-growth', `${entry.family} is not in the baseline`)];
+  const expected = new Map(baseline.allowances.map((entry) => [entry.id, entry]));
+  const violations = [];
+  for (const finding of findings) {
+    const allowance = expected.get(finding.id);
+    if (!allowance) {
+      violations.push({
+        rule: 'jscpd-unreviewed-clone',
+        file: findingFile(finding),
+        message: `${finding.lines} duplicated lines are not reviewed as tool noise`,
+      });
+    } else if (!allowanceMatchesFinding(allowance, finding)) {
+      violations.push({
+        rule: 'jscpd-baseline-identity-drift',
+        file: findingFile(finding),
+        message: `Reviewed endpoints do not match normalized finding ${finding.id}`,
+      });
     }
-    if (entry.count !== admitted.count || entry.lines !== admitted.lines) {
-      const direction =
-        entry.count < admitted.count || entry.lines < admitted.lines
-          ? 'jscpd-baseline-headroom'
-          : 'jscpd-baseline-growth';
-      return [
-        violation(
-          entry,
-          direction,
-          `${entry.family} measured count=${entry.count}, lines=${entry.lines}; baseline count=${admitted.count}, lines=${admitted.lines}`
-        ),
-      ];
-    }
-    return entry.sampleFingerprint === admitted.sampleFingerprint
-      ? []
-      : [
-          violation(
-            entry,
-            'jscpd-baseline-sample-drift',
-            `${entry.family} retained aggregate counts but changed its clone population`
-          ),
-        ];
-  });
-  for (const entry of baseline.families) {
-    if (!live.has(entry.family)) {
-      violations.push(
-        violation(
-          entry,
-          'jscpd-baseline-stale',
-          `${entry.family} is absent from the current report`
-        )
-      );
+  }
+  for (const allowance of baseline.allowances) {
+    if (allowance.reviewBy < today) {
+      violations.push({
+        rule: 'jscpd-baseline-review-expired',
+        file: `${allowance.firstFile.path}:${allowance.firstFile.start}`,
+        message: `Tool-noise review expired on ${allowance.reviewBy}`,
+      });
     }
   }
   return violations;
 }
 
-export function formatJscpdBaselineSummary(familySummary, violations) {
+export function collectJscpdBaselineAdvisories(findings, baseline) {
+  if (!baseline) return [];
+  const live = new Set(findings.map((entry) => entry.id));
+  return baseline.allowances
+    .filter((allowance) => !live.has(allowance.id))
+    .map((allowance) => ({
+      rule: 'jscpd-baseline-stale',
+      file: `${allowance.firstFile.path}:${allowance.firstFile.start}`,
+      message: `Reviewed tool noise ${allowance.id} is absent from the current report; remove the stale allowance`,
+    }));
+}
+
+export function formatJscpdBaselineSummary(familySummary, violations, advisories = []) {
   const cloneCount = familySummary.reduce((total, entry) => total + entry.count, 0);
   const lineCount = familySummary.reduce((total, entry) => total + entry.lines, 0);
   return [
-    `Baseline: ${cloneCount} clone(s) / ${lineCount} duplicated lines across ${familySummary.length} families`,
+    `Baseline: ${cloneCount} clone(s) / ${lineCount} duplicated lines across ${familySummary.length} families${advisories.length > 0 ? `; advisories=${advisories.length}` : ''}`,
     violations.length > 0 ? `Baseline violations: ${violations.length}` : '',
   ]
     .filter(Boolean)

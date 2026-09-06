@@ -145,34 +145,36 @@ describe('audit profile schema', () => {
     ).toBe(true);
   });
 
+  it('keeps npm audit signatures explicitly skipped in every profile', () => {
+    for (const profileId of ['repository', 'pr', 'security', 'coverage', 'release']) {
+      expect(resolveAuditProfile(profileId).controls.get('npm-audit-signatures')?.requirement).toBe(
+        'excluded'
+      );
+    }
+  });
+
   it('requires security engines and worktree plus history secret scans for strict profiles', () => {
     for (const profileId of ['security', 'release']) {
       const profile = resolveAuditProfile(profileId);
       expect(profile.gitleaksScopes).toEqual(['worktree', 'history']);
-      for (const controlId of [
-        'npm-audit',
-        'npm-audit-signatures',
-        'osv-scanner',
-        'gitleaks',
-        'ast-grep',
-        'codeql',
-      ]) {
+      for (const controlId of ['npm-audit', 'osv-scanner', 'gitleaks', 'ast-grep', 'codeql']) {
         expect(profile.controls.get(controlId)?.requirement).toBe('required');
       }
+      expect(profile.controls.get('npm-audit-signatures')?.requirement).toBe('excluded');
     }
   });
 
-  it('runs OSV but not npm vulnerability resolution in Fast and refreshes both in full profiles', () => {
+  it('runs OSV and npm vulnerability resolution in Fast and full profiles', () => {
     const pr = resolveAuditProfile('pr');
     expect(pr.controls.get('osv-scanner')?.requirement).toBe('required');
-    expect(pr.controls.get('npm-audit')?.requirement).toBe('excluded');
-    expect(pr.controls.get('npm-audit-signatures')?.requirement).toBe('required');
+    expect(pr.controls.get('npm-audit')?.requirement).toBe('required');
+    expect(pr.controls.get('npm-audit-signatures')?.requirement).toBe('excluded');
 
     for (const profileId of ['repository', 'security', 'release']) {
       const profile = resolveAuditProfile(profileId);
       expect(profile.controls.get('osv-scanner')?.requirement).toBe('required');
       expect(profile.controls.get('npm-audit')?.requirement).toBe('required');
-      expect(profile.controls.get('npm-audit-signatures')?.requirement).toBe('required');
+      expect(profile.controls.get('npm-audit-signatures')?.requirement).toBe('excluded');
     }
   });
 

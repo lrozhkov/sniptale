@@ -1,6 +1,6 @@
 import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
 import type { VideoProject } from '../../../features/video/project/types';
-import { collectSourceUnits } from './auto-transform.clip-units';
+import { collectRepresentativeRecordingSourceClips } from './source-timed-clips';
 import { buildStableSignalIntersections } from './time-ranges';
 
 export function isRecordingTelemetryEligibleForAutoProcessing(
@@ -12,7 +12,7 @@ export function isRecordingTelemetryEligibleForAutoProcessing(
     return false;
   }
 
-  if (collectSourceUnits(project, recordingId).length === 0) {
+  if (collectRepresentativeRecordingSourceClips(project, recordingId).length === 0) {
     return false;
   }
 

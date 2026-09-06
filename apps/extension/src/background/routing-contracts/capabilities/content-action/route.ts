@@ -35,6 +35,10 @@ import {
 
 export { issueContentPrivilegedActionAutoStartGrant };
 
+export type PreauthorizedContentActionBinding = ContentSenderBinding & {
+  readonly requestId: string;
+};
+
 export function resetContentPrivilegedActionCapabilitiesForTests(): void {
   resetContentPrivilegedActionActivationKeysForTests();
   resetContentPrivilegedActionCapabilityStoreForTests();
@@ -240,7 +244,7 @@ export function consumeContentPrivilegedActionCapabilityBinding(args: {
   contentIntent: unknown;
   resolvedTabId: number;
   sender: chrome.runtime.MessageSender | undefined;
-}): ContentSenderBinding | null {
+}): PreauthorizedContentActionBinding | null {
   if (!isContentPrivilegedActionCapability(args.contentIntent)) {
     return null;
   }
@@ -258,6 +262,7 @@ export function consumeContentPrivilegedActionCapabilityBinding(args: {
   return capability
     ? {
         ...senderDecision.principal,
+        requestId: capability.requestId,
         ...(capability.libraryDestinationAuthorized
           ? { libraryDestinationAuthorized: true as const }
           : {}),

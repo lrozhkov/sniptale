@@ -10,7 +10,12 @@ import {
   MAX_POPUP_EXPORT_JOB_TABS,
   normalizePopupExportTabTitle,
 } from '@sniptale/runtime-contracts/export';
-import { translate } from '../../../../platform/i18n';
+import {
+  ensureLocaleHydrated,
+  getCurrentLocale,
+  translate,
+  type AppLocale,
+} from '../../../../platform/i18n';
 import { executePopupExportJob } from './execute';
 import {
   publishPagePackageJobStatus,
@@ -27,6 +32,7 @@ import {
 import {
   clearPagePackageJobStatus,
   hasUnresolvedPagePackageResources,
+  readPagePackageJobSnapshot,
   readPagePackageJobStatus,
 } from './storage';
 import { acquirePopupExportMutationPermit } from './lifecycle-gate';
@@ -65,6 +71,7 @@ function createPopupExportJob(args: {
   includeWebCopy: boolean;
   intent: 'export' | 'save';
   jobId: string;
+  locale?: AppLocale;
   options: ExportOptions;
   orderedTabs: PagePackageJobTab[];
   captureTiming?: PagePackageCaptureTimingPolicy;
@@ -76,6 +83,7 @@ function createPopupExportJob(args: {
     includeFullPageScreenshot: args.includeWebCopy || args.options.includeFullPageScreenshot,
     includeViewportScreenshot: args.options.includeViewportScreenshot === true,
   };
+  const locale = args.locale ?? getCurrentLocale();
   return {
     abortController: new AbortController(),
     affectedWindowIds: new Set(),
@@ -89,6 +97,7 @@ function createPopupExportJob(args: {
     finishCancellation: null,
     expectedActivation: null,
     lastActivatedByWindow: new Map(),
+    locale,
     manualActivationConflict: false,
     publicationQueue: Promise.resolve(),
     status: {
@@ -115,7 +124,7 @@ function createPopupExportJob(args: {
         current: 0,
         total: args.orderedTabs.length,
         errors: [],
-        message: translate('popup.export.preparingPreview'),
+        message: translate('popup.export.preparingPreview', locale),
         phase: 'scanning',
       },
       warnings: [...args.warnings],
@@ -197,12 +206,14 @@ export async function startPagePackageJob(args: {
   includeWebCopy: boolean;
   intent: 'export' | 'save';
   jobId: string;
+  locale?: AppLocale;
   options: ExportOptions;
   orderedTabs: PagePackageJobTab[];
   captureTiming?: PagePackageCaptureTimingPolicy;
   temporaryTabIds?: number[];
   warnings: string[];
 }): Promise<PagePackageJobStatusV1> {
+  await ensureLocaleHydrated().catch(() => undefined);
   if (new Set(args.orderedTabs.map((tab) => tab.tabId)).size !== args.orderedTabs.length) {
     throw new Error('Page Package tabs must be unique.');
   }
@@ -227,10 +238,12 @@ export async function startPagePackageJobFromSources(args: {
   includeWebCopy: boolean;
   intent: 'export' | 'save';
   jobId: string;
+  locale?: AppLocale;
   options: ExportOptions;
   sources: PagePackageCaptureSource[];
   warnings: string[];
 }): Promise<PagePackageJobStatusV1> {
+  await ensureLocaleHydrated().catch(() => undefined);
   assertPagePackageStartInvariants(args);
   const releaseMutation = acquireStartPermit(args.sources.length);
   let materialized: Awaited<ReturnType<typeof materializePagePackageCaptureSources>> | null = null;
@@ -274,6 +287,23 @@ export async function getPagePackageJobStatus(
   return clonePagePackageJobStatus(status);
 }
 
+export async function getPagePackageJobSnapshot(jobId?: string): Promise<{
+  locale: AppLocale | null;
+  status: PagePackageJobStatusV1 | null;
+}> {
+  const activeJob = getActivePagePackageJob();
+  if (activeJob) {
+    const status = readDurablePagePackageJobStatus(activeJob);
+    return status && (jobId === undefined || status.jobId === jobId)
+      ? { locale: activeJob.locale, status: clonePagePackageJobStatus(status) }
+      : { locale: null, status: null };
+  }
+  const snapshot = await readPagePackageJobSnapshot();
+  return snapshot && (jobId === undefined || snapshot.status.jobId === jobId)
+    ? { locale: snapshot.locale, status: clonePagePackageJobStatus(snapshot.status) }
+    : { locale: null, status: null };
+}
+
 export async function cancelPagePackageJob(jobId: string): Promise<PagePackageJobStatusV1> {
   const activeJob = getActivePagePackageJob();
   if (!activeJob || activeJob.status.jobId !== jobId) {
@@ -308,7 +338,7 @@ async function finishPagePackageJobCancellation(
       ...job.status.progress,
       activeStepKey: null,
       errors: [],
-      message: translate('content.runtime.exportCancelled'),
+      message: translate('content.runtime.exportCancelled', job.locale),
       phase: 'cancelled',
     },
   });

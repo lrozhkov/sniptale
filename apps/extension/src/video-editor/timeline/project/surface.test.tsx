@@ -37,23 +37,28 @@ function renderSurface(
   return renderToStaticMarkup(
     <ProjectTimelineSurface
       currentTime={0}
+      isPlaying={false}
+      playbackRange={null}
+      onClearPlaybackRange={vi.fn()}
+      onSeekToEnd={vi.fn()}
+      onSeekToStart={vi.fn()}
+      onTogglePlay={vi.fn()}
+      onStepToNextFrame={vi.fn()}
+      onStepToPreviousFrame={vi.fn()}
+      canEditSelectedClip={false}
+      canSplitSelectedClip={false}
       fitSelectionDuration={null}
       insertion={createInsertionActions()}
-      isPlaying={false}
       onAutoTransformRecording={vi.fn()}
-      onClearPlaybackRange={vi.fn()}
       onDeleteSelectedClip={vi.fn()}
       onDuplicateSelectedClip={vi.fn()}
       onFitProject={vi.fn()}
       onFitSelection={vi.fn()}
-      onSeekToStart={vi.fn()}
       onSplitSelectedClip={vi.fn()}
       onTimelinePreviewSuspendedChange={vi.fn()}
-      onTogglePlay={vi.fn()}
       onZoomChange={vi.fn()}
       panelPrefs={createPanelPrefs()}
       pixelsPerSecond={90}
-      playbackRange={null}
       project={project}
       recordingTelemetry={recordingTelemetry}
       selectedClip={null}
@@ -98,7 +103,6 @@ function createPanelPrefs() {
     setCollapsedCursorLaneVisible: vi.fn(),
     setCollapsedTelemetryLaneVisible: vi.fn(),
     setCompactRows: vi.fn(),
-    setPanelExpanded: vi.fn(),
     setTrackHeight: vi.fn(),
     telemetryLaneVisible: false,
   };

@@ -10,6 +10,7 @@ import { repoRoot } from '../../../../analysis/repository/shared-paths.mjs';
 import { isExecutedAsScript } from '../../../../runtime/process/shared-cli.mjs';
 import { isProductSourcePath } from '../../../../analysis/repository/src-production-targets.mjs';
 import { materializeSourceIndex } from '../../../../analysis/source-index/index.mjs';
+import { isAllowedViolation, loadBaseline } from '../../../../policy/baselines/shared-baseline.mjs';
 
 const PUBLIC_CONTRACT_SURFACE_PATTERNS = [
   /^apps\/extension\/src\/contracts\//u,
@@ -93,12 +94,29 @@ function collectUnusedDeclarations(records) {
 }
 
 export function runDeadExportsCheck({
+  baseline = loadBaseline(),
   tsConfigFilePath = path.join(repoRoot, 'tsconfig.json'),
   cachePath,
 } = {}) {
   const index = materializeSourceIndex({ cachePath, tsConfigFilePath });
+  const report = collectUnusedDeclarations(index.records);
   return {
-    ...collectUnusedDeclarations(index.records),
+    unusedValueExports: report.unusedValueExports.filter(
+      ({ exportName, file }) =>
+        !isAllowedViolation(baseline, {
+          rule: 'dead-value-export',
+          file,
+          message: exportName,
+        })
+    ),
+    unusedTypeExports: report.unusedTypeExports.filter(
+      ({ exportName, file }) =>
+        !isAllowedViolation(baseline, {
+          rule: 'dead-type-export',
+          file,
+          message: exportName,
+        })
+    ),
     sourceIndexStats: index.stats,
   };
 }

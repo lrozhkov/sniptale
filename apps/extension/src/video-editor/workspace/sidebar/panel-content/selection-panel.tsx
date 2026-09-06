@@ -27,6 +27,10 @@ function createSelectionPanelOptionalActionProps(props: WorkspaceSidebarSelectio
     ...(props.onDeleteObjectTrack ? { onDeleteObjectTrack: props.onDeleteObjectTrack } : {}),
     ...(props.onSelectObjectTrack ? { onSelectObjectTrack: props.onSelectObjectTrack } : {}),
     ...(props.onRenameTrack ? { onRenameTrack: props.onRenameTrack } : {}),
+    ...(props.onToggleTrackLock ? { onToggleTrackLock: props.onToggleTrackLock } : {}),
+    ...(props.onToggleTrackVisibility
+      ? { onToggleTrackVisibility: props.onToggleTrackVisibility }
+      : {}),
     ...(props.onUpdateMediaClipFitScalePercent
       ? { onUpdateMediaClipFitScalePercent: props.onUpdateMediaClipFitScalePercent }
       : {}),
@@ -97,6 +101,7 @@ function createSelectionBodyActionProps(props: WorkspaceSidebarSelectionPanelPro
     onUpdateTransitionDuration: props.onUpdateTransitionDuration,
     onUpdateTransitionEasing: props.onUpdateTransitionEasing,
     onUpdateTransitionTemplate: props.onUpdateTransitionTemplate,
+    ...(props.onSwapClip ? { onSwapClip: props.onSwapClip } : {}),
     onDetachClipGroup: props.onDetachClipGroup,
     onUpdateClipTransform: props.onUpdateClipTransform,
     onUpdateClipMuted: props.onUpdateClipMuted,
@@ -170,6 +175,7 @@ function createSelectionPanelUpdateProps(
   WorkspaceSidebarSelectionPanelProps,
   | 'onClearCursorSampleSkinOverride'
   | 'onConvertTextClipToAnnotation'
+  | 'onSwapClip'
   | 'onDetachClipGroup'
   | 'onResizeProject'
   | 'onPreviewSceneBackground'

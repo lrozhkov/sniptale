@@ -62,7 +62,7 @@ export async function toggleWebcam(params: ToggleWebcamParams): Promise<void> {
     enabledKey: 'webcamEnabled',
     deviceIdKey: 'webcamDeviceId',
     noDevicesError: translate('popup.video.noWebcamsError'),
-    accessError: translate('popup.video.webcamAccessError'),
+    accessErrorKey: 'popup.video.webcamAccessError',
     resolveDeviceId: resolveWebcamDeviceId,
   });
 }

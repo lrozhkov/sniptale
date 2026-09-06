@@ -2,6 +2,7 @@ import { formatPreciseTime, formatTimelineRulerLabel } from '../../interaction-s
 import type { VideoEditorPlaybackRange } from '../../../../interaction/playback/range';
 
 export function ProjectTimelineRuler(props: {
+  children?: React.ReactNode;
   onBeginRangeSelection: (event: React.PointerEvent<HTMLDivElement>) => void;
   playbackRange: VideoEditorPlaybackRange | null;
   pixelsPerSecond: number;
@@ -15,8 +16,9 @@ export function ProjectTimelineRuler(props: {
 }) {
   return (
     <div
+      data-ui="video-editor.timeline.ruler"
       className={[
-        'sticky top-0 z-20 flex h-[30px] items-end border-b',
+        'sticky top-0 z-40 flex h-[30px] items-end border-b',
         'border-[var(--sniptale-color-border-soft)]',
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent)]',
         'relative px-0',
@@ -28,6 +30,7 @@ export function ProjectTimelineRuler(props: {
         pixelsPerSecond={props.pixelsPerSecond}
         playbackRange={props.playbackRange}
       />
+      {props.children}
       {props.rulerMarkers.map((marker) => (
         <div
           key={marker.id}

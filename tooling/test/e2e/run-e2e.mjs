@@ -21,6 +21,7 @@ const SMOKE_SPECS = ['tooling/test/e2e/extension-smoke/extension-smoke.spec.ts']
 const CRITICAL_SPECS = [
   'tooling/test/e2e/extension-critical/extension-critical-full-page.spec.ts',
   'tooling/test/e2e/extension-critical/extension-critical-highlighter-geometry.spec.ts',
+  'tooling/test/e2e/extension-critical/extension-critical-gallery-video-review.spec.ts',
   'tooling/test/e2e/extension-critical/extension-critical-media.spec.ts',
   'tooling/test/e2e/extension-critical/extension-critical-offscreen.spec.ts',
   'tooling/test/e2e/extension-critical/extension-critical-popup.spec.ts',
@@ -97,7 +98,7 @@ function buildScriptsForSuite(suite) {
 
 function playwrightWavesForSuite(suite, specs) {
   if (suite === 'security') {
-    return [{ buildDir: E2E_BUILD_DIRS.security, requiresDisplay: false, specs }];
+    return [{ buildDir: E2E_BUILD_DIRS.security, requiresDisplay: true, specs, workers: 1 }];
   }
   if (suite === 'all') {
     return [
@@ -106,7 +107,12 @@ function playwrightWavesForSuite(suite, specs) {
         requiresDisplay: true,
         specs: [...SMOKE_SPECS, ...CRITICAL_SPECS],
       },
-      { buildDir: E2E_BUILD_DIRS.security, requiresDisplay: false, specs: SECURITY_SPECS },
+      {
+        buildDir: E2E_BUILD_DIRS.security,
+        requiresDisplay: true,
+        specs: SECURITY_SPECS,
+        workers: 1,
+      },
     ];
   }
   return [{ buildDir: E2E_BUILD_DIRS.test, requiresDisplay: suite === 'critical', specs }];
@@ -154,7 +160,14 @@ export function runE2e({
   const playwrightStep = timeSyncStep(() => {
     const results = [];
     for (const wave of playwrightWavesForSuite(options.suite, options.specs)) {
-      const playwrightArgs = ['exec', 'playwright', '--', 'test', ...wave.specs];
+      const playwrightArgs = [
+        'exec',
+        'playwright',
+        '--',
+        'test',
+        ...(wave.workers ? [`--workers=${wave.workers}`] : []),
+        ...wave.specs,
+      ];
       const env = {
         ...createE2eEnv(options, wave),
         SNIPTALE_EXTENSION_BUILD_DIR: wave.buildDir,

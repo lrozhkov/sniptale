@@ -99,6 +99,7 @@ function createCanvasProps(
 ): React.ComponentProps<typeof ProjectTimelineCanvas> {
   return {
     currentTime: 0,
+    consumeCompletedScrubClick: () => false,
     dragGhost,
     hoveredClipId: null,
     pixelsPerSecond: 90,
@@ -109,6 +110,7 @@ function createCanvasProps(
     selectedEffectSelection: null,
     selectedTrackId: null,
     selection: createSceneSelection(),
+    snapGuideTime: null,
     seekToClientX: vi.fn(),
     telemetryLaneVisible: false,
     timelinePreviews: {},
@@ -124,6 +126,9 @@ function createCanvasActionProps() {
     onAddMotionRegion: vi.fn(),
     onBeginClipInteraction: vi.fn(),
     onBeginEffectInteraction: vi.fn(),
+    onBeginPlayheadScrub: vi.fn(),
+    onStepToNextFrame: vi.fn(),
+    onStepToPreviousFrame: vi.fn(),
     onBeginEffectRangeSelection: vi.fn(),
     onBeginRangeSelection: vi.fn(),
     onBeginTrackRangeSelection: () => vi.fn(),
@@ -133,6 +138,7 @@ function createCanvasActionProps() {
     onResizeMotionRegion: vi.fn(),
     onScroll: vi.fn(),
     onSeek: vi.fn(),
+    onSeekTime: vi.fn(),
     onSelectActionSegment: vi.fn(),
     onSelectClip: vi.fn(),
     onSelectCursorSegment: vi.fn(),

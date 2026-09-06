@@ -66,8 +66,12 @@ describe('scenario v3 runtime save helpers', () => {
   });
 
   it('normalizes unknown failures into explicit user-facing messages', () => {
-    expect(getScenarioV3RuntimeErrorMessage(new Error('Disk full'))).toBe('Disk full');
-    expect(getScenarioV3RuntimeErrorMessage('nope')).toBe('scenario.editor.v3OperationFailed');
+    expect(getScenarioV3RuntimeErrorMessage(new Error('Disk full'))).toBe(
+      'scenario.editor.v3OperationFailed. common.errors.storageDetail'
+    );
+    expect(getScenarioV3RuntimeErrorMessage('nope')).toBe(
+      'scenario.editor.v3OperationFailed. common.errors.storageDetail'
+    );
   });
 });
 

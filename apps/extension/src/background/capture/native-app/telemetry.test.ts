@@ -11,7 +11,7 @@ import {
 } from '../../../features/video/project/types/interaction';
 import { mapNativeRecordingTelemetry } from './telemetry';
 
-it('normalizes native telemetry monotonic timestamps relative to the recording timebase', () => {
+it('normalizes native relative milliseconds without subtracting the monotonic origin', () => {
   const telemetry = mapNativeRecordingTelemetry({
     createdAt: 10,
     recordingId: 'recording-1',
@@ -37,9 +37,9 @@ it('normalizes native telemetry monotonic timestamps relative to the recording t
       displaySurface: VideoDisplaySurface.WINDOW,
     })
   );
-  expect(telemetry?.actionEvents[0]?.time).toBe(50);
-  expect(telemetry?.cursorTrack?.samples[0]?.time).toBe(75);
-  expect(telemetry?.signals[0]).toEqual(expect.objectContaining({ endTime: 140, startTime: 100 }));
+  expect(telemetry?.actionEvents[0]?.time).toBe(1.05);
+  expect(telemetry?.cursorTrack?.samples[0]?.time).toBe(1.075);
+  expect(telemetry?.signals[0]).toEqual(expect.objectContaining({ endTime: 1.14, startTime: 1.1 }));
 });
 
 it('returns null for missing telemetry and rejects invalid fallback temporal values', () => {
@@ -123,3 +123,34 @@ function createViewport() {
     width: 1280,
   };
 }
+
+it('maps producer-relative active milliseconds once, including durations after a pause', () => {
+  const result = mapNativeRecordingTelemetry({
+    createdAt: 10,
+    updatedAt: 20,
+    recordingId: 'native-active-time',
+    sourceMode: 'screen',
+    timebase: {
+      id: 'native',
+      startedAtEpochMs: 1700000000000,
+      startedAtMonotonicNs: '1000000000',
+      units: 'milliseconds',
+    },
+    telemetry: {
+      actionEvents: [{ ...createActionEvent(2500), duration: 400 }],
+      cursorTrack: createCursorTrack(2750),
+      signals: [createSignal(2000, 3500)],
+      viewport: null,
+    },
+  });
+  expect(result?.provenance).toEqual({
+    source: 'native',
+    normalizationVersion: 1,
+    timeUnit: 'seconds',
+    coordinateSpace: 'desktop',
+  });
+  expect(result?.actionEvents[0]?.time).toBe(2.5);
+  expect(result?.actionEvents[0]?.duration).toBe(0.4);
+  expect(result?.cursorTrack?.samples[0]?.time).toBe(2.75);
+  expect(result?.signals[0]).toMatchObject({ startTime: 2, endTime: 3.5 });
+});

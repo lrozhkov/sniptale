@@ -55,6 +55,9 @@ function selectPlaybackPort(state: VideoEditorState): PlaybackPort {
 
 function selectTimelineEditingPort(state: VideoEditorState): TimelineEditingPort {
   return {
+    appendMaterial: state.appendMaterial,
+    insertMaterial: state.insertMaterial,
+    overlayMaterial: state.overlayMaterial,
     addAssetClip: state.addAssetClip,
     addTrack: state.addTrack,
     addTrackLogicalLane: state.addTrackLogicalLane,
@@ -73,6 +76,7 @@ function selectTimelineEditingPort(state: VideoEditorState): TimelineEditingPort
     duplicateClip: state.duplicateClip,
     insertCursorSample: state.insertCursorSample,
     moveClip: state.moveClip,
+    swapClip: state.swapClip,
     moveTrack: state.moveTrack,
     pixelsPerSecond: state.pixelsPerSecond,
     renameTrack: state.renameTrack,

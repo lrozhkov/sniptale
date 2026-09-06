@@ -1,8 +1,12 @@
 import { expect, it } from 'vitest';
 
-import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../features/video/project/factories/creation';
 import { createTextClip } from '../../../features/video/project/factories/overlay-clip';
 import {
+  VideoTrackKind,
   VideoMotionFocusMode,
   VideoProjectActionEventKind,
   VideoProjectActionPreset,
@@ -28,7 +32,9 @@ it('ignores non-render project labels and timestamps but changes for visual stat
 
 it('invalidates only the segment influenced by a bounded clip edit', async () => {
   const project = { ...createEmptyVideoProject('Segments', 1920, 1080), duration: 4, fps: 10 };
-  const trackId = project.tracks.find((track) => track.kind === 'OVERLAY')!.id;
+  const overlay = createVideoProjectTrack('Text', 0, VideoTrackKind.OVERLAY);
+  project.tracks.push(overlay);
+  const trackId = overlay.id;
   const first = { ...createTextClip(trackId, project.width, project.height, 0.2), duration: 1 };
   const second = { ...createTextClip(trackId, project.width, project.height, 2.2), duration: 1 };
   project.clips = [first, second];

@@ -13,19 +13,65 @@ import { MUTATION_PROFILES, resolveMutationRunLabel } from './mutation-policy.mj
 import { isExecutedAsScript } from '../qa/runtime/process/shared-cli.mjs';
 
 export const CI_ADVISORY_SUMMARY_PATH = '.tmp/repo-audit/advisory-summary.json';
+const COLLECTOR_FAILURE_REASONS = new Set(['report-missing', 'runner-failed', 'tool-unavailable']);
 
-function collectMutationProfile(profile) {
-  const runner = process.env.SNIPTALE_TRUSTED_CI_ROOT
+function collectorErrorMessage(error) {
+  if (error instanceof Error) return error.message;
+  return typeof error === 'string' ? error : 'Collector failed';
+}
+
+export function classifyCollectorFailure(error) {
+  if (error != null && typeof error === 'object' && COLLECTOR_FAILURE_REASONS.has(error.reason)) {
+    return error.reason;
+  }
+  const message = collectorErrorMessage(error);
+  if (/Mutation CLI is unavailable/u.test(message)) return 'tool-unavailable';
+  if (/mutation report is missing/iu.test(message)) return 'report-missing';
+  return 'runner-failed';
+}
+
+export function sanitizeBoundedCollectorMessage(error) {
+  switch (classifyCollectorFailure(error)) {
+    case 'tool-unavailable':
+      return 'Required advisory collector tool is unavailable.';
+    case 'report-missing':
+      return 'Advisory collector completed without its required report.';
+    default:
+      return 'Advisory collector failed; inspect bounded CI logs.';
+  }
+}
+
+function createCollectorFailure(reason, message, exitCode = 1) {
+  return Object.assign(new Error(message), { exitCode, reason });
+}
+
+export function collectMutationProfile(profile, environment = process.env) {
+  const runner = environment.SNIPTALE_TRUSTED_CI_ROOT
     ? '/opt/sniptale-trusted/tooling/test/mutation/run-profile.mjs'
     : 'tooling/test/mutation/run-profile.mjs';
-  const result = spawnSync(process.execPath, [runner, profile, resolveMutationRunLabel()], {
+  const runLabel = resolveMutationRunLabel(environment);
+  const result = spawnSync(process.execPath, [runner, profile, runLabel], {
     encoding: 'utf8',
-    env: process.env,
+    env: environment,
   });
-  if ((result.status ?? 1) !== 0) {
-    throw new Error(result.stderr || result.stdout || `Mutation ${profile} failed`);
+  if (result.error) {
+    throw createCollectorFailure('tool-unavailable', 'Mutation profile runner is unavailable');
   }
-  return `.tmp/mutation/${profile}/${resolveMutationRunLabel()}/summary.json`;
+  if ((result.status ?? 1) !== 0) {
+    const message = result.stderr || result.stdout || `Mutation ${profile} failed`;
+    let reason = 'runner-failed';
+    if (/Mutation CLI is unavailable/u.test(message)) reason = 'tool-unavailable';
+    else if (/Mutation report is missing/iu.test(message)) reason = 'report-missing';
+    throw createCollectorFailure(reason, message, result.status ?? 1);
+  }
+  const artifactPath = `.tmp/mutation/${profile}/${runLabel}/summary.json`;
+  if (!fs.existsSync(artifactPath)) {
+    throw createCollectorFailure(
+      'report-missing',
+      `Mutation report is missing for profile ${profile}`
+    );
+  }
+  return artifactPath;
 }
 
 function writeSummary(summary, rootDir) {
@@ -63,8 +109,15 @@ export function collectCiAdvisoryArtifacts(
   const results = collectors.map(({ id, run }) => {
     try {
       return { id, status: 'collected', artifactPath: run() };
-    } catch {
-      return { id, status: 'failed', message: 'collector failed; inspect bounded CI logs' };
+    } catch (error) {
+      const reason = classifyCollectorFailure(error);
+      const message = sanitizeBoundedCollectorMessage(error);
+      const exitCode =
+        error != null && typeof error === 'object' && Number.isInteger(error.exitCode)
+          ? error.exitCode
+          : 1;
+      process.stderr.write(`[advisory] ${id}: ${reason}: ${message}\n`);
+      return { id, status: 'failed', reason, exitCode, message };
     }
   });
   const summary = {

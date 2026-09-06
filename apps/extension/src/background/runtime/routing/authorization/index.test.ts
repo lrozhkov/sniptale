@@ -165,7 +165,13 @@ it('authorizes privileged tab routes only for the resolved top-level content sen
       resolvedTabId: 7,
       sender: contentSender(7),
     })
-  ).toEqual({ authorized: true });
+  ).toEqual({
+    authorized: true,
+    preauthorization: {
+      kind: 'privileged-tab-route',
+      senderBinding: expect.objectContaining({ documentId: 'document-7', tabId: 7 }),
+    },
+  });
 
   expect(
     authorizeIPCMessage({

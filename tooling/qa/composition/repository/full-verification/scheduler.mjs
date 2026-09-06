@@ -15,6 +15,7 @@ import {
 } from '../../../runtime/scheduling/task-scheduler.mjs';
 import { replaceDeferredOwnerGuardSteps } from '../../shared/owner-guard-step-helpers.mjs';
 import { createSchedulerLaneTask } from '../../runtime/scheduler-lane-task.mjs';
+import { COMMON_SCHEDULER_RESULT_SHAPES } from '../../runtime/scheduler-result-shapes.mjs';
 import {
   TYPECHECK_CHECKERS,
   TYPESCRIPT_TOOL_VERSION,
@@ -25,26 +26,18 @@ import { projectQaSchedulerLanes } from '../../catalog/scheduler-profiles.mjs';
 
 const FULL_VERIFY_WORKER_URL = new URL('./worker.mjs', import.meta.url);
 const FULL_RESULT_SHAPES = Object.freeze({
-  appOwners: { ownerStep: 'step' },
-  targetPaths: { ownerStep: 'step' },
-  typecheck: { typecheckStep: 'step' },
-  tests: { testSteps: 'steps' },
-  lint: {
-    loggingStep: 'step',
-    oxlintStep: 'step',
-    sonarjsStep: 'nullable-step',
-    securityStep: 'step',
-  },
-  graph: { dependencySteps: 'steps', deadExportsStep: 'step' },
+  ...COMMON_SCHEDULER_RESULT_SHAPES,
   light: {
+    formatStep: 'nullable-step',
     lineLengthStep: 'nullable-step',
-    aiHygieneStep: 'step',
+    repositoryReadabilityStep: 'nullable-step',
+    deadCommentedCodeStep: 'step',
     structuralRiskStep: 'nullable-step',
     namingStep: 'step',
+    mockParityStep: 'nullable-step',
     violationSteps: 'steps',
     i18nStep: 'step',
     designSystemStep: 'step',
-    auditStep: 'step',
   },
 });
 
@@ -79,6 +72,9 @@ function createFullVerifyWorkerContext(context) {
     codeFiles: context.codeFiles,
     excludedControlLabels: context.excludedControlLabels,
     releaseMode: context.releaseMode,
+    structuralCodeFiles: context.structuralCodeFiles,
+    structuralComparisonRevision: context.structuralComparisonRevision,
+    structuralDeletedFiles: context.structuralDeletedFiles,
     targetFiles: context.targetFiles,
   };
 }
@@ -154,7 +150,7 @@ function annotate(result, profile) {
       dependencySteps: appendTaskScheduleDetailToFirst(value.dependencySteps, detail),
     };
   }
-  const scheduleOwner = value.lineLengthStep ?? value.aiHygieneStep;
+  const scheduleOwner = value.lineLengthStep ?? value.deadCommentedCodeStep;
   return {
     ...value,
     ...(value.lineLengthStep
@@ -165,7 +161,7 @@ function annotate(result, profile) {
           ),
         }
       : {
-          aiHygieneStep: appendTaskScheduleDetail(
+          deadCommentedCodeStep: appendTaskScheduleDetail(
             scheduleOwner,
             `${detail}; ${formatQaResourceProfile(profile)}`
           ),
@@ -178,17 +174,18 @@ function assemble(results, releaseMode, includeTests) {
     indexTaskResults(results);
   const ownerSteps = [appOwners.ownerStep, targetPaths.ownerStep];
   return orderQaResultSteps([
+    ...(light.formatStep ? [light.formatStep] : []),
     ...(light.lineLengthStep ? [light.lineLengthStep] : []),
+    ...(light.repositoryReadabilityStep ? [light.repositoryReadabilityStep] : []),
     lint.oxlintStep,
     lint.loggingStep,
-    ...(releaseMode && lint.sonarjsStep ? [lint.sonarjsStep] : []),
-    light.aiHygieneStep,
+    light.deadCommentedCodeStep,
     ...(light.structuralRiskStep ? [light.structuralRiskStep] : []),
     light.namingStep,
+    ...(light.mockParityStep ? [light.mockParityStep] : []),
     ...replaceDeferredOwnerGuardSteps(light.violationSteps, ownerSteps),
     light.i18nStep,
     light.designSystemStep,
-    light.auditStep,
     lint.securityStep,
     ...graph.dependencySteps,
     typecheck.typecheckStep,

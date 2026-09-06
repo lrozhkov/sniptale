@@ -17,6 +17,7 @@ import {
   getReleaseDrop,
   resolveOutDir,
 } from './injected-build-support.ts';
+import { CHROME_BUILD_TARGET } from './manifest.ts';
 
 const CONTENT_RUNTIME_ENTRY = 'apps/extension/src/content/index.tsx';
 const CONTENT_RUNTIME_OUTPUT = 'assets/contentRuntime.js';
@@ -88,7 +89,7 @@ export function buildContentRuntime(mode: string): Plugin {
           createInlineCssTextPlugin(appRoot),
         ],
         sourcemap: shouldEmitBuildSourcemaps(mode),
-        target: ['chrome140'],
+        target: [CHROME_BUILD_TARGET],
       });
       const imports = Object.values(result.metafile.outputs).flatMap((output) => output.imports);
       assertBundleHasNoImports('Injected content runtime', imports);
@@ -132,7 +133,7 @@ export function buildContentRuntimeShim(mode: string): Plugin {
         platform: 'browser',
         plugins: [createReleaseSafeDependencyAliasPlugin(repositoryRoot)],
         sourcemap: shouldEmitBuildSourcemaps(mode),
-        target: ['chrome140'],
+        target: [CHROME_BUILD_TARGET],
       });
       const imports = Object.values(result.metafile.outputs).flatMap((output) => output.imports);
       assertBundleHasNoImports('Injected content runtime shim', imports);

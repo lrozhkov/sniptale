@@ -135,6 +135,26 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
     ru: 'Непрозрачность',
     en: 'Opacity',
   },
+  cameraPlacementDescription: {
+    ru: 'Быстро расположите независимый трек камеры. После этого размер и позицию можно точно настроить ниже или прямо на холсте.',
+    en: 'Place the independent camera track, then fine-tune its size and position below or directly on the canvas.',
+  },
+  cameraPlacementTopLeft: {
+    ru: 'Слева сверху',
+    en: 'Top left',
+  },
+  cameraPlacementTopRight: {
+    ru: 'Справа сверху',
+    en: 'Top right',
+  },
+  cameraPlacementBottomLeft: {
+    ru: 'Слева снизу',
+    en: 'Bottom left',
+  },
+  cameraPlacementBottomRight: {
+    ru: 'Справа снизу',
+    en: 'Bottom right',
+  },
   fitModeLabel: {
     ru: 'Вписывание',
     en: 'Fit mode',
@@ -166,6 +186,18 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
   trackNameLabel: {
     ru: 'Название дорожки',
     en: 'Track name',
+  },
+  trackTypeLabel: {
+    ru: 'Тип дорожки',
+    en: 'Track type',
+  },
+  trackVisibilityLabel: {
+    ru: 'Видимость',
+    en: 'Visibility',
+  },
+  trackLockLabel: {
+    ru: 'Блокировка',
+    en: 'Lock',
   },
   fitModeContain: {
     ru: 'Вписать',

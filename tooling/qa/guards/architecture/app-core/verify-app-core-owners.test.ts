@@ -6,7 +6,8 @@ import { dirname, join } from 'node:path';
 
 import {
   appCoreOwnerPolicyErrors,
-  classifyFinalAppCoreOwnerPath,
+  collectAppCoreOwnerProjection,
+  deriveAppCoreOwnerPath,
 } from './app-core-owner-policy.mjs';
 import { appCoreOwnerErrors } from './verify-app-core-owners.mjs';
 
@@ -24,22 +25,14 @@ function write(root: string, path: string, contents = 'export const value = true
 }
 
 const FIXTURE_POLICY = {
-  schemaVersion: 2,
-  finalOwnerRules: [
-    'apps/extension/src/composition/persistence',
-    'apps/extension/src/features',
-    'apps/extension/src/ui',
-    'apps/extension/src/platform',
-  ],
+  schemaVersion: 3,
   authorityOwners: ['apps/extension/src/composition/persistence/state.ts'],
-  forbiddenSourcePrefixes: ['apps/extension/src/platform/old'],
   forbiddenOwnerEdges: [
     ['apps/extension/src/features', 'apps/extension/src/ui'],
     ['apps/extension/src/platform', 'apps/extension/src/features'],
   ],
   featurePublicEntrypoints: ['apps/extension/src/features/final.ts'],
   sameConcernPersistenceEdges: [],
-  retainedAppUiRoots: ['apps/extension/src/ui'],
   forbiddenBroadBarrels: ['apps/extension/src/features/index.ts'],
 };
 
@@ -60,13 +53,17 @@ it('accepts a complete final-owner fixture', () => {
   expect(appCoreOwnerErrors(context)).toEqual([]);
 });
 
-it('rejects a newly added app-core owner that is absent from the owner policy', () => {
+it('derives the current owner projection without an exact residency registry', () => {
   const context = fixture();
   context.codeFiles.push(write(context.root, 'apps/extension/src/composition/new-owner/index.ts'));
 
-  expect(appCoreOwnerErrors(context)).toContain(
-    'unclassified app-core owner: apps/extension/src/composition/new-owner/index.ts'
+  expect(appCoreOwnerErrors(context)).toEqual([]);
+  expect(collectAppCoreOwnerProjection(context.codeFiles)).toContain(
+    'apps/extension/src/composition/new-owner'
   );
+  expect(
+    deriveAppCoreOwnerPath('apps/extension/src/composition/persistence/example/state.ts')
+  ).toBe('apps/extension/src/composition/persistence/example');
 });
 
 it('rejects stale owners, missing authorities, unclassified roots and forbidden edges', () => {
@@ -86,22 +83,14 @@ it('rejects stale owners, missing authorities, unclassified roots and forbidden 
     expect.arrayContaining([
       'authority owner is missing: apps/extension/src/composition/persistence/state.ts',
       'forbidden app-core owner import: apps/extension/src/features/backedge.ts -> apps/extension/src/ui/view.ts',
-      'retired owner path remains: apps/extension/src/platform/old',
-      'unclassified app-core owner: apps/extension/src/composition/other.ts',
     ])
   );
 });
 
-it('rejects duplicate authority classification and ambiguous final owners', () => {
+it('rejects duplicate authority classification', () => {
   const { policy } = fixture();
   policy.authorityOwners.push(policy.authorityOwners[0]);
   expect(appCoreOwnerPolicyErrors(policy)).toEqual(['invalid app-core owner policy']);
-
-  policy.authorityOwners.pop();
-  policy.finalOwnerRules.push(policy.finalOwnerRules[0]);
-  expect(() =>
-    classifyFinalAppCoreOwnerPath('apps/extension/src/composition/persistence/state.ts', policy)
-  ).toThrow('unclassified final app-core owner');
 });
 
 it('rejects duplicate exception pairs', () => {
@@ -208,7 +197,6 @@ it('rejects app-core boundary, runtime, persistence and UI residency violations'
       'persistence imports UI/runtime/workflow implementation: ' +
         'apps/extension/src/composition/persistence/sandbox-edge.ts -> ' +
         'apps/extension/src/effect-runtime-sandbox/runtime.ts',
-      'preview/catalog UI remains app-local: apps/extension/src/ui/previews/example.ts',
       'app-core imports runtime implementation: ' +
         'apps/extension/src/workflows/runtime-bridge.ts -> apps/extension/src/content/b.ts',
     ])

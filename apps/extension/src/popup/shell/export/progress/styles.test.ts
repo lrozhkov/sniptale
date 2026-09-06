@@ -32,7 +32,7 @@ describe('progress styles', () => {
     expect(progressStepDoneClassName).toContain('success');
     expect(progressStepErrorClassName).toContain('danger');
     expect(progressStepIdleClassName).toContain('text-[var(--sniptale-color-text-dim)]');
-    expect(progressErrorListClassName).toContain('text-[10px]');
+    expect(progressErrorListClassName).toContain('text-[11px]');
     expect(cancelButtonClassName).toContain('justify-center');
     expect(exportSectionContainerClassName).toContain('flex-1');
   });

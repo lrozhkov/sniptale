@@ -21,13 +21,6 @@ function collectWrapperTools(stepDefinitions) {
 function getQualityScriptEntries(packageJson) {
   return Object.entries(packageJson.scripts)
     .map(([script, command]) => {
-      if (script === 'qa:advisory') {
-        return {
-          script,
-          tool: 'verify-advisory.mjs',
-          entryKind: 'advisory',
-        };
-      }
       if (script === 'qa:structural-audit') {
         return {
           script,

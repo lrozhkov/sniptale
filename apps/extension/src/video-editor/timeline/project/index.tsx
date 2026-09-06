@@ -1,12 +1,27 @@
+import { useMemo } from 'react';
 import { ProjectTimelineBody } from './body';
 import { ProjectTimelineSurface } from './surface';
 import type { ProjectTimelineProps } from './types';
-import { useProjectTimelinePanelPrefs } from './panel/prefs';
+import type { useProjectTimelinePanelPrefs } from './panel/prefs';
 import { useProjectTimelineState } from './interaction-state/index';
 
-export const ProjectTimeline = (props: ProjectTimelineProps) => {
-  const panelPrefs = useProjectTimelinePanelPrefs(props.project);
-  const timelineState = useProjectTimelineState(props, panelPrefs.prefs.trackHeightByTrackId);
+export const ProjectTimeline = (
+  props: ProjectTimelineProps & { panelPrefs: ReturnType<typeof useProjectTimelinePanelPrefs> }
+) => {
+  const { panelPrefs } = props;
+  const heights = useMemo(
+    () =>
+      panelPrefs.prefs.compactRows
+        ? Object.fromEntries(
+            props.project.tracks.map(({ id }) => [
+              id,
+              Math.max(0.5, (panelPrefs.prefs.trackHeightByTrackId[id] ?? 1) * 0.75),
+            ])
+          )
+        : panelPrefs.prefs.trackHeightByTrackId,
+    [panelPrefs.prefs, props.project.tracks]
+  );
+  const timelineState = useProjectTimelineState(props, heights);
 
   return <ProjectTimelineLayout {...props} {...timelineState} panelPrefs={panelPrefs} />;
 };

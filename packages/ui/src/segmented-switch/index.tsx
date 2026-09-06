@@ -57,7 +57,7 @@ function WrappedSegmentedSwitch<TId extends string>(props: SegmentedSwitchProps<
             onClick={() => props.onChange(option.id)}
             className={[
               getWrappedSegmentedOptionClassName(active),
-              'relative z-10 min-w-[4.25rem] flex-1 justify-center overflow-hidden !rounded-[7px] px-2 py-1.5',
+              'relative z-10 min-w-fit max-w-full flex-auto justify-center overflow-hidden !rounded-[7px] px-2 py-1.5',
             ].join(' ')}
           >
             <span className="block min-w-0 max-w-full whitespace-normal text-center leading-tight">

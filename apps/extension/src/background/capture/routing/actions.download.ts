@@ -5,7 +5,9 @@ import { createRenderedCaptureJob } from '../jobs/rendered-job';
 import { transitionCaptureJob } from '../jobs/state-machine';
 import { createRouteErrorResponse } from '../../routing-contracts/response';
 import type { SendResponse } from './types';
-import { consumeRecentCaptureAssetBinding } from './actions.gallery-update';
+import type { RecentCaptureEditorAssetCapability } from '@sniptale/runtime-contracts/protocol/content-privileged-action';
+import { consumeRecentCaptureEditorAssetCapability } from '../editor/recent-asset-capability';
+import type { PreauthorizedContentActionBinding } from '../../routing-contracts/capabilities/content-action/route';
 
 function isDownloadAction(actionType: CaptureActionType): boolean {
   return actionType !== 'copy' && actionType !== 'edit' && actionType !== 'scenario';
@@ -66,17 +68,31 @@ export function handleExecuteSave(
 }
 
 export function handleOpenEditorWithImage(
-  dataUrl: string,
+  message: {
+    assetId?: string;
+    dataUrl: string;
+    editorAssetCapability?: RecentCaptureEditorAssetCapability;
+  },
   resolvedTabId: number,
   sendResponse: SendResponse,
-  assetId?: string
+  contentPreauthorization?: PreauthorizedContentActionBinding
 ): boolean {
-  if (assetId && !consumeRecentCaptureAssetBinding(resolvedTabId, assetId)) {
-    sendResponse(createRouteErrorResponse('Editor asset is not bound to the latest capture'));
+  const senderBinding = contentPreauthorization;
+  if (
+    message.assetId &&
+    (!message.editorAssetCapability ||
+      !senderBinding ||
+      !consumeRecentCaptureEditorAssetCapability({
+        assetId: message.assetId,
+        capability: message.editorAssetCapability,
+        senderBinding,
+      }))
+  ) {
+    sendResponse(createRouteErrorResponse('Editor asset capability is invalid or expired'));
     return true;
   }
-  openEditorWithImage(dataUrl, {
-    ...(assetId ? { assetId } : {}),
+  openEditorWithImage(message.dataUrl, {
+    ...(message.assetId ? { assetId: message.assetId } : {}),
     tabId: resolvedTabId,
   })
     .then(() => sendResponse({ success: true, result: 'accepted' }))

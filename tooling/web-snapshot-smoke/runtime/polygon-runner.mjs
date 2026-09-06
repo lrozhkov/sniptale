@@ -8,7 +8,23 @@ import { verifyExternalTarget } from '../assertions/polygon-verification.mjs';
 import { enableWebSnapshotsForSmoke } from './popup-driver.mjs';
 
 const args = process.argv.slice(2);
-if (args.includes('--fixtures')) {
+const printPackageIndex = args.indexOf('--print-package');
+const printUrlIndex = args.indexOf('--print-url');
+if (printPackageIndex >= 0 || printUrlIndex >= 0) {
+  if (printPackageIndex >= 0 && printUrlIndex >= 0) {
+    throw new Error('--print-package and --print-url cannot be combined');
+  }
+  const optionName = printPackageIndex >= 0 ? '--print-package' : '--print-url';
+  const optionIndex = printPackageIndex >= 0 ? printPackageIndex : printUrlIndex;
+  const value = args[optionIndex + 1];
+  if (!value || value.startsWith('--')) {
+    throw new Error(`${optionName} requires a value`);
+  }
+  if (args.length !== 2) throw new Error(`${optionName} cannot be combined with other options`);
+  const { runPrintPackageSmoke, runPrintUrlSmoke } = await import('./print-package-runner.mjs');
+  if (optionName === '--print-package') await runPrintPackageSmoke(value);
+  else await runPrintUrlSmoke(value);
+} else if (args.includes('--fixtures')) {
   const { runFixtureSmoke } = await import('./runner.mjs');
   await runFixtureSmoke();
 } else {

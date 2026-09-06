@@ -36,7 +36,10 @@ function renderPlaybackSummary(isPlaying: boolean, withRange = false) {
   }
 
   const onTogglePlay = vi.fn();
+  const onSeekToEnd = vi.fn();
   const onSeekToStart = vi.fn();
+  const onStepToNextFrame = vi.fn();
+  const onStepToPreviousFrame = vi.fn();
   act(() => {
     root?.render(
       <ProjectTimelinePlaybackSummary
@@ -45,21 +48,33 @@ function renderPlaybackSummary(isPlaying: boolean, withRange = false) {
         isPlaying={isPlaying}
         playbackRange={withRange ? { start: 4.5, end: 6.75 } : null}
         onClearPlaybackRange={onTogglePlay}
+        onSeekToEnd={onSeekToEnd}
         onSeekToStart={onSeekToStart}
+        onStepToNextFrame={onStepToNextFrame}
+        onStepToPreviousFrame={onStepToPreviousFrame}
         onTogglePlay={onTogglePlay}
       />
     );
   });
 
-  return { onSeekToStart, onTogglePlay };
+  return {
+    onSeekToEnd,
+    onSeekToStart,
+    onStepToNextFrame,
+    onStepToPreviousFrame,
+    onTogglePlay,
+  };
 }
 
 it('renders playback summary metadata and toggles play state', () => {
   const { onTogglePlay } = renderPlaybackSummary(true);
   expect(container?.textContent).toContain('0:12.3 / 0:45.7');
+  const pauseButton = Array.from(
+    container?.querySelectorAll<HTMLButtonElement>('button') ?? []
+  ).find((button) => button.getAttribute('aria-label') === 'videoEditor.timeline.pause');
 
   act(() => {
-    container?.querySelector<HTMLButtonElement>('button')?.click();
+    pauseButton?.click();
   });
 
   expect(onTogglePlay).toHaveBeenCalledTimes(1);
@@ -67,19 +82,58 @@ it('renders playback summary metadata and toggles play state', () => {
 
 it('seeks to the start from the playback summary control', () => {
   const { onSeekToStart } = renderPlaybackSummary(false);
+  const startButton = Array.from(
+    container?.querySelectorAll<HTMLButtonElement>('button') ?? []
+  ).find((button) => button.getAttribute('aria-label') === 'videoEditor.timeline.seekToStart');
 
   act(() => {
-    container?.querySelectorAll<HTMLButtonElement>('button')[1]?.click();
+    startButton?.click();
   });
 
+  expect(startButton).toBeDefined();
   expect(onSeekToStart).toHaveBeenCalledTimes(1);
+});
+
+it('seeks to the end from the symmetric playback summary control', () => {
+  const { onSeekToEnd } = renderPlaybackSummary(false);
+  const endButton = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+    (button) => button.getAttribute('aria-label') === 'videoEditor.timeline.seekToEnd'
+  );
+
+  act(() => endButton?.click());
+
+  expect(endButton).toBeDefined();
+  expect(onSeekToEnd).toHaveBeenCalledTimes(1);
+});
+
+it('steps to the previous and next project frames from the transport', () => {
+  const { onStepToNextFrame, onStepToPreviousFrame } = renderPlaybackSummary(false);
+  const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
+  const previousButton = buttons.find(
+    (button) => button.getAttribute('aria-label') === 'videoEditor.timeline.previousFrame'
+  );
+  const nextButton = buttons.find(
+    (button) => button.getAttribute('aria-label') === 'videoEditor.timeline.nextFrame'
+  );
+
+  act(() => {
+    previousButton?.click();
+    nextButton?.click();
+  });
+
+  expect(previousButton).toBeDefined();
+  expect(nextButton).toBeDefined();
+  expect(onStepToPreviousFrame).toHaveBeenCalledTimes(1);
+  expect(onStepToNextFrame).toHaveBeenCalledTimes(1);
 });
 
 it('renders a play label when playback is idle', () => {
   renderPlaybackSummary(false);
-  expect(container?.querySelector<HTMLButtonElement>('button')?.getAttribute('aria-label')).toBe(
-    'videoEditor.timeline.play'
-  );
+  expect(
+    Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).some(
+      (button) => button.getAttribute('aria-label') === 'videoEditor.timeline.play'
+    )
+  ).toBe(true);
 });
 
 it('uses the shared content toolbar button chrome', () => {
@@ -87,7 +141,7 @@ it('uses the shared content toolbar button chrome', () => {
   const button = container?.querySelector<HTMLButtonElement>('button');
   expect(button?.dataset['ui']).toBe('shared.ui.content-toolbar-button');
   expect(button?.className).toContain('sniptale-glass-toolbar-button');
-  expect(button?.className).toContain('!w-9');
+  expect(button?.className).toContain('!w-6');
 });
 
 it('renders the active loop range when playback range is selected', () => {
@@ -102,8 +156,8 @@ it('keeps playback control slots stable when the range reset is unavailable', ()
   renderPlaybackSummary(false, true);
   const buttonsWithRange = container?.querySelectorAll<HTMLButtonElement>('button');
 
-  expect(buttonsWithoutRange).toHaveLength(3);
-  expect(buttonsWithRange).toHaveLength(3);
+  expect(buttonsWithoutRange).toHaveLength(6);
+  expect(buttonsWithRange).toHaveLength(6);
   expect(container?.querySelector('[data-playback-counter]')?.className).toContain('tabular-nums');
 });
 

@@ -24,6 +24,7 @@ import {
   type ActivePopupExportJob,
 } from './runtime-state';
 import { clonePagePackageJobStatus } from './status';
+import { translate } from '../../../../platform/i18n';
 
 function createJob(): ActivePopupExportJob {
   return {
@@ -41,6 +42,7 @@ function createJob(): ActivePopupExportJob {
     finishCancellation: null,
     expectedActivation: null,
     lastActivatedByWindow: new Map(),
+    locale: 'en',
     manualActivationConflict: false,
     publicationQueue: Promise.resolve(),
     status: {
@@ -91,9 +93,12 @@ it('persists revisioned status and publishes an isolated update', async () => {
   await updatePagePackageJobStatus(job, { phase: 'cancelling' });
 
   expect(job.status.revision).toBe(2);
-  expect(mocks.write).toHaveBeenCalledWith(job.status);
+  expect(mocks.write).toHaveBeenCalledWith(job.status, 'en');
   expect(mocks.send).toHaveBeenCalledWith(
-    expect.objectContaining({ status: expect.not.objectContaining({ revision: 1 }) })
+    expect.objectContaining({
+      locale: 'en',
+      status: expect.not.objectContaining({ revision: 1 }),
+    })
   );
   expect(clonePagePackageJobStatus(job.status)).not.toBe(job.status);
 });
@@ -197,6 +202,9 @@ it('linearizes cancellation admission against terminal completion without deleti
   await expect(cancellation).resolves.toBe(true);
   await expect(completion).resolves.toBe(false);
   expect(cancelledFirst.status.phase).toBe('cancelling');
+  expect(cancelledFirst.status.progress.message).toBe(
+    translate('popup.export.cancellingMessage', 'en')
+  );
   expect(cancelledFirst.abortController.signal.aborted).toBe(true);
 
   const completedFirst = createJob();

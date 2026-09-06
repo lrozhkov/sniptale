@@ -18,7 +18,8 @@ import { useState, type ComponentType } from 'react';
 import type { ScreenshotCaptureConfig } from '@sniptale/runtime-contracts/capture/action';
 import type { ToolbarWorkingMode } from '@sniptale/runtime-contracts/messaging/message-types';
 import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
-import { translate } from '../../../platform/i18n/popup';
+import { translate, type TranslationKey } from '../../../platform/i18n/popup';
+import { createUserFacingErrorMessage } from '../../../platform/i18n/user-facing-error';
 import PopupFooter from '../footer';
 import {
   openGithubRepository,
@@ -175,9 +176,7 @@ export function MenuRoute({
     try {
       await triggerScreenshotCapture(buildCaptureConfig(mode, afterCapture));
     } catch (captureError) {
-      setError(
-        captureError instanceof Error ? captureError.message : translate('popup.home.captureError')
-      );
+      setError(getMenuBrowserActionError(captureError, 'popup.home.captureError'));
       setPendingAction(null);
     }
   };
@@ -186,9 +185,7 @@ export function MenuRoute({
     try {
       await openScreenshotMode(workingMode);
     } catch (openError) {
-      setError(
-        openError instanceof Error ? openError.message : translate('popup.home.openPrepError')
-      );
+      setError(getMenuBrowserActionError(openError, 'popup.home.openPrepError'));
     }
   };
 
@@ -423,4 +420,11 @@ function MenuToolbarButton({
       <span className={HOVER_LIFT_CLASS_NAME}>{translate(labelKey)}</span>
     </button>
   );
+}
+function getMenuBrowserActionError(error: unknown, summaryKey: TranslationKey): string {
+  return createUserFacingErrorMessage({
+    cause: error,
+    detail: 'browserCommunication',
+    summaryKey,
+  });
 }

@@ -16,6 +16,10 @@ import {
   createWorkspaceTimelineSelectionActions,
 } from './timeline-actions';
 import { createWorkspaceTimelineInsertionActions } from './timeline-insertion';
+import {
+  canEditProjectClip,
+  canSplitProjectClipAtTime,
+} from '../../../../features/video/project/timeline';
 
 type TimelineImportHandlers = Pick<
   VideoEditorActionHandlers,
@@ -77,6 +81,11 @@ function createWorkspaceTimelineState(
   workspace: TimelineStateWorkspace
 ) {
   return {
+    canEditSelectedClip:
+      store.selectedClipId !== null && canEditProjectClip(project, store.selectedClipId),
+    canSplitSelectedClip:
+      store.selectedClipId !== null &&
+      canSplitProjectClipAtTime(project, store.selectedClipId, store.currentTime),
     currentTime: store.currentTime,
     isPlaying: store.isPlaying,
     magnetEnabled: workspace.grid.magnetEnabled,

@@ -114,10 +114,20 @@ describe('workspace-sidebar/selection/inspect-effects', () => {
   it('renders grouped transition inspector metadata for non-crossfade presets', () => {
     renderInspectPanel();
 
-    expect(container?.textContent).toContain('videoEditor.sidebar.inspectorGroupTemplate');
-    expect(container?.textContent).toContain('videoEditor.sidebar.inspectorGroupTiming');
-    expect(container?.textContent).toContain('videoEditor.sidebar.inspectorGroupStatus');
-    expect(container?.textContent).toContain('videoEditor.sidebar.inspectorGroupStyle');
+    expect(
+      container?.querySelector(
+        'nav button[aria-label="videoEditor.sidebar.inspectorGroupTemplate"]'
+      )
+    ).not.toBeNull();
+    expect(
+      container?.querySelector('nav button[aria-label="videoEditor.sidebar.inspectorGroupTiming"]')
+    ).not.toBeNull();
+    expect(
+      container?.querySelector('nav button[aria-label="videoEditor.sidebar.inspectorGroupStatus"]')
+    ).not.toBeNull();
+    expect(
+      container?.querySelector('nav button[aria-label="videoEditor.sidebar.inspectorGroupStyle"]')
+    ).not.toBeNull();
     expect(container?.textContent).toContain('videoEditor.sidebar.transitionLightSweep');
 
     clickGroup('videoEditor.sidebar.inspectorGroupSummary');
@@ -144,8 +154,9 @@ function renderInspectPanel() {
 }
 
 function clickGroup(title: string) {
-  const button = container?.querySelector<HTMLButtonElement>(`button[title="${title}"]`);
+  const button = container?.querySelector<HTMLElement>(`nav button[title="${title}"]`);
   act(() => {
-    button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    if (!button?.parentElement?.hasAttribute('open'))
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 }

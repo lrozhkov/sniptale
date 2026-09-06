@@ -1,12 +1,29 @@
 import { ZipCentralDirectoryError, type ZipCentralDirectoryErrorCode } from './errors.js';
 
-export function decodeAsciiPath(bytes: Uint8Array): string {
+export function decodeZipPath(bytes: Uint8Array, utf8: boolean): string {
   if (bytes.byteLength === 0) fail('archive-invalid', 'ZIP entry name is empty.');
+  if (utf8) return decodeUtf8Path(bytes);
   let result = '';
   for (const byte of bytes) {
     if (byte < 0x20 || byte > 0x7e)
       fail('archive-invalid', 'ZIP entry names must be printable ASCII.');
     result += String.fromCharCode(byte);
+  }
+  return result;
+}
+
+function decodeUtf8Path(bytes: Uint8Array): string {
+  let result: string;
+  try {
+    result = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    fail('archive-invalid', 'ZIP entry name is not valid UTF-8.');
+  }
+  for (const character of result) {
+    const codePoint = character.codePointAt(0)!;
+    if (codePoint <= 0x1f || (codePoint >= 0x7f && codePoint <= 0x9f)) {
+      fail('archive-invalid', 'ZIP entry name contains a control character.');
+    }
   }
   return result;
 }

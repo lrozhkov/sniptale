@@ -428,6 +428,19 @@ function prepareBorderTagAssignment(
   };
 }
 
+function resolvePresetTagUpdate<Preset extends { id: string; tagIds: readonly string[] }>(
+  presets: readonly Preset[],
+  presetId: string,
+  tagIds: string[]
+): AnnotationTemplateTagMutationResult | { presets: Preset[] } {
+  const current = presets.find((preset) => preset.id === presetId);
+  if (!current) return { outcome: 'rejected', reason: 'not-found' };
+  if (sameTagIds(current.tagIds, tagIds)) return { outcome: 'unchanged' };
+  return {
+    presets: presets.map((preset) => (preset.id === presetId ? { ...preset, tagIds } : preset)),
+  };
+}
+
 function prepareCalloutTagAssignment(
   value: unknown,
   presetId: string,
@@ -442,15 +455,9 @@ function prepareCalloutTagAssignment(
   )
     return { outcome: 'unsafe-storage' };
   const catalog = resolveStoredCalloutPresetCatalog(parsed.value);
-  const current = catalog.presets.find((preset) => preset.id === presetId);
-  if (!current) return { outcome: 'rejected', reason: 'not-found' };
-  if (sameTagIds(current.tagIds, tagIds)) return { outcome: 'unchanged' };
-  const next = {
-    ...catalog,
-    presets: catalog.presets.map((preset) =>
-      preset.id === presetId ? { ...preset, tagIds } : preset
-    ),
-  };
+  const update = resolvePresetTagUpdate(catalog.presets, presetId, tagIds);
+  if ('outcome' in update) return update;
+  const next = { ...catalog, presets: update.presets };
   return {
     commit: () => cacheCoordinatedCalloutPresetCatalog(next),
     key: CALLOUT_PRESETS_STORAGE_KEY,
@@ -472,15 +479,9 @@ function prepareStepBadgeTagAssignment(
   )
     return { outcome: 'unsafe-storage' };
   const catalog = resolveStoredStepBadgePresetCatalog(parsed.value);
-  const current = catalog.presets.find((preset) => preset.id === presetId);
-  if (!current) return { outcome: 'rejected', reason: 'not-found' };
-  if (sameTagIds(current.tagIds, tagIds)) return { outcome: 'unchanged' };
-  const next = {
-    ...catalog,
-    presets: catalog.presets.map((preset) =>
-      preset.id === presetId ? { ...preset, tagIds } : preset
-    ),
-  };
+  const update = resolvePresetTagUpdate(catalog.presets, presetId, tagIds);
+  if ('outcome' in update) return update;
+  const next = { ...catalog, presets: update.presets };
   return {
     commit: () => cacheCoordinatedStepBadgePresetCatalog(next),
     key: STEP_BADGE_PRESETS_STORAGE_KEY,

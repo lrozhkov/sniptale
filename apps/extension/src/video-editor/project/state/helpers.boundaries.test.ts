@@ -1,5 +1,8 @@
 import { expect, it } from 'vitest';
-import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../features/video/project/factories/creation';
 import {
   VideoProjectAssetType,
   VideoProjectClipType,
@@ -19,6 +22,7 @@ import { resetVideoEditorProjectHistory } from '../history';
 
 function createProjectState(): VideoEditorProjectState {
   const project = createEmptyVideoProject('Helpers');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
 
   return {
     currentTime: 1,
@@ -92,6 +96,7 @@ it('returns an empty patch when applying a project update without an active proj
 
 it('falls back from an incompatible preferred track and creates missing kinds', () => {
   const project = createEmptyVideoProject('Helpers');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const fallback = ensureTrackForKind(project, VideoTrackKind.PRIMARY, project.tracks[1]!.id);
   const created = ensureTrackForKind(
     {

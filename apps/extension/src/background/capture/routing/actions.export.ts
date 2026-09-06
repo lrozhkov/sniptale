@@ -3,7 +3,7 @@ import { createRouteErrorResponse } from '../../routing-contracts/response';
 import type { SendResponse } from './types';
 import type { RouteCaptureMessage } from './types';
 import type { PageAccessPort } from '../../routing-contracts/page-access-port';
-import { getPreauthorizedContentActionRouteMessage } from './authorization/content-action';
+import type { PreauthorizedContentActionBinding } from '../../routing-contracts/capabilities/content-action/route';
 import {
   registerFullPageExportRun,
   throwIfFullPageCaptureAborted,
@@ -13,9 +13,10 @@ export function handleExportCaptureFullPage(
   message: Extract<RouteCaptureMessage, { type: 'EXPORT_CAPTURE_FULL_PAGE' }>,
   resolvedTabId: number,
   sendResponse: SendResponse,
-  pageAccessPort?: PageAccessPort
+  pageAccessPort?: PageAccessPort,
+  contentPreauthorization?: PreauthorizedContentActionBinding
 ): boolean {
-  const binding = getPreauthorizedContentActionRouteMessage(message);
+  const binding = contentPreauthorization;
   if (!binding || binding.tabId !== resolvedTabId) {
     sendResponse(createRouteErrorResponse('Full-page export document binding is unavailable'));
     return true;

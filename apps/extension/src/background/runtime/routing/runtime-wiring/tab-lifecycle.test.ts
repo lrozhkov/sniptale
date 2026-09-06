@@ -2,8 +2,15 @@ import { expect, it, vi } from 'vitest';
 
 const pinSessionMocks = vi.hoisted(() => ({
   clearAnnotationForkSessionForTab: vi.fn(),
+  clearRecentCaptureEditorAssetCapabilitiesForTab: vi.fn(),
   clearPinnedToolbarOperationState: vi.fn(),
   clearPinToTabSessionStorageState: vi.fn(),
+}));
+
+vi.mock('../../../capture/editor/recent-asset-capability', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../capture/editor/recent-asset-capability')>()),
+  clearRecentCaptureEditorAssetCapabilitiesForTab:
+    pinSessionMocks.clearRecentCaptureEditorAssetCapabilitiesForTab,
 }));
 
 vi.mock('../../../annotation-fork-session/route', async (importOriginal) => ({
@@ -61,6 +68,7 @@ it('restores screenshot ownership before clearing mode state on tab removal', as
   expect(state.quickEditModeState.has(7)).toBe(false);
   expect(state.viewportState.has(7)).toBe(false);
   expect(handleTabClose).toHaveBeenCalledWith(7);
+  expect(pinSessionMocks.clearRecentCaptureEditorAssetCapabilitiesForTab).toHaveBeenCalledWith(7);
   expect(pinSessionMocks.clearPinnedToolbarOperationState).toHaveBeenCalledWith(7);
   expect(pinSessionMocks.clearPinToTabSessionStorageState).toHaveBeenCalledWith(7);
   expect(pinSessionMocks.clearAnnotationForkSessionForTab).toHaveBeenCalledWith(7);
