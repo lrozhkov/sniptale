@@ -54,19 +54,11 @@ function VideoEditorProjectTitle({
 function VideoEditorSaveStateBadge({
   saveStateMeta,
 }: Pick<VideoEditorDocumentBarProps['header'], 'saveStateMeta'>) {
-  const dotClassName =
-    saveStateMeta.state === 'error'
-      ? 'bg-[var(--sniptale-color-danger)]'
-      : saveStateMeta.state === 'saving'
-        ? 'animate-pulse bg-[var(--sniptale-color-info)]'
-        : saveStateMeta.state === 'dirty'
-          ? 'bg-[var(--sniptale-color-warning)]'
-          : 'bg-[var(--sniptale-color-success)]';
+  if (saveStateMeta.state !== 'error') return null;
   return (
-    <ValueBadge className={saveStateMeta.className}>
-      <span aria-hidden="true" className={`mr-1.5 h-1.5 w-1.5 rounded-full ${dotClassName}`} />
-      <span aria-live="polite">{saveStateMeta.label}</span>
-      {saveStateMeta.state === 'error' ? (
+    <span role="alert">
+      <ValueBadge className={saveStateMeta.className}>
+        {translate('videoEditor.app.saveChangesFailed')}
         <button
           type="button"
           className="ml-2 font-semibold underline underline-offset-2"
@@ -74,8 +66,8 @@ function VideoEditorSaveStateBadge({
         >
           {translate('common.actions.retry')}
         </button>
-      ) : null}
-    </ValueBadge>
+      </ValueBadge>
+    </span>
   );
 }
 

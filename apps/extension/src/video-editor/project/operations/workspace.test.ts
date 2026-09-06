@@ -297,3 +297,31 @@ async function verifyProjectQueryMigrationPath() {
     originRecordingId: 'recording-1',
   });
 }
+
+it('retains an existing temporary project before presenting it for editing', async () => {
+  const project = createEmptyVideoProject();
+  getVideoProject.mockResolvedValue({
+    status: 'ready',
+    project,
+    workspaceRevision: 4,
+    lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: project.updatedAt },
+  });
+  saveVideoProject.mockResolvedValue(project);
+  await expect(openPersistedProject(project.id)).resolves.toEqual(project);
+  expect(saveVideoProject).toHaveBeenCalledWith(project, {
+    baseRevision: project.updatedAt,
+    expectedWorkspaceRevision: 4,
+  });
+});
+
+it('does not open a temporary project as saved when library retention fails', async () => {
+  const project = createEmptyVideoProject();
+  getVideoProject.mockResolvedValue({
+    status: 'ready',
+    project,
+    workspaceRevision: 4,
+    lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: project.updatedAt },
+  });
+  saveVideoProject.mockRejectedValue(new Error('Storage unavailable'));
+  await expect(openPersistedProject(project.id)).rejects.toThrow('Storage unavailable');
+});

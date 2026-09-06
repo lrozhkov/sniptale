@@ -260,5 +260,12 @@ export async function openPersistedProject(projectId: string): Promise<VideoProj
     );
   }
 
-  return migratePersistedRecordingAssets(persistedProject);
+  const retainedProject =
+    result.status === 'ready' && result.lifecycle?.storageClass === 'temporary'
+      ? await commitVideoProjectMutation(persistedProject, {
+          baseRevision: persistedProject.updatedAt,
+          expectedWorkspaceRevision: result.workspaceRevision,
+        })
+      : persistedProject;
+  return migratePersistedRecordingAssets(retainedProject);
 }

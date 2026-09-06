@@ -283,7 +283,6 @@ it('commits a video workspace with explicit placement and returns its durable re
   await expect(
     commitVideoProjectWorkspaceMutation(project, {
       expectedWorkspaceRevision: null,
-      storageClass: 'library',
     })
   ).resolves.toEqual({
     project: expect.objectContaining({ id: project.id, name: 'Workspace commit' }),
@@ -297,7 +296,7 @@ it('commits a video workspace with explicit placement and returns its durable re
   );
 });
 
-it('uses the configured default placement for a new video workspace', async () => {
+it('saves a new video workspace directly in the library despite the capture default', async () => {
   const { commitVideoProjectWorkspaceMutation } = await import('./index-mutations');
   const project = createVideoProject({ id: 'default-workspace' });
   projectsDbMocks.txGetMock.mockResolvedValue(undefined);
@@ -310,7 +309,7 @@ it('uses the configured default placement for a new video workspace', async () =
   });
   expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
     expect.objectContaining({
-      lifecycle: expect.objectContaining({ storageClass: 'temporary' }),
+      lifecycle: expect.objectContaining({ storageClass: 'library' }),
       workspaceRevision: 1,
     })
   );
@@ -341,4 +340,22 @@ it('uses now as createdAt fallback and ignores externally owned assets while sav
     })
   );
   expect(projectsDbMocks.txDeleteMock).not.toHaveBeenCalled();
+});
+
+it('retains a temporary project in the library with its next revisioned workspace commit', async () => {
+  vi.spyOn(Date, 'now').mockReturnValue(1000);
+  const { commitVideoProjectWorkspaceMutation } = await import('./index-mutations');
+  const project = createVideoProject({ updatedAt: 500 });
+  projectsDbMocks.txGetMock.mockResolvedValue({
+    ...createVideoProjectEntry(project),
+    workspaceRevision: 7,
+    lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: 500 },
+  });
+  await commitVideoProjectWorkspaceMutation(project, { expectedWorkspaceRevision: 7 });
+  expect(projectsDbMocks.txPutMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      lifecycle: { storageClass: 'library', savedAt: 1000, updatedAt: 1000 },
+      workspaceRevision: 8,
+    })
+  );
 });

@@ -173,6 +173,7 @@ export interface DiagnosticsTelemetryPort extends Pick<
 }
 
 export interface VideoEditorProjectStorageStatus {
+  projectId: string | null;
   projectUpdatedAt: number | null;
   saveState: VideoEditorSaveState;
 }

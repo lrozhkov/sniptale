@@ -21,8 +21,7 @@ const logger = createLogger({ namespace: 'OffscreenMultiSourceFinalize' });
 async function createProjectForSession(
   videos: MultiSourceRecordingProjectAssetInput[],
   microphoneAudio: MultiSourceAudioProjectAssetInput | null,
-  webcamVideo: ReturnType<typeof createWebcamProjectInput>,
-  storageClass: 'temporary' | 'library'
+  webcamVideo: ReturnType<typeof createWebcamProjectInput>
 ): Promise<string | null> {
   try {
     const project = createVideoProjectFromMultiSourceRecording({
@@ -31,7 +30,7 @@ async function createProjectForSession(
       videos,
       webcamVideo,
     });
-    await commitVideoProjectMutation(project, { baseRevision: null, storageClass });
+    await commitVideoProjectMutation(project, { baseRevision: null });
     return project.id;
   } catch (error) {
     logger.error('Failed to create a multi-source project; preserving raw recordings', error);
@@ -191,12 +190,7 @@ export async function finalizeSession(session: MultiSourceSession): Promise<void
   const videos = buildVideoProjectInputs(session, duration);
   const microphoneAudio = buildMicrophoneProjectInput(session.audioRecorder, duration);
   const webcamVideo = createWebcamProjectInput(session.webcamRecorder, duration);
-  const projectId = await createProjectForSession(
-    videos,
-    microphoneAudio,
-    webcamVideo,
-    storageClass
-  );
+  const projectId = await createProjectForSession(videos, microphoneAudio, webcamVideo);
   const publishedCompletion = { ...completion, projectId };
   if (projectId !== null) {
     await updateVideoRecordingCompletionOutbox(publishedCompletion);

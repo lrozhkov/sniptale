@@ -287,6 +287,7 @@ export function useVideoEditorDiagnosticsTelemetryPort<Selection>(
 export function useVideoEditorProjectStorageStatus(): VideoEditorProjectStorageStatus {
   return useVideoEditorStore(
     useShallow((state) => ({
+      projectId: state.project?.id ?? null,
       projectUpdatedAt: state.project?.updatedAt ?? null,
       saveState: state.saveState,
     }))

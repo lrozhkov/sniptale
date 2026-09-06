@@ -1,6 +1,7 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorAppMessages = defineMessageSource({
+  saveChangesFailed: { ru: 'Не удалось сохранить изменения', en: 'Changes could not be saved' },
   clipOrder: { ru: 'Порядок клипа', en: 'Clip order' },
   clipEarlier: { ru: 'Раньше', en: 'Earlier' },
   clipLater: { ru: 'Позже', en: 'Later' },

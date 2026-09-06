@@ -64,7 +64,11 @@ import {
 } from './read-guards';
 import { isHydratableVideoProject } from '../../../features/video/project/validation';
 import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../features/video/project/effect-instance';
-import { createLibraryLifecycle, updateLibraryLifecycle } from '../library-lifecycle/contracts';
+import {
+  createLibraryLifecycle,
+  promoteLibraryLifecycle,
+  updateLibraryLifecycle,
+} from '../library-lifecycle/contracts';
 
 export { deleteVideoProject } from './index.delete.ts';
 export * from './index.exports.ts';
@@ -110,12 +114,7 @@ export async function saveVideoProject(
       },
       createdAt: existing?.createdAt ?? candidate.createdAt,
       updatedAt: now,
-      lifecycle: existing
-        ? updateLibraryLifecycle(
-            existing.lifecycle ?? createLibraryLifecycle('library', existing.updatedAt),
-            now
-          )
-        : createLibraryLifecycle(options.storageClass ?? 'library', now),
+      lifecycle: buildSavedProjectLifecycle(existing, options, now),
       workspaceRevision: (existing?.workspaceRevision ?? 0) + 1,
     };
 
@@ -149,6 +148,20 @@ export async function saveVideoProject(
   });
   if (physicalDelete.assetIds.length > 0) await completePhysicalDeleteOperation(physicalDelete);
   return saved;
+}
+
+function buildSavedProjectLifecycle(
+  existing: VideoProjectEntry | null,
+  options: SaveVideoProjectOptions,
+  now: number
+) {
+  const lifecycle = existing
+    ? (existing.lifecycle ?? createLibraryLifecycle('library', existing.updatedAt))
+    : createLibraryLifecycle(options.storageClass ?? 'library', now);
+  return updateLibraryLifecycle(
+    options.storageClass === 'library' ? promoteLibraryLifecycle(lifecycle, now) : lifecycle,
+    now
+  );
 }
 
 async function prepareVideoProjectSave(project: VideoProject): Promise<VideoProject> {
