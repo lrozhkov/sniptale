@@ -117,7 +117,11 @@ export function trimProjectClipStart(
         return item.duration - delta < 0.1;
       }
 
-      return item.sourceDuration - getSourceTimedClipSourceOffset(item, delta) < 0.1;
+      const sourceDelta = getSourceTimedClipSourceOffset(item, delta);
+      return (
+        item.sourceStart + sourceDelta < -TIMELINE_GAP_EPSILON ||
+        item.sourceDuration - sourceDelta < 0.1
+      );
     })
   ) {
     return project;
