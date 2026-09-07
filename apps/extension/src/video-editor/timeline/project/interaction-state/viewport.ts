@@ -1,7 +1,7 @@
 import type { ProjectTimelineProps } from '../types';
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 
-import { clampTimelinePixelsPerSecond } from './zoom';
+import { clampTimelineScale } from '../../../contracts/timeline-scale';
 
 const FALLBACK_TIMELINE_VIEWPORT_WIDTH = 960;
 const TIMELINE_FIT_VIEWPORT_PADDING = 96;
@@ -29,7 +29,7 @@ export function useTimelineViewportWidth(
 
 function resolveTimelineFitPixelsPerSecond(duration: number, viewportWidth: number): number {
   const availableWidth = Math.max(240, viewportWidth - TIMELINE_FIT_VIEWPORT_PADDING);
-  return clampTimelinePixelsPerSecond(availableWidth / Math.max(0.5, duration));
+  return clampTimelineScale(availableWidth / Math.max(0.5, duration));
 }
 
 export function useProjectTimelineViewState(
@@ -78,6 +78,6 @@ export function useProjectTimelineViewState(
     fitSelectionDuration,
     onFitProject,
     onFitSelection,
-    visibleRangeSeconds: viewportWidth / Math.max(1, pixelsPerSecond),
+    visibleRangeSeconds: viewportWidth / clampTimelineScale(pixelsPerSecond),
   };
 }

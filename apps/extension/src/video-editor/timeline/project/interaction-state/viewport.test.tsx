@@ -55,7 +55,7 @@ it('supersedes a pending selection fit with project overview and restores the be
   act(() => controls.onFitProject());
   render(280);
   expect(scroll().scrollLeft).toBe(400);
-  render(12);
+  render(9.04);
   expect(scroll().scrollLeft).toBe(0);
 });
 
@@ -65,4 +65,18 @@ it('ignores fit selection when no clip is selected', () => {
   act(() => controls.onFitSelection());
   expect(onZoomChange).not.toHaveBeenCalled();
   expect(scroll().scrollLeft).toBe(400);
+});
+
+it('fits the admitted 24-hour project into the viewport with fractional scale', () => {
+  const originalDuration = project.duration;
+  project.duration = 86400;
+  try {
+    render(90);
+    act(() => controls.onFitProject());
+    const requested = onZoomChange.mock.lastCall?.[0] as number;
+    expect(requested).toBeGreaterThan(0);
+    expect(requested * 86400).toBeLessThanOrEqual(1000);
+  } finally {
+    project.duration = originalDuration;
+  }
 });

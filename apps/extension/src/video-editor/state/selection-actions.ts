@@ -1,3 +1,4 @@
+import { clampTimelineScale } from '../contracts/timeline-scale';
 import type { StateCreator } from 'zustand';
 import { clampNumber } from '../../features/video/project/hydration';
 import { resolvePlacementModeAfterSelectionChange } from '../project/selection/placement';
@@ -18,7 +19,7 @@ export function createSelectionStateActions(set: VideoEditorStoreSet) {
     setPlaying: (isPlaying: boolean) => set({ isPlaying }),
     togglePlaying: () => set((state) => ({ isPlaying: !state.isPlaying })),
     setPixelsPerSecond: (pixelsPerSecond: number) =>
-      set({ pixelsPerSecond: clampNumber(pixelsPerSecond, 12, 320) }),
+      set({ pixelsPerSecond: clampTimelineScale(pixelsPerSecond) }),
     selectScene: createSelectSceneAction(set),
     selectTrack: createSelectTrackAction(set),
     selectClip: createSelectClipAction(set),

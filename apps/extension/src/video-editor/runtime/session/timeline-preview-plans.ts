@@ -1,3 +1,4 @@
+import { clampTimelineScale } from '../../contracts/timeline-scale';
 import { normalizeClipPlaybackRate } from '../../../features/video/project/timeline/basics';
 import { getMediaClipSourceTime } from '../../../features/video/project/timeline';
 import {
@@ -155,7 +156,7 @@ function buildVideoPreviewSourceSlots(
 
   const rate = normalizeClipPlaybackRate(clip.playbackRate ?? 1);
   const desiredStep = viewport
-    ? Math.max(1 / 30, (64 / Math.max(1, viewport.pixelsPerSecond)) * rate)
+    ? Math.max(1 / 30, (64 / clampTimelineScale(viewport.pixelsPerSecond)) * rate)
     : STORYBOARD_SLOT_SECONDS;
   const step = viewport ? 2 ** Math.floor(Math.log2(desiredStep)) : desiredStep;
   const firstSlot = Math.floor(start / step);

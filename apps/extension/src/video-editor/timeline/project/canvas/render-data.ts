@@ -1,3 +1,4 @@
+import { clampTimelineScale } from '../../../contracts/timeline-scale';
 import { formatTimelineRulerLabel } from '../interaction-state/helpers';
 
 interface ProjectTimelineRulerMarker {
@@ -19,10 +20,11 @@ export function buildProjectTimelineRulerMarkers(
   viewport: { startTime: number; endTime: number }
 ): ProjectTimelineRulerMarker[] {
   const spanSeconds = resolveTimelineRulerSpanSeconds(pixelsPerSecond);
-  const overscanSeconds = 120 / Math.max(1, pixelsPerSecond);
+  const overscanSeconds = 120 / clampTimelineScale(pixelsPerSecond);
   const firstIndex = Math.floor(Math.max(0, viewport.startTime - overscanSeconds) / spanSeconds);
   const lastIndex = Math.ceil(
-    (Math.min(timelineWidth / Math.max(1, pixelsPerSecond), viewport.endTime) + overscanSeconds) /
+    (Math.min(timelineWidth / clampTimelineScale(pixelsPerSecond), viewport.endTime) +
+      overscanSeconds) /
       spanSeconds
   );
   return Array.from({ length: Math.max(0, lastIndex - firstIndex + 1) }, (_, index) => {
@@ -79,7 +81,7 @@ function roundWaveformPoint(value: number): number {
 }
 
 function resolveTimelineRulerSpanSeconds(pixelsPerSecond: number): number {
-  const candidateSteps = [1, 5, 10, 20, 30, 60];
+  const candidateSteps = [1, 5, 10, 20, 30, 60, 120, 300, 600, 1800, 3600, 7200, 14400, 28800];
   const minimumStepWidth = 88;
 
   for (const step of candidateSteps) {

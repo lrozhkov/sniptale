@@ -131,3 +131,7 @@ it('bounds unused decoded frames while retaining every active viewport sample', 
     revoke.mockRestore();
   }
 });
+
+it('uses overview pixel density for sparse source samples', () => {
+  expect(samplesFor(2, 200, { startTime: 0, endTime: 1000, pixelsPerSecond: 0.01 })).toEqual([2]);
+});

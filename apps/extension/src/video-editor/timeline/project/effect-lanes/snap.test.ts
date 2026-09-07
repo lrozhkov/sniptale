@@ -57,3 +57,10 @@ it('preserves motion-region targets for the existing effect snapping policy', ()
     time: 6.4,
   });
 });
+
+it('keeps the snap threshold in screen pixels at overview scale', () => {
+  const project = createEmptyVideoProject('Overview snap');
+  project.duration = 10000;
+  expect(resolveTimelineSnap(500, project, 0.01).targetTime).toBe(0);
+  expect(resolveTimelineSnap(900, project, 0.01).targetTime).toBeNull();
+});

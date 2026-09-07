@@ -157,7 +157,7 @@ function expectPlaybackStateClamp(store: ReturnType<typeof createSelectionStore>
     currentTime: 0,
     diagnosticsOpen: true,
     isPlaying: true,
-    pixelsPerSecond: 12,
+    pixelsPerSecond: 1,
   });
 }
 

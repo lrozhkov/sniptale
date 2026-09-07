@@ -1,3 +1,4 @@
+import { clampTimelineScale } from '../../../contracts/timeline-scale';
 import { getClipEndTime } from '../../../../features/video/project/timeline';
 import type { VideoProject } from '../../../../features/video/project/types';
 
@@ -29,7 +30,7 @@ export function resolveTimelineSnap(
   pixelsPerSecond: number,
   options: TimelineSnapOptions = {}
 ): TimelineSnapResult {
-  const threshold = TIMELINE_MAGNET_THRESHOLD_PX / Math.max(1, pixelsPerSecond);
+  const threshold = TIMELINE_MAGNET_THRESHOLD_PX / clampTimelineScale(pixelsPerSecond);
   const candidate = getTimelineMagnetTimes(project, options).reduce<{
     distance: number;
     time: number;

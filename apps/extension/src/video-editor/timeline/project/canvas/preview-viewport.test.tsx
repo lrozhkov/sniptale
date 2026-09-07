@@ -144,3 +144,9 @@ it('republishes resized viewports and releases the resize observer on unmount', 
   root = null;
   expect(disconnect).toHaveBeenCalledOnce();
 });
+
+it('reports the actual time span at fractional overview scale', () => {
+  const viewports: TimelinePreviewViewport[] = [];
+  renderHarness(1, viewports, 0.01);
+  expect(viewports).toEqual([{ startTime: 0, endTime: 40000, pixelsPerSecond: 0.01 }]);
+});

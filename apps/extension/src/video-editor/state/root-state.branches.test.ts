@@ -122,7 +122,7 @@ it('covers playback and project action helpers in the timeline state owner', () 
     error: 'timeline-error',
     isPlaying: true,
     isReady: false,
-    pixelsPerSecond: 12,
+    pixelsPerSecond: 10,
     saveState: 'saved',
   });
   expect(timeline.getState().project?.name).toBe('Updated demo');

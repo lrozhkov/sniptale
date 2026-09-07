@@ -62,3 +62,11 @@ it('retains bounded coverage at the last viewport and after returning to the sta
   expect(start.length).toBeLessThan(10);
   expect(start[0]?.second).toBe(0);
 });
+
+it('keeps readable bounded ruler steps for a 24-hour overview', () => {
+  const scale = 1000 / 86400;
+  const markers = buildProjectTimelineRulerMarkers(1000, scale, { startTime: 0, endTime: 86400 });
+  expect(markers.length).toBeLessThan(16);
+  expect(markers.every((marker) => marker.spanSeconds * scale >= 88)).toBe(true);
+  expect(markers.at(-1)!.second).toBeGreaterThanOrEqual(86400);
+});

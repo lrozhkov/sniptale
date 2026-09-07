@@ -1,3 +1,4 @@
+import { clampTimelineScale } from '../../../contracts/timeline-scale';
 import { useCallback, useEffect, useRef } from 'react';
 import type { TimelinePreviewViewport } from '../../../contracts/timeline-preview';
 
@@ -50,7 +51,7 @@ function resolveTimelinePreviewViewport(
     return { endTime: 0, startTime: 0, pixelsPerSecond };
   }
 
-  const pixelsPerSecondSafe = Math.max(1, pixelsPerSecond);
+  const pixelsPerSecondSafe = clampTimelineScale(pixelsPerSecond);
   const startTime = timelineElement.scrollLeft / pixelsPerSecondSafe;
   const endTime = (timelineElement.scrollLeft + timelineElement.clientWidth) / pixelsPerSecondSafe;
   return { endTime: Math.max(startTime, endTime), startTime, pixelsPerSecond: pixelsPerSecondSafe };
