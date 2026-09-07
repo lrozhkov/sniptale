@@ -274,7 +274,9 @@ test('video editor surfaces detached export failures and supports retry or close
 
   const failureDialog = page.getByRole('alertdialog');
   await expect(failureDialog).toContainText(VIDEO_EDITOR_EXPORT_FAILURE_TITLE);
-  await expect(failureDialog).toContainText('EffectV1 render failed');
+  await expect(failureDialog).not.toContainText('EffectV1 render failed');
+  await expect(failureDialog).toHaveAttribute('aria-modal', 'true');
+  await expect(failureDialog.getByRole('button').first()).toBeFocused();
   await failureDialog
     .getByRole('button', { name: VIDEO_EDITOR_EXPORT_FAILURE_RETRY_LABEL, exact: true })
     .click();
@@ -294,9 +296,12 @@ test('video editor surfaces detached export failures and supports retry or close
     targetDocumentId: E2E_VIDEO_EDITOR_DOCUMENT_ID,
     targetSenderUrl,
   });
-  await expect(failureDialog).toContainText('Retry failed');
+  await expect(failureDialog).toBeVisible();
+  await expect(failureDialog).not.toContainText('Retry failed');
+  await expect(failureDialog.getByRole('button').first()).toBeFocused();
   await failureDialog
     .getByRole('button', { name: VIDEO_EDITOR_EXPORT_FAILURE_CLOSE_LABEL, exact: true })
+    .last()
     .click();
   await expect(failureDialog).toBeHidden();
 });

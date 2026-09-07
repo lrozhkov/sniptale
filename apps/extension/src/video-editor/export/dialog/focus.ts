@@ -4,7 +4,9 @@ import { getOwnedFloatingInteractionLayers } from '@sniptale/ui/floating-interac
 /** Export owns Tab order across its form and portaled selects; select navigation stays local. */
 export function useExportDialogFocus(rootRef: RefObject<HTMLDivElement | null>) {
   useLayoutEffect(() => {
-    const dialog = rootRef.current?.querySelector<HTMLElement>('[role="dialog"]');
+    const dialog = rootRef.current?.querySelector<HTMLElement>(
+      '[role="dialog"], [role="alertdialog"]'
+    );
     if (!dialog) return;
     const document = dialog.ownerDocument;
     const opener = document.activeElement;

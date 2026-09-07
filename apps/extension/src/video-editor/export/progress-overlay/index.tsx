@@ -22,6 +22,7 @@ const PHASE_MESSAGES = {
 } as const;
 
 interface ExportProgressOverlayProps {
+  cancellationFailed?: boolean;
   status: VideoProjectExportStatus;
   onCancel: () => void;
 }
@@ -29,6 +30,7 @@ interface ExportProgressOverlayProps {
 export const ExportProgressOverlay: React.FC<ExportProgressOverlayProps> = ({
   status,
   onCancel,
+  cancellationFailed = false,
 }) => {
   useAppLocale();
   const rootRef = useRef<HTMLDivElement>(null);
@@ -70,6 +72,11 @@ export const ExportProgressOverlay: React.FC<ExportProgressOverlayProps> = ({
               style={{ width: `${progress}%` }}
             />
           </div>
+          {cancellationFailed ? (
+            <p role="alert" className="text-sm text-[var(--sniptale-color-danger)]">
+              {translate('videoEditor.progress.cancelFailed')}
+            </p>
+          ) : null}
         </ProductModalBody>
         <ProductModalFooter compact className="justify-end">
           <ProductActionButton compact tone="secondary" onClick={onCancel}>

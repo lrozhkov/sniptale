@@ -152,6 +152,7 @@ export function cancelExportState(
 ): VideoEditorExportRuntimeState {
   return {
     ...exportState,
+    error: null,
     isRunning: false,
     jobId: null,
     status: {

@@ -16,7 +16,7 @@ import { ExportProgressOverlay } from './index';
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-function renderOverlay(onCancel = vi.fn()) {
+function renderOverlay(onCancel = vi.fn(), cancellationFailed = false) {
   if (!container) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -27,6 +27,7 @@ function renderOverlay(onCancel = vi.fn()) {
     root?.render(
       <ExportProgressOverlay
         onCancel={onCancel}
+        cancellationFailed={cancellationFailed}
         status={{
           message: 'Muxing project output',
           phase: VideoProjectExportPhase.TRANSCODING,
@@ -97,6 +98,23 @@ describe('ExportProgressOverlay', () => {
     root = null;
     expect(document.activeElement).toBe(opener);
     opener.remove();
+  });
+
+  it('keeps the active cancel control and progress when cancellation fails', () => {
+    const onCancel = renderOverlay();
+    const cancel = container?.querySelector('button');
+    renderOverlay(onCancel, true);
+    expect(container?.querySelector('[role="alert"]')?.textContent).toBe(
+      'videoEditor.progress.cancelFailed'
+    );
+    expect(container?.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe(
+      '60'
+    );
+    expect(document.activeElement).toBe(cancel);
+    act(() => cancel?.click());
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    renderOverlay(onCancel, false);
+    expect(container?.querySelector('[role="alert"]')).toBeNull();
   });
 
   it('routes cancel through the shared footer action', () => {

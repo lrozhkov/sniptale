@@ -9,6 +9,10 @@ export const videoEditorProgressMessages = defineMessageSource({
     ru: 'Отменить',
     en: 'Cancel',
   },
+  cancelFailed: {
+    ru: 'Не удалось отменить экспорт. Он продолжается — попробуйте отменить ещё раз.',
+    en: 'Could not cancel the export. It is still running — try cancelling again.',
+  },
   preparing: { ru: 'Подготовка видео', en: 'Preparing video' },
   rendering: { ru: 'Создание видео', en: 'Rendering video' },
   transcoding: { ru: 'Обработка видео', en: 'Processing video' },
