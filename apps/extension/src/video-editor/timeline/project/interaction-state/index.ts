@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { VideoEditorTrackHeightMultiplier } from '../../../persistence/track-panel';
 import { useProjectTimelineEffectInteractions } from '../effect-lanes/interactions';
 import type { ProjectTimelineProps } from '../types';
@@ -7,7 +7,7 @@ import { useProjectTimelineRangeSelection } from './range';
 import { useProjectTimelineScrollSync } from './scroll-sync';
 import { useTimelineSelectedTrackAutoScroll } from './selected-track-scroll';
 import { useProjectTimelineSeek } from './seek';
-import { resolveTimelineFitPixelsPerSecond, useTimelineViewportWidth } from './viewport';
+import { useProjectTimelineViewState, useTimelineViewportWidth } from './viewport';
 
 type TimelineRangeSelectionProps = Pick<
   ProjectTimelineProps,
@@ -164,36 +164,6 @@ function useProjectTimelineDerivedState(
   return { selectedClip, timelineWidth };
 }
 
-function useProjectTimelineViewState(
-  {
-    onZoomChange,
-    pixelsPerSecond,
-    project,
-  }: Pick<ProjectTimelineProps, 'onZoomChange' | 'pixelsPerSecond' | 'project'>,
-  selectedClip: ReturnType<typeof useProjectTimelineDerivedState>['selectedClip'],
-  viewportWidth: number
-) {
-  const fitSelectionDuration = selectedClip?.duration ?? null;
-  const visibleRangeSeconds = viewportWidth / Math.max(1, pixelsPerSecond);
-  const onFitProject = useCallback(() => {
-    onZoomChange(resolveTimelineFitPixelsPerSecond(project.duration, viewportWidth));
-  }, [onZoomChange, project.duration, viewportWidth]);
-  const onFitSelection = useCallback(() => {
-    if (fitSelectionDuration === null) {
-      return;
-    }
-
-    onZoomChange(resolveTimelineFitPixelsPerSecond(fitSelectionDuration, viewportWidth));
-  }, [fitSelectionDuration, onZoomChange, viewportWidth]);
-
-  return {
-    fitSelectionDuration,
-    onFitProject,
-    onFitSelection,
-    visibleRangeSeconds,
-  };
-}
-
 export function useProjectTimelineState(
   props: ProjectTimelineProps,
   trackHeightByTrackId: TrackHeightState
@@ -208,7 +178,12 @@ export function useProjectTimelineState(
     selectedClipId,
     viewportWidth
   );
-  const viewState = useProjectTimelineViewState(props, selectedClip, viewportWidth);
+  const viewState = useProjectTimelineViewState(
+    props,
+    selectedClip,
+    viewportWidth,
+    playback.timelineRef
+  );
   const [hoveredClipId, setHoveredClipId] = useState<string | null>(null);
   useTimelineSelectedTrackAutoScroll({
     selectedTrackId: props.selectedTrackId,
