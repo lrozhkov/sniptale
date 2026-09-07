@@ -116,6 +116,7 @@ function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
   const viewer = useWorkspacePreviewContext();
   const blocking = useVideoEditorBlockingOverlayContext();
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const removeUnusedAssets = useVideoEditorTimelineEditingPort((port) => port.removeUnusedAssets);
   const appendMaterial = useVideoEditorTimelineEditingPort((port) => port.appendMaterial);
   const insertMaterial = useVideoEditorTimelineEditingPort((port) => port.insertMaterial);
   const overlayMaterial = useVideoEditorTimelineEditingPort((port) => port.overlayMaterial);
@@ -192,6 +193,7 @@ function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
           >
             {props.materialsOpen && (
               <VideoEditorMaterials
+                onRemoveUnused={removeUnusedAssets}
                 onOpenLibrary={() => header?.onOpenLibraryPanel()}
                 project={preview.project}
                 onImport={preview.onImport}

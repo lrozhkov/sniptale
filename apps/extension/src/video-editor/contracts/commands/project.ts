@@ -41,6 +41,8 @@ export interface VideoEditorProjectActions
   toggleUtilityLaneLock: (lane: keyof VideoProjectUtilityLanes) => void;
   clearUtilityLane: (lane: keyof VideoProjectUtilityLanes) => void;
   upsertAsset: (asset: VideoProjectAsset) => void;
+  /** Removes unreferenced materials from the project while preserving history and source media. */
+  removeUnusedAssets: (assetIds?: readonly string[]) => void;
   appendMaterial: (
     assetId: string,
     range?: VideoEditorMaterialSourceRange

@@ -1,3 +1,4 @@
+import { undoVideoEditorProjectHistory, redoVideoEditorProjectHistory } from '../history';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import {
@@ -278,3 +279,33 @@ function verifyNumericGuardPaths(): void {
   expect(textClip.type === 'TEXT' && textClip.style.fontSize).toBe(40);
   expect(shapeClip.type === 'SHAPE' && shapeClip.style.borderRadius).toBe(18);
 }
+
+it('removes only unused requested materials and records one reversible project mutation', () => {
+  const store = createVideoEditorTestStore();
+  const used = createVideoAsset('Used');
+  const unused = { ...used, id: 'unused' };
+  const retained = { ...used, id: 'retained' };
+  store
+    .getState()
+    .setProject({ ...createEmptyVideoProject('Materials'), assets: [used, unused, retained] });
+  store.getState().addAssetClip(used);
+  const before = store.getState().project!;
+  store.getState().removeUnusedAssets([used.id, unused.id]);
+  expect(store.getState().project?.assets.map(({ id }) => id)).toEqual([used.id, retained.id]);
+  expect(before.assets).toHaveLength(3);
+  const after = store.getState().project;
+  const history = store.getState().projectHistory;
+  const undo = undoVideoEditorProjectHistory(history, after!);
+  expect(undo?.status).toBe('applied');
+  if (undo?.status !== 'applied') throw new Error('Expected undo');
+  expect(undo.project.assets.map(({ id }) => id)).toEqual([used.id, unused.id, retained.id]);
+  const redo = redoVideoEditorProjectHistory(undo.history, undo.project);
+  expect(redo?.status).toBe('applied');
+  if (redo?.status !== 'applied') throw new Error('Expected redo');
+  expect(redo.project.assets.map(({ id }) => id)).toEqual([used.id, retained.id]);
+  store.getState().removeUnusedAssets([used.id, 'missing']);
+  expect(store.getState().project).toBe(after);
+  expect(store.getState().projectHistory).toBe(history);
+  store.getState().removeUnusedAssets();
+  expect(store.getState().project?.assets).toEqual([used]);
+});

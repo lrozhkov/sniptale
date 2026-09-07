@@ -1,3 +1,4 @@
+import { getProjectAssetUseCounts } from '../../../features/video/project/media-usage';
 import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
 import type {
   VideoEditorProjectState,
@@ -35,6 +36,7 @@ type VideoEditorProjectActionKeys =
   | 'toggleUtilityLaneLock'
   | 'clearUtilityLane'
   | 'upsertAsset'
+  | 'removeUnusedAssets'
   | 'addAssetClip'
   | 'appendMaterial'
   | 'insertMaterial'
@@ -123,6 +125,19 @@ export function createVideoEditorProjectActions(
   return {
     ...trackActions,
     upsertAsset,
+    removeUnusedAssets: (assetIds) =>
+      set((state) =>
+        applyProjectUpdate(state, (project) => {
+          const used = getProjectAssetUseCounts(project);
+          const requested = assetIds ? new Set(assetIds) : null;
+          const assets = project.assets.filter(
+            (asset) => used.has(asset.id) || (requested !== null && !requested.has(asset.id))
+          );
+          return assets.length === project.assets.length
+            ? project
+            : applyVideoProjectMutationPatch(project, { assets });
+        })
+      ),
     ...insertionActions,
     ...clipTimelineActions,
     ...clipPropertyActions,

@@ -1,3 +1,4 @@
+import { createVideoClipFromAsset } from '../../../features/video/project/factories/clip';
 // @vitest-environment jsdom
 import { act } from 'react';
 import { useActiveCanvasInsertEscape } from '@sniptale/ui/canvas-tools';
@@ -41,10 +42,12 @@ function renderMaterials() {
   );
   project.assets = [asset];
   const onSelect = vi.fn();
+  const onRemoveUnused = vi.fn();
   const onImport = { audio: vi.fn(), image: vi.fn(), video: vi.fn() };
   act(() =>
     root.render(
       <VideoEditorMaterials
+        onRemoveUnused={onRemoveUnused}
         onOpenLibrary={onOpenLibrary}
         project={project}
         selectedAssetId={null}
@@ -53,7 +56,7 @@ function renderMaterials() {
       />
     )
   );
-  return { asset, onSelect, onImport, project };
+  return { asset, onSelect, onImport, project, onRemoveUnused };
 }
 
 it('opens the selected source without editing the timeline or filling the list with placement controls', () => {
@@ -106,6 +109,7 @@ it('dismisses Import before the armed canvas insertion and restores its trigger'
       <>
         <ArmedInsertion onCancel={onCancel} />
         <VideoEditorMaterials
+          onRemoveUnused={vi.fn()}
           onOpenLibrary={onOpenLibrary}
           project={project}
           onImport={onImport}
@@ -155,6 +159,7 @@ it('yields focus to an inspector select without retaining a competing menu layer
           ]}
         />
         <VideoEditorMaterials
+          onRemoveUnused={vi.fn()}
           onOpenLibrary={onOpenLibrary}
           project={project}
           onImport={onImport}
@@ -202,4 +207,42 @@ it('opens the library independently from the local file import menu', () => {
   expect(onOpenLibrary).toHaveBeenCalled();
   expect(onImport.video).not.toHaveBeenCalled();
   expect(container.querySelector('[data-ui="video-editor.materials.import-menu"]')).toBeNull();
+});
+
+it('anchors import in the footer and only exposes removal for unused materials', () => {
+  vi.stubGlobal('requestAnimationFrame', vi.fn());
+  const { project, asset, onRemoveUnused, onImport, onSelect } = renderMaterials();
+  const footer = container.querySelector('[data-ui="video-editor.materials.footer"]')!;
+  expect(footer.parentElement?.lastElementChild).toBe(footer);
+  expect(footer.querySelector('[data-ui="video-editor.materials.library"]')).not.toBeNull();
+  expect(container.textContent).toContain(translate('videoEditor.app.materialsUnused'));
+  act(() =>
+    container.querySelector<HTMLButtonElement>('[data-ui="video-editor.materials.remove"]')!.click()
+  );
+  expect(onRemoveUnused).toHaveBeenCalledWith([asset.id]);
+  act(() =>
+    footer
+      .querySelector<HTMLButtonElement>('[data-ui="video-editor.materials.remove-unused"]')!
+      .click()
+  );
+  expect(onRemoveUnused).toHaveBeenCalledWith(undefined);
+  project.clips = [createVideoClipFromAsset(project.tracks[0]!.id, asset, 1280, 720, 0)];
+  act(() =>
+    root.render(
+      <VideoEditorMaterials
+        project={project}
+        selectedAssetId={asset.id}
+        onOpenLibrary={onOpenLibrary}
+        onRemoveUnused={onRemoveUnused}
+        onImport={onImport}
+        onSelect={onSelect}
+      />
+    )
+  );
+  expect(container.querySelector('[data-ui="video-editor.materials.remove"]')).toBeNull();
+  expect(
+    container.querySelector<HTMLButtonElement>('[data-ui="video-editor.materials.remove-unused"]')!
+      .disabled
+  ).toBe(true);
+  expect(container.textContent).toContain(translate('videoEditor.app.materialsUsed'));
 });

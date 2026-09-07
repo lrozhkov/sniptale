@@ -26,13 +26,6 @@ export function VideoEditorEffectsLibraryDock(
             action={props.headerAction}
             title={props.headerTitle}
           />
-          <div className="shrink-0 border-b border-[var(--sniptale-color-border-soft)] px-2 py-1">
-            <EffectImportControl
-              disabled={disabled}
-              onImport={props.onImportEffectFile}
-              run={run}
-            />
-          </div>
 
           <div
             className="min-h-0 flex-1 space-y-3 overflow-y-auto p-2"
@@ -64,6 +57,16 @@ export function VideoEditorEffectsLibraryDock(
             )}
             <CatalogSection {...props} disabled={disabled} run={run} />
           </div>
+          <footer
+            data-ui="video-editor.effects-library.footer"
+            className="shrink-0 border-t border-[var(--sniptale-color-border-soft)] px-2 py-1"
+          >
+            <EffectImportControl
+              disabled={disabled}
+              onImport={props.onImportEffectFile}
+              run={run}
+            />
+          </footer>
         </div>
       </FloatingChromePanel>
     </aside>
