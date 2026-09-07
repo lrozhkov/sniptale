@@ -81,6 +81,10 @@ export const videoEditorAppMessages = defineMessageSource({
   materialsVideo: { ru: 'Видео', en: 'Video' },
   materialsImage: { ru: 'Изображение', en: 'Image' },
   materialsAudio: { ru: 'Аудио', en: 'Audio' },
+  materialsImportFailed: {
+    ru: 'Не удалось импортировать файл. Проверьте, что он открывается, и попробуйте снова или выберите другой.',
+    en: 'Could not import this file. Check that it opens, then try again or choose another file.',
+  },
   materialsLoading: { ru: 'Импортируем материал…', en: 'Importing material…' },
   materialsAppend: { ru: 'Добавить в конец', en: 'Append to timeline' },
   materialsInsert: { ru: 'Вставить со сдвигом', en: 'Insert at playhead' },

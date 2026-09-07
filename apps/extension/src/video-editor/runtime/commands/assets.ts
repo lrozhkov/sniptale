@@ -1,4 +1,6 @@
 import { useCallback, useMemo } from 'react';
+import { toast } from '@sniptale/ui/product-feedback/toast-service';
+import { translate } from '../../../platform/i18n';
 import { deleteProjectAsset } from '../../../composition/persistence/projects/index';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
@@ -181,7 +183,7 @@ function useProjectAssetImportHandler(
         await importProjectAssetFile(file, assetType, port, placement);
       } catch (assetError) {
         logger.error(`Failed to import ${failureLabel}`, assetError);
-        port.setError(toErrorMessage(assetError, 'common.errors.actionFailed'));
+        toast.error(translate('videoEditor.app.materialsImportFailed'));
       }
     },
     [assetType, failureLabel, port]

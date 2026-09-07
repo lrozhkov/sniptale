@@ -11,9 +11,14 @@ import { VideoProjectAssetType, VideoTrackKind } from '../../../features/video/p
 import { useAssetHandlers } from './assets';
 import { ensureRecordingAsset } from '../../project/operations/ops';
 
-const { deleteProjectAssetMock, importProjectAssetMock } = vi.hoisted(() => ({
+const { deleteProjectAssetMock, importProjectAssetMock, toastErrorMock } = vi.hoisted(() => ({
+  toastErrorMock: vi.fn(),
   deleteProjectAssetMock: vi.fn(),
   importProjectAssetMock: vi.fn(),
+}));
+
+vi.mock('@sniptale/ui/product-feedback/toast-service', () => ({
+  toast: { error: toastErrorMock },
 }));
 
 vi.mock('../../../composition/persistence/projects/index', async (importOriginal) => ({
@@ -106,6 +111,26 @@ afterEach(() => {
 });
 
 describe('useAssetHandlers', () => {
+  it.each(['handleImportAudio', 'handleImportImage', 'handleImportVideo'] as const)(
+    '%s reports decoder failure without replacing the project and permits a retry',
+    async (handler) => {
+      const params = createParams();
+      renderHook(params);
+      importProjectAssetMock.mockRejectedValueOnce(new Error('Invalid media bytes'));
+      const file = new File(['invalid'], 'damaged.media');
+      await act(async () => latestHandlers?.[handler](file, { destination: 'materials' }));
+      expect(params.setError).not.toHaveBeenCalled();
+      expect(params.upsertAsset).not.toHaveBeenCalled();
+      expect(params.addAssetClip).not.toHaveBeenCalled();
+      expect(toastErrorMock).toHaveBeenCalledOnce();
+      expect(toastErrorMock.mock.calls[0]?.[0]).not.toContain('Invalid media bytes');
+      await act(async () => latestHandlers?.[handler](file, { destination: 'materials' }));
+      expect(params.upsertAsset).toHaveBeenCalledOnce();
+      expect(params.addAssetClip).not.toHaveBeenCalled();
+      expect(params.setError).not.toHaveBeenCalled();
+      expect(toastErrorMock).toHaveBeenCalledOnce();
+    }
+  );
   it.each(['handleImportAudio', 'handleImportImage', 'handleImportVideo'] as const)(
     '%s registers a reusable material without changing the montage',
     async (handler) => {
