@@ -1,4 +1,4 @@
-import { formatPreciseTime, formatTimelineRulerLabel } from '../../interaction-state/helpers';
+import { formatPreciseTime } from '../../interaction-state/helpers';
 import type { VideoEditorPlaybackRange } from '../../../../interaction/playback/range';
 
 export function ProjectTimelineRuler(props: {
@@ -35,16 +35,19 @@ export function ProjectTimelineRuler(props: {
         <div
           key={marker.id}
           className={[
-            'relative h-full shrink-0 border-l',
+            'absolute top-0 h-full border-l',
             marker.isMajor
               ? 'border-[var(--sniptale-color-border-soft)]'
               : 'border-[var(--sniptale-color-border-subtle)]',
           ].join(' ')}
-          style={{ width: marker.spanSeconds * props.pixelsPerSecond }}
+          style={{
+            left: marker.second * props.pixelsPerSecond,
+            width: marker.spanSeconds * props.pixelsPerSecond,
+          }}
         >
           {marker.label ? (
             <span className="absolute left-1 top-1 text-[10px] font-medium text-[var(--sniptale-color-text-dim)]">
-              {formatTimelineRulerLabel(marker.second)}
+              {marker.label}
             </span>
           ) : null}
         </div>

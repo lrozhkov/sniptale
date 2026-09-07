@@ -27,8 +27,17 @@ export function useTimelinePreviewViewportReporter(params: {
 
   useEffect(() => {
     publishPreviewViewport();
-    return () => window.cancelAnimationFrame(previewViewportFrameRef.current);
-  }, [publishPreviewViewport, timelineWidth]);
+    const node = timelineRef.current;
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(publishPreviewViewport);
+    if (node) observer?.observe(node);
+    window.addEventListener('resize', publishPreviewViewport);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', publishPreviewViewport);
+      window.cancelAnimationFrame(previewViewportFrameRef.current);
+    };
+  }, [publishPreviewViewport, timelineWidth, timelineRef]);
 
   return publishPreviewViewport;
 }

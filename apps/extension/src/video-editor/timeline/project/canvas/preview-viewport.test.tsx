@@ -119,3 +119,28 @@ function restoreDescriptor(target: object, key: string, descriptor?: PropertyDes
 
   Reflect.deleteProperty(target, key);
 }
+
+it('republishes resized viewports and releases the resize observer on unmount', () => {
+  let notifyResize: (() => void) | undefined;
+  const disconnect = vi.fn();
+  const observe = vi.fn();
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: () => void) {
+        notifyResize = callback;
+      }
+      observe = observe;
+      disconnect = disconnect;
+    }
+  );
+  const viewports: TimelinePreviewViewport[] = [];
+  renderHarness(1, viewports);
+  expect(observe).toHaveBeenCalledOnce();
+  Object.defineProperty(container!.firstElementChild, 'clientWidth', { value: 800 });
+  act(() => notifyResize?.());
+  expect(viewports.at(-1)).toEqual({ startTime: 0, endTime: 8, pixelsPerSecond: 100 });
+  act(() => root?.unmount());
+  root = null;
+  expect(disconnect).toHaveBeenCalledOnce();
+});

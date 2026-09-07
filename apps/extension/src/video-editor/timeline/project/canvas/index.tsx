@@ -1,6 +1,6 @@
 import type { TimelinePreviewViewport } from '../../../contracts/timeline-preview';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
-import type { MutableRefObject } from 'react';
+import { useCallback, useState, type MutableRefObject } from 'react';
 import type { VideoProject } from '../../../../features/video/project/types';
 import type { VideoEditorImportPlacement } from '../../../contracts/insertion';
 import type { VideoEditorPlaybackRange } from '../../../interaction/playback/range';
@@ -147,7 +147,20 @@ export function ProjectTimelineCanvas(props: ProjectTimelineCanvasProps) {
 }
 
 function useProjectTimelineCanvasModel(props: ProjectTimelineCanvasProps) {
-  const rulerMarkers = buildProjectTimelineRulerMarkers(props.timelineWidth, props.pixelsPerSecond);
+  const [viewport, setViewport] = useState({ startTime: 0, endTime: 0 });
+  const onViewportChange = props.onTimelinePreviewViewportChange;
+  const publishViewport = useCallback(
+    (next: TimelinePreviewViewport) => {
+      setViewport(next);
+      onViewportChange(next);
+    },
+    [onViewportChange]
+  );
+  const rulerMarkers = buildProjectTimelineRulerMarkers(
+    props.timelineWidth,
+    props.pixelsPerSecond,
+    viewport
+  );
   const trackLayoutModel = resolveTimelineTrackLayoutModel({
     project: props.project,
     trackHeightByTrackId: {},
@@ -167,7 +180,7 @@ function useProjectTimelineCanvasModel(props: ProjectTimelineCanvasProps) {
     timelineRef: props.timelineRef,
   });
   const publishPreviewViewport = useTimelinePreviewViewportReporter({
-    onViewportChange: props.onTimelinePreviewViewportChange,
+    onViewportChange: publishViewport,
     pixelsPerSecond: props.pixelsPerSecond,
     timelineRef: props.timelineRef,
     timelineWidth: props.timelineWidth,

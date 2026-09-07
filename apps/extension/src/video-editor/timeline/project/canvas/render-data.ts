@@ -1,3 +1,5 @@
+import { formatTimelineRulerLabel } from '../interaction-state/helpers';
+
 interface ProjectTimelineRulerMarker {
   id: string;
   isMajor: boolean;
@@ -13,20 +15,24 @@ const WAVEFORM_BAR_GAP_PERCENT = 0.8;
 
 export function buildProjectTimelineRulerMarkers(
   timelineWidth: number,
-  pixelsPerSecond: number
+  pixelsPerSecond: number,
+  viewport: { startTime: number; endTime: number }
 ): ProjectTimelineRulerMarker[] {
   const spanSeconds = resolveTimelineRulerSpanSeconds(pixelsPerSecond);
-  const markerCount =
-    Math.ceil((timelineWidth + 120) / (Math.max(1, pixelsPerSecond) * spanSeconds)) + 1;
-
-  return Array.from({ length: markerCount }, (_, index) => {
-    const second = roundTimelineMarkerSecond(index * spanSeconds);
+  const overscanSeconds = 120 / Math.max(1, pixelsPerSecond);
+  const firstIndex = Math.floor(Math.max(0, viewport.startTime - overscanSeconds) / spanSeconds);
+  const lastIndex = Math.ceil(
+    (Math.min(timelineWidth / Math.max(1, pixelsPerSecond), viewport.endTime) + overscanSeconds) /
+      spanSeconds
+  );
+  return Array.from({ length: Math.max(0, lastIndex - firstIndex + 1) }, (_, index) => {
+    const second = roundTimelineMarkerSecond((firstIndex + index) * spanSeconds);
     const isMajor = Number.isInteger(second);
 
     return {
       id: `marker-${second.toFixed(2)}`,
       isMajor,
-      label: isMajor ? buildTimelineRulerLabel(second) : null,
+      label: isMajor ? formatTimelineRulerLabel(second) : null,
       second,
       spanSeconds,
     };
@@ -87,11 +93,4 @@ function resolveTimelineRulerSpanSeconds(pixelsPerSecond: number): number {
 
 function roundTimelineMarkerSecond(value: number): number {
   return Math.round(value * 1000) / 1000;
-}
-
-function buildTimelineRulerLabel(second: number): string {
-  const totalSeconds = Math.max(0, Math.floor(second));
-  const minutes = Math.floor(totalSeconds / 60);
-  const remainder = totalSeconds % 60;
-  return `${minutes}:${String(remainder).padStart(2, '0')}`;
 }
