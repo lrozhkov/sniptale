@@ -41,6 +41,30 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it('keeps import failure guidance in the padded scrollable content without internal-error copy', () => {
+  renderDock({
+    operations: {
+      ...createOperations(),
+      operationError: { kind: 'import', code: 'BUNDLE_ARCHIVE_INVALID' },
+    },
+  });
+  const alert = container?.querySelector('[role="alert"]');
+  expect(alert?.textContent).toBe(translate('videoEditor.effectsLibrary.importFailed'));
+  expect(alert?.closest('[aria-busy]')?.className).toContain('overflow-y-auto');
+});
+
+it('shows catalog loading and a safe recovery message instead of diagnostic codes', () => {
+  renderDock({ catalogs: [], isLoading: true });
+  expect(container?.querySelector('[role="status"]')?.textContent).toBe(
+    translate('videoEditor.effectsLibrary.catalogLoading')
+  );
+  renderDock({ catalogs: [], errorCode: 'EFFECT_CATALOG_FAILED' });
+  const alert = container?.querySelector('[role="alert"]');
+  expect(alert?.textContent).toBe(translate('videoEditor.effectsLibrary.catalogLoadFailed'));
+  expect(alert?.textContent).not.toContain('EFFECT_CATALOG_FAILED');
+  expect(container?.querySelector('[role="status"]')).toBeNull();
+});
+
 it('renders nothing while the EffectV1 dock is closed', () => {
   renderDock({ isOpen: false });
   expect(container?.querySelector('[data-ui="video-editor.effects-library.dock"]')).toBeNull();
@@ -175,12 +199,12 @@ it('surfaces a rejected dropped apply through the shared operation owner', async
 
   expect(onApplyEffect).toHaveBeenCalledOnce();
   const alert = container?.querySelector('[role="alert"]')?.textContent;
-  expect(alert).toContain('Sniptale');
+  expect(alert).toBe(translate('videoEditor.effectsLibrary.applyFailed'));
   expect(alert).not.toContain('EFFECT_OPERATION_FAILED');
   expect(alert).not.toContain('drop-apply-rejected');
 });
 
-it('surfaces only an allowlisted EffectV1 diagnostic code', async () => {
+it('keeps allowlisted EffectV1 diagnostic codes out of routine feedback', async () => {
   const onApplyEffect = vi.fn(async () => {
     throw Object.assign(new Error('private failure detail'), { code: 'BUNDLE_ARCHIVE_INVALID' });
   });
@@ -191,7 +215,7 @@ it('surfaces only an allowlisted EffectV1 diagnostic code', async () => {
   await click(dropButton);
 
   const alert = container?.querySelector('[role="alert"]')?.textContent;
-  expect(alert).toContain('Sniptale');
+  expect(alert).toBe(translate('videoEditor.effectsLibrary.applyFailed'));
   expect(alert).not.toContain('BUNDLE_ARCHIVE_INVALID');
   expect(alert).not.toContain('private failure detail');
 });

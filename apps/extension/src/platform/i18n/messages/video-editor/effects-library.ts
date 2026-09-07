@@ -1,6 +1,11 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorEffectsLibraryMessages = defineMessageSource({
+  catalogLoading: { ru: 'Загружаем эффекты…', en: 'Loading effects…' },
+  catalogLoadFailed: {
+    ru: 'Не удалось загрузить эффекты. Перезагрузите страницу и попробуйте снова.',
+    en: 'Could not load effects. Reload the page and try again.',
+  },
   applyFailed: {
     ru: 'Не удалось добавить эффект.',
     en: 'The effect could not be added.',
@@ -40,8 +45,8 @@ export const videoEditorEffectsLibraryMessages = defineMessageSource({
     en: 'The effects could not be imported: {detail}',
   },
   importFailed: {
-    ru: 'Не удалось импортировать эффекты.',
-    en: 'The effects could not be imported.',
+    ru: 'Не удалось импортировать эффекты. Выберите файл эффекта или набора Sniptale и попробуйте снова.',
+    en: 'Could not import effects. Choose a Sniptale effect or bundle file and try again.',
   },
   incompatibleButton: { ru: 'Выберите цель', en: 'Select target' },
   selectClipTarget: { ru: 'Сначала выберите клип', en: 'Select a clip first' },

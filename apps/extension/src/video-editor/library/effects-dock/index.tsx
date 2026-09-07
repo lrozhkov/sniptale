@@ -1,7 +1,6 @@
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 
 import { translate } from '../../../platform/i18n';
-import { getUserFacingErrorDetail } from '../../../platform/i18n/user-facing-error';
 import { CatalogSection } from './catalog-section';
 import { EffectImportControl, EffectsLibraryHeader } from './header';
 import type { EffectLibraryOperationError } from './operations';
@@ -35,24 +34,34 @@ export function VideoEditorEffectsLibraryDock(
             />
           </div>
 
-          {props.errorCode && (
-            <p role="alert" className="text-xs text-[var(--sniptale-color-danger)]">
-              {translate('videoEditor.effectsLibrary.catalogLoadErrorWithDetail').replace(
-                '{detail}',
-                props.errorCode
-              )}
-            </p>
-          )}
-          {operationError && (
-            <p role="alert" className="text-xs text-[var(--sniptale-color-danger)]">
-              {formatOperationError(operationError)}
-            </p>
-          )}
-
           <div
             className="min-h-0 flex-1 space-y-3 overflow-y-auto p-2"
             aria-busy={disabled || props.isLoading}
           >
+            {props.isLoading && (
+              <p
+                role="status"
+                className="px-1 text-xs leading-5 text-[var(--sniptale-color-text-muted)]"
+              >
+                {translate('videoEditor.effectsLibrary.catalogLoading')}
+              </p>
+            )}
+            {props.errorCode && (
+              <p
+                role="alert"
+                className="px-1 text-xs leading-5 text-[var(--sniptale-color-danger)]"
+              >
+                {translate('videoEditor.effectsLibrary.catalogLoadFailed')}
+              </p>
+            )}
+            {operationError && (
+              <p
+                role="alert"
+                className="px-1 text-xs leading-5 text-[var(--sniptale-color-danger)]"
+              >
+                {formatOperationError(operationError)}
+              </p>
+            )}
             <CatalogSection {...props} disabled={disabled} run={run} />
           </div>
         </div>
@@ -70,5 +79,5 @@ function formatOperationError(error: EffectLibraryOperationError): string {
         : error.kind === 'delete'
           ? translate('videoEditor.effectsLibrary.deleteFailed')
           : translate('videoEditor.effectsLibrary.updateFailed');
-  return `${message} ${getUserFacingErrorDetail('unexpected')}`;
+  return message;
 }
