@@ -1,17 +1,9 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorExportDialogMessages = defineMessageSource({
-  eyebrow: {
-    ru: 'Экспорт проекта',
-    en: 'Project export',
-  },
-  titlePrefix: {
-    ru: 'Финальный рендер в',
-    en: 'Final render to',
-  },
-  description: {
-    ru: 'Файл будет собран из всех видимых дорожек и активных наложений текущего проекта.',
-    en: 'The file will be assembled from all visible tracks and active overlays in the current project.',
+  title: {
+    ru: 'Экспорт видео',
+    en: 'Export video',
   },
   scopeLabel: {
     ru: 'Область экспорта',

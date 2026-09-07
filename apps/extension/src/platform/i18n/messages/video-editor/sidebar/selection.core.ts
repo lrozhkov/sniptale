@@ -142,8 +142,8 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
     en: 'Opacity',
   },
   cameraPlacementDescription: {
-    ru: 'Быстро расположите независимый трек камеры. После этого размер и позицию можно точно настроить ниже или прямо на холсте.',
-    en: 'Place the independent camera track, then fine-tune its size and position below or directly on the canvas.',
+    ru: 'Быстро расположите независимый трек камеры. Размер и позицию можно точно настроить в разделе «Трансформация» или прямо на холсте.',
+    en: 'Place the independent camera track, then fine-tune its size and position in Transform or directly on the canvas.',
   },
   cameraPlacementTopLeft: {
     ru: 'Слева сверху',
