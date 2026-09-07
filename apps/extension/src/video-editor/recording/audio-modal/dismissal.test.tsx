@@ -59,3 +59,51 @@ it('consumes Space without activating Cancel when there is no audio to audition'
   expect(event.defaultPrevented).toBe(true);
   expect(onClose).not.toHaveBeenCalled();
 });
+
+it('focuses the recorder, contains Tab and restores the opener when hidden', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  host = document.createElement('div');
+  const opener = document.createElement('button');
+  document.body.append(host, opener);
+  opener.focus();
+  root = createRoot(host);
+  const onClose = vi.fn();
+  const render = (isOpen: boolean) =>
+    act(() =>
+      root.render(<AudioRecordingModal isOpen={isOpen} onClose={onClose} onSave={vi.fn()} />)
+    );
+  try {
+    render(true);
+    const dialog = host.querySelector('[role="dialog"]');
+    const close = host.querySelector<HTMLButtonElement>('.sniptale-modal-close')!;
+    const cancel = [...host.querySelectorAll('button')].find(
+      (button) => button.textContent === 'common.actions.cancel'
+    )!;
+    expect(dialog?.getAttribute('aria-modal')).toBe('true');
+    expect(document.activeElement).toBe(close);
+    close.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Tab',
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+    );
+    expect(document.activeElement).toBe(cancel);
+    cancel.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Tab',
+        bubbles: true,
+        cancelable: true,
+      })
+    );
+    expect(document.activeElement).toBe(close);
+    render(false);
+    expect(document.activeElement).toBe(opener);
+    render(true);
+    expect(document.activeElement).toBe(host.querySelector('.sniptale-modal-close'));
+    render(false);
+  } finally {
+    opener.remove();
+  }
+});

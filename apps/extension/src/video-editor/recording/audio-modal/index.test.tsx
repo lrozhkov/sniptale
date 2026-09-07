@@ -60,6 +60,7 @@ it('retains failed recording for retry and blocks duplicate saves and dismissal'
     Array.from(document.querySelectorAll('button')).find((button) =>
       button.textContent?.includes('recordAudioSave')
     )!;
+  save().focus();
   act(() => {
     save().click();
     save().click();
@@ -71,6 +72,7 @@ it('retains failed recording for retry and blocks duplicate saves and dismissal'
   expect(onSave).toHaveBeenCalledTimes(1);
   expect(onClose).not.toHaveBeenCalled();
   expect(save().disabled).toBe(true);
+  expect(document.activeElement?.textContent).toBe('common.actions.cancel');
   await act(async () => {
     rejectSave(new Error('destination unavailable'));
   });

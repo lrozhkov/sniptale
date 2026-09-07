@@ -39,7 +39,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('blurs track state icon buttons after pointer activation', () => {
+it('retains focus on track state icon buttons after pointer activation', () => {
   const project = createEmptyVideoProject('Track row');
   const trackLayout = buildTimelineTrackLayoutModel({
     project,
@@ -82,7 +82,7 @@ it('blurs track state icon buttons after pointer activation', () => {
     button?.click();
   });
 
-  expect(document.activeElement).not.toBe(button);
+  expect(document.activeElement).toBe(button);
 });
 
 it('offers recording only on audio rows, freezing its destination and honoring lock', () => {

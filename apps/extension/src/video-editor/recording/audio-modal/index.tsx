@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { translate } from '../../../platform/i18n';
 import { ProductModal, ProductModalBody, ProductModalFooter } from '@sniptale/ui/product-modal';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { useAudioRecordingFocus } from './focus';
 import { useAudioRecordingController } from './controller';
 import {
   AudioRecordingModalHeader,
@@ -24,7 +25,7 @@ export function AudioRecordingModal({
   onClose,
   onSave,
 }: AudioRecordingModalProps): React.JSX.Element | null {
-  const titleId = useId();
+  const { titleId, handleKeyDown } = useAudioRecordingFocus(isOpen);
   const savingRef = useRef(false);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -60,6 +61,7 @@ export function AudioRecordingModal({
 
   return (
     <ProductModal
+      onKeyDown={handleKeyDown}
       onClose={requestClose}
       closeOnBackdrop={false}
       labelledBy={titleId}
