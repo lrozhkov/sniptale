@@ -58,13 +58,45 @@ describe('ExportProgressOverlay', () => {
     renderOverlay();
 
     const dialog = container?.querySelector<HTMLElement>('[role="dialog"]');
-    const progressFill = container?.querySelector<HTMLElement>('.h-3.rounded-full');
+    const progressFill = container?.querySelector<HTMLElement>('[role="progressbar"] > div');
 
     expect(dialog).not.toBeNull();
     expect(container?.textContent).toContain('videoEditor.progress.title');
-    expect(container?.textContent).toContain('Muxing project output');
+    expect(container?.textContent).not.toContain('Muxing project output');
+    expect(container?.textContent).toContain('videoEditor.progress.transcoding');
     expect(container?.textContent).toContain('60%');
     expect(progressFill?.style.width).toBe('60%');
+  });
+
+  it('labels the modal, contains Tab focus and restores the opener', () => {
+    const opener = document.createElement('button');
+    document.body.append(opener);
+    opener.focus();
+    renderOverlay();
+    const dialog = container?.querySelector<HTMLElement>('[role="dialog"]');
+    const cancel = container?.querySelector('button');
+    expect(dialog?.getAttribute('aria-modal')).toBe('true');
+    expect(
+      document.getElementById(dialog?.getAttribute('aria-labelledby') ?? '')?.textContent
+    ).toBe('videoEditor.progress.title');
+    expect(document.activeElement).toBe(cancel);
+    for (const shiftKey of [false, true]) {
+      const tab = new KeyboardEvent('keydown', {
+        key: 'Tab',
+        shiftKey,
+        bubbles: true,
+        cancelable: true,
+      });
+      cancel?.dispatchEvent(tab);
+      expect(tab.defaultPrevented).toBe(true);
+      expect(document.activeElement).toBe(cancel);
+    }
+    renderOverlay();
+    expect(document.activeElement).toBe(cancel);
+    act(() => root?.unmount());
+    root = null;
+    expect(document.activeElement).toBe(opener);
+    opener.remove();
   });
 
   it('routes cancel through the shared footer action', () => {
