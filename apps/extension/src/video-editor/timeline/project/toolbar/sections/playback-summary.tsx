@@ -124,7 +124,7 @@ function PlaybackSummaryMeta(props: {
   const loopRange = formatToolbarLoopRange(props.playbackRange);
 
   return (
-    <div className="min-w-0 text-center">
+    <div className="min-w-0 text-center @max-[1000px]/timeline:basis-full">
       <p
         data-playback-counter="true"
         className={[
@@ -176,7 +176,12 @@ export function ProjectTimelinePlaybackSummary({
   onTogglePlay: () => void;
 }) {
   return (
-    <div className="flex shrink-0 flex-nowrap items-center justify-center gap-[var(--timeline-control-gap)]">
+    <div
+      className={[
+        'flex shrink-0 flex-nowrap items-center justify-center gap-[var(--timeline-control-gap)]',
+        '@max-[1000px]/timeline:w-44 @max-[1000px]/timeline:flex-wrap',
+      ].join(' ')}
+    >
       <PlaybackSeekToStartButton onSeekToStart={onSeekToStart} />
       <PlaybackFrameStepButton direction="previous" onStep={onStepToPreviousFrame} />
       <PlaybackToggleButton isPlaying={isPlaying} onTogglePlay={onTogglePlay} />

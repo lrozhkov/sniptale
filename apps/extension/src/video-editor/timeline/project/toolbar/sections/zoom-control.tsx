@@ -27,18 +27,11 @@ export function ProjectTimelineZoomControl({
 }) {
   return (
     <div className="flex shrink-0 items-center gap-1 px-1 text-[var(--sniptale-color-text-secondary)]">
-      <span
-        className={[
-          'whitespace-nowrap text-[12px] font-medium @max-[800px]/timeline:hidden',
-          'text-[var(--sniptale-color-text-muted)]',
-        ].join(' ')}
-      >
-        {translate('videoEditor.timeline.zoom')}
-      </span>
       <TimelineZoomIcon direction="out" />
       <span className="flex w-24 shrink-0 @max-[1000px]/timeline:w-14">
         <CompactRange
           aria-label={translate('videoEditor.timeline.zoom')}
+          title={translate('videoEditor.timeline.zoom')}
           className="w-full"
           min={TIMELINE_ZOOM_SLIDER_MIN}
           max={TIMELINE_ZOOM_SLIDER_MAX}

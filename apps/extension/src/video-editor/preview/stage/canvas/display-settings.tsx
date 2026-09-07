@@ -63,7 +63,7 @@ export function PreviewDisplaySettings(props: PreviewDisplaySettingsProps) {
         ref={triggerRef}
         type="button"
         dataUi="video.preview.display-settings"
-        className="!h-9 !gap-1.5 !px-2.5 whitespace-nowrap"
+        className="!h-9 !gap-1.5 !px-2.5 !shadow-none active:!translate-y-0 whitespace-nowrap"
         aria-label={translate('videoEditor.stage.displaySettings')}
         aria-haspopup="dialog"
         aria-expanded={open}
@@ -76,7 +76,7 @@ export function PreviewDisplaySettings(props: PreviewDisplaySettingsProps) {
         <span>
           {modeLabel} · {props.rasterPreset} · {zoomLabel}
         </span>
-        <ChevronDown size={12} aria-hidden="true" />
+        <ChevronDown size={14} aria-hidden="true" className={open ? 'rotate-180' : ''} />
       </ContentToolbarButton>
       {open
         ? createPortal(

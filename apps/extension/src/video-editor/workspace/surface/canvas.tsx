@@ -135,6 +135,7 @@ function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
     <VideoEditorWorkspaceHeader
       libraryOpen={Boolean(props.materialsOpen || props.effectsLibraryDockOpen)}
       onOpenLibraryPanel={() => props.onMaterialsOpenChange(true)}
+      onOpenEffectsPanel={() => props.onEffectsLibraryDockOpenChange(true)}
     >
       {source && (
         <WorkspaceViewerHeading

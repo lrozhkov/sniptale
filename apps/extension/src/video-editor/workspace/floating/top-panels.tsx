@@ -12,6 +12,7 @@ export function VideoEditorWorkspaceHeaderActions(props: {
   return (
     <div className="flex shrink-0 items-center gap-1">
       <ContentToolbarButton
+        className="!h-9 !w-9 !min-w-9 !px-0"
         dataUi="video-editor.viewer.scene"
         title={translate('videoEditor.sidebar.sceneProperties')}
         onClick={header.onSelectScene}
@@ -20,6 +21,7 @@ export function VideoEditorWorkspaceHeaderActions(props: {
       </ContentToolbarButton>
       {!props.inspectorOpen && (
         <ContentToolbarButton
+          className="!h-9 !w-9 !min-w-9 !px-0"
           dataUi="video-editor.viewer.open-inspector"
           title={translate('videoEditor.app.expandInspector')}
           onClick={props.onOpenInspector}

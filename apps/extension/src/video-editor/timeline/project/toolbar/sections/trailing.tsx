@@ -1,4 +1,4 @@
-import { Focus, Maximize2 } from 'lucide-react';
+import { BetweenHorizontalStart, ScanLine } from 'lucide-react';
 import { translate } from '../../../../../platform/i18n';
 import { TimelineIconButton } from '../../controls/icon-button';
 import type { ProjectTimelineToolbarProps } from '../types';
@@ -49,14 +49,14 @@ function ProjectTimelineFitControls({
     <div className="flex items-center gap-[var(--timeline-control-gap)]">
       <TimelineIconButton
         dataUi="video-editor.timeline.toolbar.fit-project"
-        icon={<Maximize2 size={13} strokeWidth={2.2} />}
+        icon={<BetweenHorizontalStart size={16} strokeWidth={2} />}
         onClick={onFitProject}
         title={translate('videoEditor.timeline.fitProject')}
       />
       <TimelineIconButton
         dataUi="video-editor.timeline.toolbar.fit-selection"
         disabled={fitSelectionDuration === null}
-        icon={<Focus size={13} strokeWidth={2.2} />}
+        icon={<ScanLine size={16} strokeWidth={2} />}
         onClick={onFitSelection}
         title={translate('videoEditor.timeline.fitSelection')}
       />

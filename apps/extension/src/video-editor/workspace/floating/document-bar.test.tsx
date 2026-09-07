@@ -111,3 +111,20 @@ it.each(['dirty', 'saving', 'saved', 'idle'])(
     expect(markup).not.toContain('role="alert"');
   }
 );
+
+it('replaces project identity with source navigation without hiding recovery errors', () => {
+  hookMocks.header.mockReturnValue({
+    ...createHeaderProps(),
+    saveStateMeta: { state: 'error', label: 'Failed', className: '' },
+  });
+  hookMocks.history.mockReturnValue({ error: null });
+  const markup = renderToStaticMarkup(
+    <VideoEditorFloatingDocumentBar>
+      <button>Source / Montage</button>
+    </VideoEditorFloatingDocumentBar>
+  );
+  expect(markup).toContain('Source / Montage');
+  expect(markup).not.toContain('Product Demo Recording');
+  expect(markup).not.toContain('<input');
+  expect(markup).toContain('common.actions.retry');
+});

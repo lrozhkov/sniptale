@@ -8,11 +8,11 @@ import {
 import type { VideoEditorHeaderController } from '../../runtime/controller/contracts/header';
 import { requestVideoEditorSaveRetry } from '../../runtime/session/save-retry';
 
-const DOCUMENT_BAR_CLASS_NAME = 'flex min-w-0 flex-1 items-center justify-center gap-2';
+const DOCUMENT_BAR_CLASS_NAME = 'flex min-w-0 flex-1 items-center justify-start gap-2';
 
 const PROJECT_TITLE_CLASS_NAME = [
   'h-9 min-w-0 w-full rounded-[8px] border border-transparent bg-transparent',
-  'px-2 text-center text-sm font-semibold text-[var(--sniptale-color-text-primary)] outline-none transition',
+  'px-2 text-left text-sm font-semibold text-[var(--sniptale-color-text-primary)] outline-none transition',
   'hover:border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_76%,transparent)]',
   'focus:border-[color:var(--sniptale-color-border-accent-strong)]',
   'focus:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_70%,transparent)]',
@@ -28,12 +28,23 @@ function VideoEditorProjectTitle({
   projectName,
 }: Pick<VideoEditorDocumentBarProps['header'], 'onRenameProject' | 'projectName'>) {
   return (
-    <label className="flex min-w-[6rem] max-w-[24rem] flex-1 items-center gap-1.5">
+    <label
+      className={[
+        'grid min-w-[6rem] max-w-[24rem] shrink items-center',
+        'focus-within:w-[30rem] focus-within:max-w-full',
+      ].join(' ')}
+    >
+      <span
+        aria-hidden="true"
+        className="invisible col-start-1 row-start-1 truncate px-2 text-sm font-semibold"
+      >
+        {projectName || ' '}
+      </span>
       <input
         aria-label={translate('videoEditor.app.title')}
         value={projectName}
         onChange={(event) => onRenameProject(event.currentTarget.value)}
-        className={PROJECT_TITLE_CLASS_NAME}
+        className={`${PROJECT_TITLE_CLASS_NAME} col-start-1 row-start-1`}
       />
     </label>
   );
@@ -66,10 +77,12 @@ export function VideoEditorFloatingDocumentBar({ children }: { children?: ReactN
   return (
     <div data-ui="video-editor.floating.document-bar" className={DOCUMENT_BAR_CLASS_NAME}>
       {children}
-      <VideoEditorProjectTitle
-        projectName={header.projectName}
-        onRenameProject={header.onRenameProject}
-      />
+      {!children && (
+        <VideoEditorProjectTitle
+          projectName={header.projectName}
+          onRenameProject={header.onRenameProject}
+        />
+      )}
       <VideoEditorSaveStateBadge saveStateMeta={header.saveStateMeta} />
       {history.error && (
         <span role="alert">

@@ -3,11 +3,16 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { VideoEditorWorkspaceHeaderActions } from './top-panels';
-import { VideoEditorLibraryNavigation } from './index';
-const actions = vi.hoisted(() => ({ onSelectScene: vi.fn() }));
+import { VideoEditorLibraryNavigation, VideoEditorWorkspaceHeader } from './index';
+const actions = vi.hoisted(() => ({
+  onSelectScene: vi.fn(),
+  projectName: 'Demo',
+  saveStateMeta: { state: 'saved' },
+}));
 vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../runtime/controller/composition/hooks')>()),
   useVideoEditorHeaderController: () => actions,
+  useVideoEditorHistoryController: () => ({ error: null }),
 }));
 it('offers Scene and only the hidden inspector opener, without legacy tool buttons', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -44,6 +49,49 @@ it('offers Scene and only the hidden inspector opener, without legacy tool butto
     );
     expect(host.querySelector('[data-ui="video-editor.viewer.open-inspector"]')).toBeNull();
     expect(host.querySelectorAll('button')).toHaveLength(1);
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});
+
+it('opens each closed library mode directly and removes both openers when the panel opens', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const materials = vi.fn(),
+    effects = vi.fn();
+  try {
+    act(() =>
+      root.render(
+        <VideoEditorWorkspaceHeader
+          libraryOpen={false}
+          onOpenLibraryPanel={materials}
+          onOpenEffectsPanel={effects}
+        />
+      )
+    );
+    act(() =>
+      host
+        .querySelector<HTMLButtonElement>('[data-ui="video-editor.viewer.open-materials"]')!
+        .click()
+    );
+    act(() =>
+      host.querySelector<HTMLButtonElement>('[data-ui="video-editor.viewer.open-effects"]')!.click()
+    );
+    expect(materials).toHaveBeenCalledOnce();
+    expect(effects).toHaveBeenCalledOnce();
+    act(() =>
+      root.render(
+        <VideoEditorWorkspaceHeader
+          libraryOpen
+          onOpenLibraryPanel={materials}
+          onOpenEffectsPanel={effects}
+        />
+      )
+    );
+    expect(host.querySelector('[data-ui="video-editor.viewer.open-materials"]')).toBeNull();
+    expect(host.querySelector('[data-ui="video-editor.viewer.open-effects"]')).toBeNull();
   } finally {
     act(() => root.unmount());
     vi.unstubAllGlobals();

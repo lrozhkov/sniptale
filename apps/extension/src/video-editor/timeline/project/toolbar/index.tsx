@@ -5,7 +5,10 @@ import {
   useVideoEditorHistoryController,
   useVideoEditorHeaderController,
 } from '../../../runtime/controller/composition/hooks';
-import { toolbarIconButtonClassName } from './sections/constants/button';
+import {
+  toolbarIconButtonClassName,
+  toolbarExportButtonClassName,
+} from './sections/constants/button';
 import { ProjectTimelinePlaybackSummary } from './sections/playback-summary';
 import { ProjectTimelineToolbarLeadingControls } from './sections/leading';
 import { ProjectTimelineToolbarTrailingActions } from './sections/trailing';
@@ -100,7 +103,13 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
         '[&_svg]:size-[18px] @max-[1400px]/timeline:[&_svg]:size-4 @max-[1000px]/timeline:[&_svg]:size-[14px]',
       ].join(' ')}
     >
-      <div className="flex shrink-0 items-center justify-start gap-[var(--timeline-control-gap)]">
+      <div className="flex shrink-0 items-center justify-center gap-[var(--timeline-control-gap)]">
+        <ProjectTimelineToolbarLeadingControls
+          {...createToolbarLeadingControlsProps(controlsProps)}
+        />
+      </div>
+      <ProjectTimelinePlaybackSummary {...controlsProps.playback} />
+      <div className="flex items-center justify-end gap-[var(--timeline-control-gap)]">
         <ContentToolbarButton
           className={toolbarIconButtonClassName}
           title={`${translate('videoEditor.app.undo')} (${translate('videoEditor.app.undoShortcut')})`}
@@ -119,6 +128,7 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
         >
           <Redo2 aria-hidden="true" />
         </ContentToolbarButton>
+        <ToolbarSeparator />
         {header && (
           <ContentToolbarButton
             className={toolbarIconButtonClassName}
@@ -131,26 +141,33 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
             <Magnet aria-hidden="true" />
           </ContentToolbarButton>
         )}
-        <ProjectTimelineToolbarLeadingControls
-          {...createToolbarLeadingControlsProps(controlsProps)}
-        />
-      </div>
-      <ProjectTimelinePlaybackSummary {...controlsProps.playback} />
-      <div className="flex items-center justify-end gap-[var(--timeline-control-gap)]">
         <ProjectTimelineToolbarTrailingActions
           {...createToolbarTrailingControlsProps(controlsProps)}
         />
+        <ToolbarSeparator />
         {header && (
           <ContentToolbarButton
-            className={toolbarIconButtonClassName}
+            className={toolbarExportButtonClassName}
             title={translate('videoEditor.app.exportButton')}
             onClick={header.onOpenExportDialog}
             dataUi="video-editor.timeline.toolbar.export"
           >
             <Clapperboard aria-hidden="true" />
+            <span className="whitespace-nowrap text-xs font-semibold">
+              {translate('videoEditor.app.exportButton')}
+            </span>
           </ContentToolbarButton>
         )}
       </div>
     </div>
+  );
+}
+
+function ToolbarSeparator() {
+  return (
+    <span
+      aria-hidden="true"
+      className="mx-1 h-5 w-px shrink-0 bg-[var(--sniptale-color-border-soft)]"
+    />
   );
 }
