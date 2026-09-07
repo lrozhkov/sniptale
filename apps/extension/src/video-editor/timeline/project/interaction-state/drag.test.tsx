@@ -56,6 +56,7 @@ function createClip(trackId: string): VideoProjectClip {
 
 function createTimelineHarness(props: {
   currentTime?: number;
+  readTimelineStartTime?: (() => number) | undefined;
   historyTransaction?: VideoEditorProjectHistoryTransactionActions;
   magnetEnabled?: boolean;
   project: ReturnType<typeof createEmptyVideoProject>;
@@ -82,6 +83,7 @@ function createTimelineHarness(props: {
         isProjectHistoryTransactionCurrent: (lease) => lease === fallbackLease,
       },
       pixelsPerSecond: 10,
+      readTimelineStartTime: props.readTimelineStartTime,
       magnetEnabled: props.magnetEnabled ?? false,
       project: props.project,
       ...(props.trackHeightByTrackId ? { trackHeightByTrackId: props.trackHeightByTrackId } : {}),
@@ -633,4 +635,36 @@ it('keeps the current logical lane during horizontal clip drags', () => {
   expect(onMoveClip).not.toHaveBeenCalled();
   act(() => window.dispatchEvent(new Event('pointerup')));
   expect(onMoveClip).toHaveBeenLastCalledWith('clip-1', 10, project.tracks[0]!.id, 'line-1');
+});
+
+it('keeps a held clip under the pointer when the visible time window scrolls and returns', () => {
+  const project = createEmptyVideoProject('Scrolled gesture');
+  const clip = createClip(project.tracks[0]!.id);
+  project.clips = [clip];
+  project.duration = 20;
+  let startTime = 43200;
+  const onMoveClip = vi.fn();
+  const onGhostChange = vi.fn();
+  const Harness = createTimelineHarness({
+    project,
+    onMoveClip,
+    onGhostChange,
+    readTimelineStartTime: () => startTime,
+    onTrimClipStart: vi.fn(),
+    onTrimClipEnd: vi.fn(),
+    onReady: (value) => {
+      beginClipInteraction = value;
+    },
+  });
+  act(() => root?.render(<Harness />));
+  act(() => beginClipInteraction?.(createPointerEvent(100, 20), clip, 'move'));
+  startTime += 3;
+  act(() => dispatchTimelinePointerMove(120, 20));
+  expect(onGhostChange).toHaveBeenLastCalledWith(expect.objectContaining({ startTime: 10 }));
+  startTime -= 3;
+  act(() => root?.render(<Harness />));
+  expect(onGhostChange).toHaveBeenLastCalledWith(expect.objectContaining({ startTime: 7 }));
+  expect(onMoveClip).not.toHaveBeenCalled();
+  act(() => window.dispatchEvent(new Event('pointerup')));
+  expect(onMoveClip).toHaveBeenCalledWith(clip.id, 7, clip.trackId, 'line-1');
 });

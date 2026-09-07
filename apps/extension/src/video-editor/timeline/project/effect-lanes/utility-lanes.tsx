@@ -80,11 +80,16 @@ function MotionSegments(
     return (
       <ProjectTimelineEffectSegment
         key={segment.id}
+        segmentId={segment.id}
         className={MOTION_LANE_SEGMENT_CLASS_NAME}
         hidden={!props.laneVisible}
         isSelected={isSelectedEffectSegment(props.selectedEffectSelection, 'motion', segment.id)}
         label={translate('videoEditor.timeline.motionLane')}
-        left={segment.start * props.pixelsPerSecond}
+        startTime={segment.start}
+        endTime={segment.end}
+        pixelsPerSecond={props.pixelsPerSecond}
+        projection={props.projection}
+        minimumWidth={20}
         onBeginEffectInteraction={(event) =>
           props.onBeginEffectInteraction(event, createMotionDragTarget(segment, 'move'))
         }
@@ -95,7 +100,6 @@ function MotionSegments(
           props.onBeginEffectInteraction(event, createMotionDragTarget(segment, 'resize-end'))
         }
         subtitle={subtitle}
-        width={Math.max(20, (segment.end - segment.start) * props.pixelsPerSecond)}
       />
     );
   });

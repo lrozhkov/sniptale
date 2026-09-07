@@ -12,5 +12,5 @@ it('provides a monotonic reversible overview-to-detail slider', () => {
     previous = scale;
   }
   expect(mapTimelineZoomSliderToPixelsPerSecond(0)).toBe(0.005);
-  expect(mapTimelineZoomSliderToPixelsPerSecond(100)).toBe(280);
+  expect(mapTimelineZoomSliderToPixelsPerSecond(100)).toBe(23040);
 });

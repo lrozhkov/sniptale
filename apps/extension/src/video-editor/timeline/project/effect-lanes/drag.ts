@@ -1,6 +1,11 @@
+import { getVideoCompositionActionDuration } from '../../../../features/video/composition/timeline/frame/actions';
 import { clampNumber } from '../../../../features/video/project/hydration';
 import type { VideoProject } from '../../../../features/video/project/types';
-import type { ProjectTimelineProps, TimelineEffectDragTarget } from '../types';
+import type {
+  ProjectTimelineProps,
+  TimelineEffectDragTarget,
+  TimelineEffectDragDraft,
+} from '../types';
 import { snapTimelineTime } from './snap';
 
 export interface EffectInteraction {
@@ -125,9 +130,11 @@ export function moveEffectTarget(
   project: VideoProject,
   projectDuration: number,
   moveEvent: PointerEvent,
-  callbacks: EffectMoveCallbacks
+  callbacks: EffectMoveCallbacks,
+  viewportDeltaSeconds = 0
 ): void {
-  const delta = (moveEvent.clientX - interaction.startClientX) / pixelsPerSecond;
+  const delta =
+    (moveEvent.clientX - interaction.startClientX) / pixelsPerSecond + viewportDeltaSeconds;
 
   switch (interaction.target.kind) {
     case 'action':
@@ -252,4 +259,87 @@ function snapMotionRegionRange(params: {
     params.pixelsPerSecond
   );
   return [params.startTime, clampNumber(endTime - params.startTime, 0.1, params.project.duration)];
+}
+
+/** Collects one proposed command and its display geometry without changing project state. */
+export function createEffectDraftCallbacks(
+  callbacks: EffectMoveCallbacks,
+  stage: (commit: () => void, range: Omit<TimelineEffectDragDraft, 'segmentId'>) => void
+): EffectMoveCallbacks {
+  return {
+    onMoveActionEvent: (id, time) =>
+      stage(() => callbacks.onMoveActionEvent(id, time), { startTime: time }),
+    onResizeActionEvent: (id, duration) =>
+      stage(() => callbacks.onResizeActionEvent(id, duration), { duration }),
+    onMoveCursorSegment: (id, nextId, startTime, endTime) =>
+      stage(
+        () => callbacks.onMoveCursorSegment(id, nextId, startTime, endTime),
+        endTime === null ? { startTime } : { startTime, duration: endTime - startTime }
+      ),
+    onMoveMotionRegion: (id, startTime) =>
+      stage(() => callbacks.onMoveMotionRegion(id, startTime), { startTime }),
+    onResizeMotionRegion: (id, startTime, duration) =>
+      stage(() => callbacks.onResizeMotionRegion(id, startTime, duration), { startTime, duration }),
+    onMoveTransitionSegment: (id, startTime) =>
+      stage(() => callbacks.onMoveTransitionSegment(id, startTime), { startTime }),
+    onUpdateEffectInstance: (id, patch) =>
+      stage(
+        () => callbacks.onUpdateEffectInstance(id, patch),
+        typeof patch.startTime === 'number' ? { startTime: patch.startTime } : {}
+      ),
+  };
+}
+
+/** Returning to the initial geometry must not rewrite source anchors through a no-op command. */
+export function isEffectDraftChanged(
+  target: TimelineEffectDragTarget,
+  range: Omit<TimelineEffectDragDraft, 'segmentId'>
+): boolean {
+  const originalStart = target.kind === 'action' ? target.originalTime : target.originalStart;
+  const originalDuration =
+    target.kind === 'action' || target.kind === 'motion'
+      ? target.originalDuration
+      : target.kind === 'cursor'
+        ? target.originalEnd - target.originalStart
+        : undefined;
+  return (
+    (range.startTime !== undefined && Math.abs(range.startTime - originalStart) > 1e-9) ||
+    (range.duration !== undefined &&
+      originalDuration !== undefined &&
+      Math.abs(range.duration - originalDuration) > 1e-9)
+  );
+}
+
+/** Display uses composition semantics while the deferred command keeps its authored values. */
+export function resolveEffectDisplayDraft(
+  project: VideoProject,
+  target: TimelineEffectDragTarget,
+  range: Omit<TimelineEffectDragDraft, 'segmentId'>
+): TimelineEffectDragDraft {
+  const draft = { segmentId: target.segmentId, ...range };
+  if (target.kind === 'action' && range.duration !== undefined) {
+    const event = project.actionEvents.find((item) => item.id === target.actionEventId);
+    return event
+      ? {
+          ...draft,
+          duration: getVideoCompositionActionDuration({ ...event, duration: range.duration }),
+        }
+      : draft;
+  }
+  if (target.kind === 'cursor') {
+    const startTime = range.startTime ?? target.originalStart;
+    return {
+      ...draft,
+      cursorSampleTimes: {
+        sampleId: target.sampleId,
+        nextSampleId: target.nextSampleId,
+        startTime,
+        endTime:
+          target.nextSampleId === null
+            ? null
+            : startTime + (range.duration ?? target.originalEnd - target.originalStart),
+      },
+    };
+  }
+  return draft;
 }

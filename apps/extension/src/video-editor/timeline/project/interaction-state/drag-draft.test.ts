@@ -287,13 +287,16 @@ it('preserves opposite linked edges and source bounds when shrinking a slow clip
   const start = trimProjectClipStart(project, 'screen', 100);
   for (const clip of start.clips) {
     expect(clip.startTime + clip.duration).toBeCloseTo(2);
-    expect(clip.startTime).toBeCloseTo(1.8);
+    expect(clip.startTime).toBeCloseTo(2 - 1 / project.fps);
   }
-  expect(start.clips[0]).toMatchObject({ sourceStart: 0.9, sourceDuration: expect.closeTo(0.1) });
+  expect(start.clips[0]).toMatchObject({
+    sourceStart: expect.closeTo(1 - 0.5 / project.fps),
+    sourceDuration: expect.closeTo(0.5 / project.fps),
+  });
   const end = trimProjectClipEnd(project, 'screen', -100);
   for (const clip of end.clips) {
     expect(clip.startTime).toBe(0);
-    expect(clip.duration).toBeCloseTo(0.2);
+    expect(clip.duration).toBeCloseTo(1 / project.fps);
   }
 });
 
@@ -306,13 +309,13 @@ it('keeps the opposite edge fixed when an imported clip starts below the source 
       ...base,
       groupId: null,
       startTime: 1,
-      duration: 0.05,
+      duration: 0.5 / project.fps,
       sourceStart: 0.5,
-      sourceDuration: 0.05,
+      sourceDuration: 0.5 / project.fps,
     },
   ];
   const result = trimProjectClipStart(project, 'screen', 0.99).clips[0]!;
-  expect(result.startTime + result.duration).toBeCloseTo(1.05);
+  expect(result.startTime + result.duration).toBeCloseTo(1 + 0.5 / project.fps);
   expect(trimProjectClipStart(project, 'screen', 1.02)).toBe(project);
   expect(trimProjectClipStart(project, 'screen', 1)).toBe(project);
 });

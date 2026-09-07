@@ -139,7 +139,9 @@ function verifyMoveAndTrimMutations(): void {
   const project = createTimelineProject();
 
   expect(moveProjectClip(project, 'missing', 2)).toBe(project);
-  expect(trimProjectClipStart(project, 'clip-1', 4.99).clips[0]?.duration).toBeCloseTo(0.1);
+  expect(trimProjectClipStart(project, 'clip-1', 4.99).clips[0]?.duration).toBeCloseTo(
+    1 / project.fps
+  );
 
   const movedProject = moveProjectClip(project, 'clip-1', 3);
   const movedClip = movedProject.clips.find((clip) => clip.id === 'clip-1');
@@ -168,10 +170,10 @@ function verifyMoveAndTrimMutations(): void {
     (clip) => clip.id === 'clip-1'
   );
   expect(minimalEndClip?.type).toBe(VideoProjectClipType.VIDEO);
-  expect(minimalEndClip?.duration).toBeCloseTo(0.1, 5);
+  expect(minimalEndClip?.duration).toBeCloseTo(1 / project.fps, 5);
   expect(
     minimalEndClip && 'sourceDuration' in minimalEndClip ? minimalEndClip.sourceDuration : null
-  ).toBeCloseTo(0.1, 5);
+  ).toBeCloseTo(1 / project.fps, 5);
 
   expect(trimProjectClipEnd(project, 'clip-1', 10)).toBe(project);
 }
@@ -302,3 +304,21 @@ it('keeps outer trims from moving an overlapping clip inside its neighbor', () =
   expect(shortenedTrailing.startTime + shortenedTrailing.duration).toBeCloseTo(5.1);
   expect(shortenedTrailing.startTime).toBe(4);
 });
+
+it.each([30, 60, 240])(
+  'trims short source clips by project frames at %sfps without a 100ms expansion',
+  (fps) => {
+    const project = createTimelineProject();
+    project.fps = fps;
+    const clip = project.clips[0]!;
+    if (clip.type !== VideoProjectClipType.VIDEO) throw new Error('Expected video fixture');
+    clip.duration = 3 / fps;
+    clip.sourceDuration = 3 / fps;
+    const end = trimProjectClipEnd(project, clip.id, clip.startTime + 2 / fps).clips[0]!;
+    expect(end.duration).toBeCloseTo(2 / fps, 10);
+    const start = trimProjectClipStart(project, clip.id, clip.startTime + 1 / fps).clips[0]!;
+    expect(start.duration).toBeCloseTo(2 / fps, 10);
+    const minimum = trimProjectClipEnd(project, clip.id, 0).clips[0]!;
+    expect(minimum.duration).toBeCloseTo(1 / fps, 10);
+  }
+);

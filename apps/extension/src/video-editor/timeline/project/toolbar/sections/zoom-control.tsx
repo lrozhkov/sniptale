@@ -25,11 +25,6 @@ export function ProjectTimelineZoomControl({
 }: Pick<ProjectTimelineToolbarProps, 'pixelsPerSecond' | 'onZoomChange'> & {
   onPreviewSuspendedChange: (suspended: boolean) => void;
 }) {
-  const commitZoomValue = (value: number) => {
-    onZoomChange(mapTimelineZoomSliderToPixelsPerSecond(value));
-    onPreviewSuspendedChange(false);
-  };
-
   return (
     <div className="flex shrink-0 items-center gap-1 px-1 text-[var(--sniptale-color-text-secondary)]">
       <span
@@ -49,14 +44,14 @@ export function ProjectTimelineZoomControl({
           max={TIMELINE_ZOOM_SLIDER_MAX}
           step={1}
           value={mapTimelinePixelsPerSecondToSliderValue(pixelsPerSecond)}
-          onBlur={(event) => commitZoomValue(Number(event.currentTarget.value))}
+          onBlur={() => onPreviewSuspendedChange(false)}
           onChange={(event) => {
             onPreviewSuspendedChange(true);
             onZoomChange(mapTimelineZoomSliderToPixelsPerSecond(Number(event.currentTarget.value)));
           }}
-          onKeyUp={(event) => commitZoomValue(Number(event.currentTarget.value))}
+          onKeyUp={() => onPreviewSuspendedChange(false)}
           onPointerCancel={() => onPreviewSuspendedChange(false)}
-          onPointerUp={(event) => commitZoomValue(Number(event.currentTarget.value))}
+          onPointerUp={() => onPreviewSuspendedChange(false)}
         />
       </span>
       <TimelineZoomIcon direction="in" />

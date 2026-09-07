@@ -4,6 +4,6 @@ it('preserves fractional overview scales and bounds invalid values to finite geo
   expect(clampTimelineScale(0.01)).toBe(0.01);
   expect(clampTimelineScale(90)).toBe(90);
   expect(clampTimelineScale(-Infinity)).toBe(0.005);
-  expect(clampTimelineScale(Infinity)).toBe(280);
+  expect(clampTimelineScale(Infinity)).toBe(23040);
   expect(clampTimelineScale(NaN)).toBe(90);
 });

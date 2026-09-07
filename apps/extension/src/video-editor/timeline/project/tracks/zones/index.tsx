@@ -1,3 +1,8 @@
+import {
+  projectTimelineInterval,
+  projectTimelinePoint,
+  type TimelineProjection,
+} from '../../interaction-state/projection';
 import { Trash2 } from 'lucide-react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { translate } from '../../../../../platform/i18n';
@@ -23,6 +28,7 @@ export function ProjectTimelineTrackZones(props: {
   gapZones: TimelineGapZone[];
   junctionZones?: TimelineJunctionZone[];
   pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
   selectedTransitionId?: string | null;
   onCloseTrackGap: (trackId: string, gapStart: number, gapEnd: number) => void;
   onDropEffectDocument?: ProjectTimelineProps['onDropEffectDocument'];
@@ -30,15 +36,21 @@ export function ProjectTimelineTrackZones(props: {
 }) {
   return (
     <>
-      <TrackCutZoneLayer cutZones={props.cutZones} pixelsPerSecond={props.pixelsPerSecond} />
+      <TrackCutZoneLayer
+        cutZones={props.cutZones}
+        pixelsPerSecond={props.pixelsPerSecond}
+        projection={props.projection}
+      />
       <TrackGapZoneLayer
         gapZones={props.gapZones}
         onCloseTrackGap={props.onCloseTrackGap}
         pixelsPerSecond={props.pixelsPerSecond}
+        projection={props.projection}
       />
       <TrackJunctionZoneLayer
         junctionZones={props.junctionZones ?? []}
         pixelsPerSecond={props.pixelsPerSecond}
+        projection={props.projection}
         selectedTransitionId={props.selectedTransitionId ?? null}
         onDropEffectDocument={props.onDropEffectDocument}
         onSelectTransition={props.onSelectTransition}
@@ -52,6 +64,7 @@ function TrackJunctionZoneLayer(props: {
   onBeginTransitionTrim: TransitionTrimHandler | undefined;
   junctionZones: TimelineJunctionZone[];
   pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
   selectedTransitionId: string | null;
   onDropEffectDocument: ProjectTimelineProps['onDropEffectDocument'] | undefined;
   onSelectTransition: ((transitionId: string) => void) | undefined;
@@ -61,6 +74,7 @@ function TrackJunctionZoneLayer(props: {
       key={zone.id}
       zone={zone}
       pixelsPerSecond={props.pixelsPerSecond}
+      projection={props.projection}
       selected={props.selectedTransitionId === zone.id}
       onDropEffectDocument={props.onDropEffectDocument}
       onSelectTransition={props.onSelectTransition}
@@ -74,9 +88,23 @@ function TrackJunctionZoneButton(props: {
   onDropEffectDocument: ProjectTimelineProps['onDropEffectDocument'] | undefined;
   onSelectTransition: ((transitionId: string) => void) | undefined;
   pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
   selected: boolean;
   zone: TimelineJunctionZone;
 }) {
+  const geometry = props.projection
+    ? projectTimelineInterval(props.projection, props.zone.start, props.zone.end)
+    : {
+        ...getJunctionZoneStyle(props.zone, props.pixelsPerSecond),
+        offsetSeconds: 0,
+        durationSeconds: props.zone.end - props.zone.start,
+        includesStart: true,
+        includesEnd: true,
+      };
+  if (!geometry) return null;
+  const duration = props.zone.end - props.zone.start;
+  const from = (geometry.offsetSeconds / duration) * 20;
+  const to = ((geometry.offsetSeconds + geometry.durationSeconds) / duration) * 20;
   return (
     <div
       {...TIMELINE_OBJECT_MARKER_PROPS}
@@ -90,7 +118,7 @@ function TrackJunctionZoneButton(props: {
           ? 'outline-[var(--sniptale-color-border-accent-strong)]'
           : 'outline-[var(--sniptale-color-border-strong)]',
       ].join(' ')}
-      style={getJunctionZoneStyle(props.zone, props.pixelsPerSecond)}
+      style={{ left: geometry.left, width: geometry.width }}
       onClick={(event) => {
         event.stopPropagation();
         props.onSelectTransition?.(props.zone.id);
@@ -127,46 +155,48 @@ function TrackJunctionZoneButton(props: {
         preserveAspectRatio="none"
       >
         <path
-          d="M0 0 L100 20 M0 20 L100 0"
+          d={`M0 ${from} L100 ${to} M0 ${20 - from} L100 ${20 - to}`}
           fill="none"
           stroke="currentColor"
           strokeWidth="1"
           vectorEffect="non-scaling-stroke"
         />
       </svg>
-      {(props.zone.end - props.zone.start) * props.pixelsPerSecond >= 64 ? (
+      {geometry.width >= 64 ? (
         <span className="pointer-events-none relative truncate px-1 bg-[var(--sniptale-color-surface-overlay)]">
           {props.zone.label}
         </span>
       ) : null}
       {props.onBeginTransitionTrim
-        ? (['start', 'end'] as const).map((edge) => (
-            <button
-              key={edge}
-              {...TIMELINE_OBJECT_MARKER_PROPS}
-              type="button"
-              tabIndex={-1}
-              aria-label={[
-                props.zone.title,
-                translate(
-                  edge === 'start'
-                    ? 'videoEditor.app.sourceInLabel'
-                    : 'videoEditor.app.sourceOutLabel'
-                ),
-              ].join(' ')}
-              data-transition-trim={edge}
-              className={[
-                'absolute inset-y-0 z-10 w-[min(8px,25%)] !cursor-ew-resize',
-                'bg-[var(--sniptale-color-border-strong)] opacity-40 hover:opacity-100',
-                edge === 'start' ? 'left-0' : 'right-0',
-              ].join(' ')}
-              onClick={(event) => event.stopPropagation()}
-              onPointerDown={(event) => {
-                event.stopPropagation();
-                props.onBeginTransitionTrim?.(event, props.zone.id, edge);
-              }}
-            />
-          ))
+        ? (['start', 'end'] as const)
+            .filter((edge) => (edge === 'start' ? geometry.includesStart : geometry.includesEnd))
+            .map((edge) => (
+              <button
+                key={edge}
+                {...TIMELINE_OBJECT_MARKER_PROPS}
+                type="button"
+                tabIndex={-1}
+                aria-label={[
+                  props.zone.title,
+                  translate(
+                    edge === 'start'
+                      ? 'videoEditor.app.sourceInLabel'
+                      : 'videoEditor.app.sourceOutLabel'
+                  ),
+                ].join(' ')}
+                data-transition-trim={edge}
+                className={[
+                  'absolute inset-y-0 z-10 w-[min(8px,25%)] !cursor-ew-resize',
+                  'bg-[var(--sniptale-color-border-strong)] opacity-40 hover:opacity-100',
+                  edge === 'start' ? 'left-0' : 'right-0',
+                ].join(' ')}
+                onClick={(event) => event.stopPropagation()}
+                onPointerDown={(event) => {
+                  event.stopPropagation();
+                  props.onBeginTransitionTrim?.(event, props.zone.id, edge);
+                }}
+              />
+            ))
         : null}
     </div>
   );
@@ -183,28 +213,45 @@ function getJunctionZoneStyle(zone: TimelineJunctionZone, pixelsPerSecond: numbe
   };
 }
 
-function TrackCutZoneLayer(props: { cutZones: TimelineCutZone[]; pixelsPerSecond: number }) {
-  return props.cutZones.map((zone) => (
-    <div
-      key={zone.id}
-      aria-hidden="true"
-      className={[
-        'pointer-events-none absolute inset-y-3 z-20 w-[6px] -translate-x-1/2 rounded-full',
-        'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_80%,transparent)]',
-        'shadow-[0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-border-strong)_40%,transparent)]',
-      ].join(' ')}
-      style={{ left: zone.time * props.pixelsPerSecond }}
-    />
-  ));
+function TrackCutZoneLayer(props: {
+  cutZones: TimelineCutZone[];
+  pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
+}) {
+  return props.cutZones.map((zone) => {
+    const left = props.projection
+      ? projectTimelinePoint(props.projection, zone.time)
+      : zone.time * props.pixelsPerSecond;
+    if (left === null) return null;
+    return (
+      <div
+        key={zone.id}
+        aria-hidden="true"
+        className={[
+          'pointer-events-none absolute inset-y-3 z-20 w-[6px] -translate-x-1/2 rounded-full',
+          'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_80%,transparent)]',
+          'shadow-[0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-border-strong)_40%,transparent)]',
+        ].join(' ')}
+        style={{ left }}
+      />
+    );
+  });
 }
 
 function TrackGapZoneLayer(props: {
   gapZones: TimelineGapZone[];
   onCloseTrackGap: (trackId: string, gapStart: number, gapEnd: number) => void;
   pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
 }) {
   return props.gapZones.map((zone) => {
-    const width = (zone.end - zone.start) * props.pixelsPerSecond;
+    const geometry = props.projection
+      ? projectTimelineInterval(props.projection, zone.start, zone.end)
+      : {
+          left: zone.start * props.pixelsPerSecond,
+          width: (zone.end - zone.start) * props.pixelsPerSecond,
+        };
+    if (!geometry) return null;
 
     return (
       <button
@@ -219,7 +266,7 @@ function TrackGapZoneLayer(props: {
         }}
         onPointerDown={(event) => event.stopPropagation()}
         className={[
-          'group absolute inset-y-2 z-10 overflow-hidden rounded-sm outline outline-1 -outline-offset-1 outline-dashed',
+          'group absolute inset-y-2 z-0 overflow-hidden rounded-sm outline outline-1 -outline-offset-1 outline-dashed',
           'outline-[color:color-mix(in_srgb,var(--sniptale-color-text-muted)_28%,transparent)]',
           'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_0%,transparent)]',
           'transition-[background-color,outline-color]',
@@ -227,8 +274,8 @@ function TrackGapZoneLayer(props: {
           'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_28%,transparent)]',
         ].join(' ')}
         style={{
-          left: zone.start * props.pixelsPerSecond,
-          width,
+          left: geometry.left,
+          width: geometry.width,
           backgroundImage: [
             'repeating-linear-gradient(135deg, transparent, transparent 5px,',
             'color-mix(in srgb, var(--sniptale-color-text-muted) 8%, transparent) 5px,',

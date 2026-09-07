@@ -167,7 +167,7 @@ function clampClipTrimDelta(
   for (const clip of clips) {
     const sourceTimed = isSourceTimedClip(clip);
     const rate = sourceTimed ? normalizeClipPlaybackRate(clip.playbackRate ?? 1) : 1;
-    const minimumDuration = Math.max(0.1, 0.1 / rate);
+    const minimumDuration = 1 / project.fps;
     if (edge === 'start') {
       minimum = Math.max(minimum, -clip.startTime);
       maximum = Math.min(maximum, clip.duration - minimumDuration);

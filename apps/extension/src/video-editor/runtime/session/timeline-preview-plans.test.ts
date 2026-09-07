@@ -135,3 +135,14 @@ it('bounds unused decoded frames while retaining every active viewport sample', 
 it('uses overview pixel density for sparse source samples', () => {
   expect(samplesFor(2, 200, { startTime: 0, endTime: 1000, pixelsPerSecond: 0.01 })).toEqual([2]);
 });
+
+it('samples distinct source positions within a high-fps detail viewport', () => {
+  const samples = samplesFor(0, 100, {
+    startTime: 20,
+    endTime: 20 + 4 / 240,
+    pixelsPerSecond: 23040,
+  });
+  const visible = samples.filter((time) => time >= 20 && time < 20 + 8 / 240).sort((a, b) => a - b);
+  expect(visible.length).toBeGreaterThanOrEqual(4);
+  expect(visible[1]! - visible[0]!).toBeLessThanOrEqual(2 / 240);
+});

@@ -15,6 +15,7 @@ function TimelineViewportHarness(props: {
   onViewportChange: (viewport: TimelinePreviewViewport) => void;
   pixelsPerSecond: number;
   renderToken: number;
+  startTime?: number | undefined;
 }) {
   const timelineRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -23,6 +24,7 @@ function TimelineViewportHarness(props: {
     pixelsPerSecond: props.pixelsPerSecond,
     timelineRef,
     timelineWidth: 400,
+    startTime: props.startTime,
   });
 
   return (
@@ -149,4 +151,34 @@ it('reports the actual time span at fractional overview scale', () => {
   const viewports: TimelinePreviewViewport[] = [];
   renderHarness(1, viewports, 0.01);
   expect(viewports).toEqual([{ startTime: 0, endTime: 40000, pixelsPerSecond: 0.01 }]);
+});
+
+it('publishes precise start changes even when the native scroll position is unchanged', () => {
+  const onViewportChange = vi.fn();
+  const startTime = 43200 + 1 / 240;
+  act(() =>
+    root?.render(
+      <TimelineViewportHarness
+        onViewportChange={onViewportChange}
+        pixelsPerSecond={280}
+        renderToken={1}
+        startTime={startTime}
+      />
+    )
+  );
+  expect(onViewportChange.mock.lastCall?.[0].startTime).toBe(startTime);
+  act(() =>
+    root?.render(
+      <TimelineViewportHarness
+        onViewportChange={onViewportChange}
+        pixelsPerSecond={280}
+        renderToken={2}
+        startTime={startTime + 1 / 240}
+      />
+    )
+  );
+  expect(onViewportChange).toHaveBeenCalledTimes(2);
+  const viewport = onViewportChange.mock.lastCall?.[0];
+  expect(viewport.startTime).toBe(startTime + 1 / 240);
+  expect(viewport.endTime - viewport.startTime).toBeCloseTo(400 / 280, 10);
 });

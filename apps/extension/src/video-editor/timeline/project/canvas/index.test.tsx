@@ -1,9 +1,13 @@
+import { createTimelineProjection } from '../interaction-state/projection';
 // @vitest-environment jsdom
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectFromRecording,
+} from '../../../../features/video/project/factories/creation';
 import { createVideoProjectMotionRegion } from '../../../../features/video/project/motion';
 import { createSceneSelection } from '../../../project/selection/model';
 import { ProjectTimelineCanvas } from './';
@@ -408,3 +412,54 @@ function createImportHandlers(
     ...overrides,
   };
 }
+
+it('projects clip, motion, range and playhead together in a distant viewport without editing source data', () => {
+  const project = createVideoProjectFromRecording({
+    duration: 86400,
+    filename: 'day.webm',
+    height: 720,
+    width: 1280,
+    mimeType: 'video/webm',
+    recordingId: 'day-recording',
+    size: 100,
+  });
+  const clip = project.clips[0]!;
+  project.motionRegions = [
+    { ...createVideoProjectMotionRegion(project, 0), startTime: 0, duration: 86400 },
+  ];
+  const original = structuredClone(project);
+  const projection = createTimelineProjection({
+    extentSeconds: 86405,
+    pixelsPerSecond: 280,
+    viewportWidth: 1000,
+    startTime: 43200,
+  });
+  act(() =>
+    root?.render(
+      <ProjectTimelineCanvas
+        {...createCanvasProps(project, { playbackRange: { start: 0, end: 86400 } })}
+        projection={projection}
+        pixelsPerSecond={280}
+        timelineWidth={86405 * 280}
+        currentTime={43200 + 500 / 280}
+      />
+    )
+  );
+  const renderedClip = container?.querySelector<HTMLElement>(
+    `[data-project-timeline-clip="${clip.id}"]`
+  );
+  expect(parseFloat(renderedClip?.style.width ?? '')).toBeCloseTo(1240, 5);
+  expect(parseFloat(renderedClip?.style.left ?? '')).toBeCloseTo(-120, 5);
+  const playhead = container?.querySelector<HTMLElement>(
+    '[data-ui="video-editor.timeline.playhead-handle"]'
+  );
+  expect(parseFloat(playhead?.style.left ?? '')).toBeCloseTo(500, 5);
+  const motion = container?.querySelector<HTMLElement>(
+    '[aria-label="videoEditor.timeline.motionLane"]'
+  )?.parentElement;
+  expect(parseFloat(motion?.style.width ?? '')).toBeCloseTo(1240, 5);
+  expect(
+    container?.querySelector('[aria-label="videoEditor.timeline.motionLane:resize-start"]')
+  ).toBeNull();
+  expect(project).toEqual(original);
+});

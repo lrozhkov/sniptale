@@ -30,6 +30,7 @@ export function ProjectTimelineClipLayout({
   onSelectClip,
   onBeginClipInteraction,
 }: ProjectTimelineClipLayoutProps) {
+  if (!viewModel.visible) return null;
   return (
     <div
       {...TIMELINE_OBJECT_MARKER_PROPS}
@@ -72,26 +73,32 @@ function ProjectTimelineClipContent({
 
   return (
     <>
-      <ProjectTimelineTrimHandle
-        className={`${viewModel.trimHandleClassName} left-0`}
-        clip={clip}
-        disabled={trackLocked}
-        mode="trim-start"
-        onBeginClipInteraction={onBeginClipInteraction}
-      />
-      <ProjectTimelineTrimHandle
-        className={`${viewModel.trimHandleClassName} right-0`}
-        clip={clip}
-        disabled={trackLocked}
-        mode="trim-end"
-        onBeginClipInteraction={onBeginClipInteraction}
-      />
+      {viewModel.includesStart ? (
+        <ProjectTimelineTrimHandle
+          className={`${viewModel.trimHandleClassName} left-0`}
+          clip={clip}
+          disabled={trackLocked}
+          mode="trim-start"
+          onBeginClipInteraction={onBeginClipInteraction}
+        />
+      ) : null}
+      {viewModel.includesEnd ? (
+        <ProjectTimelineTrimHandle
+          className={`${viewModel.trimHandleClassName} right-0`}
+          clip={clip}
+          disabled={trackLocked}
+          mode="trim-end"
+          onBeginClipInteraction={onBeginClipInteraction}
+        />
+      ) : null}
       {shouldRenderVisualPreview ? (
         <ProjectTimelineVisualClipPreview
           preview={preview}
           clip={clip}
           width={viewModel.width}
           tileWidth={viewModel.previewTileWidth}
+          offsetSeconds={viewModel.offsetSeconds}
+          visibleDuration={viewModel.visibleDuration}
         />
       ) : viewModel.waveformPeaks.length > 0 ? (
         <div className="pointer-events-none absolute inset-x-2 inset-y-2 overflow-hidden rounded-[12px]">
@@ -118,11 +125,15 @@ function ProjectTimelineVisualClipPreview({
   clip,
   width,
   tileWidth,
+  offsetSeconds,
+  visibleDuration,
 }: {
   preview: TimelineClipPreview | undefined;
   clip: VideoProjectClip;
   width: number;
   tileWidth: number;
+  offsetSeconds: number;
+  visibleDuration: number;
 }) {
   if (!preview || tileWidth === 0 || clip.duration <= 0) return null;
   const rate =
@@ -130,6 +141,8 @@ function ProjectTimelineVisualClipPreview({
       ? normalizeClipPlaybackRate(clip.playbackRate ?? 1)
       : 1;
   const sourceStart = clip.type === VideoProjectClipType.VIDEO ? clip.sourceStart : 0;
+  const scale = visibleDuration > 0 ? width / visibleDuration : 0;
+  const offsetPixels = offsetSeconds * scale;
   const frames =
     preview.kind === 'video'
       ? preview.frames
@@ -139,10 +152,10 @@ function ProjectTimelineVisualClipPreview({
       {frames.map((frame) => {
         const start = Math.max(0, (frame.sourceStart - sourceStart) / rate);
         const end = Math.min(clip.duration, (frame.sourceEnd - sourceStart) / rate);
-        const firstCell = Math.ceil(((start / clip.duration) * width) / tileWidth);
-        const lastCell = Math.ceil(((end / clip.duration) * width) / tileWidth);
-        const left = firstCell * tileWidth;
-        const right = Math.min(width, lastCell * tileWidth);
+        const firstCell = Math.ceil((start * scale) / tileWidth);
+        const lastCell = Math.ceil((end * scale) / tileWidth);
+        const left = Math.max(0, firstCell * tileWidth - offsetPixels);
+        const right = Math.min(width, lastCell * tileWidth - offsetPixels);
         if (right <= left) return null;
         return (
           <div
@@ -155,6 +168,7 @@ function ProjectTimelineVisualClipPreview({
               width: right - left,
               backgroundImage: `url(${JSON.stringify(frame.url)})`,
               backgroundSize: 'auto 100%',
+              backgroundPositionX: -((offsetPixels + left) % tileWidth),
             }}
           />
         );
@@ -169,12 +183,12 @@ function ProjectTimelineClipVisualOverlays({
   return (
     <>
       <ProjectTimelineFadeOverlay
-        align="left"
+        style={viewModel.fadeInOverlayStyle}
         title={translate('videoEditor.sidebar.fadeInLabel')}
         width={viewModel.fadeInOverlayWidth}
       />
       <ProjectTimelineFadeOverlay
-        align="right"
+        style={viewModel.fadeOutOverlayStyle}
         title={translate('videoEditor.sidebar.fadeOutLabel')}
         width={viewModel.fadeOutOverlayWidth}
       />
@@ -225,11 +239,11 @@ function ProjectTimelineTrimHandle({
 }
 
 function ProjectTimelineFadeOverlay({
-  align,
+  style,
   title,
   width,
 }: {
-  align: 'left' | 'right';
+  style: React.CSSProperties;
   title: string;
   width: number;
 }) {
@@ -237,19 +251,7 @@ function ProjectTimelineFadeOverlay({
     return null;
   }
 
-  return (
-    <div
-      title={title}
-      className={[
-        `pointer-events-none absolute inset-y-0 ${align}-0 z-0`,
-        align === 'left' ? 'bg-gradient-to-r' : 'bg-gradient-to-l',
-        'from-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_58%,transparent)]',
-        'via-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_24%,transparent)]',
-        'to-transparent',
-      ].join(' ')}
-      style={{ width }}
-    />
-  );
+  return <div title={title} className="pointer-events-none absolute inset-y-0 z-0" style={style} />;
 }
 
 function ProjectTimelineClipLabel({

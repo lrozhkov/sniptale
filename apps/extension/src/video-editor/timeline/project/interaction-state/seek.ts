@@ -4,6 +4,7 @@ import { startWindowPointerSession } from '../../../interaction/pointer-session'
 
 interface UseProjectTimelineSeekOptions {
   pixelsPerSecond: number;
+  readTimelineStartTime?: (() => number) | undefined;
   timelineRef: RefObject<HTMLDivElement | null>;
   onSeek: (time: number) => void;
   projectDuration: number;
@@ -12,27 +13,30 @@ interface UseProjectTimelineSeekOptions {
 export function resolveTimelineTimeFromClientX(
   timelineElement: HTMLDivElement,
   clientX: number,
-  pixelsPerSecond: number
+  pixelsPerSecond: number,
+  startTime = timelineElement.scrollLeft / pixelsPerSecond
 ): number {
   const rect = timelineElement.getBoundingClientRect();
-  const x = clientX - rect.left + timelineElement.scrollLeft;
-  return Math.max(0, x / pixelsPerSecond);
+  const x = clientX - rect.left;
+  return Math.max(0, startTime + x / pixelsPerSecond);
 }
 
 export function resolveClampedTimelineSeekTime(
   timelineElement: HTMLDivElement,
   clientX: number,
   pixelsPerSecond: number,
-  projectDuration: number
+  projectDuration: number,
+  startTime?: number
 ): number {
   return Math.min(
     Math.max(0, projectDuration),
-    resolveTimelineTimeFromClientX(timelineElement, clientX, pixelsPerSecond)
+    resolveTimelineTimeFromClientX(timelineElement, clientX, pixelsPerSecond, startTime)
   );
 }
 
 export function useProjectTimelineSeek({
   pixelsPerSecond,
+  readTimelineStartTime,
   timelineRef,
   onSeek,
   projectDuration,
@@ -50,11 +54,12 @@ export function useProjectTimelineSeek({
           timelineRef.current,
           clientX,
           pixelsPerSecond,
-          projectDuration
+          projectDuration,
+          readTimelineStartTime?.()
         )
       );
     },
-    [onSeek, pixelsPerSecond, projectDuration, timelineRef]
+    [onSeek, pixelsPerSecond, projectDuration, readTimelineStartTime, timelineRef]
   );
 
   const beginPlayheadScrub = useCallback(
@@ -65,7 +70,10 @@ export function useProjectTimelineSeek({
       const timeline = timelineRef.current;
       if (!timeline) return;
       const rect = timeline.getBoundingClientRect();
-      const playheadClientX = rect.left - timeline.scrollLeft + currentTime * pixelsPerSecond;
+      const playheadClientX =
+        rect.left +
+        (currentTime - (readTimelineStartTime?.() ?? timeline.scrollLeft / pixelsPerSecond)) *
+          pixelsPerSecond;
       const pointerOffset = event.clientX - playheadClientX;
       cleanupRef.current = startWindowPointerSession({
         onMove: (moveEvent) => seekToClientX(moveEvent.clientX - pointerOffset),
@@ -79,7 +87,7 @@ export function useProjectTimelineSeek({
         },
       });
     },
-    [pixelsPerSecond, seekToClientX, timelineRef]
+    [pixelsPerSecond, readTimelineStartTime, seekToClientX, timelineRef]
   );
   useEffect(() => () => cleanupRef.current?.(), []);
 

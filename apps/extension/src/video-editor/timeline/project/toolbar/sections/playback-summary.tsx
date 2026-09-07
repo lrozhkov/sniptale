@@ -1,3 +1,4 @@
+import { formatTimelineRulerLabel } from '../../interaction-state/helpers';
 import { Pause, Play, RotateCcw, SkipBack, SkipForward, StepBack, StepForward } from 'lucide-react';
 
 import { translate } from '../../../../../platform/i18n';
@@ -6,12 +7,7 @@ import type { VideoEditorPlaybackRange } from '../../../../interaction/playback/
 import { toolbarIconButtonClassName } from './constants/button';
 
 export function formatPlaybackCounterTime(value: number): string {
-  const totalTenths = Math.max(0, Math.round(value * 10));
-  const minutes = Math.floor(totalTenths / 600);
-  const seconds = Math.floor((totalTenths % 600) / 10);
-  const tenths = totalTenths % 10;
-
-  return `${minutes}:${String(seconds).padStart(2, '0')}.${tenths}`;
+  return formatTimelineRulerLabel(value, true);
 }
 
 function PlaybackToggleButton(props: { isPlaying: boolean; onTogglePlay: () => void }) {

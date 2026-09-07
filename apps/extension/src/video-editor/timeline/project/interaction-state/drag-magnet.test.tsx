@@ -291,7 +291,7 @@ it('hides a trim guide when the mutation owner clamps away from the snap target'
   });
 
   expect(onTrimClipStart).not.toHaveBeenCalled();
-  expect(harness.ghosts.at(-1)?.startTime).toBeCloseTo(2.9);
+  expect(harness.ghosts.at(-1)?.startTime).toBeCloseTo(3 - 1 / project.fps);
   expect(harness.guides.at(-1)).toBeNull();
   act(() => window.dispatchEvent(new Event('pointerup')));
   expect(onTrimClipStart).toHaveBeenLastCalledWith(clip.id, 3);

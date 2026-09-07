@@ -195,3 +195,83 @@ it('does not divide clip bodies across logical lanes', () => {
   });
   expect(model.style.clipPath).toBe('inset(0 0px 0 0px)');
 });
+
+it('bounds a day-long clip to the visible source interval without invented trim edges', async () => {
+  const { createTimelineProjection } = await import('../interaction-state/projection');
+  const project = createEmptyVideoProject('Timeline');
+  const clip = { ...createVideoClip(project.tracks[0]!.id), startTime: 0, duration: 86400 };
+  const projection = createTimelineProjection({
+    extentSeconds: 86400,
+    pixelsPerSecond: 23040,
+    viewportWidth: 1000,
+    startTime: 43200,
+  });
+  const model = buildProjectTimelineClipViewModel({
+    clip,
+    project,
+    projection,
+    pixelsPerSecond: 23040,
+    isHovered: false,
+    isSelected: true,
+    trackLocked: false,
+  });
+  expect(model.width).toBeCloseTo(1240, 5);
+  expect(model.left).toBeCloseTo(-120, 5);
+  expect(model.offsetSeconds).toBeCloseTo(43200 - 120 / 23040, 10);
+  expect(model.includesStart).toBe(false);
+  expect(model.includesEnd).toBe(false);
+  expect(Number(model.labelStyle.left) + model.left).toBeGreaterThanOrEqual(0);
+  expect(Number(model.labelStyle.right)).toBeGreaterThanOrEqual(120);
+});
+
+it('retains the visible middle of a fade with bounded geometry', async () => {
+  const { createTimelineProjection } = await import('../interaction-state/projection');
+  const project = createEmptyVideoProject('Timeline');
+  const clip = {
+    ...createVideoClip(project.tracks[0]!.id),
+    startTime: 0,
+    duration: 86400,
+    fadeInMs: 43200000,
+  };
+  const projection = createTimelineProjection({
+    extentSeconds: 86400,
+    pixelsPerSecond: 23040,
+    viewportWidth: 1000,
+    startTime: 40000,
+  });
+  const model = buildProjectTimelineClipViewModel({
+    clip,
+    project,
+    projection,
+    pixelsPerSecond: 23040,
+    isHovered: false,
+    isSelected: true,
+    trackLocked: false,
+  });
+  expect(model.includesStart).toBe(false);
+  expect(model.fadeInOverlayWidth).toBeCloseTo(model.width, 5);
+  expect(model.fadeOutOverlayWidth).toBe(0);
+});
+
+it('keeps a one-frame clip visible at project overview scale', async () => {
+  const { createTimelineProjection } = await import('../interaction-state/projection');
+  const project = createEmptyVideoProject('Overview');
+  const clip = { ...createVideoClip(project.tracks[0]!.id), startTime: 100, duration: 1 / 240 };
+  const model = buildProjectTimelineClipViewModel({
+    clip,
+    project,
+    projection: createTimelineProjection({
+      extentSeconds: 86400,
+      pixelsPerSecond: 0.005,
+      viewportWidth: 1000,
+      startTime: 0,
+    }),
+    pixelsPerSecond: 0.005,
+    isHovered: false,
+    isSelected: false,
+    trackLocked: false,
+  });
+  expect(model.visible).toBe(true);
+  expect(model.width).toBeGreaterThanOrEqual(1);
+  expect(clip.duration).toBe(1 / 240);
+});

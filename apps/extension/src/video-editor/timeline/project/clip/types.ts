@@ -1,3 +1,4 @@
+import type { TimelineProjection } from '../interaction-state/projection';
 import type React from 'react';
 import type { VideoProject, VideoProjectClip } from '../../../../features/video/project/types';
 import type { TimelineClipPreview } from '../../../contracts/timeline-preview';
@@ -8,6 +9,7 @@ export interface ProjectTimelineClipProps {
   isHovered: boolean;
   isSelected: boolean;
   pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
   preview?: TimelineClipPreview;
   project: VideoProject;
   trackClipTop?: number;
@@ -23,12 +25,19 @@ export interface ProjectTimelineClipProps {
 }
 
 export interface ProjectTimelineClipViewModel {
+  visible: boolean;
+  includesStart: boolean;
+  includesEnd: boolean;
+  offsetSeconds: number;
+  visibleDuration: number;
   bodyInsetLeft: number;
   bodyInsetRight: number;
   clipClassName: string;
   edgeClassName: string;
   fadeInOverlayWidth: number;
+  fadeInOverlayStyle: React.CSSProperties;
   fadeOutOverlayWidth: number;
+  fadeOutOverlayStyle: React.CSSProperties;
   labelStyle: React.CSSProperties;
   left: number;
   style: React.CSSProperties;

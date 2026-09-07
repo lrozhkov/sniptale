@@ -1,5 +1,7 @@
+import { createContext, useContext } from 'react';
+import { projectTimelineInterval, type TimelineProjection } from '../interaction-state/projection';
 import { TIMELINE_OBJECT_MARKER_PROPS } from '../canvas/hover-preview';
-import type { TimelineEffectSelection } from '../types';
+import type { TimelineEffectSelection, TimelineEffectDragDraft } from '../types';
 import {
   EFFECT_SEGMENT_BASE_CLASS_NAME,
   EFFECT_SEGMENT_CONTENT_CLASS_NAME,
@@ -9,14 +11,21 @@ import {
   EFFECT_SEGMENT_WARNING_CLASS_NAME,
 } from './segment.constants';
 
+export const TimelineEffectDraftContext = createContext<TimelineEffectDragDraft | null>(null);
+
 interface ProjectTimelineEffectSegmentProps {
+  segmentId: string;
   className: string;
   height?: number;
   hidden?: boolean;
   isSelected: boolean;
   label: string;
   leadingIcon?: React.ReactNode;
-  left: number;
+  startTime: number;
+  endTime: number;
+  pixelsPerSecond: number;
+  minimumWidth?: number;
+  projection?: TimelineProjection | undefined;
   onBeginEffectInteraction: React.PointerEventHandler<HTMLButtonElement>;
   onBeginTrimEndInteraction?: React.PointerEventHandler<HTMLButtonElement>;
   onBeginTrimStartInteraction?: React.PointerEventHandler<HTMLButtonElement>;
@@ -25,25 +34,40 @@ interface ProjectTimelineEffectSegmentProps {
   subtitle?: string;
   title?: string;
   top?: number;
-  width: number;
 }
 
 export function ProjectTimelineEffectSegment(props: ProjectTimelineEffectSegmentProps) {
+  const draft = useContext(TimelineEffectDraftContext);
+  const activeDraft =
+    draft?.segmentId === props.segmentId && !draft.cursorSampleTimes ? draft : null;
+  const startTime = activeDraft?.startTime ?? props.startTime;
+  const endTime = startTime + (activeDraft?.duration ?? props.endTime - props.startTime);
+  const geometry = props.projection
+    ? projectTimelineInterval(props.projection, startTime, endTime)
+    : {
+        left: startTime * props.pixelsPerSecond,
+        width: (endTime - startTime) * props.pixelsPerSecond,
+        includesStart: true,
+        includesEnd: true,
+      };
+  if (!geometry) return null;
   const height = props.height ?? EFFECT_SEGMENT_DEFAULT_HEIGHT;
   return (
     <div
+      data-timeline-effect-segment={props.segmentId}
+      data-timeline-effect-draft={activeDraft ? true : undefined}
       className="absolute"
       style={{
         height,
-        left: props.left,
+        left: geometry.left,
         top: props.top ?? `calc(50% - ${height / 2}px)`,
-        width: props.width,
+        width: Math.max(props.minimumWidth ?? 0, geometry.width),
       }}
     >
       <ProjectTimelineEffectSegmentHandle
         align="left"
         ariaLabel={`${props.label}:resize-start`}
-        onPointerDown={props.onBeginTrimStartInteraction}
+        onPointerDown={geometry.includesStart ? props.onBeginTrimStartInteraction : undefined}
       />
       <ProjectTimelineEffectSegmentButton
         className={props.className}
@@ -60,7 +84,7 @@ export function ProjectTimelineEffectSegment(props: ProjectTimelineEffectSegment
       <ProjectTimelineEffectSegmentHandle
         align="right"
         ariaLabel={`${props.label}:resize-end`}
-        onPointerDown={props.onBeginTrimEndInteraction}
+        onPointerDown={geometry.includesEnd ? props.onBeginTrimEndInteraction : undefined}
       />
     </div>
   );

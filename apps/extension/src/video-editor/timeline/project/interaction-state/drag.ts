@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { getClipEndTime, getSortedTracks } from '../../../../features/video/project/timeline';
 import type { VideoEditorTrackHeightMultiplier } from '../../../persistence/track-panel';
 import type { VideoProject, VideoProjectClip } from '../../../../features/video/project/types';
@@ -23,6 +23,7 @@ interface UseProjectTimelineDragOptions {
   magnetEnabled: boolean;
   pointerSessionCleanupRef?: React.MutableRefObject<(() => void) | null>;
   pixelsPerSecond: number;
+  readTimelineStartTime?: (() => number) | undefined;
   project: VideoProject;
   trackHeightByTrackId?: Record<string, VideoEditorTrackHeightMultiplier>;
   onSwapClip: (clipId: string, direction: 'left' | 'right') => void;
@@ -53,8 +54,10 @@ type TimelineDragSessionParams = Pick<
   | 'onTrimClipEnd'
   | 'onTrimClipStart'
   | 'pixelsPerSecond'
+  | 'readTimelineStartTime'
 > & {
   cleanupRef: React.MutableRefObject<(() => void) | null>;
+  refreshRef: React.MutableRefObject<(() => void) | null>;
   currentTimeRef: React.MutableRefObject<number>;
   setDragGhost: React.Dispatch<React.SetStateAction<TimelineClipDragGhost | null>>;
   setSnapGuideTime: React.Dispatch<React.SetStateAction<number | null>>;
@@ -66,6 +69,7 @@ type TimelineDragSessionParams = Pick<
 type TimelineDragListenerParams = Pick<
   TimelineDragSessionParams,
   | 'interactionRef'
+  | 'refreshRef'
   | 'currentTimeRef'
   | 'historyTransaction'
   | 'magnetEnabled'
@@ -75,6 +79,7 @@ type TimelineDragListenerParams = Pick<
   | 'onTrimClipEnd'
   | 'onTrimClipStart'
   | 'pixelsPerSecond'
+  | 'readTimelineStartTime'
   | 'project'
   | 'setDragGhost'
   | 'setSnapGuideTime'
@@ -149,6 +154,7 @@ export function useProjectTimelineDrag({
   magnetEnabled,
   pointerSessionCleanupRef,
   pixelsPerSecond,
+  readTimelineStartTime,
   project,
   onSwapClip,
   onMoveClip,
@@ -160,6 +166,9 @@ export function useProjectTimelineDrag({
   trackHeightByTrackId = EMPTY_TRACK_HEIGHTS,
 }: UseProjectTimelineDragOptions) {
   const interactionRef = useRef<TimelineInteraction | null>(null);
+  const refreshRef = useRef<(() => void) | null>(null);
+  const viewportStart = readTimelineStartTime?.();
+  useLayoutEffect(() => refreshRef.current?.(), [viewportStart]);
   const localCleanupRef = useRef<(() => void) | null>(null);
   const cleanupRef = pointerSessionCleanupRef ?? localCleanupRef;
   const currentTimeRef = useRef(currentTime);
@@ -193,6 +202,7 @@ export function useProjectTimelineDrag({
     beginTimelineClipInteraction(
       {
         pixelsPerSecond,
+        readTimelineStartTime,
         currentTimeRef,
         historyTransaction,
         magnetEnabled,
@@ -201,6 +211,7 @@ export function useProjectTimelineDrag({
         setSnapGuideTime,
         cleanupRef,
         interactionRef,
+        refreshRef,
         trackLayoutModelRef,
         onSwapClip,
         onMoveClip,
@@ -236,8 +247,10 @@ function attachTimelinePointerListeners({
   currentTimeRef,
   historyTransaction,
   interactionRef,
+  refreshRef,
   magnetEnabled,
   pixelsPerSecond,
+  readTimelineStartTime,
   project,
   trackLayoutModelRef,
   onSwapClip,
@@ -248,6 +261,7 @@ function attachTimelinePointerListeners({
   setDragGhost,
   setSnapGuideTime,
 }: TimelineDragListenerParams): () => void {
+  const initialStartTime = readTimelineStartTime?.() ?? 0;
   let dragActivated = false;
   let historyTransactionLease: VideoEditorProjectHistoryTransactionLease | null = null;
   let finished = false;
@@ -270,49 +284,57 @@ function attachTimelinePointerListeners({
     finished = true;
     endHistoryTransaction();
     interactionRef.current = null;
+    refreshRef.current = null;
     setDragGhost(null);
     setSnapGuideTime(null);
     onTimelinePreviewSuspendedChange(false);
   };
 
+  let lastMove: PointerEvent | null = null;
+  const onMove = (moveEvent: PointerEvent) => {
+    lastMove = moveEvent;
+    const interaction = interactionRef.current;
+    if (!interaction) {
+      return;
+    }
+
+    if (!shouldActivateTimelineDrag(interaction, moveEvent, dragActivated)) {
+      return;
+    }
+
+    dragActivated = true;
+    if (!historyTransactionLease) {
+      historyTransactionLease = historyTransaction.beginProjectHistoryTransaction();
+    }
+    if (
+      !historyTransactionLease ||
+      !historyTransaction.isProjectHistoryTransactionCurrent(historyTransactionLease)
+    ) {
+      finishInteraction();
+      return;
+    }
+    applyTimelineDragMove({
+      viewportDeltaSeconds: (readTimelineStartTime?.() ?? 0) - initialStartTime,
+      currentTime: currentTimeRef.current,
+      interaction,
+      magnetEnabled,
+      moveEvent,
+      pixelsPerSecond,
+      trackLayoutModel: trackLayoutModelRef.current,
+      onSwapClip: draft.onSwapClip,
+      onMoveClip: draft.onMoveClip,
+      setDragGhost,
+      onTrimClipEnd: draft.onTrimClipEnd,
+      onTrimClipStart: draft.onTrimClipStart,
+      project,
+      setSnapGuideTime,
+    });
+  };
+  refreshRef.current = () => {
+    if (lastMove) onMove(lastMove);
+  };
   const cleanupPointerSession = startWindowPointerSession({
-    onMove: (moveEvent) => {
-      const interaction = interactionRef.current;
-      if (!interaction) {
-        return;
-      }
-
-      if (!shouldActivateTimelineDrag(interaction, moveEvent, dragActivated)) {
-        return;
-      }
-
-      dragActivated = true;
-      if (!historyTransactionLease) {
-        historyTransactionLease = historyTransaction.beginProjectHistoryTransaction();
-      }
-      if (
-        !historyTransactionLease ||
-        !historyTransaction.isProjectHistoryTransactionCurrent(historyTransactionLease)
-      ) {
-        finishInteraction();
-        return;
-      }
-      applyTimelineDragMove({
-        currentTime: currentTimeRef.current,
-        interaction,
-        magnetEnabled,
-        moveEvent,
-        pixelsPerSecond,
-        trackLayoutModel: trackLayoutModelRef.current,
-        onSwapClip: draft.onSwapClip,
-        onMoveClip: draft.onMoveClip,
-        setDragGhost,
-        onTrimClipEnd: draft.onTrimClipEnd,
-        onTrimClipStart: draft.onTrimClipStart,
-        project,
-        setSnapGuideTime,
-      });
-    },
+    onMove,
     onEnd: () => {
       try {
         if (

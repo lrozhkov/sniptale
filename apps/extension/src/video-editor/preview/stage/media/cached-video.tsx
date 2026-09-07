@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 import { createVideoPreviewCacheMediaType } from '../../../../composition/persistence/video-preview-cache';
 import type { PreparedCachedVideoPreview } from '../../cache/types';
+import { shouldRefreshPausedPreviewMediaTime } from './sync';
 
 function appendSourceBuffer(sourceBuffer: SourceBuffer, bytes: ArrayBuffer): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -129,7 +130,10 @@ function useCachedVideoPlayback(params: {
     const relativeTime = params.currentTime - params.source.startTime;
     const duration = params.source.endTime - params.source.startTime;
     const nextTime = Math.max(0, Math.min(duration, relativeTime));
-    if (Math.abs(video.currentTime - nextTime) > 0.04) video.currentTime = nextTime;
+    const shouldSeek = params.isPlaying
+      ? Math.abs(video.currentTime - nextTime) > 0.04
+      : shouldRefreshPausedPreviewMediaTime(video.currentTime, nextTime);
+    if (shouldSeek) video.currentTime = nextTime;
     if (!params.isPlaying) {
       video.pause();
       return;

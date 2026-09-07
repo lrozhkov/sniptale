@@ -41,6 +41,23 @@ const sidebarContractMappings = SIDEBAR_CONTRACT_FILES.map((productionFile) => (
 
 export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
   ...controllerContractMappings,
+  ...[
+    'body.tsx',
+    'index.tsx',
+    'canvas/parts/clip-stack.tsx',
+    'canvas/parts/drag-ghost.tsx',
+    'canvas/parts/playback-range.tsx',
+    'canvas/parts/track-lanes.tsx',
+  ].map((path) => ({
+    owner: 'video-editor-composed-timeline',
+    productionFile: `apps/extension/src/video-editor/timeline/project/${path}`,
+    reason:
+      'Real timeline root, body and canvas exercise precise fit, clip and effect drafts, cancellation, commit and projected range geometry.',
+    testFiles: [
+      'apps/extension/src/video-editor/timeline/project/index.test.tsx',
+      'apps/extension/src/video-editor/timeline/project/canvas/index.test.tsx',
+    ],
+  })),
   {
     owner: 'video-editor-integrated-ui-proof',
     productionFile: 'apps/extension/src/ui/compact-inspector-controls/numeric.tsx',

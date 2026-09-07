@@ -1,5 +1,3 @@
-import { shouldRefreshMediaTime } from '../../../../features/video/project/playback-sync';
-
 const PREVIEW_PLAYING_SYNC_BASE_THRESHOLD = 0.2;
 const PREVIEW_PLAYING_SYNC_MIN_THRESHOLD = 0.35;
 const PREVIEW_PLAYING_SYNC_RATE_FACTOR = 0.15;
@@ -49,6 +47,14 @@ export function updatePreviewMediaSyncState(
   state.wasPlaying = isPlaying;
 }
 
+/** Paused editing follows explicit seeks; playback drift tolerances must not swallow frame steps. */
+export function shouldRefreshPausedPreviewMediaTime(
+  currentTime: number,
+  nextTime: number
+): boolean {
+  return !Number.isFinite(currentTime) || Math.abs(currentTime - nextTime) > 0.000001;
+}
+
 export function shouldRefreshPreviewMediaTime(params: {
   currentTime: number;
   isPlaying: boolean;
@@ -59,12 +65,7 @@ export function shouldRefreshPreviewMediaTime(params: {
   state: PreviewMediaSyncState;
 }): boolean {
   if (!params.isPlaying) {
-    return shouldRefreshMediaTime({
-      currentTime: params.mediaCurrentTime,
-      isPlaying: false,
-      nextTime: params.nextTime,
-      playbackRate: params.playbackRate,
-    });
+    return shouldRefreshPausedPreviewMediaTime(params.mediaCurrentTime, params.nextTime);
   }
 
   if (!Number.isFinite(params.mediaCurrentTime)) {

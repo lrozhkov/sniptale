@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { TimelineEffectDraftContext } from './effect-lanes/segment';
 import { ProjectTimelineBody } from './body';
 import { ProjectTimelineSurface } from './surface';
 import type { ProjectTimelineProps } from './types';
@@ -23,7 +24,11 @@ export const ProjectTimeline = (
   );
   const timelineState = useProjectTimelineState(props, heights);
 
-  return <ProjectTimelineLayout {...props} {...timelineState} panelPrefs={panelPrefs} />;
+  return (
+    <TimelineEffectDraftContext.Provider value={timelineState.effectDragDraft}>
+      <ProjectTimelineLayout {...props} {...timelineState} panelPrefs={panelPrefs} />
+    </TimelineEffectDraftContext.Provider>
+  );
 };
 
 function ProjectTimelineLayout(

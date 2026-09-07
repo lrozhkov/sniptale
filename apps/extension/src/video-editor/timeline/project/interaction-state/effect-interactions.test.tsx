@@ -46,6 +46,7 @@ it('wraps all effect pointer moves in one history transaction', () => {
   project.duration = 20;
   const historyTransaction = createHistoryTransactionMocks();
   const onMoveActionEvent = vi.fn();
+  let draft: ReturnType<typeof useProjectTimelineEffectInteractions>['effectDragDraft'] = null;
   let beginEffectInteraction:
     | ReturnType<typeof useProjectTimelineEffectInteractions>['beginEffectInteraction']
     | null = null;
@@ -65,6 +66,7 @@ it('wraps all effect pointer moves in one history transaction', () => {
       onUpdateEffectInstance: vi.fn(),
     });
     beginEffectInteraction = interaction.beginEffectInteraction;
+    draft = interaction.effectDragDraft;
     return null;
   }
 
@@ -78,13 +80,15 @@ it('wraps all effect pointer moves in one history transaction', () => {
     originalTime: 2,
   };
   act(() => beginEffectInteraction?.(createPointerEvent(100), target));
-  act(() => {
-    dispatchPointerMove(120);
-    dispatchPointerMove(140);
-    window.dispatchEvent(new Event('pointerup'));
-  });
-
-  expect(onMoveActionEvent).toHaveBeenCalledTimes(2);
+  act(() => dispatchPointerMove(120));
+  expect(draft).toEqual({ segmentId: 'action-1', startTime: 4 });
+  act(() => dispatchPointerMove(140));
+  expect(draft).toEqual({ segmentId: 'action-1', startTime: 6 });
+  expect(onMoveActionEvent).not.toHaveBeenCalled();
+  act(() => window.dispatchEvent(new Event('pointerup')));
+  expect(draft).toBeNull();
+  expect(onMoveActionEvent).toHaveBeenCalledOnce();
+  expect(onMoveActionEvent).toHaveBeenCalledWith('action-1', 6);
   expect(historyTransaction.beginProjectHistoryTransaction).toHaveBeenCalledOnce();
   expect(historyTransaction.endProjectHistoryTransaction).toHaveBeenCalledOnce();
 });
@@ -196,3 +200,119 @@ function dispatchPointerMove(clientX: number, clientY = 40): void {
   Object.defineProperty(event, 'clientY', { value: clientY });
   window.dispatchEvent(event);
 }
+it('includes viewport scrolling in effect movement within one transaction', () => {
+  const project = createEmptyVideoProject('Effects');
+  project.duration = 20;
+  const historyTransaction = createHistoryTransactionMocks();
+  const onMoveActionEvent = vi.fn();
+  let draft: ReturnType<typeof useProjectTimelineEffectInteractions>['effectDragDraft'] = null;
+  let startTime = 43200;
+  let beginEffectInteraction:
+    | ReturnType<typeof useProjectTimelineEffectInteractions>['beginEffectInteraction']
+    | null = null;
+
+  function Harness() {
+    const interaction = useProjectTimelineEffectInteractions({
+      historyTransaction,
+      magnetEnabled: false,
+      pixelsPerSecond: 10,
+      readTimelineStartTime: () => startTime,
+      project,
+      onMoveActionEvent,
+      onMoveCursorSegment: vi.fn(),
+      onMoveMotionRegion: vi.fn(),
+      onMoveTransitionSegment: vi.fn(),
+      onResizeActionEvent: vi.fn(),
+      onResizeMotionRegion: vi.fn(),
+      onUpdateEffectInstance: vi.fn(),
+    });
+    beginEffectInteraction = interaction.beginEffectInteraction;
+    draft = interaction.effectDragDraft;
+    return null;
+  }
+
+  act(() => root.render(<Harness />));
+  const target: TimelineEffectDragTarget = {
+    kind: 'action',
+    mode: 'move',
+    segmentId: 'action-1',
+    actionEventId: 'action-1',
+    originalDuration: 1,
+    originalTime: 2,
+  };
+  act(() => beginEffectInteraction?.(createPointerEvent(100), target));
+  startTime += 3;
+  act(() => root.render(<Harness />));
+  act(() => dispatchPointerMove(120));
+  expect(draft).toEqual({ segmentId: 'action-1', startTime: 7 });
+  expect(onMoveActionEvent).not.toHaveBeenCalled();
+  startTime -= 3;
+  act(() => root.render(<Harness />));
+  expect(draft).toEqual({ segmentId: 'action-1', startTime: 4 });
+  act(() => {
+    dispatchPointerMove(140);
+    window.dispatchEvent(new Event('pointerup'));
+  });
+
+  expect(onMoveActionEvent).toHaveBeenCalledOnce();
+  expect(onMoveActionEvent).toHaveBeenCalledWith('action-1', 6);
+  expect(draft).toBeNull();
+  expect(historyTransaction.beginProjectHistoryTransaction).toHaveBeenCalledOnce();
+  expect(historyTransaction.endProjectHistoryTransaction).toHaveBeenCalledOnce();
+});
+
+it.each(['Escape', 'pointercancel', 'blur', 'unmount', 'replacement', 'origin', 'lease'])(
+  'discards an effect gesture on %s without committing project changes',
+  (cancel) => {
+    let project = createEmptyVideoProject('Cancelable effects');
+    project.duration = 20;
+    const historyTransaction = createHistoryTransactionMocks();
+    const onMoveActionEvent = vi.fn();
+    let begin:
+      | ReturnType<typeof useProjectTimelineEffectInteractions>['beginEffectInteraction']
+      | null = null;
+    function Harness() {
+      const interaction = useProjectTimelineEffectInteractions({
+        historyTransaction,
+        magnetEnabled: false,
+        pixelsPerSecond: 10,
+        project,
+        onMoveActionEvent,
+        onMoveCursorSegment: vi.fn(),
+        onMoveMotionRegion: vi.fn(),
+        onMoveTransitionSegment: vi.fn(),
+        onResizeActionEvent: vi.fn(),
+        onResizeMotionRegion: vi.fn(),
+        onUpdateEffectInstance: vi.fn(),
+      });
+      begin = interaction.beginEffectInteraction;
+      return null;
+    }
+    act(() => root.render(<Harness />));
+    act(() => begin?.(createPointerEvent(100), createActionTarget()));
+    act(() => dispatchPointerMove(140));
+    expect(onMoveActionEvent).not.toHaveBeenCalled();
+    act(() => {
+      if (cancel === 'lease') {
+        historyTransaction.isProjectHistoryTransactionCurrent = () => false;
+        dispatchPointerMove(140);
+      } else if (cancel === 'origin') {
+        dispatchPointerMove(100);
+        window.dispatchEvent(new Event('pointerup'));
+      } else if (cancel === 'unmount') root.render(null);
+      else if (cancel === 'replacement') {
+        project = createEmptyVideoProject('Replacement');
+        root.render(<Harness />);
+      } else if (cancel === 'Escape')
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+      else window.dispatchEvent(new Event(cancel));
+    });
+    act(() => {
+      dispatchPointerMove(160);
+      window.dispatchEvent(new Event('pointerup'));
+    });
+    expect(onMoveActionEvent).not.toHaveBeenCalled();
+    expect(historyTransaction.beginProjectHistoryTransaction).toHaveBeenCalledOnce();
+    expect(historyTransaction.endProjectHistoryTransaction).toHaveBeenCalledOnce();
+  }
+);

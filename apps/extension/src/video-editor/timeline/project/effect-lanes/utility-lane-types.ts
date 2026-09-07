@@ -1,3 +1,4 @@
+import type { TimelineProjection } from '../interaction-state/projection';
 import type { MutableRefObject } from 'react';
 
 import type { VideoProject } from '../../../../features/video/project/types';
@@ -5,6 +6,7 @@ import type { TimelineEffectDragTarget, TimelineEffectSelection } from '../types
 
 export interface UtilityLaneProps {
   pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
   project: VideoProject;
   selectedEffectSelection: TimelineEffectSelection | null;
   onBeginRangeSelection: React.PointerEventHandler<HTMLDivElement>;

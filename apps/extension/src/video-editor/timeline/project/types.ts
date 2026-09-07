@@ -125,6 +125,19 @@ export interface TimelineEffectSelection {
   segmentId: string;
 }
 
+/** Transient timeline geometry; the project changes only when the gesture commits. */
+export interface TimelineEffectDragDraft {
+  segmentId: string;
+  cursorSampleTimes?: {
+    sampleId: string;
+    nextSampleId: string | null;
+    startTime: number;
+    endTime: number | null;
+  };
+  startTime?: number;
+  duration?: number;
+}
+
 export type TimelineEffectDragTarget =
   | {
       kind: 'action';

@@ -68,7 +68,7 @@ function renderPlaybackSummary(isPlaying: boolean, withRange = false) {
 
 it('renders playback summary metadata and toggles play state', () => {
   const { onTogglePlay } = renderPlaybackSummary(true);
-  expect(container?.textContent).toContain('0:12.3 / 0:45.7');
+  expect(container?.textContent).toContain('0:12.340 / 0:45.678');
   const pauseButton = Array.from(
     container?.querySelectorAll<HTMLButtonElement>('button') ?? []
   ).find((button) => button.getAttribute('aria-label') === 'videoEditor.timeline.pause');
@@ -146,7 +146,7 @@ it('uses the shared content toolbar button chrome', () => {
 
 it('renders the active loop range when playback range is selected', () => {
   renderPlaybackSummary(false, true);
-  expect(container?.textContent).toContain('(0:04.5-0:06.8)');
+  expect(container?.textContent).toContain('(0:04.500-0:06.750)');
 });
 
 it('keeps playback control slots stable when the range reset is unavailable', () => {
@@ -161,7 +161,15 @@ it('keeps playback control slots stable when the range reset is unavailable', ()
   expect(container?.querySelector('[data-playback-counter]')?.className).toContain('tabular-nums');
 });
 
-it('formats whole seconds and minute rollover with one decimal digit', () => {
-  expect(formatPlaybackCounterTime(12)).toBe('0:12.0');
-  expect(formatPlaybackCounterTime(59.96)).toBe('1:00.0');
+it('formats elapsed milliseconds without rounding into a later second', () => {
+  expect(formatPlaybackCounterTime(12)).toBe('0:12.000');
+  expect(formatPlaybackCounterTime(59.96)).toBe('0:59.960');
+});
+
+it('keeps short frames nonzero and long project time readable', () => {
+  expect(formatPlaybackCounterTime(1 / 30)).toBe('0:00.033');
+  expect(formatPlaybackCounterTime(1 / 60)).toBe('0:00.017');
+  expect(formatPlaybackCounterTime(1 / 240)).toBe('0:00.004');
+  expect(formatPlaybackCounterTime(43200 + 1 / 240)).toBe('12:00:00.004');
+  expect(formatPlaybackCounterTime(3599.9996)).toBe('1:00:00.000');
 });

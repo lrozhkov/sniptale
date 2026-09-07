@@ -10,6 +10,7 @@ import { resolveTimelineTimeFromClientX } from './seek';
 
 interface UseProjectTimelineRangeOptions {
   pixelsPerSecond: number;
+  readTimelineStartTime?: (() => number) | undefined;
   playbackRange: VideoEditorPlaybackRange | null;
   projectDuration: number;
   timelineRef: RefObject<HTMLDivElement | null>;
@@ -29,7 +30,8 @@ function resolveTimelineTime(
   timelineRef: RefObject<HTMLDivElement | null>,
   clientX: number,
   pixelsPerSecond: number,
-  duration: number
+  duration: number,
+  startTime?: number
 ): number | null {
   if (!timelineRef.current) {
     return null;
@@ -37,7 +39,7 @@ function resolveTimelineTime(
 
   return Math.min(
     Math.max(0, duration),
-    resolveTimelineTimeFromClientX(timelineRef.current, clientX, pixelsPerSecond)
+    resolveTimelineTimeFromClientX(timelineRef.current, clientX, pixelsPerSecond, startTime)
   );
 }
 
@@ -102,6 +104,7 @@ function updatePointerDraft(params: {
   clientX: number;
   eventClientX: number;
   pixelsPerSecond: number;
+  readTimelineStartTime?: (() => number) | undefined;
   projectDuration: number;
   timelineRef: RefObject<HTMLDivElement | null>;
   draftRef: React.MutableRefObject<RangeDraftState | null>;
@@ -111,7 +114,8 @@ function updatePointerDraft(params: {
     params.timelineRef,
     params.clientX,
     params.pixelsPerSecond,
-    params.projectDuration
+    params.projectDuration,
+    params.readTimelineStartTime?.()
   );
   if (currentTime === null || !params.draftRef.current) {
     return;
@@ -148,6 +152,7 @@ function createRangeSelectionStartHandler(params: {
   onSimpleClick: RangeSelectionSimpleClickHandler;
   onSetPlaybackRange: (range: VideoEditorPlaybackRange | null) => void;
   pixelsPerSecond: number;
+  readTimelineStartTime?: (() => number) | undefined;
   projectDuration: number;
   setDraftRange: React.Dispatch<React.SetStateAction<VideoEditorPlaybackRange | null>>;
   timelineRef: RefObject<HTMLDivElement | null>;
@@ -157,7 +162,8 @@ function createRangeSelectionStartHandler(params: {
       params.timelineRef,
       event.clientX,
       params.pixelsPerSecond,
-      params.projectDuration
+      params.projectDuration,
+      params.readTimelineStartTime?.()
     );
     if (anchorTime === null) {
       return;
@@ -168,12 +174,14 @@ function createRangeSelectionStartHandler(params: {
     params.clearDraftRange();
     params.draftRef.current = createInitialDraft(anchorTime);
     params.cleanupRef.current = startWindowPointerSession({
+      onCancel: params.clearDraftRange,
       onMove: (moveEvent) =>
         updatePointerDraft({
           clientX: moveEvent.clientX,
           draftRef: params.draftRef,
           eventClientX: event.clientX,
           pixelsPerSecond: params.pixelsPerSecond,
+          readTimelineStartTime: params.readTimelineStartTime,
           projectDuration: params.projectDuration,
           setDraftRange: params.setDraftRange,
           timelineRef: params.timelineRef,
@@ -192,6 +200,7 @@ function createRangeSelectionStartHandler(params: {
 
 export function useProjectTimelineRangeSelection({
   pixelsPerSecond,
+  readTimelineStartTime,
   playbackRange,
   projectDuration,
   timelineRef,
@@ -208,6 +217,7 @@ export function useProjectTimelineRangeSelection({
         onSetPlaybackRange,
         onSimpleClick,
         pixelsPerSecond,
+        readTimelineStartTime,
         projectDuration,
         setDraftRange,
         timelineRef,
@@ -218,6 +228,7 @@ export function useProjectTimelineRangeSelection({
       draftRef,
       onSetPlaybackRange,
       pixelsPerSecond,
+      readTimelineStartTime,
       projectDuration,
       setDraftRange,
       timelineRef,

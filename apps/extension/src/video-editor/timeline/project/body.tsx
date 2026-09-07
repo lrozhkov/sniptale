@@ -58,6 +58,8 @@ type ProjectTimelineBodyProps = Pick<
   | 'syncTracksScroll'
   | 'timelineRef'
   | 'timelineWidth'
+  | 'readTimelineStartTime'
+  | 'projection'
   | 'trackListRef'
   | 'tracks'
   | 'visiblePlaybackRange'
@@ -136,6 +138,8 @@ function createCanvasProps(props: ProjectTimelineBodyProps): ProjectTimelineBody
     timelinePreviews: props.timelinePreviews,
     timelineRef: props.timelineRef,
     timelineWidth: props.timelineWidth,
+    projection: props.projection,
+    readTimelineStartTime: props.readTimelineStartTime,
     trackLayoutModel: props.trackLayoutModel,
     tracks: props.tracks,
     onAddMotionRegion: props.insertion.onAddMotionRegion,

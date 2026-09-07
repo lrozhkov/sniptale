@@ -346,28 +346,28 @@ async function verifyVideoEditorTimelineBoundaries(
   const playhead = page.locator('[data-ui="video-editor.timeline.playhead-handle"]');
 
   for (let step = 0; step < 3; step += 1) await nextFrame.click();
-  await expect(counter).toContainText('0:00.1 / 0:12.0');
+  await expect(counter).toContainText('0:00.100 / 0:12.000');
   for (let step = 0; step < 3; step += 1) await page.keyboard.press(',');
-  await expect(counter).toContainText('0:00.0 / 0:12.0');
+  await expect(counter).toContainText('0:00.000 / 0:12.000');
   await seekToEnd.click();
-  await expect(counter).toContainText('0:12.0 / 0:12.0');
+  await expect(counter).toContainText('0:12.000 / 0:12.000');
   await page.keyboard.press('Home');
-  await expect(counter).toContainText('0:00.0 / 0:12.0');
+  await expect(counter).toContainText('0:00.000 / 0:12.000');
   await page.mouse.move(0, 0);
   await expect(page.locator('[data-timeline-hover-preview="true"]')).toHaveCount(0);
   await page.keyboard.press('End');
-  await expect(counter).toContainText('0:12.0 / 0:12.0');
+  await expect(counter).toContainText('0:12.000 / 0:12.000');
   await seekToStart.click();
-  await expect(counter).toContainText('0:00.0 / 0:12.0');
+  await expect(counter).toContainText('0:00.000 / 0:12.000');
   const playheadBox = await playhead.boundingBox();
   if (!playheadBox) throw new Error('Expected a visible timeline playhead handle');
   await page.mouse.move(playheadBox.x + playheadBox.width / 2, playheadBox.y + 8);
   await page.mouse.down();
   await page.mouse.move(playheadBox.x + playheadBox.width / 2 + 90, playheadBox.y + 8);
   await page.mouse.up();
-  await expect(counter).not.toContainText('0:00.0 / 0:12.0');
+  await expect(counter).not.toContainText('0:00.000 / 0:12.000');
   await page.keyboard.press('Home');
-  await expect(counter).toContainText('0:00.0 / 0:12.0');
+  await expect(counter).toContainText('0:00.000 / 0:12.000');
   await page.screenshot({ fullPage: true, path: screenshotPath });
 
   for (let index = 0; index < 3; index++) {

@@ -1,3 +1,8 @@
+import {
+  projectTimelineInterval,
+  projectTimelinePoint,
+  type TimelineProjection,
+} from '../interaction-state/projection';
 import { Keyboard, MousePointerClick } from 'lucide-react';
 import { useMemo } from 'react';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
@@ -84,9 +89,10 @@ export function ProjectTimelineTelemetryLaneLabelRow({ compactRows }: { compactR
 function ProjectTimelineTelemetryMarker(props: {
   kind: 'click' | 'key';
   label: string;
-  left: number;
+  left: number | null;
   onSeek: () => void;
 }) {
+  if (props.left === null) return null;
   const Icon = props.kind === 'key' ? Keyboard : MousePointerClick;
 
   return (
@@ -116,8 +122,16 @@ function ProjectTimelineTelemetrySpan(props: {
   endTime: number;
   kind: 'stable' | 'typing';
   pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
   startTime: number;
 }) {
+  const geometry = props.projection
+    ? projectTimelineInterval(props.projection, props.startTime, props.endTime)
+    : {
+        left: props.startTime * props.pixelsPerSecond,
+        width: (props.endTime - props.startTime) * props.pixelsPerSecond,
+      };
+  if (!geometry) return null;
   return (
     <div
       {...TIMELINE_OBJECT_MARKER_PROPS}
@@ -126,8 +140,8 @@ function ProjectTimelineTelemetrySpan(props: {
         getTelemetrySpanClassName(props.kind),
       ].join(' ')}
       style={{
-        left: props.startTime * props.pixelsPerSecond,
-        width: Math.max(16, (props.endTime - props.startTime) * props.pixelsPerSecond),
+        left: geometry.left,
+        width: Math.max(16, geometry.width),
       }}
     />
   );
@@ -136,6 +150,7 @@ function ProjectTimelineTelemetrySpan(props: {
 export function ProjectTimelineTelemetryLane(props: {
   onSeek: (time: number) => void;
   pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
   project: VideoProject;
   recordingTelemetry: RecordingTelemetryEntry | null;
 }) {
@@ -163,6 +178,7 @@ export function ProjectTimelineTelemetryLane(props: {
           endTime={span.endTime}
           kind={span.kind}
           pixelsPerSecond={props.pixelsPerSecond}
+          projection={props.projection}
           startTime={span.startTime}
         />
       ))}
@@ -171,7 +187,11 @@ export function ProjectTimelineTelemetryLane(props: {
           key={marker.id}
           kind={marker.kind}
           label={marker.label}
-          left={marker.time * props.pixelsPerSecond}
+          left={
+            props.projection
+              ? projectTimelinePoint(props.projection, marker.time)
+              : marker.time * props.pixelsPerSecond
+          }
           onSeek={() => props.onSeek(marker.time)}
         />
       ))}

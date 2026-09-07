@@ -45,10 +45,10 @@ it('bounds markers to the viewport of a 24-hour timeline without losing absolute
     startTime: 43200,
     endTime: 43204,
   });
-  expect(markers.length).toBeLessThan(10);
-  expect(markers[0]?.second).toBe(43199);
-  expect(markers.at(-1)?.second).toBe(43205);
-  expect(markers.find((m) => m.second === 43200)?.label).toBe('720:00');
+  expect(markers.length).toBeLessThan(20);
+  expect(markers[0]?.second).toBeLessThanOrEqual(43200);
+  expect(markers.at(-1)?.second).toBeGreaterThanOrEqual(43204);
+  expect(markers.find((m) => m.second === 43200)?.label).toBe('12:00:00.000');
 });
 
 it('retains bounded coverage at the last viewport and after returning to the start', () => {
@@ -56,10 +56,10 @@ it('retains bounded coverage at the last viewport and after returning to the sta
     startTime: 86396,
     endTime: 86400,
   });
-  expect(end.length).toBeLessThan(10);
+  expect(end.length).toBeLessThan(20);
   expect(end.some((marker) => marker.second === 86400)).toBe(true);
   const start = buildProjectTimelineRulerMarkers(86400 * 280, 280, { startTime: 0, endTime: 4 });
-  expect(start.length).toBeLessThan(10);
+  expect(start.length).toBeLessThan(20);
   expect(start[0]?.second).toBe(0);
 });
 
@@ -70,3 +70,58 @@ it('keeps readable bounded ruler steps for a 24-hour overview', () => {
   expect(markers.every((marker) => marker.spanSeconds * scale >= 88)).toBe(true);
   expect(markers.at(-1)!.second).toBeGreaterThanOrEqual(86400);
 });
+
+it.each([29.97, 30, 60, 240])(
+  'aligns detail ticks to %s fps without losing elapsed time',
+  (fps) => {
+    const markers = buildProjectTimelineRulerMarkers(
+      86400 * 280,
+      280,
+      {
+        startTime: 43200,
+        endTime: 43204,
+      },
+      fps
+    );
+    expect(markers.some((marker) => marker.spanSeconds < 1)).toBe(true);
+    expect(markers.every((marker) => marker.spanSeconds * 280 >= 88)).toBe(true);
+    expect(markers.length).toBeLessThan(20);
+    expect(new Set(markers.map((marker) => marker.id)).size).toBe(markers.length);
+    for (const marker of markers) {
+      expect(marker.second * fps).toBeCloseTo(Math.round(marker.second * fps), 5);
+      expect(marker.label).toMatch(/^\d+:\d{2}:\d{2}\.\d{3}$/);
+    }
+  }
+);
+
+it('uses hours in long overview labels', () => {
+  const markers = buildProjectTimelineRulerMarkers(1000, 1000 / 86400, {
+    startTime: 0,
+    endTime: 86400,
+  });
+  expect(markers.find((marker) => marker.second === 43200)?.label).toBe('12:00:00');
+});
+
+it.each([24000 / 1001, 30000 / 1001, 60000 / 1001, 240])(
+  'keeps distinct frame-aligned labels at maximum scale for %s fps',
+  (fps) => {
+    const scale = 23040;
+    const startTime = 43200;
+    const endTime = startTime + 1920 / scale;
+    const markers = buildProjectTimelineRulerMarkers(
+      86400 * scale,
+      scale,
+      { startTime, endTime },
+      fps
+    );
+    expect(markers.length).toBeLessThan(26);
+    expect(new Set(markers.map((marker) => marker.id)).size).toBe(markers.length);
+    expect(new Set(markers.map((marker) => marker.label)).size).toBe(markers.length);
+    expect(markers[0]!.second).toBeLessThanOrEqual(startTime);
+    expect(markers.at(-1)!.second).toBeGreaterThanOrEqual(endTime);
+    for (const marker of markers) {
+      expect(marker.second * fps).toBeCloseTo(Math.round(marker.second * fps), 5);
+      expect(marker.spanSeconds * scale).toBeGreaterThanOrEqual(88);
+    }
+  }
+);

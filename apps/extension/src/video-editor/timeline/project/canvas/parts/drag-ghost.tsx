@@ -1,3 +1,8 @@
+import {
+  projectTimelineInterval,
+  projectTimelinePoint,
+  type TimelineProjection,
+} from '../../interaction-state/projection';
 import { translate } from '../../../../../platform/i18n';
 import type { TimelineTrackLayout } from '../../tracks/layout';
 import { resolveClipLogicalLaneId } from '../../../../../features/video/project/timeline';
@@ -6,11 +11,13 @@ import type { TimelineClipDragGhost, TimelineClipDragPlacement } from '../../typ
 export function ProjectTimelineClipDragGhost({
   dragGhost,
   pixelsPerSecond,
+  projection,
   trackId,
   trackLayout,
 }: {
   dragGhost: TimelineClipDragGhost | null;
   pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
   trackId: string;
   trackLayout: TimelineTrackLayout | undefined;
 }) {
@@ -21,6 +28,7 @@ export function ProjectTimelineClipDragGhost({
         <ReorderSlots
           dragGhost={dragGhost}
           pixelsPerSecond={pixelsPerSecond}
+          projection={projection}
           trackLayout={trackLayout}
         />
       )}
@@ -32,6 +40,7 @@ export function ProjectTimelineClipDragGhost({
             dragGhost={clip}
             related={clip.clipId !== dragGhost.clipId}
             pixelsPerSecond={pixelsPerSecond}
+            projection={projection}
             trackLayout={trackLayout}
           />
         ))}
@@ -42,14 +51,20 @@ export function ProjectTimelineClipDragGhost({
 function ReorderSlots({
   dragGhost,
   pixelsPerSecond,
+  projection,
   trackLayout,
 }: {
   dragGhost: TimelineClipDragGhost;
   pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
   trackLayout: TimelineTrackLayout | undefined;
 }) {
   const metrics = resolveDragGhostLaneMetrics(trackLayout, dragGhost.timelineLaneId);
   return dragGhost.reorderSlots?.map((slot) => {
+    const left = projection
+      ? projectTimelinePoint(projection, slot.startTime)
+      : slot.startTime * pixelsPerSecond;
+    if (left === null) return null;
     const active = slot.direction === dragGhost.activeReorder;
     return (
       <div
@@ -62,7 +77,7 @@ function ReorderSlots({
           'border-[color:var(--sniptale-color-accent-emphasis)]',
         ].join(' ')}
         style={{
-          left: slot.startTime * pixelsPerSecond,
+          left,
           top: metrics?.clipTop ?? 0,
           height: metrics?.clipRowHeight ?? 40,
         }}
@@ -90,14 +105,24 @@ function ClipPlacementGhost({
   dragGhost,
   related,
   pixelsPerSecond,
+  projection,
   trackLayout,
 }: {
   dragGhost: TimelineClipDragPlacement;
   related: boolean;
   pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
   trackLayout: TimelineTrackLayout | undefined;
 }) {
   const metrics = resolveDragGhostLaneMetrics(trackLayout, dragGhost.timelineLaneId);
+  const geometry = projection
+    ? projectTimelineInterval(
+        projection,
+        dragGhost.startTime,
+        dragGhost.startTime + dragGhost.duration
+      )
+    : { left: dragGhost.startTime * pixelsPerSecond, width: dragGhost.duration * pixelsPerSecond };
+  if (!geometry) return null;
   const top = metrics ? metrics.clipTop + 8 : 8;
   const height = Math.max(22, (metrics?.clipRowHeight ?? 40) - 18);
   return (
@@ -115,9 +140,9 @@ function ClipPlacementGhost({
       ].join(' ')}
       style={{
         height,
-        left: dragGhost.startTime * pixelsPerSecond,
+        left: geometry.left,
         top,
-        width: Math.max(1, dragGhost.duration * pixelsPerSecond),
+        width: Math.max(1, geometry.width),
         opacity: related ? 0.8 : 1,
       }}
     >

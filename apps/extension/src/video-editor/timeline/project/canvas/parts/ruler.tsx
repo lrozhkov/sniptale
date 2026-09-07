@@ -1,3 +1,8 @@
+import {
+  projectTimelinePoint,
+  timelineTimeToViewportX,
+  type TimelineProjection,
+} from '../../interaction-state/projection';
 import { formatPreciseTime } from '../../interaction-state/helpers';
 import type { VideoEditorPlaybackRange } from '../../../../interaction/playback/range';
 
@@ -6,6 +11,7 @@ export function ProjectTimelineRuler(props: {
   onBeginRangeSelection: (event: React.PointerEvent<HTMLDivElement>) => void;
   playbackRange: VideoEditorPlaybackRange | null;
   pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
   rulerMarkers: {
     id: string;
     isMajor: boolean;
@@ -28,6 +34,7 @@ export function ProjectTimelineRuler(props: {
     >
       <ProjectTimelineRulerRangeMarkers
         pixelsPerSecond={props.pixelsPerSecond}
+        projection={props.projection}
         playbackRange={props.playbackRange}
       />
       {props.children}
@@ -41,7 +48,9 @@ export function ProjectTimelineRuler(props: {
               : 'border-[var(--sniptale-color-border-subtle)]',
           ].join(' ')}
           style={{
-            left: marker.second * props.pixelsPerSecond,
+            left: props.projection
+              ? timelineTimeToViewportX(props.projection, marker.second)
+              : marker.second * props.pixelsPerSecond,
             width: marker.spanSeconds * props.pixelsPerSecond,
           }}
         >
@@ -58,6 +67,7 @@ export function ProjectTimelineRuler(props: {
 
 function ProjectTimelineRulerRangeMarkers(props: {
   pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
   playbackRange: VideoEditorPlaybackRange | null;
 }) {
   if (!props.playbackRange) {
@@ -69,12 +79,20 @@ function ProjectTimelineRulerRangeMarkers(props: {
       <ProjectTimelineRulerRangeMarker
         align="left"
         label={formatPreciseTime(props.playbackRange.start)}
-        left={props.playbackRange.start * props.pixelsPerSecond}
+        left={
+          props.projection
+            ? projectTimelinePoint(props.projection, props.playbackRange.start)
+            : props.playbackRange.start * props.pixelsPerSecond
+        }
       />
       <ProjectTimelineRulerRangeMarker
         align="right"
         label={formatPreciseTime(props.playbackRange.end)}
-        left={props.playbackRange.end * props.pixelsPerSecond}
+        left={
+          props.projection
+            ? projectTimelinePoint(props.projection, props.playbackRange.end)
+            : props.playbackRange.end * props.pixelsPerSecond
+        }
       />
     </>
   );
@@ -83,8 +101,9 @@ function ProjectTimelineRulerRangeMarkers(props: {
 function ProjectTimelineRulerRangeMarker(props: {
   align: 'left' | 'right';
   label: string;
-  left: number;
+  left: number | null;
 }) {
+  if (props.left === null) return null;
   return (
     <div
       aria-hidden="true"

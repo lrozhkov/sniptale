@@ -1,3 +1,4 @@
+import type { TimelineProjection } from '../../interaction-state/projection';
 import { buildVideoCompositionTransitionSegments } from '../../../../../features/video/composition/timeline/lanes';
 import { getTrackClips } from '../../../../../features/video/project/timeline';
 import type { VideoProject } from '../../../../../features/video/project/types';
@@ -14,6 +15,7 @@ import type { DragMode, TimelineEffectDragTarget, TimelineEffectSelection } from
 export function ProjectTimelineTrackClipStack(props: {
   hoveredClipId: string | null;
   pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
   project: VideoProject;
   selectedClipId: string | null;
   selectedEffectSelection: TimelineEffectSelection | null;
@@ -80,6 +82,7 @@ function ProjectTimelineTrackClipItems(
         isHovered={props.hoveredClipId === clip.id}
         isSelected={props.selectedClipId === clip.id}
         pixelsPerSecond={props.pixelsPerSecond}
+        projection={props.projection}
         {...(props.timelinePreviews[clip.id] ? { preview: props.timelinePreviews[clip.id] } : {})}
         project={props.project}
         trackLocked={props.trackLocked}

@@ -7,14 +7,19 @@ export function useTimelinePreviewViewportReporter(params: {
   pixelsPerSecond: number;
   timelineRef: React.MutableRefObject<HTMLDivElement | null>;
   timelineWidth: number;
+  startTime?: number | undefined;
 }): () => void {
-  const { onViewportChange, pixelsPerSecond, timelineRef, timelineWidth } = params;
+  const { onViewportChange, pixelsPerSecond, timelineRef, timelineWidth, startTime } = params;
   const previewViewportFrameRef = useRef(0);
   const lastPublishedViewportRef = useRef<TimelinePreviewViewport | null>(null);
   const publishPreviewViewport = useCallback(() => {
     window.cancelAnimationFrame(previewViewportFrameRef.current);
     previewViewportFrameRef.current = window.requestAnimationFrame(() => {
-      const viewport = resolveTimelinePreviewViewport(timelineRef.current, pixelsPerSecond);
+      const viewport = resolveTimelinePreviewViewport(
+        timelineRef.current,
+        pixelsPerSecond,
+        startTime
+      );
       if (
         lastPublishedViewportRef.current &&
         areTimelinePreviewViewportsEqual(lastPublishedViewportRef.current, viewport)
@@ -24,7 +29,7 @@ export function useTimelinePreviewViewportReporter(params: {
       lastPublishedViewportRef.current = viewport;
       onViewportChange(viewport);
     });
-  }, [onViewportChange, pixelsPerSecond, timelineRef]);
+  }, [onViewportChange, pixelsPerSecond, startTime, timelineRef]);
 
   useEffect(() => {
     publishPreviewViewport();
@@ -45,15 +50,16 @@ export function useTimelinePreviewViewportReporter(params: {
 
 function resolveTimelinePreviewViewport(
   timelineElement: HTMLDivElement | null,
-  pixelsPerSecond: number
+  pixelsPerSecond: number,
+  preciseStartTime?: number
 ): TimelinePreviewViewport {
   if (!timelineElement) {
     return { endTime: 0, startTime: 0, pixelsPerSecond };
   }
 
   const pixelsPerSecondSafe = clampTimelineScale(pixelsPerSecond);
-  const startTime = timelineElement.scrollLeft / pixelsPerSecondSafe;
-  const endTime = (timelineElement.scrollLeft + timelineElement.clientWidth) / pixelsPerSecondSafe;
+  const startTime = preciseStartTime ?? timelineElement.scrollLeft / pixelsPerSecondSafe;
+  const endTime = startTime + timelineElement.clientWidth / pixelsPerSecondSafe;
   return { endTime: Math.max(startTime, endTime), startTime, pixelsPerSecond: pixelsPerSecondSafe };
 }
 

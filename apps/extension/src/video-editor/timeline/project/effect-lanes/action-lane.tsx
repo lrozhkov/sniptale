@@ -25,11 +25,16 @@ export function ProjectTimelineActionsLane(
       {segments.map((segment) => (
         <ProjectTimelineEffectSegment
           key={segment.id}
+          segmentId={segment.id}
           className={ACTIONS_LANE_SEGMENT_CLASS_NAME}
           hidden={!props.laneVisible}
           isSelected={isSelectedEffectSegment(props.selectedEffectSelection, 'action', segment.id)}
           label={segment.event.label}
-          left={segment.start * props.pixelsPerSecond}
+          startTime={segment.start}
+          endTime={segment.end}
+          pixelsPerSecond={props.pixelsPerSecond}
+          projection={props.projection}
+          minimumWidth={18}
           onBeginEffectInteraction={(event) =>
             props.onBeginEffectInteraction(event, createActionTarget(segment, 'move'))
           }
@@ -40,7 +45,6 @@ export function ProjectTimelineActionsLane(
             getActionPresetLabel(segment.event.preset),
             `${formatTime(segment.start)} - ${formatTime(segment.end)}`,
           ].join(' · ')}
-          width={Math.max(18, (segment.end - segment.start) * props.pixelsPerSecond)}
         />
       ))}
     </ProjectTimelineEffectLaneRow>

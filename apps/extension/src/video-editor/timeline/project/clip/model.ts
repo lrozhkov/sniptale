@@ -1,3 +1,4 @@
+import { projectTimelineInterval } from '../interaction-state/projection';
 import type React from 'react';
 import { getClipWaveformPeaks, isAudioClip } from '../../../../features/video/project/timeline';
 import { getClipGainRange } from '../../../../features/video/project/timeline/basics';
@@ -23,6 +24,7 @@ export function buildProjectTimelineClipViewModel({
   isHovered,
   isSelected,
   pixelsPerSecond,
+  projection,
   project,
   trackClipTop = 0,
   trackClipRowHeight = DEFAULT_CLIP_ROW_HEIGHT,
@@ -33,38 +35,92 @@ export function buildProjectTimelineClipViewModel({
   | 'isHovered'
   | 'isSelected'
   | 'pixelsPerSecond'
+  | 'projection'
   | 'project'
   | 'trackClipTop'
   | 'trackClipRowHeight'
   | 'trackLocked'
 >): ProjectTimelineClipViewModel {
-  const width = Math.max(1, clip.duration * pixelsPerSecond);
+  const interval = projection
+    ? projectTimelineInterval(projection, clip.startTime, clip.startTime + clip.duration)
+    : {
+        left: clip.startTime * pixelsPerSecond,
+        width: Math.max(1, clip.duration * pixelsPerSecond),
+        offsetSeconds: 0,
+        durationSeconds: clip.duration,
+        includesStart: true,
+        includesEnd: true,
+      };
+  const width = interval ? Math.max(1, interval.width) : 0;
+  const offsetSeconds = interval?.offsetSeconds ?? 0;
+  const visibleDuration = interval?.durationSeconds ?? 0;
   const transitionViewModel = getTimelineClipTransitionViewModel({
     clip,
     pixelsPerSecond,
     project,
     width,
+    offsetPixels: offsetSeconds * pixelsPerSecond,
   });
   const gainRange = getClipGainRange(clip);
   const visualEmphasis = isHovered || isSelected;
-  const waveformPeaks = getTimelineClipWaveformPeaks({ clip, project, width });
+  const waveformPeaks = getTimelineClipWaveformPeaks({
+    clip,
+    project,
+    width,
+    offsetSeconds,
+    visibleDuration,
+  });
 
+  const fadeIn = getFadeOverlay(
+    clip.fadeInMs,
+    clip.duration,
+    offsetSeconds,
+    visibleDuration,
+    pixelsPerSecond,
+    false
+  );
+  const fadeOut = getFadeOverlay(
+    clip.fadeOutMs,
+    clip.duration,
+    offsetSeconds,
+    visibleDuration,
+    pixelsPerSecond,
+    true
+  );
+  const startFraction = clip.duration > 0 ? offsetSeconds / clip.duration : 0;
+  const endFraction = clip.duration > 0 ? (offsetSeconds + visibleDuration) / clip.duration : 1;
   return {
+    visible: interval !== null,
+    includesStart: interval?.includesStart ?? false,
+    includesEnd: interval?.includesEnd ?? false,
+    offsetSeconds,
+    visibleDuration,
     clipClassName: getTimelineClipClassName({ isSelected, isHovered, trackLocked }),
     edgeClassName: getTimelineClipEdgeClassName(visualEmphasis),
-    fadeInOverlayWidth: getFadeOverlayWidth(clip.fadeInMs, clip.duration, width),
-    fadeOutOverlayWidth: getFadeOverlayWidth(clip.fadeOutMs, clip.duration, width),
-    left: clip.startTime * pixelsPerSecond,
+    fadeInOverlayWidth: fadeIn.width,
+    fadeOutOverlayWidth: fadeOut.width,
+    fadeInOverlayStyle: fadeIn.style,
+    fadeOutOverlayStyle: fadeOut.style,
+    left: interval?.left ?? 0,
     previewTileWidth: getPreviewTileWidth(trackClipRowHeight),
     style: {
       ...getTimelineClipStyle(trackClipRowHeight, trackClipTop ?? 0),
       clipPath: `inset(0 ${transitionViewModel.bodyInsetRight}px 0 ${transitionViewModel.bodyInsetLeft}px)`,
     },
     ...transitionViewModel,
+    labelStyle: {
+      left: LABEL_BASE_INSET + Math.max(transitionViewModel.bodyInsetLeft, -(interval?.left ?? 0)),
+      right:
+        LABEL_BASE_INSET +
+        Math.max(
+          transitionViewModel.bodyInsetRight,
+          projection && interval ? interval.left + width - projection.viewportWidth : 0
+        ),
+    },
     trimHandleClassName: TRIM_HANDLE_CLASS_NAME,
     waveformPeaks,
-    waveformEnvelopeEnd: gainRange.end,
-    waveformEnvelopeStart: gainRange.start,
+    waveformEnvelopeEnd: gainRange.start + (gainRange.end - gainRange.start) * endFraction,
+    waveformEnvelopeStart: gainRange.start + (gainRange.end - gainRange.start) * startFraction,
     width,
     visualEmphasis,
   };
@@ -75,22 +131,25 @@ function getTimelineClipTransitionViewModel({
   pixelsPerSecond,
   project,
   width,
+  offsetPixels,
 }: Pick<ProjectTimelineClipProps, 'clip' | 'pixelsPerSecond' | 'project'> &
-  Pick<ProjectTimelineClipViewModel, 'width'>) {
+  Pick<ProjectTimelineClipViewModel, 'width'> & { offsetPixels: number }) {
   let bodyInsetLeft = 0;
   let bodyInsetRight = 0;
   for (const junction of getTrackJunctions(project)) {
-    const halfOverlap = Math.min(width, junction.duration * pixelsPerSecond) / 2;
-    if (junction.trailingClip.id === clip.id) bodyInsetLeft = halfOverlap;
-    if (junction.leadingClip.id === clip.id) bodyInsetRight = halfOverlap;
+    const fullWidth = Math.max(1, clip.duration * pixelsPerSecond);
+    const halfOverlap = Math.min(fullWidth, junction.duration * pixelsPerSecond) / 2;
+    if (junction.trailingClip.id === clip.id)
+      bodyInsetLeft = Math.min(width, Math.max(0, halfOverlap - offsetPixels));
+    if (junction.leadingClip.id === clip.id)
+      bodyInsetRight = Math.min(
+        width,
+        Math.max(0, halfOverlap - (fullWidth - offsetPixels - width))
+      );
   }
   return {
     bodyInsetLeft,
     bodyInsetRight,
-    labelStyle: {
-      left: LABEL_BASE_INSET + bodyInsetLeft,
-      right: LABEL_BASE_INSET + bodyInsetRight,
-    },
   };
 }
 
@@ -130,13 +189,38 @@ function getTimelineClipEdgeClassName(visualEmphasis: boolean): string {
   ].join(' ');
 }
 
-function getFadeOverlayWidth(fadeMs: number, durationSeconds: number, width: number): number {
-  if (fadeMs <= 0 || durationSeconds <= 0) {
-    return 0;
-  }
-
-  const fadeSeconds = fadeMs / 1000;
-  return Math.min(width / 2, Math.max(0, fadeSeconds * (width / durationSeconds)));
+function getFadeOverlay(
+  fadeMs: number,
+  duration: number,
+  offset: number,
+  visibleDuration: number,
+  scale: number,
+  outgoing: boolean
+) {
+  const fadeDuration = Math.min(duration / 2, Math.max(0, fadeMs / 1000));
+  const fadeStart = outgoing ? duration - fadeDuration : 0;
+  const start = Math.max(offset, fadeStart);
+  const end = Math.min(offset + visibleDuration, fadeStart + fadeDuration);
+  if (end <= start || fadeDuration <= 0) return { width: 0, style: {} };
+  const positions = [start, fadeStart + fadeDuration / 2, end].filter(
+    (time) => time >= start && time <= end
+  );
+  const stops = positions.map((time) => {
+    const progress = (time - fadeStart) / fadeDuration;
+    const ratio = outgoing ? 1 - progress : progress;
+    const alpha = ratio <= 0.5 ? 58 - ratio * 68 : 48 * (1 - ratio);
+    const position = ((time - start) / (end - start)) * 100;
+    return `color-mix(in srgb,var(--sniptale-color-surface-canvas) ${alpha}%,transparent) ${position}%`;
+  });
+  const width = (end - start) * scale;
+  return {
+    width,
+    style: {
+      left: (start - offset) * scale,
+      width,
+      backgroundImage: `linear-gradient(to right,${stops.join(',')})`,
+    },
+  };
 }
 
 function getTimelineClipStyle(
@@ -154,12 +238,28 @@ function getTimelineClipWaveformPeaks({
   clip,
   project,
   width,
-}: Pick<ProjectTimelineClipProps, 'clip' | 'project'> & { width: number }): number[] {
+  offsetSeconds,
+  visibleDuration,
+}: Pick<ProjectTimelineClipProps, 'clip' | 'project'> & {
+  width: number;
+  offsetSeconds: number;
+  visibleDuration: number;
+}): number[] {
   if (!isAudioClip(clip)) {
     return [];
   }
 
-  return getClipWaveformPeaks(project, clip, Math.max(40, Math.min(160, Math.round(width / 4))));
+  const sourceRate = clip.duration > 0 ? clip.sourceDuration / clip.duration : 1;
+  const samplingClip = {
+    ...clip,
+    sourceStart: clip.sourceStart + offsetSeconds * sourceRate,
+    sourceDuration: visibleDuration * sourceRate,
+  };
+  return getClipWaveformPeaks(
+    project,
+    samplingClip,
+    Math.max(40, Math.min(160, Math.round(width / 4)))
+  );
 }
 
 function getPreviewTileWidth(trackClipRowHeight: number): number {

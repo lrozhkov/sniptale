@@ -1,3 +1,4 @@
+import type { TimelineProjection } from '../../interaction-state/projection';
 import { useState } from 'react';
 import type { VideoProject } from '../../../../../features/video/project/types';
 import type { TimelineClipPreviewMap } from '../../../../contracts/timeline-preview';
@@ -31,6 +32,7 @@ import { ProjectTimelineLogicalLaneGuides } from './lane-guides';
 
 interface ProjectTimelineTrackLanesProps {
   pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
   project: VideoProject;
   dragGhost: TimelineClipDragGhost | null;
   selection: VideoEditorSelection;
@@ -74,6 +76,7 @@ export function ProjectTimelineTrackLanes(props: ProjectTimelineTrackLanesProps)
       key={track.id}
       dragGhost={props.dragGhost}
       pixelsPerSecond={props.pixelsPerSecond}
+      projection={props.projection}
       project={props.project}
       selection={props.selection}
       hoveredClipId={props.hoveredClipId}
@@ -123,11 +126,13 @@ function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
       <ProjectTimelineClipDragGhost
         dragGhost={props.dragGhost}
         pixelsPerSecond={props.pixelsPerSecond}
+        projection={props.projection}
         trackId={props.track.id}
         trackLayout={props.trackLayout}
       />
       <ProjectTimelineTrackClipStack
         pixelsPerSecond={props.pixelsPerSecond}
+        projection={props.projection}
         project={displayProject}
         hoveredClipId={props.dragGhost?.activeReorder ? null : props.hoveredClipId}
         selectedClipId={
@@ -217,6 +222,7 @@ function resolveTimelineLaneIdFromDropEvent(
 function createTrackZoneProps(props: {
   onBeginClipInteraction: ProjectTimelineTrackLanesProps['onBeginClipInteraction'];
   pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
   project: VideoProject;
   track: VideoProject['tracks'][number];
   onCloseTrackGap: (trackId: string, gapStart: number, gapEnd: number) => void;
@@ -239,6 +245,7 @@ function createTrackZoneProps(props: {
     gapZones: buildTrackGapZones(props.project, props.track.id),
     junctionZones: buildTrackJunctionZones(props.project, props.track.id),
     pixelsPerSecond: props.pixelsPerSecond,
+    projection: props.projection,
     selectedTransitionId:
       props.selection.kind === VideoEditorSelectionKind.TRANSITION_JUNCTION
         ? props.selection.transitionId

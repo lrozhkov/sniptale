@@ -1,3 +1,4 @@
+import { projectTimelinePoint, type TimelineProjection } from '../interaction-state/projection';
 import { useState, type MutableRefObject } from 'react';
 import { resolveTimelineTimeFromClientX } from '../interaction-state/seek';
 
@@ -7,9 +8,11 @@ export const TIMELINE_OBJECT_MARKER_PROPS = {
 
 export function useTimelineHoverPreview({
   pixelsPerSecond,
+  readTimelineStartTime,
   timelineRef,
 }: {
   pixelsPerSecond: number;
+  readTimelineStartTime?: (() => number) | undefined;
   timelineRef: MutableRefObject<HTMLDivElement | null>;
 }) {
   const [hoverTime, setHoverTime] = useState<number | null>(null);
@@ -23,7 +26,12 @@ export function useTimelineHoverPreview({
     }
 
     setHoverTime(
-      resolveTimelineTimeFromClientX(timelineRef.current, event.clientX, pixelsPerSecond)
+      resolveTimelineTimeFromClientX(
+        timelineRef.current,
+        event.clientX,
+        pixelsPerSecond,
+        readTimelineStartTime?.()
+      )
     );
   };
 
@@ -35,6 +43,7 @@ export function useTimelineHoverPreview({
 }
 
 export function ProjectTimelineHoverPreview(props: {
+  projection?: TimelineProjection | undefined;
   height: number;
   hoverTime: number | null;
   pixelsPerSecond: number;
@@ -43,6 +52,10 @@ export function ProjectTimelineHoverPreview(props: {
     return null;
   }
 
+  const left = props.projection
+    ? projectTimelinePoint(props.projection, props.hoverTime)
+    : props.hoverTime * props.pixelsPerSecond;
+  if (left === null) return null;
   return (
     <div
       aria-hidden="true"
@@ -51,7 +64,7 @@ export function ProjectTimelineHoverPreview(props: {
         'pointer-events-none absolute top-0 z-20 w-px',
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-text-primary)_34%,transparent)]',
       ].join(' ')}
-      style={{ height: props.height, left: props.hoverTime * props.pixelsPerSecond }}
+      style={{ height: props.height, left }}
     />
   );
 }

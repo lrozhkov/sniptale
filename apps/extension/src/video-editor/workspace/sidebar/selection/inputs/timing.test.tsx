@@ -176,7 +176,7 @@ async function verifyAudioControls() {
   );
 
   const muteToggle = container?.querySelector<HTMLButtonElement>(
-    '[data-ui="shared.ui.compact-inspector.option-row"]'
+    'button[aria-pressed][aria-label]'
   );
   expect(muteToggle).not.toBeNull();
 

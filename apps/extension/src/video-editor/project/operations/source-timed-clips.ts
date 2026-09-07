@@ -30,12 +30,13 @@ export function isSourceTimedClip(clip: VideoProjectClip): clip is SourceTimedCl
   return clip.type === VideoProjectClipType.VIDEO || clip.type === VideoProjectClipType.AUDIO;
 }
 
+/** Applies caller-bounded source timing without changing the authored source interval. */
 export function updateSourceTimedClipTiming<TClip extends SourceTimedClip>(
   clip: TClip,
   patch: Partial<Pick<TClip, 'playbackRate' | 'sourceDuration' | 'sourceStart' | 'startTime'>>
 ): TClip {
   const playbackRate = normalizeClipPlaybackRate(patch.playbackRate ?? clip.playbackRate ?? 1);
-  const sourceDuration = Math.max(0.1, patch.sourceDuration ?? clip.sourceDuration);
+  const sourceDuration = patch.sourceDuration ?? clip.sourceDuration;
 
   return {
     ...clip,

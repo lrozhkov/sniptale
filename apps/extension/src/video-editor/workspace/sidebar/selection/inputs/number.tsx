@@ -24,7 +24,7 @@ export function NumberInput({
   disabled?: boolean;
 }) {
   const numericValue = Number.isFinite(value) ? value : 0;
-  const commitValue = useDedupedNumberChange(onChange);
+  const commitValue = useDedupedNumberChange(onChange, numericValue);
   const scrubProps =
     scrub && min !== undefined && max !== undefined ? { scrub: { min, max, step } } : {};
 

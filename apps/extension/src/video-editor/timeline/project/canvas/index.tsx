@@ -1,3 +1,4 @@
+import { projectTimelinePoint, type TimelineProjection } from '../interaction-state/projection';
 import type { TimelinePreviewViewport } from '../../../contracts/timeline-preview';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
 import { useCallback, useState, type MutableRefObject } from 'react';
@@ -54,6 +55,8 @@ interface ProjectTimelineCanvasProps {
   seekToClientX: (clientX: number) => void;
   timelineRef: MutableRefObject<HTMLDivElement | null>;
   timelineWidth: number;
+  projection?: TimelineProjection | undefined;
+  readTimelineStartTime?: (() => number) | undefined;
   trackLayoutModel?: TimelineTrackLayoutModel;
   tracks: VideoProject['tracks'];
   onBeginClipInteraction: (
@@ -138,7 +141,11 @@ export function ProjectTimelineCanvas(props: ProjectTimelineCanvasProps) {
         hoverTime={model.hoverPreview.hoverTime}
         onClearHoverPreview={model.hoverPreview.clearHoverPreview}
         playheadHeight={model.playheadHeight}
-        playheadX={props.currentTime * props.pixelsPerSecond}
+        playheadX={
+          props.projection
+            ? projectTimelinePoint(props.projection, props.currentTime)
+            : props.currentTime * props.pixelsPerSecond
+        }
         rulerMarkers={model.rulerMarkers}
         trackLayoutModel={model.trackLayoutModel}
       />
@@ -159,7 +166,8 @@ function useProjectTimelineCanvasModel(props: ProjectTimelineCanvasProps) {
   const rulerMarkers = buildProjectTimelineRulerMarkers(
     props.timelineWidth,
     props.pixelsPerSecond,
-    viewport
+    props.projection ?? viewport,
+    props.project.fps
   );
   const trackLayoutModel = resolveTimelineTrackLayoutModel({
     project: props.project,
@@ -178,12 +186,14 @@ function useProjectTimelineCanvasModel(props: ProjectTimelineCanvasProps) {
   const hoverPreview = useTimelineHoverPreview({
     pixelsPerSecond: props.pixelsPerSecond,
     timelineRef: props.timelineRef,
+    readTimelineStartTime: props.readTimelineStartTime,
   });
   const publishPreviewViewport = useTimelinePreviewViewportReporter({
     onViewportChange: publishViewport,
     pixelsPerSecond: props.pixelsPerSecond,
     timelineRef: props.timelineRef,
     timelineWidth: props.timelineWidth,
+    startTime: props.projection?.startTime,
   });
   return {
     cursorLaneVisible,
@@ -218,52 +228,72 @@ function ProjectTimelineCanvasContent(
     hoverTime: number | null;
     onClearHoverPreview: () => void;
     playheadHeight: number;
-    playheadX: number;
+    playheadX: number | null;
     trackLayoutModel: TimelineTrackLayoutModel;
     rulerMarkers: ProjectTimelineRulerMarker[];
   }
 ) {
   return (
-    <div className="relative" style={{ width: props.timelineWidth + 120 }}>
-      <ProjectTimelineCanvasChrome
-        {...props}
-        playheadHandle={
-          <ProjectTimelinePlayheadHandle
-            currentTime={props.currentTime}
-            duration={props.project.duration}
-            left={props.playheadX}
-            onBeginScrub={(event, currentTime) =>
-              props.onBeginPlayheadScrub(event, currentTime, props.onClearHoverPreview)
-            }
-            onStepToNextFrame={props.onStepToNextFrame}
-            onStepToPreviousFrame={props.onStepToPreviousFrame}
-          />
-        }
-      />
-      <ProjectTimelineHoverPreview
-        height={props.playheadHeight}
-        hoverTime={props.hoverTime}
-        pixelsPerSecond={props.pixelsPerSecond}
-      />
-      <ProjectTimelineSnapGuide
-        height={props.playheadHeight}
-        left={props.snapGuideTime === null ? null : props.snapGuideTime * props.pixelsPerSecond}
-      />
-      <ProjectTimelinePlayheadLine height={props.playheadHeight} left={props.playheadX} />
-      {props.telemetryLaneVisible ? (
-        <ProjectTimelineTelemetryLane
-          onSeek={props.onSeekTime}
-          pixelsPerSecond={props.pixelsPerSecond}
-          project={props.project}
-          recordingTelemetry={props.recordingTelemetry}
+    <div
+      className="relative"
+      style={{ width: props.projection?.scrollWidth ?? props.timelineWidth + 120 }}
+    >
+      <div
+        className="sticky left-0 overflow-clip"
+        style={{ width: props.projection?.viewportWidth ?? props.timelineWidth + 120 }}
+      >
+        <ProjectTimelineCanvasChrome
+          {...props}
+          playheadHandle={
+            props.playheadX === null ? null : (
+              <ProjectTimelinePlayheadHandle
+                currentTime={props.currentTime}
+                duration={props.project.duration}
+                left={props.playheadX}
+                onBeginScrub={(event, currentTime) =>
+                  props.onBeginPlayheadScrub(event, currentTime, props.onClearHoverPreview)
+                }
+                onStepToNextFrame={props.onStepToNextFrame}
+                onStepToPreviousFrame={props.onStepToPreviousFrame}
+              />
+            )
+          }
         />
-      ) : null}
-      <ProjectTimelineTrackLanes
-        {...props}
-        onDropTimelineFile={createTimelineFileDropHandler(props)}
-        onUnsupportedTimelineFileDrop={props.onUnsupportedTimelineFileDrop}
-      />
-      <ProjectTimelineCanvasEffectRows {...props} />
+        <ProjectTimelineHoverPreview
+          height={props.playheadHeight}
+          hoverTime={props.hoverTime}
+          pixelsPerSecond={props.pixelsPerSecond}
+          projection={props.projection}
+        />
+        <ProjectTimelineSnapGuide
+          height={props.playheadHeight}
+          left={
+            props.snapGuideTime === null
+              ? null
+              : props.projection
+                ? projectTimelinePoint(props.projection, props.snapGuideTime)
+                : props.snapGuideTime * props.pixelsPerSecond
+          }
+        />
+        {props.playheadX === null ? null : (
+          <ProjectTimelinePlayheadLine height={props.playheadHeight} left={props.playheadX} />
+        )}
+        {props.telemetryLaneVisible ? (
+          <ProjectTimelineTelemetryLane
+            onSeek={props.onSeekTime}
+            pixelsPerSecond={props.pixelsPerSecond}
+            projection={props.projection}
+            project={props.project}
+            recordingTelemetry={props.recordingTelemetry}
+          />
+        ) : null}
+        <ProjectTimelineTrackLanes
+          {...props}
+          onDropTimelineFile={createTimelineFileDropHandler(props)}
+          onUnsupportedTimelineFileDrop={props.onUnsupportedTimelineFileDrop}
+        />
+        <ProjectTimelineCanvasEffectRows {...props} />
+      </div>
     </div>
   );
 }
@@ -301,7 +331,8 @@ function createTimelineFileDropHandler(props: ProjectTimelineCanvasProps) {
       startTime: resolveTimelineTimeFromClientX(
         props.timelineRef.current,
         params.clientX,
-        props.pixelsPerSecond
+        props.pixelsPerSecond,
+        props.readTimelineStartTime?.()
       ),
       timelineLaneId: params.targetTimelineLaneId ?? null,
       trackId: resolveTimelineDropTrackId(props.project, params.targetTrackId, params.importKind),

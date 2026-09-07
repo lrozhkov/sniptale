@@ -1,3 +1,4 @@
+import type { TimelineProjection } from '../interaction-state/projection';
 import type { MutableRefObject } from 'react';
 import type { VideoProject } from '../../../../features/video/project/types';
 import type { VideoEditorSelection } from '../../../contracts/selection';
@@ -7,6 +8,7 @@ import type { TimelineEffectDragTarget, TimelineEffectSelection } from '../types
 export function ProjectTimelineCanvasEffectRows(props: {
   cursorLaneVisible: boolean;
   pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
   project: VideoProject;
   selection: VideoEditorSelection;
   selectedEffectSelection: TimelineEffectSelection | null;
@@ -36,6 +38,7 @@ export function ProjectTimelineCanvasEffectRows(props: {
       onSelectObjectTrack={props.onSelectObjectTrack}
       onSelectTransition={props.onSelectTransition}
       pixelsPerSecond={props.pixelsPerSecond}
+      projection={props.projection}
       project={props.project}
       selection={props.selection}
       selectedEffectSelection={props.selectedEffectSelection}

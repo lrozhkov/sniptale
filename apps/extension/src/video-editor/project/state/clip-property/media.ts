@@ -113,6 +113,13 @@ function updateMediaClipVisuals(
       ? normalizeVideoMediaShadowMode(clip.shadowMode)
       : normalizeVideoMediaShadowMode(patch.shadowMode);
   const shouldRefreshTransform = patch.fitMode !== undefined || patch.fitScalePercent !== undefined;
+  if (
+    !shouldRefreshTransform &&
+    shadowIntensity === normalizeVideoMediaShadowIntensity(clip.shadowIntensity) &&
+    shadowMode === normalizeVideoMediaShadowMode(clip.shadowMode)
+  ) {
+    return project;
+  }
 
   return applyVideoProjectMutationPatch(project, {
     clips: project.clips.map((item) =>

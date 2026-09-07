@@ -29,6 +29,7 @@ export type TrimClipHandler = (
 
 interface TimelineDragMoveParams {
   interaction: TimelineInteraction;
+  viewportDeltaSeconds?: number;
   currentTime: number;
   magnetEnabled: boolean;
   moveEvent: PointerEvent;
@@ -116,6 +117,7 @@ function getChangedCompanionPreviews(
 }
 
 export function applyTimelineDragMove({
+  viewportDeltaSeconds = 0,
   interaction,
   currentTime,
   magnetEnabled,
@@ -130,7 +132,8 @@ export function applyTimelineDragMove({
   project,
   setSnapGuideTime,
 }: TimelineDragMoveParams) {
-  const deltaSeconds = (moveEvent.clientX - interaction.startClientX) / pixelsPerSecond;
+  const deltaSeconds =
+    (moveEvent.clientX - interaction.startClientX) / pixelsPerSecond + viewportDeltaSeconds;
   if (interaction.mode === 'move') {
     applyTimelineClipMove({
       clip: interaction.clip,

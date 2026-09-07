@@ -156,7 +156,7 @@ function buildVideoPreviewSourceSlots(
 
   const rate = normalizeClipPlaybackRate(clip.playbackRate ?? 1);
   const desiredStep = viewport
-    ? Math.max(1 / 30, (64 / clampTimelineScale(viewport.pixelsPerSecond)) * rate)
+    ? (64 / clampTimelineScale(viewport.pixelsPerSecond)) * rate
     : STORYBOARD_SLOT_SECONDS;
   const step = viewport ? 2 ** Math.floor(Math.log2(desiredStep)) : desiredStep;
   const firstSlot = Math.floor(start / step);
