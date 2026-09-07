@@ -56,6 +56,7 @@ function renderSurface(
       onSeekToEnd={vi.fn()}
       onSeekToStart={vi.fn()}
       onTogglePlay={vi.fn()}
+      onClearPlaybackRange={vi.fn()}
       onStepToNextFrame={vi.fn()}
       onStepToPreviousFrame={vi.fn()}
       canEditSelectedClip={false}
@@ -115,6 +116,7 @@ function createPanelPrefs() {
     setCollapsedCursorLaneVisible: vi.fn(),
     setCollapsedTelemetryLaneVisible: vi.fn(),
     setCompactRows: vi.fn(),
+    setHideTrackNames: vi.fn(),
     setTrackHeight: vi.fn(),
     telemetryLaneVisible: false,
   };

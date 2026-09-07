@@ -101,6 +101,7 @@ describe('editor standalone EffectV1 host clip lifecycle', () => {
     );
     expect(splitHosts).toHaveLength(2);
     for (const splitHost of splitHosts) {
+      expect(splitHost.name).toBe(host.name);
       if (splitHost.type !== 'EFFECT') throw new Error('Expected EffectV1 host');
       expect(split!.effectInstances?.find(({ id }) => id === splitHost.effectInstanceId)).toEqual(
         expect.objectContaining({

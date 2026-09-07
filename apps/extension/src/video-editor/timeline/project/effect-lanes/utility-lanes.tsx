@@ -45,7 +45,7 @@ export function ProjectTimelineEffectCanvasRows(
 function ProjectTimelineMotionLane(props: UtilityLaneProps & { laneVisible: boolean }) {
   const segments = resolveMotionLaneSegments(props);
   return (
-    <ProjectTimelineEffectLaneRow>
+    <ProjectTimelineEffectLaneRow onPointerDown={props.onBeginRangeSelection}>
       <MotionLaneEmptyState visible={segments.length === 0} />
       <MotionSegments {...props} segments={segments} />
     </ProjectTimelineEffectLaneRow>

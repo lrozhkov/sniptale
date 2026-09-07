@@ -12,6 +12,7 @@ import {
 } from '../floating/panel-layout';
 import React, { useEffect, useState } from 'react';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
+import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { translate } from '../../../platform/i18n';
 import { VideoEditorSourceViewer } from './source-viewer';
 import type { VideoProjectAsset } from '../../../features/video/project/types';
@@ -156,6 +157,69 @@ function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
       )}
     </VideoEditorWorkspaceHeader>
   );
+  return (
+    <>
+      <WorkspaceLibraryPanel {...props}>
+        {props.materialsOpen && (
+          <VideoEditorMaterials
+            onRemoveUnused={removeUnusedAssets}
+            onOpenLibrary={() => header?.onOpenLibraryPanel()}
+            project={preview.project}
+            onImport={preview.onImport}
+            selectedAssetId={selectedAssetId}
+            onSelect={(asset) => {
+              setSelectedAssetId(asset.id);
+              showSource();
+            }}
+          />
+        )}
+        <VideoEditorWorkspaceEffectsLibrary
+          effectBundles={props.effectBundles}
+          effectOperations={props.effectOperations}
+          isOpen={props.effectsLibraryDockOpen}
+        />
+      </WorkspaceLibraryPanel>
+      <div
+        className="col-start-2 row-start-1 flex min-h-0 min-w-0 flex-col"
+        tabIndex={-1}
+        data-ui="video-editor.workspace.viewer"
+        data-viewer={sourceActive ? 'source' : 'montage'}
+      >
+        <PreviewStage
+          headerContent={viewerHeading}
+          headerActions={
+            <VideoEditorWorkspaceHeaderActions
+              inspectorOpen={props.inspectorPanel.isOpen}
+              onOpenInspector={props.inspectorPanel.onToggle}
+            />
+          }
+          alternateView={{
+            active: sourceActive,
+            content: (
+              <VideoEditorSourceViewer
+                asset={source}
+                assetUrl={source ? preview.assetUrls[source.id] : undefined}
+                active={sourceActive && !blocking}
+                fps={preview.project.fps}
+                onAppend={appendMaterial}
+                onInsert={insertMaterial}
+                onOverlay={overlayMaterial}
+                onPlaced={() => setSourceActive(false)}
+              />
+            ),
+          }}
+          {...createWorkspacePreviewProps(props, preview)}
+        />
+      </div>
+    </>
+  );
+}
+
+function WorkspaceLibraryPanel(
+  props: VideoEditorWorkspaceCanvasProps & {
+    children: React.ReactNode;
+  }
+) {
   const libraryNavigation = (
     <VideoEditorLibraryNavigation
       active={props.effectsLibraryDockOpen ? 'effects' : 'materials'}
@@ -191,29 +255,21 @@ function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
             className="@container/library min-h-0 min-w-0"
             style={{ width: props.materialsPanel.resize.width }}
           >
-            {props.materialsOpen && (
-              <VideoEditorMaterials
-                onRemoveUnused={removeUnusedAssets}
-                onOpenLibrary={() => header?.onOpenLibraryPanel()}
-                project={preview.project}
-                onImport={preview.onImport}
-                selectedAssetId={selectedAssetId}
-                headerTitle={libraryNavigation}
-                headerAction={libraryActions}
-                onSelect={(asset) => {
-                  setSelectedAssetId(asset.id);
-                  showSource();
-                }}
-              />
-            )}
-            <VideoEditorWorkspaceEffectsLibrary
-              effectBundles={props.effectBundles}
-              effectOperations={props.effectOperations}
-              isOpen={props.effectsLibraryDockOpen}
-              onOpenChange={props.onEffectsLibraryDockOpenChange}
-              headerTitle={libraryNavigation}
-              headerAction={libraryActions}
-            />
+            <FloatingChromePanel
+              className="flex h-full min-h-0 flex-col overflow-hidden"
+              dataUi="video-editor.library.panel"
+            >
+              <header
+                className={[
+                  'flex h-[52px] shrink-0 items-center justify-between gap-2 border-b',
+                  'border-[color:var(--sniptale-color-border-soft)] px-3',
+                ].join(' ')}
+              >
+                {libraryNavigation}
+                {libraryActions}
+              </header>
+              <div className="min-h-0 flex-1">{props.children}</div>
+            </FloatingChromePanel>
           </div>
           <WorkspacePanelResizeHandle
             resize={props.materialsPanel.resize}
@@ -222,38 +278,6 @@ function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
           />
         </div>
       )}
-      <div
-        className="col-start-2 row-start-1 flex min-h-0 min-w-0 flex-col"
-        tabIndex={-1}
-        data-ui="video-editor.workspace.viewer"
-        data-viewer={sourceActive ? 'source' : 'montage'}
-      >
-        <PreviewStage
-          headerContent={viewerHeading}
-          headerActions={
-            <VideoEditorWorkspaceHeaderActions
-              inspectorOpen={props.inspectorPanel.isOpen}
-              onOpenInspector={props.inspectorPanel.onToggle}
-            />
-          }
-          alternateView={{
-            active: sourceActive,
-            content: (
-              <VideoEditorSourceViewer
-                asset={source}
-                assetUrl={source ? preview.assetUrls[source.id] : undefined}
-                active={sourceActive && !blocking}
-                fps={preview.project.fps}
-                onAppend={appendMaterial}
-                onInsert={insertMaterial}
-                onOverlay={overlayMaterial}
-                onPlaced={() => setSourceActive(false)}
-              />
-            ),
-          }}
-          {...createWorkspacePreviewProps(props, preview)}
-        />
-      </div>
     </>
   );
 }

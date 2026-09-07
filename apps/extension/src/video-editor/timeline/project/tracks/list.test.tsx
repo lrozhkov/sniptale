@@ -228,6 +228,7 @@ function renderTrackList(
   project: ReturnType<typeof createEmptyVideoProject>,
   options: {
     compactRows?: boolean;
+    hideTrackNames?: boolean;
     cursorLaneVisible?: boolean;
     showTelemetryLane: boolean;
     onAddMotionRegion?: () => void;
@@ -235,7 +236,10 @@ function renderTrackList(
     motionLaneSelected?: boolean;
   }
 ) {
-  const trackPanelPrefs = createTrackPanelPrefs({ compactRows: options.compactRows ?? false });
+  const trackPanelPrefs = createTrackPanelPrefs({
+    compactRows: options.compactRows ?? false,
+    hideTrackNames: options.hideTrackNames ?? false,
+  });
   act(() => {
     root?.render(
       <ProjectTimelineTrackList
@@ -269,7 +273,7 @@ function renderTrackList(
   return trackPanelPrefs;
 }
 
-function createTrackPanelPrefs(options: { compactRows: boolean }) {
+function createTrackPanelPrefs(options: { compactRows: boolean; hideTrackNames: boolean }) {
   return {
     cursorLaneVisible: true,
     prefs: { ...DEFAULT_VIDEO_EDITOR_TRACK_PANEL_PREFS, ...options },
@@ -277,6 +281,7 @@ function createTrackPanelPrefs(options: { compactRows: boolean }) {
     setCollapsedCursorLaneVisible: vi.fn(),
     setCollapsedTelemetryLaneVisible: vi.fn(),
     setCompactRows: vi.fn(),
+    setHideTrackNames: vi.fn(),
     setTrackHeight: vi.fn(),
   };
 }
@@ -353,4 +358,44 @@ it('keeps destructive zoom cleanup in the inspector instead of the track header'
   expect(
     container?.querySelector('[data-ui="video-editor.timeline.clear-utility-lane"]')
   ).toBeNull();
+});
+
+it('toggles track names independently of compact row heights', () => {
+  const project = createEmptyVideoProject('Names');
+  const prefs = renderTrackList(project, { compactRows: true, showTelemetryLane: true });
+  const toggle = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="video-editor.timeline.toolbar.hide-track-names"]'
+  );
+  expect(toggle).not.toBeNull();
+  act(() => toggle?.click());
+  expect(prefs.setHideTrackNames).toHaveBeenCalledWith(true);
+  expect(prefs.setCompactRows).not.toHaveBeenCalled();
+  expect(
+    container?.querySelector('[data-ui="video-editor.timeline.track-select"]')?.textContent
+  ).toContain('V1');
+});
+
+it('collapses only the common header controls when both compact display options are enabled', () => {
+  const project = createEmptyVideoProject('Compact rail');
+  for (const [compactRows, hideTrackNames] of [
+    [false, true],
+    [true, false],
+    [true, true],
+  ] as const) {
+    renderTrackList(project, { showTelemetryLane: true, compactRows, hideTrackNames });
+    const header = container!.querySelector(
+      '[data-ui="video-editor.timeline.track-header-controls"]'
+    )!;
+    expect(header.querySelectorAll('button')).toHaveLength(compactRows && hideTrackNames ? 1 : 5);
+    expect(
+      header.querySelector('[data-ui="video-editor.timeline.toolbar.add-track"]')
+    ).not.toBeNull();
+    expect(
+      container!.querySelector('[data-ui="video-editor.timeline.track-select"]')?.textContent
+    ).toContain('V1');
+    expect(
+      container!.querySelector('[data-project-timeline-track-list]')?.querySelectorAll('button')
+        .length
+    ).toBeGreaterThanOrEqual(3);
+  }
 });

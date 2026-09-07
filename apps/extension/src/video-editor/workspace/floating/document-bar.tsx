@@ -29,14 +29,16 @@ function VideoEditorProjectTitle({
 }: Pick<VideoEditorDocumentBarProps['header'], 'onRenameProject' | 'projectName'>) {
   return (
     <label
-      className={[
-        'grid min-w-[6rem] max-w-[24rem] shrink items-center',
-        'focus-within:w-[30rem] focus-within:max-w-full',
-      ].join(' ')}
+      className={['grid min-w-[6rem] max-w-full shrink items-center', 'focus-within:flex-1'].join(
+        ' '
+      )}
     >
       <span
         aria-hidden="true"
-        className="invisible col-start-1 row-start-1 truncate px-2 text-sm font-semibold"
+        className={[
+          'invisible col-start-1 row-start-1 min-w-0 overflow-hidden whitespace-pre border',
+          'border-transparent pl-2 pr-2.5 text-sm font-semibold',
+        ].join(' ')}
       >
         {projectName || ' '}
       </span>
@@ -44,7 +46,7 @@ function VideoEditorProjectTitle({
         aria-label={translate('videoEditor.app.title')}
         value={projectName}
         onChange={(event) => onRenameProject(event.currentTarget.value)}
-        className={`${PROJECT_TITLE_CLASS_NAME} col-start-1 row-start-1`}
+        className={`${PROJECT_TITLE_CLASS_NAME} col-start-1 row-start-1 text-ellipsis focus:text-clip`}
       />
     </label>
   );

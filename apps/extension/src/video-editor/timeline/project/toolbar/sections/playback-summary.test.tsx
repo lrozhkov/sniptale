@@ -36,6 +36,7 @@ function renderPlaybackSummary(isPlaying: boolean, withRange = false) {
   }
 
   const onTogglePlay = vi.fn();
+  const onClearPlaybackRange = vi.fn();
   const onSeekToEnd = vi.fn();
   const onSeekToStart = vi.fn();
   const onStepToNextFrame = vi.fn();
@@ -52,6 +53,7 @@ function renderPlaybackSummary(isPlaying: boolean, withRange = false) {
         onStepToNextFrame={onStepToNextFrame}
         onStepToPreviousFrame={onStepToPreviousFrame}
         onTogglePlay={onTogglePlay}
+        onClearPlaybackRange={onClearPlaybackRange}
       />
     );
   });
@@ -62,6 +64,7 @@ function renderPlaybackSummary(isPlaying: boolean, withRange = false) {
     onStepToNextFrame,
     onStepToPreviousFrame,
     onTogglePlay,
+    onClearPlaybackRange,
   };
 }
 
@@ -148,7 +151,7 @@ it('renders the active loop range when playback range is selected', () => {
   expect(container?.textContent).toContain('(0:04.500-0:06.750)');
 });
 
-it('keeps five playback controls with or without a range, without a reset button', () => {
+it('keeps transport controls and adds a reset beside the selected range', () => {
   renderPlaybackSummary(false, false);
   const buttonsWithoutRange = container?.querySelectorAll<HTMLButtonElement>('button');
 
@@ -156,7 +159,7 @@ it('keeps five playback controls with or without a range, without a reset button
   const buttonsWithRange = container?.querySelectorAll<HTMLButtonElement>('button');
 
   expect(buttonsWithoutRange).toHaveLength(5);
-  expect(buttonsWithRange).toHaveLength(5);
+  expect(buttonsWithRange).toHaveLength(6);
   expect(container?.querySelector('[data-playback-counter]')?.className).toContain('tabular-nums');
 });
 
@@ -171,4 +174,17 @@ it('keeps short frames nonzero and long project time readable', () => {
   expect(formatPlaybackCounterTime(1 / 240)).toBe('0:00.004');
   expect(formatPlaybackCounterTime(43200 + 1 / 240)).toBe('12:00:00.004');
   expect(formatPlaybackCounterTime(3599.9996)).toBe('1:00:00.000');
+});
+
+it('clears a selected range without changing transport', () => {
+  const actions = renderPlaybackSummary(false, true);
+  const reset = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="video-editor.timeline.toolbar.clear-range"]'
+  );
+  expect(reset?.closest('[data-playback-counter]')?.textContent).toContain('(0:04.500-0:06.750)');
+  act(() => reset?.click());
+  expect(actions.onClearPlaybackRange).toHaveBeenCalledOnce();
+  expect(actions.onTogglePlay).not.toHaveBeenCalled();
+  expect(actions.onSeekToStart).not.toHaveBeenCalled();
+  expect(actions.onSeekToEnd).not.toHaveBeenCalled();
 });

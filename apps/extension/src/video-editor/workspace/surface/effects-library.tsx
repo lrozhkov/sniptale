@@ -10,12 +10,9 @@ import { VideoProjectClipType } from '../../../features/video/project/types';
 import type { EffectLibraryOperations } from '../../library/effects-dock/operations';
 
 export function VideoEditorWorkspaceEffectsLibrary(props: {
-  headerAction?: React.ReactNode;
-  headerTitle?: React.ReactNode;
   effectBundles: WorkspaceEffectBundlesState;
   effectOperations: EffectLibraryOperations;
   isOpen: boolean;
-  onOpenChange(open: boolean): void;
 }): React.JSX.Element | null {
   const preview = useVideoEditorPreviewController();
   const selections = useVideoEditorSelectionsContext();
@@ -31,8 +28,6 @@ export function VideoEditorWorkspaceEffectsLibrary(props: {
   );
   return (
     <VideoEditorEffectsLibraryDock
-      headerAction={props.headerAction}
-      headerTitle={props.headerTitle}
       catalogs={props.effectBundles.catalogs}
       currentTime={preview.transport.currentTime}
       errorCode={props.effectBundles.errorCode}
@@ -40,7 +35,6 @@ export function VideoEditorWorkspaceEffectsLibrary(props: {
       isOpen={props.isOpen}
       operations={props.effectOperations}
       onApplyEffect={onApplyEffect}
-      onClose={() => props.onOpenChange(false)}
       onDeleteEffectBundle={props.effectBundles.onDeleteEffectBundle}
       onImportEffectFile={props.effectBundles.onImportEffectFile}
       onSetEffectBundleEnabled={props.effectBundles.onSetEffectBundleEnabled}

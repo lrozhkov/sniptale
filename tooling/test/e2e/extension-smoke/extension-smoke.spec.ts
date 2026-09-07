@@ -145,7 +145,7 @@ async function expectBuiltVideoEditorGeometry(
     };
     return {
       documentBar: getBounds('[data-ui="video-editor.floating.document-bar"]'),
-      effectsDock: getBounds('[data-ui="video-editor.effects-library.dock"]'),
+      effectsDock: getBounds('[data-ui="video-editor.library.panel"]'),
       inspector: getBounds('[data-ui="video-editor.floating.context-inspector"]'),
       preview: getBounds('[data-ui="video.preview.viewport"]'),
       timeline: getBounds('[data-ui="video-editor.timeline.surface"]'),
@@ -615,7 +615,10 @@ test('video editor keeps clip actions stable and disables them without an editab
   );
   await splitButton.click();
   await expect(page.locator('[data-project-timeline-clip]')).toHaveCount(2);
-  const splitPartName = `Intro title · ${translate('shared.projectActions.splitPartSuffix', 'ru')} 2`;
+  const splitPartName = 'Intro title';
+  for (const fragment of await page.locator('[data-project-timeline-clip]').all()) {
+    await expect(fragment).toHaveAttribute('title', splitPartName);
+  }
   await expect(
     page
       .locator('[data-ui="video-editor.floating.context-inspector"]')

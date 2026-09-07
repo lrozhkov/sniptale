@@ -185,7 +185,6 @@ function createSplitSecondClipBase<TClip extends VideoProjectClip>(
     startTime: clip.startTime + localOffset,
     duration: clip.duration - localOffset,
     transform: { ...clip.transform },
-    name: `${clip.name} · ${translate('shared.projectActions.splitPartSuffix')} 2`,
     groupId: shouldKeepLinked ? secondGroupId : clip.groupId,
     linkMode: shouldKeepLinked ? VideoClipLinkMode.LINKED : clip.linkMode,
   } as TClip;

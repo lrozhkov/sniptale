@@ -92,7 +92,10 @@ function ProjectTimelineTrackMeta({
         <span className="shrink-0 text-[10px] font-semibold tabular-nums text-[var(--sniptale-color-text-dim)]">
           {trackLabel}
         </span>
-        <span className="truncate text-xs font-semibold text-[var(--sniptale-color-text-primary)]">
+        <span
+          data-timeline-track-name="true"
+          className="truncate text-xs font-semibold text-[var(--sniptale-color-text-primary)]"
+        >
           {track.name || getTrackKindLabel(track.kind)}
         </span>
       </>

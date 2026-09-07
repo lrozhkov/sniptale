@@ -73,7 +73,7 @@ export function ProjectTimelineTelemetryLaneLabelRow({ compactRows }: { compactR
     >
       <TimelineLaneIconFrame>{getTelemetryLaneIcon()}</TimelineLaneIconFrame>
       {compactRows ? null : (
-        <div className="min-w-0">
+        <div data-timeline-track-name="true" className="min-w-0">
           <div className="truncate text-[13px] font-semibold text-[var(--sniptale-color-text-primary)]">
             {translate('videoEditor.timeline.telemetryLane')}
           </div>

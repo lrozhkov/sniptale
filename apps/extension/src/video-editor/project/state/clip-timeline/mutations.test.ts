@@ -322,3 +322,28 @@ it.each([30, 60, 240])(
     expect(minimum.duration).toBeCloseTo(1 / fps, 10);
   }
 );
+
+it('preserves authored names through repeated cuts instead of accumulating part suffixes', () => {
+  const original = createTimelineProject();
+  original.clips[0]!.name = 'Мой дубль · часть 2';
+  let project = original;
+  let clipId = 'clip-1';
+  for (const time of [2, 3, 4]) {
+    project = splitProjectClipsAtTime(project, clipId, time);
+    const trailing = project.clips.find((clip) => clip.startTime === time)!;
+    expect(trailing.name).toBe('Мой дубль · часть 2');
+    clipId = trailing.id;
+  }
+  expect(project.clips.filter((clip) => clip.startTime < 5).map((clip) => clip.name)).toEqual(
+    Array(4).fill('Мой дубль · часть 2')
+  );
+  expect(original.clips).toHaveLength(2);
+});
+
+it('keeps each linked video and audio name when cutting the group', () => {
+  const original = createLinkedTimelineProject();
+  const originalNames = new Map(original.clips.map((clip) => [clip.type, clip.name]));
+  const project = splitProjectClipsAtTime(original, 'video-1', 3);
+  expect(project.clips).toHaveLength(4);
+  for (const clip of project.clips) expect(clip.name).toBe(originalNames.get(clip.type));
+});

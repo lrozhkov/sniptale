@@ -1,6 +1,10 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorTimelineLaneMessages = defineMessageSource({
+  hideTrackNames: {
+    ru: 'Скрыть названия дорожек',
+    en: 'Hide track names',
+  },
   transitionLane: {
     ru: 'Переходы',
     en: 'Transitions',

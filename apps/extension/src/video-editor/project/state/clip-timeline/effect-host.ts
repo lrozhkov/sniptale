@@ -93,7 +93,6 @@ export function splitStandaloneEffectHostWithResult(
     duration: secondDuration,
     effectInstanceId: instanceId,
     id: crypto.randomUUID(),
-    name: `${sourceHost.name} · ${translate('shared.projectActions.splitPartSuffix')} 2`,
     startTime: splitTime,
     transform: { ...sourceHost.transform },
   };

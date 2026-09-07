@@ -1,43 +1,8 @@
 import { useRef } from 'react';
-import { Upload, X } from 'lucide-react';
-import { EditorIconButton } from '@sniptale/ui/editor-chrome';
+import { Upload } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 
 import { translate } from '../../../platform/i18n';
-
-export function EffectsLibraryHeader(props: {
-  onClose(): void;
-  action?: React.ReactNode;
-  title?: React.ReactNode;
-}): React.JSX.Element {
-  return (
-    <header
-      className={[
-        'flex h-[52px] shrink-0 items-center justify-between gap-2 border-b',
-        'border-[color:var(--sniptale-color-border-soft)] px-3',
-      ].join(' ')}
-    >
-      {props.title ?? (
-        <h2
-          className="min-w-0 flex-1 truncate text-[13px] font-semibold"
-          title={translate('videoEditor.effectsLibrary.description')}
-        >
-          {translate('videoEditor.effectsLibrary.title')}
-        </h2>
-      )}
-      {props.action}
-      {!props.action && (
-        <EditorIconButton
-          className="!h-6 !w-6"
-          title={translate('common.actions.close')}
-          onClick={props.onClose}
-        >
-          <X size={14} strokeWidth={2} />
-        </EditorIconButton>
-      )}
-    </header>
-  );
-}
 
 export function EffectImportControl(props: {
   disabled: boolean;

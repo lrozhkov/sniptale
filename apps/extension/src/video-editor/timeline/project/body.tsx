@@ -75,7 +75,10 @@ export function ProjectTimelineBody(props: ProjectTimelineBodyProps) {
     <div
       className="grid min-h-0 flex-1 overflow-hidden"
       style={{
-        gridTemplateColumns: '220px minmax(0,1fr)',
+        gridTemplateColumns:
+          props.trackPanelPrefs.prefs.compactRows && props.trackPanelPrefs.prefs.hideTrackNames
+            ? '160px minmax(0,1fr)'
+            : '220px minmax(0,1fr)',
       }}
     >
       <ProjectTimelineBodyTrackList {...props} />

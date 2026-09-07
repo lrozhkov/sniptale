@@ -10,7 +10,6 @@ import {
 import { ProductToolbarMenu, ProductToolbarMenuItem } from '@sniptale/ui/product-menus/toolbar';
 import { Check, ChevronDown, Film, FolderKanban, Image, Music, Trash2, Upload } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { translate } from '../../../platform/i18n';
 import { VideoEditorFileInputNodes } from '../../chrome/file-inputs';
 import type { PreviewStageImportHandlers, VideoEditorImportKind } from '../../contracts/insertion';
@@ -23,8 +22,6 @@ const MATERIAL_IMPORT_OPTIONS = [
 ] as const;
 
 export function VideoEditorMaterials(props: {
-  headerAction?: React.ReactNode;
-  headerTitle?: React.ReactNode;
   onOpenLibrary: () => void;
   onRemoveUnused: (assetIds?: readonly string[]) => void;
   project: VideoProject;
@@ -72,85 +69,70 @@ export function VideoEditorMaterials(props: {
       data-ui="video-editor.materials"
       className="@container/materials h-full min-w-0"
     >
-      <FloatingChromePanel className="h-full overflow-hidden">
-        <div className="flex h-full min-h-0 flex-col" aria-busy={pending}>
-          <div
-            className={[
-              'flex h-[52px] shrink-0 items-center justify-between gap-2 border-b',
-              'border-[color:var(--sniptale-color-border-soft)] px-3',
-            ].join(' ')}
-          >
-            {props.headerTitle ?? (
-              <h2 className="text-[13px] font-semibold">
-                {translate('videoEditor.app.materialsTitle')}
-              </h2>
-            )}
-            {props.headerAction}
-          </div>
-          <VideoEditorFileInputNodes
-            audioInputRef={audioInputRef}
-            imageInputRef={imageInputRef}
-            videoInputRef={videoInputRef}
-            onImportAudio={(file) => void importFile('audio', file)}
-            onImportImage={(file) => void importFile('image', file)}
-            onImportVideo={(file) => void importFile('video', file)}
-          />
-          {pending && <p role="status">{translate('videoEditor.app.materialsLoading')}</p>}
-          <div className="min-h-10 flex-1 space-y-1 overflow-y-auto p-2">
-            {props.project.assets.length === 0 && (
-              <div className="px-2 py-3">
-                <p className="text-xs font-medium">{translate('videoEditor.app.materialsEmpty')}</p>
-                <p className="mt-1 text-xs text-[var(--sniptale-color-text-muted)]">
-                  {translate('videoEditor.app.materialsHint')}
-                </p>
-              </div>
-            )}
-            {props.project.assets.map((asset) => (
-              <MaterialRow
-                key={asset.id}
-                asset={asset}
-                selected={props.selectedAssetId === asset.id}
-                used={usage.has(asset.id)}
-                disabled={pending}
-                onSelect={() => props.onSelect(asset)}
-                onRemove={() => removeMaterials([asset.id])}
-              />
-            ))}
-          </div>
-          <footer
-            data-ui="video-editor.materials.footer"
-            className={[
-              'grid shrink-0 grid-cols-1 @min-[300px]/materials:grid-cols-2 items-center gap-1 border-t',
-              'border-[color:var(--sniptale-color-border-soft)] px-2 py-1',
-            ].join(' ')}
-          >
-            <ProductActionButton
-              tone="secondary"
-              className="min-w-0 justify-start !px-2"
-              onClick={props.onOpenLibrary}
-              data-ui="video-editor.materials.library"
-            >
-              <FolderKanban size={16} aria-hidden="true" />
-              <span className="truncate">{translate('videoEditor.app.materialsFromLibrary')}</span>
-            </ProductActionButton>
-            <MaterialsImportMenu
+      <div className="flex h-full min-h-0 flex-col" aria-busy={pending}>
+        <VideoEditorFileInputNodes
+          audioInputRef={audioInputRef}
+          imageInputRef={imageInputRef}
+          videoInputRef={videoInputRef}
+          onImportAudio={(file) => void importFile('audio', file)}
+          onImportImage={(file) => void importFile('image', file)}
+          onImportVideo={(file) => void importFile('video', file)}
+        />
+        {pending && <p role="status">{translate('videoEditor.app.materialsLoading')}</p>}
+        <div className="min-h-10 flex-1 space-y-1 overflow-y-auto p-2">
+          {props.project.assets.length === 0 && (
+            <div className="px-2 py-3">
+              <p className="text-xs font-medium">{translate('videoEditor.app.materialsEmpty')}</p>
+              <p className="mt-1 text-xs text-[var(--sniptale-color-text-muted)]">
+                {translate('videoEditor.app.materialsHint')}
+              </p>
+            </div>
+          )}
+          {props.project.assets.map((asset) => (
+            <MaterialRow
+              key={asset.id}
+              asset={asset}
+              selected={props.selectedAssetId === asset.id}
+              used={usage.has(asset.id)}
               disabled={pending}
-              onChoose={(kind) => inputRefs[kind].current?.click()}
+              onSelect={() => props.onSelect(asset)}
+              onRemove={() => removeMaterials([asset.id])}
             />
-            <ProductActionButton
-              compact
-              tone="secondary"
-              className="col-span-full !min-h-8 justify-start !px-2 text-[var(--sniptale-color-text-muted)]"
-              disabled={pending || unusedCount === 0}
-              onClick={() => removeMaterials()}
-              data-ui="video-editor.materials.remove-unused"
-            >
-              <Trash2 size={14} aria-hidden="true" />
-              {translate('videoEditor.app.materialsRemoveUnused')}
-            </ProductActionButton>
-          </footer>
+          ))}
         </div>
-      </FloatingChromePanel>
+        <footer
+          data-ui="video-editor.materials.footer"
+          className={[
+            'grid shrink-0 grid-cols-1 @min-[300px]/materials:grid-cols-2 items-center gap-1 border-t',
+            'border-[color:var(--sniptale-color-border-soft)] px-2 py-1',
+          ].join(' ')}
+        >
+          <ProductActionButton
+            tone="secondary"
+            className="min-w-0 justify-start !px-2"
+            onClick={props.onOpenLibrary}
+            data-ui="video-editor.materials.library"
+          >
+            <FolderKanban size={16} aria-hidden="true" />
+            <span className="truncate">{translate('videoEditor.app.materialsFromLibrary')}</span>
+          </ProductActionButton>
+          <MaterialsImportMenu
+            disabled={pending}
+            onChoose={(kind) => inputRefs[kind].current?.click()}
+          />
+          <ProductActionButton
+            compact
+            tone="secondary"
+            className="col-span-full !min-h-8 justify-start !px-2 text-[var(--sniptale-color-text-muted)]"
+            disabled={pending || unusedCount === 0}
+            onClick={() => removeMaterials()}
+            data-ui="video-editor.materials.remove-unused"
+          >
+            <Trash2 size={14} aria-hidden="true" />
+            {translate('videoEditor.app.materialsRemoveUnused')}
+          </ProductActionButton>
+        </footer>
+      </div>
     </aside>
   );
 }

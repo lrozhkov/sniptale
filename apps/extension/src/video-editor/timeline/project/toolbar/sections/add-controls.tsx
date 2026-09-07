@@ -6,7 +6,18 @@ import {
   resolveThemeSafePortalTarget,
   useResolvedPortalTheme,
 } from '@sniptale/ui/theme/safe-portal';
-import { Music, Plus, Video, ZoomIn } from 'lucide-react';
+import {
+  Activity,
+  Check,
+  MoreHorizontal,
+  MousePointer2,
+  Music,
+  Plus,
+  Rows3,
+  Text,
+  Video,
+  ZoomIn,
+} from 'lucide-react';
 import { translate } from '../../../../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
@@ -17,6 +28,14 @@ import {
 import { VideoTrackKind } from '../../../../../features/video/project/types';
 import type { ProjectTimelineInsertionActions } from '../../types';
 import { toolbarButtonClassName } from './constants/button';
+
+import type { useProjectTimelinePanelPrefs } from '../../panel/prefs';
+
+interface TrackDisplayOptions {
+  trackPanelPrefs: ReturnType<typeof useProjectTimelinePanelPrefs>;
+  hasCursor: boolean;
+  hasTelemetry: boolean;
+}
 
 const TRACK_MENU_OPTIONS = [
   {
@@ -48,7 +67,7 @@ export function ProjectTimelineAddControls(props: {
         dataUi="video-editor.timeline.toolbar.add-zoom"
       >
         <ZoomIn size={14} strokeWidth={2} />
-        <span className="@max-[1100px]/timeline:sr-only">
+        <span className="@max-[1600px]/timeline:sr-only">
           {translate('videoEditor.timeline.addZoomRegion')}
         </span>
       </ContentToolbarButton>
@@ -58,6 +77,7 @@ export function ProjectTimelineAddControls(props: {
 
 export function ProjectTimelineAddTrackControl(props: {
   onAddTrack: ProjectTimelineInsertionActions['onAddTrack'];
+  displayOptions?: TrackDisplayOptions;
 }) {
   const trackChoices = useTrackChoicesMenuState();
   return (
@@ -67,12 +87,22 @@ export function ProjectTimelineAddTrackControl(props: {
         type="button"
         onClick={trackChoices.toggle}
         className="!h-6 !w-6 !min-w-6 !p-0"
-        title={translate('videoEditor.timeline.addTrack')}
+        title={translate(
+          props.displayOptions
+            ? 'videoEditor.timeline.tracksTitle'
+            : 'videoEditor.timeline.addTrack'
+        )}
         aria-expanded={trackChoices.visible}
         dataUi="video-editor.timeline.toolbar.add-track"
       >
-        <Plus size={14} strokeWidth={2} />
-        <span className="sr-only">{translate('videoEditor.timeline.addTrack')}</span>
+        {props.displayOptions ? <MoreHorizontal size={14} /> : <Plus size={14} strokeWidth={2} />}
+        <span className="sr-only">
+          {translate(
+            props.displayOptions
+              ? 'videoEditor.timeline.tracksTitle'
+              : 'videoEditor.timeline.addTrack'
+          )}
+        </span>
       </ContentToolbarButton>
       {trackChoices.visible
         ? createPortal(
@@ -82,7 +112,11 @@ export function ProjectTimelineAddTrackControl(props: {
               data-theme={trackChoices.theme ?? undefined}
               data-ui="video-editor.timeline.toolbar.add-track.choices"
             >
-              <TrackKindChoiceGroup onAddTrack={props.onAddTrack} onClose={trackChoices.close} />
+              <TrackKindChoiceGroup
+                onAddTrack={props.onAddTrack}
+                onClose={trackChoices.close}
+                {...(props.displayOptions ? { displayOptions: props.displayOptions } : {})}
+              />
             </div>,
             resolveThemeSafePortalTarget(trackChoices.triggerRef.current)
           )
@@ -154,6 +188,7 @@ function useTrackChoicesMenuState() {
 function TrackKindChoiceGroup(props: {
   onAddTrack: ProjectTimelineInsertionActions['onAddTrack'];
   onClose: (restoreFocus?: boolean) => void;
+  displayOptions?: TrackDisplayOptions;
 }) {
   return (
     <ProductToolbarMenu
@@ -167,8 +202,15 @@ function TrackKindChoiceGroup(props: {
         minWidth: 0,
         animation: 'none',
       }}
-      title={translate('videoEditor.timeline.addTrackMenuTitle')}
+      title={translate(
+        props.displayOptions
+          ? 'videoEditor.timeline.tracksTitle'
+          : 'videoEditor.timeline.addTrackMenuTitle'
+      )}
     >
+      {props.displayOptions ? (
+        <TrackDisplayChoices options={props.displayOptions} onClose={props.onClose} />
+      ) : null}
       {TRACK_MENU_OPTIONS.map((option) => (
         <ProductToolbarMenuItem
           key={option.kind}
@@ -188,5 +230,65 @@ function TrackKindChoiceGroup(props: {
         </ProductToolbarMenuItem>
       ))}
     </ProductToolbarMenu>
+  );
+}
+
+function TrackDisplayChoices({
+  options,
+  onClose,
+}: {
+  options: TrackDisplayOptions;
+  onClose: (restoreFocus?: boolean) => void;
+}) {
+  const { trackPanelPrefs: state } = options;
+  const choices = [
+    {
+      key: 'hideTrackNames',
+      icon: <Text size={14} />,
+      selected: state.prefs.hideTrackNames,
+      disabled: false,
+      apply: () => state.setHideTrackNames(!state.prefs.hideTrackNames),
+    },
+    {
+      key: 'trackPanelCompactToggle',
+      icon: <Rows3 size={14} />,
+      selected: state.prefs.compactRows,
+      disabled: false,
+      apply: () => state.setCompactRows(!state.prefs.compactRows),
+    },
+    {
+      key: 'cursorLane',
+      icon: <MousePointer2 size={14} />,
+      selected: options.hasCursor && state.prefs.collapsedCursorLaneVisible,
+      disabled: !options.hasCursor,
+      apply: () => state.setCollapsedCursorLaneVisible(!state.prefs.collapsedCursorLaneVisible),
+    },
+    {
+      key: 'telemetryLane',
+      icon: <Activity size={14} />,
+      selected: options.hasTelemetry && state.prefs.collapsedTelemetryLaneVisible,
+      disabled: !options.hasTelemetry,
+      apply: () =>
+        state.setCollapsedTelemetryLaneVisible(!state.prefs.collapsedTelemetryLaneVisible),
+    },
+  ] as const;
+  return (
+    <div className="border-b border-[color:var(--sniptale-color-border-soft)] pb-1 mb-1">
+      {choices.map((choice) => (
+        <ProductToolbarMenuItem
+          key={choice.key}
+          selected={choice.selected}
+          disabled={choice.disabled}
+          onClick={() => {
+            onClose(true);
+            choice.apply();
+          }}
+        >
+          {choice.icon}
+          <ProductToolbarMenuItemCopy label={translate(`videoEditor.timeline.${choice.key}`)} />
+          {choice.selected ? <Check size={14} aria-hidden="true" /> : null}
+        </ProductToolbarMenuItem>
+      ))}
+    </div>
   );
 }

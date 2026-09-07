@@ -253,6 +253,7 @@ export function createWorkspaceTimelineSelectionActions(
     onStepToNextFrame: () => runtime.stepByFrames(1),
     onStepToPreviousFrame: () => runtime.stepByFrames(-1),
     onSetPlaybackRange: workspace.setPlaybackRange,
+    onClearPlaybackRange: workspace.clearPlaybackRange,
     onSelectActionSegment: selectWithInspector(store.selectActionSegment),
     onSelectClip: selectWithInspector(store.selectClip),
     onSelectCursorSegment: selectWithInspector(store.selectCursorSegment),

@@ -258,7 +258,7 @@ function SourceRangeActions({
 }) {
   const full = range.start === 0 && range.end === props.duration;
   return (
-    <div className="flex min-w-0 items-center justify-between gap-2 pt-1 text-xs">
+    <div className="flex min-w-0 items-center justify-between gap-2 pl-2 pt-1 text-xs">
       <span className="min-w-0 truncate text-[var(--sniptale-color-text-muted)] @max-[520px]/source-range:hidden">
         {translate('videoEditor.app.sourceRangeHint')}
       </span>

@@ -123,7 +123,7 @@ function LaneIdentity({
         {icon}
       </span>
       {compactRows ? null : (
-        <div className="min-w-0 flex-1">
+        <div data-timeline-track-name="true" className="min-w-0 flex-1">
           <div className="truncate text-[13px] font-semibold text-[var(--sniptale-color-text-primary)]">
             {title}
           </div>

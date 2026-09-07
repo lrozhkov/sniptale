@@ -255,7 +255,6 @@ function DroppedEffectOperationHarness(props: {
         isOpen
         operations={operations}
         onApplyEffect={props.onApplyEffect}
-        onClose={vi.fn()}
         onDeleteEffectBundle={vi.fn(async () => undefined)}
         onImportEffectFile={vi.fn(async () => undefined)}
         onSetEffectBundleEnabled={vi.fn(async () => undefined)}
@@ -279,7 +278,6 @@ function renderDock(
         isOpen
         operations={createOperations()}
         onApplyEffect={vi.fn(async () => null)}
-        onClose={vi.fn()}
         onDeleteEffectBundle={vi.fn(async () => undefined)}
         onImportEffectFile={vi.fn(async () => undefined)}
         onSetEffectBundleEnabled={vi.fn(async () => undefined)}

@@ -1,5 +1,5 @@
 import { formatTimelineRulerLabel } from '../../interaction-state/helpers';
-import { Pause, Play, SkipBack, SkipForward, StepBack, StepForward } from 'lucide-react';
+import { X, Pause, Play, SkipBack, SkipForward, StepBack, StepForward } from 'lucide-react';
 
 import { translate } from '../../../../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -102,6 +102,7 @@ function PlaybackSummaryMeta(props: {
   currentTime: number;
   duration: number;
   playbackRange: VideoEditorPlaybackRange | null;
+  onClearPlaybackRange: () => void;
 }) {
   const loopRange = formatToolbarLoopRange(props.playbackRange);
 
@@ -118,11 +119,20 @@ function PlaybackSummaryMeta(props: {
         {loopRange ? (
           <span
             className={[
-              'block whitespace-nowrap text-[11px] @max-[1000px]/timeline:text-[10px] leading-3',
+              'flex items-center justify-center gap-1 whitespace-nowrap text-[11px]',
+              '@max-[1000px]/timeline:text-[10px] leading-3',
               'text-[var(--sniptale-color-accent-emphasis)]',
             ].join(' ')}
           >
             {loopRange}
+            <ContentToolbarButton
+              title={translate('videoEditor.timeline.clearRange')}
+              dataUi="video-editor.timeline.toolbar.clear-range"
+              onClick={props.onClearPlaybackRange}
+              className="!h-4 !w-4 !min-w-4 !p-0 !text-[var(--sniptale-color-accent-emphasis)] [&_svg]:!size-3"
+            >
+              <X aria-hidden="true" />
+            </ContentToolbarButton>
           </span>
         ) : null}
         <span className="block whitespace-nowrap">
@@ -139,6 +149,7 @@ export function ProjectTimelinePlaybackSummary({
   duration,
   isPlaying,
   playbackRange,
+  onClearPlaybackRange,
   onSeekToEnd,
   onSeekToStart,
   onStepToNextFrame,
@@ -149,6 +160,7 @@ export function ProjectTimelinePlaybackSummary({
   duration: number;
   isPlaying: boolean;
   playbackRange: VideoEditorPlaybackRange | null;
+  onClearPlaybackRange: () => void;
   onSeekToEnd: () => void;
   onSeekToStart: () => void;
   onStepToNextFrame: () => void;
@@ -171,6 +183,7 @@ export function ProjectTimelinePlaybackSummary({
         currentTime={currentTime}
         duration={duration}
         playbackRange={playbackRange}
+        onClearPlaybackRange={onClearPlaybackRange}
       />
     </div>
   );

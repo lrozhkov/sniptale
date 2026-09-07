@@ -15,5 +15,6 @@ export const toolbarIconButtonClassName = [
 
 export const toolbarExportButtonClassName = [
   '!h-[var(--timeline-control-height)] !w-auto !min-w-fit !gap-2 !px-3',
-  '!bg-[var(--sniptale-color-accent-soft)] !text-[var(--sniptale-color-accent-emphasis)]',
+  '!bg-[var(--sniptale-color-surface-hover)] !text-[var(--sniptale-color-text-primary)]',
+  '[&_svg]:text-[var(--sniptale-color-accent-emphasis)]',
 ].join(' ');

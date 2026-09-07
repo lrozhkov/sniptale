@@ -26,7 +26,6 @@ type ToolbarTrailingControlsInput = Pick<
 
 function createToolbarLeadingControlsProps({
   canAddMotionRegion,
-  hasMotionRegions,
   canEditSelectedClip,
   insertion,
   canSplitSelectedClip,
@@ -39,7 +38,6 @@ function createToolbarLeadingControlsProps({
 }: Pick<
   ProjectTimelineToolbarProps,
   | 'canAddMotionRegion'
-  | 'hasMotionRegions'
   | 'canEditSelectedClip'
   | 'insertion'
   | 'canSplitSelectedClip'
@@ -52,7 +50,6 @@ function createToolbarLeadingControlsProps({
 >) {
   return {
     canAddMotionRegion,
-    hasMotionRegions,
     canEditSelectedClip,
     insertion,
     canSplitSelectedClip,
@@ -129,6 +126,9 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
           <Redo2 aria-hidden="true" />
         </ContentToolbarButton>
         <ToolbarSeparator />
+        <ProjectTimelineToolbarTrailingActions
+          {...createToolbarTrailingControlsProps(controlsProps)}
+        />
         {header && (
           <ContentToolbarButton
             className={toolbarIconButtonClassName}
@@ -141,9 +141,6 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
             <Magnet aria-hidden="true" />
           </ContentToolbarButton>
         )}
-        <ProjectTimelineToolbarTrailingActions
-          {...createToolbarTrailingControlsProps(controlsProps)}
-        />
         <ToolbarSeparator />
         {header && (
           <ContentToolbarButton

@@ -109,38 +109,36 @@ function SourceMediaViewer(props: SourceMediaViewerProps) {
         >
           {!image && <SourceTimingControls playback={viewer} fps={props.fps} />}
           <div className="flex shrink-0 items-center gap-1 border-l border-[var(--sniptale-color-border-soft)] pl-3">
-            <ProductActionButton
-              compact
-              className="!h-9 !gap-1.5 !px-2.5"
+            <ContentToolbarButton
+              className="!h-9 !w-auto !min-w-9 !gap-1.5 !rounded-[8px] !px-2.5"
               disabled={!canPlace}
+              aria-label={translate('videoEditor.app.sourceAppend')}
               title={translate('videoEditor.app.materialsAppend')}
               onClick={() => place(props.onAppend)}
             >
               <ListEnd size={16} aria-hidden="true" />
               {translate('videoEditor.app.sourceAppend')}
-            </ProductActionButton>
-            <ProductActionButton
-              compact
-              className="!h-9 !gap-1.5 !px-2.5"
-              tone="secondary"
+            </ContentToolbarButton>
+            <ContentToolbarButton
+              className="!h-9 !w-auto !min-w-9 !gap-1.5 !rounded-[8px] !px-2.5"
               disabled={!canPlace}
+              aria-label={translate('videoEditor.app.sourceInsert')}
               title={translate('videoEditor.app.materialsInsertHint')}
               onClick={() => place(props.onInsert)}
             >
               <BetweenHorizontalStart size={16} aria-hidden="true" />
               {translate('videoEditor.app.sourceInsert')}
-            </ProductActionButton>
-            <ProductActionButton
-              compact
-              className="!h-9 !gap-1.5 !px-2.5"
-              tone="secondary"
+            </ContentToolbarButton>
+            <ContentToolbarButton
+              className="!h-9 !w-auto !min-w-9 !gap-1.5 !rounded-[8px] !px-2.5"
               disabled={!canPlace}
+              aria-label={translate('videoEditor.app.sourceOverlay')}
               title={translate('videoEditor.app.materialsOverlay')}
               onClick={() => place(props.onOverlay)}
             >
               <Layers size={16} aria-hidden="true" />
               {translate('videoEditor.app.sourceOverlay')}
-            </ProductActionButton>
+            </ContentToolbarButton>
           </div>
         </div>
         {!image && (

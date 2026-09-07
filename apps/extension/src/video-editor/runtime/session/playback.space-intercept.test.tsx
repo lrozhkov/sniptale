@@ -689,3 +689,54 @@ it('retains transport focus paint across rerender and invokes only the latest ca
   act(() => root!.render(null));
   expect(document.documentElement.hasAttribute('data-video-editor-focus')).toBe(false);
 });
+
+it('steps frames from the timeline instead of nudging the selected canvas clip', () => {
+  const state = createLatestState();
+  const project = state.project!;
+  const clip = createTextClip(project.tracks[0]!.id, project.width, project.height, 0);
+  project.clips = [clip];
+  state.selectedClipId = clip.id;
+  state.selection = { kind: VideoEditorSelectionKind.CLIP, clipId: clip.id };
+  const handlers = createHandlers();
+  const stepByFrames = vi.fn();
+  const timeline = document.createElement('div');
+  timeline.dataset['ui'] = 'video-editor.timeline.canvas-scroll';
+  document.body.append(timeline);
+  try {
+    act(() =>
+      root!.render(
+        <ShortcutHarness
+          latestState={state}
+          handlers={handlers}
+          stepByFrames={stepByFrames}
+          seekTo={vi.fn()}
+          togglePlayback={vi.fn()}
+        />
+      )
+    );
+    for (const code of ['ArrowLeft', 'ArrowRight']) {
+      const event = new KeyboardEvent('keydown', {
+        code,
+        key: code,
+        bubbles: true,
+        cancelable: true,
+      });
+      act(() => timeline.dispatchEvent(event));
+      expect(event.defaultPrevented).toBe(true);
+    }
+    expect(stepByFrames.mock.calls).toEqual([[-1], [1]]);
+    expect(handlers.updateClipTransform).not.toHaveBeenCalled();
+    const input = document.createElement('input');
+    timeline.append(input);
+    const edit = new KeyboardEvent('keydown', {
+      code: 'ArrowRight',
+      bubbles: true,
+      cancelable: true,
+    });
+    act(() => input.dispatchEvent(edit));
+    expect(edit.defaultPrevented).toBe(false);
+    expect(stepByFrames).toHaveBeenCalledTimes(2);
+  } finally {
+    timeline.remove();
+  }
+});

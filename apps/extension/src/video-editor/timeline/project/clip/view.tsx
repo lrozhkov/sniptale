@@ -116,6 +116,17 @@ function ProjectTimelineClipContent({
       ) : null}
       <ProjectTimelineClipVisualOverlays viewModel={viewModel} />
       <ProjectTimelineClipLabel clip={clip} project={project} viewModel={viewModel} />
+      {viewModel.visualEmphasis ? (
+        <span
+          aria-hidden="true"
+          data-ui="video-editor.timeline.clip-contour"
+          className={[
+            'pointer-events-none absolute inset-y-0 z-40 rounded-sm border-2',
+            'border-[var(--sniptale-color-accent-emphasis)]',
+          ].join(' ')}
+          style={{ left: viewModel.bodyInsetLeft, right: viewModel.bodyInsetRight }}
+        />
+      ) : null}
     </>
   );
 }

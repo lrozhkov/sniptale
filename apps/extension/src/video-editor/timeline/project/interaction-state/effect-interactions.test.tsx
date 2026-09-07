@@ -316,3 +316,54 @@ it.each(['Escape', 'pointercancel', 'blur', 'unmount', 'replacement', 'origin', 
     expect(historyTransaction.endProjectHistoryTransaction).toHaveBeenCalledOnce();
   }
 );
+
+it.each(['click', 'drag', 'trim', 'cancel'] as const)(
+  'seeks a motion segment only on a completed click: %s',
+  (gesture) => {
+    const project = createEmptyVideoProject('Motion click');
+    project.duration = 20;
+    const onMotionClick = vi.fn();
+    const historyTransaction = createHistoryTransactionMocks();
+    let begin:
+      | ReturnType<typeof useProjectTimelineEffectInteractions>['beginEffectInteraction']
+      | null = null;
+    function Harness() {
+      const options = {
+        historyTransaction,
+        project,
+        magnetEnabled: false,
+        pixelsPerSecond: 10,
+        onMotionClick,
+        onMoveActionEvent: vi.fn(),
+        onMoveCursorSegment: vi.fn(),
+        onMoveMotionRegion: vi.fn(),
+        onMoveTransitionSegment: vi.fn(),
+        onResizeActionEvent: vi.fn(),
+        onResizeMotionRegion: vi.fn(),
+        onUpdateEffectInstance: vi.fn(),
+      };
+      begin = useProjectTimelineEffectInteractions(options).beginEffectInteraction;
+      return null;
+    }
+    act(() => root.render(<Harness />));
+    const target: TimelineEffectDragTarget = {
+      kind: 'motion',
+      mode: gesture === 'trim' ? 'resize-end' : 'move',
+      motionRegionId: 'zoom',
+      segmentId: 'zoom',
+      originalStart: 2,
+      originalDuration: 3,
+    };
+    act(() => begin?.(createPointerEvent(130), target));
+    if (gesture === 'drag') act(() => dispatchPointerMove(180));
+    act(() =>
+      window.dispatchEvent(new Event(gesture === 'cancel' ? 'pointercancel' : 'pointerup'))
+    );
+    if (gesture === 'click') {
+      expect(onMotionClick).toHaveBeenCalledExactlyOnceWith(130);
+      expect(historyTransaction.beginProjectHistoryTransaction).not.toHaveBeenCalled();
+    } else {
+      expect(onMotionClick).not.toHaveBeenCalled();
+    }
+  }
+);

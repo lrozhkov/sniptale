@@ -120,7 +120,9 @@ export function ProjectTimelineCanvas(props: ProjectTimelineCanvasProps) {
     <div
       ref={props.timelineRef}
       data-ui="video-editor.timeline.canvas-scroll"
-      className="relative min-w-0 overflow-auto"
+      tabIndex={-1}
+      onPointerDownCapture={focusTimelineWorkingSurface}
+      className="relative min-w-0 overflow-auto outline-none"
       onClick={createCanvasSeekHandler(
         props.consumeCompletedScrubClick,
         props.onSelectScene,
@@ -344,4 +346,19 @@ function createTimelineFileDropHandler(props: ProjectTimelineCanvasProps) {
 function getEffectLaneCount(cursorLaneVisible: boolean, project: VideoProject): number {
   const rows = getTimelineUtilityRowPresence(project);
   return Number(rows.actions) + Number(rows.motion) + Number(cursorLaneVisible);
+}
+
+function focusTimelineWorkingSurface(event: React.PointerEvent<HTMLDivElement>): void {
+  if (event.button !== 0 || !(event.target instanceof Element)) return;
+  if (
+    event.target.closest(
+      [
+        'input, textarea, select, [contenteditable="true"]',
+        '[role="slider"], [role="separator"], [role="menu"]',
+        '[role="listbox"], button[aria-haspopup]',
+      ].join(', ')
+    )
+  )
+    return;
+  event.currentTarget.focus({ preventScroll: true });
 }

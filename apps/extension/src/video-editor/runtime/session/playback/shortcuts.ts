@@ -108,6 +108,7 @@ function isControlNavigation(event: KeyboardEvent): boolean {
         '[role="tab"]',
         '[role="menuitem"]',
         '[role="separator"]',
+        '[role="slider"]',
       ].join(',')
     ) !== null
   );
@@ -151,9 +152,13 @@ function handlePlaybackFrameStepShortcut(
   stepByFrames: (frameDelta: number) => void
 ): boolean {
   if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return false;
-  if (event.code !== 'Comma' && event.code !== 'Period') return false;
+  const timelineArrow =
+    (event.code === 'ArrowLeft' || event.code === 'ArrowRight') &&
+    event.target instanceof Element &&
+    event.target.closest('[data-ui="video-editor.timeline.canvas-scroll"]') !== null;
+  if (event.code !== 'Comma' && event.code !== 'Period' && !timelineArrow) return false;
   event.preventDefault();
-  stepByFrames(event.code === 'Comma' ? -1 : 1);
+  stepByFrames(event.code === 'Comma' || event.code === 'ArrowLeft' ? -1 : 1);
   return true;
 }
 

@@ -101,6 +101,7 @@ function createProps(): ComponentProps<typeof ProjectTimeline> {
       setCollapsedCursorLaneVisible: idle,
       setCollapsedTelemetryLaneVisible: idle,
       setCompactRows: idle,
+      setHideTrackNames: idle,
       setTrackHeight: idle,
     },
     historyTransaction: {
@@ -121,6 +122,7 @@ function createProps(): ComponentProps<typeof ProjectTimeline> {
     onSeekToEnd: idle,
     onSeekToStart: idle,
     onTogglePlay: idle,
+    onClearPlaybackRange: vi.fn(),
     onStepToNextFrame: idle,
     onStepToPreviousFrame: idle,
     onSeek: vi.fn(),

@@ -463,3 +463,32 @@ it('projects clip, motion, range and playhead together in a distant viewport wit
   ).toBeNull();
   expect(project).toEqual(original);
 });
+
+it('focuses the timeline before a clip pointer handler cancels the default focus', () => {
+  const project = createVideoProjectFromRecording({
+    duration: 8,
+    filename: 'focus.webm',
+    height: 720,
+    width: 1280,
+    mimeType: 'video/webm',
+    recordingId: 'focus-recording',
+    size: 100,
+  });
+  const props = createCanvasProps(project, {});
+  props.onBeginClipInteraction = (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  };
+  act(() => root?.render(<ProjectTimelineCanvas {...props} />));
+  const canvas = container?.querySelector<HTMLElement>(
+    '[data-ui="video-editor.timeline.canvas-scroll"]'
+  );
+  const clip = canvas?.querySelector<HTMLElement>('[data-project-timeline-clip]');
+  expect(clip).not.toBeNull();
+  act(() =>
+    clip?.dispatchEvent(
+      new MouseEvent('pointerdown', { bubbles: true, cancelable: true, button: 0 })
+    )
+  );
+  expect(document.activeElement).toBe(canvas);
+});

@@ -1,4 +1,5 @@
 import React from 'react';
+import { usePreviewCanvasInteractionFocus } from './interaction-focus';
 import { CanvasInsertPreviewOverlay } from '@sniptale/ui/canvas-tools';
 import { PreviewStageAnnotationTargetOverlay } from '../annotation-target-overlay/index';
 import { usePreviewStageImageBank } from '../media/video-bank';
@@ -16,6 +17,7 @@ import { PreviewStageCanvasLayer, PreviewStageOverlayLayer } from './layers';
 import type { PreviewStageRootProps, PreviewStageRootSurfaceProps } from './types';
 
 export function PreviewStageRootSurface(params: PreviewStageRootSurfaceProps) {
+  const canvasInteractionActive = usePreviewCanvasInteractionFocus(params.stageRef);
   const gridProps = params.grid ? { grid: params.grid } : {};
   const onGuideChange = params.onGuideChange ?? (() => undefined);
   const { insertPointerHandlers, insertPreviewFrame } = usePreviewStageInsertSession(
@@ -26,6 +28,7 @@ export function PreviewStageRootSurface(params: PreviewStageRootSurfaceProps) {
     <div
       ref={params.stageRef as React.RefObject<HTMLDivElement>}
       data-ui="video.preview.stage.root"
+      data-canvas-interaction-active={canvasInteractionActive}
       className={[
         'relative m-auto shrink-0 overflow-hidden bg-[color:var(--sniptale-color-surface-panel)]',
         params.activeInsertKind ? 'cursor-crosshair' : 'cursor-default',
@@ -41,6 +44,7 @@ export function PreviewStageRootSurface(params: PreviewStageRootSurfaceProps) {
     >
       <PreviewStageRootMediaLayer params={params} />
       <PreviewStageRootOverlayLayer
+        canvasInteractionActive={canvasInteractionActive}
         gridProps={gridProps}
         onGuideChange={onGuideChange}
         params={params}
@@ -119,6 +123,7 @@ function PreviewStageRootMediaLayer(props: { params: PreviewStageRootSurfaceProp
 }
 
 function PreviewStageRootOverlayLayer(props: {
+  canvasInteractionActive: boolean;
   gridProps: Pick<PreviewStageRootSurfaceProps, 'grid'> | Record<string, never>;
   onGuideChange: NonNullable<PreviewStageRootSurfaceProps['onGuideChange']>;
   params: PreviewStageRootSurfaceProps;
@@ -139,9 +144,9 @@ function PreviewStageRootOverlayLayer(props: {
         placementMode={params.placementMode}
         project={params.project}
         onGuideChange={onGuideChange}
-        selectionOverlay={params.selectionOverlay}
+        selectionOverlay={props.canvasInteractionActive ? params.selectionOverlay : null}
         selectedActionEvent={params.selectedActionEvent}
-        targetOverlay={params.targetOverlay}
+        targetOverlay={props.canvasInteractionActive ? params.targetOverlay : null}
         selectedMotionRegion={params.selectedMotionRegion}
         stageRef={params.stageRef}
         {...gridProps}

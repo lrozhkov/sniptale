@@ -38,7 +38,7 @@ function ProjectTimelineAutoTransformButton(props: {
         title={translate('videoEditor.timeline.autoTransform')}
       >
         <WandSparkles size={14} aria-hidden="true" />
-        <span className="@max-[1100px]/timeline:sr-only">
+        <span className="@max-[1600px]/timeline:sr-only">
           {translate('videoEditor.timeline.autoTransform')}
         </span>
       </ContentToolbarButton>
@@ -57,7 +57,6 @@ function ProjectTimelineAutoTransformButton(props: {
 export function ProjectTimelineToolbarLeadingControls({
   canAutoTransformRecording,
   canAddMotionRegion,
-  hasMotionRegions,
   canEditSelectedClip,
   canSplitSelectedClip,
   insertion,
@@ -70,7 +69,6 @@ export function ProjectTimelineToolbarLeadingControls({
   ProjectTimelineToolbarProps,
   | 'canAutoTransformRecording'
   | 'canAddMotionRegion'
-  | 'hasMotionRegions'
   | 'canEditSelectedClip'
   | 'canSplitSelectedClip'
   | 'insertion'
@@ -82,9 +80,7 @@ export function ProjectTimelineToolbarLeadingControls({
 >) {
   return (
     <div className="flex min-w-0 flex-nowrap items-center gap-1">
-      {!hasMotionRegions && (
-        <ProjectTimelineAddControls insertion={insertion} canAddMotionRegion={canAddMotionRegion} />
-      )}
+      <ProjectTimelineAddControls insertion={insertion} canAddMotionRegion={canAddMotionRegion} />
       {canAutoTransformRecording && onAutoTransformRecording ? (
         <ProjectTimelineAutoTransformButton onAutoTransformRecording={onAutoTransformRecording} />
       ) : null}

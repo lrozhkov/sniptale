@@ -1,4 +1,4 @@
-import { Activity, MousePointer2, Rows3 } from 'lucide-react';
+import { Activity, MousePointer2, Rows3, Text } from 'lucide-react';
 import { TimelineIconButton } from '../controls/icon-button';
 import { ProjectTimelineAddTrackControl } from '../toolbar/sections/add-controls';
 import type { ProjectTimelineInsertionActions } from '../types';
@@ -44,6 +44,7 @@ export function ProjectTimelineTrackList(props: ProjectTimelineTrackListProps) {
     <div
       className={[
         'flex min-h-0 flex-col border-r',
+        props.trackPanelPrefs.prefs.hideTrackNames ? '[&_[data-timeline-track-name]]:sr-only' : '',
         'border-[color:var(--sniptale-color-border-soft)]',
         'bg-[color:var(--sniptale-color-surface-overlay)]',
       ].join(' ')}
@@ -55,6 +56,8 @@ export function ProjectTimelineTrackList(props: ProjectTimelineTrackListProps) {
 }
 
 function ProjectTimelineTrackListHeader(props: ProjectTimelineTrackListProps) {
+  const collapsed =
+    props.trackPanelPrefs.prefs.compactRows && props.trackPanelPrefs.prefs.hideTrackNames;
   return (
     <div
       className={[
@@ -70,45 +73,70 @@ function ProjectTimelineTrackListHeader(props: ProjectTimelineTrackListProps) {
         className="flex items-center gap-0.5"
         data-ui="video-editor.timeline.track-header-controls"
       >
-        <TimelineIconButton
-          active={props.trackPanelPrefs.prefs.compactRows}
-          dataUi="video-editor.timeline.toolbar.compact-tracks"
-          icon={<Rows3 size={14} />}
-          onClick={() =>
-            props.trackPanelPrefs.setCompactRows(!props.trackPanelPrefs.prefs.compactRows)
-          }
-          title={translate('videoEditor.timeline.trackPanelCompactToggle')}
+        {!collapsed ? (
+          <>
+            <TimelineIconButton
+              active={props.trackPanelPrefs.prefs.hideTrackNames}
+              dataUi="video-editor.timeline.toolbar.hide-track-names"
+              icon={<Text size={14} />}
+              onClick={() =>
+                props.trackPanelPrefs.setHideTrackNames(!props.trackPanelPrefs.prefs.hideTrackNames)
+              }
+              title={translate('videoEditor.timeline.hideTrackNames')}
+            />
+            <TimelineIconButton
+              active={props.trackPanelPrefs.prefs.compactRows}
+              dataUi="video-editor.timeline.toolbar.compact-tracks"
+              icon={<Rows3 size={14} />}
+              onClick={() =>
+                props.trackPanelPrefs.setCompactRows(!props.trackPanelPrefs.prefs.compactRows)
+              }
+              title={translate('videoEditor.timeline.trackPanelCompactToggle')}
+            />
+            <TimelineIconButton
+              active={
+                props.project.cursorTrack !== null &&
+                props.trackPanelPrefs.prefs.collapsedCursorLaneVisible
+              }
+              disabled={props.project.cursorTrack === null}
+              dataUi="video-editor.timeline.toolbar.cursor-lane"
+              icon={<MousePointer2 size={14} />}
+              onClick={() =>
+                props.trackPanelPrefs.setCollapsedCursorLaneVisible(
+                  !props.trackPanelPrefs.prefs.collapsedCursorLaneVisible
+                )
+              }
+              title={translate('videoEditor.timeline.cursorLane')}
+            />
+            <TimelineIconButton
+              active={
+                props.canShowTelemetryLane &&
+                props.trackPanelPrefs.prefs.collapsedTelemetryLaneVisible
+              }
+              disabled={!props.canShowTelemetryLane}
+              dataUi="video-editor.timeline.toolbar.telemetry-lane"
+              icon={<Activity size={14} />}
+              onClick={() =>
+                props.trackPanelPrefs.setCollapsedTelemetryLaneVisible(
+                  !props.trackPanelPrefs.prefs.collapsedTelemetryLaneVisible
+                )
+              }
+              title={translate('videoEditor.timeline.telemetryLane')}
+            />
+          </>
+        ) : null}
+        <ProjectTimelineAddTrackControl
+          onAddTrack={props.onAddTrack}
+          {...(collapsed
+            ? {
+                displayOptions: {
+                  trackPanelPrefs: props.trackPanelPrefs,
+                  hasCursor: props.project.cursorTrack !== null,
+                  hasTelemetry: props.canShowTelemetryLane,
+                },
+              }
+            : {})}
         />
-        <TimelineIconButton
-          active={
-            props.project.cursorTrack !== null &&
-            props.trackPanelPrefs.prefs.collapsedCursorLaneVisible
-          }
-          disabled={props.project.cursorTrack === null}
-          dataUi="video-editor.timeline.toolbar.cursor-lane"
-          icon={<MousePointer2 size={14} />}
-          onClick={() =>
-            props.trackPanelPrefs.setCollapsedCursorLaneVisible(
-              !props.trackPanelPrefs.prefs.collapsedCursorLaneVisible
-            )
-          }
-          title={translate('videoEditor.timeline.cursorLane')}
-        />
-        <TimelineIconButton
-          active={
-            props.canShowTelemetryLane && props.trackPanelPrefs.prefs.collapsedTelemetryLaneVisible
-          }
-          disabled={!props.canShowTelemetryLane}
-          dataUi="video-editor.timeline.toolbar.telemetry-lane"
-          icon={<Activity size={14} />}
-          onClick={() =>
-            props.trackPanelPrefs.setCollapsedTelemetryLaneVisible(
-              !props.trackPanelPrefs.prefs.collapsedTelemetryLaneVisible
-            )
-          }
-          title={translate('videoEditor.timeline.telemetryLane')}
-        />
-        <ProjectTimelineAddTrackControl onAddTrack={props.onAddTrack} />
       </div>
     </div>
   );

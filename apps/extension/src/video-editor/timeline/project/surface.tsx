@@ -14,6 +14,7 @@ type ProjectTimelineSurfaceProps = Pick<
   | 'currentTime'
   | 'isPlaying'
   | 'playbackRange'
+  | 'onClearPlaybackRange'
   | 'onStepToNextFrame'
   | 'onStepToPreviousFrame'
   | 'canEditSelectedClip'
@@ -56,11 +57,11 @@ export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
           currentTime: props.currentTime,
           isPlaying: props.isPlaying,
           playbackRange: props.playbackRange,
+          onClearPlaybackRange: props.onClearPlaybackRange,
           onStepToNextFrame: props.onStepToNextFrame,
           onStepToPreviousFrame: props.onStepToPreviousFrame,
           duration: props.project.duration,
         }}
-        hasMotionRegions={hasMotionRegions}
         canAddMotionRegion={
           props.project.duration > 0 &&
           (!hasMotionRegions || (motionLane.visible && !motionLane.locked))

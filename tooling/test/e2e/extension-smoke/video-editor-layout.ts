@@ -22,7 +22,7 @@ export async function expectVideoEditorPanelLayout(page: Page): Promise<void> {
   await expect(page.locator('[data-ui="video-editor.timeline.toolbar.undo"]')).toHaveCount(1);
   await expect(page.locator('[data-ui="video-editor.timeline.toolbar.redo"]')).toHaveCount(1);
   await expect(chrome.locator('[data-ui$=".undo"], [data-ui$=".redo"]')).toHaveCount(0);
-  const materials = page.locator('[data-ui="video-editor.materials"]');
+  const materials = page.locator('[data-ui="video-editor.library.panel"]');
   const inspector = page.locator('[data-ui="video-editor.floating.context-inspector"]');
   const timeline = page.locator('[data-ui="video-editor.timeline.surface"]');
   const leftDock = materials.locator('[data-ui="video-editor.materials.dock-toggle"]');

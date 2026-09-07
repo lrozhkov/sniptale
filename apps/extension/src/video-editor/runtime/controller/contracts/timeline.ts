@@ -63,6 +63,7 @@ interface VideoEditorTimelineActions {
   onSeek: VideoEditorRuntimeController['seekTo'];
   onSeekToEnd: () => void;
   onSeekToStart: () => void;
+  onClearPlaybackRange: () => void;
   onStepToNextFrame: () => void;
   onStepToPreviousFrame: () => void;
   onSelectActionSegment: VideoEditorSessionActions['selectActionSegment'];

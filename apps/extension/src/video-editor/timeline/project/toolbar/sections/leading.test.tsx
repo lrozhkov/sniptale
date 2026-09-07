@@ -40,7 +40,6 @@ afterEach(() => {
 
 function renderLeadingControls(options?: {
   canAddMotionRegion?: boolean;
-  hasMotionRegions?: boolean;
   canAutoTransformRecording?: boolean;
   canEditSelectedClip?: boolean;
   canSplitSelectedClip?: boolean;
@@ -65,7 +64,6 @@ function renderLeadingControls(options?: {
         <ProjectTimelineAddTrackControl onAddTrack={handlers.onAddTrack} />
         <ProjectTimelineToolbarLeadingControls
           canAddMotionRegion={options?.canAddMotionRegion ?? true}
-          hasMotionRegions={options?.hasMotionRegions ?? false}
           canAutoTransformRecording={options?.canAutoTransformRecording ?? false}
           canEditSelectedClip={options?.canEditSelectedClip ?? options?.selectedClip ?? false}
           canSplitSelectedClip={options?.canSplitSelectedClip ?? options?.selectedClip ?? false}
@@ -266,15 +264,6 @@ it('does not add zoom while its lane is unavailable for editing', () => {
   expect(button.disabled).toBe(true);
   act(() => button.click());
   expect(handlers.onAddMotionRegion).not.toHaveBeenCalled();
-});
-
-it('moves zoom creation from the toolbar to the authored zoom lane', () => {
-  renderLeadingControls({ hasMotionRegions: true });
-  expect(container?.querySelector('[data-ui="video-editor.timeline.toolbar.add-zoom"]')).toBeNull();
-  renderLeadingControls({ hasMotionRegions: false });
-  expect(
-    container?.querySelector('[data-ui="video-editor.timeline.toolbar.add-zoom"]')
-  ).not.toBeNull();
 });
 
 it('dismisses track choices on captured outside pointerdown without stealing focus', () => {

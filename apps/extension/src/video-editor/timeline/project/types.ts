@@ -62,6 +62,7 @@ export interface ProjectTimelineProps {
   onSeekToEnd: () => void;
   onSeekToStart: () => void;
   onTogglePlay: () => void;
+  onClearPlaybackRange: () => void;
   onStepToNextFrame: () => void;
   onStepToPreviousFrame: () => void;
   onSeek: (time: number) => void;

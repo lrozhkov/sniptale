@@ -44,8 +44,28 @@ export function VideoEditorLibraryNavigation(props: {
     <div
       role="group"
       aria-label={translate('videoEditor.app.materialsTitle')}
-      className="flex min-w-0 items-center gap-1"
+      className={[
+        'relative grid min-w-0 max-w-[168px] flex-1 items-center gap-1',
+        'transition-[grid-template-columns] duration-150 ease-out motion-reduce:transition-none',
+      ].join(' ')}
+      style={{
+        gridTemplateColumns:
+          props.active === 'materials' ? 'minmax(0, 1fr) 36px' : '36px minmax(0, 1fr)',
+      }}
     >
+      <span
+        aria-hidden="true"
+        data-ui="video-editor.library-tab.indicator"
+        className={[
+          'pointer-events-none absolute inset-y-0 left-0 rounded-[8px]',
+          'bg-[var(--sniptale-color-surface-hover)] transition-transform duration-150 ease-out',
+          'motion-reduce:transition-none',
+        ].join(' ')}
+        style={{
+          width: 'calc(100% - 40px)',
+          transform: props.active === 'materials' ? 'translateX(0)' : 'translateX(40px)',
+        }}
+      />
       {(['materials', 'effects'] as const).map((id) => {
         const label = translate(
           id === 'materials'
@@ -60,11 +80,9 @@ export function VideoEditorLibraryNavigation(props: {
             onClick={() => props.onChange(id)}
             dataUi={`video-editor.library-tab.${id}`}
             className={[
-              '!h-9 !min-w-9 !gap-1.5 !border-transparent !px-1.5 !shadow-none',
+              'relative !h-9 !w-full !min-w-9 !gap-1.5 !border-transparent !bg-transparent !px-1.5 !shadow-none',
               'transition-[background-color,color] motion-reduce:transition-none',
-              props.active === id
-                ? '!w-auto !bg-[var(--sniptale-color-surface-hover)] !text-[var(--sniptale-color-text-primary)]'
-                : '!w-9 !bg-transparent',
+              props.active === id ? '!text-[var(--sniptale-color-text-primary)]' : '',
             ].join(' ')}
           >
             {id === 'materials' ? <FolderOpen size={16} /> : <Sparkles size={16} />}

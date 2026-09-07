@@ -24,6 +24,7 @@ interface ProjectTimelinePanelPrefsState {
   setCollapsedCursorLaneVisible: (visible: boolean) => void;
   setCollapsedTelemetryLaneVisible: (visible: boolean) => void;
   setCompactRows: (compactRows: boolean) => void;
+  setHideTrackNames: (hidden: boolean) => void;
   setTrackHeight: (trackId: string, multiplier: VideoEditorTrackHeightMultiplier) => void;
 }
 
@@ -104,6 +105,7 @@ function useTrackPanelPrefsActions(
       'collapsedTelemetryLaneVisible'
     ),
     setCompactRows: useTrackPanelBooleanSetter(updatePrefs, 'compactRows'),
+    setHideTrackNames: useTrackPanelBooleanSetter(updatePrefs, 'hideTrackNames'),
     setTrackHeight: useTrackHeightSetter(updatePrefs),
   };
 }
@@ -131,7 +133,11 @@ function useTrackPanelBooleanSetter(
   updatePrefs: (
     updater: (currentPrefs: VideoEditorTrackPanelPrefs) => VideoEditorTrackPanelPrefs
   ) => void,
-  key: 'collapsedCursorLaneVisible' | 'collapsedTelemetryLaneVisible' | 'compactRows'
+  key:
+    | 'collapsedCursorLaneVisible'
+    | 'collapsedTelemetryLaneVisible'
+    | 'compactRows'
+    | 'hideTrackNames'
 ) {
   return useCallback(
     (visible: boolean) => updatePrefs((currentPrefs) => ({ ...currentPrefs, [key]: visible })),

@@ -77,6 +77,7 @@ function createLoadedPrefs(
     collapsedCursorLaneVisible: true,
     collapsedTelemetryLaneVisible: false,
     compactRows: false,
+    hideTrackNames: false,
     trackHeightByTrackId: {},
     ...overrides,
   };

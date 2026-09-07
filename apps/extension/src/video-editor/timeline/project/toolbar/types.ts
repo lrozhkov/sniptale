@@ -6,7 +6,6 @@ import type { VideoAutoProcessingSettings } from '@sniptale/runtime-contracts/vi
 export interface ProjectTimelineToolbarProps {
   playback: ComponentProps<typeof ProjectTimelinePlaybackSummary>;
   canAddMotionRegion: boolean;
-  hasMotionRegions: boolean;
   canEditSelectedClip: boolean;
   canSplitSelectedClip: boolean;
   fitSelectionDuration: number | null;

@@ -24,7 +24,8 @@ type TrackHeightState = Record<string, VideoEditorTrackHeightMultiplier>;
 function useProjectTimelineInteractions(
   props: ProjectTimelineProps,
   trackHeightByTrackId: TrackHeightState,
-  readTimelineStartTime: () => number
+  readTimelineStartTime: () => number,
+  onMotionClick: (clientX: number) => void
 ) {
   const pointerSessionCleanupRef = useRef<(() => void) | null>(null);
   const { beginClipInteraction, dragGhost, snapGuideTime, trackLayoutModel, tracks } =
@@ -47,6 +48,7 @@ function useProjectTimelineInteractions(
     });
   const { beginEffectInteraction, selectedEffectSelection, effectDragDraft } =
     useProjectTimelineEffectInteractions({
+      onMotionClick,
       historyTransaction: props.historyTransaction,
       pointerSessionCleanupRef,
       magnetEnabled: props.magnetEnabled,
@@ -195,12 +197,13 @@ export function useProjectTimelineState(
     viewportWidth,
     scroll.timelineRef
   );
+  const playback = useProjectTimelinePlaybackState(props, scroll, viewState.readTimelineStartTime);
   const interactions = useProjectTimelineInteractions(
     props,
     trackHeightByTrackId,
-    viewState.readTimelineStartTime
+    viewState.readTimelineStartTime,
+    playback.seekToClientX
   );
-  const playback = useProjectTimelinePlaybackState(props, scroll, viewState.readTimelineStartTime);
   const [hoveredClipId, setHoveredClipId] = useState<string | null>(null);
   useTimelineSelectedTrackAutoScroll({
     selectedTrackId: props.selectedTrackId,
