@@ -53,7 +53,6 @@ function renderSurface(
       currentTime={0}
       isPlaying={false}
       playbackRange={null}
-      onClearPlaybackRange={vi.fn()}
       onSeekToEnd={vi.fn()}
       onSeekToStart={vi.fn()}
       onTogglePlay={vi.fn()}

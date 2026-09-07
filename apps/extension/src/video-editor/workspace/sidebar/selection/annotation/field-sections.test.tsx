@@ -28,7 +28,7 @@ vi.stubGlobal('ShadowRoot', class ShadowRoot {});
 
 function createProps(templateKind: VideoOverlayTemplateKind): AnnotationFieldsSectionProps {
   const project = createEmptyVideoProject('Annotation section fields');
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(
     project.tracks[1]!.id,
     project.width,

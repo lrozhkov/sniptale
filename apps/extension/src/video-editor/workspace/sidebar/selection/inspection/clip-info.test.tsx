@@ -9,7 +9,7 @@ import { resolveClipAsset } from './clip-info';
 
 it('does not resolve media assets for generated text clips', () => {
   const project = createEmptyVideoProject('Clip info');
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const textClip = createTextClip(project.tracks[1]!.id, project.width, project.height, 0);
 
   expect(resolveClipAsset(project, textClip)).toBeNull();

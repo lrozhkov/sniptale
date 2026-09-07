@@ -10,7 +10,7 @@ import { createAnnotationVisualLayer } from './annotation-layer';
 
 it('creates target-aware annotation visual layers with resolved frame bounds', () => {
   const project = createEmptyVideoProject('Annotation layer', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(
     project.tracks[1]!.id,
     project.width,
@@ -43,7 +43,7 @@ it('creates target-aware annotation visual layers with resolved frame bounds', (
 
 it('attaches a declarative scene only for modern built-in annotation packs', () => {
   const project = createEmptyVideoProject('Annotation layer', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const template = Object.values(APPLE_GLASS_ANNOTATION_PACK.templates)
     .flat()
     .find((candidate) => candidate.id === 'lens-pin-callout');

@@ -221,7 +221,6 @@ function createTimelineActions() {
     insertion: createTimelineInsertionActions(),
     onDeleteSelectedClip: vi.fn(),
     onDeleteSelectedTimelineObject: vi.fn(),
-    onClearPlaybackRange: vi.fn(),
     onDuplicateSelectedClip: vi.fn(),
     onMoveActionEvent: vi.fn(),
     onMoveClip: vi.fn(),

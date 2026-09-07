@@ -24,7 +24,7 @@ it('normalizes subtitle track styles and recognizes subtitle tracks', () => {
     safeAreaPercent: 1,
   });
   expect(isSubtitleTrack({ kind: VideoTrackKind.SUBTITLE } as never)).toBe(true);
-  expect(isSubtitleTrack({ kind: VideoTrackKind.OVERLAY } as never)).toBe(false);
+  expect(isSubtitleTrack({ kind: VideoTrackKind.PRIMARY } as never)).toBe(false);
 });
 
 it('positions subtitle transforms by placement and safe area', () => {

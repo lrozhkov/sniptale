@@ -69,7 +69,7 @@ it('rejects audio and standalone-host clips as target-effect inputs', async () =
   const catalog = await createRawCatalog('neutral-target-effect.sniptale-effect.json');
   const project = createProjectWithTransition();
   const audioTrack = createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO);
-  const overlayTrack = createVideoProjectTrack('Effects', 0, VideoTrackKind.OVERLAY);
+  const overlayTrack = createVideoProjectTrack('Effects', 0, VideoTrackKind.PRIMARY);
   project.tracks.push(audioTrack, overlayTrack);
   const audio = createRecordingAudioClip(project.assets[0]!, audioTrack.id, 1, 'audio-group');
   const host = createEffectHostClip({

@@ -226,7 +226,7 @@ it('rejects pre-public v1 projects at the hydration boundary', () => {
 it('accepts all supported asset sources and clip variants', () => {
   const project = createEmptyVideoProject('Variants', 1280, 720);
   project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
-  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.PRIMARY));
   const assets = createVariantAssets();
   const clips = createVariantClips(project, assets);
 
@@ -343,7 +343,7 @@ it('rejects invalid top-level enums and numeric bounds', () => {
 it('rejects malformed annotation clip fields', () => {
   const project = createEmptyVideoProject('Annotation', 1280, 720);
   project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
-  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.PRIMARY));
   const annotationClip = createAnnotationClip(project.tracks[2]!.id, 1280, 720, 0);
 
   expect(isHydratableVideoProject({ ...project, clips: [annotationClip] })).toBe(true);
@@ -438,4 +438,11 @@ it('accepts canonical gradient presets and rejects malformed or superseded gradi
       })
     ).toBe(false);
   }
+});
+
+it('rejects removed annotation track kinds at project admission', () => {
+  const project = createEmptyVideoProject('Removed track');
+  const payload = { ...project, tracks: [{ ...project.tracks[0], kind: 'OVERLAY' }] };
+  expect(isHydratableVideoProject(payload)).toBe(false);
+  expect(isExportReadyVideoProject(payload)).toBe(false);
 });

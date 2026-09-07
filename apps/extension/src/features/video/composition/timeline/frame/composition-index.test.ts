@@ -28,10 +28,10 @@ function createImageAsset(id: string) {
 
 it('resolves visual layers from a reusable timeline index without changing layer order', () => {
   const project = createEmptyVideoProject('Indexed layers', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const sortedTracks = getSortedTracks(project);
-  const primaryTrackId = sortedTracks.find((track) => track.kind === VideoTrackKind.PRIMARY)!.id;
-  const overlayTrackId = sortedTracks.find((track) => track.kind === VideoTrackKind.OVERLAY)!.id;
+  const primaryTrackId = sortedTracks.find((track) => track.isRoot)!.id;
+  const overlayTrackId = sortedTracks.find((track) => track.name === 'Annotations')!.id;
   const imageAsset = createImageAsset('indexed');
   const lowerClip = createVideoClipFromAsset(primaryTrackId, imageAsset, 1280, 720, 0);
   const upperClip = createVideoClipFromAsset(overlayTrackId, imageAsset, 1280, 720, 0);

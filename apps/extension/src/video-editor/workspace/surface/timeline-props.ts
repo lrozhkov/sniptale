@@ -101,7 +101,6 @@ function getTimelineInteractionActionProps(controller: VideoEditorTimelineContro
     onMoveTransitionSegment: controller.actions.onMoveTransitionSegment,
     onResizeActionEvent: controller.actions.onResizeActionEvent,
     onResizeMotionRegion: controller.actions.onResizeMotionRegion,
-    onClearPlaybackRange: controller.actions.onClearPlaybackRange,
     onSeekToEnd: controller.actions.onSeekToEnd,
     onSeekToStart: controller.actions.onSeekToStart,
     onTogglePlay: controller.actions.onTogglePlay,

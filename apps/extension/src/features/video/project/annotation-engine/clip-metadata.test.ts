@@ -6,7 +6,7 @@ import { normalizeAnnotationTemplateMetadata } from './clip-metadata';
 
 it('preserves snapshot template fallback data while normalizing annotation metadata', () => {
   const project = createEmptyVideoProject('Annotation metadata');
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 0);
   const template = clip.templateSnapshot!.template!;
   clip.templateRef = { packId: 'custom.pack', templateId: 'custom-template' };

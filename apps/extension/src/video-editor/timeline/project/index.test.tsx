@@ -118,7 +118,6 @@ function createProps(): ComponentProps<typeof ProjectTimeline> {
       onImport: { audio: idle, image: idle, video: idle },
       onUnsupportedFileDrop: idle,
     },
-    onClearPlaybackRange: idle,
     onSeekToEnd: idle,
     onSeekToStart: idle,
     onTogglePlay: idle,

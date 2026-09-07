@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import type { MutableRefObject } from 'react';
 import { isEditableTarget } from '../../app-model/utils';
 import { VideoEditorSelectionKind } from '../../../contracts/selection';
@@ -219,15 +219,38 @@ function handlePlaybackNudgeShortcut(
 }
 
 /** Registers Space for one active transport; the context owner releases it on deactivation. */
-export function registerPlaybackSpaceShortcut(togglePlayback: () => void): () => void {
+function registerPlaybackSpaceShortcut(togglePlayback: () => void): () => void {
+  const restoreFocusPaint = () =>
+    document.documentElement.removeAttribute('data-video-editor-focus');
   const onKeyDown = (event: KeyboardEvent) => {
-    if (event.code !== 'Space' || isEditableTarget(event.target)) return;
+    if (event.code !== 'Space' || isEditableTarget(event.target)) {
+      restoreFocusPaint();
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
+    document.documentElement.setAttribute('data-video-editor-focus', 'playback');
     if (!event.repeat) togglePlayback();
   };
   window.addEventListener('keydown', onKeyDown, KEYDOWN_LISTENER_OPTIONS);
-  return () => window.removeEventListener('keydown', onKeyDown, KEYDOWN_LISTENER_OPTIONS);
+  window.addEventListener('pointerdown', restoreFocusPaint, true);
+  window.addEventListener('focusin', restoreFocusPaint, true);
+  return () => {
+    window.removeEventListener('keydown', onKeyDown, KEYDOWN_LISTENER_OPTIONS);
+    window.removeEventListener('pointerdown', restoreFocusPaint, true);
+    window.removeEventListener('focusin', restoreFocusPaint, true);
+    restoreFocusPaint();
+  };
+}
+
+/** Keeps transport ownership stable across playback updates while invoking the latest action. */
+export function usePlaybackSpaceShortcut(togglePlayback: () => void, enabled = true): void {
+  const latestToggle = useRef(togglePlayback);
+  latestToggle.current = togglePlayback;
+  useEffect(() => {
+    if (!enabled) return;
+    return registerPlaybackSpaceShortcut(() => latestToggle.current());
+  }, [enabled]);
 }
 
 export function usePlaybackShortcuts(
@@ -238,6 +261,9 @@ export function usePlaybackShortcuts(
   togglePlayback: () => void,
   enabled = true
 ) {
+  usePlaybackSpaceShortcut(() => {
+    if (latestStateRef.current.project) togglePlayback();
+  }, enabled);
   useEffect(() => {
     if (!enabled) return;
 
@@ -257,13 +283,9 @@ export function usePlaybackShortcuts(
       );
     };
 
-    const releaseSpace = registerPlaybackSpaceShortcut(() => {
-      if (latestStateRef.current.project) togglePlayback();
-    });
     window.addEventListener('keydown', handleKeyDown, KEYDOWN_LISTENER_OPTIONS);
     document.addEventListener('keydown', handleKeyDown, KEYDOWN_LISTENER_OPTIONS);
     return () => {
-      releaseSpace();
       window.removeEventListener('keydown', handleKeyDown, KEYDOWN_LISTENER_OPTIONS);
       document.removeEventListener('keydown', handleKeyDown, KEYDOWN_LISTENER_OPTIONS);
     };

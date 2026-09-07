@@ -123,7 +123,7 @@ function createRecordingFixture(project: VideoProject) {
 }
 
 function createStandaloneHost(project: VideoProject, duration: number) {
-  const track = createVideoProjectTrack('Effects', 0, VideoTrackKind.OVERLAY);
+  const track = createVideoProjectTrack('Effects', 0, VideoTrackKind.PRIMARY);
   project.tracks.push(track);
   const trackId = track.id;
   return createEffectHostClip({

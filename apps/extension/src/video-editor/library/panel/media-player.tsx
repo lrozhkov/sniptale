@@ -3,7 +3,7 @@ import { Maximize2, Minimize2, Pause, Play, Search, Volume2, VolumeX } from 'luc
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductRange } from '@sniptale/ui/product-form-controls';
 import { translate } from '../../../platform/i18n';
-import { registerPlaybackSpaceShortcut } from '../../runtime/session/playback/shortcuts';
+import { usePlaybackSpaceShortcut } from '../../runtime/session/playback/shortcuts';
 import { formatDuration } from '../../chrome/display';
 
 /** Disposable library playback owns its media element; it never edits project timing. */
@@ -138,7 +138,7 @@ function useLibraryPlayback(src: string | null) {
       void node.play().catch(() => setFailed(true));
     }
   }, []);
-  useEffect(() => registerPlaybackSpaceShortcut(toggle), [toggle]);
+  usePlaybackSpaceShortcut(toggle);
   useEffect(() => {
     const node = video.current;
     return () => node?.pause();

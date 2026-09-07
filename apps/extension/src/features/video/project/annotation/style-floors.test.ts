@@ -6,7 +6,7 @@ import { VideoTrackKind, VideoOverlayTemplateKind } from '../types/index';
 
 function createClip() {
   const project = createEmptyVideoProject('Style floors', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   return createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 1);
 }
 

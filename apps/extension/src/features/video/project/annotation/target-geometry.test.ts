@@ -9,7 +9,7 @@ import { VideoTrackKind, VideoOverlayTemplateKind } from '../types/index';
 
 it('expands annotation bounds to include target-aware connector geometry', () => {
   const project = createEmptyVideoProject('Geometry', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(
     project.tracks[1]!.id,
     project.width,
@@ -27,7 +27,7 @@ it('expands annotation bounds to include target-aware connector geometry', () =>
 
 it('expands bracket-callout bounds to include target frame geometry', () => {
   const project = createEmptyVideoProject('Geometry', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(
     project.tracks[1]!.id,
     project.width,
@@ -45,7 +45,7 @@ it('expands bracket-callout bounds to include target frame geometry', () => {
 
 it('expands spotlight bounds to include focus frame and pulse geometry', () => {
   const project = createEmptyVideoProject('Geometry', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(
     project.tracks[1]!.id,
     project.width,
@@ -63,7 +63,7 @@ it('expands spotlight bounds to include focus frame and pulse geometry', () => {
 
 it('resolves marker connector points for point-target pointer labels', () => {
   const project = createEmptyVideoProject('Geometry', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(
     project.tracks[1]!.id,
     project.width,
@@ -80,7 +80,7 @@ it('resolves marker connector points for point-target pointer labels', () => {
 
 it('resolves elbow bend points for rect-target connector callouts', () => {
   const project = createEmptyVideoProject('Geometry', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(
     project.tracks[1]!.id,
     project.width,
@@ -97,7 +97,7 @@ it('resolves elbow bend points for rect-target connector callouts', () => {
 
 it('keeps plain annotation bounds unchanged without targets or markers', () => {
   const project = createEmptyVideoProject('Geometry', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(
     project.tracks[1]!.id,
     project.width,

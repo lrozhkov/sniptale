@@ -3,7 +3,6 @@ import { createEmptyVideoProject } from '../../../../features/video/project/fact
 import {
   VideoOverlayTemplateKind,
   VideoProjectClipType,
-  VideoTrackKind,
 } from '../../../../features/video/project/types';
 import { createVideoEditorProjectTestStore } from '../test-store.test-support';
 
@@ -14,7 +13,7 @@ function createConversionStore() {
 it('converts text clips into annotation templates through the dedicated conversion seam', () => {
   const store = createConversionStore();
   const project = createEmptyVideoProject('Conversion seam');
-  const overlayTrackId = project.tracks.find((track) => track.kind === 'OVERLAY')?.id ?? 'overlay';
+  const overlayTrackId = project.tracks[0]!.id;
 
   store.getState().setProject(project);
   const textClipId = store.getState().addTextOverlay(overlayTrackId, 0.5);
@@ -34,8 +33,7 @@ it('converts text clips into annotation templates through the dedicated conversi
 it('leaves text clips unchanged when their track is locked', () => {
   const store = createConversionStore();
   const project = createEmptyVideoProject('Locked conversion seam');
-  const overlayTrackId =
-    project.tracks.find((track) => track.kind === VideoTrackKind.OVERLAY)?.id ?? 'overlay';
+  const overlayTrackId = project.tracks[0]!.id;
 
   store.getState().setProject(project);
   const textClipId = store.getState().addTextOverlay(overlayTrackId, 0.5);
@@ -54,8 +52,7 @@ it('leaves text clips unchanged when their track is locked', () => {
 it('keeps non-text clip targets as a clip-level no-op', () => {
   const store = createConversionStore();
   const project = createEmptyVideoProject('Guarded conversion seam');
-  const overlayTrackId =
-    project.tracks.find((track) => track.kind === VideoTrackKind.OVERLAY)?.id ?? 'overlay';
+  const overlayTrackId = project.tracks[0]!.id;
 
   store.getState().setProject(project);
   const annotationClipId = store

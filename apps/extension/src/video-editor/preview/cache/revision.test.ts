@@ -32,7 +32,7 @@ it('ignores non-render project labels and timestamps but changes for visual stat
 
 it('invalidates only the segment influenced by a bounded clip edit', async () => {
   const project = { ...createEmptyVideoProject('Segments', 1920, 1080), duration: 4, fps: 10 };
-  const overlay = createVideoProjectTrack('Text', 0, VideoTrackKind.OVERLAY);
+  const overlay = createVideoProjectTrack('Text', 0, VideoTrackKind.PRIMARY);
   project.tracks.push(overlay);
   const trackId = overlay.id;
   const first = { ...createTextClip(trackId, project.width, project.height, 0.2), duration: 1 };

@@ -27,9 +27,9 @@ export function createStoreWithEffects() {
 
 export function createProjectWithEffects(): VideoProject {
   const project = createEmptyVideoProject('effect-actions');
-  project.tracks.push(createVideoProjectTrack('Effects', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Effects', 0, VideoTrackKind.PRIMARY));
   const primaryTrackId = project.tracks[0]!.id;
-  const overlayTrackId = project.tracks.find(({ kind }) => kind === 'OVERLAY')!.id;
+  const overlayTrackId = project.tracks.find(({ name }) => name === 'Effects')!.id;
   const leading = createTextClip(primaryTrackId, project.width, project.height, 3);
   leading.id = 'clip-a';
   leading.duration = 2;

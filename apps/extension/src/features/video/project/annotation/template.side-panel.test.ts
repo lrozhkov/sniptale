@@ -5,7 +5,7 @@ import { VideoTrackKind, VideoOverlayTemplateKind, VideoTemplateDirection } from
 
 it('resolves side reveal panels against the project edge by direction', () => {
   const project = createEmptyVideoProject('Templates', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(
     project.tracks[1]!.id,
     project.width,

@@ -101,7 +101,11 @@ function ProjectTimelineClipContent({
           visibleDuration={viewModel.visibleDuration}
         />
       ) : viewModel.waveformPeaks.length > 0 ? (
-        <div className="pointer-events-none absolute inset-x-2 inset-y-2 overflow-hidden rounded-[12px]">
+        <div
+          data-ui="video-editor.timeline.audio-waveform"
+          className="pointer-events-none absolute inset-x-2 bottom-0.5 overflow-hidden"
+          style={{ top: viewModel.labelHeight + 2 }}
+        >
           <AudioClipWaveform
             envelopeEnd={viewModel.waveformEnvelopeEnd}
             envelopeStart={viewModel.waveformEnvelopeStart}
@@ -259,6 +263,7 @@ function ProjectTimelineClipLabel({
   project,
   viewModel,
 }: Pick<ProjectTimelineClipLayoutProps, 'clip' | 'project' | 'viewModel'>) {
+  if (viewModel.labelHeight === 0) return null;
   const label = clip.name?.trim() || buildClipLabel(project, clip);
   return (
     <div

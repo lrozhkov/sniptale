@@ -101,14 +101,14 @@ it('falls back from an incompatible preferred track and creates missing kinds', 
   const created = ensureTrackForKind(
     {
       ...project,
-      tracks: project.tracks.filter((track) => track.kind !== VideoTrackKind.OVERLAY),
+      tracks: project.tracks.filter((track) => track.kind !== VideoTrackKind.PRIMARY),
     },
-    VideoTrackKind.OVERLAY,
+    VideoTrackKind.PRIMARY,
     project.tracks[0]!.id
   );
 
   expect(fallback.trackId).toBe(project.tracks[0]!.id);
-  expect(created.project.tracks.some((track) => track.kind === VideoTrackKind.OVERLAY)).toBe(true);
+  expect(created.project.tracks.some((track) => track.kind === VideoTrackKind.PRIMARY)).toBe(true);
 });
 
 it('rejects missing and mismatched editable clip operations', () => {

@@ -25,7 +25,7 @@ it('keeps the block selection order stable for the gallery-first insertion flow'
 
 it('expands recipes into normal project clips without hidden state', () => {
   const project = createEmptyVideoProject('Blocks');
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clips = expandVideoBlockRecipe(
     VideoBlockKind.CHAPTER_OPENER,
     project.tracks[1]!.id,
@@ -51,14 +51,14 @@ it('keeps subtitle-first recipes on subtitle tracks and spotlight recipes on ove
   expect(getVideoBlockRecipeDefinition(VideoBlockKind.FEATURE_SPOTLIGHT)).toEqual(
     expect.objectContaining({
       preview: expect.objectContaining({ variant: 'SPOTLIGHT' }),
-      trackKind: 'OVERLAY',
+      trackKind: 'PRIMARY',
     })
   );
 });
 
 it('uses the editorial lower-third starter for speaker intro recipes', () => {
   const project = createEmptyVideoProject('Speaker intro');
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clips = expandVideoBlockRecipe(
     VideoBlockKind.SPEAKER_INTRO,
     project.tracks[1]!.id,
@@ -77,7 +77,7 @@ it('uses the editorial lower-third starter for speaker intro recipes', () => {
 
 it('expands every shipped block kind into valid clips', () => {
   const project = createEmptyVideoProject('All blocks');
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const trackId = project.tracks[1]!.id;
 
   for (const blockKind of getVideoBlockRecipeSelectionOrder()) {

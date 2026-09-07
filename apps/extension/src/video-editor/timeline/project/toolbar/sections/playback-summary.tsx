@@ -1,5 +1,5 @@
 import { formatTimelineRulerLabel } from '../../interaction-state/helpers';
-import { Pause, Play, RotateCcw, SkipBack, SkipForward, StepBack, StepForward } from 'lucide-react';
+import { Pause, Play, SkipBack, SkipForward, StepBack, StepForward } from 'lucide-react';
 
 import { translate } from '../../../../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -33,24 +33,6 @@ function PlaybackToggleButton(props: { isPlaying: boolean; onTogglePlay: () => v
       ) : (
         <Play size={16} strokeWidth={2.2} />
       )}
-    </ContentToolbarButton>
-  );
-}
-
-function PlaybackResetButton(props: { disabled?: boolean; onClearPlaybackRange: () => void }) {
-  return (
-    <ContentToolbarButton
-      type="button"
-      onClick={props.onClearPlaybackRange}
-      className={[
-        toolbarIconButtonClassName,
-        props.disabled ? 'pointer-events-none invisible' : '',
-      ].join(' ')}
-      disabled={props.disabled}
-      aria-label={translate('videoEditor.timeline.clearRange')}
-      title={translate('videoEditor.timeline.clearRange')}
-    >
-      <RotateCcw size={14} strokeWidth={2} />
     </ContentToolbarButton>
   );
 }
@@ -157,7 +139,6 @@ export function ProjectTimelinePlaybackSummary({
   duration,
   isPlaying,
   playbackRange,
-  onClearPlaybackRange,
   onSeekToEnd,
   onSeekToStart,
   onStepToNextFrame,
@@ -168,7 +149,6 @@ export function ProjectTimelinePlaybackSummary({
   duration: number;
   isPlaying: boolean;
   playbackRange: VideoEditorPlaybackRange | null;
-  onClearPlaybackRange: () => void;
   onSeekToEnd: () => void;
   onSeekToStart: () => void;
   onStepToNextFrame: () => void;
@@ -187,7 +167,6 @@ export function ProjectTimelinePlaybackSummary({
       <PlaybackToggleButton isPlaying={isPlaying} onTogglePlay={onTogglePlay} />
       <PlaybackFrameStepButton direction="next" onStep={onStepToNextFrame} />
       <PlaybackSeekToEndButton onSeekToEnd={onSeekToEnd} />
-      <PlaybackResetButton disabled={!playbackRange} onClearPlaybackRange={onClearPlaybackRange} />
       <PlaybackSummaryMeta
         currentTime={currentTime}
         duration={duration}

@@ -36,7 +36,7 @@ it('applies immutable content-addressed snapshots and reuses only byte-identical
   expect(first.tracks).toHaveLength(2);
   expect(second.tracks).toBe(first.tracks);
   expect(second.clips.every((clip) => clip.trackId === first.tracks[1]?.id)).toBe(true);
-  expect(first.tracks[1]).toEqual(expect.objectContaining({ kind: 'OVERLAY', order: -1 }));
+  expect(first.tracks[1]).toEqual(expect.objectContaining({ kind: 'PRIMARY', order: -1 }));
   expect(second.effectSnapshots).toHaveLength(1);
   expect(second.effectInstances).toHaveLength(2);
   expect(second.clips).toEqual([
@@ -153,3 +153,36 @@ function readFixture(): string {
     'utf8'
   );
 }
+
+it('places overlapping standalone effects on separate video layers and reuses a free upper layer', async () => {
+  const catalog = await createRawCatalog(readFixture());
+  const apply = (
+    project: Parameters<typeof applyEffectCatalogDocument>[0]['project'],
+    startTime: number,
+    instanceId: string
+  ) =>
+    applyEffectCatalogDocument({
+      catalog,
+      documentId: catalog.documents[0]!.id,
+      instanceId,
+      project,
+      startTime,
+      target: { kind: 'scene' },
+    });
+  const first = await apply(createEmptyVideoProject('Visual layers'), 0, 'first');
+  const second = await apply(first, 1, 'overlap');
+  const firstClip = second.clips.find(
+    (clip) => clip.type === 'EFFECT' && clip.effectInstanceId === 'first'
+  )!;
+  const overlappingClip = second.clips.find(
+    (clip) => clip.type === 'EFFECT' && clip.effectInstanceId === 'overlap'
+  )!;
+  expect(overlappingClip.trackId).not.toBe(firstClip.trackId);
+  const firstTrack = second.tracks.find((track) => track.id === firstClip.trackId)!;
+  const upperTrack = second.tracks.find((track) => track.id === overlappingClip.trackId)!;
+  expect(upperTrack.kind).toBe('PRIMARY');
+  expect(upperTrack.order).toBeLessThan(firstTrack.order);
+  const third = await apply(second, 5, 'later');
+  expect(third.tracks).toBe(second.tracks);
+  expect(third.clips.at(-1)?.startTime).toBe(5);
+});

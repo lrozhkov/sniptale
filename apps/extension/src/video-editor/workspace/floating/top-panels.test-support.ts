@@ -85,7 +85,6 @@ function createTimelineEditActions(): Omit<
     },
     onAddTrackLogicalLane: noop(),
     onAutoTransformRecording: noop(),
-    onClearPlaybackRange: noop(),
     onClearUtilityLane: noop(),
     onCloseTrackGap: noop(),
     onDeleteSelectedClip: noop(),

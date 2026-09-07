@@ -49,7 +49,7 @@ function verifyClipKinds(): void {
   const videoClip = createVideoClip();
   const textClip = createTextClip();
   const annotationProject = createEmptyVideoProject('Timeline');
-  annotationProject.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  annotationProject.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const annotationClip = createAnnotationClip(
     annotationProject.tracks[1]!.id,
     annotationProject.width,

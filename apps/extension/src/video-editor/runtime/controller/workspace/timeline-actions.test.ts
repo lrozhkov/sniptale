@@ -36,10 +36,11 @@ function createStore(project = createEmptyVideoProject('Timeline actions')) {
 
 function createWorkspace(): Pick<
   VideoEditorWorkspaceState,
-  'clearPlaybackRange' | 'confirm' | 'inspector' | 'setPlaybackRange'
+  'clearPlaybackRange' | 'confirm' | 'inspector' | 'playbackRange' | 'setPlaybackRange'
 > {
   return {
     clearPlaybackRange: vi.fn(),
+    playbackRange: null,
     inspector: { mode: 'selection', openSelection: vi.fn() },
     confirm: {
       dialog: null,
@@ -217,4 +218,26 @@ it('moves anchored interactions into durable project time before later source ed
     expect.objectContaining({ time: 4, timeBasis: 'project' })
   );
   expect(sourceEdited.cursorTrack?.samples[0]).not.toHaveProperty('sourceAnchor');
+});
+
+it('clears the playback interval only for seeks outside its inclusive boundaries', () => {
+  const workspace = { ...createWorkspace(), playbackRange: { start: 2, end: 5 } };
+  const seekTo = vi.fn();
+  const project = createEmptyVideoProject('Range seeks');
+  project.duration = 10;
+  const actions = createWorkspaceTimelineSelectionActions(
+    createStore(project),
+    { seekTo } as unknown as VideoEditorRuntimeController,
+    workspace
+  );
+  for (const time of [2, 3, 5]) actions.onSeek(time);
+  expect(workspace.clearPlaybackRange).not.toHaveBeenCalled();
+  actions.onSeek(1);
+  expect(workspace.clearPlaybackRange).toHaveBeenCalledTimes(1);
+  actions.onSeek(6);
+  expect(workspace.clearPlaybackRange).toHaveBeenCalledTimes(2);
+  actions.onSeekToStart();
+  actions.onSeekToEnd();
+  expect(workspace.clearPlaybackRange).toHaveBeenCalledTimes(4);
+  expect(seekTo.mock.calls).toEqual([[2], [3], [5], [1], [6], [0], [10]]);
 });

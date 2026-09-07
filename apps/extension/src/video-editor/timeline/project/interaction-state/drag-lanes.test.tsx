@@ -50,7 +50,7 @@ it('moves directly to the lower physical track without creating a logical lane',
   };
   project.tracks.push({
     id: 'overlay-track',
-    kind: VideoTrackKind.OVERLAY,
+    kind: VideoTrackKind.PRIMARY,
     locked: false,
     name: 'Overlay',
     order: 10,
@@ -240,7 +240,7 @@ function createProjectWithTwoTracks(): VideoProject {
   const project = createEmptyVideoProject('Multi-line drag');
   project.tracks.push({
     id: 'overlay-track',
-    kind: VideoTrackKind.OVERLAY,
+    kind: VideoTrackKind.PRIMARY,
     locked: false,
     name: 'Overlay',
     order: 10,

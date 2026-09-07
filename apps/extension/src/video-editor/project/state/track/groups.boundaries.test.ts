@@ -52,7 +52,7 @@ it('covers add-track selection and sorted-order move/toggle boundaries', () => {
     0
   );
   expect(
-    runtime.getState().project?.tracks.filter((track) => track.kind === VideoTrackKind.OVERLAY)
+    runtime.getState().project?.tracks.filter((track) => track.kind === VideoTrackKind.PRIMARY)
       .length
   ).toBeGreaterThan(0);
 });
@@ -64,13 +64,13 @@ it('moves tracks against normalized visual order rather than raw array position'
     .getState()
     .project!.tracks.find((track) => track.kind === VideoTrackKind.PRIMARY)!.id;
 
-  structure.addTrack(VideoTrackKind.OVERLAY);
+  structure.addTrack(VideoTrackKind.PRIMARY);
   structure.addTrack(VideoTrackKind.AUDIO);
   structure.moveTrack(primaryTrackId, 'up');
 
   expect(getSortedTracks(runtime.getState().project!).map((track) => track.kind)).toEqual([
     VideoTrackKind.PRIMARY,
-    VideoTrackKind.OVERLAY,
+    VideoTrackKind.PRIMARY,
     VideoTrackKind.AUDIO,
   ]);
 });
@@ -82,7 +82,7 @@ it('protects root tracks while allowing selected extra tracks to fall back to th
     .getState()
     .project!.tracks.find((track) => track.kind === VideoTrackKind.PRIMARY)!.id;
 
-  structure.addTrack(VideoTrackKind.OVERLAY);
+  structure.addTrack(VideoTrackKind.PRIMARY);
   const extraOverlayTrackId = runtime.getState().project!.tracks.at(-1)!.id;
 
   structure.deleteTrack(rootPrimaryTrackId);

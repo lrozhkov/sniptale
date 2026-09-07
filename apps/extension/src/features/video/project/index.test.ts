@@ -122,7 +122,7 @@ function verifyRecordingSidecarVideos() {
 
 function verifyAnnotationFacadeExports() {
   const project = createEmptyVideoProject('Templates');
-  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.PRIMARY));
   const annotationClip = createAnnotationClip(project.tracks[1]!.id, 1280, 720, 1);
   const textClip = createTextClip(project.tracks[1]!.id, 1280, 720, 2);
 

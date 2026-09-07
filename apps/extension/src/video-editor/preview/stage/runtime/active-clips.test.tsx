@@ -72,7 +72,7 @@ afterEach(() => {
 
 it('orders active preview clips from lower tracks to upper tracks', () => {
   const project = createEmptyVideoProject('Preview clip priority');
-  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.PRIMARY));
   const sortedTracks = getSortedTracks(project);
   const upperTrackId = sortedTracks[0]!.id;
   const lowerTrackId = sortedTracks[1]!.id;

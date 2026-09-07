@@ -160,7 +160,7 @@ async function expectEffectExportCompleted(page: Page, jobId: string): Promise<v
 
 function createTargetEffectExportProject(): VideoProject {
   const project = createEmptyVideoProject('EffectV1 MP4 E2E', 160, 90);
-  const track = createVideoProjectTrack('Effects', 0, VideoTrackKind.OVERLAY);
+  const track = createVideoProjectTrack('Effects', 0, VideoTrackKind.PRIMARY);
   project.tracks.push(track);
   const clip = {
     ...createTextClip(track.id, project.width, project.height, 0),
@@ -194,7 +194,7 @@ function createTargetEffectExportProject(): VideoProject {
 
 function createStandaloneEffectExportProject(): SerializableEffectProject {
   const project = createEmptyVideoProject('Standalone EffectV1 MP4 E2E', 160, 90);
-  const track = createVideoProjectTrack('Effects', 0, VideoTrackKind.OVERLAY);
+  const track = createVideoProjectTrack('Effects', 0, VideoTrackKind.PRIMARY);
   project.tracks.push(track);
   const instanceId = 'effect-v1-standalone-mp4-instance';
   const sha256 = createHash('sha256').update(STANDALONE_EFFECT_SOURCE).digest('hex');

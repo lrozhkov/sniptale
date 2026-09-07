@@ -75,7 +75,7 @@ it('uses the selected track name as its inspector identity', () => {
   const selectedTrack = {
     id: 'track-1',
     isRoot: false,
-    kind: VideoTrackKind.OVERLAY,
+    kind: VideoTrackKind.PRIMARY,
     locked: false,
     name: 'Callouts',
     order: 1,

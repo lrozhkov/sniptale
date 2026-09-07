@@ -47,7 +47,6 @@ function renderPlaybackSummary(isPlaying: boolean, withRange = false) {
         duration={45.678}
         isPlaying={isPlaying}
         playbackRange={withRange ? { start: 4.5, end: 6.75 } : null}
-        onClearPlaybackRange={onTogglePlay}
         onSeekToEnd={onSeekToEnd}
         onSeekToStart={onSeekToStart}
         onStepToNextFrame={onStepToNextFrame}
@@ -149,15 +148,15 @@ it('renders the active loop range when playback range is selected', () => {
   expect(container?.textContent).toContain('(0:04.500-0:06.750)');
 });
 
-it('keeps playback control slots stable when the range reset is unavailable', () => {
+it('keeps five playback controls with or without a range, without a reset button', () => {
   renderPlaybackSummary(false, false);
   const buttonsWithoutRange = container?.querySelectorAll<HTMLButtonElement>('button');
 
   renderPlaybackSummary(false, true);
   const buttonsWithRange = container?.querySelectorAll<HTMLButtonElement>('button');
 
-  expect(buttonsWithoutRange).toHaveLength(6);
-  expect(buttonsWithRange).toHaveLength(6);
+  expect(buttonsWithoutRange).toHaveLength(5);
+  expect(buttonsWithRange).toHaveLength(5);
   expect(container?.querySelector('[data-playback-counter]')?.className).toContain('tabular-nums');
 });
 

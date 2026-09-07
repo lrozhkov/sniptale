@@ -27,7 +27,7 @@ type TimelineImportHandlers = Pick<
 >;
 type TimelineActionWorkspace = Pick<
   VideoEditorWorkspaceState,
-  'clearPlaybackRange' | 'confirm' | 'inspector' | 'setPlaybackRange'
+  'clearPlaybackRange' | 'confirm' | 'inspector' | 'playbackRange' | 'setPlaybackRange'
 >;
 type TimelineStateWorkspace = Pick<VideoEditorWorkspaceState, 'grid' | 'playbackRange'>;
 type TimelineControllerWorkspace = TimelineActionWorkspace & TimelineStateWorkspace;

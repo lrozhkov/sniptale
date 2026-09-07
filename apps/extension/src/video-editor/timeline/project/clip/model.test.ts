@@ -5,11 +5,11 @@ import {
   VideoClipTransitionKind,
   VideoMediaFitMode,
   VideoProjectClipType,
-  type VideoProjectClip,
+  type VideoProjectVideoClip,
 } from '../../../../features/video/project/types';
 import { buildProjectTimelineClipViewModel } from './model';
 
-function createVideoClip(trackId: string): VideoProjectClip {
+function createVideoClip(trackId: string): VideoProjectVideoClip {
   return {
     id: 'clip-1',
     trackId,
@@ -59,7 +59,7 @@ it('builds clip timeline view models with crossfade metadata and temporal width'
   expect(viewModel.left).toBe(10);
   expect(viewModel.bodyInsetLeft).toBe(5);
   expect(viewModel.bodyInsetRight).toBe(0);
-  expect(viewModel.clipClassName).toContain('ring-2');
+  expect(viewModel.clipClassName).toContain('outline-2');
   expect(viewModel.clipClassName).toContain('opacity-55');
 });
 
@@ -88,8 +88,8 @@ it('keeps the same emphasis contract for selected and hovered clips', () => {
 
   expect(selectedModel.visualEmphasis).toBe(true);
   expect(hoveredModel.visualEmphasis).toBe(true);
-  expect(selectedModel.clipClassName).toContain('brightness-110');
-  expect(hoveredModel.clipClassName).toContain('brightness-110');
+  expect(selectedModel.clipClassName).not.toContain('brightness-');
+  expect(hoveredModel.clipClassName).not.toContain('brightness-');
   expect(selectedModel.fadeInOverlayWidth).toBe(10);
   expect(selectedModel.fadeOutOverlayWidth).toBe(20);
 });
@@ -274,4 +274,42 @@ it('keeps a one-frame clip visible at project overview scale', async () => {
   expect(model.visible).toBe(true);
   expect(model.width).toBeGreaterThanOrEqual(1);
   expect(clip.duration).toBe(1 / 240);
+});
+
+it('does not alter thumbnail luminance to indicate selection or hover', () => {
+  const project = createEmptyVideoProject('Selection');
+  for (const isSelected of [false, true])
+    for (const isHovered of [false, true]) {
+      const model = buildProjectTimelineClipViewModel({
+        clip: createVideoClip(project.tracks[0]!.id),
+        project,
+        isSelected,
+        isHovered,
+        pixelsPerSecond: 60,
+        trackLocked: false,
+      });
+      expect(model.clipClassName).not.toContain('brightness-');
+    }
+});
+
+it('reserves separate name and waveform bands, using waveform-only for short audio rows', () => {
+  const project = createEmptyVideoProject('Audio density');
+  const clip = { ...createVideoClip(project.tracks[0]!.id), type: VideoProjectClipType.AUDIO };
+  for (const [trackClipRowHeight, labelHeight] of [
+    [62, 20],
+    [40, 0],
+    [31, 0],
+  ] as const) {
+    const model = buildProjectTimelineClipViewModel({
+      clip,
+      project,
+      trackClipRowHeight,
+      pixelsPerSecond: 60,
+      isSelected: false,
+      isHovered: false,
+      trackLocked: false,
+    });
+    expect(model.labelHeight).toBe(labelHeight);
+    expect(Number(model.style.height) - model.labelHeight - 4).toBeGreaterThanOrEqual(18);
+  }
 });

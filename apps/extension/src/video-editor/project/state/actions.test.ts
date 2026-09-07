@@ -32,7 +32,7 @@ describe('video editor store project track and asset actions', () => {
     const project = createEmptyVideoProject('Delete track');
 
     store.getState().setProject(project);
-    store.getState().addTrack(VideoTrackKind.OVERLAY);
+    store.getState().addTrack(VideoTrackKind.PRIMARY);
     const extraOverlayTrackId = store.getState().project!.tracks.at(-1)!.id;
     const overlayClipId = store.getState().addTextOverlay(extraOverlayTrackId, 1);
     store.getState().addTrack(VideoTrackKind.AUDIO);

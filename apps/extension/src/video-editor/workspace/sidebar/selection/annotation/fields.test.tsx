@@ -28,7 +28,7 @@ vi.stubGlobal('ShadowRoot', class ShadowRoot {});
 
 function createProps() {
   const project = createEmptyVideoProject('Annotation fields');
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(
     project.tracks[1]!.id,
     project.width,
@@ -111,7 +111,7 @@ function registerLegacyAnnotationFieldTests() {
 
   it('uses shared template capability controls to hide subline-only fields for pointer labels', () => {
     const project = createEmptyVideoProject('Pointer annotation fields');
-    project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+    project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
     const clip = createAnnotationClip(
       project.tracks[1]!.id,
       project.width,
@@ -138,7 +138,7 @@ function registerLegacyAnnotationFieldTests() {
 
 function createModernProps(pack: VideoAnnotationPack, template: VideoAnnotationTemplate) {
   const project = createEmptyVideoProject('Modern annotation fields');
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 0, {
     pack,
     packLabel: pack.label,

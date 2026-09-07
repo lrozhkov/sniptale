@@ -16,7 +16,7 @@ import { createSceneTimeline } from './resolver.timeline.test-support.ts';
 
 export function createProjectAndClip() {
   const project = createEmptyVideoProject('Annotation scene', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 1);
   clip.duration = 3;
   clip.introDurationMs = 500;

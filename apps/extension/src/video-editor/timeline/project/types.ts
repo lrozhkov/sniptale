@@ -59,7 +59,6 @@ export interface ProjectTimelineProps {
   selectedTrackId: string | null;
   telemetryLaneVisible: boolean;
   timelinePreviews: TimelineClipPreviewMap;
-  onClearPlaybackRange: () => void;
   onSeekToEnd: () => void;
   onSeekToStart: () => void;
   onTogglePlay: () => void;

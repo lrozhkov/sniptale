@@ -35,8 +35,6 @@ function getTrackKindIcon(kind: VideoProjectTrack['kind']) {
       return <Film className={TRACK_ICON_CLASS_NAME} />;
     case VideoTrackKind.AUDIO:
       return <Volume2 className={TRACK_ICON_CLASS_NAME} />;
-    case VideoTrackKind.OVERLAY:
-      return <Sparkles className={TRACK_ICON_CLASS_NAME} />;
     case VideoTrackKind.SUBTITLE:
       return <Type className={TRACK_ICON_CLASS_NAME} />;
   }

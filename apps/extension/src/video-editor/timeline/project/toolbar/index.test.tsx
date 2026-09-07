@@ -69,7 +69,6 @@ function createToolbarProps(): ProjectTimelineToolbarTestProps {
       duration: 8,
       isPlaying: false,
       playbackRange: null,
-      onClearPlaybackRange: vi.fn(),
       onSeekToEnd: vi.fn(),
       onSeekToStart: vi.fn(),
       onTogglePlay: vi.fn(),

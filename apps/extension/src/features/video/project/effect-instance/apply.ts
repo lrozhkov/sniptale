@@ -1,8 +1,8 @@
 import type { EffectBundleCatalogEntry } from '../effect-bundle/catalog';
 import type { VideoProject } from '../types';
-import { VideoProjectClipType, VideoTrackKind } from '../types';
+import { VideoProjectClipType } from '../types';
 import { createEffectHostClip } from '../factories/overlay-clip';
-import { createVideoProjectTrack, getDefaultTrackName } from '../factories/creation';
+import { resolveVideoOverlayTrack } from '../factories/creation';
 import { buildProjectTransitionSegments } from '../transition/project';
 import { readVerifiedCatalogDocument, type VerifiedCatalogAsset } from './catalog-reader';
 import { ApplyEffectInstanceError } from './errors';
@@ -51,12 +51,7 @@ export async function applyEffectCatalogDocument(args: {
   };
   const overlayTrack =
     document.kind === 'standalone'
-      ? (args.project.tracks.find(({ kind }) => kind === VideoTrackKind.OVERLAY) ??
-        createVideoProjectTrack(
-          getDefaultTrackName(VideoTrackKind.OVERLAY),
-          Math.min(0, ...args.project.tracks.map((track) => track.order)) - 1,
-          VideoTrackKind.OVERLAY
-        ))
+      ? resolveVideoOverlayTrack(args.project, timing.startTime, timing.duration)
       : null;
   const clips = overlayTrack
     ? [

@@ -190,7 +190,7 @@ async function expectTrackMenuPlacement(page: Page): Promise<void> {
   expect(bounds.y).toBeGreaterThanOrEqual(0);
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
   expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height);
-  await expect(menu.locator('button')).toHaveCount(3);
+  await expect(menu.locator('button')).toHaveCount(2);
   await menu.locator('button').first().focus();
   await page.keyboard.press('Escape');
   await expect(menu).toHaveCount(0);

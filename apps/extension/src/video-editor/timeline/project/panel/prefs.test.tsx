@@ -84,7 +84,7 @@ function createLoadedPrefs(
 
 it('keeps local heights stable while the same tracks are reordered', async () => {
   let project = createEmptyVideoProject('Reorder presentation');
-  project.tracks.push(createVideoProjectTrack('Overlay', 2, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Overlay', 2, VideoTrackKind.PRIMARY));
   const firstId = project.tracks[0]!.id;
   loadPrefsMock.mockResolvedValue(createLoadedPrefs({}));
   function Harness() {

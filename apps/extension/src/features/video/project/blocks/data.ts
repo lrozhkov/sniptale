@@ -35,7 +35,7 @@ const VIDEO_BLOCK_RECIPE_DEFINITIONS = {
       VideoTemplatePreviewVariant.CALLOUT
     ),
     scenarioLabelKey: 'videoEditor.templates.blockScenarioExplain',
-    trackKind: VideoTrackKind.OVERLAY,
+    trackKind: VideoTrackKind.PRIMARY,
     useCaseKey: 'videoEditor.templates.blockUseCaseStepExplainer',
   },
   [VideoBlockKind.CHAPTER_OPENER]: {
@@ -48,7 +48,7 @@ const VIDEO_BLOCK_RECIPE_DEFINITIONS = {
       VideoTemplatePreviewVariant.TITLE
     ),
     scenarioLabelKey: 'videoEditor.templates.blockScenarioIntro',
-    trackKind: VideoTrackKind.OVERLAY,
+    trackKind: VideoTrackKind.PRIMARY,
     useCaseKey: 'videoEditor.templates.blockUseCaseChapterOpener',
   },
   [VideoBlockKind.FEATURE_SPOTLIGHT]: {
@@ -61,7 +61,7 @@ const VIDEO_BLOCK_RECIPE_DEFINITIONS = {
       VideoTemplatePreviewVariant.SPOTLIGHT
     ),
     scenarioLabelKey: 'videoEditor.templates.blockScenarioSpotlight',
-    trackKind: VideoTrackKind.OVERLAY,
+    trackKind: VideoTrackKind.PRIMARY,
     useCaseKey: 'videoEditor.templates.blockUseCaseFeatureSpotlight',
   },
   [VideoBlockKind.SPEAKER_INTRO]: {
@@ -74,7 +74,7 @@ const VIDEO_BLOCK_RECIPE_DEFINITIONS = {
       VideoTemplatePreviewVariant.LOWER_THIRD
     ),
     scenarioLabelKey: 'videoEditor.templates.blockScenarioIntro',
-    trackKind: VideoTrackKind.OVERLAY,
+    trackKind: VideoTrackKind.PRIMARY,
     useCaseKey: 'videoEditor.templates.blockUseCaseSpeakerIntro',
   },
   [VideoBlockKind.CTA_WRAP_UP]: {
@@ -87,7 +87,7 @@ const VIDEO_BLOCK_RECIPE_DEFINITIONS = {
       VideoTemplatePreviewVariant.CTA
     ),
     scenarioLabelKey: 'videoEditor.templates.blockScenarioClose',
-    trackKind: VideoTrackKind.OVERLAY,
+    trackKind: VideoTrackKind.PRIMARY,
     useCaseKey: 'videoEditor.templates.blockUseCaseCtaWrapUp',
   },
 } as const satisfies Record<VideoBlockKindType, VideoBlockRecipeDefinition>;

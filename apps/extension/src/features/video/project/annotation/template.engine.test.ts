@@ -15,7 +15,7 @@ import {
 
 it('creates annotation clips with declarative template metadata snapshots', () => {
   const project = createEmptyVideoProject('Annotation engine', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(
     project.tracks[1]!.id,
     project.width,
@@ -43,7 +43,7 @@ it('creates annotation clips with declarative template metadata snapshots', () =
 
 it('creates annotation clips from built-in template refs with snapshots and field defaults', () => {
   const project = createEmptyVideoProject('Annotation engine', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const template = APPLE_GLASS_ANNOTATION_PACK.templates.callout.find(
     (candidate) => candidate.id === 'crawling-arrow-card'
   );
@@ -77,7 +77,7 @@ it('creates annotation clips from built-in template refs with snapshots and fiel
 
 it('updates declarative template metadata when applying legacy template presets', () => {
   const project = createEmptyVideoProject('Annotation engine', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 0);
   const updatedClip = applyAnnotationTemplatePreset(
     clip,
@@ -94,7 +94,7 @@ it('updates declarative template metadata when applying legacy template presets'
 
 it('keeps template metadata while preserving user geometry during style swaps', () => {
   const project = createEmptyVideoProject('Annotation engine', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(
     project.tracks[1]!.id,
     project.width,
@@ -118,7 +118,7 @@ it('keeps template metadata while preserving user geometry during style swaps', 
 
 it('resolves annotation presentation for regular and side-panel template geometry', () => {
   const project = createEmptyVideoProject('Annotation engine', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const lowerThirdClip = createAnnotationClip(
     project.tracks[1]!.id,
     project.width,

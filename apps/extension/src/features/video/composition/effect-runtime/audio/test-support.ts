@@ -23,7 +23,7 @@ const AUDIO_SHA = '0'.repeat(64);
 export function createAudioProject(): VideoProject {
   const document = createAudioDocument();
   const project = createEmptyVideoProject('Effect audio');
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   project.duration = 10;
   project.effectSnapshots = [createAudioSnapshot(document)];
   project.effectInstances = [
@@ -39,7 +39,7 @@ export function createAudioProject(): VideoProject {
       target: { kind: 'scene' },
     },
   ];
-  const overlayTrack = project.tracks.find(({ kind }) => kind === 'OVERLAY')!;
+  const overlayTrack = project.tracks.find(({ name }) => name === 'Annotations')!;
   project.clips = [
     createEffectHostClip({
       duration: 1.5,

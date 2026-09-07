@@ -13,7 +13,7 @@ import { setup } from './material.test-support';
 
 it('appends at the current montage end and commits selection and history atomically', () => {
   const { store, asset, project } = setup();
-  const overlay = createVideoProjectTrack('Overlay', -1, VideoTrackKind.OVERLAY);
+  const overlay = createVideoProjectTrack('Overlay', -1, VideoTrackKind.PRIMARY);
   project.tracks.push(overlay);
   store.setState({ selectedTrackId: overlay.id });
   const listener = vi.fn((state: VideoEditorProjectState) => {
@@ -321,7 +321,7 @@ it('keeps a standalone effect document phase across the inserted interval', () =
   const { store, asset } = setup();
   store.getState().appendMaterial(asset.id);
   const project = store.getState().project!;
-  const track = createVideoProjectTrack('Effect', -1, VideoTrackKind.OVERLAY);
+  const track = createVideoProjectTrack('Effect', -1, VideoTrackKind.PRIMARY);
   const host = createEffectHostClip({
     duration: 4,
     startTime: 1,

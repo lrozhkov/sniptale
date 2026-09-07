@@ -69,7 +69,7 @@ function verifyTrackZoneDerivation() {
     )?.id ?? '';
   const cutTrack =
     project.tracks.find(
-      (track) => track.name === 'Видео cut' && track.kind === VideoTrackKind.OVERLAY
+      (track) => track.name === 'Видео cut' && track.kind === VideoTrackKind.PRIMARY
     )?.id ?? '';
 
   expectPrimaryTrackZones(project, primaryTrack);
@@ -202,8 +202,7 @@ function verifyGapZoneDerivation() {
   const project = createEmptyVideoProject('Gap seam');
   const primaryTrack = project.tracks[0]?.id ?? '';
   const audioTrack = project.tracks[1]?.id ?? '';
-  const overlayTrack =
-    project.tracks.find((track) => track.kind === VideoTrackKind.OVERLAY)?.id ?? '';
+  const missingTrack = 'missing-track';
   const asset = createTimelineZoneAsset('asset-gap');
   const firstClip = createVideoClipFromAsset(primaryTrack, asset, 1280, 720, 0);
   const secondClip = createVideoClipFromAsset(primaryTrack, asset, 1280, 720, 3);
@@ -224,7 +223,7 @@ function verifyGapZoneDerivation() {
     },
   ]);
   expect(buildTrackGapZones(project, audioTrack)).toEqual([]);
-  expect(buildTrackGapZones(project, overlayTrack)).toEqual([]);
+  expect(buildTrackGapZones(project, missingTrack)).toEqual([]);
 }
 
 it('routes each transition boundary to its own trim without selecting the clip behind it', () => {

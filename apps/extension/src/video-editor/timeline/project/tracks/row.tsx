@@ -112,6 +112,7 @@ function ProjectTimelineTrackStateControls({
     <div className="flex gap-1">
       {track.kind === VideoTrackKind.AUDIO && <AudioTrackRecordingButton track={track} />}
       <TimelineIconButton
+        frameless
         active={track.visible}
         icon={
           track.visible ? (
@@ -137,6 +138,7 @@ function ProjectTimelineTrackStateControls({
         }
       />
       <TimelineIconButton
+        frameless
         active={track.locked}
         icon={
           track.locked ? <Lock size={13} strokeWidth={2} /> : <Unlock size={13} strokeWidth={2} />

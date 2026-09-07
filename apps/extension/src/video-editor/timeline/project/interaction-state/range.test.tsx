@@ -234,3 +234,28 @@ it.each(['Escape', 'pointercancel', 'blur'])(
     expect(onSeek).toHaveBeenCalledExactlyOnceWith(1);
   }
 );
+
+it('publishes a replacement range after seeking so stale seek policy cannot erase it', () => {
+  let selected: { start: number; end: number } | null = { start: 1, end: 2 };
+  renderRangeHarness(
+    root,
+    (state) => {
+      harnessState = state;
+    },
+    {
+      playbackRange: selected,
+      onSeek: (time) => {
+        if (time < 1 || time > 2) selected = null;
+      },
+      onSetPlaybackRange: (range) => {
+        selected = range;
+      },
+    }
+  );
+  act(() => {
+    dispatchPointerEvent(harnessState!.timelineRef.current!, 'pointerdown', 240);
+    dispatchPointerEvent(window, 'pointermove', 360);
+    dispatchPointerEvent(window, 'pointerup', 360);
+  });
+  expect(selected).toEqual({ start: 4, end: 6 });
+});

@@ -101,7 +101,7 @@ function verifyEnsureTrackForKind(): void {
   expect(audio.project.tracks[1]?.order).toBeGreaterThan(project.tracks[0]!.order);
   expect(ensureTrackForKind(audio.project, VideoTrackKind.AUDIO).project).toBe(audio.project);
 
-  const created = ensureTrackForKind(project, VideoTrackKind.OVERLAY);
+  const created = ensureTrackForKind(project, VideoTrackKind.SUBTITLE);
   expect(created.project.tracks).toHaveLength(2);
   expect(created.project.tracks[1]?.order).toBeLessThan(project.tracks[0]!.order);
   expect(created.project.updatedAt).toBe(100);

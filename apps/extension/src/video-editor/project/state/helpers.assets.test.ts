@@ -81,7 +81,7 @@ function createShapeClipWithEmbeddedAsset(trackId: string) {
 
 it('retains both placed and unplaced materials when their track is deleted', () => {
   const project = createEmptyVideoProject('Helpers');
-  const track = createVideoProjectTrack('Video layer', 0, VideoTrackKind.OVERLAY);
+  const track = createVideoProjectTrack('Video layer', 0, VideoTrackKind.PRIMARY);
   project.tracks.push(track);
   const primaryTrackId = track.id;
 
@@ -97,7 +97,7 @@ it('retains both placed and unplaced materials when their track is deleted', () 
 
 it('retains embedded graphics as materials after deleting their overlay track', () => {
   const project = createEmptyVideoProject('Embedded assets');
-  const overlayTrack = createVideoProjectTrack('Graphics', 0, VideoTrackKind.OVERLAY);
+  const overlayTrack = createVideoProjectTrack('Graphics', 0, VideoTrackKind.PRIMARY);
   project.tracks.push(overlayTrack);
   const overlayTrackId = overlayTrack.id;
 

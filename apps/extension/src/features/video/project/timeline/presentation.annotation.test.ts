@@ -6,7 +6,7 @@ import * as timelinePresentation from './presentation';
 
 it('treats annotation clips as visual overlays in the timeline seam', () => {
   const project = createEmptyVideoProject('Timeline');
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const annotationClip = createAnnotationClip(
     project.tracks[1]!.id,
     project.width,

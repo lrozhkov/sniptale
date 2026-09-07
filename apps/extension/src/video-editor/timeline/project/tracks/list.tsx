@@ -197,7 +197,6 @@ function getTrackPositionLabel(tracks: VideoProject['tracks'], trackIndex: numbe
   const prefix = {
     [VideoTrackKind.PRIMARY]: 'V',
     [VideoTrackKind.AUDIO]: 'A',
-    [VideoTrackKind.OVERLAY]: 'O',
     [VideoTrackKind.SUBTITLE]: 'S',
   }[track.kind];
   return `${prefix}${position}`;

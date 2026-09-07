@@ -9,6 +9,7 @@ export function TimelineIconButton(props: {
   danger?: boolean | undefined;
   dataUi?: string | undefined;
   disabled?: boolean | undefined;
+  frameless?: boolean | undefined;
   icon: ReactNode;
   stopPropagation?: boolean | undefined;
   title: string;
@@ -18,7 +19,10 @@ export function TimelineIconButton(props: {
     <EditorIconButton
       title={props.title}
       onClick={props.onClick}
-      className={TIMELINE_ICON_BUTTON_CLASS_NAME}
+      className={[
+        TIMELINE_ICON_BUTTON_CLASS_NAME,
+        props.frameless ? '!border-0 !shadow-none' : '',
+      ].join(' ')}
       data-ui={props.dataUi ?? 'video-editor.timeline.icon-button'}
       {...(props.active === undefined
         ? {}

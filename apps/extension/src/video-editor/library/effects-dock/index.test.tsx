@@ -152,8 +152,8 @@ it('keeps an invalid EffectV1 catalog row visible with delete-only recovery', as
 
 it('does not expose a transition that already owns an EffectV1 instance', () => {
   const project = createEmptyVideoProject('occupied transition');
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
-  const track = project.tracks.find(({ kind }) => kind === VideoTrackKind.OVERLAY)!;
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
+  const track = project.tracks.find(({ name }) => name === 'Annotations')!;
   const leading = { ...createTextClip(track.id, project.width, project.height, 0), id: 'leading' };
   const trailing = {
     ...createTextClip(track.id, project.width, project.height, 1),

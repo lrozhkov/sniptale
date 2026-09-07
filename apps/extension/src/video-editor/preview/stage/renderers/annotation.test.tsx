@@ -22,7 +22,7 @@ let root: Root | null = null;
 
 function renderAnnotation(templateKind: VideoOverlayTemplateKind, currentTime = 0.7) {
   const project = createEmptyVideoProject('Preview', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(
     project.tracks[1]!.id,
     project.width,
@@ -187,7 +187,7 @@ function renderModernAnnotation(
   headline: string
 ) {
   const project = createEmptyVideoProject('Preview', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const template = Object.values(pack.templates)
     .flat()
     .find((candidate) => candidate.id === templateId);

@@ -149,8 +149,8 @@ function createVideoProps(
 
 function createProps(): WorkspaceSidebarSelectionPanelProps {
   const project = createEmptyVideoProject('Text template upgrade');
-  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
-  const overlayTrackId = project.tracks.find((track) => track.kind === 'OVERLAY')?.id ?? 'overlay';
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.PRIMARY));
+  const overlayTrackId = project.tracks.find((track) => track.name === 'Overlay')?.id ?? 'overlay';
   const clip = createTextClip(overlayTrackId, project.width, project.height, 0);
   project.clips.push(clip);
 

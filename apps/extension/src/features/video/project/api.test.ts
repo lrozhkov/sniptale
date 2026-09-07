@@ -12,14 +12,16 @@ import {
   createVideoProjectFromRecording,
   createVideoProjectTrack,
   getDefaultTrackName,
+  resolveVideoOverlayTrack,
 } from './factories/creation';
-import { createSubtitleClip } from './factories/overlay-clip';
+import { createSubtitleClip, createTextClip } from './factories/overlay-clip';
 import { createFittedTransform } from './factories/clip';
 import { createVideoProjectMotionRegion } from './motion/index';
 import { getDefaultExportSettings } from './timeline';
 import {
   VideoCursorCaptureMode,
   VideoProjectAssetType,
+  VideoProjectTrackRole,
   VideoProjectClipType,
   VideoSceneBackgroundKind,
   VideoProjectSourceKind,
@@ -133,13 +135,13 @@ function verifySharedTrackAndAssetFactories() {
   expect(createClipGroupId()).toEqual(expect.any(String));
   expect(getDefaultTrackName(VideoTrackKind.PRIMARY, 2)).toContain('2');
   expect(getDefaultTrackName(VideoTrackKind.AUDIO, 3)).toContain('3');
-  expect(getDefaultTrackName(VideoTrackKind.OVERLAY, 1)).not.toContain('1');
-  expect(getDefaultTrackName(VideoTrackKind.OVERLAY, 2)).toContain('2');
+  expect(getDefaultTrackName(VideoTrackKind.PRIMARY, 1)).toContain('1');
+  expect(getDefaultTrackName(VideoTrackKind.PRIMARY, 2)).toContain('2');
   expect(getDefaultTrackName(VideoTrackKind.SUBTITLE, 2)).toContain('2');
-  expect(createVideoProjectTrack('Extra overlay', 4, VideoTrackKind.OVERLAY)).toEqual(
+  expect(createVideoProjectTrack('Extra overlay', 4, VideoTrackKind.PRIMARY)).toEqual(
     expect.objectContaining({
       isRoot: false,
-      kind: VideoTrackKind.OVERLAY,
+      kind: VideoTrackKind.PRIMARY,
       locked: false,
       name: 'Extra overlay',
       order: 4,
@@ -280,3 +282,45 @@ function expectRecordingProjectShape(project: ReturnType<typeof createVideoProje
   expect(project.motionRegions).toEqual([]);
   expect(project.duration).toBe(12.5);
 }
+
+it('exposes ordinary video and audio tracks without an annotation track kind', () => {
+  expect(Object.values(VideoTrackKind)).not.toContain('OVERLAY');
+});
+
+it.each(['occupied', 'camera', 'locked', 'hidden', 'below-content'] as const)(
+  'places an overlay above content without taking a %s track',
+  (unavailable) => {
+    const project = createEmptyVideoProject('Overlay placement');
+    const screen = project.tracks[0]!;
+    const candidate = createVideoProjectTrack('Video 2', 0, VideoTrackKind.PRIMARY);
+    project.tracks.push(candidate);
+    const screenClip = createTextClip(screen.id, project.width, project.height, 0);
+    screenClip.duration = 10;
+    project.clips.push(screenClip);
+    if (unavailable === 'occupied') {
+      const clip = createTextClip(candidate.id, project.width, project.height, 1);
+      clip.duration = 3;
+      project.clips.push(clip);
+    }
+    if (unavailable === 'camera') candidate.role = VideoProjectTrackRole.CAMERA;
+    if (unavailable === 'locked') candidate.locked = true;
+    if (unavailable === 'hidden') candidate.visible = false;
+    if (unavailable === 'below-content') candidate.order = screen.order + 1;
+    const original = structuredClone(project);
+    const resolved = resolveVideoOverlayTrack(project, 2, 2, candidate.id);
+    expect(resolved.kind).toBe(VideoTrackKind.PRIMARY);
+    expect(project.tracks.some(({ id }) => id === resolved.id)).toBe(false);
+    expect(resolved.order).toBeLessThan(Math.min(...project.tracks.map(({ order }) => order)));
+    expect(project).toEqual(original);
+  }
+);
+
+it('reuses a free upper video layer at the exact end of its previous clip', () => {
+  const project = createEmptyVideoProject('Adjacent overlays');
+  const layer = createVideoProjectTrack('Video 2', 0, VideoTrackKind.PRIMARY);
+  project.tracks.push(layer);
+  const clip = createTextClip(layer.id, project.width, project.height, 0);
+  clip.duration = 2;
+  project.clips.push(clip);
+  expect(resolveVideoOverlayTrack(project, 2, 3, layer.id)).toBe(layer);
+});

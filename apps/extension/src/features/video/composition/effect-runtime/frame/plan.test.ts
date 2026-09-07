@@ -125,7 +125,7 @@ function expectTransitionPlan(plan: unknown): void {
 
 function createProject(): VideoProject {
   const project = createEmptyVideoProject('Effect runtime', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const trackId = project.tracks[0]!.id;
   project.duration = 5;
   project.clips = [createClip('clip-a', trackId, 0), createClip('clip-b', trackId, 2)];
@@ -187,7 +187,7 @@ function attachEffectRuntimeState(project: VideoProject): void {
 }
 
 function createStandaloneHost(project: VideoProject) {
-  const trackId = project.tracks.find(({ kind }) => kind === 'OVERLAY')?.id;
+  const trackId = project.tracks.find(({ name }) => name === 'Annotations')?.id;
   if (!trackId) throw new Error('Expected overlay track');
   const host = createEffectHostClip({
     duration: 3,

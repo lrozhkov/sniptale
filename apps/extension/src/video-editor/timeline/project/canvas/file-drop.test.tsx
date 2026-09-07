@@ -46,9 +46,10 @@ it('drops a compatible video file on a timeline track with captured placement', 
 
 it('auto-routes an incompatible dropped image file while preserving drop time', () => {
   const onImportImage = vi.fn();
-  const { project, trackId } = renderCanvas({
+  const { project } = renderCanvas({
     onImportTimelineFile: createImportHandlers({ image: onImportImage }),
   });
+  const trackId = project.tracks[1]!.id;
 
   dispatchTimelineFileDrop(trackId, new File(['image'], 'shot.png', { type: 'image/png' }), 290);
 
@@ -76,7 +77,7 @@ function renderCanvas(options: {
 }) {
   const project = createEmptyVideoProject('Canvas drop');
   project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
-  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.PRIMARY));
 
   act(() => {
     root?.render(

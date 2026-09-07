@@ -187,7 +187,7 @@ function createHost(project: VideoProject, instance: VideoProjectEffectInstance)
     projectHeight: project.height,
     projectWidth: project.width,
     startTime: instance.startTime,
-    trackId: project.tracks.find(({ kind }) => kind === 'OVERLAY')!.id,
+    trackId: project.tracks.find(({ name }) => name === 'Overlay')!.id,
   });
 }
 
@@ -211,7 +211,7 @@ function createInstance(
 
 function createProjectWithTargets(): VideoProject {
   const project = createEmptyVideoProject('references');
-  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.PRIMARY));
   const asset = createRecordingProjectAsset({
     duration: 9,
     filename: 'recording.webm',

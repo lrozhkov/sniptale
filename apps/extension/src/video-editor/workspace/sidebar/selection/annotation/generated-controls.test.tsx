@@ -124,7 +124,7 @@ describe('annotation generated controls', () => {
 function registerCustomGeneratedControlTests() {
   it('renders controls from a custom template snapshot', () => {
     const project = createEmptyVideoProject('Generated controls');
-    project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+    project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
     const clip = createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 0);
     const template = createTemplate();
     clip.templateRef = { packId: 'custom.pack', templateId: template.id };
@@ -265,7 +265,7 @@ function registerGeneratedControlMutationTests() {
 
 function createBuiltInProps(pack: VideoAnnotationPack, template: VideoAnnotationTemplate) {
   const project = createEmptyVideoProject('Generated built-in controls');
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 0, {
     pack,
     packLabel: pack.label,

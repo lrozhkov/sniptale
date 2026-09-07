@@ -3,7 +3,6 @@ import type { Gradient } from '@sniptale/foundation/paint';
 export const VideoTrackKind = {
   PRIMARY: 'PRIMARY',
   AUDIO: 'AUDIO',
-  OVERLAY: 'OVERLAY',
   SUBTITLE: 'SUBTITLE',
 } as const;
 

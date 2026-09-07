@@ -26,9 +26,9 @@ interface LargeEffectFixture {
 export async function createLargeEffectProject(): Promise<VideoProject> {
   const fixture = await createLargeEffectFixture();
   const project = createEmptyVideoProject('Large EffectV1 export', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.PRIMARY));
   project.id = 'project-1';
-  const overlayTrack = project.tracks.find(({ kind }) => kind === 'OVERLAY');
+  const overlayTrack = project.tracks.find(({ name }) => name === 'Overlay');
   if (!overlayTrack) throw new Error('Expected overlay track');
   return {
     ...project,

@@ -25,7 +25,7 @@ function createProjectTemplateClip(
 it('creates detached lower-third clips with translated defaults', () => {
   vi.spyOn(crypto, 'randomUUID').mockReturnValue('11111111-1111-4111-8111-111111111111');
   const project = createEmptyVideoProject('Templates', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
 
   expect(createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 2)).toEqual(
     expect.objectContaining({
@@ -47,7 +47,7 @@ it('creates detached lower-third clips with translated defaults', () => {
 
 it('resolves intro and outro presentation effects from project time', () => {
   const project = createEmptyVideoProject('Templates', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 1);
   clip.introAnimation = 'SLIDE_LEFT_FADE';
   clip.outroAnimation = 'SHIMMER_ENTRY';
@@ -75,7 +75,7 @@ it('resolves intro and outro presentation effects from project time', () => {
 
 it('resolves template-specific style variants and reveal masks', () => {
   const project = createEmptyVideoProject('Templates', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const accentClip = createProjectTemplateClip(
     project,
     VideoOverlayTemplateKind.LOWER_THIRD_ACCENT
@@ -113,7 +113,7 @@ it('resolves template-specific style variants and reveal masks', () => {
 
 it('keeps shipped hold-state motion alive after intro for living templates', () => {
   const project = createEmptyVideoProject('Templates', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const shimmerClip = createAnnotationClip(
     project.tracks[1]!.id,
     project.width,
@@ -145,7 +145,7 @@ it('keeps shipped hold-state motion alive after intro for living templates', () 
 
 it('applies broader template presets for creation and template switching', () => {
   const project = createEmptyVideoProject('Templates', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const shimmerClip = createAnnotationClip(
     project.tracks[1]!.id,
     project.width,
@@ -173,7 +173,7 @@ it('applies broader template presets for creation and template switching', () =>
 
 it('supports style swaps that keep manual placement and timing adjustments intact', () => {
   const project = createEmptyVideoProject('Templates', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(
     project.tracks[1]!.id,
     project.width,
@@ -218,7 +218,7 @@ it('supports style swaps that keep manual placement and timing adjustments intac
 
 it('assigns target-aware defaults to pointer and bracket-callout templates', () => {
   const project = createEmptyVideoProject('Templates', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const calloutCardClip = createAnnotationClip(
     project.tracks[1]!.id,
     project.width,
@@ -252,7 +252,7 @@ it('assigns target-aware defaults to pointer and bracket-callout templates', () 
 
 it('assigns target-aware defaults to connector and spotlight templates', () => {
   const project = createEmptyVideoProject('Templates', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const connectorClip = createAnnotationClip(
     project.tracks[1]!.id,
     project.width,
@@ -283,7 +283,7 @@ it('assigns target-aware defaults to connector and spotlight templates', () => {
 
 it('resolves defaults across all shipped annotation template families', () => {
   const project = createEmptyVideoProject('Templates', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
 
   for (const templateKind of Object.values(VideoOverlayTemplateKind)) {
     const defaults = resolveAnnotationTemplateDefaults(project.width, project.height, templateKind);

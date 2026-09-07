@@ -29,7 +29,7 @@ function createProject(clips: VideoProjectClip[] = []): VideoProject {
     tracks: [
       {
         id: 'track-1',
-        kind: VideoTrackKind.OVERLAY,
+        kind: VideoTrackKind.PRIMARY,
         locked: false,
         name: 'Track',
         order: 0,

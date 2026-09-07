@@ -33,7 +33,7 @@ afterEach(() => {
 it('shares restored heights with the track inspector and routes order to the existing command', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const project = createEmptyVideoProject('Track presentation');
-  const track = createVideoProjectTrack('Overlay', 2, VideoTrackKind.OVERLAY);
+  const track = createVideoProjectTrack('Overlay', 2, VideoTrackKind.PRIMARY);
   project.tracks.push(track);
   const move = vi.fn();
   mocks.controller = { state: { project }, actions: { onMoveTrack: move } };

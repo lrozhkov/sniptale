@@ -52,7 +52,7 @@ export function createActionEvent(): VideoProjectActionEvent {
 
 export function createProject() {
   const project = createEmptyVideoProject('Domain Boundary', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const asset = createAsset();
   const clip = createVideoClipFromAsset(project.tracks[0]!.id, asset, 1280, 720);
   const annotationClip = createAnnotationClip(project.tracks[1]!.id, 1280, 720, 1);
@@ -76,7 +76,7 @@ export function createProject() {
 
 export function createTextProject() {
   const project = createEmptyVideoProject('Text Domain Boundary', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   return {
     ...project,
     clips: [createTextClip(project.tracks[1]!.id, 1280, 720, 0)],
@@ -85,7 +85,7 @@ export function createTextProject() {
 
 export function createShapeProject() {
   const project = createEmptyVideoProject('Shape Domain Boundary', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const asset = createAsset();
   const shapeClip = createShapeClip(
     project.tracks[1]!.id,

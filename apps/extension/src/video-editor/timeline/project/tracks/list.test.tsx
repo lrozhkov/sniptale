@@ -344,3 +344,13 @@ it('exposes a separate selected Zoom lane button and keeps Add region independen
   expect(onAddMotionRegion).toHaveBeenCalledOnce();
   expect(onSelectMotionLane).toHaveBeenCalledOnce();
 });
+
+it('keeps destructive zoom cleanup in the inspector instead of the track header', () => {
+  const project = createEmptyVideoProject('Zoom controls');
+  project.motionRegions = [createVideoProjectMotionRegion(project, 0)];
+  renderTrackList(project, { showTelemetryLane: false });
+  expect(container?.querySelector('[data-ui="video-editor.timeline.add-zoom"]')).not.toBeNull();
+  expect(
+    container?.querySelector('[data-ui="video-editor.timeline.clear-utility-lane"]')
+  ).toBeNull();
+});

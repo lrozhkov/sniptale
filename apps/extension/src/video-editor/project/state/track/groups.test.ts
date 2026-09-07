@@ -156,7 +156,7 @@ function verifyTrackDeleteSelectionCleanup() {
     true
   );
 
-  structure.addTrack(VideoTrackKind.OVERLAY);
+  structure.addTrack(VideoTrackKind.PRIMARY);
   const extraOverlayTrackId = runtime.getState().project!.tracks.at(-1)!.id;
   runtime.replaceState(buildOverlaySelectionState(runtime.getState(), extraOverlayTrackId, clipId));
   structure.deleteTrack(extraOverlayTrackId);
@@ -189,7 +189,7 @@ function createOverlayAsset() {
 
 function seedRemovableOverlayTrack(runtime: ReturnType<typeof createMutableState>) {
   const structure = createProjectTrackStructureActions(runtime.set);
-  structure.addTrack(VideoTrackKind.OVERLAY);
+  structure.addTrack(VideoTrackKind.PRIMARY);
   const removableTrackId = runtime.getState().project!.tracks.at(-1)!.id;
   const extraAsset = createOverlayAsset();
 

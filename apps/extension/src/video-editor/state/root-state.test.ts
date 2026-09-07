@@ -274,7 +274,7 @@ describe('video editor store timeline control state owner', () => {
       diagnosticsOpen: true,
       error: 'broken',
       isReady: true,
-      pixelsPerSecond: 280,
+      pixelsPerSecond: 999,
       saveState: 'saving',
       selectedTrackId: 'track-1',
       selection: { kind: 'motion-region', motionRegionId: 'motion-1' },

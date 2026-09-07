@@ -100,7 +100,7 @@ describe('workspace-sidebar/selection/inspect-track', () => {
 
   it('renders deletable tracks with the shared danger action style', () => {
     const markup = renderToStaticMarkup(
-      <WorkspaceSidebarInspectPanel {...createProps(VideoTrackKind.OVERLAY)} />
+      <WorkspaceSidebarInspectPanel {...createProps(VideoTrackKind.PRIMARY)} />
     );
 
     expect(markup).not.toContain('videoEditor.sidebar.inspectorGroupInfo');
@@ -123,7 +123,7 @@ describe('workspace-sidebar/selection/inspect-track', () => {
 
   it('commits a localized track name without exposing the internal kind enum', () => {
     vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-    const props = createProps(VideoTrackKind.OVERLAY);
+    const props = createProps(VideoTrackKind.PRIMARY);
     const container = document.createElement('div');
     const root = createRoot(container);
 
@@ -131,8 +131,8 @@ describe('workspace-sidebar/selection/inspect-track', () => {
       root.render(<WorkspaceSidebarInspectPanel {...props} />);
     });
 
-    expect(container.textContent).toContain('videoEditor.timeline.trackKindOverlay');
-    expect(container.textContent).not.toContain(VideoTrackKind.OVERLAY);
+    expect(container.textContent).toContain('videoEditor.timeline.trackKindPrimary');
+    expect(container.textContent).not.toContain(VideoTrackKind.PRIMARY);
     const input = container.querySelector<HTMLInputElement>(
       'input[aria-label="videoEditor.sidebar.trackNameLabel"]'
     );

@@ -68,7 +68,7 @@ it('refreshes the selected-track identity from authoritative props', () => {
     const selectedTrack = {
       id: 'track-1',
       isRoot: false,
-      kind: VideoTrackKind.OVERLAY,
+      kind: VideoTrackKind.PRIMARY,
       locked: false,
       name,
       order: 1,

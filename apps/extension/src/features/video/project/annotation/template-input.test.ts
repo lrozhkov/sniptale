@@ -97,7 +97,7 @@ function registerTemplateInputSnapshotTests() {
 
 function createClipFor(template: VideoAnnotationTemplate) {
   const project = createEmptyVideoProject('Template input', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   return createTemplateRefAnnotationClip(createInput(template), (templateKind) =>
     createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 0, templateKind)
   );

@@ -19,7 +19,7 @@ import { getCurrentVideoEditorProjectSnapshot } from '../store';
 
 type TimelineWorkspace = Pick<
   VideoEditorWorkspaceState,
-  'clearPlaybackRange' | 'confirm' | 'inspector' | 'setPlaybackRange'
+  'clearPlaybackRange' | 'confirm' | 'inspector' | 'playbackRange' | 'setPlaybackRange'
 >;
 type SelectedClipActions = {
   deleteSelectedClip: () => void;
@@ -188,7 +188,6 @@ export function createWorkspaceTimelineEditingActions(
       endProjectHistoryTransaction: store.endProjectHistoryTransaction,
       isProjectHistoryTransactionCurrent: store.isProjectHistoryTransactionCurrent,
     },
-    onClearPlaybackRange: workspace.clearPlaybackRange,
     onDeleteSelectedClip: selectedClipActions.deleteSelectedClip,
     onDeleteSelectedTimelineObject: () =>
       deleteSelectedTimelineObject(store.selection, store, selectedClipActions),
@@ -242,10 +241,15 @@ export function createWorkspaceTimelineSelectionActions(
       workspace.inspector.openSelection();
     };
   };
+  const seekOutsideRange = (time: number) => {
+    const range = workspace.playbackRange;
+    if (range && (time < range.start || time > range.end)) workspace.clearPlaybackRange();
+    runtime.seekTo(time);
+  };
   return {
-    onSeek: runtime.seekTo,
-    onSeekToEnd: () => runtime.seekTo(store.project?.duration ?? 0),
-    onSeekToStart: () => runtime.seekTo(0),
+    onSeek: seekOutsideRange,
+    onSeekToEnd: () => seekOutsideRange(store.project?.duration ?? 0),
+    onSeekToStart: () => seekOutsideRange(0),
     onStepToNextFrame: () => runtime.stepByFrames(1),
     onStepToPreviousFrame: () => runtime.stepByFrames(-1),
     onSetPlaybackRange: workspace.setPlaybackRange,

@@ -108,6 +108,11 @@ export function buildProjectTimelineClipViewModel({
       clipPath: `inset(0 ${transitionViewModel.bodyInsetRight}px 0 ${transitionViewModel.bodyInsetLeft}px)`,
     },
     ...transitionViewModel,
+    labelHeight:
+      isAudioClip(clip) &&
+      Math.max(MIN_CLIP_HEIGHT, trackClipRowHeight - CLIP_VERTICAL_PADDING) < 36
+        ? 0
+        : 20,
     labelStyle: {
       left: LABEL_BASE_INSET + Math.max(transitionViewModel.bodyInsetLeft, -(interval?.left ?? 0)),
       right:
@@ -162,20 +167,17 @@ function getTimelineClipClassName({
 
   return [
     'pointer-events-auto absolute flex items-center overflow-hidden rounded-sm',
-    'outline outline-1 -outline-offset-1',
-    'outline-[color:color-mix(in_srgb,var(--sniptale-color-text-primary)_24%,transparent)]',
+    'outline -outline-offset-2',
     'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_92%,transparent)]',
     'text-xs text-[var(--sniptale-color-text-primary-strong)]',
     'shadow-[0_1px_3px_color-mix(in_srgb,var(--sniptale-color-text-primary)_8%,transparent)]',
-    'transition-[border-color,box-shadow,filter]',
+    'transition-[outline-color,box-shadow]',
     visualEmphasis
       ? [
-          'ring-2 ring-[color:color-mix(in_srgb,var(--sniptale-color-accent-emphasis)_74%,transparent)]',
-          'border-[color:color-mix(in_srgb,var(--sniptale-color-accent-emphasis)_66%,transparent)]',
+          'outline-2 outline-[var(--sniptale-color-accent-emphasis)]',
           SELECTED_CLIP_SHADOW_CLASS_NAME,
-          'brightness-110',
         ].join(' ')
-      : '',
+      : 'outline-1 outline-[color:color-mix(in_srgb,var(--sniptale-color-text-primary)_24%,transparent)]',
     trackLocked ? 'opacity-55 cursor-default' : 'cursor-grab',
   ].join(' ');
 }

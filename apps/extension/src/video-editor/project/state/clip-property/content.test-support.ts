@@ -153,7 +153,7 @@ function createProjectClips(project: VideoProject): VideoProject['clips'] {
 
 export function createProjectWithMediaTrack(): VideoProject {
   const project = createEmptyVideoProject('Fit');
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   project.assets = createProjectAssets();
   project.clips = createProjectClips(project);
   return project;

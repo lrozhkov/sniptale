@@ -59,7 +59,7 @@ it('normalizes grouped media clips with fit, playback, and legacy names', () => 
 
 it('keeps annotation clip normalization wired through the shared clip hydration seam', () => {
   const project = createEmptyVideoProject('Hydration clip', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 0);
   clip.target = 'invalid' as never;
   clip.targetPoint = { x: 120, y: 240 };

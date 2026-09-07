@@ -7,7 +7,7 @@ import { resolveCompositionAnnotationClip } from './resolved-clip';
 
 it('resolves legacy annotation presentation without a declarative scene', () => {
   const project = createEmptyVideoProject('Resolved annotation', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(
     project.tracks[1]!.id,
     project.width,
@@ -31,7 +31,7 @@ it('resolves legacy annotation presentation without a declarative scene', () => 
 
 it('attaches the resolved scene for a modern annotation pack', () => {
   const project = createEmptyVideoProject('Resolved annotation', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const template = Object.values(APPLE_GLASS_ANNOTATION_PACK.templates)
     .flat()
     .find((candidate) => candidate.id === 'lens-pin-callout');

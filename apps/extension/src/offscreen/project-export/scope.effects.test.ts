@@ -61,7 +61,7 @@ it('projects transitions and EffectV1 references as a closed selected-clip graph
 
 it('retains a standalone EffectV1 instance only with its selected ordinary clip host', () => {
   const project = createScopeProject([createScopeClip('clip-1', VideoProjectClipType.VIDEO)]);
-  const overlayTrack = createVideoProjectTrack('Effect', 0, VideoTrackKind.OVERLAY);
+  const overlayTrack = createVideoProjectTrack('Effect', 0, VideoTrackKind.PRIMARY);
   project.tracks.push(overlayTrack);
   const host = createEffectHostClip({
     duration: 1,

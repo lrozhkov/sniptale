@@ -22,7 +22,7 @@ vi.stubGlobal('ShadowRoot', class ShadowRoot {});
 
 function createClip(templateKind: VideoOverlayTemplateKind) {
   const project = createEmptyVideoProject('Annotation target controls');
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   return createAnnotationClip(
     project.tracks[1]!.id,
     project.width,

@@ -25,7 +25,7 @@ function addTrackToProject(project: VideoProject, kind: VideoTrackKind) {
   const sequence = project.tracks.filter((track) => track.kind === kind).length + 1;
   const track = createVideoProjectTrack(
     getDefaultTrackName(kind, sequence),
-    kind === VideoTrackKind.OVERLAY || kind === VideoTrackKind.SUBTITLE
+    kind === VideoTrackKind.PRIMARY || kind === VideoTrackKind.SUBTITLE
       ? Math.min(0, ...project.tracks.map((item) => item.order)) - 1
       : Math.max(0, ...project.tracks.map((item) => item.order)) + 1,
     kind
@@ -161,7 +161,7 @@ function createAddTrackLogicalLaneAction(
 }
 
 function createAddTrackAction(set: VideoEditorStoreSet): VideoEditorProjectState['addTrack'] {
-  return (kind = VideoTrackKind.OVERLAY) =>
+  return (kind = VideoTrackKind.PRIMARY) =>
     set((state) => {
       if (!state.project) {
         return {};

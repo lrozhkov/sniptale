@@ -45,7 +45,7 @@ function createPresentationFixture() {
 
 it('shrinks annotation typography continuously for tiny preview scales', () => {
   const project = createEmptyVideoProject('Render metrics', 1280, 720);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(
     project.tracks[1]!.id,
     project.width,

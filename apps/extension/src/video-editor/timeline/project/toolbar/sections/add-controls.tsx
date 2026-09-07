@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useGlassSelectOverlay } from '@sniptale/ui/glass-select/overlay-state';
+import { useGlassSelectLayout } from '@sniptale/ui/glass-select/layout';
+import { isComposedEventWithinElement } from '@sniptale/ui/dom-events';
 import {
   resolveThemeSafePortalTarget,
   useResolvedPortalTheme,
 } from '@sniptale/ui/theme/safe-portal';
-import { Music, Plus, StickyNote, Video, ZoomIn } from 'lucide-react';
+import { Music, Plus, Video, ZoomIn } from 'lucide-react';
 import { translate } from '../../../../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
@@ -29,12 +30,6 @@ const TRACK_MENU_OPTIONS = [
     hintKey: 'videoEditor.timeline.addAudioTrackNote',
     kind: VideoTrackKind.AUDIO,
     labelKey: 'videoEditor.timeline.addAudioTrack',
-  },
-  {
-    icon: <StickyNote size={14} strokeWidth={2.1} />,
-    hintKey: 'videoEditor.timeline.addOverlayTrackNote',
-    kind: VideoTrackKind.OVERLAY,
-    labelKey: 'videoEditor.timeline.addOverlayTrack',
   },
 ] as const;
 
@@ -105,17 +100,33 @@ function useTrackChoicesMenuState() {
     setVisible(false);
     if (restoreFocus) triggerRef.current?.focus();
   }, []);
-  const setOpen = useCallback((next: boolean | ((current: boolean) => boolean)) => {
-    setVisible(next);
-    if (next === false) triggerRef.current?.focus();
-  }, []);
-  const { portalStyle } = useGlassSelectOverlay({
+  const { portalStyle } = useGlassSelectLayout({
     portal: true,
     isOpen: visible,
-    setIsOpen: setOpen,
     containerRef: menuRootRef,
     menuRef,
   });
+  useEffect(() => {
+    if (!visible) return;
+    const dismissOutside = (event: PointerEvent) => {
+      if (
+        !isComposedEventWithinElement(event, menuRootRef.current) &&
+        !isComposedEventWithinElement(event, menuRef.current)
+      ) {
+        if (document.activeElement === triggerRef.current) triggerRef.current?.blur();
+        close();
+      }
+    };
+    const dismissKeyboard = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close(true);
+    };
+    document.addEventListener('pointerdown', dismissOutside, true);
+    document.addEventListener('keydown', dismissKeyboard);
+    return () => {
+      document.removeEventListener('pointerdown', dismissOutside, true);
+      document.removeEventListener('keydown', dismissKeyboard);
+    };
+  }, [visible, close]);
   const theme = useResolvedPortalTheme(triggerRef.current);
   useEffect(() => {
     if (!visible) return;

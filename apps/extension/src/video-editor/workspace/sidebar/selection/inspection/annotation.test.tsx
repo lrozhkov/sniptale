@@ -90,8 +90,8 @@ function createSelectionHandlers() {
 
 function createProps() {
   const project = createEmptyVideoProject('Annotation');
-  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
-  const overlayTrackId = project.tracks.find((track) => track.kind === 'OVERLAY')?.id ?? 'overlay';
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.PRIMARY));
+  const overlayTrackId = project.tracks.find((track) => track.name === 'Overlay')?.id ?? 'overlay';
   const clip = createAnnotationClip(
     overlayTrackId,
     project.width,

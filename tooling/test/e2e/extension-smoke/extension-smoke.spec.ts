@@ -258,11 +258,13 @@ async function verifyVideoEditorAddTrackMenu(
   for (const key of [
     'videoEditor.timeline.addVideoTrackNote',
     'videoEditor.timeline.addAudioTrackNote',
-    'videoEditor.timeline.addOverlayTrackNote',
   ] as const) {
     await expect(addTrackMenu.getByText(translate(key, 'ru'), { exact: true })).toBeVisible();
   }
-  await expect(addTrackMenu.locator('.sniptale-toolbar-menu-item')).toHaveCount(3);
+  await expect(addTrackMenu.locator('.sniptale-toolbar-menu-item')).toHaveCount(2);
+  await expect(
+    addTrackMenu.locator('[data-ui="video-editor.timeline.toolbar.add-track.overlay"]')
+  ).toHaveCount(0);
   await expect(
     addTrackMenu.getByText(translate('videoEditor.timeline.addSubtitleTrack', 'ru'), {
       exact: true,
@@ -508,7 +510,7 @@ test('video editor keeps clip actions stable and disables them without an editab
   hostOrigin,
 }, testInfo) => {
   const project = createEmptyVideoProject('Focused timeline proof');
-  const overlayTrack = createVideoProjectTrack('Titles', 0, VideoTrackKind.OVERLAY);
+  const overlayTrack = createVideoProjectTrack('Titles', 0, VideoTrackKind.PRIMARY);
   project.tracks.push(overlayTrack);
   const clip = createTextClip(overlayTrack.id, project.width, project.height, 0.5);
   clip.name = 'Intro title';

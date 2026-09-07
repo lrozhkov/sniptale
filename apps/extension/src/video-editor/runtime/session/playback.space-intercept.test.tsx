@@ -6,7 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createTextClip } from '../../../features/video/project/factories/overlay-clip';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import { VideoEditorSelectionKind } from '../../contracts/selection';
-import { usePlaybackShortcuts } from './playback/shortcuts';
+import { usePlaybackShortcuts, usePlaybackSpaceShortcut } from './playback/shortcuts';
 import type { PlaybackHandlers, PlaybackLatestState } from '../../interaction/playback/types';
 
 function ShortcutHarness(props: {
@@ -650,4 +650,42 @@ it('keeps split and delete explicit while Space preserves the selected clip', ()
   });
   expect(handlers.splitClipAt).toHaveBeenCalledExactlyOnceWith('selected-clip', 2);
   expect(handlers.deleteClip).toHaveBeenCalledExactlyOnceWith('selected-clip');
+});
+
+it('keeps control focus while suppressing playback-only focus paint until navigation resumes', () => {
+  renderShortcutHarness(root!, vi.fn());
+  const button = document.createElement('button');
+  document.body.append(button);
+  try {
+    button.focus();
+    dispatchSpaceKeyDownInAct(button);
+    expect(document.activeElement).toBe(button);
+    expect(document.documentElement.getAttribute('data-video-editor-focus')).toBe('playback');
+    act(() => button.dispatchEvent(new KeyboardEvent('keydown', { code: 'Tab', bubbles: true })));
+    expect(document.documentElement.hasAttribute('data-video-editor-focus')).toBe(false);
+    dispatchSpaceKeyDownInAct(button);
+    act(() => button.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+    expect(document.documentElement.hasAttribute('data-video-editor-focus')).toBe(false);
+  } finally {
+    button.remove();
+  }
+});
+
+function SpaceOwner(props: { toggle: () => void }) {
+  usePlaybackSpaceShortcut(props.toggle);
+  return null;
+}
+
+it('retains transport focus paint across rerender and invokes only the latest callback', () => {
+  const first = vi.fn();
+  const second = vi.fn();
+  act(() => root!.render(<SpaceOwner toggle={first} />));
+  dispatchSpaceKeyDownInAct(document.body);
+  act(() => root!.render(<SpaceOwner toggle={second} />));
+  expect(document.documentElement.getAttribute('data-video-editor-focus')).toBe('playback');
+  dispatchSpaceKeyDownInAct(document.body);
+  expect(first).toHaveBeenCalledOnce();
+  expect(second).toHaveBeenCalledOnce();
+  act(() => root!.render(null));
+  expect(document.documentElement.hasAttribute('data-video-editor-focus')).toBe(false);
 });

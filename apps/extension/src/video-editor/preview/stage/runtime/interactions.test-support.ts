@@ -145,7 +145,7 @@ export function createLockedStageScenario() {
 
 export function createLockedOverlayScenario() {
   const project = createEmptyVideoProject('Locked overlay');
-  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.PRIMARY));
   project.width = 200;
   project.height = 100;
   const clip = createAnnotationClip(project.tracks[1]!.id, 200, 100, 0);

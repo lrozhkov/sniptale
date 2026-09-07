@@ -8,7 +8,6 @@ import { isRecordingTelemetryEligibleForAutoProcessing } from '../../project/ope
 
 type ProjectTimelineSurfaceProps = Pick<
   ProjectTimelineProps & ReturnType<typeof useProjectTimelineState>,
-  | 'onClearPlaybackRange'
   | 'onSeekToEnd'
   | 'onSeekToStart'
   | 'onTogglePlay'
@@ -51,7 +50,6 @@ export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
     >
       <ProjectTimelineToolbar
         playback={{
-          onClearPlaybackRange: props.onClearPlaybackRange,
           onSeekToEnd: props.onSeekToEnd,
           onSeekToStart: props.onSeekToStart,
           onTogglePlay: props.onTogglePlay,

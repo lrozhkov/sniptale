@@ -96,8 +96,8 @@ function completeDraftSelection(params: {
     return;
   }
 
-  params.onSetPlaybackRange(range);
   params.onSimpleClick(range.start);
+  params.onSetPlaybackRange(range);
 }
 
 function updatePointerDraft(params: {

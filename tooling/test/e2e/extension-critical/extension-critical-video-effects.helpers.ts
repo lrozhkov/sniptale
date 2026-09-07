@@ -69,7 +69,7 @@ export async function openEffectVideoEditorHarness(
 
 export function createTransitionE2eProject(): VideoProject {
   const project = createEmptyVideoProject('EffectV1 transition E2E', 3840, 2160);
-  const track = createVideoProjectTrack('Effects', 0, VideoTrackKind.OVERLAY);
+  const track = createVideoProjectTrack('Effects', 0, VideoTrackKind.PRIMARY);
   project.tracks.push(track);
   const laneId = createVideoProjectClipLogicalLaneId(0);
   const leading = {

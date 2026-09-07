@@ -53,7 +53,7 @@ function createStage(width = 220, height = 140) {
 
 function createSelectionProject() {
   const project = createEmptyVideoProject('Selection', 200, 100);
-  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.PRIMARY));
   project.clips = [
     {
       assetId: 'asset-1',
@@ -91,7 +91,7 @@ function createSelectionProject() {
 
 function createLockedAnnotationProject() {
   const project = createEmptyVideoProject('Annotation selection', 200, 100);
-  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(project.tracks[1]!.id, 200, 100, 0);
   clip.transform = {
     ...clip.transform,

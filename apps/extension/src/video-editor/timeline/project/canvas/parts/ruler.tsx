@@ -108,6 +108,7 @@ function ProjectTimelineRulerRangeMarker(props: {
     <div
       aria-hidden="true"
       className="pointer-events-none absolute inset-y-0 z-10"
+      data-ui={`video-editor.timeline.range-marker.${props.align === 'left' ? 'start' : 'end'}`}
       style={{ left: props.left }}
     >
       <div className="absolute inset-y-0 left-0 w-px bg-[var(--sniptale-color-accent-emphasis)]" />
@@ -117,7 +118,7 @@ function ProjectTimelineRulerRangeMarker(props: {
           'border-[color:color-mix(in_srgb,var(--sniptale-color-border-accent-strong)_45%,transparent)]',
           'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_94%,var(--sniptale-color-accent-soft)_6%)]',
           'text-[var(--sniptale-color-accent-emphasis)]',
-          props.align === 'left' ? 'left-1' : 'right-1 -translate-x-full',
+          props.align === 'left' ? 'left-1' : 'right-1',
         ].join(' ')}
       >
         {props.label}

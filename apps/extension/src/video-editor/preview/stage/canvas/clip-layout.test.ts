@@ -106,7 +106,7 @@ function createAnnotationOverlayClip(
   project: ReturnType<typeof createVideoProject>
 ): VideoProjectAnnotationClip {
   const overlayProject = createEmptyVideoProject('Preview');
-  overlayProject.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
+  overlayProject.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(overlayProject.tracks[1]!.id, project.width, project.height, 0);
   clip.transform.rotation = 15;
   return clip;

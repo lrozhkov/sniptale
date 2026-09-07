@@ -33,7 +33,6 @@ interface VideoEditorTimelineActions {
   insertion: VideoEditorInsertionActions & {
     onUnsupportedFileDrop: () => void;
   };
-  onClearPlaybackRange: VideoEditorWorkspaceState['clearPlaybackRange'];
   onAddTrackLogicalLane: VideoEditorProjectActions['addTrackLogicalLane'];
   onDeleteSelectedClip: () => void;
   onDeleteSelectedTimelineObject: () => void;

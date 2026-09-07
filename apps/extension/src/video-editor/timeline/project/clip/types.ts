@@ -38,6 +38,7 @@ export interface ProjectTimelineClipViewModel {
   fadeInOverlayStyle: React.CSSProperties;
   fadeOutOverlayWidth: number;
   fadeOutOverlayStyle: React.CSSProperties;
+  labelHeight: number;
   labelStyle: React.CSSProperties;
   left: number;
   style: React.CSSProperties;

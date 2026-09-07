@@ -13,9 +13,9 @@ import { resolveInitialVideoEditorSelection } from './model';
 
 it('skips a persisted subtitle-first clip when choosing the initial selection', () => {
   const project = createEmptyVideoProject('Legacy subtitles');
-  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.PRIMARY));
   const subtitleTrack = createVideoProjectTrack('Subtitles', 4, VideoTrackKind.SUBTITLE);
-  const overlayTrack = project.tracks.find((track) => track.kind === VideoTrackKind.OVERLAY)!;
+  const overlayTrack = project.tracks.find((track) => track.name === 'Overlay')!;
   const subtitleClip = createSubtitleClip(subtitleTrack.id, project.width, project.height, 0);
   const textClip = createTextClip(overlayTrack.id, project.width, project.height, 0);
   project.tracks.push(subtitleTrack);

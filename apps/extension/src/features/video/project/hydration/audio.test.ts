@@ -65,7 +65,7 @@ function createEnvelopeProject() {
 
 function createMixedHydrationProject() {
   const project = createEmptyVideoProject('Hydration mixed');
-  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.PRIMARY));
   const [primaryTrack, overlayTrack] = project.tracks;
 
   project.source = { kind: VideoProjectSourceKind.RECORDING, recordingId: 'recording-source' };

@@ -55,7 +55,7 @@ function createStage(width = 220, height = 140) {
 
 function createModernTargetProject(pack: VideoAnnotationPack, template: VideoAnnotationTemplate) {
   const project = createEmptyVideoProject('Targets', 200, 100);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(project.tracks[1]!.id, 200, 100, 0, {
     pack,
     packLabel: pack.label,
@@ -206,7 +206,7 @@ it('shows target rect handles for bracket-style callout cards too', () => {
 
 it('uses modern template target support before legacy templateKind fallback', () => {
   const project = createEmptyVideoProject('Modern targets', 200, 100);
-  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY));
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const template = Object.values(APPLE_GLASS_ANNOTATION_PACK.templates)
     .flat()
     .find((candidate) => candidate.id === 'soft-spotlight');

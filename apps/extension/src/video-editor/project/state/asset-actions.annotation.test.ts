@@ -68,7 +68,7 @@ function registerTemplateRefAnnotationInsertionTests() {
 function registerLegacyAnnotationInsertionTests() {
   it('inserts on the explicitly preferred overlay track', () => {
     const project = createEmptyVideoProject('Assets');
-    const preferredTrack = createVideoProjectTrack('Annotations', 0, VideoTrackKind.OVERLAY);
+    const preferredTrack = createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY);
     project.tracks.push(preferredTrack);
 
     const result = addAnnotationOverlayToProject(project, preferredTrack.id, 2.25);

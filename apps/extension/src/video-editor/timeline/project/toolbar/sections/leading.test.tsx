@@ -220,14 +220,14 @@ it('wires track creation from the track header control', () => {
   expect(document.body.textContent).toContain('videoEditor.timeline.addVideoTrackNote');
   expect(document.body.textContent).toContain('videoEditor.timeline.addAudioTrack');
   expect(document.body.textContent).toContain('videoEditor.timeline.addAudioTrackNote');
-  expect(document.body.textContent).toContain('videoEditor.timeline.addOverlayTrack');
-  expect(document.body.textContent).toContain('videoEditor.timeline.addOverlayTrackNote');
+  expect(document.body.textContent).not.toContain('videoEditor.timeline.addOverlayTrack');
+  expect(document.body.textContent).not.toContain('videoEditor.timeline.addOverlayTrackNote');
   expect(document.body.textContent).not.toContain('videoEditor.timeline.addSubtitleTrack');
   expect(
     document.querySelectorAll(
       '.sniptale-toolbar-menu-item[data-ui^="video-editor.timeline.toolbar.add-track."]'
     )
-  ).toHaveLength(3);
+  ).toHaveLength(2);
 
   act(() => {
     getButtonByText('videoEditor.timeline.addAudioTrack').click();
@@ -275,4 +275,32 @@ it('moves zoom creation from the toolbar to the authored zoom lane', () => {
   expect(
     container?.querySelector('[data-ui="video-editor.timeline.toolbar.add-zoom"]')
   ).not.toBeNull();
+});
+
+it('dismisses track choices on captured outside pointerdown without stealing focus', () => {
+  renderLeadingControls();
+  const trigger = getButtonByText('videoEditor.timeline.addTrack');
+  const outside = document.createElement('button');
+  document.body.appendChild(outside);
+  outside.addEventListener('pointerdown', (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+  });
+  try {
+    act(() => trigger.click());
+    outside.focus();
+    act(() =>
+      outside.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true }))
+    );
+    expect(document.querySelector('.sniptale-toolbar-menu')).toBeNull();
+    expect(document.activeElement).toBe(outside);
+    act(() => trigger.click());
+    expect(document.querySelector('.sniptale-toolbar-menu')).not.toBeNull();
+    act(() => trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+    expect(document.querySelector('.sniptale-toolbar-menu')).not.toBeNull();
+    act(() => trigger.click());
+    expect(document.querySelector('.sniptale-toolbar-menu')).toBeNull();
+  } finally {
+    outside.remove();
+  }
 });

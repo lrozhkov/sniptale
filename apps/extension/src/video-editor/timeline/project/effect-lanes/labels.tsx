@@ -142,6 +142,7 @@ function UtilityLaneStateControls(props: {
         />
       ) : null}
       <TimelineIconButton
+        frameless
         active={props.state.visible}
         dataUi="timeline.utility-lane-state"
         icon={props.state.visible ? <Eye size={13} /> : <EyeOff size={13} />}
@@ -154,6 +155,7 @@ function UtilityLaneStateControls(props: {
         stopPropagation
       />
       <TimelineIconButton
+        frameless
         active={props.state.locked}
         dataUi="timeline.utility-lane-state"
         icon={props.state.locked ? <Lock size={13} /> : <Unlock size={13} />}
@@ -165,15 +167,17 @@ function UtilityLaneStateControls(props: {
         onClick={() => props.onToggleUtilityLaneLock(props.lane)}
         stopPropagation
       />
-      <TimelineIconButton
-        danger
-        disabled={props.state.locked}
-        dataUi="video-editor.timeline.clear-utility-lane"
-        icon={<Trash2 size={13} />}
-        title={translate('videoEditor.timeline.clearLane')}
-        onClick={() => props.onClearUtilityLane(props.lane)}
-        stopPropagation
-      />
+      {props.lane !== 'camera' ? (
+        <TimelineIconButton
+          danger
+          disabled={props.state.locked}
+          dataUi="video-editor.timeline.clear-utility-lane"
+          icon={<Trash2 size={13} />}
+          title={translate('videoEditor.timeline.clearLane')}
+          onClick={() => props.onClearUtilityLane(props.lane)}
+          stopPropagation
+        />
+      ) : null}
     </>
   );
 }
