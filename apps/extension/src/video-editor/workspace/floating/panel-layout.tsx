@@ -133,6 +133,9 @@ export function WorkspacePanelDockToggle(props: {
       aria-label={label}
       title={label}
       aria-pressed={props.fullHeight}
+      onPointerDown={(event) => {
+        if (event.button === 0) event.preventDefault();
+      }}
       onClick={props.onToggle}
       dataUi={props.dataUi}
     >

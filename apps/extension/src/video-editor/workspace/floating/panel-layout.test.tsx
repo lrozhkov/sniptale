@@ -2,7 +2,11 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { useWorkspacePanelSizes, WorkspacePanelResizeHandle } from './panel-layout';
+import {
+  useWorkspacePanelSizes,
+  WorkspacePanelResizeHandle,
+  WorkspacePanelDockToggle,
+} from './panel-layout';
 
 let container: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
@@ -138,4 +142,18 @@ it('restores automatic sizing when a resize gesture is cancelled', () => {
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
   resizeFrame(1920);
   expect(width('materials')).toBe(320);
+});
+
+it('prevents pointer docking from blurring an active editor input while retaining activation', () => {
+  const onToggle = vi.fn();
+  act(() =>
+    root.render(<WorkspacePanelDockToggle fullHeight={false} onToggle={onToggle} dataUi="dock" />)
+  );
+  const button = container.querySelector<HTMLButtonElement>('button')!;
+  const down = new MouseEvent('pointerdown', { button: 0, bubbles: true, cancelable: true });
+  act(() => button.dispatchEvent(down));
+  expect(down.defaultPrevented).toBe(true);
+  expect(onToggle).not.toHaveBeenCalled();
+  act(() => button.click());
+  expect(onToggle).toHaveBeenCalledOnce();
 });
