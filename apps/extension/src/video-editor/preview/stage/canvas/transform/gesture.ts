@@ -77,6 +77,7 @@ export function startPreviewTransformGesture(params: PreviewTransformGesturePara
     params.state.finished = true;
     if (params.state.animationFrameId !== null) cancelAnimationFrame(params.state.animationFrameId);
     removeGestureListeners(handleMove, handleUp, handleCancel);
+    window.removeEventListener('keydown', handleKeyDown, true);
     if (reason === 'commit') {
       const transform = updatePreviewTransform(params);
       params.onCommit(params.state.clipId, transform);
@@ -102,11 +103,18 @@ export function startPreviewTransformGesture(params: PreviewTransformGesturePara
     finish(params.state.activated ? 'commit' : 'cancel');
   };
   const handleCancel = () => finish('cancel');
+  const handleKeyDown = (event: KeyboardEvent) => {
+    if (event.key !== 'Escape') return;
+    event.preventDefault();
+    event.stopPropagation();
+    finish('cancel');
+  };
 
   params.onBegin?.(params.state.clipId);
   params.onCacheBypassChange?.(true);
   window.addEventListener('pointermove', handleMove);
   window.addEventListener('pointerup', handleUp);
   window.addEventListener('pointercancel', handleCancel);
+  window.addEventListener('keydown', handleKeyDown, true);
   return handleCancel;
 }
