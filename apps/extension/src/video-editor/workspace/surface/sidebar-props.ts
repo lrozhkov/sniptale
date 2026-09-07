@@ -22,8 +22,6 @@ function getWorkspaceSidebarStateProps(
   WorkspaceSidebarProps,
   | 'activeProjectId'
   | 'collapsed'
-  | 'diagnosticsContent'
-  | 'diagnosticsOpen'
   | 'gridSettings'
   | 'inspectorMode'
   | 'recentColors'
@@ -37,8 +35,6 @@ function getWorkspaceSidebarStateProps(
   return {
     activeProjectId: controller.state.activeProjectId,
     collapsed: controller.state.collapsed,
-    diagnosticsContent: controller.state.diagnosticsContent,
-    diagnosticsOpen: controller.state.diagnosticsOpen,
     gridSettings: controller.state.gridSettings,
     inspectorMode: controller.state.inspectorMode,
     recentColors: controller.state.recentColors,
@@ -130,7 +126,6 @@ function getWorkspaceSidebarProjectEffectProps(
 ): Pick<
   WorkspaceSidebarProps,
   | 'onToggleCollapsed'
-  | 'onToggleDiagnostics'
   | 'onUpdateActionEventDetails'
   | 'onUpdateCursorSampleInterpolation'
   | 'onUpdateCursorSampleSkinOverride'
@@ -149,7 +144,6 @@ function getWorkspaceSidebarProjectEffectProps(
 > {
   return {
     onToggleCollapsed: controller.projectActions.onToggleCollapsed,
-    onToggleDiagnostics: controller.projectActions.onToggleDiagnostics,
     onClearPlacementMode: controller.projectActions.onClearPlacementMode,
     onClearCursorSampleSkinOverride: controller.projectActions.onClearCursorSampleSkinOverride,
     onUpdateActionEventDetails: controller.projectActions.onUpdateActionEventDetails,

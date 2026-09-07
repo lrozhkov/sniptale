@@ -39,7 +39,6 @@ export function createSelectionStateActions(set: VideoEditorStoreSet) {
           : state
       ),
     ...createPlacementStateActions(set),
-    setDiagnosticsOpen: (diagnosticsOpen: boolean) => set({ diagnosticsOpen }),
   };
 }
 

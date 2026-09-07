@@ -6,7 +6,6 @@ import type { VideoEditorState } from './types';
 function createSelectionStore(project = createEmptyVideoProject('Selection')) {
   let state = {
     currentTime: 0,
-    diagnosticsOpen: false,
     error: null,
     exportState: {
       dialogOpen: false,

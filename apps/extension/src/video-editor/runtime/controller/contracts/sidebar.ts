@@ -1,4 +1,3 @@
-import type React from 'react';
 import type { VideoEditorPlacementMode } from '../../../contracts/placement';
 import type { VideoEditorSelection } from '../../../contracts/selection';
 import type { VideoEditorProjectActions } from '../../../contracts/commands/project';
@@ -19,8 +18,6 @@ interface VideoEditorSidebarCommands extends VideoEditorProjectActions, VideoEdi
 interface VideoEditorSidebarState {
   activeProjectId: string;
   collapsed: boolean;
-  diagnosticsContent: React.ReactNode;
-  diagnosticsOpen: boolean;
   gridSettings: {
     color: string;
     enabled: boolean;
@@ -51,6 +48,7 @@ interface VideoEditorSidebarProjectActions {
   onAddActionEvent: (preset: VideoProjectActionPreset) => void;
   onAddMotionRegion: () => void;
   onAddRecording: VideoEditorActionHandlers['handleAddRecording'];
+  onAddLibraryMedia: VideoEditorActionHandlers['handleAddLibraryMedia'];
   onAddTrack: VideoEditorSidebarCommands['addTrack'];
   onApplyEffectDocument: VideoEditorSidebarCommands['applyEffectDocument'];
   onClearCursorSampleSkinOverride: VideoEditorSidebarCommands['clearCursorSampleSkinOverride'];
@@ -90,7 +88,6 @@ interface VideoEditorSidebarProjectActions {
   onStartMotionPathStopPointPlacement: VideoEditorSidebarCommands['startMotionPathStopPointPlacement'];
   onStartObjectTrackAnchorPlacement: VideoEditorSidebarCommands['startObjectTrackAnchorPlacement'];
   onToggleCollapsed: VideoEditorWorkspaceState['toggleSidebarCollapsed'];
-  onToggleDiagnostics: VideoEditorSidebarCommands['setDiagnosticsOpen'];
   onUpdateActionEventDetails: VideoEditorSidebarCommands['updateActionEventDetails'];
   onUpdateCursorSampleInterpolation: VideoEditorSidebarCommands['updateCursorSampleInterpolation'];
   onUpdateCursorSampleSkinOverride: VideoEditorSidebarCommands['updateCursorSampleSkinOverride'];

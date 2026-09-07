@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from 'react';
-import { Film, Image, Library, Trash2, FolderOpen } from 'lucide-react';
+import { Library, Trash2, FolderOpen } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { EmptyState } from '../../../ui/compact-inspector-controls';
@@ -7,7 +7,6 @@ import { useProjectTransitionPending } from '../../runtime/commands/project-tran
 
 type LibraryItemVariant = 'row' | 'card';
 type LibraryItemActionTone = 'neutral' | 'danger' | 'accent';
-type LibraryPreviewFallback = 'project' | 'recording';
 
 function cx(...values: Array<string | false | null | undefined>): string {
   return values.filter(Boolean).join(' ');
@@ -99,41 +98,6 @@ export function LibraryItemMetadataLine({ values }: { values: Array<string | nul
     <p className="truncate text-xs text-[var(--sniptale-color-text-secondary)]">
       {visibleValues.join(' · ')}
     </p>
-  );
-}
-
-export function LibraryPreviewSlot(props: {
-  alt: string;
-  fallback: LibraryPreviewFallback;
-  compact?: boolean;
-  hero?: boolean;
-  thumbnailUrl: string | undefined;
-}) {
-  const Icon = props.fallback === 'project' ? Image : Film;
-  const sizeClassName = props.hero
-    ? 'aspect-video w-full'
-    : props.compact
-      ? 'h-12 w-[4.5rem]'
-      : 'h-16 w-24';
-
-  return (
-    <div
-      className={[
-        'relative shrink-0 overflow-hidden rounded-[8px] border',
-        sizeClassName,
-        'border-[color:var(--sniptale-color-border-soft)]',
-        'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_72%,#000_28%)]',
-      ].join(' ')}
-      data-ui="library-thumbnail"
-    >
-      {props.thumbnailUrl ? (
-        <img className="h-full w-full object-cover" src={props.thumbnailUrl} alt={props.alt} />
-      ) : (
-        <div className="flex h-full w-full items-center justify-center text-[var(--sniptale-color-text-dim)]">
-          <Icon size={20} strokeWidth={1.8} aria-hidden />
-        </div>
-      )}
-    </div>
   );
 }
 

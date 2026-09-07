@@ -20,7 +20,6 @@ import type { VideoEditorState } from './types';
 function createSelectionStore() {
   let state = {
     currentTime: 0,
-    diagnosticsOpen: false,
     error: null,
     exportState: {
       dialogOpen: false,
@@ -152,10 +151,8 @@ function expectPlaybackStateClamp(store: ReturnType<typeof createSelectionStore>
   store.actions.setCurrentTime(999);
   store.actions.setPixelsPerSecond(1);
   store.actions.togglePlaying();
-  store.actions.setDiagnosticsOpen(true);
   expect(store.getState()).toMatchObject({
     currentTime: 0,
-    diagnosticsOpen: true,
     isPlaying: true,
     pixelsPerSecond: 1,
   });

@@ -29,11 +29,8 @@ function createPanelStateProps() {
     inspectorMode: 'selection' as const,
     project: createEmptyVideoProject('Panel content'),
     activeProjectId: 'project-1',
-    diagnosticsMeta: 'Diagnostics',
-    diagnosticsContent: null,
     projectsOpen: false,
     recordingsOpen: false,
-    diagnosticsSectionOpen: false,
     projects: [],
     recordings: [],
     recordingId: null,
@@ -87,7 +84,6 @@ function createPanelActionProps() {
     onUpdateShapeStyle: vi.fn(),
     onToggleProjectsOpen: vi.fn(),
     onToggleRecordingsOpen: vi.fn(),
-    onToggleDiagnosticsSection: vi.fn(),
   };
 }
 

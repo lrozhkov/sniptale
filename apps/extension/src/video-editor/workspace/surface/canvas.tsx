@@ -162,6 +162,22 @@ function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
       <WorkspaceLibraryPanel {...props}>
         {props.materialsOpen && (
           <VideoEditorMaterials
+            onShowUse={(use) => {
+              preview.transport.onPausePlayback();
+              setSourceActive(false);
+              setSelectedAssetId(null);
+              if (use.kind === 'scene') {
+                preview.selection.onSelectScene();
+                if (!props.inspectorPanel.isOpen) props.inspectorPanel.onToggle();
+              }
+              if (use.kind === 'clip') {
+                const clip = preview.project.clips.find((clip) => clip.id === use.clipId);
+                if (clip) {
+                  preview.selection.onSelectClip(clip.id);
+                  preview.transport.onSeek(clip.startTime);
+                }
+              }
+            }}
             onRemoveUnused={removeUnusedAssets}
             onOpenLibrary={() => header?.onOpenLibraryPanel()}
             project={preview.project}

@@ -1,4 +1,4 @@
-import { getTrackJunctions } from '../../../../features/video/project/transition/junctions';
+import { getReachableClipTimingBounds } from './reachable-placement';
 import { clampNumber } from '../../../../features/video/project/timeline/basics';
 import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
 import { getLinkedClipIds, getTrackClips } from '../../../../features/video/project/timeline';
@@ -133,7 +133,7 @@ export function trimProjectClipStart(
   return nextProject;
 }
 
-/** Preserve the ordering of existing overlaps without moving an untouched neighbor. */
+/** Share nearest-neighbor and authored-overlap bounds with playback-rate edits. */
 function getTrimJunctionBounds(
   project: VideoProject,
   clips: EditableClipOperation['affectedClips'],
@@ -142,15 +142,17 @@ function getTrimJunctionBounds(
   let minimum = -Infinity;
   let maximum = Infinity;
   const affectedIds = new Set(clips.map((clip) => clip.id));
-  for (const { leadingClip, trailingClip } of getTrackJunctions(project)) {
-    const leadingMoves = affectedIds.has(leadingClip.id);
-    const trailingMoves = affectedIds.has(trailingClip.id);
-    if (leadingMoves === trailingMoves) continue;
-    const leadingEdge = leadingClip.startTime + (edge === 'end' ? leadingClip.duration : 0);
-    const trailingEdge = trailingClip.startTime + (edge === 'end' ? trailingClip.duration : 0);
-    const availableDelta = Math.max(0, trailingEdge - leadingEdge - 0.1);
-    if (leadingMoves) maximum = Math.min(maximum, availableDelta);
-    else minimum = Math.max(minimum, -availableDelta);
+  for (const clip of clips) {
+    const bounds = getReachableClipTimingBounds(project, clip, affectedIds);
+    const currentEdge = clip.startTime + (edge === 'end' ? clip.duration : 0);
+    minimum = Math.max(
+      minimum,
+      (edge === 'start' ? bounds.minimumStart : bounds.minimumEnd) - currentEdge
+    );
+    maximum = Math.min(
+      maximum,
+      (edge === 'start' ? bounds.maximumStart : bounds.maximumEnd) - currentEdge
+    );
   }
   return { minimum, maximum };
 }

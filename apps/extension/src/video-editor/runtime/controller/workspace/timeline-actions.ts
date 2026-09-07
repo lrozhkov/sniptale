@@ -7,7 +7,7 @@ import { VideoProjectInteractionTimeBasis } from '../../../../features/video/pro
 import type { VideoEditorRuntimeController } from '../../session';
 import type {
   ClipSelectionPort,
-  DiagnosticsTelemetryPort,
+  RecordingTelemetryPort,
   HistoryPort,
   ProjectLifecyclePort,
   TimelineEditingPort,
@@ -29,7 +29,7 @@ type SelectedClipActions = {
 
 type TimelineActionStore = TimelineEditingPort &
   ClipSelectionPort &
-  Pick<DiagnosticsTelemetryPort, 'toggleTelemetryLaneVisibility'> &
+  Pick<RecordingTelemetryPort, 'toggleTelemetryLaneVisibility'> &
   Pick<
     HistoryPort,
     | 'beginProjectHistoryTransaction'

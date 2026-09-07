@@ -16,12 +16,6 @@ const CAST_CLEANUP_LOCAL_OWNER_MAPPING_ENTRIES = [
     testFiles: ['apps/extension/src/editor/chrome/tool-icons.test.tsx'],
   },
   {
-    owner: 'video-editor-diagnostics-panel-action-text',
-    productionFile: 'apps/extension/src/video-editor/diagnostics/panel/action-text.ts',
-    reason: 'Diagnostics action text parsing is covered by action text tests.',
-    testFiles: ['apps/extension/src/video-editor/diagnostics/panel/action-text.test.ts'],
-  },
-  {
     owner: 'video-editor-effects-library-state',
     productionFile: 'apps/extension/src/video-editor/library/effects-dock/index.tsx',
     reason: 'Effects library state and counts are covered by dock tests.',

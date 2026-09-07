@@ -64,22 +64,14 @@ function renderPanel(isOpen: boolean) {
   act(() => {
     root?.render(
       <VideoEditorLibraryPanel
-        activeProjectId=""
-        diagnosticsContent={null}
-        diagnosticsOpen={false}
         isOpen={isOpen}
-        onAddRecording={vi.fn()}
+        savedViews={[]}
+        items={[]}
+        loading={false}
+        error={null}
+        onRefresh={vi.fn(async () => undefined)}
+        onAddMedia={vi.fn(async () => undefined)}
         onClose={vi.fn()}
-        onCreateProject={vi.fn()}
-        onDeleteProject={vi.fn()}
-        onImportAudio={vi.fn()}
-        onImportImage={vi.fn()}
-        onImportVideo={vi.fn()}
-        onOpenProject={vi.fn()}
-        onToggleDiagnostics={vi.fn()}
-        projects={[]}
-        recordingId={null}
-        recordings={[]}
       />
     );
   });

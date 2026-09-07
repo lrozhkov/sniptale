@@ -149,6 +149,7 @@ function createSidebarProjectActions() {
     onAddActionEvent: vi.fn(),
     onApplyEffectDocument: vi.fn(() => 'template-instance-1'),
     onAddRecording: vi.fn(),
+    onAddLibraryMedia: vi.fn(async () => undefined),
     onCreateProject: vi.fn(),
     onDeleteProject: vi.fn(),
     onEnableCursorTrack: vi.fn(),
@@ -161,7 +162,6 @@ function createSidebarProjectActions() {
     onResizeProject: vi.fn(),
     onSetSceneBackground: vi.fn(),
     onToggleCollapsed: vi.fn(),
-    onToggleDiagnostics: vi.fn(),
     onUpdateCursorSkin: vi.fn(),
   };
 }
@@ -170,8 +170,6 @@ function createSidebarState() {
   return {
     activeProjectId: 'project-1',
     collapsed: true,
-    diagnosticsContent: 'diagnostics',
-    diagnosticsOpen: false,
     gridSettings: {
       color: '#94a3b8',
       enabled: false,
@@ -285,15 +283,12 @@ function expectWorkspaceMarkup(markup: string) {
 function verifyWorkspaceMainRouting() {
   hookMocks.controller = createWorkspaceController();
   const markup = renderToStaticMarkup(
-    <VideoEditorWorkspaceMain
-      diagnosticsContent="diagnostics"
-      previewHeightStyle={{ height: '280px' }}
-    />
+    <VideoEditorWorkspaceMain previewHeightStyle={{ height: '280px' }} />
   );
 
   expect(markup).not.toContain('data-ui="video-editor.floating-workspace"');
   expect(markup).toContain('video-editor.library-tab.effects');
-  expect(inspectorSpy.mock.calls[0]?.[0]).toMatchObject({ diagnosticsContent: 'diagnostics' });
+  expect(inspectorSpy.mock.calls[0]?.[0]).not.toHaveProperty('diagnosticsContent');
   expect(markup).toContain('data-ui="video-editor.workspace.upper"');
   expect(markup).not.toContain('pr-[calc(var(--video-editor-inspector-width)');
   expect(previewSpy.mock.calls[0]?.[0]).toMatchObject({
@@ -347,7 +342,7 @@ it('releases Source input ownership when Undo removes its source asset', async (
   const root = createRoot(container);
   try {
     await act(async () => {
-      root.render(<VideoEditorWorkspaceMain diagnosticsContent={null} previewHeightStyle={{}} />);
+      root.render(<VideoEditorWorkspaceMain previewHeightStyle={{}} />);
     });
     expect(hookMocks.setSourceActive).toHaveBeenCalledWith(false);
   } finally {
@@ -393,8 +388,7 @@ it('continues measuring the visible frame after switching projects', async () =>
   const container = document.createElement('div');
   document.body.append(container);
   const root = createRoot(container);
-  const render = () =>
-    root.render(<VideoEditorWorkspaceMain diagnosticsContent={null} previewHeightStyle={{}} />);
+  const render = () => root.render(<VideoEditorWorkspaceMain previewHeightStyle={{}} />);
   try {
     hookMocks.controller = createWorkspaceController();
     await act(async () => render());
@@ -426,24 +420,17 @@ it('continues measuring the visible frame after switching projects', async () =>
   }
 });
 
-it('routes every library file import into materials', () => {
+it('routes library media insertion to the awaited materials command', async () => {
   const actions = createSidebarProjectActions();
   hookMocks.controller = {
     ...createWorkspaceController(),
     sidebar: createSidebarController(actions),
   };
   libraryPanelSpy.mockClear();
-  renderToStaticMarkup(
-    <VideoEditorWorkspaceMain diagnosticsContent={null} previewHeightStyle={{}} />
-  );
+  renderToStaticMarkup(<VideoEditorWorkspaceMain previewHeightStyle={{}} />);
   const props = libraryPanelSpy.mock.calls[0]![0];
-  const file = new File(['source'], 'source.webm');
-  props.onImportVideo(file);
-  props.onImportAudio(file);
-  props.onImportImage(file);
-  for (const callback of [actions.onImportVideo, actions.onImportAudio, actions.onImportImage]) {
-    expect(callback).toHaveBeenCalledWith(file, { destination: 'materials' });
-  }
+  await props.onAddMedia('library-image');
+  expect(actions.onAddLibraryMedia).toHaveBeenCalledWith('library-image');
 });
 
 it('binds the recording modal save to the captured track destination', async () => {
@@ -451,9 +438,7 @@ it('binds the recording modal save to the captured track destination', async () 
   const target = { projectId: 'project', trackId: 'voice', startTime: 7 };
   controller.layout.audioRecordingTarget = target;
   hookMocks.controller = controller;
-  renderToStaticMarkup(
-    <VideoEditorWorkspaceMain diagnosticsContent={null} previewHeightStyle={{}} />
-  );
+  renderToStaticMarkup(<VideoEditorWorkspaceMain previewHeightStyle={{}} />);
   const props = audioRecordingModalSpy.mock.lastCall![0];
   const file = new File(['voice'], 'voice.webm');
   const trim = { trimStart: 1, trimEnd: 4 };

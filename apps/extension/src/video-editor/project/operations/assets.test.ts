@@ -5,11 +5,25 @@ import { createEmptyVideoProject } from '../../../features/video/project/factori
 import { VideoProjectAssetType } from '../../../features/video/project/types';
 
 const getRecordingMock = vi.fn();
+const getMediaLibraryEntryMock = vi.fn();
+const getMediaAssetBlobMock = vi.fn();
+const getAggregatePresentationMock = vi.fn();
 const saveProjectAssetSafelyMock = vi.fn();
 const loadAudioMetadataMock = vi.fn();
 const loadImageMetadataMock = vi.fn();
 const loadVideoMetadataMock = vi.fn();
 const projectAssetId = '00000000-0000-4000-8000-000000000001';
+
+vi.mock('../../../composition/persistence/media-library/index', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/media-library/index')
+  >()),
+  getMediaLibraryEntry: getMediaLibraryEntryMock,
+  getMediaAssetBlob: getMediaAssetBlobMock,
+}));
+vi.mock('../../../composition/persistence/aggregate-presentations', () => ({
+  getAggregatePresentation: getAggregatePresentationMock,
+}));
 
 vi.mock('../../../composition/persistence/recordings/index', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/recordings/index')>()),
@@ -31,6 +45,99 @@ describe('project asset helpers', () => {
   beforeEach(setupProjectAssetHelpersTest);
 
   it('copies recording assets into project-owned storage', verifyRecordingAssetCopy);
+
+  it('copies the current edited image and reuses the project copy on repeat insertion', async () => {
+    const { ensureLibraryMediaAsset } = await import('./assets');
+    const file = createPngFile();
+    getMediaLibraryEntryMock.mockResolvedValue({
+      id: 'library-image',
+      kind: 'screenshot',
+      source: { kind: 'screenshot' },
+      filename: 'edited.png',
+      workspaceRevision: 3,
+    });
+    getAggregatePresentationMock.mockResolvedValue({ presentationRevision: 3, previewBlob: file });
+    const project = createEmptyVideoProject('Image copy');
+    const asset = await ensureLibraryMediaAsset(project, 'library-image');
+    expect(asset).toMatchObject({
+      name: 'edited.png',
+      type: VideoProjectAssetType.IMAGE,
+      source: { kind: 'project-asset', projectAssetId, originMediaId: 'library-image' },
+    });
+    expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
+    expect(saveProjectAssetSafelyMock).toHaveBeenCalledOnce();
+    expect(project.assets).toHaveLength(0);
+    if (!asset) throw new Error('Missing asset');
+    project.assets.push(asset);
+    getMediaLibraryEntryMock.mockResolvedValue(undefined);
+    expect(await ensureLibraryMediaAsset(project, 'library-image')).toBe(asset);
+    expect(saveProjectAssetSafelyMock).toHaveBeenCalledOnce();
+    expect(getMediaLibraryEntryMock).toHaveBeenCalledOnce();
+  });
+
+  it.each([undefined, { presentationRevision: 2 }, { presentationRevision: 3 }])(
+    'rejects unavailable or stale image presentation without falling back to original: %j',
+    async (presentation) => {
+      const { ensureLibraryMediaAsset } = await import('./assets');
+      getMediaLibraryEntryMock.mockResolvedValue({
+        kind: 'image',
+        source: { kind: 'screenshot' },
+        workspaceRevision: 3,
+      });
+      getAggregatePresentationMock.mockResolvedValue(presentation);
+      await expect(ensureLibraryMediaAsset(createEmptyVideoProject(), 'image')).rejects.toThrow();
+      expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
+      expectNoImportSideEffects();
+    }
+  );
+
+  it('preserves recording identity when adding from the media library', async () => {
+    const { ensureLibraryMediaAsset } = await import('./assets');
+    mockRecordingEntry();
+    getMediaLibraryEntryMock.mockResolvedValue({
+      kind: 'recording',
+      source: { kind: 'recording', recordingId: 'recording-1' },
+    });
+    const project = createEmptyVideoProject();
+    const asset = await ensureLibraryMediaAsset(project, 'library-recording');
+    expect(asset).toMatchObject({
+      type: VideoProjectAssetType.RECORDING,
+      source: { originRecordingId: 'recording-1' },
+    });
+    if (!asset) throw new Error('Missing asset');
+    project.assets.push(asset);
+    expect(await ensureLibraryMediaAsset(project, 'library-recording')).toBe(asset);
+    expect(saveProjectAssetSafelyMock).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    undefined,
+    { kind: 'audio', source: { kind: 'project-asset' } },
+    { kind: 'web-archive', source: { kind: 'web-snapshot' } },
+  ])('rejects missing and unsupported library entries before copying: %j', async (entry) => {
+    const { ensureLibraryMediaAsset } = await import('./assets');
+    getMediaLibraryEntryMock.mockResolvedValue(entry);
+    await expect(ensureLibraryMediaAsset(createEmptyVideoProject(), 'missing')).rejects.toThrow();
+    expect(getMediaAssetBlobMock).not.toHaveBeenCalled();
+    expectNoImportSideEffects();
+  });
+
+  it('validates exported video bytes and propagates storage failure without changing the project', async () => {
+    const { ensureLibraryMediaAsset } = await import('./assets');
+    const project = createEmptyVideoProject();
+    getMediaLibraryEntryMock.mockResolvedValue({
+      kind: 'export',
+      source: { kind: 'project-export' },
+      filename: 'export.webm',
+    });
+    getMediaAssetBlobMock.mockResolvedValue(new Blob(['invalid'], { type: 'video/webm' }));
+    await expect(ensureLibraryMediaAsset(project, 'export')).rejects.toThrow();
+    expectNoImportSideEffects();
+    getMediaAssetBlobMock.mockResolvedValue(createWebmFile());
+    saveProjectAssetSafelyMock.mockRejectedValueOnce(new Error('Storage full'));
+    await expect(ensureLibraryMediaAsset(project, 'export')).rejects.toThrow('Storage full');
+    expect(project.assets).toHaveLength(0);
+  });
 
   it('rejects oversized image imports before metadata loading starts', verifyOversizedImport);
 

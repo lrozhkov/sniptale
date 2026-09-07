@@ -27,7 +27,7 @@ export async function renderPreviewSceneWithExactCache(params: {
   cache: VideoPreviewExactFrameCache;
   job: PreviewRenderParams;
   render: typeof renderPreviewScene;
-}): Promise<void> {
+}): Promise<void | false> {
   const { job } = params;
   if (
     job.previewMode !== 'cache' ||
@@ -35,8 +35,7 @@ export async function renderPreviewSceneWithExactCache(params: {
     !job.renderRevision ||
     !job.previewRasterSize
   ) {
-    await params.render(job);
-    return;
+    return params.render(job);
   }
   const renderRevision = await job.renderRevision;
   if (job.signal?.aborted) return;
@@ -50,7 +49,8 @@ export async function renderPreviewSceneWithExactCache(params: {
   const cached = params.cache.get(key);
   if (cached && presentCachedFrame(job.canvas, cached)) return;
 
-  await params.render(job);
+  const presented = await params.render(job);
+  if (presented === false) return false;
   if (job.signal?.aborted || typeof createImageBitmap !== 'function') return;
   const bitmap = await createImageBitmap(job.canvas);
   if (job.signal?.aborted) {

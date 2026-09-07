@@ -51,7 +51,6 @@ export interface UseVideoEditorRuntimeParams {
     setReady: VideoEditorSessionActions['setReady'];
     setError: VideoEditorSessionActions['setError'];
     setSaveState: VideoEditorSessionActions['setSaveState'];
-    setDiagnosticsOpen: VideoEditorSessionActions['setDiagnosticsOpen'];
   };
   exportState: {
     getActiveJobId: () => string | null;

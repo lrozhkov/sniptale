@@ -9,7 +9,7 @@ import {
 } from '../../../features/video/project/factories/creation';
 import { VideoProjectAssetType, VideoTrackKind } from '../../../features/video/project/types';
 import { useAssetHandlers } from './assets';
-import { ensureRecordingAsset } from '../../project/operations/ops';
+import { ensureLibraryMediaAsset, ensureRecordingAsset } from '../../project/operations/ops';
 
 const { deleteProjectAssetMock, importProjectAssetMock, toastErrorMock } = vi.hoisted(() => ({
   toastErrorMock: vi.fn(),
@@ -31,6 +31,7 @@ vi.mock('../../project/operations/ops', async (importOriginal) => {
   return {
     ...actual,
     ensureRecordingAsset: vi.fn(),
+    ensureLibraryMediaAsset: vi.fn(),
     importProjectAsset: importProjectAssetMock,
   };
 });
@@ -222,6 +223,62 @@ async function verifyStaleImportCleanup() {
 }
 
 describe('library material import', () => {
+  it('coalesces concurrent library insertion and never places a timeline clip', async () => {
+    const params = createParams();
+    const asset = await importProjectAssetMock();
+    vi.mocked(ensureLibraryMediaAsset).mockResolvedValue(asset);
+    renderHook(params);
+    const first = latestHandlers!.handleAddLibraryMedia('library-image');
+    const second = latestHandlers!.handleAddLibraryMedia('library-image');
+    expect(second).toBe(first);
+    await act(async () => first);
+    expect(ensureLibraryMediaAsset).toHaveBeenCalledOnce();
+    expect(params.upsertAsset).toHaveBeenCalledExactlyOnceWith(asset);
+    expect(params.addAssetClip).not.toHaveBeenCalled();
+  });
+
+  it('propagates library insertion failure and allows retry', async () => {
+    const params = createParams();
+    const asset = await importProjectAssetMock();
+    vi.mocked(ensureLibraryMediaAsset).mockRejectedValueOnce(new Error('Unavailable'));
+    renderHook(params);
+    await expect(latestHandlers!.handleAddLibraryMedia('image')).rejects.toThrow('Unavailable');
+    expect(params.upsertAsset).not.toHaveBeenCalled();
+    vi.mocked(ensureLibraryMediaAsset).mockResolvedValueOnce(asset);
+    await act(async () => latestHandlers!.handleAddLibraryMedia('image'));
+    expect(params.upsertAsset).toHaveBeenCalledExactlyOnceWith(asset);
+  });
+
+  it.each(['switch', 'unmount'])('cleans a new library copy after %s', async (reason) => {
+    const params = createParams();
+    const asset = await importProjectAssetMock();
+    vi.mocked(ensureLibraryMediaAsset).mockResolvedValueOnce(asset);
+    renderHook(params);
+    const pending = latestHandlers!.handleAddLibraryMedia('image');
+    if (reason === 'switch') params.getCurrentProjectId = () => 'other-project';
+    else
+      act(() => {
+        root?.unmount();
+        root = null;
+      });
+    await expect(pending).rejects.toThrow();
+    expect(deleteProjectAssetMock).toHaveBeenCalledExactlyOnceWith('asset-1');
+    expect(params.upsertAsset).not.toHaveBeenCalled();
+  });
+
+  it('retains an existing library copy after target changes', async () => {
+    const params = createParams();
+    const asset = await importProjectAssetMock();
+    params.getCurrentProject()!.assets.push(asset);
+    vi.mocked(ensureLibraryMediaAsset).mockResolvedValueOnce(asset);
+    renderHook(params);
+    const pending = latestHandlers!.handleAddLibraryMedia('image');
+    params.getCurrentProjectId = () => 'other-project';
+    await expect(pending).rejects.toThrow();
+    expect(deleteProjectAssetMock).not.toHaveBeenCalled();
+    expect(params.upsertAsset).not.toHaveBeenCalled();
+  });
+
   it('adds the recording to materials without placing any clip', async () => {
     const params = createParams();
     const asset = await importProjectAssetMock();

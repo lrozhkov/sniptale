@@ -1133,18 +1133,6 @@
       "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
     },
     {
-      "file": "apps/extension/src/video-editor/diagnostics/action-text/formatters.test.ts",
-      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
-      "rule": "manual-mock-export-parity",
-      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
-    },
-    {
-      "file": "apps/extension/src/video-editor/diagnostics/panel/useDiagnosticsPanelExports.test.tsx",
-      "message": "Mock for apps/extension/src/platform/i18n/index.ts is missing exports: DEFAULT_LOCALE, FALLBACK_LOCALE, SUPPORTED_LOCALES, compareStrings, createTranslator, formatDateTime, formatNumber, getCurrentLocale, getDictionary, getStoredLocalePreference, setLocalePreference, subscribeToLocaleChanges, useAppLocale, usePageLocaleMetadata. Add explicit stubs or use an importOriginal partial mock.",
-      "rule": "manual-mock-export-parity",
-      "noiseId": "noise.mock-export-parity.intentional-closed-mocks"
-    },
-    {
       "file": "apps/extension/src/video-editor/export/dialog/capability-state.test.tsx",
       "message": "Mock for apps/extension/src/video-editor/project/operations/ops.ts is missing exports: cancelProjectExport, createBlankProject, deletePersistedProject, ensureRecordingAsset, importProjectAsset, loadInitialProjectFromLocation, openPersistedProject, startProjectExport. Add explicit stubs or use an importOriginal partial mock.",
       "rule": "manual-mock-export-parity",

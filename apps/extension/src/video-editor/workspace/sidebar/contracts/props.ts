@@ -1,5 +1,4 @@
 import type { VideoEditorProjectActions } from '../../../contracts/commands/project';
-import type { ReactNode } from 'react';
 import type {
   VideoProjectAnnotationStylePatch,
   VideoProjectAnnotationTemplatePatch,
@@ -35,8 +34,6 @@ import type { ProjectListItem, RecordingListItem } from '../../../library/contra
 export interface WorkspaceSidebarProps {
   activeProjectId: string;
   collapsed: boolean;
-  diagnosticsContent: ReactNode;
-  diagnosticsOpen: boolean;
   gridSettings: WorkspaceSidebarGridSettings;
   inspectorMode: VideoEditorInspectorMode;
   onAddActionEvent: (preset: VideoProjectActionPreset) => void;
@@ -86,7 +83,6 @@ export interface WorkspaceSidebarProps {
   onStartMotionPathStopPointPlacement?: (motionRegionId: string, stopId: string) => void;
   onStartObjectTrackAnchorPlacement?: (objectTrackId: string) => void;
   onToggleCollapsed: () => void;
-  onToggleDiagnostics: (open: boolean) => void;
   onUpdateActionEventDetails?: (
     actionEventId: string,
     patch: Partial<

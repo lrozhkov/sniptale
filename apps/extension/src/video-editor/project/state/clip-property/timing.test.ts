@@ -89,6 +89,39 @@ describe('video editor clip timing actions', () => {
 });
 
 describe('video editor clip timing valid updates', () => {
+  it('stops a slowdown at the nearest neighbor and keeps selection and boundary requests stable', () => {
+    const store = createTimingStore();
+    const project = createProjectWithVideoClip();
+    project.clips.push({ ...project.clips[1]!, id: 'third', startTime: 10 });
+    store.getState().setProject(project);
+    store.getState().selectClip('clip-1');
+    const neighbors = store.getState().project!.clips.slice(1);
+    store.getState().updateClipPlaybackRate('clip-1', 0.1);
+    const stopped = store.getState();
+    expect(stopped.project?.clips[0]).toMatchObject({
+      playbackRate: 0.8,
+      duration: 5,
+      sourceDuration: 4,
+    });
+    expect(stopped.project?.clips.slice(1)).toEqual(neighbors);
+    expect(stopped.selection).toEqual({ kind: 'clip', clipId: 'clip-1' });
+    expect(stopped.projectHistory.past).toHaveLength(1);
+    store.getState().updateClipPlaybackRate('clip-1', 0.1);
+    expect(store.getState().project).toBe(stopped.project);
+    expect(store.getState().projectHistory).toBe(stopped.projectHistory);
+    store.getState().updateClipPlaybackRate('clip-1', 2);
+    expect(store.getState().project?.clips[0]?.duration).toBe(2);
+  });
+
+  it('does not constrain slowdown by another logical lane', () => {
+    const store = createTimingStore();
+    const project = createProjectWithVideoClip();
+    project.clips[1]!.timelineLaneId = 'line-2';
+    store.getState().setProject(project);
+    store.getState().updateClipPlaybackRate('clip-1', 0.1);
+    expect(store.getState().project?.clips[0]?.duration).toBe(40);
+  });
+
   it('applies bounded fade, playback-rate, and transition updates for valid clips', () => {
     vi.spyOn(Date, 'now').mockReturnValue(400);
     const store = createTimingStore();
@@ -122,7 +155,21 @@ describe('video editor clip timing valid updates', () => {
 
     store.getState().updateClipPlaybackRate('clip-1', 0);
     const rateClip = store.getState().project?.clips[0];
-    expect(rateClip && 'playbackRate' in rateClip ? rateClip.playbackRate : null).toBe(0.1);
-    expect(rateClip?.duration).toBeCloseTo(40, 5);
+    expect(rateClip && 'playbackRate' in rateClip ? rateClip.playbackRate : null).toBe(0.8);
+    expect(rateClip?.duration).toBeCloseTo(5, 5);
   });
+});
+
+it('keeps both ends reachable when speed changes inside an authored overlap', () => {
+  const store = createTimingStore();
+  const project = createProjectWithVideoClip();
+  project.clips[1]!.startTime = 4;
+  store.getState().setProject(project);
+  store.getState().updateClipPlaybackRate('clip-1', 0.1);
+  const leading = store.getState().project!.clips[0]!;
+  expect(leading.startTime + leading.duration).toBeCloseTo(5.9);
+  store.getState().setProject(project);
+  store.getState().updateClipPlaybackRate('clip-2', 16);
+  const trailing = store.getState().project!.clips[1]!;
+  expect(trailing.startTime + trailing.duration).toBeCloseTo(5.1);
 });

@@ -1,4 +1,4 @@
-import { useContext, useMemo, type Context, type ReactNode } from 'react';
+import { useContext, useMemo, type Context } from 'react';
 import { syncProjectSceneBackground } from '../../../../features/video/project/scene/background';
 import { getSaveStateMeta } from '../../app-model/utils';
 import type { VideoEditorActionHandlers } from '../../commands';
@@ -18,7 +18,7 @@ import {
   getCurrentVideoEditorCurrentTime,
   useVideoEditorAnnotationEditingPort,
   useVideoEditorClipSelectionPort,
-  useVideoEditorDiagnosticsTelemetryPort,
+  useVideoEditorRecordingTelemetryPort,
   useVideoEditorEffectEditingPort,
   useVideoEditorExportPort,
   useVideoEditorHistoryPort,
@@ -28,7 +28,6 @@ import {
   useVideoEditorTimelineEditingPort,
 } from '../store';
 import {
-  createWorkspaceDiagnosticsController,
   createWorkspaceHeaderController,
   createWorkspaceLayoutController,
   createWorkspacePreviewController,
@@ -105,6 +104,7 @@ function useRuntimeControllerFromContexts(): VideoEditorRuntimeController {
 function useSidebarCommandHandlers(): Pick<
   VideoEditorActionHandlers,
   | 'handleAddRecording'
+  | 'handleAddLibraryMedia'
   | 'handleCreateProject'
   | 'handleDeleteProject'
   | 'handleImportAudio'
@@ -141,9 +141,6 @@ export function useVideoEditorOverlaysController() {
 }
 
 export function useVideoEditorCommandPaletteController() {
-  const diagnostics = useVideoEditorDiagnosticsTelemetryPort(
-    ({ diagnosticsOpen, setDiagnosticsOpen }) => ({ diagnosticsOpen, setDiagnosticsOpen })
-  );
   const playback = useVideoEditorPlaybackPort(({ currentTime, isPlaying }) => ({
     currentTime,
     isPlaying,
@@ -162,7 +159,6 @@ export function useVideoEditorCommandPaletteController() {
   return createVideoEditorCommandPaletteController({
     runtime,
     store: {
-      ...diagnostics,
       ...playback,
       ...selection,
       ...timeline,
@@ -177,14 +173,6 @@ export function useVideoEditorHistoryController() {
   const history = useVideoEditorHistoryPort((port) => port);
   const blockingOverlayOpen = useVideoEditorBlockingOverlayContext();
   return createVideoEditorHistoryController(history, !blockingOverlayOpen);
-}
-
-export function useVideoEditorDiagnosticsController() {
-  const diagnostics = useVideoEditorDiagnosticsTelemetryPort(
-    ({ diagnosticsOpen, setDiagnosticsOpen }) => ({ diagnosticsOpen, setDiagnosticsOpen })
-  );
-  const recordingId = useVideoEditorProjectLifecyclePort((port) => port.recordingId);
-  return createWorkspaceDiagnosticsController({ ...diagnostics, recordingId });
 }
 
 export function useVideoEditorLayoutController() {
@@ -282,7 +270,7 @@ export function useVideoEditorPreviewController() {
   );
 }
 
-export function useVideoEditorSidebarController(diagnosticsContent: ReactNode) {
+export function useVideoEditorSidebarController() {
   const project = usePresentedProject();
   const lifecycle = useVideoEditorProjectLifecyclePort(({ project, recordingId }) => ({
     project,
@@ -290,7 +278,7 @@ export function useVideoEditorSidebarController(diagnosticsContent: ReactNode) {
   }));
   const annotation = useVideoEditorAnnotationEditingPort((port) => port);
   const selection = useVideoEditorClipSelectionPort((port) => port);
-  const diagnostics = useVideoEditorDiagnosticsTelemetryPort((port) => port);
+  const telemetry = useVideoEditorRecordingTelemetryPort((port) => port);
   const effects = useVideoEditorEffectEditingPort((port) => port);
   const session = useVideoEditorRuntimeSessionPort((port) => port);
   const timeline = useVideoEditorTimelineEditingPort((port) => port);
@@ -310,7 +298,7 @@ export function useVideoEditorSidebarController(diagnosticsContent: ReactNode) {
   const store = {
     ...annotation,
     ...selection,
-    ...diagnostics,
+    ...telemetry,
     ...effects,
     ...session,
     ...timeline,
@@ -321,7 +309,7 @@ export function useVideoEditorSidebarController(diagnosticsContent: ReactNode) {
     getCurrentTime: getCurrentVideoEditorCurrentTime,
   });
   return createWorkspaceSidebarController(
-    { actions, diagnosticsContent, libraries, selections, store, workspace },
+    { actions, libraries, selections, store, workspace },
     project,
     projectUpdaters
   );
@@ -331,7 +319,7 @@ export function useVideoEditorTimelineController() {
   const lifecycle = useVideoEditorProjectLifecyclePort((port) => port.project);
   const playback = useVideoEditorPlaybackPort((port) => port);
   const selection = useVideoEditorClipSelectionPort((port) => port);
-  const diagnostics = useVideoEditorDiagnosticsTelemetryPort(
+  const telemetry = useVideoEditorRecordingTelemetryPort(
     ({ recordingTelemetry, telemetryLaneVisible, toggleTelemetryLaneVisibility }) => ({
       recordingTelemetry,
       telemetryLaneVisible,
@@ -358,7 +346,7 @@ export function useVideoEditorTimelineController() {
     ...playback,
     ...annotation,
     ...selection,
-    ...diagnostics,
+    ...telemetry,
     ...effects,
     ...history,
     ...timeline,

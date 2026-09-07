@@ -31,7 +31,6 @@ export interface VideoEditorOverlaysController {
 }
 
 export interface VideoEditorCommandPaletteController {
-  diagnosticsOpen: boolean;
   isPlaying: boolean;
   leftSidebarCollapsed: boolean;
   onAddShapeOverlay: VideoEditorProjectActions['addShapeOverlay'];
@@ -41,7 +40,6 @@ export interface VideoEditorCommandPaletteController {
   onOpenExportDialog: VideoEditorExportActions['openExportDialog'];
   onSplitSelectedClip: () => void;
   selectedClipId: string | null;
-  toggleDiagnostics: () => void;
   togglePlaying: VideoEditorRuntimeController['togglePlayback'];
   toggleSidebarCollapsed: VideoEditorWorkspaceState['toggleSidebarCollapsed'];
 }

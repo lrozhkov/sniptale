@@ -7,11 +7,6 @@ const mainSpy = vi.fn();
 
 vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../runtime/controller/composition/hooks')>()),
-  useVideoEditorDiagnosticsController: () => ({
-    isOpen: false,
-    onClose: vi.fn(),
-    recordingId: null,
-  }),
   useVideoEditorLayoutController: () => ({ previewPaneHeight: 300 }),
   useVideoEditorOverlaysController: () => ({
     exportDialog: {},
@@ -39,13 +34,14 @@ describe('VideoEditorWorkspace', () => {
     mainSpy.mockReset();
   });
 
-  it('passes narrowed overlay and workspace slices plus diagnostics content', () => {
+  it('passes narrowed overlay and workspace slices without diagnostics content', () => {
     const markup = renderToStaticMarkup(<VideoEditorWorkspace />);
 
     expect(markup).toContain('data-ui="video-editor.workspace.root"');
     expect(markup).toContain('data-ui="video-editor.workspace.backdrop"');
     expect(overlaysSpy).toHaveBeenCalledTimes(1);
     expect(mainSpy).toHaveBeenCalledTimes(1);
+    expect(mainSpy.mock.calls[0]?.[0]).not.toHaveProperty('diagnosticsContent');
     expect(mainSpy.mock.calls[0]?.[0]).toMatchObject({
       previewHeightStyle: { height: '300px' },
     });

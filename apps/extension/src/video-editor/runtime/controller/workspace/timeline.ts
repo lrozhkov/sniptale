@@ -3,7 +3,7 @@ import type { VideoEditorRuntimeController } from '../../session';
 import type {
   AnnotationEditingPort,
   ClipSelectionPort,
-  DiagnosticsTelemetryPort,
+  RecordingTelemetryPort,
   EffectEditingPort,
   HistoryPort,
   PlaybackPort,
@@ -51,7 +51,7 @@ function createWorkspaceTimelineActions(
   store: TimelineEditingPort &
     AnnotationEditingPort &
     ClipSelectionPort &
-    Pick<DiagnosticsTelemetryPort, 'toggleTelemetryLaneVisibility'> &
+    Pick<RecordingTelemetryPort, 'toggleTelemetryLaneVisibility'> &
     HistoryPort &
     Pick<ProjectLifecyclePort, 'project' | 'setError'>,
   runtime: VideoEditorRuntimeController,
@@ -74,7 +74,7 @@ function createWorkspaceTimelineState(
   store: TimelineEditingPort &
     ClipSelectionPort &
     PlaybackPort &
-    Pick<DiagnosticsTelemetryPort, 'recordingTelemetry' | 'telemetryLaneVisible'> &
+    Pick<RecordingTelemetryPort, 'recordingTelemetry' | 'telemetryLaneVisible'> &
     Pick<ProjectLifecyclePort, 'project'>,
   runtime: VideoEditorRuntimeController,
   project: NonNullable<ProjectLifecyclePort['project']>,
@@ -109,7 +109,7 @@ export function createWorkspaceTimelineController(
     PlaybackPort &
     EffectEditingPort &
     Pick<
-      DiagnosticsTelemetryPort,
+      RecordingTelemetryPort,
       'recordingTelemetry' | 'telemetryLaneVisible' | 'toggleTelemetryLaneVisibility'
     > &
     Pick<ProjectLifecyclePort, 'project' | 'setError'>,

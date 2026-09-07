@@ -15,7 +15,7 @@ import {
   getCurrentVideoEditorProjectSnapshot,
   getCurrentVideoEditorSelectedClipId,
   useVideoEditorClipSelectionPort,
-  useVideoEditorDiagnosticsTelemetryPort,
+  useVideoEditorRecordingTelemetryPort,
   useVideoEditorExportPort,
   useVideoEditorHistoryPort,
   useVideoEditorPlaybackPort,
@@ -55,7 +55,7 @@ function useVideoEditorRuntimeComposition(
   const history = useVideoEditorHistoryPort((port) => port);
   const exportPort = useVideoEditorExportPort((port) => port);
   const session = useVideoEditorRuntimeSessionPort((port) => port);
-  const telemetry = useVideoEditorDiagnosticsTelemetryPort((port) => port);
+  const telemetry = useVideoEditorRecordingTelemetryPort((port) => port);
   const selections = useVideoEditorSelections(
     lifecycle.project,
     selection.selection,
@@ -122,7 +122,6 @@ function useVideoEditorRuntimeComposition(
       setReady: lifecycle.setReady,
       setError: lifecycle.setError,
       setSaveState: lifecycle.setSaveState,
-      setDiagnosticsOpen: telemetry.setDiagnosticsOpen,
     },
     exportState: {
       getActiveJobId: getCurrentVideoEditorExportJobId,

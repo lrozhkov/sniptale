@@ -55,6 +55,7 @@ vi.mock('../media-metadata', () => ({
 }));
 
 vi.mock('./assets', () => ({
+  ensureLibraryMediaAsset: vi.fn(),
   ensureRecordingAsset: vi.fn(),
   importProjectAsset: vi.fn(),
   importRecordingProjectAsset: importRecordingProjectAssetMock,

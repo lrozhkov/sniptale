@@ -1,3 +1,8 @@
+import type {
+  LibraryFacetId,
+  LibraryFacetFilters,
+  LibraryFilterScope,
+} from '../../../features/media-hub/library-filters';
 export const GALLERY_SAVED_VIEWS_STORAGE_KEY = 'sniptale_gallery_saved_views';
 export const MAX_GALLERY_SAVED_VIEWS = 50;
 export const MAX_GALLERY_SAVED_VIEW_NAME_LENGTH = 80;
@@ -8,16 +13,9 @@ export type GallerySavedViewFolder =
   | 'scenario'
   | 'screenshot'
   | 'web-snapshot';
-export type GallerySavedViewScope = 'all' | 'library' | 'temporary';
-export type GallerySavedViewFacetId =
-  | 'created'
-  | 'duration'
-  | 'format'
-  | 'resolution'
-  | 'size'
-  | 'source'
-  | 'updated';
-export type GallerySavedViewFacetFilters = Record<GallerySavedViewFacetId, string[]>;
+export type GallerySavedViewScope = LibraryFilterScope;
+export type GallerySavedViewFacetId = LibraryFacetId;
+export type GallerySavedViewFacetFilters = LibraryFacetFilters;
 export type GallerySavedViewMoveDirection = 'down' | 'up';
 
 export interface GallerySavedViewFilterSnapshot {

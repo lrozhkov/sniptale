@@ -49,13 +49,11 @@ function createVideoEditorRuntimeController(
 
 function useApplyLoadedProject(
   setProject: UseVideoEditorRuntimeParams['projectState']['setProject'],
-  setError: UseVideoEditorRuntimeParams['projectState']['setError'],
-  setDiagnosticsOpen: UseVideoEditorRuntimeParams['projectState']['setDiagnosticsOpen']
+  setError: UseVideoEditorRuntimeParams['projectState']['setError']
 ) {
   return useCallback<ApplyLoadedProject>(
-    (project, recordingId) =>
-      createApplyLoadedProject(setProject, setError, setDiagnosticsOpen)(project, recordingId),
-    [setDiagnosticsOpen, setError, setProject]
+    (project, recordingId) => createApplyLoadedProject(setProject, setError)(project, recordingId),
+    [setError, setProject]
   );
 }
 
@@ -90,8 +88,7 @@ export function useVideoEditorRuntime(
   const timelinePreviewRuntime = useTimelinePreviewRuntime(params.project, assetUrls);
   const applyLoadedProject = useApplyLoadedProject(
     params.projectState.setProject,
-    params.projectState.setError,
-    params.projectState.setDiagnosticsOpen
+    params.projectState.setError
   );
   const playback = useVideoEditorPlayback(
     params.project,

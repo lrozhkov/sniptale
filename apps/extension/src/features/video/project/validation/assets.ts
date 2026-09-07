@@ -25,7 +25,8 @@ function isAssetSource(value: unknown): boolean {
   if (value['kind'] === 'project-asset') {
     return (
       isString(value['projectAssetId']) &&
-      (value['originRecordingId'] === undefined || isString(value['originRecordingId']))
+      (value['originRecordingId'] === undefined || isString(value['originRecordingId'])) &&
+      (value['originMediaId'] === undefined || isString(value['originMediaId']))
     );
   }
   if (value['kind'] === 'scenario-asset') {

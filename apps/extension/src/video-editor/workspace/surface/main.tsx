@@ -1,6 +1,7 @@
 import { WorkspaceTrackPresentation } from './track-presentation';
 import { AudioRecordingModal } from '../../recording/audio-modal';
 import { VideoEditorLibraryPanel } from '../../library/panel';
+import { useVideoEditorMediaLibrary } from '../../runtime/controller/libraries';
 import React, { useState } from 'react';
 import { VideoProjectStorageStatus } from '../floating/storage-status';
 import { VideoEditorFloatingInspectorStack } from '../floating/inspector-stack';
@@ -21,7 +22,6 @@ import { useEffectLibraryOperations } from '../../library/effects-dock/operation
 import { useWorkspacePanelSizes } from '../floating/panel-layout';
 
 interface VideoEditorWorkspaceMainProps {
-  diagnosticsContent: React.ReactNode;
   previewHeightStyle: React.CSSProperties;
 }
 
@@ -29,7 +29,6 @@ interface VideoEditorWorkspaceMainProps {
  * Renders the interactive workspace body after overlay state is resolved.
  */
 export function VideoEditorWorkspaceMain({
-  diagnosticsContent,
   previewHeightStyle,
 }: VideoEditorWorkspaceMainProps): React.JSX.Element {
   const [activeInsertKind, setActiveInsertKind] = useState<VideoPreviewCanvasInsertKind | null>(
@@ -73,7 +72,6 @@ export function VideoEditorWorkspaceMain({
             inspector={
               <VideoEditorFloatingInspectorStack
                 onClose={inspector.onToggle}
-                diagnosticsContent={diagnosticsContent}
                 resize={panelSizes.inspector}
                 fullHeight={inspectorFullHeight}
                 onToggleFullHeight={() => setInspectorFullHeight((current) => !current)}
@@ -87,7 +85,7 @@ export function VideoEditorWorkspaceMain({
             onClearActiveInsertKind={() => setActiveInsertKind(null)}
             onEffectsLibraryDockOpenChange={changeEffectsOpen}
           />
-          <VideoEditorWorkspaceOverlays diagnosticsContent={diagnosticsContent} />
+          <VideoEditorWorkspaceOverlays />
         </WorkspaceTrackPresentation>
       </div>
     </InspectorGroupFocusContext.Provider>
@@ -129,56 +127,37 @@ function useWorkspacePanels() {
   };
 }
 
-function VideoEditorWorkspaceOverlays(props: {
-  diagnosticsContent: React.ReactNode;
-}): React.JSX.Element {
+function VideoEditorWorkspaceOverlays(): React.JSX.Element {
   return (
     <>
-      <VideoEditorWorkspaceLibraryPanel diagnosticsContent={props.diagnosticsContent} />
-      <VideoEditorAudioRecordingModal diagnosticsContent={props.diagnosticsContent} />
+      <VideoEditorWorkspaceLibraryPanel />
+      <VideoEditorAudioRecordingModal />
     </>
   );
 }
 
-function VideoEditorWorkspaceLibraryPanel({
-  diagnosticsContent,
-}: Pick<VideoEditorWorkspaceMainProps, 'diagnosticsContent'>): React.JSX.Element | null {
+function VideoEditorWorkspaceLibraryPanel(): React.JSX.Element | null {
   const header = useVideoEditorHeaderController();
-  const sidebar = useVideoEditorSidebarController(diagnosticsContent);
+  const sidebar = useVideoEditorSidebarController();
+  const media = useVideoEditorMediaLibrary(header?.libraryPanelOpen ?? false);
   if (!header || !sidebar) return null;
   return (
     <VideoEditorLibraryPanel
-      activeProjectId={sidebar.state.activeProjectId}
-      diagnosticsContent={sidebar.state.diagnosticsContent}
-      diagnosticsOpen={sidebar.state.diagnosticsOpen}
       isOpen={header.libraryPanelOpen}
-      onAddRecording={sidebar.projectActions.onAddRecording}
+      items={media.items}
+      savedViews={media.savedViews}
+      loading={media.loading}
+      error={media.error}
+      onRefresh={media.refresh}
+      onAddMedia={sidebar.projectActions.onAddLibraryMedia}
       onClose={header.onCloseLibraryPanel}
-      onCreateProject={sidebar.projectActions.onCreateProject}
-      onDeleteProject={sidebar.projectActions.onDeleteProject}
-      onImportAudio={(file) =>
-        sidebar.projectActions.onImportAudio(file, { destination: 'materials' })
-      }
-      onImportImage={(file) =>
-        sidebar.projectActions.onImportImage(file, { destination: 'materials' })
-      }
-      onImportVideo={(file) =>
-        sidebar.projectActions.onImportVideo(file, { destination: 'materials' })
-      }
-      onOpenProject={sidebar.projectActions.onOpenProject}
-      onToggleDiagnostics={sidebar.projectActions.onToggleDiagnostics}
-      projects={sidebar.state.projects}
-      recordingId={sidebar.state.recordingId}
-      recordings={sidebar.state.recordings}
     />
   );
 }
 
-function VideoEditorAudioRecordingModal({
-  diagnosticsContent,
-}: Pick<VideoEditorWorkspaceMainProps, 'diagnosticsContent'>): React.JSX.Element | null {
+function VideoEditorAudioRecordingModal(): React.JSX.Element | null {
   const layout = useVideoEditorLayoutController();
-  const sidebar = useVideoEditorSidebarController(diagnosticsContent);
+  const sidebar = useVideoEditorSidebarController();
   if (!sidebar) return null;
   return (
     <AudioRecordingModal

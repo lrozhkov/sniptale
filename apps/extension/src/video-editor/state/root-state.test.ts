@@ -268,10 +268,8 @@ describe('video editor store timeline control state owner', () => {
     timeline.getState().setPixelsPerSecond(999);
     timeline.getState().selectTrack('track-1');
     timeline.getState().selectMotionRegion('motion-1');
-    timeline.getState().setDiagnosticsOpen(true);
 
     expect(timeline.getState()).toMatchObject({
-      diagnosticsOpen: true,
       error: 'broken',
       isReady: true,
       pixelsPerSecond: 999,

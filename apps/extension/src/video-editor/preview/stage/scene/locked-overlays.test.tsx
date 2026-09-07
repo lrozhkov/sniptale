@@ -118,6 +118,11 @@ function createRenderPass() {
 }
 
 function SceneHarness() {
+  const [video] = React.useState(() => {
+    const element = document.createElement('video');
+    Object.defineProperty(element, 'readyState', { value: 4 });
+    return element;
+  });
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
   const stageRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -129,7 +134,7 @@ function SceneHarness() {
     imageBank: {},
     project: createEmptyVideoProject('Scene', 200, 100),
     stageRef,
-    videoRefs: { current: {} },
+    videoRefs: { current: { 'video-1': video } },
   });
 
   return (

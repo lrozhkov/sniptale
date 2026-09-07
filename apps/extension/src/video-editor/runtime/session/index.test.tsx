@@ -72,7 +72,6 @@ function createProjectState(): UseVideoEditorRuntimeParams['projectState'] {
     setReady: fn(),
     setError: fn(),
     setSaveState: fn(),
-    setDiagnosticsOpen: fn(),
   };
 }
 
@@ -160,8 +159,7 @@ it('composes asset, preview, playback, load, and lifecycle owners into one runti
   renderedController.applyLoadedProject(params.project!, 'recording-2');
   expect(mocks.createApplyLoadedProject).toHaveBeenCalledWith(
     params.projectState.setProject,
-    params.projectState.setError,
-    params.projectState.setDiagnosticsOpen
+    params.projectState.setError
   );
   expect(applyLoadedProject).toHaveBeenCalledWith(params.project, 'recording-2');
 });

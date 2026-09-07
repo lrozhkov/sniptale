@@ -93,3 +93,57 @@ it('does not constrain a start trim by a linked companion whose start edge is el
   expect(store.getState().project!.clips[0]!.startTime).toBe(1.5);
   expect(store.getState().project!.clips[1]).toEqual(project.clips[1]);
 });
+
+it('holds an expanding end before a separated neighbor instead of tunneling across several clips', () => {
+  const { store, project } = recording();
+  const screen = project.clips[0]!;
+  project.clips.push(
+    { ...screen, id: 'next-screen', groupId: null, startTime: 5, sourceDuration: 1, duration: 1 },
+    { ...screen, id: 'last-screen', groupId: null, startTime: 7, sourceDuration: 1, duration: 1 }
+  );
+  const untouched = project.clips.slice(2);
+  store.getState().trimClipEnd(screen.id, 50);
+  const stopped = store.getState();
+  expect(stopped.project!.clips[0]!.startTime + stopped.project!.clips[0]!.duration).toBe(5);
+  expect(stopped.project!.clips[1]!.startTime + stopped.project!.clips[1]!.duration).toBe(5);
+  expect(stopped.project!.clips.slice(2)).toEqual(untouched);
+  store.getState().trimClipEnd(screen.id, 50);
+  expect(store.getState().project).toBe(stopped.project);
+});
+
+it('holds an expanding start after a separated neighbor', () => {
+  const { store, project } = recording();
+  const screen = project.clips[0]!;
+  project.clips.push({
+    ...screen,
+    id: 'previous-screen',
+    groupId: null,
+    startTime: 0,
+    sourceDuration: 1.9,
+    duration: 1.9,
+  });
+  store.getState().trimClipStart(screen.id, 0);
+  expect(store.getState().project!.clips[0]!.startTime).toBeCloseTo(1.9);
+  expect(store.getState().project!.clips[1]!.startTime).toBeCloseTo(1.9);
+});
+
+it('uses the tightest linked lane limit for a common playback rate without moving neighbors', () => {
+  const { store, project } = recording();
+  const screen = project.clips[0]!;
+  const camera = project.clips[1]!;
+  project.clips.push({
+    ...camera,
+    id: 'next-camera',
+    groupId: null,
+    startTime: 4.5,
+    sourceDuration: 1,
+    duration: 1,
+  });
+  const neighbor = project.clips[2];
+  store.getState().updateClipPlaybackRate(screen.id, 0.1);
+  const result = store.getState().project!;
+  expect(result.clips[0]).toMatchObject({ playbackRate: 0.8, duration: 2.5, sourceDuration: 2 });
+  expect(result.clips[1]).toMatchObject({ playbackRate: 0.8, duration: 2.5, sourceDuration: 2 });
+  expect(result.clips[2]).toEqual(neighbor);
+  expect(store.getState().projectHistory.past).toHaveLength(1);
+});

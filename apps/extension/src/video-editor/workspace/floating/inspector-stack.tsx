@@ -1,5 +1,4 @@
 import { WorkspacePanelCloseButton } from './index';
-import { type ReactNode } from 'react';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import {
   useVideoEditorSidebarController,
@@ -25,18 +24,16 @@ type VideoEditorInspectorStackProps = {
   onClose: () => void;
   fullHeight?: boolean;
   onToggleFullHeight?: () => void;
-  diagnosticsContent: ReactNode;
   resize: WorkspacePanelResize;
 };
 
 export function VideoEditorFloatingInspectorStack({
-  diagnosticsContent,
   onClose,
   fullHeight = false,
   onToggleFullHeight,
   resize,
 }: VideoEditorInspectorStackProps) {
-  const controller = useVideoEditorSidebarController(diagnosticsContent);
+  const controller = useVideoEditorSidebarController();
   const layout = useWorkspaceLayoutContext();
   if (!controller) return null;
 
@@ -73,9 +70,6 @@ function VideoEditorFloatingInspectorContent({
   const sidebarState = useWorkspaceSidebarState(
     sidebarProps.selection,
     sidebarProps.selectedClip,
-    sidebarProps.recordingId,
-    sidebarProps.diagnosticsOpen,
-    sidebarProps.onToggleDiagnostics,
     sidebarProps.selectedTrack
   );
 
@@ -123,12 +117,9 @@ function VideoEditorFloatingInspectorContent({
         </div>
         <WorkspaceSidebarPanelContent
           {...sidebarProps}
-          diagnosticsMeta={sidebarState.diagnosticsMeta}
-          diagnosticsSectionOpen={sidebarState.diagnosticsSectionOpen}
           inputRefs={sidebarState.inputRefs}
           projectsOpen={sidebarState.projectsOpen}
           recordingsOpen={sidebarState.recordingsOpen}
-          onToggleDiagnosticsSection={sidebarState.toggleDiagnosticsSection}
           onToggleProjectsOpen={sidebarState.toggleProjectsOpen}
           onToggleRecordingsOpen={sidebarState.toggleRecordingsOpen}
         />

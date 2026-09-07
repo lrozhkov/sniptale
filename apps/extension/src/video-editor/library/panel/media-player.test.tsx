@@ -43,8 +43,9 @@ beforeEach(() => {
     )
   );
   video = container.querySelector('video')!;
-  Object.defineProperty(video, 'duration', { value: 4 });
-  Object.defineProperty(video, 'readyState', { value: 1 });
+  Object.defineProperty(video, 'error', { value: null, configurable: true });
+  Object.defineProperty(video, 'duration', { value: 4, configurable: true });
+  Object.defineProperty(video, 'readyState', { value: 1, configurable: true });
   act(() => video.dispatchEvent(new Event('loadedmetadata')));
 });
 afterEach(() => {
@@ -103,4 +104,101 @@ it('pauses the media when its selected recording leaves the surface', () => {
   act(() => root.render(<div>Another recording</div>));
   expect(video.pause).toHaveBeenCalledOnce();
   expect(space(container).defaultPrevented).toBe(false);
+});
+
+it.each([Infinity, NaN])(
+  'plays decodable media with unknown duration %s and enables seek after resolution',
+  async (duration) => {
+    Object.defineProperty(video, 'duration', { value: duration, configurable: true });
+    act(() => video.dispatchEvent(new Event('loadedmetadata')));
+    expect(control('videoEditor.timeline.play').disabled).toBe(false);
+    expect(control('videoEditor.sidebar.mediaPreviewSeek').disabled).toBe(true);
+    expect(container.querySelector('[data-ui="library-media-transport"]')?.textContent).toContain(
+      '—'
+    );
+    await act(async () => control('videoEditor.timeline.play').click());
+    expect(video.play).toHaveBeenCalledOnce();
+    Object.defineProperty(video, 'duration', { value: 3.25, configurable: true });
+    act(() => video.dispatchEvent(new Event('durationchange')));
+    expect(control('videoEditor.sidebar.mediaPreviewSeek').disabled).toBe(false);
+    expect(control('videoEditor.sidebar.mediaPreviewSeek').getAttribute('max')).toBe('3.25');
+  }
+);
+
+it('does not admit playback before metadata or after decode failure', () => {
+  Object.defineProperty(video, 'readyState', { value: 0, configurable: true });
+  act(() => video.dispatchEvent(new Event('loadedmetadata')));
+  expect(control('videoEditor.timeline.play').disabled).toBe(true);
+  Object.defineProperty(video, 'readyState', { value: 1, configurable: true });
+  Object.defineProperty(video, 'error', { value: { code: 3 }, configurable: true });
+  act(() => video.dispatchEvent(new Event('error')));
+  expect(control('videoEditor.timeline.play').disabled).toBe(true);
+  expect(container.querySelector('[role="alert"]')).not.toBeNull();
+});
+
+it('pans the enlarged preview and releases its pointer when cancelled', () => {
+  const viewport = container.querySelector<HTMLDivElement>('[data-ui="library-media-viewport"]')!;
+  const capture = vi.fn();
+  const release = vi.fn();
+  viewport.setPointerCapture = capture;
+  viewport.hasPointerCapture = () => true;
+  viewport.releasePointerCapture = release;
+  const pointer = (type: string, x: number, y: number) => {
+    const event = new MouseEvent(type, {
+      bubbles: true,
+      cancelable: true,
+      button: 0,
+      clientX: x,
+      clientY: y,
+    });
+    Object.defineProperty(event, 'pointerId', { value: 7 });
+    act(() => viewport.dispatchEvent(event));
+  };
+  pointer('pointerdown', 100, 100);
+  expect(capture).not.toHaveBeenCalled();
+  const zoom = control('videoEditor.sidebar.mediaPreviewZoomLabel');
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(zoom, '2');
+    zoom.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  viewport.scrollLeft = 40;
+  viewport.scrollTop = 60;
+  pointer('pointerdown', 100, 100);
+  expect(capture).toHaveBeenCalledWith(7);
+  expect(viewport.style.cursor).toBe('grabbing');
+  pointer('pointermove', 70, 80);
+  expect(viewport.scrollLeft).toBe(70);
+  expect(viewport.scrollTop).toBe(80);
+  pointer('pointercancel', 70, 80);
+  expect(release).toHaveBeenCalledWith(7);
+  expect(viewport.style.cursor).toBe('grab');
+  pointer('pointermove', 30, 30);
+  expect(viewport.scrollLeft).toBe(70);
+});
+
+it('places fullscreen Close before playback and exits through the browser owner', () => {
+  const frame = container.querySelector('[data-ui="library-media-player"]');
+  const exit = vi.fn(async () => undefined);
+  Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => frame });
+  Object.defineProperty(document, 'exitFullscreen', { configurable: true, value: exit });
+  act(() => document.dispatchEvent(new Event('fullscreenchange')));
+  const transport = container.querySelector('[data-ui="library-media-transport"]')!;
+  const close = transport.querySelector<HTMLButtonElement>('button')!;
+  expect(close.dataset['ui']).toBe('library-media-fullscreen-close');
+  act(() => close.click());
+  expect(exit).toHaveBeenCalledOnce();
+  Reflect.deleteProperty(document, 'fullscreenElement');
+  Reflect.deleteProperty(document, 'exitFullscreen');
+});
+
+it('restores keyboard focus to the fullscreen trigger after leaving fullscreen', () => {
+  const frame = container.querySelector('[data-ui="library-media-player"]');
+  control('videoEditor.stage.enterFullscreen').focus();
+  Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: frame });
+  act(() => document.dispatchEvent(new Event('fullscreenchange')));
+  control('videoEditor.stage.exitFullscreen').focus();
+  Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null });
+  act(() => document.dispatchEvent(new Event('fullscreenchange')));
+  expect(document.activeElement).toBe(control('videoEditor.stage.enterFullscreen'));
+  Reflect.deleteProperty(document, 'fullscreenElement');
 });

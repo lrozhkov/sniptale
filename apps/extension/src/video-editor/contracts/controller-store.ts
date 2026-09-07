@@ -164,12 +164,11 @@ export interface RuntimeSessionPort
   placementMode: VideoEditorPlacementMode | null;
 }
 
-/** Diagnostics visibility and recording telemetry capability. */
-export interface DiagnosticsTelemetryPort extends Pick<
+/** Recording telemetry capability. */
+export interface RecordingTelemetryPort extends Pick<
   VideoEditorSessionActions,
-  'setDiagnosticsOpen' | 'setRecordingTelemetry' | 'toggleTelemetryLaneVisibility'
+  'setRecordingTelemetry' | 'toggleTelemetryLaneVisibility'
 > {
-  diagnosticsOpen: boolean;
   recordingTelemetry: RecordingTelemetryEntry | null;
   telemetryLaneVisible: boolean;
 }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Bug, FolderOpen, Library } from 'lucide-react';
+import { FolderOpen, Library } from 'lucide-react';
 import {
   InspectorShellFrame,
   InspectorShellPanel,
@@ -19,13 +19,11 @@ import { CollapsedSelectionCard, CollapsibleSection, renderCollapsedRailButtons 
 export function WorkspaceSidebarCollapsedRail(props: {
   selectedClipLabel: string;
   selectedClipIcon: React.ReactNode;
-  diagnosticsOpen: boolean;
   onToggleCollapsed: () => void;
   onCreateProject: () => void | Promise<void>;
   onImportImage: () => void;
   onImportVideo: () => void;
   onImportAudio: () => void;
-  onToggleDiagnostics: () => void;
 }) {
   return (
     <InspectorShellFrame
@@ -59,13 +57,9 @@ export function WorkspaceSidebarLibraryPanels(props: {
   activeProjectId: string;
   projectsOpen: boolean;
   recordingsOpen: boolean;
-  diagnosticsSectionOpen: boolean;
-  diagnosticsMeta: string;
   recordingId: string | null;
-  diagnosticsContent: React.ReactNode;
   onToggleProjectsOpen: () => void;
   onToggleRecordingsOpen: () => void;
-  onToggleDiagnosticsSection: () => void;
   onOpenProject: (projectId: string) => void | Promise<void>;
   onDeleteProject: (projectId: string) => void | Promise<void>;
   onAddRecording: (recordingId: string) => void;
@@ -74,7 +68,6 @@ export function WorkspaceSidebarLibraryPanels(props: {
     <>
       <WorkspaceSidebarProjectsSection {...props} />
       <WorkspaceSidebarRecordingsSection {...props} />
-      <WorkspaceSidebarDiagnosticsSection {...props} />
     </>
   );
 }
@@ -142,35 +135,6 @@ function WorkspaceSidebarRecordingsSection(
               onAddRecording={props.onAddRecording}
             />
           ))
-        )}
-      </div>
-    </CollapsibleSection>
-  );
-}
-
-function WorkspaceSidebarDiagnosticsSection(
-  props: Pick<
-    React.ComponentProps<typeof WorkspaceSidebarLibraryPanels>,
-    | 'diagnosticsMeta'
-    | 'diagnosticsSectionOpen'
-    | 'onToggleDiagnosticsSection'
-    | 'recordingId'
-    | 'diagnosticsContent'
-  >
-) {
-  return (
-    <CollapsibleSection
-      title={translate('videoEditor.sidebar.diagnosticsTitle')}
-      meta={props.diagnosticsMeta}
-      icon={<Bug size={17} strokeWidth={2} />}
-      expanded={props.diagnosticsSectionOpen}
-      onToggle={props.onToggleDiagnosticsSection}
-    >
-      <div className="pt-3">
-        {props.recordingId ? (
-          props.diagnosticsContent
-        ) : (
-          <EmptyLibrarySection message={translate('videoEditor.sidebar.diagnosticsNoRecording')} />
         )}
       </div>
     </CollapsibleSection>

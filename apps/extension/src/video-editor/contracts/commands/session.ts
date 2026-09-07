@@ -28,7 +28,6 @@ export interface VideoEditorSessionActions {
   startMotionAreaPlacement: (motionRegionId: string) => void;
   startMotionPathStopAreaPlacement: (motionRegionId: string, stopId: string) => void;
   startMotionPathStopPointPlacement: (motionRegionId: string, stopId: string) => void;
-  setDiagnosticsOpen: (open: boolean) => void;
   setRecordingTelemetry: (recordingTelemetry: RecordingTelemetryEntry | null) => void;
   toggleTelemetryLaneVisibility: () => void;
 }

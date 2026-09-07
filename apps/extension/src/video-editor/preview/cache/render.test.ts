@@ -46,3 +46,32 @@ it('presents only an exact cache hit without invoking the renderer', async () =>
   expect(context.drawImage).toHaveBeenCalledWith(bitmap, 0, 0, 1280, 720);
   expect(render).not.toHaveBeenCalled();
 });
+
+it('does not cache a retained old frame when the renderer defers an unavailable video frame', async () => {
+  const capture = vi.fn().mockResolvedValue(new FakeImageBitmap(1280, 720));
+  vi.stubGlobal('createImageBitmap', capture);
+  try {
+    const cache = createVideoPreviewExactFrameCache(1024);
+    const set = vi.spyOn(cache, 'set');
+    const result = await renderPreviewSceneWithExactCache({
+      cache,
+      render: vi.fn().mockResolvedValue(false),
+      job: {
+        canvas: document.createElement('canvas'),
+        currentTime: 1,
+        imageBank: {},
+        previewMode: 'cache',
+        previewRasterSize: { width: 1280, height: 720 },
+        project: createEmptyVideoProject(),
+        renderRevision: Promise.resolve('revision'),
+        stage: null,
+        videoRefs: { current: {} },
+      },
+    });
+    expect(result).toBe(false);
+    expect(capture).not.toHaveBeenCalled();
+    expect(set).not.toHaveBeenCalled();
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

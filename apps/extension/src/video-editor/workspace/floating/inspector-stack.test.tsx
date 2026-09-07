@@ -21,11 +21,8 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
 vi.mock('../surface/sidebar-props', () => ({
   getWorkspaceSidebarProps: () => ({
     activeProjectId: 'project-1',
-    diagnosticsContent: null,
-    diagnosticsOpen: false,
     gridSettings: {},
     inspectorMode: 'selection',
-    onToggleDiagnostics: vi.fn(),
     project: { clips: [], tracks: [] },
     projects: [],
     recordingId: null,
@@ -53,7 +50,6 @@ it('hides the context inspector when the inspector rail state is collapsed', () 
   const markup = renderToStaticMarkup(
     <VideoEditorFloatingInspectorStack
       onClose={vi.fn()}
-      diagnosticsContent={null}
       resize={{
         width: 344,
         min: 280,
@@ -74,7 +70,6 @@ it('renders a context inspector surface without introducing a layers panel', () 
   const markup = renderToStaticMarkup(
     <VideoEditorFloatingInspectorStack
       onClose={vi.fn()}
-      diagnosticsContent={null}
       resize={{
         width: 344,
         min: 280,
@@ -96,7 +91,6 @@ it('renders a context inspector surface without introducing a layers panel', () 
   expect(markup).not.toContain('layers');
   expect(contentSpy.mock.calls[0]?.[0]).toEqual(
     expect.objectContaining({
-      diagnosticsMeta: expect.any(String),
       inputRefs: expect.any(Object),
       onToggleProjectsOpen: expect.any(Function),
     })

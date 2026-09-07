@@ -35,7 +35,6 @@ it('uses the track action projection in the complete sidebar controller', () => 
       },
     });
   const store = dependencyProxy({
-    diagnosticsOpen: false,
     placementMode: null,
     project,
     recordingId: null,
@@ -52,7 +51,6 @@ it('uses the track action projection in the complete sidebar controller', () => 
   const controller = createWorkspaceSidebarController(
     {
       actions: dependencyProxy(),
-      diagnosticsContent: null,
       libraries: dependencyProxy({ projects: [], recordings: [] }),
       selections: dependencyProxy({ selection: { kind: 'scene' } }),
       store,
@@ -69,7 +67,6 @@ it('uses the track action projection in the complete sidebar controller', () => 
   const fallbackController = createWorkspaceSidebarController(
     {
       actions: dependencyProxy(),
-      diagnosticsContent: null,
       libraries: dependencyProxy({ projects: [], recordings: [] }),
       selections: {
         selection: undefined,

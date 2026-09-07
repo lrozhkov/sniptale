@@ -16,7 +16,7 @@ import {
 import type { VideoTimelinePlacementMode } from '../../../features/video/project/types/index';
 import type {
   ClipSelectionPort,
-  DiagnosticsTelemetryPort,
+  RecordingTelemetryPort,
   EffectEditingPort,
   ProjectLifecyclePort,
   TimelineEditingPort,
@@ -45,7 +45,7 @@ type SharedTimelineAction =
 type WorkspaceProjectUpdaterStore = Pick<ProjectLifecyclePort, 'project'> & {
   getCurrentTime: () => number;
 } & Pick<ClipSelectionPort, 'selectMotionRegion'> &
-  Pick<DiagnosticsTelemetryPort, 'recordingTelemetry'> &
+  Pick<RecordingTelemetryPort, 'recordingTelemetry'> &
   Pick<TimelineEditingPort, SharedTimelineAction> &
   EffectEditingPort;
 

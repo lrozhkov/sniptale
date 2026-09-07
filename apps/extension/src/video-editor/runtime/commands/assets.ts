@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { toast } from '@sniptale/ui/product-feedback/toast-service';
 import { translate } from '../../../platform/i18n';
 import { deleteProjectAsset } from '../../../composition/persistence/projects/index';
@@ -8,7 +8,11 @@ import {
   VideoTrackKind,
   type VideoProjectAsset,
 } from '../../../features/video/project/types/index';
-import { ensureRecordingAsset, importProjectAsset } from '../../project/operations/ops';
+import {
+  ensureLibraryMediaAsset,
+  ensureRecordingAsset,
+  importProjectAsset,
+} from '../../project/operations/ops';
 import type {
   VideoEditorImportPlacement,
   VideoEditorAudioRecordingTarget,
@@ -190,17 +194,57 @@ function useProjectAssetImportHandler(
   );
 }
 
+function useLibraryMediaAssetHandler(port: AssetHandlerPort) {
+  const pending = useRef(new Map<string, Promise<void>>());
+  const lifecycle = useRef(0);
+  useEffect(() => {
+    lifecycle.current += 1;
+    return () => {
+      lifecycle.current += 1;
+    };
+  }, []);
+
+  return useCallback(
+    (mediaId: string): Promise<void> => {
+      const project = port.getCurrentProject();
+      if (!project || project.id !== port.getCurrentProjectId()) {
+        return Promise.reject(new Error(translate('videoEditor.app.materialsUnavailable')));
+      }
+      const key = JSON.stringify([project.id, mediaId]);
+      const existing = pending.current.get(key);
+      if (existing) return existing;
+      const generation = lifecycle.current;
+      const task = (async () => {
+        const asset = await ensureLibraryMediaAsset(project, mediaId);
+        if (!asset) throw new Error(translate('videoEditor.sidebar.libraryMediaUnavailable'));
+        if (lifecycle.current !== generation || port.getCurrentProjectId() !== project.id) {
+          if (!project.assets.some(({ id }) => id === asset.id)) {
+            await cleanupStaleImportedAsset(asset);
+          }
+          throw new Error(translate('videoEditor.app.materialsUnavailable'));
+        }
+        port.upsertAsset(asset);
+      })().finally(() => pending.current.delete(key));
+      pending.current.set(key, task);
+      return task;
+    },
+    [port]
+  );
+}
+
 export function useAssetHandlers(
   port: AssetHandlerPort
 ): Pick<
   VideoEditorActionHandlers,
   | 'handleAddRecording'
+  | 'handleAddLibraryMedia'
   | 'handleImportAudio'
   | 'handleImportImage'
   | 'handleImportRecordedAudio'
   | 'handleImportVideo'
 > {
   const handleAddRecording = useRecordingAssetHandler(port);
+  const handleAddLibraryMedia = useLibraryMediaAssetHandler(port);
   const handleImportImage = useProjectAssetImportHandler(
     VideoProjectAssetType.IMAGE,
     'image',
@@ -235,6 +279,7 @@ export function useAssetHandlers(
   return useMemo(
     () => ({
       handleAddRecording,
+      handleAddLibraryMedia,
       handleImportImage,
       handleImportVideo,
       handleImportAudio,
@@ -242,6 +287,7 @@ export function useAssetHandlers(
     }),
     [
       handleAddRecording,
+      handleAddLibraryMedia,
       handleImportAudio,
       handleImportImage,
       handleImportRecordedAudio,

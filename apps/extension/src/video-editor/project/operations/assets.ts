@@ -1,4 +1,10 @@
 import { getRecording } from '../../../composition/persistence/recordings/index';
+import { getAggregatePresentation } from '../../../composition/persistence/aggregate-presentations';
+import {
+  getMediaAssetBlob,
+  getMediaLibraryEntry,
+} from '../../../composition/persistence/media-library/index';
+import type { MediaLibraryEntry } from '../../../composition/persistence/media-library/contracts';
 import { createVideoProjectAsset } from '../../../features/video/project/factories/creation';
 import { saveProjectAssetSafely } from '../../../workflows/media-hub/store';
 import { translate } from '../../../platform/i18n';
@@ -96,6 +102,54 @@ export async function importRecordingProjectAsset(
   }
 
   return buildProjectRecordingAsset(sourceRecordingId, entry.file, entry.filename);
+}
+
+/** Copies library media into the project, preserving recording telemetry provenance. */
+export async function ensureLibraryMediaAsset(
+  project: VideoProject,
+  mediaId: string
+): Promise<VideoProjectAsset | null> {
+  const existing = project.assets.find(
+    (asset) => asset.source.kind === 'project-asset' && asset.source.originMediaId === mediaId
+  );
+  if (existing) return existing;
+
+  const entry = await getMediaLibraryEntry(mediaId);
+  if (!entry) throw new Error(translate('videoEditor.sidebar.libraryMediaUnavailable'));
+  const assetType = getLibraryImportType(entry);
+  if (entry.source.kind === 'recording') {
+    return ensureRecordingAsset(project, entry.source.recordingId);
+  }
+
+  const blob = await readLibraryImportBlob(entry, assetType);
+  if (!blob) throw new Error(translate('videoEditor.sidebar.libraryMediaUnavailable'));
+  const file = new File([blob], entry.filename, { type: blob.type });
+  const asset = await importProjectAsset(file, assetType);
+  if (asset.source.kind === 'project-asset') {
+    asset.source.originMediaId = mediaId;
+  }
+  return asset;
+}
+
+function getLibraryImportType(entry: MediaLibraryEntry): ImportableProjectAssetType {
+  if (entry.source.kind !== 'web-snapshot') {
+    if (entry.kind === 'image' || entry.kind === 'screenshot') return VideoProjectAssetType.IMAGE;
+    if (entry.kind === 'video' || entry.kind === 'recording' || entry.kind === 'export') {
+      return VideoProjectAssetType.VIDEO;
+    }
+  }
+  throw new Error(translate('videoEditor.app.importAssetUnsupported'));
+}
+
+async function readLibraryImportBlob(
+  entry: MediaLibraryEntry,
+  assetType: ImportableProjectAssetType
+): Promise<Blob | undefined> {
+  if (assetType !== VideoProjectAssetType.IMAGE) return getMediaAssetBlob(entry.id);
+  const presentation = await getAggregatePresentation({ id: entry.id, kind: 'image' });
+  return presentation?.presentationRevision === (entry.workspaceRevision ?? 0)
+    ? presentation.previewBlob
+    : undefined;
 }
 
 async function buildImportedImageAsset(file: File): Promise<VideoProjectAsset> {

@@ -1,5 +1,4 @@
 import {
-  Bug,
   Copy,
   Download,
   PanelsLeftRight,
@@ -68,16 +67,6 @@ function buildVideoEditorProjectActions(
       active: false,
       onSelect: () => {
         void controller.toggleSidebarCollapsed();
-      },
-    }),
-    createCommandPaletteToggleAction({
-      id: 'video-editor-toggle-diagnostics',
-      title: translate('videoEditor.sidebar.diagnosticsTitle'),
-      section: translate('shared.ui.commandPaletteWorkspaceSection'),
-      icon: commandPaletteIcon(Bug),
-      active: false,
-      onSelect: () => {
-        void controller.toggleDiagnostics();
       },
     }),
   ];

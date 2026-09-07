@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 import { getRecordingTelemetry } from '../../../composition/persistence/recordings/telemetry';
 import { subscribeToMediaHubEvents } from '../../../features/media-hub/events';
-import type { DiagnosticsTelemetryPort } from '../../contracts/controller-store';
+import type { RecordingTelemetryPort } from '../../contracts/controller-store';
 
 export function useRecordingTelemetry(
   sourceRecordingId: string | null,
-  setRecordingTelemetry: DiagnosticsTelemetryPort['setRecordingTelemetry']
+  setRecordingTelemetry: RecordingTelemetryPort['setRecordingTelemetry']
 ) {
   useEffect(() => {
     let disposed = false;

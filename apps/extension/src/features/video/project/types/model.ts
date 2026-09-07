@@ -105,6 +105,8 @@ export type VideoProjectAssetSource =
       kind: 'project-asset';
       projectAssetId: string;
       originRecordingId?: string;
+      /** Library provenance for repeat-import detection; rendering uses the project-owned copy. */
+      originMediaId?: string;
     }
   | {
       kind: 'scenario-asset';

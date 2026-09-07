@@ -54,3 +54,33 @@ it('protects hidden media, linked audio, scene backgrounds, embedded images and 
     ['analysis', 1],
   ]);
 });
+
+it('retains distinct clip targets for repeated use and a separate scene reference', async () => {
+  const { getProjectAssetUses } = await import('./media-usage');
+  const project = createEmptyVideoProject();
+  const asset = createVideoProjectAsset(
+    'Shared',
+    VideoProjectAssetType.VIDEO,
+    { kind: 'project-asset', projectAssetId: 'shared' },
+    {
+      width: 1280,
+      height: 720,
+      duration: 5,
+      mimeType: 'video/webm',
+      size: 10,
+      hasAudio: false,
+      audioPeaks: null,
+    }
+  );
+  project.clips = [
+    createVideoClipFromAsset(project.tracks[0]!.id, asset, 1280, 720, 0),
+    createVideoClipFromAsset(project.tracks[0]!.id, asset, 1280, 720, 10),
+  ];
+  project.sceneBackground = { kind: 'image', assetId: asset.id };
+  expect(getProjectAssetUses(project)).toEqual([
+    { assetId: asset.id, kind: 'clip', clipId: project.clips[0]!.id },
+    { assetId: asset.id, kind: 'clip', clipId: project.clips[1]!.id },
+    { assetId: asset.id, kind: 'scene' },
+  ]);
+  expect(getProjectAssetUseCounts(project).get(asset.id)).toBe(3);
+});

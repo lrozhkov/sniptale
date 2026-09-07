@@ -1,30 +1,15 @@
-import type { ReactNode } from 'react';
-
-import type { VideoEditorFileInputRefs } from '../../chrome/file-inputs';
-import type { ProjectListItem, RecordingListItem } from './items';
+import type { GallerySavedView } from '../../../composition/persistence/gallery-saved-views/contract';
+import type { MediaLibraryItem } from '../../../composition/persistence/media-library/contracts';
 
 export interface VideoEditorLibraryPanelProps {
-  activeProjectId: string;
-  diagnosticsContent: ReactNode;
-  diagnosticsOpen: boolean;
   isOpen: boolean;
-  onAddRecording: (recordingId: string) => void;
+  items: MediaLibraryItem[];
+  savedViews: GallerySavedView[];
+  loading: boolean;
+  error: string | null;
+  onRefresh: () => Promise<void>;
+  onAddMedia: (mediaId: string) => Promise<void>;
   onClose: () => void;
-  onCreateProject: () => void | Promise<void>;
-  onDeleteProject: (projectId: string) => void | Promise<void>;
-  onImportAudio: (file: File) => void;
-  onImportImage: (file: File) => void;
-  onImportVideo: (file: File) => void;
-  onOpenProject: (projectId: string) => void | Promise<void>;
-  onToggleDiagnostics: (open: boolean) => void;
-  projects: ProjectListItem[];
-  recordingId: string | null;
-  recordings: RecordingListItem[];
 }
 
-export interface VideoEditorLibraryPanelBodyProps extends Omit<
-  VideoEditorLibraryPanelProps,
-  'isOpen'
-> {
-  inputRefs: VideoEditorFileInputRefs;
-}
+export type VideoEditorLibraryPanelBodyProps = Omit<VideoEditorLibraryPanelProps, 'isOpen'>;

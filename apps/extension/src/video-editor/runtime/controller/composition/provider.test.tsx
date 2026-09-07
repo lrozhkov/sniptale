@@ -55,7 +55,6 @@ const mocks = vi.hoisted(() => {
   };
   const session = { clearPlacementMode: action, placementMode: null };
   const telemetry = {
-    setDiagnosticsOpen: action,
     setRecordingTelemetry: action,
   };
   const libraries = {
@@ -133,7 +132,10 @@ vi.mock('../../session', async (importOriginal) => ({
 vi.mock('../../session/history-shortcuts', () => ({
   useVideoEditorProjectHistoryShortcuts: vi.fn(),
 }));
-vi.mock('../libraries', () => ({ useVideoEditorLibraries: () => mocks.libraries }));
+vi.mock('../libraries', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../libraries')>()),
+  useVideoEditorLibraries: () => mocks.libraries,
+}));
 vi.mock('../overlay-playback', () => ({ useVideoEditorOverlayPlayback: vi.fn() }));
 vi.mock('../playback-range', () => ({ usePlaybackRangeSanity: vi.fn() }));
 vi.mock('../recording-telemetry', () => ({ useRecordingTelemetry: vi.fn() }));
@@ -164,7 +166,7 @@ vi.mock('../store', async (importOriginal) => ({
   getCurrentVideoEditorSelectedClipId: () => mocks.selection.selectedClipId,
   useVideoEditorClipSelectionPort: (selector: (port: typeof mocks.selection) => unknown) =>
     selector(mocks.selection),
-  useVideoEditorDiagnosticsTelemetryPort: (selector: (port: typeof mocks.telemetry) => unknown) =>
+  useVideoEditorRecordingTelemetryPort: (selector: (port: typeof mocks.telemetry) => unknown) =>
     selector(mocks.telemetry),
   useVideoEditorExportPort: (selector: (port: typeof mocks.exportPort) => unknown) =>
     selector(mocks.exportPort),

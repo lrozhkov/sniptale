@@ -2,7 +2,7 @@ import { useShallow } from 'zustand/react/shallow';
 import type {
   AnnotationEditingPort,
   ClipSelectionPort,
-  DiagnosticsTelemetryPort,
+  RecordingTelemetryPort,
   EffectEditingPort,
   ExportPort,
   HistoryPort,
@@ -215,11 +215,9 @@ function selectRuntimeSessionPort(state: VideoEditorState): RuntimeSessionPort {
   };
 }
 
-function selectDiagnosticsTelemetryPort(state: VideoEditorState): DiagnosticsTelemetryPort {
+function selectRecordingTelemetryPort(state: VideoEditorState): RecordingTelemetryPort {
   return {
-    diagnosticsOpen: state.diagnosticsOpen,
     recordingTelemetry: state.recordingTelemetry,
-    setDiagnosticsOpen: state.setDiagnosticsOpen,
     setRecordingTelemetry: state.setRecordingTelemetry,
     telemetryLaneVisible: state.telemetryLaneVisible,
     toggleTelemetryLaneVisibility: state.toggleTelemetryLaneVisibility,
@@ -280,10 +278,10 @@ export function useVideoEditorRuntimeSessionPort<Selection>(
   return usePort(selectRuntimeSessionPort, selector);
 }
 
-export function useVideoEditorDiagnosticsTelemetryPort<Selection>(
-  selector: PortSelector<DiagnosticsTelemetryPort, Selection>
+export function useVideoEditorRecordingTelemetryPort<Selection>(
+  selector: PortSelector<RecordingTelemetryPort, Selection>
 ): Selection {
-  return usePort(selectDiagnosticsTelemetryPort, selector);
+  return usePort(selectRecordingTelemetryPort, selector);
 }
 
 export function useVideoEditorProjectStorageStatus(): VideoEditorProjectStorageStatus {

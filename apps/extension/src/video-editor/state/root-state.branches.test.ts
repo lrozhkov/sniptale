@@ -111,14 +111,12 @@ it('covers playback and project action helpers in the timeline state owner', () 
   timeline.getState().setCurrentTime(12);
   timeline.getState().setPlaying(true);
   timeline.getState().setPixelsPerSecond(10);
-  timeline.getState().setDiagnosticsOpen(true);
   timeline.getState().setReady(false);
   timeline.getState().setError('timeline-error');
   timeline.getState().setSaveState('saved');
 
   expect(timeline.getState()).toMatchObject({
     currentTime: 0,
-    diagnosticsOpen: true,
     error: 'timeline-error',
     isPlaying: true,
     isReady: false,

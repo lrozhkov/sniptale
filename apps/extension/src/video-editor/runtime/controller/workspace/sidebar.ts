@@ -1,4 +1,3 @@
-import type React from 'react';
 import type { VideoEditorLibrariesState } from '../../app-model/types';
 import type { VideoEditorActionHandlers } from '../../commands';
 import type { VideoEditorSelections } from '../selections';
@@ -6,7 +5,7 @@ import type { VideoEditorWorkspaceState } from '../workspace-state';
 import type {
   AnnotationEditingPort,
   ClipSelectionPort,
-  DiagnosticsTelemetryPort,
+  RecordingTelemetryPort,
   EffectEditingPort,
   ProjectLifecyclePort,
   RuntimeSessionPort,
@@ -15,7 +14,7 @@ import type {
 
 type EditorStore = AnnotationEditingPort &
   ClipSelectionPort &
-  DiagnosticsTelemetryPort &
+  RecordingTelemetryPort &
   EffectEditingPort &
   RuntimeSessionPort &
   TimelineEditingPort &
@@ -23,6 +22,7 @@ type EditorStore = AnnotationEditingPort &
 type SidebarCommandHandlers = Pick<
   VideoEditorActionHandlers,
   | 'handleAddRecording'
+  | 'handleAddLibraryMedia'
   | 'handleCreateProject'
   | 'handleDeleteProject'
   | 'handleImportAudio'
@@ -38,7 +38,6 @@ import { createWorkspaceSidebarPlacementActions } from './sidebar-placement-acti
 
 interface CreateWorkspaceSidebarArgs {
   actions: SidebarCommandHandlers;
-  diagnosticsContent: React.ReactNode;
   libraries: VideoEditorLibrariesState;
   selections: VideoEditorSelections;
   store: EditorStore;
@@ -95,6 +94,7 @@ function createWorkspaceSidebarProjectActions(args: {
     onAddActionEvent: args.projectUpdaters.addActionEvent,
     onAddMotionRegion: args.projectUpdaters.addMotionRegion,
     onAddRecording: args.actions.handleAddRecording,
+    onAddLibraryMedia: args.actions.handleAddLibraryMedia,
     onAddTrack: args.store.addTrack,
     onApplyEffectDocument: args.store.applyEffectDocument,
     onCreateProject: args.actions.handleCreateProject,
@@ -112,7 +112,6 @@ function createWorkspaceSidebarProjectActions(args: {
     onResizeProject: args.projectUpdaters.resizeProject,
     ...createWorkspaceSidebarBackgroundActions(args),
     onToggleCollapsed: args.workspace.toggleSidebarCollapsed,
-    onToggleDiagnostics: args.store.setDiagnosticsOpen,
     onUpdateActionEventDetails: args.projectUpdaters.updateActionEventDetails,
     onDeleteMotionRegion: args.projectUpdaters.deleteMotionRegion,
     onGenerateMotionPathFromCursor: args.projectUpdaters.generateMotionPathFromCursor,
@@ -179,7 +178,6 @@ function createWorkspaceSidebarBackgroundActions(args: {
 }
 
 function createWorkspaceSidebarState(args: {
-  diagnosticsContent: React.ReactNode;
   libraries: VideoEditorLibrariesState;
   project: NonNullable<EditorStore['project']>;
   selections: VideoEditorSelections;
@@ -189,8 +187,6 @@ function createWorkspaceSidebarState(args: {
   return {
     activeProjectId: args.project.id,
     collapsed: args.workspace.leftSidebarCollapsed,
-    diagnosticsContent: args.diagnosticsContent,
-    diagnosticsOpen: args.store.diagnosticsOpen,
     gridSettings: {
       color: args.workspace.grid.gridColor,
       enabled: args.workspace.grid.gridEnabled,
@@ -232,7 +228,6 @@ export function createWorkspaceSidebarController(
       workspace: args.workspace,
     }),
     state: createWorkspaceSidebarState({
-      diagnosticsContent: args.diagnosticsContent,
       libraries: args.libraries,
       project,
       selections: args.selections,

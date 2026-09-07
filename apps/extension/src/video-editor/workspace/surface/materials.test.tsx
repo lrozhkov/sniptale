@@ -47,6 +47,7 @@ function renderMaterials() {
   act(() =>
     root.render(
       <VideoEditorMaterials
+        onShowUse={vi.fn()}
         onRemoveUnused={onRemoveUnused}
         onOpenLibrary={onOpenLibrary}
         project={project}
@@ -61,10 +62,56 @@ function renderMaterials() {
 
 it('opens the selected source without editing the timeline or filling the list with placement controls', () => {
   const { asset, onSelect, project } = renderMaterials();
-  act(() => container.querySelector<HTMLButtonElement>('button[aria-pressed]')!.click());
+  act(() =>
+    container.querySelector<HTMLButtonElement>('[data-material-id] button[aria-pressed]')!.click()
+  );
   expect(onSelect).toHaveBeenCalledWith(asset);
   expect(project.clips).toEqual([]);
   expect(container.textContent).not.toContain(translate('videoEditor.app.materialsAppend'));
+});
+
+it('includes library recordings alongside local video in the Video category', async () => {
+  const { asset, project, onImport, onSelect, onRemoveUnused } = renderMaterials();
+  document.body.append(container);
+  project.assets.push(
+    {
+      ...asset,
+      id: 'library-recording',
+      type: VideoProjectAssetType.RECORDING,
+      name: 'Recorded screen.webm',
+    },
+    { ...asset, id: 'image', type: VideoProjectAssetType.IMAGE, name: 'Screenshot.png' }
+  );
+  act(() =>
+    root.render(
+      <VideoEditorMaterials
+        project={project}
+        onImport={onImport}
+        onSelect={onSelect}
+        onRemoveUnused={onRemoveUnused}
+        onOpenLibrary={onOpenLibrary}
+        onShowUse={vi.fn()}
+        selectedAssetId={null}
+      />
+    )
+  );
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>(
+        `[aria-label="${translate('videoEditor.sidebar.materialsCategory')}"]`
+      )!
+      .click()
+  );
+  const videoOption = Array.from(document.querySelectorAll<HTMLElement>('[role="option"]')).find(
+    (option) => option.textContent === translate('videoEditor.app.materialsVideo')
+  );
+  expect(videoOption).toBeDefined();
+  await act(async () => videoOption!.click());
+  expect(
+    Array.from(container.querySelectorAll('[data-material-id]')).map((row) =>
+      row.getAttribute('data-material-id')
+    )
+  ).toEqual([asset.id, 'library-recording']);
 });
 
 it('imports only into materials and rejects duplicate file input while loading', async () => {
@@ -109,6 +156,7 @@ it('dismisses Import before the armed canvas insertion and restores its trigger'
       <>
         <ArmedInsertion onCancel={onCancel} />
         <VideoEditorMaterials
+          onShowUse={vi.fn()}
           onRemoveUnused={vi.fn()}
           onOpenLibrary={onOpenLibrary}
           project={project}
@@ -159,6 +207,7 @@ it('yields focus to an inspector select without retaining a competing menu layer
           ]}
         />
         <VideoEditorMaterials
+          onShowUse={vi.fn()}
           onRemoveUnused={vi.fn()}
           onOpenLibrary={onOpenLibrary}
           project={project}
@@ -230,6 +279,7 @@ it('anchors import in the footer and only exposes removal for unused materials',
   act(() =>
     root.render(
       <VideoEditorMaterials
+        onShowUse={vi.fn()}
         project={project}
         selectedAssetId={asset.id}
         onOpenLibrary={onOpenLibrary}
@@ -245,4 +295,65 @@ it('anchors import in the footer and only exposes removal for unused materials',
       .disabled
   ).toBe(true);
   expect(container.textContent).toContain(translate('videoEditor.app.materialsUsed'));
+});
+
+it('filters used materials and searches names without changing the bulk-removal scope', () => {
+  const { asset, project, onImport, onSelect, onRemoveUnused } = renderMaterials();
+  project.assets.push({ ...asset, id: 'unused', name: 'Unused.webm' });
+  project.clips = [createVideoClipFromAsset(project.tracks[0]!.id, asset, 1280, 720, 0)];
+  act(() =>
+    root.render(
+      <VideoEditorMaterials
+        onShowUse={vi.fn()}
+        project={project}
+        onImport={onImport}
+        onSelect={onSelect}
+        onRemoveUnused={onRemoveUnused}
+        onOpenLibrary={onOpenLibrary}
+        selectedAssetId={null}
+      />
+    )
+  );
+  const rows = () =>
+    Array.from(container.querySelectorAll('[data-material-id]')).map((n) =>
+      n.getAttribute('data-material-id')
+    );
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>(
+        `[aria-label="${translate('videoEditor.sidebar.materialsHideUsed')}"]`
+      )!
+      .click()
+  );
+  expect(rows()).toEqual(['unused']);
+  act(() =>
+    container.querySelector<HTMLButtonElement>('[data-ui="video-editor.materials.search"]')!.click()
+  );
+  const input = container.querySelector<HTMLInputElement>(
+    `[aria-label="${translate('videoEditor.sidebar.materialsSearch')}"]`
+  )!;
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+      input,
+      'missing'
+    );
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(rows()).toEqual([]);
+  expect(container.textContent).toContain(translate('videoEditor.sidebar.materialsNoMatches'));
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>('[data-ui="video-editor.materials.remove-unused"]')!
+      .click()
+  );
+  expect(onRemoveUnused).toHaveBeenCalledWith(undefined);
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>(
+        `[aria-label="${translate('videoEditor.sidebar.materialsCloseSearch')}"]`
+      )!
+      .click()
+  );
+  expect(rows()).toEqual(['unused']);
+  expect(onSelect).not.toHaveBeenCalled();
 });

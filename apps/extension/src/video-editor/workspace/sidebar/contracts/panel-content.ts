@@ -3,7 +3,6 @@ import type { WorkspaceSidebarProps } from './props';
 
 type WorkspaceSidebarPanelContentPropKeys =
   | 'activeProjectId'
-  | 'diagnosticsContent'
   | 'gridSettings'
   | 'inspectorMode'
   | 'onAddActionEvent'
@@ -93,10 +92,7 @@ export interface WorkspaceSidebarPanelContentSharedProps extends Pick<
   WorkspaceSidebarProps,
   WorkspaceSidebarPanelContentPropKeys
 > {
-  diagnosticsMeta: string;
-  diagnosticsSectionOpen: boolean;
   inputRefs: VideoEditorFileInputRefs;
-  onToggleDiagnosticsSection: () => void;
   onToggleProjectsOpen: () => void;
   onToggleRecordingsOpen: () => void;
   projectsOpen: boolean;

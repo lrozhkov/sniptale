@@ -1523,12 +1523,6 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
-      "file": "apps/extension/src/video-editor/diagnostics/panel/action-text.ts",
-      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
-      "rule": "policy-state-descriptor-required",
-      "noiseId": "noise.policy-state-descriptor.non-authority-signals"
-    },
-    {
       "file": "apps/extension/src/video-editor/export/dialog/capability-state.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: capability-path.",
       "rule": "policy-state-descriptor-required",

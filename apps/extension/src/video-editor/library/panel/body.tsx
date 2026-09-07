@@ -1,106 +1,70 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react';
-import { ProductModalHeader } from '@sniptale/ui/product-modal';
-import { VideoEditorFileInputNodes } from '../../chrome/file-inputs';
+import { matchesLibraryFilters } from '../../../features/media-hub/library-filters';
+import { useDeferredValue, useMemo, useState } from 'react';
 import { LibraryPanelDrawerContent } from './content';
-import { buildLibraryPanelState } from './state';
-import { LibraryPanelTitle, type LibraryPanelTab } from './sections';
 import { useLibraryThumbnails } from './thumbnails/use-thumbnails';
-import type { LibraryThumbnailItem } from './thumbnails/types';
 import type { VideoEditorLibraryPanelBodyProps } from '../contracts/panel';
-
-function createImportHandler(onImport: (file: File) => void, onClose: () => void) {
-  return (file: File) => {
-    onImport(file);
-    onClose();
-  };
-}
-
-function LibraryPanelInputs(props: VideoEditorLibraryPanelBodyProps) {
-  const handleImportImage = createImportHandler(props.onImportImage, props.onClose);
-  const handleImportVideo = createImportHandler(props.onImportVideo, props.onClose);
-  const handleImportAudio = createImportHandler(props.onImportAudio, props.onClose);
-
-  return (
-    <VideoEditorFileInputNodes
-      {...props.inputRefs}
-      onImportAudio={handleImportAudio}
-      onImportImage={handleImportImage}
-      onImportVideo={handleImportVideo}
-    />
-  );
-}
-
-function createThumbnailItems(
-  libraryState: ReturnType<typeof buildLibraryPanelState>
-): LibraryThumbnailItem[] {
-  const projectItems = libraryState.visibleProjects.map((project) => ({
-    createdAt: project.updatedAt,
-    id: project.id,
-    mimeType: null,
-    sourceMediaId: project.thumbnailSourceMediaId,
-    thumbnailId: project.thumbnailId,
-    ...(project.workspaceRevision === undefined
-      ? {}
-      : { workspaceRevision: project.workspaceRevision }),
-  }));
-  const recordingItems = libraryState.visibleRecordings.map((recording) => ({
-    createdAt: recording.createdAt,
-    id: recording.id,
-    mimeType: recording.mimeType,
-    sourceMediaId: recording.thumbnailId,
-    thumbnailId: recording.thumbnailId,
-  }));
-
-  return [...projectItems, ...recordingItems];
-}
 
 export function VideoEditorLibraryPanelBody(props: VideoEditorLibraryPanelBodyProps) {
   const [query, setQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<LibraryPanelTab>('media');
-  const deferredQuery = useDeferredValue(query);
-  const diagnosticsAvailable = props.recordingId !== null;
-  const libraryState = useMemo(
-    () =>
-      buildLibraryPanelState({
-        activeProjectId: props.activeProjectId,
-        projects: props.projects,
-        query: deferredQuery,
-        recordings: props.recordings,
-      }),
-    [deferredQuery, props.activeProjectId, props.projects, props.recordings]
+  const [category, setCategory] = useState<'video' | 'image'>('video');
+  const [presetId, setPresetId] = useState<string | null>(null);
+  const savedViews = props.savedViews.filter((view) =>
+    ['all', 'recording', 'screenshot'].includes(view.folderFilter)
   );
-  const thumbnailItems = useMemo(() => createThumbnailItems(libraryState), [libraryState]);
+  const preset = savedViews.find((view) => view.id === presetId);
+  const normalizedQuery = useDeferredValue(query).trim().toLocaleLowerCase();
+  const items = useMemo(
+    () =>
+      props.items.filter((item) => {
+        if (item.source.kind === 'project-asset') return false;
+        const eligible =
+          category === 'image'
+            ? item.kind === 'image' || item.kind === 'screenshot'
+            : ['recording', 'video', 'export'].includes(item.kind) &&
+              item.mimeType.startsWith('video/');
+        return (
+          eligible &&
+          item.filename.toLocaleLowerCase().includes(normalizedQuery) &&
+          (!preset || matchesLibraryFilters(item, preset.filters, Date.now()))
+        );
+      }),
+    [props.items, category, normalizedQuery, preset]
+  );
+  const thumbnailItems = useMemo(
+    () =>
+      items.map((item) => ({
+        createdAt: item.createdAt,
+        id: item.id,
+        mimeType: item.mimeType,
+        sourceMediaId: item.id,
+        thumbnailId: item.id,
+        ...(item.workspaceRevision === undefined
+          ? {}
+          : { workspaceRevision: item.workspaceRevision }),
+      })),
+    [items]
+  );
   const thumbnails = useLibraryThumbnails(thumbnailItems);
-
-  useEffect(() => {
-    if (!diagnosticsAvailable && activeTab === 'diagnostics') {
-      setActiveTab('media');
-    }
-  }, [activeTab, diagnosticsAvailable]);
-
   return (
-    <>
-      <LibraryPanelInputs {...props} />
-      <ProductModalHeader
-        title={
-          <LibraryPanelTitle
-            projectsCount={props.projects.length}
-            recordingsCount={props.recordings.length}
-          />
-        }
-        onClose={props.onClose}
-        compact
-      />
-      <LibraryPanelDrawerContent
-        {...props}
-        {...libraryState}
-        activeTab={activeTab}
-        diagnosticsAvailable={diagnosticsAvailable}
-        onQueryChange={setQuery}
-        onTabChange={setActiveTab}
-        query={query}
-        thumbnails={thumbnails}
-      />
-    </>
+    <LibraryPanelDrawerContent
+      {...props}
+      items={items}
+      query={query}
+      onQueryChange={setQuery}
+      category={category}
+      onCategoryChange={(next) => {
+        setCategory(next);
+        setPresetId(null);
+      }}
+      savedViews={savedViews}
+      presetId={preset?.id ?? null}
+      onPresetChange={(id) => {
+        const view = savedViews.find((candidate) => candidate.id === id);
+        setPresetId(id);
+        if (view?.folderFilter === 'recording') setCategory('video');
+        if (view?.folderFilter === 'screenshot') setCategory('image');
+      }}
+      thumbnails={thumbnails}
+    />
   );
 }

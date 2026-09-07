@@ -73,3 +73,26 @@ it('retains membership when media has been materialized into a project asset', (
     })
   ).toBe(true);
 });
+
+it('preserves library provenance through serialization and hydration', () => {
+  const project = recording();
+  const asset = project.assets[0];
+  if (!asset) throw new Error('Missing fixture');
+  asset.source = {
+    kind: 'project-asset',
+    projectAssetId: 'copy',
+    originRecordingId: 'screen',
+    originMediaId: 'library-screen',
+  };
+  const parsed = parseHydratableVideoProject(JSON.parse(JSON.stringify(project)));
+  if (!parsed) throw new Error('Project rejected');
+  expect(hydrateVideoProject(parsed).assets[0]?.source).toEqual(asset.source);
+});
+
+it.each([null, 42, {}, []])('rejects malformed library provenance %j', (originMediaId) => {
+  const asset = {
+    ...recording().assets[0],
+    source: { kind: 'project-asset', projectAssetId: 'copy', originMediaId },
+  };
+  expect(isVideoProjectAsset(asset)).toBe(false);
+});

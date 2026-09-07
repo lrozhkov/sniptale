@@ -6,7 +6,6 @@ import type { VideoEditorWorkspaceState } from '../workspace-state';
 import type {
   AnnotationEditingPort,
   ClipSelectionPort,
-  DiagnosticsTelemetryPort,
   ExportPort,
   PlaybackPort,
   ProjectLifecyclePort,
@@ -57,17 +56,6 @@ interface CreateWorkspacePreviewArgs {
   selections: Pick<VideoEditorSelections, 'selectedActionEvent' | 'selectedMotionRegion'>;
   store: PreviewStore;
   workspace: Pick<VideoEditorWorkspaceState, 'grid' | 'inspector' | 'playbackRange' | 'preview'>;
-}
-
-export function createWorkspaceDiagnosticsController(
-  store: Pick<DiagnosticsTelemetryPort, 'diagnosticsOpen' | 'setDiagnosticsOpen'> &
-    Pick<ProjectLifecyclePort, 'recordingId'>
-) {
-  return {
-    isOpen: store.diagnosticsOpen,
-    onClose: () => store.setDiagnosticsOpen(false),
-    recordingId: store.recordingId,
-  };
 }
 
 function createHeaderGridController(workspace: Pick<VideoEditorWorkspaceState, 'grid'>) {

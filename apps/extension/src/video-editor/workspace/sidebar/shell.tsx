@@ -15,40 +15,29 @@ import { WorkspaceSidebarPanelContent } from './panel-content/index';
 interface WorkspaceSidebarExpandedPanelProps extends WorkspaceSidebarProps {
   selectionIcon: React.ReactNode;
   selectionTitle: string;
-  diagnosticsMeta: string;
   projectsOpen: boolean;
   recordingsOpen: boolean;
-  diagnosticsSectionOpen: boolean;
   inputRefs: VideoEditorFileInputRefs;
   onToggleProjectsOpen: () => void;
   onToggleRecordingsOpen: () => void;
-  onToggleDiagnosticsSection: () => void;
 }
 
 export function WorkspaceSidebarCollapsedShell({
   selectedClipLabel,
   selectedClipIcon,
-  diagnosticsOpen,
   inputRefs,
   onToggleCollapsed,
   onCreateProject,
   onImportImage,
   onImportVideo,
   onImportAudio,
-  onToggleDiagnostics,
 }: Pick<
   WorkspaceSidebarProps,
-  | 'diagnosticsOpen'
-  | 'onToggleCollapsed'
-  | 'onCreateProject'
-  | 'onImportImage'
-  | 'onImportVideo'
-  | 'onImportAudio'
+  'onToggleCollapsed' | 'onCreateProject' | 'onImportImage' | 'onImportVideo' | 'onImportAudio'
 > & {
   selectedClipLabel: string;
   selectedClipIcon: React.ReactNode;
   inputRefs: VideoEditorFileInputRefs;
-  onToggleDiagnostics: () => void;
 }) {
   return (
     <>
@@ -61,13 +50,11 @@ export function WorkspaceSidebarCollapsedShell({
       <WorkspaceSidebarCollapsedRail
         selectedClipLabel={selectedClipLabel}
         selectedClipIcon={selectedClipIcon}
-        diagnosticsOpen={diagnosticsOpen}
         onToggleCollapsed={onToggleCollapsed}
         onCreateProject={onCreateProject}
         onImportImage={() => inputRefs.imageInputRef.current?.click()}
         onImportVideo={() => inputRefs.videoInputRef.current?.click()}
         onImportAudio={() => inputRefs.audioInputRef.current?.click()}
-        onToggleDiagnostics={onToggleDiagnostics}
       />
     </>
   );

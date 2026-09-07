@@ -16,6 +16,7 @@ export interface VideoEditorActionHandlers {
   handleCreateProject: () => Promise<void>;
   handleDeleteProject: (projectId: string) => Promise<void>;
   handleAddRecording: (recordingId: string) => Promise<void>;
+  handleAddLibraryMedia: (mediaId: string) => Promise<void>;
   handleImportImage: (file: File, placement?: VideoEditorImportPlacement) => Promise<void>;
   handleImportVideo: (file: File, placement?: VideoEditorImportPlacement) => Promise<void>;
   handleImportAudio: (file: File, placement?: VideoEditorImportPlacement) => Promise<void>;
@@ -70,6 +71,7 @@ export interface VideoEditorCommandHandlers {
   assets: Pick<
     VideoEditorActionHandlers,
     | 'handleAddRecording'
+    | 'handleAddLibraryMedia'
     | 'handleImportAudio'
     | 'handleImportImage'
     | 'handleImportRecordedAudio'

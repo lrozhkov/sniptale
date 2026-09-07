@@ -12,6 +12,7 @@ function createProjectCrudActions(): Pick<
   | 'onDeleteProject'
   | 'onOpenProject'
   | 'onAddRecording'
+  | 'onAddLibraryMedia'
   | 'onImportAudio'
   | 'onImportImage'
   | 'onImportRecordedAudio'
@@ -19,6 +20,7 @@ function createProjectCrudActions(): Pick<
 > {
   return {
     onAddRecording: noop(),
+    onAddLibraryMedia: vi.fn(async () => undefined),
     onCreateProject: noop(),
     onDeleteProject: noop(),
     onImportAudio: noop(),
@@ -88,7 +90,6 @@ function createProjectEditActions(): Omit<
     onToggleTrackLock: noop(),
     onToggleTrackVisibility: noop(),
     onToggleCollapsed: noop(),
-    onToggleDiagnostics: noop(),
     onUpdateActionEventDetails: noop(),
     onUpdateCursorSampleInterpolation: noop(),
     onUpdateCursorSampleSkinOverride: noop(),
@@ -148,8 +149,6 @@ export function createSidebarController(
     state: {
       activeProjectId: project.id,
       collapsed: false,
-      diagnosticsContent: null,
-      diagnosticsOpen: false,
       gridSettings: {
         color: '#94a3b8',
         enabled: false,

@@ -6,7 +6,6 @@ import { buildVideoEditorCommandPaletteActions } from './actions';
 
 function createPaletteController(): VideoEditorCommandPaletteController {
   return {
-    diagnosticsOpen: false,
     isPlaying: false,
     leftSidebarCollapsed: false,
     onAddShapeOverlay: vi.fn(),
@@ -16,7 +15,6 @@ function createPaletteController(): VideoEditorCommandPaletteController {
     onOpenExportDialog: vi.fn(),
     onSplitSelectedClip: vi.fn(),
     selectedClipId: 'clip-1',
-    toggleDiagnostics: vi.fn(),
     togglePlaying: vi.fn(),
     toggleSidebarCollapsed: vi.fn(),
   };
@@ -49,7 +47,6 @@ it('routes project and playback actions without retired annotation tools', () =>
   selectAction(controller, 'video-editor-open-export', history).onSelect();
   selectAction(controller, 'video-editor-undo', history).onSelect();
   selectAction(controller, 'video-editor-toggle-sidebar').onSelect();
-  selectAction(controller, 'video-editor-toggle-diagnostics').onSelect();
   selectAction(controller, 'video-editor-toggle-playback').onSelect();
   const actions = buildVideoEditorCommandPaletteActions(controller, history);
 
@@ -57,7 +54,7 @@ it('routes project and playback actions without retired annotation tools', () =>
   expect(history.onUndo).toHaveBeenCalledTimes(1);
   expect(selectAction(controller, 'video-editor-redo', history).disabled).toBe(true);
   expect(controller.toggleSidebarCollapsed).toHaveBeenCalledTimes(1);
-  expect(controller.toggleDiagnostics).toHaveBeenCalledTimes(1);
+  expect(actions.some((action) => action.id === 'video-editor-toggle-diagnostics')).toBe(false);
   expect(controller.togglePlaying).toHaveBeenCalledTimes(1);
   expect(actions.some((action) => action.id === 'video-editor-add-text')).toBe(false);
   expect(actions.some((action) => action.id === 'video-editor-add-rectangle')).toBe(false);
@@ -110,7 +107,7 @@ it('reports history failures instead of presenting failed commands as empty hist
   );
 });
 
-it('uses toggle subtitles for playback and diagnostics actions', () => {
+it('uses toggle subtitles for playback actions', () => {
   const controller = createPaletteController();
   controller.isPlaying = true;
 
@@ -118,8 +115,5 @@ it('uses toggle subtitles for playback and diagnostics actions', () => {
 
   expect(actions.find((action) => action.id === 'video-editor-toggle-playback')?.subtitle).toBe(
     translate('shared.ui.commandPaletteCurrentContextHint')
-  );
-  expect(actions.find((action) => action.id === 'video-editor-toggle-diagnostics')?.subtitle).toBe(
-    translate('shared.ui.commandPaletteToggleHint')
   );
 });
