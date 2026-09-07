@@ -117,13 +117,13 @@ it.each(['escape', 'pointercancel', 'lostpointercapture'])(
     expect(captured).toBe(false);
   }
 );
-it('scrubs the independent ruler without replacing the selected range', () => {
+it('selects the same range from the ruler as from the lane, without a separate scrub mode', () => {
   pointer('pointerdown', 100, host.querySelector('[data-source-ruler]')!);
   pointer('pointermove', 200);
   pointer('pointerup', 200);
-  expect(seek).toHaveBeenLastCalledWith(2);
-  expect(commit).not.toHaveBeenCalled();
-  expect(range()).toEqual({ start: 1, end: 3 });
+  expect(seek).toHaveBeenLastCalledWith(1);
+  expect(commit).toHaveBeenCalledExactlyOnceWith({ start: 1, end: 2 });
+  expect(range()).toEqual({ start: 1, end: 2 });
 });
 it('resizes edges by frame with keyboard and ignores all gestures while unavailable', () => {
   const end = host.querySelector('[data-source-edge="end"]')!;
@@ -164,4 +164,24 @@ it('keeps fractional-duration keyboard boundaries on frames and preserves the ex
   );
   expect(range().start).toBeCloseTo(119 / 30);
   expect(range().end - range().start).toBeGreaterThanOrEqual(1 / 30);
+});
+
+it('selects the entire source with the range action and does not start a drag', () => {
+  const all = host.querySelector<HTMLButtonElement>('[data-ui="video-editor.source-range.all"]')!;
+  expect(all).not.toBeNull();
+  act(() => all.click());
+  expect(range()).toEqual({ start: 0, end: 4 });
+  expect(captured).toBe(false);
+  expect(all.disabled).toBe(true);
+});
+it('selects all with the local keyboard shortcut and keeps clicks independent from the range', () => {
+  const ruler = host.querySelector('[data-source-ruler]')!;
+  pointer('pointerdown', 350, ruler);
+  pointer('pointerup', 350);
+  expect(seek).toHaveBeenLastCalledWith(3.5);
+  expect(commit).not.toHaveBeenCalled();
+  act(() =>
+    ruler.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true }))
+  );
+  expect(range()).toEqual({ start: 0, end: 4 });
 });

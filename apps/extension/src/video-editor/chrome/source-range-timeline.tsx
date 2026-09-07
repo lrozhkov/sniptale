@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
+import { ScanLine } from 'lucide-react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { formatPreciseTime } from '../contracts/time-format';
 import { translate } from '../../platform/i18n';
 import type { VideoEditorMaterialSourceRange } from '../contracts/insertion';
 
@@ -18,7 +21,7 @@ type Gesture = {
   x: number;
   cursor: number;
   range: VideoEditorMaterialSourceRange;
-  mode: 'seek' | 'select' | 'start' | 'end';
+  mode: 'select' | 'start' | 'end';
   preview: VideoEditorMaterialSourceRange | null;
 };
 
@@ -68,12 +71,7 @@ function useSourceRangeGesture(props: SourceTimelineProps) {
       event.target instanceof Element
         ? event.target.closest('[data-source-edge]')?.getAttribute('data-source-edge')
         : null;
-    const mode =
-      target === 'start' || target === 'end'
-        ? target
-        : event.target instanceof Element && event.target.closest('[data-source-ruler]')
-          ? 'seek'
-          : 'select';
+    const mode = target === 'start' || target === 'end' ? target : 'select';
     const origin = timeAt(event.clientX);
     drag.current = {
       pointerId: event.pointerId,
@@ -87,16 +85,12 @@ function useSourceRangeGesture(props: SourceTimelineProps) {
     plane.current!.setPointerCapture(event.pointerId);
     if (event.target instanceof HTMLElement)
       event.target.closest<HTMLElement>('[role="slider"]')?.focus();
-    if (mode === 'seek' || mode === 'select') props.onSeek(origin);
+    if (mode === 'select') props.onSeek(origin);
   };
   const move = (event: PointerEvent<HTMLDivElement>) => {
     const current = drag.current;
     if (!current || event.pointerId !== current.pointerId) return;
     const time = timeAt(event.clientX);
-    if (current.mode === 'seek') {
-      props.onSeek(time);
-      return;
-    }
     if (Math.abs(event.clientX - current.x) < 4 && !current.preview) return;
     const range =
       current.mode === 'select'
@@ -130,7 +124,7 @@ function constrainSourceRange(
   return { start, end: Math.min(duration, Math.max(end, firstEnd)) };
 }
 
-/** Ruler seeks, the source lane selects, and handles trim the selected source interval. */
+/** Click positions playback, drag selects on either surface, and visible handles resize the interval. */
 export function SourceRangeTimeline(props: SourceTimelineProps) {
   const gesture = useSourceRangeGesture(props);
   const [width, setWidth] = useState(640);
@@ -148,96 +142,143 @@ export function SourceRangeTimeline(props: SourceTimelineProps) {
   const markers = sourceRulerMarkers(props.duration, width);
   return (
     <div
-      ref={gesture.plane}
-      data-ui="video-editor.source-range"
-      data-in={range.start}
-      data-out={range.end}
-      className="relative min-w-0 select-none touch-none px-0 pb-1"
-      onPointerDown={gesture.down}
-      onPointerMove={gesture.move}
-      onPointerUp={() => gesture.finish(false)}
-      onPointerCancel={() => gesture.finish(true)}
-      onLostPointerCapture={() => gesture.finish(true)}
+      className="@container/source-range"
+      onKeyDown={(event) => {
+        if (props.disabled || !(event.ctrlKey || event.metaKey) || event.key.toLowerCase() !== 'a')
+          return;
+        event.preventDefault();
+        event.stopPropagation();
+        props.onRange({ start: 0, end: props.duration });
+      }}
     >
       <div
-        data-source-ruler="true"
-        role="slider"
-        tabIndex={props.disabled ? -1 : 0}
-        aria-label={translate('videoEditor.app.sourcePosition')}
-        aria-disabled={props.disabled}
-        aria-valuemin={0}
-        aria-valuemax={props.duration}
-        aria-valuenow={props.cursor}
-        className={[
-          'relative h-7 cursor-ew-resize overflow-hidden focus-visible:outline',
-          'focus-visible:outline-1',
-          'focus-visible:outline-[var(--sniptale-color-focus-ring)]',
-        ].join(' ')}
-        onKeyDown={(event) => {
-          if (props.disabled) return;
-          const time =
-            event.key === 'Home'
-              ? 0
-              : event.key === 'End'
-                ? props.duration
-                : event.key === 'ArrowLeft'
-                  ? props.cursor - 1 / props.fps
-                  : event.key === 'ArrowRight'
-                    ? props.cursor + 1 / props.fps
-                    : null;
-          if (time === null) return;
-          event.preventDefault();
-          event.stopPropagation();
-          props.onSeek(time);
-        }}
+        ref={gesture.plane}
+        data-ui="video-editor.source-range"
+        data-in={range.start}
+        data-out={range.end}
+        className="relative min-w-0 select-none touch-none px-0 pb-1"
+        onPointerDown={gesture.down}
+        onPointerMove={gesture.move}
+        onPointerUp={() => gesture.finish(false)}
+        onPointerCancel={() => gesture.finish(true)}
+        onLostPointerCapture={() => gesture.finish(true)}
       >
-        {markers
-          .filter((marker) => marker.second <= props.duration)
-          .map((marker) => (
-            <span
-              key={marker.id}
-              aria-hidden="true"
-              className={[
-                'pointer-events-none absolute bottom-0 h-2 border-l',
-                'border-[var(--sniptale-color-border-soft)]',
-              ].join(' ')}
-              style={{ left: percent(marker.second) }}
-            >
-              <span className="absolute -top-4 left-1 text-[10px] text-[var(--sniptale-color-text-muted)]">
-                {marker.label}
-              </span>
-            </span>
-          ))}
-      </div>
-      <div
-        className={[
-          'relative cursor-crosshair rounded bg-[var(--sniptale-color-surface-hover)]',
-          props.peaks ? 'h-16' : 'h-10',
-        ].join(' ')}
-        data-ui="video-editor.source-lane"
-      >
-        {props.peaks && <SourceWaveform peaks={props.peaks} />}
         <div
-          className="absolute inset-y-0 bg-[var(--sniptale-color-accent-soft)]"
-          style={{ left: percent(range.start), width: percent(range.end - range.start) }}
-        />
-        {(['start', 'end'] as const).map((edge) => (
-          <SourceRangeEdge
-            key={edge}
-            edge={edge}
-            range={range}
-            props={props}
-            position={percent(range[edge])}
+          data-source-ruler="true"
+          role="slider"
+          tabIndex={props.disabled ? -1 : 0}
+          aria-label={translate('videoEditor.app.sourcePosition')}
+          aria-disabled={props.disabled}
+          aria-valuemin={0}
+          aria-valuemax={props.duration}
+          aria-valuenow={props.cursor}
+          className={[
+            'relative h-7 cursor-pointer overflow-hidden focus-visible:outline',
+            'focus-visible:outline-1',
+            'focus-visible:outline-[var(--sniptale-color-focus-ring)]',
+          ].join(' ')}
+          onKeyDown={(event) => {
+            if (props.disabled) return;
+            const time =
+              event.key === 'Home'
+                ? 0
+                : event.key === 'End'
+                  ? props.duration
+                  : event.key === 'ArrowLeft'
+                    ? props.cursor - 1 / props.fps
+                    : event.key === 'ArrowRight'
+                      ? props.cursor + 1 / props.fps
+                      : null;
+            if (time === null) return;
+            event.preventDefault();
+            event.stopPropagation();
+            props.onSeek(time);
+          }}
+        >
+          {markers
+            .filter((marker) => marker.second <= props.duration)
+            .map((marker) => (
+              <span
+                key={marker.id}
+                aria-hidden="true"
+                className={[
+                  'pointer-events-none absolute bottom-0 h-2 border-l',
+                  'border-[var(--sniptale-color-border-soft)]',
+                ].join(' ')}
+                style={{ left: percent(marker.second) }}
+              >
+                <span className="absolute -top-4 left-1 text-[10px] text-[var(--sniptale-color-text-muted)]">
+                  {marker.label}
+                </span>
+              </span>
+            ))}
+        </div>
+        <div
+          title={translate('videoEditor.app.sourceRangeHint')}
+          className={[
+            'relative cursor-pointer rounded bg-[var(--sniptale-color-surface-hover)]',
+            props.peaks ? 'h-16' : 'h-10',
+          ].join(' ')}
+          data-ui="video-editor.source-lane"
+        >
+          {props.peaks && <SourceWaveform peaks={props.peaks} />}
+          <div
+            className="absolute inset-y-0 bg-[var(--sniptale-color-accent-soft)]"
+            style={{ left: percent(range.start), width: percent(range.end - range.start) }}
           />
-        ))}
+          {(['start', 'end'] as const).map((edge) => (
+            <SourceRangeEdge
+              key={edge}
+              edge={edge}
+              range={range}
+              props={props}
+              position={percent(range[edge])}
+            />
+          ))}
+        </div>
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0 w-px bg-[var(--sniptale-color-accent)]"
+          style={{ left: percent(props.cursor) }}
+        >
+          <span className="absolute -left-1 top-0 h-2 w-2 rounded-b-sm bg-[var(--sniptale-color-accent)]" />
+        </div>
       </div>
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-y-0 w-px bg-[var(--sniptale-color-accent)]"
-        style={{ left: percent(props.cursor) }}
+      <SourceRangeActions props={props} range={range} />
+    </div>
+  );
+}
+
+function SourceRangeActions({
+  props,
+  range,
+}: {
+  props: SourceTimelineProps;
+  range: VideoEditorMaterialSourceRange;
+}) {
+  const full = range.start === 0 && range.end === props.duration;
+  return (
+    <div className="flex min-w-0 items-center justify-between gap-2 pt-1 text-xs">
+      <span className="min-w-0 truncate text-[var(--sniptale-color-text-muted)] @max-[520px]/source-range:hidden">
+        {translate('videoEditor.app.sourceRangeHint')}
+      </span>
+      <output
+        className="ml-auto shrink-0 tabular-nums text-[var(--sniptale-color-text-secondary)]"
+        aria-label={translate('videoEditor.app.sourceSelectedRange')}
       >
-        <span className="absolute -left-1 top-0 h-2 w-2 rounded-b-sm bg-[var(--sniptale-color-accent)]" />
-      </div>
+        {formatPreciseTime(range.start)} — {formatPreciseTime(range.end)}
+      </output>
+      <ContentToolbarButton
+        dataUi="video-editor.source-range.all"
+        className="!h-7 !w-auto !min-w-fit !gap-1.5 !px-2"
+        aria-label={translate('videoEditor.app.sourceReset')}
+        title={translate('videoEditor.app.sourceReset')}
+        disabled={props.disabled || props.duration <= 0 || full}
+        onClick={() => props.onRange({ start: 0, end: props.duration })}
+      >
+        <ScanLine size={14} aria-hidden="true" />
+        <span>{translate('videoEditor.app.sourceEntireSource')}</span>
+      </ContentToolbarButton>
     </div>
   );
 }
@@ -297,6 +338,16 @@ function SourceRangeEdge({
           edge === 'start' ? 'left-0' : 'right-0',
         ].join(' ')}
       />
+      <span
+        aria-hidden="true"
+        className={[
+          'absolute top-1/2 h-6 w-2 -translate-y-1/2 rounded-sm',
+          'bg-[var(--sniptale-color-accent)] shadow-sm',
+          edge === 'start' ? 'left-0' : 'right-0',
+        ].join(' ')}
+      >
+        <span className="absolute inset-y-1.5 left-1/2 w-px -translate-x-1/2 bg-[var(--sniptale-color-text-inverse)]" />
+      </span>
     </button>
   );
 }

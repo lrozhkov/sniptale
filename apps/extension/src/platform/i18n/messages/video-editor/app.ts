@@ -45,6 +45,12 @@ export const videoEditorAppMessages = defineMessageSource({
   sourceMarkIn: { ru: 'Начало фрагмента (I)', en: 'Mark In (I)' },
   sourceMarkOut: { ru: 'Последний кадр фрагмента (O)', en: 'Mark Out (O)' },
   sourceReset: { ru: 'Выбрать исходник целиком', en: 'Use entire source' },
+  sourceEntireSource: { ru: 'Весь исходник', en: 'Entire source' },
+  sourceSelectedRange: { ru: 'Выбранный фрагмент', en: 'Selected range' },
+  sourceRangeHint: {
+    ru: 'Клик — позиция · потяните для выделения',
+    en: 'Click to seek · drag to select',
+  },
   sourceLoading: { ru: 'Загружаем исходник…', en: 'Loading source…' },
   sourceMediaFailed: {
     ru: 'Не удалось прочитать исходник. Повторите загрузку или выберите другой материал.',

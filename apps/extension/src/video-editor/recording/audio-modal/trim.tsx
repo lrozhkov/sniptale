@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Pause, Play, RotateCcw } from 'lucide-react';
+import { Pause, Play } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { InspectorPanel } from '../../../ui/compact-inspector-controls';
-import { EditorIconButton } from '@sniptale/ui/editor-chrome';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { SourceRangeTimeline } from '../../chrome/source-range-timeline';
 import { useRecordedAudioPeaks } from './waveform';
 import { formatPreciseTime } from '../../contracts/time-format';
@@ -24,7 +24,7 @@ function AudioRecordingTrimPanel(props: AudioRecordingTrimController & { disable
     seek(range.start);
   };
   return (
-    <InspectorPanel data-ui="video-editor.audio-recording.trim-panel" className="grid gap-3 p-4">
+    <InspectorPanel data-ui="video-editor.audio-recording.trim-panel" className="grid gap-2 p-3">
       <audio
         ref={props.audioRef}
         src={props.audioUrl}
@@ -45,7 +45,8 @@ function AudioRecordingTrimPanel(props: AudioRecordingTrimController & { disable
         onRange={select}
       />
       <div className="flex items-center gap-3" data-ui="video-editor.audio-recording.playback">
-        <EditorIconButton
+        <ContentToolbarButton
+          className="!h-9 !w-9 !min-w-9 !px-0"
           disabled={props.disabled}
           title={translate(
             props.isPlayingSelection ? 'videoEditor.timeline.pause' : 'videoEditor.timeline.play'
@@ -56,22 +57,10 @@ function AudioRecordingTrimPanel(props: AudioRecordingTrimController & { disable
           }}
         >
           {props.isPlayingSelection ? <Pause size={16} /> : <Play size={16} />}
-        </EditorIconButton>
+        </ContentToolbarButton>
         <span className="text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
           {formatPreciseTime(cursor)} / {formatPreciseTime(props.recordedDuration)}
         </span>
-        <span className="ml-auto text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
-          {formatPreciseTime(props.trimStart)} — {formatPreciseTime(props.trimEnd)}
-        </span>
-        <EditorIconButton
-          disabled={
-            props.disabled || (props.trimStart === 0 && props.trimEnd === props.recordedDuration)
-          }
-          title={translate('videoEditor.app.sourceReset')}
-          onClick={() => select({ start: 0, end: props.recordedDuration })}
-        >
-          <RotateCcw size={15} />
-        </EditorIconButton>
       </div>
       {peaks === null && (
         <p className="text-xs text-[var(--sniptale-color-text-muted)]">

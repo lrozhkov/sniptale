@@ -4,12 +4,15 @@ import {
   Music,
   Pause,
   Play,
-  RotateCcw,
+  ListEnd,
+  BetweenHorizontalStart,
+  Layers,
   SkipBack,
   SkipForward,
   StepBack,
   StepForward,
 } from 'lucide-react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { SourceRangeTimeline } from '../../chrome/source-range-timeline';
 import { translate } from '../../../platform/i18n';
@@ -104,44 +107,44 @@ function SourceMediaViewer(props: SourceMediaViewerProps) {
           </p>
         )}
         <div
-          className="flex min-w-0 items-center justify-center gap-1"
+          className="flex min-w-0 items-center justify-center gap-3 px-3"
           data-ui="video-editor.source-placement"
         >
-          {!image && (
-            <SourceTimingControls
-              playback={viewer}
-              fps={props.fps}
-              onReset={() =>
-                props.onDraftChange({ ...props.draft, range: { start: 0, end: duration } })
-              }
-            />
-          )}
-          <ProductActionButton
-            compact
-            disabled={!canPlace}
-            title={translate('videoEditor.app.materialsAppend')}
-            onClick={() => place(props.onAppend)}
-          >
-            {translate('videoEditor.app.sourceAppend')}
-          </ProductActionButton>
-          <ProductActionButton
-            compact
-            tone="secondary"
-            disabled={!canPlace}
-            title={translate('videoEditor.app.materialsInsertHint')}
-            onClick={() => place(props.onInsert)}
-          >
-            {translate('videoEditor.app.sourceInsert')}
-          </ProductActionButton>
-          <ProductActionButton
-            compact
-            tone="secondary"
-            disabled={!canPlace}
-            title={translate('videoEditor.app.materialsOverlay')}
-            onClick={() => place(props.onOverlay)}
-          >
-            {translate('videoEditor.app.sourceOverlay')}
-          </ProductActionButton>
+          {!image && <SourceTimingControls playback={viewer} fps={props.fps} />}
+          <div className="flex shrink-0 items-center gap-1 border-l border-[var(--sniptale-color-border-soft)] pl-3">
+            <ProductActionButton
+              compact
+              className="!h-9 !gap-1.5 !px-2.5"
+              disabled={!canPlace}
+              title={translate('videoEditor.app.materialsAppend')}
+              onClick={() => place(props.onAppend)}
+            >
+              <ListEnd size={16} aria-hidden="true" />
+              {translate('videoEditor.app.sourceAppend')}
+            </ProductActionButton>
+            <ProductActionButton
+              compact
+              className="!h-9 !gap-1.5 !px-2.5"
+              tone="secondary"
+              disabled={!canPlace}
+              title={translate('videoEditor.app.materialsInsertHint')}
+              onClick={() => place(props.onInsert)}
+            >
+              <BetweenHorizontalStart size={16} aria-hidden="true" />
+              {translate('videoEditor.app.sourceInsert')}
+            </ProductActionButton>
+            <ProductActionButton
+              compact
+              className="!h-9 !gap-1.5 !px-2.5"
+              tone="secondary"
+              disabled={!canPlace}
+              title={translate('videoEditor.app.materialsOverlay')}
+              onClick={() => place(props.onOverlay)}
+            >
+              <Layers size={16} aria-hidden="true" />
+              {translate('videoEditor.app.sourceOverlay')}
+            </ProductActionButton>
+          </div>
         </div>
         {!image && (
           <SourceRangeTimeline
@@ -169,17 +172,15 @@ function SourceTransportButton(props: {
   children: React.ReactNode;
 }) {
   return (
-    <ProductActionButton
-      compact
-      tone="secondary"
+    <ContentToolbarButton
       disabled={props.disabled}
       aria-label={props.label}
       title={props.label}
-      className="!px-1.5"
+      className="!h-9 !w-9 !min-w-9 !px-0"
       onClick={props.onClick}
     >
       {props.children}
-    </ProductActionButton>
+    </ContentToolbarButton>
   );
 }
 
@@ -256,7 +257,6 @@ function SourceMediaSurface({
 function SourceTimingControls({
   playback,
   fps,
-  onReset,
 }: {
   playback: Pick<
     ReturnType<typeof useSourceMediaViewer>,
@@ -272,7 +272,6 @@ function SourceTimingControls({
     | 'toggle'
   >;
   fps: number;
-  onReset: () => void;
 }) {
   const { cursor, lastFrame, usable, playing, seek, step, toggle } = playback;
   return (
@@ -316,13 +315,6 @@ function SourceTimingControls({
         <output data-source-counter="true" className="px-1 text-xs tabular-nums">
           {sourceTime(cursor, fps)}
         </output>
-        <SourceTransportButton
-          label={translate('videoEditor.app.sourceReset')}
-          disabled={!usable}
-          onClick={onReset}
-        >
-          <RotateCcw size={14} />
-        </SourceTransportButton>
       </div>
     </>
   );
