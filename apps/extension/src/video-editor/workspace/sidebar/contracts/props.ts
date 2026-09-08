@@ -137,7 +137,11 @@ export interface WorkspaceSidebarProps {
   ) => void;
   onUpdateCursorSampleVisibility?: (sampleId: string, visible: boolean) => void;
   onUpdateCursorSkin: (patch: Partial<VideoProjectCursorTrack['skin']>) => void;
-  onUpdateMediaClipFitMode: (clipId: string, fitMode: VideoMediaFitMode) => void;
+  onUpdateMediaClipFitMode: (
+    clipId: string,
+    fitMode: VideoMediaFitMode,
+    fitScalePercent?: number
+  ) => void;
   onUpdateMediaClipFitScalePercent?: (clipId: string, fitScalePercent: number) => void;
   onUpdateMediaClipShadowIntensity?: (clipId: string, shadowIntensity: number) => void;
   onUpdateMediaClipShadowMode?: (clipId: string, shadowMode: VideoMediaShadowMode) => void;

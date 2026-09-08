@@ -1,3 +1,4 @@
+import { getMediaFramingPresets } from '../../../../../features/video/project/factories/framing-presets';
 import { InspectorDetails } from '../shared/details';
 import { translate } from '../../../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -17,6 +18,7 @@ import { getMediaFitModeOptions } from './media-fit-options';
 
 type MediaFrameControlsProps = Pick<
   WorkspaceSidebarSelectionPanelProps,
+  | 'project'
   | 'onApplyMediaClipVisualsToTrack'
   | 'onUpdateMediaClipFitMode'
   | 'onUpdateMediaClipFitScalePercent'
@@ -54,18 +56,21 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
 
   return (
     <div className="space-y-1">
-      <MediaFitModeSelect
-        clipId={props.clip.id}
-        disabled={props.locked}
-        fitMode={props.clip.fitMode}
-        onUpdateMediaClipFitMode={props.onUpdateMediaClipFitMode}
-      />
-      <MediaFitScaleControls
-        clipId={props.clip.id}
-        disabled={props.locked}
-        fitScalePercent={props.clip.fitScalePercent ?? 100}
-        onUpdateMediaClipFitScalePercent={props.onUpdateMediaClipFitScalePercent}
-      />
+      <MediaFramingPresets {...props} />
+      <InspectorDetails label={translate('videoEditor.sidebar.framingFineTune')}>
+        <MediaFitModeSelect
+          clipId={props.clip.id}
+          disabled={props.locked}
+          fitMode={props.clip.fitMode}
+          onUpdateMediaClipFitMode={props.onUpdateMediaClipFitMode}
+        />
+        <MediaFitScaleControls
+          clipId={props.clip.id}
+          disabled={props.locked}
+          fitScalePercent={props.clip.fitScalePercent ?? 100}
+          onUpdateMediaClipFitScalePercent={props.onUpdateMediaClipFitScalePercent}
+        />
+      </InspectorDetails>
       <InspectorDetails label={translate('videoEditor.sidebar.inspectorGroupAppearance')}>
         <MediaShadowControls
           clipId={props.clip.id}
@@ -182,6 +187,80 @@ export function MediaApplyVisualsButton(
       >
         {translate('videoEditor.sidebar.fitApplyToTrackLabel')}
       </ProductActionButton>
+    </div>
+  );
+}
+
+function MediaFramingPresets(props: MediaFrameControlsProps) {
+  const clip = props.clip;
+  const asset =
+    'assetId' in clip ? props.project.assets.find(({ id }) => id === clip.assetId) : undefined;
+  if (!asset || !('fitMode' in clip)) return null;
+  const presets = getMediaFramingPresets(
+    asset.metadata.width,
+    asset.metadata.height,
+    props.project.width,
+    props.project.height
+  );
+  const labels = [
+    translate('videoEditor.sidebar.framingWhole'),
+    translate('videoEditor.sidebar.framingBackground'),
+    translate('videoEditor.sidebar.framingFill'),
+  ];
+  const hints = [
+    translate('videoEditor.sidebar.framingWholeHint'),
+    translate('videoEditor.sidebar.framingBackgroundHint'),
+    translate('videoEditor.sidebar.framingFillHint'),
+  ];
+  return (
+    <div className="grid grid-cols-3 gap-1 pb-2" data-ui="video-editor.framing-presets">
+      {presets.map((preset, index) => {
+        const transform = preset.transform;
+        const active =
+          clip.fitMode === preset.fitMode &&
+          Math.abs((clip.fitScalePercent ?? 100) - preset.fitScalePercent) < 0.01 &&
+          (['x', 'y', 'width', 'height', 'rotation'] as const).every(
+            (key) => Math.abs(clip.transform[key] - transform[key]) < 0.5
+          );
+        return (
+          <ProductActionButton
+            key={preset.id}
+            compact
+            tone="toggle"
+            active={active}
+            aria-pressed={active}
+            disabled={props.locked}
+            aria-label={labels[index]}
+            title={hints[index]}
+            className="!h-auto min-w-0 flex-col !gap-1 !rounded-[var(--sniptale-radius-sm)] !px-1 !py-2"
+            onClick={() =>
+              props.onUpdateMediaClipFitMode(clip.id, preset.fitMode, preset.fitScalePercent)
+            }
+          >
+            <svg
+              width="52"
+              height="32"
+              viewBox={`0 0 ${props.project.width} ${props.project.height}`}
+              preserveAspectRatio="xMidYMid meet"
+              aria-hidden
+              className="overflow-hidden rounded-sm"
+            >
+              <svg width={props.project.width} height={props.project.height} overflow="hidden">
+                <rect width="100%" height="100%" fill="var(--sniptale-color-surface-overlay)" />
+                <rect
+                  x={transform.x}
+                  y={transform.y}
+                  width={transform.width}
+                  height={transform.height}
+                  fill="currentColor"
+                  opacity="0.5"
+                />
+              </svg>
+            </svg>
+            <span className="max-w-full truncate text-[11px]">{labels[index]}</span>
+          </ProductActionButton>
+        );
+      })}
     </div>
   );
 }

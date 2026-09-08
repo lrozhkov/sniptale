@@ -181,3 +181,27 @@ it('makes camera dimensions crop the image immediately and keeps resize atomic',
   if (undo?.status !== 'applied') throw new Error('Expected undo');
   expect(undo.project.clips).toEqual(before.clips);
 });
+
+it('applies fit mode and preset scale in one undoable change and respects track locking', () => {
+  const store = createContentStore();
+  store.getState().setProject(createProjectWithMediaTrack());
+  const before = store.getState().project!;
+  store.getState().updateMediaClipFitMode('clip-video', VideoMediaFitMode.CONTAIN, 88);
+  const after = store.getState().project!;
+  expect(after.clips.find((clip) => clip.id === 'clip-video')).toMatchObject({
+    fitMode: VideoMediaFitMode.CONTAIN,
+    fitScalePercent: 88,
+  });
+  const undo = undoVideoEditorProjectHistory(store.getState().projectHistory, after);
+  if (undo?.status !== 'applied') throw new Error('Expected undo');
+  expect(undo.project.clips).toEqual(before.clips);
+  const redo = redoVideoEditorProjectHistory(undo.history, undo.project);
+  if (redo?.status !== 'applied') throw new Error('Expected redo');
+  expect(redo.project.clips).toEqual(after.clips);
+  store
+    .getState()
+    .setProject({ ...before, tracks: before.tracks.map((track) => ({ ...track, locked: true })) });
+  const locked = store.getState().project;
+  store.getState().updateMediaClipFitMode('clip-video', VideoMediaFitMode.COVER, 100);
+  expect(store.getState().project).toBe(locked);
+});

@@ -36,10 +36,15 @@ export function createClipMediaStyleActions(
   | 'applyMediaClipVisualsToTrack'
 > {
   return {
-    updateMediaClipFitMode: (clipId, fitMode) =>
+    updateMediaClipFitMode: (clipId, fitMode, fitScalePercent) =>
       set((state) =>
         applyProjectUpdate(state, (project) =>
-          updateMediaClipVisuals(project, clipId, { fitMode }, state.currentTime)
+          updateMediaClipVisuals(
+            project,
+            clipId,
+            { fitMode, ...(fitScalePercent === undefined ? {} : { fitScalePercent }) },
+            state.currentTime
+          )
         )
       ),
     updateMediaClipFitScalePercent: (clipId, fitScalePercent) =>

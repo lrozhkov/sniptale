@@ -97,7 +97,11 @@ export interface VideoEditorProjectActions
   updateClipFades: (clipId: string, patch: VideoEditorFadePatch) => void;
   updateClipTransitions: (clipId: string, patch: VideoEditorTransitionPatch) => void;
   updateClipPlaybackRate: (clipId: string, playbackRate: number) => void;
-  updateMediaClipFitMode: (clipId: string, fitMode: VideoMediaFitMode) => void;
+  updateMediaClipFitMode: (
+    clipId: string,
+    fitMode: VideoMediaFitMode,
+    fitScalePercent?: number
+  ) => void;
   updateMediaClipFitScalePercent: (clipId: string, fitScalePercent: number) => void;
   updateMediaClipShadowIntensity: (clipId: string, shadowIntensity: number) => void;
   updateMediaClipShadowMode: (clipId: string, shadowMode: VideoMediaShadowMode) => void;
