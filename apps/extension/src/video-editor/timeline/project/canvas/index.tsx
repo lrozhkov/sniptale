@@ -267,6 +267,7 @@ function ProjectTimelineCanvasContent(
                 onBeginScrub={(event, currentTime) =>
                   props.onBeginPlayheadScrub(event, currentTime, props.onClearHoverPreview)
                 }
+                onSeekTime={props.onSeekTime}
                 onStepToNextFrame={props.onStepToNextFrame}
                 onStepToPreviousFrame={props.onStepToPreviousFrame}
               />

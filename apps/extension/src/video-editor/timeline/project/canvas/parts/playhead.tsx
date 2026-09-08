@@ -19,6 +19,7 @@ export function ProjectTimelinePlayheadHandle(props: {
   duration: number;
   left: number;
   onBeginScrub: (event: React.PointerEvent<HTMLElement>, currentTime: number) => void;
+  onSeekTime: (time: number) => void;
   onStepToNextFrame: () => void;
   onStepToPreviousFrame: () => void;
 }) {
@@ -44,6 +45,12 @@ export function ProjectTimelinePlayheadHandle(props: {
       onPointerDown={(event) => props.onBeginScrub(event, props.currentTime)}
       onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => {
+        if (event.defaultPrevented) return;
+        if (event.key === 'Home' || event.key === 'End') {
+          event.preventDefault();
+          props.onSeekTime(event.key === 'Home' ? 0 : props.duration);
+          return;
+        }
         const isPreviousFrameKey = event.key === 'ArrowLeft' || event.key === 'ArrowDown';
         const isNextFrameKey = event.key === 'ArrowRight' || event.key === 'ArrowUp';
         if (event.defaultPrevented || (!isPreviousFrameKey && !isNextFrameKey)) {
