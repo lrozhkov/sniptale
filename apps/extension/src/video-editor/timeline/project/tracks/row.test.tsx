@@ -85,7 +85,7 @@ it('retains focus on track state icon buttons after pointer activation', () => {
   expect(document.activeElement).toBe(button);
 });
 
-it('offers recording only on audio rows, freezing its destination and honoring lock', () => {
+it('keeps microphone entry out of track headers', () => {
   const project = createEmptyVideoProject('Voice');
   const track = project.tracks[0]!;
   recordingMocks.project.mockReturnValue(project);
@@ -111,17 +111,8 @@ it('offers recording only on audio rows, freezing its destination and honoring l
   expect(button()).toBeNull();
   track.kind = VideoTrackKind.AUDIO;
   render();
-  act(() => button()!.click());
-  expect(recordingMocks.open).toHaveBeenCalledWith({
-    projectId: project.id,
-    trackId: track.id,
-    startTime: 7,
-  });
-  track.locked = true;
-  render();
-  expect(button()!.disabled).toBe(true);
-  act(() => button()!.click());
-  expect(recordingMocks.open).toHaveBeenCalledTimes(1);
+  expect(button()).toBeNull();
+  expect(recordingMocks.open).not.toHaveBeenCalled();
 });
 
 it('uses speaker state for audio while retaining visibility eyes for video', () => {

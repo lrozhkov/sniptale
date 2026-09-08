@@ -136,7 +136,10 @@ function useVideoEditorRuntimeComposition(
 
   useVideoEditorOverlayPlayback({
     blockingOverlayOpen,
-    enabled: lifecycle.project !== null && !workspace.preview.sourceViewerActive,
+    enabled:
+      lifecycle.project !== null &&
+      !workspace.preview.sourceViewerActive &&
+      !(workspace.audioRecordingDialogOpen && workspace.audioRecordingTarget !== null),
     isPlaying: playback.isPlaying,
     setPlaybackPlaying: runtime.setPlaybackPlaying,
   });

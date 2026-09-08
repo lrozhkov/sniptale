@@ -21,6 +21,7 @@ import {
   FolderKanban,
   Image,
   Music,
+  Mic,
   Trash2,
   Upload,
   Search,
@@ -41,6 +42,7 @@ const MATERIAL_IMPORT_OPTIONS = [
 
 export function VideoEditorMaterials(props: {
   onOpenLibrary: () => void;
+  onRecordAudio?: () => void;
   onShowUse: (use: ProjectAssetUse) => void;
   onRemoveUnused: (assetIds?: readonly string[]) => void;
   project: VideoProject;
@@ -150,38 +152,14 @@ export function VideoEditorMaterials(props: {
             />
           ))}
         </div>
-        <footer
-          data-ui="video-editor.materials.footer"
-          className={[
-            'grid shrink-0 grid-cols-1 @min-[300px]/materials:grid-cols-2 items-center gap-1 border-t',
-            'border-[color:var(--sniptale-color-border-soft)] px-2 py-1',
-          ].join(' ')}
-        >
-          <ProductActionButton
-            tone="secondary"
-            className="min-w-0 justify-start !px-2"
-            onClick={props.onOpenLibrary}
-            data-ui="video-editor.materials.library"
-          >
-            <FolderKanban size={16} aria-hidden="true" />
-            <span className="truncate">{translate('videoEditor.app.materialsFromLibrary')}</span>
-          </ProductActionButton>
-          <MaterialsImportMenu
-            disabled={pending}
-            onChoose={(kind) => inputRefs[kind].current?.click()}
-          />
-          <ProductActionButton
-            compact
-            tone="secondary"
-            className="col-span-full !min-h-8 justify-start !px-2 text-[var(--sniptale-color-text-muted)]"
-            disabled={pending || unusedCount === 0}
-            onClick={() => removeMaterials()}
-            data-ui="video-editor.materials.remove-unused"
-          >
-            <Trash2 size={14} aria-hidden="true" />
-            {translate('videoEditor.app.materialsRemoveUnused')}
-          </ProductActionButton>
-        </footer>
+        <MaterialsFooter
+          pending={pending}
+          unusedCount={unusedCount}
+          onOpenLibrary={props.onOpenLibrary}
+          onRecordAudio={props.onRecordAudio}
+          onChoose={(kind) => inputRefs[kind].current?.click()}
+          onRemoveUnused={() => removeMaterials()}
+        />
       </div>
     </aside>
   );
@@ -508,4 +486,54 @@ function useMaterialsImportKeyboard(
       document.removeEventListener('focusin', dismissOnFocusLeave);
     };
   }, [open, containerRef, menuRef, setVisible, setOpen]);
+}
+
+function MaterialsFooter(props: {
+  pending: boolean;
+  unusedCount: number;
+  onOpenLibrary: () => void;
+  onRecordAudio: (() => void) | undefined;
+  onChoose: (kind: VideoEditorImportKind) => void;
+  onRemoveUnused: () => void;
+}) {
+  return (
+    <footer
+      data-ui="video-editor.materials.footer"
+      className={[
+        'grid shrink-0 grid-cols-1 @min-[300px]/materials:grid-cols-2 items-center gap-1 border-t',
+        'border-[color:var(--sniptale-color-border-soft)] px-2 py-1',
+      ].join(' ')}
+    >
+      <ProductActionButton
+        tone="secondary"
+        className="min-w-0 justify-start !px-2"
+        onClick={props.onOpenLibrary}
+        data-ui="video-editor.materials.library"
+      >
+        <FolderKanban size={16} aria-hidden="true" />
+        <span className="truncate">{translate('videoEditor.app.materialsFromLibrary')}</span>
+      </ProductActionButton>
+      <MaterialsImportMenu disabled={props.pending} onChoose={props.onChoose} />
+      <ProductActionButton
+        tone="secondary"
+        className="col-span-full justify-start !px-2"
+        onClick={props.onRecordAudio}
+        data-ui="video-editor.materials.record-audio"
+      >
+        <Mic size={16} aria-hidden="true" />
+        {translate('videoEditor.app.recordAudioMicrophone')}
+      </ProductActionButton>
+      <ProductActionButton
+        compact
+        tone="secondary"
+        className="col-span-full !min-h-8 justify-start !px-2 text-[var(--sniptale-color-text-muted)]"
+        disabled={props.pending || props.unusedCount === 0}
+        onClick={props.onRemoveUnused}
+        data-ui="video-editor.materials.remove-unused"
+      >
+        <Trash2 size={14} aria-hidden="true" />
+        {translate('videoEditor.app.materialsRemoveUnused')}
+      </ProductActionButton>
+    </footer>
+  );
 }

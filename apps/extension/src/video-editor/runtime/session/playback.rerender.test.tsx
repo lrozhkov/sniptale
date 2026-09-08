@@ -285,7 +285,9 @@ it('keeps the ticker active after cached-frame playback preparation', async () =
   };
   controller!.registerPreviewRuntime(runtime);
 
-  act(() => controller!.setPlaybackPlaying(false));
+  act(() => {
+    void controller!.setPlaybackPlaying(false);
+  });
   await act(async () => controller!.setPlaybackPlaying(true));
 
   expect(runtime.prepare).toHaveBeenCalledOnce();

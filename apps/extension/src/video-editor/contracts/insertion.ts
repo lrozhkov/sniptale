@@ -40,4 +40,5 @@ export interface VideoEditorAudioRecordingTarget {
   projectId: string;
   trackId: string;
   startTime: number;
+  endTime: number;
 }

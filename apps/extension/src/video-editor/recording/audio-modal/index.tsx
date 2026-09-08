@@ -1,15 +1,17 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { TimelineRecordingPanel } from './timeline-panel';
+import type React from 'react';
 import { translate } from '../../../platform/i18n';
 import { ProductModal, ProductModalBody, ProductModalFooter } from '@sniptale/ui/product-modal';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useAudioRecordingFocus } from './focus';
-import { useAudioRecordingController } from './controller';
+import { useAudioRecordingDialogSession } from './controller';
 import {
+  AudioRecordingDeviceSelect,
   AudioRecordingModalHeader,
   AudioRecordingSaveButton,
   AudioRecordingTransport,
 } from './controls';
-import { createRecordedAudioFile, type AudioRecordingModalProps } from './shared';
+import { type AudioRecordingModalProps } from './shared';
 import { renderAudioRecordingTrimPanel } from './trim';
 
 function AudioRecordingCancelButton({ onClose }: Pick<AudioRecordingModalProps, 'onClose'>) {
@@ -24,41 +26,83 @@ export function AudioRecordingModal({
   isOpen,
   onClose,
   onSave,
+  timeline,
 }: AudioRecordingModalProps): React.JSX.Element | null {
   const { titleId, handleKeyDown } = useAudioRecordingFocus(isOpen);
-  const savingRef = useRef(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const requestClose = useCallback(() => {
-    if (!savingRef.current) onClose();
-  }, [onClose]);
-  const controller = useAudioRecordingController(isOpen, isSaving);
-  useEffect(() => {
-    if (isOpen) setSaveError(null);
-  }, [isOpen]);
-  const saveRecording = async () => {
-    if (savingRef.current || !controller.save.audioBlob) return;
-    savingRef.current = true;
-    setIsSaving(true);
-    setSaveError(null);
-    try {
-      await onSave(createRecordedAudioFile(controller.save.audioBlob), {
-        trimStart: controller.save.trimStart,
-        trimEnd: controller.save.trimEnd,
-      });
-      controller.save.resetSession();
-      onClose();
-    } catch {
-      setSaveError(translate('common.errors.actionFailed'));
-    } finally {
-      savingRef.current = false;
-      setIsSaving(false);
-    }
-  };
-  if (!isOpen) {
-    return null;
-  }
+  const session = useAudioRecordingDialogSession({ isOpen, onClose, onSave, timeline });
+  const {
+    deviceId,
+    setDeviceId,
+    controller,
+    isSaving,
+    saveError,
+    starting,
+    requestClose,
+    startRecording,
+    saveRecording,
+  } = session;
+  const device = (
+    <AudioRecordingDeviceSelect
+      value={deviceId}
+      onChange={setDeviceId}
+      disabled={starting || isSaving || controller.transport.status === 'recording'}
+    />
+  );
+  if (!isOpen) return null;
+  if (timeline)
+    return (
+      <ProductModal
+        backdropClassName="!bg-[color:color-mix(in_srgb,var(--sniptale-color-overlay)_18%,transparent)]"
+        dialogClassName={[
+          '!top-auto !bottom-3 !transform-[translate(-50%,0)] !rounded-lg',
+          '!bg-[var(--sniptale-color-surface-panel)]',
+        ].join(' ')}
+        onKeyDown={handleKeyDown}
+        onClose={requestClose}
+        closeOnBackdrop={false}
+        labelledBy={titleId}
+        width="min(800px, calc(100vw - 32px))"
+        maxHeight="calc(100vh - 24px)"
+      >
+        <TimelineRecordingPanel
+          titleId={titleId}
+          startTime={timeline.startTime}
+          duration={timeline.duration}
+          controller={controller}
+          device={device}
+          starting={starting}
+          saving={isSaving}
+          error={saveError}
+          onStart={startRecording}
+          onClose={requestClose}
+          onSave={saveRecording}
+        />
+      </ProductModal>
+    );
 
+  return (
+    <MaterialRecordingDialog
+      session={session}
+      titleId={titleId}
+      handleKeyDown={handleKeyDown}
+      device={device}
+    />
+  );
+}
+
+function MaterialRecordingDialog({
+  session,
+  titleId,
+  handleKeyDown,
+  device,
+}: {
+  session: ReturnType<typeof useAudioRecordingDialogSession>;
+  titleId: string;
+  handleKeyDown: React.KeyboardEventHandler<HTMLDivElement>;
+  device: React.ReactNode;
+}) {
+  const { controller, isSaving, saveError, starting, requestClose, startRecording, saveRecording } =
+    session;
   return (
     <ProductModal
       onKeyDown={handleKeyDown}
@@ -70,16 +114,22 @@ export function AudioRecordingModal({
       scrollable
     >
       <AudioRecordingModalHeader titleId={titleId} onClose={requestClose} disabled={isSaving} />
-      <ProductModalBody compact className="gap-4">
-        <fieldset disabled={isSaving} className="contents">
+      <ProductModalBody compact className="min-h-0 flex-1 overflow-y-auto !gap-2 !py-2">
+        {controller.transport.status !== 'recorded' && device}
+        <fieldset disabled={isSaving || starting} className="contents">
           <AudioRecordingTransport
             durationLabel={controller.transport.durationLabel}
             error={controller.transport.error}
-            onStartRecording={() => void controller.transport.startRecording()}
+            onStartRecording={startRecording}
             onStopRecording={controller.transport.stopRecording}
             status={controller.transport.status}
           />
         </fieldset>
+        {starting && (
+          <p role="status" className="text-xs text-[var(--sniptale-color-text-secondary)]">
+            {translate('videoEditor.app.recordAudioPreparing')}
+          </p>
+        )}
         {saveError && (
           <p role="alert" className="text-sm text-[var(--sniptale-color-danger-text)]">
             {saveError}
@@ -89,9 +139,10 @@ export function AudioRecordingModal({
           {renderAudioRecordingTrimPanel(controller.trim, isSaving)}
         </fieldset>
       </ProductModalBody>
-      <ProductModalFooter compact>
+      <ProductModalFooter compact className="shrink-0 !py-2">
         <AudioRecordingCancelButton onClose={requestClose} />
         <AudioRecordingSaveButton
+          destination="materials"
           audioBlob={controller.save.audioBlob}
           disabled={isSaving}
           onSave={saveRecording}

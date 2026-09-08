@@ -1,3 +1,4 @@
+import { isAudioRecordingRangeAvailable } from '../../project/operations/timeline-gaps';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { toast } from '@sniptale/ui/product-feedback/toast-service';
 import { translate } from '../../../platform/i18n';
@@ -5,7 +6,6 @@ import { deleteProjectAsset } from '../../../composition/persistence/projects/in
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   VideoProjectAssetType,
-  VideoTrackKind,
   type VideoProjectAsset,
 } from '../../../features/video/project/types/index';
 import {
@@ -91,13 +91,9 @@ function isRecordingDestinationAvailable(
   const project = port.getCurrentProject();
   if (!project || project.id !== port.getCurrentProjectId()) return false;
   if (!target) return true;
-  const track = project.tracks.find(({ id }) => id === target.trackId);
   return (
     project.id === target.projectId &&
-    Number.isFinite(target.startTime) &&
-    target.startTime >= 0 &&
-    track?.kind === VideoTrackKind.AUDIO &&
-    !track.locked
+    isAudioRecordingRangeAvailable(project, target.trackId, target.startTime, target.endTime)
   );
 }
 
@@ -110,7 +106,7 @@ async function importRecordedAudioFile(
   if (!isRecordingDestinationAvailable(port, target))
     throw new Error('Recording destination unavailable');
   const targetProjectId = port.getCurrentProjectId()!;
-  const insertionTime = target?.startTime ?? port.getCurrentTime();
+  const insertionTime = target ? target.startTime + trim.trimStart : 0;
   const asset = await importProjectAsset(file, VideoProjectAssetType.AUDIO);
   if (await isStaleImportedAsset({ asset, port, targetProjectId })) {
     throw new Error('Recording project changed');
@@ -119,6 +115,20 @@ async function importRecordedAudioFile(
     await cleanupStaleImportedAsset(asset);
     throw new Error('Recording destination unavailable');
   }
+  if (!target) {
+    port.upsertAsset(asset);
+    return;
+  }
+  const duration = asset.metadata.duration;
+  if (
+    !Number.isFinite(trim.trimStart) ||
+    trim.trimStart < 0 ||
+    !duration ||
+    insertionTime + duration > target.endTime + 0.001
+  ) {
+    await cleanupStaleImportedAsset(asset);
+    throw new Error('Recording exceeds destination');
+  }
   const lease = port.beginProjectHistoryTransaction();
   if (lease === null) {
     await cleanupStaleImportedAsset(asset);
@@ -126,21 +136,8 @@ async function importRecordedAudioFile(
   }
   try {
     port.upsertAsset(asset);
-    const clipId = port.addAssetClip(asset, target?.trackId ?? null, insertionTime);
+    const clipId = port.addAssetClip(asset, target.trackId, insertionTime);
     if (!clipId) throw new Error('Recording insertion failed');
-    const assetDuration = Math.max(0.1, asset.metadata.duration ?? trim.trimEnd);
-    const normalizedTrimStart = Math.max(0, Math.min(trim.trimStart, assetDuration - 0.1));
-    const normalizedTrimEnd = Math.max(
-      normalizedTrimStart + 0.1,
-      Math.min(trim.trimEnd, assetDuration)
-    );
-
-    if (normalizedTrimStart > 0) {
-      port.trimClipStart(clipId, insertionTime + normalizedTrimStart);
-      port.moveClip(clipId, insertionTime);
-    }
-
-    port.trimClipEnd(clipId, insertionTime + normalizedTrimEnd - normalizedTrimStart);
   } finally {
     port.endProjectHistoryTransaction(lease);
   }

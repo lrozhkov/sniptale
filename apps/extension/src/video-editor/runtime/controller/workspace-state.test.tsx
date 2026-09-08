@@ -174,7 +174,7 @@ it('freezes the audio destination and clears it on close or global recording ent
   renderWorkspaceHarness(root, (state) => {
     workspaceState = state;
   });
-  const target = { projectId: 'project', trackId: 'voice', startTime: 7 };
+  const target = { projectId: 'project', trackId: 'voice', startTime: 7, endTime: 12 };
   act(() => createWorkspaceLayoutController(workspaceState!).openTrackAudioRecordingDialog(target));
   target.startTime = 20;
   expect(createWorkspaceLayoutController(workspaceState!).audioRecordingTarget?.startTime).toBe(7);
@@ -193,7 +193,7 @@ it('keeps the recording destination independent of viewer selection, transport a
     workspaceState = state;
   });
   const project = createEmptyVideoProject('Voice');
-  const target = { projectId: project.id, trackId: 'voice', startTime: 7 };
+  const target = { projectId: project.id, trackId: 'voice', startTime: 7, endTime: 12 };
   act(() => workspaceState!.openTrackAudioRecordingDialog(target));
   const store = { selectClip: vi.fn(), selectScene: vi.fn(), currentTime: 20, isPlaying: false };
   const runtime = { seekTo: vi.fn(), togglePlayback: vi.fn(), pausePlayback: vi.fn() };

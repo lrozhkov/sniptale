@@ -1,8 +1,17 @@
+import {
+  RuntimePlaybackContext,
+  WorkspacePlaybackRangeContext,
+} from '../../runtime/controller/composition/contexts';
+import {
+  useVideoEditorPlaybackPort,
+  getCurrentVideoEditorProjectSnapshot,
+} from '../../runtime/controller/store';
+import { isAudioRecordingRangeAvailable } from '../../project/operations/timeline-gaps';
 import { WorkspaceTrackPresentation } from './track-presentation';
 import { AudioRecordingModal } from '../../recording/audio-modal';
 import { VideoEditorLibraryPanel } from '../../library/panel';
 import { useVideoEditorMediaLibrary } from '../../runtime/controller/libraries';
-import React, { useState } from 'react';
+import React, { useState, useContext, useRef, useEffect, useMemo } from 'react';
 import { VideoProjectStorageStatus } from '../floating/storage-status';
 import { VideoEditorFloatingInspectorStack } from '../floating/inspector-stack';
 import {
@@ -158,9 +167,69 @@ function VideoEditorWorkspaceLibraryPanel(): React.JSX.Element | null {
 function VideoEditorAudioRecordingModal(): React.JSX.Element | null {
   const layout = useVideoEditorLayoutController();
   const sidebar = useVideoEditorSidebarController();
+  const runtime = useContext(RuntimePlaybackContext);
+  const ranges = useContext(WorkspacePlaybackRangeContext);
+  const setCurrentTime = useVideoEditorPlaybackPort((port) => port.setCurrentTime);
+  const current = useRef({ open: layout.audioRecordingDialogOpen });
+  current.current = { open: layout.audioRecordingDialogOpen };
+  const target = layout.audioRecordingTarget;
+  const runtimeRef = useRef(runtime);
+  runtimeRef.current = runtime;
+  const rangesRef = useRef(ranges);
+  rangesRef.current = ranges;
+  useEffect(() => {
+    if (!layout.audioRecordingDialogOpen || !runtimeRef.current) return;
+    const runtime = runtimeRef.current;
+    const ranges = rangesRef.current;
+    const previousRange = ranges?.playbackRange ?? null;
+    runtime.pausePlayback();
+    if (target) {
+      ranges?.setPlaybackRange({ start: target.startTime, end: target.endTime, loop: false });
+      runtime.seekTo(target.startTime);
+    }
+    return () => {
+      runtimeRef.current?.pausePlayback();
+      if (target) rangesRef.current?.setPlaybackRange(previousRange);
+    };
+  }, [layout.audioRecordingDialogOpen, target]);
+  const timeline = useMemo(
+    () =>
+      target && runtime
+        ? {
+            startTime: target.startTime,
+            duration: target.endTime - target.startTime,
+            beforeStart: async () => {
+              const project = getCurrentVideoEditorProjectSnapshot();
+              if (
+                !project ||
+                project.id !== target.projectId ||
+                !isAudioRecordingRangeAvailable(
+                  project,
+                  target.trackId,
+                  target.startTime,
+                  target.endTime
+                )
+              )
+                throw new Error('Recording destination unavailable');
+              runtime.pausePlayback();
+              setCurrentTime(target.startTime);
+              await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+              if (!current.current.open) throw new Error('Recording cancelled');
+              const started = await runtime.setPlaybackPlaying(true);
+              if (started === false || !current.current.open)
+                throw new Error('Playback unavailable');
+            },
+            onStop: () => {
+              runtime.pausePlayback();
+            },
+          }
+        : undefined,
+    [target, runtime, setCurrentTime]
+  );
   if (!sidebar) return null;
   return (
     <AudioRecordingModal
+      timeline={timeline}
       isOpen={layout.audioRecordingDialogOpen}
       onClose={layout.closeAudioRecordingDialog}
       onSave={(file, trim) =>

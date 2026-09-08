@@ -1,3 +1,4 @@
+import { useVideoEditorOverlayPlayback } from '../overlay-playback';
 // @vitest-environment jsdom
 
 import { act, useContext, type ReactNode } from 'react';
@@ -69,7 +70,9 @@ const mocks = vi.hoisted(() => {
     autoProcessingModalOpen: false,
     setAutoProcessingModalOpen: action,
     audioRecordingDialogOpen: false,
-    audioRecordingTarget: null,
+    audioRecordingTarget: null as
+      | import('../../../contracts/insertion').VideoEditorAudioRecordingTarget
+      | null,
     openTrackAudioRecordingDialog: action,
     clearPlaybackRange: action,
     closeAudioRecordingDialog: action,
@@ -303,4 +306,22 @@ it('suspends montage shortcuts while auto-processing owns the modal', () => {
   mocks.workspace.autoProcessingModalOpen = false;
   act(render);
   expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(true);
+});
+
+it('keeps input blocked while interval recording owns playback instead of the overlay pause policy', () => {
+  mocks.lifecycle.project = createEmptyVideoProject('Voice');
+  mocks.workspace.audioRecordingDialogOpen = true;
+  mocks.workspace.audioRecordingTarget = {
+    projectId: mocks.lifecycle.project.id,
+    trackId: 'voice',
+    startTime: 0,
+    endTime: 3,
+  };
+  act(() => root.render(<VideoEditorCompositionProvider />));
+  expect(vi.mocked(useVideoEditorOverlayPlayback).mock.lastCall?.[0].enabled).toBe(false);
+  expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(false);
+  mocks.workspace.audioRecordingTarget = null;
+  act(() => root.render(<VideoEditorCompositionProvider />));
+  expect(vi.mocked(useVideoEditorOverlayPlayback).mock.lastCall?.[0].enabled).toBe(true);
+  mocks.workspace.audioRecordingDialogOpen = false;
 });

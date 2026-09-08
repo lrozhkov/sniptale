@@ -1,3 +1,4 @@
+import { createAudioClip } from '../../../features/video/project/timeline/project-meta.test.helpers';
 // @vitest-environment jsdom
 
 import { act } from 'react';
@@ -150,7 +151,7 @@ describe('useAssetHandlers', () => {
     }
   );
   it(
-    'imports recorded audio and reapplies the trimmed selection on the timeline',
+    'imports the prepared recording into materials without creating a clip',
     verifyRecordedAudioImport
   );
   it('imports project assets with explicit timeline placement', verifyTimelineAssetPlacement);
@@ -174,14 +175,10 @@ async function verifyRecordedAudioImport() {
     VideoProjectAssetType.AUDIO
   );
   expect(params.upsertAsset).toHaveBeenCalledTimes(1);
-  expect(params.addAssetClip).toHaveBeenCalledWith(
-    expect.objectContaining({ id: 'asset-1' }),
-    null,
-    8
-  );
-  expect(params.trimClipStart).toHaveBeenCalledWith('clip-1', 9.5);
-  expect(params.moveClip).toHaveBeenCalledWith('clip-1', 8);
-  expect(params.trimClipEnd).toHaveBeenCalledWith('clip-1', 10.5);
+  expect(params.addAssetClip).not.toHaveBeenCalled();
+  expect(params.trimClipStart).not.toHaveBeenCalled();
+  expect(params.moveClip).not.toHaveBeenCalled();
+  expect(params.trimClipEnd).not.toHaveBeenCalled();
 }
 
 async function verifyTimelineAssetPlacement() {
@@ -367,7 +364,12 @@ describe('recording into an explicit audio track', () => {
     const project = params.getCurrentProject()!;
     const track = createVideoProjectTrack('Voice', 1, VideoTrackKind.AUDIO);
     project.tracks.push(track);
-    return { params, track, target: { projectId: project.id, trackId: track.id, startTime: 7 } };
+    project.duration = 20;
+    return {
+      params,
+      track,
+      target: { projectId: project.id, trackId: track.id, startTime: 7, endTime: 20 },
+    };
   }
 
   it('preserves the opening track and playhead through asynchronous import in one history lease', async () => {
@@ -383,17 +385,21 @@ describe('recording into an explicit audio track', () => {
     expect(params.addAssetClip).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'asset-1' }),
       target.trackId,
-      7
+      8
     );
     expect(params.beginProjectHistoryTransaction).toHaveBeenCalledTimes(1);
     expect(params.endProjectHistoryTransaction).toHaveBeenCalledTimes(1);
-    expect(params.trimClipEnd).toHaveBeenCalledWith('clip-1', 10);
+    expect(params.trimClipEnd).not.toHaveBeenCalled();
   });
 
-  it.each(['missing', 'locked', 'video', 'project'])(
+  it.each(['missing', 'locked', 'video', 'project', 'occupied'])(
     'rejects a %s target without importing or placing',
     async (reason) => {
       const { params, track, target } = setupTarget();
+      if (reason === 'occupied')
+        params
+          .getCurrentProject()!
+          .clips.push(createAudioClip({ trackId: track.id, startTime: 10, duration: 2 }));
       if (reason === 'missing') params.getCurrentProject()!.tracks = [];
       if (reason === 'locked') track.locked = true;
       if (reason === 'video') track.kind = VideoTrackKind.PRIMARY;

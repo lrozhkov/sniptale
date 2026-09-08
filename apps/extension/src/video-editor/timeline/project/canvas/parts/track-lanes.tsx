@@ -1,3 +1,4 @@
+import { AudioRecordingZones } from '../../tracks/zones/audio-recording';
 import type { TimelineProjection } from '../../interaction-state/projection';
 import { useState } from 'react';
 import type { VideoProject } from '../../../../../features/video/project/types';
@@ -106,16 +107,25 @@ function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
   const displayProject = getReorderDisplayProject(props.project, props.dragGhost);
   return (
     <div
-      className={getTrackLaneClassName(
-        props.selection,
-        props.selectedTrackId,
-        props.track.id,
-        props.dropActive
-      )}
+      className={
+        'group/audio ' +
+        getTrackLaneClassName(
+          props.selection,
+          props.selectedTrackId,
+          props.track.id,
+          props.dropActive
+        )
+      }
       data-track-lane-id={props.track.id}
       style={{ height: props.trackLayout?.rowHeight }}
       {...createTrackLaneEventProps(props)}
     >
+      <AudioRecordingZones
+        project={props.project}
+        trackId={props.track.id}
+        pixelsPerSecond={props.pixelsPerSecond}
+        projection={props.projection}
+      />
       <ProjectTimelineLogicalLaneGuides trackLayout={props.trackLayout} />
       <ProjectTimelineTrackZones
         {...createTrackZoneProps({

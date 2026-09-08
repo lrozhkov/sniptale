@@ -463,3 +463,48 @@ it('deletes a selected group with one callback and leaves single-clip commands i
   expect(setCurrentTime).toHaveBeenCalledWith(2);
   expect(deleteClip).toHaveBeenCalledExactlyOnceWith(['clip-1', 'clip-2']);
 });
+
+it('stops a voice-over range at its end without restarting', async () => {
+  const useVideoEditorPlayback = await importPlaybackHook();
+  const project = createEmptyVideoProject('Playback');
+  project.duration = 2;
+  project.clips = [createVideoClip(project.tracks[0]!.id)];
+  const setCurrentTime = vi.fn<(time: number) => void>();
+  const setPlaying = vi.fn<(playing: boolean) => void>();
+  renderPlaybackHarness(root, {
+    currentTime: 0.2,
+    clearPlacementMode: vi.fn(),
+    deleteActionEvent: vi.fn<(actionEventId: string) => void>(),
+    deleteClip: vi.fn<(clipId: string | readonly string[]) => void>(),
+    deleteCursorSample: vi.fn<(sampleId: string) => void>(),
+    deleteMotionRegion: vi.fn<(motionRegionId: string) => void>(),
+    deleteObjectTrack: vi.fn<(objectTrackId: string) => void>(),
+    isPlaying: true,
+    playbackRange: { start: 0.2, end: 0.5, loop: false },
+    placementMode: null,
+    onSeekReady: (value) => {
+      seekTo = value;
+    },
+    project,
+    selection: { kind: VideoEditorSelectionKind.CLIP, clipId: 'clip-1' },
+    selectedClipId: 'clip-1',
+    setCurrentTime,
+    setPlaying,
+    splitClipAt: vi.fn<(clipId: string, time: number) => void>(),
+    updateActionEventDetails: vi.fn(),
+    updateClipTransform: vi.fn(),
+    updateMotionRegion: vi.fn(),
+    useVideoEditorPlayback,
+  });
+
+  expect(frameCallback).not.toBeNull();
+
+  act(() => {
+    frameCallback?.(1600);
+  });
+
+  expect(setPlaying).toHaveBeenCalledWith(false);
+  expect(setCurrentTime).toHaveBeenLastCalledWith(0.5);
+
+  expect(setCurrentTime).not.toHaveBeenCalledWith(0.2);
+});

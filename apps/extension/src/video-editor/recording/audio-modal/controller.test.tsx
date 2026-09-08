@@ -135,3 +135,123 @@ it('keeps full recorded duration available after narrowing the selected interval
   expect(latestController?.trim?.isPlayingSelection).toBe(true);
   expect(latestController?.transport.error).toBeNull();
 });
+
+it('waits for video readiness, requests the chosen microphone and stops at the interval limit', async () => {
+  vi.useFakeTimers();
+  let now = 0;
+  vi.spyOn(performance, 'now').mockImplementation(() => now);
+  const stopTrack = vi.fn();
+  getUserMediaMock.mockResolvedValueOnce({ getTracks: () => [{ stop: stopTrack }] });
+  const start = vi.fn();
+  class Recorder extends EventTarget {
+    static isTypeSupported = () => true;
+    state = 'inactive';
+    mimeType = 'audio/webm';
+    start() {
+      this.state = 'recording';
+      start();
+    }
+    stop() {
+      this.state = 'inactive';
+      const data = new Event('dataavailable');
+      Object.defineProperty(data, 'data', { value: new Blob(['audio']) });
+      this.dispatchEvent(data);
+      this.dispatchEvent(new Event('stop'));
+    }
+  }
+  vi.stubGlobal('MediaRecorder', Recorder);
+  vi.stubGlobal(
+    'URL',
+    class extends URL {
+      static createObjectURL() {
+        return 'blob:bounded';
+      }
+      static revokeObjectURL() {}
+    }
+  );
+  let ready!: () => void;
+  const beforeStart = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        ready = resolve;
+      })
+  );
+  const onStop = vi.fn();
+  function Bounded() {
+    latestController = useAudioRecordingController(true, false, 'chosen-mic', {
+      startTime: 0,
+      duration: 2,
+      beforeStart,
+      onStop,
+    });
+    return null;
+  }
+  container = document.createElement('div');
+  document.body.append(container);
+  root = createRoot(container);
+  await act(async () => root?.render(<Bounded />));
+  let pending: Promise<void> | undefined;
+  await act(async () => {
+    pending = latestController?.transport.startRecording();
+    await Promise.resolve();
+  });
+  expect(getUserMediaMock).toHaveBeenCalledWith({ audio: { deviceId: { exact: 'chosen-mic' } } });
+  expect(start).not.toHaveBeenCalled();
+  await act(async () => {
+    ready();
+    await pending;
+  });
+  expect(start).toHaveBeenCalledOnce();
+  now = 2100;
+  act(() => vi.advanceTimersByTime(150));
+  expect(latestController?.transport.status).toBe('recorded');
+  expect(latestController?.save.trimEnd).toBe(2);
+  expect(stopTrack).toHaveBeenCalledOnce();
+  expect(onStop).toHaveBeenCalledOnce();
+  act(() => latestController?.trim?.resolveDuration(2.1));
+  expect(latestController?.trim?.recordedDuration).toBe(2);
+  vi.useRealTimers();
+});
+
+it('ignores late recorder events from a closed take after a new take starts', async () => {
+  const oldTrackStop = vi.fn();
+  const newTrackStop = vi.fn();
+  getUserMediaMock
+    .mockResolvedValueOnce({ getTracks: () => [{ stop: oldTrackStop }] })
+    .mockResolvedValueOnce({ getTracks: () => [{ stop: newTrackStop }] });
+  const recorders: Recorder[] = [];
+  class Recorder extends EventTarget {
+    static isTypeSupported = () => true;
+    state = 'inactive';
+    mimeType = 'audio/webm';
+    constructor() {
+      super();
+      recorders.push(this);
+    }
+    start() {
+      this.state = 'recording';
+    }
+  }
+  vi.stubGlobal('MediaRecorder', Recorder);
+  const onStop = vi.fn();
+  function Bounded() {
+    latestController = useAudioRecordingController(true, false, '', {
+      startTime: 0,
+      duration: 5,
+      beforeStart: async () => undefined,
+      onStop,
+    });
+    return null;
+  }
+  container = document.createElement('div');
+  document.body.append(container);
+  root = createRoot(container);
+  await act(async () => root?.render(<Bounded />));
+  await act(async () => latestController?.transport.startRecording());
+  act(() => latestController?.save.resetSession());
+  await act(async () => latestController?.transport.startRecording());
+  act(() => recorders[0]!.dispatchEvent(new Event('stop')));
+  expect(newTrackStop).not.toHaveBeenCalled();
+  expect(onStop).not.toHaveBeenCalled();
+  expect(latestController?.transport.status).toBe('recording');
+});

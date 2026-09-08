@@ -136,8 +136,8 @@ export function requestPlaybackStart(
   refs: PlaybackRuntimeRefs,
   requestRef: MutableRefObject<PlaybackRequestState>,
   setPhase: PhaseSetter
-): void {
-  if (!refs.latestStateRef.current.project) return;
+): Promise<boolean> {
+  if (!refs.latestStateRef.current.project) return Promise.resolve(false);
   const time = resolvePlaybackStartTime(
     refs.latestStateRef.current.currentTime,
     refs.latestStateRef.current.playbackRange
@@ -147,9 +147,9 @@ export function requestPlaybackStart(
   setPhase('starting');
   if (!refs.previewRuntimeRef.current) {
     completeStart({ outcome: 'live-ready', refs, setPhase, time });
-    return;
+    return Promise.resolve(true);
   }
-  void preparePlaybackRequest({
+  return preparePlaybackRequest({
     generation: request.generation,
     isPlaying: true,
     reason: 'play',
@@ -158,10 +158,15 @@ export function requestPlaybackStart(
     time,
   }).then(
     (outcome) => {
-      if (!isCurrentRequest(requestRef, request.generation) || outcome === 'cancelled') return;
+      if (!isCurrentRequest(requestRef, request.generation) || outcome === 'cancelled')
+        return false;
       completeStart({ outcome, refs, setPhase, time });
+      return true;
     },
-    () => failCurrentRequest({ generation: request.generation, refs, requestRef, setPhase })
+    () => {
+      failCurrentRequest({ generation: request.generation, refs, requestRef, setPhase });
+      return false;
+    }
   );
 }
 

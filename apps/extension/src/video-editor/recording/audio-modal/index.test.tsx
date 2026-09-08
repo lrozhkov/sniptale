@@ -4,9 +4,15 @@ import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { AudioRecordingModal } from './index';
 
+vi.mock('./trim-file', () => ({
+  createTrimmedRecordingFile: vi.fn(
+    async () => new File(['audio'], 'take.wav', { type: 'audio/wav' })
+  ),
+}));
+
 const controller = vi.hoisted(() => ({ reset: vi.fn() }));
-vi.mock('./controller', () => ({
-  useAudioRecordingController: () => {
+vi.mock('./session', () => ({
+  useAudioRecordingSession: () => {
     return {
       transport: {
         durationLabel: '00:04',
@@ -61,7 +67,7 @@ it('retains failed recording for retry and blocks duplicate saves and dismissal'
       button.textContent?.includes('recordAudioSave')
     )!;
   save().focus();
-  act(() => {
+  await act(async () => {
     save().click();
     save().click();
     document.querySelector<HTMLButtonElement>('.sniptale-modal-close')!.click();

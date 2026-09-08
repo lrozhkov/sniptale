@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Pause, Play } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { InspectorPanel } from '../../../ui/compact-inspector-controls';
@@ -8,7 +8,13 @@ import { useRecordedAudioPeaks } from './waveform';
 import { formatPreciseTime } from '../../contracts/time-format';
 import type { AudioRecordingTrimController } from './session-types';
 
-function AudioRecordingTrimPanel(props: AudioRecordingTrimController & { disabled: boolean }) {
+function AudioRecordingTrimPanel(
+  props: AudioRecordingTrimController & {
+    disabled: boolean;
+    compact?: boolean;
+    actions?: ReactNode;
+  }
+) {
   const [cursor, setCursor] = useState(0);
   const peaks = useRecordedAudioPeaks(props.audioBlob, props.recordedDuration);
   const seek = (time: number) => {
@@ -23,8 +29,14 @@ function AudioRecordingTrimPanel(props: AudioRecordingTrimController & { disable
     props.selectRange(range);
     seek(range.start);
   };
+  const Panel = props.compact ? 'div' : InspectorPanel;
   return (
-    <InspectorPanel data-ui="video-editor.audio-recording.trim-panel" className="grid gap-2 p-3">
+    <Panel
+      data-ui="video-editor.audio-recording.trim-panel"
+      className={
+        props.compact ? 'grid gap-1 [&_[data-ui="video-editor.source-lane"]]:h-8' : 'grid gap-2 p-3'
+      }
+    >
       <audio
         ref={props.audioRef}
         src={props.audioUrl}
@@ -61,21 +73,30 @@ function AudioRecordingTrimPanel(props: AudioRecordingTrimController & { disable
         <span className="text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
           {formatPreciseTime(cursor)} / {formatPreciseTime(props.recordedDuration)}
         </span>
+        {props.actions && <div className="ml-auto flex items-center gap-2">{props.actions}</div>}
       </div>
       {peaks === null && (
         <p className="text-xs text-[var(--sniptale-color-text-muted)]">
           {translate('videoEditor.app.recordAudioWaveformUnavailable')}
         </p>
       )}
-    </InspectorPanel>
+    </Panel>
   );
 }
 
 export function renderAudioRecordingTrimPanel(
   controller: AudioRecordingTrimController | null,
-  disabled = false
+  disabled = false,
+  compact = false,
+  actions?: ReactNode
 ) {
   return controller ? (
-    <AudioRecordingTrimPanel key={controller.audioUrl} {...controller} disabled={disabled} />
+    <AudioRecordingTrimPanel
+      key={controller.audioUrl}
+      {...controller}
+      disabled={disabled}
+      compact={compact}
+      actions={actions}
+    />
   ) : null;
 }

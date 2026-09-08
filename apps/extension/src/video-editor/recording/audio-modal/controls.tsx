@@ -1,4 +1,5 @@
-import type React from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { ProductModalHeader } from '@sniptale/ui/product-modal';
 import { Mic, Save, Square } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
@@ -8,7 +9,7 @@ import type { AudioRecordingStatus } from './shared';
 
 export function RecordingActionButton(props: {
   disabled?: boolean;
-  icon: React.ReactNode;
+  icon: ReactNode;
   label: string;
   onClick: () => void;
 }) {
@@ -26,6 +27,7 @@ export function RecordingActionButton(props: {
 }
 
 export function AudioRecordingSaveButton(props: {
+  destination?: 'timeline' | 'materials';
   audioBlob: Blob | null;
   disabled: boolean;
   onSave: () => Promise<void>;
@@ -38,7 +40,11 @@ export function AudioRecordingSaveButton(props: {
       className="px-4 disabled:cursor-not-allowed disabled:opacity-50"
     >
       <Save size={16} strokeWidth={2.1} />
-      {translate('videoEditor.app.recordAudioSave')}
+      {translate(
+        props.destination === 'materials'
+          ? 'videoEditor.app.recordAudioSaveMaterial'
+          : 'videoEditor.app.recordAudioSave'
+      )}
     </ProductActionButton>
   );
 }
@@ -60,6 +66,7 @@ export function AudioRecordingModalHeader(props: {
 }
 
 export function AudioRecordingTransport(props: {
+  compact?: boolean;
   durationLabel: string;
   error: string | null;
   onStartRecording: () => void;
@@ -69,10 +76,15 @@ export function AudioRecordingTransport(props: {
   if (props.status === 'recorded') return <RecordedAudioSummary {...props} />;
   return (
     <>
-      <p className="mb-4 text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
-        {translate('videoEditor.app.recordAudioDescription')}
-      </p>
-      <InspectorPanel data-ui="video-editor.audio-recording.transport" className="grid gap-3 p-4">
+      {!props.compact && (
+        <p className="mb-4 text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
+          {translate('videoEditor.app.recordAudioDescription')}
+        </p>
+      )}
+      <InspectorPanel
+        data-ui="video-editor.audio-recording.transport"
+        className={props.compact ? 'grid gap-1 p-2' : 'grid gap-3 p-4'}
+      >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-medium text-[var(--sniptale-color-text-muted)]">
@@ -127,5 +139,43 @@ function RecordedAudioSummary(props: {
         </p>
       )}
     </div>
+  );
+}
+
+export function AudioRecordingDeviceSelect(props: {
+  value: string;
+  onChange: (value: string) => void;
+  disabled: boolean;
+}) {
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  useEffect(() => {
+    let active = true;
+    const update = () =>
+      void navigator.mediaDevices
+        ?.enumerateDevices?.()
+        .then((items) => {
+          if (active)
+            setDevices(items.filter((item) => item.kind === 'audioinput' && item.deviceId));
+        })
+        .catch(() => undefined);
+    update();
+    navigator.mediaDevices?.addEventListener?.('devicechange', update);
+    return () => {
+      active = false;
+      navigator.mediaDevices?.removeEventListener?.('devicechange', update);
+    };
+  }, []);
+  return (
+    <CompactSelect
+      {...props}
+      aria-label={translate('videoEditor.app.recordAudioDevice')}
+      options={[
+        { value: '', label: translate('videoEditor.app.recordAudioDefaultDevice') },
+        ...devices.map((device, index) => ({
+          value: device.deviceId,
+          label: device.label || `${translate('videoEditor.app.recordAudioDevice')} ${index + 1}`,
+        })),
+      ]}
+    />
   );
 }

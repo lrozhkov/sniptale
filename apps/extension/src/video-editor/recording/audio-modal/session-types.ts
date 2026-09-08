@@ -1,5 +1,5 @@
 import type React from 'react';
-import type { AudioRecordingStatus } from './shared';
+import type { AudioRecordingStatus, AudioRecordingModalProps } from './shared';
 import type { VideoEditorMaterialSourceRange } from '../../contracts/insertion';
 
 export interface AudioRecordingState {
@@ -40,6 +40,7 @@ interface AudioRecordingSaveController {
 }
 
 interface AudioRecordingTransportController {
+  elapsedSeconds: number;
   durationLabel: string;
   error: string | null;
   startRecording: () => Promise<void>;
@@ -68,6 +69,8 @@ export interface AudioRecordingControllerState {
 }
 
 export interface RecordingSessionArgs {
+  deviceId?: string;
+  timeline?: AudioRecordingModalProps['timeline'];
   clearTimer: () => void;
   mimeType: string;
   refs: AudioRecordingRefs;

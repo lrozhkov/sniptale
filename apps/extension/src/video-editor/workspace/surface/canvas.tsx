@@ -117,6 +117,7 @@ interface VideoEditorWorkspaceCanvasProps {
 }
 
 function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
+  const recordingLayout = useVideoEditorLayoutController();
   const header = useVideoEditorHeaderController();
   const preview = useVideoEditorPreviewController();
   const viewer = useWorkspacePreviewContext();
@@ -167,6 +168,7 @@ function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
       <WorkspaceLibraryPanel {...props}>
         {props.materialsOpen && (
           <VideoEditorMaterials
+            onRecordAudio={recordingLayout.openAudioRecordingDialog}
             onShowUse={(use) => {
               preview.transport.onPausePlayback();
               setSourceActive(false);

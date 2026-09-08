@@ -19,7 +19,7 @@ export interface VideoEditorRuntimeController {
   pausePlayback: () => number;
   seekTo: (time: number) => void;
   stepByFrames: (frameDelta: number) => void;
-  setPlaybackPlaying: (playing: boolean) => void;
+  setPlaybackPlaying: (playing: boolean) => void | Promise<boolean>;
   togglePlayback: () => void;
   applyLoadedProject: ApplyLoadedProject;
 }

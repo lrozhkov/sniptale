@@ -1,3 +1,4 @@
+import type { AudioRecordingModalProps } from './shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { translate } from '../../../platform/i18n';
 import { beginRecordingSession } from './capture';
@@ -177,13 +178,14 @@ function useRecordingPlaybackControls(state: AudioRecordingState) {
   return { pauseSelection, playSelection };
 }
 
-function createRecordingRangeControls(state: AudioRecordingState) {
+function createRecordingRangeControls(state: AudioRecordingState, limit = Infinity) {
   const selectRange = (range: { start: number; end: number }) => {
-    state.setTrimStart(range.start);
-    state.setTrimEnd(range.end);
+    state.setTrimStart(Math.min(range.start, limit));
+    state.setTrimEnd(Math.min(range.end, limit));
   };
   const resolveDuration = (duration: number) => {
     if (!Number.isFinite(duration) || duration <= 0) return;
+    duration = Math.min(duration, limit);
     state.setRecordedDuration(duration);
     state.setTrimEnd((end) => Math.min(end, duration));
     state.setTrimStart((start) => Math.min(start, Math.max(0, duration - 0.01)));
@@ -194,7 +196,9 @@ function createRecordingRangeControls(state: AudioRecordingState) {
 function useRecordingCaptureControls(
   state: AudioRecordingState,
   refs: AudioRecordingRefs,
-  resetSession: () => void
+  resetSession: () => void,
+  deviceId: string,
+  timeline?: AudioRecordingModalProps['timeline']
 ) {
   const clearTimer = useCallback(() => clearRecordingTimer(refs.timerRef), [refs.timerRef]);
   const stopStream = useCallback(() => stopRecordingStream(refs.streamRef), [refs.streamRef]);
@@ -208,6 +212,8 @@ function useRecordingCaptureControls(
 
     resetSession();
     await beginRecordingSession({
+      deviceId,
+      timeline,
       clearTimer,
       mimeType,
       refs,
@@ -215,7 +221,7 @@ function useRecordingCaptureControls(
       state,
       stopStream,
     });
-  }, [clearTimer, refs, resetSession, state, stopStream]);
+  }, [clearTimer, refs, resetSession, state, stopStream, deviceId, timeline]);
 
   const stopRecording = useCallback(() => {
     const recorder = refs.mediaRecorderRef.current;
@@ -229,14 +235,24 @@ function useRecordingCaptureControls(
   return { startRecording, stopRecording };
 }
 
-export function useAudioRecordingSession(isOpen: boolean): AudioRecordingControllerState {
+export function useAudioRecordingSession(
+  isOpen: boolean,
+  deviceId = '',
+  timeline?: AudioRecordingModalProps['timeline']
+): AudioRecordingControllerState {
   const state = useAudioRecordingState();
   const refs = useAudioRecordingRefs();
   const resetSession = useRecordingReset(state, refs);
   useRecordingLifecycle(isOpen, resetSession, state);
   const playbackControls = useRecordingPlaybackControls(state);
-  const rangeControls = createRecordingRangeControls(state);
-  const captureControls = useRecordingCaptureControls(state, refs, resetSession);
+  const rangeControls = createRecordingRangeControls(state, timeline?.duration);
+  const captureControls = useRecordingCaptureControls(
+    state,
+    refs,
+    resetSession,
+    deviceId,
+    timeline
+  );
   const recordedDuration = Math.max(0, state.recordedDuration || state.durationSeconds);
 
   return {
@@ -247,6 +263,7 @@ export function useAudioRecordingSession(isOpen: boolean): AudioRecordingControl
       trimStart: state.trimStart,
     },
     transport: {
+      elapsedSeconds: state.durationSeconds,
       durationLabel: formatDurationLabel(state.durationSeconds),
       error: state.error,
       startRecording: captureControls.startRecording,

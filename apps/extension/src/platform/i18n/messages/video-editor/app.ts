@@ -1,6 +1,19 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorAppMessages = defineMessageSource({
+  recordAudioMicrophone: { ru: 'Запись с микрофона', en: 'Record microphone' },
+  recordAudioVoiceover: { ru: 'Озвучка', en: 'Voiceover' },
+  recordAudioLimit: { ru: 'Максимум', en: 'Maximum' },
+  recordAudioRemaining: { ru: 'Осталось', en: 'Remaining' },
+  recordAudioInsert: { ru: 'Вставить в промежуток', en: 'Insert into gap' },
+  recordAudioSaveMaterial: { ru: 'Сохранить в материалы', en: 'Save to materials' },
+  recordAudioStartFailed: {
+    ru: 'Не удалось начать запись. Попробуйте ещё раз.',
+    en: 'Recording could not start. Try again.',
+  },
+  recordAudioPreparing: { ru: 'Подготовка записи…', en: 'Preparing recording…' },
+  recordAudioDevice: { ru: 'Микрофон', en: 'Microphone' },
+  recordAudioDefaultDevice: { ru: 'По умолчанию', en: 'Default device' },
   saveChangesFailed: { ru: 'Не удалось сохранить изменения', en: 'Changes could not be saved' },
   clipOrder: { ru: 'Порядок клипа', en: 'Clip order' },
   clipEarlier: { ru: 'Раньше', en: 'Earlier' },

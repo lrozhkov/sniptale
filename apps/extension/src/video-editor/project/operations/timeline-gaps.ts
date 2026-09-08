@@ -198,3 +198,25 @@ export function isMatchingTrackGapCandidate(
     Math.abs(candidate.end - gapEnd) <= TIMELINE_GAP_EPSILON
   );
 }
+
+/** A voice take must fit wholly into an unoccupied, editable audio interval. */
+export function isAudioRecordingRangeAvailable(
+  project: VideoProject,
+  trackId: string,
+  start: number,
+  end: number
+): boolean {
+  const track = project.tracks.find((item) => item.id === trackId);
+  return (
+    track?.kind === 'AUDIO' &&
+    !track.locked &&
+    Number.isFinite(start) &&
+    Number.isFinite(end) &&
+    start >= 0 &&
+    end <= project.duration &&
+    end - start >= 2 &&
+    !project.clips.some(
+      (clip) => clip.trackId === trackId && clip.startTime < end && getClipEndTime(clip) > start
+    )
+  );
+}
