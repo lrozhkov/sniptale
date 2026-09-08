@@ -113,7 +113,7 @@ function ProjectTimelineClipContent({
                 aria-hidden="true"
                 data-ui="video-editor.camera-position-marker"
                 className={[
-                  'pointer-events-none absolute bottom-1 z-10 h-1.5 w-1.5 -translate-x-1/2 rotate-45 border',
+                  'pointer-events-none absolute bottom-1.5 z-10 size-2.5 -translate-x-1/2 rotate-45 border',
                   'border-[var(--sniptale-color-text-secondary)] bg-[var(--sniptale-color-surface-panel)]',
                 ].join(' ')}
                 style={{ left: `${(offset / viewModel.visibleDuration) * 100}%` }}
