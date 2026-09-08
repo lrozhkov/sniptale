@@ -15,6 +15,7 @@ import {
 } from '@sniptale/ui/theme/safe-portal';
 import { ProductToolbarMenu, ProductToolbarMenuItem } from '@sniptale/ui/product-menus/toolbar';
 import {
+  Pencil,
   Check,
   ChevronDown,
   Film,
@@ -50,6 +51,7 @@ export function VideoEditorMaterials(props: {
   onOpenLibrary: () => void;
   onRecordAudio?: () => void;
   onShowUse: (use: ProjectAssetUse) => void;
+  onRename: (assetId: string, name: string) => void;
   onRemoveUnused: (assetIds?: readonly string[]) => void;
   project: VideoProject;
   onImport: PreviewStageImportHandlers;
@@ -154,6 +156,7 @@ export function VideoEditorMaterials(props: {
               used={usage.has(asset.id)}
               disabled={pending}
               onSelect={() => props.onSelect(asset)}
+              onRename={(name) => props.onRename(asset.id, name)}
               onRemove={() => removeMaterials([asset.id])}
             />
           ))}
@@ -298,6 +301,7 @@ function MaterialRow(props: {
   disabled: boolean;
   onSelect: () => void;
   onRemove: () => void;
+  onRename: (name: string) => void;
 }) {
   const rowRef = useRef<HTMLDivElement | null>(null);
   const Icon = props.asset.type === 'AUDIO' ? Music : props.asset.type === 'IMAGE' ? Image : Film;
@@ -328,37 +332,7 @@ function MaterialRow(props: {
           </ProductActionButton>
         )}
       </div>
-      <div className="min-w-0 flex-1">
-        <ProductActionButton
-          compact
-          tone="toggle"
-          active={props.selected}
-          className="!min-h-12 w-full min-w-0 flex-1 flex-col !items-start justify-center !gap-0.5 !px-2 text-left"
-          aria-pressed={props.selected}
-          aria-label={props.asset.name}
-          aria-describedby={`material-usage-${props.asset.id}`}
-          onClick={props.onSelect}
-        >
-          <span className="w-full truncate text-[13px]" title={props.asset.name}>
-            {props.asset.name}
-          </span>
-          <span
-            id={`material-usage-${props.asset.id}`}
-            className="flex max-w-full min-w-0 items-center gap-1 text-[11px] text-[var(--sniptale-color-text-muted)]"
-            title={translate(
-              props.used ? 'videoEditor.app.materialsUsed' : 'videoEditor.app.materialsUnused'
-            )}
-          >
-            <span className="shrink-0">{formatBytes(props.asset.metadata.size)} ·</span>
-            {props.used && <Check size={12} className="shrink-0" aria-hidden="true" />}
-            <span className={props.used ? '@max-[260px]/library:sr-only truncate' : 'truncate'}>
-              {translate(
-                props.used ? 'videoEditor.app.materialsUsed' : 'videoEditor.app.materialsUnused'
-              )}
-            </span>
-          </span>
-        </ProductActionButton>
-      </div>
+      <MaterialName {...props} />
       {props.uses.some((use) => use.kind !== 'analysis') && (
         <div className="relative size-8 shrink-0">
           <CompactSelect
@@ -570,5 +544,99 @@ function MaterialsFooter(props: {
         </ProductActionButton>
       </div>
     </footer>
+  );
+}
+
+function MaterialName(props: {
+  asset: VideoProjectAsset;
+  selected: boolean;
+  used: boolean;
+  disabled: boolean;
+  onSelect: () => void;
+  onRename: (name: string) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const editingRef = useRef(false);
+  const nameRef = useRef<HTMLDivElement>(null);
+  const finishRename = (commit: boolean) => {
+    if (!editingRef.current) return;
+    editingRef.current = false;
+    if (commit && draft?.trim()) props.onRename(draft.trim());
+    setDraft(null);
+  };
+  return (
+    <div ref={nameRef} className="flex min-h-12 min-w-0 flex-1 items-center gap-1">
+      <div className="min-w-0 flex-1">
+        {draft !== null ? (
+          <input
+            autoFocus
+            aria-label={translate('videoEditor.app.materialsRename')}
+            value={draft}
+            onFocus={(event) => event.currentTarget.select()}
+            onChange={(event) => setDraft(event.target.value)}
+            onBlur={() => finishRename(true)}
+            onKeyDown={(event) => {
+              if (event.key !== 'Enter' && event.key !== 'Escape') return;
+              event.preventDefault();
+              event.stopPropagation();
+              finishRename(event.key === 'Enter');
+              nameRef.current?.querySelector<HTMLButtonElement>('[data-material-rename]')?.focus();
+            }}
+            className={[
+              'h-8 w-full min-w-0 rounded-[var(--sniptale-radius-sm)] border',
+              'border-[var(--sniptale-color-accent)] bg-transparent px-2 text-[13px] outline-none',
+            ].join(' ')}
+          />
+        ) : (
+          <ProductActionButton
+            compact
+            tone="toggle"
+            active={props.selected}
+            className="!min-h-12 w-full min-w-0 flex-1 flex-col !items-start justify-center !gap-0.5 !px-2 text-left"
+            aria-pressed={props.selected}
+            aria-label={props.asset.name}
+            aria-describedby={`material-usage-${props.asset.id}`}
+            onClick={props.onSelect}
+          >
+            <span className="w-full truncate text-[13px]" title={props.asset.name}>
+              {props.asset.name}
+            </span>
+            <span
+              id={`material-usage-${props.asset.id}`}
+              className="flex max-w-full min-w-0 items-center gap-1 text-[11px] text-[var(--sniptale-color-text-muted)]"
+              title={translate(
+                props.used ? 'videoEditor.app.materialsUsed' : 'videoEditor.app.materialsUnused'
+              )}
+            >
+              <span className="shrink-0">{formatBytes(props.asset.metadata.size)} ·</span>
+              {props.used && <Check size={12} className="shrink-0" aria-hidden="true" />}
+              <span className={props.used ? '@max-[260px]/library:sr-only truncate' : 'truncate'}>
+                {translate(
+                  props.used ? 'videoEditor.app.materialsUsed' : 'videoEditor.app.materialsUnused'
+                )}
+              </span>
+            </span>
+          </ProductActionButton>
+        )}
+      </div>
+      <ProductActionButton
+        data-material-rename
+        compact
+        tone="secondary"
+        disabled={props.disabled}
+        className={[
+          '!size-8 !min-h-8 shrink-0 !p-0 opacity-0',
+          'group-hover/material:opacity-100 group-focus-within/material:opacity-100',
+        ].join(' ')}
+        aria-label={`${translate('videoEditor.app.materialsRename')}: ${props.asset.name}`}
+        title={translate('videoEditor.app.materialsRename')}
+        onClick={() => {
+          editingRef.current = true;
+          setDraft(props.asset.name);
+        }}
+      >
+        <Pencil size={14} aria-hidden />
+      </ProductActionButton>
+    </div>
   );
 }

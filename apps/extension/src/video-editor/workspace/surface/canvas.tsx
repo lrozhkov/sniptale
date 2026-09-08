@@ -135,6 +135,7 @@ function VideoEditorWorkspaceUpper(
   const viewer = useWorkspacePreviewContext();
   const blocking = useVideoEditorBlockingOverlayContext();
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const renameAsset = useVideoEditorTimelineEditingPort((port) => port.renameAsset);
   const removeUnusedAssets = useVideoEditorTimelineEditingPort((port) => port.removeUnusedAssets);
   const appendMaterial = useVideoEditorTimelineEditingPort((port) => port.appendMaterial);
   const insertMaterial = useVideoEditorTimelineEditingPort((port) => port.insertMaterial);
@@ -189,6 +190,7 @@ function VideoEditorWorkspaceUpper(
               if (use.kind === 'scene' && !props.inspectorPanel.isOpen)
                 props.inspectorPanel.onToggle();
             }}
+            onRename={renameAsset}
             onRemoveUnused={removeUnusedAssets}
             onOpenLibrary={() => header?.onOpenLibraryPanel()}
             project={preview.project}

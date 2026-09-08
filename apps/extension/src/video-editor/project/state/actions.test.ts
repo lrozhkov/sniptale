@@ -336,3 +336,31 @@ it('removes only unused requested materials and records one reversible project m
   store.getState().removeUnusedAssets();
   expect(store.getState().project?.assets).toEqual([used]);
 });
+
+it('renames a material reversibly without changing its media or existing clips', () => {
+  const store = createVideoEditorTestStore();
+  const asset = createVideoAsset('Original');
+  store.getState().setProject({ ...createEmptyVideoProject(), assets: [asset] });
+  store.getState().addAssetClip(asset);
+  const before = store.getState().project!;
+  store.getState().renameAsset(asset.id, '  Interview  ');
+  const after = store.getState().project!;
+  expect(after.assets[0]).toEqual({ ...asset, name: 'Interview' });
+  expect(after.clips).toEqual(before.clips);
+  const history = store.getState().projectHistory;
+  for (const [id, name] of [
+    [asset.id, ' '],
+    [asset.id, 'Interview'],
+    ['missing', 'Title'],
+  ] as const) {
+    store.getState().renameAsset(id, name);
+    expect(store.getState().project).toBe(after);
+    expect(store.getState().projectHistory).toBe(history);
+  }
+  const undo = undoVideoEditorProjectHistory(history, after);
+  if (undo?.status !== 'applied') throw new Error('Expected undo');
+  expect(undo.project.assets[0]?.name).toBe('Original');
+  const redo = redoVideoEditorProjectHistory(undo.history, undo.project);
+  if (redo?.status !== 'applied') throw new Error('Expected redo');
+  expect(redo.project.assets[0]?.name).toBe('Interview');
+});

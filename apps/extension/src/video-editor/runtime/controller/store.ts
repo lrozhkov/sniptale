@@ -110,6 +110,7 @@ function selectTimelineEditingPort(state: VideoEditorState): TimelineEditingPort
     updateTransitionDuration: state.updateTransitionDuration,
     updateTransitionEasing: state.updateTransitionEasing,
     updateTransitionTemplate: state.updateTransitionTemplate,
+    renameAsset: state.renameAsset,
     upsertAsset: state.upsertAsset,
     upsertAssets: state.upsertAssets,
     removeUnusedAssets: state.removeUnusedAssets,

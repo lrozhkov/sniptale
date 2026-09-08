@@ -42,6 +42,8 @@ export interface VideoEditorProjectActions
   toggleUtilityLaneVisibility: (lane: keyof VideoProjectUtilityLanes) => void;
   toggleUtilityLaneLock: (lane: keyof VideoProjectUtilityLanes) => void;
   clearUtilityLane: (lane: keyof VideoProjectUtilityLanes) => void;
+  /** Renames the project material without changing its source or existing clip labels. */
+  renameAsset: (assetId: string, name: string) => void;
   upsertAsset: (asset: VideoProjectAsset) => void;
   upsertAssets: (assets: readonly VideoProjectAsset[]) => void;
   /** Removes unreferenced materials from the project while preserving history and source media. */

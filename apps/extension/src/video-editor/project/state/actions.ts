@@ -35,6 +35,7 @@ type VideoEditorProjectActionKeys =
   | 'toggleUtilityLaneVisibility'
   | 'toggleUtilityLaneLock'
   | 'clearUtilityLane'
+  | 'renameAsset'
   | 'upsertAsset'
   | 'upsertAssets'
   | 'removeUnusedAssets'
@@ -133,6 +134,21 @@ export function createVideoEditorProjectActions(
     ...trackActions,
     upsertAsset: (asset) => upsertAssets([asset]),
     upsertAssets,
+    renameAsset: (assetId, name) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      set((state) =>
+        applyProjectUpdate(state, (project) => {
+          const asset = project.assets.find(({ id }) => id === assetId);
+          if (!asset || asset.name === trimmed) return project;
+          return applyVideoProjectMutationPatch(project, {
+            assets: project.assets.map((item) =>
+              item.id === assetId ? { ...item, name: trimmed } : item
+            ),
+          });
+        })
+      );
+    },
     removeUnusedAssets: (assetIds) =>
       set((state) =>
         applyProjectUpdate(state, (project) => {

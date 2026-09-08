@@ -86,6 +86,7 @@ export const videoEditorAppMessages = defineMessageSource({
   materialsImport: { ru: 'Импорт', en: 'Import' },
   materialsFromLibrary: { ru: 'Из библиотеки', en: 'Library' },
   materialsFromDisk: { ru: 'С компьютера', en: 'Local files' },
+  materialsRename: { ru: 'Переименовать материал', en: 'Rename material' },
   materialsRemove: { ru: 'Убрать из проекта', en: 'Remove from project' },
   materialsRemoveUnused: { ru: 'Убрать неиспользуемые', en: 'Remove unused' },
   materialsUsed: { ru: 'Используется', en: 'In use' },

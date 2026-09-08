@@ -159,6 +159,7 @@ const expectedKeys = {
     'updateTransitionDuration',
     'updateTransitionEasing',
     'updateTransitionTemplate',
+    'renameAsset',
     'upsertAsset',
     'upsertAssets',
     'removeUnusedAssets',
