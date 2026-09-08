@@ -47,13 +47,16 @@ export function CursorSkinFields(props: {
   preset: NonNullable<
     NonNullable<WorkspaceSidebarSelectionPanelProps['project']['cursorTrack']>['skin']
   >['preset'];
-  recentColors: WorkspaceSidebarSelectionPanelProps['recentColors'];
+  recentColors: WorkspaceSidebarSelectionPanelProps['recentColors'] | undefined;
   scale: number;
   shadow: boolean;
-  onRememberRecentColor: WorkspaceSidebarSelectionPanelProps['onRememberRecentColor'];
+  onRememberRecentColor: WorkspaceSidebarSelectionPanelProps['onRememberRecentColor'] | undefined;
   onSetCursorCaptureMode: WorkspaceSidebarSelectionPanelProps['onSetCursorCaptureMode'];
   onUpdateCursorSkin: WorkspaceSidebarSelectionPanelProps['onUpdateCursorSkin'];
 }) {
+  if (props.captureMode === VideoCursorCaptureMode.EMBEDDED_FALLBACK) {
+    return <CursorCaptureCapability captureMode={props.captureMode} />;
+  }
   if (props.part === 'animation')
     return (
       <CursorAnimationField
@@ -117,9 +120,9 @@ function CursorAppearanceFields(props: {
   preset: NonNullable<
     NonNullable<WorkspaceSidebarSelectionPanelProps['project']['cursorTrack']>['skin']
   >['preset'];
-  recentColors: WorkspaceSidebarSelectionPanelProps['recentColors'];
+  recentColors: WorkspaceSidebarSelectionPanelProps['recentColors'] | undefined;
   scale: number;
-  onRememberRecentColor: WorkspaceSidebarSelectionPanelProps['onRememberRecentColor'];
+  onRememberRecentColor: WorkspaceSidebarSelectionPanelProps['onRememberRecentColor'] | undefined;
   onUpdateCursorSkin: WorkspaceSidebarSelectionPanelProps['onUpdateCursorSkin'];
 }) {
   return (

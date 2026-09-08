@@ -28,16 +28,8 @@ describe('cursor-options', () => {
     expect(getCursorAnimationOptions()).toEqual([
       { value: VideoCursorAnimationPreset.NONE, label: 'videoEditor.sidebar.cursorAnimationNone' },
       {
-        value: VideoCursorAnimationPreset.PULSE,
-        label: 'videoEditor.sidebar.cursorAnimationPulse',
-      },
-      {
-        value: VideoCursorAnimationPreset.FLOAT,
-        label: 'videoEditor.sidebar.cursorAnimationFloat',
-      },
-      {
-        value: VideoCursorAnimationPreset.BREATHE,
-        label: 'videoEditor.sidebar.cursorAnimationBreathe',
+        value: VideoCursorAnimationPreset.PRESS,
+        label: 'videoEditor.sidebar.cursorAnimationPress',
       },
     ]);
   });

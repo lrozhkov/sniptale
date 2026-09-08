@@ -34,16 +34,8 @@ export function getCursorAnimationOptions() {
       label: translate('videoEditor.sidebar.cursorAnimationNone'),
     },
     {
-      value: VideoCursorAnimationPreset.PULSE,
-      label: translate('videoEditor.sidebar.cursorAnimationPulse'),
-    },
-    {
-      value: VideoCursorAnimationPreset.FLOAT,
-      label: translate('videoEditor.sidebar.cursorAnimationFloat'),
-    },
-    {
-      value: VideoCursorAnimationPreset.BREATHE,
-      label: translate('videoEditor.sidebar.cursorAnimationBreathe'),
+      value: VideoCursorAnimationPreset.PRESS,
+      label: translate('videoEditor.sidebar.cursorAnimationPress'),
     },
   ];
   return options;

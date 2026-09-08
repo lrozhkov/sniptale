@@ -1,3 +1,4 @@
+import { isActionClickStyle, isActionKeyStyle } from './action-style';
 import { isMotionAnimation } from '../motion/timing';
 import { parseMotionSourceBinding } from '../motion/source-binding';
 import {
@@ -147,6 +148,9 @@ function isPresentationOffset(value: unknown): boolean {
 export function isVideoProjectActionPresentation(value: unknown): boolean {
   return (
     isRecord(value) &&
+    (value['clickStyle'] === undefined || isActionClickStyle(value['clickStyle'])) &&
+    (value['keyStyle'] === undefined || isActionKeyStyle(value['keyStyle'])) &&
+    (value['easing'] === undefined || isEnumValue(value['easing'], VideoTemporalEasing)) &&
     isBoolean(value['enabled']) &&
     isEnumValue(value['clickPreset'], VideoProjectActionPreset) &&
     isPresentationDuration(value['duration']) &&
@@ -159,6 +163,9 @@ export function isVideoProjectActionPresentation(value: unknown): boolean {
 export function isVideoProjectActionPresentationOverride(value: unknown): boolean {
   return (
     isRecord(value) &&
+    (value['clickStyle'] === undefined || isActionClickStyle(value['clickStyle'])) &&
+    (value['keyStyle'] === undefined || isActionKeyStyle(value['keyStyle'])) &&
+    (value['easing'] === undefined || isEnumValue(value['easing'], VideoTemporalEasing)) &&
     (value['enabled'] === undefined || isBoolean(value['enabled'])) &&
     (value['preset'] === undefined || isEnumValue(value['preset'], VideoProjectActionPreset)) &&
     (value['duration'] === undefined || isPresentationDuration(value['duration'])) &&

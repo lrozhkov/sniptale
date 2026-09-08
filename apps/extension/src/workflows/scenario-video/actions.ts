@@ -38,6 +38,7 @@ export function resolveActionKindForPreset(
     case VideoProjectActionPreset.SPOTLIGHT:
       return VideoProjectActionEventKind.CALLOUT;
     case VideoProjectActionPreset.NONE:
+    case VideoProjectActionPreset.CLICK_PRESS:
     case VideoProjectActionPreset.CLICK_RIPPLE:
       return VideoProjectActionEventKind.CLICK;
   }

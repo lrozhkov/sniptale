@@ -30,3 +30,28 @@ it.each([VideoCursorCaptureMode.SEPARATE, VideoCursorCaptureMode.EMBEDDED_FALLBA
     }
   }
 );
+
+it('compresses a separate cursor only during click feedback and is stable on seek', () => {
+  const project = createEmptyVideoProject('Click cursor');
+  project.duration = 4;
+  project.cursorTrack = {
+    captureMode: VideoCursorCaptureMode.SEPARATE,
+    skin: { ...normalizeVideoProjectCursorSkin(undefined), animationPreset: 'PRESS' },
+    samples: [{ id: 'one', time: 0, x: 40, y: 50, visible: true }],
+  };
+  project.actionEvents = [
+    {
+      id: 'click',
+      kind: 'CLICK',
+      anchor: { kind: 'project', time: 1 },
+      label: 'Click',
+      data: {},
+      point: null,
+      presentation: { preset: 'NONE' },
+    },
+  ];
+  expect(resolveVideoCompositionCursor(project, 0.5, [])?.scale).toBe(1);
+  expect(resolveVideoCompositionCursor(project, 1.125, [])?.scale).toBeCloseTo(0.82);
+  expect(resolveVideoCompositionCursor(project, 2, [])?.scale).toBe(1);
+  expect(resolveVideoCompositionCursor(project, 1.125, [])?.scale).toBeCloseTo(0.82);
+});

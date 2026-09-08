@@ -24,7 +24,7 @@ describe('effect-options', () => {
     ]);
   });
 
-  it('builds action preset options including scroll emphasis', () => {
+  it('builds action preset options without unsupported scroll or zoom choices', () => {
     expect(getActionPresetOptions()).toEqual([
       { value: VideoProjectActionPreset.NONE, label: 'videoEditor.sidebar.actionPresetNone' },
       {
@@ -36,12 +36,8 @@ describe('effect-options', () => {
         label: 'videoEditor.sidebar.actionPresetSpotlight',
       },
       {
-        value: VideoProjectActionPreset.DWELL_ZOOM,
-        label: 'videoEditor.sidebar.actionPresetDwellZoom',
-      },
-      {
-        value: VideoProjectActionPreset.SCROLL_EMPHASIS,
-        label: 'videoEditor.sidebar.actionPresetScrollEmphasis',
+        value: VideoProjectActionPreset.CLICK_PRESS,
+        label: 'videoEditor.sidebar.actionPresetPress',
       },
     ]);
   });

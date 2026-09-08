@@ -1,3 +1,12 @@
+import {
+  getActionClickStyle,
+  getActionKeyStyle,
+} from '../../../../../features/video/project/action-style';
+import {
+  ActionClickStyleFields,
+  ActionKeyStyleFields,
+} from '../effect-controls/action-style-fields';
+import { CursorSkinFields } from '../effect-controls/cursor-fields';
 import { InspectorDetails } from '../shared/details';
 import { useWorkspaceTrackPresentation } from '../../../surface/track-presentation';
 import { translate } from '../../../../../platform/i18n';
@@ -14,7 +23,16 @@ type HistoryProps = Pick<
   WorkspaceSidebarSelectionPanelProps,
   'project' | 'onUpdateActionPresentation'
 > &
-  Partial<Pick<WorkspaceSidebarSelectionPanelProps, 'onAddActionEvent'>>;
+  Partial<
+    Pick<
+      WorkspaceSidebarSelectionPanelProps,
+      | 'onAddActionEvent'
+      | 'onUpdateCursorSkin'
+      | 'onRememberRecentColor'
+      | 'recentColors'
+      | 'onSetCursorCaptureMode'
+    >
+  >;
 
 export function InspectHistoryLanePanel(props: HistoryProps) {
   const trackPresentation = useWorkspaceTrackPresentation();
@@ -30,8 +48,8 @@ export function InspectHistoryLanePanel(props: HistoryProps) {
         groups={[
           {
             id: 'appearance',
-            semantic: 'appearance' as const,
-            label: translate('videoEditor.sidebar.inspectorGroupAppearance'),
+            semantic: 'effects' as const,
+            label: translate('videoEditor.sidebar.historyClickEffects'),
             defaultActive: true,
             content: (
               <>
@@ -55,22 +73,33 @@ export function InspectHistoryLanePanel(props: HistoryProps) {
                     })
                   }
                 />
+                {presentation.clickPreset !== 'NONE' ? (
+                  <ActionClickStyleFields
+                    value={getActionClickStyle(presentation.clickStyle)}
+                    disabled={disabled}
+                    recentColors={props.recentColors}
+                    onRememberRecentColor={props.onRememberRecentColor}
+                    onChange={(clickStyle) => update({ clickStyle })}
+                  />
+                ) : null}
               </>
             ),
           },
           {
             id: 'animation',
             semantic: 'animation',
-            label: translate('videoEditor.sidebar.inspectorGroupAnimation'),
+            label: translate('videoEditor.sidebar.historyTransitions'),
             content: (
               <ActionPrimaryFields
                 part="animation"
+                easing={presentation.easing ?? 'EASE_OUT'}
                 preset={presentation.clickPreset}
                 duration={presentation.duration}
                 offset={presentation.offset}
                 disabled={disabled}
-                onChange={({ duration, offset }) =>
+                onChange={({ duration, offset, easing }) =>
                   update({
+                    ...(easing === undefined ? {} : { easing }),
                     ...(duration === undefined ? {} : { duration }),
                     ...(offset === undefined ? {} : { offset }),
                   })
@@ -79,9 +108,40 @@ export function InspectHistoryLanePanel(props: HistoryProps) {
             ),
           },
           {
+            id: 'keys',
+            semantic: 'content',
+            label: translate('videoEditor.sidebar.historyKeyboard'),
+            content: (
+              <>
+                <ToggleField
+                  label={translate('videoEditor.sidebar.historyShowKeys')}
+                  checked={presentation.showKeystrokes}
+                  disabled={disabled}
+                  onChange={(showKeystrokes) => update({ showKeystrokes })}
+                />
+                {presentation.showKeystrokes ? (
+                  <ActionKeyStyleFields
+                    value={getActionKeyStyle(presentation.keyStyle)}
+                    disabled={disabled}
+                    recentColors={props.recentColors}
+                    onRememberRecentColor={props.onRememberRecentColor}
+                    onChange={(keyStyle) => update({ keyStyle })}
+                  />
+                ) : null}
+              </>
+            ),
+          },
+          {
+            id: 'cursor',
+            semantic: 'tracking',
+            label: translate('videoEditor.sidebar.historyCursor'),
+            visible: !!props.project.cursorTrack && !!props.onUpdateCursorSkin,
+            content: <HistoryCursorSettings props={props} disabled={disabled} />,
+          },
+          {
             id: 'behavior',
             semantic: 'history' as const,
-            label: translate('videoEditor.sidebar.inspectorGroupHistory'),
+            label: translate('videoEditor.sidebar.historyRules'),
             content: (
               <>
                 <SliderField
@@ -93,12 +153,6 @@ export function InspectHistoryLanePanel(props: HistoryProps) {
                   disabled={disabled}
                   onChange={(clickSuppressionInterval) => update({ clickSuppressionInterval })}
                   formatValue={(value) => `${value.toFixed(2)} s`}
-                />
-                <ToggleField
-                  label={translate('videoEditor.sidebar.historyShowKeys')}
-                  checked={presentation.showKeystrokes}
-                  disabled={disabled}
-                  onChange={(showKeystrokes) => update({ showKeystrokes })}
                 />
                 {props.project.cursorTrack?.samples.length && trackPresentation ? (
                   <InspectorDetails label={translate('videoEditor.sidebar.inspectorDisplay')}>
@@ -115,5 +169,23 @@ export function InspectHistoryLanePanel(props: HistoryProps) {
         ]}
       />
     </section>
+  );
+}
+
+function HistoryCursorSettings({ props, disabled }: { props: HistoryProps; disabled: boolean }) {
+  if (!props.project.cursorTrack || !props.onUpdateCursorSkin) return null;
+  return (
+    <fieldset disabled={disabled} className="min-w-0">
+      <CursorSkinFields
+        {...props.project.cursorTrack.skin}
+        captureMode={props.project.cursorTrack.captureMode}
+        recentColors={props.recentColors}
+        onRememberRecentColor={props.onRememberRecentColor}
+        onSetCursorCaptureMode={props.onSetCursorCaptureMode ?? (() => {})}
+        onUpdateCursorSkin={(patch) => {
+          if (!disabled) props.onUpdateCursorSkin?.(patch);
+        }}
+      />
+    </fieldset>
   );
 }

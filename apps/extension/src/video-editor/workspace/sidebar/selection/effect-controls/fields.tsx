@@ -30,6 +30,8 @@ export function TemporalEasingSelect(props: {
 }
 
 export function ActionPrimaryFields(props: {
+  easing?: VideoTemporalEasing;
+  showEasing?: boolean;
   part?: 'appearance' | 'animation';
   duration: number;
   offset: number;
@@ -51,6 +53,15 @@ export function ActionPrimaryFields(props: {
       )}
       {props.part !== 'appearance' ? (
         <>
+          {props.showEasing !== false ? (
+            <SelectInput
+              label={translate('videoEditor.sidebar.actionEasing')}
+              value={props.easing ?? 'EASE_OUT'}
+              disabled={props.disabled}
+              options={getTemporalEasingOptions()}
+              onChange={(easing) => props.onChange({ easing })}
+            />
+          ) : null}
           <SliderField
             label={translate('videoEditor.sidebar.historyDuration')}
             value={props.duration}

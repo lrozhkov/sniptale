@@ -96,6 +96,9 @@ export interface VideoCompositionCursorState {
 }
 
 export interface VideoCompositionActionState {
+  clickStyle?: import('../project/types').VideoActionClickStyle;
+  keyStyle?: import('../project/types').VideoActionKeyStyle;
+  easing?: import('../project/types').VideoTemporalEasing;
   preset: VideoProjectActionPreset;
   occurrence: VideoProjectActionOccurrence;
   clipId: string | null;

@@ -86,7 +86,7 @@ it('locks project presentation controls without hiding their values', () => {
   act(() =>
     container
       .querySelector<HTMLButtonElement>(
-        'nav button[aria-label="videoEditor.sidebar.inspectorGroupAnimation"]'
+        'nav button[aria-label="videoEditor.sidebar.historyTransitions"]'
       )!
       .click()
   );
@@ -166,14 +166,15 @@ it('changes the preset, timing and behavior defaults through the shared controls
   await click('button[aria-label="videoEditor.sidebar.actionPresetLabel"]');
   await click('[role="option"]');
   expect(onUpdateActionPresentation).toHaveBeenCalledWith({ clickPreset: 'NONE' });
-  await click('nav button[aria-label="videoEditor.sidebar.inspectorGroupAnimation"]');
+  await click('nav button[aria-label="videoEditor.sidebar.historyTransitions"]');
   number('videoEditor.sidebar.historyDuration', '1.25');
   expect(onUpdateActionPresentation).toHaveBeenCalledWith({ duration: 1.25 });
   number('videoEditor.sidebar.historyOffset', '-0.3');
   expect(onUpdateActionPresentation).toHaveBeenCalledWith({ offset: expect.closeTo(-0.3, 12) });
-  await click('nav button[aria-label="videoEditor.sidebar.inspectorGroupHistory"]');
+  await click('nav button[aria-label="videoEditor.sidebar.historyRules"]');
   number('videoEditor.sidebar.historySuppression', '0.75');
   expect(onUpdateActionPresentation).toHaveBeenCalledWith({ clickSuppressionInterval: 0.75 });
+  await click('nav button[aria-label="videoEditor.sidebar.historyKeyboard"]');
   await click('button[aria-label="videoEditor.sidebar.historyShowKeys"]');
   expect(onUpdateActionPresentation).toHaveBeenCalledWith({ showKeystrokes: true });
 });

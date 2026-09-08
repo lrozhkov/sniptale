@@ -18,7 +18,7 @@ describe('workspace-sidebar/selection/effect-fields', () => {
       <ActionPrimaryFields
         duration={0.9}
         offset={-0.25}
-        preset={VideoProjectActionPreset.SCROLL_EMPHASIS}
+        preset={VideoProjectActionPreset.CLICK_PRESS}
         disabled={false}
         onChange={vi.fn()}
       />
@@ -28,7 +28,7 @@ describe('workspace-sidebar/selection/effect-fields', () => {
     expect(markup).toContain('videoEditor.sidebar.historyOffset');
     expect(markup).toContain('-0.25');
     expect(markup).not.toContain('videoEditor.sidebar.textLabel');
-    expect(markup).toContain('videoEditor.sidebar.actionPresetScrollEmphasis');
+    expect(markup).toContain('videoEditor.sidebar.actionPresetPress');
   });
 
   it('disables both placement actions while locked and retains active placement feedback', () => {

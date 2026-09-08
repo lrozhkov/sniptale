@@ -1,3 +1,4 @@
+import { getActionClickStyle, getActionKeyStyle } from './action-style';
 import {
   resolveVideoProjectActionOccurrences,
   type VideoProjectActionOccurrence,
@@ -20,6 +21,9 @@ export type VideoProjectActionPresentationReason =
   | 'outside-source';
 
 export interface ResolvedVideoProjectActionPresentation {
+  clickStyle: ReturnType<typeof getActionClickStyle>;
+  keyStyle: ReturnType<typeof getActionKeyStyle>;
+  easing: import('./types').VideoTemporalEasing;
   event: VideoProjectActionEvent;
   preset: VideoProjectActionPreset;
   duration: number;
@@ -116,6 +120,9 @@ function resolveEvent(
   return {
     event,
     occurrence,
+    clickStyle: getActionClickStyle(override?.clickStyle ?? defaults.clickStyle),
+    keyStyle: getActionKeyStyle(override?.keyStyle ?? defaults.keyStyle),
+    easing: override?.easing ?? defaults.easing ?? 'EASE_OUT',
     preset,
     duration,
     offset,

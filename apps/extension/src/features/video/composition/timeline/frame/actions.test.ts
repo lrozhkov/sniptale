@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { resolveVideoCompositionActions } from './actions';
+import {
+  resolveVideoCompositionActions,
+  resolveVideoCompositionActionSourceMapping,
+} from './actions';
 import { resolveVideoCompositionFrame } from './index';
 import {
   createEmptyVideoProject,
@@ -134,4 +137,40 @@ describe('composition action admission', () => {
     project.clips = [{ ...clip, duration: 2, sourceDuration: 2 }];
     expect(resolveVideoCompositionActions(project, 1.9)).toEqual([]);
   });
+});
+
+it('projects authored visual settings consistently on seek and validates the source mapping', () => {
+  const { project, clip } = capturedProject();
+  const clickStyle = { color: '#12abef', size: 64, opacity: 0.6, strokeWidth: 4 };
+  project.actionEvents[0]!.presentation = {
+    ...project.actionEvents[0]!.presentation,
+    clickStyle,
+    easing: 'LINEAR',
+  };
+  const first = resolveVideoCompositionActions(project, 2.2)[0]!;
+  expect(first.clickStyle).toEqual(clickStyle);
+  expect(first.easing).toBe('LINEAR');
+  resolveVideoCompositionActions(project, 3.5);
+  expect(resolveVideoCompositionActions(project, 2.2)[0]).toEqual(first);
+  expect(resolveVideoCompositionActionSourceMapping(project, first.occurrence, 2.2)).toMatchObject({
+    frame: clip.transform,
+    sourceWidth: 1000,
+    sourceHeight: 800,
+  });
+  expect(
+    resolveVideoCompositionActionSourceMapping(
+      project,
+      { ...first.occurrence, event: manualEvent() },
+      2.2
+    )
+  ).toBeNull();
+  expect(
+    resolveVideoCompositionActionSourceMapping(
+      project,
+      { ...first.occurrence, clipId: 'missing' },
+      2.2
+    )
+  ).toBeNull();
+  project.assets = [];
+  expect(resolveVideoCompositionActionSourceMapping(project, first.occurrence, 2.2)).toBeNull();
 });
