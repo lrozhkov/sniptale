@@ -1,3 +1,4 @@
+import { DEFAULT_CAMERA_APPEARANCE } from '../../../../features/video/project/camera/appearance';
 import {
   activeCameraPosition,
   updateCameraPositionVisual,
@@ -15,6 +16,7 @@ import {
   type VideoMediaShadowMode,
   type VideoProject,
   type VideoProjectClip,
+  type VideoProjectVideoClip,
 } from '../../../../features/video/project/types/index';
 import type { VideoEditorProjectState, VideoEditorProjectSliceSet } from '../contracts';
 import { applyProjectUpdate, areClipTracksEditable } from '../helpers';
@@ -60,7 +62,9 @@ export function createClipMediaStyleActions(
       ),
     applyMediaClipVisualsToTrack: (clipId) =>
       set((state) =>
-        applyProjectUpdate(state, (project) => applyMediaClipVisualsToTrack(project, clipId))
+        applyProjectUpdate(state, (project) =>
+          applyMediaClipVisualsToTrack(project, clipId, state.currentTime)
+        )
       ),
   };
 }
@@ -170,7 +174,7 @@ function normalizeMediaFitScalePercent(value: number, fallback = 100): number {
   return clampVideoPropertyNumber(value, VIDEO_CLIP_PROPERTY_LIMITS.fitScalePercent);
 }
 
-function applyMediaClipVisualsToTrack(project: VideoProject, clipId: string) {
+function applyMediaClipVisualsToTrack(project: VideoProject, clipId: string, time: number) {
   const clip = project.clips.find((item) => item.id === clipId);
   if (!isMediaClip(clip)) {
     return project;
@@ -183,6 +187,12 @@ function applyMediaClipVisualsToTrack(project: VideoProject, clipId: string) {
     return project;
   }
 
+  if (
+    clip.type === 'VIDEO' &&
+    project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')
+  ) {
+    return applyCameraVisualsToTrack(project, clip, time);
+  }
   return applyVideoProjectMutationPatch(project, {
     clips: project.clips.map((item) =>
       item.trackId === clip.trackId && isMediaClip(item)
@@ -201,5 +211,38 @@ function applyMediaClipVisualsToTrack(project: VideoProject, clipId: string) {
           }
         : item
     ),
+  });
+}
+
+function applyCameraVisualsToTrack(
+  project: VideoProject,
+  source: VideoProjectVideoClip,
+  time: number
+) {
+  const position = activeCameraPosition(source, time);
+  const { width, height } = position?.transform ?? source.transform;
+  const fitMode = position?.fitMode ?? source.fitMode;
+  const appearance = source.cameraAppearance ?? DEFAULT_CAMERA_APPEARANCE;
+  return applyVideoProjectMutationPatch(project, {
+    clips: project.clips.map((clip) => {
+      if (clip.type !== 'VIDEO' || clip.trackId !== source.trackId) return clip;
+      return {
+        ...clip,
+        cameraAppearance: { ...appearance },
+        shadowIntensity: normalizeVideoMediaShadowIntensity(source.shadowIntensity),
+        shadowMode: normalizeVideoMediaShadowMode(source.shadowMode),
+        fitMode,
+        transform: { ...clip.transform, width, height },
+        ...(clip.cameraPositions
+          ? {
+              cameraPositions: clip.cameraPositions.map((entry) => ({
+                ...entry,
+                fitMode,
+                transform: { ...entry.transform, width, height },
+              })),
+            }
+          : {}),
+      };
+    }),
   });
 }

@@ -231,7 +231,12 @@ function beginNumericEditing({
   draftState.setEditing(true);
   draftState.setDraft(draftState.editValue);
   const input = event.currentTarget;
-  window.requestAnimationFrame(() => input.select());
+  window.requestAnimationFrame(() => {
+    const root = input.getRootNode();
+    const active =
+      root instanceof ShadowRoot ? root.activeElement : input.ownerDocument.activeElement;
+    if (active === input && draftState.editingRef.current) input.select();
+  });
 }
 
 function cancelNumericEditing(draftState: NumericDraftState) {

@@ -88,7 +88,7 @@ export function CameraLayoutControls(props: CameraLayoutControlsProps) {
           return (
             <ProductActionButton
               key={option.placement}
-              className="h-7! min-h-7! w-7! rounded-md! p-0! shrink-0"
+              className="h-7! min-h-7! w-7! rounded-md! p-0! shrink-0 [&:not(:focus-visible)]:shadow-none!"
               compact
               tone="toggle"
               active={active}
@@ -130,7 +130,7 @@ export function CameraLayoutControls(props: CameraLayoutControlsProps) {
             key={id}
             compact
             tone="toggle"
-            className="h-7! min-h-7! w-7! rounded-md! p-0! shrink-0"
+            className="h-7! min-h-7! w-7! rounded-md! p-0! shrink-0 [&:not(:focus-visible)]:shadow-none!"
             data-ui={`video-editor.camera-layout-${id.toLowerCase()}`}
             aria-label={translate(labelKey)}
             title={translate(labelKey)}

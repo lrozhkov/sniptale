@@ -14,6 +14,7 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
     en: 'Camera framing: drag the image or use arrow keys',
   },
   cameraCropZoom: { ru: 'Приближение', en: 'Zoom in' },
+  cameraCropSection: { ru: 'Изображение внутри', en: 'Image inside frame' },
   cameraCropCenter: { ru: 'Центрировать изображение', en: 'Center image' },
 
   typingSelection: { ru: 'Набор текста', en: 'Typing interval' },

@@ -168,7 +168,7 @@ function getMediaShadowModeOptions(disabled: boolean) {
   ];
 }
 
-function MediaApplyVisualsButton(
+export function MediaApplyVisualsButton(
   props: Pick<MediaFrameFieldProps, 'clip' | 'disabled' | 'onApplyMediaClipVisualsToTrack'>
 ) {
   return (
@@ -176,7 +176,7 @@ function MediaApplyVisualsButton(
       <ProductActionButton
         compact
         tone="secondary"
-        disabled={props.disabled}
+        disabled={props.disabled || !props.onApplyMediaClipVisualsToTrack}
         onClick={() => props.onApplyMediaClipVisualsToTrack?.(props.clip.id)}
         className="self-end whitespace-nowrap"
       >
