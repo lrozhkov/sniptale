@@ -43,14 +43,14 @@ function createProps() {
 describe('workspace-sidebar/selection/body', () => {
   it.each([true, false])(
     'preserves camera commands and live split eligibility %s through the body seam',
-    (canSplitCameraInterval) => {
+    (canAddCameraPosition) => {
       // Native camera selection exposed this gap: outer panel forwarding and the
       // isolated camera controls passed, while this intermediate projection dropped both callbacks.
       const props = {
         ...createProps(),
         onApplyCameraLayout: vi.fn(),
-        onSplitCameraInterval: vi.fn(),
-        canSplitCameraInterval,
+        onEditCameraPosition: vi.fn(),
+        canAddCameraPosition,
       };
       inspectPanelMock.mockClear();
 
@@ -59,8 +59,8 @@ describe('workspace-sidebar/selection/body', () => {
       expect(inspectPanelMock).toHaveBeenLastCalledWith(
         expect.objectContaining({
           onApplyCameraLayout: props.onApplyCameraLayout,
-          onSplitCameraInterval: props.onSplitCameraInterval,
-          canSplitCameraInterval,
+          onEditCameraPosition: props.onEditCameraPosition,
+          canAddCameraPosition,
         }),
         undefined
       );

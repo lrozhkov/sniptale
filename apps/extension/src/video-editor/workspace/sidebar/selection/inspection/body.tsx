@@ -17,8 +17,8 @@ type WorkspaceSidebarSelectionBodyProps = Partial<
     | 'selection'
     | 'selectedClip'
     | 'onApplyCameraLayout'
-    | 'onSplitCameraInterval'
-    | 'canSplitCameraInterval'
+    | 'onEditCameraPosition'
+    | 'canAddCameraPosition'
     | 'selectedTransition'
     | 'selectedCursorSample'
     | 'currentTime'
@@ -142,8 +142,8 @@ function createInspectPanelProps(props: WorkspaceSidebarSelectionBodyProps) {
     selection: props.selection ?? createSceneSelection(),
     selectedClip: props.selectedClip ?? null,
     ...(props.onApplyCameraLayout ? { onApplyCameraLayout: props.onApplyCameraLayout } : {}),
-    ...(props.onSplitCameraInterval ? { onSplitCameraInterval: props.onSplitCameraInterval } : {}),
-    canSplitCameraInterval: props.canSplitCameraInterval ?? false,
+    ...(props.onEditCameraPosition ? { onEditCameraPosition: props.onEditCameraPosition } : {}),
+    canAddCameraPosition: props.canAddCameraPosition ?? false,
     ...(props.currentTime === undefined ? {} : { currentTime: props.currentTime }),
     selectedActionOccurrence: props.selectedActionOccurrence ?? null,
     selectedCursorSample: props.selectedCursorSample ?? null,

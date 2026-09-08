@@ -100,6 +100,27 @@ function ProjectTimelineClipContent({
 
   return (
     <>
+      {clip.type === 'VIDEO' &&
+      project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')
+        ? (clip.cameraPositions ?? []).map((position) => {
+            const offset =
+              (position.sourceTime - clip.sourceStart) / (clip.playbackRate ?? 1) -
+              viewModel.offsetSeconds;
+            if (offset < 0 || offset > viewModel.visibleDuration) return null;
+            return (
+              <span
+                key={position.id}
+                aria-hidden="true"
+                data-ui="video-editor.camera-position-marker"
+                className={[
+                  'pointer-events-none absolute bottom-1 z-10 h-1.5 w-1.5 -translate-x-1/2 rotate-45 border',
+                  'border-[var(--sniptale-color-text-secondary)] bg-[var(--sniptale-color-surface-panel)]',
+                ].join(' ')}
+                style={{ left: `${(offset / viewModel.visibleDuration) * 100}%` }}
+              />
+            );
+          })
+        : null}
       {viewModel.includesStart ? (
         <ProjectTimelineTrimHandle
           className={`${viewModel.trimHandleClassName} left-0`}

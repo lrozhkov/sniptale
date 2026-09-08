@@ -8,7 +8,7 @@ export function createSelectionPanelOptionalUpdateProps(
 ) {
   return {
     ...(props.onApplyCameraLayout ? { onApplyCameraLayout: props.onApplyCameraLayout } : {}),
-    ...(props.onSplitCameraInterval ? { onSplitCameraInterval: props.onSplitCameraInterval } : {}),
+    ...(props.onEditCameraPosition ? { onEditCameraPosition: props.onEditCameraPosition } : {}),
     ...(props.onApplyMediaClipVisualsToTrack
       ? { onApplyMediaClipVisualsToTrack: props.onApplyMediaClipVisualsToTrack }
       : {}),

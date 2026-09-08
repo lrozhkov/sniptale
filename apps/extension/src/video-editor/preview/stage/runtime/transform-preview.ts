@@ -1,3 +1,5 @@
+import { resolveCameraCanvasTransform } from './camera-transform';
+import { updateCameraPositionVisual } from '../../../../features/video/project/camera/animation';
 import { useCallback, useMemo, useState } from 'react';
 
 import type { VideoProject, VideoProjectTransform } from '../../../../features/video/project/types';
@@ -34,11 +36,26 @@ export function usePreviewStageTransientTransform(
       };
     return {
       ...project,
-      clips: project.clips.map((clip) =>
-        clip.id === transient.clipId ? { ...clip, transform: transient.transform } : clip
-      ),
+      clips: project.clips.map((clip) => {
+        if (clip.id !== transient.clipId) return clip;
+        const time = frozenTime ?? currentTime;
+        const destination = resolveCameraCanvasTransform(
+          project,
+          clip.id,
+          time,
+          transient.transform
+        );
+        if (!destination) return clip;
+        if (
+          clip.type === 'VIDEO' &&
+          project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA')
+        ) {
+          return updateCameraPositionVisual(clip, time, { transform: destination });
+        }
+        return { ...clip, transform: transient.transform };
+      }),
     };
-  }, [project, transient]);
+  }, [project, transient, frozenTime, currentTime]);
   const gestureHooks = useMemo<PreviewTransformGestureHooks>(
     () => ({
       onActivate: () => {

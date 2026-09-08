@@ -34,24 +34,24 @@ it('preserves utility lane commands on the selection inspection path', () => {
 it('carries camera commands and live eligibility from surface props to the actual selection panel', () => {
   const controller = createFloatingWorkspaceController().sidebar;
   const onApplyCameraLayout = vi.fn();
-  const onSplitCameraInterval = vi.fn();
+  const onEditCameraPosition = vi.fn();
   controller.clipActions.onApplyCameraLayout = onApplyCameraLayout;
-  controller.clipActions.onSplitCameraInterval = onSplitCameraInterval;
-  controller.state.canSplitCameraInterval = true;
+  controller.clipActions.onEditCameraPosition = onEditCameraPosition;
+  controller.state.canAddCameraPosition = true;
   const source = getWorkspaceSidebarProps(controller);
   const props = createSelectionPanelProps({
     ...source,
     gridSettings: controller.state.gridSettings,
   });
-  expect(props.canSplitCameraInterval).toBe(true);
+  expect(props.canAddCameraPosition).toBe(true);
   props.onApplyCameraLayout?.('camera-interval', 'FULLFRAME');
-  props.onSplitCameraInterval?.('camera-interval');
+  props.onEditCameraPosition?.('camera-interval', { kind: 'add' });
   expect(onApplyCameraLayout).toHaveBeenCalledWith('camera-interval', 'FULLFRAME');
-  expect(onSplitCameraInterval).toHaveBeenCalledWith('camera-interval');
-  controller.state.canSplitCameraInterval = false;
+  expect(onEditCameraPosition).toHaveBeenCalledWith('camera-interval', { kind: 'add' });
+  controller.state.canAddCameraPosition = false;
   const atBoundary = createSelectionPanelProps({
     ...getWorkspaceSidebarProps(controller),
     gridSettings: controller.state.gridSettings,
   });
-  expect(atBoundary.canSplitCameraInterval).toBe(false);
+  expect(atBoundary.canAddCameraPosition).toBe(false);
 });

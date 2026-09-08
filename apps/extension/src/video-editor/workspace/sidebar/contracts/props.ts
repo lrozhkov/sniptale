@@ -1,3 +1,4 @@
+import type { CameraPositionEdit } from '../../../../features/video/project/camera/animation';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
 import type { VideoEditorSessionActions } from '../../../contracts/commands/session';
 import type { VideoProjectActionOccurrence } from '../../../../features/video/project/action-occurrences';
@@ -123,7 +124,7 @@ export interface WorkspaceSidebarProps {
     layout: VideoProjectCameraLayout,
     placement?: VideoProjectCameraPlacement
   ) => void;
-  onSplitCameraInterval?: (clipId: string) => void;
+  onEditCameraPosition?: (clipId: string, edit: CameraPositionEdit) => void;
   onUpdateClipTransform: (clipId: string, patch: Partial<VideoProjectClip['transform']>) => void;
   onUpdateClipVolume: (clipId: string, volume: number) => void;
   onUpdateCursorSampleInterpolation?: (
@@ -173,7 +174,7 @@ export interface WorkspaceSidebarProps {
   recordingId: string | null;
   recordings: RecordingListItem[];
   selectedActionOccurrence?: VideoProjectActionOccurrence | null;
-  canSplitCameraInterval?: boolean;
+  canAddCameraPosition?: boolean;
   selectedClip: VideoProjectClip | null;
   selectedCursorSample?: VideoProjectCursorSample | null;
   selectedMotionRegion?: VideoProjectMotionRegion | null;

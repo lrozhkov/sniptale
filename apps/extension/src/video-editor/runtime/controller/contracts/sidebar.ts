@@ -1,3 +1,4 @@
+import type { CameraPositionEdit } from '../../../../features/video/project/camera/animation';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
 import type {
   VideoProjectCameraLayout,
@@ -44,7 +45,7 @@ interface VideoEditorSidebarState {
   recordings: VideoEditorLibrariesState['recordings'];
   currentTime?: number;
   selectedActionOccurrence: VideoEditorSelections['selectedActionOccurrence'];
-  canSplitCameraInterval?: boolean;
+  canAddCameraPosition?: boolean;
   selectedClip: VideoEditorSelections['selectedClip'];
   selectedCursorSample: VideoEditorSelections['selectedCursorSample'];
   selectedMotionRegion: VideoEditorSelections['selectedMotionRegion'];
@@ -129,7 +130,7 @@ interface VideoEditorSidebarClipActions {
     layout: VideoProjectCameraLayout,
     placement?: VideoProjectCameraPlacement
   ) => void;
-  onSplitCameraInterval?: (clipId: string) => void;
+  onEditCameraPosition?: (clipId: string, edit: CameraPositionEdit) => void;
   onUpdateClipTransform: VideoEditorSidebarCommands['updateClipTransform'];
   onUpdateClipVolume: VideoEditorSidebarCommands['updateClipVolume'];
   onApplyMediaClipVisualsToTrack: VideoEditorSidebarCommands['applyMediaClipVisualsToTrack'];

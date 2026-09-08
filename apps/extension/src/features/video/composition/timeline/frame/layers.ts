@@ -1,3 +1,4 @@
+import { resolveCameraVisualClip } from '../../../project/camera/animation';
 import { resolveVideoCompositionActions } from './actions';
 import {
   getClipCompositeVisualOpacity,
@@ -60,6 +61,7 @@ function createVisualLayer(
     actions: readonly VideoCompositionActionState[];
   }
 ): VideoCompositionVisualLayer | null {
+  clip = resolveCameraVisualClip(project, clip, currentTime);
   if (!isVisualClip(clip)) {
     return null;
   }

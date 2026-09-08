@@ -198,7 +198,7 @@ type WorkspaceSidebarClipActionProps = Pick<
   | 'onUpdateClipPlaybackRate'
   | 'onUpdateClipMuted'
   | 'onApplyCameraLayout'
-  | 'onSplitCameraInterval'
+  | 'onEditCameraPosition'
   | 'onUpdateClipTransform'
   | 'onUpdateClipVolume'
   | 'onUpdateMediaClipFitMode'
@@ -231,9 +231,7 @@ function getWorkspaceSidebarClipActionProps(
       actions.onUpdateClipPlaybackRate(clipId, playbackRate),
     onUpdateClipMuted: actions.onUpdateClipMuted,
     ...(actions.onApplyCameraLayout ? { onApplyCameraLayout: actions.onApplyCameraLayout } : {}),
-    ...(actions.onSplitCameraInterval
-      ? { onSplitCameraInterval: actions.onSplitCameraInterval }
-      : {}),
+    ...(actions.onEditCameraPosition ? { onEditCameraPosition: actions.onEditCameraPosition } : {}),
     onUpdateClipTransform: actions.onUpdateClipTransform,
     onUpdateClipVolume: actions.onUpdateClipVolume,
     onUpdateMediaClipFitMode: actions.onUpdateMediaClipFitMode,
@@ -256,7 +254,7 @@ function getWorkspaceSidebarSelectionProps(
   | 'recordingTelemetry'
   | 'currentTime'
   | 'selectedActionOccurrence'
-  | 'canSplitCameraInterval'
+  | 'canAddCameraPosition'
   | 'selectedClip'
   | 'selectedCursorSample'
   | 'selectedMotionRegion'
@@ -273,7 +271,7 @@ function getWorkspaceSidebarSelectionProps(
       ? { recordingTelemetry: controller.state.recordingTelemetry }
       : {}),
     selectedActionOccurrence: controller.state.selectedActionOccurrence ?? null,
-    canSplitCameraInterval: controller.state.canSplitCameraInterval ?? false,
+    canAddCameraPosition: controller.state.canAddCameraPosition ?? false,
     selectedClip: controller.state.selectedClip,
     selectedCursorSample: controller.state.selectedCursorSample ?? null,
     selectedMotionRegion: controller.state.selectedMotionRegion ?? null,

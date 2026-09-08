@@ -63,6 +63,40 @@ function hasBaseClipFields(value: Record<string, unknown>): boolean {
   );
 }
 
+function hasCameraPositions(value: unknown): boolean {
+  if (value === undefined) return true;
+  if (!Array.isArray(value) || value.length > 512) return false;
+  const ids = new Set<string>();
+  let previous = -1;
+  return value.every((item: unknown) => {
+    if (
+      !isRecord(item) ||
+      !isBoundedString(item['id'], 256) ||
+      !isString(item['id']) ||
+      ids.has(item['id']) ||
+      !isBoundedNumber(item['sourceTime'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) ||
+      typeof item['sourceTime'] !== 'number' ||
+      item['sourceTime'] <= previous ||
+      !isTransform(item['transform']) ||
+      !isRecord(item['transform']) ||
+      Number(item['transform']['width']) <= 0 ||
+      Number(item['transform']['height']) <= 0 ||
+      !isEnumValue(item['fitMode'], VideoMediaFitMode) ||
+      !isRecord(item['transition']) ||
+      !(
+        item['transition']['kind'] === 'instant' ||
+        item['transition']['kind'] === 'smooth' ||
+        item['transition']['kind'] === 'shrink'
+      ) ||
+      !isBoundedNumber(item['transition']['duration'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS)
+    )
+      return false;
+    ids.add(item['id']);
+    previous = item['sourceTime'];
+    return true;
+  });
+}
+
 function hasMediaVisualFields(value: Record<string, unknown>): boolean {
   return (
     isEnumValue(value['fitMode'], VideoMediaFitMode) &&
@@ -126,6 +160,7 @@ export function isVideoProjectClip(value: unknown): value is VideoProjectClip {
       (value['playbackRate'] === undefined || isPlaybackRate(value['playbackRate'])) &&
       (value['type'] === VideoProjectClipType.AUDIO ||
         (hasMediaVisualFields(value) &&
+          hasCameraPositions(value['cameraPositions']) &&
           (value['sourceInstanceId'] === undefined || isString(value['sourceInstanceId']))))
     );
   }

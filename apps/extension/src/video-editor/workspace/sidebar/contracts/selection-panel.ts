@@ -67,7 +67,7 @@ export interface WorkspaceSidebarSelectionPanelProps {
   onUpdateClipPlaybackRate?: WorkspaceSidebarProps['onUpdateClipPlaybackRate'];
   onUpdateClipMuted: WorkspaceSidebarProps['onUpdateClipMuted'];
   onApplyCameraLayout?: WorkspaceSidebarProps['onApplyCameraLayout'];
-  onSplitCameraInterval?: WorkspaceSidebarProps['onSplitCameraInterval'];
+  onEditCameraPosition?: WorkspaceSidebarProps['onEditCameraPosition'];
   onUpdateClipTransform: WorkspaceSidebarProps['onUpdateClipTransform'];
   onUpdateClipVolume: WorkspaceSidebarProps['onUpdateClipVolume'];
   onUpdateCursorSampleInterpolation: NonNullable<
@@ -103,7 +103,7 @@ export interface WorkspaceSidebarSelectionPanelProps {
   project: VideoProject;
   recentColors: string[];
   selectedActionOccurrence: VideoProjectActionOccurrence | null;
-  canSplitCameraInterval?: boolean;
+  canAddCameraPosition?: boolean;
   selectedClip: VideoProjectClip | null;
   selectedCursorSample: VideoProjectCursorSample | null;
   selectedMotionRegion: VideoProjectMotionRegion | null;

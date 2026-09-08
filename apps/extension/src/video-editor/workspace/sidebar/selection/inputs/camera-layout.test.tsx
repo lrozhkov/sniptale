@@ -53,9 +53,9 @@ function createProps() {
     project,
     clip,
     disabled: false,
-    canSplitCameraInterval: true,
+    canAddCameraPosition: true,
     onApplyCameraLayout: vi.fn(),
-    onSplitCameraInterval: vi.fn(),
+    onEditCameraPosition: vi.fn(),
   };
 }
 
@@ -68,21 +68,21 @@ function button(suffix: string) {
 }
 
 describe('camera interval controls', () => {
-  it('keeps the hidden interval selectable and restores it through one explicit layout command', () => {
+  it('restores a hidden camera through the layout selector', () => {
     const props = createProps();
     props.clip.transform.opacity = 0;
     act(() => root.render(<CameraLayoutControls {...props} />));
-    expect(button('layout-hidden').getAttribute('aria-pressed')).toBe('true');
-    act(() => button('layout-fullframe').click());
+    expect(layoutButton().textContent).toContain('videoEditor.sidebar.cameraLayoutHidden');
+    chooseLayout('videoEditor.sidebar.cameraLayoutFullframe');
     expect(props.onApplyCameraLayout).toHaveBeenCalledWith(
       props.clip.id,
       VideoProjectCameraLayout.FULLFRAME
     );
     expect(props.clip.transform.opacity).toBe(0);
-    expect(button('layout-hidden').getAttribute('aria-pressed')).toBe('true');
+    expect(layoutButton().textContent).toContain('videoEditor.sidebar.cameraLayoutHidden');
   });
 
-  it('targets the exact interval for corner placement and split and exposes accessible corner names', () => {
+  it('targets the camera for placement and adding a position with accessible corner names', () => {
     const props = createProps();
     act(() => root.render(<CameraLayoutControls {...props} />));
     expect(button('placement-top_left').getAttribute('aria-label')).toBe(
@@ -90,24 +90,38 @@ describe('camera interval controls', () => {
     );
     act(() => button('placement-top_left').click());
     expect(props.onApplyCameraLayout).toHaveBeenCalledWith(props.clip.id, 'OVERLAY', 'TOP_LEFT');
-    act(() => button('split-interval').click());
-    expect(props.onSplitCameraInterval).toHaveBeenCalledWith(props.clip.id);
+    act(() => button('add-position').click());
+    expect(props.onEditCameraPosition).toHaveBeenCalledWith(props.clip.id, { kind: 'add' });
   });
 
-  it('blocks boundary splitting and all edits on a locked camera', () => {
+  it('blocks duplicate positions and all edits on a locked camera', () => {
     const props = createProps();
-    act(() => root.render(<CameraLayoutControls {...props} canSplitCameraInterval={false} />));
-    expect(button('split-interval').disabled).toBe(true);
-    expect(button('layout-overlay').disabled).toBe(false);
+    act(() => root.render(<CameraLayoutControls {...props} canAddCameraPosition={false} />));
+    expect(button('add-position').disabled).toBe(true);
+    expect(layoutButton().disabled).toBe(false);
     act(() => root.render(<CameraLayoutControls {...props} disabled />));
     expect(Array.from(container.querySelectorAll('button')).every((item) => item.disabled)).toBe(
       true
     );
     act(() => {
-      button('layout-hidden').click();
-      button('split-interval').click();
+      layoutButton().click();
+      button('add-position').click();
     });
     expect(props.onApplyCameraLayout).not.toHaveBeenCalled();
-    expect(props.onSplitCameraInterval).not.toHaveBeenCalled();
+    expect(props.onEditCameraPosition).not.toHaveBeenCalled();
   });
 });
+
+function layoutButton() {
+  return container.querySelector<HTMLButtonElement>(
+    '[aria-label="videoEditor.sidebar.cameraLayoutLabel"]'
+  )!;
+}
+function chooseLayout(label: string) {
+  act(() => layoutButton().click());
+  const option = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]')).find(
+    (item) => item.textContent?.includes(label)
+  );
+  expect(option).toBeDefined();
+  act(() => option!.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 })));
+}

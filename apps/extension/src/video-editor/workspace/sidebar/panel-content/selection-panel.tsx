@@ -71,7 +71,7 @@ function createSelectionBodyStateProps(props: WorkspaceSidebarSelectionPanelProp
     ...(props.gridSettings ? { gridSettings: props.gridSettings } : {}),
     project: props.project,
     selection: props.selection,
-    canSplitCameraInterval: props.canSplitCameraInterval ?? false,
+    canAddCameraPosition: props.canAddCameraPosition ?? false,
     selectedClip: props.selectedClip,
     selectedTransition: props.selectedTransition,
     selectedCursorSample: props.selectedCursorSample,
@@ -128,7 +128,7 @@ function createSelectionBodyActionProps(props: WorkspaceSidebarSelectionPanelPro
     ...(props.onTrimClipEnd ? { onTrimClipEnd: props.onTrimClipEnd } : {}),
     onDetachClipGroup: props.onDetachClipGroup,
     ...(props.onApplyCameraLayout ? { onApplyCameraLayout: props.onApplyCameraLayout } : {}),
-    ...(props.onSplitCameraInterval ? { onSplitCameraInterval: props.onSplitCameraInterval } : {}),
+    ...(props.onEditCameraPosition ? { onEditCameraPosition: props.onEditCameraPosition } : {}),
     onUpdateClipTransform: props.onUpdateClipTransform,
     onUpdateClipMuted: props.onUpdateClipMuted,
     onUpdateClipVolume: props.onUpdateClipVolume,
@@ -177,7 +177,7 @@ function createSelectionPanelStateProps(
   | 'recordingTelemetry'
   | 'onApplyTypingCompression'
   | 'selectedActionOccurrence'
-  | 'canSplitCameraInterval'
+  | 'canAddCameraPosition'
   | 'selectedClip'
   | 'selectedCursorSample'
   | 'selectedMotionRegion'
@@ -191,7 +191,7 @@ function createSelectionPanelStateProps(
     selection: props.selection ?? createSceneSelection(),
     project: props.project,
     recentColors: props.recentColors ?? [],
-    canSplitCameraInterval: props.canSplitCameraInterval ?? false,
+    canAddCameraPosition: props.canAddCameraPosition ?? false,
     selectedClip: props.selectedClip,
     ...(props.currentTime === undefined ? {} : { currentTime: props.currentTime }),
     ...(props.typingProject ? { typingProject: props.typingProject } : {}),
@@ -230,7 +230,7 @@ function createSelectionPanelUpdateProps(
   | 'onUpdateClipMuted'
   | 'onUpdateClipPlaybackRate'
   | 'onApplyCameraLayout'
-  | 'onSplitCameraInterval'
+  | 'onEditCameraPosition'
   | 'onUpdateClipTransform'
   | 'onUpdateClipVolume'
   | 'onUpdateCursorSampleSkinOverride'

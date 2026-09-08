@@ -3,7 +3,14 @@ import {
   type VideoProjectCameraLayout,
   type VideoProjectCameraPlacement,
 } from '../../../../features/video/project/camera/placement';
-import { canSplitProjectClipAtTime } from '../../../../features/video/project/timeline';
+import {
+  canAddCameraPosition,
+  type CameraPositionEdit,
+} from '../../../../features/video/project/camera/animation';
+import {
+  editCameraPosition,
+  cameraPositionSeekTime,
+} from '../../../../features/video/project/camera/editing';
 import type { VideoEditorLibrariesState } from '../../app-model/types';
 import type { VideoEditorActionHandlers } from '../../commands';
 import type { VideoEditorSelections } from '../selections';
@@ -26,7 +33,7 @@ type EditorStore = AnnotationEditingPort &
   RuntimeSessionPort &
   TimelineEditingPort &
   Pick<ProjectLifecyclePort, 'project' | 'recordingId'> &
-  Pick<PlaybackPort, 'currentTime'>;
+  Pick<PlaybackPort, 'currentTime' | 'setCurrentTime' | 'setPlaying'>;
 type SidebarCommandHandlers = Pick<
   VideoEditorActionHandlers,
   | 'handleAddRecording'
@@ -62,19 +69,6 @@ type SidebarWorkspace = Pick<
   | 'toggleSidebarCollapsed'
 >;
 
-function canSplitCameraInterval(
-  project: NonNullable<EditorStore['project']>,
-  clipId: string,
-  time: number
-) {
-  const clip = project.clips.find((item) => item.id === clipId);
-  return (
-    clip?.type === 'VIDEO' &&
-    project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA') &&
-    canSplitProjectClipAtTime(project, clipId, time)
-  );
-}
-
 function createWorkspaceSidebarClipActions(store: EditorStore) {
   return {
     onApplyMediaClipVisualsToTrack: store.applyMediaClipVisualsToTrack,
@@ -94,14 +88,35 @@ function createWorkspaceSidebarClipActions(store: EditorStore) {
       clipId: string,
       layout: VideoProjectCameraLayout,
       placement?: VideoProjectCameraPlacement
-    ) =>
+    ) => {
       store.updateProject((project) =>
-        applyVideoProjectCameraLayout(project, clipId, layout, placement)
-      ),
-    onSplitCameraInterval: (clipId: string) => {
-      if (store.project && canSplitCameraInterval(store.project, clipId, store.currentTime)) {
-        store.splitClipAt(clipId, store.currentTime);
+        applyVideoProjectCameraLayout(project, clipId, layout, placement, store.currentTime)
+      );
+      if (store.project)
+        store.setCurrentTime(cameraPositionSeekTime(store.project, clipId, store.currentTime));
+    },
+    onEditCameraPosition: (clipId: string, edit: CameraPositionEdit) => {
+      if (!store.project) return;
+      store.setPlaying(false);
+      if (edit.kind === 'select') {
+        store.setCurrentTime(
+          cameraPositionSeekTime(store.project, clipId, store.currentTime, edit.id)
+        );
+        return;
       }
+      let nextTime = store.currentTime;
+      store.updateProject((project) => {
+        const next = editCameraPosition(project, clipId, store.currentTime, edit);
+        if (next !== project && (edit.kind === 'add' || edit.kind === 'update'))
+          nextTime = cameraPositionSeekTime(
+            next,
+            clipId,
+            store.currentTime,
+            edit.kind === 'update' ? edit.id : undefined
+          );
+        return next;
+      });
+      if (nextTime !== store.currentTime) store.setCurrentTime(nextTime);
     },
     onUpdateClipTransform: store.updateClipTransform,
     onUpdateClipVolume: store.updateClipVolume,
@@ -245,9 +260,9 @@ function createWorkspaceSidebarState(args: {
     recordingTelemetry: args.store.recordingTelemetry,
     currentTime: args.store.currentTime,
     selectedActionOccurrence: args.selections.selectedActionOccurrence ?? null,
-    canSplitCameraInterval:
+    canAddCameraPosition:
       !!args.selections.selectedClip &&
-      canSplitCameraInterval(args.project, args.selections.selectedClip.id, args.store.currentTime),
+      canAddCameraPosition(args.project, args.selections.selectedClip.id, args.store.currentTime),
     selectedClip: args.selections.selectedClip,
     selectedCursorSample: args.selections.selectedCursorSample ?? null,
     selectedMotionRegion: args.selections.selectedMotionRegion ?? null,

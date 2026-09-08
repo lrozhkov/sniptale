@@ -1,3 +1,4 @@
+import { activeCameraPosition } from '../../../../../features/video/project/camera/animation';
 import type React from 'react';
 import { translate } from '../../../../../platform/i18n';
 import {
@@ -123,8 +124,11 @@ function createStandardClipGroups(
   clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>,
   runtime: ReturnType<typeof createSelectionRuntime>
 ) {
+  const cameraPosition = isCameraRoleVideoClip(props.project, clip)
+    ? activeCameraPosition(clip, props.currentTime ?? clip.startTime)
+    : undefined;
   const transformContent = renderTransformFields(
-    clip,
+    cameraPosition ? { ...clip, transform: cameraPosition.transform } : clip,
     runtime.selectedTrackLocked,
     props.onUpdateClipTransform
   );
@@ -192,6 +196,9 @@ function createCameraPlacementGroup(
   locked: boolean
 ) {
   const isCameraClip = isCameraRoleVideoClip(props.project, clip);
+  const position = isCameraClip
+    ? activeCameraPosition(clip, props.currentTime ?? clip.startTime)
+    : undefined;
 
   return {
     id: 'camera',
@@ -201,18 +208,23 @@ function createCameraPlacementGroup(
     content: isCameraClip ? (
       <>
         <CameraLayoutControls
+          currentTime={props.currentTime ?? clip.startTime}
           clip={clip}
           disabled={locked}
           project={props.project}
           {...(props.onApplyCameraLayout ? { onApplyCameraLayout: props.onApplyCameraLayout } : {})}
-          {...(props.onSplitCameraInterval
-            ? { onSplitCameraInterval: props.onSplitCameraInterval }
+          {...(props.onEditCameraPosition
+            ? { onEditCameraPosition: props.onEditCameraPosition }
             : {})}
-          {...(props.canSplitCameraInterval === undefined
+          {...(props.canAddCameraPosition === undefined
             ? {}
-            : { canSplitCameraInterval: props.canSplitCameraInterval })}
+            : { canAddCameraPosition: props.canAddCameraPosition })}
         />
-        <MediaFrameControls {...props} clip={clip} locked={locked} />
+        <MediaFrameControls
+          {...props}
+          clip={position ? { ...clip, fitMode: position.fitMode } : clip}
+          locked={locked}
+        />
       </>
     ) : null,
     visible: isCameraClip,

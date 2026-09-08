@@ -1,3 +1,4 @@
+import { activeCameraPosition, updateCameraPositionVisual } from './animation';
 import type { VideoProjectTransform } from '../types/layout';
 import { applyVideoProjectClipsPatch } from '../mutation';
 import {
@@ -54,7 +55,8 @@ export function applyVideoProjectCameraLayout(
   project: VideoProject,
   clipId: string,
   layout: VideoProjectCameraLayout,
-  placement: VideoProjectCameraPlacement = VideoProjectCameraPlacement.BOTTOM_RIGHT
+  placement: VideoProjectCameraPlacement = VideoProjectCameraPlacement.BOTTOM_RIGHT,
+  time: number = 0
 ): VideoProject {
   const clip = project.clips.find((item) => item.id === clipId);
   const track = project.tracks.find((item) => item.id === clip?.trackId);
@@ -67,11 +69,14 @@ export function applyVideoProjectCameraLayout(
     return project;
 
   if (layout === VideoProjectCameraLayout.HIDDEN) {
-    if (clip.transform.opacity === 0) return project;
+    if ((activeCameraPosition(clip, time)?.transform ?? clip.transform).opacity === 0)
+      return project;
     return applyVideoProjectClipsPatch(
       project,
       project.clips.map((item) =>
-        item.id === clipId ? { ...clip, transform: { ...clip.transform, opacity: 0 } } : item
+        item.id === clipId
+          ? updateCameraPositionVisual(clip, time, { transform: { opacity: 0 } })
+          : item
       )
     );
   }
@@ -91,13 +96,14 @@ export function applyVideoProjectCameraLayout(
     project.clips.map((item) =>
       item.id === clipId
         ? {
-            ...clip,
-            fitMode:
-              layout === VideoProjectCameraLayout.FULLFRAME
-                ? VideoMediaFitMode.COVER
-                : VideoMediaFitMode.CONTAIN,
+            ...updateCameraPositionVisual(clip, time, {
+              fitMode:
+                layout === VideoProjectCameraLayout.FULLFRAME
+                  ? VideoMediaFitMode.COVER
+                  : VideoMediaFitMode.CONTAIN,
+              transform: { ...frame, rotation: 0, opacity: 1 },
+            }),
             fitScalePercent: 100,
-            transform: { ...frame, rotation: 0, opacity: 1 },
           }
         : item
     )

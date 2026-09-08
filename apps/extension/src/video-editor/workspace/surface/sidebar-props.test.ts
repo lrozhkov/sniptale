@@ -58,13 +58,13 @@ describe('workspace/sidebar-props', () => {
 it('forwards camera layout actions and preserves false split eligibility', () => {
   const controller = createFloatingWorkspaceController().sidebar;
   const onApplyCameraLayout = vi.fn();
-  const onSplitCameraInterval = vi.fn();
+  const onEditCameraPosition = vi.fn();
   controller.clipActions.onApplyCameraLayout = onApplyCameraLayout;
-  controller.clipActions.onSplitCameraInterval = onSplitCameraInterval;
-  controller.state.canSplitCameraInterval = false;
+  controller.clipActions.onEditCameraPosition = onEditCameraPosition;
+  controller.state.canAddCameraPosition = false;
   const props = getWorkspaceSidebarProps(controller);
-  expect(props.canSplitCameraInterval).toBe(false);
+  expect(props.canAddCameraPosition).toBe(false);
   props.onApplyCameraLayout?.('camera', 'OVERLAY', 'TOP_RIGHT');
   expect(onApplyCameraLayout).toHaveBeenCalledWith('camera', 'OVERLAY', 'TOP_RIGHT');
-  expect(props.onSplitCameraInterval).toBe(onSplitCameraInterval);
+  expect(props.onEditCameraPosition).toBe(onEditCameraPosition);
 });

@@ -281,7 +281,11 @@ export function useVideoEditorPreviewController() {
 
 export function useVideoEditorSidebarController() {
   const project = usePresentedProject();
-  const currentTime = useVideoEditorPlaybackPort((port) => port.currentTime);
+  const playback = useVideoEditorPlaybackPort(({ currentTime, setCurrentTime, setPlaying }) => ({
+    currentTime,
+    setCurrentTime,
+    setPlaying,
+  }));
   const lifecycle = useVideoEditorProjectLifecyclePort(({ project, recordingId }) => ({
     project,
     recordingId,
@@ -306,7 +310,7 @@ export function useVideoEditorSidebarController() {
   const actions = useSidebarCommandHandlers();
   if (!project || !lifecycle.project) return null;
   const store = {
-    currentTime,
+    ...playback,
     ...annotation,
     ...selection,
     ...telemetry,

@@ -1,3 +1,4 @@
+import { resolveCameraClip } from '../../../../features/video/project/camera/animation';
 import { createVideoClipFromAsset } from '../../../../features/video/project/factories/clip';
 import {
   VideoProjectAssetType,
@@ -176,25 +177,29 @@ it('commits a camera layout through updateProject as one undoable visual edit', 
   expect(useVideoEditorStore.getState().project?.clips).toEqual(after.clips);
 });
 
-it('recomputes camera split eligibility at the current playhead and splits with the existing command', () => {
+it('adds a source-time position without splitting and restores it through Undo/Redo', () => {
   const { controller, cameraId } = createCameraControllerFixture();
   useVideoEditorStore.getState().setCurrentTime(1);
-  expect(controller().state.canSplitCameraInterval).toBe(false);
+  expect(controller().state.canAddCameraPosition).toBe(false);
   useVideoEditorStore.getState().setCurrentTime(5);
-  expect(controller().state.canSplitCameraInterval).toBe(false);
+  expect(controller().state.canAddCameraPosition).toBe(false);
   useVideoEditorStore.getState().setCurrentTime(3);
   const live = controller();
-  expect(live.state.canSplitCameraInterval).toBe(true);
-  live.clipActions.onSplitCameraInterval?.(cameraId);
+  expect(live.state.canAddCameraPosition).toBe(true);
+  live.clipActions.onEditCameraPosition?.(cameraId, { kind: 'add' });
+  expect(useVideoEditorStore.getState().currentTime).toBe(3.5);
   expect(
     useVideoEditorStore.getState().project?.clips.map((clip) => [clip.startTime, clip.duration])
-  ).toEqual([
-    [1, 2],
-    [3, 2],
-  ]);
+  ).toEqual([[1, 4]]);
+  const edited = useVideoEditorStore.getState().project!;
+  expect(edited.clips[0]).toMatchObject({
+    cameraPositions: [{ sourceTime: 2, transition: { kind: 'smooth' } }],
+  });
   expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(1);
   useVideoEditorStore.getState().undoProject();
-  expect(useVideoEditorStore.getState().project?.clips).toHaveLength(1);
+  expect(useVideoEditorStore.getState().project?.clips[0]).not.toHaveProperty('cameraPositions');
+  useVideoEditorStore.getState().redoProject();
+  expect(useVideoEditorStore.getState().project?.clips).toEqual(edited.clips);
 });
 
 it('does not mutate a locked camera through either inspector callback', () => {
@@ -208,9 +213,39 @@ it('does not mutate a locked camera through either inspector callback', () => {
   });
   useVideoEditorStore.getState().setCurrentTime(3);
   const locked = controller();
-  expect(locked.state.canSplitCameraInterval).toBe(false);
+  expect(locked.state.canAddCameraPosition).toBe(false);
   locked.clipActions.onApplyCameraLayout?.(cameraId, VideoProjectCameraLayout.HIDDEN);
-  locked.clipActions.onSplitCameraInterval?.(cameraId);
+  locked.clipActions.onEditCameraPosition?.(cameraId, { kind: 'add' });
   expect(useVideoEditorStore.getState().project?.clips).toEqual(project.clips);
   expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(0);
+});
+
+it('keeps a camera curve through real split and duplicate commands, with independent edits', () => {
+  const { controller, cameraId } = createCameraControllerFixture();
+  useVideoEditorStore.getState().setCurrentTime(2);
+  controller().clipActions.onEditCameraPosition?.(cameraId, { kind: 'add' });
+  controller().clipActions.onApplyCameraLayout?.(cameraId, VideoProjectCameraLayout.FULLFRAME);
+  const original = useVideoEditorStore.getState().project!.clips[0]!;
+  if (original.type !== 'VIDEO') throw new Error('Expected camera');
+  const time = 2.25;
+  const expected = resolveCameraClip(original, time).transform;
+  useVideoEditorStore.getState().splitClipAt(cameraId, time);
+  const right = useVideoEditorStore
+    .getState()
+    .project!.clips.find((clip) => clip.startTime === time)!;
+  if (right.type !== 'VIDEO') throw new Error('Expected split camera');
+  expect(resolveCameraClip(right, time).transform).toEqual(expected);
+  useVideoEditorStore.getState().duplicateClip(right.id);
+  const duplicate = useVideoEditorStore
+    .getState()
+    .project!.clips.find((clip) => clip.id !== right.id && clip.id !== original.id)!;
+  if (duplicate.type !== 'VIDEO') throw new Error('Expected duplicate camera');
+  expect(resolveCameraClip(duplicate, duplicate.startTime).transform).toEqual(expected);
+  useVideoEditorStore.getState().setCurrentTime(duplicate.startTime + 1);
+  useVideoEditorStore.getState().updateClipTransform(duplicate.id, { rotation: 25 });
+  const updated = useVideoEditorStore.getState().project!;
+  expect(updated.clips.find((clip) => clip.id === right.id)).toEqual(right);
+  const copy = updated.clips.find((clip) => clip.id === duplicate.id)!;
+  if (copy.type !== 'VIDEO') throw new Error('Expected duplicate camera');
+  expect(copy.cameraPositions![0]!.transform.rotation).toBe(25);
 });
