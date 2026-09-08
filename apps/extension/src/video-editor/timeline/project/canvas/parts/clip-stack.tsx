@@ -13,6 +13,7 @@ import {
 import type { DragMode, TimelineEffectDragTarget, TimelineEffectSelection } from '../../types';
 
 export function ProjectTimelineTrackClipStack(props: {
+  hideClipNames?: boolean;
   hoveredClipId: string | null;
   pixelsPerSecond: number;
   projection?: TimelineProjection | undefined;
@@ -80,6 +81,7 @@ function ProjectTimelineTrackClipItems(
       <ProjectTimelineClip
         key={clip.id}
         clip={clip}
+        hideClipNames={props.hideClipNames ?? false}
         isHovered={props.hoveredClipId === clip.id}
         isSelected={props.selectedClipId === clip.id || !!props.selectedClipIds?.includes(clip.id)}
         pixelsPerSecond={props.pixelsPerSecond}

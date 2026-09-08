@@ -1,3 +1,4 @@
+import { buildProjectTransitionSegments } from '../../../../features/video/project/transition/project';
 import { resolveProjectExportRange } from '../../../../features/video/project/export/range';
 import { resolveEffectRuntimeAudioPlans } from '../../../../features/video/composition/effect-runtime/audio/plan';
 import { getSourceTimedClipSourceOffset } from '../../../../features/video/project/timeline';
@@ -21,7 +22,22 @@ export function collectRenderableAudioClips(
     (clip): clip is VideoProjectAudioClip | VideoProjectVideoClip =>
       shouldRenderClipAudio(project, clip)
   );
-  const clips = [...mediaClips, ...resolveEffectRuntimeAudioPlans(project)];
+  const segments = buildProjectTransitionSegments(project);
+  const preparedMediaClips = mediaClips.map((clip) => {
+    const audioTransitions = segments
+      .filter((segment) => segment.leadingClipId === clip.id || segment.trailingClipId === clip.id)
+      .map((segment) => ({
+        start: segment.start,
+        end: segment.end,
+        easing: segment.transition.easing,
+        incoming: segment.trailingClipId === clip.id,
+      }));
+    return audioTransitions.length ? { ...clip, audioTransitions } : clip;
+  });
+  const clips: OfflineAudioRenderableClip[] = [
+    ...preparedMediaClips,
+    ...resolveEffectRuntimeAudioPlans(project),
+  ];
 
   return clips.flatMap((clip) => {
     if (!range) {
@@ -50,6 +66,15 @@ export function clipAudioClipToExportRange(
 
   return {
     ...clip,
+    ...(clip.audioTransitions
+      ? {
+          audioTransitions: clip.audioTransitions.map((transition) => ({
+            ...transition,
+            start: transition.start - range.start,
+            end: transition.end - range.start,
+          })),
+        }
+      : {}),
     startTime: overlapStart - range.start,
     duration: overlapDuration,
     sourceStart:

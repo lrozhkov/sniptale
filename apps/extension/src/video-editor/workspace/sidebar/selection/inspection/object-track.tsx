@@ -29,8 +29,8 @@ function createObjectTrackGroups(
   return [
     {
       id: 'info',
+      semantic: 'info' as const,
       label: translate('videoEditor.sidebar.inspectorGroupSummary'),
-      defaultActive: true,
       content: (
         <ObjectTrackSummaryCard
           selected
@@ -40,14 +40,16 @@ function createObjectTrackGroups(
       ),
     },
     {
-      id: 'samples',
-      label: translate('videoEditor.sidebar.inspectorGroupStatus'),
-      content: <ObjectTrackConfidencePanel props={props} />,
-    },
-    {
-      id: 'correction',
-      label: translate('videoEditor.sidebar.inspectorGroupCorrection'),
-      content: <ObjectTrackCorrectionPanel props={props} />,
+      id: 'tracking',
+      semantic: 'tracking',
+      defaultActive: true,
+      label: translate('videoEditor.sidebar.inspectorGroupObjectTracking'),
+      content: (
+        <>
+          <ObjectTrackConfidencePanel props={props} />
+          <ObjectTrackCorrectionPanel props={props} />
+        </>
+      ),
     },
   ] as const;
 }

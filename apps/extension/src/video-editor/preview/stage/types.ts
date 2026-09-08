@@ -1,3 +1,4 @@
+import type { VideoProjectEffectInstancePatch } from '../../contracts/commands/patches';
 import type { VideoProjectActionOccurrence } from '../../../features/video/project/action-occurrences';
 import type React from 'react';
 
@@ -93,6 +94,12 @@ export interface PreviewStageCanvasProps {
     | undefined;
   onAddShapeOverlay: (shapeType: VideoProjectShapeType) => string | null;
   onAddTextOverlay: () => string | null;
+  onPreviewEffectAnchors?:
+    | ((instanceId: string, anchors: Record<string, { x: number; y: number }> | null) => void)
+    | undefined;
+  onUpdateEffectInstance?:
+    | ((instanceId: string, patch: VideoProjectEffectInstancePatch) => void)
+    | undefined;
   onUpdateClipTransform: (clipId: string, patch: Partial<VideoProjectClip['transform']>) => void;
   onUpdateAnnotationClipTemplate: (
     clipId: string,

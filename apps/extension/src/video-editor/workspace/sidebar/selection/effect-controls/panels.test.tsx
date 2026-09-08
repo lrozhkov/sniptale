@@ -244,20 +244,17 @@ describe('effect-panels', () => {
     const props = createProps();
 
     renderPanel(<InspectTransitionPanel {...props} />);
-    clickGroup('videoEditor.sidebar.inspectorGroupSummary');
     expect(container?.textContent).toContain('videoEditor.sidebar.transitionLightSweep');
-    expect(container?.textContent).toContain('videoEditor.templates.catalogStatusOptional');
-
-    clickGroup('videoEditor.sidebar.inspectorGroupTemplate');
+    expect(container?.textContent).not.toContain('videoEditor.templates.catalogStatusOptional');
     expect(container?.textContent).toContain('videoEditor.sidebar.transitionSwapStyleLabel');
-
-    clickGroup('videoEditor.sidebar.inspectorGroupStyle');
     expect(container?.textContent).toContain('videoEditor.sidebar.transitionHighlightColorLabel');
+    clickGroup('videoEditor.sidebar.inspectorGroupInfo');
+    expect(container?.textContent).toContain('videoEditor.sidebar.transitionLeadingClipLabel');
 
     renderPanel(<InspectActionPanel {...props} />);
     clickGroup('videoEditor.sidebar.inspectorGroupInfo');
     expect(container?.textContent).toContain('videoEditor.sidebar.historyEventKind');
-    expect(container?.textContent).toContain('CLICK');
+    expect(container?.textContent).toContain('videoEditor.timeline.historyClick');
     expect(
       container?.querySelector(
         'nav button[aria-label="videoEditor.sidebar.inspectorGroupPlacement"]'

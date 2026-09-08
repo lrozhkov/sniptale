@@ -71,22 +71,46 @@ export function resolveReachableClipStartTime(props: {
   trackId?: string;
   timelineLaneId?: string | null;
 }): number {
-  const targetClip = createMovedClipPlacementProbe(props);
-  const laneClips = props.project.clips.filter(
-    (clip) =>
-      !props.operation.clipIdSet.has(clip.id) && clipsShareTimelinePlacementLane(clip, targetClip)
+  const anchor = props.operation.clip;
+  const placements = props.project.clips
+    .filter((clip) => props.operation.clipIdSet.has(clip.id))
+    .map((clip) => {
+      const target = clip.id === anchor.id ? createMovedClipPlacementProbe(props) : clip;
+      const neighbors = props.project.clips.filter(
+        (neighbor) =>
+          !props.operation.clipIdSet.has(neighbor.id) &&
+          clipsShareTimelinePlacementLane(target, neighbor)
+      );
+      return { target, neighbors, offset: clip.startTime - anchor.startTime };
+    });
+  const valid = (start: number) =>
+    placements.every(
+      ({ target, neighbors, offset }) =>
+        start + offset >= 0 &&
+        !hasBlockedPlacement({ ...target, startTime: start + offset }, neighbors)
+    );
+  if (valid(props.startTime)) return props.startTime;
+
+  const candidates = placements.flatMap(({ target, neighbors, offset }) =>
+    neighbors.flatMap((neighbor) =>
+      createReachableStartCandidates(target, neighbor).map((start) => start - offset)
+    )
   );
-  if (!hasFullContainment(targetClip, laneClips)) {
-    return props.startTime;
-  }
-
-  const resolvedStart = laneClips
-    .flatMap((clip) => createReachableStartCandidates(targetClip, clip))
-    .map((candidate) => Math.max(0, candidate))
-    .filter((candidate) => !hasFullContainment({ ...targetClip, startTime: candidate }, laneClips))
-    .sort((left, right) => Math.abs(left - props.startTime) - Math.abs(right - props.startTime))[0];
-
-  return resolvedStart ?? props.startTime;
+  // Placing after every stationary clip is always a reachable fallback, also for linked audio.
+  const afterAll = Math.max(
+    0,
+    ...placements.flatMap(({ neighbors, offset }) => [
+      -offset,
+      ...neighbors.map((clip) => clip.startTime + clip.duration - offset),
+    ])
+  );
+  return (
+    [...candidates, afterAll]
+      .filter(valid)
+      .sort(
+        (left, right) => Math.abs(left - props.startTime) - Math.abs(right - props.startTime)
+      )[0] ?? afterAll
+  );
 }
 
 function createMovedClipPlacementProbe(props: {
@@ -113,11 +137,36 @@ function clipsShareTimelinePlacementLane(
   );
 }
 
-function hasFullContainment(
+function hasBlockedPlacement(
   movingClip: VideoProjectClip,
   laneClips: readonly VideoProjectClip[]
 ): boolean {
-  return laneClips.some((clip) => clipsFullyContainEachOther(movingClip, clip));
+  if (laneClips.some((clip) => clipsFullyContainEachOther(movingClip, clip))) return true;
+  const ordered = [...laneClips].sort((left, right) => left.startTime - right.startTime);
+  const movingEnd = movingClip.startTime + movingClip.duration;
+  let spanStart = Infinity;
+  let spanEnd = -Infinity;
+  for (const clip of ordered) {
+    const end = clip.startTime + clip.duration;
+    if (clip.startTime <= spanEnd + TIMELINE_GAP_EPSILON) {
+      // A third clip cannot intersect the overlap between two stationary clips.
+      if (
+        Math.min(movingEnd, spanEnd, end) - Math.max(movingClip.startTime, clip.startTime) >
+        TIMELINE_GAP_EPSILON
+      )
+        return true;
+      spanEnd = Math.max(spanEnd, end);
+    } else {
+      spanStart = clip.startTime;
+      spanEnd = end;
+    }
+    if (
+      movingClip.startTime >= spanStart - TIMELINE_GAP_EPSILON &&
+      movingEnd <= spanEnd + TIMELINE_GAP_EPSILON
+    )
+      return true;
+  }
+  return false;
 }
 
 function clipsFullyContainEachOther(
@@ -140,6 +189,8 @@ function createReachableStartCandidates(
 ): number[] {
   const existingEnd = existingClip.startTime + existingClip.duration;
   return [
+    existingClip.startTime - movingClip.duration,
+    existingEnd,
     existingClip.startTime - MIN_REACHABLE_CLIP_EDGE_SECONDS,
     existingEnd - movingClip.duration + MIN_REACHABLE_CLIP_EDGE_SECONDS,
     existingClip.startTime + MIN_REACHABLE_CLIP_EDGE_SECONDS,

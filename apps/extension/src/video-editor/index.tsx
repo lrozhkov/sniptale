@@ -8,6 +8,7 @@ import '@sniptale/ui/styles/toolbar';
 import '@sniptale/ui/styles/overlays';
 import './styles/spacing-compatibility.css';
 import './styles/playback-focus.css';
+import './styles/timeline-items.css';
 
 // Инициализация трассировщика (только в dev/build режимах)
 initTracer('video-editor');

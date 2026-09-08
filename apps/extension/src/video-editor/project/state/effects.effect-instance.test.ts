@@ -1,3 +1,4 @@
+import { undoVideoEditorProjectHistory, redoVideoEditorProjectHistory } from '../history';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { VideoProject } from '../../../features/video/project/types';
@@ -201,5 +202,47 @@ describe('editor EffectV1 async apply authority', () => {
 
     await expect(result).resolves.toBeNull();
     expect(store.getState().project?.name).toBe('replacement');
+  });
+});
+
+it('keeps scene anchors independent across duplicate, split and history snapshots', () => {
+  const store = createStoreWithEffects();
+  const instanceId = 'scene-a';
+  store.getState().updateEffectInstance(instanceId, { sceneAnchors: { tip: { x: 120, y: 80 } } });
+  const anchored = store.getState().project!;
+  const host = anchored.clips.find(
+    (clip) => clip.type === 'EFFECT' && clip.effectInstanceId === instanceId
+  )!;
+  store.getState().updateClipTransform(host.id, { x: 400, y: 200, rotation: 90 });
+  expect(
+    store.getState().project!.effectInstances!.find((i) => i.id === instanceId)!.sceneAnchors
+  ).toEqual({ tip: { x: 120, y: 80 } });
+  const duplicated = duplicateStandaloneEffectHost(anchored, host.id)!;
+  const original = duplicated.project.effectInstances!.find((i) => i.id === instanceId)!;
+  const copy = duplicated.project.effectInstances!.find(
+    (i) => i.id === duplicated.effectInstanceId
+  )!;
+  expect(copy.sceneAnchors).toEqual(original.sceneAnchors);
+  expect(copy.sceneAnchors!['tip']).not.toBe(original.sceneAnchors!['tip']);
+  const split = splitStandaloneEffectHost(anchored, host.id, host.startTime + 1)!;
+  const siblings = split.effectInstances!.filter(
+    (i) => i.snapshotId === original.snapshotId && i.sceneAnchors
+  );
+  expect(siblings).toHaveLength(2);
+  expect(siblings[1]!.sceneAnchors).toEqual(siblings[0]!.sceneAnchors);
+  expect(siblings[1]!.sceneAnchors!['tip']).not.toBe(siblings[0]!.sceneAnchors!['tip']);
+  store.getState().updateEffectInstance(instanceId, { sceneAnchors: { tip: { x: 50, y: 40 } } });
+  const state = store.getState();
+  const undone = undoVideoEditorProjectHistory(state.projectHistory, state.project!);
+  expect(undone?.status).toBe('applied');
+  if (!undone || undone.status !== 'applied') throw new Error('Expected undo');
+  expect(undone.project.effectInstances!.find((i) => i.id === instanceId)!.sceneAnchors).toEqual({
+    tip: { x: 120, y: 80 },
+  });
+  const redone = redoVideoEditorProjectHistory(undone.history, undone.project);
+  expect(redone?.status).toBe('applied');
+  if (!redone || redone.status !== 'applied') throw new Error('Expected redo');
+  expect(redone.project.effectInstances!.find((i) => i.id === instanceId)!.sceneAnchors).toEqual({
+    tip: { x: 50, y: 40 },
   });
 });

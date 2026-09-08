@@ -1,3 +1,4 @@
+import { InspectorDetails } from '../shared/details';
 import { translate } from '../../../../../platform/i18n';
 import { VideoMotionFocusMode } from '../../../../../features/video/project/types';
 import type { VideoProjectMotionArea } from '../../../../../features/video/project/types';
@@ -70,10 +71,7 @@ export function ManualAreaFields(props: {
         motionRegionId={props.motionRegionId}
         panel={props.panel}
       />
-      <details className="text-xs text-[var(--sniptale-color-text-secondary)]">
-        <summary className="cursor-pointer py-2">
-          {translate('videoEditor.sidebar.framingExactPosition')}
-        </summary>
+      <InspectorDetails label={translate('videoEditor.sidebar.inspectorExactPlacement')}>
         <div className="pt-2">
           <MotionAreaCoordinateSection
             focusArea={focusArea}
@@ -81,7 +79,7 @@ export function ManualAreaFields(props: {
             panel={props.panel}
           />
         </div>
-      </details>
+      </InspectorDetails>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import type { TimelineClipPreview } from '../../../contracts/timeline-preview';
 import type { DragMode } from '../types';
 
 export interface ProjectTimelineClipProps {
+  hideClipNames?: boolean;
   clip: VideoProjectClip;
   isHovered: boolean;
   isSelected: boolean;

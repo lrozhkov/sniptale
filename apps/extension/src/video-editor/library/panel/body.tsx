@@ -58,11 +58,9 @@ export function VideoEditorLibraryPanelBody(props: VideoEditorLibraryPanelBodyPr
       }}
       savedViews={savedViews}
       presetId={preset?.id ?? null}
-      onPresetChange={(id) => {
-        const view = savedViews.find((candidate) => candidate.id === id);
+      onPresetChange={(id, nextCategory) => {
         setPresetId(id);
-        if (view?.folderFilter === 'recording') setCategory('video');
-        if (view?.folderFilter === 'screenshot') setCategory('image');
+        setCategory(nextCategory);
       }}
       thumbnails={thumbnails}
     />

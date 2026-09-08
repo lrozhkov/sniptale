@@ -1,7 +1,7 @@
 import { useState } from 'react';
+import { buildTimelineMotionSegments } from './segments';
 import {
   buildVideoCompositionCursorSegments,
-  buildVideoCompositionMotionSegments,
   buildVideoCompositionTransitionSegments,
 } from '../../../../features/video/composition/timeline/lanes';
 import type { VideoProject } from '../../../../features/video/project/types';
@@ -36,7 +36,7 @@ function getTimelineEffectSelection(
     case VideoEditorSelectionKind.ACTION_OCCURRENCE:
       return { kind: 'action', segmentId: JSON.stringify([selection.eventId, selection.clipId]) };
     case VideoEditorSelectionKind.MOTION_REGION:
-      return buildVideoCompositionMotionSegments(project).some(
+      return buildTimelineMotionSegments(project).some(
         (segment) => segment.id === selection.motionRegionId
       )
         ? { kind: 'motion', segmentId: selection.motionRegionId }
@@ -112,7 +112,9 @@ export function useResolvedEffectSelection(
   );
 
   return {
-    selectedEffectSelection: getTimelineEffectSelection(project, selection) ?? optimisticSelection,
+    selectedEffectSelection: selection
+      ? getTimelineEffectSelection(project, selection)
+      : optimisticSelection,
     setOptimisticSelection,
   };
 }

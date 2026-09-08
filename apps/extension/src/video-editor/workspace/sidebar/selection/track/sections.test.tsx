@@ -19,7 +19,7 @@ it('renders only general supported-track metadata and the explicit delete action
   );
 
   expect(markup).toContain('videoEditor.sidebar.trackNameLabel');
-  expect(markup).toContain('videoEditor.timeline.trackKindPrimary');
+  expect(markup).not.toContain('videoEditor.timeline.trackKindPrimary');
   expect(markup).not.toContain(`>${VideoTrackKind.PRIMARY}<`);
   expect(markup).toContain('videoEditor.timeline.deleteTrackTitle');
   expect(markup).not.toContain('videoEditor.sidebar.subtitlePlacementLabel');

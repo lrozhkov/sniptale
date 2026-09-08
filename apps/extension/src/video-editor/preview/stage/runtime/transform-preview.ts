@@ -1,7 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 
 import type { VideoProject, VideoProjectTransform } from '../../../../features/video/project/types';
 import type { PreviewTransformGestureHooks } from '../canvas/transform/gesture';
+
+interface TransientAnchors {
+  instanceId: string;
+  anchors: Record<string, { x: number; y: number }>;
+}
 
 interface TransientTransform {
   clipId: string;
@@ -13,11 +18,20 @@ export function usePreviewStageTransientTransform(
   playback: { currentTime: number; pause(): number }
 ) {
   const { currentTime, pause } = playback;
-  const [transient, setTransient] = useState<TransientTransform | null>(null);
+  const [transient, setTransient] = useState<TransientTransform | TransientAnchors | null>(null);
   const [cacheBypass, setCacheBypass] = useState(false);
   const [frozenTime, setFrozenTime] = useState<number | null>(null);
   const previewProject = useMemo(() => {
     if (!transient) return project;
+    if ('instanceId' in transient)
+      return {
+        ...project,
+        effectInstances: (project.effectInstances ?? []).map((instance) =>
+          instance.id === transient.instanceId
+            ? { ...instance, sceneAnchors: transient.anchors }
+            : instance
+        ),
+      };
     return {
       ...project,
       clips: project.clips.map((clip) =>
@@ -41,7 +55,22 @@ export function usePreviewStageTransientTransform(
     }),
     [pause]
   );
+  const onPreviewEffectAnchors = useCallback(
+    (instanceId: string, anchors: Record<string, { x: number; y: number }> | null) => {
+      if (anchors) {
+        setFrozenTime(pause());
+        setCacheBypass(true);
+        setTransient({ instanceId, anchors });
+      } else {
+        setTransient(null);
+        setFrozenTime(null);
+        setCacheBypass(false);
+      }
+    },
+    [pause]
+  );
   return {
+    onPreviewEffectAnchors,
     cacheBypass,
     currentTime: frozenTime ?? currentTime,
     gestureHooks,

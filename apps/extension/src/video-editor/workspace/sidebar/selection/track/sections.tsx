@@ -1,3 +1,5 @@
+import { InspectorDetails } from '../shared/details';
+import { VideoTrackKind } from '../../../../../features/video/project/types';
 import { ArrowUp, ArrowDown } from 'lucide-react';
 import { useWorkspaceTrackPresentation } from '../../../surface/track-presentation';
 import { translate } from '../../../../../platform/i18n';
@@ -5,7 +7,6 @@ import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { TextField, NumericRow } from '../../../../../ui/compact-inspector-controls';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { ToggleField } from '../shared/controls';
-import { getVideoTrackKindLabel } from '../../track-kind-label';
 
 export function TrackGeneralFields(props: {
   onRenameTrack?: WorkspaceSidebarSelectionPanelProps['onRenameTrack'];
@@ -13,8 +14,6 @@ export function TrackGeneralFields(props: {
   onToggleTrackVisibility?: WorkspaceSidebarSelectionPanelProps['onToggleTrackVisibility'];
   selectedTrack: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedTrack']>;
 }) {
-  const kindLabel = getVideoTrackKindLabel(props.selectedTrack.kind);
-
   return (
     <>
       <TextField
@@ -26,19 +25,14 @@ export function TrackGeneralFields(props: {
         onValueCommit={(name) => props.onRenameTrack?.(props.selectedTrack.id, name)}
       />
       <div className="mt-3 space-y-2">
-        <div
-          className={[
-            'flex min-h-9 items-center justify-between gap-3',
-            'text-[length:var(--sniptale-compact-font-size,12px)]',
-          ].join(' ')}
-        >
-          <span>{translate('videoEditor.sidebar.trackTypeLabel')}</span>
-          <span className="text-[var(--sniptale-color-text-muted)]">{kindLabel}</span>
-        </div>
         <ToggleField
           checked={props.selectedTrack.visible}
           disabled={!props.onToggleTrackVisibility}
-          label={translate('videoEditor.sidebar.trackVisibilityLabel')}
+          label={translate(
+            props.selectedTrack.kind === VideoTrackKind.AUDIO
+              ? 'videoEditor.sidebar.videoSoundLabel'
+              : 'videoEditor.sidebar.trackVisibilityLabel'
+          )}
           onChange={() => props.onToggleTrackVisibility?.(props.selectedTrack.id)}
         />
         <ToggleField
@@ -66,7 +60,7 @@ export function TrackPanelDeleteButton(props: {
       compact
       tone="danger"
       onClick={() => props.onDeleteTrack?.(props.trackId)}
-      className="mt-3 w-full"
+      className="mt-3"
     >
       {translate('videoEditor.timeline.deleteTrackTitle')}
     </ProductActionButton>
@@ -86,20 +80,6 @@ export function TrackLayoutFields({
     panelPrefs.setTrackHeight(track.id, Math.round(value / 0.25) * 0.25);
   return (
     <div className="mt-3 space-y-2" data-ui="video-editor.inspector.track-layout">
-      <NumericRow
-        appearance="plain"
-        scrub={{ min: 0.5, max: 3 }}
-        label={translate('videoEditor.timeline.trackHeight')}
-        value={panelPrefs.prefs.trackHeightByTrackId[track.id] ?? 1}
-        min={0.5}
-        max={3}
-        step={0.25}
-        precision={2}
-        normalizeValue={(value) => Math.round(value / 0.25) * 0.25}
-        unit="x"
-        onPreviewValue={setHeight}
-        onCommitValue={setHeight}
-      />
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs text-[var(--sniptale-color-text-secondary)]">
           {translate('videoEditor.app.trackOrder')}
@@ -127,6 +107,29 @@ export function TrackLayoutFields({
           </ProductActionButton>
         </div>
       </div>
+      <InspectorDetails label={translate('videoEditor.sidebar.inspectorDisplay')}>
+        {track.kind === VideoTrackKind.PRIMARY ? (
+          <ToggleField
+            label={translate('videoEditor.timeline.hideClipNames')}
+            checked={panelPrefs.prefs.hiddenClipNamesByTrackId?.[track.id] ?? false}
+            onChange={(hidden) => panelPrefs.setClipNamesHidden(track.id, hidden)}
+          />
+        ) : null}
+        <NumericRow
+          appearance="plain"
+          scrub={{ min: 0.5, max: 3 }}
+          label={translate('videoEditor.timeline.trackHeight')}
+          value={panelPrefs.prefs.trackHeightByTrackId[track.id] ?? 1}
+          min={0.5}
+          max={3}
+          step={0.25}
+          precision={2}
+          normalizeValue={(value) => Math.round(value / 0.25) * 0.25}
+          unit="x"
+          onPreviewValue={setHeight}
+          onCommitValue={setHeight}
+        />
+      </InspectorDetails>
     </div>
   );
 }

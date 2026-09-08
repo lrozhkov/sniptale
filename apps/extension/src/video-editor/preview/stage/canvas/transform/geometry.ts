@@ -88,6 +88,7 @@ function resolveResizeAxis(params: {
 }
 
 export function resizePreviewTransform(params: {
+  aspectRatio?: number | undefined;
   delta: PreviewTransformPoint;
   handle: PreviewTransformResizeHandle;
   minSize: number;
@@ -107,6 +108,19 @@ export function resizePreviewTransform(params: {
     minSize: params.minSize,
     size: params.transform.height,
   });
+  if (params.aspectRatio) {
+    const widthChange = Math.abs(horizontal.size / params.transform.width - 1);
+    const heightChange = Math.abs(vertical.size / params.transform.height - 1);
+    const width = Math.max(
+      params.minSize,
+      params.minSize * params.aspectRatio,
+      widthChange >= heightChange ? horizontal.size : vertical.size * params.aspectRatio
+    );
+    horizontal.size = width;
+    vertical.size = width / params.aspectRatio;
+    horizontal.midpoint = (direction.x * (horizontal.size - params.transform.width)) / 2;
+    vertical.midpoint = (direction.y * (vertical.size - params.transform.height)) / 2;
+  }
   const center = getTransformCenter(params.transform);
   const centerOffset = rotatePoint(
     { x: horizontal.midpoint, y: vertical.midpoint },

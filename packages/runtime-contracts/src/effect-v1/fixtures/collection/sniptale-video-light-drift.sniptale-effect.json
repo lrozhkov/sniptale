@@ -1,0 +1,412 @@
+{
+  "schemaVersion": "sniptale.effect.v1",
+  "id": "sniptale-video-light-drift",
+  "kind": "targetEffect",
+  "duration": 5,
+  "label": {
+    "ru": "Световой блик",
+    "en": "Drifting light"
+  },
+  "description": {
+    "ru": "Настраиваемая обработка; интенсивность 0 сохраняет исходник.",
+    "en": "Adjustable processing; zero intensity preserves the source."
+  },
+  "assets": [],
+  "controls": [
+    {
+      "id": "strength",
+      "kind": "number",
+      "label": {
+        "ru": "Интенсивность (%)",
+        "en": "Intensity (%)"
+      },
+      "defaultValue": 30,
+      "min": 0,
+      "max": 100,
+      "step": 1
+    },
+    {
+      "id": "edge",
+      "kind": "number",
+      "label": {
+        "ru": "Плавный вход/выход (%)",
+        "en": "Soft edges (% duration)"
+      },
+      "defaultValue": 8,
+      "min": 0,
+      "max": 40,
+      "step": 1
+    },
+    {
+      "id": "tint",
+      "kind": "color",
+      "label": {
+        "ru": "Цвет света",
+        "en": "Light color"
+      },
+      "defaultValue": "#ffb36a"
+    },
+    {
+      "id": "travel",
+      "kind": "number",
+      "label": {
+        "ru": "Движение (%)",
+        "en": "Travel (%)"
+      },
+      "defaultValue": 65,
+      "min": 0,
+      "max": 100,
+      "step": 1
+    },
+    {
+      "id": "height",
+      "kind": "number",
+      "label": {
+        "ru": "Положение Y (%)",
+        "en": "Position Y (%)"
+      },
+      "defaultValue": 20,
+      "min": 0,
+      "max": 100,
+      "step": 1
+    }
+  ],
+  "layers": [],
+  "clips": [],
+  "scenes": [
+    {
+      "id": "main",
+      "start": 0,
+      "duration": 5
+    }
+  ],
+  "timeline": {
+    "phases": [],
+    "tracks": []
+  },
+  "program": {
+    "kind": "graph",
+    "version": 1,
+    "definitions": {
+      "s": {
+        "op": "div",
+        "args": [
+          {
+            "op": "min",
+            "args": [
+              {
+                "op": "read",
+                "path": "width"
+              },
+              {
+                "op": "read",
+                "path": "height"
+              }
+            ]
+          },
+          720
+        ]
+      },
+      "edge": {
+        "op": "max",
+        "args": [
+          0.0001,
+          {
+            "op": "div",
+            "args": [
+              {
+                "op": "read",
+                "path": "controls.edge"
+              },
+              100
+            ]
+          }
+        ]
+      },
+      "envelope": {
+        "op": "select",
+        "value": {
+          "op": "eq",
+          "args": [
+            {
+              "op": "read",
+              "path": "controls.edge"
+            },
+            0
+          ]
+        },
+        "values": [
+          1,
+          {
+            "op": "mul",
+            "args": [
+              {
+                "op": "out",
+                "args": [
+                  {
+                    "op": "clamp",
+                    "args": [
+                      {
+                        "op": "div",
+                        "args": [
+                          {
+                            "op": "read",
+                            "path": "progress"
+                          },
+                          {
+                            "op": "read",
+                            "path": "defs.edge"
+                          }
+                        ]
+                      },
+                      0,
+                      1
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "out",
+                "args": [
+                  {
+                    "op": "clamp",
+                    "args": [
+                      {
+                        "op": "div",
+                        "args": [
+                          {
+                            "op": "sub",
+                            "args": [
+                              1,
+                              {
+                                "op": "read",
+                                "path": "progress"
+                              }
+                            ]
+                          },
+                          {
+                            "op": "read",
+                            "path": "defs.edge"
+                          }
+                        ]
+                      },
+                      0,
+                      1
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "amount": {
+        "op": "mul",
+        "args": [
+          {
+            "op": "div",
+            "args": [
+              {
+                "op": "read",
+                "path": "controls.strength"
+              },
+              100
+            ]
+          },
+          {
+            "op": "read",
+            "path": "defs.envelope"
+          }
+        ]
+      }
+    },
+    "commands": [
+      {
+        "op": "clear"
+      },
+      {
+        "op": "image",
+        "input": "source",
+        "x": 0,
+        "y": 0,
+        "width": {
+          "op": "read",
+          "path": "width"
+        },
+        "height": {
+          "op": "read",
+          "path": "height"
+        },
+        "fit": "cover"
+      },
+      {
+        "op": "fillRect",
+        "x": 0,
+        "y": 0,
+        "width": {
+          "op": "read",
+          "path": "width"
+        },
+        "height": {
+          "op": "read",
+          "path": "height"
+        },
+        "fill": {
+          "kind": "radialGradient",
+          "x0": {
+            "op": "mul",
+            "args": [
+              {
+                "op": "read",
+                "path": "width"
+              },
+              {
+                "op": "add",
+                "args": [
+                  0.12,
+                  {
+                    "op": "mul",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "progress"
+                      },
+                      0.75,
+                      {
+                        "op": "div",
+                        "args": [
+                          {
+                            "op": "read",
+                            "path": "controls.travel"
+                          },
+                          100
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "y0": {
+            "op": "mul",
+            "args": [
+              {
+                "op": "read",
+                "path": "height"
+              },
+              {
+                "op": "div",
+                "args": [
+                  {
+                    "op": "read",
+                    "path": "controls.height"
+                  },
+                  100
+                ]
+              }
+            ]
+          },
+          "r0": 0,
+          "x1": {
+            "op": "mul",
+            "args": [
+              {
+                "op": "read",
+                "path": "width"
+              },
+              {
+                "op": "add",
+                "args": [
+                  0.12,
+                  {
+                    "op": "mul",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "progress"
+                      },
+                      0.75,
+                      {
+                        "op": "div",
+                        "args": [
+                          {
+                            "op": "read",
+                            "path": "controls.travel"
+                          },
+                          100
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "y1": {
+            "op": "mul",
+            "args": [
+              {
+                "op": "read",
+                "path": "height"
+              },
+              {
+                "op": "div",
+                "args": [
+                  {
+                    "op": "read",
+                    "path": "controls.height"
+                  },
+                  100
+                ]
+              }
+            ]
+          },
+          "r1": {
+            "op": "mul",
+            "args": [
+              {
+                "op": "max",
+                "args": [
+                  {
+                    "op": "read",
+                    "path": "width"
+                  },
+                  {
+                    "op": "read",
+                    "path": "height"
+                  }
+                ]
+              },
+              0.8
+            ]
+          },
+          "stops": [
+            {
+              "offset": 0,
+              "color": {
+                "op": "read",
+                "path": "controls.tint"
+              }
+            },
+            {
+              "offset": 1,
+              "color": "#00000000"
+            }
+          ]
+        },
+        "alpha": {
+          "op": "mul",
+          "args": [
+            {
+              "op": "read",
+              "path": "defs.amount"
+            },
+            0.65
+          ]
+        },
+        "blend": "screen"
+      }
+    ]
+  }
+}

@@ -1,3 +1,6 @@
+import { resolveEffectV1ObjectRenderBounds } from '@sniptale/runtime-contracts/effect-v1';
+import { resolveEffectObjectControls } from '../../../project/effect-instance/layout';
+import { parseEffectLogicalDimensions } from '../../../../../contracts/effect-runtime/dimensions';
 import { buildProjectTransitionSegments } from '../../../project/transition/project';
 import {
   isEffectInstanceTimingEqual,
@@ -5,7 +8,7 @@ import {
   resolveEffectInstanceTime,
 } from '../../../project/effect-instance/timing';
 import type { VideoProject } from '../../../project/types/index';
-import { assertEffectRasterDimensions } from '../runtime/resource-limits';
+import { EFFECT_RUNTIME_RESOURCE_LIMITS } from '../runtime/resource-limits';
 import { parseEffectRuntimeSnapshotDocument } from '../runtime/snapshot-document';
 import type { EffectRuntimeFrameDimensions, EffectRuntimeFramePlan } from '../runtime/types';
 import { resolveEffectRuntimeFrameTarget, type UnindexedEffectRuntimeFrameTarget } from './target';
@@ -78,10 +81,46 @@ function resolveInstanceFramePlan(args: {
     target.kind === 'clip'
       ? { ...target, chainIndex: takeChainIndex(args.chainIndexes, target.clipId) }
       : target;
-  const dimensions = resolveDimensions(args.project, target);
+  const bodyDimensions = resolveDimensions(args.project, target);
+  const controls =
+    target.kind === 'scene'
+      ? resolveEffectObjectControls(document, instance, target.placement)
+      : instance.controls;
+  const layout = document.objectLayout;
+  const bounds = layout?.handles?.length
+    ? resolveEffectV1ObjectRenderBounds(layout, controls)
+    : undefined;
+  const bitmapBounds =
+    bounds && layout
+      ? {
+          x: bounds.x / layout.width,
+          y: bounds.y / layout.height,
+          width: bounds.width / layout.width,
+          height: bounds.height / layout.height,
+        }
+      : undefined;
+  const dimensions = bitmapBounds
+    ? {
+        width: bodyDimensions.width * bitmapBounds.width,
+        height: bodyDimensions.height * bitmapBounds.height,
+      }
+    : bodyDimensions;
+  if (!parseEffectLogicalDimensions(dimensions.width, dimensions.height))
+    fail('effectPlanTargetFailure');
+  const density = Math.min(
+    1,
+    Math.sqrt(
+      EFFECT_RUNTIME_RESOURCE_LIMITS.maxOutputPixels / (dimensions.width * dimensions.height)
+    )
+  );
+  const renderDimensions = {
+    width: Math.max(1, Math.floor(dimensions.width * density)),
+    height: Math.max(1, Math.floor(dimensions.height * density)),
+  };
   return {
     assets: snapshot.assets,
-    controls: instance.controls,
+    controls,
+    ...(bitmapBounds ? { bitmapBounds } : {}),
     dimensions,
     documentSha256: snapshot.sha256,
     documentSource: snapshot.source,
@@ -91,7 +130,7 @@ function resolveInstanceFramePlan(args: {
     frameIndex: Math.max(0, Math.round(timing.effectTime * args.project.fps)),
     kind: instance.kind,
     progress: timing.progress,
-    renderDimensions: dimensions,
+    renderDimensions,
     snapshotId: snapshot.id,
     target: resolvedTarget,
     time: timing.effectTime,
@@ -143,14 +182,9 @@ function resolveDimensions(
     target.kind === 'clip' || target.kind === 'scene'
       ? { height: target.placement.height, width: target.placement.width }
       : { height: project.height, width: project.width };
-  const width = Math.max(1, Math.round(dimensions.width));
-  const height = Math.max(1, Math.round(dimensions.height));
-  try {
-    assertEffectRasterDimensions(width, height);
-  } catch {
-    fail('effectPlanTargetFailure');
-  }
-  return { height, width };
+  const parsed = parseEffectLogicalDimensions(dimensions.width, dimensions.height);
+  if (!parsed) fail('effectPlanTargetFailure');
+  return parsed;
 }
 
 function takeChainIndex(indexes: Map<string, number>, clipId: string): number {

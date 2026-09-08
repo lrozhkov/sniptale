@@ -229,18 +229,7 @@ export function createWorkspaceTimelineSelectionActions(
     onSelectActionOccurrence: selectWithInspector(store.selectActionOccurrence),
     onSelectClip: selectWithInspector(store.selectClip),
     onSelectCursorSegment: selectWithInspector(store.selectCursorSegment),
-    onSelectMotionRegion: (motionRegionId: string, part?: 'connection') => {
-      selectWithInspector(store.selectMotionRegion)(motionRegionId, part);
-      const destination = store.project?.motionRegions?.find(
-        (region) => region.id === motionRegionId
-      );
-      const source =
-        destination && store.project
-          ? resolveMotionConnectionSource(store.project, destination)
-          : null;
-      if (part && destination && source)
-        seekOutsideRange((source.startTime + source.duration + destination.startTime) / 2);
-    },
+    onSelectMotionRegion: selectWithInspector(store.selectMotionRegion),
     onConnectMotionRegions: (fromRegionId: string, motionRegionId: string) => {
       const project = store.project;
       const destination = project?.motionRegions?.find((region) => region.id === motionRegionId);

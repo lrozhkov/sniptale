@@ -42,7 +42,7 @@ export function duplicateStandaloneEffectHost(
     transform: { ...sourceHost.transform },
   };
   const instance = {
-    ...sourceInstance,
+    ...structuredClone(sourceInstance),
     controls: { ...sourceInstance.controls },
     id: instanceId,
     startTime: host.startTime,
@@ -97,13 +97,13 @@ export function splitStandaloneEffectHostWithResult(
     transform: { ...sourceHost.transform },
   };
   const firstInstance = {
-    ...sourceInstance,
+    ...structuredClone(sourceInstance),
     controls: { ...sourceInstance.controls },
     duration: localOffset,
     sourceStart,
   };
   const secondInstance = {
-    ...sourceInstance,
+    ...structuredClone(sourceInstance),
     controls: { ...sourceInstance.controls },
     duration: secondDuration,
     id: instanceId,

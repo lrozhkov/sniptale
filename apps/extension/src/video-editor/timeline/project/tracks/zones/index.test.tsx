@@ -8,7 +8,12 @@ import { createVideoClipFromAsset } from '../../../../../features/video/project/
 import { splitProjectClipsAtTime } from '../../../../project/state/clip-timeline/mutations';
 import { VideoTrackKind } from '../../../../../features/video/project/types';
 import { writeVideoEditorEffectDocumentDragPayload } from '../../../../contracts/effect-document-drag';
-import { buildTrackCutZones, buildTrackGapZones, buildTrackJunctionZones } from './index';
+import {
+  ProjectTimelineTrackZones,
+  buildTrackCutZones,
+  buildTrackGapZones,
+  buildTrackJunctionZones,
+} from './index';
 import { createTimelineZoneAsset, createTimelineZoneProject } from './test-support';
 import {
   createEffectDocumentDataTransfer,
@@ -91,8 +96,8 @@ function verifyTrackZoneRendering() {
 
   expect(cutZone?.getAttribute('style')).toContain('left: 60px');
   expect(buttons).toHaveLength(4);
-  expect(gapButton?.style.left).toBe('40px');
-  expect(gapButton?.style.width).toBe('20px');
+  expect(gapButton?.closest<HTMLElement>('[data-timeline-object]')?.style.left).toBe('40px');
+  expect(gapButton?.closest<HTMLElement>('[data-timeline-object]')?.style.width).toBe('20px');
   expect(transitionButton?.style.left).toBe('80px');
   expect(transitionButton?.style.width).toBe('20px');
   expect(stackedCue).toBeNull();
@@ -246,4 +251,63 @@ it('keeps transition selection available without trim handles on locked tracks',
   const button = container?.querySelector<HTMLButtonElement>('[aria-label="transition title"]');
   act(() => button?.click());
   expect(onSelectTransition).toHaveBeenCalledWith('transition-zone');
+});
+
+it('groups gap actions as sibling buttons and recording does not collapse the gap', () => {
+  const closeGap = vi.fn();
+  const record = vi.fn();
+  act(() =>
+    root?.render(
+      <ProjectTimelineTrackZones
+        cutZones={[]}
+        gapZones={[{ id: 'gap', trackId: 'audio', start: 1, end: 2 }]}
+        pixelsPerSecond={20}
+        onCloseTrackGap={closeGap}
+        renderGapAction={() => <button onClick={record}>Record</button>}
+      />
+    )
+  );
+  const group = container?.querySelector('[data-ui="video-editor.timeline.gap-actions"]');
+  const buttons = group?.querySelectorAll('button');
+  expect(buttons).toHaveLength(2);
+  expect(buttons?.[0]?.parentElement).toBe(buttons?.[1]?.parentElement);
+  expect(group?.closest('button')).toBeNull();
+  act(() => buttons?.[1]?.click());
+  expect(record).toHaveBeenCalledOnce();
+  expect(closeGap).not.toHaveBeenCalled();
+  act(() => buttons?.[0]?.click());
+  expect(closeGap).toHaveBeenCalledWith('audio', 1, 2);
+});
+
+it('does not accept visual effect documents on an audio junction', () => {
+  const drop = vi.fn();
+  act(() =>
+    root?.render(
+      <ProjectTimelineTrackZones
+        cutZones={[]}
+        gapZones={[]}
+        pixelsPerSecond={100}
+        onCloseTrackGap={vi.fn()}
+        onDropEffectDocument={drop}
+        junctionZones={[
+          {
+            id: 'audio-fade',
+            start: 1,
+            end: 2,
+            audio: true,
+            label: '1s',
+            title: 'Crossfade',
+            detail: '',
+            zoneClassName: '',
+            zoneSelectedClassName: '',
+          },
+        ]}
+      />
+    )
+  );
+  const target = container!.querySelector('[data-ui="timeline.track-transition-zone"]')!;
+  const event = new Event('drop', { bubbles: true, cancelable: true });
+  act(() => target.dispatchEvent(event));
+  expect(drop).not.toHaveBeenCalled();
+  expect(event.defaultPrevented).toBe(false);
 });

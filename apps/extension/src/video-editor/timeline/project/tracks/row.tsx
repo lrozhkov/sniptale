@@ -4,7 +4,7 @@ import { translate } from '../../../../platform/i18n';
 import type { VideoProject } from '../../../../features/video/project/types';
 import { getTrackKindLabel } from '../interaction-state/helpers';
 import { TimelineIconButton } from '../controls/icon-button';
-import { getTrackIcon, TimelineLaneIconFrame } from './lane-icons';
+import { getTrackIcon, TimelineLaneIdentity, TIMELINE_LANE_HEADER_CLASS_NAME } from './lane-icons';
 import type { TimelineTrackLayout } from './layout';
 
 const TRACK_SELECT_FOCUS_CLASS_NAME = [
@@ -35,13 +35,8 @@ export function ProjectTimelineTrackRow({
 }: ProjectTimelineTrackRowProps) {
   return (
     <div
-      className={[
-        'relative flex items-center border-b border-[color:var(--sniptale-color-border-subtle)] transition',
-        compactRows ? 'gap-1 px-2' : 'gap-2 px-3',
-        isSelected
-          ? 'bg-[color:var(--sniptale-color-surface-panel)]'
-          : 'hover:bg-[color:var(--sniptale-color-surface-panel)]',
-      ].join(' ')}
+      className={TIMELINE_LANE_HEADER_CLASS_NAME}
+      data-selected={isSelected}
       style={{ height: trackLayout?.rowHeight }}
     >
       <ProjectTimelineTrackMeta
@@ -61,7 +56,6 @@ export function ProjectTimelineTrackRow({
 }
 
 function ProjectTimelineTrackMeta({
-  compactRows,
   isSelected,
   track,
   trackLabel,
@@ -77,23 +71,17 @@ function ProjectTimelineTrackMeta({
       data-ui="video-editor.timeline.track-select"
       className={[
         'flex min-w-0 items-center',
-        compactRows ? 'flex-1 gap-1 text-left' : 'flex-1 gap-2 text-left',
+        'flex-1 gap-2 text-left',
         TRACK_SELECT_FOCUS_CLASS_NAME,
       ].join(' ')}
       onClick={() => onSelectTrack(track.id)}
     >
-      <TimelineLaneIconFrame>{getTrackIcon(track)}</TimelineLaneIconFrame>
-      <>
-        <span className="shrink-0 text-[10px] font-semibold tabular-nums text-[var(--sniptale-color-text-dim)]">
-          {trackLabel}
-        </span>
-        <span
-          data-timeline-track-name="true"
-          className="truncate text-xs font-semibold text-[var(--sniptale-color-text-primary)]"
-        >
-          {track.name || getTrackKindLabel(track.kind)}
-        </span>
-      </>
+      <TimelineLaneIdentity
+        selected={isSelected}
+        icon={getTrackIcon(track)}
+        prefix={trackLabel}
+        name={track.name || getTrackKindLabel(track.kind)}
+      />
     </button>
   );
 }
@@ -110,7 +98,7 @@ function ProjectTimelineTrackStateControls({
     <div className="flex gap-1">
       <TimelineIconButton
         frameless
-        active={track.visible}
+        active={!track.visible}
         icon={
           track.visible ? (
             <EnabledIcon size={13} strokeWidth={2} />

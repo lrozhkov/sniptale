@@ -28,35 +28,18 @@ afterEach(() => {
   container.remove();
 });
 
-it('adds a manual click from the history inspector and honors the track lock', () => {
-  const project = createEmptyVideoProject('Manual click');
-  const onAddActionEvent = vi.fn();
-  const render = () =>
-    act(() =>
-      root.render(
-        <InspectHistoryLanePanel
-          project={project}
-          onAddActionEvent={onAddActionEvent}
-          onUpdateActionPresentation={vi.fn()}
-        />
-      )
-    );
-  render();
-  const button = () =>
-    container.querySelector<HTMLButtonElement>(
-      'button[aria-label="videoEditor.timeline.historyAddClick"]'
-    );
-  expect(button()).not.toBeNull();
-  act(() => button()?.click());
-  expect(onAddActionEvent).toHaveBeenCalledWith('CLICK_RIPPLE');
-  project.utilityLanes = {
-    actions: { visible: true, locked: true },
-    camera: { visible: true, locked: false },
-  };
-  render();
-  expect(button()?.disabled).toBe(true);
-  act(() => button()?.click());
-  expect(onAddActionEvent).toHaveBeenCalledOnce();
+it('keeps creation actions out of the history inspector', () => {
+  act(() =>
+    root.render(
+      <InspectHistoryLanePanel
+        project={createEmptyVideoProject()}
+        onUpdateActionPresentation={vi.fn()}
+      />
+    )
+  );
+  expect(
+    container.querySelector('button[aria-label="videoEditor.timeline.historyAddClick"]')
+  ).toBeNull();
 });
 
 it('edits visualization defaults even when history is empty', () => {
@@ -100,7 +83,15 @@ it('locks project presentation controls without hiding their values', () => {
   expect(toggle?.disabled).toBe(true);
   act(() => toggle?.click());
   expect(onUpdateActionPresentation).not.toHaveBeenCalled();
+  act(() =>
+    container
+      .querySelector<HTMLButtonElement>(
+        'nav button[aria-label="videoEditor.sidebar.inspectorGroupAnimation"]'
+      )!
+      .click()
+  );
   expect(container.textContent).toContain('videoEditor.sidebar.historyDuration');
+  expect(container.querySelector<HTMLInputElement>('input')?.disabled).toBe(true);
 });
 
 it('applies history defaults through the workspace inspector to the real project store', () => {
@@ -175,11 +166,12 @@ it('changes the preset, timing and behavior defaults through the shared controls
   await click('button[aria-label="videoEditor.sidebar.actionPresetLabel"]');
   await click('[role="option"]');
   expect(onUpdateActionPresentation).toHaveBeenCalledWith({ clickPreset: 'NONE' });
+  await click('nav button[aria-label="videoEditor.sidebar.inspectorGroupAnimation"]');
   number('videoEditor.sidebar.historyDuration', '1.25');
   expect(onUpdateActionPresentation).toHaveBeenCalledWith({ duration: 1.25 });
   number('videoEditor.sidebar.historyOffset', '-0.3');
   expect(onUpdateActionPresentation).toHaveBeenCalledWith({ offset: expect.closeTo(-0.3, 12) });
-  await click('nav button[aria-label="videoEditor.sidebar.inspectorGroupBehavior"]');
+  await click('nav button[aria-label="videoEditor.sidebar.inspectorGroupHistory"]');
   number('videoEditor.sidebar.historySuppression', '0.75');
   expect(onUpdateActionPresentation).toHaveBeenCalledWith({ clickSuppressionInterval: 0.75 });
   await click('button[aria-label="videoEditor.sidebar.historyShowKeys"]');

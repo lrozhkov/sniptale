@@ -1,3 +1,4 @@
+import { InspectorDetails } from '../../shared/details';
 import { getActionEventLabel } from '../../../../../chrome/display';
 import { canEditActionOccurrenceOnCanvas } from '../../../../../preview/stage/canvas/geometry';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -42,21 +43,6 @@ export function InspectActionPanel(props: ActionProps) {
         presentation: { ...event.presentation, ...patch },
       });
   };
-  const normalized = event.anchor.kind === 'recording-source';
-  const point = resolved.point ?? {
-    x: normalized ? 0.5 : props.project.width / 2,
-    y: normalized ? 0.5 : props.project.height / 2,
-  };
-  const updatePoint = (patch: VideoProjectActionPresentationOverride) =>
-    update({
-      ...patch,
-      ...(normalized && patch.point
-        ? { point: { x: patch.point.x / 100, y: patch.point.y / 100 } }
-        : {}),
-    });
-  const canPlace =
-    props.currentTime !== undefined &&
-    canEditActionOccurrenceOnCanvas(props.project, occurrence, props.currentTime);
   return (
     <section className={PANEL_SECTION_CLASS_NAME} data-ui="video-editor.inspector.history-event">
       {presentations.filter((row) => row.occurrence.eventId === occurrence.eventId).length > 1 ? (
@@ -68,11 +54,13 @@ export function InspectActionPanel(props: ActionProps) {
         groups={[
           {
             id: 'info',
+            semantic: 'info' as const,
             label: translate('videoEditor.sidebar.inspectorGroupInfo'),
             content: <ActionOverview resolved={resolved} />,
           },
           {
             id: 'appearance',
+            semantic: 'appearance' as const,
             label: translate('videoEditor.sidebar.inspectorGroupAppearance'),
             defaultActive: true,
             content: (
@@ -108,6 +96,7 @@ export function InspectActionPanel(props: ActionProps) {
                   </p>
                 ) : null}
                 <ActionPrimaryFields
+                  part="appearance"
                   duration={resolved.duration}
                   offset={resolved.offset}
                   preset={resolved.preset}
@@ -132,41 +121,97 @@ export function InspectActionPanel(props: ActionProps) {
               </>
             ),
           },
+          {
+            id: 'animation',
+            semantic: 'animation',
+            label: translate('videoEditor.sidebar.inspectorGroupAnimation'),
+            content: (
+              <ActionPrimaryFields
+                part="animation"
+                duration={resolved.duration}
+                offset={resolved.offset}
+                preset={resolved.preset}
+                disabled={disabled}
+                onChange={update}
+              />
+            ),
+          },
           ...(event.kind === 'KEY'
             ? []
             : [
                 {
                   id: 'placement',
+                  semantic: 'placement' as const,
                   label: translate('videoEditor.sidebar.inspectorGroupPlacement'),
                   content: (
-                    <>
-                      <ActionPointFields
-                        point={normalized ? { x: point.x * 100, y: point.y * 100 } : point}
-                        projectHeight={normalized ? 100 : props.project.height}
-                        projectWidth={normalized ? 100 : props.project.width}
-                        disabled={disabled}
-                        onChange={updatePoint}
-                      />
-                      <ActionPointButtons
-                        actionEventId={event.id}
-                        placementModeKind={props.placementMode?.kind ?? null}
-                        projectHeight={normalized ? 100 : props.project.height}
-                        projectWidth={normalized ? 100 : props.project.width}
-                        disabled={disabled}
-                        onClearPlacementMode={props.onClearPlacementMode}
-                        onStartActionPointPlacement={() =>
-                          props.onStartActionPointPlacement(occurrence.eventId, occurrence.clipId)
-                        }
-                        canvasDisabled={!canPlace}
-                        onChange={updatePoint}
-                      />
-                    </>
+                    <ActionPlacementFields
+                      props={props}
+                      resolved={resolved}
+                      disabled={disabled}
+                      update={update}
+                    />
                   ),
                 },
               ]),
         ]}
       />
     </section>
+  );
+}
+
+function ActionPlacementFields({
+  props,
+  resolved,
+  disabled,
+  update,
+}: {
+  props: ActionProps;
+  resolved: ActionPresentation;
+  disabled: boolean;
+  update: (patch: VideoProjectActionPresentationOverride) => void;
+}) {
+  const occurrence = resolved.occurrence;
+  const event = resolved.event;
+  const normalized = event.anchor.kind === 'recording-source';
+  const point = resolved.point ?? {
+    x: normalized ? 0.5 : props.project.width / 2,
+    y: normalized ? 0.5 : props.project.height / 2,
+  };
+  const updatePoint = (patch: VideoProjectActionPresentationOverride) =>
+    update({
+      ...patch,
+      ...(normalized && patch.point
+        ? { point: { x: patch.point.x / 100, y: patch.point.y / 100 } }
+        : {}),
+    });
+  const canPlace =
+    props.currentTime !== undefined &&
+    canEditActionOccurrenceOnCanvas(props.project, occurrence, props.currentTime);
+  return (
+    <>
+      <ActionPointButtons
+        actionEventId={event.id}
+        placementModeKind={props.placementMode?.kind ?? null}
+        projectHeight={normalized ? 100 : props.project.height}
+        projectWidth={normalized ? 100 : props.project.width}
+        disabled={disabled}
+        onClearPlacementMode={props.onClearPlacementMode}
+        onStartActionPointPlacement={() =>
+          props.onStartActionPointPlacement(occurrence.eventId, occurrence.clipId)
+        }
+        canvasDisabled={!canPlace}
+        onChange={updatePoint}
+      />
+      <InspectorDetails label={translate('videoEditor.sidebar.inspectorExactPlacement')}>
+        <ActionPointFields
+          point={normalized ? { x: point.x * 100, y: point.y * 100 } : point}
+          projectHeight={normalized ? 100 : props.project.height}
+          projectWidth={normalized ? 100 : props.project.width}
+          disabled={disabled}
+          onChange={updatePoint}
+        />
+      </InspectorDetails>
+    </>
   );
 }
 
@@ -178,7 +223,10 @@ function ActionOverview({ resolved }: { resolved: ActionPresentation }) {
         label={translate('videoEditor.sidebar.historyEventLabel')}
         value={getActionEventLabel(event)}
       />
-      <DetailItem label={translate('videoEditor.sidebar.historyEventKind')} value={event.kind} />
+      <DetailItem
+        label={translate('videoEditor.sidebar.historyEventKind')}
+        value={getActionEventLabel({ kind: event.kind, label: '', data: {} })}
+      />
       <DetailItem
         label={translate('videoEditor.sidebar.actionTimePrefix')}
         value={`${resolved.occurrence.time.toFixed(2)} s`}

@@ -99,6 +99,7 @@ export function useProjectTimelineViewState(
     requestFit(fitSelectionDuration, selectedStart + fitSelectionDuration / 2);
   }, [fitSelectionDuration, selectedStart, requestFit]);
   return {
+    navigateTo: navigation.navigateTo,
     projection: navigation.projection,
     readTimelineStartTime: readStartTime,
     fitSelectionDuration,

@@ -20,6 +20,6 @@ it('adds internal keyboard and cursor rows without overlapping click targets', (
   const layout = getTimelineHistoryLayout(project, [], true);
   expect(layout.keyTop! - layout.clickTop).toBeGreaterThanOrEqual(28);
   expect(layout.cursorTop! - layout.keyTop!).toBeGreaterThanOrEqual(28);
-  expect(layout.height).toBe(layout.cursorTop! + 32);
+  expect(layout.height).toBe(layout.cursorTop! + 24);
   expect(getTimelineHistoryLayout(project, [], false).cursorTop).toBeNull();
 });

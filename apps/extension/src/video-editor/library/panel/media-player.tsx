@@ -28,7 +28,7 @@ export function LibraryMediaPlayer(props: {
   const [imageReady, setImageReady] = useState(false);
   const pan = useLibraryPreviewPan(viewport, zoom > 1);
   const playback = useLibraryPlayback(props.src);
-  const { video, sync, failed, setFailed } = playback;
+  const { video, sync, loadMetadata, failed, setFailed } = playback;
   const { frame, fullscreen, fullscreenButton, enterFullscreen, exitFullscreen } =
     useLibraryFullscreen(setFailed);
   const ready = props.kind === 'image' ? imageReady : playback.ready;
@@ -92,7 +92,7 @@ export function LibraryMediaPlayer(props: {
                 src={props.src}
                 preload="metadata"
                 aria-label={props.filename}
-                onLoadedMetadata={sync}
+                onLoadedMetadata={loadMetadata}
                 onDurationChange={sync}
                 onTimeUpdate={sync}
                 onPlay={sync}
@@ -182,6 +182,7 @@ function useLibraryFullscreen(setFailed: (failed: boolean) => void) {
 
 function useLibraryPlayback(src: string | null) {
   const video = useRef<HTMLVideoElement>(null);
+  const probingDuration = useRef(false);
   const [media, setMedia] = useState<{
     duration: number | null;
     time: number;
@@ -193,18 +194,31 @@ function useLibraryPlayback(src: string | null) {
   const ready = src !== null && media.ready;
   const sync = () => {
     const node = video.current;
-    if (node)
+    if (node) {
+      if (probingDuration.current && Number.isFinite(node.duration) && node.duration > 0) {
+        probingDuration.current = false;
+        node.currentTime = 0;
+      }
       setMedia({
         duration: Number.isFinite(node.duration) && node.duration > 0 ? node.duration : null,
-        ready: node.readyState >= 1 && node.error === null,
-        time: node.currentTime,
+        ready: node.readyState >= 1 && node.error === null && !probingDuration.current,
+        time: probingDuration.current ? 0 : node.currentTime,
         paused: node.paused,
         muted: node.muted,
       });
+    }
+  };
+  const loadMetadata = () => {
+    const node = video.current;
+    if (node && (!Number.isFinite(node.duration) || node.duration <= 0)) {
+      probingDuration.current = true;
+      node.currentTime = Number.MAX_SAFE_INTEGER;
+    }
+    sync();
   };
   const toggle = useCallback(() => {
     const node = video.current;
-    if (!node || node.readyState < 1 || node.error) return;
+    if (!node || node.readyState < 1 || node.error || probingDuration.current) return;
     if (!node.paused) node.pause();
     else {
       setFailed(false);
@@ -213,12 +227,13 @@ function useLibraryPlayback(src: string | null) {
   }, []);
   usePlaybackSpaceShortcut(toggle);
   useEffect(() => {
+    probingDuration.current = false;
     setMedia({ duration: null, time: 0, paused: true, muted: false, ready: false });
     setFailed(false);
     const node = video.current;
     return () => node?.pause();
   }, [src]);
-  return { video, media, ready, sync, toggle, failed, setFailed };
+  return { video, media, ready, sync, loadMetadata, toggle, failed, setFailed };
 }
 
 function LibraryMediaTransport(props: {
@@ -237,17 +252,6 @@ function LibraryMediaTransport(props: {
   );
   return (
     <div className="flex min-w-0 shrink-0 items-center gap-2" data-ui="library-media-transport">
-      {props.onExitFullscreen ? (
-        <ContentToolbarButton
-          ref={props.fullscreenButtonRef}
-          onClick={props.onExitFullscreen}
-          title={translate('videoEditor.stage.exitFullscreen')}
-          aria-label={translate('videoEditor.stage.exitFullscreen')}
-          dataUi="library-media-fullscreen-close"
-        >
-          <X size={16} aria-hidden="true" />
-        </ContentToolbarButton>
-      ) : null}
       {!props.image ? (
         <>
           <ContentToolbarButton
@@ -295,6 +299,17 @@ function LibraryMediaTransport(props: {
         <span className="flex-1" />
       )}
       {props.children}
+      {props.onExitFullscreen ? (
+        <ContentToolbarButton
+          ref={props.fullscreenButtonRef}
+          onClick={props.onExitFullscreen}
+          title={translate('videoEditor.stage.exitFullscreen')}
+          aria-label={translate('videoEditor.stage.exitFullscreen')}
+          dataUi="library-media-fullscreen-close"
+        >
+          <X size={16} aria-hidden="true" />
+        </ContentToolbarButton>
+      ) : null}
     </div>
   );
 }

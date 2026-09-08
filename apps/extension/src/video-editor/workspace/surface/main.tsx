@@ -1,3 +1,5 @@
+import { InspectorSectionMemoryProvider } from '../sidebar/selection/grouped-inspector/presentation';
+import { useWorkspacePreference } from '../../runtime/controller/workspace-preferences';
 import {
   RuntimePlaybackContext,
   WorkspacePlaybackRangeContext,
@@ -49,8 +51,10 @@ export function VideoEditorWorkspaceMain({
   const effectBundles = useWorkspaceEffectBundles();
   const effectOperations = useEffectLibraryOperations();
   const panelSizes = useWorkspacePanelSizes(materialsOpen || effectsLibraryDockOpen);
-  const [materialsFullHeight, setMaterialsFullHeight] = useState(false);
-  const [inspectorFullHeight, setInspectorFullHeight] = useState(false);
+  const [materialsFullHeight, setMaterialsFullHeight] =
+    useWorkspacePreference('materialsFullHeight');
+  const [inspectorFullHeight, setInspectorFullHeight] =
+    useWorkspacePreference('inspectorFullHeight');
   const workspaceStyle: React.CSSProperties & { '--video-editor-inspector-width': string } = {
     '--video-editor-inspector-width': `${panelSizes.inspector.width}px`,
   };
@@ -60,50 +64,52 @@ export function VideoEditorWorkspaceMain({
   });
 
   return (
-    <InspectorGroupFocusContext.Provider value={inspectorGroupFocus}>
-      <div
-        className="relative flex min-h-0 min-w-[1280px] flex-1 flex-col overflow-hidden"
-        style={workspaceStyle}
-        ref={panelSizes.containerRef}
-      >
-        <WorkspaceTrackPresentation>
-          <VideoProjectStorageStatus />
-          <VideoEditorWorkspaceCanvas
-            inspectorPanel={inspector}
-            onMaterialsOpenChange={toggleMaterials}
-            inspectorFullHeight={inspectorFullHeight}
-            materialsPanel={{
-              resize: panelSizes.materials,
-              fullHeight: materialsFullHeight,
-              onToggle: () => setMaterialsFullHeight((current) => !current),
-            }}
-            materialsOpen={materialsOpen}
-            inspector={
-              <VideoEditorFloatingInspectorStack
-                onClose={inspector.onToggle}
-                resize={panelSizes.inspector}
-                fullHeight={inspectorFullHeight}
-                onToggleFullHeight={() => setInspectorFullHeight((current) => !current)}
-              />
-            }
-            activeInsertKind={activeInsertKind}
-            effectBundles={effectBundles}
-            effectOperations={effectOperations}
-            effectsLibraryDockOpen={effectsLibraryDockOpen}
-            previewHeightStyle={previewHeightStyle}
-            onClearActiveInsertKind={() => setActiveInsertKind(null)}
-            onEffectsLibraryDockOpenChange={changeEffectsOpen}
-          />
-          <VideoEditorWorkspaceOverlays />
-        </WorkspaceTrackPresentation>
-      </div>
-    </InspectorGroupFocusContext.Provider>
+    <InspectorSectionMemoryProvider>
+      <InspectorGroupFocusContext.Provider value={inspectorGroupFocus}>
+        <div
+          className="relative flex min-h-0 min-w-[1280px] flex-1 flex-col overflow-hidden"
+          style={workspaceStyle}
+          ref={panelSizes.containerRef}
+        >
+          <WorkspaceTrackPresentation>
+            <VideoProjectStorageStatus />
+            <VideoEditorWorkspaceCanvas
+              inspectorPanel={inspector}
+              onMaterialsOpenChange={toggleMaterials}
+              inspectorFullHeight={inspectorFullHeight}
+              materialsPanel={{
+                resize: panelSizes.materials,
+                fullHeight: materialsFullHeight,
+                onToggle: () => setMaterialsFullHeight((current) => !current),
+              }}
+              materialsOpen={materialsOpen}
+              inspector={
+                <VideoEditorFloatingInspectorStack
+                  onClose={inspector.onToggle}
+                  resize={panelSizes.inspector}
+                  fullHeight={inspectorFullHeight}
+                  onToggleFullHeight={() => setInspectorFullHeight((current) => !current)}
+                />
+              }
+              activeInsertKind={activeInsertKind}
+              effectBundles={effectBundles}
+              effectOperations={effectOperations}
+              effectsLibraryDockOpen={effectsLibraryDockOpen}
+              previewHeightStyle={previewHeightStyle}
+              onClearActiveInsertKind={() => setActiveInsertKind(null)}
+              onEffectsLibraryDockOpenChange={changeEffectsOpen}
+            />
+            <VideoEditorWorkspaceOverlays />
+          </WorkspaceTrackPresentation>
+        </div>
+      </InspectorGroupFocusContext.Provider>
+    </InspectorSectionMemoryProvider>
   );
 }
 
 function useWorkspacePanels() {
   const header = useVideoEditorHeaderController();
-  const [activeLibrary, setActiveLibrary] = useState<'materials' | 'effects' | null>('materials');
+  const [activeLibrary, setActiveLibrary] = useWorkspacePreference('activeLibrary');
   const effectsLibraryDockOpen = activeLibrary === 'effects';
   const materialsOpen = activeLibrary === 'materials';
   const changeEffectsOpen = (open: boolean) => {

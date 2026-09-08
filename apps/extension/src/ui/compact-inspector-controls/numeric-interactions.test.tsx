@@ -248,3 +248,48 @@ it('keeps mixed and disabled values inert', () => {
   expect(onPreviewValue).not.toHaveBeenCalled();
   expect(onCommitValue).not.toHaveBeenCalled();
 });
+
+it('does not restore a stale coupled dimension when a focused pristine field receives new props', () => {
+  const { onCommitValue, onPreviewValue } = renderNumeric({ value: 40 });
+  act(() => input().focus());
+  act(() =>
+    root?.render(
+      <NumericValueField
+        label="Opacity"
+        value={80}
+        unit="%"
+        min={0}
+        max={100}
+        step={5}
+        onPreviewValue={onPreviewValue}
+        onCommitValue={onCommitValue}
+      />
+    )
+  );
+  expect(input().value).toBe('80');
+  act(() => input().blur());
+  expect(onCommitValue).not.toHaveBeenCalledWith(40);
+});
+
+it('preserves an explicitly edited draft when a related parameter updates', () => {
+  const { onCommitValue, onPreviewValue } = renderNumeric({ value: 40 });
+  act(() => input().focus());
+  act(() => setInputValue(input(), '55'));
+  act(() =>
+    root?.render(
+      <NumericValueField
+        label="Opacity"
+        value={80}
+        unit="%"
+        min={0}
+        max={100}
+        step={5}
+        onPreviewValue={onPreviewValue}
+        onCommitValue={onCommitValue}
+      />
+    )
+  );
+  expect(input().value).toBe('55');
+  act(() => input().blur());
+  expect(onCommitValue).toHaveBeenCalledWith(55);
+});

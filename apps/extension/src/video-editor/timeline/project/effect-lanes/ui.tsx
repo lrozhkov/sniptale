@@ -1,14 +1,10 @@
+import { TimelineLaneIdentity, TIMELINE_LANE_HEADER_CLASS_NAME } from '../tracks/lane-icons';
 import { translate } from '../../../../platform/i18n';
 import { EFFECT_LANE_ROW_HEIGHT } from '../interaction-state/helpers';
 
 const EFFECT_LANE_ROW_CLASS_NAME = [
   'relative border-b border-[var(--sniptale-color-border-subtle)]',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_78%,transparent)]',
-].join(' ');
-
-const EFFECT_LANE_LABEL_CLASS_NAME = [
-  'flex h-full items-center gap-2.5 px-3',
-  'text-[var(--sniptale-color-text-secondary)]',
 ].join(' ');
 
 const EFFECT_LANE_EMPTY_LABEL_CLASS_NAME = [
@@ -18,11 +14,13 @@ const EFFECT_LANE_EMPTY_LABEL_CLASS_NAME = [
 
 export function ProjectTimelineEffectLaneRow({
   children,
+  muted = false,
   onClick,
   onMouseLeave,
   onMouseMove,
   onPointerDown,
 }: React.PropsWithChildren<{
+  muted?: boolean;
   onClick?: React.MouseEventHandler<HTMLDivElement>;
   onMouseLeave?: React.MouseEventHandler<HTMLDivElement>;
   onMouseMove?: React.MouseEventHandler<HTMLDivElement>;
@@ -32,6 +30,7 @@ export function ProjectTimelineEffectLaneRow({
     <div
       className={EFFECT_LANE_ROW_CLASS_NAME}
       data-project-timeline-effect-lane-row="true"
+      data-timeline-lane-muted={muted}
       style={{ height: EFFECT_LANE_ROW_HEIGHT }}
       onClick={(event) => {
         onClick?.(event);
@@ -72,10 +71,8 @@ export function ProjectTimelineEffectLaneLabelRow({
   return (
     <ProjectTimelineEffectLaneRow>
       <div
-        className={[
-          compactRows ? 'flex h-full items-center justify-center' : EFFECT_LANE_LABEL_CLASS_NAME,
-          isSelected ? 'bg-[var(--sniptale-color-accent-soft)]' : '',
-        ].join(' ')}
+        className={`${TIMELINE_LANE_HEADER_CLASS_NAME} h-full !border-b-0`}
+        data-selected={isSelected ?? false}
       >
         {onSelect ? (
           <button
@@ -85,16 +82,26 @@ export function ProjectTimelineEffectLaneLabelRow({
             aria-label={title}
             onClick={onSelect}
             className={[
-              'flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left',
+              'flex min-w-0 flex-1 items-center gap-2 rounded-md text-left',
               'focus-visible:outline focus-visible:outline-2',
               'focus-visible:outline-[var(--sniptale-color-focus-ring)]',
             ].join(' ')}
           >
-            <LaneIdentity icon={icon} title={title} compactRows={compactRows} />
+            <TimelineLaneIdentity
+              icon={icon}
+              prefix="Z1"
+              name={title}
+              selected={isSelected ?? false}
+            />
           </button>
         ) : (
-          <div className="flex min-w-0 flex-1 items-center gap-2.5">
-            <LaneIdentity icon={icon} title={title} compactRows={compactRows} />
+          <div className="flex min-w-0 flex-1 items-center gap-2">
+            <TimelineLaneIdentity
+              icon={icon}
+              prefix="Z1"
+              name={title}
+              selected={isSelected ?? false}
+            />
           </div>
         )}
         {trailingControls && !compactRows ? (
@@ -102,33 +109,5 @@ export function ProjectTimelineEffectLaneLabelRow({
         ) : null}
       </div>
     </ProjectTimelineEffectLaneRow>
-  );
-}
-
-function LaneIdentity({
-  icon,
-  title,
-  compactRows,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  compactRows: boolean;
-}) {
-  return (
-    <>
-      <span
-        className="flex h-7 w-7 items-center justify-center rounded-[10px] border
-            border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]"
-      >
-        {icon}
-      </span>
-      {compactRows ? null : (
-        <div data-timeline-track-name="true" className="min-w-0 flex-1">
-          <div className="truncate text-[13px] font-semibold text-[var(--sniptale-color-text-primary)]">
-            {title}
-          </div>
-        </div>
-      )}
-    </>
   );
 }

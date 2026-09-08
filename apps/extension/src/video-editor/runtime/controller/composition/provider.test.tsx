@@ -85,7 +85,15 @@ const mocks = vi.hoisted(() => {
     openAudioRecordingDialog: action,
     openLibraryPanel: action,
     playbackRange: null,
-    preview: { sourceViewerActive: false },
+    preview: {
+      sourceViewerActive: false,
+      preferences: {
+        preferences: { mode: 'live', rasterPreset: '720p', zoom: 'fit' },
+        updatePreferences: action,
+        retrySave: action,
+        saveFailed: false,
+      },
+    },
     sceneBackgroundColors: {},
     setPlaybackRange: action,
     toggleLibraryPanel: action,
@@ -111,6 +119,7 @@ const mocks = vi.hoisted(() => {
   };
   return {
     commands,
+    effects: { updateEffectInstance: fn() },
     exportPort,
     history,
     libraries,
@@ -169,6 +178,8 @@ vi.mock('../store', async (importOriginal) => ({
   getCurrentVideoEditorProjectId: () => null,
   getCurrentVideoEditorProjectSnapshot: () => mocks.lifecycle.project,
   getCurrentVideoEditorSelectedClipId: () => mocks.selection.selectedClipId,
+  useVideoEditorEffectEditingPort: (selector: (port: typeof mocks.effects) => unknown) =>
+    selector(mocks.effects),
   useVideoEditorClipSelectionPort: (selector: (port: typeof mocks.selection) => unknown) =>
     selector(mocks.selection),
   useVideoEditorRecordingTelemetryPort: (selector: (port: typeof mocks.telemetry) => unknown) =>
@@ -189,7 +200,7 @@ vi.mock('../store', async (importOriginal) => ({
 
 import { VideoEditorBlockingOverlayContext, VideoEditorLibrariesContext } from './contexts';
 import { VideoEditorCompositionProvider } from './provider';
-import { useVideoEditorSidebarController } from './hooks';
+import { useVideoEditorSidebarController, useVideoEditorPreviewController } from './hooks';
 import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 
 let container: HTMLDivElement;
@@ -324,4 +335,24 @@ it('keeps input blocked while interval recording owns playback instead of the ov
   act(() => root.render(<VideoEditorCompositionProvider />));
   expect(vi.mocked(useVideoEditorOverlayPlayback).mock.lastCall?.[0].enabled).toBe(true);
   mocks.workspace.audioRecordingDialogOpen = false;
+});
+
+it('connects canvas scene-anchor edits to the authoritative effect mutation port', () => {
+  mocks.lifecycle.project = createEmptyVideoProject('Anchors');
+  let controller: ReturnType<typeof useVideoEditorPreviewController> = null;
+  function PreviewConsumer() {
+    controller = useVideoEditorPreviewController();
+    return null;
+  }
+  act(() =>
+    root.render(
+      <VideoEditorCompositionProvider>
+        <PreviewConsumer />
+      </VideoEditorCompositionProvider>
+    )
+  );
+  expect(controller).not.toBeNull();
+  const patch = { sceneAnchors: { tip: { x: 30, y: 40 } } };
+  act(() => controller?.editing.onUpdateEffectInstance('effect', patch));
+  expect(mocks.effects.updateEffectInstance).toHaveBeenCalledWith('effect', patch);
 });

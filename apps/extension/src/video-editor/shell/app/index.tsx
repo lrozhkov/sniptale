@@ -1,3 +1,4 @@
+import { WorkspacePreferencesProvider } from '../../runtime/controller/workspace-preferences';
 import React, { useState } from 'react';
 import { usePageLocaleMetadata } from '../../../platform/i18n';
 import { useCommandPaletteHotkey } from '../../../ui/command-palette/hotkey';
@@ -16,12 +17,14 @@ export const App: React.FC = () => {
   usePageLocaleMetadata('videoEditor.app.documentTitle');
   const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
   return (
-    <VideoEditorCompositionProvider commandPaletteOpen={commandPaletteOpen}>
-      <VideoEditorShellGate
-        commandPaletteOpen={commandPaletteOpen}
-        setCommandPaletteOpen={setCommandPaletteOpen}
-      />
-    </VideoEditorCompositionProvider>
+    <WorkspacePreferencesProvider>
+      <VideoEditorCompositionProvider commandPaletteOpen={commandPaletteOpen}>
+        <VideoEditorShellGate
+          commandPaletteOpen={commandPaletteOpen}
+          setCommandPaletteOpen={setCommandPaletteOpen}
+        />
+      </VideoEditorCompositionProvider>
+    </WorkspacePreferencesProvider>
   );
 };
 

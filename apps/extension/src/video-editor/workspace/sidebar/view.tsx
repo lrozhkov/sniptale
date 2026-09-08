@@ -157,7 +157,7 @@ function WorkspaceSidebarHeaderTitleRow({
 }: Pick<WorkspaceSidebarHeaderProps, 'inspectorMode' | 'selectionIcon' | 'selectionTitle'>) {
   return (
     <div
-      className="flex h-[52px] w-full min-w-0 items-center gap-2 px-3"
+      className="flex w-full min-w-0 items-center gap-2"
       data-ui="video-editor.workspace.sidebar-header-title-row"
     >
       <span

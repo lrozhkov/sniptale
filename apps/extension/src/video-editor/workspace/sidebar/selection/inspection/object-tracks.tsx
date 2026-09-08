@@ -9,7 +9,6 @@ import {
   DetailList,
   PANEL_DIVIDER_CLASS_NAME,
   PANEL_HEADING_CLASS_NAME,
-  PANEL_META_CLASS_NAME,
 } from '../shared/panel';
 
 export function SceneObjectTracksPanel(props: {
@@ -51,25 +50,28 @@ export function ObjectTrackSummaryCard(props: {
     <div className={`space-y-3 pt-3 first:pt-0 first:border-t-0 ${PANEL_DIVIDER_CLASS_NAME}`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
-            {summary.title}
-          </p>
-          <p className={`mt-1 ${PANEL_META_CLASS_NAME}`}>{props.track.id}</p>
+          {!props.selected ? (
+            <p className="truncate text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
+              {summary.title}
+            </p>
+          ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <ProductActionButton
-            compact
-            data-ui="video-editor.object-track.select"
-            disabled={props.selected}
-            type="button"
-            onClick={() => props.onSelectObjectTrack?.(props.track.id)}
-          >
-            {translate(
-              props.selected
-                ? 'videoEditor.sidebar.objectTrackSelectedLabel'
-                : 'videoEditor.sidebar.objectTrackSelectLabel'
-            )}
-          </ProductActionButton>
+          {!props.selected ? (
+            <ProductActionButton
+              compact
+              data-ui="video-editor.object-track.select"
+              disabled={props.selected}
+              type="button"
+              onClick={() => props.onSelectObjectTrack?.(props.track.id)}
+            >
+              {translate(
+                props.selected
+                  ? 'videoEditor.sidebar.objectTrackSelectedLabel'
+                  : 'videoEditor.sidebar.objectTrackSelectLabel'
+              )}
+            </ProductActionButton>
+          ) : null}
           <DangerButton
             label={translate('videoEditor.sidebar.objectTrackDeleteLabel')}
             onClick={() => props.onDeleteObjectTrack?.(props.track.id)}

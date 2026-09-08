@@ -245,7 +245,16 @@ function buildSuggestions(
         buildAutoTransformCandidates(entry, request.settings.stableSegments)
       )
     );
-    if (request.camera) suggestions.push(...buildCameraSuggestions(project, target, clip, entry));
+    if (request.camera) {
+      const cameraProject = {
+        ...project,
+        motionRegions: [
+          ...(project.motionRegions ?? []),
+          ...suggestions.flatMap((row) => (row.region ? [row.region] : [])),
+        ],
+      };
+      suggestions.push(...buildCameraSuggestions(cameraProject, target, clip, entry));
+    }
   }
   return suggestions;
 }

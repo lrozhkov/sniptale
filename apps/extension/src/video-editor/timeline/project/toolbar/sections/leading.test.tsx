@@ -1,3 +1,4 @@
+import { createEmptyVideoProject } from '../../../../../features/video/project/factories/creation';
 // @vitest-environment jsdom
 import { ProjectTimelineAddTrackControl } from './add-controls';
 
@@ -9,7 +10,7 @@ vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
-import { VideoTrackKind } from '../../../../../features/video/project/types';
+import { VideoTrackKind, VideoProjectTrackRole } from '../../../../../features/video/project/types';
 import { ProjectTimelineToolbarLeadingControls } from './leading';
 
 let container: HTMLDivElement | null = null;
@@ -37,6 +38,8 @@ afterEach(() => {
 });
 
 function renderLeadingControls(options?: {
+  historySelected?: boolean;
+  historyLocked?: boolean;
   canAddMotionRegion?: boolean;
   canDeleteSelectedClip?: boolean;
   canEditSelectedClip?: boolean;
@@ -50,23 +53,41 @@ function renderLeadingControls(options?: {
   }
 
   const handlers = {
+    onAddActionEvent: vi.fn(),
     onAddMotionRegion: vi.fn(),
     onAddTrack: vi.fn(),
     onToggleTelemetryLaneVisibility: vi.fn(),
     onZoomChange: vi.fn(),
   };
 
+  const project = createEmptyVideoProject();
+  project.utilityLanes = {
+    actions: { visible: true, locked: options?.historyLocked ?? false },
+    camera: { visible: true, locked: false },
+  };
   act(() => {
     root?.render(
       <>
         <ProjectTimelineAddTrackControl onAddTrack={handlers.onAddTrack} />
         <ProjectTimelineToolbarLeadingControls
+          historySelected={options?.historySelected ?? false}
+          historyActions={{
+            project,
+            selection: { kind: 'history-lane' },
+            actions: {
+              prepare: async () => ({ status: 'stale' }),
+              apply: async () => 'stale',
+              isCurrent: () => false,
+            },
+            onSeek: vi.fn(),
+            onModalVisibilityChange: vi.fn(),
+          }}
           canAddMotionRegion={options?.canAddMotionRegion ?? true}
           canDeleteSelectedClip={options?.canDeleteSelectedClip ?? options?.selectedClip ?? false}
           canEditSelectedClip={options?.canEditSelectedClip ?? options?.selectedClip ?? false}
           canSplitSelectedClip={options?.canSplitSelectedClip ?? options?.selectedClip ?? false}
           insertion={{
-            onAddActionEvent: vi.fn(),
+            onAddActionEvent: handlers.onAddActionEvent,
             onAddMotionRegion: handlers.onAddMotionRegion,
             onAddShapeOverlay: vi.fn(),
             onAddTextOverlay: vi.fn(),
@@ -155,7 +176,7 @@ it('wires track creation from the track header control', () => {
     document.querySelectorAll(
       '.sniptale-toolbar-menu-item[data-ui^="video-editor.timeline.toolbar.add-track."]'
     )
-  ).toHaveLength(2);
+  ).toHaveLength(3);
 
   act(() => {
     getButtonByText('videoEditor.timeline.addAudioTrack').click();
@@ -222,4 +243,71 @@ it('dismisses track choices on captured outside pointerdown without stealing foc
   } finally {
     outside.remove();
   }
+});
+
+it('keeps track choices open while the timeline layout settles after opening', () => {
+  const observers: Array<{ callback: ResizeObserverCallback; target?: Element }> = [];
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      entry: (typeof observers)[number];
+      constructor(callback: ResizeObserverCallback) {
+        this.entry = { callback };
+        observers.push(this.entry);
+      }
+      observe(target: Element) {
+        this.entry.target = target;
+      }
+      disconnect() {}
+    }
+  );
+  renderLeadingControls();
+  container!.setAttribute('data-ui', 'video-editor.timeline.surface');
+  let width = 1000;
+  vi.spyOn(container!, 'getBoundingClientRect').mockImplementation(
+    () => new DOMRect(0, 0, width, 300)
+  );
+  act(() => getButtonByText('videoEditor.timeline.addTrack').click());
+  width = 999;
+  act(() => {
+    for (const entry of observers) {
+      if (entry.target === container) entry.callback([], {} as ResizeObserver);
+    }
+  });
+  expect(document.querySelector('.sniptale-toolbar-menu')).not.toBeNull();
+});
+
+it('offers history actions only for the selected history lane and honors its lock', () => {
+  renderLeadingControls({ historySelected: false });
+  expect(container?.querySelector('[data-ui="video-editor.auto.open"]')).toBeNull();
+  expect(
+    container?.querySelector('[data-ui="video-editor.timeline.toolbar.add-click"]')
+  ).toBeNull();
+  const handlers = renderLeadingControls({ historySelected: true });
+  expect(container?.querySelector('[data-ui="video-editor.auto.open"]')).not.toBeNull();
+  act(() =>
+    container
+      ?.querySelector<HTMLButtonElement>('[data-ui="video-editor.timeline.toolbar.add-click"]')
+      ?.click()
+  );
+  expect(handlers.onAddActionEvent).toHaveBeenCalledWith('CLICK_RIPPLE');
+  renderLeadingControls({ historySelected: true, historyLocked: true });
+  expect(
+    container?.querySelector<HTMLButtonElement>(
+      '[data-ui="video-editor.timeline.toolbar.add-click"]'
+    )?.disabled
+  ).toBe(true);
+});
+
+it('creates a camera track from the menu and restores the trigger focus', () => {
+  const handlers = renderLeadingControls();
+  const trigger = getButtonByText('videoEditor.timeline.addTrack');
+  act(() => trigger.click());
+  act(() => getButtonByText('videoEditor.timeline.addCameraTrack').click());
+  expect(handlers.onAddTrack).toHaveBeenCalledWith(
+    VideoTrackKind.PRIMARY,
+    VideoProjectTrackRole.CAMERA
+  );
+  expect(document.querySelector('.sniptale-toolbar-menu')).toBeNull();
+  expect(document.activeElement).toBe(trigger);
 });

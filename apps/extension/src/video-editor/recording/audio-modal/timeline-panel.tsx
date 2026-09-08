@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useLayoutEffect, useState, type ReactNode } from 'react';
 import { Mic, RotateCcw, Save, Square, X } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -111,5 +111,34 @@ export function TimelineRecordingPanel(props: {
         </p>
       )}
     </div>
+  );
+}
+
+/** Isolate timeline controls while keeping the video being voiced unobscured. */
+export function TimelineRecordingBackdrop() {
+  const [top, setTop] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    const surface = document.querySelector('[data-ui="video-editor.timeline.surface"]');
+    if (!surface) return;
+    const update = () => setTop(surface.getBoundingClientRect().top);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(surface);
+    window.addEventListener('resize', update);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, []);
+  return top === null ? null : (
+    <div
+      aria-hidden="true"
+      data-ui="video-editor.audio-recording.timeline-backdrop"
+      className={[
+        'pointer-events-none fixed inset-x-0 bottom-0 z-[2147483646] backdrop-blur-[2px]',
+        'bg-[color:color-mix(in_srgb,var(--sniptale-color-overlay)_24%,transparent)]',
+      ].join(' ')}
+      style={{ top }}
+    />
   );
 }

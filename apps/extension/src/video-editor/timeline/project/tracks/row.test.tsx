@@ -69,7 +69,7 @@ it('retains focus on track state icon buttons after pointer activation', () => {
 
   expect(buttons).toHaveLength(2);
   expect(buttons?.[0]?.className).toContain('--timeline-control-height');
-  expect(buttons?.[0]?.getAttribute('data-active')).toBe('true');
+  expect(buttons?.[0]?.getAttribute('data-active')).toBe('false');
   expect(buttons?.[1]?.getAttribute('data-active')).toBe('false');
   expect(
     container?.querySelector('[data-ui="video-editor.timeline.track-select"]')?.textContent
@@ -150,5 +150,5 @@ it('uses speaker state for audio while retaining visibility eyes for video', () 
   expect(container!.querySelector('.lucide-volume-x')).not.toBeNull();
   expect(
     container!.querySelector('.lucide-volume-x')!.closest('button')!.getAttribute('aria-pressed')
-  ).toBe('false');
+  ).toBe('true');
 });

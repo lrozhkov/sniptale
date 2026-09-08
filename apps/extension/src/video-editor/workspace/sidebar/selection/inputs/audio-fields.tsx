@@ -1,3 +1,4 @@
+import { InspectorDetails } from '../shared/details';
 import { Link2, Unlink } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../../../../platform/i18n';
@@ -39,12 +40,14 @@ function renderSharedAudioFields(params: {
         value={sharedVolumeValue}
         onChange={(value) => params.onUpdateClipVolume(params.clip.id, value)}
       />
-      <AudioEnvelopeFields
-        disabled={params.disabled}
-        endValue={gainRange.end}
-        startValue={gainRange.start}
-        onChange={(patch) => params.onUpdateClipAudioEnvelope(params.clip.id, patch)}
-      />
+      <InspectorDetails label={translate('videoEditor.sidebar.inspectorEnvelope')}>
+        <AudioEnvelopeFields
+          disabled={params.disabled}
+          endValue={gainRange.end}
+          startValue={gainRange.start}
+          onChange={(patch) => params.onUpdateClipAudioEnvelope(params.clip.id, patch)}
+        />
+      </InspectorDetails>
     </>
   );
 }
@@ -67,6 +70,9 @@ export function renderAudioFields(
     (item) => item.id !== clip.id && linkedIds.includes(item.id)
   );
   const audio = isVideoClip(clip) ? (companions.find(isAudioClip) ?? clip) : clip;
+  const asset = props.project.assets.find((item) => item.id === audio.assetId);
+  if (isVideoClip(audio) && asset?.metadata.hasAudio !== true && companions.length === 0)
+    return null;
   return (
     <>
       {companions.length > 0 ? (
@@ -90,9 +96,6 @@ export function renderAudioFields(
               {translate('videoEditor.sidebar.detachButton')}
             </ProductActionButton>
           </div>
-          <p className="mt-2 text-xs text-[var(--sniptale-color-text-dim)]">
-            {translate('videoEditor.sidebar.linkedClipsDescription')}
-          </p>
         </div>
       ) : null}
       {renderSharedAudioFields({

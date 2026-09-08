@@ -40,7 +40,8 @@ export function createMaterialPlacementAction(
         asset,
         mode === 'append' ? end : state.currentTime,
         mode === 'overlay' ? 'overlay' : 'append',
-        range
+        range,
+        state.selectedTrackId
       );
       const existingIds = new Set(project.clips.map(({ id }) => id));
       const addedClips = result.project.clips.filter(({ id }) => !existingIds.has(id));

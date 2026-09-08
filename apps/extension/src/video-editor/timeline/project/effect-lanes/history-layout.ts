@@ -1,6 +1,8 @@
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
 import type { VideoProject } from '../../../../features/video/project/types';
 
+export const TIMELINE_CURSOR_ROW_HEIGHT = 24;
+
 /** One row geometry shared by the history rail, canvas, playhead and drop coordinates. */
 export function getTimelineHistoryLayout(
   project: VideoProject,
@@ -22,6 +24,6 @@ export function getTimelineHistoryLayout(
     typingTop,
     actionHeight,
     cursorTop,
-    height: actionHeight + (cursorTop === null ? 0 : 32),
+    height: actionHeight + (cursorTop === null ? 0 : TIMELINE_CURSOR_ROW_HEIGHT),
   };
 }

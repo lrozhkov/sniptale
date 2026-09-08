@@ -4,7 +4,7 @@ import {
   type TimelineProjection,
 } from '../../interaction-state/projection';
 import { Trash2 } from 'lucide-react';
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import type { ReactNode, PointerEvent as ReactPointerEvent } from 'react';
 import { translate } from '../../../../../platform/i18n';
 import { TIMELINE_OBJECT_MARKER_PROPS } from '../../canvas/hover-preview';
 import type { TimelineCutZone, TimelineGapZone, TimelineJunctionZone } from './model';
@@ -26,6 +26,7 @@ export function ProjectTimelineTrackZones(props: {
   onBeginTransitionTrim?: TransitionTrimHandler | undefined;
   cutZones: TimelineCutZone[];
   gapZones: TimelineGapZone[];
+  renderGapAction?: ((zone: TimelineGapZone) => ReactNode) | undefined;
   junctionZones?: TimelineJunctionZone[];
   pixelsPerSecond: number;
   projection?: TimelineProjection | undefined;
@@ -43,6 +44,7 @@ export function ProjectTimelineTrackZones(props: {
       />
       <TrackGapZoneLayer
         gapZones={props.gapZones}
+        renderGapAction={props.renderGapAction}
         onCloseTrackGap={props.onCloseTrackGap}
         pixelsPerSecond={props.pixelsPerSecond}
         projection={props.projection}
@@ -111,11 +113,12 @@ function TrackJunctionZoneButton(props: {
       data-ui="timeline.track-transition-zone"
       title={props.zone.title}
       className={[
+        'video-editor-timeline-item',
         'group absolute bottom-2 z-30 flex h-5 items-center justify-center overflow-hidden',
         'rounded-sm outline outline-1 -outline-offset-1 px-0 text-[10px] font-semibold',
         'bg-[var(--sniptale-color-surface-overlay)] text-[var(--sniptale-color-text-secondary)]',
         props.selected
-          ? 'outline-[var(--sniptale-color-border-accent-strong)]'
+          ? 'video-editor-timeline-item-selected outline-[var(--sniptale-color-border-strong)]'
           : 'outline-[var(--sniptale-color-border-strong)]',
       ].join(' ')}
       style={{ left: geometry.left, width: geometry.width }}
@@ -125,12 +128,13 @@ function TrackJunctionZoneButton(props: {
       }}
       onPointerDown={stopPointerPropagation}
       onDragOver={(event) => {
-        if (!hasVideoEditorEffectDocumentDragType(event.dataTransfer)) return;
+        if (props.zone.audio || !hasVideoEditorEffectDocumentDragType(event.dataTransfer)) return;
         event.preventDefault();
         event.stopPropagation();
         event.dataTransfer.dropEffect = 'copy';
       }}
       onDrop={(event) => {
+        if (props.zone.audio) return;
         const payload = readVideoEditorEffectDocumentDragPayload(event.dataTransfer);
         if (!payload || payload.kind !== 'transition') return;
         event.preventDefault();
@@ -146,7 +150,7 @@ function TrackJunctionZoneButton(props: {
       <button
         type="button"
         aria-label={props.zone.title}
-        className="absolute inset-0 w-full h-full"
+        className="absolute inset-0 w-full h-full !cursor-pointer"
       />
       <svg
         aria-hidden="true"
@@ -240,6 +244,7 @@ function TrackCutZoneLayer(props: {
 
 function TrackGapZoneLayer(props: {
   gapZones: TimelineGapZone[];
+  renderGapAction?: ((zone: TimelineGapZone) => ReactNode) | undefined;
   onCloseTrackGap: (trackId: string, gapStart: number, gapEnd: number) => void;
   pixelsPerSecond: number;
   projection?: TimelineProjection | undefined;
@@ -254,19 +259,13 @@ function TrackGapZoneLayer(props: {
     if (!geometry) return null;
 
     return (
-      <button
+      <div
         {...TIMELINE_OBJECT_MARKER_PROPS}
         key={zone.id}
-        type="button"
-        aria-label={translate('videoEditor.timeline.closeGap')}
-        title={translate('videoEditor.timeline.closeGap')}
-        onClick={(event) => {
-          event.stopPropagation();
-          props.onCloseTrackGap(zone.trackId, zone.start, zone.end);
-        }}
-        onPointerDown={(event) => event.stopPropagation()}
+        onPointerDown={stopPointerPropagation}
         className={[
-          'group absolute inset-y-2 z-0 overflow-hidden rounded-sm outline outline-1 -outline-offset-1 outline-dashed',
+          'group absolute inset-y-2 z-0 hover:z-30 focus-within:z-30 rounded-sm',
+          'outline outline-1 -outline-offset-1 outline-dashed',
           'outline-[color:color-mix(in_srgb,var(--sniptale-color-text-muted)_28%,transparent)]',
           'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_0%,transparent)]',
           'transition-[background-color,outline-color]',
@@ -283,17 +282,32 @@ function TrackGapZoneLayer(props: {
           ].join(' '),
         }}
       >
-        <span
+        <div
+          data-ui="video-editor.timeline.gap-actions"
           className={[
-            'pointer-events-none absolute left-1/2 top-1/2 flex h-6 w-6',
-            '-translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full',
-            'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-muted)]',
-            'opacity-0 shadow-sm transition-opacity group-hover:opacity-100',
+            'absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1',
+            'rounded-lg border border-[var(--sniptale-color-border-soft)] p-0.5 shadow-sm',
+            'bg-[var(--sniptale-color-surface-panel)] opacity-0 group-hover:opacity-100 focus-within:opacity-100',
           ].join(' ')}
         >
-          <Trash2 size={13} strokeWidth={2.1} />
-        </span>
-      </button>
+          <button
+            type="button"
+            aria-label={translate('videoEditor.timeline.closeGap')}
+            title={translate('videoEditor.timeline.closeGap')}
+            className={[
+              'flex h-7 w-7 items-center justify-center rounded-md',
+              'hover:bg-[var(--sniptale-color-surface-hover)]',
+            ].join(' ')}
+            onClick={(event) => {
+              event.stopPropagation();
+              props.onCloseTrackGap(zone.trackId, zone.start, zone.end);
+            }}
+          >
+            <Trash2 size={15} strokeWidth={2.1} />
+          </button>
+          {props.renderGapAction?.(zone)}
+        </div>
+      </div>
     );
   });
 }

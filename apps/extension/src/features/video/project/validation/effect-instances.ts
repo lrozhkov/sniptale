@@ -67,7 +67,14 @@ function validateEffectProjectBranches(
   }
   return (
     retainedBytes <= MAX_PROJECT_EFFECT_SNAPSHOT_BYTES &&
-    instances.every(({ snapshotId }) => snapshotIds.has(snapshotId))
+    instances.every(
+      (instance) =>
+        snapshotIds.has(instance.snapshotId) &&
+        hasValidInstanceLayout(
+          instance,
+          snapshots.find((snapshot) => snapshot.id === instance.snapshotId)!
+        )
+    )
   );
 }
 
@@ -167,6 +174,7 @@ function isEffectInstance(value: unknown): value is VideoProjectEffectInstance {
     isPositiveFinite(value['playbackRate']) &&
     (value['sourceStart'] === undefined || isNonNegativeFinite(value['sourceStart'])) &&
     isEffectTarget(value['target']) &&
+    isSceneAnchors(value['sceneAnchors']) &&
     isControls(value['controls'])
   );
 }
@@ -204,4 +212,48 @@ function isNonNegativeFinite(value: unknown): value is number {
 
 function isPositiveFinite(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
+function isSceneAnchors(value: unknown): boolean {
+  if (value === undefined) return true;
+  return (
+    isRecord(value) &&
+    Object.keys(value).length <= 8 &&
+    Object.values(value).every(
+      (point) =>
+        isRecord(point) &&
+        Object.keys(point).length === 2 &&
+        typeof point['x'] === 'number' &&
+        Number.isFinite(point['x']) &&
+        Math.abs(point['x']) <= 1_000_000 &&
+        typeof point['y'] === 'number' &&
+        Number.isFinite(point['y']) &&
+        Math.abs(point['y']) <= 1_000_000
+    )
+  );
+}
+
+function hasValidInstanceLayout(
+  instance: VideoProjectEffectInstance,
+  snapshot: VideoProjectEffectSnapshot
+): boolean {
+  let value: unknown;
+  try {
+    value = parseBoundedEffectJson(new TextEncoder().encode(snapshot.source));
+  } catch {
+    return false;
+  }
+  const document = validateEffectV1Document(value).document;
+  if (!document) return false;
+  const handles = document.objectLayout?.handles ?? [];
+  const anchors = instance.sceneAnchors ?? {};
+  return (
+    Object.keys(anchors).length === handles.length &&
+    handles.every(
+      (handle) =>
+        Object.hasOwn(anchors, handle.id) &&
+        instance.controls[handle.xControl] === undefined &&
+        instance.controls[handle.yControl] === undefined
+    )
+  );
 }

@@ -147,7 +147,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
         labelledBy={titleId}
         onClose={onClose}
         closeOnBackdrop
-        width="min(640px, calc(100vw - 32px))"
+        width="min(560px, calc(100vw - 32px))"
       >
         <ProductModalHeader
           compact

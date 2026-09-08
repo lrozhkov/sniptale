@@ -3,6 +3,7 @@ import type { ProjectTimelineClipProps } from './types';
 import { ProjectTimelineClipLayout } from './view';
 
 export function ProjectTimelineClip({
+  hideClipNames = false,
   clip,
   isHovered,
   isSelected,
@@ -18,6 +19,7 @@ export function ProjectTimelineClip({
   onBeginClipInteraction,
 }: ProjectTimelineClipProps) {
   const viewModel = buildProjectTimelineClipViewModel({
+    hideClipNames,
     clip,
     isHovered,
     isSelected,

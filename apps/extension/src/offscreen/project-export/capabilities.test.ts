@@ -60,14 +60,14 @@ it('reports MP4 codec availability with AVC-first default priority', async () =>
   ]);
 });
 
-it('hides MP4 when no offscreen video encoder is available', async () => {
+it('hides video export when no offscreen video encoder is available', async () => {
   vi.stubGlobal('VideoEncoder', undefined);
 
   const capabilities = await getProjectExportCapabilities(createSettings());
 
   expect(capabilities.formats).toEqual([
     { format: VideoExportFormat.MP4, available: false },
-    { format: VideoExportFormat.WEBM, available: true },
+    { format: VideoExportFormat.WEBM, available: false },
   ]);
   expect(capabilities.defaultMp4VideoCodec).toBeNull();
   expect(capabilities.mp4Codecs).toEqual([

@@ -26,6 +26,8 @@ export type VideoProjectEffectTarget =
   | { kind: 'transition'; transitionId: string };
 
 export interface VideoProjectEffectInstance {
+  /** Authoritative logical scene positions; local handle controls are derived at render time. */
+  sceneAnchors?: Record<string, { x: number; y: number }>;
   controls: Record<string, number | string>;
   duration: number;
   enabled: boolean;

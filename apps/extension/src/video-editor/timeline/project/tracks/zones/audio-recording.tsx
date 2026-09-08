@@ -16,68 +16,94 @@ import {
 } from '../../interaction-state/projection';
 import { TIMELINE_OBJECT_MARKER_PROPS } from '../../canvas/hover-preview';
 
+type RecordingRange = { start: number; end: number };
+
+function RecordingButton(props: { project: VideoProject; trackId: string; range: RecordingRange }) {
+  const dialogs = useContext(WorkspaceDialogsContext);
+  if (!dialogs) return null;
+  return (
+    <button
+      {...TIMELINE_OBJECT_MARKER_PROPS}
+      type="button"
+      data-ui="video-editor.timeline.record-range"
+      className={[
+        'pointer-events-auto flex h-7 w-7 shrink-0 items-center justify-center rounded-md',
+        'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-primary)]',
+        'hover:bg-[var(--sniptale-color-surface-hover)]',
+      ].join(' ')}
+      title={translate('videoEditor.app.recordAudioMicrophone')}
+      aria-label={translate('videoEditor.app.recordAudioMicrophone')}
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={(event) => {
+        event.stopPropagation();
+        dialogs.openTrackAudioRecordingDialog({
+          projectId: props.project.id,
+          trackId: props.trackId,
+          startTime: props.range.start,
+          endTime: props.range.end,
+        });
+      }}
+    >
+      <Mic size={15} aria-hidden="true" />
+    </button>
+  );
+}
+
+export function AudioGapRecordingAction(props: {
+  project: VideoProject;
+  trackId: string;
+  range: RecordingRange;
+}) {
+  const ranges = useContext(WorkspacePlaybackRangeContext);
+  const selected = ranges?.playbackRange;
+  const range =
+    selected &&
+    selected.start >= props.range.start &&
+    selected.end <= props.range.end &&
+    isAudioRecordingRangeAvailable(props.project, props.trackId, selected.start, selected.end)
+      ? selected
+      : props.range;
+  if (!isAudioRecordingRangeAvailable(props.project, props.trackId, range.start, range.end))
+    return null;
+  return <RecordingButton {...props} range={range} />;
+}
+
 export function AudioRecordingZones(props: {
   project: VideoProject;
   trackId: string;
   pixelsPerSecond: number;
   projection?: TimelineProjection | undefined;
 }) {
-  const dialogs = useContext(WorkspaceDialogsContext);
   const ranges = useContext(WorkspacePlaybackRangeContext);
-  if (!dialogs || !ranges) return null;
-  const selected = ranges.playbackRange;
-  const selectedAvailable =
-    selected &&
-    isAudioRecordingRangeAvailable(props.project, props.trackId, selected.start, selected.end);
-  const candidates = selectedAvailable
-    ? [selected]
-    : buildVideoEditorTrackGapCandidates(props.project, props.trackId);
-  return candidates
-    .filter((range) =>
-      isAudioRecordingRangeAvailable(props.project, props.trackId, range.start, range.end)
+  const selected = ranges?.playbackRange;
+  if (
+    !selected ||
+    !isAudioRecordingRangeAvailable(props.project, props.trackId, selected.start, selected.end)
+  )
+    return null;
+  // Existing gaps own their complete action group. Only an otherwise empty range needs a separate affordance.
+  if (
+    buildVideoEditorTrackGapCandidates(props.project, props.trackId).some(
+      (gap) => selected.start >= gap.start && selected.end <= gap.end
     )
-    .map((range) => {
-      const geometry = props.projection
-        ? projectTimelineInterval(props.projection, range.start, range.end)
-        : {
-            left: range.start * props.pixelsPerSecond,
-            width: (range.end - range.start) * props.pixelsPerSecond,
-          };
-      if (!geometry) return null;
-      return (
-        <div
-          key={`${range.start}:${range.end}`}
-          className={[
-            'pointer-events-none absolute inset-y-1 z-10 flex items-center justify-center opacity-0',
-            'group-hover/audio:opacity-100 focus-within:opacity-100',
-          ].join(' ')}
-          style={{ left: geometry.left, width: geometry.width }}
-        >
-          <button
-            {...TIMELINE_OBJECT_MARKER_PROPS}
-            type="button"
-            data-ui="video-editor.timeline.record-range"
-            className={[
-              'pointer-events-auto ml-14 flex h-7 w-7 shrink-0 items-center justify-center rounded-md border',
-              'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]',
-              'text-[var(--sniptale-color-text-primary)]',
-            ].join(' ')}
-            title={translate('videoEditor.app.recordAudioButton')}
-            aria-label={translate('videoEditor.app.recordAudioButton')}
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={(event) => {
-              event.stopPropagation();
-              dialogs.openTrackAudioRecordingDialog({
-                projectId: props.project.id,
-                trackId: props.trackId,
-                startTime: range.start,
-                endTime: range.end,
-              });
-            }}
-          >
-            <Mic size={15} aria-hidden="true" />
-          </button>
-        </div>
-      );
-    });
+  )
+    return null;
+  const geometry = props.projection
+    ? projectTimelineInterval(props.projection, selected.start, selected.end)
+    : {
+        left: selected.start * props.pixelsPerSecond,
+        width: (selected.end - selected.start) * props.pixelsPerSecond,
+      };
+  if (!geometry) return null;
+  return (
+    <div
+      className={[
+        'pointer-events-none absolute inset-y-1 z-20 flex items-center justify-center opacity-0',
+        'group-hover/audio:opacity-100 focus-within:opacity-100',
+      ].join(' ')}
+      style={{ left: geometry.left, width: geometry.width }}
+    >
+      <RecordingButton project={props.project} trackId={props.trackId} range={selected} />
+    </div>
+  );
 }

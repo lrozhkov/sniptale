@@ -1,7 +1,6 @@
 import { createSceneGradientBackground } from '../../../../../features/video/project/scene/background-gradient';
 import { translate } from '../../../../../platform/i18n';
 import { VideoSceneBackgroundKind } from '../../../../../features/video/project/types';
-import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { SelectInput } from '../shared/controls';
 import { PANEL_META_CLASS_NAME } from '../shared/panel';
 import { SceneBackgroundColorEditor } from './colors';
@@ -135,21 +134,4 @@ export function getSceneBackgroundAssetOptions(
     value: asset.id,
     label: asset.name,
   }));
-}
-
-export function getSceneBackgroundSummaryLabel(
-  sceneBackground: SceneBackground,
-  project: WorkspaceSidebarSelectionPanelProps['project']
-) {
-  switch (sceneBackground.kind) {
-    case VideoSceneBackgroundKind.SOLID:
-      return sceneBackground.color;
-    case VideoSceneBackgroundKind.GRADIENT:
-      return sceneBackground.gradient.stops.map((stop) => stop.color).join(' → ');
-    case VideoSceneBackgroundKind.IMAGE:
-      return (
-        project.assets.find((asset) => asset.id === sceneBackground.assetId)?.name ??
-        sceneBackground.assetId
-      );
-  }
 }

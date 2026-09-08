@@ -51,7 +51,7 @@ it('renders a compact track header together with track rows and effect lanes', (
 
   expect(header?.className).toContain('h-[30px]');
   expect(header?.className).not.toContain('uppercase');
-  expect(container?.textContent).toContain('videoEditor.timeline.telemetryLane');
+  expect(container?.textContent).toContain('videoEditor.timeline.historyLaneShort');
   expect(container?.textContent).not.toContain('videoEditor.timeline.motionLane');
   expect(container?.textContent).toContain('User custom video title');
   expect(container?.textContent).toContain('V1');
@@ -63,7 +63,7 @@ it('omits the telemetry label row when the read-only telemetry lane is hidden', 
 
   renderTrackList(project, { showTelemetryLane: false });
 
-  expect(container?.textContent).not.toContain('videoEditor.timeline.telemetryLane');
+  expect(container?.textContent).not.toContain('videoEditor.timeline.historyLaneShort');
 });
 
 it('keeps a single track rail without duplicate height or ordering controls', () => {
@@ -108,27 +108,16 @@ it('keeps hidden utility lanes visible in the track rail with state controls', (
   expect(container?.querySelector('[data-ui="video-editor.timeline.history-lane"]')).not.toBeNull();
   expect(container?.textContent).toContain('videoEditor.timeline.motionLane');
   expect(container?.querySelectorAll('[data-ui="timeline.utility-lane-state"]').length).toBe(4);
-  expect(
-    container?.querySelector<HTMLButtonElement>('[data-ui="video-editor.timeline.add-zoom"]')
-      ?.disabled
-  ).toBe(true);
+  expect(container?.querySelector('[data-ui="video-editor.timeline.add-zoom"]')).toBeNull();
 });
 
-it('adds a zoom at the playhead from the persistent editable lane action', () => {
-  const project = createEmptyVideoProject('Zoom add action');
+it('keeps zoom creation out of the track rail', () => {
+  const project = createEmptyVideoProject();
   project.motionRegions = [createVideoProjectMotionRegion(project, 0)];
-  const onAddMotionRegion = vi.fn();
-
-  renderTrackList(project, { showTelemetryLane: false, onAddMotionRegion });
-
-  const addButton = container?.querySelector<HTMLButtonElement>(
-    '[data-ui="video-editor.timeline.add-zoom"]'
-  );
-  expect(addButton?.disabled).toBe(false);
-
-  act(() => addButton?.click());
-
-  expect(onAddMotionRegion).toHaveBeenCalledOnce();
+  renderTrackList(project, { showTelemetryLane: true });
+  expect(container?.querySelector('[data-ui="video-editor.timeline.add-zoom"]')).toBeNull();
+  expect(container?.textContent).toContain('Z1');
+  expect(container?.textContent).toContain('H1');
 });
 
 it('keeps persisted clip logical lanes inside one physical track row', () => {
@@ -181,7 +170,7 @@ it('keeps track names and state controls readable in compact mode', () => {
 
   expect(scrollArea?.style.gridTemplateColumns).toBe('');
   expect(container?.textContent).toContain(project.tracks[0]!.name);
-  expect(container?.textContent).toContain('videoEditor.timeline.telemetryLane');
+  expect(container?.textContent).toContain('videoEditor.timeline.historyLaneShort');
   expect(container?.querySelectorAll('[data-ui="timeline.utility-lane-state"]')).toHaveLength(2);
   expect(
     container?.querySelectorAll('[data-ui="timeline.track-kind-icon"]').length
@@ -249,17 +238,6 @@ function renderTrackList(
         motionLaneSelected={options.motionLaneSelected}
         canShowTelemetryLane={options.showTelemetryLane}
         cursorLaneVisible={options.cursorLaneVisible ?? true}
-        autoProcessing={{
-          project,
-          selection: null,
-          actions: {
-            prepare: async () => ({ status: 'stale' }),
-            apply: async () => 'stale',
-            isCurrent: () => false,
-          },
-          onSeek: vi.fn(),
-          onModalVisibilityChange: vi.fn(),
-        }}
         project={project}
         selectedTrackId={project.tracks[0]?.id ?? null}
         showTelemetryLane={options.showTelemetryLane}
@@ -272,7 +250,6 @@ function renderTrackList(
         trackPanelPrefs={trackPanelPrefs}
         tracks={project.tracks}
         onAddTrack={vi.fn()}
-        onAddMotionRegion={options.onAddMotionRegion ?? vi.fn()}
         onClearUtilityLane={vi.fn()}
         onScroll={vi.fn()}
         onSelectTrack={vi.fn()}
@@ -295,6 +272,7 @@ function createTrackPanelPrefs(options: { compactRows: boolean; hideTrackNames: 
     setCollapsedTelemetryLaneVisible: vi.fn(),
     setCompactRows: vi.fn(),
     setHideTrackNames: vi.fn(),
+    setClipNamesHidden: vi.fn(),
     setTrackHeight: vi.fn(),
   };
 }
@@ -322,12 +300,10 @@ it('routes compact rows and action history from the track header and disables un
   const button = (id: string) =>
     header.querySelector<HTMLButtonElement>(`[data-ui="video-editor.timeline.toolbar.${id}"]`)!;
   expect(button('compact-tracks').getAttribute('aria-pressed')).toBe('false');
-  expect(button('cursor-lane').disabled).toBe(true);
-  expect(button('cursor-lane').getAttribute('aria-pressed')).toBe('false');
+  expect(button('cursor-lane')).toBeNull();
   act(() => {
     button('compact-tracks').click();
     button('telemetry-lane').click();
-    button('cursor-lane').click();
   });
   expect(prefs.setCompactRows).toHaveBeenCalledWith(true);
   expect(prefs.setCollapsedTelemetryLaneVisible).toHaveBeenCalledWith(
@@ -354,20 +330,15 @@ it('exposes a separate selected Zoom lane button and keeps Add region independen
   expect(label.getAttribute('aria-pressed')).toBe('true');
   act(() => label.click());
   expect(onSelectMotionLane).toHaveBeenCalledOnce();
-  act(() =>
-    container!
-      .querySelector<HTMLButtonElement>('[data-ui="video-editor.timeline.add-zoom"]')!
-      .click()
-  );
-  expect(onAddMotionRegion).toHaveBeenCalledOnce();
-  expect(onSelectMotionLane).toHaveBeenCalledOnce();
+  expect(container?.querySelector('[data-ui="video-editor.timeline.add-zoom"]')).toBeNull();
+  expect(onAddMotionRegion).not.toHaveBeenCalled();
 });
 
 it('keeps destructive zoom cleanup in the inspector instead of the track header', () => {
   const project = createEmptyVideoProject('Zoom controls');
   project.motionRegions = [createVideoProjectMotionRegion(project, 0)];
   renderTrackList(project, { showTelemetryLane: false });
-  expect(container?.querySelector('[data-ui="video-editor.timeline.add-zoom"]')).not.toBeNull();
+  expect(container?.querySelector('[data-ui="video-editor.timeline.add-zoom"]')).toBeNull();
   expect(
     container?.querySelector('[data-ui="video-editor.timeline.clear-utility-lane"]')
   ).toBeNull();
@@ -388,7 +359,7 @@ it('toggles track names independently of compact row heights', () => {
   ).toContain('V1');
 });
 
-it('collapses only the common header controls when both compact display options are enabled', () => {
+it('keeps all four header controls available with either compact display option', () => {
   const project = createEmptyVideoProject('Compact rail');
   for (const [compactRows, hideTrackNames] of [
     [false, true],
@@ -399,7 +370,7 @@ it('collapses only the common header controls when both compact display options 
     const header = container!.querySelector(
       '[data-ui="video-editor.timeline.track-header-controls"]'
     )!;
-    expect(header.querySelectorAll('button')).toHaveLength(compactRows && hideTrackNames ? 1 : 5);
+    expect(header.querySelectorAll('button')).toHaveLength(4);
     expect(
       header.querySelector('[data-ui="video-editor.timeline.toolbar.add-track"]')
     ).not.toBeNull();
@@ -413,14 +384,8 @@ it('collapses only the common header controls when both compact display options 
   }
 });
 
-it('opens auto processing from the history header with no implicit selected source', () => {
+it('keeps auto processing out of the history track header', () => {
   const project = createEmptyVideoProject('History');
   renderTrackList(project, { showTelemetryLane: true, compactRows: true, hideTrackNames: true });
-  const button = document.querySelector<HTMLButtonElement>('[data-ui="video-editor.auto.open"]');
-  expect(button).not.toBeNull();
-  act(() => button?.click());
-  expect(document.querySelector('.sniptale-modal')).not.toBeNull();
-  expect(
-    document.querySelector<HTMLButtonElement>('[data-ui="video-editor.auto.review"]')?.disabled
-  ).toBe(true);
+  expect(document.querySelector('[data-ui="video-editor.auto.open"]')).toBeNull();
 });

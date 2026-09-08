@@ -264,3 +264,38 @@ function createClip(id: string, trackId: string, startTime: number): VideoProjec
     volume: 1,
   };
 }
+
+it('separates extended negative raster bounds from rotated body placement and stable local time', () => {
+  const project = createProject();
+  const snapshot = project.effectSnapshots![0]!;
+  const source = readFileSync(
+    new URL(
+      '../../../../../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/' +
+        'sniptale-callout-light.sniptale-effect.json',
+      import.meta.url
+    ),
+    'utf8'
+  );
+  snapshot.source = source;
+  snapshot.documentId = 'sniptale-callout-light';
+  const instance = project.effectInstances![0]!;
+  instance.controls = {};
+  instance.sceneAnchors = { tip: { x: 0, y: 0 } };
+  const host = project.clips.find((c) => c.id === 'standalone-host')!;
+  host.transform = { ...host.transform, x: 600, y: 400, width: 760, height: 240, rotation: 37 };
+  const plan = resolveEffectRuntimeFramePlans(project, 1).find(
+    (p) => p.effectInstanceId === instance.id
+  )!;
+  expect(plan.target).toMatchObject({ placement: host.transform });
+  expect(plan.controls['anchorX']).toBeLessThan(0);
+  expect(plan.bitmapBounds!.x).toBeLessThan(0);
+  expect(plan.dimensions.width).toBeCloseTo(host.transform.width * plan.bitmapBounds!.width, 8);
+  expect(plan.renderDimensions.width * plan.renderDimensions.height).toBeLessThanOrEqual(8_388_608);
+  expect(
+    resolveEffectRuntimeFramePlans(project, 0).find((p) => p.effectInstanceId === instance.id)!
+      .bitmapBounds
+  ).toEqual(plan.bitmapBounds);
+  expect(
+    resolveEffectRuntimeFramePlans(project, 1).find((p) => p.effectInstanceId === instance.id)
+  ).toEqual(plan);
+});

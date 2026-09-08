@@ -1,3 +1,4 @@
+import { applyEffectObjectLayout } from '../object-layout.js';
 import type { EffectV1Document, EffectV1GraphProgram } from '@sniptale/runtime-contracts/effect-v1';
 
 import type { EffectRuntimeGraphFrameContext, RuntimeCanvas } from '../model/types.js';
@@ -24,19 +25,20 @@ export function createEffectV1GraphRenderer(
       const canvas = context.createCanvas(context.width, context.height);
       const renderContext = canvas.getContext('2d');
       if (!renderContext) throw new Error('CANVAS_CONTEXT_UNAVAILABLE');
+      renderContext.clearRect(0, 0, context.width, context.height);
+      const objectContext = applyEffectObjectLayout(document.objectLayout, context, renderContext);
       const state: RenderState = {
         canvas,
         context: renderContext,
         passes: new Map(),
         runtime,
         scope: {
-          context,
+          context: objectContext,
           definitions: program.definitions ?? {},
           definitionCache: new Map(),
           vars: {},
         },
       };
-      renderContext.clearRect(0, 0, context.width, context.height);
       await executeEffectV1Commands(program.commands, state);
       return canvas;
     },

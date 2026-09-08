@@ -2,19 +2,12 @@ import { GridSettingsPanel } from '../../settings';
 import { translate } from '../../../../../platform/i18n';
 import { getProjectSceneBackground } from '../../../../../features/video/project/scene/background';
 import { VideoProjectAssetType } from '../../../../../features/video/project/types';
-import { resolveVideoProjectActionOccurrences } from '../../../../../features/video/project/action-occurrences';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { InspectorGroupedPanel } from '../grouped-inspector';
 import { NumberInput } from '../inputs/number';
 import { SceneObjectTracksPanel } from './object-tracks';
-import {
-  DetailItem,
-  DetailList,
-  PANEL_HEADING_CLASS_NAME,
-  PANEL_META_CLASS_NAME,
-  PANEL_SECTION_CLASS_NAME,
-} from '../shared/panel';
-import { getSceneBackgroundSummaryLabel, SceneBackgroundFields } from '../scene-background/fields';
+import { PANEL_META_CLASS_NAME, PANEL_SECTION_CLASS_NAME } from '../shared/panel';
+import { SceneBackgroundFields } from '../scene-background/fields';
 
 export function InspectScenePanel(props: WorkspaceSidebarSelectionPanelProps) {
   const sceneBackground = getProjectSceneBackground(props.project);
@@ -38,11 +31,13 @@ function createSceneGroups(
   return [
     {
       id: 'info',
+      semantic: 'info' as const,
       label: translate('videoEditor.sidebar.inspectorGroupSummary'),
       content: <SceneInfo project={props.project} sceneBackground={sceneBackground} />,
     },
     {
       id: 'canvas',
+      semantic: 'canvas' as const,
       label: translate('videoEditor.sidebar.inspectorGroupCanvas'),
       defaultActive: true,
       content: (
@@ -64,6 +59,7 @@ function createSceneGroups(
     },
     {
       id: 'background',
+      semantic: 'background' as const,
       label: translate('videoEditor.sidebar.inspectorGroupBackground'),
       content: (
         <SceneBackgroundFields
@@ -87,6 +83,7 @@ function createSceneObjectTracksGroup(
 ) {
   return {
     id: 'object-tracks',
+    semantic: 'tracking' as const,
     label: translate('videoEditor.sidebar.inspectorGroupObjectTracks'),
     visible: objectTracks.length > 0,
     content: (
@@ -107,20 +104,6 @@ function SceneInfo(props: {
   return (
     <div className="space-y-3">
       <SceneHeader project={props.project} />
-      <DetailList>
-        <DetailItem
-          label={translate('videoEditor.sidebar.projectSourceLabel')}
-          value={getProjectSourceLabel(props.project.source.kind)}
-        />
-        <DetailItem
-          label={translate('videoEditor.timeline.actionsLane')}
-          value={getActionSummaryLabel(props.project)}
-        />
-        <DetailItem
-          label={translate('videoEditor.sidebar.projectBackgroundLabel')}
-          value={getSceneBackgroundSummaryLabel(props.sceneBackground, props.project)}
-        />
-      </DetailList>
     </div>
   );
 }
@@ -134,7 +117,6 @@ function SceneHeader({ project }: Pick<WorkspaceSidebarSelectionPanelProps, 'pro
 
   return (
     <div>
-      <p className={PANEL_HEADING_CLASS_NAME}>{translate('videoEditor.sidebar.projectTitle')}</p>
       <p className={`mt-1 ${PANEL_META_CLASS_NAME}`}>{projectMeta}</p>
     </div>
   );
@@ -166,28 +148,4 @@ function SceneProjectSizeFields(props: {
       />
     </div>
   );
-}
-
-function getProjectSourceLabel(
-  sourceKind: WorkspaceSidebarSelectionPanelProps['project']['source']['kind']
-) {
-  switch (sourceKind) {
-    case 'recording':
-      return translate('videoEditor.sidebar.projectSourceRecording');
-    case 'scenario':
-      return translate('videoEditor.sidebar.projectSourceScenario');
-    case 'manual':
-      return translate('videoEditor.sidebar.projectSourceManual');
-  }
-}
-
-function getActionSummaryLabel(project: WorkspaceSidebarSelectionPanelProps['project']) {
-  const actionEvents = resolveVideoProjectActionOccurrences(project);
-  if (actionEvents.length > 0) {
-    return String(actionEvents.length);
-  }
-
-  return project.source.kind === 'recording'
-    ? translate('videoEditor.sidebar.actionTrackUnavailable')
-    : '0';
 }

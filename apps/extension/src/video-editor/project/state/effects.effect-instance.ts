@@ -168,6 +168,7 @@ function updateMatchingEffectInstance(
   if (instance.id !== instanceId) return instance;
   return {
     ...instance,
+    ...(patch.sceneAnchors ? { sceneAnchors: structuredClone(patch.sceneAnchors) } : {}),
     ...(patch.controls ? { controls: mergeControls(instance.controls, patch.controls) } : {}),
     ...(patch.enabled === undefined ? {} : { enabled: patch.enabled }),
     ...(patch.startTime === undefined || instance.kind === 'transition'

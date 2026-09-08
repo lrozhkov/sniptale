@@ -1,3 +1,4 @@
+import { useWorkspacePreference } from './workspace-preferences';
 import type React from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -28,7 +29,7 @@ function beginVerticalResize(
 
 export function useVideoEditorWorkspacePreviewState() {
   const [sourceViewerActive, setSourceViewerActive] = useState(false);
-  const [paneHeight, setPaneHeight] = useState<number | null>(null);
+  const [paneHeight, setPaneHeight] = useWorkspacePreference('previewHeight');
   const workspaceSplitRef = useRef<HTMLDivElement>(null);
   const resizeCleanupRef = useRef<(() => void) | null>(null);
   const preferences = useVideoEditorPreviewPreferences();
@@ -53,14 +54,14 @@ export function useVideoEditorWorkspacePreviewState() {
         setPaneHeight
       );
     },
-    [paneHeight]
+    [paneHeight, setPaneHeight]
   );
 
   const resetPaneHeight = useCallback(() => {
     resizeCleanupRef.current?.();
     resizeCleanupRef.current = null;
     setPaneHeight(null);
-  }, []);
+  }, [setPaneHeight]);
   const handleVerticalResizeKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === 'Home') {
       event.preventDefault();

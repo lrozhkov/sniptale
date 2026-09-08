@@ -1,8 +1,11 @@
+import type { AutoProcessingHeaderProps } from './sections/auto-transform-wizard';
 import type { ComponentProps } from 'react';
 import type { ProjectTimelinePlaybackSummary } from './sections/playback-summary';
 import type { ProjectTimelineInsertionActions } from '../types';
 
 export interface ProjectTimelineToolbarProps {
+  historyActions?: AutoProcessingHeaderProps;
+  historySelected?: boolean;
   playback: ComponentProps<typeof ProjectTimelinePlaybackSummary>;
   canAddMotionRegion: boolean;
   canDeleteSelectedClip: boolean;

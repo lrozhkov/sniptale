@@ -15,6 +15,7 @@ export const TimelineEffectDraftContext = createContext<TimelineEffectDragDraft 
 
 interface ProjectTimelineEffectSegmentProps {
   segmentId: string;
+  movable?: boolean;
   className: string;
   height?: number;
   hidden?: boolean;
@@ -68,10 +69,15 @@ export function ProjectTimelineEffectSegment(props: ProjectTimelineEffectSegment
       <ProjectTimelineEffectSegmentHandle
         align="left"
         ariaLabel={`${props.label}:resize-start`}
-        onPointerDown={geometry.includesStart ? props.onBeginTrimStartInteraction : undefined}
+        onPointerDown={
+          geometry.includesStart && props.movable !== false
+            ? props.onBeginTrimStartInteraction
+            : undefined
+        }
       />
       <ProjectTimelineEffectSegmentButton
         className={props.className}
+        movable={props.movable !== false}
         hidden={props.hidden ?? false}
         isSelected={props.isSelected}
         label={props.label}
@@ -86,13 +92,18 @@ export function ProjectTimelineEffectSegment(props: ProjectTimelineEffectSegment
       <ProjectTimelineEffectSegmentHandle
         align="right"
         ariaLabel={`${props.label}:resize-end`}
-        onPointerDown={geometry.includesEnd ? props.onBeginTrimEndInteraction : undefined}
+        onPointerDown={
+          geometry.includesEnd && props.movable !== false
+            ? props.onBeginTrimEndInteraction
+            : undefined
+        }
       />
     </div>
   );
 }
 
 function ProjectTimelineEffectSegmentButton(props: {
+  movable: boolean;
   className: string;
   hidden: boolean;
   isSelected: boolean;
@@ -109,14 +120,15 @@ function ProjectTimelineEffectSegmentButton(props: {
     <button
       {...TIMELINE_OBJECT_MARKER_PROPS}
       type="button"
+      data-timeline-item-muted={props.hidden}
       title={props.title ?? props.label}
       aria-label={props.title ?? props.label}
       onClick={(event) => event.stopPropagation()}
       onPointerDown={props.onBeginEffectInteraction}
       className={[
         EFFECT_SEGMENT_BASE_CLASS_NAME,
+        props.movable ? '!cursor-grab' : '!cursor-pointer',
         props.className,
-        props.hidden ? 'opacity-45 saturate-[0.55]' : '',
         props.status === 'warning' ? EFFECT_SEGMENT_WARNING_CLASS_NAME : '',
         props.isSelected ? EFFECT_SEGMENT_SELECTED_CLASS_NAME : '',
       ].join(' ')}

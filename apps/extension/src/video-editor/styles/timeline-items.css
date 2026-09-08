@@ -1,0 +1,81 @@
+/* Decorative children inherit the item's capability; resize handles keep their explicit cursor. */
+.video-editor-timeline-item * {
+  cursor: inherit;
+}
+
+/* One contour above item artwork; isolation keeps range boundaries above the whole item. */
+.video-editor-timeline-item {
+  --timeline-item-contour: transparent;
+  isolation: isolate;
+}
+
+.video-editor-timeline-item::after {
+  content: '';
+  position: absolute;
+  inset: 0 var(--timeline-item-inset-right, 0) 0 var(--timeline-item-inset-left, 0);
+  z-index: 40;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px var(--timeline-item-contour);
+  transition: box-shadow 120ms ease;
+}
+
+.video-editor-timeline-item:where(:hover, .video-editor-timeline-item-hovered):not(:disabled),
+.video-editor-timeline-item.video-editor-timeline-item-selected {
+  --timeline-item-contour: var(--sniptale-color-border-accent-strong);
+  border-color: transparent;
+}
+
+.video-editor-timeline-item:where(
+    :hover,
+    .video-editor-timeline-item-hovered,
+    .video-editor-timeline-item-selected
+  ):not(:focus-visible) {
+  outline-color: transparent;
+  box-shadow: none;
+}
+
+.video-editor-timeline-item.video-editor-timeline-item-selected {
+  --timeline-item-contour: var(--sniptale-color-accent-emphasis);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .video-editor-timeline-item,
+  .video-editor-timeline-item::after {
+    transition: none;
+  }
+}
+
+/* Muted output remains editable: subdue artwork, never the interaction contour. */
+:is(
+  [data-timeline-lane-muted='true'] .video-editor-timeline-item,
+  .video-editor-timeline-item[data-timeline-item-muted='true']
+) {
+  color: var(--sniptale-color-text-secondary);
+  background-color: var(--sniptale-color-surface-input);
+}
+
+:is(
+  [data-timeline-lane-muted='true'] .video-editor-timeline-item,
+  .video-editor-timeline-item[data-timeline-item-muted='true']
+)::before {
+  content: '';
+  position: absolute;
+  inset: 0 var(--timeline-item-inset-right, 0) 0 var(--timeline-item-inset-left, 0);
+  border-radius: inherit;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    135deg,
+    transparent 0 7px,
+    color-mix(in srgb, var(--sniptale-color-text-dim) 12%, transparent) 7px 8px
+  );
+}
+
+[data-timeline-lane-muted='true']
+  :is(
+    [data-ui='video-editor.timeline.clip-preview'],
+    [data-ui='video-editor.timeline.audio-waveform']
+  ) {
+  filter: grayscale(1);
+  opacity: 0.45;
+}

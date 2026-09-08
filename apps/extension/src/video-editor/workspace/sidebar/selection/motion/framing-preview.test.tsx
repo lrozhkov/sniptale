@@ -62,14 +62,14 @@ afterEach(() => {
   host.remove();
   vi.restoreAllMocks();
 });
-const render = (locked = false, nextProject = project, nextRegion = region) =>
+const render = (locked = false, nextProject = project, nextRegion = region, nextUrls = assetUrls) =>
   act(() =>
     root.render(
       <fieldset disabled={locked}>
         <FramingPreviewSurface
           project={nextProject}
           region={nextRegion}
-          assetUrls={assetUrls}
+          assetUrls={nextUrls}
           onCommit={commit}
           onCommitArea={commitArea}
         />
@@ -136,7 +136,7 @@ it('cancels a draft and respects the locked fieldset for pointer and keyboard ed
 
 it('disposes stale rendering, ignores its result and offers retry after a current failure', async () => {
   render();
-  const replacement = { ...project, name: 'Replacement' };
+  const replacement = { ...project, backgroundColor: '#000000' };
   render(false, replacement);
   expect(pending[0]!.signal.aborted).toBe(true);
   expect(pending[0]!.dispose).toHaveBeenCalledOnce();
@@ -253,3 +253,54 @@ it.each([false, true])(
     );
   }
 );
+
+it('retains a decoded frame through focus edits and autosave metadata changes', async () => {
+  render(false, project, areaRegion);
+  await ready();
+  const editedRegion = { ...areaRegion, focusArea: { ...areaRegion.focusArea, x: 250 } };
+  render(
+    false,
+    { ...project, updatedAt: project.updatedAt + 1, motionRegions: [editedRegion] },
+    editedRegion
+  );
+  expect(button().disabled).toBe(false);
+  expect(pending).toHaveLength(1);
+  expect(draw).toHaveBeenCalledOnce();
+});
+
+it('does not cancel a pending decode for focus-only changes', async () => {
+  render();
+  render(false, {
+    ...project,
+    updatedAt: project.updatedAt + 1,
+    motionRegions: [{ ...region, scale: 3 }],
+  });
+  expect(pending).toHaveLength(1);
+  expect(pending[0]!.signal.aborted).toBe(false);
+  await ready();
+  expect(button().disabled).toBe(false);
+});
+
+it('refreshes the frame when the sampled zoom time changes', async () => {
+  const timedProject = { ...project, duration: 10 };
+  render(false, timedProject, { ...region, startTime: 0, duration: 2 });
+  await ready();
+  render(false, timedProject, { ...region, startTime: 4, duration: 2 });
+  expect(button().disabled).toBe(true);
+  expect(pending).toHaveLength(2);
+  await ready(1);
+  expect(button().disabled).toBe(false);
+});
+
+it('reuses equivalent project snapshots but refreshes changed media URLs', async () => {
+  render();
+  await ready();
+  render(false, structuredClone(project), region, {});
+  expect(pending).toHaveLength(1);
+  expect(button().disabled).toBe(false);
+  render(false, project, region, { source: 'blob:replacement' });
+  expect(pending).toHaveLength(2);
+  expect(button().disabled).toBe(true);
+  await ready(1);
+  expect(button().disabled).toBe(false);
+});

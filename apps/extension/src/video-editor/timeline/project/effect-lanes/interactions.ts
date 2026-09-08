@@ -29,7 +29,6 @@ import type {
 } from '../../../contracts/commands/history';
 
 interface UseProjectTimelineEffectInteractionsOptions {
-  onMotionClick?: ((clientX: number) => void) | undefined;
   historyTransaction: VideoEditorProjectHistoryTransactionActions;
   pointerSessionCleanupRef?: React.MutableRefObject<(() => void) | null>;
   magnetEnabled: boolean;
@@ -59,7 +58,6 @@ interface EffectInteractionSessionRefs {
 }
 
 interface EffectInteractionMovementOptions extends EffectInteractionSessionRefs {
-  onMotionClick?: ((clientX: number) => void) | undefined;
   setDraft: React.Dispatch<React.SetStateAction<TimelineEffectDragDraft | null>>;
   historyTransaction: VideoEditorProjectHistoryTransactionActions;
   magnetEnabled: boolean;
@@ -137,14 +135,6 @@ function startEffectInteractionSession(
         options.historyTransaction.isProjectHistoryTransactionCurrent(historyTransactionLease)
       )
         pendingCommit?.();
-      if (
-        commit &&
-        !historyTransactionLease &&
-        options.target.kind === 'motion' &&
-        options.target.mode === 'move'
-      ) {
-        options.onMotionClick?.(options.startClientX);
-      }
     } finally {
       pendingCommit = null;
       endHistoryTransaction();
@@ -193,6 +183,7 @@ function startEffectInteractionSession(
     if (lastMove) onMove(lastMove);
   };
   cleanupPointerSession = startWindowPointerSession({
+    cursor: 'mode' in options.target && options.target.mode !== 'move' ? 'ew-resize' : 'grabbing',
     onMove,
     onEnd: () => finishInteraction(true),
     onCancel: () => finishInteraction(),
@@ -237,7 +228,6 @@ function createBeginEffectInteraction(options: BeginEffectInteractionOptions) {
       readTimelineStartTime: options.readTimelineStartTime,
       project: options.project,
       projectDuration: options.projectDuration,
-      onMotionClick: options.onMotionClick,
       startClientX: event.clientX,
       target,
     });
@@ -281,7 +271,6 @@ function createBeginEffectInteractionOptions(args: {
   setOptimisticSelection: React.Dispatch<React.SetStateAction<TimelineEffectSelection | null>>;
 }): BeginEffectInteractionOptions {
   return {
-    onMotionClick: args.options.onMotionClick,
     setDraft: args.setDraft,
     cleanupRef: args.refs.cleanupRef,
     refreshRef: args.refs.refreshRef,

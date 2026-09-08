@@ -1,3 +1,4 @@
+import { PreviewEffectHandles } from './effect-handles';
 import React from 'react';
 import { usePreviewCanvasInteractionFocus } from './interaction-focus';
 import { CanvasInsertPreviewOverlay } from '@sniptale/ui/canvas-tools';
@@ -202,6 +203,8 @@ export function PreviewStageRoot(params: PreviewStageRootProps) {
 export function createPreviewStageSelectionOverlay(
   params: Pick<
     PreviewStageCanvasProps,
+    | 'onUpdateEffectInstance'
+    | 'onPreviewEffectAnchors'
     | 'beginInteraction'
     | 'camera'
     | 'mode'
@@ -216,14 +219,17 @@ export function createPreviewStageSelectionOverlay(
   }
 
   return (
-    <PreviewStageSelectionOverlay
-      beginInteraction={params.beginInteraction}
-      camera={params.camera}
-      project={params.project}
-      selectedClip={params.selectedClip}
-      selectedClipLocked={params.selectedClipLocked}
-      stageRef={params.stageRef}
-    />
+    <>
+      <PreviewStageSelectionOverlay
+        beginInteraction={params.beginInteraction}
+        camera={params.camera}
+        project={params.project}
+        selectedClip={params.selectedClip}
+        selectedClipLocked={params.selectedClipLocked}
+        stageRef={params.stageRef}
+      />
+      <PreviewEffectHandles {...params} />
+    </>
   );
 }
 

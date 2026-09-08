@@ -38,7 +38,15 @@ export function ProjectTimelineClipLayout({
       data-project-timeline-clip={clip.id}
       title={clip.name?.trim() || buildClipLabel(project, clip)}
       className={viewModel.clipClassName}
-      style={{ ...viewModel.style, left: viewModel.left, width: viewModel.width }}
+      style={
+        {
+          ...viewModel.style,
+          left: viewModel.left,
+          width: viewModel.width,
+          '--timeline-item-inset-left': `${viewModel.bodyInsetLeft}px`,
+          '--timeline-item-inset-right': `${viewModel.bodyInsetRight}px`,
+        } as React.CSSProperties
+      }
       onClick={(event) => {
         event.stopPropagation();
         if (event.detail === 0) selectTimelineClip(event, clip.id, onSelectClip);
@@ -112,6 +120,7 @@ function ProjectTimelineClipContent({
       ) : null}
       {shouldRenderVisualPreview ? (
         <ProjectTimelineVisualClipPreview
+          labelHeight={viewModel.labelHeight}
           preview={preview}
           clip={clip}
           width={viewModel.width}
@@ -135,17 +144,6 @@ function ProjectTimelineClipContent({
       ) : null}
       <ProjectTimelineClipVisualOverlays viewModel={viewModel} />
       <ProjectTimelineClipLabel clip={clip} project={project} viewModel={viewModel} />
-      {viewModel.visualEmphasis ? (
-        <span
-          aria-hidden="true"
-          data-ui="video-editor.timeline.clip-contour"
-          className={[
-            'pointer-events-none absolute inset-y-0 z-40 rounded-sm border-2',
-            'border-[var(--sniptale-color-accent-emphasis)]',
-          ].join(' ')}
-          style={{ left: viewModel.bodyInsetLeft, right: viewModel.bodyInsetRight }}
-        />
-      ) : null}
     </>
   );
 }
@@ -155,6 +153,7 @@ function isVisualPreviewClip(clip: VideoProjectClip): boolean {
 }
 
 function ProjectTimelineVisualClipPreview({
+  labelHeight,
   preview,
   clip,
   width,
@@ -162,6 +161,7 @@ function ProjectTimelineVisualClipPreview({
   offsetSeconds,
   visibleDuration,
 }: {
+  labelHeight: number;
   preview: TimelineClipPreview | undefined;
   clip: VideoProjectClip;
   width: number;
@@ -182,7 +182,11 @@ function ProjectTimelineVisualClipPreview({
       ? preview.frames
       : [{ url: preview.url, sourceStart: 0, sourceEnd: clip.duration }];
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 top-5 z-0 overflow-hidden opacity-90">
+    <div
+      data-ui="video-editor.timeline.clip-preview"
+      className="pointer-events-none absolute inset-x-0 bottom-0 z-0 overflow-hidden opacity-90"
+      style={{ top: labelHeight }}
+    >
       {frames.map((frame) => {
         const start = Math.max(0, (frame.sourceStart - sourceStart) / rate);
         const end = Math.min(clip.duration, (frame.sourceEnd - sourceStart) / rate);

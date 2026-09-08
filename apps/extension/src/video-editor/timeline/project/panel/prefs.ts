@@ -25,6 +25,7 @@ interface ProjectTimelinePanelPrefsState {
   setCollapsedTelemetryLaneVisible: (visible: boolean) => void;
   setCompactRows: (compactRows: boolean) => void;
   setHideTrackNames: (hidden: boolean) => void;
+  setClipNamesHidden: (trackId: string, hidden: boolean) => void;
   setTrackHeight: (trackId: string, multiplier: VideoEditorTrackHeightMultiplier) => void;
 }
 
@@ -46,7 +47,7 @@ export function useProjectTimelinePanelPrefs(
 
   return {
     cursorLaneVisible:
-      project.cursorTrack !== null &&
+      (project.cursorTrack?.samples.length ?? 0) > 0 &&
       prefs.collapsedTelemetryLaneVisible &&
       prefs.collapsedCursorLaneVisible,
     prefs,
@@ -110,6 +111,14 @@ function useTrackPanelPrefsActions(
     setCompactRows: useTrackPanelBooleanSetter(updatePrefs, 'compactRows'),
     setHideTrackNames: useTrackPanelBooleanSetter(updatePrefs, 'hideTrackNames'),
     setTrackHeight: useTrackHeightSetter(updatePrefs),
+    setClipNamesHidden: useCallback(
+      (trackId: string, hidden: boolean) =>
+        updatePrefs((current) => ({
+          ...current,
+          hiddenClipNamesByTrackId: { ...current.hiddenClipNamesByTrackId, [trackId]: hidden },
+        })),
+      [updatePrefs]
+    ),
   };
 }
 
@@ -172,6 +181,13 @@ function pruneTrackPanelPrefs(
 ): VideoEditorTrackPanelPrefs {
   return {
     ...prefs,
+    ...(prefs.hiddenClipNamesByTrackId
+      ? {
+          hiddenClipNamesByTrackId: Object.fromEntries(
+            Object.entries(prefs.hiddenClipNamesByTrackId).filter(([id]) => currentTrackIds.has(id))
+          ),
+        }
+      : {}),
     trackHeightByTrackId: Object.fromEntries(
       Object.entries(prefs.trackHeightByTrackId).filter(([trackId]) => currentTrackIds.has(trackId))
     ),

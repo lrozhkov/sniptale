@@ -90,6 +90,8 @@ function buildPreviewStageSurfaceActionProps(
     onUpdateActionEventDetails: props.onUpdateActionEventDetails,
     onUpdateAnnotationClipTemplate: props.onUpdateAnnotationClipTemplate,
     onUpdateClipTransform: props.onUpdateClipTransform,
+    onUpdateEffectInstance: props.onUpdateEffectInstance,
+    onPreviewEffectAnchors: runtime.render.onPreviewEffectAnchors,
     onUpdateMotionRegion: props.onUpdateMotionRegion,
     onUpsertObjectTrackCorrectionAnchor: props.onUpsertObjectTrackCorrectionAnchor,
   };

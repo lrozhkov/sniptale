@@ -1,9 +1,13 @@
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
-import { VideoTrackKind } from '../../../../features/video/project/types';
+import { VideoTrackKind, VideoProjectTrackRole } from '../../../../features/video/project/types';
 import { createVideoEditorProjectTrackActions } from './actions';
 import type { VideoEditorProjectState } from '../contracts';
-import { resetVideoEditorProjectHistory } from '../../history';
+import {
+  undoVideoEditorProjectHistory,
+  redoVideoEditorProjectHistory,
+  resetVideoEditorProjectHistory,
+} from '../../history';
 
 function createMutableState() {
   const project = createEmptyVideoProject('Draft');
@@ -51,4 +55,30 @@ it('combines structure and toggle track actions into one project track owner', (
       visible: false,
     })
   );
+});
+
+it('adds and selects an independent camera track with undo and redo', () => {
+  const runtime = createMutableState();
+  const actions = createVideoEditorProjectTrackActions(runtime.set);
+  actions.addTrack(VideoTrackKind.PRIMARY, VideoProjectTrackRole.CAMERA);
+  const state = runtime.getState();
+  const camera = state.project!.tracks.at(-1)!;
+  expect(camera).toMatchObject({
+    kind: VideoTrackKind.PRIMARY,
+    role: VideoProjectTrackRole.CAMERA,
+    isRoot: false,
+    visible: true,
+    locked: false,
+  });
+  expect(state.selection).toEqual({ kind: 'track', trackId: camera.id });
+  expect(state.selectedTrackId).toBe(camera.id);
+  expect(state.project!.clips).toHaveLength(0);
+  const undo = undoVideoEditorProjectHistory(state.projectHistory, state.project!);
+  if (undo?.status !== 'applied') throw new Error('Expected undo');
+  expect(undo.project.tracks.some((track) => track.id === camera.id)).toBe(false);
+  const redo = redoVideoEditorProjectHistory(undo.history, undo.project);
+  if (redo?.status !== 'applied') throw new Error('Expected redo');
+  expect(redo.project.tracks.at(-1)).toEqual(camera);
+  actions.addTrack(VideoTrackKind.PRIMARY, VideoProjectTrackRole.CAMERA);
+  expect(runtime.getState().project!.tracks.at(-1)!.name).not.toBe(camera.name);
 });

@@ -11,22 +11,31 @@ import {
   useAutoProcessingWorkflow,
   type AutoProcessingWorkflowProps,
 } from './auto-transform-workflow';
-import { TimelineIconButton } from '../../controls/icon-button';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { toolbarButtonClassName } from './constants/button';
 
 export type AutoProcessingHeaderProps = Omit<AutoProcessingWorkflowProps, 'onClose'> & {
   onModalVisibilityChange: (visible: boolean) => void;
 };
-export function ProjectTimelineAutoProcessingControl(props: AutoProcessingHeaderProps) {
+export function ProjectTimelineAutoProcessingControl(
+  props: AutoProcessingHeaderProps & { visible?: boolean }
+) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <TimelineIconButton
-        dataUi="video-editor.auto.open"
-        title={translate('videoEditor.timeline.autoTransform')}
-        icon={<WandSparkles size={13} />}
-        onClick={() => setOpen(true)}
-        stopPropagation
-      />
+      {props.visible !== false ? (
+        <ContentToolbarButton
+          className={toolbarButtonClassName}
+          dataUi="video-editor.auto.open"
+          title={translate('videoEditor.timeline.autoTransform')}
+          onClick={() => setOpen(true)}
+        >
+          <WandSparkles size={14} aria-hidden="true" />
+          <span className="@max-[1600px]/timeline:sr-only">
+            {translate('videoEditor.timeline.autoTransform')}
+          </span>
+        </ContentToolbarButton>
+      ) : null}
       {open ? <AutoTransformWizard {...props} onClose={() => setOpen(false)} /> : null}
     </>
   );
@@ -92,7 +101,10 @@ export function AutoTransformWizard(props: AutoProcessingHeaderProps & { onClose
       step={step}
       onVisibilityChange={props.onModalVisibilityChange}
     >
-      <ProductModalBody compact className="min-h-0 !h-[min(400px,calc(100vh_-_240px))] !gap-0 !p-0">
+      <ProductModalBody
+        compact
+        className="min-h-0 max-h-[min(400px,calc(100vh_-_240px))] !gap-0 !p-0"
+      >
         {step === 'setup' ? (
           <AutoProcessingSetup
             choices={choices}

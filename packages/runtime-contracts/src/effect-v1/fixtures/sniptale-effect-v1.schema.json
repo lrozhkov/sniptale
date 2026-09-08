@@ -3007,6 +3007,56 @@
       "type": "object"
     },
     "layers": { "items": { "$ref": "#/$defs/layer" }, "type": "array" },
+    "objectLayout": {
+      "additionalProperties": false,
+      "properties": {
+        "width": { "minimum": 1, "maximum": 16384, "type": "number" },
+        "height": { "minimum": 1, "maximum": 16384, "type": "number" },
+        "resize": { "enum": ["scale", "reflow"] },
+        "handles": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$"
+              },
+              "label": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "ru": { "type": "string" },
+                  "en": { "type": "string" }
+                },
+                "required": ["ru", "en"]
+              },
+              "xControl": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$"
+              },
+              "yControl": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$"
+              },
+              "padding": { "type": "number", "minimum": 0, "maximum": 256 }
+            },
+            "required": ["id", "label", "xControl", "yControl", "padding"]
+          }
+        }
+      },
+      "required": ["width", "height", "resize"],
+      "type": "object",
+      "allOf": [
+        {
+          "if": { "required": ["handles"] },
+          "then": { "properties": { "resize": { "const": "scale" } } }
+        }
+      ]
+    },
     "presets": { "type": "array" },
     "program": { "$ref": "#/$defs/program" },
     "scenes": {
@@ -3032,6 +3082,12 @@
     "timeline"
   ],
   "title": "Sniptale Effect v1",
+  "allOf": [
+    {
+      "if": { "required": ["objectLayout"] },
+      "then": { "properties": { "kind": { "const": "standalone" } } }
+    }
+  ],
   "type": "object",
   "xExpressionOperations": [
     "abs",

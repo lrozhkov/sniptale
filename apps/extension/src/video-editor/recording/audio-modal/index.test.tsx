@@ -3,6 +3,7 @@ import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
 import { AudioRecordingModal } from './index';
+import { TimelineRecordingPanel } from './timeline-panel';
 
 vi.mock('./trim-file', () => ({
   createTrimmedRecordingFile: vi.fn(
@@ -92,4 +93,46 @@ it('retains failed recording for retry and blocks duplicate saves and dismissal'
   expect(onSave.mock.calls[1]![1]).toEqual({ trimStart: 1, trimEnd: 4 });
   expect(controller.reset).toHaveBeenCalledTimes(1);
   expect(onClose).toHaveBeenCalledTimes(1);
+});
+
+it('shows remaining interval time and stops recording from the compact timeline strip', () => {
+  document.body.append(host);
+  root = createRoot(host);
+  const stop = vi.fn();
+  act(() =>
+    root.render(
+      <TimelineRecordingPanel
+        titleId="record"
+        startTime={2}
+        duration={5}
+        starting={false}
+        saving={false}
+        error={null}
+        device={<span>Microphone</span>}
+        onStart={vi.fn()}
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+        controller={{
+          save: { audioBlob: null, resetSession: vi.fn(), trimEnd: 0, trimStart: 0 },
+          trim: null,
+          transport: {
+            elapsedSeconds: 3,
+            durationLabel: '00:03',
+            error: null,
+            startRecording: vi.fn(),
+            stopRecording: stop,
+            status: 'recording',
+          },
+        }}
+      />
+    )
+  );
+  expect(
+    host.querySelector('[data-ui="video-editor.audio-recording.limit"]')?.textContent
+  ).toContain('00:02');
+  const button = [...host.querySelectorAll('button')].find((b) =>
+    b.textContent?.includes('videoEditor.app.recordAudioStop')
+  )!;
+  act(() => button.click());
+  expect(stop).toHaveBeenCalledTimes(1);
 });

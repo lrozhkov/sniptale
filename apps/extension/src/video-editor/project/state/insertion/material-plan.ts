@@ -70,6 +70,7 @@ function resolveMaterialTrack(params: {
   kind: VideoTrackKind;
   mode: 'append' | 'overlay';
   primary: boolean;
+  preferredTrackId?: string | null;
 }) {
   const { project, tracks, claimed, asset, kind, mode, primary } = params;
   const camera = kind === VideoTrackKind.PRIMARY && asset.recordingPart?.role === 'camera';
@@ -79,15 +80,19 @@ function resolveMaterialTrack(params: {
       !claimed.has(track.id) &&
       (track.role === VideoProjectTrackRole.CAMERA) === camera
   );
+  const preferred = primary
+    ? available.find((track) => track.id === params.preferredTrackId)
+    : undefined;
   const previous = available.find((track) =>
     project.clips.some(
       (clip) => clip.trackId === track.id && 'assetId' in clip && clip.assetId === asset.id
     )
   );
   const existing =
-    primary && !camera && kind === VideoTrackKind.PRIMARY
+    preferred ??
+    (primary && !camera && kind === VideoTrackKind.PRIMARY
       ? (available.find((track) => track.isRoot) ?? available[0])
-      : (previous ?? available.find((track) => !track.isRoot));
+      : (previous ?? available.find((track) => !track.isRoot)));
   if (mode === 'append' && existing) {
     claimed.add(existing.id);
     return existing;
@@ -147,7 +152,8 @@ export function buildMaterialPlacement(
   asset: VideoProjectAsset,
   time: number,
   mode: 'append' | 'overlay',
-  sourceRange?: VideoEditorMaterialSourceRange
+  sourceRange?: VideoEditorMaterialSourceRange,
+  preferredTrackId?: string | null
 ): AddAssetClipResult {
   const range = sourceRange ?? {
     start: 0,
@@ -183,6 +189,7 @@ export function buildMaterialPlacement(
         kind,
         mode,
         primary: part.id === asset.id,
+        ...(preferredTrackId ? { preferredTrackId } : {}),
       });
       const clip = createMaterialClip({
         project,

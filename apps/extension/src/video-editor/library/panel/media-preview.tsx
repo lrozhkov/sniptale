@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, Plus } from 'lucide-react';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { LibraryMediaAdd } from './media-add';
 import { getMediaAssetBlob } from '../../../composition/persistence/media-library/index';
 import { getAggregatePresentation } from '../../../composition/persistence/aggregate-presentations';
 import type { MediaLibraryItem } from '../../../composition/persistence/media-library/contracts';
@@ -64,26 +63,8 @@ function LibraryMediaInsert(props: {
   ready: boolean;
   onAddMedia: (mediaId: string) => Promise<void>;
 }) {
-  const [pending, setPending] = useState(false);
-  const [added, setAdded] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const item = props.item;
   const isImage = item.kind === 'image' || item.kind === 'screenshot';
-  const add = async () => {
-    if (pending) return;
-    setPending(true);
-    setError(null);
-    try {
-      await props.onAddMedia(item.id);
-      setAdded(true);
-    } catch (cause) {
-      setError(
-        cause instanceof Error ? cause.message : translate('videoEditor.app.materialsImportFailed')
-      );
-    } finally {
-      setPending(false);
-    }
-  };
   return (
     <>
       <footer className="flex shrink-0 items-center gap-4 border-t border-[var(--sniptale-color-border-soft)] pt-3">
@@ -102,26 +83,8 @@ function LibraryMediaInsert(props: {
               .join(' · ')}
           </p>
         </div>
-        <ProductActionButton
-          tone="secondary"
-          disabled={pending || added || !props.ready}
-          onClick={() => void add()}
-        >
-          {added ? <Check size={16} aria-hidden /> : <Plus size={16} aria-hidden />}
-          {translate(
-            pending
-              ? 'common.states.loading'
-              : added
-                ? 'videoEditor.sidebar.libraryAddedMaterials'
-                : 'videoEditor.sidebar.addToTimeline'
-          )}
-        </ProductActionButton>
+        <LibraryMediaAdd itemId={item.id} ready={props.ready} onAddMedia={props.onAddMedia} />
       </footer>
-      {error ? (
-        <p role="alert" className="text-xs text-[var(--sniptale-color-text-primary)]">
-          {error}
-        </p>
-      ) : null}
     </>
   );
 }

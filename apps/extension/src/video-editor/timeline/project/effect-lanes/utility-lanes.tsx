@@ -42,7 +42,10 @@ export function ProjectTimelineEffectCanvasRows(
 function ProjectTimelineMotionLane(props: UtilityLaneProps & { laneVisible: boolean }) {
   const segments = resolveMotionLaneSegments(props);
   return (
-    <ProjectTimelineEffectLaneRow onPointerDown={props.onBeginRangeSelection}>
+    <ProjectTimelineEffectLaneRow
+      muted={!props.laneVisible}
+      onPointerDown={props.onBeginRangeSelection}
+    >
       <MotionLaneEmptyState visible={segments.length === 0} />
       <MotionConnections {...props} />
       <MotionSegments {...props} segments={segments} />
@@ -91,11 +94,10 @@ function MotionConnections(props: UtilityLaneProps & { laneVisible: boolean }) {
         className={[
           `absolute top-1/2 flex h-7 -translate-y-1/2 items-center justify-center
 overflow-hidden rounded border text-xs transition-opacity`,
-          'disabled:pointer-events-none disabled:opacity-40',
-          selected
-            ? `border-[var(--sniptale-color-border-accent-strong)] bg-[var(--sniptale-color-accent-soft)]
-text-[var(--sniptale-color-accent-emphasis)]`
-            : 'border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-secondary)]',
+          '!cursor-pointer disabled:pointer-events-none disabled:opacity-40',
+          connected ? 'video-editor-timeline-item' : '',
+          selected ? 'video-editor-timeline-item-selected' : '',
+          'border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-secondary)]',
           connected
             ? 'bg-[var(--sniptale-color-surface-panel)]'
             : 'border-dashed opacity-0 hover:opacity-100 focus-visible:opacity-100',
@@ -145,9 +147,9 @@ function MotionSegments(
       <ProjectTimelineEffectSegment
         key={segment.id}
         segmentId={segment.id}
+        movable={!getVideoProjectUtilityLanes(props.project).camera.locked}
         className={MOTION_LANE_SEGMENT_CLASS_NAME}
         height={28}
-        hidden={!props.laneVisible}
         isSelected={isSelectedEffectSegment(props.selectedEffectSelection, 'motion', segment.id)}
         label={translate('videoEditor.timeline.motionLane')}
         hideLabel

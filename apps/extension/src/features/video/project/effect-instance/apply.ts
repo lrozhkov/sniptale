@@ -1,3 +1,5 @@
+import { initializeEffectSceneAnchors } from './layout';
+import type { EffectV1ObjectLayout } from '@sniptale/runtime-contracts/effect-v1';
 import type { EffectBundleCatalogEntry } from '../effect-bundle/catalog';
 import type { VideoProject } from '../types';
 import { VideoProjectClipType } from '../types';
@@ -56,9 +58,25 @@ export async function applyEffectCatalogDocument(args: {
   const clips = overlayTrack
     ? [
         ...args.project.clips,
-        createStandaloneHostClip(args.project, instance, catalogDocument.id, overlayTrack.id),
+        createStandaloneHostClip(
+          args.project,
+          instance,
+          catalogDocument.id,
+          overlayTrack.id,
+          document.objectLayout
+        ),
       ]
     : args.project.clips;
+  const host = clips.find(
+    (clip) => clip.type === 'EFFECT' && clip.effectInstanceId === instance.id
+  );
+  if (host && document.objectLayout?.handles?.length) {
+    instance.sceneAnchors = initializeEffectSceneAnchors(document, host.transform, args.project)!;
+    for (const handle of document.objectLayout.handles) {
+      delete instance.controls[handle.xControl];
+      delete instance.controls[handle.yControl];
+    }
+  }
   return {
     ...args.project,
     clips,
@@ -75,9 +93,11 @@ function createStandaloneHostClip(
   project: VideoProject,
   instance: VideoProjectEffectInstance,
   name: string,
-  trackId: string
+  trackId: string,
+  objectLayout: EffectV1ObjectLayout | undefined
 ) {
   return createEffectHostClip({
+    objectLayout,
     duration: instance.duration,
     effectInstanceId: instance.id,
     name,

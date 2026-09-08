@@ -1,0 +1,154 @@
+{
+  "schemaVersion": "sniptale.effect.v1",
+  "id": "sniptale-transition-dissolve",
+  "kind": "transition",
+  "duration": 0.8,
+  "label": {
+    "ru": "Мягкое смешивание",
+    "en": "Soft dissolve"
+  },
+  "description": {
+    "ru": "Переход с точными начальным и конечным кадрами.",
+    "en": "A transition with exact start and end frames."
+  },
+  "assets": [],
+  "controls": [
+    {
+      "id": "curve",
+      "kind": "number",
+      "label": {
+        "ru": "Плавность (%)",
+        "en": "Easing (%)"
+      },
+      "defaultValue": 85,
+      "min": 0,
+      "max": 100,
+      "step": 1
+    }
+  ],
+  "layers": [],
+  "clips": [],
+  "scenes": [
+    {
+      "id": "main",
+      "start": 0,
+      "duration": 0.8
+    }
+  ],
+  "timeline": {
+    "phases": [],
+    "tracks": []
+  },
+  "program": {
+    "kind": "graph",
+    "version": 1,
+    "definitions": {
+      "s": {
+        "op": "div",
+        "args": [
+          {
+            "op": "min",
+            "args": [
+              {
+                "op": "read",
+                "path": "width"
+              },
+              {
+                "op": "read",
+                "path": "height"
+              }
+            ]
+          },
+          720
+        ]
+      },
+      "q": {
+        "op": "mix",
+        "args": [
+          {
+            "op": "read",
+            "path": "progress"
+          },
+          {
+            "op": "inOut",
+            "args": [
+              {
+                "op": "read",
+                "path": "progress"
+              }
+            ]
+          },
+          {
+            "op": "div",
+            "args": [
+              {
+                "op": "read",
+                "path": "controls.curve"
+              },
+              100
+            ]
+          }
+        ]
+      },
+      "pulse": {
+        "op": "mul",
+        "args": [
+          4,
+          {
+            "op": "read",
+            "path": "defs.q"
+          },
+          {
+            "op": "sub",
+            "args": [
+              1,
+              {
+                "op": "read",
+                "path": "defs.q"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "commands": [
+      {
+        "op": "clear"
+      },
+      {
+        "op": "image",
+        "input": "from",
+        "x": 0,
+        "y": 0,
+        "width": {
+          "op": "read",
+          "path": "width"
+        },
+        "height": {
+          "op": "read",
+          "path": "height"
+        },
+        "fit": "cover"
+      },
+      {
+        "op": "image",
+        "input": "to",
+        "x": 0,
+        "y": 0,
+        "width": {
+          "op": "read",
+          "path": "width"
+        },
+        "height": {
+          "op": "read",
+          "path": "height"
+        },
+        "fit": "cover",
+        "alpha": {
+          "op": "read",
+          "path": "defs.q"
+        }
+      }
+    ]
+  }
+}

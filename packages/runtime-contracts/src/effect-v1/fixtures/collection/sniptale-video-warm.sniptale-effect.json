@@ -1,0 +1,282 @@
+{
+  "schemaVersion": "sniptale.effect.v1",
+  "id": "sniptale-video-warm",
+  "kind": "targetEffect",
+  "duration": 5,
+  "label": {
+    "ru": "Тёплое тонирование",
+    "en": "Warm tint"
+  },
+  "description": {
+    "ru": "Настраиваемая обработка; интенсивность 0 сохраняет исходник.",
+    "en": "Adjustable processing; zero intensity preserves the source."
+  },
+  "assets": [],
+  "controls": [
+    {
+      "id": "strength",
+      "kind": "number",
+      "label": {
+        "ru": "Интенсивность (%)",
+        "en": "Intensity (%)"
+      },
+      "defaultValue": 30,
+      "min": 0,
+      "max": 100,
+      "step": 1
+    },
+    {
+      "id": "edge",
+      "kind": "number",
+      "label": {
+        "ru": "Плавный вход/выход (%)",
+        "en": "Soft edges (% duration)"
+      },
+      "defaultValue": 8,
+      "min": 0,
+      "max": 40,
+      "step": 1
+    },
+    {
+      "id": "tint",
+      "kind": "color",
+      "label": {
+        "ru": "Тонирование",
+        "en": "Tint"
+      },
+      "defaultValue": "#eaae72"
+    },
+    {
+      "id": "saturation",
+      "kind": "number",
+      "label": {
+        "ru": "Насыщенность (%)",
+        "en": "Saturation (%)"
+      },
+      "defaultValue": 80,
+      "min": 0,
+      "max": 140,
+      "step": 1
+    }
+  ],
+  "layers": [],
+  "clips": [],
+  "scenes": [
+    {
+      "id": "main",
+      "start": 0,
+      "duration": 5
+    }
+  ],
+  "timeline": {
+    "phases": [],
+    "tracks": []
+  },
+  "program": {
+    "kind": "graph",
+    "version": 1,
+    "definitions": {
+      "s": {
+        "op": "div",
+        "args": [
+          {
+            "op": "min",
+            "args": [
+              {
+                "op": "read",
+                "path": "width"
+              },
+              {
+                "op": "read",
+                "path": "height"
+              }
+            ]
+          },
+          720
+        ]
+      },
+      "edge": {
+        "op": "max",
+        "args": [
+          0.0001,
+          {
+            "op": "div",
+            "args": [
+              {
+                "op": "read",
+                "path": "controls.edge"
+              },
+              100
+            ]
+          }
+        ]
+      },
+      "envelope": {
+        "op": "select",
+        "value": {
+          "op": "eq",
+          "args": [
+            {
+              "op": "read",
+              "path": "controls.edge"
+            },
+            0
+          ]
+        },
+        "values": [
+          1,
+          {
+            "op": "mul",
+            "args": [
+              {
+                "op": "out",
+                "args": [
+                  {
+                    "op": "clamp",
+                    "args": [
+                      {
+                        "op": "div",
+                        "args": [
+                          {
+                            "op": "read",
+                            "path": "progress"
+                          },
+                          {
+                            "op": "read",
+                            "path": "defs.edge"
+                          }
+                        ]
+                      },
+                      0,
+                      1
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "out",
+                "args": [
+                  {
+                    "op": "clamp",
+                    "args": [
+                      {
+                        "op": "div",
+                        "args": [
+                          {
+                            "op": "sub",
+                            "args": [
+                              1,
+                              {
+                                "op": "read",
+                                "path": "progress"
+                              }
+                            ]
+                          },
+                          {
+                            "op": "read",
+                            "path": "defs.edge"
+                          }
+                        ]
+                      },
+                      0,
+                      1
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "amount": {
+        "op": "mul",
+        "args": [
+          {
+            "op": "div",
+            "args": [
+              {
+                "op": "read",
+                "path": "controls.strength"
+              },
+              100
+            ]
+          },
+          {
+            "op": "read",
+            "path": "defs.envelope"
+          }
+        ]
+      }
+    },
+    "commands": [
+      {
+        "op": "clear"
+      },
+      {
+        "op": "image",
+        "input": "source",
+        "x": 0,
+        "y": 0,
+        "width": {
+          "op": "read",
+          "path": "width"
+        },
+        "height": {
+          "op": "read",
+          "path": "height"
+        },
+        "fit": "cover",
+        "filter": {
+          "saturate": {
+            "op": "mix",
+            "args": [
+              1,
+              {
+                "op": "div",
+                "args": [
+                  {
+                    "op": "read",
+                    "path": "controls.saturation"
+                  },
+                  100
+                ]
+              },
+              {
+                "op": "read",
+                "path": "defs.amount"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "op": "fillRect",
+        "x": 0,
+        "y": 0,
+        "width": {
+          "op": "read",
+          "path": "width"
+        },
+        "height": {
+          "op": "read",
+          "path": "height"
+        },
+        "fill": {
+          "op": "read",
+          "path": "controls.tint"
+        },
+        "alpha": {
+          "op": "mul",
+          "args": [
+            {
+              "op": "read",
+              "path": "defs.amount"
+            },
+            0.18
+          ]
+        },
+        "blend": "screen"
+      }
+    ]
+  }
+}

@@ -13,6 +13,7 @@ import type {
   VideoProjectShapeType,
   VideoProjectUtilityLanes,
   VideoTrackKind,
+  VideoProjectTrackRole,
 } from '../../../features/video/project/types/index';
 import type {
   VideoEditorAudioEnvelopePatch,
@@ -33,7 +34,7 @@ export interface VideoEditorProjectActions
   renameProject: (name: string) => void;
   renameTrack: (trackId: string, name: string) => void;
   addTrackLogicalLane: (trackId: string) => void;
-  addTrack: (kind?: VideoTrackKind) => void;
+  addTrack: (kind?: VideoTrackKind, role?: VideoProjectTrackRole) => void;
   deleteTrack: (trackId: string) => void;
   moveTrack: (trackId: string, direction: 'up' | 'down') => void;
   toggleTrackVisibility: (trackId: string) => void;

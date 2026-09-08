@@ -104,7 +104,9 @@ it('does not expose internal project asset copies as additional library sources'
       },
     ],
   });
-  expect(container.querySelectorAll('[data-ui="recordings-scroll"] button')).toHaveLength(1);
+  expect(
+    container.querySelectorAll('[data-ui="recordings-scroll"] button[aria-pressed]')
+  ).toHaveLength(1);
 });
 it('exposes loading and a retryable read error without showing stale media', () => {
   const onRefresh = vi.fn();
@@ -114,9 +116,7 @@ it('exposes loading and a retryable read error without showing stale media', () 
   render({ error: 'Read failed', onRefresh });
   expect(container.querySelector('[role=alert]')?.textContent).toBe('Read failed');
   act(() =>
-    container
-      .querySelector<HTMLButtonElement>('[aria-label="videoEditor.sidebar.libraryRefresh"]')!
-      .click()
+    container.querySelector<HTMLButtonElement>('[aria-label="common.actions.retry"]')!.click()
   );
   expect(onRefresh).toHaveBeenCalledOnce();
 });

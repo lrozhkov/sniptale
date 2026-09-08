@@ -1,6 +1,8 @@
+import { InspectorSelectionFamilyContext } from './grouped-inspector/presentation';
+import { InspectorDetails } from './shared/details';
 import { translate } from '../../../../platform/i18n';
 import { buildClipLabel } from '../../../../features/video/project/timeline';
-import { PANEL_HEADING_CLASS_NAME } from './shared/panel';
+import { PANEL_META_CLASS_NAME } from './shared/panel';
 import { InspectHistorySpanPanel } from './inspection/history-span';
 import { VideoEditorSelectionKind } from '../../../contracts/selection';
 import type { WorkspaceSidebarSelectionPanelProps } from '../contracts/selection-panel';
@@ -18,12 +20,23 @@ import { InspectMotionLanePanel } from './inspection/motion-lane';
 const PANEL_STACK_CLASS_NAME = 'space-y-3';
 
 export function WorkspaceSidebarInspectPanel(props: WorkspaceSidebarSelectionPanelProps) {
+  const clipTrack = props.selectedClip
+    ? props.project.tracks.find((track) => track.id === props.selectedClip?.trackId)
+    : undefined;
+  const family =
+    props.selection.kind === 'clip'
+      ? `clip:${props.selectedClip?.type}:${clipTrack?.role ?? ''}`
+      : props.selection.kind === 'track'
+        ? `track:${props.selectedTrack?.kind}`
+        : props.selection.kind;
   return (
-    <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-3">
-      <div className={PANEL_STACK_CLASS_NAME}>
-        <SelectionBody {...props} />
+    <InspectorSelectionFamilyContext.Provider value={family}>
+      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-3">
+        <div className={PANEL_STACK_CLASS_NAME}>
+          <SelectionBody {...props} />
+        </div>
       </div>
-    </div>
+    </InspectorSelectionFamilyContext.Provider>
   );
 }
 
@@ -50,19 +63,18 @@ function SelectionBody(props: WorkspaceSidebarSelectionPanelProps) {
       const clips = props.project.clips.filter((clip) => ids.includes(clip.id));
       return (
         <section data-ui="video-editor.inspector.clip-group" className="space-y-3">
-          <h3 className={PANEL_HEADING_CLASS_NAME}>
+          <p className={PANEL_META_CLASS_NAME}>
             {translate('videoEditor.sidebar.clipGroup')}: {clips.length}
-          </h3>
-          <p className="text-xs text-[var(--sniptale-color-text-secondary)]">
-            {translate('videoEditor.sidebar.clipGroupHint')}
           </p>
-          <ul className="space-y-2 text-sm text-[var(--sniptale-color-text-primary)]">
-            {clips.map((clip) => (
-              <li key={clip.id} className="truncate" title={buildClipLabel(props.project, clip)}>
-                {buildClipLabel(props.project, clip)}
-              </li>
-            ))}
-          </ul>
+          <InspectorDetails label={translate('videoEditor.sidebar.inspectorMoreDetails')}>
+            <ul className="space-y-2 text-sm text-[var(--sniptale-color-text-primary)]">
+              {clips.map((clip) => (
+                <li key={clip.id} className="truncate" title={buildClipLabel(props.project, clip)}>
+                  {buildClipLabel(props.project, clip)}
+                </li>
+              ))}
+            </ul>
+          </InspectorDetails>
         </section>
       );
     }

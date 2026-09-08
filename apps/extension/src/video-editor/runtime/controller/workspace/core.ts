@@ -6,6 +6,7 @@ import type { VideoEditorSelections } from '../selections';
 import type { VideoEditorWorkspaceState } from '../workspace-state';
 import type {
   AnnotationEditingPort,
+  EffectEditingPort,
   ClipSelectionPort,
   ExportPort,
   PlaybackPort,
@@ -37,6 +38,7 @@ interface CreateWorkspaceHeaderArgs {
 }
 
 type PreviewStore = AnnotationEditingPort &
+  Pick<EffectEditingPort, 'updateEffectInstance'> &
   Pick<ClipSelectionPort, 'selectClip' | 'selectScene' | 'selectedClipId'> &
   Pick<PlaybackPort, 'currentTime' | 'isPlaying'> &
   RuntimeSessionPort &
@@ -209,6 +211,7 @@ export function createWorkspacePreviewController(
       onEnableCursorTrack: projectUpdaters.enableCursorTrack,
       onUpdateAnnotationClipTemplate: args.store.updateAnnotationClipTemplate,
       onUpdateClipTransform: args.store.updateClipTransform,
+      onUpdateEffectInstance: args.store.updateEffectInstance,
     },
     pointAuthoring: {
       onClearPlacementMode: args.store.clearPlacementMode,

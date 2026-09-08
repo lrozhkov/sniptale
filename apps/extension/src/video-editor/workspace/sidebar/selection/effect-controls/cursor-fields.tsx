@@ -1,7 +1,7 @@
 import { translate } from '../../../../../platform/i18n';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { getCursorAnimationOptions, getCursorPresetOptions } from './cursor-options';
-import { NumberInput } from '../inputs/number';
+import { InspectorDetails } from '../shared/details';
 import { ColorField, SelectInput, ToggleField } from '../shared/controls';
 import { DetailItem, DetailList, PANEL_META_CLASS_NAME } from '../shared/panel';
 import { VideoCursorCaptureMode } from '../../../../../features/video/project/types';
@@ -13,10 +13,10 @@ type CursorTrackCaptureMode = NonNullable<
 
 export function CursorPositionFields(props: { x: number; y: number }) {
   return (
-    <div className="space-y-3">
-      <NumberInput label="X" value={props.x} disabled onChange={() => undefined} />
-      <NumberInput label="Y" value={props.y} disabled onChange={() => undefined} />
-    </div>
+    <DetailList>
+      <DetailItem label="X" value={Math.round(props.x)} />
+      <DetailItem label="Y" value={Math.round(props.y)} />
+    </DetailList>
   );
 }
 
@@ -28,7 +28,7 @@ export function CursorVisibilityField(props: {
     <div className="mt-3">
       <CursorSkinToggle
         checked={props.visible}
-        label={translate('videoEditor.sidebar.cursorVisibleLabel')}
+        label={translate('videoEditor.sidebar.inspectorSampleVisible')}
         onChange={props.onChange}
       />
     </div>
@@ -36,6 +36,7 @@ export function CursorVisibilityField(props: {
 }
 
 export function CursorSkinFields(props: {
+  part?: 'appearance' | 'animation';
   showCaptureCapability?: boolean;
   animationPreset: NonNullable<
     NonNullable<WorkspaceSidebarSelectionPanelProps['project']['cursorTrack']>['skin']
@@ -53,12 +54,20 @@ export function CursorSkinFields(props: {
   onSetCursorCaptureMode: WorkspaceSidebarSelectionPanelProps['onSetCursorCaptureMode'];
   onUpdateCursorSkin: WorkspaceSidebarSelectionPanelProps['onUpdateCursorSkin'];
 }) {
+  if (props.part === 'animation')
+    return (
+      <CursorAnimationField
+        animationPreset={props.animationPreset}
+        onUpdateCursorSkin={props.onUpdateCursorSkin}
+      />
+    );
   return (
     <div className="grid grid-cols-1 gap-3">
       {props.showCaptureCapability !== false ? (
         <CursorCaptureCapability captureMode={props.captureMode} />
       ) : null}
       <CursorAppearanceFields
+        showAnimation={props.part !== 'appearance'}
         animationPreset={props.animationPreset}
         color={props.color}
         preset={props.preset}
@@ -76,7 +85,7 @@ export function CursorSkinFields(props: {
   );
 }
 
-export function CursorCaptureCapability(props: { captureMode: CursorTrackCaptureMode }) {
+function CursorCaptureCapability(props: { captureMode: CursorTrackCaptureMode }) {
   const embedded = props.captureMode === VideoCursorCaptureMode.EMBEDDED_FALLBACK;
   return (
     <div>
@@ -100,6 +109,7 @@ export function CursorCaptureCapability(props: { captureMode: CursorTrackCapture
 }
 
 function CursorAppearanceFields(props: {
+  showAnimation: boolean;
   animationPreset: NonNullable<
     NonNullable<WorkspaceSidebarSelectionPanelProps['project']['cursorTrack']>['skin']
   >['animationPreset'];
@@ -115,10 +125,15 @@ function CursorAppearanceFields(props: {
   return (
     <div className="space-y-3">
       <CursorPresetField preset={props.preset} onUpdateCursorSkin={props.onUpdateCursorSkin} />
-      <CursorAnimationField
-        animationPreset={props.animationPreset}
-        onUpdateCursorSkin={props.onUpdateCursorSkin}
-      />
+      {props.showAnimation ? (
+        <>
+          {' '}
+          <CursorAnimationField
+            animationPreset={props.animationPreset}
+            onUpdateCursorSkin={props.onUpdateCursorSkin}
+          />
+        </>
+      ) : null}
       <ColorField
         label={translate('videoEditor.sidebar.cursorColorLabel')}
         recentColors={props.recentColors}
@@ -187,15 +202,18 @@ function CursorSkinToggles(props: {
   return (
     <>
       <CursorSkinToggle
-        checked={props.shadow}
-        label={translate('videoEditor.sidebar.cursorShadowLabel')}
-        onChange={(checked) => props.onUpdateCursorSkin({ shadow: checked })}
-      />
-      <CursorSkinToggle
         checked={!props.hidden}
         label={translate('videoEditor.sidebar.cursorVisibleLabel')}
         onChange={(checked) => props.onUpdateCursorSkin({ hidden: !checked })}
       />
+      <InspectorDetails label={translate('videoEditor.sidebar.inspectorMoreDetails')}>
+        {' '}
+        <CursorSkinToggle
+          checked={props.shadow}
+          label={translate('videoEditor.sidebar.cursorShadowLabel')}
+          onChange={(checked) => props.onUpdateCursorSkin({ shadow: checked })}
+        />
+      </InspectorDetails>
     </>
   );
 }

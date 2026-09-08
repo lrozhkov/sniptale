@@ -1,3 +1,4 @@
+import { InspectorDetails } from '../shared/details';
 import { getMotionBindingCandidates } from '../../../../../features/video/project/motion/source-binding';
 import { SelectInput } from '../shared/controls';
 import { translate } from '../../../../../platform/i18n';
@@ -14,7 +15,7 @@ import {
   MotionTargetActionField,
 } from './fields';
 import { ManualFocusFields } from './focus';
-import { DetailItem, DetailList, PANEL_HEADING_CLASS_NAME } from '../shared/panel';
+import { DetailItem, DetailList } from '../shared/panel';
 import { SliderField } from '../shared/sliders';
 
 export function MotionCameraFields(props: {
@@ -45,12 +46,6 @@ export function MotionTimingFields(props: {
         duration={props.motionRegion.duration}
         motionRegionId={props.motionRegion.id}
         panel={props.panel}
-      />
-      <MotionZoomFields motionRegion={props.motionRegion} panel={props.panel} />
-      <MotionEasingField
-        motionRegionId={props.motionRegion.id}
-        panel={props.panel}
-        value={props.motionRegion.easing}
       />
     </div>
   );
@@ -96,16 +91,24 @@ export function MotionBehaviorFields(props: {
 }) {
   return (
     <div className="grid grid-cols-1 gap-3">
-      <MotionOverlayZoomField
+      <MotionZoomFields motionRegion={props.motionRegion} panel={props.panel} />
+      <MotionEasingField
         motionRegionId={props.motionRegion.id}
         panel={props.panel}
-        value={props.motionRegion.overlayZoomMode}
+        value={props.motionRegion.easing}
       />
-      <MotionBlurField
-        motionRegionId={props.motionRegion.id}
-        panel={props.panel}
-        value={props.motionRegion.motionBlurAmount ?? 0}
-      />
+      <InspectorDetails label={translate('videoEditor.sidebar.inspectorMoreDetails')}>
+        <MotionOverlayZoomField
+          motionRegionId={props.motionRegion.id}
+          panel={props.panel}
+          value={props.motionRegion.overlayZoomMode}
+        />
+        <MotionBlurField
+          motionRegionId={props.motionRegion.id}
+          panel={props.panel}
+          value={props.motionRegion.motionBlurAmount ?? 0}
+        />
+      </InspectorDetails>
     </div>
   );
 }
@@ -210,7 +213,6 @@ function MotionPlacementFields(props: {
 export function MotionOverview(props: { motionRegion: VideoProjectMotionRegion }) {
   return (
     <div className="space-y-3">
-      <p className={PANEL_HEADING_CLASS_NAME}>{translate('videoEditor.timeline.motionLane')}</p>
       <DetailList>
         <DetailItem
           label={translate('videoEditor.sidebar.motionFocusLabel')}

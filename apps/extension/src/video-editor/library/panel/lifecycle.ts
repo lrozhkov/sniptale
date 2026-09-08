@@ -31,6 +31,7 @@ export function useLibraryDrawerLifecycle(args: {
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
+        if (document.fullscreenElement) return;
         event.preventDefault();
         onClose();
         return;

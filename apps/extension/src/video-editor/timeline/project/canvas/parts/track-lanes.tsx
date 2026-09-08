@@ -1,4 +1,4 @@
-import { AudioRecordingZones } from '../../tracks/zones/audio-recording';
+import { AudioGapRecordingAction, AudioRecordingZones } from '../../tracks/zones/audio-recording';
 import type { TimelineProjection } from '../../interaction-state/projection';
 import { useState } from 'react';
 import type { VideoProject } from '../../../../../features/video/project/types';
@@ -32,6 +32,7 @@ import { ProjectTimelineTrackClipStack } from './clip-stack';
 import { ProjectTimelineLogicalLaneGuides } from './lane-guides';
 
 interface ProjectTimelineTrackLanesProps {
+  hiddenClipNamesByTrackId?: Readonly<Record<string, boolean>> | undefined;
   pixelsPerSecond: number;
   projection?: TimelineProjection | undefined;
   project: VideoProject;
@@ -75,6 +76,7 @@ export function ProjectTimelineTrackLanes(props: ProjectTimelineTrackLanesProps)
   return props.tracks.map((track) => (
     <ProjectTimelineTrackLane
       key={track.id}
+      hiddenClipNamesByTrackId={props.hiddenClipNamesByTrackId}
       dragGhost={props.dragGhost}
       pixelsPerSecond={props.pixelsPerSecond}
       projection={props.projection}
@@ -117,6 +119,7 @@ function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
         )
       }
       data-track-lane-id={props.track.id}
+      data-timeline-lane-muted={!props.track.visible}
       style={{ height: props.trackLayout?.rowHeight }}
       {...createTrackLaneEventProps(props)}
     >
@@ -141,6 +144,7 @@ function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
         trackLayout={props.trackLayout}
       />
       <ProjectTimelineTrackClipStack
+        hideClipNames={props.hiddenClipNamesByTrackId?.[props.track.id] ?? false}
         pixelsPerSecond={props.pixelsPerSecond}
         projection={props.projection}
         project={displayProject}
@@ -254,6 +258,9 @@ function createTrackZoneProps(props: {
         },
     cutZones: buildTrackCutZones(props.project, props.track.id),
     gapZones: buildTrackGapZones(props.project, props.track.id),
+    renderGapAction: (zone) => (
+      <AudioGapRecordingAction project={props.project} trackId={props.track.id} range={zone} />
+    ),
     junctionZones: buildTrackJunctionZones(props.project, props.track.id),
     pixelsPerSecond: props.pixelsPerSecond,
     projection: props.projection,

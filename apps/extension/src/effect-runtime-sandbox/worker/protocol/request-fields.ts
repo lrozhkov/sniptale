@@ -1,3 +1,4 @@
+import { parseEffectLogicalDimensions } from '../../../contracts/effect-runtime/dimensions';
 import {
   resolveEffectV1InputContract,
   validateEffectV1Document,
@@ -195,7 +196,7 @@ export function parseWorkerRequestFields(
   document: EffectV1Document
 ): WorkerRequestFields | null {
   const { value } = envelope;
-  const dimensions = parseDimensions(value['width'], value['height']);
+  const dimensions = parseEffectLogicalDimensions(value['width'], value['height']);
   const renderDimensions = parseDimensions(value['renderWidth'], value['renderHeight']);
   const timing = parseTiming(value, document.duration);
   const controls = parseControls(value['controls'], document);

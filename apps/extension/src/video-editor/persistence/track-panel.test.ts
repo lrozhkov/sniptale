@@ -161,3 +161,16 @@ it('restores name visibility independently and ignores malformed name preference
     compactRows: true,
   });
 });
+
+it('restores caption visibility only for current tracks with boolean settings', async () => {
+  localGetMock.mockResolvedValue({
+    'sniptale_video_editor_track_panel_prefs:captions': {
+      hiddenClipNamesByTrackId: { video: true, audio: false, stale: true, invalid: 'yes' },
+    },
+  });
+  const prefs = await loadVideoEditorTrackPanelPrefs(
+    'captions',
+    new Set(['video', 'audio', 'invalid'])
+  );
+  expect(prefs.hiddenClipNamesByTrackId).toEqual({ video: true, audio: false });
+});

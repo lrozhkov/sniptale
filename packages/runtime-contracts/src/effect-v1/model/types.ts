@@ -53,6 +53,21 @@ export type EffectV1GraphProgram = {
 
 export type EffectV1Program = EffectV1GraphProgram;
 
+export type EffectV1ObjectLayout = {
+  width: number;
+  height: number;
+  resize: 'scale' | 'reflow';
+  handles?: EffectV1ObjectHandle[];
+};
+
+export type EffectV1ObjectHandle = {
+  id: string;
+  label: LocaleText;
+  xControl: string;
+  yControl: string;
+  padding: number;
+};
+
 export type EffectV1Document = {
   assets: EffectV1Asset[];
   clips: EffectClip[];
@@ -63,6 +78,7 @@ export type EffectV1Document = {
   kind: EffectV1Kind;
   label: LocaleText;
   layers: EffectLayer[];
+  objectLayout?: EffectV1ObjectLayout;
   presets?: unknown[];
   program: EffectV1Program;
   scenes: EffectScene[];

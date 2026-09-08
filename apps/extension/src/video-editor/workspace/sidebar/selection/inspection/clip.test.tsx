@@ -186,7 +186,7 @@ describe('workspace-sidebar/selection/inspect-core', () => {
     ).toBeNull();
     expect(container?.textContent).not.toContain('videoEditor.sidebar.clipTypeText');
     clickGroup('videoEditor.sidebar.inspectorGroupSummary');
-    expect(container?.textContent).toContain('videoEditor.sidebar.clipTypeText');
+    expect(container?.textContent).toContain('videoEditor.sidebar.inspectorGroupSummary');
   });
 
   it('renders text-to-template upgrade controls for manual text overlays', () => {
@@ -221,7 +221,7 @@ describe('workspace-sidebar/selection/inspect-core', () => {
 
       clickGroup('videoEditor.sidebar.inspectorGroupTiming');
 
-      expect(container?.textContent).toContain('videoEditor.sidebar.fadeInLabel');
+      expect(container?.textContent).not.toContain('videoEditor.sidebar.fadeInLabel');
       if (assetType === VideoProjectAssetType.VIDEO) {
         expect(container?.textContent).toContain('videoEditor.sidebar.playbackRateLabel');
       } else {
@@ -231,6 +231,8 @@ describe('workspace-sidebar/selection/inspect-core', () => {
       expect(container?.textContent).not.toContain('videoEditor.sidebar.fitScalePercentLabel');
       expect(container?.textContent).not.toContain('videoEditor.sidebar.mediaShadowIntensityLabel');
 
+      clickGroup('videoEditor.sidebar.inspectorGroupAnimation');
+      expect(container?.textContent).toContain('videoEditor.sidebar.fadeInLabel');
       clickGroup('videoEditor.sidebar.inspectorGroupTransform');
       expect(container?.textContent).toContain('videoEditor.sidebar.rotationLabel');
       expect(container?.textContent).not.toContain('videoEditor.sidebar.fitModeLabel');
@@ -271,7 +273,7 @@ describe('workspace-sidebar/selection/inspect-core', () => {
 
     renderInspectPanel(props);
 
-    expect(container?.textContent).toContain('videoEditor.sidebar.cameraIntervalHint');
+    expect(container?.textContent).toContain('videoEditor.sidebar.cameraLayoutOverlay');
     const bottomLeft = Array.from(container?.querySelectorAll('button') ?? []).find(
       (button) =>
         button.getAttribute('aria-label') === 'videoEditor.sidebar.cameraPlacementBottomLeft'
@@ -302,7 +304,7 @@ describe('workspace-sidebar/selection/inspect-core', () => {
     );
     renderInspectPanel({ ...props });
 
-    expect(container?.textContent).toContain('videoEditor.sidebar.cameraIntervalHint');
+    expect(container?.textContent).toContain('videoEditor.sidebar.cameraLayoutOverlay');
     expect(container?.textContent).not.toContain('videoEditor.sidebar.rotationLabel');
   });
 

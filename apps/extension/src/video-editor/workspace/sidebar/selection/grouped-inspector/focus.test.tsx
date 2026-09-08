@@ -64,11 +64,13 @@ function renderFocusedPanel(focusIntent: InspectorGroupFocusIntent) {
               content: 'General controls',
               defaultActive: true,
               id: 'general',
+              semantic: 'content' as const,
               label: 'General',
             },
             {
               content: 'Template controls',
               id: 'effect-v1',
+              semantic: 'effects' as const,
               label: 'Templates',
             },
           ]}

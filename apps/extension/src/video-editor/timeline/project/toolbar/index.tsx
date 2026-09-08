@@ -25,6 +25,8 @@ type ToolbarTrailingControlsInput = Pick<
 >;
 
 function createToolbarLeadingControlsProps({
+  historyActions,
+  historySelected,
   canAddMotionRegion,
   canDeleteSelectedClip,
   canEditSelectedClip,
@@ -36,6 +38,8 @@ function createToolbarLeadingControlsProps({
   onSplitSelectedClip,
 }: Pick<
   ProjectTimelineToolbarProps,
+  | 'historyActions'
+  | 'historySelected'
   | 'canAddMotionRegion'
   | 'canDeleteSelectedClip'
   | 'canEditSelectedClip'
@@ -47,6 +51,8 @@ function createToolbarLeadingControlsProps({
   | 'onSplitSelectedClip'
 >) {
   return {
+    ...(historyActions ? { historyActions } : {}),
+    historySelected: historySelected ?? false,
     canAddMotionRegion,
     canDeleteSelectedClip,
     canEditSelectedClip,
@@ -128,7 +134,7 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
         />
         {header && (
           <ContentToolbarButton
-            className={toolbarIconButtonClassName}
+            className={`${toolbarIconButtonClassName} !border-transparent !shadow-none`}
             title={translate('videoEditor.app.magnetButton')}
             active={header.grid.magnetEnabled}
             aria-pressed={header.grid.magnetEnabled}

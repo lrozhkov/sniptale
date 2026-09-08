@@ -135,3 +135,17 @@ it('limits generated framing to an explicitly selected clip while preserving exi
   );
   expect(regions.filter((region) => region.targetAction?.clipId === 'first')).toHaveLength(1);
 });
+
+it('does not suggest framing over a manual zoom or its connection', () => {
+  const project = fixture();
+  const first = { ...createVideoProjectMotionRegion(project, 5), duration: 0.5 };
+  const second = { ...createVideoProjectMotionRegion(project, 10), duration: 2 };
+  second.incomingConnection = { fromRegionId: first.id, easing: first.easing };
+  project.motionRegions = [first, second];
+  const regions = buildAutoZoomRegions({ project, recordingId, telemetry });
+  expect(
+    regions
+      .filter((region) => region.id.startsWith('auto-motion:'))
+      .map((region) => region.startTime)
+  ).toEqual([19]);
+});

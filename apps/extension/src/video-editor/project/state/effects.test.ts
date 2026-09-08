@@ -634,3 +634,25 @@ it('moves an action presentation while retaining its original fact and other ove
   if (undo?.status !== 'applied') throw new Error('Expected undo');
   expect(undo.project.actionEvents).toEqual(before.actionEvents);
 });
+
+it('clamps zoom timing at its neighbour and retains the result through undo and redo', () => {
+  const project = createProject([createVideoClip({ duration: 10, sourceDuration: 10 })]);
+  const first = { ...createVideoProjectMotionRegion(project, 1), duration: 2 };
+  const second = { ...createVideoProjectMotionRegion(project, 6), duration: 2 };
+  project.motionRegions = [first, second];
+  const store = createStoreState();
+  store.getState().setProject(project);
+  store.getState().updateMotionRegion(first.id, { startTime: 9 });
+  const moved = store.getState();
+  expect(moved.project?.motionRegions?.[0]).toMatchObject({ startTime: 4, duration: 2 });
+  const undo = undoVideoEditorProjectHistory(moved.projectHistory, moved.project!);
+  expect(undo?.status).toBe('applied');
+  if (undo?.status !== 'applied') throw new Error('Expected undo');
+  expect(undo.project.motionRegions?.[0]).toMatchObject({ startTime: 1, duration: 2 });
+  const redo = redoVideoEditorProjectHistory(undo.history, undo.project);
+  expect(redo?.status).toBe('applied');
+  if (redo?.status !== 'applied') throw new Error('Expected redo');
+  expect(redo.project.motionRegions?.[0]).toMatchObject({ startTime: 4, duration: 2 });
+  store.getState().updateMotionRegion(first.id, { duration: 8 });
+  expect(store.getState().project?.motionRegions?.[0]).toMatchObject({ startTime: 4, duration: 2 });
+});

@@ -1,35 +1,42 @@
+import { InspectorDetails } from '../../shared/details';
 import { translate } from '../../../../../../platform/i18n';
-import { getVideoTemplateCatalogStatusLabelKey } from '../../../../../../features/video/project/template/catalog-status';
 import { getVideoTransitionTemplateDefinition } from '../../../../../../features/video/project/transition/template';
 import { resolveClipLogicalLaneId } from '../../../../../../features/video/project/timeline';
 import { resolveTransitionTemplateControls } from '../../../../../../features/video/project/transition/template-controls';
-import { TemplatePreviewBadges } from '../../../../../library/template-preview';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../../contracts/selection-panel';
 import { ColorField, SelectInput } from '../../shared/controls';
 import { InspectorGroupedPanel } from '../../grouped-inspector';
-import {
-  DetailItem,
-  DetailList,
-  PANEL_HEADING_CLASS_NAME,
-  PANEL_META_CLASS_NAME,
-  PANEL_SECTION_CLASS_NAME,
-} from '../../shared/panel';
+import { DetailItem, DetailList, PANEL_SECTION_CLASS_NAME } from '../../shared/panel';
 import { OptionButtonsField } from '../../shared/option-buttons';
 import { SliderField } from '../../shared/sliders';
 import {
   getTransitionDirectionOptions,
   getTransitionEasingOptions,
   getTransitionIntensityOptions,
-  getTransitionLabel,
   getTransitionTemplateOptions,
 } from '../transition-options';
 import { SelectionEmptyState } from '../../inspection/helpers';
 import { TransitionTemplateActions } from './transition-template-actions';
 import { createEffectInstanceGroup } from '../../effect-instance/groups';
 
+type TransitionPanelProps = Pick<
+  WorkspaceSidebarSelectionPanelProps,
+  | 'project'
+  | 'selectedTransition'
+  | 'recentColors'
+  | 'onRememberRecentColor'
+  | 'onUpdateTransitionDuration'
+  | 'onUpdateTransitionEasing'
+  | 'onUpdateTransitionTemplate'
+  | 'onDeleteEffectInstance'
+  | 'onDuplicateEffectInstance'
+  | 'onMoveEffectInstance'
+  | 'onUpdateEffectInstance'
+>;
+
 type SelectedTransition = NonNullable<WorkspaceSidebarSelectionPanelProps['selectedTransition']>;
 
-export function InspectTransitionPanel(props: WorkspaceSidebarSelectionPanelProps) {
+export function InspectTransitionPanel(props: TransitionPanelProps) {
   const transition = props.selectedTransition;
   if (!transition) {
     return <SelectionEmptyState />;
@@ -39,9 +46,18 @@ export function InspectTransitionPanel(props: WorkspaceSidebarSelectionPanelProp
 }
 
 function TransitionInspectorContent(props: {
-  props: WorkspaceSidebarSelectionPanelProps;
+  props: TransitionPanelProps;
   transition: SelectedTransition;
 }) {
+  const audioTransition = props.props.project.clips.some(
+    (clip) => clip.id === props.transition.leadingClipId && clip.type === 'AUDIO'
+  );
+  if (audioTransition)
+    return (
+      <section className={PANEL_SECTION_CLASS_NAME}>
+        <TransitionMotionFields props={props.props} transition={props.transition} audioOnly />
+      </section>
+    );
   const definition = getVideoTransitionTemplateDefinition(
     props.transition.templateKind ?? props.transition.kind
   );
@@ -56,47 +72,44 @@ function TransitionInspectorContent(props: {
 
 function createTransitionGroups(
   props: {
-    props: WorkspaceSidebarSelectionPanelProps;
+    props: TransitionPanelProps;
     transition: SelectedTransition;
   },
   controls: ReturnType<typeof resolveTransitionTemplateControls>
 ) {
   return [
     {
-      id: 'info',
-      label: translate('videoEditor.sidebar.inspectorGroupSummary'),
-      defaultActive: true,
-      content: <TransitionOverview transition={props.transition} />,
-    },
-    {
       id: 'general',
-      label: translate('videoEditor.sidebar.inspectorGroupTemplate'),
-      content: <TransitionTemplateField props={props.props} transition={props.transition} />,
-      visible: controls.showTemplateField,
+      semantic: 'transition',
+      defaultActive: true,
+      label: translate('videoEditor.sidebar.inspectorGroupTransition'),
+      content: (
+        <>
+          <TransitionTemplateField props={props.props} transition={props.transition} />
+          {controls.showStyleGroup ? (
+            <TransitionStyleFields props={props.props} transition={props.transition} />
+          ) : null}
+        </>
+      ),
     },
     {
       id: 'motion',
-      label: translate('videoEditor.sidebar.inspectorGroupTiming'),
+      semantic: 'animation',
+      label: translate('videoEditor.sidebar.inspectorGroupAnimation'),
       content: <TransitionMotionFields props={props.props} transition={props.transition} />,
-      visible: controls.showMotionGroup,
-    },
-    {
-      id: 'status',
-      label: translate('videoEditor.sidebar.inspectorGroupStatus'),
-      content: <TransitionBoundaryStatus props={props.props} transition={props.transition} />,
     },
     createTransitionStackGroup(props),
     {
-      id: 'style',
-      label: translate('videoEditor.sidebar.inspectorGroupStyle'),
-      content: <TransitionStyleFields props={props.props} transition={props.transition} />,
-      visible: controls.showStyleGroup,
+      id: 'info',
+      semantic: 'info',
+      label: translate('videoEditor.sidebar.inspectorGroupInfo'),
+      content: <TransitionBoundaryStatus props={props.props} transition={props.transition} />,
     },
   ] as const;
 }
 
 function createTransitionStackGroup(props: {
-  props: WorkspaceSidebarSelectionPanelProps;
+  props: TransitionPanelProps;
   transition: SelectedTransition;
 }) {
   return {
@@ -109,12 +122,13 @@ function createTransitionStackGroup(props: {
       target: { kind: 'transition', transitionId: props.transition.id },
     }),
     id: 'transition-stack',
-    label: translate('videoEditor.sidebar.inspectorGroupTemplateStack'),
+    semantic: 'effects' as const,
+    label: translate('videoEditor.sidebar.inspectorGroupEffects'),
   };
 }
 
 function TransitionBoundaryStatus(props: {
-  props: WorkspaceSidebarSelectionPanelProps;
+  props: TransitionPanelProps;
   transition: SelectedTransition;
 }) {
   const leadingClip = props.props.project.clips.find(
@@ -163,37 +177,8 @@ function TransitionBoundaryStatus(props: {
   );
 }
 
-function TransitionOverview(props: { transition: SelectedTransition }) {
-  const definition = getVideoTransitionTemplateDefinition(
-    props.transition.templateKind ?? props.transition.kind
-  );
-
-  return (
-    <>
-      <p className={PANEL_HEADING_CLASS_NAME}>{getTransitionLabel(props.transition)}</p>
-      <p className={`mt-1 ${PANEL_META_CLASS_NAME}`}>{translate(definition.groupLabelKey)}</p>
-      <p
-        className={[
-          'mt-2 text-[11px] font-medium uppercase tracking-[0.12em]',
-          'text-[var(--sniptale-color-text-secondary)]',
-        ].join(' ')}
-      >
-        {translate(definition.useCaseKey)}
-      </p>
-      <TemplatePreviewBadges preview={definition.preview} />
-      <p className="mt-2 text-xs leading-5 text-[var(--sniptale-color-text-secondary)]">
-        {translate(definition.descriptionKey)}
-      </p>
-      <p className={`mt-2 ${PANEL_META_CLASS_NAME}`}>
-        {translate(getVideoTemplateCatalogStatusLabelKey(definition.catalogStatus))} ·{' '}
-        {`${definition.defaultDurationSeconds.toFixed(2)}s`}
-      </p>
-    </>
-  );
-}
-
 function TransitionTemplateField(props: {
-  props: WorkspaceSidebarSelectionPanelProps;
+  props: TransitionPanelProps;
   transition: SelectedTransition;
 }) {
   const templateKind = props.transition.templateKind ?? props.transition.kind;
@@ -206,19 +191,22 @@ function TransitionTemplateField(props: {
         onChange={(value) =>
           props.props.onUpdateTransitionTemplate(props.transition.id, { templateKind: value })
         }
-        options={getTransitionTemplateOptions()}
+        options={getTransitionTemplateOptions().map(({ value, label }) => ({ value, label }))}
       />
-      <TransitionTemplateActions
-        transition={props.transition}
-        onUpdateTransitionDuration={props.props.onUpdateTransitionDuration}
-        onUpdateTransitionTemplate={props.props.onUpdateTransitionTemplate}
-      />
+      <InspectorDetails label={translate('videoEditor.sidebar.inspectorMoreDetails')}>
+        <TransitionTemplateActions
+          transition={props.transition}
+          onUpdateTransitionDuration={props.props.onUpdateTransitionDuration}
+          onUpdateTransitionTemplate={props.props.onUpdateTransitionTemplate}
+        />
+      </InspectorDetails>
     </div>
   );
 }
 
 function TransitionMotionFields(props: {
-  props: WorkspaceSidebarSelectionPanelProps;
+  audioOnly?: boolean;
+  props: TransitionPanelProps;
   transition: SelectedTransition;
 }) {
   const definition = getVideoTransitionTemplateDefinition(
@@ -243,7 +231,7 @@ function TransitionMotionFields(props: {
         onChange={(value) => props.props.onUpdateTransitionEasing(props.transition.id, value)}
         options={getTransitionEasingOptions()}
       />
-      {controls.supportsDirection ? (
+      {!props.audioOnly && controls.supportsDirection ? (
         <SelectInput
           label={translate('videoEditor.sidebar.transitionDirectionLabel')}
           value={props.transition.direction ?? definition.defaultDirection}
@@ -253,7 +241,7 @@ function TransitionMotionFields(props: {
           options={getTransitionDirectionOptions()}
         />
       ) : null}
-      {controls.supportsIntensity ? (
+      {!props.audioOnly && controls.supportsIntensity ? (
         <OptionButtonsField
           label={translate('videoEditor.sidebar.transitionIntensityLabel')}
           value={props.transition.intensity ?? definition.defaultIntensity}
@@ -268,7 +256,7 @@ function TransitionMotionFields(props: {
 }
 
 function TransitionStyleFields(props: {
-  props: WorkspaceSidebarSelectionPanelProps;
+  props: TransitionPanelProps;
   transition: SelectedTransition;
 }) {
   const definition = getVideoTransitionTemplateDefinition(

@@ -46,13 +46,14 @@ function useNumericDraftState({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(() => formatCompactEditNumber(value, { precision }));
   const editingRef = useRef(false);
+  const dirtyRef = useRef(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const stepValueRef = useRef(value ?? 0);
   const syncedPropKeyRef = useRef('');
   const propKey = `${value ?? 'mixed'}|${precision ?? 'auto'}|${unit}`;
 
   useEffect(() => {
-    if (editing) {
+    if (editing && dirtyRef.current) {
       syncedPropKeyRef.current = propKey;
       return;
     }
@@ -66,6 +67,7 @@ function useNumericDraftState({
 
   return {
     draft,
+    dirtyRef,
     editing,
     editingRef,
     editValue: formatCompactEditNumber(value, { precision }),
@@ -140,7 +142,12 @@ function commitNumericDraft({
   if (!draftState.editingRef.current) {
     return;
   }
+  if (!draftState.dirtyRef.current) {
+    cancelNumericEditing(draftState);
+    return;
+  }
   const parsed = parseCompactNumber(draftState.draft, unit);
+  draftState.dirtyRef.current = false;
   draftState.editingRef.current = false;
   if (parsed === null) {
     cancelNumericEditing(draftState);
@@ -170,6 +177,7 @@ function applyNumericStep({
   direction: 1 | -1;
   draftState: NumericDraftState;
 }) {
+  draftState.dirtyRef.current = false;
   const stepped = draftState.stepValueRef.current + step * direction;
   const next = clampNumber(normalizeValue?.(stepped) ?? stepped, min, max);
   draftState.stepValueRef.current = next;
@@ -190,6 +198,7 @@ function updateNumericDraft({
   draftState: NumericDraftState;
   event: ChangeEvent<HTMLInputElement>;
 }) {
+  draftState.dirtyRef.current = true;
   const nextDraft = event.currentTarget.value;
   if (!draftState.editingRef.current) {
     draftState.editingRef.current = true;
@@ -217,6 +226,7 @@ function beginNumericEditing({
   if (disabled || draftState.editingRef.current) {
     return;
   }
+  draftState.dirtyRef.current = false;
   draftState.editingRef.current = true;
   draftState.setEditing(true);
   draftState.setDraft(draftState.editValue);
@@ -225,6 +235,7 @@ function beginNumericEditing({
 }
 
 function cancelNumericEditing(draftState: NumericDraftState) {
+  draftState.dirtyRef.current = false;
   draftState.stepValueRef.current = draftState.appliedValue;
   draftState.editingRef.current = false;
   draftState.setEditing(false);

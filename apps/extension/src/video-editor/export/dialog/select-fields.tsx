@@ -19,6 +19,9 @@ import {
 import { getMp4CodecOptions } from './codec-options';
 import type { ExportDialogFieldParams } from './field-contract';
 
+const EXPORT_FIELD_CLASS_NAME =
+  '!min-h-9 !rounded-md !border-transparent !bg-transparent !px-0 !py-0';
+
 function getExportQualityOptions() {
   return [
     {
@@ -131,6 +134,7 @@ function ExportDialogCodecField<TCodec extends string>(props: {
         <StatusRow label={label} value={props.codecOptions[0]?.label ?? ''} />
       ) : (
         <SelectField
+          className={EXPORT_FIELD_CLASS_NAME}
           label={label}
           value={props.currentCodec}
           onChange={props.onChange}
@@ -174,12 +178,14 @@ export function ExportDialogSelectFields(params: ExportDialogFieldParams) {
   return (
     <>
       <SelectField
+        className={EXPORT_FIELD_CLASS_NAME}
         label={translate('videoEditor.exportDialog.scopeLabel')}
         value={currentScope}
         onChange={(scope) => onChange({ scope })}
         options={scopeOptions}
       />
       <SelectField
+        className={EXPORT_FIELD_CLASS_NAME}
         label={translate('videoEditor.exportDialog.formatLabel')}
         value={settings.format}
         onChange={(format) => onChange(buildFormatPatch({ capabilities, format, settings }))}
@@ -200,6 +206,7 @@ export function ExportDialogSelectFields(params: ExportDialogFieldParams) {
         />
       ) : null}
       <SelectField
+        className={EXPORT_FIELD_CLASS_NAME}
         label={translate('videoEditor.exportDialog.resolutionLabel')}
         value={currentResolution}
         onChange={(resolution) => {
@@ -213,6 +220,7 @@ export function ExportDialogSelectFields(params: ExportDialogFieldParams) {
         options={getExportResolutionOptions()}
       />
       <SelectField
+        className={EXPORT_FIELD_CLASS_NAME}
         label={translate('videoEditor.exportDialog.qualityLabel')}
         value={settings.quality}
         onChange={(quality) => onChange({ quality })}
@@ -239,7 +247,7 @@ export function ExportDialogNumberField(params: {
       value={params.value}
       onPreviewValue={params.onChange}
       onCommitValue={params.onChange}
-      {...(params.className === undefined ? {} : { className: params.className })}
+      className={params.className ?? EXPORT_FIELD_CLASS_NAME}
       {...(params.max === undefined ? {} : { max: params.max })}
     />
   );

@@ -1,3 +1,4 @@
+import type { VideoProjectEffectInstancePatch } from '../../../contracts/commands/patches';
 import type { VideoProjectActionOccurrence } from '../../../../features/video/project/action-occurrences';
 import type { ReactNode } from 'react';
 import type { VideoProjectAnnotationTemplatePatch } from '../../../../features/video/project/annotation/contract';
@@ -60,6 +61,9 @@ export interface PreviewStageProps {
     patch: VideoProjectAnnotationTemplatePatch
   ) => void;
   onUpdateActionEventDetails: (actionEventId: string, patch: VideoEditorActionEventPatch) => void;
+  onUpdateEffectInstance?:
+    | ((instanceId: string, patch: VideoProjectEffectInstancePatch) => void)
+    | undefined;
   onUpdateClipTransform: (clipId: string, patch: Partial<VideoProjectClip['transform']>) => void;
   onUpdateMotionRegion: (motionRegionId: string, patch: VideoEditorMotionRegionPatch) => void;
   onUpsertObjectTrackCorrectionAnchor?:

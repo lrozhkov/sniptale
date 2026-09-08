@@ -1,3 +1,4 @@
+import type { EffectV1ObjectLayout } from '@sniptale/runtime-contracts/effect-v1';
 import { translate } from '../../../../platform/i18n';
 import {
   DEFAULT_CLIP_FADE_MS,
@@ -25,6 +26,7 @@ import {
 } from '../types/index';
 
 export function createEffectHostClip(args: {
+  objectLayout?: EffectV1ObjectLayout | undefined;
   duration: number;
   effectInstanceId: string;
   name: string;
@@ -33,8 +35,20 @@ export function createEffectHostClip(args: {
   startTime: number;
   trackId: string;
 }): VideoProjectEffectClip {
-  const width = Math.max(1, Math.round(args.projectWidth * 0.48));
-  const height = Math.max(1, Math.round((width * args.projectHeight) / args.projectWidth));
+  const layout = args.objectLayout;
+  const fitScale = layout
+    ? Math.min(
+        1,
+        (args.projectWidth * 0.48) / layout.width,
+        (args.projectHeight * 0.8) / layout.height
+      )
+    : 1;
+  const width = layout
+    ? layout.width * fitScale
+    : Math.max(1, Math.round(args.projectWidth * 0.48));
+  const height = layout
+    ? layout.height * fitScale
+    : Math.max(1, Math.round((width * args.projectHeight) / args.projectWidth));
   return {
     id: crypto.randomUUID(),
     trackId: args.trackId,

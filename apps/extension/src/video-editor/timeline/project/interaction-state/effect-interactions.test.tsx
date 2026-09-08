@@ -419,11 +419,11 @@ it.each(['Escape', 'pointercancel', 'blur', 'unmount', 'replacement', 'origin', 
 );
 
 it.each(['click', 'drag', 'trim', 'cancel'] as const)(
-  'seeks a motion segment only on a completed click: %s',
+  'selects a motion segment without a playback callback: %s',
   (gesture) => {
     const project = createEmptyVideoProject('Motion click');
     project.duration = 20;
-    const onMotionClick = vi.fn();
+    const onSelectMotionRegion = vi.fn();
     const historyTransaction = createHistoryTransactionMocks();
     let begin:
       | ReturnType<typeof useProjectTimelineEffectInteractions>['beginEffectInteraction']
@@ -434,7 +434,7 @@ it.each(['click', 'drag', 'trim', 'cancel'] as const)(
         project,
         magnetEnabled: false,
         pixelsPerSecond: 10,
-        onMotionClick,
+        onSelectMotionRegion,
         onMoveMotionRegion: vi.fn(),
 
         onMoveCursorSegment: vi.fn(),
@@ -461,10 +461,10 @@ it.each(['click', 'drag', 'trim', 'cancel'] as const)(
       window.dispatchEvent(new Event(gesture === 'cancel' ? 'pointercancel' : 'pointerup'))
     );
     if (gesture === 'click') {
-      expect(onMotionClick).toHaveBeenCalledExactlyOnceWith(130);
+      expect(onSelectMotionRegion).toHaveBeenCalledExactlyOnceWith('zoom');
       expect(historyTransaction.beginProjectHistoryTransaction).not.toHaveBeenCalled();
     } else {
-      expect(onMotionClick).not.toHaveBeenCalled();
+      expect(onSelectMotionRegion).toHaveBeenCalledExactlyOnceWith('zoom');
     }
   }
 );

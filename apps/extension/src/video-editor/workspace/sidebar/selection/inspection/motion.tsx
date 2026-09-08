@@ -45,7 +45,7 @@ export function InspectMotionConnectionPanel(props: WorkspaceSidebarSelectionPan
         <ProductActionButton
           compact
           tone="danger"
-          className="mt-4 w-full"
+          className="mt-3"
           onClick={() => props.onUpdateMotionRegion(destination.id, { incomingConnection: null })}
         >
           {translate('videoEditor.timeline.disconnectFraming')}
@@ -68,6 +68,7 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
         groups={[
           {
             id: 'info',
+            semantic: 'info' as const,
             label: translate('videoEditor.sidebar.inspectorGroupInfo'),
             content: (
               <MotionInspectorFieldset locked={isLocked}>
@@ -77,7 +78,8 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
           },
           {
             id: 'zoom',
-            label: translate('videoEditor.sidebar.inspectorGroupZoom'),
+            semantic: 'framing' as const,
+            label: translate('videoEditor.sidebar.inspectorGroupFraming'),
             defaultActive: true,
             content: (
               <MotionInspectorFieldset locked={isLocked}>
@@ -87,6 +89,7 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
           },
           {
             id: 'timing',
+            semantic: 'timing' as const,
             label: translate('videoEditor.sidebar.inspectorGroupTiming'),
             content: (
               <MotionInspectorFieldset locked={isLocked}>
@@ -96,7 +99,8 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
           },
           {
             id: 'behavior',
-            label: translate('videoEditor.sidebar.inspectorGroupBehavior'),
+            semantic: 'animation' as const,
+            label: translate('videoEditor.sidebar.inspectorGroupAnimation'),
             content: (
               <MotionInspectorFieldset locked={isLocked}>
                 <MotionBehaviorFields motionRegion={motionRegion} panel={props} />
@@ -110,7 +114,7 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
         disabled={isLocked}
         tone="danger"
         onClick={() => props.onDeleteMotionRegion(motionRegion.id)}
-        className="mt-3 w-full"
+        className="mt-3"
       >
         {translate('common.actions.delete')}
       </ProductActionButton>

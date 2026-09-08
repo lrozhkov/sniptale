@@ -1,3 +1,5 @@
+import { InspectorDetails } from '../shared/details';
+import { useWorkspaceTrackPresentation } from '../../../surface/track-presentation';
 import { translate } from '../../../../../platform/i18n';
 import { getVideoProjectActionPresentation } from '../../../../../features/video/project/action-presentation';
 import { getVideoProjectUtilityLanes } from '../../../../../features/video/project/utility-lanes';
@@ -15,6 +17,7 @@ type HistoryProps = Pick<
   Partial<Pick<WorkspaceSidebarSelectionPanelProps, 'onAddActionEvent'>>;
 
 export function InspectHistoryLanePanel(props: HistoryProps) {
+  const trackPresentation = useWorkspaceTrackPresentation();
   const presentation = getVideoProjectActionPresentation(props.project);
   const disabled =
     getVideoProjectUtilityLanes(props.project).actions.locked || !props.onUpdateActionPresentation;
@@ -27,24 +30,11 @@ export function InspectHistoryLanePanel(props: HistoryProps) {
         groups={[
           {
             id: 'appearance',
+            semantic: 'appearance' as const,
             label: translate('videoEditor.sidebar.inspectorGroupAppearance'),
             defaultActive: true,
             content: (
               <>
-                <ProductActionButton
-                  tone="secondary"
-                  compact
-                  className="mb-3 w-full"
-                  aria-label={translate('videoEditor.timeline.historyAddClick')}
-                  disabled={
-                    getVideoProjectUtilityLanes(props.project).actions.locked ||
-                    !props.onAddActionEvent
-                  }
-                  onClick={() => props.onAddActionEvent?.(presentation.clickPreset)}
-                >
-                  <MousePointerClick size={14} aria-hidden="true" />
-                  {translate('videoEditor.timeline.historyAddClick')}
-                </ProductActionButton>
                 <ToggleField
                   label={translate('videoEditor.sidebar.historyEnabled')}
                   checked={presentation.enabled}
@@ -52,6 +42,7 @@ export function InspectHistoryLanePanel(props: HistoryProps) {
                   onChange={(enabled) => update({ enabled })}
                 />
                 <ActionPrimaryFields
+                  part="appearance"
                   preset={presentation.clickPreset}
                   duration={presentation.duration}
                   offset={presentation.offset}
@@ -68,8 +59,29 @@ export function InspectHistoryLanePanel(props: HistoryProps) {
             ),
           },
           {
+            id: 'animation',
+            semantic: 'animation',
+            label: translate('videoEditor.sidebar.inspectorGroupAnimation'),
+            content: (
+              <ActionPrimaryFields
+                part="animation"
+                preset={presentation.clickPreset}
+                duration={presentation.duration}
+                offset={presentation.offset}
+                disabled={disabled}
+                onChange={({ duration, offset }) =>
+                  update({
+                    ...(duration === undefined ? {} : { duration }),
+                    ...(offset === undefined ? {} : { offset }),
+                  })
+                }
+              />
+            ),
+          },
+          {
             id: 'behavior',
-            label: translate('videoEditor.sidebar.inspectorGroupBehavior'),
+            semantic: 'history' as const,
+            label: translate('videoEditor.sidebar.inspectorGroupHistory'),
             content: (
               <>
                 <SliderField
@@ -88,6 +100,15 @@ export function InspectHistoryLanePanel(props: HistoryProps) {
                   disabled={disabled}
                   onChange={(showKeystrokes) => update({ showKeystrokes })}
                 />
+                {props.project.cursorTrack?.samples.length && trackPresentation ? (
+                  <InspectorDetails label={translate('videoEditor.sidebar.inspectorDisplay')}>
+                    <ToggleField
+                      label={translate('videoEditor.timeline.cursorLane')}
+                      checked={trackPresentation.panelPrefs.prefs.collapsedCursorLaneVisible}
+                      onChange={trackPresentation.panelPrefs.setCollapsedCursorLaneVisible}
+                    />
+                  </InspectorDetails>
+                ) : null}
               </>
             ),
           },
@@ -96,5 +117,3 @@ export function InspectHistoryLanePanel(props: HistoryProps) {
     </section>
   );
 }
-import { MousePointerClick } from 'lucide-react';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';

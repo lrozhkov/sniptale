@@ -162,7 +162,7 @@ it('shows insertion failure, allows retry and reports success only after complet
   await act(async () => root.render(<MediaPreviewPane item={recording} onAddMedia={add} />));
   const button = container.querySelector<HTMLButtonElement>('footer button')!;
   await act(async () => button.click());
-  expect(container.textContent).toContain('Storage full');
+  expect(container.textContent).toContain('videoEditor.app.materialsImportFailed');
   expect(button.disabled).toBe(false);
   let finish!: () => void;
   add.mockReturnValueOnce(

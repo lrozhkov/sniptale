@@ -1,5 +1,5 @@
 import { getTimelineUtilityRowPresence } from './segments';
-import { Eye, EyeOff, Lock, Plus, Unlock, Trash2 } from 'lucide-react';
+import { Eye, EyeOff, Lock, Unlock, Trash2 } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import { getVideoProjectUtilityLanes } from '../../../../features/video/project/utility-lanes';
 import type { VideoProjectUtilityLaneKind } from '../../../../features/video/project/utility-lanes';
@@ -14,7 +14,6 @@ export function ProjectTimelineEffectLaneLabelRows({
   onToggleUtilityLaneLock,
   onClearUtilityLane,
   onToggleUtilityLaneVisibility,
-  onAddMotionRegion,
   onSelectMotionLane,
   motionLaneSelected,
   project,
@@ -24,7 +23,6 @@ export function ProjectTimelineEffectLaneLabelRows({
   onClearUtilityLane: (lane: VideoProjectUtilityLaneKind) => void;
   onToggleUtilityLaneLock: (lane: VideoProjectUtilityLaneKind) => void;
   onToggleUtilityLaneVisibility: (lane: VideoProjectUtilityLaneKind) => void;
-  onAddMotionRegion: () => void;
   onSelectMotionLane?: (() => void) | undefined;
   motionLaneSelected?: boolean | undefined;
   project: VideoProject;
@@ -42,7 +40,6 @@ export function ProjectTimelineEffectLaneLabelRows({
           onSelect={onSelectMotionLane}
           isSelected={motionLaneSelected}
           state={utilityLanes.camera}
-          onAdd={() => onAddMotionRegion()}
           onClearUtilityLane={onClearUtilityLane}
           onToggleUtilityLaneLock={onToggleUtilityLaneLock}
           onToggleUtilityLaneVisibility={onToggleUtilityLaneVisibility}
@@ -59,7 +56,6 @@ function ProjectTimelineUtilityLaneLabelRow(props: {
   isSelected?: boolean | undefined;
   lane: VideoProjectUtilityLaneKind;
   state: VideoProjectUtilityLanes[VideoProjectUtilityLaneKind];
-  onAdd?: (() => void) | undefined;
   onClearUtilityLane: (lane: VideoProjectUtilityLaneKind) => void;
   onToggleUtilityLaneLock: (lane: VideoProjectUtilityLaneKind) => void;
   onToggleUtilityLaneVisibility: (lane: VideoProjectUtilityLaneKind) => void;
@@ -78,7 +74,6 @@ function ProjectTimelineUtilityLaneLabelRow(props: {
           onClearUtilityLane={props.onClearUtilityLane}
           onToggleUtilityLaneLock={props.onToggleUtilityLaneLock}
           onToggleUtilityLaneVisibility={props.onToggleUtilityLaneVisibility}
-          {...(props.onAdd ? { onAdd: props.onAdd } : {})}
         />
       }
     />
@@ -88,26 +83,15 @@ function ProjectTimelineUtilityLaneLabelRow(props: {
 function UtilityLaneStateControls(props: {
   lane: VideoProjectUtilityLaneKind;
   state: VideoProjectUtilityLanes[VideoProjectUtilityLaneKind];
-  onAdd?: (() => void) | undefined;
   onClearUtilityLane: (lane: VideoProjectUtilityLaneKind) => void;
   onToggleUtilityLaneLock: (lane: VideoProjectUtilityLaneKind) => void;
   onToggleUtilityLaneVisibility: (lane: VideoProjectUtilityLaneKind) => void;
 }) {
   return (
     <>
-      {props.onAdd ? (
-        <TimelineIconButton
-          dataUi="video-editor.timeline.add-zoom"
-          disabled={!props.state.visible || props.state.locked}
-          icon={<Plus size={13} strokeWidth={2.2} />}
-          title={translate('videoEditor.timeline.addZoomRegion')}
-          onClick={props.onAdd}
-          stopPropagation
-        />
-      ) : null}
       <TimelineIconButton
         frameless
-        active={props.state.visible}
+        active={!props.state.visible}
         dataUi="timeline.utility-lane-state"
         icon={props.state.visible ? <Eye size={13} /> : <EyeOff size={13} />}
         title={

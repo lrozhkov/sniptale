@@ -1,3 +1,4 @@
+import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -49,6 +50,7 @@ function renderSelection(
   selected: Readonly<Record<string, unknown>> = {}
 ): string {
   const props = {
+    project: createEmptyVideoProject(),
     ...selectedDefaults,
     ...selected,
     selection,

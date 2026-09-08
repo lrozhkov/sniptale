@@ -30,6 +30,7 @@ export function TemporalEasingSelect(props: {
 }
 
 export function ActionPrimaryFields(props: {
+  part?: 'appearance' | 'animation';
   duration: number;
   offset: number;
   preset: VideoProjectActionPreset;
@@ -39,7 +40,7 @@ export function ActionPrimaryFields(props: {
 }) {
   return (
     <div className="space-y-2">
-      {props.showPreset !== false && (
+      {props.part !== 'animation' && props.showPreset !== false && (
         <SelectInput
           label={translate('videoEditor.sidebar.actionPresetLabel')}
           value={props.preset}
@@ -48,26 +49,30 @@ export function ActionPrimaryFields(props: {
           options={getActionPresetOptions()}
         />
       )}
-      <SliderField
-        label={translate('videoEditor.sidebar.historyDuration')}
-        value={props.duration}
-        min={0.05}
-        max={5}
-        step={0.05}
-        disabled={props.disabled}
-        onChange={(duration) => props.onChange({ duration })}
-        formatValue={(value) => `${value.toFixed(2)} s`}
-      />
-      <SliderField
-        label={translate('videoEditor.sidebar.historyOffset')}
-        value={props.offset}
-        min={Math.min(-5, props.offset)}
-        max={Math.max(5, props.offset)}
-        step={0.05}
-        disabled={props.disabled}
-        onChange={(offset) => props.onChange({ offset })}
-        formatValue={(value) => `${value.toFixed(2)} s`}
-      />
+      {props.part !== 'appearance' ? (
+        <>
+          <SliderField
+            label={translate('videoEditor.sidebar.historyDuration')}
+            value={props.duration}
+            min={0.05}
+            max={5}
+            step={0.05}
+            disabled={props.disabled}
+            onChange={(duration) => props.onChange({ duration })}
+            formatValue={(value) => `${value.toFixed(2)} s`}
+          />
+          <SliderField
+            label={translate('videoEditor.sidebar.historyOffset')}
+            value={props.offset}
+            min={Math.min(-5, props.offset)}
+            max={Math.max(5, props.offset)}
+            step={0.05}
+            disabled={props.disabled}
+            onChange={(offset) => props.onChange({ offset })}
+            formatValue={(value) => `${value.toFixed(2)} s`}
+          />
+        </>
+      ) : null}
     </div>
   );
 }
@@ -116,7 +121,7 @@ export function ActionPointButtons(props: {
 }) {
   const active = props.placementModeKind === VideoEditorPlacementModeKind.ACTION_POINT;
   return (
-    <div className="mt-2 space-y-2">
+    <div className="mt-2 flex flex-wrap items-center gap-1">
       <ProductActionButton
         compact
         tone="toggle"

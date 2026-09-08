@@ -69,8 +69,8 @@ it('creates logical backing canvases and exposes safe sizes and scales', () => {
   });
 
   expect(factory(10.4, 20.6)).toBe(canvas);
-  expect(createCanvas).toHaveBeenCalledWith(30, 63);
-  expect(getLogicalCanvasSize(canvas)).toEqual({ height: 21, width: 10 });
+  expect(createCanvas).toHaveBeenCalledWith(31, 62);
+  expect(getLogicalCanvasSize(canvas)).toEqual({ height: 20.6, width: 10.4 });
   expect(getLogicalCanvasScale(context)).toEqual({ uniform: 3, x: 3, y: 3 });
   expect(getLogicalCanvasScale(createPassContext())).toEqual({ uniform: 1, x: 1, y: 1 });
 });

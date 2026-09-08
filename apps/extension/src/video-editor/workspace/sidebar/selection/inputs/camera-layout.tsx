@@ -62,9 +62,6 @@ export function CameraLayoutControls(props: CameraLayoutControlsProps) {
   const disabled = props.disabled || !props.onApplyCameraLayout;
   return (
     <div className="space-y-3" data-ui="video-editor.camera-placement-controls">
-      <p className="text-xs text-[var(--sniptale-color-text-muted)]">
-        {translate('videoEditor.sidebar.cameraIntervalHint')}
-      </p>
       <div
         className="grid grid-cols-3 gap-1"
         role="group"
@@ -137,7 +134,7 @@ export function CameraLayoutControls(props: CameraLayoutControlsProps) {
       <ProductActionButton
         compact
         tone="secondary"
-        className="w-full"
+        className="self-end"
         disabled={props.disabled || !props.onSplitCameraInterval || !props.canSplitCameraInterval}
         data-ui="video-editor.camera-split-interval"
         onClick={() => props.onSplitCameraInterval?.(props.clip.id)}

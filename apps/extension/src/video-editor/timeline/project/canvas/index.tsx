@@ -34,6 +34,7 @@ import { ProjectTimelineCanvasEffectRows } from './effect-rows';
 import { getTimelineUtilityRowPresence } from '../effect-lanes/segments';
 
 interface ProjectTimelineCanvasProps {
+  hiddenClipNamesByTrackId?: Readonly<Record<string, boolean>> | undefined;
   currentTime: number;
   consumeCompletedScrubClick: () => boolean;
   dragGhost: TimelineClipDragGhost | null;

@@ -1,4 +1,3 @@
-import { translate } from '../../../../../platform/i18n';
 import type { GlassSelectOption } from '../../../../../ui/glass-select';
 import {
   getVideoTemplateDirectionDefinitions,
@@ -9,7 +8,6 @@ import {
   getVideoTransitionTemplateDefinition,
   getVideoTransitionTemplateSelectionOrder,
 } from '../../../../../features/video/project/transition/template';
-import type { VideoProjectTransition } from '../../../../../features/video/project/types';
 import type { VideoTransitionTemplateKind } from '../../../../../features/video/project/types';
 import type {
   VideoTemplateDirection,
@@ -35,10 +33,4 @@ export function getTransitionDirectionOptions(): GlassSelectOption<VideoTemplate
 
 export function getTransitionIntensityOptions(): GlassSelectOption<VideoTemplateIntensity>[] {
   return buildVocabularySelectOptions(getVideoTemplateIntensityDefinitions());
-}
-
-export function getTransitionLabel(transition: VideoProjectTransition): string {
-  return translate(
-    getVideoTransitionTemplateDefinition(transition.templateKind ?? transition.kind).labelKey
-  );
 }

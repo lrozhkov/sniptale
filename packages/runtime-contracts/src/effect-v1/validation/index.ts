@@ -1,3 +1,4 @@
+import { validateEffectV1ObjectLayout } from '../object-layout/validation.js';
 import { createEffectV1Diagnostics, finishEffectV1Validation } from '../model/diagnostics.js';
 import { resolveEffectV1InputContract } from '../model/inputs.js';
 import { validateEffectV1Assets } from '../asset/validation.js';
@@ -76,6 +77,7 @@ function validateEffectV1DocumentInternal(input: unknown): EffectV1ValidationRes
   const scenes = validateEffectV1Scenes(input['scenes'], Number(input['duration']), report);
   validateEffectV1Clips(input['clips'], layers, scenes, Number(input['duration']), report);
   const controlIds = validateEffectV1Controls(input['controls'], report);
+  validateEffectV1ObjectLayout(input['objectLayout'], input['kind'], input['controls'], report);
   const trackIds = validateEffectV1Timeline(
     input['timeline'],
     layers,

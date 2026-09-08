@@ -68,7 +68,7 @@ it('selects disabled events at authored presentation time while retaining captur
   expect(marker.dataset['historyStatus']).toBe('event-disabled');
   act(() => marker.click());
   expect(select).toHaveBeenCalledWith('captured', null);
-  expect(seek).toHaveBeenCalledWith(1.5);
+  expect(seek).not.toHaveBeenCalled();
   expect(parent).not.toHaveBeenCalled();
   expect(project).toEqual(original);
 });
@@ -108,7 +108,7 @@ it('offers each dense event through the shared keyboard-accessible popover', () 
   expect(document.activeElement).toBe(options[1]);
   act(() => options[1]!.click());
   expect(select).toHaveBeenCalledWith('b', null);
-  expect(seek).toHaveBeenCalledWith(1);
+  expect(seek).not.toHaveBeenCalled();
   expect(document.querySelector('[role="listbox"]')).toBeNull();
 });
 it('selects the history header even when the project has no events', () => {
@@ -131,7 +131,7 @@ it('selects the history header even when the project has no events', () => {
   expect(select).toHaveBeenCalledOnce();
 });
 
-it('history viewport targets: keeps a scrolled overscan cluster reachable without changing event seek', () => {
+it('history viewport targets: keeps a scrolled overscan cluster reachable without seeking', () => {
   const project = createEmptyVideoProject();
   project.duration = 30;
   project.actionEvents = Array.from({ length: 11 }, (_, index) => ({
@@ -169,7 +169,7 @@ it('history viewport targets: keeps a scrolled overscan cluster reachable withou
   expect(option!.disabled).toBe(false);
   act(() => option!.click());
   expect(select).toHaveBeenCalledWith('dense-8', null);
-  expect(seek).toHaveBeenCalledWith(9 + 8 * 0.2);
+  expect(seek).not.toHaveBeenCalled();
 });
 
 it('history viewport targets: retains full hit areas at zero and right viewport edges', () => {
@@ -199,9 +199,7 @@ it('history viewport targets: retains full hit areas at zero and right viewport 
     expect(anchor + 12).toBeLessThanOrEqual(200);
     act(() => marker.click());
     expect(select).toHaveBeenLastCalledWith(event.id, null);
-    expect(seek).toHaveBeenLastCalledWith(
-      event.anchor.kind === 'project' ? event.anchor.time : Number.NaN
-    );
+    expect(seek).not.toHaveBeenCalled();
   }
 });
 
@@ -305,11 +303,11 @@ it('shows a bounded cluster count and exposes selected membership without replac
   expect(lastEvent).toBeDefined();
   act(() => lastEvent!.click());
   expect(select).toHaveBeenCalledWith('count-100', null);
-  expect(seek).toHaveBeenCalledWith(1);
+  expect(seek).not.toHaveBeenCalled();
   expect(document.querySelector('[role="listbox"]')).toBeNull();
 });
 
-it('selects and seeks the exact repeated source appearance', () => {
+it('selects the exact repeated source appearance without seeking', () => {
   const project = createEmptyVideoProject();
   project.duration = 20;
   project.clips = [
@@ -351,7 +349,7 @@ it('selects and seeks the exact repeated source appearance', () => {
   expect(markers).toHaveLength(2);
   act(() => markers[1]!.click());
   expect(select).toHaveBeenCalledWith('shared', 'repeat');
-  expect(seek).toHaveBeenCalledWith(11);
+  expect(seek).not.toHaveBeenCalled();
   expect(project.actionEvents).toHaveLength(1);
 });
 
@@ -457,7 +455,7 @@ it.each(['pointer', 'keyboard'] as const)(
         signalId: 'typing',
         clipId: `typing-${suffix}`,
       });
-      expect(seek).toHaveBeenLastCalledWith(1);
+      expect(seek).not.toHaveBeenCalled();
       expect(document.querySelector('[role="listbox"]')).toBeNull();
     }
     expect(project).toEqual(original);
@@ -495,7 +493,7 @@ it('keeps a lone typing span directly selectable despite overlapping stable back
     signalId: 'typing',
     clipId: 'typing-a',
   });
-  expect(seek).toHaveBeenCalledWith(1);
+  expect(seek).not.toHaveBeenCalled();
 });
 
 it('separates simultaneous click and keyboard markers into internal rows', () => {

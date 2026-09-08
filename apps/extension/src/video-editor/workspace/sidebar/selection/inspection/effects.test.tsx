@@ -131,32 +131,20 @@ describe('workspace-sidebar/selection/inspect-effects', () => {
   it('renders grouped transition inspector metadata for non-crossfade presets', () => {
     renderInspectPanel();
 
-    expect(
-      container?.querySelector(
-        'nav button[aria-label="videoEditor.sidebar.inspectorGroupTemplate"]'
-      )
-    ).not.toBeNull();
-    expect(
-      container?.querySelector('nav button[aria-label="videoEditor.sidebar.inspectorGroupTiming"]')
-    ).not.toBeNull();
-    expect(
-      container?.querySelector('nav button[aria-label="videoEditor.sidebar.inspectorGroupStatus"]')
-    ).not.toBeNull();
-    expect(
-      container?.querySelector('nav button[aria-label="videoEditor.sidebar.inspectorGroupStyle"]')
-    ).not.toBeNull();
-    expect(container?.textContent).toContain('videoEditor.sidebar.transitionLightSweep');
-
-    clickGroup('videoEditor.sidebar.inspectorGroupSummary');
-    expect(container?.textContent).toContain('videoEditor.templates.transitionGroupReveal');
-    expect(container?.textContent).toContain('videoEditor.templates.transitionUseCaseLightSweep');
-    expect(container?.textContent).toContain(
-      'videoEditor.templates.transitionDescriptionLightSweep'
+    const sectionNames = [...container!.querySelectorAll('nav button')].map((button) =>
+      button.getAttribute('aria-label')
     );
-    expect(container?.textContent).toContain('videoEditor.templates.previewToneHero');
-    expect(container?.textContent).toContain('videoEditor.templates.previewMotionSweep');
-
-    clickGroup('videoEditor.sidebar.inspectorGroupTiming');
+    expect(sectionNames).toEqual([
+      'videoEditor.sidebar.inspectorGroupTransition',
+      'videoEditor.sidebar.inspectorGroupAnimation',
+      'videoEditor.sidebar.inspectorGroupInfo',
+    ]);
+    expect(container?.textContent).toContain('videoEditor.sidebar.transitionLightSweep');
+    expect(container?.textContent).toContain('videoEditor.sidebar.transitionHighlightColorLabel');
+    clickGroup('videoEditor.sidebar.inspectorGroupInfo');
+    expect(container?.textContent).toContain('videoEditor.sidebar.transitionLeadingClipLabel');
+    expect(container?.textContent).not.toContain('videoEditor.templates.previewToneHero');
+    clickGroup('videoEditor.sidebar.inspectorGroupAnimation');
     expect(container?.textContent).toContain('videoEditor.sidebar.transitionDirectionLabel');
     expect(container?.textContent).not.toContain(
       'videoEditor.sidebar.transitionHighlightColorLabel'

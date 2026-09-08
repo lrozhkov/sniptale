@@ -2,10 +2,7 @@ import type { TimelineEffectDragTarget } from '../types';
 import { TimelineEffectDraftContext } from './segment';
 import { getTimelineHistoryLayout } from './history-layout';
 import { getActionEventLabel } from '../../../chrome/display';
-import {
-  ProjectTimelineAutoProcessingControl,
-  type AutoProcessingHeaderProps,
-} from '../toolbar/sections/auto-transform-wizard';
+
 import type { VideoEditorTypingSpanTarget } from '../../../contracts/commands/timeline';
 import {
   projectTimelineInterval,
@@ -38,17 +35,15 @@ import { translate } from '../../../../platform/i18n';
 import type { VideoProject } from '../../../../features/video/project/types';
 import { buildTimelineTelemetryLaneData } from '../../../project/operations/telemetry-lane';
 import { TIMELINE_OBJECT_MARKER_PROPS } from '../canvas/hover-preview';
-import { getTelemetryLaneIcon, TimelineLaneIconFrame } from '../tracks/lane-icons';
+import {
+  getTelemetryLaneIcon,
+  TimelineLaneIdentity,
+  TIMELINE_LANE_HEADER_CLASS_NAME,
+} from '../tracks/lane-icons';
 
 const TELEMETRY_ROW_CLASS_NAME = [
   'relative border-b border-[var(--sniptale-color-border-subtle)]',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-overlay)_86%,transparent)]',
-].join(' ');
-
-const TELEMETRY_LABEL_ROW_CLASS_NAME = [
-  'flex items-center gap-1 border-b px-3',
-  'border-[var(--sniptale-color-border-subtle)]',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-overlay)_94%,transparent)]',
 ].join(' ');
 
 const TELEMETRY_EMPTY_LABEL_CLASS_NAME = [
@@ -59,8 +54,8 @@ const TELEMETRY_EMPTY_LABEL_CLASS_NAME = [
 function getTelemetrySpanClassName(kind: 'stable' | 'typing'): string {
   if (kind === 'typing') {
     return [
-      'border-[color:color-mix(in_srgb,var(--sniptale-color-info)_22%,var(--sniptale-color-border-soft)_78%)]',
-      'bg-[color:color-mix(in_srgb,var(--sniptale-color-info)_10%,var(--sniptale-color-surface-panel))]',
+      'border-[var(--sniptale-color-border-soft)]',
+      'bg-[var(--sniptale-color-surface-panel)]',
     ].join(' ');
   }
 
@@ -71,7 +66,6 @@ function getTelemetrySpanClassName(kind: 'stable' | 'typing'): string {
 }
 
 export function ProjectTimelineTelemetryLaneLabelRow(props: {
-  autoProcessing?: AutoProcessingHeaderProps | undefined;
   compactRows: boolean;
   height?: number;
   project?: VideoProject;
@@ -83,31 +77,32 @@ export function ProjectTimelineTelemetryLaneLabelRow(props: {
   const enabled = props.project ? getVideoProjectActionPresentation(props.project).enabled : true;
   const locked = props.project ? getVideoProjectUtilityLanes(props.project).actions.locked : false;
   return (
-    <div className={TELEMETRY_LABEL_ROW_CLASS_NAME} style={{ height: props.height ?? 56 }}>
+    <div
+      className={TIMELINE_LANE_HEADER_CLASS_NAME}
+      data-selected={props.selected ?? false}
+      style={{ height: props.height ?? 56 }}
+    >
       <button
         type="button"
         data-ui="video-editor.timeline.history-lane"
         aria-pressed={props.selected ?? false}
         className={`flex min-w-0 flex-1 items-center gap-2 text-left text-[var(--sniptale-color-text-primary)]
-aria-pressed:text-[var(--sniptale-color-accent-emphasis)]`}
+`}
         aria-label={translate('videoEditor.timeline.telemetryLane')}
         onClick={props.onSelect}
       >
-        <TimelineLaneIconFrame>{getTelemetryLaneIcon()}</TimelineLaneIconFrame>
-        {props.compactRows ? null : (
-          <span data-timeline-track-name="true" className="truncate text-[13px] font-semibold">
-            {translate('videoEditor.timeline.telemetryLane')}
-          </span>
-        )}
+        <TimelineLaneIdentity
+          selected={props.selected ?? false}
+          icon={getTelemetryLaneIcon()}
+          prefix="H1"
+          name={translate('videoEditor.timeline.historyLaneShort')}
+        />
       </button>
-      <div className="flex shrink-0 items-center gap-0.5">
-        {props.autoProcessing ? (
-          <ProjectTimelineAutoProcessingControl {...props.autoProcessing} />
-        ) : null}
+      <div className="flex shrink-0 items-center gap-1">
         {props.onToggleVisibility ? (
           <TimelineIconButton
             frameless
-            active={enabled}
+            active={!enabled}
             disabled={locked}
             dataUi="timeline.utility-lane-state"
             icon={enabled ? <Eye size={13} /> : <EyeOff size={13} />}
@@ -163,6 +158,7 @@ function historyLabel(item: ResolvedVideoProjectActionPresentation) {
 }
 
 function HistoryMarker(props: {
+  movable: boolean;
   item: ResolvedVideoProjectActionPresentation;
   left: number;
   top: number;
@@ -188,10 +184,12 @@ function HistoryMarker(props: {
       aria-label={historyLabel(item)}
       aria-pressed={props.selected}
       className={[
-        'absolute flex h-6 w-6 -translate-x-1/2 cursor-grab items-center justify-center rounded-md border',
+        'video-editor-timeline-item',
+        props.movable ? '!cursor-grab' : '!cursor-pointer',
+        'absolute flex h-6 w-6 -translate-x-1/2 items-center justify-center rounded-md border',
         'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-secondary)]',
         props.selected
-          ? 'border-[var(--sniptale-color-border-accent-strong)] ring-2 ring-[var(--sniptale-color-accent-emphasis)]'
+          ? 'video-editor-timeline-item-selected border-[var(--sniptale-color-border-soft)]'
           : 'border-[var(--sniptale-color-border-soft)]',
         item.reason === 'suppressed' ? 'border-dashed' : '',
         !item.enabled ? 'opacity-60' : '',
@@ -266,10 +264,11 @@ function ProjectTimelineTelemetrySpan(props: {
       data-history-recording-id={props.target?.recordingId}
       title={props.label ?? kindLabel}
       className={[
-        `absolute flex items-center justify-center rounded border text-[10px] truncate px-1 aria-pressed:ring-2
-aria-pressed:ring-[var(--sniptale-color-accent-emphasis)] focus-visible:outline-2`,
+        'absolute flex items-center justify-center rounded border text-[10px] truncate px-1',
+        props.onSelect ? 'video-editor-timeline-item !cursor-pointer' : 'cursor-default',
+        props.selected ? 'video-editor-timeline-item-selected' : '',
         getTelemetrySpanClassName(props.kind),
-        props.kind === 'typing' ? 'z-10' : 'pointer-events-none',
+        props.kind === 'typing' ? '' : 'pointer-events-none',
       ].join(' ')}
       style={{
         top: props.top,
@@ -348,7 +347,6 @@ export function ProjectTimelineTelemetryLane(props: TimelineHistoryLaneProps) {
     const item = byId.get(id);
     if (!item) return;
     props.onSelectActionOccurrence?.(item.occurrence.eventId, item.occurrence.clipId);
-    props.onSeek(historyMarkerTime(item, props.project));
   };
   const selectedId =
     props.selection?.kind === 'action-occurrence'
@@ -357,6 +355,7 @@ export function ProjectTimelineTelemetryLane(props: TimelineHistoryLaneProps) {
   return (
     <div
       data-ui="video-editor.timeline.history-row"
+      data-timeline-lane-muted={!getVideoProjectActionPresentation(props.project).enabled}
       className={TELEMETRY_ROW_CLASS_NAME}
       style={{ height: layout.height }}
     >
@@ -372,6 +371,10 @@ export function ProjectTimelineTelemetryLane(props: TimelineHistoryLaneProps) {
         </div>
       ) : null}
       <ActionHistoryMarkers
+        movable={
+          !getVideoProjectUtilityLanes(props.project).actions.locked &&
+          Boolean(props.onBeginEffectInteraction)
+        }
         groups={groups}
         byId={byId}
         selectedId={selectedId}
@@ -396,12 +399,14 @@ export function ProjectTimelineTelemetryLane(props: TimelineHistoryLaneProps) {
 }
 
 function ActionHistoryMarkers({
+  movable,
   groups,
   byId,
   selectedId,
   select,
   begin,
 }: {
+  movable: boolean;
   begin: (
     event: React.PointerEvent<HTMLButtonElement>,
     item: ResolvedVideoProjectActionPresentation
@@ -416,6 +421,7 @@ function ActionHistoryMarkers({
       {groups.map((group) =>
         group.ids.length === 1 ? (
           <HistoryMarker
+            movable={movable}
             key={group.ids[0]}
             item={byId.get(group.ids[0]!)!}
             left={group.left}
@@ -438,15 +444,34 @@ function ActionHistoryMarkers({
               placeholder={group.ids.length > 99 ? '99+' : String(group.ids.length)}
               aria-pressed={Boolean(selectedId && group.ids.includes(selectedId))}
               aria-label={`${translate('videoEditor.timeline.telemetryLane')} · ${group.ids.length}`}
-              style={historyClusterStyle(Boolean(selectedId && group.ids.includes(selectedId)))}
-              className={`[&_.sniptale-select-chevron]:h-2.5! [&_.sniptale-select-chevron]:w-2.5!
-[&_.sniptale-select-chevron]:right-1! [&_.sniptale-select-placeholder]:text-current!`}
+              style={historyClusterStyle()}
+              className={[
+                'video-editor-timeline-item',
+                selectedId && group.ids.includes(selectedId)
+                  ? 'video-editor-timeline-item-selected'
+                  : '',
+                '[&_.sniptale-select-chevron]:h-2.5! [&_.sniptale-select-chevron]:w-2.5!',
+                '[&_.sniptale-select-chevron]:right-1! [&_.sniptale-select-placeholder]:text-current!',
+              ].join(' ')}
               controlSize="sm"
               menuWidth={360}
-              menuClassName="max-h-80!"
+              menuClassName={[
+                'max-h-80!',
+                '[&_[role=option]:has([data-history-muted])]:!text-[var(--sniptale-color-text-dim)]',
+                '[&_[role=option]:has([data-history-muted])]:!bg-[var(--sniptale-color-surface-input)]',
+              ].join(' ')}
               menuScrollable
               onChange={select}
-              options={group.ids.map((id) => ({ value: id, label: historyLabel(byId.get(id)!) }))}
+              options={group.ids.map((id) => {
+                const item = byId.get(id)!;
+                return {
+                  value: id,
+                  label: historyLabel(item),
+                  ...(!item.enabled
+                    ? { icon: <EyeOff size={14} aria-hidden="true" data-history-muted /> }
+                    : {}),
+                };
+              })}
             />
           </div>
         )
@@ -455,7 +480,7 @@ function ActionHistoryMarkers({
   );
 }
 
-function historyClusterStyle(selected: boolean): CSSProperties & Record<`--${string}`, string> {
+function historyClusterStyle(): CSSProperties & Record<`--${string}`, string> {
   return {
     width: 40,
     minWidth: 40,
@@ -466,15 +491,10 @@ function historyClusterStyle(selected: boolean): CSSProperties & Record<`--${str
     justifyContent: 'center',
     '--sniptale-field-radius': 'var(--sniptale-radius-lg)',
     '--sniptale-field-font-size': '11px',
-    '--sniptale-field-bg-idle': selected
-      ? 'var(--sniptale-color-accent-soft)'
-      : 'var(--sniptale-color-surface-panel)',
-    '--sniptale-field-border-idle': selected
-      ? 'var(--sniptale-color-border-accent-strong)'
-      : 'var(--sniptale-color-border-soft)',
-    '--sniptale-field-shadow-idle': selected
-      ? 'inset 0 0 0 1px var(--sniptale-color-border-accent-strong)'
-      : 'none',
+    '--sniptale-field-bg-idle': 'var(--sniptale-color-surface-panel)',
+    '--sniptale-field-bg-hover': 'var(--sniptale-color-surface-panel)',
+    '--sniptale-field-border-idle': 'var(--sniptale-color-border-soft)',
+    '--sniptale-field-shadow-idle': 'none',
   };
 }
 
@@ -562,7 +582,6 @@ function HistoryIntervals(
       signalId: span.signalId,
       clipId: span.clipId,
     });
-    props.onSeek(span.startTime);
   };
   return (
     <>
@@ -607,7 +626,7 @@ function HistoryIntervals(
           return (
             <div
               key={JSON.stringify(group.ids)}
-              className="absolute z-10 h-6"
+              className="absolute h-6"
               style={{ left: group.left, width: group.width, top: layout.typingTop ?? 32 }}
               onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => event.stopPropagation()}
@@ -620,12 +639,16 @@ function HistoryIntervals(
                 aria-pressed={selected}
                 disabled={!props.onSelectHistorySpan}
                 style={{
-                  ...historyClusterStyle(selected),
+                  ...historyClusterStyle(),
                   width: group.width,
                   minWidth: 0,
                   padding: '0 2px',
                 }}
-                className="[&_.sniptale-select-chevron]:hidden [&_.sniptale-select-placeholder]:text-current!"
+                className={[
+                  'video-editor-timeline-item',
+                  selected ? 'video-editor-timeline-item-selected' : '',
+                  '[&_.sniptale-select-chevron]:hidden [&_.sniptale-select-placeholder]:text-current!',
+                ].join(' ')}
                 controlSize="sm"
                 menuWidth={360}
                 menuClassName="max-h-80!"

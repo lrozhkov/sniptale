@@ -15,6 +15,7 @@ export function RecordingActionButton(props: {
 }) {
   return (
     <ProductActionButton
+      compact
       tone="secondary"
       disabled={props.disabled}
       onClick={props.onClick}
@@ -34,6 +35,7 @@ export function AudioRecordingSaveButton(props: {
 }) {
   return (
     <ProductActionButton
+      compact
       tone="primary"
       disabled={props.disabled || !props.audioBlob}
       onClick={() => void props.onSave()}
@@ -77,20 +79,20 @@ export function AudioRecordingTransport(props: {
   return (
     <>
       {!props.compact && (
-        <p className="mb-4 text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
+        <p className="text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
           {translate('videoEditor.app.recordAudioDescription')}
         </p>
       )}
       <InspectorPanel
         data-ui="video-editor.audio-recording.transport"
-        className={props.compact ? 'grid gap-1 p-2' : 'grid gap-3 p-4'}
+        className={props.compact ? 'grid gap-1 p-2' : 'grid gap-3 !rounded-md p-3'}
       >
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-medium text-[var(--sniptale-color-text-muted)]">
               {translate('videoEditor.app.recordAudioDurationLabel')}
             </p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums text-[var(--sniptale-color-text-primary)]">
+            <p className="mt-1 text-xl font-semibold tabular-nums text-[var(--sniptale-color-text-primary)]">
               {props.durationLabel}
             </p>
           </div>

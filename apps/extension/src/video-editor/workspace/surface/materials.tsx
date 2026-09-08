@@ -27,12 +27,18 @@ import {
   Search,
   X,
   ListFilter,
+  LocateFixed,
 } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../../platform/i18n';
 import { VideoEditorFileInputNodes } from '../../chrome/file-inputs';
 import type { PreviewStageImportHandlers, VideoEditorImportKind } from '../../contracts/insertion';
 import type { VideoProject, VideoProjectAsset } from '../../../features/video/project/types';
+
+const MATERIAL_ACTION_CLASS_NAME = [
+  'w-full min-w-0 justify-start !h-8 !min-h-8 !px-2',
+  '!rounded-[var(--sniptale-radius-sm)] [&_svg]:shrink-0',
+].join(' ');
 
 const MATERIAL_IMPORT_OPTIONS = [
   { kind: 'video', icon: Film, labelKey: 'videoEditor.app.materialsVideo' },
@@ -293,11 +299,13 @@ function MaterialRow(props: {
   onSelect: () => void;
   onRemove: () => void;
 }) {
+  const rowRef = useRef<HTMLDivElement | null>(null);
   const Icon = props.asset.type === 'AUDIO' ? Music : props.asset.type === 'IMAGE' ? Image : Film;
   return (
     <div
       className="group/material flex min-w-0 items-center gap-1"
       data-material-id={props.asset.id}
+      ref={rowRef}
     >
       <div className="relative flex size-8 shrink-0 items-center justify-center">
         <Icon size={16} aria-hidden="true" className="text-[var(--sniptale-color-text-muted)]" />
@@ -336,17 +344,29 @@ function MaterialRow(props: {
           </span>
           <span
             id={`material-usage-${props.asset.id}`}
-            className="flex items-center gap-1 text-[11px] text-[var(--sniptale-color-text-muted)]"
-          >
-            <span>{formatBytes(props.asset.metadata.size)} ·</span>
-            {props.used && <Check size={12} aria-hidden="true" />}
-            {translate(
+            className="flex max-w-full min-w-0 items-center gap-1 text-[11px] text-[var(--sniptale-color-text-muted)]"
+            title={translate(
               props.used ? 'videoEditor.app.materialsUsed' : 'videoEditor.app.materialsUnused'
             )}
+          >
+            <span className="shrink-0">{formatBytes(props.asset.metadata.size)} ·</span>
+            {props.used && <Check size={12} className="shrink-0" aria-hidden="true" />}
+            <span className={props.used ? '@max-[260px]/library:sr-only truncate' : 'truncate'}>
+              {translate(
+                props.used ? 'videoEditor.app.materialsUsed' : 'videoEditor.app.materialsUnused'
+              )}
+            </span>
           </span>
         </ProductActionButton>
-        {props.uses.some((use) => use.kind !== 'analysis') && (
+      </div>
+      {props.uses.some((use) => use.kind !== 'analysis') && (
+        <div className="relative size-8 shrink-0">
           <CompactSelect
+            menuAnchorRef={rowRef}
+            dataUi="video-editor.materials.show-use"
+            containerClassName="!w-8"
+            className="!size-8 !p-0 [&>span]:hidden [&>svg]:hidden"
+            title={translate('videoEditor.sidebar.materialsShowUses')}
             appearance="plain"
             controlSize="sm"
             value=""
@@ -376,8 +396,16 @@ function MaterialRow(props: {
               ];
             })}
           />
-        )}
-      </div>
+          <span
+            className={[
+              'pointer-events-none absolute inset-0 flex items-center justify-center',
+              'text-[var(--sniptale-color-text-muted)]',
+            ].join(' ')}
+          >
+            <LocateFixed size={15} aria-hidden="true" />
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -406,21 +434,23 @@ function MaterialsImportMenu(props: {
     <div ref={containerRef} className="w-full">
       <ProductActionButton
         tone="secondary"
-        className="w-full min-w-0 justify-start !px-2"
+        className={MATERIAL_ACTION_CLASS_NAME}
         disabled={props.disabled}
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
         data-ui="video-editor.materials.import"
       >
-        <Upload size={16} aria-hidden="true" />
-        <span className="flex-1 text-left">{translate('videoEditor.app.materialsFromDisk')}</span>
+        <Upload size={14} aria-hidden="true" />
+        <span className="min-w-0 flex-1 text-left">
+          {translate('videoEditor.app.materialsFromDisk')}
+        </span>
         <ChevronDown size={14} aria-hidden="true" />
       </ProductActionButton>
       {open
         ? createPortal(
             <div
               ref={menuRef}
-              style={{ ...portalStyle, width: 240 }}
+              style={portalStyle}
               data-theme={theme ?? undefined}
               data-ui="video-editor.materials.import-menu"
             >
@@ -500,40 +530,45 @@ function MaterialsFooter(props: {
     <footer
       data-ui="video-editor.materials.footer"
       className={[
-        'grid shrink-0 grid-cols-1 @min-[300px]/materials:grid-cols-2 items-center gap-1 border-t',
-        'border-[color:var(--sniptale-color-border-soft)] px-2 py-1',
+        'flex shrink-0 flex-col gap-0.5 border-t',
+        'border-[color:var(--sniptale-color-border-soft)] p-2',
       ].join(' ')}
     >
       <ProductActionButton
         tone="secondary"
-        className="min-w-0 justify-start !px-2"
+        className={MATERIAL_ACTION_CLASS_NAME}
         onClick={props.onOpenLibrary}
         data-ui="video-editor.materials.library"
       >
-        <FolderKanban size={16} aria-hidden="true" />
+        <FolderKanban size={14} aria-hidden="true" />
         <span className="truncate">{translate('videoEditor.app.materialsFromLibrary')}</span>
       </ProductActionButton>
       <MaterialsImportMenu disabled={props.pending} onChoose={props.onChoose} />
       <ProductActionButton
         tone="secondary"
-        className="col-span-full justify-start !px-2"
+        className={MATERIAL_ACTION_CLASS_NAME}
         onClick={props.onRecordAudio}
+        title={translate('videoEditor.app.recordAudioMicrophone')}
+        aria-label={translate('videoEditor.app.recordAudioMicrophone')}
         data-ui="video-editor.materials.record-audio"
       >
-        <Mic size={16} aria-hidden="true" />
-        {translate('videoEditor.app.recordAudioMicrophone')}
+        <Mic size={14} aria-hidden="true" />
+        <span>{translate('videoEditor.app.recordAudioMicrophone')}</span>
       </ProductActionButton>
-      <ProductActionButton
-        compact
-        tone="secondary"
-        className="col-span-full !min-h-8 justify-start !px-2 text-[var(--sniptale-color-text-muted)]"
-        disabled={props.pending || props.unusedCount === 0}
-        onClick={props.onRemoveUnused}
-        data-ui="video-editor.materials.remove-unused"
-      >
-        <Trash2 size={14} aria-hidden="true" />
-        {translate('videoEditor.app.materialsRemoveUnused')}
-      </ProductActionButton>
+      <div className="mt-1 border-t border-[var(--sniptale-color-border-soft)] pt-1">
+        <ProductActionButton
+          tone="secondary"
+          className={MATERIAL_ACTION_CLASS_NAME}
+          disabled={props.pending || props.unusedCount === 0}
+          onClick={props.onRemoveUnused}
+          title={translate('videoEditor.app.materialsRemoveUnused')}
+          aria-label={translate('videoEditor.app.materialsRemoveUnused')}
+          data-ui="video-editor.materials.remove-unused"
+        >
+          <Trash2 size={14} aria-hidden="true" />
+          <span>{translate('videoEditor.app.materialsRemoveUnused')}</span>
+        </ProductActionButton>
+      </div>
     </footer>
   );
 }

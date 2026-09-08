@@ -30,9 +30,7 @@ it('appends at the current montage end and commits selection and history atomica
   expect(append(asset.id).status).toBe('placed');
   expect(append(asset.id).status).toBe('placed');
   expect(store.getState().project?.clips.map(({ startTime }) => startTime)).toEqual([0, 6]);
-  expect(
-    store.getState().project?.clips.every(({ trackId }) => trackId === project.tracks[0]!.id)
-  ).toBe(true);
+  expect(store.getState().project?.clips.every(({ trackId }) => trackId === overlay.id)).toBe(true);
   expect(store.getState().project?.assets).toEqual([asset]);
   expect(store.getState().projectHistory.past).toHaveLength(2);
   expect(listener).toHaveBeenCalledTimes(2);
@@ -130,12 +128,13 @@ it('rejects stale material selection and an unloaded project without notifying s
   expect(listener).not.toHaveBeenCalled();
 });
 
-it('appends to the root video track after overlay tracks are sorted into visual order', () => {
+it('uses the root video track without a selected destination after visual sorting', () => {
   const { store, asset, project } = setup();
   const rootId = project.tracks[0]!.id;
   store.getState().overlayMaterial(asset.id);
   const layered = store.getState().project!;
   store.setState({
+    selectedTrackId: null,
     project: { ...layered, tracks: [...layered.tracks].sort((a, b) => a.order - b.order) },
   });
   const result = store.getState().appendMaterial(asset.id);
@@ -446,4 +445,66 @@ it('rejects insertion when an affected zoom lane is locked', () => {
     reason: 'locked-track',
   });
   expect(store.getState()).toBe(before);
+});
+
+it.each([VideoProjectAssetType.VIDEO, VideoProjectAssetType.AUDIO])(
+  'inserts %s at the playhead on the selected compatible track',
+  (type) => {
+    const { store, asset, project } = setup(false, type);
+    const kind =
+      type === VideoProjectAssetType.AUDIO ? VideoTrackKind.AUDIO : VideoTrackKind.PRIMARY;
+    const target = createVideoProjectTrack('Chosen', 3, kind);
+    project.tracks.push(target);
+    store.setState({ selectedTrackId: target.id, currentTime: 2 });
+    const result = store.getState().insertMaterial(asset.id);
+    expect(result.status).toBe('placed');
+    const clip = store
+      .getState()
+      .project!.clips.find(({ id }) => id === (result.status === 'placed' ? result.clipId : ''));
+    expect(clip).toMatchObject({ trackId: target.id, startTime: 2 });
+  }
+);
+
+it.each([VideoProjectAssetType.VIDEO, VideoProjectAssetType.AUDIO])(
+  'never inserts %s onto an incompatible selected track',
+  (type) => {
+    const { store, asset, project } = setup(false, type);
+    const wrong = createVideoProjectTrack(
+      'Wrong',
+      5,
+      type === VideoProjectAssetType.AUDIO ? VideoTrackKind.PRIMARY : VideoTrackKind.AUDIO
+    );
+    project.tracks.push(wrong);
+    store.setState({ selectedTrackId: wrong.id });
+    const result = store.getState().insertMaterial(asset.id);
+    expect(result.status).toBe('placed');
+    expect(store.getState().project!.clips.every((clip) => clip.trackId !== wrong.id)).toBe(true);
+  }
+);
+it('rejects a selected locked track without moving existing clips or committing history', () => {
+  const { store, asset, project } = setup();
+  const track = { ...createVideoProjectTrack('Locked', 5, VideoTrackKind.PRIMARY), locked: true };
+  project.tracks.push(track);
+  store.setState({ selectedTrackId: track.id });
+  expect(store.getState().insertMaterial(asset.id)).toEqual({
+    status: 'rejected',
+    reason: 'locked-track',
+  });
+  expect(store.getState().project).toBe(project);
+  expect(store.getState().projectHistory.past).toHaveLength(0);
+});
+it('keeps embedded audio on an audio track when the chosen video track receives the picture', () => {
+  const { store, asset, project } = setup(true);
+  const track = createVideoProjectTrack('Chosen video', 5, VideoTrackKind.PRIMARY);
+  project.tracks.push(track);
+  store.setState({ selectedTrackId: track.id });
+  expect(store.getState().insertMaterial(asset.id).status).toBe('placed');
+  const next = store.getState().project!;
+  expect(next.clips.find((clip) => clip.type === 'VIDEO')).toMatchObject({
+    trackId: track.id,
+    startTime: 3,
+  });
+  const audio = next.clips.find((clip) => clip.type === 'AUDIO')!;
+  expect(next.tracks.find((track) => track.id === audio.trackId)?.kind).toBe(VideoTrackKind.AUDIO);
+  expect(audio.startTime).toBe(3);
 });

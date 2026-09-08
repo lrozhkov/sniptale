@@ -51,9 +51,11 @@ function render(items: MediaLibraryItem[]) {
 it('selects media and recovers selection when a filter removes the selected item', () => {
   const items = [item('first'), item('second')];
   render(items);
-  act(() => container.querySelectorAll<HTMLButtonElement>('button')[1]!.click());
+  act(() => container.querySelectorAll<HTMLButtonElement>('button[aria-pressed]')[1]!.click());
   expect(container.querySelector('[data-ui=selected]')?.textContent).toBe('second');
-  expect(container.querySelectorAll('button')[1]?.getAttribute('aria-pressed')).toBe('true');
+  expect(container.querySelectorAll('button[aria-pressed]')[1]?.getAttribute('aria-pressed')).toBe(
+    'true'
+  );
   render(items.slice(0, 1));
   expect(container.querySelector('[data-ui=selected]')?.textContent).toBe('first');
   render([]);

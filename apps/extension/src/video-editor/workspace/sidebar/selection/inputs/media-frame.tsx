@@ -1,3 +1,4 @@
+import { InspectorDetails } from '../shared/details';
 import { translate } from '../../../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { isVideoClip } from '../../../../../features/video/project/timeline';
@@ -65,14 +66,16 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
         fitScalePercent={props.clip.fitScalePercent ?? 100}
         onUpdateMediaClipFitScalePercent={props.onUpdateMediaClipFitScalePercent}
       />
-      <MediaShadowControls
-        clipId={props.clip.id}
-        disabled={props.locked}
-        shadowIntensity={props.clip.shadowIntensity ?? 0}
-        shadowMode={props.clip.shadowMode ?? VideoMediaShadowMode.BACKDROP}
-        onUpdateMediaClipShadowIntensity={props.onUpdateMediaClipShadowIntensity}
-        onUpdateMediaClipShadowMode={props.onUpdateMediaClipShadowMode}
-      />
+      <InspectorDetails label={translate('videoEditor.sidebar.inspectorGroupAppearance')}>
+        <MediaShadowControls
+          clipId={props.clip.id}
+          disabled={props.locked}
+          shadowIntensity={props.clip.shadowIntensity ?? 0}
+          shadowMode={props.clip.shadowMode ?? VideoMediaShadowMode.BACKDROP}
+          onUpdateMediaClipShadowIntensity={props.onUpdateMediaClipShadowIntensity}
+          onUpdateMediaClipShadowMode={props.onUpdateMediaClipShadowMode}
+        />
+      </InspectorDetails>
       <MediaApplyVisualsButton
         clip={props.clip}
         disabled={props.locked}

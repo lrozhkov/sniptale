@@ -214,7 +214,7 @@ export function isAudioRecordingRangeAvailable(
     Number.isFinite(end) &&
     start >= 0 &&
     end <= project.duration &&
-    end - start >= 2 &&
+    end - start >= 1 &&
     !project.clips.some(
       (clip) => clip.trackId === trackId && clip.startTime < end && getClipEndTime(clip) > start
     )

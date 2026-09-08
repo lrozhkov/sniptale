@@ -11,6 +11,7 @@ interface TimelineZone {
 }
 
 export interface TimelineJunctionZone extends TimelineZone {
+  audio?: boolean;
   detail: string;
   label: string;
   stackIndex?: number;
@@ -101,6 +102,7 @@ export function buildTrackJunctionZones(
 
     return [
       {
+        ...(leadingClip.type === 'AUDIO' ? { audio: true } : {}),
         detail: summary.detail,
         end,
         id: transition.id,

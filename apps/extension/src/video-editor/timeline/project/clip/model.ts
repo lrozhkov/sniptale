@@ -9,17 +9,14 @@ const DEFAULT_CLIP_ROW_HEIGHT = 62;
 const MIN_CLIP_HEIGHT = 22;
 const CLIP_VERTICAL_PADDING = 18;
 const LABEL_BASE_INSET = 12;
-const SELECTED_CLIP_SHADOW_CLASS_NAME = [
-  'shadow-[0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-accent-emphasis)_28%,transparent),',
-  '0_2px_8px_color-mix(in_srgb,var(--sniptale-color-text-primary)_8%,transparent)]',
-].join('');
 const TRIM_HANDLE_CLASS_NAME = [
-  'absolute inset-y-0 z-30 w-[min(10px,25%)] !cursor-ew-resize',
+  'absolute inset-y-0 z-30 w-[min(10px,25%)] !cursor-ew-resize disabled:pointer-events-none',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_20%,transparent)]',
   'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_32%,transparent)]',
 ].join(' ');
 
 export function buildProjectTimelineClipViewModel({
+  hideClipNames = false,
   clip,
   isHovered,
   isSelected,
@@ -31,6 +28,7 @@ export function buildProjectTimelineClipViewModel({
   trackLocked,
 }: Pick<
   ProjectTimelineClipProps,
+  | 'hideClipNames'
   | 'clip'
   | 'isHovered'
   | 'isSelected'
@@ -102,15 +100,17 @@ export function buildProjectTimelineClipViewModel({
     fadeInOverlayStyle: fadeIn.style,
     fadeOutOverlayStyle: fadeOut.style,
     left: interval?.left ?? 0,
-    previewTileWidth: getPreviewTileWidth(trackClipRowHeight),
+    previewTileWidth: getPreviewTileWidth(trackClipRowHeight, hideClipNames),
     style: {
       ...getTimelineClipStyle(trackClipRowHeight, trackClipTop ?? 0),
-      clipPath: `inset(0 ${transitionViewModel.bodyInsetRight}px 0 ${transitionViewModel.bodyInsetLeft}px)`,
+      // Only mask junction sides; a vertical mask clips subpixel-positioned contours.
+      clipPath: `inset(-1px ${transitionViewModel.bodyInsetRight}px -1px ${transitionViewModel.bodyInsetLeft}px)`,
     },
     ...transitionViewModel,
     labelHeight:
-      isAudioClip(clip) &&
-      Math.max(MIN_CLIP_HEIGHT, trackClipRowHeight - CLIP_VERTICAL_PADDING) < 36
+      hideClipNames ||
+      (isAudioClip(clip) &&
+        Math.max(MIN_CLIP_HEIGHT, trackClipRowHeight - CLIP_VERTICAL_PADDING) < 36)
         ? 0
         : 20,
     labelStyle: {
@@ -163,22 +163,17 @@ function getTimelineClipClassName({
   isSelected,
   trackLocked,
 }: Pick<ProjectTimelineClipProps, 'isHovered' | 'isSelected' | 'trackLocked'>): string {
-  const visualEmphasis = isHovered || isSelected;
-
   return [
     'pointer-events-auto absolute flex items-center overflow-hidden rounded-sm',
-    'outline -outline-offset-2',
+    'video-editor-timeline-item',
+    'outline outline-1 -outline-offset-1',
     'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_92%,transparent)]',
     'text-xs text-[var(--sniptale-color-text-primary-strong)]',
     'shadow-[0_1px_3px_color-mix(in_srgb,var(--sniptale-color-text-primary)_8%,transparent)]',
-    'transition-[outline-color,box-shadow]',
-    visualEmphasis
-      ? [
-          'outline-2 outline-[var(--sniptale-color-accent-emphasis)]',
-          SELECTED_CLIP_SHADOW_CLASS_NAME,
-        ].join(' ')
-      : 'outline-1 outline-[color:color-mix(in_srgb,var(--sniptale-color-text-primary)_24%,transparent)]',
-    trackLocked ? 'opacity-55 cursor-default' : 'cursor-grab',
+    'outline-[color:color-mix(in_srgb,var(--sniptale-color-text-primary)_24%,transparent)]',
+    isSelected ? 'video-editor-timeline-item-selected' : '',
+    isHovered ? 'video-editor-timeline-item-hovered' : '',
+    trackLocked ? 'opacity-55 !cursor-pointer' : '!cursor-grab',
   ].join(' ');
 }
 
@@ -264,9 +259,9 @@ function getTimelineClipWaveformPeaks({
   );
 }
 
-function getPreviewTileWidth(trackClipRowHeight: number): number {
+function getPreviewTileWidth(trackClipRowHeight: number, hideClipNames: boolean): number {
   const clipHeight = Math.max(MIN_CLIP_HEIGHT, trackClipRowHeight - CLIP_VERTICAL_PADDING);
-  const pictureHeight = clipHeight - 20;
+  const pictureHeight = clipHeight - (hideClipNames ? 0 : 20);
   if (pictureHeight < 16) return 0;
   return (pictureHeight * 16) / 9;
 }

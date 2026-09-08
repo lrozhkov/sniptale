@@ -1,5 +1,3 @@
-import { Minus, Plus } from 'lucide-react';
-
 import { translate } from '../../../../../platform/i18n';
 import { CompactRange } from '../../../../../ui/compact-inspector-controls';
 import {
@@ -11,13 +9,6 @@ import type { ProjectTimelineToolbarProps } from '../types';
 const TIMELINE_ZOOM_SLIDER_MIN = 0;
 const TIMELINE_ZOOM_SLIDER_MAX = 100;
 
-function TimelineZoomIcon({ direction }: { direction: 'in' | 'out' }) {
-  const Icon = direction === 'in' ? Plus : Minus;
-  return (
-    <Icon size={14} strokeWidth={2} className="shrink-0 text-[var(--sniptale-color-text-muted)]" />
-  );
-}
-
 export function ProjectTimelineZoomControl({
   onPreviewSuspendedChange,
   pixelsPerSecond,
@@ -27,8 +18,7 @@ export function ProjectTimelineZoomControl({
 }) {
   return (
     <div className="flex shrink-0 items-center gap-1 px-1 text-[var(--sniptale-color-text-secondary)]">
-      <TimelineZoomIcon direction="out" />
-      <span className="flex w-24 shrink-0 @max-[1000px]/timeline:w-14">
+      <span className="flex w-[clamp(80px,10cqw,192px)] shrink-0">
         <CompactRange
           aria-label={translate('videoEditor.timeline.zoom')}
           title={translate('videoEditor.timeline.zoom')}
@@ -47,7 +37,6 @@ export function ProjectTimelineZoomControl({
           onPointerUp={() => onPreviewSuspendedChange(false)}
         />
       </span>
-      <TimelineZoomIcon direction="in" />
     </div>
   );
 }

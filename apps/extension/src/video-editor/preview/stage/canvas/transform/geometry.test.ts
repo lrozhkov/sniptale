@@ -46,3 +46,23 @@ it('rotates resize cursors with their visual handles', () => {
   expect(getPreviewTransformResizeCursor('nw', 90)).toBe('ne-resize');
   expect(getPreviewTransformResizeCursor('se', -90)).toBe('sw-resize');
 });
+
+it.each(['nw', 'ne', 'sw', 'se'] as const)(
+  'preserves the scale aspect and opposite corner for %s at arbitrary rotation',
+  (handle) => {
+    const opposite = { nw: 'se', ne: 'sw', sw: 'ne', se: 'nw' } as const;
+    const transform = { ...TRANSFORM, width: 380, height: 120, rotation: 37 };
+    const pivot = getPreviewTransformHandlePoint(transform, opposite[handle]);
+    const resized = resizePreviewTransform({
+      transform,
+      handle,
+      delta: { x: 170, y: 35 },
+      minSize: 40,
+      aspectRatio: 380 / 120,
+    });
+    expect(resized.width / resized.height).toBeCloseTo(380 / 120, 10);
+    const nextPivot = getPreviewTransformHandlePoint(resized, opposite[handle]);
+    expect(nextPivot.x).toBeCloseTo(pivot.x, 8);
+    expect(nextPivot.y).toBeCloseTo(pivot.y, 8);
+  }
+);

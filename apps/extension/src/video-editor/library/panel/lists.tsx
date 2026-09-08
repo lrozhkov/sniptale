@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
+import { LibraryMediaAdd } from './media-add';
 import { Film, Image } from 'lucide-react';
 import type { MediaLibraryItem } from '../../../composition/persistence/media-library/contracts';
 import { translate } from '../../../platform/i18n';
@@ -8,6 +9,7 @@ import type { LibraryThumbnailViewState } from './thumbnails/types';
 import { MediaPreviewPane } from './media-preview';
 
 export function LibraryMediaSection(props: {
+  search?: ReactNode;
   items: MediaLibraryItem[];
   thumbnails: Record<string, LibraryThumbnailViewState>;
   onAddMedia: (mediaId: string) => Promise<void>;
@@ -19,63 +21,70 @@ export function LibraryMediaSection(props: {
       className="grid min-h-0 min-w-0 flex-1 grid-cols-[minmax(240px,0.65fr)_minmax(0,1.35fr)] gap-4"
       data-ui="video-editor.library.media-tab"
     >
-      <div className="min-h-0 space-y-2 overflow-y-auto pr-1" data-ui="recordings-scroll">
-        {props.items.length === 0 ? (
-          <p className="text-sm text-[var(--sniptale-color-text-muted)]">
-            {translate('videoEditor.sidebar.libraryNoSearchResults')}
-          </p>
-        ) : (
-          props.items.map((item) => {
-            const isImage = item.kind === 'image' || item.kind === 'screenshot';
-            const Icon = isImage ? Image : Film;
-            const thumbnail = props.thumbnails[item.id]?.url;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setSelectedId(item.id)}
-                aria-pressed={selected?.id === item.id}
-                className={[
-                  'flex w-full items-center gap-3 rounded-lg border p-2 text-left',
-                  'hover:bg-[var(--sniptale-color-surface-panel)]',
-                  selected?.id === item.id
-                    ? 'border-[var(--sniptale-color-border-accent-strong)] bg-[var(--sniptale-color-surface-panel)]'
-                    : 'border-[var(--sniptale-color-border-soft)]',
-                ].join(' ')}
-              >
-                <span
-                  className={[
-                    'flex h-14 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md',
-                    'bg-[var(--sniptale-color-surface-panel)]',
-                  ].join(' ')}
-                >
-                  {thumbnail ? (
-                    <img src={thumbnail} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <Icon size={22} aria-hidden />
-                  )}
-                </span>
-                <span className="min-w-0">
-                  <span
-                    className="block truncate text-sm font-medium text-[var(--sniptale-color-text-primary)]"
-                    title={item.filename}
+      <div className="flex min-h-0 min-w-0 flex-col gap-3">
+        {props.search}
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1" data-ui="recordings-scroll">
+          {props.items.length === 0 ? (
+            <p className="text-sm text-[var(--sniptale-color-text-muted)]">
+              {translate('videoEditor.sidebar.libraryNoSearchResults')}
+            </p>
+          ) : (
+            props.items.map((item) => {
+              const isImage = item.kind === 'image' || item.kind === 'screenshot';
+              const Icon = isImage ? Image : Film;
+              const thumbnail = props.thumbnails[item.id]?.url;
+              return (
+                <div key={item.id} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedId(item.id)}
+                    aria-pressed={selected?.id === item.id}
+                    className={[
+                      'flex w-full items-center gap-3 rounded-lg border p-2 pr-10 text-left',
+                      'hover:bg-[var(--sniptale-color-surface-panel)]',
+                      selected?.id === item.id
+                        ? 'border-[var(--sniptale-color-border-accent-strong)] bg-[var(--sniptale-color-surface-panel)]'
+                        : 'border-[var(--sniptale-color-border-soft)]',
+                    ].join(' ')}
                   >
-                    {item.filename}
-                  </span>
-                  <span className="block truncate text-xs text-[var(--sniptale-color-text-muted)]">
-                    {[
-                      !isImage && item.duration !== null ? formatDuration(item.duration) : null,
-                      formatDimensions(item.width, item.height),
-                      formatSize(item.size),
-                    ]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </span>
-                </span>
-              </button>
-            );
-          })
-        )}
+                    <span
+                      className={[
+                        'flex h-14 w-20 shrink-0 items-center justify-center overflow-hidden rounded-md',
+                        'bg-[var(--sniptale-color-surface-panel)]',
+                      ].join(' ')}
+                    >
+                      {thumbnail ? (
+                        <img src={thumbnail} alt="" className="h-full w-full object-cover" />
+                      ) : (
+                        <Icon size={22} aria-hidden />
+                      )}
+                    </span>
+                    <span className="min-w-0">
+                      <span
+                        className="block truncate text-sm font-medium text-[var(--sniptale-color-text-primary)]"
+                        title={item.filename}
+                      >
+                        {item.filename}
+                      </span>
+                      <span className="block truncate text-xs text-[var(--sniptale-color-text-muted)]">
+                        {[
+                          !isImage && item.duration !== null ? formatDuration(item.duration) : null,
+                          formatDimensions(item.width, item.height),
+                          formatSize(item.size),
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </span>
+                    </span>
+                  </button>
+                  <div className="absolute bottom-2 right-2">
+                    <LibraryMediaAdd itemId={item.id} compact onAddMedia={props.onAddMedia} />
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
       <MediaPreviewPane
         key={selected?.id ?? 'empty'}

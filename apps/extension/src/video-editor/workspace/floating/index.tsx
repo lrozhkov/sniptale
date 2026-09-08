@@ -1,3 +1,4 @@
+import { WorkspacePanelButton } from './panel-header';
 import { FolderOpen, Sparkles, X } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { translate } from '../../../platform/i18n';
@@ -102,13 +103,8 @@ export function WorkspacePanelCloseButton(props: {
   title: string;
 }) {
   return (
-    <ContentToolbarButton
-      className="!h-7 !w-7 !min-w-7 !px-0"
-      dataUi={props.dataUi}
-      title={props.title}
-      onClick={props.onClose}
-    >
-      <X size={15} />
-    </ContentToolbarButton>
+    <WorkspacePanelButton dataUi={props.dataUi} title={props.title} onClick={props.onClose}>
+      <X size={16} aria-hidden="true" />
+    </WorkspacePanelButton>
   );
 }

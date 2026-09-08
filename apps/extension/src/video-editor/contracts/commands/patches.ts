@@ -62,6 +62,7 @@ export type VideoEditorTransitionTemplatePatch = Partial<
 >;
 
 export type VideoProjectEffectInstancePatch = {
+  sceneAnchors?: VideoProjectEffectInstance['sceneAnchors'];
   controls?: Partial<VideoProjectEffectInstance['controls']>;
   enabled?: boolean;
   startTime?: number;

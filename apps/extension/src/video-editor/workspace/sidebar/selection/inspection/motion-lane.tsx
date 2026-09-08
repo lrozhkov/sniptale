@@ -1,4 +1,4 @@
-import { Plus, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { translate } from '../../../../../platform/i18n';
 import { getVideoProjectUtilityLanes } from '../../../../../features/video/project/utility-lanes';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -33,18 +33,8 @@ export function InspectMotionLanePanel(
       />
       <ProductActionButton
         compact
-        tone="secondary"
-        className="mt-3 w-full"
-        disabled={lane.locked || !lane.visible}
-        onClick={props.onAddMotionRegion}
-      >
-        <Plus size={14} />
-        {translate('videoEditor.timeline.addZoomRegion')}
-      </ProductActionButton>
-      <ProductActionButton
-        compact
         tone="danger"
-        className="mt-3 w-full"
+        className="mt-3"
         disabled={lane.locked || !props.onClearUtilityLane || !props.project.motionRegions?.length}
         onClick={() => props.onClearUtilityLane?.('camera')}
       >

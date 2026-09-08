@@ -52,6 +52,14 @@ function renderSurface(
 ) {
   return renderToStaticMarkup(
     <ProjectTimelineSurface
+      selection={{ kind: 'scene' }}
+      onSeek={vi.fn()}
+      onAutoProcessingModalVisibilityChange={vi.fn()}
+      autoProcessing={{
+        prepare: async () => ({ status: 'stale' }),
+        apply: async () => 'stale',
+        isCurrent: () => false,
+      }}
       currentTime={0}
       isPlaying={false}
       playbackRange={null}
@@ -119,6 +127,7 @@ function createPanelPrefs() {
     setCollapsedTelemetryLaneVisible: vi.fn(),
     setCompactRows: vi.fn(),
     setHideTrackNames: vi.fn(),
+    setClipNamesHidden: vi.fn(),
     setTrackHeight: vi.fn(),
     telemetryLaneVisible: false,
   };

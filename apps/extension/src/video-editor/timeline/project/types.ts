@@ -1,3 +1,4 @@
+import type { VideoEditorProjectActions } from '../../contracts/commands/project';
 import type { AutoProcessingActions } from '../../project/operations/auto-transform';
 import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
 import type {
@@ -6,7 +7,6 @@ import type {
   VideoProjectActionPreset,
   VideoProjectClip,
   VideoProjectShapeType,
-  VideoTrackKind,
 } from '../../../features/video/project/types';
 import type { VideoProjectUtilityLaneKind } from '../../../features/video/project/utility-lanes';
 import type { VideoEditorPlaybackRange } from '../../interaction/playback/range';
@@ -32,7 +32,7 @@ export interface ProjectTimelineInsertionActions {
   onAddShapeOverlay: (shapeType: VideoProjectShapeType) => void;
   onAddSubtitleOverlay?: () => void;
   onAddTextOverlay: () => void;
-  onAddTrack: (kind?: VideoTrackKind) => void;
+  onAddTrack: VideoEditorProjectActions['addTrack'];
   onEnableCursorTrack: () => void;
   onImport: {
     audio: (file: File, placement?: VideoEditorImportPlacement) => void | Promise<void>;
@@ -42,7 +42,13 @@ export interface ProjectTimelineInsertionActions {
   onUnsupportedFileDrop: () => void;
 }
 
+export interface TimelineClipRevealRequest {
+  clipId: string;
+  serial: number;
+}
+
 export interface ProjectTimelineProps {
+  revealClipRequest?: TimelineClipRevealRequest | undefined;
   canDeleteSelectedClip: boolean;
   canEditSelectedClip: boolean;
   canSplitSelectedClip: boolean;

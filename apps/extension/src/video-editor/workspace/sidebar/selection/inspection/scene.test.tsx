@@ -127,7 +127,7 @@ function verifiesSceneMetadataFocus() {
   renderInspectPanel(createProps());
   clickGroup('videoEditor.sidebar.inspectorGroupSummary');
 
-  expect(container?.textContent).toContain('videoEditor.sidebar.projectSourceLabel');
+  expect(container?.textContent).not.toContain('videoEditor.sidebar.projectSourceLabel');
   expect(container?.textContent).not.toContain('videoEditor.sidebar.timelinePlacementLabel');
   expect(container?.textContent).not.toContain('videoEditor.sidebar.actionsTitle');
 }
@@ -142,8 +142,8 @@ function verifiesRecordingBackedSummaries() {
   clickGroup('videoEditor.sidebar.inspectorGroupSummary');
 
   expect(container?.textContent).not.toContain('videoEditor.sidebar.cursorTrackUnavailable');
-  expect(container?.textContent).toContain('videoEditor.timeline.actionsLane');
-  expect(container?.textContent).toContain('videoEditor.sidebar.actionTrackUnavailable');
+  expect(container?.textContent).not.toContain('videoEditor.timeline.actionsLane');
+  expect(container?.textContent).not.toContain('videoEditor.sidebar.actionTrackUnavailable');
 }
 
 function verifiesAuthoredEventSummary() {
@@ -167,7 +167,7 @@ function verifiesAuthoredEventSummary() {
   clickGroup('videoEditor.sidebar.inspectorGroupSummary');
 
   expect(container?.textContent).not.toContain('videoEditor.sidebar.actionTrackUnavailable');
-  expect(container?.innerHTML).toContain('>1<');
+  expect(container?.textContent).toContain('1920×1080');
 }
 
 function verifiesSceneBackgroundSelectLabels() {

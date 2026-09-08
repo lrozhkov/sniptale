@@ -1,3 +1,4 @@
+import { constrainMotionTiming } from '../../../features/video/project/motion/placement';
 import { resolveVideoProjectActionOccurrences } from '../../../features/video/project/action-occurrences';
 import { getVideoProjectActionPresentation } from '../../../features/video/project/action-presentation';
 import {
@@ -7,7 +8,6 @@ import {
 import { normalizeVideoProjectMotionRegion } from '../../../features/video/project/motion';
 import {
   bindMotionRegionToClip,
-  clampMotionRegionStartTime,
   getMotionBindingCandidates,
 } from '../../../features/video/project/motion/source-binding';
 import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
@@ -254,17 +254,18 @@ function createMotionRegionUpdater(set: VideoEditorStoreSet) {
                 const clip = project.clips.find(
                   (item) => item.id === updated.sourceBinding?.clipId
                 );
-                if (
-                  clip?.type === VideoProjectClipType.VIDEO &&
-                  (patch.duration !== undefined || patch.startTime !== undefined)
-                ) {
-                  if (patch.startTime !== undefined && patch.duration === undefined) {
-                    updated = {
-                      ...updated,
-                      startTime: clampMotionRegionStartTime(project, updated, patch.startTime),
-                    };
-                  }
-                  updated = bindMotionRegionToClip(updated, clip);
+                if (patch.duration !== undefined || patch.startTime !== undefined) {
+                  updated = {
+                    ...updated,
+                    ...constrainMotionTiming(
+                      project,
+                      region,
+                      updated,
+                      patch.duration === undefined
+                    ),
+                  };
+                  if (clip?.type === VideoProjectClipType.VIDEO)
+                    updated = bindMotionRegionToClip(updated, clip);
                 }
                 return normalizeVideoProjectMotionRegion(project, updated);
               }),

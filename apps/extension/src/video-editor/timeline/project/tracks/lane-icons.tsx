@@ -15,12 +15,28 @@ import type { VideoProjectTrack } from '../../../../features/video/project/types
 
 const TRACK_ICON_CLASS_NAME = 'h-4 w-4';
 
-export function TimelineLaneIconFrame({ children }: { children: React.ReactNode }) {
+export const TIMELINE_LANE_HEADER_CLASS_NAME = [
+  'relative flex items-center gap-2 border-b px-2',
+  'border-[var(--sniptale-color-border-subtle)] text-[var(--sniptale-color-text-secondary)]',
+  'hover:bg-[var(--sniptale-color-surface-panel)]',
+  'data-[selected=true]:bg-[var(--sniptale-color-surface-hover)]',
+].join(' ');
+
+function TimelineLaneIconFrame({
+  children,
+  selected,
+}: {
+  children: React.ReactNode;
+  selected: boolean;
+}) {
   return (
     <span
       className={[
         'flex h-7 w-7 shrink-0 items-center justify-center rounded-[10px] border',
         'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]',
+        selected
+          ? 'text-[var(--sniptale-color-accent-emphasis)]'
+          : 'text-[var(--sniptale-color-text-secondary)]',
       ].join(' ')}
       data-ui="timeline.track-kind-icon"
     >
@@ -63,4 +79,34 @@ export function getTelemetryLaneIcon() {
 
 export function getCursorLaneIcon() {
   return <MousePointer2 className={TRACK_ICON_CLASS_NAME} />;
+}
+
+export function TimelineLaneIdentity({
+  icon,
+  prefix,
+  name,
+  selected = false,
+}: {
+  icon: React.ReactNode;
+  prefix: string;
+  name: string;
+  selected?: boolean;
+}) {
+  return (
+    <>
+      <TimelineLaneIconFrame selected={selected}>{icon}</TimelineLaneIconFrame>
+      <span
+        data-timeline-track-prefix
+        className="shrink-0 text-[10px] font-semibold tabular-nums text-[var(--sniptale-color-text-dim)]"
+      >
+        {prefix}
+      </span>
+      <span
+        data-timeline-track-name="true"
+        className="truncate text-xs font-semibold text-[var(--sniptale-color-text-primary)]"
+      >
+        {name}
+      </span>
+    </>
+  );
 }

@@ -68,6 +68,7 @@ function createLegacyAnnotationGroups(
   return [
     {
       id: 'general',
+      semantic: 'content' as const,
       label: translate('videoEditor.sidebar.inspectorGroupGeneral'),
       meta: legacyMeta,
       defaultActive: true,
@@ -76,6 +77,7 @@ function createLegacyAnnotationGroups(
     createLegacyAnnotationContentGroup(props, legacyMeta),
     {
       id: 'style',
+      semantic: 'appearance' as const,
       label: translate('videoEditor.sidebar.inspectorGroupStyle'),
       meta: legacyMeta,
       content: renderAnnotationAppearanceFields(props),
@@ -83,6 +85,7 @@ function createLegacyAnnotationGroups(
     },
     {
       id: 'target',
+      semantic: 'placement' as const,
       label: translate('videoEditor.sidebar.inspectorGroupTarget'),
       meta: legacyMeta,
       content: (
@@ -96,6 +99,7 @@ function createLegacyAnnotationGroups(
     },
     {
       id: 'motion',
+      semantic: 'animation' as const,
       label: translate('videoEditor.sidebar.inspectorGroupMotion'),
       meta: legacyMeta,
       content: renderAnnotationMotionFields(props),
@@ -109,6 +113,7 @@ function createLegacyAnnotationContentGroup(
 ) {
   return {
     id: 'content',
+    semantic: 'content' as const,
     label: translate('videoEditor.sidebar.inspectorGroupContent'),
     meta: legacyMeta,
     content: (
@@ -131,6 +136,15 @@ function createModernAnnotationGroups(
     const placementTargetVisible = section === VideoAnnotationControlSection.PLACEMENT;
     return {
       id: section,
+      semantic: (
+        {
+          advanced: 'appearance',
+          appearance: 'appearance',
+          content: 'content',
+          motion: 'animation',
+          placement: 'placement',
+        } as const
+      )[section],
       label: translate(MODERN_SECTION_LABELS[section]),
       content: (
         <>
@@ -145,6 +159,7 @@ function createModernAnnotationGroups(
   return [
     {
       id: 'basic',
+      semantic: 'appearance' as const,
       label: translate('videoEditor.sidebar.annotationInspectorSectionBasic'),
       defaultActive: true,
       content: <ModernAnnotationSummary packLabel={packLabel} template={template} />,

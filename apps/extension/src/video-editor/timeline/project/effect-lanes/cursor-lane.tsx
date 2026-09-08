@@ -1,4 +1,5 @@
 import { useContext } from 'react';
+import { TIMELINE_CURSOR_ROW_HEIGHT } from './history-layout';
 import { projectTimelineInterval, type TimelineProjection } from '../interaction-state/projection';
 import { buildVideoCompositionCursorSegments } from '../../../../features/video/composition/timeline/lanes';
 import { translate } from '../../../../platform/i18n';
@@ -19,8 +20,8 @@ import type {
 } from '../types';
 
 const CURSOR_VISIBLE_SEGMENT_CLASS_NAME = [
-  'border-[color:color-mix(in_srgb,var(--sniptale-color-success)_28%,var(--sniptale-color-border-soft)_72%)]',
-  'bg-[color:color-mix(in_srgb,var(--sniptale-color-success-soft)_88%,transparent)]',
+  'border-[color:var(--sniptale-color-border-soft)]',
+  'bg-[color:var(--sniptale-color-surface-input)]',
 ].join(' ');
 
 const CURSOR_HIDDEN_SEGMENT_CLASS_NAME = [
@@ -72,7 +73,8 @@ export function ProjectTimelineCursorLane(props: {
   );
   return props.embedded ? (
     <div
-      className="relative h-8 border-t border-[var(--sniptale-color-border-subtle)]"
+      className="relative border-t border-[var(--sniptale-color-border-subtle)]"
+      style={{ height: TIMELINE_CURSOR_ROW_HEIGHT }}
       data-ui="video-editor.timeline.history-cursor-row"
     >
       {content}
@@ -92,6 +94,7 @@ function ProjectTimelineCursorSegment(props: {
 }) {
   return (
     <ProjectTimelineEffectSegment
+      height={18}
       segmentId={props.segment.id}
       className={
         props.segment.visible ? CURSOR_VISIBLE_SEGMENT_CLASS_NAME : CURSOR_HIDDEN_SEGMENT_CLASS_NAME
@@ -103,7 +106,7 @@ function ProjectTimelineCursorSegment(props: {
       )}
       label={translate('videoEditor.timeline.cursorLane')}
       hideLabel
-      leadingIcon={getCursorLaneIcon()}
+      leadingIcon={<span className="[&_svg]:h-3 [&_svg]:w-3">{getCursorLaneIcon()}</span>}
       startTime={props.segment.start}
       endTime={props.segment.end}
       pixelsPerSecond={props.pixelsPerSecond}

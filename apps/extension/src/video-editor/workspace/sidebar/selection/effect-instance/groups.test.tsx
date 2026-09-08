@@ -166,3 +166,72 @@ it('routes duplicate and order through the composed selection panel into the eff
   expect(handlers.onDuplicateEffectInstance).toHaveBeenCalledExactlyOnceWith('first');
   expect(handlers.onMoveEffectInstance).toHaveBeenCalledExactlyOnceWith('first', 'down');
 });
+
+it('preserves an off-scene handle coordinate when committing its existing value', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { parseEffectV1Source } = await import('@sniptale/runtime-contracts/effect-v1');
+  const source = readFileSync(
+    'packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-callout-light.sniptale-effect.json',
+    'utf8'
+  );
+  const parsed = parseEffectV1Source(source);
+  if (!parsed.document) throw new Error('Expected callout fixture');
+  const handle = parsed.document.objectLayout!.handles![0]!;
+  const project = createEmptyVideoProject('Handle');
+  project.effectSnapshots = [
+    {
+      id: 'snapshot',
+      documentId: parsed.document.id,
+      kind: 'standalone',
+      assets: [],
+      retainedByteLength: new TextEncoder().encode(source).length,
+      schemaVersion: 'sniptale.effect.v1',
+      sha256: '0'.repeat(64),
+      source,
+    },
+  ];
+  project.effectInstances = [
+    {
+      id: 'callout',
+      kind: 'standalone',
+      snapshotId: 'snapshot',
+      enabled: true,
+      controls: {},
+      duration: 3,
+      playbackRate: 1,
+      startTime: 0,
+      target: { kind: 'scene' },
+      sceneAnchors: { [handle.id]: { x: -120, y: 900 } },
+    },
+  ];
+  const update = vi.fn();
+  act(() =>
+    root.render(
+      createEffectInstanceGroup({
+        project,
+        instanceId: 'callout',
+        target: { kind: 'scene' },
+        onUpdateEffectInstance: update,
+        onDeleteEffectInstance: vi.fn(),
+        onDuplicateEffectInstance: vi.fn(() => null),
+        onMoveEffectInstance: vi.fn(),
+      }).content
+    )
+  );
+  const input = [...container.querySelectorAll<HTMLInputElement>('input')].find((node) =>
+    node.getAttribute('aria-label')?.endsWith('· X')
+  )!;
+  act(() => input.focus());
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '-150');
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  act(() => input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })));
+  expect(update).not.toHaveBeenCalledWith(
+    'callout',
+    expect.objectContaining({ sceneAnchors: { [handle.id]: { x: 0, y: 900 } } })
+  );
+  expect(update).toHaveBeenCalledWith('callout', {
+    sceneAnchors: { [handle.id]: { x: -150, y: 900 } },
+  });
+});

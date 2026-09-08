@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
-import type { VideoProject } from '../../../../../features/video/project/types';
+import { useEffect, useMemo, useState } from 'react';
 import { createVideoPreviewFrameMaterializer } from '../../../../preview/cache/materializer';
+import { createVideoPreviewRenderIdentity } from '../../../../preview/cache/revision';
 import type { FramingPreviewProps } from './framing-preview-interaction';
 
 export function useFramingFrame(
@@ -8,43 +8,57 @@ export function useFramingFrame(
   canvasRef: React.RefObject<HTMLCanvasElement | null>
 ) {
   const { project, region, assetUrls } = props;
-  const [frame, setFrame] = useState<{ project: VideoProject; status: 'ready' | 'error' } | null>(
-    null
+  const identity = useMemo(
+    () => createVideoPreviewRenderIdentity({ ...project, motionRegions: [] }),
+    [project]
   );
+  const time = Math.min(project.duration, region.startTime + region.duration / 2);
+  const key = JSON.stringify([
+    identity,
+    time,
+    Object.entries(assetUrls).sort(([a], [b]) => a.localeCompare(b)),
+  ]);
+  const [request, setRequest] = useState(() => ({ key, project, assetUrls, time }));
+  // A new project object is also published for focus edits and autosave. Only the
+  // unzoomed composition, sampled time and media URLs invalidate the decoded frame.
+  if (request.key !== key) setRequest({ key, project, assetUrls, time });
+  const [frame, setFrame] = useState<{
+    request: typeof request;
+    status: 'ready' | 'error';
+  } | null>(null);
   const [retry, setRetry] = useState(0);
-  const ready = frame?.project === project && frame.status === 'ready';
-  const failed = frame?.project === project && frame.status === 'error';
+  const ready = frame?.request === request && frame.status === 'ready';
+  const failed = frame?.request === request && frame.status === 'error';
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const controller = new AbortController();
     const materializer = createVideoPreviewFrameMaterializer({
-      assetUrls,
+      assetUrls: request.assetUrls,
       ownerDocument: canvas.ownerDocument,
-      project: { ...project, motionRegions: [] },
+      project: { ...request.project, motionRegions: [] },
       rasterSize: {
         width: 480,
-        height: Math.max(2, Math.round((480 * project.height) / project.width)),
+        height: Math.max(2, Math.round((480 * request.project.height) / request.project.width)),
       },
     });
-    const time = Math.min(project.duration, region.startTime + region.duration / 2);
     void materializer
-      .renderFrame(time, controller.signal)
+      .renderFrame(request.time, controller.signal)
       .then((source) => {
         if (controller.signal.aborted) return;
         canvas.width = source.width;
         canvas.height = source.height;
         canvas.getContext('2d')?.drawImage(source, 0, 0);
-        setFrame({ project, status: 'ready' });
+        setFrame({ request, status: 'ready' });
       })
       .catch(() => {
-        if (!controller.signal.aborted) setFrame({ project, status: 'error' });
+        if (!controller.signal.aborted) setFrame({ request, status: 'error' });
       });
     return () => {
       controller.abort();
       materializer.dispose();
     };
-  }, [assetUrls, project, region.startTime, region.duration, retry, canvasRef]);
+  }, [request, retry, canvasRef]);
   return {
     ready,
     failed,

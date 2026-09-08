@@ -1,3 +1,7 @@
+import {
+  constrainMotionTiming,
+  getMotionInsertionRange,
+} from '../../../features/video/project/motion/placement';
 import { bindMotionRegionToClip } from '../../../features/video/project/motion/source-binding';
 import { getVideoProjectUtilityLanes } from '../../../features/video/project/utility-lanes';
 import { resolveVideoProjectActionOccurrences } from '../../../features/video/project/action-occurrences';
@@ -187,7 +191,12 @@ function extendAutoRegion(
 
   const normalized = normalizeVideoProjectMotionRegion(project, {
     ...region,
-    duration: clampedDuration,
+    ...constrainMotionTiming(
+      project,
+      region,
+      { startTime: region.startTime, duration: clampedDuration },
+      false
+    ),
     motionBlurAmount: Math.max(region.motionBlurAmount ?? 0, profile.motionBlurAmount),
     scale: Math.max(region.scale, profile.scale),
     zoomInDuration: Math.max(region.zoomInDuration, profile.zoomInDuration),
@@ -202,7 +211,10 @@ function createAutoRegion(
   click: Click,
   profile: AutoZoomProfile
 ): MotionRegion | null {
+  const free = getMotionInsertionRange(project, click.time);
+  if (!free) return null;
   const duration = Math.min(
+    free.duration,
     profile.duration,
     project.duration - click.time,
     click.runEnd - click.time
@@ -267,7 +279,7 @@ export function buildAutoZoomRegions(params: BuildParams): MotionRegion[] {
     if (reusableRegion && isRepeatedNearby) {
       autoRegions[autoRegions.indexOf(reusableRegion)] = extendAutoRegion(
         reusableRegion,
-        project,
+        { ...project, motionRegions: [...manualRegions, ...autoRegions] },
         click,
         profile
       );
@@ -278,7 +290,11 @@ export function buildAutoZoomRegions(params: BuildParams): MotionRegion[] {
       continue;
     }
 
-    const region = createAutoRegion(project, click, profile);
+    const region = createAutoRegion(
+      { ...project, motionRegions: [...manualRegions, ...autoRegions] },
+      click,
+      profile
+    );
     if (region) {
       autoRegions.push(region);
       lastAutoZoomTimes.set(click.runId, click.time);

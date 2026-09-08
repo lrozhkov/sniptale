@@ -79,10 +79,9 @@ export function ProjectTimelineBody(props: ProjectTimelineBodyProps) {
     <div
       className="grid min-h-0 flex-1 overflow-hidden"
       style={{
-        gridTemplateColumns:
-          props.trackPanelPrefs.prefs.compactRows && props.trackPanelPrefs.prefs.hideTrackNames
-            ? '160px minmax(0,1fr)'
-            : '220px minmax(0,1fr)',
+        gridTemplateColumns: props.trackPanelPrefs.prefs.hideTrackNames
+          ? '136px minmax(0,1fr)'
+          : '220px minmax(0,1fr)',
       }}
     >
       <ProjectTimelineBodyTrackList {...props} />
@@ -103,27 +102,20 @@ function createTrackListProps(props: ProjectTimelineBodyProps): ProjectTimelineB
   return {
     canShowTelemetryLane: true,
     recordingTelemetry: props.recordingTelemetry,
-    autoProcessing: {
-      project: props.project,
-      selection: props.selection,
-      actions: props.autoProcessing,
-      onSeek: props.onSeek,
-      onModalVisibilityChange: props.onAutoProcessingModalVisibilityChange,
-    },
     onSelectHistoryLane: props.onSelectHistoryLane,
     historyLaneSelected: props.selection?.kind === VideoEditorSelectionKind.HISTORY_LANE,
     onSelectMotionLane: props.onSelectMotionLane,
     motionLaneSelected: props.selection?.kind === VideoEditorSelectionKind.MOTION_LANE,
     cursorLaneVisible: props.cursorLaneVisible,
     project: props.project,
-    selectedTrackId: props.selectedTrackId,
+    selectedTrackId:
+      props.selection?.kind === VideoEditorSelectionKind.TRACK ? props.selection.trackId : null,
     showTelemetryLane: props.telemetryLaneVisible,
     trackLayoutModel: props.trackLayoutModel,
     trackListRef: props.trackListRef,
     trackPanelPrefs: props.trackPanelPrefs,
     tracks: props.tracks,
     onAddTrack: props.insertion.onAddTrack,
-    onAddMotionRegion: () => props.insertion.onAddMotionRegion(),
     onClearUtilityLane: props.onClearUtilityLane,
     onScroll: () => props.syncTracksScroll('tracks'),
     onSelectTrack: props.onSelectTrack,
@@ -136,6 +128,7 @@ function createTrackListProps(props: ProjectTimelineBodyProps): ProjectTimelineB
 
 function createCanvasProps(props: ProjectTimelineBodyProps): ProjectTimelineBodyCanvasProps {
   return {
+    hiddenClipNamesByTrackId: props.trackPanelPrefs.prefs.hiddenClipNamesByTrackId,
     currentTime: props.currentTime,
     consumeCompletedScrubClick: props.consumeCompletedScrubClick,
     cursorLaneVisible: props.cursorLaneVisible,

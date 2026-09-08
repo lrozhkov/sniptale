@@ -70,6 +70,7 @@ it.each([createWorkspaceProjectUpdaters, createWorkspacePreviewProjectUpdaters])
   'recreates the first zoom as visible and editable in the same project update (%#)',
   (createActions) => {
     const project = createEmptyVideoProject('Zoom');
+    project.duration = 10;
     project.utilityLanes = {
       actions: { visible: true, locked: false },
       camera: { visible: false, locked: true },
@@ -82,3 +83,15 @@ it.each([createWorkspaceProjectUpdaters, createWorkspacePreviewProjectUpdaters])
     expect(project.utilityLanes?.camera).toEqual({ visible: true, locked: false });
   }
 );
+
+it('rejects an occupied zoom insertion and fits the next free gap', () => {
+  const project = createEmptyVideoProject('Zoom placement');
+  project.duration = 10;
+  const store = createStore(project);
+  const actions = createWorkspaceProjectUpdaters(store);
+  actions.addMotionRegion(2);
+  actions.addMotionRegion(3);
+  expect(project.motionRegions).toHaveLength(1);
+  actions.addMotionRegion(1);
+  expect(project.motionRegions?.at(-1)).toMatchObject({ startTime: 1, duration: 1 });
+});

@@ -148,3 +148,38 @@ it('prefers absolute audio gain fields when envelope values are absent', async (
   expect(context.lastGain?.gain.setValueAtTime).toHaveBeenCalledWith(1.5, 0.5);
   expect(context.lastGain?.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.25, 2.5);
 });
+
+it.each(['LINEAR', 'EASE_IN_OUT'] as const)(
+  'schedules %s crossfade at the retained phase of a partial export',
+  async (easing) => {
+    const { scheduleOfflineAudioClipMix } = await import('./schedule');
+    const { getTransitionProgress } =
+      await import('../../../../features/video/project/transition/runtime');
+    const context = new FakeOfflineAudioContext() as unknown as FakeOfflineAudioContext &
+      OfflineAudioContext;
+    scheduleOfflineAudioClipMix(
+      context,
+      {
+        duration: 0.5,
+        startTime: 0,
+        sourceStart: 0,
+        sourceDuration: 0.5,
+        volume: 1,
+        muted: false,
+        fadeInMs: 0,
+        fadeOutMs: 0,
+        audioTransitions: [{ start: -0.25, end: 0.75, incoming: true, easing }],
+      } as never,
+      createAudioBuffer(1, 48000, 48000)
+    );
+    const automation = context.lastGain!.gain;
+    expect(automation.setValueAtTime).toHaveBeenCalledWith(
+      getTransitionProgress({ start: -0.25, end: 0.75, transition: { easing } }, 0),
+      0
+    );
+    expect(automation.linearRampToValueAtTime).toHaveBeenLastCalledWith(
+      getTransitionProgress({ start: -0.25, end: 0.75, transition: { easing } }, 0.5),
+      0.5
+    );
+  }
+);

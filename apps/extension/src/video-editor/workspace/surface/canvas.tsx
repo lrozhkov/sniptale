@@ -1,3 +1,5 @@
+import { WorkspacePanelHeader } from '../floating/panel-header';
+import type { ProjectAssetUse } from '../../../features/video/project/media-usage';
 import { VideoEditorWorkspaceHeaderActions } from '../floating/top-panels';
 import { useWorkspaceTrackPresentation } from './track-presentation';
 import React, { useEffect, useState } from 'react';
@@ -7,6 +9,7 @@ import { translate } from '../../../platform/i18n';
 import { VideoEditorSourceViewer } from './source-viewer';
 import type { VideoProjectAsset } from '../../../features/video/project/types';
 import { ProjectTimeline } from '../../timeline/project';
+import type { TimelineClipRevealRequest } from '../../timeline/project/types';
 import { PreviewStage } from '../../preview/stage';
 import { VideoEditorMaterials } from './materials';
 import type { VideoPreviewCanvasInsertKind } from '../../preview/stage/types';
@@ -47,6 +50,7 @@ import {
 } from '../../runtime/controller/store';
 
 export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProps) {
+  const [revealClipRequest, setRevealClipRequest] = useState<TimelineClipRevealRequest>();
   const layout = useVideoEditorLayoutController();
   const preview = useVideoEditorPreviewController();
   const viewer = useWorkspacePreviewContext();
@@ -63,7 +67,13 @@ export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProp
         }}
       >
         <div data-ui="video-editor.workspace.upper" className="contents">
-          <VideoEditorWorkspaceUpper key={preview?.project.id ?? 'empty'} {...props} />
+          <VideoEditorWorkspaceUpper
+            key={preview?.project.id ?? 'empty'}
+            {...props}
+            onRevealClip={(clipId) =>
+              setRevealClipRequest((previous) => ({ clipId, serial: (previous?.serial ?? 0) + 1 }))
+            }
+          />
         </div>
         <div
           className="col-start-3 row-start-1 flex min-h-0 min-w-0"
@@ -93,7 +103,7 @@ export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProp
             gridColumnEnd: props.inspectorFullHeight ? 3 : 4,
           }}
         >
-          <VideoEditorWorkspaceTimeline {...props} />
+          <VideoEditorWorkspaceTimeline {...props} revealClipRequest={revealClipRequest} />
         </div>
       </div>
     </div>
@@ -116,7 +126,9 @@ interface VideoEditorWorkspaceCanvasProps {
   onEffectsLibraryDockOpenChange: (open: boolean) => void;
 }
 
-function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
+function VideoEditorWorkspaceUpper(
+  props: VideoEditorWorkspaceCanvasProps & { onRevealClip: (clipId: string) => void }
+) {
   const recordingLayout = useVideoEditorLayoutController();
   const header = useVideoEditorHeaderController();
   const preview = useVideoEditorPreviewController();
@@ -173,17 +185,9 @@ function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
               preview.transport.onPausePlayback();
               setSourceActive(false);
               setSelectedAssetId(null);
-              if (use.kind === 'scene') {
-                preview.selection.onSelectScene();
-                if (!props.inspectorPanel.isOpen) props.inspectorPanel.onToggle();
-              }
-              if (use.kind === 'clip') {
-                const clip = preview.project.clips.find((clip) => clip.id === use.clipId);
-                if (clip) {
-                  preview.selection.onSelectClip(clip.id);
-                  preview.transport.onSeek(clip.startTime);
-                }
-              }
+              revealWorkspaceMaterial(use, preview, props.onRevealClip);
+              if (use.kind === 'scene' && !props.inspectorPanel.isOpen)
+                props.inspectorPanel.onToggle();
             }}
             onRemoveUnused={removeUnusedAssets}
             onOpenLibrary={() => header?.onOpenLibraryPanel()}
@@ -309,15 +313,9 @@ function WorkspaceLibraryPanel(
               className="flex h-full min-h-0 flex-col overflow-hidden"
               dataUi="video-editor.library.panel"
             >
-              <header
-                className={[
-                  'flex h-[52px] shrink-0 items-center justify-between gap-2 border-b',
-                  'border-[color:var(--sniptale-color-border-soft)] px-3',
-                ].join(' ')}
-              >
+              <WorkspacePanelHeader actions={libraryActions}>
                 {libraryNavigation}
-                {libraryActions}
-              </header>
+              </WorkspacePanelHeader>
               <div className="min-h-0 flex-1">{props.children}</div>
             </FloatingChromePanel>
           </div>
@@ -360,6 +358,23 @@ function createWorkspacePreviewProps(
   };
 }
 
+function revealWorkspaceMaterial(
+  use: ProjectAssetUse,
+  preview: Pick<
+    NonNullable<ReturnType<typeof useVideoEditorPreviewController>>,
+    'project' | 'selection' | 'transport'
+  >,
+  onRevealClip: (clipId: string) => void
+) {
+  if (use.kind === 'scene') preview.selection.onSelectScene();
+  if (use.kind !== 'clip') return;
+  const clip = preview.project.clips.find((clip) => clip.id === use.clipId);
+  if (!clip) return;
+  preview.selection.onSelectClip(clip.id);
+  preview.transport.onSeek(clip.startTime);
+  onRevealClip(clip.id);
+}
+
 function createWorkspacePreviewActions(
   preview: NonNullable<ReturnType<typeof useVideoEditorPreviewController>>
 ): Pick<
@@ -395,7 +410,11 @@ function createWorkspacePreviewActions(
   };
 }
 
-function VideoEditorWorkspaceTimeline(props: VideoEditorWorkspaceCanvasProps): React.JSX.Element {
+function VideoEditorWorkspaceTimeline(
+  props: VideoEditorWorkspaceCanvasProps & {
+    revealClipRequest: TimelineClipRevealRequest | undefined;
+  }
+): React.JSX.Element {
   const controller = useVideoEditorTimelineController();
   const presentation = useWorkspaceTrackPresentation();
   const onApplyEffectDocument = useVideoEditorEffectEditingPort((port) => port.applyEffectDocument);
@@ -403,6 +422,7 @@ function VideoEditorWorkspaceTimeline(props: VideoEditorWorkspaceCanvasProps): R
   return (
     <div className="min-h-[220px] min-w-0 flex-1">
       <ProjectTimeline
+        revealClipRequest={props.revealClipRequest}
         panelPrefs={presentation.panelPrefs}
         {...getProjectTimelineProps(
           controller,

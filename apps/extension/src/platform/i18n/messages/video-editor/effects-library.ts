@@ -1,6 +1,17 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorEffectsLibraryMessages = defineMessageSource({
+  exportInstance: { ru: 'Экспорт эффекта', en: 'Export effect' },
+  exportFailed: { ru: 'Не удалось экспортировать эффект', en: 'Could not export effect' },
+  objectText: { ru: 'Текст', en: 'Text' },
+  objectAppearance: { ru: 'Вид', en: 'Appearance' },
+  objectAnimation: { ru: 'Анимация', en: 'Animation' },
+  objectAdvanced: { ru: 'Дополнительно', en: 'Advanced' },
+  appearanceOrder: { ru: 'Порядок появления', en: 'Appearance order' },
+  lineThenText: { ru: 'Линия → текст', en: 'Line → text' },
+  textThenLine: { ru: 'Текст → линия', en: 'Text → line' },
+  together: { ru: 'Вместе', en: 'Together' },
+
   catalogLoading: { ru: 'Загружаем эффекты…', en: 'Loading effects…' },
   catalogLoadFailed: {
     ru: 'Не удалось загрузить эффекты. Перезагрузите страницу и попробуйте снова.',

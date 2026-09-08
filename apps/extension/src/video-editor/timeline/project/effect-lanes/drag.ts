@@ -1,3 +1,4 @@
+import { constrainMotionTiming } from '../../../../features/video/project/motion/placement';
 import { clampNumber } from '../../../../features/video/project/hydration';
 import type { VideoProject } from '../../../../features/video/project/types';
 import type {
@@ -109,16 +110,21 @@ function moveMotionRegionTarget(
   }
 
   const { duration, startTime } = resolveMotionRegionRange(target, delta, projectDuration);
+  const [snappedStart, snappedDuration] = snapMotionRegionRange({
+    duration,
+    magnetEnabled,
+    pixelsPerSecond,
+    project,
+    startTime,
+    target,
+  });
+  const region = project.motionRegions?.find((item) => item.id === target.motionRegionId);
+  const range = { startTime: snappedStart, duration: snappedDuration };
+  const constrained = region ? constrainMotionTiming(project, region, range, false) : range;
   callbacks.onResizeMotionRegion(
     target.motionRegionId,
-    ...snapMotionRegionRange({
-      duration,
-      magnetEnabled,
-      pixelsPerSecond,
-      project,
-      startTime,
-      target,
-    })
+    constrained.startTime,
+    constrained.duration
   );
 }
 
@@ -210,6 +216,13 @@ function snapMotionRegionStartTime(params: {
   const region = params.project.motionRegions?.find(
     (item) => item.id === params.target.motionRegionId
   );
+  if (region)
+    return constrainMotionTiming(
+      params.project,
+      region,
+      { startTime: snappedStart, duration: region.duration },
+      true
+    ).startTime;
   return clampMotionRegionStartTime(
     params.project,
     region ?? { duration: params.target.originalDuration },

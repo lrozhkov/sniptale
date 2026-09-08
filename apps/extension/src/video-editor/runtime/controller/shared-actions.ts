@@ -1,3 +1,4 @@
+import { getMotionInsertionRange } from '../../../features/video/project/motion/placement';
 import { getVideoProjectUtilityLanes } from '../../../features/video/project/utility-lanes';
 import { getVideoProjectActionPresentation } from '../../../features/video/project/action-presentation';
 import { createVideoProjectMotionRegion } from '../../../features/video/project/motion';
@@ -227,10 +228,15 @@ function createMotionRegionUpdaters(store: WorkspaceProjectUpdaterStore) {
 function createMotionRegionAdder(store: PreviewProjectUpdaterStore) {
   return (startTime?: number) => {
     store.updateProject((project) => {
-      const region = bindMotionRegionToUniqueVideo(
-        project,
-        createVideoProjectMotionRegion(project, startTime ?? store.getCurrentTime())
-      );
+      if (project.motionRegions?.length && getVideoProjectUtilityLanes(project).camera.locked)
+        return project;
+      const range = getMotionInsertionRange(project, startTime ?? store.getCurrentTime());
+      if (!range) return project;
+      const created = createVideoProjectMotionRegion(project, range.startTime);
+      const region = bindMotionRegionToUniqueVideo(project, {
+        ...created,
+        duration: Math.min(created.duration, range.duration),
+      });
       queueMicrotask(() => store.selectMotionRegion(region.id));
       return {
         ...project,

@@ -3,6 +3,8 @@ import { videoEditorTimelineAutoTransformMessages } from './timeline-auto-transf
 import { videoEditorTimelineLaneMessages } from './timeline-lanes';
 
 export const videoEditorTimelineMessages = defineMessageSource({
+  historyLaneShort: { ru: 'История', en: 'History' },
+  hideClipNames: { ru: 'Скрывать названия фрагментов', en: 'Hide clip names' },
   framingConnection: { ru: 'Переход кадрирования', en: 'Framing transition' },
   connectFraming: { ru: 'Соединить состояния', en: 'Connect framing states' },
   disconnectFraming: { ru: 'Убрать переход', en: 'Remove framing transition' },
@@ -109,6 +111,11 @@ export const videoEditorTimelineMessages = defineMessageSource({
   addVideoTrackNote: {
     ru: 'Дополнительные видео и визуальные слои',
     en: 'Extra footage and visual layers',
+  },
+  addCameraTrack: { ru: 'Камера', en: 'Camera' },
+  addCameraTrackNote: {
+    ru: 'Отдельный видеослой с настройками камеры',
+    en: 'Separate video layer with camera controls',
   },
   addAudioTrack: {
     ru: 'Аудио-дорожка',

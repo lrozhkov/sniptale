@@ -6,7 +6,7 @@ import { createEmptyVideoProject } from '../../../../../features/video/project/f
 import { createVideoProjectMotionRegion } from '../../../../../features/video/project/motion';
 import { InspectMotionLanePanel } from './motion-lane';
 
-it('edits lane visibility/lock and gates add/clear using current lane state', () => {
+it('edits lane visibility/lock and keeps creation in the toolbar and gates clear using current lane state', () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   const host = document.createElement('div');
   document.body.append(host);
@@ -42,8 +42,8 @@ it('edits lane visibility/lock and gates add/clear using current lane state', ()
         (b) => !b.hasAttribute('aria-pressed')
       );
     act(() => actions()[0]!.click());
-    expect(add).toHaveBeenCalledOnce();
-    act(() => actions()[1]!.click());
+    expect(add).not.toHaveBeenCalled();
+    expect(actions()).toHaveLength(1);
     expect(clear).toHaveBeenCalledWith('camera');
     project.utilityLanes = {
       actions: { visible: true, locked: false },
@@ -53,8 +53,7 @@ it('edits lane visibility/lock and gates add/clear using current lane state', ()
     expect(actions().every((b) => b.disabled)).toBe(true);
     project.utilityLanes.camera = { visible: false, locked: false };
     render();
-    expect(actions()[0]!.disabled).toBe(true);
-    expect(actions()[1]!.disabled).toBe(false);
+    expect(actions()[0]!.disabled).toBe(false);
   } finally {
     act(() => root.unmount());
     host.remove();

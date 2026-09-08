@@ -74,10 +74,11 @@ describe('workspace-sidebar/selection/inspect-motion', () => {
 
     clickGroup('videoEditor.sidebar.inspectorGroupTiming');
     expect(container?.textContent).toContain('videoEditor.sidebar.motionDurationLabel');
-    expect(container?.textContent).toContain('videoEditor.sidebar.motionZoomInLabel');
+    expect(container?.textContent).not.toContain('videoEditor.sidebar.motionZoomInLabel');
     expect(container?.textContent).not.toContain('videoEditor.sidebar.motionBlurLabel');
 
-    clickGroup('videoEditor.sidebar.inspectorGroupBehavior');
+    clickGroup('videoEditor.sidebar.inspectorGroupAnimation');
+    expect(container?.textContent).toContain('videoEditor.sidebar.motionZoomInLabel');
     expect(container?.textContent).toContain('videoEditor.sidebar.motionBlurLabel');
     expect(container?.textContent).toContain('videoEditor.sidebar.motionOverlayZoomLabel');
   });

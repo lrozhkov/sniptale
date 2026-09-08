@@ -1,3 +1,4 @@
+import { resolveEffectClipTransformPatch } from '../../../../features/video/project/effect-instance/layout';
 import { clampNumber } from '../../../../features/video/project/timeline/basics';
 import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
 import { getClipGainRange } from '../../../../features/video/project/timeline/basics';
@@ -89,7 +90,15 @@ function updateClipTransform(
     return applyProjectUpdate(state, (project) =>
       updateClipWithProjectGuard(project, clipId, (item) => ({
         ...item,
-        transform: { ...item.transform, ...normalizedPatch },
+        transform: {
+          ...item.transform,
+          ...resolveEffectClipTransformPatch(
+            project,
+            item,
+            normalizedPatch,
+            VIDEO_CLIP_PROPERTY_LIMITS.transformSize
+          ),
+        },
       }))
     );
   });

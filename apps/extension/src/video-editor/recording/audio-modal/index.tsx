@@ -1,4 +1,4 @@
-import { TimelineRecordingPanel } from './timeline-panel';
+import { TimelineRecordingBackdrop, TimelineRecordingPanel } from './timeline-panel';
 import type React from 'react';
 import { translate } from '../../../platform/i18n';
 import { ProductModal, ProductModalBody, ProductModalFooter } from '@sniptale/ui/product-modal';
@@ -16,7 +16,7 @@ import { renderAudioRecordingTrimPanel } from './trim';
 
 function AudioRecordingCancelButton({ onClose }: Pick<AudioRecordingModalProps, 'onClose'>) {
   return (
-    <ProductActionButton tone="secondary" onClick={onClose} className="px-4">
+    <ProductActionButton compact tone="secondary" onClick={onClose} className="px-4">
       {translate('common.actions.cancel')}
     </ProductActionButton>
   );
@@ -51,33 +51,36 @@ export function AudioRecordingModal({
   if (!isOpen) return null;
   if (timeline)
     return (
-      <ProductModal
-        backdropClassName="!bg-[color:color-mix(in_srgb,var(--sniptale-color-overlay)_18%,transparent)]"
-        dialogClassName={[
-          '!top-auto !bottom-3 !transform-[translate(-50%,0)] !rounded-lg',
-          '!bg-[var(--sniptale-color-surface-panel)]',
-        ].join(' ')}
-        onKeyDown={handleKeyDown}
-        onClose={requestClose}
-        closeOnBackdrop={false}
-        labelledBy={titleId}
-        width="min(800px, calc(100vw - 32px))"
-        maxHeight="calc(100vh - 24px)"
-      >
-        <TimelineRecordingPanel
-          titleId={titleId}
-          startTime={timeline.startTime}
-          duration={timeline.duration}
-          controller={controller}
-          device={device}
-          starting={starting}
-          saving={isSaving}
-          error={saveError}
-          onStart={startRecording}
+      <>
+        <TimelineRecordingBackdrop />
+        <ProductModal
+          backdropClassName="!bg-[color:color-mix(in_srgb,var(--sniptale-color-overlay)_18%,transparent)]"
+          dialogClassName={[
+            '!top-auto !bottom-3 !transform-[translate(-50%,0)] !rounded-lg',
+            '!bg-[var(--sniptale-color-surface-panel)]',
+          ].join(' ')}
+          onKeyDown={handleKeyDown}
           onClose={requestClose}
-          onSave={saveRecording}
-        />
-      </ProductModal>
+          closeOnBackdrop={false}
+          labelledBy={titleId}
+          width="min(800px, calc(100vw - 32px))"
+          maxHeight="calc(100vh - 24px)"
+        >
+          <TimelineRecordingPanel
+            titleId={titleId}
+            startTime={timeline.startTime}
+            duration={timeline.duration}
+            controller={controller}
+            device={device}
+            starting={starting}
+            saving={isSaving}
+            error={saveError}
+            onStart={startRecording}
+            onClose={requestClose}
+            onSave={saveRecording}
+          />
+        </ProductModal>
+      </>
     );
 
   return (
@@ -109,7 +112,7 @@ function MaterialRecordingDialog({
       onClose={requestClose}
       closeOnBackdrop={false}
       labelledBy={titleId}
-      width="min(720px, calc(100vw - 32px))"
+      width="min(600px, calc(100vw - 32px))"
       maxHeight="min(760px, calc(100vh - 32px))"
       scrollable
     >

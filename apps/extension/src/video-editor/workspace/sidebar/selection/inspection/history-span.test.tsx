@@ -152,7 +152,7 @@ it('does not offer a fake preview for missing telemetry or locked source tracks'
   expect(props.onApplyTypingCompression).not.toHaveBeenCalled();
 });
 
-it('selects the exact repeated typing span and seeks its visible start without duplicate action markers', () => {
+it('selects the exact repeated typing span without moving playback without duplicate action markers', () => {
   const props = fixture();
   props.project.clips.push(
     createVideoClip({ id: 'repeat', sourceInstanceId: 'instance', startTime: 22 })
@@ -177,7 +177,7 @@ it('selects the exact repeated typing span and seeks its visible start without d
   const repeated = container.querySelector<HTMLButtonElement>('[data-history-clip-id="repeat"]')!;
   act(() => repeated.click());
   expect(select).toHaveBeenCalledExactlyOnceWith({ ...target, clipId: 'repeat' });
-  expect(seek).toHaveBeenCalledExactlyOnceWith(24);
+  expect(seek).not.toHaveBeenCalled();
 });
 
 it('disables applying a snapshot rejected as stale by the authoritative command', () => {

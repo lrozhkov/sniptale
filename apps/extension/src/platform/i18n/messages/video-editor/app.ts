@@ -40,6 +40,8 @@ export const videoEditorAppMessages = defineMessageSource({
     en: 'Temporally linked camera and audio move with the clip.',
   },
 
+  inspectorShowAll: { ru: 'Показать все разделы', en: 'Show all sections' },
+  inspectorShowSelected: { ru: 'Показывать по разделам', en: 'Show one section at a time' },
   panelFullHeight: { ru: 'Развернуть панель по высоте', en: 'Expand panel to full height' },
   panelRestoreHeight: {
     ru: 'Вернуть панель к высоте просмотра',

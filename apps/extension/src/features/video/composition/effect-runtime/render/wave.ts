@@ -1,3 +1,4 @@
+import { EFFECT_RUNTIME_RESOURCE_LIMITS } from '../runtime/resource-limits';
 // policyStateIds: [] - empty render maps are immutable sentinels, not authority state.
 import type { EffectRuntimeSandboxExecutor } from '../../../../../contracts/effect-runtime/types';
 import type { VideoCompositionMediaSource } from '../../draw/media-source';
@@ -69,13 +70,24 @@ function scaleEffectRuntimeFramePlan(
   plan: EffectRuntimeFramePlan,
   rasterScale: number | undefined
 ): EffectRuntimeFramePlan {
-  const scale = Math.max(0.01, rasterScale ?? 1);
-  if (scale === 1) return plan;
+  const scale = Math.min(
+    Math.max(0.01, rasterScale ?? 1),
+    Math.sqrt(
+      EFFECT_RUNTIME_RESOURCE_LIMITS.maxOutputPixels /
+        (plan.dimensions.width * plan.dimensions.height)
+    )
+  );
+  if (
+    scale === 1 &&
+    plan.renderDimensions.width === plan.dimensions.width &&
+    plan.renderDimensions.height === plan.dimensions.height
+  )
+    return plan;
   return {
     ...plan,
     renderDimensions: {
-      height: Math.max(1, Math.round(plan.dimensions.height * scale)),
-      width: Math.max(1, Math.round(plan.dimensions.width * scale)),
+      height: Math.max(1, Math.floor(plan.dimensions.height * scale)),
+      width: Math.max(1, Math.floor(plan.dimensions.width * scale)),
     },
   };
 }

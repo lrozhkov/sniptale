@@ -111,8 +111,10 @@ describe('workspace-sidebar/selection/inspect-cursor', () => {
     renderInspectPanel(createProps());
     clickGroup('videoEditor.sidebar.inspectorGroupAppearance');
 
-    expect(container?.textContent).toContain('videoEditor.sidebar.cursorTrackAppearanceTitle');
-    expect(container?.textContent).toContain('videoEditor.sidebar.cursorAppearanceTrackLinkHint');
+    expect(container?.textContent).not.toContain('videoEditor.sidebar.cursorTrackAppearanceTitle');
+    expect(container?.textContent).not.toContain(
+      'videoEditor.sidebar.cursorAppearanceTrackLinkHint'
+    );
     expect(container?.textContent).toContain('videoEditor.sidebar.cursorColorLabel');
     expect(container?.textContent).toContain('videoEditor.sidebar.cursorCaptureModeSeparate');
     expect(container?.textContent).toContain('videoEditor.sidebar.cursorAppearanceUnlink');
@@ -134,7 +136,7 @@ describe('workspace-sidebar/selection/inspect-cursor', () => {
     expect(container?.textContent).toContain('videoEditor.sidebar.cursorFallbackHint');
     expect(container?.textContent).not.toContain('videoEditor.sidebar.cursorInterpolationLabel');
     const visibility = container?.querySelector<HTMLButtonElement>(
-      'button[aria-label="videoEditor.sidebar.cursorVisibleLabel"]'
+      'button[aria-label="videoEditor.sidebar.inspectorSampleVisible"]'
     );
     expect(visibility).toBeTruthy();
     act(() => visibility?.click());
@@ -156,6 +158,7 @@ describe('workspace-sidebar/selection/inspect-cursor', () => {
   it('restores an embedded overlay override and retains interpolation and capture mode', () => {
     const props = createProps();
     renderInspectPanel(props);
+    clickGroup('videoEditor.sidebar.inspectorGroupAnimation');
     expect(container?.textContent).toContain('videoEditor.sidebar.cursorInterpolationLabel');
     props.project.cursorTrack!.captureMode = VideoCursorCaptureMode.EMBEDDED_FALLBACK;
     props.project.cursorTrack!.samples[0]!.skinOverride = {
@@ -187,7 +190,9 @@ describe('workspace-sidebar/selection/inspect-cursor', () => {
     renderInspectPanel(props);
     clickGroup('videoEditor.sidebar.inspectorGroupAppearance');
 
-    expect(container?.textContent).toContain('videoEditor.sidebar.cursorAppearanceOverrideHint');
+    expect(container?.textContent).not.toContain(
+      'videoEditor.sidebar.cursorAppearanceOverrideHint'
+    );
     expect(container?.textContent).toContain('videoEditor.sidebar.cursorAppearanceRestoreTrack');
 
     clickGroup('videoEditor.sidebar.inspectorGroupInfo');

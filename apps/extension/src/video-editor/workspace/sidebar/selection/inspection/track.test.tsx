@@ -131,7 +131,7 @@ describe('workspace-sidebar/selection/inspect-track', () => {
       root.render(<WorkspaceSidebarInspectPanel {...props} />);
     });
 
-    expect(container.textContent).toContain('videoEditor.timeline.trackKindPrimary');
+    expect(container.textContent).not.toContain('videoEditor.timeline.trackKindPrimary');
     expect(container.textContent).not.toContain(VideoTrackKind.PRIMARY);
     const input = container.querySelector<HTMLInputElement>(
       'input[aria-label="videoEditor.sidebar.trackNameLabel"]'

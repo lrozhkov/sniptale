@@ -1,3 +1,4 @@
+import { getEffectClipObjectLayout } from '../../../../features/video/project/effect-instance/layout';
 import type React from 'react';
 
 import type { VideoCompositionCameraState } from '../../../../features/video/composition/types';
@@ -34,6 +35,7 @@ type ResizeHandle = 'move' | PreviewTransformResizeHandle;
 const PREVIEW_RESIZE_MIN_SIZE = 40;
 
 export interface InteractionState extends PreviewTransformGestureState {
+  aspectRatio?: number | undefined;
   camera: VideoCompositionCameraState;
   clip: VideoProjectClip;
   mode: ResizeHandle;
@@ -61,8 +63,10 @@ function createPreviewStageInteractionState(params: {
     origin: { clientX: event.clientX, clientY: event.clientY },
     transform: clip.transform,
   });
+  const layout = getEffectClipObjectLayout(project, clip);
   return {
     ...gestureState,
+    aspectRatio: layout?.resize === 'scale' ? layout.width / layout.height : undefined,
     camera,
     clip,
     mode,
@@ -145,7 +149,7 @@ function resolvePreviewStageTransform(params: {
   const transform = resolveUnsnappedTransform(params.state, delta);
   const snapped = snapClipTransform({
     clip: params.state.clip,
-    mode: params.state.mode === 'move' ? 'move' : 'resize',
+    mode: params.state.mode === 'move' || params.state.aspectRatio ? 'move' : 'resize',
     project: params.project,
     settings: params.settings,
     transform,
@@ -166,6 +170,7 @@ function resolveUnsnappedTransform(
     };
   }
   return resizePreviewTransform({
+    aspectRatio: state.aspectRatio,
     delta,
     handle: state.mode,
     minSize: PREVIEW_RESIZE_MIN_SIZE,

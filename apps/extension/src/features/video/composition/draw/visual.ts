@@ -38,7 +38,8 @@ export function drawCompositionVisualLayerBitmap(
   bitmap: ImageBitmap,
   scaleX: number,
   scaleY: number,
-  opacityMultiplier = 1
+  opacityMultiplier = 1,
+  bitmapBounds = { x: 0, y: 0, width: 1, height: 1 }
 ): void {
   const frame = getScaledLayerFrame(layer, scaleX, scaleY);
   const displayScale = (scaleX + scaleY) / 2;
@@ -54,10 +55,10 @@ export function drawCompositionVisualLayerBitmap(
     0,
     bitmap.width,
     bitmap.height,
-    frame.x,
-    frame.y,
-    frame.width,
-    frame.height
+    frame.x + bitmapBounds.x * frame.width,
+    frame.y + bitmapBounds.y * frame.height,
+    frame.width * bitmapBounds.width,
+    frame.height * bitmapBounds.height
   );
   context.restore();
 }

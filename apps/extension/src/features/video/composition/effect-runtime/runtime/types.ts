@@ -31,6 +31,8 @@ type EffectRuntimeFrameTarget =
     };
 
 export interface EffectRuntimeFramePlan {
+  /** Bitmap rectangle relative to the unrotated body, expressed as body-size ratios. */
+  bitmapBounds?: { x: number; y: number; width: number; height: number };
   assets: readonly VideoProjectEffectSnapshotAsset[];
   controls: Readonly<Record<string, number | string>>;
   dimensions: EffectRuntimeFrameDimensions;
@@ -49,6 +51,7 @@ export interface EffectRuntimeFramePlan {
 }
 
 export interface EffectRuntimeRenderedFrame {
+  bitmapBounds?: EffectRuntimeFramePlan['bitmapBounds'];
   bitmap: ImageBitmap;
   effectInstanceId: string;
   height: number;

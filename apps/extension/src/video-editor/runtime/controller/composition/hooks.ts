@@ -226,6 +226,7 @@ function usePresentedProject() {
 }
 
 export function useVideoEditorPreviewController() {
+  const updateEffectInstance = useVideoEditorEffectEditingPort((port) => port.updateEffectInstance);
   const project = usePresentedProject();
   const lifecycleProject = useVideoEditorProjectLifecyclePort((port) => port.project);
   const playback = useVideoEditorPlaybackPort((port) => port);
@@ -262,7 +263,14 @@ export function useVideoEditorPreviewController() {
     {
       actions: assets,
       selections,
-      store: { ...annotation, ...selection, ...playback, ...session, ...timeline },
+      store: {
+        ...annotation,
+        ...selection,
+        ...playback,
+        ...session,
+        ...timeline,
+        updateEffectInstance,
+      },
       workspace,
     },
     runtime,

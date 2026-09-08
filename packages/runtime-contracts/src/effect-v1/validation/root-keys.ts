@@ -9,6 +9,7 @@ export const EFFECT_V1_ROOT_KEYS = new Set([
   'kind',
   'label',
   'layers',
+  'objectLayout',
   'presets',
   'program',
   'scenes',

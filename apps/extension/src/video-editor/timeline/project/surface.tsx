@@ -1,3 +1,4 @@
+import { getMotionInsertionRange } from '../../../features/video/project/motion/placement';
 import { getVideoProjectUtilityLanes } from '../../../features/video/project/utility-lanes';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ProjectTimelineToolbar } from './toolbar';
@@ -7,6 +8,10 @@ import type { useProjectTimelineState } from './interaction-state/index';
 
 type ProjectTimelineSurfaceProps = Pick<
   ProjectTimelineProps & ReturnType<typeof useProjectTimelineState>,
+  | 'selection'
+  | 'autoProcessing'
+  | 'onAutoProcessingModalVisibilityChange'
+  | 'onSeek'
   | 'onSeekToEnd'
   | 'onSeekToStart'
   | 'onTogglePlay'
@@ -49,6 +54,14 @@ export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
       ].join(' ')}
     >
       <ProjectTimelineToolbar
+        historySelected={props.selection?.kind === 'history-lane'}
+        historyActions={{
+          project: props.project,
+          selection: props.selection,
+          actions: props.autoProcessing,
+          onSeek: props.onSeek,
+          onModalVisibilityChange: props.onAutoProcessingModalVisibilityChange,
+        }}
         playback={{
           onSeekToEnd: props.onSeekToEnd,
           onSeekToStart: props.onSeekToStart,
@@ -62,7 +75,7 @@ export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
           duration: props.project.duration,
         }}
         canAddMotionRegion={
-          props.project.duration > 0 &&
+          getMotionInsertionRange(props.project, props.currentTime) !== null &&
           (!hasMotionRegions || (motionLane.visible && !motionLane.locked))
         }
         canDeleteSelectedClip={props.canDeleteSelectedClip}

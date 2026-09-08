@@ -87,6 +87,7 @@ export function AutoProcessingModal(props: {
         labelledBy={titleId}
       >
         <ProductModalHeader
+          compact
           title={
             <span id={titleId} className="flex items-center gap-2">
               <WandSparkles size={18} aria-hidden="true" />
@@ -98,7 +99,7 @@ export function AutoProcessingModal(props: {
           closeTitle={translate('common.actions.close')}
         />
         <ol
-          className={`flex shrink-0 items-center gap-3 border-b border-[var(--sniptale-color-border-soft)] px-6 py-3
+          className={`flex shrink-0 items-center gap-3 border-b border-[var(--sniptale-color-border-soft)] px-5 py-3
 text-xs`}
           aria-label={translate('videoEditor.timeline.autoSteps')}
         >

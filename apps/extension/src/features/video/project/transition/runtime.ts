@@ -18,7 +18,9 @@ export function getTransitionIntensityMultiplier(intensity: VideoTemplateIntensi
 }
 
 export function getTransitionProgress(
-  segment: VideoProjectTransitionSegment,
+  segment: Pick<VideoProjectTransitionSegment, 'start' | 'end'> & {
+    transition: Pick<VideoProjectTransitionSegment['transition'], 'easing'>;
+  },
   currentTime: number
 ): number | null {
   if (currentTime < segment.start || currentTime >= segment.end) {

@@ -334,6 +334,7 @@ function attachTimelinePointerListeners({
     if (lastMove) onMove(lastMove);
   };
   const cleanupPointerSession = startWindowPointerSession({
+    cursor: interactionRef.current?.mode === 'move' ? 'grabbing' : 'ew-resize',
     onMove,
     onEnd: () => {
       try {

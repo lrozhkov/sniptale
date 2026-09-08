@@ -61,3 +61,34 @@ it.each(['pointercancel', 'blur', 'Escape'])(
     expect(onMove).not.toHaveBeenCalled();
   }
 );
+
+it.each(['pointerup', 'pointercancel', 'blur', 'Escape', 'cleanup'])(
+  'holds a document cursor until %s and removes its override',
+  (trigger) => {
+    const cleanup = startWindowPointerSession({
+      cursor: 'grabbing',
+      onMove: vi.fn(),
+      onCancel: vi.fn(),
+    });
+    const style = document.querySelector('style[data-video-editor-pointer-cursor]');
+    expect(style?.textContent).toContain('cursor: grabbing !important');
+    if (trigger === 'cleanup') cleanup();
+    else
+      window.dispatchEvent(
+        trigger === 'Escape' ? new KeyboardEvent('keydown', { key: 'Escape' }) : new Event(trigger)
+      );
+    expect(document.querySelector('style[data-video-editor-pointer-cursor]')).toBeNull();
+    cleanup();
+  }
+);
+
+it('does not release another session cursor when an older session is cleaned up', () => {
+  const first = startWindowPointerSession({ cursor: 'grabbing', onMove: vi.fn() });
+  const second = startWindowPointerSession({ cursor: 'ew-resize', onMove: vi.fn() });
+  first();
+  expect(document.querySelector('style[data-video-editor-pointer-cursor]')?.textContent).toContain(
+    'cursor: ew-resize !important'
+  );
+  second();
+  expect(document.querySelector('style[data-video-editor-pointer-cursor]')).toBeNull();
+});

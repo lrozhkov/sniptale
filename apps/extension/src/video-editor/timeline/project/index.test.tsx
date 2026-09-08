@@ -102,6 +102,7 @@ function createProps(): ComponentProps<typeof ProjectTimeline> {
       setCollapsedTelemetryLaneVisible: idle,
       setCompactRows: idle,
       setHideTrackNames: idle,
+      setClipNamesHidden: idle,
       setTrackHeight: idle,
     },
     historyTransaction: {
@@ -297,4 +298,29 @@ it('keeps an empty project compact until history data exists', () => {
   props.panelPrefs.telemetryLaneVisible = true;
   mountTimeline(props);
   expect(container.querySelector('[data-ui="video-editor.timeline.history-row"]')).toBeNull();
+});
+
+it('sizes the track rail by names independently of row height', () => {
+  for (const compactRows of [false, true]) {
+    let namedHeight: string | undefined;
+    for (const hideTrackNames of [false, true]) {
+      const props = createProps();
+      props.panelPrefs.prefs = { ...props.panelPrefs.prefs, compactRows, hideTrackNames };
+      mountTimeline(props);
+      const rail = container.querySelector('[data-project-timeline-track-list]')!;
+      const body = rail.parentElement!.parentElement!;
+      expect(body.style.gridTemplateColumns).toBe(
+        hideTrackNames ? '136px minmax(0,1fr)' : '220px minmax(0,1fr)'
+      );
+      const header = container.querySelector(
+        '[data-ui="video-editor.timeline.track-header-controls"]'
+      )!;
+      expect(header.previousElementSibling?.classList.contains('sr-only')).toBe(hideTrackNames);
+      const row = rail.querySelector(
+        '[data-ui="video-editor.timeline.track-select"]'
+      )!.parentElement!;
+      if (!hideTrackNames) namedHeight = row.style.height;
+      else expect(row.style.height).toBe(namedHeight);
+    }
+  }
 });

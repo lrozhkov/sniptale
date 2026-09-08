@@ -1,3 +1,6 @@
+import { List, PanelLeft } from 'lucide-react';
+import { WorkspacePanelButton, WorkspacePanelHeader } from './panel-header';
+import { useWorkspacePreference } from '../../runtime/controller/workspace-preferences';
 import { WorkspacePanelCloseButton } from './index';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import {
@@ -89,32 +92,32 @@ function VideoEditorFloatingInspectorContent({
         className={INSPECTOR_STACK_CLASS_NAME}
         style={{ width: `${resize.width}px` }}
       >
-        <div className="flex min-w-0 items-center border-b border-[color:var(--sniptale-color-border-soft)]">
-          <div className="min-w-0 flex-1">
-            <WorkspaceSidebarHeader
-              inspectorMode={sidebarProps.inspectorMode}
-              selectionIcon={sidebarState.selectionIcon}
-              selectionTitle={sidebarState.selectionTitle}
-              selectedTrack={sidebarProps.selectedTrack}
-            />
-          </div>
-          {onToggleFullHeight && (
-            <div className="mr-2">
-              <WorkspacePanelDockToggle
-                fullHeight={fullHeight}
-                onToggle={onToggleFullHeight}
-                dataUi="video-editor.inspector.dock-toggle"
+        <WorkspacePanelHeader
+          actions={
+            <>
+              {onToggleFullHeight && (
+                <WorkspacePanelDockToggle
+                  fullHeight={fullHeight}
+                  onToggle={onToggleFullHeight}
+                  dataUi="video-editor.inspector.dock-toggle"
+                />
+              )}
+              <InspectorPresentationToggle />
+              <WorkspacePanelCloseButton
+                onClose={onClose}
+                dataUi="video-editor.inspector.close"
+                title={translate('videoEditor.app.collapseInspector')}
               />
-            </div>
-          )}
-          <div className="mr-2">
-            <WorkspacePanelCloseButton
-              onClose={onClose}
-              dataUi="video-editor.inspector.close"
-              title={translate('videoEditor.app.collapseInspector')}
-            />
-          </div>
-        </div>
+            </>
+          }
+        >
+          <WorkspaceSidebarHeader
+            inspectorMode={sidebarProps.inspectorMode}
+            selectionIcon={sidebarState.selectionIcon}
+            selectionTitle={sidebarState.selectionTitle}
+            selectedTrack={sidebarProps.selectedTrack}
+          />
+        </WorkspacePanelHeader>
         <WorkspaceSidebarPanelContent
           {...sidebarProps}
           inputRefs={sidebarState.inputRefs}
@@ -125,5 +128,26 @@ function VideoEditorFloatingInspectorContent({
         />
       </FloatingChromePanel>
     </>
+  );
+}
+
+function InspectorPresentationToggle() {
+  const [mode, setMode] = useWorkspacePreference('inspectorPresentation');
+  const all = mode === 'all';
+  const Icon = all ? List : PanelLeft;
+  const label = translate(
+    all ? 'videoEditor.app.inspectorShowSelected' : 'videoEditor.app.inspectorShowAll'
+  );
+  return (
+    <WorkspacePanelButton
+      type="button"
+      dataUi="video-editor.inspector.presentation-toggle"
+      title={label}
+      aria-label={label}
+      aria-pressed={all}
+      onClick={() => setMode(all ? 'sections' : 'all')}
+    >
+      <Icon size={14} aria-hidden="true" />
+    </WorkspacePanelButton>
   );
 }

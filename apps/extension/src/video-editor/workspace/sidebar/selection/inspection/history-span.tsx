@@ -1,3 +1,4 @@
+import { InspectorDetails } from '../shared/details';
 import { useState } from 'react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { formatNumber, translate, useAppLocale } from '../../../../../platform/i18n';
@@ -40,18 +41,30 @@ function TypingPreviewSummary({ plan }: { plan: Extract<Preview['plan'], { statu
     ['typingLinked', String(plan.affectedClipIds.length)],
   ] as const;
   return (
-    <dl className="space-y-2 text-xs" aria-live="polite">
-      {details.map(([label, value]) => (
-        <div key={label} className="flex items-baseline justify-between gap-3">
-          <dt className="text-[var(--sniptale-color-text-secondary)]">
-            {translate(`videoEditor.sidebar.${label}`)}
-          </dt>
-          <dd className="m-0 shrink-0 tabular-nums text-[var(--sniptale-color-text-primary)]">
-            {value}
-          </dd>
-        </div>
-      ))}
-    </dl>
+    <div className="space-y-2 text-xs" aria-live="polite">
+      <dl className="space-y-2">
+        {details.slice(0, 2).map(([label, value]) => (
+          <div key={label} className="flex items-baseline justify-between gap-3">
+            <dt className="text-[var(--sniptale-color-text-secondary)]">
+              {translate(`videoEditor.sidebar.${label}`)}
+            </dt>
+            <dd className="m-0 shrink-0 tabular-nums text-[var(--sniptale-color-text-primary)]">
+              {value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+      <InspectorDetails label={translate('videoEditor.sidebar.inspectorMoreDetails')}>
+        <dl className="space-y-2">
+          {details.slice(2).map(([label, value]) => (
+            <div key={label} className="flex justify-between gap-3">
+              <dt>{translate(`videoEditor.sidebar.${label}`)}</dt>
+              <dd className="m-0 tabular-nums">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      </InspectorDetails>
+    </div>
   );
 }
 

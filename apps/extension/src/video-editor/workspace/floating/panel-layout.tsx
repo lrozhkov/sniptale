@@ -1,6 +1,7 @@
+import { useWorkspacePreference } from '../../runtime/controller/workspace-preferences';
 import { useEffect, useRef, useState } from 'react';
 import { ChevronsUpDown, ChevronsDownUp } from 'lucide-react';
-import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { WorkspacePanelButton } from './panel-header';
 import { translate } from '../../../platform/i18n';
 import { startWindowPointerSession } from '../../interaction/pointer-session';
 
@@ -24,10 +25,9 @@ export function useWorkspacePanelSizes(materialsOpen: boolean) {
   const containerRef = useRef<HTMLDivElement>(null);
   const cleanupRef = useRef<(() => void) | null>(null);
   const [frameWidth, setFrameWidth] = useState(1280);
-  const [widths, setWidths] = useState<Record<PanelSide, number | null>>({
-    materials: null,
-    inspector: null,
-  });
+  const [materialsWidthPreference, setMaterialsWidth] = useWorkspacePreference('materialsWidth');
+  const [inspectorWidthPreference, setInspectorWidth] = useWorkspacePreference('inspectorWidth');
+  const widths = { materials: materialsWidthPreference, inspector: inspectorWidthPreference };
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -46,17 +46,17 @@ export function useWorkspacePanelSizes(materialsOpen: boolean) {
   const materialsWidth = Math.min(widths.materials ?? defaults.materials, materialsMax);
   const inspectorMax = Math.min(520, frameWidth - 40 - 640 - (materialsOpen ? materialsWidth : 0));
   const dimension = (side: PanelSide): WorkspacePanelResize => {
+    const setWidth = side === 'materials' ? setMaterialsWidth : setInspectorWidth;
     const limits = PANEL_WIDTHS[side];
     const max = side === 'inspector' ? inspectorMax : materialsMax;
     const clamp = (value: number) => Math.max(limits.min, Math.min(max, value));
     const width = clamp(widths[side] ?? defaults[side]);
-    const update = (value: number) =>
-      setWidths((current) => ({ ...current, [side]: clamp(value) }));
+    const update = (value: number) => setWidth(clamp(value));
     const direction = side === 'materials' ? 1 : -1;
     const reset = () => {
       cleanupRef.current?.();
       cleanupRef.current = null;
-      setWidths((current) => ({ ...current, [side]: null }));
+      setWidth(null);
     };
     return {
       width,
@@ -70,7 +70,7 @@ export function useWorkspacePanelSizes(materialsOpen: boolean) {
         const startX = event.clientX;
         cleanupRef.current = startWindowPointerSession({
           onMove: (move) => update(width + (move.clientX - startX) * direction),
-          onCancel: () => setWidths((current) => ({ ...current, [side]: widths[side] })),
+          onCancel: () => setWidth(widths[side]),
           onEnd: () => {
             cleanupRef.current = null;
           },
@@ -127,9 +127,8 @@ export function WorkspacePanelDockToggle(props: {
   );
   const Icon = props.fullHeight ? ChevronsDownUp : ChevronsUpDown;
   return (
-    <ContentToolbarButton
+    <WorkspacePanelButton
       type="button"
-      className="!h-6 !w-6 !min-w-6 !px-0 text-[var(--sniptale-color-text-muted)]"
       aria-label={label}
       title={label}
       aria-pressed={props.fullHeight}
@@ -140,6 +139,6 @@ export function WorkspacePanelDockToggle(props: {
       dataUi={props.dataUi}
     >
       <Icon size={14} aria-hidden="true" />
-    </ContentToolbarButton>
+    </WorkspacePanelButton>
   );
 }

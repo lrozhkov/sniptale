@@ -1,3 +1,4 @@
+import { useWorkspacePreference } from './workspace-preferences';
 import type { VideoEditorAudioRecordingTarget } from '../../contracts/insertion';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { loadRecentColors, pushRecentColor } from '../../../composition/persistence/recent-colors';
@@ -208,7 +209,8 @@ export function useVideoEditorWorkspaceState(): VideoEditorWorkspaceState {
   const libraryPanel = useVideoEditorLibraryPanelState();
   const audioRecordingDialog = useAudioRecordingDialogState();
   const sceneBackgroundColors = useSceneBackgroundColorState();
-  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
+  const [leftSidebarCollapsed, setLeftSidebarCollapsed] =
+    useWorkspacePreference('inspectorCollapsed');
   const inspector = useVideoEditorInspectorState(setLeftSidebarCollapsed);
   const [playbackRange, setPlaybackRange] = useState<VideoEditorPlaybackRange | null>(null);
   const preview = useVideoEditorWorkspacePreviewState();
@@ -216,7 +218,7 @@ export function useVideoEditorWorkspaceState(): VideoEditorWorkspaceState {
 
   const toggleSidebarCollapsed = useCallback(() => {
     setLeftSidebarCollapsed((value) => !value);
-  }, []);
+  }, [setLeftSidebarCollapsed]);
 
   const clearPlaybackRange = useCallback(() => setPlaybackRange(null), []);
   const confirm = useMemo(
