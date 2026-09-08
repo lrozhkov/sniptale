@@ -111,6 +111,7 @@ export function CategorizedInspector<SectionId extends string>(props: {
   ariaLabel: string;
   dataUi?: string;
   initialSection: SectionId;
+  onSectionChange?: (section: SectionId) => void;
   renderSection: (section: SectionId) => ReactNode;
   renderSectionHeadingControl?: (section: SectionId) => ReactNode;
   sections: readonly CategorizedInspectorSection<SectionId>[];
@@ -130,6 +131,7 @@ export function CategorizedInspector<SectionId extends string>(props: {
     const next = props.sections[nextIndex];
     if (!next) return;
     setActiveSection(next.id);
+    props.onSectionChange?.(next.id);
     buttonRefs.current[nextIndex]?.focus();
   };
 
@@ -154,7 +156,10 @@ export function CategorizedInspector<SectionId extends string>(props: {
               buttonRefs.current[index] = element;
             }}
             key={section.id}
-            onClick={() => setActiveSection(section.id)}
+            onClick={() => {
+              setActiveSection(section.id);
+              props.onSectionChange?.(section.id);
+            }}
             onKeyDown={(event) => handleNavigation(event, index)}
             section={section}
           />

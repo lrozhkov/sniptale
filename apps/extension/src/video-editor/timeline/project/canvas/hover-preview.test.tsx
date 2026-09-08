@@ -72,13 +72,15 @@ function renderCanvas() {
   act(() => {
     root?.render(
       <ProjectTimelineCanvas
+        consumeCompletedScrubClick={() => false}
         currentTime={0}
         dragGhost={null}
         playbackRange={null}
         pixelsPerSecond={90}
         project={project}
-        recordingTelemetry={null}
+        recordingTelemetry={[]}
         selection={createSceneSelection()}
+        snapGuideTime={null}
         hoveredClipId={null}
         selectedClipId={null}
         selectedEffectSelection={null}
@@ -101,6 +103,9 @@ function createCanvasTestActions() {
   return {
     onBeginClipInteraction: vi.fn(),
     onBeginEffectInteraction: vi.fn(),
+    onBeginPlayheadScrub: vi.fn(),
+    onStepToNextFrame: vi.fn(),
+    onStepToPreviousFrame: vi.fn(),
     onBeginEffectRangeSelection: vi.fn(),
     onBeginRangeSelection: vi.fn(),
     onBeginTrackRangeSelection: () => vi.fn(),
@@ -108,7 +113,8 @@ function createCanvasTestActions() {
     onCloseTrackGap: vi.fn(),
     onImportTimelineFile: { audio: vi.fn(), image: vi.fn(), video: vi.fn() },
     onSeek: vi.fn(),
-    onSelectActionSegment: vi.fn(),
+    onSeekTime: vi.fn(),
+    onSelectActionOccurrence: vi.fn(),
     onSelectClip: vi.fn(),
     onSelectCursorSegment: vi.fn(),
     onSelectMotionRegion: vi.fn(),
@@ -118,7 +124,7 @@ function createCanvasTestActions() {
     onSelectTransition: vi.fn(),
     onSetHoveredClipId: vi.fn(),
     onTimelinePreviewViewportChange: vi.fn(),
-    onResizeActionEvent: vi.fn(),
+
     onResizeMotionRegion: vi.fn(),
     onScroll: vi.fn(),
     onUnsupportedTimelineFileDrop: vi.fn(),

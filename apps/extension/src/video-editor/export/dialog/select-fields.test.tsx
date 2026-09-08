@@ -4,9 +4,10 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
+const locale = vi.hoisted(() => ({ prefix: '' }));
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/i18n')>()),
-  translate: (key: string) => key,
+  translate: (key: string) => locale.prefix + key,
 }));
 import { createVideoExportCapabilities } from '../../../features/video/project/export/capabilities';
 import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
@@ -22,9 +23,49 @@ let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
 beforeEach(() => {
+  locale.prefix = '';
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
+});
+
+it('refreshes source resolution and every quality label after a mounted locale change', () => {
+  const onChange = vi.fn();
+  for (const language of ['ru:', 'en:', 'ru:']) {
+    locale.prefix = language;
+    for (const [quality, label] of [
+      [VideoExportQualityPreset.LOW, 'qualityLow'],
+      [VideoExportQualityPreset.MEDIUM, 'qualityMedium'],
+      [VideoExportQualityPreset.HIGH, 'qualityHigh'],
+      [VideoExportQualityPreset.ULTRA, 'qualityUltra'],
+    ] as const) {
+      act(() => {
+        root!.render(
+          <ExportDialogSelectFields
+            capabilities={null}
+            onChange={onChange}
+            selectedClipAvailable={false}
+            sourceDimensions={{ width: 1920, height: 1080 }}
+            settings={{
+              downloadAfterExport: true,
+              format: VideoExportFormat.MP4,
+              mp4VideoCodec: VideoMp4Codec.AVC,
+              resolution: VideoResolutionPreset.SOURCE,
+              fps: 30,
+              height: 1080,
+              width: 1920,
+              quality,
+            }}
+          />
+        );
+      });
+      expect(container!.textContent).toContain(
+        `${language}videoEditor.exportDialog.resolutionSource`
+      );
+      expect(container!.textContent).toContain(`${language}videoEditor.exportDialog.${label}`);
+    }
+  }
+  expect(onChange).not.toHaveBeenCalled();
 });
 
 afterEach(() => {

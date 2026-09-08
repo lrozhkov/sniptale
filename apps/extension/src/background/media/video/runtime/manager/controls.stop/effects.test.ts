@@ -84,7 +84,7 @@ vi.mock('../../../content-surface/surface-lease', async (importOriginal) => ({
   updateVideoRecordingSurface: updateVideoRecordingSurfaceMock,
 }));
 
-import { runStopSideEffects } from './effects';
+import { runStopSideEffects, waitForStopSideEffects } from './effects';
 
 beforeEach(() => {
   installBackgroundRuntimeMessagingMock({ sendTabMessage: sendTabMessageMock });
@@ -105,7 +105,7 @@ beforeEach(() => {
 });
 
 function flushStopSideEffects(): Promise<void> {
-  return Promise.resolve().then(() => Promise.resolve());
+  return waitForStopSideEffects();
 }
 
 function createControlledCursorTelemetry() {
@@ -161,9 +161,12 @@ it('skips tab side effects when no tab is available', () => {
   expect(sendTabMessageMock).not.toHaveBeenCalled();
 });
 
-it('does not persist annotation telemetry when cursor telemetry capture is disabled', async () => {
+it('persists action history for a plain tab with controlled cursor disabled', async () => {
   vi.spyOn(Date, 'now').mockReturnValue(1234);
   getVideoRecordingIdMock.mockReturnValue('recording-1');
+  const telemetry = createControlledCursorTelemetry();
+  disableControlledCursorCaptureMock.mockResolvedValue(telemetry);
+  getControlledCursorTelemetryMock.mockReturnValue(null);
 
   runStopSideEffects({
     mode: CaptureMode.TAB,
@@ -172,7 +175,10 @@ it('does not persist annotation telemetry when cursor telemetry capture is disab
 
   await flushStopSideEffects();
 
-  expect(saveRecordingTelemetrySafelyMock).not.toHaveBeenCalled();
+  expect(disableControlledCursorCaptureMock).toHaveBeenCalledWith(7);
+  expect(saveRecordingTelemetrySafelyMock).toHaveBeenCalledWith(
+    expect.objectContaining({ recordingId: 'recording-1', actionEvents: telemetry.actionEvents })
+  );
 });
 
 it('persists merged controlled cursor telemetry when the dedicated cursor path is active', async () => {
@@ -187,7 +193,7 @@ it('persists merged controlled cursor telemetry when the dedicated cursor path i
   };
   const telemetry = createControlledCursorTelemetry();
   disableControlledCursorCaptureMock.mockResolvedValue(telemetry);
-  getControlledCursorTelemetryMock.mockReturnValue(telemetry);
+  getControlledCursorTelemetryMock.mockReturnValue(null);
 
   runStopSideEffects({
     mode: CaptureMode.TAB,
@@ -200,7 +206,7 @@ it('persists merged controlled cursor telemetry when the dedicated cursor path i
     recordingId: null,
   });
 
-  expect(appendControlledCursorTelemetryMock).toHaveBeenCalledWith(telemetry);
+  expect(appendControlledCursorTelemetryMock).not.toHaveBeenCalled();
   expect(saveRecordingTelemetrySafelyMock).toHaveBeenCalledWith({
     actionEvents: [],
     captureMode: CaptureMode.TAB,
@@ -243,3 +249,110 @@ it('does not persist telemetry when recording metadata is unavailable', async ()
 
   expect(saveRecordingTelemetrySafelyMock).not.toHaveBeenCalled();
 });
+
+it('waits for independent geometry and content results while preserving the stopped recording identity', async () => {
+  const viewport = {
+    width: 1280,
+    height: 720,
+    devicePixelRatio: 1,
+    visualViewportScale: 1,
+    visualViewportOffsetX: 0,
+    visualViewportOffsetY: 0,
+  };
+  const telemetry = {
+    ...createControlledCursorTelemetry(),
+    viewportObservation: { initial: viewport, stable: true },
+    actionEvents: [
+      {
+        id: 'click',
+        kind: 'CLICK',
+        label: 'Click',
+        time: 1,
+        duration: 0.45,
+        preset: 'CLICK_RIPPLE',
+        point: { x: 320, y: 540 },
+        data: {},
+      },
+    ],
+  };
+  let finishContent: (value: typeof telemetry) => void = () => undefined;
+  disableControlledCursorCaptureMock.mockReturnValue(
+    new Promise<typeof telemetry>((resolve) => {
+      finishContent = resolve;
+    })
+  );
+  getVideoRecordingIdMock.mockReturnValue('stopped-recording');
+  const geometry = {
+    viewport,
+    visibleClientRect: { x: 0, y: 0, width: 1280, height: 720 },
+    scaleX: 1 / 1280,
+    scaleY: 1 / 720,
+    offsetX: 0,
+    offsetY: 0,
+  };
+  const collected = runStopSideEffects({ mode: CaptureMode.TAB, tabId: 7 }, 'detailed', {
+    recordingPointTransform: Promise.resolve(geometry),
+  });
+  await Promise.resolve();
+  expect(saveRecordingTelemetrySafelyMock).not.toHaveBeenCalled();
+  getVideoRecordingIdMock.mockReturnValue('later-recording');
+  getControlledCursorTelemetryMock.mockReturnValue({ ...telemetry, actionEvents: [] });
+  finishContent(telemetry);
+  await collected;
+  await waitForStopSideEffects();
+  expect(saveRecordingTelemetrySafelyMock).toHaveBeenCalledOnce();
+  expect(saveRecordingTelemetrySafelyMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      recordingId: 'stopped-recording',
+      actionEvents: [
+        expect.objectContaining({
+          id: 'click',
+          point: { x: 320, y: 540 },
+          recordingPoint: { x: 0.25, y: 0.75 },
+        }),
+      ],
+    })
+  );
+  expect(telemetry.actionEvents[0]).not.toHaveProperty('recordingPoint');
+});
+
+it.each([true, false])(
+  'retains facts with missing geometry unless discarded=%s',
+  async (discard) => {
+    getVideoRecordingIdMock.mockReturnValue('recording');
+    const telemetry = {
+      ...createControlledCursorTelemetry(),
+      actionEvents: [
+        {
+          id: 'click',
+          kind: 'CLICK',
+          label: 'Click',
+          time: 1,
+          duration: 0.45,
+          preset: 'CLICK_RIPPLE',
+          point: { x: 320, y: 540 },
+          data: {},
+        },
+      ],
+    };
+    disableControlledCursorCaptureMock.mockResolvedValue(telemetry);
+    await runStopSideEffects({ mode: CaptureMode.TAB, tabId: 7 }, 'detailed', {
+      discard,
+      recordingPointTransform: Promise.resolve(null),
+    });
+    await waitForStopSideEffects();
+    if (discard) expect(saveRecordingTelemetrySafelyMock).not.toHaveBeenCalled();
+    else
+      expect(saveRecordingTelemetrySafelyMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          actionEvents: [
+            expect.objectContaining({
+              id: 'click',
+              point: { x: 320, y: 540 },
+              recordingPoint: null,
+            }),
+          ],
+        })
+      );
+  }
+);

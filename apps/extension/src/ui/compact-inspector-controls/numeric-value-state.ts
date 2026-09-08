@@ -19,6 +19,7 @@ import {
 interface NumericValueStateParams {
   max?: number | undefined;
   min?: number | undefined;
+  normalizeValue?: ((value: number) => number) | undefined;
   onCommitValue: (value: number) => void;
   onPreviewValue: (value: number) => void;
   precision?: number | undefined;
@@ -45,13 +46,14 @@ function useNumericDraftState({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(() => formatCompactEditNumber(value, { precision }));
   const editingRef = useRef(false);
+  const dirtyRef = useRef(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const stepValueRef = useRef(value ?? 0);
   const syncedPropKeyRef = useRef('');
   const propKey = `${value ?? 'mixed'}|${precision ?? 'auto'}|${unit}`;
 
   useEffect(() => {
-    if (editing) {
+    if (editing && dirtyRef.current) {
       syncedPropKeyRef.current = propKey;
       return;
     }
@@ -65,9 +67,11 @@ function useNumericDraftState({
 
   return {
     draft,
+    dirtyRef,
     editing,
     editingRef,
     editValue: formatCompactEditNumber(value, { precision }),
+    appliedValue: value ?? 0,
     inputRef,
     setDraft,
     setEditing,
@@ -82,6 +86,7 @@ function useNumericFieldActions({
   draftState,
   max,
   min,
+  normalizeValue,
   onCommitValue,
   onPreviewValue,
   precision,
@@ -89,7 +94,7 @@ function useNumericFieldActions({
   unit,
 }: NumericValueStateParams & { draftState: NumericDraftState }) {
   const commitDraft = () => {
-    commitNumericDraft({ draftState, max, min, onCommitValue, precision, unit });
+    commitNumericDraft({ draftState, max, min, normalizeValue, onCommitValue, precision, unit });
   };
   const applyStep = (direction: 1 | -1) => {
     applyNumericStep({
@@ -97,6 +102,7 @@ function useNumericFieldActions({
       draftState,
       max,
       min,
+      normalizeValue,
       onCommitValue,
       onPreviewValue,
       precision,
@@ -123,22 +129,31 @@ function commitNumericDraft({
   draftState,
   max,
   min,
+  normalizeValue,
   onCommitValue,
   precision,
   unit,
-}: Pick<NumericValueStateParams, 'max' | 'min' | 'onCommitValue' | 'precision' | 'unit'> & {
+}: Pick<
+  NumericValueStateParams,
+  'max' | 'min' | 'normalizeValue' | 'onCommitValue' | 'precision' | 'unit'
+> & {
   draftState: NumericDraftState;
 }) {
   if (!draftState.editingRef.current) {
     return;
   }
+  if (!draftState.dirtyRef.current) {
+    cancelNumericEditing(draftState);
+    return;
+  }
   const parsed = parseCompactNumber(draftState.draft, unit);
+  draftState.dirtyRef.current = false;
   draftState.editingRef.current = false;
   if (parsed === null) {
     cancelNumericEditing(draftState);
     return;
   }
-  const next = clampNumber(parsed, min, max);
+  const next = clampNumber(normalizeValue?.(parsed) ?? parsed, min, max);
   draftState.stepValueRef.current = next;
   draftState.setEditing(false);
   draftState.setDraft(formatCompactEditNumber(next, { precision }));
@@ -150,18 +165,21 @@ function applyNumericStep({
   draftState,
   max,
   min,
+  normalizeValue,
   onCommitValue,
   onPreviewValue,
   precision,
   step,
 }: Pick<
   NumericValueStateParams,
-  'max' | 'min' | 'onCommitValue' | 'onPreviewValue' | 'precision' | 'step'
+  'max' | 'min' | 'normalizeValue' | 'onCommitValue' | 'onPreviewValue' | 'precision' | 'step'
 > & {
   direction: 1 | -1;
   draftState: NumericDraftState;
 }) {
-  const next = clampNumber(draftState.stepValueRef.current + step * direction, min, max);
+  draftState.dirtyRef.current = false;
+  const stepped = draftState.stepValueRef.current + step * direction;
+  const next = clampNumber(normalizeValue?.(stepped) ?? stepped, min, max);
   draftState.stepValueRef.current = next;
   draftState.setEditing(draftState.editingRef.current);
   draftState.setDraft(formatCompactEditNumber(next, { precision }));
@@ -180,6 +198,7 @@ function updateNumericDraft({
   draftState: NumericDraftState;
   event: ChangeEvent<HTMLInputElement>;
 }) {
+  draftState.dirtyRef.current = true;
   const nextDraft = event.currentTarget.value;
   if (!draftState.editingRef.current) {
     draftState.editingRef.current = true;
@@ -207,6 +226,7 @@ function beginNumericEditing({
   if (disabled || draftState.editingRef.current) {
     return;
   }
+  draftState.dirtyRef.current = false;
   draftState.editingRef.current = true;
   draftState.setEditing(true);
   draftState.setDraft(draftState.editValue);
@@ -215,6 +235,8 @@ function beginNumericEditing({
 }
 
 function cancelNumericEditing(draftState: NumericDraftState) {
+  draftState.dirtyRef.current = false;
+  draftState.stepValueRef.current = draftState.appliedValue;
   draftState.editingRef.current = false;
   draftState.setEditing(false);
   draftState.setDraft(draftState.editValue);

@@ -1,0 +1,6 @@
+/* Space controls the active transport without changing the focused control or its Tab position. */
+:root[data-video-editor-focus='playback'] :focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  transition: none !important;
+}

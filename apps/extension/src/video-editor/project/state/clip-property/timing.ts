@@ -11,6 +11,7 @@ import {
   updateSourceTimedClipTiming,
 } from '../helpers';
 import { clampVideoPropertyNumber, VIDEO_CLIP_PROPERTY_LIMITS } from './constraints';
+import { getReachableClipTimingBounds } from '../clip-timeline/reachable-placement';
 
 type VideoEditorStoreSet = VideoEditorProjectSliceSet;
 
@@ -88,10 +89,27 @@ function createClipTransitionActions(
             return project;
           }
 
-          const nextPlaybackRate = clampVideoPropertyNumber(
-            playbackRate,
-            VIDEO_CLIP_PROPERTY_LIMITS.playbackRate
-          );
+          let minimumRate: number = VIDEO_CLIP_PROPERTY_LIMITS.playbackRate.min;
+          let maximumRate: number = VIDEO_CLIP_PROPERTY_LIMITS.playbackRate.max;
+          for (const clip of operation.affectedClips) {
+            if (!isSourceTimedClip(clip)) continue;
+            const bounds = getReachableClipTimingBounds(project, clip);
+            const maximumDuration = bounds.maximumEnd - clip.startTime;
+            const minimumDuration = Math.max(1 / project.fps, bounds.minimumEnd - clip.startTime);
+            minimumRate = Math.max(minimumRate, clip.sourceDuration / maximumDuration);
+            maximumRate = Math.min(maximumRate, clip.sourceDuration / minimumDuration);
+          }
+          if (minimumRate > maximumRate) return project;
+          const nextPlaybackRate = clampVideoPropertyNumber(playbackRate, {
+            min: minimumRate,
+            max: maximumRate,
+          });
+          if (
+            operation.affectedClips.every(
+              (clip) => isSourceTimedClip(clip) && (clip.playbackRate ?? 1) === nextPlaybackRate
+            )
+          )
+            return project;
           return applyEditableClipPatch(project, operation.clipIdSet, (item) =>
             isSourceTimedClip(item)
               ? updateSourceTimedClipTiming(item, { playbackRate: nextPlaybackRate })

@@ -1,3 +1,4 @@
+import { useVideoEditorOverlayPlayback } from '../overlay-playback';
 // @vitest-environment jsdom
 
 import { act, useContext, type ReactNode } from 'react';
@@ -10,7 +11,7 @@ const mocks = vi.hoisted(() => {
   const lifecycle = {
     error: null,
     isReady: false,
-    project: null,
+    project: null as import('../../../../features/video/project/types').VideoProject | null,
     recordingId: null,
     renameProject: action,
     saveState: 'saved',
@@ -41,6 +42,8 @@ const mocks = vi.hoisted(() => {
     projectHistoryTransactionActive: false,
     redoProject: action,
     undoProject: action,
+    beginProjectHistoryTransaction: action,
+    endProjectHistoryTransaction: action,
   };
   const exportPort = {
     cancelExport: action,
@@ -53,7 +56,6 @@ const mocks = vi.hoisted(() => {
   };
   const session = { clearPlacementMode: action, placementMode: null };
   const telemetry = {
-    setDiagnosticsOpen: action,
     setRecordingTelemetry: action,
   };
   const libraries = {
@@ -65,19 +67,33 @@ const mocks = vi.hoisted(() => {
     refreshRecordings: action,
   };
   const workspace = {
+    autoProcessingModalOpen: false,
+    setAutoProcessingModalOpen: action,
     audioRecordingDialogOpen: false,
+    audioRecordingTarget: null as
+      | import('../../../contracts/insertion').VideoEditorAudioRecordingTarget
+      | null,
+    openTrackAudioRecordingDialog: action,
     clearPlaybackRange: action,
     closeAudioRecordingDialog: action,
     closeLibraryPanel: action,
     confirm: { dialog: null, onCancel: action, onConfirm: action, request: action },
     grid: { magnetEnabled: false },
-    inspector: { mode: 'selection', openGridSettings: action, openSelection: action },
+    inspector: { mode: 'selection', openSelection: action },
     leftSidebarCollapsed: false,
     libraryPanelOpen: false,
     openAudioRecordingDialog: action,
     openLibraryPanel: action,
     playbackRange: null,
-    preview: {},
+    preview: {
+      sourceViewerActive: false,
+      preferences: {
+        preferences: { mode: 'live', rasterPreset: '720p', zoom: 'fit' },
+        updatePreferences: action,
+        retrySave: action,
+        saveFailed: false,
+      },
+    },
     sceneBackgroundColors: {},
     setPlaybackRange: action,
     toggleLibraryPanel: action,
@@ -89,6 +105,7 @@ const mocks = vi.hoisted(() => {
     pausePlayback: action,
     registerPreviewRuntime: action,
     seekTo: action,
+    stepByFrames: action,
     setPlaybackPlaying: action,
     setTimelinePreviewSuspended: action,
     setTimelinePreviewViewport: action,
@@ -102,13 +119,14 @@ const mocks = vi.hoisted(() => {
   };
   return {
     commands,
+    effects: { updateEffectInstance: fn() },
     exportPort,
     history,
     libraries,
     lifecycle,
     playback,
     runtime,
-    runtimeHook: fn(() => runtime),
+    runtimeHook: fn((_args: { playback: { shortcutsEnabled: boolean } }) => runtime),
     selection,
     session,
     telemetry,
@@ -128,14 +146,17 @@ vi.mock('../../session', async (importOriginal) => ({
 vi.mock('../../session/history-shortcuts', () => ({
   useVideoEditorProjectHistoryShortcuts: vi.fn(),
 }));
-vi.mock('../libraries', () => ({ useVideoEditorLibraries: () => mocks.libraries }));
+vi.mock('../libraries', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../libraries')>()),
+  useVideoEditorLibraries: () => mocks.libraries,
+}));
 vi.mock('../overlay-playback', () => ({ useVideoEditorOverlayPlayback: vi.fn() }));
 vi.mock('../playback-range', () => ({ usePlaybackRangeSanity: vi.fn() }));
 vi.mock('../recording-telemetry', () => ({ useRecordingTelemetry: vi.fn() }));
 vi.mock('../selections', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../selections')>()),
   useVideoEditorSelections: () => ({
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedClip: null,
     selectedCursorSample: null,
     selectedMotionRegion: null,
@@ -157,9 +178,11 @@ vi.mock('../store', async (importOriginal) => ({
   getCurrentVideoEditorProjectId: () => null,
   getCurrentVideoEditorProjectSnapshot: () => mocks.lifecycle.project,
   getCurrentVideoEditorSelectedClipId: () => mocks.selection.selectedClipId,
+  useVideoEditorEffectEditingPort: (selector: (port: typeof mocks.effects) => unknown) =>
+    selector(mocks.effects),
   useVideoEditorClipSelectionPort: (selector: (port: typeof mocks.selection) => unknown) =>
     selector(mocks.selection),
-  useVideoEditorDiagnosticsTelemetryPort: (selector: (port: typeof mocks.telemetry) => unknown) =>
+  useVideoEditorRecordingTelemetryPort: (selector: (port: typeof mocks.telemetry) => unknown) =>
     selector(mocks.telemetry),
   useVideoEditorExportPort: (selector: (port: typeof mocks.exportPort) => unknown) =>
     selector(mocks.exportPort),
@@ -177,12 +200,17 @@ vi.mock('../store', async (importOriginal) => ({
 
 import { VideoEditorBlockingOverlayContext, VideoEditorLibrariesContext } from './contexts';
 import { VideoEditorCompositionProvider } from './provider';
+import { useVideoEditorSidebarController, useVideoEditorPreviewController } from './hooks';
+import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 
 let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
+  mocks.workspace.autoProcessingModalOpen = false;
   mocks.playback.currentTime = 0;
+  mocks.lifecycle.project = null;
+  mocks.workspace.preview.sourceViewerActive = false;
   mocks.exportPort.exportState = { dialogOpen: false, error: null, isRunning: false };
   mocks.runtimeHook.mockClear();
   container = document.createElement('div');
@@ -243,4 +271,88 @@ it('keeps stable children and unrelated contexts isolated across provider update
   mocks.exportPort.exportState = { ...mocks.exportPort.exportState, dialogOpen: true };
   act(renderProvider);
   expect(blockingRender).toHaveBeenCalledTimes(2);
+});
+
+it('admits montage shortcuts only when the montage viewer is active and no overlay blocks input', () => {
+  const render = () => root.render(<VideoEditorCompositionProvider />);
+  act(render);
+  expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(true);
+  mocks.workspace.preview.sourceViewerActive = true;
+  act(render);
+  expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(false);
+  mocks.workspace.preview.sourceViewerActive = false;
+  mocks.exportPort.exportState.dialogOpen = true;
+  act(render);
+  expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(false);
+  mocks.exportPort.exportState.dialogOpen = false;
+  act(render);
+  expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(true);
+});
+
+it('keeps inspector time on the live playback port across seeks', () => {
+  const snapshots: (number | undefined)[] = [];
+  function InspectorConsumer() {
+    const controller = useVideoEditorSidebarController();
+    snapshots.push(controller?.state.currentTime);
+    return null;
+  }
+  const render = () =>
+    root.render(
+      <VideoEditorCompositionProvider>
+        <InspectorConsumer />
+      </VideoEditorCompositionProvider>
+    );
+  mocks.lifecycle.project = createEmptyVideoProject('Inspector clock');
+  act(render);
+  mocks.playback.currentTime = 3.5;
+  act(render);
+  expect(snapshots).toEqual([0, 3.5]);
+});
+
+it('suspends montage shortcuts while auto-processing owns the modal', () => {
+  const render = () => root.render(<VideoEditorCompositionProvider />);
+  mocks.workspace.autoProcessingModalOpen = true;
+  act(render);
+  expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(false);
+  mocks.workspace.autoProcessingModalOpen = false;
+  act(render);
+  expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(true);
+});
+
+it('keeps input blocked while interval recording owns playback instead of the overlay pause policy', () => {
+  mocks.lifecycle.project = createEmptyVideoProject('Voice');
+  mocks.workspace.audioRecordingDialogOpen = true;
+  mocks.workspace.audioRecordingTarget = {
+    projectId: mocks.lifecycle.project.id,
+    trackId: 'voice',
+    startTime: 0,
+    endTime: 3,
+  };
+  act(() => root.render(<VideoEditorCompositionProvider />));
+  expect(vi.mocked(useVideoEditorOverlayPlayback).mock.lastCall?.[0].enabled).toBe(false);
+  expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(false);
+  mocks.workspace.audioRecordingTarget = null;
+  act(() => root.render(<VideoEditorCompositionProvider />));
+  expect(vi.mocked(useVideoEditorOverlayPlayback).mock.lastCall?.[0].enabled).toBe(true);
+  mocks.workspace.audioRecordingDialogOpen = false;
+});
+
+it('connects canvas scene-anchor edits to the authoritative effect mutation port', () => {
+  mocks.lifecycle.project = createEmptyVideoProject('Anchors');
+  let controller: ReturnType<typeof useVideoEditorPreviewController> = null;
+  function PreviewConsumer() {
+    controller = useVideoEditorPreviewController();
+    return null;
+  }
+  act(() =>
+    root.render(
+      <VideoEditorCompositionProvider>
+        <PreviewConsumer />
+      </VideoEditorCompositionProvider>
+    )
+  );
+  expect(controller).not.toBeNull();
+  const patch = { sceneAnchors: { tip: { x: 30, y: 40 } } };
+  act(() => controller?.editing.onUpdateEffectInstance('effect', patch));
+  expect(mocks.effects.updateEffectInstance).toHaveBeenCalledWith('effect', patch);
 });

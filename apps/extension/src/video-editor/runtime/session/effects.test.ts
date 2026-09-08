@@ -12,13 +12,11 @@ it('applies a loaded project and updates browser history through the explicit dr
   const { replaceVideoEditorUrl } = await import('../browser-driver');
   const setProject = vi.fn();
   const setError = vi.fn();
-  const setDiagnosticsOpen = vi.fn();
   const project = createEmptyVideoProject('Loaded');
 
-  createApplyLoadedProject(setProject, setError, setDiagnosticsOpen)(project, 'recording-1');
+  createApplyLoadedProject(setProject, setError)(project, 'recording-1');
 
   expect(setProject).toHaveBeenCalledWith(project, 'recording-1');
   expect(setError).toHaveBeenCalledWith(null);
-  expect(setDiagnosticsOpen).toHaveBeenCalledWith(false);
   expect(replaceVideoEditorUrl).toHaveBeenCalledWith(project.id, 'recording-1');
 });

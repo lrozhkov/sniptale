@@ -182,17 +182,16 @@ describe('highlighter hover click interaction', () => {
     expect(addFrame).not.toHaveBeenCalled();
   });
 
-  it('creates a frame from the last hover target and freezes the preview', () => {
+  it('uses the live click target when the cached hover target is unrelated', () => {
     const { addFrame, handlers, hideHoverOverlay, session } = createFixture();
     const lastHoverTarget = document.createElement('button');
+    const clickTarget = document.createElement('div');
     session.lastHoverTarget = lastHoverTarget;
-    targetResolver.resolveSelectablePageHtmlElement.mockReturnValueOnce(
-      document.createElement('div')
-    );
+    targetResolver.resolveSelectablePageHtmlElement.mockReturnValueOnce(clickTarget);
 
     handlers.handleClick(createClickEvent());
 
-    expect(addFrame).toHaveBeenCalledWith(lastHoverTarget);
+    expect(addFrame).toHaveBeenCalledWith(clickTarget);
     expect(session.isHoverPreviewFrozen).toBe(true);
     expect(session.lastHoverTarget).toBeNull();
     expect(hideHoverOverlay).toHaveBeenCalledOnce();

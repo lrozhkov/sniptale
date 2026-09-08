@@ -21,84 +21,17 @@ import type {
 } from './types';
 import { isGalleryMediaItem, type GalleryItem } from '../library/items';
 import { formatDate } from '../library/ui';
+import { getGalleryDateBucketLabel } from './date-facets';
 import {
-  GALLERY_DATE_BUCKET_IDS,
-  getGalleryDateBucketLabel,
-  getGalleryDateFacetValue,
-} from './date-facets';
-
-const SIZE_BUCKETS = [
-  { id: '0:102400', min: 0, max: 100 * 1024 },
-  { id: '102400:524288', min: 100 * 1024, max: 512 * 1024 },
-  { id: '524288:1048576', min: 512 * 1024, max: 1024 * 1024 },
-  { id: '1048576:10485760', min: 1024 * 1024, max: 10 * 1024 * 1024 },
-  { id: '10485760:104857600', min: 10 * 1024 * 1024, max: 100 * 1024 * 1024 },
-  { id: '104857600:infinity', min: 100 * 1024 * 1024, max: Number.POSITIVE_INFINITY },
-] as const;
-
-const DURATION_BUCKETS = [
-  { id: 'under-minute', min: 0, max: 60 },
-  { id: '1-5-minutes', min: 60, max: 5 * 60 },
-  { id: '5-30-minutes', min: 5 * 60, max: 30 * 60 },
-  { id: 'over-30-minutes', min: 30 * 60, max: Number.POSITIVE_INFINITY },
-] as const;
+  SIZE_BUCKETS,
+  DURATION_BUCKETS,
+  LIBRARY_DATE_BUCKET_IDS,
+  getLibraryFacetValue,
+  matchesLibraryFilters,
+} from '../../features/media-hub/library-filters';
 
 function incrementCount(counts: Map<string, number>, value: string | null): void {
   if (value) counts.set(value, (counts.get(value) ?? 0) + 1);
-}
-
-function getGalleryFormat(item: GalleryItem): string {
-  const extension = item.filename.split('.').pop()?.trim().toLowerCase();
-  if (extension && extension !== item.filename.toLowerCase()) return extension;
-  return item.mimeType.split('/').pop()?.toLowerCase() ?? item.mimeType.toLowerCase();
-}
-
-function getGallerySizeBucket(size: number): string {
-  return (
-    SIZE_BUCKETS.find((bucket) => size >= bucket.min && size < bucket.max)?.id ?? SIZE_BUCKETS[0].id
-  );
-}
-
-function getGalleryResolutionBucket(item: GalleryItem): string | null {
-  if (!item.width || !item.height) return null;
-  const longSide = Math.max(item.width, item.height);
-  if (longSide < 1280) return 'compact';
-  if (longSide < 1920) return 'hd';
-  if (longSide < 2560) return 'full-hd';
-  if (longSide < 3840) return 'qhd';
-  return 'uhd';
-}
-
-function getGalleryDurationBucket(item: GalleryItem): string | null {
-  if (item.duration == null) return null;
-  return (
-    DURATION_BUCKETS.find((bucket) => item.duration! >= bucket.min && item.duration! < bucket.max)
-      ?.id ?? null
-  );
-}
-
-function getGallerySource(item: GalleryItem): string | null {
-  if (item.sourceUrl) {
-    try {
-      return new URL(item.sourceUrl).hostname.replace(/^www\./, '').toLowerCase();
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
-
-function getGalleryFacetValue(
-  item: GalleryItem,
-  id: GalleryFacetFilterId,
-  now: number
-): string | null {
-  if (id === 'created' || id === 'updated') return getGalleryDateFacetValue(item, id, now);
-  if (id === 'format') return getGalleryFormat(item);
-  if (id === 'size') return getGallerySizeBucket(item.size);
-  if (id === 'resolution') return getGalleryResolutionBucket(item);
-  if (id === 'duration') return getGalleryDurationBucket(item);
-  return getGallerySource(item);
 }
 
 function getSizeBucketLabel(id: string): string {
@@ -160,8 +93,8 @@ function createFacetDefinition(
     }
     if (id === 'created' || id === 'updated') {
       return (
-        GALLERY_DATE_BUCKET_IDS.indexOf(left.value as (typeof GALLERY_DATE_BUCKET_IDS)[number]) -
-        GALLERY_DATE_BUCKET_IDS.indexOf(right.value as (typeof GALLERY_DATE_BUCKET_IDS)[number])
+        LIBRARY_DATE_BUCKET_IDS.indexOf(left.value as (typeof LIBRARY_DATE_BUCKET_IDS)[number]) -
+        LIBRARY_DATE_BUCKET_IDS.indexOf(right.value as (typeof LIBRARY_DATE_BUCKET_IDS)[number])
       );
     }
     return left.label.localeCompare(right.label);
@@ -208,7 +141,7 @@ export function getGalleryFacets(
 
   for (const item of facetItems) {
     item.tags.forEach((tag) => incrementCount(tagCounts, tag));
-    facetIds.forEach((id) => incrementCount(counts.get(id)!, getGalleryFacetValue(item, id, now)));
+    facetIds.forEach((id) => incrementCount(counts.get(id)!, getLibraryFacetValue(item, id, now)));
   }
 
   return [
@@ -240,17 +173,6 @@ export function getGalleryFacets(
       createFacetDefinition(id, counts.get(id)!, context.facetFilters?.[id] ?? [])
     ),
   ];
-}
-
-function matchesGalleryFacets(
-  item: GalleryItem,
-  filters: GalleryFacetFilters,
-  now: number
-): boolean {
-  return (Object.entries(filters) as Array<[GalleryFacetFilterId, string[]]>).every(
-    ([id, values]) =>
-      values.length === 0 || values.includes(getGalleryFacetValue(item, id, now) ?? '')
-  );
 }
 
 function matchesGalleryFolderFilter(
@@ -368,15 +290,17 @@ export function getFilteredGalleryItems(args: {
   const now = args.now ?? Date.now();
   const normalizedSearch = args.search.trim().toLowerCase();
   const scope = args.scope ?? 'library';
-  const scopedItems = args.items.filter(
-    (item) => scope === 'all' || (item.lifecycle?.storageClass ?? 'library') === scope
+  const taggedItems = args.items.filter((item) =>
+    matchesLibraryFilters(
+      item,
+      {
+        activeTags: args.activeTags,
+        ...(args.facetFilters ? { facetFilters: args.facetFilters } : {}),
+        scope,
+      },
+      now
+    )
   );
-  const taggedItems = scopedItems.filter((item) => {
-    return (
-      (args.activeTags.length === 0 || args.activeTags.some((tag) => item.tags.includes(tag))) &&
-      (!args.facetFilters || matchesGalleryFacets(item, args.facetFilters, now))
-    );
-  });
   const result = taggedItems.filter((item) => {
     if (!matchesGalleryFolderFilter(args.folderFilter, item.kind)) {
       return false;

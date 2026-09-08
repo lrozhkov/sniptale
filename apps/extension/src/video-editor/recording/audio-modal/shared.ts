@@ -5,6 +5,15 @@ type AudioTrimRange = {
 
 export interface AudioRecordingModalProps {
   isOpen: boolean;
+  timeline?:
+    | {
+        startTime: number;
+        duration: number;
+        beforeStart: () => Promise<void>;
+        onStop: () => void;
+      }
+    | undefined;
+
   onClose: () => void;
   onSave: (file: File, trim: AudioTrimRange) => Promise<void>;
 }
@@ -31,37 +40,6 @@ function resolveRecordingMimeType() {
   ];
 
   return supportedTypes.find((mimeType) => MediaRecorder.isTypeSupported(mimeType)) ?? '';
-}
-
-function resolveRecordingExtension(mimeType: string) {
-  if (mimeType.includes('ogg')) {
-    return 'ogg';
-  }
-
-  if (mimeType.includes('mp4')) {
-    return 'm4a';
-  }
-
-  return 'webm';
-}
-
-export function createRecordedAudioFile(blob: Blob) {
-  const now = new Date();
-  const timestamp = [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, '0'),
-    String(now.getDate()).padStart(2, '0'),
-    '-',
-    String(now.getHours()).padStart(2, '0'),
-    String(now.getMinutes()).padStart(2, '0'),
-    String(now.getSeconds()).padStart(2, '0'),
-  ].join('');
-  const mimeType = blob.type || 'audio/webm';
-  const extension = resolveRecordingExtension(mimeType);
-
-  return new File([blob], `voice-${timestamp}.${extension}`, {
-    type: mimeType,
-  });
 }
 
 export { resolveRecordingMimeType };

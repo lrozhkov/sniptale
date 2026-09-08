@@ -28,15 +28,15 @@ describe('video editor placement', () => {
 function verifySelectionPlacementRules() {
   expect(
     resolvePlacementModeAfterSelectionChange(
-      { kind: 'action-segment', actionEventId: 'action-1' },
-      createActionPointPlacementMode('action-1')
+      { kind: 'action-occurrence', eventId: 'action-1', clipId: null },
+      createActionPointPlacementMode('action-1', null)
     )
-  ).toEqual(createActionPointPlacementMode('action-1'));
+  ).toEqual(createActionPointPlacementMode('action-1', null));
 
   expect(
     resolvePlacementModeAfterSelectionChange(
       { kind: 'motion-region', motionRegionId: 'motion-1' },
-      createActionPointPlacementMode('action-1')
+      createActionPointPlacementMode('action-1', null)
     )
   ).toBeNull();
 }
@@ -46,8 +46,11 @@ function verifyProjectPlacementRules() {
   const motionRegions = project.motionRegions ?? [];
 
   expect(
-    resolvePlacementModeAfterProjectUpdate(project, createActionPointPlacementMode('action-1'))
-  ).toEqual(createActionPointPlacementMode('action-1'));
+    resolvePlacementModeAfterProjectUpdate(
+      project,
+      createActionPointPlacementMode('action-1', null)
+    )
+  ).toEqual(createActionPointPlacementMode('action-1', null));
   expect(
     resolvePlacementModeAfterProjectUpdate(project, createMotionFocusPlacementMode('motion-1'))
   ).toEqual(createMotionFocusPlacementMode('motion-1'));
@@ -79,7 +82,10 @@ function verifyProjectPlacementRules() {
   project.motionRegions = [];
 
   expect(
-    resolvePlacementModeAfterProjectUpdate(project, createActionPointPlacementMode('action-1'))
+    resolvePlacementModeAfterProjectUpdate(
+      project,
+      createActionPointPlacementMode('action-1', null)
+    )
   ).toBeNull();
   expect(
     resolvePlacementModeAfterProjectUpdate(project, createMotionFocusPlacementMode('motion-1'))
@@ -104,13 +110,13 @@ function createPlacementProject() {
 function createPlacementActionEvent(): VideoProjectActionEvent {
   return {
     data: {},
-    duration: 0.3,
+    capturedDuration: 0.3,
     id: 'action-1',
     kind: VideoProjectActionEventKind.CLICK,
     label: 'Action',
     point: { x: 20, y: 30 },
-    preset: VideoProjectActionPreset.CLICK_RIPPLE,
-    time: 0.2,
+    presentation: { preset: VideoProjectActionPreset.CLICK_RIPPLE },
+    anchor: { kind: 'project', time: 0.2 },
   };
 }
 
@@ -129,7 +135,7 @@ function createPlacementMotionRegion(
     motionBlurAmount: 0,
     scale: 1.4,
     startTime: id === 'motion-2' ? 0.5 : 0,
-    targetActionEventId: null,
+    targetAction: null,
     zoomInDuration: 0.2,
     zoomOutDuration: 0.2,
   };

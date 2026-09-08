@@ -72,7 +72,7 @@ function createProps(
     previewMode: 'live',
     previewRasterSize: { height: 100, width: 200 },
     project,
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedClipId: null,
     selectedMotionRegion: null,
     selectionOverlay: null,
@@ -132,9 +132,11 @@ it('prioritizes active insert tools over existing preview overlays', () => {
     ),
   });
   const stage = renderRoot(props);
+  act(() => stage.focus());
   const overlay = container?.querySelector<HTMLButtonElement>(
     '[data-ui="video.preview.existing-overlay"]'
   );
+  expect(overlay).not.toBeNull();
 
   act(() => {
     overlay?.dispatchEvent(pointerEvent('pointerdown', 200, 100));
@@ -143,6 +145,17 @@ it('prioritizes active insert tools over existing preview overlays', () => {
 
   expect(beginInteraction).not.toHaveBeenCalled();
   expect(props.onAddShapeOverlay).toHaveBeenCalledWith(VideoProjectShapeType.RECTANGLE);
+});
+
+it('shows insertion intent on the canvas only while an annotation tool is armed', () => {
+  const props = createProps();
+  const stage = renderRoot(props);
+
+  expect(stage.className).toContain('cursor-crosshair');
+
+  const idleStage = renderRoot({ ...props, activeInsertKind: null });
+  expect(idleStage.className).toContain('cursor-default');
+  expect(idleStage.className).not.toContain('cursor-crosshair');
 });
 
 it('drops pending video insert sessions when active insert is cleared externally', () => {

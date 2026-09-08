@@ -1,3 +1,8 @@
+import { resolveVideoCompositionFrame } from '../../../../features/video/composition/timeline/frame';
+import {
+  mapActionOccurrencePointToScene,
+  mapScenePointToActionOccurrence,
+} from '../../../preview/stage/canvas/geometry';
 import {
   buildDraggedArea,
   clampStagePoint,
@@ -48,10 +53,15 @@ export function applyPlaybackSelectionNudge(
   switch (latestState.selection.kind) {
     case VideoEditorSelectionKind.CLIP:
       return nudgeSelectedClip(latestState, handlers, deltaX, deltaY);
-    case VideoEditorSelectionKind.ACTION_SEGMENT:
+    case VideoEditorSelectionKind.ACTION_OCCURRENCE:
       return nudgeSelectedActionPoint(latestState, handlers, deltaX, deltaY);
     case VideoEditorSelectionKind.MOTION_REGION:
       return nudgeSelectedMotionRegion(latestState, handlers, deltaX, deltaY);
+    case VideoEditorSelectionKind.CLIP_GROUP:
+    case VideoEditorSelectionKind.HISTORY_SPAN:
+    case VideoEditorSelectionKind.HISTORY_LANE:
+    case VideoEditorSelectionKind.MOTION_LANE:
+    case VideoEditorSelectionKind.MOTION_CONNECTION:
     case VideoEditorSelectionKind.SCENE:
     case VideoEditorSelectionKind.TRACK:
     case VideoEditorSelectionKind.TRANSITION_JUNCTION:
@@ -88,17 +98,33 @@ function nudgeSelectedActionPoint(
   deltaX: number,
   deltaY: number
 ): boolean {
-  const { project, selectedActionEvent } = latestState;
-  if (!project || !selectedActionEvent) {
+  const { project, selectedActionOccurrence } = latestState;
+  if (!project || !selectedActionOccurrence) {
     return false;
   }
 
-  const point = selectedActionEvent.point ?? getProjectCenter(project);
-  handlers.updateActionEventDetails(selectedActionEvent.id, {
-    point: clampStagePoint(project, {
-      x: point.x + deltaX,
-      y: point.y + deltaY,
-    }),
+  const camera = resolveVideoCompositionFrame(project, latestState.currentTime).camera;
+  const point = mapActionOccurrencePointToScene(
+    project,
+    selectedActionOccurrence,
+    latestState.currentTime,
+    camera
+  );
+  if (!point) return false;
+  const mapped = mapScenePointToActionOccurrence(
+    project,
+    selectedActionOccurrence,
+    latestState.currentTime,
+    camera,
+    {
+      x: point.x + deltaX / camera.scale,
+      y: point.y + deltaY / camera.scale,
+    }
+  );
+  if (!mapped) return false;
+  handlers.updateActionEventDetails(selectedActionOccurrence.eventId, {
+    point: mapped,
+    clipId: selectedActionOccurrence.clipId,
   });
   return true;
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createVideoProjectMotionRegion } from '../../features/video/project/motion';
 import { createEmptyVideoProject } from '../../features/video/project/factories/creation';
 import {
   VideoCursorAnimationPreset,
@@ -19,7 +20,6 @@ import type { VideoEditorState } from './types';
 function createSelectionStore() {
   let state = {
     currentTime: 0,
-    diagnosticsOpen: false,
     error: null,
     exportState: {
       dialogOpen: false,
@@ -71,25 +71,6 @@ describe('video editor timeline selection state owner', () => {
     verifyCursorClipAndMotionAreaSelection
   );
 
-  it('stores moving-zoom stop placement ownership under the motion selection seam', () => {
-    const store = createSelectionStore();
-
-    store.actions.startMotionPathStopPointPlacement('motion-1', 'stop-1');
-    store.actions.selectMotionRegion('motion-1');
-    expect(store.getState().placementMode).toEqual({
-      kind: 'motion-path-stop-point',
-      motionRegionId: 'motion-1',
-      stopId: 'stop-1',
-    });
-
-    store.actions.startMotionPathStopAreaPlacement('motion-1', 'stop-2');
-    expect(store.getState().placementMode).toEqual({
-      kind: 'motion-path-stop-area',
-      motionRegionId: 'motion-1',
-      stopId: 'stop-2',
-    });
-  });
-
   it('does not start utility lane placements when the lane is locked', () => {
     const store = createSelectionStore();
     store.getState().project!.utilityLanes = {
@@ -97,7 +78,7 @@ describe('video editor timeline selection state owner', () => {
       camera: { visible: true, locked: true },
     };
 
-    store.actions.startActionPointPlacement('action-1');
+    store.actions.startActionPointPlacement('action-1', null);
     store.actions.startMotionFocusPlacement('motion-1');
 
     expect(store.getState().placementMode).toBeNull();
@@ -128,10 +109,12 @@ function verifyDirectActionOwnerRouting() {
 }
 
 function expectActionPlacementRouting(store: ReturnType<typeof createSelectionStore>) {
-  store.actions.startActionPointPlacement('action-1');
-  store.actions.selectActionSegment('action-1');
+  store.getState().project!.actionEvents = [createSeedActionEvent()];
+  store.actions.startActionPointPlacement('action-1', null);
+  store.actions.selectActionOccurrence('action-1', null);
   expect(store.getState().placementMode).toEqual({
-    actionEventId: 'action-1',
+    eventId: 'action-1',
+    clipId: null,
     kind: 'action-point',
   });
 }
@@ -151,12 +134,10 @@ function expectPlaybackStateClamp(store: ReturnType<typeof createSelectionStore>
   store.actions.setCurrentTime(999);
   store.actions.setPixelsPerSecond(1);
   store.actions.togglePlaying();
-  store.actions.setDiagnosticsOpen(true);
   expect(store.getState()).toMatchObject({
     currentTime: 0,
-    diagnosticsOpen: true,
     isPlaying: true,
-    pixelsPerSecond: 12,
+    pixelsPerSecond: 1,
   });
 }
 
@@ -214,13 +195,13 @@ function createSeedClip(trackId: string) {
 function createSeedActionEvent() {
   return {
     data: {},
-    duration: 0.4,
+    capturedDuration: 0.4,
     id: 'action-1',
     kind: VideoProjectActionEventKind.CLICK,
     label: 'Click',
     point: { x: 20, y: 30 },
-    preset: VideoProjectActionPreset.CLICK_RIPPLE,
-    time: 0.2,
+    presentation: { preset: VideoProjectActionPreset.CLICK_RIPPLE },
+    anchor: { kind: 'project' as const, time: 0.2 },
   };
 }
 
@@ -251,8 +232,23 @@ function createSeedMotionRegion() {
     id: 'motion-1',
     scale: 1.4,
     startTime: 0.2,
-    targetActionEventId: null,
+    targetAction: null,
     zoomInDuration: 0.2,
     zoomOutDuration: 0.2,
   };
 }
+
+it('selects the authored Zoom lane without selecting a region or media track', () => {
+  const store = createSelectionStore();
+  store.actions.selectMotionLane();
+  expect(store.getState().selection.kind).toBe('scene');
+  const project = store.getState().project!;
+  project.motionRegions = [createVideoProjectMotionRegion(project, 0)];
+  store.actions.selectTrack(project.tracks[0]!.id);
+  store.actions.startMotionAreaPlacement(project.motionRegions[0]!.id);
+  store.actions.selectMotionLane();
+  expect(store.getState().selection).toEqual({ kind: 'motion-lane' });
+  expect(store.getState().selectedTrackId).toBeNull();
+  expect(store.getState().placementMode).toBeNull();
+  expect(store.getState().project).toBe(project);
+});

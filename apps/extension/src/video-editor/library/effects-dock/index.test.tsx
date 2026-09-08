@@ -1,17 +1,23 @@
 // @vitest-environment jsdom
 
 import { act } from 'react';
+import { readFileSync } from 'node:fs';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 import type { EffectBundleCatalogEntry } from '../../../features/video/project/effect-bundle/catalog';
-import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import { translate } from '../../../platform/i18n';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../features/video/project/factories/creation';
 import { createTextClip } from '../../../features/video/project/factories/overlay-clip';
 import {
   VideoTrackKind,
   VideoTransitionEasing,
   VideoTransitionKind,
 } from '../../../features/video/project/types';
+import { EffectImportControl } from './header';
 import { VideoEditorEffectsLibraryDock } from './index';
 import { useEffectLibraryOperations, type EffectLibraryOperations } from './operations';
 import { resolveEffectTransitionTargetId } from '../../workspace/surface/effects-library';
@@ -35,9 +41,57 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it('keeps import failure guidance in the padded scrollable content without internal-error copy', () => {
+  renderDock({
+    operations: {
+      ...createOperations(),
+      operationError: { kind: 'import', code: 'BUNDLE_ARCHIVE_INVALID' },
+    },
+  });
+  const alert = container?.querySelector('[role="alert"]');
+  expect(alert?.textContent).toBe(translate('videoEditor.effectsLibrary.importFailed'));
+  expect(alert?.closest('[aria-busy]')?.className).toContain('overflow-y-auto');
+});
+
+it('shows catalog loading and a safe recovery message instead of diagnostic codes', () => {
+  renderDock({ catalogs: [], isLoading: true });
+  expect(container?.querySelector('[role="status"]')?.textContent).toBe(
+    translate('videoEditor.effectsLibrary.catalogLoading')
+  );
+  renderDock({ catalogs: [], errorCode: 'EFFECT_CATALOG_FAILED' });
+  const alert = container?.querySelector('[role="alert"]');
+  expect(alert?.textContent).toBe(translate('videoEditor.effectsLibrary.catalogLoadFailed'));
+  expect(alert?.textContent).not.toContain('EFFECT_CATALOG_FAILED');
+  expect(container?.querySelector('[role="status"]')).toBeNull();
+});
+
 it('renders nothing while the EffectV1 dock is closed', () => {
   renderDock({ isOpen: false });
   expect(container?.querySelector('[data-ui="video-editor.effects-library.dock"]')).toBeNull();
+});
+
+it('uses the compact tokenized dock and user-facing EffectV1 target labels', () => {
+  renderDock();
+
+  const dock = container?.querySelector<HTMLElement>(
+    '[data-ui="video-editor.effects-library.dock"]'
+  );
+  const documentRows = container?.querySelectorAll<HTMLElement>('[draggable="true"]');
+
+  expect(dock?.className).toContain('h-full');
+  expect(dock?.className).not.toContain('absolute');
+  expect(documentRows).toHaveLength(3);
+  expect(documentRows?.[0]?.className).toContain('var(--sniptale-color-surface-panel)');
+  expect(container?.textContent).toContain(
+    translate('videoEditor.effectsLibrary.documentKindScene')
+  );
+  expect(container?.textContent).toContain(
+    translate('videoEditor.effectsLibrary.documentKindClip')
+  );
+  expect(container?.textContent).toContain(
+    translate('videoEditor.effectsLibrary.selectClipTarget')
+  );
+  expect(container?.textContent).not.toContain('targetEffect');
 });
 
 it('exposes only targets that are available for each EffectV1 kind', async () => {
@@ -50,6 +104,8 @@ it('exposes only targets that are available for each EffectV1 kind', async () =>
   expect(standalone.disabled).toBe(false);
   expect(target.disabled).toBe(true);
   expect(transition.disabled).toBe(true);
+  expect(standalone.textContent).toBe(translate('videoEditor.effectsLibrary.applyToScene'));
+  expect(target.textContent).toBe(translate('videoEditor.effectsLibrary.selectClipTarget'));
 
   await click(standalone);
   expect(onApplyEffect).toHaveBeenCalledWith(
@@ -96,7 +152,8 @@ it('keeps an invalid EffectV1 catalog row visible with delete-only recovery', as
 
 it('does not expose a transition that already owns an EffectV1 instance', () => {
   const project = createEmptyVideoProject('occupied transition');
-  const track = project.tracks.find(({ kind }) => kind === VideoTrackKind.OVERLAY)!;
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
+  const track = project.tracks.find(({ name }) => name === 'Annotations')!;
   const leading = { ...createTextClip(track.id, project.width, project.height, 0), id: 'leading' };
   const trailing = {
     ...createTextClip(track.id, project.width, project.height, 1),
@@ -142,12 +199,12 @@ it('surfaces a rejected dropped apply through the shared operation owner', async
 
   expect(onApplyEffect).toHaveBeenCalledOnce();
   const alert = container?.querySelector('[role="alert"]')?.textContent;
-  expect(alert).toContain('Sniptale');
+  expect(alert).toBe(translate('videoEditor.effectsLibrary.applyFailed'));
   expect(alert).not.toContain('EFFECT_OPERATION_FAILED');
   expect(alert).not.toContain('drop-apply-rejected');
 });
 
-it('surfaces only an allowlisted EffectV1 diagnostic code', async () => {
+it('keeps allowlisted EffectV1 diagnostic codes out of routine feedback', async () => {
   const onApplyEffect = vi.fn(async () => {
     throw Object.assign(new Error('private failure detail'), { code: 'BUNDLE_ARCHIVE_INVALID' });
   });
@@ -158,7 +215,7 @@ it('surfaces only an allowlisted EffectV1 diagnostic code', async () => {
   await click(dropButton);
 
   const alert = container?.querySelector('[role="alert"]')?.textContent;
-  expect(alert).toContain('Sniptale');
+  expect(alert).toBe(translate('videoEditor.effectsLibrary.applyFailed'));
   expect(alert).not.toContain('BUNDLE_ARCHIVE_INVALID');
   expect(alert).not.toContain('private failure detail');
 });
@@ -198,7 +255,6 @@ function DroppedEffectOperationHarness(props: {
         isOpen
         operations={operations}
         onApplyEffect={props.onApplyEffect}
-        onClose={vi.fn()}
         onDeleteEffectBundle={vi.fn(async () => undefined)}
         onImportEffectFile={vi.fn(async () => undefined)}
         onSetEffectBundleEnabled={vi.fn(async () => undefined)}
@@ -222,7 +278,6 @@ function renderDock(
         isOpen
         operations={createOperations()}
         onApplyEffect={vi.fn(async () => null)}
-        onClose={vi.fn()}
         onDeleteEffectBundle={vi.fn(async () => undefined)}
         onImportEffectFile={vi.fn(async () => undefined)}
         onSetEffectBundleEnabled={vi.fn(async () => undefined)}
@@ -280,10 +335,10 @@ function createDocument(
 }
 
 function findDocumentButton(id: string): HTMLButtonElement {
-  const label = [...(container?.querySelectorAll('p') ?? [])].find(
-    (element) => element.textContent === id
+  const row = [...(container?.querySelectorAll('[data-effect-document]') ?? [])].find(
+    (element) => element.getAttribute('data-effect-document') === id
   );
-  const button = label?.parentElement?.parentElement?.querySelector('button');
+  const button = row?.querySelector('button');
   if (!(button instanceof HTMLButtonElement)) throw new Error(`Missing button for ${id}`);
   return button;
 }
@@ -291,3 +346,62 @@ function findDocumentButton(id: string): HTMLButtonElement {
 async function click(button: HTMLButtonElement): Promise<void> {
   await act(async () => button.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 }
+
+it('opens the picker, ignores its cancellation and resets it after a selected pack', async () => {
+  const onImport = vi.fn(async () => undefined);
+  const run = vi.fn(async (_kind: 'import', action: () => Promise<unknown>) => {
+    await action();
+  });
+  act(() => root?.render(<EffectImportControl disabled={false} onImport={onImport} run={run} />));
+  const input = container!.querySelector('input')!;
+  const open = vi.spyOn(input, 'click');
+  act(() => container!.querySelector('button')!.click());
+  expect(open).toHaveBeenCalledOnce();
+  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
+  expect(run).not.toHaveBeenCalled();
+  const file = new File(['{}'], 'pack.sniptale-effect.json');
+  Object.defineProperty(input, 'files', { configurable: true, value: [file] });
+  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
+  expect(onImport).toHaveBeenCalledWith(file);
+  expect(input.value).toBe('');
+  act(() => root?.render(<EffectImportControl disabled onImport={onImport} run={run} />));
+  expect(container!.querySelector('button')!.disabled).toBe(true);
+});
+
+it('presents the imported document label instead of its internal identifier', () => {
+  const catalog = createCatalog();
+  catalog.documents[1]!.source = readFileSync(
+    'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-target-effect.sniptale-effect.json',
+    'utf8'
+  );
+  renderDock({ catalogs: [{ catalog, status: 'ready' }] });
+  expect(container?.textContent).toContain('Neutral Target Effect');
+  expect(container?.textContent).not.toContain('effect-pack');
+  expect(container?.textContent).not.toContain('EffectV1');
+});
+
+it('filters document names and restores the catalog after an empty search', () => {
+  const catalog = createCatalog();
+  catalog.documents[1]!.source = readFileSync(
+    'packages/runtime-contracts/src/effect-v1/fixtures/valid/neutral-target-effect.sniptale-effect.json',
+    'utf8'
+  );
+  renderDock({ catalogs: [{ catalog, status: 'ready' }] });
+  const input = container!.querySelector<HTMLInputElement>('input:not([type="file"])')!;
+  const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+  const search = (value: string) =>
+    act(() => {
+      setValue.call(input, value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  search('Neutral');
+  expect(container?.querySelectorAll('[data-effect-document]')).toHaveLength(1);
+  expect(container?.textContent).toContain('Neutral Target Effect');
+  search('not-in-this-catalog');
+  expect(container?.querySelectorAll('[data-effect-document]')).toHaveLength(0);
+  expect(container?.querySelector('[role="status"]')?.textContent).toBe(
+    translate('videoEditor.effectsLibrary.noSearchResults')
+  );
+  search('');
+  expect(container?.querySelectorAll('[data-effect-document]')).toHaveLength(3);
+});

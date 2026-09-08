@@ -52,13 +52,13 @@ function createActionEvent(args: {
 }): VideoProjectActionEvent {
   return {
     data: {},
-    duration: 0,
+    capturedDuration: 0,
     id: args.id,
     kind: resolveActionKindForPreset(args.preset),
     label: args.label,
     point: args.point,
-    preset: args.preset,
-    time: args.time,
+    presentation: { preset: args.preset },
+    anchor: { kind: 'project', time: args.time },
   };
 }
 

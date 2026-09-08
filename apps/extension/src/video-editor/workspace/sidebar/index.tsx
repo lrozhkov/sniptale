@@ -9,9 +9,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = (props) => {
   const state = useWorkspaceSidebarState(
     props.selection ?? createSceneSelection(),
     props.selectedClip,
-    props.recordingId,
-    props.diagnosticsOpen,
-    props.onToggleDiagnostics
+    props.selectedTrack
   );
 
   if (props.collapsed) {
@@ -19,14 +17,12 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = (props) => {
       <WorkspaceSidebarCollapsedShell
         selectedClipLabel={state.selectionLabel}
         selectedClipIcon={state.selectionIcon}
-        diagnosticsOpen={props.diagnosticsOpen}
         inputRefs={state.inputRefs}
         onToggleCollapsed={props.onToggleCollapsed}
         onCreateProject={props.onCreateProject}
         onImportAudio={props.onImportAudio}
         onImportImage={props.onImportImage}
         onImportVideo={props.onImportVideo}
-        onToggleDiagnostics={() => props.onToggleDiagnostics(!props.diagnosticsOpen)}
       />
     );
   }
@@ -36,14 +32,11 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = (props) => {
       {...props}
       selectionIcon={state.selectionIcon}
       selectionTitle={state.selectionTitle}
-      diagnosticsMeta={state.diagnosticsMeta}
       projectsOpen={state.projectsOpen}
       recordingsOpen={state.recordingsOpen}
-      diagnosticsSectionOpen={state.diagnosticsSectionOpen}
       inputRefs={state.inputRefs}
       onToggleProjectsOpen={state.toggleProjectsOpen}
       onToggleRecordingsOpen={state.toggleRecordingsOpen}
-      onToggleDiagnosticsSection={state.toggleDiagnosticsSection}
     />
   );
 };

@@ -21,11 +21,8 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
 vi.mock('../surface/sidebar-props', () => ({
   getWorkspaceSidebarProps: () => ({
     activeProjectId: 'project-1',
-    diagnosticsContent: null,
-    diagnosticsOpen: false,
     gridSettings: {},
     inspectorMode: 'selection',
-    onToggleDiagnostics: vi.fn(),
     project: { clips: [], tracks: [] },
     projects: [],
     recordingId: null,
@@ -51,7 +48,17 @@ vi.mock('../sidebar/view', () => ({
 it('hides the context inspector when the inspector rail state is collapsed', () => {
   hookMocks.collapsed = true;
   const markup = renderToStaticMarkup(
-    <VideoEditorFloatingInspectorStack diagnosticsContent={null} />
+    <VideoEditorFloatingInspectorStack
+      onClose={vi.fn()}
+      resize={{
+        width: 344,
+        min: 280,
+        max: 520,
+        onDoubleClick: vi.fn(),
+        onPointerDown: vi.fn(),
+        onKeyDown: vi.fn(),
+      }}
+    />
   );
 
   expect(markup).toBe('');
@@ -61,7 +68,17 @@ it('hides the context inspector when the inspector rail state is collapsed', () 
 it('renders a context inspector surface without introducing a layers panel', () => {
   hookMocks.collapsed = false;
   const markup = renderToStaticMarkup(
-    <VideoEditorFloatingInspectorStack diagnosticsContent={null} />
+    <VideoEditorFloatingInspectorStack
+      onClose={vi.fn()}
+      resize={{
+        width: 344,
+        min: 280,
+        max: 520,
+        onDoubleClick: vi.fn(),
+        onPointerDown: vi.fn(),
+        onKeyDown: vi.fn(),
+      }}
+    />
   );
 
   expect(markup).toContain('data-ui="video-editor.floating.context-inspector"');
@@ -69,10 +86,11 @@ it('renders a context inspector surface without introducing a layers panel', () 
   expect(markup).toContain('data-ui="mock-context-inspector-content"');
   expect(markup).toContain('data-ui="video-editor.floating.context-inspector.resize"');
   expect(markup).toContain('role="separator"');
+  expect(markup).toContain('width:344px');
+  expect(markup).toContain('aria-valuenow="344"');
   expect(markup).not.toContain('layers');
   expect(contentSpy.mock.calls[0]?.[0]).toEqual(
     expect.objectContaining({
-      diagnosticsMeta: expect.any(String),
       inputRefs: expect.any(Object),
       onToggleProjectsOpen: expect.any(Function),
     })

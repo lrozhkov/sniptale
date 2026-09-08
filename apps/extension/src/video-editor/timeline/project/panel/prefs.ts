@@ -24,7 +24,8 @@ interface ProjectTimelinePanelPrefsState {
   setCollapsedCursorLaneVisible: (visible: boolean) => void;
   setCollapsedTelemetryLaneVisible: (visible: boolean) => void;
   setCompactRows: (compactRows: boolean) => void;
-  setPanelExpanded: (expanded: boolean) => void;
+  setHideTrackNames: (hidden: boolean) => void;
+  setClipNamesHidden: (trackId: string, hidden: boolean) => void;
   setTrackHeight: (trackId: string, multiplier: VideoEditorTrackHeightMultiplier) => void;
 }
 
@@ -46,15 +47,20 @@ export function useProjectTimelinePanelPrefs(
 
   return {
     cursorLaneVisible:
-      project.cursorTrack !== null && (prefs.panelExpanded || prefs.collapsedCursorLaneVisible),
+      (project.cursorTrack?.samples.length ?? 0) > 0 &&
+      prefs.collapsedTelemetryLaneVisible &&
+      prefs.collapsedCursorLaneVisible,
     prefs,
-    telemetryLaneVisible: prefs.panelExpanded || prefs.collapsedTelemetryLaneVisible,
+    telemetryLaneVisible: prefs.collapsedTelemetryLaneVisible,
     ...actions,
   };
 }
 
 function useCurrentTrackIds(project: VideoProject): ReadonlySet<string> {
-  const trackIdsKey = project.tracks.map((track) => track.id).join('\n');
+  const trackIdsKey = project.tracks
+    .map((track) => track.id)
+    .sort()
+    .join('\n');
   return useMemo(() => new Set(trackIdsKey === '' ? [] : trackIdsKey.split('\n')), [trackIdsKey]);
 }
 
@@ -103,8 +109,16 @@ function useTrackPanelPrefsActions(
       'collapsedTelemetryLaneVisible'
     ),
     setCompactRows: useTrackPanelBooleanSetter(updatePrefs, 'compactRows'),
-    setPanelExpanded: useTrackPanelBooleanSetter(updatePrefs, 'panelExpanded'),
+    setHideTrackNames: useTrackPanelBooleanSetter(updatePrefs, 'hideTrackNames'),
     setTrackHeight: useTrackHeightSetter(updatePrefs),
+    setClipNamesHidden: useCallback(
+      (trackId: string, hidden: boolean) =>
+        updatePrefs((current) => ({
+          ...current,
+          hiddenClipNamesByTrackId: { ...current.hiddenClipNamesByTrackId, [trackId]: hidden },
+        })),
+      [updatePrefs]
+    ),
   };
 }
 
@@ -135,7 +149,7 @@ function useTrackPanelBooleanSetter(
     | 'collapsedCursorLaneVisible'
     | 'collapsedTelemetryLaneVisible'
     | 'compactRows'
-    | 'panelExpanded'
+    | 'hideTrackNames'
 ) {
   return useCallback(
     (visible: boolean) => updatePrefs((currentPrefs) => ({ ...currentPrefs, [key]: visible })),
@@ -167,6 +181,13 @@ function pruneTrackPanelPrefs(
 ): VideoEditorTrackPanelPrefs {
   return {
     ...prefs,
+    ...(prefs.hiddenClipNamesByTrackId
+      ? {
+          hiddenClipNamesByTrackId: Object.fromEntries(
+            Object.entries(prefs.hiddenClipNamesByTrackId).filter(([id]) => currentTrackIds.has(id))
+          ),
+        }
+      : {}),
     trackHeightByTrackId: Object.fromEntries(
       Object.entries(prefs.trackHeightByTrackId).filter(([trackId]) => currentTrackIds.has(trackId))
     ),

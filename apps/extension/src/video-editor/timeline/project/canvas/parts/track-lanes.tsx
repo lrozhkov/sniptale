@@ -1,3 +1,5 @@
+import { AudioGapRecordingAction, AudioRecordingZones } from '../../tracks/zones/audio-recording';
+import type { TimelineProjection } from '../../interaction-state/projection';
 import { useState } from 'react';
 import type { VideoProject } from '../../../../../features/video/project/types';
 import type { TimelineClipPreviewMap } from '../../../../contracts/timeline-preview';
@@ -10,7 +12,6 @@ import {
   buildTrackGapZones,
   buildTrackCutZones,
   buildTrackJunctionZones,
-  buildTrackStackedOverlapZones,
   ProjectTimelineTrackZones,
 } from '../../tracks/zones/index';
 import type {
@@ -31,7 +32,9 @@ import { ProjectTimelineTrackClipStack } from './clip-stack';
 import { ProjectTimelineLogicalLaneGuides } from './lane-guides';
 
 interface ProjectTimelineTrackLanesProps {
+  hiddenClipNamesByTrackId?: Readonly<Record<string, boolean>> | undefined;
   pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
   project: VideoProject;
   dragGhost: TimelineClipDragGhost | null;
   selection: VideoEditorSelection;
@@ -52,7 +55,7 @@ interface ProjectTimelineTrackLanesProps {
   onCloseTrackGap: (trackId: string, gapStart: number, gapEnd: number) => void;
   onDropTimelineFile: (params: TimelineFileDropParams) => void;
   onDropEffectDocument?: ProjectTimelineProps['onDropEffectDocument'];
-  onSelectClip: (clipId: string | null) => void;
+  onSelectClip: (clipId: string | null, intent?: 'replace' | 'toggle' | 'range') => void;
   onSelectTransition: (transitionId: string) => void;
   onSetHoveredClipId: (clipId: string | null) => void;
   onUnsupportedTimelineFileDrop: () => void;
@@ -73,8 +76,10 @@ export function ProjectTimelineTrackLanes(props: ProjectTimelineTrackLanesProps)
   return props.tracks.map((track) => (
     <ProjectTimelineTrackLane
       key={track.id}
+      hiddenClipNamesByTrackId={props.hiddenClipNamesByTrackId}
       dragGhost={props.dragGhost}
       pixelsPerSecond={props.pixelsPerSecond}
+      projection={props.projection}
       project={props.project}
       selection={props.selection}
       hoveredClipId={props.hoveredClipId}
@@ -101,31 +106,53 @@ export function ProjectTimelineTrackLanes(props: ProjectTimelineTrackLanesProps)
 }
 
 function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
+  const displayProject = getReorderDisplayProject(props.project, props.dragGhost);
   return (
     <div
-      className={getTrackLaneClassName(
-        props.selection,
-        props.selectedTrackId,
-        props.track.id,
-        props.dropActive
-      )}
+      className={
+        'group/audio ' +
+        getTrackLaneClassName(
+          props.selection,
+          props.selectedTrackId,
+          props.track.id,
+          props.dropActive
+        )
+      }
       data-track-lane-id={props.track.id}
+      data-timeline-lane-muted={!props.track.visible}
       style={{ height: props.trackLayout?.rowHeight }}
       {...createTrackLaneEventProps(props)}
     >
+      <AudioRecordingZones
+        project={props.project}
+        trackId={props.track.id}
+        pixelsPerSecond={props.pixelsPerSecond}
+        projection={props.projection}
+      />
       <ProjectTimelineLogicalLaneGuides trackLayout={props.trackLayout} />
-      <ProjectTimelineTrackZones {...createTrackZoneProps(props)} />
+      <ProjectTimelineTrackZones
+        {...createTrackZoneProps({
+          ...props,
+          project: getDragDisplayProject(props.project, props.dragGhost),
+        })}
+      />
       <ProjectTimelineClipDragGhost
         dragGhost={props.dragGhost}
         pixelsPerSecond={props.pixelsPerSecond}
+        projection={props.projection}
         trackId={props.track.id}
         trackLayout={props.trackLayout}
       />
       <ProjectTimelineTrackClipStack
+        hideClipNames={props.hiddenClipNamesByTrackId?.[props.track.id] ?? false}
         pixelsPerSecond={props.pixelsPerSecond}
-        project={props.project}
-        hoveredClipId={props.hoveredClipId}
-        selectedClipId={props.selectedClipId}
+        projection={props.projection}
+        project={displayProject}
+        hoveredClipId={props.dragGhost?.activeReorder ? null : props.hoveredClipId}
+        selectedClipId={
+          props.dragGhost?.activeReorder ? props.dragGhost.clipId : props.selectedClipId
+        }
+        selectedClipIds={props.selection.kind === 'clip-group' ? props.selection.clipIds : []}
         selectedEffectSelection={props.selectedEffectSelection}
         timelinePreviews={props.timelinePreviews}
         trackId={props.track.id}
@@ -138,6 +165,34 @@ function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
       />
     </div>
   );
+}
+
+/** Presentation-only geometry; the gesture owner publishes the command on release. */
+function getReorderDisplayProject(project: VideoProject, ghost: TimelineClipDragGhost | null) {
+  if (!ghost?.activeReorder) return project;
+  return getDragDisplayProject(project, ghost);
+}
+
+function getDragDisplayProject(project: VideoProject, ghost: TimelineClipDragGhost | null) {
+  if (!ghost) return project;
+  const placements = new Map(
+    [ghost, ...(ghost.relatedClips ?? [])].map((clip) => [clip.clipId, clip])
+  );
+  return {
+    ...project,
+    clips: project.clips.map((clip) => {
+      const placement = placements.get(clip.id);
+      return placement
+        ? {
+            ...clip,
+            startTime: placement.startTime,
+            duration: placement.duration,
+            trackId: placement.trackId,
+            timelineLaneId: placement.timelineLaneId,
+          }
+        : clip;
+    }),
+  };
 }
 
 function createTrackLaneEventProps(props: ProjectTimelineTrackLaneProps) {
@@ -180,7 +235,9 @@ function resolveTimelineLaneIdFromDropEvent(
 }
 
 function createTrackZoneProps(props: {
+  onBeginClipInteraction: ProjectTimelineTrackLanesProps['onBeginClipInteraction'];
   pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
   project: VideoProject;
   track: VideoProject['tracks'][number];
   onCloseTrackGap: (trackId: string, gapStart: number, gapEnd: number) => void;
@@ -189,11 +246,24 @@ function createTrackZoneProps(props: {
   selection: VideoEditorSelection;
 }): React.ComponentProps<typeof ProjectTimelineTrackZones> {
   return {
+    onBeginTransitionTrim: props.track.locked
+      ? undefined
+      : (event, transitionId, edge) => {
+          const transition = props.project.transitions?.find((item) => item.id === transitionId);
+          const clipId = edge === 'start' ? transition?.trailingClipId : transition?.leadingClipId;
+          const clip = props.project.clips.find((item) => item.id === clipId);
+          if (!clip) return;
+          props.onBeginClipInteraction(event, clip, edge === 'start' ? 'trim-start' : 'trim-end');
+          props.onSelectTransition(transitionId);
+        },
     cutZones: buildTrackCutZones(props.project, props.track.id),
     gapZones: buildTrackGapZones(props.project, props.track.id),
+    renderGapAction: (zone) => (
+      <AudioGapRecordingAction project={props.project} trackId={props.track.id} range={zone} />
+    ),
     junctionZones: buildTrackJunctionZones(props.project, props.track.id),
     pixelsPerSecond: props.pixelsPerSecond,
-    stackedOverlapZones: buildTrackStackedOverlapZones(props.project, props.track.id),
+    projection: props.projection,
     selectedTransitionId:
       props.selection.kind === VideoEditorSelectionKind.TRANSITION_JUNCTION
         ? props.selection.transitionId

@@ -1,3 +1,4 @@
+import type { RecordingPointTransform } from '../../../../../../features/video/project/types';
 import { VideoRecordingStatus } from '@sniptale/runtime-contracts/video/types/types';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
@@ -93,7 +94,8 @@ function isRecordingStartCancellable(): boolean {
 
 async function sendStopSignals(
   discard: boolean,
-  failureLogging: StopFailureLogging = 'detailed'
+  failureLogging: StopFailureLogging = 'detailed',
+  onGeometry?: (transform: RecordingPointTransform | null) => void
 ): Promise<RecordingStopResult> {
   const recordingId = getVideoRecordingId();
   const previousState = getVideoRecordingRuntimeState();
@@ -124,6 +126,7 @@ async function sendStopSignals(
   try {
     const acknowledgement = await requestBoundOffscreenRecordingStop(sourceBinding, discard);
     terminalError = acknowledgement.terminalError;
+    onGeometry?.(acknowledgement.recordingPointTransform);
   } catch (error) {
     if (await hasCommittedPostRecordResult(recordingId)) {
       if (isCurrentVideoRecordingId(recordingId)) {
@@ -238,13 +241,7 @@ export async function stopRecording(discard = false): Promise<RecordingStopResul
   const context = beginVideoRecordingStop();
   logger.log('Stopping recording', { mode: context.mode, tabId: context.tabId });
 
-  runStopSideEffects(context);
-
-  if (context.shouldResetImmediately) {
-    return completeEarlyStop();
-  }
-
-  return await sendStopSignals(discard);
+  return completeStopWithTelemetry(context, discard, 'detailed');
 }
 
 export async function stopRecordingForPrivacyErasure(): Promise<RecordingStopResult> {
@@ -261,13 +258,7 @@ export async function stopRecordingForPrivacyErasure(): Promise<RecordingStopRes
     mode: context.mode,
     tabId: context.tabId,
   });
-  runStopSideEffects(context, 'fixed');
-
-  if (context.shouldResetImmediately) {
-    return completeEarlyStop();
-  }
-
-  return sendStopSignals(true, 'fixed');
+  return completeStopWithTelemetry(context, true, 'fixed');
 }
 
 export async function cancelRecordingStart(): Promise<RecordingStopResult> {
@@ -277,4 +268,22 @@ export async function cancelRecordingStart(): Promise<RecordingStopResult> {
   }
 
   return await stopRecording(true);
+}
+
+async function completeStopWithTelemetry(
+  context: ReturnType<typeof beginVideoRecordingStop>,
+  discard: boolean,
+  failureLogging: StopFailureLogging
+): Promise<RecordingStopResult> {
+  let settleGeometry: (transform: RecordingPointTransform | null) => void = () => undefined;
+  const recordingPointTransform = new Promise<RecordingPointTransform | null>((resolve) => {
+    settleGeometry = resolve;
+  });
+  try {
+    void runStopSideEffects(context, failureLogging, { discard, recordingPointTransform });
+    if (context.shouldResetImmediately) return await completeEarlyStop();
+    return await sendStopSignals(discard, failureLogging, settleGeometry);
+  } finally {
+    settleGeometry(null);
+  }
 }

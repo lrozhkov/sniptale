@@ -9,6 +9,7 @@ interface GlassSelectOverlayOptions {
   containerRef: RefObject<HTMLDivElement | null>;
   menuRef: RefObject<HTMLDivElement | null>;
   placement?: 'auto' | 'bottom';
+  menuWidth?: number;
 }
 
 export function useGlassSelectOverlay({
@@ -18,6 +19,7 @@ export function useGlassSelectOverlay({
   containerRef,
   menuRef,
   placement,
+  menuWidth,
 }: GlassSelectOverlayOptions) {
   useGlassSelectDismiss({
     isOpen,
@@ -32,6 +34,7 @@ export function useGlassSelectOverlay({
     containerRef,
     menuRef,
     ...(placement === undefined ? {} : { placement }),
+    ...(menuWidth === undefined ? {} : { menuWidth }),
   });
 
   return {

@@ -1,9 +1,13 @@
 // @vitest-environment jsdom
+import { VideoTrackKind } from '../../../../features/video/project/types';
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, expect, it, vi } from 'vitest';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../features/video/project/factories/creation';
 import type { VideoEditorTrackPanelPrefs } from '../../../persistence/track-panel';
 import { useProjectTimelinePanelPrefs } from './prefs';
 
@@ -44,14 +48,14 @@ it('ignores a late initial prefs load after a newer local panel update', async (
 
   await renderPrefsHarness(project);
   act(() => {
-    latestPrefs?.setPanelExpanded(true);
+    latestPrefs?.setCompactRows(true);
   });
   await act(async () => {
-    resolveLoad(createLoadedPrefs({ panelExpanded: false }));
+    resolveLoad(createLoadedPrefs({ compactRows: false }));
     await Promise.resolve();
   });
 
-  expect(latestPrefs?.prefs.panelExpanded).toBe(true);
+  expect(latestPrefs?.prefs.compactRows).toBe(true);
 });
 
 async function renderPrefsHarness(project: ReturnType<typeof createEmptyVideoProject>) {
@@ -73,8 +77,26 @@ function createLoadedPrefs(
     collapsedCursorLaneVisible: true,
     collapsedTelemetryLaneVisible: false,
     compactRows: false,
-    panelExpanded: false,
+    hideTrackNames: false,
     trackHeightByTrackId: {},
     ...overrides,
   };
 }
+
+it('keeps local heights stable while the same tracks are reordered', async () => {
+  let project = createEmptyVideoProject('Reorder presentation');
+  project.tracks.push(createVideoProjectTrack('Overlay', 2, VideoTrackKind.PRIMARY));
+  const firstId = project.tracks[0]!.id;
+  loadPrefsMock.mockResolvedValue(createLoadedPrefs({}));
+  function Harness() {
+    latestPrefs = useProjectTimelinePanelPrefs(project);
+    return null;
+  }
+  root = createRoot(document.createElement('div'));
+  await act(async () => root?.render(<Harness />));
+  act(() => latestPrefs?.setTrackHeight(firstId, 2));
+  project = { ...project, tracks: [...project.tracks].reverse() };
+  await act(async () => root?.render(<Harness />));
+  expect(latestPrefs?.prefs.trackHeightByTrackId[firstId]).toBe(2);
+  expect(loadPrefsMock).toHaveBeenCalledOnce();
+});

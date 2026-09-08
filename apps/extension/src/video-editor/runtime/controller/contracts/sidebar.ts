@@ -1,4 +1,9 @@
-import type React from 'react';
+import type { CameraPositionEdit } from '../../../../features/video/project/camera/animation';
+import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
+import type {
+  VideoProjectCameraLayout,
+  VideoProjectCameraPlacement,
+} from '../../../../features/video/project/camera/placement';
 import type { VideoEditorPlacementMode } from '../../../contracts/placement';
 import type { VideoEditorSelection } from '../../../contracts/selection';
 import type { VideoEditorProjectActions } from '../../../contracts/commands/project';
@@ -17,10 +22,10 @@ import type { VideoEditorLibrariesState } from '../../app-model/types';
 interface VideoEditorSidebarCommands extends VideoEditorProjectActions, VideoEditorSessionActions {}
 
 interface VideoEditorSidebarState {
+  typingProject?: VideoProject;
+  recordingTelemetry?: readonly RecordingTelemetryEntry[];
   activeProjectId: string;
   collapsed: boolean;
-  diagnosticsContent: React.ReactNode;
-  diagnosticsOpen: boolean;
   gridSettings: {
     color: string;
     enabled: boolean;
@@ -38,7 +43,9 @@ interface VideoEditorSidebarState {
   recentColors: string[];
   recordingId: string | null;
   recordings: VideoEditorLibrariesState['recordings'];
-  selectedActionEvent: VideoEditorSelections['selectedActionEvent'];
+  currentTime?: number;
+  selectedActionOccurrence: VideoEditorSelections['selectedActionOccurrence'];
+  canAddCameraPosition?: boolean;
   selectedClip: VideoEditorSelections['selectedClip'];
   selectedCursorSample: VideoEditorSelections['selectedCursorSample'];
   selectedMotionRegion: VideoEditorSelections['selectedMotionRegion'];
@@ -48,9 +55,11 @@ interface VideoEditorSidebarState {
 }
 
 interface VideoEditorSidebarProjectActions {
+  onApplyTypingCompression?: VideoEditorSessionActions['applyTypingCompression'];
   onAddActionEvent: (preset: VideoProjectActionPreset) => void;
   onAddMotionRegion: () => void;
   onAddRecording: VideoEditorActionHandlers['handleAddRecording'];
+  onAddLibraryMedia: VideoEditorActionHandlers['handleAddLibraryMedia'];
   onAddTrack: VideoEditorSidebarCommands['addTrack'];
   onApplyEffectDocument: VideoEditorSidebarCommands['applyEffectDocument'];
   onClearCursorSampleSkinOverride: VideoEditorSidebarCommands['clearCursorSampleSkinOverride'];
@@ -61,7 +70,7 @@ interface VideoEditorSidebarProjectActions {
   onDeleteMotionRegion: VideoEditorSidebarCommands['deleteMotionRegion'];
   onDeleteObjectTrack: VideoEditorSidebarCommands['deleteObjectTrack'];
   onSelectObjectTrack: VideoEditorSidebarCommands['selectObjectTrack'];
-  onGenerateMotionPathFromCursor: (motionRegionId: string) => void;
+
   onDeleteProject: VideoEditorActionHandlers['handleDeleteProject'];
   onDeleteTrack: (trackId: string) => void;
   onEnableCursorTrack: () => void;
@@ -72,6 +81,11 @@ interface VideoEditorSidebarProjectActions {
   onInsertCursorSample: VideoEditorSidebarCommands['insertCursorSample'];
   onOpenProject: VideoEditorActionHandlers['handleOpenProject'];
   onRenameTrack: VideoEditorSidebarCommands['renameTrack'];
+  onToggleUtilityLaneVisibility: VideoEditorProjectActions['toggleUtilityLaneVisibility'];
+  onToggleUtilityLaneLock: VideoEditorProjectActions['toggleUtilityLaneLock'];
+  onClearUtilityLane: VideoEditorProjectActions['clearUtilityLane'];
+  onToggleTrackLock: VideoEditorSidebarCommands['toggleTrackLock'];
+  onToggleTrackVisibility: VideoEditorSidebarCommands['toggleTrackVisibility'];
   onResizeProject: (width: number, height: number) => void;
   onSetCursorCaptureMode: (captureMode: VideoProjectCursorTrack['captureMode']) => void;
   onSetSceneBackground: (sceneBackground: VideoProjectSceneBackground) => void;
@@ -81,11 +95,10 @@ interface VideoEditorSidebarProjectActions {
   onStartActionPointPlacement: VideoEditorSidebarCommands['startActionPointPlacement'];
   onStartMotionAreaPlacement: VideoEditorSidebarCommands['startMotionAreaPlacement'];
   onStartMotionFocusPlacement: VideoEditorSidebarCommands['startMotionFocusPlacement'];
-  onStartMotionPathStopAreaPlacement: VideoEditorSidebarCommands['startMotionPathStopAreaPlacement'];
-  onStartMotionPathStopPointPlacement: VideoEditorSidebarCommands['startMotionPathStopPointPlacement'];
+
   onStartObjectTrackAnchorPlacement: VideoEditorSidebarCommands['startObjectTrackAnchorPlacement'];
   onToggleCollapsed: VideoEditorWorkspaceState['toggleSidebarCollapsed'];
-  onToggleDiagnostics: VideoEditorSidebarCommands['setDiagnosticsOpen'];
+  onUpdateActionPresentation: VideoEditorSidebarCommands['updateActionPresentation'];
   onUpdateActionEventDetails: VideoEditorSidebarCommands['updateActionEventDetails'];
   onUpdateCursorSampleInterpolation: VideoEditorSidebarCommands['updateCursorSampleInterpolation'];
   onUpdateCursorSampleSkinOverride: VideoEditorSidebarCommands['updateCursorSampleSkinOverride'];
@@ -104,11 +117,20 @@ interface VideoEditorSidebarProjectActions {
 
 interface VideoEditorSidebarClipActions {
   onConvertTextClipToAnnotation: VideoEditorSidebarCommands['convertTextClipToAnnotation'];
+  onSwapClip: VideoEditorSidebarCommands['swapClip'];
+  onTrimClipStart: VideoEditorSidebarCommands['trimClipStart'];
+  onTrimClipEnd: VideoEditorSidebarCommands['trimClipEnd'];
   onDetachClipGroup: VideoEditorSidebarCommands['detachClipGroup'];
   onUpdateClipAudioEnvelope: VideoEditorSidebarCommands['updateClipAudioEnvelope'];
   onUpdateClipFades: VideoEditorSidebarCommands['updateClipFades'];
   onUpdateClipPlaybackRate: VideoEditorSidebarCommands['updateClipPlaybackRate'];
   onUpdateClipMuted: VideoEditorSidebarCommands['updateClipMuted'];
+  onApplyCameraLayout?: (
+    clipId: string,
+    layout: VideoProjectCameraLayout,
+    placement?: VideoProjectCameraPlacement
+  ) => void;
+  onEditCameraPosition?: (clipId: string, edit: CameraPositionEdit) => void;
   onUpdateClipTransform: VideoEditorSidebarCommands['updateClipTransform'];
   onUpdateClipVolume: VideoEditorSidebarCommands['updateClipVolume'];
   onApplyMediaClipVisualsToTrack: VideoEditorSidebarCommands['applyMediaClipVisualsToTrack'];

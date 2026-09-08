@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useId, useRef } from 'react';
 import { Download, FileOutput } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { getAvailableMp4VideoCodecs } from '../../../features/video/project/export/capabilities';
@@ -9,7 +9,7 @@ import {
   ProductModalFooter,
   ProductModalHeader,
 } from '@sniptale/ui/product-modal';
-import { OptionRow, PanelSection } from '../../../ui/compact-inspector-controls';
+import { OptionRow } from '../../../ui/compact-inspector-controls';
 import { VideoExportFormat } from '../../../features/video/project/types';
 import type {
   VideoExportCapabilities,
@@ -18,6 +18,7 @@ import type {
 } from '../../../features/video/project/types';
 import { useExportDialogCapabilities } from './capability-state';
 import { ExportDialogFields } from './fields';
+import { useExportDialogFocus } from './focus';
 
 interface ExportDialogProps {
   selectedClipAvailable?: boolean;
@@ -26,22 +27,6 @@ interface ExportDialogProps {
   onClose: () => void;
   onChange: (patch: VideoProjectExportSettingsPatch) => void;
   onExport: () => void;
-}
-
-function ExportDialogHeader({ formatLabel }: { formatLabel: string }) {
-  return (
-    <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--sniptale-color-text-muted)]">
-        {translate('videoEditor.exportDialog.eyebrow')}
-      </p>
-      <h2 className="mt-1 text-2xl font-semibold text-[var(--sniptale-color-text-primary)]">
-        {translate('videoEditor.exportDialog.titlePrefix')} {formatLabel}
-      </h2>
-      <p className="mt-2 text-sm text-[var(--sniptale-color-text-muted)]">
-        {translate('videoEditor.exportDialog.description')}
-      </p>
-    </div>
-  );
 }
 
 function ExportDialogHintCard(props: {
@@ -61,13 +46,14 @@ function ExportDialogHintCard(props: {
       : translate('videoEditor.exportDialog.webmHint');
 
   return (
-    <PanelSection label={hintMessage}>
+    <div className="text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
+      <p role="status">{hintMessage}</p>
       {capabilityError ? (
         <p className="mt-2 text-xs text-[var(--sniptale-color-text-muted)]">
           {translate('videoEditor.exportDialog.capabilityFallbackNote')} {capabilityError}
         </p>
       ) : null}
-    </PanelSection>
+    </div>
   );
 }
 
@@ -150,37 +136,49 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
     settings,
   });
 
-  const formatLabel =
-    settings.format === VideoExportFormat.MP4
-      ? translate('videoEditor.exportDialog.formatMp4Label')
-      : translate('videoEditor.exportDialog.formatWebmLabel');
+  const rootRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  useExportDialogFocus(rootRef);
   const canExport = !capabilitiesPending;
 
   return (
-    <ProductModal onClose={onClose} closeOnBackdrop width="min(880px, calc(100vw - 32px))">
-      <ProductModalHeader
-        title={<ExportDialogHeader formatLabel={formatLabel} />}
+    <div ref={rootRef} className="contents">
+      <ProductModal
+        labelledBy={titleId}
         onClose={onClose}
-      />
-      <ProductModalBody className="gap-4">
-        <ExportDialogFields
-          capabilities={capabilities}
-          settings={settings}
-          sourceDimensions={sourceDimensions}
-          onChange={onChange}
-          selectedClipAvailable={selectedClipAvailable}
+        closeOnBackdrop
+        width="min(560px, calc(100vw - 32px))"
+      >
+        <ProductModalHeader
+          compact
+          title={<span id={titleId}>{translate('videoEditor.exportDialog.title')}</span>}
+          closeTitle={translate('common.actions.close')}
+          onClose={onClose}
         />
-        <ExportDialogHintCard
-          capabilities={capabilities}
-          capabilitiesPending={capabilitiesPending}
-          capabilityError={capabilityError}
-          settings={settings}
-        />
-        <ExportDialogDownloadToggle settings={settings} onChange={onChange} />
-      </ProductModalBody>
-      <ProductModalFooter>
-        <ExportDialogActions disabled={!canExport} onClose={onClose} onExport={onExport} />
-      </ProductModalFooter>
-    </ProductModal>
+        <ProductModalBody compact className="min-h-0 gap-3 overflow-y-auto">
+          <ExportDialogFields
+            capabilities={capabilities}
+            settings={settings}
+            sourceDimensions={sourceDimensions}
+            onChange={onChange}
+            selectedClipAvailable={selectedClipAvailable}
+          />
+          <ExportDialogHintCard
+            capabilities={capabilities}
+            capabilitiesPending={capabilitiesPending}
+            capabilityError={capabilityError}
+            settings={settings}
+          />
+          <ExportDialogDownloadToggle settings={settings} onChange={onChange} />
+        </ProductModalBody>
+        <ProductModalFooter compact className="shrink-0">
+          <span className="mr-auto text-xs tabular-nums text-[var(--sniptale-color-text-muted)]">
+            {translate('videoEditor.exportDialog.outputSizeLabel')}: {settings.width} ×{' '}
+            {settings.height}
+          </span>
+          <ExportDialogActions disabled={!canExport} onClose={onClose} onExport={onExport} />
+        </ProductModalFooter>
+      </ProductModal>
+    </div>
   );
 };

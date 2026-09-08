@@ -1,9 +1,5 @@
 import React from 'react';
 import { WorkspaceSidebarPanelBody } from './body';
-import {
-  InspectorGroupHeaderSlotContext,
-  type InspectorGroupHeaderSlot,
-} from '../selection/grouped-inspector';
 import type { WorkspaceSidebarPanelContentSharedProps } from '../contracts/panel-content';
 
 function WorkspaceSidebarPanelSurface({ children }: { children: React.ReactNode }) {
@@ -11,6 +7,9 @@ function WorkspaceSidebarPanelSurface({ children }: { children: React.ReactNode 
     <div
       className={[
         'flex min-h-0 flex-1 flex-col overflow-hidden',
+        '[--sniptale-compact-font-size:12px] [--sniptale-compact-control-height:32px]',
+        '@min-[360px]/inspector:[--sniptale-compact-font-size:13px]',
+        '@min-[360px]/inspector:[--sniptale-compact-control-height:36px]',
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,var(--sniptale-color-surface-canvas))]',
       ].join(' ')}
     >
@@ -19,24 +18,10 @@ function WorkspaceSidebarPanelSurface({ children }: { children: React.ReactNode 
   );
 }
 
-export function WorkspaceSidebarPanelContent(
-  props: WorkspaceSidebarPanelContentSharedProps & {
-    onSetInspectorHeaderSlot: React.Dispatch<React.SetStateAction<InspectorGroupHeaderSlot | null>>;
-  }
-) {
-  const { inspectorMode, onSetInspectorHeaderSlot } = props;
-
-  React.useEffect(() => {
-    if (inspectorMode !== 'selection') {
-      onSetInspectorHeaderSlot(null);
-    }
-  }, [inspectorMode, onSetInspectorHeaderSlot]);
-
+export function WorkspaceSidebarPanelContent(props: WorkspaceSidebarPanelContentSharedProps) {
   return (
     <WorkspaceSidebarPanelSurface>
-      <InspectorGroupHeaderSlotContext.Provider value={onSetInspectorHeaderSlot}>
-        <WorkspaceSidebarPanelBody {...props} />
-      </InspectorGroupHeaderSlotContext.Provider>
+      <WorkspaceSidebarPanelBody {...props} />
     </WorkspaceSidebarPanelSurface>
   );
 }

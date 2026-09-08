@@ -4,7 +4,6 @@ import type { VideoEditorWorkspaceState } from './workspace-state';
 import type {
   AnnotationEditingPort,
   ClipSelectionPort,
-  DiagnosticsTelemetryPort,
   ExportPort,
   HistoryPort,
   PlaybackPort,
@@ -66,8 +65,7 @@ export function createVideoEditorOverlaysController(args: {
 
 export function createVideoEditorCommandPaletteController(args: {
   runtime: Pick<VideoEditorRuntimeController, 'togglePlayback'>;
-  store: Pick<DiagnosticsTelemetryPort, 'diagnosticsOpen' | 'setDiagnosticsOpen'> &
-    Pick<PlaybackPort, 'currentTime' | 'isPlaying'> &
+  store: Pick<PlaybackPort, 'currentTime' | 'isPlaying'> &
     Pick<ClipSelectionPort, 'selectedClipId'> &
     Pick<TimelineEditingPort, 'deleteClip' | 'duplicateClip' | 'splitClipAt'> &
     Pick<AnnotationEditingPort, 'addShapeOverlay' | 'addTextOverlay'> &
@@ -77,7 +75,6 @@ export function createVideoEditorCommandPaletteController(args: {
   const selectedClipActions = createSelectedClipActions(args.store);
 
   return {
-    diagnosticsOpen: args.store.diagnosticsOpen,
     isPlaying: args.store.isPlaying,
     leftSidebarCollapsed: args.workspace.leftSidebarCollapsed,
     onAddShapeOverlay: args.store.addShapeOverlay,
@@ -87,7 +84,6 @@ export function createVideoEditorCommandPaletteController(args: {
     onOpenExportDialog: args.store.openExportDialog,
     onSplitSelectedClip: selectedClipActions.splitSelectedClip,
     selectedClipId: args.store.selectedClipId,
-    toggleDiagnostics: () => args.store.setDiagnosticsOpen(!args.store.diagnosticsOpen),
     togglePlaying: args.runtime.togglePlayback,
     toggleSidebarCollapsed: args.workspace.toggleSidebarCollapsed,
   };

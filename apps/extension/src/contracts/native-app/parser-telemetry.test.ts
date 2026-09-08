@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import type { RecordingActionEvent } from '../../features/video/project/types';
 
 import { parseNativeAppInboundMessage } from './index';
 
@@ -64,7 +65,7 @@ function createRecordingStopped() {
   };
 }
 
-function createSafeKeyEvent(label: string) {
+function createSafeKeyEvent(label: string): RecordingActionEvent {
   return {
     data: { repeated: false },
     duration: 0.1,
@@ -76,3 +77,59 @@ function createSafeKeyEvent(label: string) {
     time: 0.2,
   };
 }
+
+it('retains raw wire timing and optional metadata without materializing a montage anchor', () => {
+  const event: RecordingActionEvent = {
+    ...createSafeKeyEvent('Enter'),
+    animation: { start: 0.2, end: 0.3, duration: 0.1 },
+    sourceAnchor: {
+      kind: 'recording-source',
+      recordingId: 'recording-1',
+      sourceClipId: 'raw-source',
+      sourceTime: 0.2,
+    },
+    timeBasis: 'project',
+  };
+  const input = createRecordingStopped();
+  const result = parseNativeAppInboundMessage({
+    ...input,
+    telemetry: { ...input.telemetry, actionEvents: [event] },
+  });
+  expect(result).toEqual({
+    ok: true,
+    value: { ...input, telemetry: { ...input.telemetry, actionEvents: [event] } },
+  });
+});
+
+it.each([null, { x: 0.25, y: 0.75 }])(
+  'retains explicit recording-image geometry %j independently of raw client coordinates',
+  (recordingPoint) => {
+    const input = createRecordingStopped();
+    const event = { ...createSafeKeyEvent('Enter'), point: { x: 320, y: 180 }, recordingPoint };
+    expect(
+      parseNativeAppInboundMessage({
+        ...input,
+        telemetry: { ...input.telemetry, actionEvents: [event] },
+      })
+    ).toEqual({
+      ok: true,
+      value: { ...input, telemetry: { ...input.telemetry, actionEvents: [event] } },
+    });
+  }
+);
+
+it.each([{ x: 1.01, y: 0.5 }, { x: -1, y: 0 }, { x: 0.5 }, { x: '0.5', y: 0.5 }])(
+  'rejects malformed recording-image geometry %j at native ingress',
+  (recordingPoint) => {
+    const input = createRecordingStopped();
+    expect(
+      parseNativeAppInboundMessage({
+        ...input,
+        telemetry: {
+          ...input.telemetry,
+          actionEvents: [{ ...createSafeKeyEvent('Enter'), recordingPoint }],
+        },
+      })
+    ).toMatchObject({ ok: false });
+  }
+);

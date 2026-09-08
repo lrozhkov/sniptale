@@ -1,4 +1,8 @@
 import {
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
+} from '../infrastructure/indexed-db/core.stores';
+import {
   AGGREGATE_PRESENTATIONS_STORE,
   ASSET_OPERATIONS_STORE,
   ASSET_OWNERS_STORE,
@@ -229,6 +233,8 @@ async function deleteMediaLibraryRows(assetId: string): Promise<void> {
     const tx = db.transaction(
       [
         MEDIA_LIBRARY_STORE,
+        VIDEO_WORKSPACES_STORE,
+        VIDEO_WORKSPACE_DRAFTS_STORE,
         THUMBNAILS_STORE,
         IMAGE_WORKSPACES_STORE,
         AGGREGATE_PRESENTATIONS_STORE,
@@ -240,6 +246,8 @@ async function deleteMediaLibraryRows(assetId: string): Promise<void> {
     );
     try {
       await tx.objectStore(MEDIA_LIBRARY_STORE).delete(assetId);
+      await tx.objectStore(VIDEO_WORKSPACES_STORE).delete(assetId);
+      await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(assetId);
       await tx.objectStore(THUMBNAILS_STORE).delete(assetId);
       const workspace = parseImageWorkspaceEntry(
         await tx.objectStore(IMAGE_WORKSPACES_STORE).get(assetId)

@@ -14,14 +14,30 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 
-it('shows auto-processing only for eligible telemetry on the base recording', () => {
+vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../runtime/controller/composition/hooks')>()),
+  useVideoEditorHistoryController: () => ({
+    canUndo: false,
+    canRedo: false,
+    onUndo: vi.fn(),
+    onRedo: vi.fn(),
+  }),
+  useVideoEditorHeaderController: () => ({
+    grid: { magnetEnabled: true, onToggleMagnet: vi.fn() },
+    onOpenExportDialog: vi.fn(),
+  }),
+}));
+
+it('keeps auto-processing out of the top toolbar regardless of base-recording telemetry', () => {
   const project = createProject(
     [createVideoClip({ assetId: 'asset-video', trackId: 'track-video' })],
     [createTrack('track-video', 0)]
   );
   project.baseRecordingId = 'rec-asset-video';
 
-  expect(renderSurface(project, createTelemetry())).toContain('videoEditor.timeline.autoTransform');
+  expect(renderSurface(project, createTelemetry())).not.toContain(
+    'videoEditor.timeline.autoTransform'
+  );
   expect(renderSurface(project, createTelemetry({ actionEvents: [] }))).not.toContain(
     'videoEditor.timeline.autoTransform'
   );
@@ -36,28 +52,40 @@ function renderSurface(
 ) {
   return renderToStaticMarkup(
     <ProjectTimelineSurface
+      selection={{ kind: 'scene' }}
+      onSeek={vi.fn()}
+      onAutoProcessingModalVisibilityChange={vi.fn()}
+      autoProcessing={{
+        prepare: async () => ({ status: 'stale' }),
+        apply: async () => 'stale',
+        isCurrent: () => false,
+      }}
       currentTime={0}
+      isPlaying={false}
+      playbackRange={null}
+      onSeekToEnd={vi.fn()}
+      onSeekToStart={vi.fn()}
+      onTogglePlay={vi.fn()}
+      onClearPlaybackRange={vi.fn()}
+      onStepToNextFrame={vi.fn()}
+      onStepToPreviousFrame={vi.fn()}
+      canDeleteSelectedClip={false}
+      canEditSelectedClip={false}
+      canSplitSelectedClip={false}
       fitSelectionDuration={null}
       insertion={createInsertionActions()}
-      isPlaying={false}
-      onAutoTransformRecording={vi.fn()}
-      onClearPlaybackRange={vi.fn()}
       onDeleteSelectedClip={vi.fn()}
       onDuplicateSelectedClip={vi.fn()}
       onFitProject={vi.fn()}
       onFitSelection={vi.fn()}
-      onSeekToStart={vi.fn()}
       onSplitSelectedClip={vi.fn()}
       onTimelinePreviewSuspendedChange={vi.fn()}
-      onTogglePlay={vi.fn()}
       onZoomChange={vi.fn()}
       panelPrefs={createPanelPrefs()}
       pixelsPerSecond={90}
-      playbackRange={null}
       project={project}
-      recordingTelemetry={recordingTelemetry}
+      recordingTelemetry={[recordingTelemetry]}
       selectedClip={null}
-      visibleRangeSeconds={10}
     >
       <div>Timeline</div>
     </ProjectTimelineSurface>
@@ -98,7 +126,8 @@ function createPanelPrefs() {
     setCollapsedCursorLaneVisible: vi.fn(),
     setCollapsedTelemetryLaneVisible: vi.fn(),
     setCompactRows: vi.fn(),
-    setPanelExpanded: vi.fn(),
+    setHideTrackNames: vi.fn(),
+    setClipNamesHidden: vi.fn(),
     setTrackHeight: vi.fn(),
     telemetryLaneVisible: false,
   };

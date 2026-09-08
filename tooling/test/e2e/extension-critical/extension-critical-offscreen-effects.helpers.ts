@@ -3,7 +3,10 @@ import { readFileSync } from 'node:fs';
 
 import { expect, type Page } from '@playwright/test';
 import type { ProjectExportInputReference } from '../../../../apps/extension/src/contracts/video/types/messages.export';
-import { createEmptyVideoProject } from '../../../../apps/extension/src/features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../apps/extension/src/features/video/project/factories/creation';
 import {
   createEffectHostClip,
   createTextClip,
@@ -157,8 +160,8 @@ async function expectEffectExportCompleted(page: Page, jobId: string): Promise<v
 
 function createTargetEffectExportProject(): VideoProject {
   const project = createEmptyVideoProject('EffectV1 MP4 E2E', 160, 90);
-  const track = project.tracks.find(({ kind }) => kind === VideoTrackKind.OVERLAY);
-  if (!track) throw new Error('Overlay track unavailable');
+  const track = createVideoProjectTrack('Effects', 0, VideoTrackKind.PRIMARY);
+  project.tracks.push(track);
   const clip = {
     ...createTextClip(track.id, project.width, project.height, 0),
     duration: 1,
@@ -191,8 +194,8 @@ function createTargetEffectExportProject(): VideoProject {
 
 function createStandaloneEffectExportProject(): SerializableEffectProject {
   const project = createEmptyVideoProject('Standalone EffectV1 MP4 E2E', 160, 90);
-  const track = project.tracks.find(({ kind }) => kind === VideoTrackKind.OVERLAY);
-  if (!track) throw new Error('Overlay track unavailable');
+  const track = createVideoProjectTrack('Effects', 0, VideoTrackKind.PRIMARY);
+  project.tracks.push(track);
   const instanceId = 'effect-v1-standalone-mp4-instance';
   const sha256 = createHash('sha256').update(STANDALONE_EFFECT_SOURCE).digest('hex');
   const snapshotId = `effect:${sha256}`;

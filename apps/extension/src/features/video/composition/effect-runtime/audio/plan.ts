@@ -1,7 +1,10 @@
 import type { EffectV1Document } from '@sniptale/runtime-contracts/effect-v1';
 
 import { buildProjectTransitionSegments } from '../../../project/transition/project';
-import { isEffectInstanceTimingEqual } from '../../../project/effect-instance/timing';
+import {
+  isEffectInstanceSourceRangeValid,
+  isEffectInstanceTimingEqual,
+} from '../../../project/effect-instance/timing';
 import type {
   VideoProjectEffectInstance,
   VideoProjectEffectSnapshot,
@@ -102,7 +105,7 @@ function assertAudioSnapshotIntegrity(
   if (
     document.id !== snapshot.documentId ||
     document.kind !== snapshot.kind ||
-    !isEffectInstanceTimingEqual(document.duration, instance.duration * instance.playbackRate)
+    !isEffectInstanceSourceRangeValid(instance, document.duration)
   ) {
     fail('effectAudioIntegrityFailure');
   }
@@ -143,7 +146,12 @@ function resolveTargetAvailability(
     const host = project.clips.find(
       (clip) => clip.type === 'EFFECT' && clip.effectInstanceId === instance.id
     );
-    if (!host) return { status: 'invalid' };
+    if (
+      !host ||
+      !isEffectInstanceTimingEqual(host.startTime, instance.startTime) ||
+      !isEffectInstanceTimingEqual(host.duration, instance.duration)
+    )
+      return { status: 'invalid' };
     const track = project.tracks.find(({ id }) => id === host.trackId);
     return track?.visible === true
       ? {

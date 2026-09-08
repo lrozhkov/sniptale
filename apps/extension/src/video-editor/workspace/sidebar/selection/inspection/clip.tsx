@@ -1,3 +1,5 @@
+import { CameraAppearanceControls } from '../inputs/camera-appearance';
+import { activeCameraPosition } from '../../../../../features/video/project/camera/animation';
 import type React from 'react';
 import { translate } from '../../../../../platform/i18n';
 import {
@@ -6,15 +8,18 @@ import {
   isVideoClip,
 } from '../../../../../features/video/project/timeline';
 import type { VideoProjectAnnotationClip } from '../../../../../features/video/project/types/index';
-import { VideoProjectClipType } from '../../../../../features/video/project/types';
+import {
+  VideoProjectClipType,
+  VideoProjectTrackRole,
+} from '../../../../../features/video/project/types';
 import { resolveAnnotationTemplateControls } from '../../../../../features/video/project/annotation/template-controls';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { createAnnotationGroups } from '../annotation/fields';
-import { ClipTimingControls } from '../inputs/clip-timing';
+import { ClipTimingControls, ClipFadeFields } from '../inputs/clip-timing';
 import { InspectorGroupedPanel } from '../grouped-inspector';
 import { createSelectionRuntime, SelectionEmptyState } from './helpers';
 import { renderAudioFields } from '../inputs/audio-fields';
-import { MediaFrameControls } from '../inputs/media-frame';
+import { MediaFrameControls, MediaShadowControls } from '../inputs/media-frame';
 import { PANEL_SECTION_CLASS_NAME } from '../shared/panel';
 import {
   renderShapeStyleFields,
@@ -25,6 +30,7 @@ import { renderTransformFields } from '../inputs/transform-fields';
 import { createEffectInstanceGroup } from '../effect-instance/groups';
 import { ClipInfo, resolveClipAsset } from './clip-info';
 import { isVideoEditorPresentedClip } from '../../../../project/operations/presented-tracks';
+import { CameraLayoutControls, CameraFitControls } from '../inputs/camera-layout';
 
 export function InspectClipPanel(props: WorkspaceSidebarSelectionPanelProps) {
   const clip = props.selectedClip;
@@ -33,10 +39,14 @@ export function InspectClipPanel(props: WorkspaceSidebarSelectionPanelProps) {
   }
 
   const runtime = createSelectionRuntime(props);
+  const cameraRoleClip = isCameraRoleVideoClip(props.project, clip);
 
   return (
     <section className={PANEL_SECTION_CLASS_NAME}>
-      <InspectorGroupedPanel groups={createClipGroups(props, clip, runtime)} />
+      <InspectorGroupedPanel
+        key={cameraRoleClip ? 'camera' : clip.type}
+        groups={createClipGroups(props, clip, runtime)}
+      />
     </section>
   );
 }
@@ -49,8 +59,9 @@ function createClipGroups(
   const asset = resolveClipAsset(props.project, clip);
   const infoGroup = {
     id: 'info',
+    semantic: 'info' as const,
     label: translate('videoEditor.sidebar.inspectorGroupSummary'),
-    defaultActive: true,
+    defaultActive: false,
     content: <ClipInfo asset={asset} clip={clip} locked={runtime.selectedTrackLocked} />,
   } as const;
 
@@ -114,64 +125,150 @@ function createStandardClipGroups(
   clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>,
   runtime: ReturnType<typeof createSelectionRuntime>
 ) {
+  const cameraPosition = isCameraRoleVideoClip(props.project, clip)
+    ? activeCameraPosition(clip, props.currentTime ?? clip.startTime)
+    : undefined;
   const transformContent = renderTransformFields(
-    clip,
+    cameraPosition ? { ...clip, transform: cameraPosition.transform } : clip,
     runtime.selectedTrackLocked,
     props.onUpdateClipTransform
   );
-  const frameContent = createFrameContent(props, clip, runtime, transformContent);
-  const audioContent = renderAudioFields(
-    clip,
-    runtime.linkedAudioClip,
-    runtime.linkedVideoClip,
-    runtime.selectedTrackLocked,
-    props.onUpdateClipMuted,
-    props.onUpdateClipVolume,
-    props.onUpdateClipAudioEnvelope
-  );
+  const audioContent = renderAudioFields(props);
   const contentFields = renderClipContentFields(props, clip, runtime);
   const styleFields = renderClipStyleFields(props, clip, runtime);
 
   return [
     createGeneralGroup(contentFields),
+    createCameraPlacementGroup(props, clip, runtime.selectedTrackLocked),
+    createFramingGroup(props, clip, runtime.selectedTrackLocked),
+    createTransformGroup(clip, transformContent),
     createTimingGroup(props, clip, runtime.selectedTrackLocked),
-    createTransformGroup(clip, frameContent),
     {
       id: 'audio',
+      semantic: 'audio' as const,
       label: translate('videoEditor.sidebar.inspectorGroupAudio'),
-      content: audioContent,
+      defaultActive: clip.type === VideoProjectClipType.AUDIO,
+      content: (
+        <>
+          {audioContent}
+          {clip.type === VideoProjectClipType.AUDIO ? (
+            <ClipFadeFields
+              audio
+              clipId={clip.id}
+              fadeInMs={clip.fadeInMs}
+              fadeOutMs={clip.fadeOutMs}
+              locked={runtime.selectedTrackLocked}
+              onUpdateClipFades={props.onUpdateClipFades}
+            />
+          ) : null}
+        </>
+      ),
       visible: audioContent !== null,
     },
     {
       id: 'style',
+      semantic: 'appearance' as const,
       label: getClipStyleGroupLabel(clip),
       content: styleFields,
       visible: styleFields !== null,
+    },
+    {
+      id: 'animation',
+      semantic: 'animation',
+      label: translate('videoEditor.sidebar.inspectorGroupAnimation'),
+      visible: clip.type !== VideoProjectClipType.AUDIO,
+      content: (
+        <ClipFadeFields
+          clipId={clip.id}
+          fadeInMs={clip.fadeInMs}
+          fadeOutMs={clip.fadeOutMs}
+          locked={runtime.selectedTrackLocked}
+          onUpdateClipFades={props.onUpdateClipFades}
+        />
+      ),
     },
     createClipEffectGroup(props, clip, runtime.selectedTrackLocked),
   ] as const;
 }
 
-function createFrameContent(
+function createCameraPlacementGroup(
   props: WorkspaceSidebarSelectionPanelProps,
   clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>,
-  runtime: ReturnType<typeof createSelectionRuntime>,
-  transformContent: React.ReactNode
+  locked: boolean
 ) {
-  const mediaFrameContent = isMediaFrameClip(clip) ? (
-    <MediaFrameControls {...props} clip={clip} locked={runtime.selectedTrackLocked} />
-  ) : null;
+  const isCameraClip = isCameraRoleVideoClip(props.project, clip);
 
-  if (transformContent === null && mediaFrameContent === null) {
-    return null;
-  }
+  return {
+    id: 'camera',
+    semantic: 'camera' as const,
+    label: translate('videoEditor.sidebar.inspectorGroupCamera'),
+    defaultActive: isCameraClip,
+    content: isCameraClip ? (
+      <>
+        <CameraLayoutControls
+          key={`${clip.id}:${activeCameraPosition(clip, props.currentTime ?? clip.startTime)?.id ?? 'initial'}`}
+          customControls={<CameraFitControls {...props} clip={clip} disabled={locked} />}
+          currentTime={props.currentTime ?? clip.startTime}
+          clip={clip}
+          disabled={locked}
+          project={props.project}
+          {...(props.onApplyCameraLayout ? { onApplyCameraLayout: props.onApplyCameraLayout } : {})}
+          {...(props.onEditCameraPosition
+            ? { onEditCameraPosition: props.onEditCameraPosition }
+            : {})}
+          {...(props.canAddCameraPosition === undefined
+            ? {}
+            : { canAddCameraPosition: props.canAddCameraPosition })}
+        />
+        <CameraAppearanceControls
+          clip={clip}
+          currentTime={props.currentTime ?? clip.startTime}
+          disabled={locked}
+          {...(props.onEditCameraPosition ? { onEdit: props.onEditCameraPosition } : {})}
+        />
+        <MediaShadowControls
+          clipId={clip.id}
+          disabled={locked}
+          shadowIntensity={clip.shadowIntensity ?? 0}
+          shadowMode={clip.shadowMode ?? 'BACKDROP'}
+          {...(props.onUpdateMediaClipShadowIntensity
+            ? { onUpdateMediaClipShadowIntensity: props.onUpdateMediaClipShadowIntensity }
+            : {})}
+          {...(props.onUpdateMediaClipShadowMode
+            ? { onUpdateMediaClipShadowMode: props.onUpdateMediaClipShadowMode }
+            : {})}
+        />
+      </>
+    ) : null,
+    visible: isCameraClip,
+  } as const;
+}
 
-  return (
-    <div className="space-y-4">
-      {transformContent}
-      {mediaFrameContent}
-    </div>
-  );
+function isCameraRoleVideoClip(
+  project: WorkspaceSidebarSelectionPanelProps['project'],
+  clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>
+): clip is Extract<
+  WorkspaceSidebarSelectionPanelProps['project']['clips'][number],
+  { type: 'VIDEO' }
+> {
+  const track = project.tracks.find((item) => item.id === clip.trackId);
+  return clip.type === VideoProjectClipType.VIDEO && track?.role === VideoProjectTrackRole.CAMERA;
+}
+
+function createFramingGroup(
+  props: WorkspaceSidebarSelectionPanelProps,
+  clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>,
+  locked: boolean
+) {
+  const visible = isMediaFrameClip(clip) && !isCameraRoleVideoClip(props.project, clip);
+  return {
+    id: 'framing',
+    semantic: 'framing' as const,
+    label: translate('videoEditor.sidebar.inspectorGroupFraming'),
+    defaultActive: visible && !isCameraRoleVideoClip(props.project, clip),
+    visible,
+    content: visible ? <MediaFrameControls {...props} clip={clip} locked={locked} /> : null,
+  } as const;
 }
 
 function isMediaFrameClip(clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>) {
@@ -185,6 +282,7 @@ function createTimingGroup(
 ) {
   return {
     id: 'timing',
+    semantic: 'timing' as const,
     label: translate('videoEditor.sidebar.inspectorGroupTiming'),
     content: <ClipTimingControls {...props} clip={clip} locked={locked} />,
   } as const;
@@ -213,6 +311,7 @@ function createClipEffectGroup(
 function createGeneralGroup(contentFields: React.ReactNode) {
   return {
     id: 'general',
+    semantic: 'content' as const,
     label: translate('videoEditor.sidebar.inspectorGroupContent'),
     content: contentFields,
     visible: contentFields !== null,
@@ -233,6 +332,7 @@ function createTransformGroup(
 ) {
   return {
     id: 'transform',
+    semantic: 'placement' as const,
     label: translate('videoEditor.sidebar.inspectorGroupTransform'),
     content,
     visible: content !== null && !isSubtitleClip(clip),

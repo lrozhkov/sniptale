@@ -7,13 +7,7 @@ import { getAssetById } from '../../../../../features/video/project/timeline/bas
 import { VideoProjectClipType } from '../../../../../features/video/project/types';
 import { translate } from '../../../../../platform/i18n';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
-import { getClipTypeLabel } from '../../../../chrome/display';
-import {
-  DetailItem,
-  DetailList,
-  PANEL_HEADING_CLASS_NAME,
-  PANEL_META_CLASS_NAME,
-} from '../shared/panel';
+import { DetailItem, DetailList, PANEL_META_CLASS_NAME } from '../shared/panel';
 import { SelectionLockedState } from './helpers';
 
 export function ClipInfo(props: {
@@ -23,10 +17,6 @@ export function ClipInfo(props: {
 }) {
   return (
     <div className="space-y-3">
-      <div>
-        <p className={PANEL_HEADING_CLASS_NAME}>{props.clip.name}</p>
-        <p className={`mt-1 ${PANEL_META_CLASS_NAME}`}>{getClipTypeLabel(props.clip)}</p>
-      </div>
       {props.locked ? <SelectionLockedState /> : null}
       <ClipOverviewDetails assetName={props.asset?.name ?? null} clip={props.clip} />
       <ClipAssetMeta asset={props.asset} />
@@ -66,7 +56,7 @@ function ClipOverviewDetails(props: {
           label={translate('videoEditor.sidebar.actionTimePrefix')}
           value={`${props.clip.startTime.toFixed(1)}s - ${(props.clip.startTime + props.clip.duration).toFixed(1)}s`}
         />
-        {props.assetName ? (
+        {props.assetName && props.assetName !== props.clip.name ? (
           <DetailItem
             label={translate('videoEditor.sidebar.projectSourceLabel')}
             value={props.assetName}
@@ -82,13 +72,12 @@ function ClipAssetMeta(props: { asset: ReturnType<typeof resolveClipAsset> }) {
     return null;
   }
 
+  const { width, height, duration } = props.asset.metadata;
+  const dimensions = width > 0 && height > 0 ? `${width}×${height}` : '';
+  const seconds = duration
+    ? `${duration.toFixed(1)} ${translate('videoEditor.sidebar.typingSeconds')}`
+    : '';
   return (
-    <div className="mt-3">
-      <p className={PANEL_META_CLASS_NAME}>{props.asset.name}</p>
-      <p className={`mt-1 ${PANEL_META_CLASS_NAME}`}>
-        {`${props.asset.metadata.width}x${props.asset.metadata.height}`}
-        {props.asset.metadata.duration ? ` / ${props.asset.metadata.duration.toFixed(1)}s` : ''}
-      </p>
-    </div>
+    <p className={PANEL_META_CLASS_NAME}>{[dimensions, seconds].filter(Boolean).join(' · ')}</p>
   );
 }

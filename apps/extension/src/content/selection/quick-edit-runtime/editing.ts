@@ -18,6 +18,7 @@ type QuickEditEditingOverlayActions = {
 type QuickEditEditingActionProps = {
   editingElements: Map<string, EditableElement>;
   overlayActions: QuickEditEditingOverlayActions;
+  setInputShieldSuspended: (suspended: boolean) => void;
   updateBlockingOverlayShape: (element: HTMLElement) => void;
 };
 
@@ -66,9 +67,15 @@ export function createQuickEditEditingActions(props: QuickEditEditingActionProps
     const editableRecord = buildEditableElementRecord(element);
     historyTracker.begin(element, id);
 
-    activateEditableElement(element, id, editableRecord, {
-      ...createEditableElementOverlayBindings(props, element),
-    });
+    props.setInputShieldSuspended(true);
+    try {
+      activateEditableElement(element, id, editableRecord, {
+        ...createEditableElementOverlayBindings(props, element),
+      });
+    } catch (error) {
+      props.setInputShieldSuspended(props.editingElements.size > 0);
+      throw error;
+    }
     logger.log('Element made editable', id);
   }
 
@@ -76,6 +83,7 @@ export function createQuickEditEditingActions(props: QuickEditEditingActionProps
     const id = element.dataset['sniptaleEditableId'];
 
     finishEditableElement(props.editingElements, clearElementEditingState, element);
+    if (props.editingElements.size === 0) props.setInputShieldSuspended(false);
     historyTracker.commit(element, id);
   }
 
@@ -83,6 +91,7 @@ export function createQuickEditEditingActions(props: QuickEditEditingActionProps
     const id = element.dataset['sniptaleEditableId'];
 
     cancelEditableElement(props.editingElements, clearElementEditingState, element);
+    if (props.editingElements.size === 0) props.setInputShieldSuspended(false);
     historyTracker.cancel(id);
   }
 

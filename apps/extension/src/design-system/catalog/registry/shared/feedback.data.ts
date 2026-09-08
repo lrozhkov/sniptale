@@ -69,10 +69,7 @@ export const SHARED_DESIGN_SYSTEM_FEEDBACK_REGISTRY: DesignSystemRegistryEntry[]
         'video-editor.loading-screen',
         'Видео-редактор > Loading screen',
         'Video editor > Loading screen',
-        [
-          'apps/extension/src/video-editor/shell/status-screen/index.tsx',
-          'apps/extension/src/video-editor/diagnostics/panel/states.tsx',
-        ]
+        ['apps/extension/src/video-editor/shell/status-screen/index.tsx']
       ),
     ],
     status: 'active',

@@ -4,6 +4,9 @@ import { recordTelemetryPauseBoundary } from './events';
 import type { TelemetryState } from './types';
 import {
   attachListeners,
+  attachViewportObserver,
+  removeViewportObserver,
+  observeViewportGeometry,
   buildViewportSnapshot,
   createInitialState,
   removeListeners,
@@ -25,6 +28,7 @@ function enableTelemetryState(
 ): void {
   clearLegacyControlledCursorArtifacts();
   removeListeners(state);
+  removeViewportObserver(state);
   resetTelemetryState(state, recordingId, offsetSeconds);
 
   if (!state.isEnabled) {
@@ -32,6 +36,8 @@ function enableTelemetryState(
   }
 
   attachListeners(state);
+  if (!state.viewportObserver) attachViewportObserver(state);
+  observeViewportGeometry(state);
 }
 
 function pauseTelemetryState(state: TelemetryState): void {
@@ -42,6 +48,7 @@ function pauseTelemetryState(state: TelemetryState): void {
   clearLegacyControlledCursorArtifacts();
   recordTelemetryPauseBoundary(state);
   state.accumulatedDurationMs += Math.max(0, performance.now() - state.segmentStartedAtTimestamp);
+  observeViewportGeometry(state);
   state.isPaused = true;
   removeListeners(state);
 }
@@ -55,16 +62,21 @@ function resumeTelemetryState(state: TelemetryState): void {
   state.isPaused = false;
   state.segmentStartedAtTimestamp = performance.now();
   attachListeners(state);
+  if (!state.viewportObserver) attachViewportObserver(state);
+  observeViewportGeometry(state);
 }
 
 function disableEnabledTelemetryState(state: TelemetryState): RecordingTelemetrySnapshot {
   clearLegacyControlledCursorArtifacts();
   recordTelemetryPauseBoundary(state);
   removeListeners(state);
+  observeViewportGeometry(state);
+  removeViewportObserver(state);
   state.isEnabled = false;
   state.viewport = buildViewportSnapshot();
   return {
     viewport: state.viewport,
+    viewportObservation: state.viewportObservation ?? null,
     cursorTrack: state.cursorTrack,
     actionEvents: [...state.actionEvents],
     signals: state.signals.map((signal) => ({
@@ -78,6 +90,7 @@ function disableEnabledTelemetryState(state: TelemetryState): RecordingTelemetry
 function disableTelemetryState(state: TelemetryState): RecordingTelemetrySnapshot | null {
   clearLegacyControlledCursorArtifacts();
   if (!state.isEnabled) {
+    removeViewportObserver(state);
     removeListeners(state);
     return null;
   }

@@ -277,18 +277,26 @@ function collectRuntimeLabels(files) {
   ].sort();
 }
 
-function createPreflightAnalysis(report) {
+export function createPreflightAnalysis(report) {
   const consumers = [
     ...(report.contractChecklist ?? []),
     ...(report.transitiveConsumerHints ?? []),
     ...(report.typecheckBlastRadius ?? []),
   ];
+  const uniqueConsumers = [...new Set(consumers)];
+  const consumerSummary =
+    uniqueConsumers.length <= 500
+      ? uniqueConsumers
+      : [
+          ...uniqueConsumers.slice(0, 499),
+          `${uniqueConsumers.length - 499} additional consumers are listed in the full preflight log.`,
+        ];
   return {
     owners: [...(report.ownerRuntime ?? [])],
     runtimes: collectRuntimeLabels(report.context.allTargetFiles ?? report.context.targetFiles),
     riskAreas: (report.riskFindings ?? []).map(({ id }) => id),
     documents: [...(report.relevantDocs ?? [])],
-    consumers: [...new Set(consumers)],
+    consumers: consumerSummary,
     proofRequirements: [
       ...new Set([
         ...(report.proofHints ?? []),

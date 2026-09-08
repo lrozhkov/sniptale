@@ -9,12 +9,20 @@ import {
 type WorkspaceSidebarSelectionBodyProps = Partial<
   Pick<
     WorkspaceSidebarProps,
+    | 'gridSettings'
+    | 'typingProject'
+    | 'recordingTelemetry'
+    | 'onApplyTypingCompression'
     | 'project'
     | 'selection'
     | 'selectedClip'
+    | 'onApplyCameraLayout'
+    | 'onEditCameraPosition'
+    | 'canAddCameraPosition'
     | 'selectedTransition'
     | 'selectedCursorSample'
-    | 'selectedActionEvent'
+    | 'currentTime'
+    | 'selectedActionOccurrence'
     | 'selectedMotionRegion'
     | 'selectedObjectTrack'
     | 'selectedTrack'
@@ -37,10 +45,10 @@ type WorkspaceSidebarSelectionBodyProps = Partial<
     | 'onDeleteCursorSample'
     | 'onDeleteObjectTrack'
     | 'onSelectObjectTrack'
-    | 'onGenerateMotionPathFromCursor'
     | 'onInsertCursorSample'
     | 'onUpdateCursorSampleInterpolation'
     | 'onUpdateCursorSampleVisibility'
+    | 'onUpdateActionPresentation'
     | 'onUpdateActionEventDetails'
     | 'onUpdateAnnotationClipContent'
     | 'onUpdateAnnotationClipStyle'
@@ -49,13 +57,14 @@ type WorkspaceSidebarSelectionBodyProps = Partial<
     | 'onStartActionPointPlacement'
     | 'onStartMotionAreaPlacement'
     | 'onStartMotionFocusPlacement'
-    | 'onStartMotionPathStopAreaPlacement'
-    | 'onStartMotionPathStopPointPlacement'
     | 'onStartObjectTrackAnchorPlacement'
     | 'onClearPlacementMode'
     | 'onUpdateMotionRegion'
     | 'onUpdateTransitionDuration'
     | 'onUpdateTransitionEasing'
+    | 'onSwapClip'
+    | 'onTrimClipStart'
+    | 'onTrimClipEnd'
     | 'onDetachClipGroup'
     | 'onUpdateClipTransform'
     | 'onUpdateClipMuted'
@@ -70,6 +79,11 @@ type WorkspaceSidebarSelectionBodyProps = Partial<
     | 'onApplyMediaClipVisualsToTrack'
     | 'onConvertTextClipToAnnotation'
     | 'onRenameTrack'
+    | 'onToggleTrackLock'
+    | 'onToggleUtilityLaneVisibility'
+    | 'onToggleUtilityLaneLock'
+    | 'onClearUtilityLane'
+    | 'onToggleTrackVisibility'
     | 'onUpdateTextContent'
     | 'onUpdateTextStyle'
     | 'onUpdateSubtitleTrackStyle'
@@ -77,6 +91,7 @@ type WorkspaceSidebarSelectionBodyProps = Partial<
     | 'onUpdateTransitionTemplate'
     | 'onDeleteEffectInstance'
     | 'onDuplicateEffectInstance'
+    | 'onMoveEffectInstance'
     | 'onUpdateEffectInstance'
     | 'onUpsertObjectTrackCorrectionAnchor'
   >
@@ -90,6 +105,9 @@ type WorkspaceSidebarSelectionBodyProps = Partial<
     | 'onResetSceneBackgroundPreview'
     | 'onSetSceneBackground'
     | 'onResizeProject'
+    | 'onSwapClip'
+    | 'onTrimClipStart'
+    | 'onTrimClipEnd'
     | 'onDetachClipGroup'
     | 'onUpdateClipTransform'
     | 'onUpdateClipMuted'
@@ -114,10 +132,20 @@ export function WorkspaceSidebarSelectionBody(props: WorkspaceSidebarSelectionBo
 
 function createInspectPanelProps(props: WorkspaceSidebarSelectionBodyProps) {
   return {
+    ...(props.gridSettings ? { gridSettings: props.gridSettings } : {}),
+    ...(props.typingProject ? { typingProject: props.typingProject } : {}),
+    ...(props.recordingTelemetry ? { recordingTelemetry: props.recordingTelemetry } : {}),
+    ...(props.onApplyTypingCompression
+      ? { onApplyTypingCompression: props.onApplyTypingCompression }
+      : {}),
     project: props.project,
     selection: props.selection ?? createSceneSelection(),
     selectedClip: props.selectedClip ?? null,
-    selectedActionEvent: props.selectedActionEvent ?? null,
+    ...(props.onApplyCameraLayout ? { onApplyCameraLayout: props.onApplyCameraLayout } : {}),
+    ...(props.onEditCameraPosition ? { onEditCameraPosition: props.onEditCameraPosition } : {}),
+    canAddCameraPosition: props.canAddCameraPosition ?? false,
+    ...(props.currentTime === undefined ? {} : { currentTime: props.currentTime }),
+    selectedActionOccurrence: props.selectedActionOccurrence ?? null,
     selectedCursorSample: props.selectedCursorSample ?? null,
     selectedMotionRegion: props.selectedMotionRegion ?? null,
     selectedObjectTrack: props.selectedObjectTrack ?? null,
@@ -132,6 +160,11 @@ function createInspectPanelProps(props: WorkspaceSidebarSelectionBodyProps) {
     onApplyMediaClipVisualsToTrack: props.onApplyMediaClipVisualsToTrack,
     ...createSelectionAnnotationUpdateDefaults(props),
     onRenameTrack: props.onRenameTrack,
+    onToggleTrackLock: props.onToggleTrackLock,
+    onToggleUtilityLaneVisibility: props.onToggleUtilityLaneVisibility,
+    onToggleUtilityLaneLock: props.onToggleUtilityLaneLock,
+    onClearUtilityLane: props.onClearUtilityLane,
+    onToggleTrackVisibility: props.onToggleTrackVisibility,
     onUpdateShapeStyle: props.onUpdateShapeStyle,
     onUpdateSubtitleTrackStyle: props.onUpdateSubtitleTrackStyle,
     onUpdateTextContent: props.onUpdateTextContent,
@@ -149,7 +182,7 @@ function createInspectPanelOptionalProps(props: WorkspaceSidebarSelectionBodyPro
     onDeleteCursorSample: props.onDeleteCursorSample ?? (() => undefined),
     onDeleteObjectTrack: props.onDeleteObjectTrack ?? (() => undefined),
     onSelectObjectTrack: props.onSelectObjectTrack ?? (() => undefined),
-    onGenerateMotionPathFromCursor: props.onGenerateMotionPathFromCursor ?? (() => undefined),
+
     onEnableCursorTrack: props.onEnableCursorTrack ?? (() => undefined),
     onInsertCursorSample: props.onInsertCursorSample ?? (() => undefined),
     onSetCursorCaptureMode: props.onSetCursorCaptureMode ?? (() => undefined),
@@ -164,15 +197,15 @@ function createInspectPanelEffectProps(props: WorkspaceSidebarSelectionBodyProps
   return {
     onUpdateCursorSampleInterpolation: props.onUpdateCursorSampleInterpolation ?? (() => undefined),
     onUpdateCursorSampleVisibility: props.onUpdateCursorSampleVisibility ?? (() => undefined),
+    ...(props.onUpdateActionPresentation
+      ? { onUpdateActionPresentation: props.onUpdateActionPresentation }
+      : {}),
     onUpdateActionEventDetails: props.onUpdateActionEventDetails ?? (() => undefined),
     onDeleteMotionRegion: props.onDeleteMotionRegion ?? (() => undefined),
     onStartActionPointPlacement: props.onStartActionPointPlacement ?? (() => undefined),
     onStartMotionAreaPlacement: props.onStartMotionAreaPlacement ?? (() => undefined),
     onStartMotionFocusPlacement: props.onStartMotionFocusPlacement ?? (() => undefined),
-    onStartMotionPathStopAreaPlacement:
-      props.onStartMotionPathStopAreaPlacement ?? (() => undefined),
-    onStartMotionPathStopPointPlacement:
-      props.onStartMotionPathStopPointPlacement ?? (() => undefined),
+
     onStartObjectTrackAnchorPlacement: props.onStartObjectTrackAnchorPlacement ?? (() => undefined),
     onClearPlacementMode: props.onClearPlacementMode ?? (() => undefined),
     onUpdateMotionRegion: props.onUpdateMotionRegion ?? (() => undefined),
@@ -181,6 +214,7 @@ function createInspectPanelEffectProps(props: WorkspaceSidebarSelectionBodyProps
     onUpdateTransitionTemplate: props.onUpdateTransitionTemplate ?? (() => undefined),
     onDeleteEffectInstance: props.onDeleteEffectInstance ?? (() => undefined),
     onDuplicateEffectInstance: props.onDuplicateEffectInstance ?? (() => null),
+    onMoveEffectInstance: props.onMoveEffectInstance ?? (() => undefined),
     onUpdateEffectInstance: props.onUpdateEffectInstance ?? (() => undefined),
     onUpsertObjectTrackCorrectionAnchor:
       props.onUpsertObjectTrackCorrectionAnchor ?? (() => undefined),

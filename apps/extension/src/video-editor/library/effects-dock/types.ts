@@ -19,7 +19,6 @@ export interface VideoEditorEffectsLibraryDockProps {
     startTime: number;
     target: VideoProjectEffectTarget;
   }): Promise<string | null>;
-  onClose(): void;
   onDeleteEffectBundle(packId: string): Promise<void>;
   onImportEffectFile(file: File): Promise<void>;
   onSetEffectBundleEnabled(packId: string, enabled: boolean): Promise<void>;

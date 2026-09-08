@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import {
+  createEmptyVideoProject,
+  createVideoProjectAsset,
+  createVideoProjectTrack,
+} from '../../../../features/video/project/factories/creation';
+import {
+  VideoTrackKind,
   VideoClipLinkMode,
   VideoClipTransitionKind,
   VideoMediaFitMode,
@@ -62,6 +67,7 @@ function createTimelineProject(): VideoProject {
 
 function createLinkedTimelineProject(): VideoProject {
   const project = createEmptyVideoProject('Timeline linked');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const [primaryTrack, audioTrack] = project.tracks;
   project.clips = [
     {
@@ -133,7 +139,9 @@ function verifyMoveAndTrimMutations(): void {
   const project = createTimelineProject();
 
   expect(moveProjectClip(project, 'missing', 2)).toBe(project);
-  expect(trimProjectClipStart(project, 'clip-1', 4.99)).toBe(project);
+  expect(trimProjectClipStart(project, 'clip-1', 4.99).clips[0]?.duration).toBeCloseTo(
+    1 / project.fps
+  );
 
   const movedProject = moveProjectClip(project, 'clip-1', 3);
   const movedClip = movedProject.clips.find((clip) => clip.id === 'clip-1');
@@ -162,10 +170,10 @@ function verifyMoveAndTrimMutations(): void {
     (clip) => clip.id === 'clip-1'
   );
   expect(minimalEndClip?.type).toBe(VideoProjectClipType.VIDEO);
-  expect(minimalEndClip?.duration).toBeCloseTo(0.1, 5);
+  expect(minimalEndClip?.duration).toBeCloseTo(1 / project.fps, 5);
   expect(
     minimalEndClip && 'sourceDuration' in minimalEndClip ? minimalEndClip.sourceDuration : null
-  ).toBeCloseTo(0.1, 5);
+  ).toBeCloseTo(1 / project.fps, 5);
 
   expect(trimProjectClipEnd(project, 'clip-1', 10)).toBe(project);
 }
@@ -252,3 +260,90 @@ function verifyLinkedMutationOwnership(): void {
     duplicatedProject.clips.filter((clip) => clip.linkMode === VideoClipLinkMode.LINKED)
   ).toHaveLength(4);
 }
+
+it('holds transition trims before they engulf either adjacent clip', () => {
+  const project = createTimelineProject();
+  const first = project.clips[0]!;
+  const second = project.clips[1]!;
+  if (first.type !== VideoProjectClipType.VIDEO || second.type !== VideoProjectClipType.VIDEO)
+    throw new Error('Video fixture');
+  first.sourceStart = 5;
+  second.startTime = 4;
+  second.sourceStart = 5;
+  const start = trimProjectClipStart(project, second.id, -10).clips[1]!;
+  expect(start.startTime).toBeCloseTo(1.1);
+  const asset = createVideoProjectAsset(
+    'Source',
+    'VIDEO',
+    { kind: 'project-asset', projectAssetId: 'asset-1' },
+    {
+      duration: 20,
+      width: 1280,
+      height: 720,
+      mimeType: 'video/webm',
+      size: 1,
+      hasAudio: false,
+      audioPeaks: null,
+    }
+  );
+  asset.id = first.assetId;
+  project.assets = [asset];
+  const end = trimProjectClipEnd(project, first.id, 20).clips[0]!;
+  expect(end.startTime + end.duration).toBeCloseTo(5.9);
+});
+
+it('keeps outer trims from moving an overlapping clip inside its neighbor', () => {
+  const project = createTimelineProject();
+  const first = project.clips[0]!;
+  const second = project.clips[1]!;
+  second.startTime = 4;
+  const shortenedLeading = trimProjectClipStart(project, first.id, 4.5).clips[0]!;
+  expect(shortenedLeading.startTime).toBeCloseTo(3.9);
+  expect(shortenedLeading.startTime + shortenedLeading.duration).toBeCloseTo(5);
+  const shortenedTrailing = trimProjectClipEnd(project, second.id, 4.5).clips[1]!;
+  expect(shortenedTrailing.startTime + shortenedTrailing.duration).toBeCloseTo(5.1);
+  expect(shortenedTrailing.startTime).toBe(4);
+});
+
+it.each([30, 60, 240])(
+  'trims short source clips by project frames at %sfps without a 100ms expansion',
+  (fps) => {
+    const project = createTimelineProject();
+    project.fps = fps;
+    const clip = project.clips[0]!;
+    if (clip.type !== VideoProjectClipType.VIDEO) throw new Error('Expected video fixture');
+    clip.duration = 3 / fps;
+    clip.sourceDuration = 3 / fps;
+    const end = trimProjectClipEnd(project, clip.id, clip.startTime + 2 / fps).clips[0]!;
+    expect(end.duration).toBeCloseTo(2 / fps, 10);
+    const start = trimProjectClipStart(project, clip.id, clip.startTime + 1 / fps).clips[0]!;
+    expect(start.duration).toBeCloseTo(2 / fps, 10);
+    const minimum = trimProjectClipEnd(project, clip.id, 0).clips[0]!;
+    expect(minimum.duration).toBeCloseTo(1 / fps, 10);
+  }
+);
+
+it('preserves authored names through repeated cuts instead of accumulating part suffixes', () => {
+  const original = createTimelineProject();
+  original.clips[0]!.name = 'Мой дубль · часть 2';
+  let project = original;
+  let clipId = 'clip-1';
+  for (const time of [2, 3, 4]) {
+    project = splitProjectClipsAtTime(project, clipId, time);
+    const trailing = project.clips.find((clip) => clip.startTime === time)!;
+    expect(trailing.name).toBe('Мой дубль · часть 2');
+    clipId = trailing.id;
+  }
+  expect(project.clips.filter((clip) => clip.startTime < 5).map((clip) => clip.name)).toEqual(
+    Array(4).fill('Мой дубль · часть 2')
+  );
+  expect(original.clips).toHaveLength(2);
+});
+
+it('keeps each linked video and audio name when cutting the group', () => {
+  const original = createLinkedTimelineProject();
+  const originalNames = new Map(original.clips.map((clip) => [clip.type, clip.name]));
+  const project = splitProjectClipsAtTime(original, 'video-1', 3);
+  expect(project.clips).toHaveLength(4);
+  for (const clip of project.clips) expect(clip.name).toBe(originalNames.get(clip.type));
+});

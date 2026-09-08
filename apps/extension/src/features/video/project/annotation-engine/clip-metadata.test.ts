@@ -1,11 +1,13 @@
+import { VideoTrackKind } from '../types';
 import { expect, it } from 'vitest';
 import { createAnnotationClip } from '../factories/overlay-clip';
-import { createEmptyVideoProject } from '../factories/creation';
+import { createEmptyVideoProject, createVideoProjectTrack } from '../factories/creation';
 import { normalizeAnnotationTemplateMetadata } from './clip-metadata';
 
 it('preserves snapshot template fallback data while normalizing annotation metadata', () => {
   const project = createEmptyVideoProject('Annotation metadata');
-  const clip = createAnnotationClip(project.tracks[2]!.id, project.width, project.height, 0);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
+  const clip = createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 0);
   const template = clip.templateSnapshot!.template!;
   clip.templateRef = { packId: 'custom.pack', templateId: 'custom-template' };
   clip.templateSnapshot = {

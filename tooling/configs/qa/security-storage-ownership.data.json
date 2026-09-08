@@ -119,6 +119,21 @@
   ],
   "sensitiveRetentionOwners": [
     {
+      "file": "apps/extension/src/composition/persistence/review-workspaces/store.ts",
+      "owner": "review-workspaces",
+      "justification": "Owns user-authored video review history and recoverable comment field text across restarts.",
+      "reviewNote": "Local-only source-time annotations, edit intent, complete linear history, and final text inserted into the comment field. No raw recognition events, interim transcripts or audio. Explicit media backup only; drafts excluded from reports; no sync/logs/diagnostics. Deleted with media and verified local-data erasure.",
+      "storageWrites": [
+        {
+          "sink": "store.put",
+          "keys": [
+            "VIDEO_WORKSPACES_STORE",
+            "VIDEO_WORKSPACE_DRAFTS_STORE"
+          ]
+        }
+      ]
+    },
+    {
       "file": "apps/extension/src/composition/persistence/gallery-saved-views/index.ts",
       "owner": "gallery-saved-views",
       "justification": "The saved Gallery view owner retains bounded user-selected facet identifiers, including tag and source values, as reusable local navigation preferences.",

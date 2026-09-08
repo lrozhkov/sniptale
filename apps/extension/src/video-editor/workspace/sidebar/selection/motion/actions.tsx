@@ -5,13 +5,16 @@ import {
 import { translate } from '../../../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { VideoMotionFocusMode } from '../../../../../features/video/project/types';
-import { getVisibleProjectActionEvents } from '../../../../project/operations/action-events';
+import { resolveVideoProjectActionOccurrences } from '../../../../../features/video/project/action-occurrences';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { getProjectCenter } from './utils';
 
 function getActionModeTarget(panel: WorkspaceSidebarSelectionPanelProps) {
-  const actionEvents = getVisibleProjectActionEvents(panel.project);
-  return panel.selectedMotionRegion?.targetActionEventId ?? actionEvents[0]?.id ?? null;
+  const selected = panel.selectedActionOccurrence;
+  return (
+    panel.selectedMotionRegion?.targetAction ??
+    (selected ? { eventId: selected.eventId, clipId: selected.clipId } : null)
+  );
 }
 
 function getManualPoint(panel: WorkspaceSidebarSelectionPanelProps) {
@@ -61,7 +64,7 @@ function updateFocusMode(
     case VideoMotionFocusMode.ACTION:
       panel.onUpdateMotionRegion?.(motionRegionId, {
         focusMode,
-        targetActionEventId: getActionModeTarget(panel),
+        targetAction: getActionModeTarget(panel),
       });
       return;
   }
@@ -95,7 +98,7 @@ export function MotionQuickActions(props: { panel: WorkspaceSidebarSelectionPane
   }
 
   const motionRegionId = motionRegion.id;
-  const hasActionTarget = getVisibleProjectActionEvents(props.panel.project).length > 0;
+  const hasActionTarget = resolveVideoProjectActionOccurrences(props.panel.project).length > 0;
 
   return (
     <div className="grid grid-cols-2 gap-2">

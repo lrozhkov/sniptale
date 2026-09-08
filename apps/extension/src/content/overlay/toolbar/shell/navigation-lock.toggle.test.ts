@@ -8,6 +8,7 @@ const navigationLockToggleMocks = vi.hoisted(() => ({
 vi.mock('../../../selection/locker', () => ({
   disableNavigationLock: navigationLockToggleMocks.disableNavigationLock,
   enableNavigationLock: navigationLockToggleMocks.enableNavigationLock,
+  setNavigationInputShieldSuspended: vi.fn(),
 }));
 
 import { createToolbarNavigationLockToggle } from './navigation-lock.toggle';

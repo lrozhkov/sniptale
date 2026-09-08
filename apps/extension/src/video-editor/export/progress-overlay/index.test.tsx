@@ -16,7 +16,7 @@ import { ExportProgressOverlay } from './index';
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
-function renderOverlay(onCancel = vi.fn()) {
+function renderOverlay(onCancel = vi.fn(), cancellationFailed = false) {
   if (!container) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -27,6 +27,7 @@ function renderOverlay(onCancel = vi.fn()) {
     root?.render(
       <ExportProgressOverlay
         onCancel={onCancel}
+        cancellationFailed={cancellationFailed}
         status={{
           message: 'Muxing project output',
           phase: VideoProjectExportPhase.TRANSCODING,
@@ -58,13 +59,62 @@ describe('ExportProgressOverlay', () => {
     renderOverlay();
 
     const dialog = container?.querySelector<HTMLElement>('[role="dialog"]');
-    const progressFill = container?.querySelector<HTMLElement>('.h-3.rounded-full');
+    const progressFill = container?.querySelector<HTMLElement>('[role="progressbar"] > div');
 
     expect(dialog).not.toBeNull();
     expect(container?.textContent).toContain('videoEditor.progress.title');
-    expect(container?.textContent).toContain('Muxing project output');
+    expect(container?.textContent).not.toContain('Muxing project output');
+    expect(container?.textContent).toContain('videoEditor.progress.transcoding');
     expect(container?.textContent).toContain('60%');
     expect(progressFill?.style.width).toBe('60%');
+  });
+
+  it('labels the modal, contains Tab focus and restores the opener', () => {
+    const opener = document.createElement('button');
+    document.body.append(opener);
+    opener.focus();
+    renderOverlay();
+    const dialog = container?.querySelector<HTMLElement>('[role="dialog"]');
+    const cancel = container?.querySelector('button');
+    expect(dialog?.getAttribute('aria-modal')).toBe('true');
+    expect(
+      document.getElementById(dialog?.getAttribute('aria-labelledby') ?? '')?.textContent
+    ).toBe('videoEditor.progress.title');
+    expect(document.activeElement).toBe(cancel);
+    for (const shiftKey of [false, true]) {
+      const tab = new KeyboardEvent('keydown', {
+        key: 'Tab',
+        shiftKey,
+        bubbles: true,
+        cancelable: true,
+      });
+      cancel?.dispatchEvent(tab);
+      expect(tab.defaultPrevented).toBe(true);
+      expect(document.activeElement).toBe(cancel);
+    }
+    renderOverlay();
+    expect(document.activeElement).toBe(cancel);
+    act(() => root?.unmount());
+    root = null;
+    expect(document.activeElement).toBe(opener);
+    opener.remove();
+  });
+
+  it('keeps the active cancel control and progress when cancellation fails', () => {
+    const onCancel = renderOverlay();
+    const cancel = container?.querySelector('button');
+    renderOverlay(onCancel, true);
+    expect(container?.querySelector('[role="alert"]')?.textContent).toBe(
+      'videoEditor.progress.cancelFailed'
+    );
+    expect(container?.querySelector('[role="progressbar"]')?.getAttribute('aria-valuenow')).toBe(
+      '60'
+    );
+    expect(document.activeElement).toBe(cancel);
+    act(() => cancel?.click());
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    renderOverlay(onCancel, false);
+    expect(container?.querySelector('[role="alert"]')).toBeNull();
   });
 
   it('routes cancel through the shared footer action', () => {

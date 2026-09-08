@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 
 const mocks = vi.hoisted(() => ({
   appendTelemetry: vi.fn(),
@@ -69,6 +70,19 @@ const binding = {
   tabId: 7,
 };
 
+it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
+  'restores action history without a controlled cursor in %s',
+  async (captureMode) => {
+    mocks.isEnabled.mockReturnValue(false);
+    mocks.getRuntimeState.mockReturnValue({ duration: 12, captureMode });
+    await suspendControlledCursorEffects(binding);
+    expect(mocks.appendTelemetry).toHaveBeenCalledWith({ signals: [] });
+    await restoreControlledCursorEffects(binding);
+    expect(mocks.enable).toHaveBeenCalledWith(7, 'recording-1', 12);
+    expect(mocks.sync).toHaveBeenCalledWith(7, 'resume');
+  }
+);
+
 it('flushes telemetry without owning recorder pause or resume transport', async () => {
   expect(beginControlledCursorNavigationEffects()).toBe(11);
   await suspendControlledCursorEffects(binding);
@@ -84,6 +98,15 @@ it('restores content telemetry state and clears pending effects', async () => {
   expect(mocks.sync).toHaveBeenCalledWith(7, 'resume');
   expect(mocks.setAutoPaused).toHaveBeenCalledWith(false);
   expect(mocks.clearNavigation).toHaveBeenCalledWith(11);
+});
+
+it('keeps navigation time on the continuously recorded source clock', async () => {
+  mocks.isEnabled.mockReturnValue(false);
+  mocks.getRuntimeState.mockReturnValue({ duration: 12, captureMode: CaptureMode.TAB });
+  await suspendControlledCursorEffects(binding);
+  mocks.getRuntimeState.mockReturnValue({ duration: 15.5, captureMode: CaptureMode.TAB });
+  await restoreControlledCursorEffects(binding);
+  expect(mocks.enable).toHaveBeenCalledWith(7, 'recording-1', 15.5);
 });
 
 it('abandons stale continuations without publishing restored state', async () => {

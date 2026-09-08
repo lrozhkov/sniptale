@@ -5,9 +5,11 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
   createEmptyVideoProject,
+  createVideoProjectTrack,
   createVideoProjectAsset,
 } from '../../../../features/video/project/factories/creation';
 import {
+  VideoTrackKind,
   type VideoProject,
   type VideoProjectAudioClip,
   type VideoProjectClip,
@@ -161,6 +163,7 @@ afterEach(() => {
 
 it('keeps audio-capable videos in the hidden audio bank and excludes silent videos', async () => {
   const project = createEmptyVideoProject('Preview');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const videoClip = createVideoClip(project.tracks[0]!.id);
   const silentVideoClip = createVideoClip(project.tracks[0]!.id, {
     assetId: 'asset-video-silent',
@@ -196,6 +199,7 @@ it('keeps audio-capable videos in the hidden audio bank and excludes silent vide
 
 it('prefers the linked audio companion over a duplicate hidden video driver', async () => {
   const project = createEmptyVideoProject('Preview');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const { audioClip, videoClip } = createLinkedRecordingPair(project);
   const onResolve = vi.fn();
 

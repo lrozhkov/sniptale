@@ -6,12 +6,12 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const {
-  drawActionCompositionStateMock,
+  drawSceneActionCompositionStatesMock,
   drawCursorCompositionStateMock,
   mapCompositionPointThroughCameraMock,
   resolveVideoCompositionRenderPassesMock,
 } = vi.hoisted(() => ({
-  drawActionCompositionStateMock: vi.fn(),
+  drawSceneActionCompositionStatesMock: vi.fn(),
   drawCursorCompositionStateMock: vi.fn(),
   mapCompositionPointThroughCameraMock: vi.fn(),
   resolveVideoCompositionRenderPassesMock: vi.fn(),
@@ -19,7 +19,7 @@ const {
 
 vi.mock('../../../../features/video/composition/draw', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../features/video/composition/draw')>()),
-  drawActionCompositionState: drawActionCompositionStateMock,
+  drawSceneActionCompositionStates: drawSceneActionCompositionStatesMock,
   drawCompositionVisualLayer: vi.fn(),
   drawCursorCompositionState: drawCursorCompositionStateMock,
 }));
@@ -136,7 +136,7 @@ beforeEach(() => {
     configurable: true,
     value: vi.fn(() => createCanvasContextMock()),
   });
-  drawActionCompositionStateMock.mockReset();
+  drawSceneActionCompositionStatesMock.mockReset();
   drawCursorCompositionStateMock.mockReset();
   mapCompositionPointThroughCameraMock.mockReset();
   resolveVideoCompositionRenderPassesMock.mockReset();
@@ -216,13 +216,16 @@ function expectScaledOverlayCalls() {
       y: expect.closeTo(74.4, 8),
     })
   );
-  expect(drawActionCompositionStateMock).toHaveBeenCalledWith(
+  expect(drawSceneActionCompositionStatesMock).toHaveBeenCalledWith(
     expect.anything(),
-    expect.objectContaining({
-      point: { x: expect.closeTo(112.2, 8), y: expect.closeTo(150.3, 8) },
-    }),
-    { x: expect.closeTo(39.6, 8), y: expect.closeTo(74.4, 8) },
-    expect.closeTo(1.65, 8)
+    [{ point: { x: 80, y: 90 } }],
+    createScaledCamera(),
+    {
+      offsetX: expect.closeTo(0, 8),
+      offsetY: expect.closeTo(15, 8),
+      scaleX: expect.closeTo(1.1, 8),
+      scaleY: expect.closeTo(1.1, 8),
+    }
   );
 }
 

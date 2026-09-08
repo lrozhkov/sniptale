@@ -74,7 +74,7 @@ it('keeps hidden file inputs mounted and quiet across idle sidebar rerenders', (
   renderPanel(props, inputRefs, 'Selection');
   const initialInputs = querySidebarInputs();
 
-  renderPanel({ ...props, diagnosticsOpen: true }, inputRefs, 'Selection updated');
+  renderPanel(props, inputRefs, 'Selection updated');
   const rerenderedInputs = querySidebarInputs();
 
   expect(rerenderedInputs).toEqual(initialInputs);
@@ -117,16 +117,13 @@ function renderPanel(
     root?.render(
       <WorkspaceSidebarExpandedPanel
         {...props}
-        diagnosticsMeta="Diagnostics"
         projectsOpen
         recordingsOpen={false}
-        diagnosticsSectionOpen={props.diagnosticsOpen}
         inputRefs={inputRefs}
         selectionIcon={<span>icon</span>}
         selectionTitle={selectionTitle}
         onToggleProjectsOpen={vi.fn()}
         onToggleRecordingsOpen={vi.fn()}
-        onToggleDiagnosticsSection={vi.fn()}
       />
     );
   });
@@ -167,8 +164,6 @@ function createBaseProps(): WorkspaceSidebarProps {
   return {
     activeProjectId: 'project-1',
     collapsed: false,
-    diagnosticsContent: null,
-    diagnosticsOpen: false,
     gridSettings: {
       color: '#94a3b8',
       enabled: false,
@@ -206,7 +201,6 @@ function createActionProps() {
     onSetCursorCaptureMode: vi.fn(),
     onSetSceneBackground: vi.fn(),
     onToggleCollapsed: vi.fn(),
-    onToggleDiagnostics: vi.fn(),
     onUpdateClipAudioEnvelope: vi.fn(),
     onUpdateClipFades: vi.fn(),
     onUpdateClipMuted: vi.fn(),

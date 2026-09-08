@@ -94,7 +94,7 @@ it('preserves current track selection for cursor and action segments', () => {
   timeline.getState().selectCursorSegment('sample-1');
   expect(timeline.getState().selectedTrackId).toBe(primaryTrack!.id);
 
-  timeline.getState().selectActionSegment('action-1');
+  timeline.getState().selectActionOccurrence('action-1', null);
   expect(timeline.getState().selectedTrackId).toBe(primaryTrack!.id);
 });
 
@@ -111,18 +111,16 @@ it('covers playback and project action helpers in the timeline state owner', () 
   timeline.getState().setCurrentTime(12);
   timeline.getState().setPlaying(true);
   timeline.getState().setPixelsPerSecond(10);
-  timeline.getState().setDiagnosticsOpen(true);
   timeline.getState().setReady(false);
   timeline.getState().setError('timeline-error');
   timeline.getState().setSaveState('saved');
 
   expect(timeline.getState()).toMatchObject({
     currentTime: 0,
-    diagnosticsOpen: true,
     error: 'timeline-error',
     isPlaying: true,
     isReady: false,
-    pixelsPerSecond: 12,
+    pixelsPerSecond: 10,
     saveState: 'saved',
   });
   expect(timeline.getState().project?.name).toBe('Updated demo');

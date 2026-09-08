@@ -1,3 +1,9 @@
+import type { VideoEditorAnnotationActions } from './annotation';
+import type { VideoEditorObjectTrackActions } from './object-tracks';
+import type { VideoEditorTemporalActions } from './temporal';
+import type { VideoEditorEffectInstanceActions } from './effect-instance';
+import type { VideoEditorMoveClipAction, VideoEditorTrimClipAction } from './timeline';
+import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
 import type {
   VideoBlockKind,
   VideoMediaFitMode,
@@ -7,17 +13,17 @@ import type {
   VideoProjectShapeType,
   VideoProjectUtilityLanes,
   VideoTrackKind,
+  VideoProjectTrackRole,
 } from '../../../features/video/project/types/index';
 import type {
   VideoEditorAudioEnvelopePatch,
   VideoEditorFadePatch,
   VideoEditorTransitionPatch,
 } from './patches';
-import type { VideoEditorAnnotationActions } from './annotation';
-import type { VideoEditorObjectTrackActions } from './object-tracks';
-import type { VideoEditorTemporalActions } from './temporal';
-import type { VideoEditorEffectInstanceActions } from './effect-instance';
-import type { VideoEditorMoveClipAction } from './timeline';
+import type {
+  VideoEditorMaterialPlacementResult,
+  VideoEditorMaterialSourceRange,
+} from '../insertion';
 
 export interface VideoEditorProjectActions
   extends
@@ -28,7 +34,7 @@ export interface VideoEditorProjectActions
   renameProject: (name: string) => void;
   renameTrack: (trackId: string, name: string) => void;
   addTrackLogicalLane: (trackId: string) => void;
-  addTrack: (kind?: VideoTrackKind) => void;
+  addTrack: (kind?: VideoTrackKind, role?: VideoProjectTrackRole) => void;
   deleteTrack: (trackId: string) => void;
   moveTrack: (trackId: string, direction: 'up' | 'down') => void;
   toggleTrackVisibility: (trackId: string) => void;
@@ -37,6 +43,25 @@ export interface VideoEditorProjectActions
   toggleUtilityLaneLock: (lane: keyof VideoProjectUtilityLanes) => void;
   clearUtilityLane: (lane: keyof VideoProjectUtilityLanes) => void;
   upsertAsset: (asset: VideoProjectAsset) => void;
+  upsertAssets: (assets: readonly VideoProjectAsset[]) => void;
+  /** Removes unreferenced materials from the project while preserving history and source media. */
+  removeUnusedAssets: (assetIds?: readonly string[]) => void;
+  appendMaterial: (
+    assetId: string,
+    range?: VideoEditorMaterialSourceRange,
+    telemetry?: RecordingTelemetryEntry
+  ) => VideoEditorMaterialPlacementResult;
+  /** Inserts at the playhead and opens an equal gap across the montage. */
+  insertMaterial: (
+    assetId: string,
+    range?: VideoEditorMaterialSourceRange,
+    telemetry?: RecordingTelemetryEntry
+  ) => VideoEditorMaterialPlacementResult;
+  overlayMaterial: (
+    assetId: string,
+    range?: VideoEditorMaterialSourceRange,
+    telemetry?: RecordingTelemetryEntry
+  ) => VideoEditorMaterialPlacementResult;
   addAssetClip: (
     asset: VideoProjectAsset,
     trackId?: string | null,
@@ -56,10 +81,11 @@ export interface VideoEditorProjectActions
     startTime?: number
   ) => string | null;
   moveClip: VideoEditorMoveClipAction;
-  trimClipStart: (clipId: string, nextStartTime: number) => void;
-  trimClipEnd: (clipId: string, nextEndTime: number) => void;
+  swapClip: (clipId: string, direction: 'left' | 'right') => void;
+  trimClipStart: VideoEditorTrimClipAction;
+  trimClipEnd: VideoEditorTrimClipAction;
   splitClipAt: (clipId: string, splitTime: number) => void;
-  deleteClip: (clipId: string) => void;
+  deleteClip: (clipId: string | readonly string[]) => void;
   duplicateClip: (clipId: string) => void;
   detachClipGroup: (clipId: string) => void;
   updateClipTransform: (clipId: string, patch: Partial<VideoProjectClip['transform']>) => void;

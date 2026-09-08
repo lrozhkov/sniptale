@@ -1,9 +1,18 @@
 import { VOICE_INPUT_TEST_SESSION_DURATION_MS } from '@sniptale/runtime-contracts/voice-input';
 import { resolveExtensionDocumentSenderUrl } from '../../platform/runtime-messaging/document-sender';
 
-export type VoiceInputConsumerId = 'content-page-tools' | 'editor-callout' | 'settings-test';
+export type VoiceInputConsumerId =
+  | 'content-page-tools'
+  | 'editor-callout'
+  | 'gallery-video-review'
+  | 'settings-test';
 
 const voiceInputConsumerPolicies = [
+  {
+    id: 'gallery-video-review',
+    documentPath: 'apps/extension/src/gallery/index.html',
+    maxDurationMs: null,
+  },
   {
     id: 'editor-callout',
     documentPath: 'apps/extension/src/editor/index.html',

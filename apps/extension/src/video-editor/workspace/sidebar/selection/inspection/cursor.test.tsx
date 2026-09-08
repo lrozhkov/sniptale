@@ -97,7 +97,7 @@ function createProps() {
     selectedClip: null,
     selectedTransition: null,
     selectedCursorSample: project.cursorTrack.samples[0] ?? null,
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedMotionRegion: null,
     selectedTrack: null,
     placementMode: null,
@@ -111,8 +111,10 @@ describe('workspace-sidebar/selection/inspect-cursor', () => {
     renderInspectPanel(createProps());
     clickGroup('videoEditor.sidebar.inspectorGroupAppearance');
 
-    expect(container?.textContent).toContain('videoEditor.sidebar.cursorTrackAppearanceTitle');
-    expect(container?.textContent).toContain('videoEditor.sidebar.cursorAppearanceTrackLinkHint');
+    expect(container?.textContent).not.toContain('videoEditor.sidebar.cursorTrackAppearanceTitle');
+    expect(container?.textContent).not.toContain(
+      'videoEditor.sidebar.cursorAppearanceTrackLinkHint'
+    );
     expect(container?.textContent).toContain('videoEditor.sidebar.cursorColorLabel');
     expect(container?.textContent).toContain('videoEditor.sidebar.cursorCaptureModeSeparate');
     expect(container?.textContent).toContain('videoEditor.sidebar.cursorAppearanceUnlink');
@@ -122,6 +124,52 @@ describe('workspace-sidebar/selection/inspect-cursor', () => {
 
     clickGroup('videoEditor.sidebar.inspectorGroupInfo');
     expect(container?.textContent).toContain('videoEditor.sidebar.cursorAppearanceModeTrack');
+  });
+
+  it('keeps embedded overlay editing honest and does not offer ineffective interpolation', () => {
+    const props = createProps();
+    props.project.cursorTrack!.captureMode = VideoCursorCaptureMode.EMBEDDED_FALLBACK;
+    const before = JSON.stringify(props.project);
+    renderInspectPanel(props);
+
+    expect(container?.textContent).toContain('videoEditor.sidebar.cursorCaptureModeFallback');
+    expect(container?.textContent).toContain('videoEditor.sidebar.cursorFallbackHint');
+    expect(container?.textContent).not.toContain('videoEditor.sidebar.cursorInterpolationLabel');
+    const visibility = container?.querySelector<HTMLButtonElement>(
+      'button[aria-label="videoEditor.sidebar.inspectorSampleVisible"]'
+    );
+    expect(visibility).toBeTruthy();
+    act(() => visibility?.click());
+    expect(props.onUpdateCursorSampleVisibility).toHaveBeenCalledWith('sample-1', false);
+
+    clickGroup('videoEditor.sidebar.inspectorGroupAppearance');
+    act(() => findButton('videoEditor.sidebar.cursorAppearanceUnlink')?.click());
+    expect(props.onUpdateCursorSampleSkinOverride).toHaveBeenCalledWith(
+      'sample-1',
+      props.project.cursorTrack!.skin
+    );
+    act(() => findButton('common.actions.delete')?.click());
+    expect(props.onDeleteCursorSample).toHaveBeenCalledWith('sample-1');
+    expect(props.onSetCursorCaptureMode).not.toHaveBeenCalled();
+    expect(props.onUpdateCursorSampleInterpolation).not.toHaveBeenCalled();
+    expect(JSON.stringify(props.project)).toBe(before);
+  });
+
+  it('restores an embedded overlay override and retains interpolation and capture mode', () => {
+    const props = createProps();
+    renderInspectPanel(props);
+    clickGroup('videoEditor.sidebar.inspectorGroupAnimation');
+    expect(container?.textContent).toContain('videoEditor.sidebar.cursorInterpolationLabel');
+    props.project.cursorTrack!.captureMode = VideoCursorCaptureMode.EMBEDDED_FALLBACK;
+    props.project.cursorTrack!.samples[0]!.skinOverride = {
+      ...props.project.cursorTrack!.skin,
+      color: '#ff0000',
+    };
+    renderInspectPanel(props);
+    clickGroup('videoEditor.sidebar.inspectorGroupAppearance');
+    act(() => findButton('videoEditor.sidebar.cursorAppearanceRestoreTrack')?.click());
+    expect(props.onClearCursorSampleSkinOverride).toHaveBeenCalledWith('sample-1');
+    expect(props.onSetCursorCaptureMode).not.toHaveBeenCalled();
   });
 
   it('shows restore controls when a cursor segment has its own style override', () => {
@@ -142,7 +190,9 @@ describe('workspace-sidebar/selection/inspect-cursor', () => {
     renderInspectPanel(props);
     clickGroup('videoEditor.sidebar.inspectorGroupAppearance');
 
-    expect(container?.textContent).toContain('videoEditor.sidebar.cursorAppearanceOverrideHint');
+    expect(container?.textContent).not.toContain(
+      'videoEditor.sidebar.cursorAppearanceOverrideHint'
+    );
     expect(container?.textContent).toContain('videoEditor.sidebar.cursorAppearanceRestoreTrack');
 
     clickGroup('videoEditor.sidebar.inspectorGroupInfo');
@@ -157,9 +207,10 @@ function renderInspectPanel(props: ReturnType<typeof createProps>) {
 }
 
 function clickGroup(title: string) {
-  const button = container?.querySelector<HTMLButtonElement>(`button[title="${title}"]`);
+  const button = container?.querySelector<HTMLElement>(`nav button[title="${title}"]`);
   act(() => {
-    button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    if (!button?.parentElement?.hasAttribute('open'))
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 }
 

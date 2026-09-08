@@ -26,17 +26,14 @@ interface LoadedImageMetadata {
   size: number;
 }
 
-function detectVideoAudioPresence(video: HTMLVideoElement) {
-  const extendedVideo = video as HTMLVideoElement & {
-    mozHasAudio?: boolean;
-    webkitAudioDecodedByteCount?: number;
-    audioTracks?: { length: number };
-  };
-  return Boolean(
-    extendedVideo.audioTracks?.length ||
-    extendedVideo.mozHasAudio ||
-    (extendedVideo.webkitAudioDecodedByteCount ?? 0) > 0
-  );
+async function detectVideoAudioPresence(blob: Blob): Promise<boolean> {
+  const { Input, BlobSource, ALL_FORMATS } = await import('mediabunny');
+  const input = new Input({ source: new BlobSource(blob), formats: ALL_FORMATS });
+  try {
+    return (await input.getAudioTracks()).length > 0;
+  } finally {
+    input.dispose();
+  }
 }
 
 export function loadVideoMetadata(blob: Blob): Promise<LoadedVideoMetadata> {
@@ -56,7 +53,7 @@ export function loadVideoMetadata(blob: Blob): Promise<LoadedVideoMetadata> {
     resolveMediaDuration(video, 1)
       .then(async (durationResult) => {
         const { duration } = durationResult;
-        const hasAudio = detectVideoAudioPresence(video);
+        const hasAudio = await detectVideoAudioPresence(blob);
         const audioPeaks =
           hasAudio && durationResult.isAuthoritative ? await loadAudioPeaks(blob, duration) : null;
 

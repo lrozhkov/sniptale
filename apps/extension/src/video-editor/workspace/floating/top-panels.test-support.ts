@@ -31,13 +31,12 @@ function createInsertionActions(): VideoEditorTimelineController['actions']['ins
 function createHeaderController(): VideoEditorHeaderController {
   return {
     grid: { magnetEnabled: true, onToggleMagnet: noop() },
-    inspectorMode: 'grid',
+    inspectorMode: 'selection',
     leftSidebarCollapsed: false,
     libraryPanelOpen: false,
     onCloseLibraryPanel: noop(),
     onOpenAudioRecordingDialog: noop(),
     onOpenExportDialog: noop(),
-    onOpenGridSettings: noop(),
     onOpenLibraryPanel: noop(),
     onRenameProject: noop(),
     onSelectScene: noop(),
@@ -51,9 +50,11 @@ function createHeaderController(): VideoEditorHeaderController {
 
 function createTimelineSelectionActions(): Pick<
   TimelineActions,
-  | 'onSelectActionSegment'
+  | 'onSelectActionOccurrence'
   | 'onSelectClip'
   | 'onSelectCursorSegment'
+  | 'onSelectHistoryLane'
+  | 'onSelectMotionLane'
   | 'onSelectMotionRegion'
   | 'onSelectObjectTrack'
   | 'onSelectScene'
@@ -61,9 +62,11 @@ function createTimelineSelectionActions(): Pick<
   | 'onSelectTransition'
 > {
   return {
-    onSelectActionSegment: noop(),
+    onSelectActionOccurrence: noop(),
     onSelectClip: noop(),
     onSelectCursorSegment: noop(),
+    onSelectHistoryLane: noop(),
+    onSelectMotionLane: noop(),
     onSelectMotionRegion: noop(),
     onSelectObjectTrack: noop(),
     onSelectScene: noop(),
@@ -83,31 +86,38 @@ function createTimelineEditActions(): Omit<
       isProjectHistoryTransactionCurrent: () => true,
     },
     onAddTrackLogicalLane: noop(),
-    onAutoTransformRecording: noop(),
-    onClearPlaybackRange: noop(),
+    onConnectMotionRegions: noop(),
+    onAutoProcessingModalVisibilityChange: noop(),
+    autoProcessing: {
+      prepare: async () => ({ status: 'stale' as const }),
+      apply: async () => 'stale' as const,
+      isCurrent: () => false,
+    },
     onClearUtilityLane: noop(),
     onCloseTrackGap: noop(),
     onDeleteSelectedClip: noop(),
     onDeleteSelectedTimelineObject: noop(),
     onDeleteTrack: noop(),
     onDuplicateSelectedClip: noop(),
-    onMoveActionEvent: noop(),
+    onSwapClip: vi.fn(),
     onMoveClip: noop(),
     onMoveCursorSegment: noop(),
     onMoveMotionRegion: noop(),
     onMoveTrack: noop(),
     onMoveTransitionSegment: noop(),
     onRenameTrack: noop(),
-    onResizeActionEvent: noop(),
     onResizeMotionRegion: noop(),
     onSeek: noop(),
+    onClearPlaybackRange: noop(),
+    onSeekToEnd: noop(),
     onSeekToStart: noop(),
+    onStepToNextFrame: noop(),
+    onStepToPreviousFrame: noop(),
     onSetPlaybackRange: noop(),
     onSplitSelectedClip: noop(),
     onTimelinePreviewSuspendedChange: noop(),
     onTimelinePreviewViewportChange: noop(),
     onTogglePlay: noop(),
-    onToggleTelemetryLaneVisibility: noop(),
     onToggleTrackLock: noop(),
     onToggleTrackVisibility: noop(),
     onToggleUtilityLaneLock: noop(),
@@ -131,17 +141,19 @@ function createTimelineController(
       ...createTimelineSelectionActions(),
     },
     state: {
+      canDeleteSelectedClip: false,
+      canEditSelectedClip: false,
+      canSplitSelectedClip: false,
       currentTime: 0,
       isPlaying: false,
       magnetEnabled: true,
       pixelsPerSecond: 90,
       playbackRange: null,
       project,
-      recordingTelemetry: null,
+      recordingTelemetry: [],
       selectedClipId: null,
       selectedTrackId: null,
       selection: createSceneSelection(),
-      telemetryLaneVisible: false,
       timelinePreviews: {},
     },
   };
@@ -204,7 +216,7 @@ function createFloatingPreviewPreferences() {
 function createFloatingPreviewSelection() {
   return {
     placementMode: null,
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedClipId: null,
     selectedMotionRegion: null,
     onSelectClip: noop(),

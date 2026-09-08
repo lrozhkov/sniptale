@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CURRENT_SCHEMA_CONTRACTS, type DatabaseMigrationDescriptor } from './schema-contracts';
-import { EXPECTED_INDEXES, EXPECTED_STORES } from './core.stores';
+import { DB_VERSION, EXPECTED_INDEXES, EXPECTED_STORES } from './core.stores';
 
 const mocks = vi.hoisted(() => {
   const local = new Map<string, unknown>();
@@ -75,7 +75,7 @@ function createCurrentDatabase(
           [],
       },
     })),
-    version: options.version ?? 1,
+    version: options.version ?? DB_VERSION,
   };
 }
 
@@ -103,7 +103,7 @@ beforeEach(() => {
   mocks.previewCacheAbsent.mockResolvedValue(true);
   mocks.storageAvailable.mockReturnValue(true);
   vi.stubGlobal('indexedDB', {
-    databases: vi.fn(async () => [{ name: 'sniptale-db', version: 1 }]),
+    databases: vi.fn(async () => [{ name: 'sniptale-db', version: DB_VERSION }]),
     deleteDatabase: vi.fn(),
   });
   vi.stubGlobal('navigator', {
@@ -126,7 +126,7 @@ describe('database admission inspection', () => {
 
     vi.stubGlobal('indexedDB', undefined);
     await expect(inspectDatabaseAdmission()).resolves.toEqual({
-      databaseVersion: 1,
+      databaseVersion: DB_VERSION,
       status: 'ready',
     });
   });
@@ -142,7 +142,7 @@ describe('database admission inspection', () => {
 
     mocks.local.set(ALPHA_RESET_JOURNAL_KEY, { phase: 'complete', version: 1 });
     await expect(inspectDatabaseAdmission()).resolves.toEqual({
-      databaseVersion: 1,
+      databaseVersion: DB_VERSION,
       status: 'ready',
     });
   });
@@ -152,7 +152,7 @@ describe('database admission inspection', () => {
     mocks.openDB.mockResolvedValue(db);
 
     await expect(inspectDatabaseAdmission()).resolves.toEqual({
-      databaseVersion: 1,
+      databaseVersion: DB_VERSION,
       status: 'ready',
     });
     expect(db.close).toHaveBeenCalledOnce();
@@ -169,7 +169,7 @@ describe('database admission inspection', () => {
 
     vi.stubGlobal('indexedDB', {
       databases: vi.fn(async () => [
-        { name: 'sniptale-db', version: 1 },
+        { name: 'sniptale-db', version: DB_VERSION },
         { name: 'sniptale-video-db', version: 30 },
       ]),
     });
@@ -179,9 +179,9 @@ describe('database admission inspection', () => {
     });
 
     vi.stubGlobal('indexedDB', {
-      databases: vi.fn(async () => [{ name: 'sniptale-db', version: 2 }]),
+      databases: vi.fn(async () => [{ name: 'sniptale-db', version: DB_VERSION + 1 }]),
     });
-    mocks.openDB.mockResolvedValueOnce(createCurrentDatabase({ version: 2 }));
+    mocks.openDB.mockResolvedValueOnce(createCurrentDatabase({ version: DB_VERSION + 1 }));
     await expect(inspectDatabaseAdmission()).resolves.toMatchObject({
       reason: 'future-version',
       status: 'unsupported-version',
@@ -256,7 +256,7 @@ describe('migration admission policy', () => {
 
   it('admits a registered non-destructive migration after quota proof', async () => {
     await expect(evaluateDatabaseMigrationPlan(1, [migration()])).resolves.toEqual({
-      databaseVersion: 1,
+      databaseVersion: DB_VERSION,
       status: 'ready',
     });
   });
@@ -381,7 +381,7 @@ describe('restartable explicit recovery reset', () => {
     expect(mocks.local.has(ALPHA_RESET_JOURNAL_KEY)).toBe(false);
     expect(mocks.local.has(DATABASE_BACKUP_RECEIPT_KEY)).toBe(false);
     await expect(inspectDatabaseAdmission()).resolves.toEqual({
-      databaseVersion: 1,
+      databaseVersion: DB_VERSION,
       status: 'ready',
     });
     expect(deleteDatabase.mock.calls.map(([name]) => name)).toEqual([

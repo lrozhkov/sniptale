@@ -1,9 +1,10 @@
+import type { VideoProjectActionPreset } from '../../../../features/video/project/types';
 import type { VideoEditorActionHandlers } from '../../commands';
 import type { VideoEditorRuntimeController } from '../../session';
 import type {
   AnnotationEditingPort,
   ClipSelectionPort,
-  DiagnosticsTelemetryPort,
+  RecordingTelemetryPort,
   EffectEditingPort,
   HistoryPort,
   PlaybackPort,
@@ -16,6 +17,11 @@ import {
   createWorkspaceTimelineSelectionActions,
 } from './timeline-actions';
 import { createWorkspaceTimelineInsertionActions } from './timeline-insertion';
+import {
+  areProjectClipsEditable,
+  canEditProjectClip,
+  canSplitProjectClipAtTime,
+} from '../../../../features/video/project/timeline';
 
 type TimelineImportHandlers = Pick<
   VideoEditorActionHandlers,
@@ -23,16 +29,17 @@ type TimelineImportHandlers = Pick<
 >;
 type TimelineActionWorkspace = Pick<
   VideoEditorWorkspaceState,
-  'clearPlaybackRange' | 'confirm' | 'inspector' | 'setPlaybackRange'
+  | 'setAutoProcessingModalOpen'
+  | 'clearPlaybackRange'
+  | 'confirm'
+  | 'inspector'
+  | 'playbackRange'
+  | 'setPlaybackRange'
 >;
 type TimelineStateWorkspace = Pick<VideoEditorWorkspaceState, 'grid' | 'playbackRange'>;
 type TimelineControllerWorkspace = TimelineActionWorkspace & TimelineStateWorkspace;
 type TimelineProjectUpdaters = {
-  addActionEvent: (
-    preset: NonNullable<
-      NonNullable<ProjectLifecyclePort['project']>['actionEvents'][number]['preset']
-    >
-  ) => void;
+  addActionEvent: (preset: VideoProjectActionPreset) => void;
   addMotionRegion: () => void;
   enableCursorTrack: () => void;
   updateEffectInstance: EffectEditingPort['updateEffectInstance'];
@@ -47,7 +54,6 @@ function createWorkspaceTimelineActions(
   store: TimelineEditingPort &
     AnnotationEditingPort &
     ClipSelectionPort &
-    Pick<DiagnosticsTelemetryPort, 'toggleTelemetryLaneVisibility'> &
     HistoryPort &
     Pick<ProjectLifecyclePort, 'project' | 'setError'>,
   runtime: VideoEditorRuntimeController,
@@ -57,6 +63,7 @@ function createWorkspaceTimelineActions(
   selectedClipActions: TimelineSelectedClipActions
 ) {
   return {
+    onAutoProcessingModalVisibilityChange: workspace.setAutoProcessingModalOpen,
     insertion: createWorkspaceTimelineInsertionActions(store, actions, projectUpdaters),
     ...createWorkspaceTimelineEditingActions(store, workspace, selectedClipActions),
     onUpdateEffectInstance: projectUpdaters.updateEffectInstance,
@@ -70,13 +77,23 @@ function createWorkspaceTimelineState(
   store: TimelineEditingPort &
     ClipSelectionPort &
     PlaybackPort &
-    Pick<DiagnosticsTelemetryPort, 'recordingTelemetry' | 'telemetryLaneVisible'> &
+    Pick<RecordingTelemetryPort, 'recordingTelemetry'> &
     Pick<ProjectLifecyclePort, 'project'>,
   runtime: VideoEditorRuntimeController,
   project: NonNullable<ProjectLifecyclePort['project']>,
   workspace: TimelineStateWorkspace
 ) {
   return {
+    canDeleteSelectedClip:
+      store.selection.kind === 'clip-group'
+        ? store.selection.clipIds.length > 0 &&
+          areProjectClipsEditable(project, store.selection.clipIds)
+        : store.selectedClipId !== null && areProjectClipsEditable(project, [store.selectedClipId]),
+    canEditSelectedClip:
+      store.selectedClipId !== null && canEditProjectClip(project, store.selectedClipId),
+    canSplitSelectedClip:
+      store.selectedClipId !== null &&
+      canSplitProjectClipAtTime(project, store.selectedClipId, store.currentTime),
     currentTime: store.currentTime,
     isPlaying: store.isPlaying,
     magnetEnabled: workspace.grid.magnetEnabled,
@@ -87,7 +104,6 @@ function createWorkspaceTimelineState(
     selection: store.selection,
     selectedClipId: store.selectedClipId,
     selectedTrackId: store.selectedTrackId,
-    telemetryLaneVisible: store.telemetryLaneVisible,
     timelinePreviews: runtime.timelinePreviews,
   };
 }
@@ -99,10 +115,7 @@ export function createWorkspaceTimelineController(
     HistoryPort &
     PlaybackPort &
     EffectEditingPort &
-    Pick<
-      DiagnosticsTelemetryPort,
-      'recordingTelemetry' | 'telemetryLaneVisible' | 'toggleTelemetryLaneVisibility'
-    > &
+    Pick<RecordingTelemetryPort, 'recordingTelemetry'> &
     Pick<ProjectLifecyclePort, 'project' | 'setError'>,
   runtime: VideoEditorRuntimeController,
   project: NonNullable<ProjectLifecyclePort['project']>,

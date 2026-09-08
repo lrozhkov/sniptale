@@ -53,7 +53,7 @@ async function drawTestClip(clip: unknown) {
   const context = createContext();
   const project = {
     height: 100,
-    tracks: [{ id: 'track-1', kind: 'OVERLAY', subtitleStyle: { fontSize: 20 } }],
+    tracks: [{ id: 'track-1', kind: 'PRIMARY', subtitleStyle: { fontSize: 20 } }],
     width: 100,
   };
 

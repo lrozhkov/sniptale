@@ -14,7 +14,8 @@ interface PlaybackPreparationActions {
   cancelPlaybackPreparation: () => void;
   pausePlayback: () => number;
   seekTo: (time: number) => void;
-  setPlaybackPlaying: (playing: boolean) => void;
+  seekToPaused: (time: number) => void;
+  setPlaybackPlaying: (playing: boolean) => void | Promise<boolean>;
   togglePlayback: () => void;
 }
 
@@ -37,7 +38,7 @@ function usePlaybackPreparationActions(params: {
   const setPlaybackPlaying = useCallback(
     (playing: boolean) => {
       if (!playing) return void pausePlayback();
-      requestPlaybackStart(stable, requestRef, setPhase);
+      return requestPlaybackStart(stable, requestRef, setPhase);
     },
     [pausePlayback, requestRef, setPhase, stable]
   );
@@ -45,10 +46,21 @@ function usePlaybackPreparationActions(params: {
     (time: number) => requestPlaybackSeek(stable, requestRef, setPhase, time),
     [requestRef, setPhase, stable]
   );
+  const seekToPaused = useCallback(
+    (time: number) => requestPlaybackSeek(stable, requestRef, setPhase, time, false),
+    [requestRef, setPhase, stable]
+  );
   const togglePlayback = useCallback(() => {
-    setPlaybackPlaying(!(phase === 'starting' || stable.latestStateRef.current.isPlaying));
+    void setPlaybackPlaying(!(phase === 'starting' || stable.latestStateRef.current.isPlaying));
   }, [phase, setPlaybackPlaying, stable.latestStateRef]);
-  return { cancelPlaybackPreparation, pausePlayback, seekTo, setPlaybackPlaying, togglePlayback };
+  return {
+    cancelPlaybackPreparation,
+    pausePlayback,
+    seekTo,
+    seekToPaused,
+    setPlaybackPlaying,
+    togglePlayback,
+  };
 }
 
 export function usePlaybackPreparation(refs: PlaybackRuntimeRefs): PlaybackPreparationActions & {

@@ -70,7 +70,7 @@ function createPanelProps(): WorkspaceSidebarSelectionPanelProps {
     placementMode: null,
     project,
     recentColors: [],
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedClip: null,
     selectedCursorSample: null,
     selectedMotionRegion: null,

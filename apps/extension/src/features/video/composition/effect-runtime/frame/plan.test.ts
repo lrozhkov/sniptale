@@ -2,9 +2,13 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
-import { createEmptyVideoProject } from '../../../project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../project/factories/creation';
 import { createEffectHostClip } from '../../../project/factories/overlay-clip';
 import {
+  VideoTrackKind,
   VideoClipLinkMode,
   VideoClipTransitionKind,
   VideoMediaFitMode,
@@ -18,6 +22,25 @@ import { resolveVideoCompositionFrame } from '../../timeline/frame/index';
 import { resolveEffectRuntimeFramePlans } from './plan';
 
 describe('shared EffectV1 preview/export frame plan', () => {
+  it('continues a standalone document subrange at its retained phase', () => {
+    const project = createProject();
+    const instance = project.effectInstances!.find(({ id }) => id === 'standalone-1')!;
+    Object.assign(instance, { sourceStart: 2, startTime: 9, duration: 1 });
+    Object.assign(
+      project.clips.find(({ id }) => id === 'standalone-host')!,
+      { startTime: 9, duration: 1 }
+    );
+    expect(resolveEffectRuntimeFramePlans(project, 9.5)).toEqual([
+      expect.objectContaining({ effectInstanceId: instance.id, time: 2.5 }),
+    ]);
+  });
+  it.each([-1, NaN, Infinity, 3])('rejects invalid retained frame range %s', (sourceStart) => {
+    const project = createProject();
+    Object.assign(project.effectInstances![0]!, { sourceStart, duration: 1 });
+    expect(() => resolveEffectRuntimeFramePlans(project, 0.5)).toThrow(
+      expect.objectContaining({ code: 'effectPlanIntegrityFailure' })
+    );
+  });
   it('owns standalone, stable target chains, and transition timing without fallback', () => {
     const plans = resolveEffectRuntimeFramePlans(createProject(), 2.5);
 
@@ -102,6 +125,7 @@ function expectTransitionPlan(plan: unknown): void {
 
 function createProject(): VideoProject {
   const project = createEmptyVideoProject('Effect runtime', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const trackId = project.tracks[0]!.id;
   project.duration = 5;
   project.clips = [createClip('clip-a', trackId, 0), createClip('clip-b', trackId, 2)];
@@ -163,7 +187,7 @@ function attachEffectRuntimeState(project: VideoProject): void {
 }
 
 function createStandaloneHost(project: VideoProject) {
-  const trackId = project.tracks.find(({ kind }) => kind === 'OVERLAY')?.id;
+  const trackId = project.tracks.find(({ name }) => name === 'Annotations')?.id;
   if (!trackId) throw new Error('Expected overlay track');
   const host = createEffectHostClip({
     duration: 3,
@@ -240,3 +264,38 @@ function createClip(id: string, trackId: string, startTime: number): VideoProjec
     volume: 1,
   };
 }
+
+it('separates extended negative raster bounds from rotated body placement and stable local time', () => {
+  const project = createProject();
+  const snapshot = project.effectSnapshots![0]!;
+  const source = readFileSync(
+    new URL(
+      '../../../../../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/' +
+        'sniptale-callout-light.sniptale-effect.json',
+      import.meta.url
+    ),
+    'utf8'
+  );
+  snapshot.source = source;
+  snapshot.documentId = 'sniptale-callout-light';
+  const instance = project.effectInstances![0]!;
+  instance.controls = {};
+  instance.sceneAnchors = { tip: { x: 0, y: 0 } };
+  const host = project.clips.find((c) => c.id === 'standalone-host')!;
+  host.transform = { ...host.transform, x: 600, y: 400, width: 760, height: 240, rotation: 37 };
+  const plan = resolveEffectRuntimeFramePlans(project, 1).find(
+    (p) => p.effectInstanceId === instance.id
+  )!;
+  expect(plan.target).toMatchObject({ placement: host.transform });
+  expect(plan.controls['anchorX']).toBeLessThan(0);
+  expect(plan.bitmapBounds!.x).toBeLessThan(0);
+  expect(plan.dimensions.width).toBeCloseTo(host.transform.width * plan.bitmapBounds!.width, 8);
+  expect(plan.renderDimensions.width * plan.renderDimensions.height).toBeLessThanOrEqual(8_388_608);
+  expect(
+    resolveEffectRuntimeFramePlans(project, 0).find((p) => p.effectInstanceId === instance.id)!
+      .bitmapBounds
+  ).toEqual(plan.bitmapBounds);
+  expect(
+    resolveEffectRuntimeFramePlans(project, 1).find((p) => p.effectInstanceId === instance.id)
+  ).toEqual(plan);
+});

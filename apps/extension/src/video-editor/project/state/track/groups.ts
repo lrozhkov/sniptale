@@ -8,7 +8,11 @@ import {
   createNextVideoProjectTrackLogicalLane,
   getVideoProjectTrackLogicalLaneIds,
 } from '../../../../features/video/project/timeline/logical-lanes';
-import { VideoTrackKind } from '../../../../features/video/project/types/index';
+import { translate } from '../../../../platform/i18n';
+import {
+  VideoTrackKind,
+  VideoProjectTrackRole,
+} from '../../../../features/video/project/types/index';
 import type { VideoProject } from '../../../../features/video/project/types/index';
 import type { VideoEditorProjectState, VideoEditorProjectSliceSet } from '../contracts';
 import { applyProjectUpdate } from '../helpers';
@@ -21,14 +25,27 @@ import {
 
 type VideoEditorStoreSet = VideoEditorProjectSliceSet;
 
-function addTrackToProject(project: VideoProject, kind: VideoTrackKind) {
-  const sequence = project.tracks.filter((track) => track.kind === kind).length + 1;
+function addTrackToProject(
+  project: VideoProject,
+  kind: VideoTrackKind,
+  role?: VideoProjectTrackRole
+) {
+  const camera = kind === VideoTrackKind.PRIMARY && role === VideoProjectTrackRole.CAMERA;
+  const sequence =
+    project.tracks.filter(
+      (track) => track.kind === kind && (track.role === VideoProjectTrackRole.CAMERA) === camera
+    ).length + 1;
   const track = createVideoProjectTrack(
-    getDefaultTrackName(kind, sequence),
-    project.tracks.length,
+    camera
+      ? `${translate('videoEditor.timeline.addCameraTrack')} ${sequence}`
+      : getDefaultTrackName(kind, sequence),
+    kind === VideoTrackKind.PRIMARY || kind === VideoTrackKind.SUBTITLE
+      ? Math.min(0, ...project.tracks.map((item) => item.order)) - 1
+      : Math.max(0, ...project.tracks.map((item) => item.order)) + 1,
     kind
   );
 
+  if (camera) track.role = VideoProjectTrackRole.CAMERA;
   return applyVideoProjectMutationPatch(project, {
     tracks: [...project.tracks, track],
   });
@@ -159,13 +176,13 @@ function createAddTrackLogicalLaneAction(
 }
 
 function createAddTrackAction(set: VideoEditorStoreSet): VideoEditorProjectState['addTrack'] {
-  return (kind = VideoTrackKind.OVERLAY) =>
+  return (kind = VideoTrackKind.PRIMARY, role) =>
     set((state) => {
       if (!state.project) {
         return {};
       }
 
-      const nextProject = addTrackToProject(state.project, kind);
+      const nextProject = addTrackToProject(state.project, kind, role);
       const nextTrackId = nextProject.tracks[nextProject.tracks.length - 1]?.id ?? null;
 
       return {

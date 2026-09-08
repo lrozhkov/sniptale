@@ -1,13 +1,3 @@
-import { createMotionPathAreaTarget } from '../../../../features/video/project/motion/path-targets';
-import {
-  type VideoProjectMotionArea,
-  VideoMotionCameraMode,
-  VideoMotionPathTargetKind,
-} from '../../../../features/video/project/types/index';
-import type { VideoProjectMotionRegion } from '../../../../features/video/project/types/index';
-import { resolveMotionPath, updateMotionPathStop } from '../../../project/motion-path/core';
-import type { AreaOverlayParams } from './types';
-
 export const AREA_OUTLINE_CLASS_NAME = [
   'pointer-events-auto absolute border-2',
   'border-[color:var(--sniptale-color-accent-emphasis)] bg-[color:color-mix(',
@@ -32,25 +22,3 @@ export const AREA_HINT_CLASS_NAME = [
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_90%,transparent)]',
   'text-[var(--sniptale-color-text-primary)] shadow-[0_10px_24px_rgba(0,0,0,0.18)]',
 ].join(' ');
-
-export function updateMotionPathAreaStop(params: {
-  area: VideoProjectMotionArea;
-  motionRegion: VideoProjectMotionRegion;
-  onUpdateMotionRegion: AreaOverlayParams['onUpdateMotionRegion'];
-  project: AreaOverlayParams['project'];
-  stopId: string;
-}) {
-  const path = resolveMotionPath(params.project, params.motionRegion);
-  const nextPath = updateMotionPathStop(path, params.stopId, (stop) => ({
-    ...stop,
-    target:
-      stop.target.kind === VideoMotionPathTargetKind.AREA
-        ? createMotionPathAreaTarget(params.project, params.area)
-        : stop.target,
-  }));
-
-  params.onUpdateMotionRegion(params.motionRegion.id, {
-    cameraMode: VideoMotionCameraMode.PATH,
-    path: nextPath,
-  });
-}

@@ -3,6 +3,11 @@ import { videoEditorTimelineAutoTransformMessages } from './timeline-auto-transf
 import { videoEditorTimelineLaneMessages } from './timeline-lanes';
 
 export const videoEditorTimelineMessages = defineMessageSource({
+  historyLaneShort: { ru: 'История', en: 'History' },
+  hideClipNames: { ru: 'Скрывать названия фрагментов', en: 'Hide clip names' },
+  framingConnection: { ru: 'Переход кадрирования', en: 'Framing transition' },
+  connectFraming: { ru: 'Соединить состояния', en: 'Connect framing states' },
+  disconnectFraming: { ru: 'Убрать переход', en: 'Remove framing transition' },
   trackKindPrimary: {
     ru: 'Видео',
     en: 'Video',
@@ -31,6 +36,22 @@ export const videoEditorTimelineMessages = defineMessageSource({
     ru: 'В начало',
     en: 'Go to start',
   },
+  seekToEnd: {
+    ru: 'В конец',
+    en: 'Go to end',
+  },
+  previousFrame: {
+    ru: 'Предыдущий кадр',
+    en: 'Previous frame',
+  },
+  nextFrame: {
+    ru: 'Следующий кадр',
+    en: 'Next frame',
+  },
+  playhead: {
+    ru: 'Позиция воспроизведения',
+    en: 'Playhead position',
+  },
   title: {
     ru: 'Таймлайн',
     en: 'Timeline',
@@ -47,12 +68,32 @@ export const videoEditorTimelineMessages = defineMessageSource({
     ru: 'Разрезать',
     en: 'Split',
   },
+  splitShortcut: {
+    ru: 'S',
+    en: 'S',
+  },
+  splitUnavailableTitle: {
+    ru: 'Переместите позицию воспроизведения внутрь выбранного клипа',
+    en: 'Move the playhead inside the selected clip',
+  },
+  clipLockedTitle: {
+    ru: 'Разблокируйте дорожку, чтобы редактировать выбранный клип',
+    en: 'Unlock the track to edit the selected clip',
+  },
   duplicate: {
     ru: 'Копия',
     en: 'Duplicate',
   },
+  duplicateShortcut: {
+    ru: 'Ctrl/⌘+D',
+    en: 'Ctrl/⌘+D',
+  },
   delete: {
     ru: 'Удалить',
+    en: 'Delete',
+  },
+  deleteShortcut: {
+    ru: 'Delete',
     en: 'Delete',
   },
   addTrack: {
@@ -67,13 +108,30 @@ export const videoEditorTimelineMessages = defineMessageSource({
     ru: 'Видео-дорожка',
     en: 'Video track',
   },
+  addVideoTrackNote: {
+    ru: 'Дополнительные видео и визуальные слои',
+    en: 'Extra footage and visual layers',
+  },
+  addCameraTrack: { ru: 'Камера', en: 'Camera' },
+  addCameraTrackNote: {
+    ru: 'Отдельный видеослой с настройками камеры',
+    en: 'Separate video layer with camera controls',
+  },
   addAudioTrack: {
     ru: 'Аудио-дорожка',
     en: 'Audio track',
   },
+  addAudioTrackNote: {
+    ru: 'Музыка, голос и другие аудиослои',
+    en: 'Music, voice, and other audio layers',
+  },
   addOverlayTrack: {
     ru: 'Дорожка аннотаций',
     en: 'Annotation track',
+  },
+  addOverlayTrackNote: {
+    ru: 'Текст, фигуры и экранные пометки',
+    en: 'Text, shapes, and on-screen callouts',
   },
   addSubtitleTrack: {
     ru: 'Дорожка субтитров',
@@ -100,8 +158,8 @@ export const videoEditorTimelineMessages = defineMessageSource({
     en: 'Select a clip on the timeline to split, duplicate, or delete it.',
   },
   zoom: {
-    ru: 'Масштаб таймлайна',
-    en: 'Timeline zoom',
+    ru: 'Масштаб',
+    en: 'Zoom',
   },
   fitProject: {
     ru: 'Вместить проект',
@@ -166,6 +224,14 @@ export const videoEditorTimelineMessages = defineMessageSource({
   trackHeight: {
     ru: 'Высота дорожки',
     en: 'Track height',
+  },
+  trackAudioEnabled: {
+    ru: 'Выключить звук дорожки',
+    en: 'Mute track',
+  },
+  trackAudioMuted: {
+    ru: 'Включить звук дорожки',
+    en: 'Unmute track',
   },
   trackVisible: {
     ru: 'видна',
@@ -232,6 +298,10 @@ export const videoEditorTimelineMessages = defineMessageSource({
   emptyLaneLabel: {
     ru: 'Сегменты появятся здесь, когда в проекте появятся данные.',
     en: 'Segments will appear here when the project contains data.',
+  },
+  emptyZoomLaneLabel: {
+    ru: 'Нажмите + или наведите на дорожку, чтобы добавить зум.',
+    en: 'Press + or point at the lane to add a zoom.',
   },
   fileDropUnsupported: {
     ru: 'Этот файл нельзя добавить на таймлайн.',

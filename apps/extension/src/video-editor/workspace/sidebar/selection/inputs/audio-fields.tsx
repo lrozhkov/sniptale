@@ -1,5 +1,13 @@
+import { InspectorDetails } from '../shared/details';
+import { Link2, Unlink } from 'lucide-react';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../../../../platform/i18n';
-import { isAudioClip, isVideoClip } from '../../../../../features/video/project/timeline';
+import {
+  areProjectClipsEditable,
+  getLinkedClipIds,
+  isAudioClip,
+  isVideoClip,
+} from '../../../../../features/video/project/timeline';
 import { getClipGainRange } from '../../../../../features/video/project/timeline/basics';
 import type { VideoProjectClip } from '../../../../../features/video/project/types';
 import type { WorkspaceSidebarProps } from '../../contracts/props';
@@ -32,47 +40,72 @@ function renderSharedAudioFields(params: {
         value={sharedVolumeValue}
         onChange={(value) => params.onUpdateClipVolume(params.clip.id, value)}
       />
-      <AudioEnvelopeFields
-        disabled={params.disabled}
-        endValue={gainRange.end}
-        startValue={gainRange.start}
-        onChange={(patch) => params.onUpdateClipAudioEnvelope(params.clip.id, patch)}
-      />
+      <InspectorDetails label={translate('videoEditor.sidebar.inspectorEnvelope')}>
+        <AudioEnvelopeFields
+          disabled={params.disabled}
+          endValue={gainRange.end}
+          startValue={gainRange.start}
+          onChange={(patch) => params.onUpdateClipAudioEnvelope(params.clip.id, patch)}
+        />
+      </InspectorDetails>
     </>
   );
 }
 
 export function renderAudioFields(
-  selectedClip: WorkspaceSidebarProps['selectedClip'],
-  linkedAudioClip: VideoProjectClip | null,
-  linkedVideoClip: VideoProjectClip | null,
-  selectedTrackLocked: boolean,
-  onUpdateClipMuted: WorkspaceSidebarProps['onUpdateClipMuted'],
-  onUpdateClipVolume: WorkspaceSidebarProps['onUpdateClipVolume'],
-  onUpdateClipAudioEnvelope: WorkspaceSidebarProps['onUpdateClipAudioEnvelope']
+  props: Pick<
+    WorkspaceSidebarProps,
+    | 'project'
+    | 'selectedClip'
+    | 'onUpdateClipMuted'
+    | 'onUpdateClipVolume'
+    | 'onUpdateClipAudioEnvelope'
+    | 'onDetachClipGroup'
+  >
 ) {
-  if (!selectedClip) return null;
-
-  if (isVideoClip(selectedClip) && !linkedAudioClip) {
-    return renderSharedAudioFields({
-      clip: selectedClip,
-      disabled: selectedTrackLocked,
-      label: translate('videoEditor.sidebar.videoSoundLabel'),
-      onUpdateClipAudioEnvelope,
-      onUpdateClipMuted,
-      onUpdateClipVolume,
-    });
-  }
-
-  if (!isAudioClip(selectedClip)) return null;
-  return renderSharedAudioFields({
-    clip: selectedClip,
-    disabled: selectedTrackLocked,
-    label: linkedVideoClip
-      ? translate('videoEditor.sidebar.linkedAudioLabel')
-      : translate('videoEditor.sidebar.audioClipLabel'),
-    onUpdateClipAudioEnvelope,
-    onUpdateClipMuted,
-    onUpdateClipVolume,
-  });
+  const clip = props.selectedClip;
+  if (!clip || (!isVideoClip(clip) && !isAudioClip(clip))) return null;
+  const linkedIds = getLinkedClipIds(props.project, clip.id);
+  const companions = props.project.clips.filter(
+    (item) => item.id !== clip.id && linkedIds.includes(item.id)
+  );
+  const audio = isVideoClip(clip) ? (companions.find(isAudioClip) ?? clip) : clip;
+  const asset = props.project.assets.find((item) => item.id === audio.assetId);
+  if (isVideoClip(audio) && asset?.metadata.hasAudio !== true && companions.length === 0)
+    return null;
+  return (
+    <>
+      {companions.length > 0 ? (
+        <div className="mb-3 border-b border-[var(--sniptale-color-border-subtle)] pb-3">
+          <div className="flex min-w-0 items-center gap-2 text-xs">
+            <Link2 size={14} className="shrink-0" aria-hidden="true" />
+            <span
+              className="min-w-0 flex-1 truncate"
+              title={companions.map((item) => item.name).join(', ')}
+            >
+              {companions.map((item) => item.name).join(', ')}
+            </span>
+            <ProductActionButton
+              tone="secondary"
+              compact
+              title={translate('videoEditor.sidebar.detachButton')}
+              disabled={!areProjectClipsEditable(props.project, linkedIds)}
+              onClick={() => props.onDetachClipGroup(clip.id)}
+            >
+              <Unlink size={14} aria-hidden="true" />
+              {translate('videoEditor.sidebar.detachButton')}
+            </ProductActionButton>
+          </div>
+        </div>
+      ) : null}
+      {renderSharedAudioFields({
+        clip: audio,
+        disabled: !areProjectClipsEditable(props.project, [audio.id]),
+        label: translate('videoEditor.sidebar.videoSoundLabel'),
+        onUpdateClipAudioEnvelope: props.onUpdateClipAudioEnvelope,
+        onUpdateClipMuted: props.onUpdateClipMuted,
+        onUpdateClipVolume: props.onUpdateClipVolume,
+      })}
+    </>
+  );
 }

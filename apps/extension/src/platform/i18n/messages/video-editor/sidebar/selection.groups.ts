@@ -12,8 +12,8 @@ export const videoEditorSidebarSelectionGroupMessages = {
     en: 'Info',
   },
   inspectorGroupSummary: {
-    ru: 'Сводка',
-    en: 'Summary',
+    ru: 'Сведения',
+    en: 'Info',
   },
   inspectorGroupCanvas: {
     ru: 'Холст',
@@ -59,9 +59,13 @@ export const videoEditorSidebarSelectionGroupMessages = {
     ru: 'Трекинг',
     en: 'Tracking',
   },
-  inspectorGroupTransform: {
+  inspectorGroupFraming: {
     ru: 'Кадр',
-    en: 'Transform',
+    en: 'Framing',
+  },
+  inspectorGroupTransform: {
+    ru: 'Расположение',
+    en: 'Placement',
   },
   inspectorGroupAudio: {
     ru: 'Звук',
@@ -72,7 +76,7 @@ export const videoEditorSidebarSelectionGroupMessages = {
     en: 'Media',
   },
   inspectorGroupContent: {
-    ru: 'Контент',
+    ru: 'Содержание',
     en: 'Content',
   },
   inspectorGroupStyle: {
@@ -96,16 +100,20 @@ export const videoEditorSidebarSelectionGroupMessages = {
     en: 'Target',
   },
   inspectorGroupAppearance: {
-    ru: 'Вид',
+    ru: 'Оформление',
     en: 'Appearance',
   },
   inspectorGroupPlacement: {
-    ru: 'Позиция',
+    ru: 'Расположение',
     en: 'Placement',
   },
   inspectorGroupCamera: {
     ru: 'Камера',
     en: 'Camera',
+  },
+  inspectorGroupZoom: {
+    ru: 'Зум',
+    en: 'Zoom',
   },
   inspectorGroupPath: {
     ru: 'Путь',
@@ -119,4 +127,16 @@ export const videoEditorSidebarSelectionGroupMessages = {
     ru: 'Размещение',
     en: 'Layout',
   },
+  inspectorGroupAnimation: { ru: 'Анимация', en: 'Animation' },
+  inspectorGroupHistory: { ru: 'История', en: 'History' },
+  inspectorGroupTransition: { ru: 'Переход', en: 'Transition' },
+  inspectorGroupEffects: { ru: 'Эффекты', en: 'Effects' },
+  inspectorExactPlacement: { ru: 'Точное положение', en: 'Precise placement' },
+  inspectorSourceBounds: { ru: 'Границы исходника', en: 'Source bounds' },
+  inspectorEnvelope: { ru: 'Огибающая громкости', en: 'Volume envelope' },
+  inspectorDisplay: { ru: 'Отображение дорожки', en: 'Track display' },
+  inspectorMoreDetails: { ru: 'Подробности', en: 'Details' },
+  inspectorAudioFadeIn: { ru: 'Нарастание звука', en: 'Fade in' },
+  inspectorAudioFadeOut: { ru: 'Затухание звука', en: 'Fade out' },
+  inspectorSampleVisible: { ru: 'Показывать этот участок', en: 'Show this segment' },
 } as const;

@@ -65,11 +65,11 @@ export function getLogicalCanvasScale(context: LogicalCanvasContext): LogicalCan
 }
 
 function normalizeScale(renderSize: number, outputSize: number): number {
-  return Math.max(0.0001, normalizeDimension(renderSize) / normalizeDimension(outputSize));
+  return normalizeDimension(renderSize) / normalizeDimension(outputSize);
 }
 
 function normalizeDimension(value: number): number {
-  return Math.max(1, Math.round(Number(value) || 1));
+  return Math.max(1, Number.isFinite(value) ? value : 1);
 }
 
 function normalizeContextScale(value: unknown): number {

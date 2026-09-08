@@ -1,3 +1,7 @@
+import { DetailItem, DetailList } from '../shared/panel';
+import { InspectorDetails } from '../shared/details';
+import { ClipSourceRangeControls } from './source-range';
+import { ClipOrderControls } from './clip-order';
 import { translate } from '../../../../../platform/i18n';
 import { isAudioClip, isVideoClip } from '../../../../../features/video/project/timeline';
 import {
@@ -20,13 +24,6 @@ type ClipTimingControlsProps = WorkspaceSidebarSelectionPanelProps & {
 export function ClipTimingControls(props: ClipTimingControlsProps) {
   return (
     <>
-      <ClipFadeFields
-        clipId={props.clip.id}
-        fadeInMs={props.clip.fadeInMs}
-        fadeOutMs={props.clip.fadeOutMs}
-        locked={props.locked}
-        onUpdateClipFades={props.onUpdateClipFades}
-      />
       {isVideoClip(props.clip) || isAudioClip(props.clip) ? (
         <div className="mt-3">
           <ClipPlaybackRateField
@@ -37,11 +34,41 @@ export function ClipTimingControls(props: ClipTimingControlsProps) {
           />
         </div>
       ) : null}
+      {(isVideoClip(props.clip) || isAudioClip(props.clip)) &&
+      props.onTrimClipStart &&
+      props.onTrimClipEnd ? (
+        <InspectorDetails label={translate('videoEditor.sidebar.inspectorSourceBounds')}>
+          <ClipSourceRangeControls
+            key={props.clip.id}
+            project={props.project}
+            clip={props.clip}
+            locked={props.locked}
+            onTrimClipStart={props.onTrimClipStart}
+            onTrimClipEnd={props.onTrimClipEnd}
+          />
+        </InspectorDetails>
+      ) : null}
+      {props.onSwapClip ? (
+        <ClipOrderControls
+          project={props.project}
+          clipId={props.clip.id}
+          onSwapClip={props.onSwapClip}
+        />
+      ) : null}
+      {!isVideoClip(props.clip) && !isAudioClip(props.clip) ? (
+        <DetailList>
+          <DetailItem
+            label={translate('videoEditor.sidebar.motionDurationLabel')}
+            value={`${props.clip.duration.toFixed(2)} ${translate('videoEditor.sidebar.typingSeconds')}`}
+          />
+        </DetailList>
+      ) : null}
     </>
   );
 }
 
-function ClipFadeFields(props: {
+export function ClipFadeFields(props: {
+  audio?: boolean;
   clipId: string;
   fadeInMs: number;
   fadeOutMs: number;
@@ -51,7 +78,11 @@ function ClipFadeFields(props: {
   return (
     <div className="mt-3 space-y-3">
       <SliderField
-        label={translate('videoEditor.sidebar.fadeInLabel')}
+        label={translate(
+          props.audio
+            ? 'videoEditor.sidebar.inspectorAudioFadeIn'
+            : 'videoEditor.sidebar.fadeInLabel'
+        )}
         value={props.fadeInMs / 1000}
         min={0}
         max={5}
@@ -63,7 +94,11 @@ function ClipFadeFields(props: {
         }
       />
       <SliderField
-        label={translate('videoEditor.sidebar.fadeOutLabel')}
+        label={translate(
+          props.audio
+            ? 'videoEditor.sidebar.inspectorAudioFadeOut'
+            : 'videoEditor.sidebar.fadeOutLabel'
+        )}
         value={props.fadeOutMs / 1000}
         min={0}
         max={5}

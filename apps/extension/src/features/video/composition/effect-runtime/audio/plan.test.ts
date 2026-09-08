@@ -11,6 +11,30 @@ import {
 import { EffectRuntimeAudioPlanError, resolveEffectRuntimeAudioPlans } from './plan';
 const AUDIO_SHA = '0'.repeat(64);
 
+it('starts a trimmed effect audio segment at its retained document offset', () => {
+  const project = createAudioProject();
+  Object.assign(project.effectInstances![0]!, { sourceStart: 1, startTime: 9, duration: 1 });
+  Object.assign(project.clips[0]!, { startTime: 9, duration: 1 });
+  expect(resolveEffectRuntimeAudioPlans(project)).toEqual([
+    expect.objectContaining({
+      startTime: 9,
+      duration: 0.25,
+      sourceStart: 0.75,
+      sourceDuration: 0.5,
+      playbackRate: 2,
+    }),
+  ]);
+});
+
+it.each([-1, NaN, Infinity, 3])('rejects invalid retained audio range %s', (sourceStart) => {
+  const project = createAudioProject();
+  Object.assign(project.effectInstances![0]!, { sourceStart, duration: 1 });
+  project.clips[0]!.duration = 1;
+  expect(() => resolveEffectRuntimeAudioPlans(project)).toThrow(
+    expect.objectContaining({ code: 'effectAudioIntegrityFailure' })
+  );
+});
+
 it('maps EffectV1 clip timing, offset, volume, and playback rate into one shared audio plan', () => {
   const project = createAudioProject();
 

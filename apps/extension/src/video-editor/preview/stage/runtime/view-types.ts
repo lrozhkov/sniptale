@@ -1,3 +1,6 @@
+import type { VideoProjectEffectInstancePatch } from '../../../contracts/commands/patches';
+import type { VideoProjectActionOccurrence } from '../../../../features/video/project/action-occurrences';
+import type { ReactNode } from 'react';
 import type { VideoProjectAnnotationTemplatePatch } from '../../../../features/video/project/annotation/contract';
 import type {
   VideoProject,
@@ -8,7 +11,10 @@ import type {
   VideoTrackKind,
 } from '../../../../features/video/project/types';
 import type { VideoEditorObjectTrackActions } from '../../../contracts/commands/object-tracks';
-import type { VideoEditorMotionRegionPatch } from '../../../contracts/commands/patches';
+import type {
+  VideoEditorActionEventPatch,
+  VideoEditorMotionRegionPatch,
+} from '../../../contracts/commands/patches';
 import type { PreviewStageImportHandlers } from '../../../contracts/insertion';
 import type { VideoEditorPlacementMode } from '../../../contracts/placement';
 import type { VideoEditorPlaybackRange } from '../../../interaction/playback/range';
@@ -18,9 +24,17 @@ import type {
   VideoEditorPreviewRasterPreset,
   VideoEditorPreviewZoom,
 } from '../../../contracts/preview-runtime';
-import type { PreviewStageGridSettings, VideoPreviewCanvasInsertKind } from '../types';
+import type {
+  PreviewStageAlternateView,
+  PreviewStageGridSettings,
+  VideoPreviewCanvasInsertKind,
+} from '../types';
 
 export interface PreviewStageProps {
+  alternateView?: PreviewStageAlternateView | undefined;
+  /** Workspace context for the stage header; hidden during native fullscreen. */
+  headerContent?: ReactNode;
+  headerActions?: ReactNode;
   project: VideoProject;
   assetUrls: Record<string, string>;
   currentTime: number;
@@ -33,7 +47,7 @@ export interface PreviewStageProps {
   previewZoom: VideoEditorPreviewZoom;
   placementMode: VideoEditorPlacementMode | null;
   selectedClipId: string | null;
-  selectedActionEvent: VideoProject['actionEvents'][number] | null;
+  selectedActionOccurrence: VideoProjectActionOccurrence | null;
   selectedMotionRegion: VideoProjectMotionRegion | null;
   onAddActionEvent: (preset: VideoProjectActionPreset) => void;
   onAddMotionRegion: () => void;
@@ -46,12 +60,10 @@ export interface PreviewStageProps {
     clipId: string,
     patch: VideoProjectAnnotationTemplatePatch
   ) => void;
-  onUpdateActionEventDetails: (
-    actionEventId: string,
-    patch: Partial<
-      Pick<VideoProject['actionEvents'][number], 'duration' | 'label' | 'point' | 'preset'>
-    >
-  ) => void;
+  onUpdateActionEventDetails: (actionEventId: string, patch: VideoEditorActionEventPatch) => void;
+  onUpdateEffectInstance?:
+    | ((instanceId: string, patch: VideoProjectEffectInstancePatch) => void)
+    | undefined;
   onUpdateClipTransform: (clipId: string, patch: Partial<VideoProjectClip['transform']>) => void;
   onUpdateMotionRegion: (motionRegionId: string, patch: VideoEditorMotionRegionPatch) => void;
   onUpsertObjectTrackCorrectionAnchor?:

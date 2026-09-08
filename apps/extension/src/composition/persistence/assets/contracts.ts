@@ -77,6 +77,11 @@ export interface AssetObjectWriter {
   finalize(): Promise<PreparedAssetObject>;
 }
 
+/** Positioned staging writes allow muxers to finalize headers without buffering the movie. */
+export interface SeekableAssetObjectWriter extends AssetObjectWriter {
+  writeAt(position: number, chunk: Blob): Promise<void>;
+}
+
 export interface AssetReadyJournal<TPayload = unknown> {
   assetRefs: AssetRef[];
   createdAt: number;

@@ -1,11 +1,20 @@
+import type { Gradient } from '@sniptale/foundation/paint';
+
 export const VideoTrackKind = {
   PRIMARY: 'PRIMARY',
   AUDIO: 'AUDIO',
-  OVERLAY: 'OVERLAY',
   SUBTITLE: 'SUBTITLE',
 } as const;
 
 export type VideoTrackKind = (typeof VideoTrackKind)[keyof typeof VideoTrackKind];
+
+/** Optional semantic purpose for a physical track; it does not change timeline mechanics. */
+export const VideoProjectTrackRole = {
+  CAMERA: 'CAMERA',
+} as const;
+
+export type VideoProjectTrackRole =
+  (typeof VideoProjectTrackRole)[keyof typeof VideoProjectTrackRole];
 
 export const VideoSubtitlePlacement = {
   TOP: 'TOP',
@@ -38,12 +47,6 @@ export interface VideoSceneGradientAnimation {
   mode: VideoSceneGradientAnimationMode;
   speed: number;
   intensity: number;
-}
-
-export interface VideoSceneGradientColorStop {
-  color: string;
-  offset: number;
-  opacity?: number | undefined;
 }
 
 export interface VideoProjectTransform {
@@ -130,6 +133,7 @@ export interface VideoProjectTrack {
   visible: boolean;
   locked: boolean;
   kind: VideoTrackKind;
+  role?: VideoProjectTrackRole;
   logicalLanes?: VideoProjectLogicalLane[];
   subtitleStyle?: VideoProjectSubtitleTrackStyle;
 }
@@ -145,10 +149,7 @@ export interface VideoProjectSolidBackground {
 
 export interface VideoProjectGradientBackground {
   kind: typeof VideoSceneBackgroundKind.GRADIENT;
-  from: string;
-  to: string;
-  angle: number;
-  stops?: readonly VideoSceneGradientColorStop[] | undefined;
+  gradient: Gradient;
   animation?: VideoSceneGradientAnimation;
 }
 

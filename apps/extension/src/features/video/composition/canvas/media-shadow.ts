@@ -30,7 +30,8 @@ export function normalizeVideoMediaShadowMode(
 export function resolveVideoMediaShadowParams(
   intensity: number | undefined,
   displayScale = 1,
-  mode: VideoMediaShadowModeValue | undefined = VideoMediaShadowMode.BACKDROP
+  mode: VideoMediaShadowModeValue | undefined = VideoMediaShadowMode.BACKDROP,
+  camera = false
 ): VideoMediaShadowParams | null {
   const normalizedIntensity = normalizeVideoMediaShadowIntensity(intensity);
   if (normalizedIntensity <= 0) {
@@ -40,6 +41,18 @@ export function resolveVideoMediaShadowParams(
   const strength = normalizedIntensity / 100;
   const scale = Math.max(0.1, displayScale);
   const normalizedMode = normalizeVideoMediaShadowMode(mode);
+  if (camera) {
+    const glow = normalizedMode === VideoMediaShadowMode.GLOW;
+    return {
+      blur: (6 + strength * 30) * scale,
+      color: glow
+        ? `rgba(255, 255, 255, ${0.12 + strength * 0.83})`
+        : `rgba(0, 0, 0, ${0.18 + strength * 0.77})`,
+      offsetX: 0,
+      offsetY: glow ? 0 : (2 + strength * 5) * scale,
+      paint: { color: glow ? 'rgba(255, 255, 255, 1)' : 'rgba(0, 0, 0, 1)', kind: 'outer-shadow' },
+    };
+  }
   if (normalizedMode === VideoMediaShadowMode.GLOW) {
     return {
       blur: Math.round((12 + strength * 34) * scale * 100) / 100,

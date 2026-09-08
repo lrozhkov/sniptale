@@ -1,3 +1,4 @@
+import { isRecordingPoint } from '../../../features/video/project/validation/recording-telemetry';
 import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
 import type {
   CaptureMode,
@@ -6,8 +7,8 @@ import type {
 } from '@sniptale/runtime-contracts/video/types/types';
 import type {
   VideoProject,
-  VideoProjectActionEvent,
   VideoProjectActionPoint,
+  RecordingActionEvent,
   VideoProjectCursorTrack,
 } from '../../../features/video/project/types';
 
@@ -104,11 +105,11 @@ export function normalizeRecordingCursorTrackToProjectSpace(
 }
 
 export function normalizeRecordingActionEventsToProjectSpace(
-  actionEvents: VideoProjectActionEvent[],
-  params: NormalizeRecordingTelemetryParams
-): VideoProjectActionEvent[] {
+  actionEvents: RecordingActionEvent[],
+  _params: NormalizeRecordingTelemetryParams
+): RecordingActionEvent[] {
   return actionEvents.map((event) => ({
     ...event,
-    ...(event.point === null ? {} : { point: normalizePoint(event.point, params) }),
+    point: isRecordingPoint(event.recordingPoint) ? { ...event.recordingPoint } : null,
   }));
 }

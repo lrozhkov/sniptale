@@ -10,7 +10,7 @@ vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
 }));
 
 it('renders only general supported-track metadata and the explicit delete action', () => {
-  const track = createVideoProjectTrack('Overlay', 1, VideoTrackKind.OVERLAY);
+  const track = createVideoProjectTrack('Overlay', 1, VideoTrackKind.PRIMARY);
   const markup = renderToStaticMarkup(
     <>
       <TrackGeneralFields selectedTrack={track} />
@@ -18,7 +18,9 @@ it('renders only general supported-track metadata and the explicit delete action
     </>
   );
 
-  expect(markup).toContain(VideoTrackKind.OVERLAY);
+  expect(markup).toContain('videoEditor.sidebar.trackNameLabel');
+  expect(markup).not.toContain('videoEditor.timeline.trackKindPrimary');
+  expect(markup).not.toContain(`>${VideoTrackKind.PRIMARY}<`);
   expect(markup).toContain('videoEditor.timeline.deleteTrackTitle');
   expect(markup).not.toContain('videoEditor.sidebar.subtitlePlacementLabel');
   expect(markup).not.toContain('type="range"');

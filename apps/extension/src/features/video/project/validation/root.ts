@@ -1,4 +1,6 @@
-import type { VideoProject, VideoProjectClip } from '../types/index';
+import { resolveVideoProjectActionOccurrences } from '../action-occurrences';
+import { parsePaint } from '@sniptale/foundation/paint';
+import type { VideoProject, VideoProjectClip, VideoProjectSourceTimeAnchor } from '../types/index';
 import {
   VideoProjectClipType,
   VideoProjectSourceKind,
@@ -9,7 +11,12 @@ import {
 } from '../types/index';
 import { isVideoProjectAsset } from './assets';
 import { isVideoProjectClip } from './clips';
-import { isActionEvent, isCursorTrack, isMotionRegion } from './interaction';
+import {
+  isActionEvent,
+  isVideoProjectActionPresentation,
+  isCursorTrack,
+  isMotionRegion,
+} from './interaction';
 import { isObjectTrack, isUtilityLanes } from './optional-branches';
 import {
   MAX_VIDEO_PROJECT_DIMENSION,
@@ -47,9 +54,7 @@ function isSceneBackground(value: unknown): boolean {
     isRecord(value) &&
     ((value['kind'] === VideoSceneBackgroundKind.SOLID && isColorString(value['color'])) ||
       (value['kind'] === VideoSceneBackgroundKind.GRADIENT &&
-        isColorString(value['from']) &&
-        isColorString(value['to']) &&
-        isBoundedNumber(value['angle'], -3600, 3600)) ||
+        parsePaint({ kind: 'gradient', gradient: value['gradient'] }) !== null) ||
       (value['kind'] === VideoSceneBackgroundKind.IMAGE && isString(value['assetId'])))
   );
 }
@@ -91,6 +96,8 @@ function isHydratableProjectShape(value: unknown): value is VideoProject {
     isBoundedArray(value['clips'], isVideoProjectClip) &&
     isNullable(value['cursorTrack'], isCursorTrack) &&
     isBoundedArray(value['actionEvents'], isActionEvent) &&
+    (value['actionPresentation'] === undefined ||
+      isVideoProjectActionPresentation(value['actionPresentation'])) &&
     (value['sceneBackground'] === undefined || isSceneBackground(value['sceneBackground'])) &&
     (value['transitions'] === undefined || isBoundedArray(value['transitions'], isTransition)) &&
     !Object.hasOwn(value, 'templateInstances') &&
@@ -105,7 +112,7 @@ function hasValidVideoProjectBaseReferences(project: VideoProject): boolean {
   const assetIds = new Set(project.assets.map((asset) => asset.id));
   const trackIds = new Set(project.tracks.map((track) => track.id));
   const clipIds = new Set(project.clips.map((clip) => clip.id));
-  const actionEventIds = new Set(project.actionEvents.map((event) => event.id));
+  const occurrences = resolveVideoProjectActionOccurrences(project);
 
   return (
     project.clips.every((clip) => hasValidClipReferences(clip, assetIds, trackIds)) &&
@@ -116,8 +123,77 @@ function hasValidVideoProjectBaseReferences(project: VideoProject): boolean {
     ) &&
     (project.motionRegions ?? []).every(
       (region) =>
-        region.targetActionEventId === null || actionEventIds.has(region.targetActionEventId)
+        region.targetAction === null ||
+        occurrences.some(
+          (occurrence) =>
+            occurrence.eventId === region.targetAction?.eventId &&
+            occurrence.clipId === region.targetAction.clipId
+        )
+    ) &&
+    hasValidInteractionAnchorReferences(project)
+  );
+}
+
+function hasValidInteractionAnchorReferences(project: VideoProject): boolean {
+  if (
+    project.cursorTrack?.samples.some(
+      (sample) => sample.sourceAnchor && sample.timeBasis === 'project'
     )
+  )
+    return false;
+  const factKeys = new Set<string>();
+  for (const event of project.actionEvents) {
+    const anchor = event.anchor;
+    if (anchor.kind === 'project') continue;
+    const key = JSON.stringify([anchor.recordingId, anchor.sourceInstanceId, anchor.sourceEventId]);
+    if (factKeys.has(key)) return false;
+    factKeys.add(key);
+    if (
+      !project.clips.some((clip) => {
+        if (clip.type !== 'VIDEO' || clip.sourceInstanceId !== anchor.sourceInstanceId)
+          return false;
+        const asset = project.assets.find((item) => item.id === clip.assetId);
+        return asset?.source.kind === 'recording'
+          ? asset.source.recordingId === anchor.recordingId
+          : asset?.source.kind === 'project-asset' &&
+              asset.source.originRecordingId === anchor.recordingId;
+      })
+    )
+      return false;
+  }
+  const anchors =
+    project.cursorTrack?.samples.flatMap((sample) =>
+      sample.sourceAnchor ? [{ anchor: sample.sourceAnchor, time: sample.time }] : []
+    ) ?? [];
+  return anchors.every(({ anchor, time }) =>
+    hasValidInteractionAnchorReference(project, anchor, time)
+  );
+}
+
+function hasValidInteractionAnchorReference(
+  project: VideoProject,
+  anchor: VideoProjectSourceTimeAnchor,
+  time: number
+): boolean {
+  const clip = project.clips.find((item) => item.id === anchor.sourceClipId);
+  if (!clip || clip.type !== VideoProjectClipType.VIDEO) {
+    return false;
+  }
+
+  const asset = project.assets.find((item) => item.id === clip.assetId);
+  const matchesRecording = Boolean(
+    asset &&
+    ((asset.source.kind === 'recording' && asset.source.recordingId === anchor.recordingId) ||
+      (asset.source.kind === 'project-asset' &&
+        asset.source.originRecordingId === anchor.recordingId))
+  );
+  return (
+    matchesRecording &&
+    anchor.sourceTime >= clip.sourceStart &&
+    anchor.sourceTime <= clip.sourceStart + clip.sourceDuration &&
+    Math.abs(
+      clip.startTime + (anchor.sourceTime - clip.sourceStart) / (clip.playbackRate ?? 1) - time
+    ) <= 0.000_001
   );
 }
 

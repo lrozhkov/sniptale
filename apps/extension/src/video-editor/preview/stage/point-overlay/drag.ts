@@ -18,7 +18,8 @@ export function beginPointHandleDrag(params: PointDragParams): void {
       event.clientY,
       stage,
       params.project,
-      params.camera
+      params.camera,
+      params.target.kind === 'action-point' && params.target.clipId !== null
     );
     if (nextPoint) {
       const snapped = snapStagePoint({

@@ -1,5 +1,5 @@
 import {
-  drawActionCompositionState,
+  drawSceneActionCompositionStates,
   drawCursorCompositionState,
 } from '../../../../features/video/composition/draw';
 import {
@@ -61,21 +61,12 @@ function drawPreviewSceneOverlays(params: {
         scale: params.frame.cursor.scale * overlayScale,
       }
     : null;
-  const fallbackPoint = scaledCursor ? { x: scaledCursor.x, y: scaledCursor.y } : null;
-
-  for (const action of params.frame.actions) {
-    drawActionCompositionState(
-      params.context,
-      {
-        ...action,
-        point: action.point
-          ? mapPreviewScenePoint(action.point, params.camera, params.viewport)
-          : null,
-      },
-      fallbackPoint,
-      overlayScale
-    );
-  }
+  drawSceneActionCompositionStates(params.context, params.frame.actions, params.camera, {
+    offsetX: params.viewport.offsetX,
+    offsetY: params.viewport.offsetY,
+    scaleX: params.viewport.scale,
+    scaleY: params.viewport.scale,
+  });
 
   if (scaledCursor) {
     drawCursorCompositionState(params.context, scaledCursor);
@@ -96,7 +87,7 @@ export async function renderPreviewScene(params: {
   signal?: AbortSignal;
   stage: HTMLDivElement | null;
   videoRefs: PreviewStageVideoRefs;
-}): Promise<void> {
+}): Promise<void | false> {
   const renderPasses = resolveVideoCompositionRenderPasses(params.project, params.currentTime);
   const clipMediaElements = createPreviewSceneMediaMap(params.videoRefs);
   const effectRuntimeFrames = await resolvePreviewEffectRuntimeFrames(
@@ -110,6 +101,22 @@ export async function renderPreviewScene(params: {
   }
   try {
     if (params.signal?.aborted) return;
+    // Media seeking can invalidate readiness after the React render was queued.
+    // Keep the last complete frame until the decoder supplies a replacement.
+    const frames = [
+      renderPasses.overlayFrame,
+      ...renderPasses.visualPasses.filter((pass) => pass.alpha > 0).map((pass) => pass.frame),
+    ];
+    if (
+      frames.some((frame) =>
+        frame.visualLayers.some((layer) => {
+          if (layer.kind !== 'video' || layer.opacity <= 0) return false;
+          const video = clipMediaElements.get(layer.clipId);
+          return !video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA;
+        })
+      )
+    )
+      return false;
     drawResolvedPreviewScene({
       clipMediaElements,
       effectRuntimeFrames,

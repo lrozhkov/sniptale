@@ -1,4 +1,4 @@
-import { useContext, useMemo, type Context, type ReactNode } from 'react';
+import { useContext, useMemo, type Context } from 'react';
 import { syncProjectSceneBackground } from '../../../../features/video/project/scene/background';
 import { getSaveStateMeta } from '../../app-model/utils';
 import type { VideoEditorActionHandlers } from '../../commands';
@@ -18,7 +18,7 @@ import {
   getCurrentVideoEditorCurrentTime,
   useVideoEditorAnnotationEditingPort,
   useVideoEditorClipSelectionPort,
-  useVideoEditorDiagnosticsTelemetryPort,
+  useVideoEditorRecordingTelemetryPort,
   useVideoEditorEffectEditingPort,
   useVideoEditorExportPort,
   useVideoEditorHistoryPort,
@@ -28,7 +28,6 @@ import {
   useVideoEditorTimelineEditingPort,
 } from '../store';
 import {
-  createWorkspaceDiagnosticsController,
   createWorkspaceHeaderController,
   createWorkspaceLayoutController,
   createWorkspacePreviewController,
@@ -66,13 +65,13 @@ export const useWorkspaceDialogsContext = () =>
   useRequiredContext(WorkspaceDialogsContext, 'Workspace dialogs context');
 export const useWorkspaceLayoutContext = () =>
   useRequiredContext(WorkspaceLayoutContext, 'Workspace layout context');
-export const useWorkspaceGridContext = () =>
+const useWorkspaceGridContext = () =>
   useRequiredContext(WorkspaceGridContext, 'Workspace grid context');
-export const useWorkspaceInspectorContext = () =>
+const useWorkspaceInspectorContext = () =>
   useRequiredContext(WorkspaceInspectorContext, 'Workspace inspector context');
 const useWorkspacePlaybackRangeContext = () =>
   useRequiredContext(WorkspacePlaybackRangeContext, 'Workspace playback-range context');
-const useWorkspacePreviewContext = () =>
+export const useWorkspacePreviewContext = () =>
   useRequiredContext(WorkspacePreviewContext, 'Workspace preview context');
 const useWorkspaceSceneBackgroundContext = () =>
   useRequiredContext(WorkspaceSceneBackgroundContext, 'Workspace scene-background context');
@@ -80,7 +79,7 @@ const useVideoEditorLibrariesContext = () =>
   useRequiredContext(VideoEditorLibrariesContext, 'Video editor libraries context');
 export const useVideoEditorSelectionsContext = () =>
   useRequiredContext(VideoEditorSelectionsContext, 'Video editor selections context');
-const useVideoEditorBlockingOverlayContext = () =>
+export const useVideoEditorBlockingOverlayContext = () =>
   useRequiredContext(VideoEditorBlockingOverlayContext, 'Video editor blocking-overlay context');
 const useRuntimePlaybackContext = () =>
   useRequiredContext(RuntimePlaybackContext, 'Runtime playback context');
@@ -105,6 +104,7 @@ function useRuntimeControllerFromContexts(): VideoEditorRuntimeController {
 function useSidebarCommandHandlers(): Pick<
   VideoEditorActionHandlers,
   | 'handleAddRecording'
+  | 'handleAddLibraryMedia'
   | 'handleCreateProject'
   | 'handleDeleteProject'
   | 'handleImportAudio'
@@ -141,9 +141,6 @@ export function useVideoEditorOverlaysController() {
 }
 
 export function useVideoEditorCommandPaletteController() {
-  const diagnostics = useVideoEditorDiagnosticsTelemetryPort(
-    ({ diagnosticsOpen, setDiagnosticsOpen }) => ({ diagnosticsOpen, setDiagnosticsOpen })
-  );
   const playback = useVideoEditorPlaybackPort(({ currentTime, isPlaying }) => ({
     currentTime,
     isPlaying,
@@ -162,7 +159,6 @@ export function useVideoEditorCommandPaletteController() {
   return createVideoEditorCommandPaletteController({
     runtime,
     store: {
-      ...diagnostics,
       ...playback,
       ...selection,
       ...timeline,
@@ -177,14 +173,6 @@ export function useVideoEditorHistoryController() {
   const history = useVideoEditorHistoryPort((port) => port);
   const blockingOverlayOpen = useVideoEditorBlockingOverlayContext();
   return createVideoEditorHistoryController(history, !blockingOverlayOpen);
-}
-
-export function useVideoEditorDiagnosticsController() {
-  const diagnostics = useVideoEditorDiagnosticsTelemetryPort(
-    ({ diagnosticsOpen, setDiagnosticsOpen }) => ({ diagnosticsOpen, setDiagnosticsOpen })
-  );
-  const recordingId = useVideoEditorProjectLifecyclePort((port) => port.recordingId);
-  return createWorkspaceDiagnosticsController({ ...diagnostics, recordingId });
 }
 
 export function useVideoEditorLayoutController() {
@@ -238,6 +226,7 @@ function usePresentedProject() {
 }
 
 export function useVideoEditorPreviewController() {
+  const updateEffectInstance = useVideoEditorEffectEditingPort((port) => port.updateEffectInstance);
   const project = usePresentedProject();
   const lifecycleProject = useVideoEditorProjectLifecyclePort((port) => port.project);
   const playback = useVideoEditorPlaybackPort((port) => port);
@@ -262,6 +251,7 @@ export function useVideoEditorPreviewController() {
     getCurrentTime: getCurrentVideoEditorCurrentTime,
     selectMotionRegion: selection.selectMotionRegion,
     clearCursorSampleSkinOverride: timeline.clearCursorSampleSkinOverride,
+    updateActionPresentation: timeline.updateActionPresentation,
     updateActionEventDetails: timeline.updateActionEventDetails,
     updateCursorSampleInterpolation: timeline.updateCursorSampleInterpolation,
     updateCursorSampleSkinOverride: timeline.updateCursorSampleSkinOverride,
@@ -273,7 +263,14 @@ export function useVideoEditorPreviewController() {
     {
       actions: assets,
       selections,
-      store: { ...annotation, ...selection, ...playback, ...session, ...timeline },
+      store: {
+        ...annotation,
+        ...selection,
+        ...playback,
+        ...session,
+        ...timeline,
+        updateEffectInstance,
+      },
       workspace,
     },
     runtime,
@@ -282,15 +279,20 @@ export function useVideoEditorPreviewController() {
   );
 }
 
-export function useVideoEditorSidebarController(diagnosticsContent: ReactNode) {
+export function useVideoEditorSidebarController() {
   const project = usePresentedProject();
+  const playback = useVideoEditorPlaybackPort(({ currentTime, setCurrentTime, setPlaying }) => ({
+    currentTime,
+    setCurrentTime,
+    setPlaying,
+  }));
   const lifecycle = useVideoEditorProjectLifecyclePort(({ project, recordingId }) => ({
     project,
     recordingId,
   }));
   const annotation = useVideoEditorAnnotationEditingPort((port) => port);
   const selection = useVideoEditorClipSelectionPort((port) => port);
-  const diagnostics = useVideoEditorDiagnosticsTelemetryPort((port) => port);
+  const telemetry = useVideoEditorRecordingTelemetryPort((port) => port);
   const effects = useVideoEditorEffectEditingPort((port) => port);
   const session = useVideoEditorRuntimeSessionPort((port) => port);
   const timeline = useVideoEditorTimelineEditingPort((port) => port);
@@ -308,9 +310,10 @@ export function useVideoEditorSidebarController(diagnosticsContent: ReactNode) {
   const actions = useSidebarCommandHandlers();
   if (!project || !lifecycle.project) return null;
   const store = {
+    ...playback,
     ...annotation,
     ...selection,
-    ...diagnostics,
+    ...telemetry,
     ...effects,
     ...session,
     ...timeline,
@@ -321,7 +324,7 @@ export function useVideoEditorSidebarController(diagnosticsContent: ReactNode) {
     getCurrentTime: getCurrentVideoEditorCurrentTime,
   });
   return createWorkspaceSidebarController(
-    { actions, diagnosticsContent, libraries, selections, store, workspace },
+    { actions, libraries, selections, store, workspace },
     project,
     projectUpdaters
   );
@@ -331,13 +334,9 @@ export function useVideoEditorTimelineController() {
   const lifecycle = useVideoEditorProjectLifecyclePort((port) => port.project);
   const playback = useVideoEditorPlaybackPort((port) => port);
   const selection = useVideoEditorClipSelectionPort((port) => port);
-  const diagnostics = useVideoEditorDiagnosticsTelemetryPort(
-    ({ recordingTelemetry, telemetryLaneVisible, toggleTelemetryLaneVisibility }) => ({
-      recordingTelemetry,
-      telemetryLaneVisible,
-      toggleTelemetryLaneVisibility,
-    })
-  );
+  const telemetry = useVideoEditorRecordingTelemetryPort(({ recordingTelemetry }) => ({
+    recordingTelemetry,
+  }));
   const annotation = useVideoEditorAnnotationEditingPort((port) => port);
   const effects = useVideoEditorEffectEditingPort((port) => port);
   const history = useVideoEditorHistoryPort((port) => port);
@@ -349,8 +348,14 @@ export function useVideoEditorTimelineController() {
   const inspector = useWorkspaceInspectorContext();
   const playbackRange = useWorkspacePlaybackRangeContext();
   const workspace = useMemo(
-    () => ({ ...playbackRange, confirm: dialogs.confirm, grid, inspector }),
-    [dialogs.confirm, grid, inspector, playbackRange]
+    () => ({
+      ...playbackRange,
+      confirm: dialogs.confirm,
+      grid,
+      inspector,
+      setAutoProcessingModalOpen: dialogs.setAutoProcessingModalOpen,
+    }),
+    [dialogs.confirm, dialogs.setAutoProcessingModalOpen, grid, inspector, playbackRange]
   );
   const assets = useAssetCommandContext();
   if (!lifecycle) return null;
@@ -358,7 +363,7 @@ export function useVideoEditorTimelineController() {
     ...playback,
     ...annotation,
     ...selection,
-    ...diagnostics,
+    ...telemetry,
     ...effects,
     ...history,
     ...timeline,

@@ -3,22 +3,25 @@ import { DEFAULT_VIDEO_PROJECT_BACKGROUND, createVideoProjectSource } from '../d
 import { getVideoProjectMutationTimestamp } from '../mutation';
 import { createDefaultVideoProjectUtilityLanes } from '../utility-lanes';
 import { syncProjectSceneBackground } from '../scene/background';
+import { createAudioClipFromAsset } from './clip';
 import {
-  createAudioClipFromAsset,
-  createVideoClipFromAsset,
-  createVideoProjectTransform,
-} from './clip';
-import { createVideoProjectAsset, createVideoProjectTrack, getDefaultTrackName } from './creation';
+  createClipGroupId,
+  createVideoProjectAsset,
+  createVideoProjectTrack,
+  getDefaultTrackName,
+} from './creation';
 import {
-  VideoMediaFitMode,
   VideoProjectAssetType,
-  VideoProjectClipType,
+  VideoProjectTrackRole,
   VideoTimelinePlacementMode,
   VideoTrackKind,
   type VideoProject,
+  type VideoProjectAsset,
   type VideoProjectClip,
   type VideoProjectTrack,
 } from '../types/index';
+import { createRecordingSidecarClip } from './recording-sidecar';
+import { resolveVideoProjectCameraTrackOrder } from '../camera/track-order';
 
 export type MultiSourceRecordingProjectAssetInput = {
   recordingId: string;
@@ -47,8 +50,11 @@ function createSceneBackgroundFields() {
   );
 }
 
-function createVideoAsset(input: MultiSourceRecordingProjectAssetInput) {
-  return createVideoProjectAsset(
+function createVideoAsset(
+  input: MultiSourceRecordingProjectAssetInput,
+  recordingPart: NonNullable<VideoProjectAsset['recordingPart']>
+): VideoProjectAsset {
+  const asset = createVideoProjectAsset(
     input.filename,
     VideoProjectAssetType.RECORDING,
     { kind: 'recording', recordingId: input.recordingId },
@@ -62,6 +68,7 @@ function createVideoAsset(input: MultiSourceRecordingProjectAssetInput) {
       audioPeaks: null,
     }
   );
+  return { ...asset, recordingPart };
 }
 
 function createAudioAsset(input: MultiSourceAudioProjectAssetInput) {
@@ -81,24 +88,16 @@ function createAudioAsset(input: MultiSourceAudioProjectAssetInput) {
   );
 }
 
-function createVideoTracks(count: number): VideoProjectTrack[] {
-  return Array.from({ length: count }, (_item, index) =>
-    createVideoProjectTrack(
+function createVideoTracks(count: number, cameraTrackIndex: number | null): VideoProjectTrack[] {
+  return Array.from({ length: count }, (_item, index) => {
+    const track = createVideoProjectTrack(
       getDefaultTrackName(VideoTrackKind.PRIMARY, index + 1),
-      index + 1,
+      index === cameraTrackIndex ? resolveVideoProjectCameraTrackOrder(0, 1) : index + 1,
       VideoTrackKind.PRIMARY,
       index === 0
-    )
-  );
-}
-
-function createOverlayTrack(): VideoProjectTrack {
-  return createVideoProjectTrack(
-    getDefaultTrackName(VideoTrackKind.OVERLAY, 1),
-    0,
-    VideoTrackKind.OVERLAY,
-    true
-  );
+    );
+    return index === cameraTrackIndex ? { ...track, role: VideoProjectTrackRole.CAMERA } : track;
+  });
 }
 
 function createAudioTrack(order: number): VideoProjectTrack {
@@ -106,7 +105,7 @@ function createAudioTrack(order: number): VideoProjectTrack {
     getDefaultTrackName(VideoTrackKind.AUDIO, 1),
     order,
     VideoTrackKind.AUDIO,
-    true
+    false
   );
 }
 
@@ -115,26 +114,20 @@ function createVideoClips(params: {
   projectWidth: number;
   tracks: VideoProjectTrack[];
   videos: ReturnType<typeof createVideoAsset>[];
+  groupId: string | null;
+  duration: number;
 }): VideoProjectClip[] {
-  return params.videos.map((asset, index) => {
-    const clip = createVideoClipFromAsset(
-      params.tracks[index]?.id ?? params.tracks[0]?.id ?? '',
+  return params.videos.map((asset, index) =>
+    createRecordingSidecarClip({
       asset,
-      params.projectWidth,
-      params.projectHeight,
-      0,
-      { muted: true }
-    );
-    if (clip.type !== VideoProjectClipType.VIDEO) {
-      return clip;
-    }
-
-    return {
-      ...clip,
-      fitMode: VideoMediaFitMode.SOURCE_100,
-      transform: createVideoProjectTransform(asset.metadata.width, asset.metadata.height),
-    };
-  });
+      projectHeight: params.projectHeight,
+      projectWidth: params.projectWidth,
+      trackId: params.tracks[index]?.id ?? params.tracks[0]?.id ?? '',
+      ...(params.tracks[index]?.role ? { trackRole: params.tracks[index].role } : {}),
+      groupId: params.groupId,
+      duration: params.duration,
+    })
+  );
 }
 
 export function createVideoProjectFromMultiSourceRecording(options: {
@@ -147,18 +140,37 @@ export function createVideoProjectFromMultiSourceRecording(options: {
   const videos = options.webcamVideo ? [...options.videos, options.webcamVideo] : options.videos;
   const projectWidth = firstVideo?.width ?? 1920;
   const projectHeight = firstVideo?.height ?? 1080;
-  const videoTracks = createVideoTracks(videos.length);
+  const videoTracks = createVideoTracks(
+    videos.length,
+    options.webcamVideo ? options.videos.length : null
+  );
   const audioTrack = createAudioTrack(videoTracks.length + 1);
-  const videoAssets = videos.map(createVideoAsset);
+  const recordingId = firstVideo?.recordingId ?? options.webcamVideo?.recordingId;
+  const videoAssets = videos.map((input, index) =>
+    createVideoAsset(input, {
+      recordingId: recordingId ?? input.recordingId,
+      role: index === options.videos.length ? 'camera' : index === 0 ? 'primary' : 'video',
+    })
+  );
   const audioAsset = options.microphoneAudio ? createAudioAsset(options.microphoneAudio) : null;
+  if (audioAsset && recordingId) audioAsset.recordingPart = { recordingId, role: 'audio' };
+  const groupId = videoAssets.length + Number(Boolean(audioAsset)) > 1 ? createClipGroupId() : null;
+  const duration = Math.max(
+    0.1,
+    firstVideo?.duration ?? options.webcamVideo?.duration ?? audioAsset?.metadata.duration ?? 0.1
+  );
   const clips = createVideoClips({
+    groupId,
+    duration,
     projectHeight,
     projectWidth,
     tracks: videoTracks,
     videos: videoAssets,
   });
   if (audioAsset) {
-    clips.push(createAudioClipFromAsset(audioTrack.id, audioAsset, 0));
+    const clip = createAudioClipFromAsset(audioTrack.id, audioAsset, 0, { groupId });
+    const audioDuration = Math.min(duration, clip.duration);
+    clips.push({ ...clip, duration: audioDuration, sourceDuration: audioDuration });
   }
   const now = getVideoProjectMutationTimestamp();
   return {
@@ -176,7 +188,7 @@ export function createVideoProjectFromMultiSourceRecording(options: {
     createdAt: now,
     updatedAt: now,
     assets: audioAsset ? [...videoAssets, audioAsset] : videoAssets,
-    tracks: [createOverlayTrack(), ...videoTracks, audioTrack],
+    tracks: audioAsset ? [...videoTracks, audioTrack] : videoTracks,
     clips,
     transitions: [],
     utilityLanes: createDefaultVideoProjectUtilityLanes(),

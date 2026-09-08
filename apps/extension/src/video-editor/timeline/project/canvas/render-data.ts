@@ -1,3 +1,6 @@
+import { clampTimelineScale } from '../../../contracts/timeline-scale';
+import { formatTimelineRulerLabel } from '../interaction-state/helpers';
+
 interface ProjectTimelineRulerMarker {
   id: string;
   isMajor: boolean;
@@ -13,20 +16,27 @@ const WAVEFORM_BAR_GAP_PERCENT = 0.8;
 
 export function buildProjectTimelineRulerMarkers(
   timelineWidth: number,
-  pixelsPerSecond: number
+  pixelsPerSecond: number,
+  viewport: { startTime: number; endTime: number },
+  fps = 30
 ): ProjectTimelineRulerMarker[] {
-  const spanSeconds = resolveTimelineRulerSpanSeconds(pixelsPerSecond);
-  const markerCount =
-    Math.ceil((timelineWidth + 120) / (Math.max(1, pixelsPerSecond) * spanSeconds)) + 1;
-
-  return Array.from({ length: markerCount }, (_, index) => {
-    const second = roundTimelineMarkerSecond(index * spanSeconds);
+  const spanSeconds = resolveTimelineRulerSpanSeconds(pixelsPerSecond, fps);
+  const detailed = spanSeconds < 1;
+  const overscanSeconds = 120 / clampTimelineScale(pixelsPerSecond);
+  const firstIndex = Math.floor(Math.max(0, viewport.startTime - overscanSeconds) / spanSeconds);
+  const lastIndex = Math.ceil(
+    (Math.min(timelineWidth / clampTimelineScale(pixelsPerSecond), viewport.endTime) +
+      overscanSeconds) /
+      spanSeconds
+  );
+  return Array.from({ length: Math.max(0, lastIndex - firstIndex + 1) }, (_, index) => {
+    const second = (firstIndex + index) * spanSeconds;
     const isMajor = Number.isInteger(second);
 
     return {
-      id: `marker-${second.toFixed(2)}`,
+      id: detailed ? `frame-${Math.round(second * fps)}` : `marker-${second.toFixed(2)}`,
       isMajor,
-      label: isMajor ? buildTimelineRulerLabel(second) : null,
+      label: formatTimelineRulerLabel(second, detailed),
       second,
       spanSeconds,
     };
@@ -72,10 +82,15 @@ function roundWaveformPoint(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-function resolveTimelineRulerSpanSeconds(pixelsPerSecond: number): number {
-  const candidateSteps = [1, 5, 10, 20, 30, 60];
+function resolveTimelineRulerSpanSeconds(pixelsPerSecond: number, fps: number): number {
   const minimumStepWidth = 88;
-
+  const minimumFrames = (minimumStepWidth * fps) / pixelsPerSecond;
+  const decade = 10 ** Math.floor(Math.log10(Math.max(1, minimumFrames)));
+  const frameStep =
+    [1, 2, 5, 10].map((factor) => factor * decade).find((frames) => frames >= minimumFrames) ??
+    Math.ceil(minimumFrames);
+  if (fps > 1 && frameStep < fps) return frameStep / fps;
+  const candidateSteps = [1, 5, 10, 20, 30, 60, 120, 300, 600, 1800, 3600, 7200, 14400, 28800];
   for (const step of candidateSteps) {
     if (step * pixelsPerSecond >= minimumStepWidth) {
       return step;
@@ -83,15 +98,4 @@ function resolveTimelineRulerSpanSeconds(pixelsPerSecond: number): number {
   }
 
   return candidateSteps.at(-1) ?? 60;
-}
-
-function roundTimelineMarkerSecond(value: number): number {
-  return Math.round(value * 1000) / 1000;
-}
-
-function buildTimelineRulerLabel(second: number): string {
-  const totalSeconds = Math.max(0, Math.floor(second));
-  const minutes = Math.floor(totalSeconds / 60);
-  const remainder = totalSeconds % 60;
-  return `${minutes}:${String(remainder).padStart(2, '0')}`;
 }

@@ -8,8 +8,7 @@ it('maps placement commands without exposing the controller store', () => {
     startActionPointPlacement: vi.fn(),
     startMotionAreaPlacement: vi.fn(),
     startMotionFocusPlacement: vi.fn(),
-    startMotionPathStopAreaPlacement: vi.fn(),
-    startMotionPathStopPointPlacement: vi.fn(),
+
     startObjectTrackAnchorPlacement: vi.fn(),
   };
 
@@ -20,8 +19,7 @@ it('maps placement commands without exposing the controller store', () => {
     onStartActionPointPlacement: store.startActionPointPlacement,
     onStartMotionAreaPlacement: store.startMotionAreaPlacement,
     onStartMotionFocusPlacement: store.startMotionFocusPlacement,
-    onStartMotionPathStopAreaPlacement: store.startMotionPathStopAreaPlacement,
-    onStartMotionPathStopPointPlacement: store.startMotionPathStopPointPlacement,
+
     onStartObjectTrackAnchorPlacement: store.startObjectTrackAnchorPlacement,
   });
 });

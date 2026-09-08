@@ -27,6 +27,17 @@ function createSelectionPanelOptionalActionProps(props: WorkspaceSidebarSelectio
     ...(props.onDeleteObjectTrack ? { onDeleteObjectTrack: props.onDeleteObjectTrack } : {}),
     ...(props.onSelectObjectTrack ? { onSelectObjectTrack: props.onSelectObjectTrack } : {}),
     ...(props.onRenameTrack ? { onRenameTrack: props.onRenameTrack } : {}),
+    ...(props.onToggleTrackLock ? { onToggleTrackLock: props.onToggleTrackLock } : {}),
+    ...(props.onToggleUtilityLaneVisibility
+      ? { onToggleUtilityLaneVisibility: props.onToggleUtilityLaneVisibility }
+      : {}),
+    ...(props.onToggleUtilityLaneLock
+      ? { onToggleUtilityLaneLock: props.onToggleUtilityLaneLock }
+      : {}),
+    ...(props.onClearUtilityLane ? { onClearUtilityLane: props.onClearUtilityLane } : {}),
+    ...(props.onToggleTrackVisibility
+      ? { onToggleTrackVisibility: props.onToggleTrackVisibility }
+      : {}),
     ...(props.onUpdateMediaClipFitScalePercent
       ? { onUpdateMediaClipFitScalePercent: props.onUpdateMediaClipFitScalePercent }
       : {}),
@@ -45,6 +56,10 @@ function createSelectionPanelOptionalActionProps(props: WorkspaceSidebarSelectio
     ...(props.onDeleteEffectInstance
       ? { onDeleteEffectInstance: props.onDeleteEffectInstance }
       : {}),
+    ...(props.onDuplicateEffectInstance
+      ? { onDuplicateEffectInstance: props.onDuplicateEffectInstance }
+      : {}),
+    ...(props.onMoveEffectInstance ? { onMoveEffectInstance: props.onMoveEffectInstance } : {}),
     ...(props.onUpsertObjectTrackCorrectionAnchor
       ? { onUpsertObjectTrackCorrectionAnchor: props.onUpsertObjectTrackCorrectionAnchor }
       : {}),
@@ -53,12 +68,20 @@ function createSelectionPanelOptionalActionProps(props: WorkspaceSidebarSelectio
 
 function createSelectionBodyStateProps(props: WorkspaceSidebarSelectionPanelProps) {
   return {
+    ...(props.gridSettings ? { gridSettings: props.gridSettings } : {}),
     project: props.project,
     selection: props.selection,
+    canAddCameraPosition: props.canAddCameraPosition ?? false,
     selectedClip: props.selectedClip,
     selectedTransition: props.selectedTransition,
     selectedCursorSample: props.selectedCursorSample,
-    selectedActionEvent: props.selectedActionEvent,
+    ...(props.currentTime === undefined ? {} : { currentTime: props.currentTime }),
+    ...(props.typingProject ? { typingProject: props.typingProject } : {}),
+    ...(props.recordingTelemetry ? { recordingTelemetry: props.recordingTelemetry } : {}),
+    ...(props.onApplyTypingCompression
+      ? { onApplyTypingCompression: props.onApplyTypingCompression }
+      : {}),
+    selectedActionOccurrence: props.selectedActionOccurrence,
     selectedMotionRegion: props.selectedMotionRegion,
     ...(props.selectedObjectTrack === undefined
       ? {}
@@ -85,9 +108,12 @@ function createSelectionBodyActionProps(props: WorkspaceSidebarSelectionPanelPro
     onAddMotionRegion: props.onAddMotionRegion,
     onUpdateCursorSampleInterpolation: props.onUpdateCursorSampleInterpolation,
     onUpdateCursorSampleVisibility: props.onUpdateCursorSampleVisibility,
+    ...(props.onUpdateActionPresentation
+      ? { onUpdateActionPresentation: props.onUpdateActionPresentation }
+      : {}),
     onUpdateActionEventDetails: props.onUpdateActionEventDetails,
     onDeleteMotionRegion: props.onDeleteMotionRegion,
-    onGenerateMotionPathFromCursor: props.onGenerateMotionPathFromCursor ?? (() => undefined),
+
     onStartActionPointPlacement: props.onStartActionPointPlacement,
     onStartMotionAreaPlacement: props.onStartMotionAreaPlacement,
     onStartMotionFocusPlacement: props.onStartMotionFocusPlacement,
@@ -97,7 +123,12 @@ function createSelectionBodyActionProps(props: WorkspaceSidebarSelectionPanelPro
     onUpdateTransitionDuration: props.onUpdateTransitionDuration,
     onUpdateTransitionEasing: props.onUpdateTransitionEasing,
     onUpdateTransitionTemplate: props.onUpdateTransitionTemplate,
+    ...(props.onSwapClip ? { onSwapClip: props.onSwapClip } : {}),
+    ...(props.onTrimClipStart ? { onTrimClipStart: props.onTrimClipStart } : {}),
+    ...(props.onTrimClipEnd ? { onTrimClipEnd: props.onTrimClipEnd } : {}),
     onDetachClipGroup: props.onDetachClipGroup,
+    ...(props.onApplyCameraLayout ? { onApplyCameraLayout: props.onApplyCameraLayout } : {}),
+    ...(props.onEditCameraPosition ? { onEditCameraPosition: props.onEditCameraPosition } : {}),
     onUpdateClipTransform: props.onUpdateClipTransform,
     onUpdateClipMuted: props.onUpdateClipMuted,
     onUpdateClipVolume: props.onUpdateClipVolume,
@@ -137,10 +168,16 @@ function createSelectionPanelStateProps(
   props: WorkspaceSidebarSelectionPanelSourceProps
 ): Pick<
   WorkspaceSidebarSelectionPanelProps,
+  | 'gridSettings'
   | 'placementMode'
   | 'project'
   | 'recentColors'
-  | 'selectedActionEvent'
+  | 'currentTime'
+  | 'typingProject'
+  | 'recordingTelemetry'
+  | 'onApplyTypingCompression'
+  | 'selectedActionOccurrence'
+  | 'canAddCameraPosition'
   | 'selectedClip'
   | 'selectedCursorSample'
   | 'selectedMotionRegion'
@@ -150,11 +187,19 @@ function createSelectionPanelStateProps(
   | 'selection'
 > {
   return {
+    ...(props.gridSettings ? { gridSettings: props.gridSettings } : {}),
     selection: props.selection ?? createSceneSelection(),
     project: props.project,
     recentColors: props.recentColors ?? [],
+    canAddCameraPosition: props.canAddCameraPosition ?? false,
     selectedClip: props.selectedClip,
-    selectedActionEvent: props.selectedActionEvent ?? null,
+    ...(props.currentTime === undefined ? {} : { currentTime: props.currentTime }),
+    ...(props.typingProject ? { typingProject: props.typingProject } : {}),
+    ...(props.recordingTelemetry ? { recordingTelemetry: props.recordingTelemetry } : {}),
+    ...(props.onApplyTypingCompression
+      ? { onApplyTypingCompression: props.onApplyTypingCompression }
+      : {}),
+    selectedActionOccurrence: props.selectedActionOccurrence ?? null,
     selectedCursorSample: props.selectedCursorSample ?? null,
     selectedMotionRegion: props.selectedMotionRegion ?? null,
     selectedObjectTrack: props.selectedObjectTrack ?? null,
@@ -170,6 +215,9 @@ function createSelectionPanelUpdateProps(
   WorkspaceSidebarSelectionPanelProps,
   | 'onClearCursorSampleSkinOverride'
   | 'onConvertTextClipToAnnotation'
+  | 'onSwapClip'
+  | 'onTrimClipStart'
+  | 'onTrimClipEnd'
   | 'onDetachClipGroup'
   | 'onResizeProject'
   | 'onPreviewSceneBackground'
@@ -181,6 +229,8 @@ function createSelectionPanelUpdateProps(
   | 'onUpdateClipFades'
   | 'onUpdateClipMuted'
   | 'onUpdateClipPlaybackRate'
+  | 'onApplyCameraLayout'
+  | 'onEditCameraPosition'
   | 'onUpdateClipTransform'
   | 'onUpdateClipVolume'
   | 'onUpdateCursorSampleSkinOverride'

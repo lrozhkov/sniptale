@@ -22,7 +22,7 @@ interface PreviewSceneRenderSchedulerState {
 interface PreviewSceneRenderSchedulerOptions {
   onError: (error: unknown) => void;
   onSuccess?: () => void;
-  render: (job: Parameters<typeof renderPreviewScene>[0]) => Promise<void>;
+  render: (job: Parameters<typeof renderPreviewScene>[0]) => ReturnType<typeof renderPreviewScene>;
 }
 
 const PLAYBACK_RENDER_MIN_INTERVAL_MS = 16;
@@ -103,8 +103,8 @@ function startNextPreviewSceneRender(
   void args
     .render(renderJob)
     .then(
-      () => {
-        if (!controller.signal.aborted) {
+      (presented) => {
+        if (presented !== false && !controller.signal.aborted) {
           args.onSuccess?.();
         }
       },

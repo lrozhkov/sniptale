@@ -3,6 +3,7 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { VideoRecordingMediaDevice } from '@sniptale/runtime-contracts/video/types/messages.surface';
 import type { HandledOffscreenRuntimeMessageType } from './message-types';
 import { buildProjectExportCommandSuccessResponse } from './project-export-response';
+import { isRecordingPointTransform } from '../../features/video/project/validation/recording-telemetry';
 
 type OffscreenCommandSuccessResponse = Record<string, unknown> & { success: true };
 
@@ -156,6 +157,18 @@ function buildDesktopFrameResponse(result: unknown): OffscreenCommandSuccessResp
 
 function buildStopRecordingResponse(result: unknown): OffscreenCommandSuccessResponse {
   const type = VideoMessageType.OFFSCREEN_STOP_RECORDING;
+  if (
+    isRecordWithExactKeys(result, ['result', 'recordingPointTransform']) &&
+    result['result'] === 'stopped' &&
+    (result['recordingPointTransform'] === null ||
+      isRecordingPointTransform(result['recordingPointTransform']))
+  ) {
+    return {
+      result: 'accepted',
+      success: true,
+      recordingPointTransform: result['recordingPointTransform'],
+    };
+  }
   if (isRecordWithExactKeys(result, ['result']) && result['result'] === 'stopped') {
     return { result: 'accepted', success: true };
   }

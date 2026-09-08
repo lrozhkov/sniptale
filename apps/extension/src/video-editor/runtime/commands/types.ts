@@ -1,5 +1,9 @@
+import type { VideoEditorProjectHistoryTransactionActions } from '../../contracts/commands/history';
 import type { VideoProject } from '../../../features/video/project/types/index';
-import type { VideoEditorImportPlacement } from '../../contracts/insertion';
+import type {
+  VideoEditorImportPlacement,
+  VideoEditorAudioRecordingTarget,
+} from '../../contracts/insertion';
 import type { VideoEditorExportRuntimeState } from '../../contracts/export-state';
 import type { VideoEditorExportActions } from '../../contracts/commands/export';
 import type { VideoEditorProjectActions } from '../../contracts/commands/project';
@@ -12,12 +16,14 @@ export interface VideoEditorActionHandlers {
   handleCreateProject: () => Promise<void>;
   handleDeleteProject: (projectId: string) => Promise<void>;
   handleAddRecording: (recordingId: string) => Promise<void>;
+  handleAddLibraryMedia: (mediaId: string) => Promise<void>;
   handleImportImage: (file: File, placement?: VideoEditorImportPlacement) => Promise<void>;
   handleImportVideo: (file: File, placement?: VideoEditorImportPlacement) => Promise<void>;
   handleImportAudio: (file: File, placement?: VideoEditorImportPlacement) => Promise<void>;
   handleImportRecordedAudio: (
     file: File,
-    trim: { trimEnd: number; trimStart: number }
+    trim: { trimEnd: number; trimStart: number },
+    target?: VideoEditorAudioRecordingTarget | null
   ) => Promise<void>;
   handleStartExport: () => Promise<void>;
   handleCancelExport: () => Promise<void>;
@@ -27,11 +33,18 @@ interface VideoEditorCommandErrorPort {
   setError: VideoEditorSessionActions['setError'];
 }
 
-export interface AssetHandlerPort extends VideoEditorCommandErrorPort {
+export interface AssetHandlerPort
+  extends
+    VideoEditorCommandErrorPort,
+    Pick<
+      VideoEditorProjectHistoryTransactionActions,
+      'beginProjectHistoryTransaction' | 'endProjectHistoryTransaction'
+    > {
   getCurrentProject: () => VideoProject | null;
   getCurrentProjectId: () => string | null;
   getCurrentTime: () => number;
   upsertAsset: VideoEditorProjectActions['upsertAsset'];
+  upsertAssets: VideoEditorProjectActions['upsertAssets'];
   addAssetClip: VideoEditorProjectActions['addAssetClip'];
   moveClip: VideoEditorProjectActions['moveClip'];
   trimClipEnd: VideoEditorProjectActions['trimClipEnd'];
@@ -59,6 +72,7 @@ export interface VideoEditorCommandHandlers {
   assets: Pick<
     VideoEditorActionHandlers,
     | 'handleAddRecording'
+    | 'handleAddLibraryMedia'
     | 'handleImportAudio'
     | 'handleImportImage'
     | 'handleImportRecordedAudio'

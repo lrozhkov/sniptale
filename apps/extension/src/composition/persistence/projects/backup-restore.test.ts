@@ -27,6 +27,8 @@ function stores(): VideoProjectBackupRestoreStores {
     assets: store(),
     exports,
     media: store(),
+    videoWorkspaces: store(),
+    videoDrafts: store(),
     operations: store(),
     owners,
     presentations: store(),
@@ -222,6 +224,10 @@ describe('video project backup restore adapter', () => {
 
     expect(target.assets.delete).toHaveBeenCalledWith('project-asset-1');
     expect(target.exports.delete).toHaveBeenCalledWith('old-export');
+    for (const id of ['project-asset:project-asset-1', 'export:old-export']) {
+      expect(target.videoWorkspaces.delete).toHaveBeenCalledWith(id);
+      expect(target.videoDrafts.delete).toHaveBeenCalledWith(id);
+    }
     expect(target.projects.delete).toHaveBeenCalledWith('project');
     expect(pendingDelete.assetIds).toEqual(['asset-object', 'export-object']);
   });

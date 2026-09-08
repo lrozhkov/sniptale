@@ -1,13 +1,9 @@
-import { resolveExportTargetBitrate } from './codecs';
-import { setupExportAudio } from './media';
-import { type LoadedImagesMap } from './renderer';
-import { runCompositeRenderLoop } from './render-loop';
-import { getSupportedWebmExportMimeType } from './runtime';
 import type { VideoProject, VideoProjectExportSettings } from '../../features/video/project/types';
-import { VideoWebmCodec } from '../../features/video/project/types';
-import { translate } from '../../platform/i18n';
-import { applyVideoTrackContentHint } from '../../platform/media-utils/video-recording';
-import { type ExportJobState } from './types';
+import { renderOfflineAudioMix } from './offline-audio';
+import { runFrameDrivenCompositeRenderLoop } from './render-loop/frame-driven';
+import type { LoadedImagesMap } from './renderer';
+import type { ExportJobState } from './types';
+import { createWebmEncoding } from './webm-encoding';
 
 export async function renderCompositeToWebm(
   job: ExportJobState,
@@ -17,131 +13,31 @@ export async function renderCompositeToWebm(
   context: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement
 ): Promise<Blob> {
-  const preparedAudio = await setupExportAudio(
-    project,
-    settings,
-    job,
-    job.exportAbortController?.signal
-  );
-  let capturedTracks: MediaStreamTrack[] = [];
-
+  const signal = job.exportAbortController?.signal;
+  const mixedAudio = await renderOfflineAudioMix(project, settings, signal);
+  const pipeline = await createWebmEncoding(settings, Boolean(mixedAudio));
+  const check = () => {
+    if (job.cancelled || signal?.aborted) throw new Error('PROJECT_EXPORT_CANCELLED');
+    pipeline.check();
+  };
   try {
-    const canvasStream = canvas.captureStream(settings.fps);
-    capturedTracks = [...canvasStream.getTracks(), ...preparedAudio.tracks];
-    const canvasTrack = canvasStream.getVideoTracks()[0];
-    if (!canvasTrack) throw new Error(translate('offscreenExport.canvasContextError'));
-    applyVideoTrackContentHint(canvasTrack, 'detail');
-    const stream = new MediaStream(capturedTracks);
-    job.exportStream = stream;
-    const codec = settings.webmVideoCodec ?? VideoWebmCodec.VP9;
-    const mimeType = getSupportedWebmExportMimeType(codec, preparedAudio.tracks.length > 0);
-    const recorder = createWebmRecorder(stream, settings, mimeType);
-    job.mediaRecorder = recorder;
-    const blobRecorder = createWebmBlobRecorder(recorder, mimeType, () => job.cancelled);
-    return await runWebmRecording({
-      blobRecorder,
-      context,
-      job,
-      loadedImages,
-      preparedAudio,
-      project,
-      recorder,
-      settings,
-    });
-  } finally {
-    preparedAudio.dispose();
-    capturedTracks.forEach((track) => track.stop());
-    job.exportStream = null;
-  }
-}
-
-interface WebmRecordingInput {
-  blobRecorder: ReturnType<typeof createWebmBlobRecorder>;
-  context: CanvasRenderingContext2D;
-  job: ExportJobState;
-  loadedImages: LoadedImagesMap;
-  preparedAudio: Awaited<ReturnType<typeof setupExportAudio>>;
-  project: VideoProject;
-  recorder: MediaRecorder;
-  settings: VideoProjectExportSettings;
-}
-
-async function runWebmRecording(input: WebmRecordingInput): Promise<Blob> {
-  const { blobRecorder, context, job, loadedImages, preparedAudio, project, recorder, settings } =
-    input;
-  recorder.start(1000);
-  preparedAudio.start();
-  try {
-    await runCompositeRenderLoop(
+    check();
+    await runFrameDrivenCompositeRenderLoop(
       job,
       project,
       settings,
+      canvas,
       context,
       loadedImages,
-      job.exportAbortController?.signal
+      pipeline.videoEncoder,
+      check,
+      signal
     );
-    stopRecorderIfNeeded(recorder);
-    return await blobRecorder.blobPromise;
-  } catch (error) {
-    stopRecorderIfNeeded(recorder);
-    blobRecorder.rejectBlob(error);
-    await blobRecorder.blobPromise.catch(() => undefined);
-    throw error;
+    check();
+    const blob = await pipeline.finish(mixedAudio?.buffer);
+    check();
+    return blob;
   } finally {
-    job.mediaRecorder = null;
-  }
-}
-
-function createWebmRecorder(
-  stream: MediaStream,
-  settings: VideoProjectExportSettings,
-  mimeType: string
-) {
-  return new MediaRecorder(stream, {
-    mimeType,
-    videoBitsPerSecond: resolveExportTargetBitrate(settings),
-  });
-}
-
-function createWebmBlobRecorder(
-  recorder: MediaRecorder,
-  mimeType: string,
-  isCancelled: () => boolean
-) {
-  const chunks: Blob[] = [];
-  recorder.ondataavailable = (event) => {
-    if (event.data && event.data.size > 0) {
-      chunks.push(event.data);
-    }
-  };
-
-  let resolveBlob!: (blob: Blob) => void;
-  let rejectBlob!: (reason?: unknown) => void;
-  const blobPromise = new Promise<Blob>((resolve, reject) => {
-    resolveBlob = resolve;
-    rejectBlob = reject;
-  });
-
-  recorder.onerror = (event) => {
-    rejectBlob(
-      (event as ErrorEvent).error ?? new Error(translate('offscreenExport.webmRecorderError'))
-    );
-  };
-
-  recorder.onstop = () => {
-    if (isCancelled()) {
-      rejectBlob(new Error('PROJECT_EXPORT_CANCELLED'));
-      return;
-    }
-
-    resolveBlob(new Blob(chunks, { type: mimeType }));
-  };
-
-  return { blobPromise, rejectBlob };
-}
-
-function stopRecorderIfNeeded(recorder: MediaRecorder) {
-  if (recorder.state !== 'inactive') {
-    recorder.stop();
+    await pipeline.dispose();
   }
 }

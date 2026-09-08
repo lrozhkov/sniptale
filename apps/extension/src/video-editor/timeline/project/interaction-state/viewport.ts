@@ -1,6 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useTimelineNavigation } from './navigation';
+import type { ProjectTimelineProps } from '../types';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 
-import { clampTimelinePixelsPerSecond } from './zoom';
+import { clampTimelineScale } from '../../../contracts/timeline-scale';
 
 const FALLBACK_TIMELINE_VIEWPORT_WIDTH = 960;
 const TIMELINE_FIT_VIEWPORT_PADDING = 96;
@@ -26,7 +28,84 @@ export function useTimelineViewportWidth(
   return viewportWidth;
 }
 
-export function resolveTimelineFitPixelsPerSecond(duration: number, viewportWidth: number): number {
+function resolveTimelineFitPixelsPerSecond(
+  duration: number,
+  viewportWidth: number,
+  fps: number
+): number {
   const availableWidth = Math.max(240, viewportWidth - TIMELINE_FIT_VIEWPORT_PADDING);
-  return clampTimelinePixelsPerSecond(availableWidth / Math.max(0.5, duration));
+  return clampTimelineScale(availableWidth / Math.max(1 / fps, duration));
+}
+
+export function useProjectTimelineViewState(
+  {
+    onZoomChange,
+    currentTime,
+    pixelsPerSecond,
+    project,
+  }: Pick<ProjectTimelineProps, 'onZoomChange' | 'currentTime' | 'pixelsPerSecond' | 'project'>,
+  selectedClip: { startTime: number; duration: number } | null,
+  viewportWidth: number,
+  timelineRef: React.MutableRefObject<HTMLDivElement | null>
+) {
+  const navigation = useTimelineNavigation({
+    extentSeconds: Math.max(project.duration + 5, 10) + 120 / pixelsPerSecond,
+    pixelsPerSecond,
+    viewportWidth,
+    timelineRef,
+  });
+  const { navigateTo, readStartTime } = navigation;
+  const [fitRequest, setFitRequest] = useState<{
+    pixelsPerSecond: number;
+    center: number | null;
+    viewportX: number;
+  } | null>(null);
+  const fitSelectionDuration = selectedClip?.duration ?? null;
+  const selectedStart = selectedClip?.startTime ?? null;
+  useLayoutEffect(() => {
+    if (!fitRequest || fitRequest.pixelsPerSecond !== pixelsPerSecond) return;
+    navigateTo(
+      fitRequest.center === null ? 0 : fitRequest.center - fitRequest.viewportX / pixelsPerSecond
+    );
+    setFitRequest(null);
+  }, [fitRequest, pixelsPerSecond, navigateTo]);
+  const requestFit = useCallback(
+    (duration: number, center: number | null) => {
+      const zoom = resolveTimelineFitPixelsPerSecond(duration, viewportWidth, project.fps);
+      setFitRequest({ pixelsPerSecond: zoom, center, viewportX: viewportWidth / 2 });
+      onZoomChange(zoom);
+    },
+    [onZoomChange, viewportWidth, project.fps]
+  );
+  const requestZoom = useCallback(
+    (value: number) => {
+      const zoom = clampTimelineScale(value);
+      const startTime = readStartTime();
+      const playheadX = (currentTime - startTime) * pixelsPerSecond;
+      const viewportX =
+        playheadX >= 0 && playheadX <= viewportWidth ? playheadX : viewportWidth / 2;
+      const center = startTime + viewportX / pixelsPerSecond;
+      setFitRequest({ pixelsPerSecond: zoom, center, viewportX });
+      onZoomChange(zoom);
+    },
+    [currentTime, onZoomChange, pixelsPerSecond, readStartTime, viewportWidth]
+  );
+  const onFitProject = useCallback(
+    () => requestFit(project.duration, null),
+    [project.duration, requestFit]
+  );
+  const onFitSelection = useCallback(() => {
+    if (selectedStart === null || fitSelectionDuration === null) return;
+    requestFit(fitSelectionDuration, selectedStart + fitSelectionDuration / 2);
+  }, [fitSelectionDuration, selectedStart, requestFit]);
+  return {
+    navigateTo: navigation.navigateTo,
+    projection: navigation.projection,
+    readTimelineStartTime: readStartTime,
+    fitSelectionDuration,
+    onZoomChange: requestZoom,
+    onFitProject,
+    onFitSelection,
+    visibleRangeSeconds: viewportWidth / clampTimelineScale(pixelsPerSecond),
+  };
 }

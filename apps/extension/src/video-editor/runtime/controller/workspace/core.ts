@@ -1,3 +1,4 @@
+import type { VideoProjectActionPreset } from '../../../../features/video/project/types';
 import type { VideoEditorRuntimeController } from '../../session';
 import type { SaveStateMeta, VideoEditorLibrariesState } from '../../app-model/types';
 import type { VideoEditorActionHandlers } from '../../commands';
@@ -5,8 +6,8 @@ import type { VideoEditorSelections } from '../selections';
 import type { VideoEditorWorkspaceState } from '../workspace-state';
 import type {
   AnnotationEditingPort,
+  EffectEditingPort,
   ClipSelectionPort,
-  DiagnosticsTelemetryPort,
   ExportPort,
   PlaybackPort,
   ProjectLifecyclePort,
@@ -37,6 +38,7 @@ interface CreateWorkspaceHeaderArgs {
 }
 
 type PreviewStore = AnnotationEditingPort &
+  Pick<EffectEditingPort, 'updateEffectInstance'> &
   Pick<ClipSelectionPort, 'selectClip' | 'selectScene' | 'selectedClipId'> &
   Pick<PlaybackPort, 'currentTime' | 'isPlaying'> &
   RuntimeSessionPort &
@@ -54,20 +56,9 @@ interface CreateWorkspacePreviewArgs {
     VideoEditorActionHandlers,
     'handleImportAudio' | 'handleImportImage' | 'handleImportVideo'
   >;
-  selections: Pick<VideoEditorSelections, 'selectedActionEvent' | 'selectedMotionRegion'>;
+  selections: Pick<VideoEditorSelections, 'selectedActionOccurrence' | 'selectedMotionRegion'>;
   store: PreviewStore;
   workspace: Pick<VideoEditorWorkspaceState, 'grid' | 'inspector' | 'playbackRange' | 'preview'>;
-}
-
-export function createWorkspaceDiagnosticsController(
-  store: Pick<DiagnosticsTelemetryPort, 'diagnosticsOpen' | 'setDiagnosticsOpen'> &
-    Pick<ProjectLifecyclePort, 'recordingId'>
-) {
-  return {
-    isOpen: store.diagnosticsOpen,
-    onClose: () => store.setDiagnosticsOpen(false),
-    recordingId: store.recordingId,
-  };
 }
 
 function createHeaderGridController(workspace: Pick<VideoEditorWorkspaceState, 'grid'>) {
@@ -89,7 +80,6 @@ export function createWorkspaceHeaderController(
     onOpenAudioRecordingDialog: args.workspace.openAudioRecordingDialog,
     onCloseLibraryPanel: args.workspace.closeLibraryPanel,
     onOpenExportDialog: args.store.openExportDialog,
-    onOpenGridSettings: args.workspace.inspector.openGridSettings,
     onOpenLibraryPanel: args.workspace.openLibraryPanel,
     onRenameProject: args.store.renameProject,
     onSelectScene: () => {
@@ -115,6 +105,8 @@ export function createWorkspaceLayoutController(
   workspace: Pick<
     VideoEditorWorkspaceState,
     | 'audioRecordingDialogOpen'
+    | 'audioRecordingTarget'
+    | 'openTrackAudioRecordingDialog'
     | 'closeAudioRecordingDialog'
     | 'leftSidebarCollapsed'
     | 'openAudioRecordingDialog'
@@ -124,6 +116,8 @@ export function createWorkspaceLayoutController(
 ) {
   return {
     audioRecordingDialogOpen: workspace.audioRecordingDialogOpen,
+    audioRecordingTarget: workspace.audioRecordingTarget,
+    openTrackAudioRecordingDialog: workspace.openTrackAudioRecordingDialog,
     closeAudioRecordingDialog: workspace.closeAudioRecordingDialog,
     handleStartVerticalResize: workspace.preview.handleStartVerticalResize,
     leftSidebarCollapsed: workspace.leftSidebarCollapsed,
@@ -159,7 +153,7 @@ function createWorkspacePreviewTransport(
 function createWorkspacePreviewSelection(args: CreateWorkspacePreviewArgs) {
   return {
     placementMode: args.store.placementMode,
-    selectedActionEvent: args.selections.selectedActionEvent,
+    selectedActionOccurrence: args.selections.selectedActionOccurrence,
     selectedClipId: args.store.selectedClipId,
     selectedMotionRegion: args.selections.selectedMotionRegion,
   };
@@ -197,11 +191,7 @@ export function createWorkspacePreviewController(
   runtime: VideoEditorRuntimeController,
   project: NonNullable<ProjectLifecyclePort['project']>,
   projectUpdaters: {
-    addActionEvent: (
-      preset: NonNullable<
-        NonNullable<ProjectLifecyclePort['project']>['actionEvents'][number]['preset']
-      >
-    ) => void;
+    addActionEvent: (preset: VideoProjectActionPreset) => void;
     addMotionRegion: () => void;
     enableCursorTrack: () => void;
   }
@@ -221,6 +211,7 @@ export function createWorkspacePreviewController(
       onEnableCursorTrack: projectUpdaters.enableCursorTrack,
       onUpdateAnnotationClipTemplate: args.store.updateAnnotationClipTemplate,
       onUpdateClipTransform: args.store.updateClipTransform,
+      onUpdateEffectInstance: args.store.updateEffectInstance,
     },
     pointAuthoring: {
       onClearPlacementMode: args.store.clearPlacementMode,

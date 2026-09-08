@@ -154,11 +154,15 @@ it('resets immediately when stop is requested before the recorder is active', as
 
   await expect(stopRecording()).resolves.toEqual({ result: 'cancelled-before-active' });
 
-  expect(runStopSideEffectsMock).toHaveBeenCalledWith({
-    mode: CaptureMode.TAB,
-    shouldResetImmediately: true,
-    tabId: 7,
-  });
+  expect(runStopSideEffectsMock).toHaveBeenCalledWith(
+    {
+      mode: CaptureMode.TAB,
+      shouldResetImmediately: true,
+      tabId: 7,
+    },
+    'detailed',
+    expect.objectContaining({ discard: false, recordingPointTransform: expect.any(Promise) })
+  );
   expect(resetVideoRecordingRuntimeStateMock).toHaveBeenCalledOnce();
   expect(resetCompletedVideoRecordingSessionMock).toHaveBeenCalledOnce();
   expect(finishVideoRecordingStopMock).toHaveBeenCalledOnce();
@@ -685,5 +689,21 @@ it('reports primitive offscreen stop delivery failures', async () => {
   expect(setVideoRecordingRuntimeStateMock).toHaveBeenNthCalledWith(
     2,
     expect.objectContaining({ error: 'transport failed' })
+  );
+});
+
+it('dispatches STOP without waiting for a hanging content telemetry collection', async () => {
+  beginVideoRecordingStopMock.mockReturnValue({
+    mode: CaptureMode.TAB,
+    tabId: 7,
+    shouldResetImmediately: false,
+  });
+  runStopSideEffectsMock.mockReturnValueOnce(new Promise<void>(() => undefined));
+  await expect(stopRecording()).resolves.toEqual({ result: 'accepted' });
+  expect(sendRuntimeMessageMock).toHaveBeenCalledWith(
+    expect.objectContaining({
+      type: VideoMessageType.OFFSCREEN_STOP_RECORDING,
+      recordingId: 'recording-1',
+    })
   );
 });

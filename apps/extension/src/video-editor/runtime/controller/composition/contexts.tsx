@@ -7,7 +7,10 @@ import type { VideoEditorWorkspaceState } from '../workspace-state';
 
 type WorkspaceDialogsContextValue = Pick<
   VideoEditorWorkspaceState,
+  | 'setAutoProcessingModalOpen'
   | 'audioRecordingDialogOpen'
+  | 'audioRecordingTarget'
+  | 'openTrackAudioRecordingDialog'
   | 'closeAudioRecordingDialog'
   | 'closeLibraryPanel'
   | 'confirm'
@@ -47,7 +50,7 @@ export const VideoEditorBlockingOverlayContext = createContext<boolean | null>(n
 
 export const RuntimePlaybackContext = createContext<Pick<
   VideoEditorRuntimeController,
-  'pausePlayback' | 'seekTo' | 'setPlaybackPlaying' | 'togglePlayback'
+  'pausePlayback' | 'seekTo' | 'setPlaybackPlaying' | 'stepByFrames' | 'togglePlayback'
 > | null>(null);
 export const RuntimePreviewContext = createContext<Pick<
   VideoEditorRuntimeController,

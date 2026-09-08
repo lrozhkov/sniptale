@@ -161,8 +161,8 @@ function resolveSliderScrub(props: SliderFieldProps, display: SliderDisplayMappi
 
 export function SliderField(props: SliderFieldProps) {
   const disabledProps = props.disabled === undefined ? {} : { disabled: props.disabled };
-  const changeValue = useDedupedNumberChange(props.onChange);
-  const separateCommitValue = useDedupedNumberChange(props.onCommit ?? props.onChange);
+  const changeValue = useDedupedNumberChange(props.onChange, props.value);
+  const separateCommitValue = useDedupedNumberChange(props.onCommit ?? props.onChange, props.value);
   const commitValue = props.onCommit ? separateCommitValue : changeValue;
   const step = props.step ?? 1;
   const display = resolveSliderDisplayMapping({
@@ -186,6 +186,8 @@ export function SliderField(props: SliderFieldProps) {
 
   return (
     <NumericRow
+      appearance="plain"
+      className="min-h-8! py-0! grid-cols-[minmax(0,1fr)_auto]!"
       label={props.label}
       max={display.max}
       min={display.min}

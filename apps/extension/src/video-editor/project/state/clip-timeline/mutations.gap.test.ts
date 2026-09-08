@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../features/video/project/factories/creation';
+import {
+  VideoTrackKind,
   VideoClipLinkMode,
   VideoClipTransitionKind,
   VideoMediaFitMode,
@@ -10,6 +14,28 @@ import {
 import { closeProjectTrackGap } from './mutations';
 
 describe('video editor project gap close mutations', () => {
+  it('closes the second then first gap without swallowing the middle clip', () => {
+    const project = createTimelineProject();
+    const trackId = project.tracks[0]!.id;
+    project.clips = [0, 6, 12].map((startTime, index) =>
+      createVideoClip({ assetId: 'asset-1', id: `clip-${index}`, startTime, trackId })
+    );
+    const secondClosed = closeProjectTrackGap(project, trackId, 10, 12);
+    expect(secondClosed.clips.map((clip) => clip.startTime)).toEqual([0, 6, 10]);
+    expect(closeProjectTrackGap(secondClosed, trackId, 4, 10)).toBe(secondClosed);
+    expect(closeProjectTrackGap(secondClosed, trackId, 10, 12)).toBe(secondClosed);
+
+    const bothClosed = closeProjectTrackGap(secondClosed, trackId, 4, 6);
+    expect(bothClosed.clips.map((clip) => [clip.startTime, clip.duration])).toEqual([
+      [0, 4],
+      [4, 4],
+      [8, 4],
+    ]);
+    expect(bothClosed.transitions).toEqual([]);
+    expect(closeProjectTrackGap(bothClosed, trackId, 4, 6)).toBe(bothClosed);
+    expect(project.clips.map((clip) => clip.startTime)).toEqual([0, 6, 12]);
+  });
+
   it('closes a simple same-track gap', () => {
     const project = createTimelineProject();
     const closedProject = closeProjectTrackGap(project, project.tracks[0]!.id, 5, 6);
@@ -82,6 +108,7 @@ function createTimelineProject(): VideoProject {
 
 function createGapProjectWithLinkedTrailingClip(): VideoProject {
   const project = createTimelineProject();
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
   const audioTrackId = project.tracks[1]!.id;
   const trailingClip = project.clips.find((clip) => clip.id === 'clip-2')!;
 

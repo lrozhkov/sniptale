@@ -75,6 +75,7 @@ interface CreateLiveRecordingArtifactSessionOwnerInput {
   coordinator: RecordingStagingCoordinator;
   encoding: LiveRecordingEncodingConfig;
   frameTransform?: LiveVideoFrameTransform | undefined;
+  onVideoFrameGeometry?: (frame: VideoFrame) => void;
   stream: MediaStream;
   writer: RecordingStagingArtifactWriter;
 }
@@ -512,6 +513,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
         const result = await this.readNextVideoFrame();
         if (result.done) break;
         const frame = result.value;
+        this.input.onVideoFrameGeometry?.(frame);
         this.videoDiagnostics.observeSourceFrame(frame);
         if (this.phase === 'paused') {
           frame.close();

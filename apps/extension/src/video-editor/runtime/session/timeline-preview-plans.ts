@@ -1,3 +1,5 @@
+import { clampTimelineScale } from '../../contracts/timeline-scale';
+import { normalizeClipPlaybackRate } from '../../../features/video/project/timeline/basics';
 import { getMediaClipSourceTime } from '../../../features/video/project/timeline';
 import {
   VideoProjectClipType,
@@ -46,18 +48,19 @@ export function getNextTimelinePreviewFrameBatch(
   generatedUrlCache: Map<string, TimelinePreviewFrame>
 ): { assetUrl: string; samples: readonly TimelineVideoFrameSample[] } | null {
   const firstMissingPlan = plans.find(
-    (plan) => plan.kind === 'video' && plan.slotKeys.some((key) => !generatedUrlCache.has(key))
+    (plan) =>
+      plan.kind === 'video' && plan.slots.some((slot) => !generatedUrlCache.has(slot.cacheKey))
   );
   if (!firstMissingPlan) {
     return null;
   }
 
-  const samples = firstMissingPlan.slotKeys
-    .filter((key) => !generatedUrlCache.has(key))
+  const samples = firstMissingPlan.slots
+    .filter((slot) => !generatedUrlCache.has(slot.cacheKey))
     .slice(0, TIMELINE_PREVIEW_BATCH_SIZE)
-    .map((cacheKey) => ({
-      cacheKey,
-      sourceTime: parseTimelinePreviewFrameCacheKey(cacheKey).sourceTime,
+    .map((slot) => ({
+      cacheKey: slot.cacheKey,
+      sourceTime: slot.sourceStart,
     }));
 
   return { assetUrl: firstMissingPlan.assetUrl, samples };
@@ -66,7 +69,13 @@ export function getNextTimelinePreviewFrameBatch(
 export function getTimelinePreviewPlanKey(plans: readonly TimelinePreviewPlan[]): string {
   return plans
     .map((plan) =>
-      [plan.clipId, plan.kind, plan.assetId, plan.assetUrl, ...plan.slotKeys].join(',')
+      [
+        plan.clipId,
+        plan.kind,
+        plan.assetId,
+        plan.assetUrl,
+        ...plan.slots.flatMap((slot) => [slot.cacheKey, slot.sourceEnd]),
+      ].join(',')
     )
     .join('|');
 }
@@ -75,7 +84,9 @@ export function resolveTimelinePreviewFrameOwner(
   plans: readonly TimelinePreviewPlan[],
   cacheKey: string
 ): { assetId: string; assetUrl: string } | null {
-  const plan = plans.find((item) => item.kind === 'video' && item.slotKeys.includes(cacheKey));
+  const plan = plans.find(
+    (item) => item.kind === 'video' && item.slots.some((slot) => slot.cacheKey === cacheKey)
+  );
   return plan ? { assetId: plan.assetId, assetUrl: plan.assetUrl } : null;
 }
 
@@ -89,7 +100,7 @@ function createImagePreviewPlan(
     assetUrl,
     clipId,
     kind: 'image',
-    slotKeys: [],
+    slots: [],
   };
 }
 
@@ -100,15 +111,27 @@ function createVideoPreviewPlan(
   assetDuration: number | null
 ): TimelinePreviewPlan {
   const sourceSlots = buildVideoPreviewSourceSlots(clip, viewport, assetDuration);
+  const visibleStart = viewport
+    ? getMediaClipSourceTime(clip, viewport.startTime)
+    : clip.sourceStart;
+  const visibleEnd = viewport
+    ? getMediaClipSourceTime(clip, viewport.endTime)
+    : clip.sourceStart + clip.sourceDuration;
+  const isVisible = (slot: (typeof sourceSlots)[number]) =>
+    slot.sourceEnd > visibleStart && slot.sourceStart < visibleEnd;
+  const prioritizedSlots = [...sourceSlots].sort(
+    (left, right) => Number(isVisible(right)) - Number(isVisible(left))
+  );
 
   return {
     assetId: clip.assetId,
     assetUrl,
     clipId: clip.id,
     kind: 'video',
-    slotKeys: sourceSlots.map((sourceTime) =>
-      createTimelinePreviewFrameCacheKey(clip.assetId, assetUrl, sourceTime)
-    ),
+    slots: prioritizedSlots.map((slot) => ({
+      ...slot,
+      cacheKey: createTimelinePreviewFrameCacheKey(clip.assetId, assetUrl, slot.sourceStart),
+    })),
   };
 }
 
@@ -116,17 +139,28 @@ function buildVideoPreviewSourceSlots(
   clip: VideoProjectVideoClip,
   viewport: TimelinePreviewViewport | null,
   assetDuration: number | null
-): readonly number[] {
+): readonly { sourceStart: number; sourceEnd: number }[] {
   const sourceRange = resolvePreviewSourceRange(clip, viewport);
   if (!sourceRange) {
     return [];
   }
 
-  const firstSlot = Math.floor(sourceRange.start / STORYBOARD_SLOT_SECONDS);
-  const lastSlot = Math.max(
-    firstSlot,
-    Math.ceil(Math.max(sourceRange.start, sourceRange.end) / STORYBOARD_SLOT_SECONDS) - 1
-  );
+  const start = Math.max(0, sourceRange.start);
+  const end =
+    assetDuration !== null && Number.isFinite(assetDuration)
+      ? Math.min(sourceRange.end, assetDuration)
+      : sourceRange.end;
+  if (end <= start) {
+    return [];
+  }
+
+  const rate = normalizeClipPlaybackRate(clip.playbackRate ?? 1);
+  const desiredStep = viewport
+    ? (64 / clampTimelineScale(viewport.pixelsPerSecond)) * rate
+    : STORYBOARD_SLOT_SECONDS;
+  const step = viewport ? 2 ** Math.floor(Math.log2(desiredStep)) : desiredStep;
+  const firstSlot = Math.floor(start / step);
+  const lastSlot = Math.max(firstSlot, Math.ceil(end / step) - 1);
   const slots: number[] = [];
   const totalSlots = Math.max(1, lastSlot - firstSlot + 1);
   const stride = Math.max(1, Math.ceil(totalSlots / MAX_ASSET_STORYBOARD_FRAMES));
@@ -136,11 +170,11 @@ function buildVideoPreviewSourceSlots(
     slot <= lastSlot && slots.length < MAX_ASSET_STORYBOARD_FRAMES;
     slot += stride
   ) {
-    pushUniqueSourceTime(slots, clampSourceTime(slot * STORYBOARD_SLOT_SECONDS, assetDuration));
+    slots.push(Math.max(start, slot * step));
   }
 
   slots.sort((left, right) => left - right);
-  return slots.slice(0, MAX_ASSET_STORYBOARD_FRAMES);
+  return slots.map((sourceStart, index) => ({ sourceStart, sourceEnd: slots[index + 1] ?? end }));
 }
 
 function resolvePreviewSourceRange(
@@ -155,14 +189,12 @@ function resolvePreviewSourceRange(
     return { end: clip.sourceStart + clip.sourceDuration, start: clip.sourceStart };
   }
 
-  const projectStart = Math.max(
-    clip.startTime,
-    viewport.startTime - TIMELINE_PREVIEW_VIEWPORT_BUFFER_SECONDS
+  const buffer = Math.min(
+    TIMELINE_PREVIEW_VIEWPORT_BUFFER_SECONDS,
+    (viewport.endTime - viewport.startTime) / 2
   );
-  const projectEnd = Math.min(
-    clip.startTime + clip.duration,
-    viewport.endTime + TIMELINE_PREVIEW_VIEWPORT_BUFFER_SECONDS
-  );
+  const projectStart = Math.max(clip.startTime, viewport.startTime - buffer);
+  const projectEnd = Math.min(clip.startTime + clip.duration, viewport.endTime + buffer);
   if (projectEnd <= projectStart) {
     return null;
   }
@@ -181,26 +213,6 @@ function createTimelinePreviewFrameCacheKey(
   return ['video', assetId, assetUrl, normalizeSourceTimeKey(sourceTime)].join(':');
 }
 
-function parseTimelinePreviewFrameCacheKey(cacheKey: string): { sourceTime: number } {
-  const sourceTime = Number(cacheKey.slice(cacheKey.lastIndexOf(':') + 1));
-  return { sourceTime };
-}
-
 function normalizeSourceTimeKey(sourceTime: number): string {
-  return sourceTime.toFixed(2);
-}
-
-function clampSourceTime(sourceTime: number, assetDuration: number | null): number {
-  const upperBound =
-    assetDuration !== null && Number.isFinite(assetDuration)
-      ? Math.max(0, assetDuration)
-      : sourceTime;
-  return Math.min(upperBound, Math.max(0, sourceTime));
-}
-
-function pushUniqueSourceTime(sourceTimes: number[], sourceTime: number): void {
-  const normalized = Number(normalizeSourceTimeKey(sourceTime));
-  if (!sourceTimes.some((value) => Math.abs(value - normalized) <= 0.01)) {
-    sourceTimes.push(normalized);
-  }
+  return String(sourceTime);
 }

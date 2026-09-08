@@ -1,4 +1,5 @@
 export interface VideoEditorPlaybackRange {
+  loop?: boolean;
   end: number;
   start: number;
 }
@@ -29,7 +30,7 @@ export function clampPlaybackRange(
     return null;
   }
 
-  return { start, end };
+  return { ...range, start, end };
 }
 
 function clampToProject(value: number, duration: number): number {

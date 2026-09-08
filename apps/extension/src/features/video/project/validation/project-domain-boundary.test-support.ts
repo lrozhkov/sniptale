@@ -1,9 +1,14 @@
 import { createAnnotationClip, createShapeClip, createTextClip } from '../factories/overlay-clip';
-import { createEmptyVideoProject, createVideoProjectAsset } from '../factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+  createVideoProjectAsset,
+} from '../factories/creation';
 import { createVideoClipFromAsset } from '../factories/clip';
 import { createVideoProjectCursorTrack } from '../defaults';
 import { createVideoProjectMotionRegion } from '../motion/index';
 import {
+  VideoTrackKind,
   VideoProjectActionEventKind,
   VideoProjectActionPreset,
   VideoProjectAssetType,
@@ -35,21 +40,22 @@ export function createAsset(): VideoProjectAsset {
 export function createActionEvent(): VideoProjectActionEvent {
   return {
     data: { button: 'primary' },
-    duration: 0.2,
+    capturedDuration: 0.2,
     id: 'action-1',
     kind: VideoProjectActionEventKind.CLICK,
     label: 'Click',
     point: { x: 100, y: 120 },
-    preset: VideoProjectActionPreset.CLICK_RIPPLE,
-    time: 1,
+    presentation: { preset: VideoProjectActionPreset.CLICK_RIPPLE },
+    anchor: { kind: 'project', time: 1 },
   };
 }
 
 export function createProject() {
   const project = createEmptyVideoProject('Domain Boundary', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const asset = createAsset();
   const clip = createVideoClipFromAsset(project.tracks[0]!.id, asset, 1280, 720);
-  const annotationClip = createAnnotationClip(project.tracks[2]!.id, 1280, 720, 1);
+  const annotationClip = createAnnotationClip(project.tracks[1]!.id, 1280, 720, 1);
   const actionEvent = createActionEvent();
 
   return {
@@ -62,7 +68,7 @@ export function createProject() {
     motionRegions: [
       {
         ...createVideoProjectMotionRegion(project, 1),
-        targetActionEventId: actionEvent.id,
+        targetAction: { eventId: actionEvent.id, clipId: null },
       },
     ],
   };
@@ -70,17 +76,19 @@ export function createProject() {
 
 export function createTextProject() {
   const project = createEmptyVideoProject('Text Domain Boundary', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   return {
     ...project,
-    clips: [createTextClip(project.tracks[2]!.id, 1280, 720, 0)],
+    clips: [createTextClip(project.tracks[1]!.id, 1280, 720, 0)],
   };
 }
 
 export function createShapeProject() {
   const project = createEmptyVideoProject('Shape Domain Boundary', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const asset = createAsset();
   const shapeClip = createShapeClip(
-    project.tracks[2]!.id,
+    project.tracks[1]!.id,
     1280,
     720,
     0,

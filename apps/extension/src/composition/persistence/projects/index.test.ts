@@ -214,7 +214,7 @@ async function verifyProjectReadListAndDelete() {
     })
   );
   await expect(listVideoProjects()).resolves.toEqual([
-    expect.objectContaining({ clipCount: 1, id: 'project-2', trackCount: 2 }),
+    expect.objectContaining({ clipCount: 1, id: 'project-2', trackCount: 1 }),
     expect.objectContaining({ clipCount: 0, id: 'project-1', trackCount: 0 }),
   ]);
 

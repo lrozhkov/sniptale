@@ -20,7 +20,7 @@ import type {
   VideoProjectAssetSource,
   VideoProjectTrack,
 } from '../types/index';
-import { VideoTimelinePlacementMode, VideoTrackKind } from '../types/index';
+import { VideoTimelinePlacementMode, VideoTrackKind, VideoProjectTrackRole } from '../types/index';
 
 export function createClipGroupId(): string {
   return crypto.randomUUID();
@@ -33,14 +33,9 @@ export function getDefaultTrackName(kind: VideoTrackKind, index = 1): string {
   if (kind === VideoTrackKind.AUDIO) {
     return `${translate('shared.videoProject.trackAudioPrefix')} ${index}`;
   }
-  if (kind === VideoTrackKind.SUBTITLE) {
-    return index === 1
-      ? translate('shared.videoProject.trackSubtitles')
-      : `${translate('shared.videoProject.trackSubtitlesPrefix')} ${index}`;
-  }
   return index === 1
-    ? translate('shared.videoProject.trackOverlays')
-    : `${translate('shared.videoProject.trackOverlaysPrefix')} ${index}`;
+    ? translate('shared.videoProject.trackSubtitles')
+    : `${translate('shared.videoProject.trackSubtitlesPrefix')} ${index}`;
 }
 
 export function createVideoProjectTrack(
@@ -64,6 +59,54 @@ export function createVideoProjectTrack(
   };
 }
 
+/** Resolves a free ordinary video layer above visible content for an overlay interval. */
+export function resolveVideoOverlayTrack(
+  project: VideoProject,
+  startTime: number,
+  duration: number,
+  preferredTrackId?: string | null
+): VideoProjectTrack {
+  const occupied = new Set(
+    project.clips
+      .filter(
+        (clip) =>
+          clip.startTime < startTime + duration && startTime < clip.startTime + clip.duration
+      )
+      .map((clip) => clip.trackId)
+  );
+  const highestContentOrder = Math.min(
+    Infinity,
+    ...project.tracks
+      .filter(
+        (track) => track.kind !== VideoTrackKind.AUDIO && track.visible && occupied.has(track.id)
+      )
+      .map((track) => track.order)
+  );
+  const available = project.tracks.filter(
+    (track) =>
+      track.kind === VideoTrackKind.PRIMARY &&
+      track.role !== VideoProjectTrackRole.CAMERA &&
+      track.visible &&
+      !track.locked &&
+      !occupied.has(track.id) &&
+      track.order < highestContentOrder
+  );
+  const existing =
+    available.find((track) => track.id === preferredTrackId) ??
+    available.find((track) => !track.isRoot);
+  return (
+    existing ??
+    createVideoProjectTrack(
+      getDefaultTrackName(
+        VideoTrackKind.PRIMARY,
+        project.tracks.filter((track) => track.kind === VideoTrackKind.PRIMARY).length + 1
+      ),
+      Math.min(0, ...project.tracks.map((track) => track.order)) - 1,
+      VideoTrackKind.PRIMARY
+    )
+  );
+}
+
 export function createVideoProjectAsset(
   name: string,
   type: VideoProjectAssetType,
@@ -85,7 +128,12 @@ export function createEmptyVideoProject(
   width = 1920,
   height = 1080
 ): VideoProject {
-  const { audioTrack, overlayTrack, primaryTrack } = createDefaultProjectTracks();
+  const primaryTrack = createVideoProjectTrack(
+    getDefaultTrackName(VideoTrackKind.PRIMARY, 1),
+    1,
+    VideoTrackKind.PRIMARY,
+    true
+  );
   const now = getVideoProjectMutationTimestamp();
 
   return {
@@ -103,7 +151,7 @@ export function createEmptyVideoProject(
     createdAt: now,
     updatedAt: now,
     assets: [],
-    tracks: [primaryTrack, audioTrack, overlayTrack],
+    tracks: [primaryTrack],
     clips: [],
     transitions: [],
     effectInstances: [],
@@ -113,33 +161,6 @@ export function createEmptyVideoProject(
     motionRegions: [],
     cursorTrack: null,
     actionEvents: [],
-  };
-}
-
-function createDefaultProjectTracks(): {
-  audioTrack: VideoProjectTrack;
-  overlayTrack: VideoProjectTrack;
-  primaryTrack: VideoProjectTrack;
-} {
-  return {
-    overlayTrack: createVideoProjectTrack(
-      getDefaultTrackName(VideoTrackKind.OVERLAY, 1),
-      0,
-      VideoTrackKind.OVERLAY,
-      true
-    ),
-    primaryTrack: createVideoProjectTrack(
-      getDefaultTrackName(VideoTrackKind.PRIMARY, 1),
-      1,
-      VideoTrackKind.PRIMARY,
-      true
-    ),
-    audioTrack: createVideoProjectTrack(
-      getDefaultTrackName(VideoTrackKind.AUDIO, 1),
-      2,
-      VideoTrackKind.AUDIO,
-      true
-    ),
   };
 }
 

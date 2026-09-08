@@ -3,10 +3,12 @@ import type { ProjectTimelineClipProps } from './types';
 import { ProjectTimelineClipLayout } from './view';
 
 export function ProjectTimelineClip({
+  hideClipNames = false,
   clip,
   isHovered,
   isSelected,
   pixelsPerSecond,
+  projection,
   preview,
   project,
   trackClipTop,
@@ -17,10 +19,12 @@ export function ProjectTimelineClip({
   onBeginClipInteraction,
 }: ProjectTimelineClipProps) {
   const viewModel = buildProjectTimelineClipViewModel({
+    hideClipNames,
     clip,
     isHovered,
     isSelected,
     pixelsPerSecond,
+    projection,
     project,
     trackLocked,
     ...(trackClipTop === undefined ? {} : { trackClipTop }),

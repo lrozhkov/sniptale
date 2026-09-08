@@ -1,3 +1,9 @@
+import type {
+  VideoWorkspace,
+  VideoWorkspaceDraft,
+  VideoWorkspaceSnapshot,
+} from '../review-workspaces/contracts';
+import { putVideoReviewRestore } from '../review-workspaces/backup-restore';
 import type { AggregatePresentationEntry } from '../aggregate-presentations/contracts';
 import { createAggregatePresentationKey } from '../aggregate-presentations/contracts';
 import type {
@@ -43,12 +49,18 @@ interface IndexStore<T = unknown> extends Store<T> {
 }
 
 interface PreparedVideoProjectArchiveRoot {
-  assets: Array<{ entry: StoredProjectAssetEntry; filename: string; ref: AssetRef }>;
+  assets: Array<{
+    entry: StoredProjectAssetEntry;
+    filename: string;
+    ref: AssetRef;
+    videoReview?: VideoWorkspaceSnapshot;
+  }>;
   entry: VideoProjectEntry;
   exports: Array<{
     entry: StoredProjectExportEntry;
     ref: AssetRef;
     thumbnail?: MediaThumbnailEntry;
+    videoReview?: VideoWorkspaceSnapshot;
   }>;
   presentation?: AggregatePresentationEntry;
   thumbnail?: MediaThumbnailEntry;
@@ -58,6 +70,8 @@ export interface VideoProjectBackupRestoreStores {
   assets: Store<StoredProjectAssetEntry>;
   exports: IndexStore<StoredProjectExportEntry>;
   media: Store<MediaLibraryEntry>;
+  videoWorkspaces: Store<VideoWorkspace>;
+  videoDrafts: Store<VideoWorkspaceDraft>;
   operations: Store;
   owners: OwnerStore;
   presentations: Store<AggregatePresentationEntry>;
@@ -106,6 +120,8 @@ async function deleteExisting(args: {
     const asset = parseProjectAssetEntry(await args.stores.assets.get(id));
     await args.stores.assets.delete(id);
     await args.stores.media.delete(`project-asset:${id}`);
+    await args.stores.videoWorkspaces.delete(`project-asset:${id}`);
+    await args.stores.videoDrafts.delete(`project-asset:${id}`);
     await args.stores.thumbnails.delete(`project-asset:${id}`);
     if (asset)
       await unlink({
@@ -121,6 +137,8 @@ async function deleteExisting(args: {
     if (!entry) continue;
     await args.stores.exports.delete(entry.id);
     await args.stores.media.delete(`export:${entry.id}`);
+    await args.stores.videoWorkspaces.delete(`export:${entry.id}`);
+    await args.stores.videoDrafts.delete(`export:${entry.id}`);
     await args.stores.thumbnails.delete(`export:${entry.id}`);
     await unlink({
       assetId: entry.assetId,
@@ -200,6 +218,12 @@ async function publishProjectAssets(
       role: PROJECT_MEDIA_ASSET_ROLE,
     });
     await stores.assets.put(asset.entry);
+    if (asset.videoReview)
+      await putVideoReviewRestore({
+        review: asset.videoReview,
+        workspaces: stores.videoWorkspaces,
+        drafts: stores.videoDrafts,
+      });
     await stores.media.put({
       ...buildProjectAssetMediaEntry(asset.entry),
       filename: asset.filename,
@@ -221,6 +245,12 @@ async function publishProjectExports(
       role: PROJECT_MEDIA_ASSET_ROLE,
     });
     await stores.exports.put(item.entry);
+    if (item.videoReview)
+      await putVideoReviewRestore({
+        review: item.videoReview,
+        workspaces: stores.videoWorkspaces,
+        drafts: stores.videoDrafts,
+      });
     await stores.media.put(buildProjectExportMediaEntry(item.entry));
     if (item.thumbnail) await stores.thumbnails.put(item.thumbnail);
   }

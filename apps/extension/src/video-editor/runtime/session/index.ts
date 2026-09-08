@@ -18,7 +18,8 @@ export interface VideoEditorRuntimeController {
   registerPreviewRuntime: (runtime: PlaybackPreviewRuntime | null) => void;
   pausePlayback: () => number;
   seekTo: (time: number) => void;
-  setPlaybackPlaying: (playing: boolean) => void;
+  stepByFrames: (frameDelta: number) => void;
+  setPlaybackPlaying: (playing: boolean) => void | Promise<boolean>;
   togglePlayback: () => void;
   applyLoadedProject: ApplyLoadedProject;
 }
@@ -39,6 +40,7 @@ function createVideoEditorRuntimeController(
     registerPreviewRuntime: playback.registerPreviewRuntime,
     pausePlayback: playback.pausePlayback,
     seekTo: playback.seekTo,
+    stepByFrames: playback.stepByFrames,
     setPlaybackPlaying: playback.setPlaybackPlaying,
     togglePlayback: playback.togglePlayback,
     applyLoadedProject,
@@ -47,13 +49,11 @@ function createVideoEditorRuntimeController(
 
 function useApplyLoadedProject(
   setProject: UseVideoEditorRuntimeParams['projectState']['setProject'],
-  setError: UseVideoEditorRuntimeParams['projectState']['setError'],
-  setDiagnosticsOpen: UseVideoEditorRuntimeParams['projectState']['setDiagnosticsOpen']
+  setError: UseVideoEditorRuntimeParams['projectState']['setError']
 ) {
   return useCallback<ApplyLoadedProject>(
-    (project, recordingId) =>
-      createApplyLoadedProject(setProject, setError, setDiagnosticsOpen)(project, recordingId),
-    [setDiagnosticsOpen, setError, setProject]
+    (project, recordingId) => createApplyLoadedProject(setProject, setError)(project, recordingId),
+    [setError, setProject]
   );
 }
 
@@ -88,8 +88,7 @@ export function useVideoEditorRuntime(
   const timelinePreviewRuntime = useTimelinePreviewRuntime(params.project, assetUrls);
   const applyLoadedProject = useApplyLoadedProject(
     params.projectState.setProject,
-    params.projectState.setError,
-    params.projectState.setDiagnosticsOpen
+    params.projectState.setError
   );
   const playback = useVideoEditorPlayback(
     params.project,
@@ -98,15 +97,17 @@ export function useVideoEditorRuntime(
       isPlaying: params.playback.isPlaying,
       playbackRange: params.playback.playbackRange,
       projectHistoryTransactionActive: params.playback.projectHistoryTransactionActive,
+      shortcutsEnabled: params.playback.shortcutsEnabled,
       selection: params.playback.selection,
       placementMode: params.playback.placementMode,
       selectedClipId: params.playback.selectedClipId,
-      selectedActionEvent: params.playback.selectedActionEvent,
+      selectedActionOccurrence: params.playback.selectedActionOccurrence,
       selectedMotionRegion: params.playback.selectedMotionRegion,
     },
     {
       setCurrentTime: params.playback.setCurrentTime,
       setPlaying: params.playback.setPlaying,
+      duplicateClip: params.playback.duplicateClip,
       splitClipAt: params.playback.splitClipAt,
       deleteClip: params.playback.deleteSelection.clip,
       deleteActionEvent: params.playback.deleteSelection.actionEvent,

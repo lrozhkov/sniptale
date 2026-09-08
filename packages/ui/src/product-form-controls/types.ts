@@ -28,6 +28,8 @@ export interface ProductSelectProps<T extends string = string> extends Omit<
   containerClassName?: string;
   menuClassName?: string;
   menuPlacement?: 'auto' | 'bottom';
+  /** Preferred positive menu width in CSS pixels, bounded to the viewport with an 8px inset. Omit to match the trigger width. */
+  menuWidth?: number;
   menuScrollable?: boolean;
   dataUi?: string;
 }
@@ -50,6 +52,7 @@ export interface ProductSelectTriggerProps<T extends string = string> {
     | 'dataUi'
     | 'menuClassName'
     | 'menuPlacement'
+    | 'menuWidth'
     | 'menuScrollable'
     | 'onChange'
     | 'options'

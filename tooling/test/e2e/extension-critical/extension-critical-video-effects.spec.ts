@@ -22,8 +22,6 @@ import {
 } from '../extension-critical.helpers';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 
-const VIDEO_EDITOR_PREVIEW_MODE_LABEL = translate('videoEditor.stage.previewMode', 'ru');
-const VIDEO_EDITOR_PREVIEW_RASTER_LABEL = translate('videoEditor.stage.previewRaster', 'ru');
 const VIDEO_EDITOR_PREVIEW_CACHE_LABEL = translate('videoEditor.stage.previewModeCache', 'ru');
 const VIDEO_EDITOR_PREVIEW_CACHE_READY_LABEL = translate(
   'videoEditor.stage.previewCacheReady',
@@ -50,7 +48,7 @@ test('EffectV1 catalog enable toggle stays live in Chromium IndexedDB', async ({
   });
   await expect(enableButton).toBeVisible();
   await enableButton.click();
-  await expect(page.getByText('neutral-standalone', { exact: true })).toBeVisible();
+  await expect(page.locator('[data-effect-document="neutral-standalone"]')).toBeVisible();
   await expect(
     page.getByRole('button', { name: VIDEO_EDITOR_EFFECT_DISABLE_LABEL, exact: true })
   ).toBeVisible();
@@ -92,10 +90,10 @@ test('cached EffectV1 preview prepares beyond the first frame and starts playbac
     documentId: 'neutral-standalone',
     fixturePath: EFFECT_V1_STANDALONE_FIXTURE,
   });
-  await page.getByRole('button', { name: VIDEO_EDITOR_PREVIEW_RASTER_LABEL }).click();
-  await page.getByRole('option', { name: '720p', exact: true }).click();
-  await page.getByRole('button', { name: VIDEO_EDITOR_PREVIEW_MODE_LABEL }).click();
-  await page.getByText(VIDEO_EDITOR_PREVIEW_CACHE_LABEL, { exact: true }).click();
+  await page.locator('[data-ui="video.preview.display-settings"]').click();
+  await page.getByRole('radio', { name: '720p', exact: true }).check();
+  await page.getByRole('radio', { name: VIDEO_EDITOR_PREVIEW_CACHE_LABEL, exact: true }).check();
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: VIDEO_EDITOR_PLAY_LABEL, exact: true }).click();
 
   await expect(page.getByText(VIDEO_EDITOR_PREVIEW_CACHE_READY_LABEL, { exact: true })).toBeVisible(

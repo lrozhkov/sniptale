@@ -80,8 +80,7 @@ function verifyAssetTrackRouting(): void {
 
   expect(imageResult.project.clips[0]).toEqual(
     expect.objectContaining({
-      trackId: imageResult.project.tracks.find((track) => track.kind === VideoTrackKind.OVERLAY)!
-        .id,
+      trackId: imageResult.selectedTrackId,
       type: VideoProjectClipType.IMAGE,
     })
   );
@@ -169,7 +168,7 @@ function verifyAnnotationInsertion(): void {
     })
   );
   expect(result.project.tracks.find((track) => track.id === result.selectedTrackId)?.kind).toBe(
-    VideoTrackKind.OVERLAY
+    VideoTrackKind.PRIMARY
   );
 }
 
@@ -195,7 +194,7 @@ function verifyBlockInsertion(): void {
   expect(
     spotlightResult.project.tracks.find((track) => track.id === spotlightResult.selectedTrackId)
       ?.kind
-  ).toBe(VideoTrackKind.OVERLAY);
+  ).toBe(VideoTrackKind.PRIMARY);
   expect(subtitleResult.project.clips[0]).toEqual(
     expect.objectContaining({
       text: expect.any(String),
@@ -243,13 +242,10 @@ function verifyOccupiedTrackInsertionFallback(): void {
   const insertedShapeClip = shapeResult.project.clips.find(
     (clip) => clip.type === VideoProjectClipType.SHAPE
   );
-  const textTrackEnd = textResult.project.clips.reduce(
-    (maxEnd, clip) => Math.max(maxEnd, clip.startTime + clip.duration),
-    0
-  );
+  expect(insertedShapeClip?.trackId).not.toBe(textResult.selectedTrackId);
 
   expect(insertedGroupedStartTimes).toEqual(new Set([7]));
-  expect(insertedShapeClip?.startTime).toBe(textTrackEnd);
+  expect(insertedShapeClip?.startTime).toBe(2);
 }
 
 function verifyAssetDedup(): void {

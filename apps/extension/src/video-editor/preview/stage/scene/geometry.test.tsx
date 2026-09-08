@@ -6,12 +6,12 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const {
-  drawActionCompositionStateMock,
+  drawSceneActionCompositionStatesMock,
   drawCursorCompositionStateMock,
   mapCompositionPointThroughCameraMock,
   resolveVideoCompositionRenderPassesMock,
 } = vi.hoisted(() => ({
-  drawActionCompositionStateMock: vi.fn(),
+  drawSceneActionCompositionStatesMock: vi.fn(),
   drawCursorCompositionStateMock: vi.fn(),
   mapCompositionPointThroughCameraMock: vi.fn(),
   resolveVideoCompositionRenderPassesMock: vi.fn(),
@@ -19,7 +19,7 @@ const {
 
 vi.mock('../../../../features/video/composition/draw', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../features/video/composition/draw')>()),
-  drawActionCompositionState: drawActionCompositionStateMock,
+  drawSceneActionCompositionStates: drawSceneActionCompositionStatesMock,
   drawCompositionVisualLayer: vi.fn(),
   drawCursorCompositionState: drawCursorCompositionStateMock,
 }));
@@ -133,7 +133,7 @@ beforeEach(() => {
   vi.stubGlobal('ResizeObserver', ResizeObserverMock);
   capturePrototypeDescriptors();
   installPrototypeMocks();
-  drawActionCompositionStateMock.mockReset();
+  drawSceneActionCompositionStatesMock.mockReset();
   drawCursorCompositionStateMock.mockReset();
   mapCompositionPointThroughCameraMock.mockReset();
   resolveVideoCompositionRenderPassesMock.mockReset();
@@ -267,12 +267,10 @@ async function verifyCameraMappedOverlays() {
     expect.anything(),
     expect.objectContaining({ x: 20, y: 50 })
   );
-  expect(drawActionCompositionStateMock).toHaveBeenCalledWith(
+  expect(drawSceneActionCompositionStatesMock).toHaveBeenCalledWith(
     expect.anything(),
-    expect.objectContaining({
-      point: { x: 40, y: 70 },
-    }),
-    { x: 20, y: 50 },
-    1
+    [{ point: { x: 80, y: 90 } }],
+    renderPass.overlayFrame.camera,
+    { offsetX: 0, offsetY: 0, scaleX: 1, scaleY: 1 }
   );
 }

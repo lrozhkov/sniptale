@@ -1,7 +1,11 @@
 import { vi } from 'vitest';
 import { createAnnotationClip } from '../../../../features/video/project/factories/overlay-clip';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../features/video/project/factories/creation';
+import {
+  VideoTrackKind,
   VideoClipLinkMode,
   VideoClipTransitionKind,
   VideoMediaFitMode,
@@ -141,9 +145,10 @@ export function createLockedStageScenario() {
 
 export function createLockedOverlayScenario() {
   const project = createEmptyVideoProject('Locked overlay');
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.PRIMARY));
   project.width = 200;
   project.height = 100;
-  const clip = createAnnotationClip(project.tracks[2]!.id, 200, 100, 0);
+  const clip = createAnnotationClip(project.tracks[1]!.id, 200, 100, 0);
   clip.transform = {
     ...clip.transform,
     height: 30,

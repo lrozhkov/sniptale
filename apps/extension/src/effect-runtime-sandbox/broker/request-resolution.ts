@@ -1,3 +1,4 @@
+import { parseEffectLogicalDimensions } from '../../contracts/effect-runtime/dimensions';
 import type { EffectV1Document } from '@sniptale/runtime-contracts/effect-v1';
 
 import { createEffectRuntimeAssetSelectionId } from '../../contracts/effect-runtime/immutable-refs';
@@ -19,7 +20,6 @@ import { parseVisualAssets } from './request-assets';
 import { parseAndVerifyEffectDocument } from './request-document';
 import {
   parseControls,
-  parseFrameDimensions,
   parseInputFrames,
   parseRenderDimensions,
   parseTiming,
@@ -127,7 +127,7 @@ function createAcceptedRequest(args: {
 }
 
 function parseResolvedRequestFields(value: Record<string, unknown>, document: EffectV1Document) {
-  const dimensions = parseFrameDimensions(value['width'], value['height']);
+  const dimensions = parseEffectLogicalDimensions(value['width'], value['height']);
   const renderDimensions = parseRenderDimensions(
     value['renderWidth'],
     value['renderHeight'],

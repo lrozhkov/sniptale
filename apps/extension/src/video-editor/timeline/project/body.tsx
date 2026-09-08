@@ -1,4 +1,5 @@
 import type { ComponentProps } from 'react';
+import { VideoEditorSelectionKind } from '../../contracts/selection';
 import { ProjectTimelineCanvas } from './canvas';
 import { ProjectTimelineTrackList } from './tracks/list';
 import type { ProjectTimelineProps } from './types';
@@ -10,28 +11,36 @@ type ProjectTimelineBodyProps = Pick<
   | 'beginClipInteraction'
   | 'beginEffectInteraction'
   | 'beginEffectRangeSelection'
+  | 'beginPlayheadScrub'
   | 'beginRangeSelection'
   | 'beginTrackRangeSelection'
   | 'currentTime'
+  | 'consumeCompletedScrubClick'
   | 'dragGhost'
   | 'handleTimelineSeek'
   | 'hoveredClipId'
+  | 'autoProcessing'
+  | 'onAutoProcessingModalVisibilityChange'
   | 'insertion'
   | 'onCloseTrackGap'
   | 'onDropEffectDocument'
-  | 'onDeleteTrack'
-  | 'onMoveTrack'
   | 'onClearUtilityLane'
-  | 'onSelectActionSegment'
+  | 'onSelectHistorySpan'
+  | 'onSelectActionOccurrence'
   | 'onSelectClip'
   | 'onSelectCursorSegment'
   | 'onSelectMotionRegion'
+  | 'onConnectMotionRegions'
+  | 'onSelectMotionLane'
+  | 'onSelectHistoryLane'
   | 'onSelectObjectTrack'
   | 'onSelectScene'
   | 'onSelectTrack'
   | 'onSelectTransition'
-  | 'onResizeActionEvent'
   | 'onResizeMotionRegion'
+  | 'onSeek'
+  | 'onStepToNextFrame'
+  | 'onStepToPreviousFrame'
   | 'onToggleTrackLock'
   | 'onToggleTrackVisibility'
   | 'onToggleUtilityLaneLock'
@@ -42,20 +51,23 @@ type ProjectTimelineBodyProps = Pick<
   | 'recordingTelemetry'
   | 'selection'
   | 'seekToClientX'
+  | 'snapGuideTime'
   | 'selectedClipId'
   | 'selectedEffectSelection'
   | 'selectedTrackId'
   | 'setHoveredClipId'
-  | 'telemetryLaneVisible'
   | 'timelinePreviews'
   | 'trackLayoutModel'
   | 'syncTracksScroll'
   | 'timelineRef'
   | 'timelineWidth'
+  | 'readTimelineStartTime'
+  | 'projection'
   | 'trackListRef'
   | 'tracks'
   | 'visiblePlaybackRange'
 > & {
+  telemetryLaneVisible: boolean;
   cursorLaneVisible: boolean;
   trackPanelPrefs: ReturnType<typeof useProjectTimelinePanelPrefs>;
 };
@@ -67,23 +79,15 @@ export function ProjectTimelineBody(props: ProjectTimelineBodyProps) {
     <div
       className="grid min-h-0 flex-1 overflow-hidden"
       style={{
-        gridTemplateColumns: resolveTrackPanelGridColumns(props.trackPanelPrefs.prefs),
+        gridTemplateColumns: props.trackPanelPrefs.prefs.hideTrackNames
+          ? '136px minmax(0,1fr)'
+          : '220px minmax(0,1fr)',
       }}
     >
       <ProjectTimelineBodyTrackList {...props} />
       <ProjectTimelineBodyCanvas {...props} />
     </div>
   );
-}
-
-function resolveTrackPanelGridColumns(
-  prefs: ReturnType<typeof useProjectTimelinePanelPrefs>['prefs']
-): string {
-  if (prefs.compactRows) {
-    return '56px minmax(0,1fr)';
-  }
-
-  return prefs.panelExpanded ? '440px minmax(0,1fr)' : '220px minmax(0,1fr)';
 }
 
 function ProjectTimelineBodyTrackList(props: ProjectTimelineBodyProps) {
@@ -96,17 +100,23 @@ function ProjectTimelineBodyCanvas(props: ProjectTimelineBodyProps) {
 
 function createTrackListProps(props: ProjectTimelineBodyProps): ProjectTimelineBodyTrackListProps {
   return {
+    canShowTelemetryLane: true,
+    recordingTelemetry: props.recordingTelemetry,
+    onSelectHistoryLane: props.onSelectHistoryLane,
+    historyLaneSelected: props.selection?.kind === VideoEditorSelectionKind.HISTORY_LANE,
+    onSelectMotionLane: props.onSelectMotionLane,
+    motionLaneSelected: props.selection?.kind === VideoEditorSelectionKind.MOTION_LANE,
     cursorLaneVisible: props.cursorLaneVisible,
     project: props.project,
-    selectedTrackId: props.selectedTrackId,
+    selectedTrackId:
+      props.selection?.kind === VideoEditorSelectionKind.TRACK ? props.selection.trackId : null,
     showTelemetryLane: props.telemetryLaneVisible,
     trackLayoutModel: props.trackLayoutModel,
     trackListRef: props.trackListRef,
     trackPanelPrefs: props.trackPanelPrefs,
     tracks: props.tracks,
+    onAddTrack: props.insertion.onAddTrack,
     onClearUtilityLane: props.onClearUtilityLane,
-    onDeleteTrack: props.onDeleteTrack,
-    onMoveTrack: props.onMoveTrack,
     onScroll: () => props.syncTracksScroll('tracks'),
     onSelectTrack: props.onSelectTrack,
     onToggleTrackLock: props.onToggleTrackLock,
@@ -118,7 +128,9 @@ function createTrackListProps(props: ProjectTimelineBodyProps): ProjectTimelineB
 
 function createCanvasProps(props: ProjectTimelineBodyProps): ProjectTimelineBodyCanvasProps {
   return {
+    hiddenClipNamesByTrackId: props.trackPanelPrefs.prefs.hiddenClipNamesByTrackId,
     currentTime: props.currentTime,
+    consumeCompletedScrubClick: props.consumeCompletedScrubClick,
     cursorLaneVisible: props.cursorLaneVisible,
     dragGhost: props.dragGhost,
     hoveredClipId: props.hoveredClipId,
@@ -131,29 +143,37 @@ function createCanvasProps(props: ProjectTimelineBodyProps): ProjectTimelineBody
     selectedEffectSelection: props.selectedEffectSelection,
     selectedTrackId: props.selectedTrackId,
     selection: props.selection,
+    snapGuideTime: props.snapGuideTime,
     telemetryLaneVisible: props.telemetryLaneVisible,
     timelinePreviews: props.timelinePreviews,
     timelineRef: props.timelineRef,
     timelineWidth: props.timelineWidth,
+    projection: props.projection,
+    readTimelineStartTime: props.readTimelineStartTime,
     trackLayoutModel: props.trackLayoutModel,
     tracks: props.tracks,
     onAddMotionRegion: props.insertion.onAddMotionRegion,
     onBeginClipInteraction: props.beginClipInteraction,
     onBeginEffectInteraction: props.beginEffectInteraction,
     onBeginEffectRangeSelection: props.beginEffectRangeSelection,
+    onBeginPlayheadScrub: props.beginPlayheadScrub,
     onBeginRangeSelection: props.beginRangeSelection,
     onBeginTrackRangeSelection: props.beginTrackRangeSelection,
     onCloseTrackGap: props.onCloseTrackGap,
     ...(props.onDropEffectDocument ? { onDropEffectDocument: props.onDropEffectDocument } : {}),
     onImportTimelineFile: props.insertion.onImport,
-    onResizeActionEvent: props.onResizeActionEvent,
     onResizeMotionRegion: props.onResizeMotionRegion,
     onScroll: () => props.syncTracksScroll('timeline'),
     onSeek: props.handleTimelineSeek,
-    onSelectActionSegment: props.onSelectActionSegment,
+    onSeekTime: props.onSeek,
+    onStepToNextFrame: props.onStepToNextFrame,
+    onStepToPreviousFrame: props.onStepToPreviousFrame,
+    ...(props.onSelectHistorySpan ? { onSelectHistorySpan: props.onSelectHistorySpan } : {}),
+    onSelectActionOccurrence: props.onSelectActionOccurrence,
     onSelectClip: props.onSelectClip,
     onSelectCursorSegment: props.onSelectCursorSegment,
     onSelectMotionRegion: props.onSelectMotionRegion,
+    onConnectMotionRegions: props.onConnectMotionRegions,
     onSelectObjectTrack: props.onSelectObjectTrack,
     onSelectScene: props.onSelectScene,
     onSelectTrack: props.onSelectTrack,

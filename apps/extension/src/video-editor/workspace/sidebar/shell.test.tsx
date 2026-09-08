@@ -94,8 +94,6 @@ function createBaseStateProps() {
     selectedClip: null,
     selectedTrack: null,
     recordingId: null,
-    diagnosticsOpen: false,
-    diagnosticsContent: null,
     gridSettings: {
       color: '#94a3b8',
       enabled: false,
@@ -139,7 +137,6 @@ function createBaseActionProps() {
     onUpdateTextStyle: vi.fn(),
     onUpdateShapeStyle: vi.fn(),
     onUpdateCursorSkin: vi.fn(),
-    onToggleDiagnostics: vi.fn(),
   };
 }
 
@@ -168,7 +165,6 @@ it('wires collapsed rail import actions to the current file input refs', () => {
 
   renderNode(
     <WorkspaceSidebarCollapsedShell
-      diagnosticsOpen={false}
       inputRefs={{
         imageInputRef: createMockInputRef(imageClick),
         videoInputRef: createMockInputRef(videoClick),
@@ -181,7 +177,6 @@ it('wires collapsed rail import actions to the current file input refs', () => {
       onImportImage={props.onImportImage}
       onImportVideo={props.onImportVideo}
       onImportAudio={props.onImportAudio}
-      onToggleDiagnostics={() => props.onToggleDiagnostics(true)}
     />
   );
 
@@ -206,16 +201,13 @@ it('renders the expanded shell frame and forwards panel content props', () => {
   renderNode(
     <WorkspaceSidebarExpandedPanel
       {...props}
-      diagnosticsMeta="Diagnostics"
       projectsOpen
       recordingsOpen={false}
-      diagnosticsSectionOpen
       inputRefs={inputRefs}
       selectionIcon={<span>icon</span>}
       selectionTitle="Selection"
       onToggleProjectsOpen={vi.fn()}
       onToggleRecordingsOpen={vi.fn()}
-      onToggleDiagnosticsSection={vi.fn()}
     />
   );
 
@@ -228,7 +220,6 @@ it('renders the expanded shell frame and forwards panel content props', () => {
   expect(panelContentMock).toHaveBeenCalledOnce();
   expect(panelContentMock.mock.calls[0]?.[0]).toEqual(
     expect.objectContaining({
-      diagnosticsMeta: 'Diagnostics',
       inputRefs,
       selectedTrack: null,
     })

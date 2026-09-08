@@ -1,3 +1,4 @@
+import { resolveVideoOverlayTrack } from '../../../features/video/project/factories/creation';
 import {
   createAudioClipFromAsset,
   createVideoClipFromAsset,
@@ -16,6 +17,7 @@ import type {
   VideoBlockKind,
   VideoProject,
   VideoProjectAsset,
+  VideoProjectClip,
 } from '../../../features/video/project/types/index';
 import type { VideoAnnotationTemplateInput } from '../../../features/video/project/annotation/template';
 import { VideoProjectAssetType, VideoTrackKind } from '../../../features/video/project/types/index';
@@ -28,6 +30,27 @@ import {
 import { ensureTrackForKind } from './helpers';
 import { addVideoAssetClip } from './asset-video-actions';
 
+function buildVisualOverlayResult(
+  project: VideoProject,
+  clips: VideoProjectClip[],
+  preferredTrackId: string | null,
+  asset?: VideoProjectAsset
+): AddAssetClipResult {
+  if (clips.length === 0) return { project, selectedClipId: null, selectedTrackId: null };
+  const start = Math.min(...clips.map((clip) => clip.startTime));
+  const end = Math.max(...clips.map((clip) => clip.startTime + clip.duration));
+  const track = resolveVideoOverlayTrack(project, start, end - start, preferredTrackId);
+  return buildInsertedClipResult({
+    ...(asset ? { asset } : {}),
+    project: project.tracks.includes(track)
+      ? project
+      : { ...project, tracks: [...project.tracks, track] },
+    clips: clips.map((clip) => ({ ...clip, trackId: track.id })),
+    selectedClipId: clips[0]!.id,
+    selectedTrackId: track.id,
+  });
+}
+
 function addImageAssetClip(
   project: VideoProject,
   asset: VideoProjectAsset,
@@ -35,25 +58,11 @@ function addImageAssetClip(
   insertionTime: number,
   timelineLaneId?: string | null
 ): AddAssetClipResult {
-  const overlayTrack = ensureTrackForKind(project, VideoTrackKind.OVERLAY, preferredTrackId);
   const clip = assignClipTimelineLane(
-    createVideoClipFromAsset(
-      overlayTrack.trackId,
-      asset,
-      project.width,
-      project.height,
-      insertionTime
-    ),
+    createVideoClipFromAsset('', asset, project.width, project.height, insertionTime),
     timelineLaneId
   );
-
-  return buildInsertedClipResult({
-    asset,
-    clips: [clip],
-    project: overlayTrack.project,
-    selectedClipId: clip.id,
-    selectedTrackId: clip.trackId,
-  });
+  return buildVisualOverlayResult(project, [clip], preferredTrackId, asset);
 }
 
 function addAudioAssetClip(
@@ -101,15 +110,8 @@ export function addTextOverlayToProject(
   preferredTrackId: string | null,
   insertionTime: number
 ): AddAssetClipResult {
-  const overlayTrack = ensureTrackForKind(project, VideoTrackKind.OVERLAY, preferredTrackId);
-  const clip = createTextClip(overlayTrack.trackId, project.width, project.height, insertionTime);
-
-  return buildInsertedClipResult({
-    clips: [clip],
-    project: overlayTrack.project,
-    selectedClipId: clip.id,
-    selectedTrackId: clip.trackId,
-  });
+  const clip = createTextClip('', project.width, project.height, insertionTime);
+  return buildVisualOverlayResult(project, [clip], preferredTrackId);
 }
 
 export function addAnnotationOverlayToProject(
@@ -118,21 +120,14 @@ export function addAnnotationOverlayToProject(
   insertionTime: number,
   templateInput?: VideoAnnotationTemplateInput
 ): AddAssetClipResult {
-  const overlayTrack = ensureTrackForKind(project, VideoTrackKind.OVERLAY, preferredTrackId);
   const clip = createAnnotationClip(
-    overlayTrack.trackId,
+    '',
     project.width,
     project.height,
     insertionTime,
     templateInput
   );
-
-  return buildInsertedClipResult({
-    clips: [clip],
-    project: overlayTrack.project,
-    selectedClipId: clip.id,
-    selectedTrackId: clip.trackId,
-  });
+  return buildVisualOverlayResult(project, [clip], preferredTrackId);
 }
 
 export function addSubtitleOverlayToProject(
@@ -163,6 +158,13 @@ export function addVideoBlockToProject(
   insertionTime: number
 ): AddAssetClipResult {
   const definition = getVideoBlockRecipeDefinition(blockKind);
+  if (definition.trackKind === VideoTrackKind.PRIMARY) {
+    return buildVisualOverlayResult(
+      project,
+      expandVideoBlockRecipe(blockKind, '', project, insertionTime),
+      preferredTrackId
+    );
+  }
   const blockTrack = ensureTrackForKind(project, definition.trackKind, preferredTrackId);
   const clips = expandVideoBlockRecipe(
     blockKind,
@@ -185,19 +187,6 @@ export function addShapeOverlayToProject(
   insertionTime: number,
   shapeType: Parameters<VideoEditorProjectState['addShapeOverlay']>[0]
 ): AddAssetClipResult {
-  const overlayTrack = ensureTrackForKind(project, VideoTrackKind.OVERLAY, preferredTrackId);
-  const clip = createShapeClip(
-    overlayTrack.trackId,
-    project.width,
-    project.height,
-    insertionTime,
-    shapeType
-  );
-
-  return buildInsertedClipResult({
-    clips: [clip],
-    project: overlayTrack.project,
-    selectedClipId: clip.id,
-    selectedTrackId: clip.trackId,
-  });
+  const clip = createShapeClip('', project.width, project.height, insertionTime, shapeType);
+  return buildVisualOverlayResult(project, [clip], preferredTrackId);
 }

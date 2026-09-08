@@ -1,6 +1,7 @@
 import { expect, it } from 'vitest';
 
 import { importFresh } from '../../test-support/test-helpers';
+import { collectProductTestInventory } from '../../../test/harness/product-test-inventory.mjs';
 
 it('uses the wrapper coverage profile when the wrapper env is set', async () => {
   process.env.SNIPTALE_VITEST_SUITE = 'product';
@@ -28,7 +29,7 @@ it('uses the wrapper coverage profile when the wrapper env is set', async () => 
   });
   expect(module.default.test?.testTimeout).toBe(15000);
   expect(module.default.test?.hookTimeout).toBe(15000);
-  expect(module.default.test?.include).toHaveLength(1959);
+  expect(module.default.test?.include).toEqual(collectProductTestInventory().jsdomVmThreadsFiles);
   expect(module.default.test?.pool).toBe('vmThreads');
   expect(module.default.test?.vmMemoryLimit).toBe('512MB');
   delete process.env.SNIPTALE_PRODUCT_VITEST_PARTITION;
@@ -70,7 +71,7 @@ it('projects exact node vmThreads and compatibility threads partitions', async (
     '../../../../vitest.config.ts',
     import.meta.url
   );
-  expect(nodeVm.default.test?.include).toHaveLength(2788);
+  expect(nodeVm.default.test?.include).toEqual(collectProductTestInventory().nodeVmThreadsFiles);
   expect(nodeVm.default.test?.pool).toBe('vmThreads');
   expect(nodeVm.default.test?.vmMemoryLimit).toBe('512MB');
 

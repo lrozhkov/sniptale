@@ -27,7 +27,7 @@ export function NumericStepper({ disabled, label, onStep }: NumericStepperProps)
           'flex h-3.5 w-5 items-center justify-center rounded-[4px]',
           'hover:bg-[color:var(--sniptale-color-surface-hover)]'
         )}
-        {...getStepperButtonHandlers({ disabled, direction: 1, repeat })}
+        {...getStepperButtonHandlers({ disabled, direction: 1, repeat, onStep })}
       >
         <ChevronUp size={10} strokeWidth={2.4} />
       </button>
@@ -39,7 +39,7 @@ export function NumericStepper({ disabled, label, onStep }: NumericStepperProps)
           'flex h-3.5 w-5 items-center justify-center rounded-[4px]',
           'hover:bg-[color:var(--sniptale-color-surface-hover)]'
         )}
-        {...getStepperButtonHandlers({ disabled, direction: -1, repeat })}
+        {...getStepperButtonHandlers({ disabled, direction: -1, repeat, onStep })}
       >
         <ChevronDown size={10} strokeWidth={2.4} />
       </button>
@@ -51,12 +51,19 @@ function getStepperButtonHandlers({
   disabled,
   direction,
   repeat,
+  onStep,
 }: {
   disabled?: boolean | undefined;
   direction: 1 | -1;
   repeat: ReturnType<typeof useStepperRepeat>;
+  onStep: NumericStepperProps['onStep'];
 }) {
   return {
+    onClick: (event: React.MouseEvent<HTMLButtonElement>) => {
+      if (disabled || event.detail !== 0) return;
+      event.stopPropagation();
+      onStep(direction);
+    },
     onPointerDown: (event: React.PointerEvent<HTMLButtonElement>) => {
       if (disabled) {
         return;

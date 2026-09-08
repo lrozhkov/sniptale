@@ -1,3 +1,4 @@
+import { resolveCameraCanvasTransform } from './camera-transform';
 import React, { useEffect, useRef } from 'react';
 
 import { resolveVideoCompositionFrame } from '../../../../features/video/composition/timeline/frame';
@@ -67,7 +68,15 @@ function usePreviewStageSurfaceState(params: {
       interactionRef,
       onGuideChange: setGuides,
       onSelectClip: params.onSelectClip,
-      onUpdateClipTransform: params.onUpdateClipTransform,
+      onUpdateClipTransform: (clipId, transform) => {
+        const destination = resolveCameraCanvasTransform(
+          params.project,
+          clipId,
+          params.currentTime,
+          transform
+        );
+        if (destination) params.onUpdateClipTransform(clipId, destination);
+      },
       project: params.project,
       grid: params.grid,
       stage: stageRef.current,
@@ -134,6 +143,7 @@ export function usePreviewStageRuntime(params: PreviewStageProps) {
     media,
     previewRasterSize,
     render: {
+      onPreviewEffectAnchors: transient.onPreviewEffectAnchors,
       currentTime: transient.currentTime,
       effectRuntimeFeedback,
       project: transient.previewProject,

@@ -59,7 +59,8 @@ export function handleStagePointPlacement(
     event.clientY,
     stage,
     params.project,
-    params.camera
+    params.camera,
+    params.placementMode.kind === 'action-point' && params.placementMode.clipId !== null
   );
   if (!point) {
     params.onClearPlacementMode();

@@ -101,7 +101,7 @@ function createProps() {
       trailingClipId: 'clip-b',
     },
     selectedCursorSample: null,
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedMotionRegion: null,
     selectedTrack: null,
     placementMode: null,
@@ -111,25 +111,40 @@ function createProps() {
 }
 
 describe('workspace-sidebar/selection/inspect-effects', () => {
+  it('routes an empty history lane to project presentation defaults', () => {
+    const props = createProps();
+    act(() =>
+      root?.render(
+        <WorkspaceSidebarInspectPanel
+          {...props}
+          selection={{ kind: VideoEditorSelectionKind.HISTORY_LANE }}
+          onUpdateActionPresentation={vi.fn()}
+        />
+      )
+    );
+    expect(
+      container?.querySelector('[data-ui="video-editor.inspector.history-lane"]')
+    ).not.toBeNull();
+    expect(container?.textContent).toContain('videoEditor.sidebar.historyEnabled');
+  });
+
   it('renders grouped transition inspector metadata for non-crossfade presets', () => {
     renderInspectPanel();
 
-    expect(container?.textContent).toContain('videoEditor.sidebar.inspectorGroupTemplate');
-    expect(container?.textContent).toContain('videoEditor.sidebar.inspectorGroupTiming');
-    expect(container?.textContent).toContain('videoEditor.sidebar.inspectorGroupStatus');
-    expect(container?.textContent).toContain('videoEditor.sidebar.inspectorGroupStyle');
-    expect(container?.textContent).toContain('videoEditor.sidebar.transitionLightSweep');
-
-    clickGroup('videoEditor.sidebar.inspectorGroupSummary');
-    expect(container?.textContent).toContain('videoEditor.templates.transitionGroupReveal');
-    expect(container?.textContent).toContain('videoEditor.templates.transitionUseCaseLightSweep');
-    expect(container?.textContent).toContain(
-      'videoEditor.templates.transitionDescriptionLightSweep'
+    const sectionNames = [...container!.querySelectorAll('nav button')].map((button) =>
+      button.getAttribute('aria-label')
     );
-    expect(container?.textContent).toContain('videoEditor.templates.previewToneHero');
-    expect(container?.textContent).toContain('videoEditor.templates.previewMotionSweep');
-
-    clickGroup('videoEditor.sidebar.inspectorGroupTiming');
+    expect(sectionNames).toEqual([
+      'videoEditor.sidebar.inspectorGroupTransition',
+      'videoEditor.sidebar.inspectorGroupAnimation',
+      'videoEditor.sidebar.inspectorGroupInfo',
+    ]);
+    expect(container?.textContent).toContain('videoEditor.sidebar.transitionLightSweep');
+    expect(container?.textContent).toContain('videoEditor.sidebar.transitionHighlightColorLabel');
+    clickGroup('videoEditor.sidebar.inspectorGroupInfo');
+    expect(container?.textContent).toContain('videoEditor.sidebar.transitionLeadingClipLabel');
+    expect(container?.textContent).not.toContain('videoEditor.templates.previewToneHero');
+    clickGroup('videoEditor.sidebar.inspectorGroupAnimation');
     expect(container?.textContent).toContain('videoEditor.sidebar.transitionDirectionLabel');
     expect(container?.textContent).not.toContain(
       'videoEditor.sidebar.transitionHighlightColorLabel'
@@ -144,8 +159,9 @@ function renderInspectPanel() {
 }
 
 function clickGroup(title: string) {
-  const button = container?.querySelector<HTMLButtonElement>(`button[title="${title}"]`);
+  const button = container?.querySelector<HTMLElement>(`nav button[title="${title}"]`);
   act(() => {
-    button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    if (!button?.parentElement?.hasAttribute('open'))
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 }

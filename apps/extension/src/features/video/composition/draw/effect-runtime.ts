@@ -30,7 +30,8 @@ export function drawEffectRuntimeVisualLayer(args: {
       standalone.bitmap,
       args.scaleX,
       args.scaleY,
-      args.alpha
+      args.alpha,
+      standalone.bitmapBounds
     );
     return true;
   }

@@ -41,6 +41,32 @@ function createProps() {
 }
 
 describe('workspace-sidebar/selection/body', () => {
+  it.each([true, false])(
+    'preserves camera commands and live split eligibility %s through the body seam',
+    (canAddCameraPosition) => {
+      // Native camera selection exposed this gap: outer panel forwarding and the
+      // isolated camera controls passed, while this intermediate projection dropped both callbacks.
+      const props = {
+        ...createProps(),
+        onApplyCameraLayout: vi.fn(),
+        onEditCameraPosition: vi.fn(),
+        canAddCameraPosition,
+      };
+      inspectPanelMock.mockClear();
+
+      renderToStaticMarkup(<WorkspaceSidebarSelectionBody {...props} />);
+
+      expect(inspectPanelMock).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          onApplyCameraLayout: props.onApplyCameraLayout,
+          onEditCameraPosition: props.onEditCameraPosition,
+          canAddCameraPosition,
+        }),
+        undefined
+      );
+    }
+  );
+
   it('renders the inspector body as a vertical scroll owner with horizontal clipping', () => {
     const markup = renderToStaticMarkup(<WorkspaceSidebarSelectionBody {...createProps()} />);
 

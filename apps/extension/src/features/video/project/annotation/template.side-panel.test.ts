@@ -1,12 +1,13 @@
 import { expect, it } from 'vitest';
-import { createEmptyVideoProject } from '../factories/creation';
+import { createEmptyVideoProject, createVideoProjectTrack } from '../factories/creation';
 import { createAnnotationClip, resolveAnnotationPresentation } from './template';
-import { VideoOverlayTemplateKind, VideoTemplateDirection } from '../types/index';
+import { VideoTrackKind, VideoOverlayTemplateKind, VideoTemplateDirection } from '../types/index';
 
 it('resolves side reveal panels against the project edge by direction', () => {
   const project = createEmptyVideoProject('Templates', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(
-    project.tracks[2]!.id,
+    project.tracks[1]!.id,
     project.width,
     project.height,
     0,

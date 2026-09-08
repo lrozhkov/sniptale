@@ -1,12 +1,12 @@
-import { createDefaultMotionPath } from '../../../../../features/video/project/motion/path';
+import { InspectorDetails } from '../shared/details';
+import { getMotionBindingCandidates } from '../../../../../features/video/project/motion/source-binding';
+import { SelectInput } from '../shared/controls';
 import { translate } from '../../../../../platform/i18n';
-import {
-  VideoMotionCameraMode,
-  VideoMotionFocusMode,
-} from '../../../../../features/video/project/types';
+import { VideoMotionFocusMode } from '../../../../../features/video/project/types';
 import type { VideoProjectMotionRegion } from '../../../../../features/video/project/types';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { ManualAreaFields } from './area';
+import { MotionFramingPreview } from './framing-preview';
 import {
   MotionBlurField,
   MotionEasingField,
@@ -15,113 +15,101 @@ import {
   MotionTargetActionField,
 } from './fields';
 import { ManualFocusFields } from './focus';
-import { MotionPathEditor } from './path-editor/index';
-import { OptionButtonsField } from '../shared/option-buttons';
-import { DetailItem, DetailList, PANEL_HEADING_CLASS_NAME } from '../shared/panel';
+import { DetailItem, DetailList } from '../shared/panel';
 import { SliderField } from '../shared/sliders';
 
 export function MotionCameraFields(props: {
   motionRegion: VideoProjectMotionRegion;
   panel: WorkspaceSidebarSelectionPanelProps;
 }) {
-  const isMovingZoom = props.motionRegion.cameraMode === VideoMotionCameraMode.PATH;
-
   return (
     <div className="grid grid-cols-1 gap-3">
-      <MotionCameraModeField motionRegion={props.motionRegion} panel={props.panel} />
-      {!isMovingZoom ? (
-        <MotionScaleFields motionRegion={props.motionRegion} panel={props.panel} />
+      {props.motionRegion.focusMode === VideoMotionFocusMode.MANUAL ||
+      props.motionRegion.focusMode === VideoMotionFocusMode.MANUAL_AREA ? (
+        <MotionFramingPreview {...props} />
       ) : null}
-      <MotionOverlayZoomField
-        motionRegionId={props.motionRegion.id}
-        panel={props.panel}
-        value={props.motionRegion.overlayZoomMode}
-      />
-      <MotionDurationField
-        duration={props.motionRegion.duration}
-        motionRegionId={props.motionRegion.id}
-        panel={props.panel}
-      />
-      <MotionZoomFields motionRegion={props.motionRegion} panel={props.panel} />
-      <MotionEasingField
-        motionRegionId={props.motionRegion.id}
-        panel={props.panel}
-        value={props.motionRegion.easing}
-      />
-      <MotionBlurField
-        motionRegionId={props.motionRegion.id}
-        panel={props.panel}
-        value={props.motionRegion.motionBlurAmount ?? 0}
-      />
-    </div>
-  );
-}
-
-export function MotionTargetFields(props: {
-  motionRegion: VideoProjectMotionRegion;
-  panel: WorkspaceSidebarSelectionPanelProps;
-}) {
-  if (props.motionRegion.cameraMode === VideoMotionCameraMode.PATH) {
-    return null;
-  }
-
-  return (
-    <div className="grid grid-cols-1 gap-3">
+      <MotionScaleFields motionRegion={props.motionRegion} panel={props.panel} />
       <MotionFocusModeField motionRegion={props.motionRegion} panel={props.panel} />
       <MotionPlacementFields motionRegion={props.motionRegion} panel={props.panel} />
     </div>
   );
 }
 
-export function MotionPathFields(props: {
-  motionRegion: VideoProjectMotionRegion;
-  panel: WorkspaceSidebarSelectionPanelProps;
-}) {
-  if (props.motionRegion.cameraMode !== VideoMotionCameraMode.PATH) {
-    return null;
-  }
-
-  return <MotionPathEditor motionRegion={props.motionRegion} panel={props.panel} />;
-}
-
-function MotionCameraModeField(props: {
+export function MotionTimingFields(props: {
   motionRegion: VideoProjectMotionRegion;
   panel: WorkspaceSidebarSelectionPanelProps;
 }) {
   return (
-    <OptionButtonsField
-      label={translate('videoEditor.sidebar.motionCameraModeLabel')}
-      layout="stacked"
-      value={props.motionRegion.cameraMode ?? VideoMotionCameraMode.STATIC}
-      onChange={(value) => handleCameraModeChange(props.panel, props.motionRegion, value)}
+    <div className="grid grid-cols-1 gap-3">
+      <MotionBindingField {...props} />
+      <MotionDurationField
+        duration={props.motionRegion.duration}
+        motionRegionId={props.motionRegion.id}
+        panel={props.panel}
+      />
+    </div>
+  );
+}
+
+function MotionBindingField({
+  motionRegion,
+  panel,
+}: {
+  motionRegion: VideoProjectMotionRegion;
+  panel: WorkspaceSidebarSelectionPanelProps;
+}) {
+  const candidates = getMotionBindingCandidates(panel.project, motionRegion);
+  const current = panel.project.clips.find(
+    (clip) => clip.id === motionRegion.sourceBinding?.clipId
+  );
+  const clips =
+    current && !candidates.some((clip) => clip.id === current.id)
+      ? [current, ...candidates]
+      : candidates;
+  return (
+    <SelectInput
+      label={translate('videoEditor.sidebar.framingBinding')}
+      value={motionRegion.sourceBinding?.clipId ?? ''}
+      disabled={motionRegion.duration <= 0}
+      onChange={(value) =>
+        panel.onUpdateMotionRegion(motionRegion.id, { sourceClipId: value || null })
+      }
       options={[
-        {
-          label: translate('videoEditor.sidebar.motionCameraModeStatic'),
-          value: VideoMotionCameraMode.STATIC,
-        },
-        {
-          label: translate('videoEditor.sidebar.motionCameraModePath'),
-          value: VideoMotionCameraMode.PATH,
-        },
+        { value: '', label: translate('videoEditor.sidebar.framingBindingScene') },
+        ...clips.map((clip) => ({
+          value: clip.id,
+          label: `${clip.name} · ${clip.startTime.toFixed(2)} s`,
+        })),
       ]}
     />
   );
 }
 
-function handleCameraModeChange(
-  panel: WorkspaceSidebarSelectionPanelProps,
-  motionRegion: VideoProjectMotionRegion,
-  cameraMode: VideoMotionCameraMode
-) {
-  panel.onClearPlacementMode();
-  panel.onUpdateMotionRegion(
-    motionRegion.id,
-    cameraMode === VideoMotionCameraMode.PATH
-      ? {
-          cameraMode,
-          path: motionRegion.path ?? createDefaultMotionPath(panel.project, motionRegion),
-        }
-      : { cameraMode }
+export function MotionBehaviorFields(props: {
+  motionRegion: VideoProjectMotionRegion;
+  panel: WorkspaceSidebarSelectionPanelProps;
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-3">
+      <MotionZoomFields motionRegion={props.motionRegion} panel={props.panel} />
+      <MotionEasingField
+        motionRegionId={props.motionRegion.id}
+        panel={props.panel}
+        value={props.motionRegion.easing}
+      />
+      <InspectorDetails label={translate('videoEditor.sidebar.inspectorMoreDetails')}>
+        <MotionOverlayZoomField
+          motionRegionId={props.motionRegion.id}
+          panel={props.panel}
+          value={props.motionRegion.overlayZoomMode}
+        />
+        <MotionBlurField
+          motionRegionId={props.motionRegion.id}
+          panel={props.panel}
+          value={props.motionRegion.motionBlurAmount ?? 0}
+        />
+      </InspectorDetails>
+    </div>
   );
 }
 
@@ -137,7 +125,7 @@ function MotionScaleFields(props: {
     <SliderField
       label={translate('videoEditor.sidebar.motionScaleLabel')}
       value={props.motionRegion.scale}
-      min={1}
+      min={0.1}
       max={4}
       step={0.05}
       onChange={(value) =>
@@ -214,7 +202,7 @@ function MotionPlacementFields(props: {
         <MotionTargetActionField
           motionRegionId={props.motionRegion.id}
           panel={props.panel}
-          value={props.motionRegion.targetActionEventId}
+          value={props.motionRegion.targetAction}
         />
       );
     case VideoMotionFocusMode.CURSOR:
@@ -223,27 +211,12 @@ function MotionPlacementFields(props: {
 }
 
 export function MotionOverview(props: { motionRegion: VideoProjectMotionRegion }) {
-  const isMovingZoom = props.motionRegion.cameraMode === VideoMotionCameraMode.PATH;
-
   return (
     <div className="space-y-3">
-      <p className={PANEL_HEADING_CLASS_NAME}>{translate('videoEditor.timeline.motionLane')}</p>
       <DetailList>
         <DetailItem
-          label={translate('videoEditor.sidebar.motionCameraModeLabel')}
-          value={
-            isMovingZoom
-              ? translate('videoEditor.sidebar.motionCameraModePath')
-              : translate('videoEditor.sidebar.motionCameraModeStatic')
-          }
-        />
-        <DetailItem
           label={translate('videoEditor.sidebar.motionFocusLabel')}
-          value={
-            isMovingZoom
-              ? translate('videoEditor.sidebar.motionPathSummary')
-              : getMotionFocusModeLabel(props.motionRegion.focusMode)
-          }
+          value={getMotionFocusModeLabel(props.motionRegion.focusMode)}
         />
         <DetailItem
           label={translate('videoEditor.sidebar.actionTimePrefix')}

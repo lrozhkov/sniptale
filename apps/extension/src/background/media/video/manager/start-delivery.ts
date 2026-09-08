@@ -7,6 +7,10 @@ import { issueCameraRecorderLaunchToken } from '../runtime/camera-recorder-contr
 import { activateVideoRecordingLease } from '../recording-control-lease';
 import { beginPreparedRecording } from './flow';
 import { scheduleRecordingStartActivationWatchdog } from './start-activation-watchdog';
+import { enableControlledCursorCapture } from '../runtime/manager/controlled-cursor/messages';
+import { createLogger } from '@sniptale/platform/observability/logger';
+
+const logger = createLogger({ namespace: 'BackgroundVideoStartDelivery' });
 
 export type RecordingStartResult =
   | { cameraLaunchToken?: string; controlToken: string; recordingId: string; result: 'accepted' }
@@ -18,6 +22,7 @@ export async function finalizeAcceptedRecordingStart(
   context: {
     captureMode: CaptureMode;
     generation: number;
+    tabId?: number | null;
     settings: { sourceCount?: number };
     viewportPresetId: string | null;
   },
@@ -32,6 +37,18 @@ export async function finalizeAcceptedRecordingStart(
       recordingId,
       streamInstanceId,
     });
+    if (
+      context.tabId != null &&
+      (context.captureMode === CaptureMode.TAB || context.captureMode === CaptureMode.TAB_CROP)
+    ) {
+      try {
+        // Reset preparation/countdown events only once the recorder has begun.
+        await enableControlledCursorCapture(context.tabId, recordingId, 0);
+      } catch {
+        // Optional history must not discard a successfully started video.
+        logger.warn('Action history could not start on the recording page');
+      }
+    }
   }
   const activeLease = await activateVideoRecordingLease({
     generation: context.generation,

@@ -1,94 +1,50 @@
+import { createSolidPaint, getRepresentativeColor, type Paint } from '@sniptale/foundation/paint';
 import { translate } from '../../../../../platform/i18n';
-import { ColorField as CompactInspectorColorField } from '../../../../../ui/compact-inspector-controls';
-import { VideoSceneBackgroundKind } from '../../../../../features/video/project/types';
-import { SliderField } from '../shared/sliders';
-import { GradientAnimationControls, GradientPresetGrid } from './gradient-controls';
-import { GradientStopControls } from './stops';
+import { CompactPaintSelector } from '../../../../../ui/paint-selector';
 import {
-  type GradientSceneBackground,
-  SCENE_BACKGROUND_PALETTE,
-  type SceneBackgroundFieldProps,
-} from './shared';
+  VideoSceneBackgroundKind,
+  type VideoProjectSceneBackground,
+} from '../../../../../features/video/project/types';
+import { GradientAnimationControls } from './gradient-controls';
+import { SCENE_BACKGROUND_PALETTE, type SceneBackgroundFieldProps } from './shared';
 
 export function SceneBackgroundColorEditor(props: SceneBackgroundFieldProps) {
-  switch (props.sceneBackground.kind) {
-    case VideoSceneBackgroundKind.SOLID:
-      return <SolidBackgroundEditor {...props} />;
-    case VideoSceneBackgroundKind.GRADIENT:
-      return <GradientBackgroundEditor {...props} sceneBackground={props.sceneBackground} />;
-    case VideoSceneBackgroundKind.IMAGE:
-      return null;
-  }
-}
-
-function SolidBackgroundEditor(props: SceneBackgroundFieldProps) {
-  if (props.sceneBackground.kind !== VideoSceneBackgroundKind.SOLID) {
-    return null;
-  }
-
-  const label = translate('videoEditor.sidebar.sceneBackgroundColorLabel');
-
-  return (
-    <CompactInspectorColorField
-      title={label}
-      label={label}
-      value={props.sceneBackground.color}
-      recentColors={props.recentColors}
-      palette={SCENE_BACKGROUND_PALETTE}
-      onChange={(color) =>
-        commitSceneBackgroundColor({ kind: VideoSceneBackgroundKind.SOLID, color }, color, props)
-      }
-      onPreviewChange={(color) =>
-        props.onPreviewSceneBackground({ kind: VideoSceneBackgroundKind.SOLID, color })
-      }
-      onPreviewReset={props.onResetSceneBackgroundPreview}
-    />
-  );
-}
-
-function GradientBackgroundEditor(
-  props: Omit<SceneBackgroundFieldProps, 'sceneBackground'> & {
-    sceneBackground: GradientSceneBackground;
-  }
-) {
   const background = props.sceneBackground;
-
+  if (background.kind === VideoSceneBackgroundKind.IMAGE) return null;
+  const value: Paint =
+    background.kind === VideoSceneBackgroundKind.SOLID
+      ? createSolidPaint(background.color)
+      : { kind: 'gradient', gradient: background.gradient };
+  const toBackground = (paint: Paint): VideoProjectSceneBackground =>
+    paint.kind === 'solid'
+      ? { kind: VideoSceneBackgroundKind.SOLID, color: paint.color }
+      : {
+          kind: VideoSceneBackgroundKind.GRADIENT,
+          gradient: paint.gradient,
+          ...(background.kind === VideoSceneBackgroundKind.GRADIENT && background.animation
+            ? { animation: background.animation }
+            : {}),
+        };
+  const label = translate('videoEditor.sidebar.sceneBackgroundColorLabel');
   return (
     <>
-      <GradientPresetGrid background={background} {...props} />
-      <GradientStopControls background={background} {...props} />
-      <SliderField
-        label={translate('videoEditor.sidebar.sceneBackgroundAngleLabel')}
-        value={background.angle}
-        min={0}
-        max={360}
-        step={1}
-        onChange={(value) =>
-          props.onSetSceneBackground({
-            kind: VideoSceneBackgroundKind.GRADIENT,
-            angle: value,
-            from: background.from,
-            to: background.to,
-            ...(background.stops ? { stops: background.stops } : {}),
-            ...(background.animation ? { animation: background.animation } : {}),
-          })
-        }
-        formatValue={(value) => `${Math.round(value)}°`}
+      <CompactPaintSelector
+        label={label}
+        title={label}
+        value={value}
+        recentColors={props.recentColors}
+        palette={SCENE_BACKGROUND_PALETTE}
+        onChange={(paint) => {
+          props.onSetSceneBackground(toBackground(paint));
+          props.onResetSceneBackgroundPreview();
+          void props.onRememberRecentColor(getRepresentativeColor(paint));
+        }}
+        onPreviewChange={(paint) => props.onPreviewSceneBackground(toBackground(paint))}
+        onPreviewReset={props.onResetSceneBackgroundPreview}
       />
-      <GradientAnimationControls background={background} {...props} />
+      {background.kind === VideoSceneBackgroundKind.GRADIENT && (
+        <GradientAnimationControls background={background} {...props} />
+      )}
     </>
   );
-}
-
-function commitSceneBackgroundColor(
-  sceneBackground: NonNullable<SceneBackgroundFieldProps['sceneBackground']>,
-  color: string,
-  props: Pick<
-    SceneBackgroundFieldProps,
-    'onRememberRecentColor' | 'onResetSceneBackgroundPreview' | 'onSetSceneBackground'
-  >
-) {
-  props.onSetSceneBackground(sceneBackground);
-  props.onResetSceneBackgroundPreview();
-  void props.onRememberRecentColor(color);
 }

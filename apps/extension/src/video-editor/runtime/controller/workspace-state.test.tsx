@@ -1,4 +1,10 @@
 // @vitest-environment jsdom
+import {
+  createWorkspaceLayoutController,
+  createWorkspaceHeaderController,
+  createWorkspacePreviewController,
+} from './workspace/core';
+import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 
 import type React from 'react';
 import { act } from 'react';
@@ -100,6 +106,7 @@ it('updates the preview pane height while vertical resize listeners are active',
 
   act(() => {
     workspaceState!.preview.handleStartVerticalResize({
+      button: 0,
       clientY: 100,
       preventDefault: vi.fn(),
     } as unknown as React.PointerEvent<HTMLDivElement>);
@@ -109,7 +116,7 @@ it('updates the preview pane height while vertical resize listeners are active',
     dispatchResizeMove(180);
   });
 
-  expect(workspaceState!.preview.paneHeight).toBe(380);
+  expect(workspaceState!.preview.paneHeight).toBe(372);
 
   act(() => {
     window.dispatchEvent(new Event('pointerup'));
@@ -119,7 +126,7 @@ it('updates the preview pane height while vertical resize listeners are active',
     dispatchResizeMove(220);
   });
 
-  expect(workspaceState!.preview.paneHeight).toBe(380);
+  expect(workspaceState!.preview.paneHeight).toBe(372);
 });
 
 it('cleans up resize listeners when the workspace unmounts mid-drag', () => {
@@ -130,6 +137,7 @@ it('cleans up resize listeners when the workspace unmounts mid-drag', () => {
   mockWorkspaceBounds(workspaceState!);
   act(() => {
     workspaceState!.preview.handleStartVerticalResize({
+      button: 0,
       clientY: 100,
       preventDefault: vi.fn(),
     } as unknown as React.PointerEvent<HTMLDivElement>);
@@ -160,4 +168,111 @@ it('stores and clears the local playback loop range without touching project sta
   });
 
   expect(workspaceState!.playbackRange).toBeNull();
+});
+
+it('freezes the audio destination and clears it on close or global recording entry', () => {
+  renderWorkspaceHarness(root, (state) => {
+    workspaceState = state;
+  });
+  const target = { projectId: 'project', trackId: 'voice', startTime: 7, endTime: 12 };
+  act(() => createWorkspaceLayoutController(workspaceState!).openTrackAudioRecordingDialog(target));
+  target.startTime = 20;
+  expect(createWorkspaceLayoutController(workspaceState!).audioRecordingTarget?.startTime).toBe(7);
+  expect(workspaceState!.audioRecordingDialogOpen).toBe(true);
+  act(() => workspaceState!.closeAudioRecordingDialog());
+  expect(workspaceState!.audioRecordingTarget).toBeNull();
+  expect(workspaceState!.audioRecordingDialogOpen).toBe(false);
+  act(() => createWorkspaceLayoutController(workspaceState!).openTrackAudioRecordingDialog(target));
+  act(() => workspaceState!.openAudioRecordingDialog());
+  expect(workspaceState!.audioRecordingTarget).toBeNull();
+  expect(workspaceState!.audioRecordingDialogOpen).toBe(true);
+});
+
+it('keeps the recording destination independent of viewer selection, transport and preferences', () => {
+  renderWorkspaceHarness(root, (state) => {
+    workspaceState = state;
+  });
+  const project = createEmptyVideoProject('Voice');
+  const target = { projectId: project.id, trackId: 'voice', startTime: 7, endTime: 12 };
+  act(() => workspaceState!.openTrackAudioRecordingDialog(target));
+  const store = { selectClip: vi.fn(), selectScene: vi.fn(), currentTime: 20, isPlaying: false };
+  const runtime = { seekTo: vi.fn(), togglePlayback: vi.fn(), pausePlayback: vi.fn() };
+  const preview = createWorkspacePreviewController(
+    {
+      workspace: workspaceState!,
+      store,
+      selections: { selectedActionOccurrence: null, selectedMotionRegion: null },
+      actions: {
+        handleImportAudio: vi.fn(),
+        handleImportImage: vi.fn(),
+        handleImportVideo: vi.fn(),
+      },
+    } as unknown as Parameters<typeof createWorkspacePreviewController>[0],
+    runtime as unknown as Parameters<typeof createWorkspacePreviewController>[1],
+    project,
+    { addActionEvent: vi.fn(), addMotionRegion: vi.fn(), enableCursorTrack: vi.fn() }
+  );
+  const header = createWorkspaceHeaderController(
+    {
+      workspace: workspaceState!,
+      store: { ...store, openExportDialog: vi.fn(), renameProject: vi.fn() },
+      libraries: { projectExports: [] },
+      saveStateMeta: {} as never,
+    },
+    project
+  );
+  act(() => {
+    preview.selection.onSelectClip('another-clip');
+    preview.selection.onSelectScene();
+    header.onSelectScene();
+    preview.transport.onSeek(20);
+    preview.preferences.onZoomChange('fit');
+    preview.preferences.onModeChange(preview.preferences.mode);
+    preview.preferences.onRasterPresetChange(preview.preferences.rasterPreset);
+  });
+  expect(store.selectClip).toHaveBeenCalledWith('another-clip');
+  expect(runtime.seekTo).toHaveBeenCalledWith(20);
+  expect(createWorkspaceLayoutController(workspaceState!).audioRecordingTarget).toEqual(target);
+  act(() => header.onOpenAudioRecordingDialog());
+  expect(createWorkspaceLayoutController(workspaceState!).audioRecordingTarget).toBeNull();
+});
+
+it('reveals a collapsed inspector for the explicit Scene command', () => {
+  renderWorkspaceHarness(root, (state) => {
+    workspaceState = state;
+  });
+  act(() => workspaceState!.toggleSidebarCollapsed());
+  expect(workspaceState!.leftSidebarCollapsed).toBe(true);
+  const selectScene = vi.fn();
+  const header = createWorkspaceHeaderController(
+    {
+      workspace: workspaceState!,
+      store: { selectScene, openExportDialog: vi.fn(), renameProject: vi.fn() },
+      libraries: { projectExports: [] },
+      saveStateMeta: {} as never,
+    },
+    createEmptyVideoProject('Scene')
+  );
+  act(() => header.onSelectScene());
+  expect(selectScene).toHaveBeenCalledOnce();
+  expect(workspaceState!.leftSidebarCollapsed).toBe(false);
+});
+
+it('opens a collapsed inspector for selection without changing the library or playback range', () => {
+  renderWorkspaceHarness(root, (state) => {
+    workspaceState = state;
+  });
+  act(() => {
+    workspaceState!.toggleSidebarCollapsed();
+    workspaceState!.openLibraryPanel();
+    workspaceState!.setPlaybackRange({ start: 1, end: 2 });
+  });
+  expect(workspaceState!.leftSidebarCollapsed).toBe(true);
+  act(() => workspaceState!.inspector.openSelection());
+  expect(workspaceState!.leftSidebarCollapsed).toBe(false);
+  expect(workspaceState!.inspector.mode).toBe('selection');
+  expect(workspaceState!.libraryPanelOpen).toBe(true);
+  expect(workspaceState!.playbackRange).toEqual({ start: 1, end: 2 });
+  act(() => workspaceState!.inspector.openSelection());
+  expect(workspaceState!.leftSidebarCollapsed).toBe(false);
 });

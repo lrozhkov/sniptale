@@ -82,7 +82,7 @@ function resolvePointerPoint(
     camera: props.camera,
     clientX: event.clientX,
     clientY: event.clientY,
-    lockToViewport: shouldLockPreviewClipToViewport(clip, props.camera),
+    lockToViewport: shouldLockPreviewClipToViewport(clip, props.camera, props.project),
     project: props.project,
     stage,
   });
@@ -119,7 +119,7 @@ function getTargetHandleMetrics(
       stage,
       props.project,
       props.camera,
-      shouldLockPreviewClipToViewport(clip, props.camera)
+      shouldLockPreviewClipToViewport(clip, props.camera, props.project)
     ).scaleX
   );
 
@@ -210,7 +210,7 @@ function renderPointTarget(
           props.project,
           clip.targetPoint,
           props.camera,
-          shouldLockPreviewClipToViewport(clip, props.camera),
+          shouldLockPreviewClipToViewport(clip, props.camera, props.project),
           stage
         ),
         borderWidth: `${metrics.borderWidth}px`,
@@ -245,7 +245,7 @@ function renderRectTarget(
           props.project,
           clip.targetRect,
           props.camera,
-          shouldLockPreviewClipToViewport(clip, props.camera),
+          shouldLockPreviewClipToViewport(clip, props.camera, props.project),
           stage
         ),
         borderWidth: `${metrics.borderWidth}px`,

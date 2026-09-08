@@ -19,45 +19,52 @@ import {
 import { getMp4CodecOptions } from './codec-options';
 import type { ExportDialogFieldParams } from './field-contract';
 
-const EXPORT_QUALITY_OPTIONS = [
-  {
-    value: VideoExportQualityPreset.LOW,
-    label: translate('videoEditor.exportDialog.qualityLow'),
-  },
-  {
-    value: VideoExportQualityPreset.MEDIUM,
-    label: translate('videoEditor.exportDialog.qualityMedium'),
-  },
-  {
-    value: VideoExportQualityPreset.HIGH,
-    label: translate('videoEditor.exportDialog.qualityHigh'),
-  },
-  {
-    value: VideoExportQualityPreset.ULTRA,
-    label: translate('videoEditor.exportDialog.qualityUltra'),
-  },
-] as const;
+const EXPORT_FIELD_CLASS_NAME =
+  '!min-h-9 !rounded-md !border-transparent !bg-transparent !px-0 !py-0';
 
-const EXPORT_RESOLUTION_OPTIONS = [
-  VideoResolutionPreset.SOURCE,
-  VideoResolutionPreset.P240,
-  VideoResolutionPreset.P360,
-  VideoResolutionPreset.P480,
-  VideoResolutionPreset.P720,
-  VideoResolutionPreset.P1080,
-  VideoResolutionPreset.P1440,
-  VideoResolutionPreset.P2160,
-].map((value) => ({
-  value,
-  label:
-    value === VideoResolutionPreset.SOURCE
-      ? translate('videoEditor.exportDialog.resolutionSource')
-      : value === VideoResolutionPreset.P1440
-        ? '1440p (2K)'
-        : value === VideoResolutionPreset.P2160
-          ? '2160p (4K)'
-          : value.toLowerCase(),
-}));
+function getExportQualityOptions() {
+  return [
+    {
+      value: VideoExportQualityPreset.LOW,
+      label: translate('videoEditor.exportDialog.qualityLow'),
+    },
+    {
+      value: VideoExportQualityPreset.MEDIUM,
+      label: translate('videoEditor.exportDialog.qualityMedium'),
+    },
+    {
+      value: VideoExportQualityPreset.HIGH,
+      label: translate('videoEditor.exportDialog.qualityHigh'),
+    },
+    {
+      value: VideoExportQualityPreset.ULTRA,
+      label: translate('videoEditor.exportDialog.qualityUltra'),
+    },
+  ] as const;
+}
+
+function getExportResolutionOptions() {
+  return [
+    VideoResolutionPreset.SOURCE,
+    VideoResolutionPreset.P240,
+    VideoResolutionPreset.P360,
+    VideoResolutionPreset.P480,
+    VideoResolutionPreset.P720,
+    VideoResolutionPreset.P1080,
+    VideoResolutionPreset.P1440,
+    VideoResolutionPreset.P2160,
+  ].map((value) => ({
+    value,
+    label:
+      value === VideoResolutionPreset.SOURCE
+        ? translate('videoEditor.exportDialog.resolutionSource')
+        : value === VideoResolutionPreset.P1440
+          ? '1440p (2K)'
+          : value === VideoResolutionPreset.P2160
+            ? '2160p (4K)'
+            : value.toLowerCase(),
+  }));
+}
 
 const WEBM_CODEC_OPTIONS = [
   { value: VideoWebmCodec.VP9, label: 'VP9' },
@@ -127,6 +134,7 @@ function ExportDialogCodecField<TCodec extends string>(props: {
         <StatusRow label={label} value={props.codecOptions[0]?.label ?? ''} />
       ) : (
         <SelectField
+          className={EXPORT_FIELD_CLASS_NAME}
           label={label}
           value={props.currentCodec}
           onChange={props.onChange}
@@ -170,12 +178,14 @@ export function ExportDialogSelectFields(params: ExportDialogFieldParams) {
   return (
     <>
       <SelectField
+        className={EXPORT_FIELD_CLASS_NAME}
         label={translate('videoEditor.exportDialog.scopeLabel')}
         value={currentScope}
         onChange={(scope) => onChange({ scope })}
         options={scopeOptions}
       />
       <SelectField
+        className={EXPORT_FIELD_CLASS_NAME}
         label={translate('videoEditor.exportDialog.formatLabel')}
         value={settings.format}
         onChange={(format) => onChange(buildFormatPatch({ capabilities, format, settings }))}
@@ -196,6 +206,7 @@ export function ExportDialogSelectFields(params: ExportDialogFieldParams) {
         />
       ) : null}
       <SelectField
+        className={EXPORT_FIELD_CLASS_NAME}
         label={translate('videoEditor.exportDialog.resolutionLabel')}
         value={currentResolution}
         onChange={(resolution) => {
@@ -206,13 +217,14 @@ export function ExportDialogSelectFields(params: ExportDialogFieldParams) {
           );
           onChange({ resolution, ...dimensions });
         }}
-        options={EXPORT_RESOLUTION_OPTIONS}
+        options={getExportResolutionOptions()}
       />
       <SelectField
+        className={EXPORT_FIELD_CLASS_NAME}
         label={translate('videoEditor.exportDialog.qualityLabel')}
         value={settings.quality}
         onChange={(quality) => onChange({ quality })}
-        options={EXPORT_QUALITY_OPTIONS}
+        options={getExportQualityOptions()}
       />
     </>
   );
@@ -235,7 +247,7 @@ export function ExportDialogNumberField(params: {
       value={params.value}
       onPreviewValue={params.onChange}
       onCommitValue={params.onChange}
-      {...(params.className === undefined ? {} : { className: params.className })}
+      className={params.className ?? EXPORT_FIELD_CLASS_NAME}
       {...(params.max === undefined ? {} : { max: params.max })}
     />
   );

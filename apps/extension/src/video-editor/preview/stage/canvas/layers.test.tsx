@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 
-import type React from 'react';
+import { createRef, type default as React } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { createSceneGradientBackground } from '../../../../features/video/project/scene/background-gradient';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 const { handleStageAreaPlacementMock, handleStagePointPlacementMock, handleStagePointerDownMock } =
@@ -15,10 +17,6 @@ vi.mock('../area-overlay/index', () => ({
   handleStageAreaPlacement: handleStageAreaPlacementMock,
 }));
 
-vi.mock('../motion-path/index', () => ({
-  PreviewStageMotionPathOverlay: () => null,
-}));
-
 vi.mock('../point-overlay/index', () => ({
   PreviewStagePointOverlay: () => null,
   handleStagePointPlacement: handleStagePointPlacementMock,
@@ -29,7 +27,7 @@ vi.mock('./selection-overlay', () => ({
   handleStagePointerDown: handleStagePointerDownMock,
 }));
 import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
-import { handlePreviewStageRootPointerDown } from './layers';
+import { handlePreviewStageRootPointerDown, PreviewStageCanvasLayer } from './layers';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -39,6 +37,7 @@ function createPointerParams(
   overrides: Partial<Parameters<typeof handlePreviewStageRootPointerDown>[1]> = {}
 ): Parameters<typeof handlePreviewStageRootPointerDown>[1] {
   return {
+    currentTime: 0,
     activeClips: [],
     beginInteraction: vi.fn(),
     camera: {
@@ -58,7 +57,7 @@ function createPointerParams(
     onUpdateMotionRegion: vi.fn(),
     placementMode: null,
     project: createEmptyVideoProject('Canvas', 100, 100),
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedMotionRegion: null,
     stageRef: { current: document.createElement('div') },
     ...overrides,
@@ -100,4 +99,26 @@ it('falls through to the selection handler after area and point handlers decline
   expect(handleStageAreaPlacementMock).toHaveBeenCalledOnce();
   expect(handleStagePointPlacementMock).toHaveBeenCalledOnce();
   expect(handleStagePointerDownMock).toHaveBeenCalledOnce();
+});
+
+it('composites translucent scene pixels once against the opaque video display matte', () => {
+  const project = createEmptyVideoProject('Transparent background');
+  project.sceneBackground = createSceneGradientBackground('#ff000080');
+  const markup = renderToStaticMarkup(
+    <PreviewStageCanvasLayer
+      project={project}
+      activeClips={[]}
+      audioBankClips={[]}
+      videoBankClips={[]}
+      audioRefs={{ current: {} }}
+      videoRefs={{ current: {} }}
+      canvasRef={createRef<HTMLCanvasElement>()}
+      assetUrls={{}}
+      cachedVideo={null}
+      currentTime={0}
+      isPlaying={false}
+    />
+  );
+  expect(markup).toContain('background-color:#000');
+  expect(markup).not.toContain('gradient(');
 });

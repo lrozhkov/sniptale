@@ -1,4 +1,8 @@
 import {
+  activeCameraPosition,
+  updateCameraPositionVisual,
+} from '../../../../features/video/project/camera/animation';
+import {
   normalizeVideoMediaShadowIntensity,
   normalizeVideoMediaShadowMode,
 } from '../../../../features/video/composition/canvas/media-shadow';
@@ -32,12 +36,14 @@ export function createClipMediaStyleActions(
   return {
     updateMediaClipFitMode: (clipId, fitMode) =>
       set((state) =>
-        applyProjectUpdate(state, (project) => updateMediaClipVisuals(project, clipId, { fitMode }))
+        applyProjectUpdate(state, (project) =>
+          updateMediaClipVisuals(project, clipId, { fitMode }, state.currentTime)
+        )
       ),
     updateMediaClipFitScalePercent: (clipId, fitScalePercent) =>
       set((state) =>
         applyProjectUpdate(state, (project) =>
-          updateMediaClipVisuals(project, clipId, { fitScalePercent })
+          updateMediaClipVisuals(project, clipId, { fitScalePercent }, state.currentTime)
         )
       ),
     updateMediaClipShadowIntensity: (clipId, shadowIntensity) =>
@@ -92,14 +98,19 @@ function updateMediaClipVisuals(
     fitScalePercent?: number;
     shadowIntensity?: number;
     shadowMode?: VideoMediaShadowMode;
-  }
+  },
+  time = 0
 ) {
   const clip = project.clips.find((item) => item.id === clipId);
   if (!isMediaClip(clip) || !areClipTracksEditable(project, [clipId])) {
     return project;
   }
 
-  const fitMode = patch.fitMode ?? clip.fitMode;
+  const isCamera =
+    clip.type === 'VIDEO' &&
+    project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA');
+  const position = isCamera ? activeCameraPosition(clip, time) : undefined;
+  const fitMode = patch.fitMode ?? position?.fitMode ?? clip.fitMode;
   const fitScalePercent =
     patch.fitScalePercent === undefined
       ? normalizeMediaFitScalePercent(clip.fitScalePercent ?? 100)
@@ -113,22 +124,39 @@ function updateMediaClipVisuals(
       ? normalizeVideoMediaShadowMode(clip.shadowMode)
       : normalizeVideoMediaShadowMode(patch.shadowMode);
   const shouldRefreshTransform = patch.fitMode !== undefined || patch.fitScalePercent !== undefined;
+  if (
+    !shouldRefreshTransform &&
+    shadowIntensity === normalizeVideoMediaShadowIntensity(clip.shadowIntensity) &&
+    shadowMode === normalizeVideoMediaShadowMode(clip.shadowMode)
+  ) {
+    return project;
+  }
 
   return applyVideoProjectMutationPatch(project, {
-    clips: project.clips.map((item) =>
-      item.id === clipId && isMediaClip(item)
-        ? {
-            ...item,
+    clips: project.clips.map((item): VideoProjectClip => {
+      if (item.id !== clipId || !isMediaClip(item)) return item;
+      if (isCamera && item.type === 'VIDEO' && shouldRefreshTransform) {
+        return {
+          ...updateCameraPositionVisual(item, time, {
             fitMode,
-            fitScalePercent,
-            shadowIntensity,
-            shadowMode,
-            transform: shouldRefreshTransform
-              ? resolveMediaClipFitTransform(project, item, fitMode, fitScalePercent)
-              : item.transform,
-          }
-        : item
-    ),
+            transform: resolveMediaClipFitTransform(project, item, fitMode, fitScalePercent),
+          }),
+          fitScalePercent,
+          shadowIntensity,
+          shadowMode,
+        };
+      }
+      return {
+        ...item,
+        fitMode,
+        fitScalePercent,
+        shadowIntensity,
+        shadowMode,
+        transform: shouldRefreshTransform
+          ? resolveMediaClipFitTransform(project, item, fitMode, fitScalePercent)
+          : item.transform,
+      };
+    }),
   });
 }
 

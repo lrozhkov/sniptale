@@ -1,10 +1,15 @@
+import { reconcileMotionSourceBindings } from '../../../features/video/project/motion/source-binding';
 import {
   createVideoProjectTrack,
   getDefaultTrackName,
 } from '../../../features/video/project/factories/creation';
 import { clampNumber } from '../../../features/video/project/hydration';
 import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
-import { getLinkedClipIds, syncProjectDuration } from '../../../features/video/project/timeline';
+import {
+  areProjectClipsEditable,
+  getLinkedClipIds,
+  syncProjectDuration,
+} from '../../../features/video/project/timeline';
 import type { VideoProject, VideoProjectClip } from '../../../features/video/project/types/index';
 import {
   VideoClipLinkMode,
@@ -15,7 +20,11 @@ import {
   resolvePlacementModeAfterProjectUpdate,
   resolvePlacementModeAfterSelectionChange,
 } from '../selection/placement';
-import { isSourceTimedClip, updateSourceTimedClipTiming } from '../operations/source-timed-clips';
+import {
+  isSourceTimedClip,
+  reconcileRecordingInteractionAnchors,
+  updateSourceTimedClipTiming,
+} from '../operations/source-timed-clips';
 import type { VideoEditorProjectState } from './contracts';
 import {
   resolveSelectedTrackIdFromSelection,
@@ -54,7 +63,9 @@ export function ensureTrackForKind(
   const sequence = project.tracks.filter((track) => track.kind === kind).length + 1;
   const track = createVideoProjectTrack(
     getDefaultTrackName(kind, sequence),
-    project.tracks.length,
+    kind === VideoTrackKind.PRIMARY || kind === VideoTrackKind.SUBTITLE
+      ? Math.min(0, ...project.tracks.map((item) => item.order)) - 1
+      : Math.max(0, ...project.tracks.map((item) => item.order)) + 1,
     kind
   );
   return {
@@ -67,7 +78,8 @@ export function ensureTrackForKind(
 
 export function applyProjectUpdate(
   state: VideoEditorProjectState,
-  updater: (project: VideoProject) => VideoProject
+  updater: (project: VideoProject) => VideoProject,
+  splitLineage?: ReadonlyMap<string, string>
 ): Partial<VideoEditorProjectState> {
   if (!state.project) {
     return {};
@@ -77,26 +89,43 @@ export function applyProjectUpdate(
   if (updatedProject === state.project) {
     return {};
   }
-  const nextProject = syncProjectDuration(updatedProject);
+  const nextProject = reconcileProjectMutation(state.project, updatedProject, splitLineage);
   return {
-    ...applyProjectSnapshot(state, nextProject),
+    ...applyProjectSnapshot(state, nextProject, splitLineage),
     projectHistory: recordVideoEditorProjectHistory(
       state.projectHistory,
       state.project,
-      nextProject
+      nextProject,
+      state.selection
     ),
   };
 }
 
+/** Reconcile each temporal mutation before the next split, without publishing history. */
+export function reconcileProjectMutation(
+  previousProject: VideoProject,
+  updatedProject: VideoProject,
+  splitLineage?: ReadonlyMap<string, string>
+): VideoProject {
+  return syncProjectDuration(
+    reconcileMotionSourceBindings(
+      previousProject,
+      reconcileRecordingInteractionAnchors(previousProject, updatedProject, splitLineage),
+      splitLineage
+    )
+  );
+}
+
 export function applyProjectSnapshot(
   state: VideoEditorProjectState,
-  nextProject: VideoProject
+  nextProject: VideoProject,
+  splitLineage?: ReadonlyMap<string, string>
 ): Partial<VideoEditorProjectState> {
   const nextTime = clampNumber(state.currentTime, 0, Math.max(0, nextProject.duration));
   const selectedTrackStillExists = state.selectedTrackId
     ? nextProject.tracks.some((track) => track.id === state.selectedTrackId)
     : false;
-  const selection = resolveSelectionAfterProjectUpdate(nextProject, state.selection);
+  const selection = resolveSelectionAfterProjectUpdate(nextProject, state.selection, splitLineage);
   const selectedTrackId =
     resolveSelectedTrackIdFromSelection(nextProject, selection) ??
     (selectedTrackStillExists ? state.selectedTrackId : (nextProject.tracks[0]?.id ?? null));
@@ -171,15 +200,7 @@ export function isTrackCompatibleWithClip(
 }
 
 export function areClipTracksEditable(project: VideoProject, clipIds: string[]): boolean {
-  return clipIds.every((clipId) => {
-    const clip = project.clips.find((item) => item.id === clipId);
-    if (!clip) {
-      return false;
-    }
-
-    const track = project.tracks.find((item) => item.id === clip.trackId);
-    return Boolean(track && !track.locked);
-  });
+  return areProjectClipsEditable(project, clipIds);
 }
 
 export function detachLinkedClips(project: VideoProject, clipId: string): VideoProject {
@@ -199,26 +220,4 @@ export function detachLinkedClips(project: VideoProject, clipId: string): VideoP
         : clip
     ),
   });
-}
-
-export function pruneUnusedProjectAssets(project: VideoProject): VideoProject {
-  const referencedAssetIds = new Set(project.clips.flatMap(collectClipAssetIds));
-  const nextAssets = project.assets.filter((asset) => referencedAssetIds.has(asset.id));
-
-  if (nextAssets.length === project.assets.length) {
-    return project;
-  }
-
-  return applyVideoProjectMutationPatch(project, {
-    assets: nextAssets,
-  });
-}
-
-function collectClipAssetIds(clip: VideoProjectClip): string[] {
-  const assetIds = 'assetId' in clip ? [clip.assetId] : [];
-  if (clip.type === VideoProjectClipType.SHAPE && clip.embeddedAsset) {
-    assetIds.push(clip.embeddedAsset.assetId);
-  }
-
-  return assetIds;
 }

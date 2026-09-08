@@ -1,15 +1,26 @@
+import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
+import { getTimelineHistoryLayout } from '../effect-lanes/history-layout';
+import { Activity, Rows3, Text } from 'lucide-react';
+import { TimelineIconButton } from '../controls/icon-button';
+import { ProjectTimelineAddTrackControl } from '../toolbar/sections/add-controls';
+import type { ProjectTimelineInsertionActions } from '../types';
 import type { MutableRefObject } from 'react';
 import { translate } from '../../../../platform/i18n';
 import type { VideoProjectUtilityLaneKind } from '../../../../features/video/project/utility-lanes';
-import type { VideoProject } from '../../../../features/video/project/types';
+import {
+  VideoProjectTrackRole,
+  VideoTrackKind,
+  type VideoProject,
+} from '../../../../features/video/project/types';
 import { ProjectTimelineEffectLaneLabelRows } from '../effect-lanes/labels';
 import type { TimelineTrackLayoutModel } from './layout';
-import { ProjectTimelineExpandedRows } from '../panel';
 import { ProjectTimelineTelemetryLaneLabelRow } from '../effect-lanes/telemetry-lane';
 import { ProjectTimelineTrackRow } from './row';
 import type { useProjectTimelinePanelPrefs } from '../panel/prefs';
 
 interface ProjectTimelineTrackListProps {
+  recordingTelemetry?: readonly RecordingTelemetryEntry[];
+  canShowTelemetryLane: boolean;
   cursorLaneVisible: boolean;
   project: VideoProject;
   selectedTrackId: string | null;
@@ -18,11 +29,14 @@ interface ProjectTimelineTrackListProps {
   trackListRef: MutableRefObject<HTMLDivElement | null>;
   trackPanelPrefs: ReturnType<typeof useProjectTimelinePanelPrefs>;
   tracks: VideoProject['tracks'];
-  onMoveTrack: (trackId: string, direction: 'up' | 'down') => void;
+  onAddTrack: ProjectTimelineInsertionActions['onAddTrack'];
   onClearUtilityLane: (lane: VideoProjectUtilityLaneKind) => void;
-  onDeleteTrack: (trackId: string) => void;
   onScroll: () => void;
   onSelectTrack: (trackId: string) => void;
+  onSelectHistoryLane?: (() => void) | undefined;
+  historyLaneSelected?: boolean | undefined;
+  onSelectMotionLane?: (() => void) | undefined;
+  motionLaneSelected?: boolean | undefined;
   onToggleTrackLock: (trackId: string) => void;
   onToggleTrackVisibility: (trackId: string) => void;
   onToggleUtilityLaneLock: (lane: VideoProjectUtilityLaneKind) => void;
@@ -34,32 +48,73 @@ export function ProjectTimelineTrackList(props: ProjectTimelineTrackListProps) {
     <div
       className={[
         'flex min-h-0 flex-col border-r',
+        props.trackPanelPrefs.prefs.hideTrackNames ? '[&_[data-timeline-track-name]]:sr-only' : '',
         'border-[color:var(--sniptale-color-border-soft)]',
         'bg-[color:var(--sniptale-color-surface-overlay)]',
       ].join(' ')}
     >
-      <ProjectTimelineTrackListHeader trackPanelPrefs={props.trackPanelPrefs} />
+      <ProjectTimelineTrackListHeader {...props} />
       <ProjectTimelineTrackListScrollArea {...props} />
     </div>
   );
 }
 
-function ProjectTimelineTrackListHeader({
-  trackPanelPrefs,
-}: Pick<ProjectTimelineTrackListProps, 'trackPanelPrefs'>) {
-  const compactRows = trackPanelPrefs.prefs.compactRows;
-
+function ProjectTimelineTrackListHeader(props: ProjectTimelineTrackListProps) {
+  const collapsed = props.trackPanelPrefs.prefs.hideTrackNames;
   return (
     <div
       className={[
         'flex h-[30px] items-center border-b text-[11px]',
-        compactRows ? 'justify-center px-1' : 'justify-between px-3',
+        'justify-between gap-1 px-2',
         'font-semibold',
         'border-[color:var(--sniptale-color-border-soft)]',
         'text-[var(--sniptale-color-text-muted)]',
       ].join(' ')}
     >
-      {compactRows ? null : <span>{translate('videoEditor.timeline.tracksTitle')}</span>}
+      <span className={collapsed ? 'sr-only' : undefined}>
+        {translate('videoEditor.timeline.tracksTitle')}
+      </span>
+      <div
+        className="flex items-center gap-0.5"
+        data-ui="video-editor.timeline.track-header-controls"
+      >
+        <TimelineIconButton
+          frameless
+          active={props.trackPanelPrefs.prefs.hideTrackNames}
+          dataUi="video-editor.timeline.toolbar.hide-track-names"
+          icon={<Text size={14} />}
+          onClick={() =>
+            props.trackPanelPrefs.setHideTrackNames(!props.trackPanelPrefs.prefs.hideTrackNames)
+          }
+          title={translate('videoEditor.timeline.hideTrackNames')}
+        />
+        <TimelineIconButton
+          frameless
+          active={props.trackPanelPrefs.prefs.compactRows}
+          dataUi="video-editor.timeline.toolbar.compact-tracks"
+          icon={<Rows3 size={14} />}
+          onClick={() =>
+            props.trackPanelPrefs.setCompactRows(!props.trackPanelPrefs.prefs.compactRows)
+          }
+          title={translate('videoEditor.timeline.trackPanelCompactToggle')}
+        />
+        <TimelineIconButton
+          frameless
+          active={
+            props.canShowTelemetryLane && props.trackPanelPrefs.prefs.collapsedTelemetryLaneVisible
+          }
+          disabled={!props.canShowTelemetryLane}
+          dataUi="video-editor.timeline.toolbar.telemetry-lane"
+          icon={<Activity size={14} />}
+          onClick={() =>
+            props.trackPanelPrefs.setCollapsedTelemetryLaneVisible(
+              !props.trackPanelPrefs.prefs.collapsedTelemetryLaneVisible
+            )
+          }
+          title={translate('videoEditor.timeline.telemetryLane')}
+        />
+        <ProjectTimelineAddTrackControl onAddTrack={props.onAddTrack} />
+      </div>
     </div>
   );
 }
@@ -70,23 +125,15 @@ function ProjectTimelineTrackListScrollArea(props: ProjectTimelineTrackListProps
       ref={props.trackListRef}
       data-project-timeline-track-list="true"
       className="grid min-h-0 flex-1 overflow-x-hidden overflow-y-auto"
-      style={{
-        gridTemplateColumns:
-          props.trackPanelPrefs.prefs.panelExpanded && !props.trackPanelPrefs.prefs.compactRows
-            ? 'minmax(0, 1fr) minmax(0, 1fr)'
-            : 'minmax(0, 1fr)',
-      }}
       onScroll={props.onScroll}
     >
       <ProjectTimelineRailRows {...props} />
-      {props.trackPanelPrefs.prefs.panelExpanded && !props.trackPanelPrefs.prefs.compactRows ? (
-        <ProjectTimelineExpandedRows {...props} />
-      ) : null}
     </div>
   );
 }
 
 function ProjectTimelineRailRows(props: {
+  recordingTelemetry?: readonly RecordingTelemetryEntry[];
   cursorLaneVisible: boolean;
   project: VideoProject;
   selectedTrackId: string | null;
@@ -94,24 +141,42 @@ function ProjectTimelineRailRows(props: {
   trackLayoutModel: TimelineTrackLayoutModel;
   trackPanelPrefs: ReturnType<typeof useProjectTimelinePanelPrefs>;
   tracks: VideoProject['tracks'];
+  onClearUtilityLane: (lane: VideoProjectUtilityLaneKind) => void;
   onSelectTrack: (trackId: string) => void;
+  onSelectHistoryLane?: (() => void) | undefined;
+  historyLaneSelected?: boolean | undefined;
+  onSelectMotionLane?: (() => void) | undefined;
+  motionLaneSelected?: boolean | undefined;
   onToggleTrackLock: (trackId: string) => void;
   onToggleTrackVisibility: (trackId: string) => void;
   onToggleUtilityLaneLock: (lane: VideoProjectUtilityLaneKind) => void;
   onToggleUtilityLaneVisibility: (lane: VideoProjectUtilityLaneKind) => void;
 }) {
   return (
-    <div className="min-w-0 border-r border-[color:var(--sniptale-color-border-soft)]">
+    <div className="min-w-0">
       {props.showTelemetryLane ? (
         <ProjectTimelineTelemetryLaneLabelRow
-          compactRows={props.trackPanelPrefs.prefs.compactRows}
+          height={
+            getTimelineHistoryLayout(
+              props.project,
+              props.recordingTelemetry,
+              props.cursorLaneVisible
+            ).height
+          }
+          compactRows={false}
+          project={props.project}
+          onSelect={props.onSelectHistoryLane}
+          selected={props.historyLaneSelected}
+          onToggleVisibility={() => props.onToggleUtilityLaneVisibility('actions')}
+          onToggleLock={() => props.onToggleUtilityLaneLock('actions')}
         />
       ) : null}
-      {props.tracks.map((track) => (
+      {props.tracks.map((track, index) => (
         <ProjectTimelineTrackRow
           key={track.id}
           compactRows={props.trackPanelPrefs.prefs.compactRows}
           isSelected={props.selectedTrackId === track.id}
+          trackLabel={getTrackPositionLabel(props.tracks, index)}
           trackLayout={props.trackLayoutModel.layoutByTrackId.get(track.id)}
           track={track}
           onSelectTrack={props.onSelectTrack}
@@ -120,7 +185,10 @@ function ProjectTimelineRailRows(props: {
         />
       ))}
       <ProjectTimelineEffectLaneLabelRows
-        compactRows={props.trackPanelPrefs.prefs.compactRows}
+        onSelectMotionLane={props.onSelectMotionLane}
+        motionLaneSelected={props.motionLaneSelected}
+        compactRows={false}
+        onClearUtilityLane={props.onClearUtilityLane}
         cursorLaneVisible={props.cursorLaneVisible}
         project={props.project}
         onToggleUtilityLaneLock={props.onToggleUtilityLaneLock}
@@ -128,4 +196,28 @@ function ProjectTimelineRailRows(props: {
       />
     </div>
   );
+}
+
+function getTrackPositionLabel(tracks: VideoProject['tracks'], trackIndex: number): string {
+  const track = tracks[trackIndex];
+  if (!track) return '';
+  if (track.role === VideoProjectTrackRole.CAMERA) {
+    const cameraPosition = tracks
+      .slice(0, trackIndex + 1)
+      .filter((item) => item.role === VideoProjectTrackRole.CAMERA).length;
+    return `C${cameraPosition}`;
+  }
+  const position = tracks
+    .slice(0, trackIndex + 1)
+    .filter(
+      (item) =>
+        item.kind === track.kind &&
+        (track.kind !== VideoTrackKind.PRIMARY || item.role !== VideoProjectTrackRole.CAMERA)
+    ).length;
+  const prefix = {
+    [VideoTrackKind.PRIMARY]: 'V',
+    [VideoTrackKind.AUDIO]: 'A',
+    [VideoTrackKind.SUBTITLE]: 'S',
+  }[track.kind];
+  return `${prefix}${position}`;
 }

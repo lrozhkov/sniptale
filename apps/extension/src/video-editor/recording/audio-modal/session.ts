@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { AudioRecordingModalProps } from './shared';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { translate } from '../../../platform/i18n';
 import { beginRecordingSession } from './capture';
 import { formatDurationLabel, resolveRecordingMimeType, type AudioRecordingStatus } from './shared';
@@ -7,26 +8,6 @@ import type {
   AudioRecordingRefs,
   AudioRecordingState,
 } from './session-types';
-
-function useEscapeClose(isOpen: boolean, onClose: () => void) {
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') {
-        return;
-      }
-
-      event.preventDefault();
-      onClose();
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-}
 
 function useAudioRecordingState(): AudioRecordingState {
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -122,19 +103,28 @@ function useTrimPlaybackLifecycle(state: AudioRecordingState) {
       return;
     }
 
+    let frame = 0;
     const handleTimeUpdate = () => {
-      if (audio.currentTime < state.trimEnd - 0.02) {
-        return;
-      }
-
+      if (audio.paused || audio.currentTime < state.trimEnd) return;
       audio.pause();
+      audio.currentTime = state.trimEnd;
       state.setIsPlayingSelection(false);
     };
-    const handlePause = () => state.setIsPlayingSelection(false);
-
+    const monitor = () => {
+      handleTimeUpdate();
+      if (!audio.paused) frame = requestAnimationFrame(monitor);
+    };
+    const handlePause = () => {
+      cancelAnimationFrame(frame);
+      state.setIsPlayingSelection(false);
+    };
+    audio.addEventListener('play', monitor);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('pause', handlePause);
+    if (!audio.paused) monitor();
     return () => {
+      cancelAnimationFrame(frame);
+      audio.removeEventListener('play', monitor);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('pause', handlePause);
     };
@@ -143,7 +133,6 @@ function useTrimPlaybackLifecycle(state: AudioRecordingState) {
 
 function useRecordingLifecycle(
   isOpen: boolean,
-  onClose: () => void,
   resetSession: () => void,
   state: AudioRecordingState
 ) {
@@ -160,7 +149,6 @@ function useRecordingLifecycle(
   }, [isOpen, resetSession]);
 
   useEffect(() => () => resetSessionOnUnmountRef.current(), []);
-  useEscapeClose(isOpen, onClose);
   useTrimPlaybackLifecycle(state);
 }
 
@@ -171,9 +159,16 @@ function useRecordingPlaybackControls(state: AudioRecordingState) {
       return;
     }
 
-    audio.currentTime = state.trimStart;
-    await audio.play();
-    state.setIsPlayingSelection(true);
+    if (audio.currentTime < state.trimStart || audio.currentTime >= state.trimEnd)
+      audio.currentTime = state.trimStart;
+    state.setError(null);
+    try {
+      await audio.play();
+      if (state.audioRef.current === audio) state.setIsPlayingSelection(!audio.paused);
+    } catch {
+      if (state.audioRef.current === audio)
+        state.setError(translate('videoEditor.app.sourcePlayFailed'));
+    }
   }, [state]);
 
   const pauseSelection = useCallback(() => {
@@ -183,10 +178,27 @@ function useRecordingPlaybackControls(state: AudioRecordingState) {
   return { pauseSelection, playSelection };
 }
 
+function createRecordingRangeControls(state: AudioRecordingState, limit = Infinity) {
+  const selectRange = (range: { start: number; end: number }) => {
+    state.setTrimStart(Math.min(range.start, limit));
+    state.setTrimEnd(Math.min(range.end, limit));
+  };
+  const resolveDuration = (duration: number) => {
+    if (!Number.isFinite(duration) || duration <= 0) return;
+    duration = Math.min(duration, limit);
+    state.setRecordedDuration(duration);
+    state.setTrimEnd((end) => Math.min(end, duration));
+    state.setTrimStart((start) => Math.min(start, Math.max(0, duration - 0.01)));
+  };
+  return { selectRange, resolveDuration };
+}
+
 function useRecordingCaptureControls(
   state: AudioRecordingState,
   refs: AudioRecordingRefs,
-  resetSession: () => void
+  resetSession: () => void,
+  deviceId: string,
+  timeline?: AudioRecordingModalProps['timeline']
 ) {
   const clearTimer = useCallback(() => clearRecordingTimer(refs.timerRef), [refs.timerRef]);
   const stopStream = useCallback(() => stopRecordingStream(refs.streamRef), [refs.streamRef]);
@@ -200,6 +212,8 @@ function useRecordingCaptureControls(
 
     resetSession();
     await beginRecordingSession({
+      deviceId,
+      timeline,
       clearTimer,
       mimeType,
       refs,
@@ -207,7 +221,7 @@ function useRecordingCaptureControls(
       state,
       stopStream,
     });
-  }, [clearTimer, refs, resetSession, state, stopStream]);
+  }, [clearTimer, refs, resetSession, state, stopStream, deviceId, timeline]);
 
   const stopRecording = useCallback(() => {
     const recorder = refs.mediaRecorderRef.current;
@@ -223,18 +237,23 @@ function useRecordingCaptureControls(
 
 export function useAudioRecordingSession(
   isOpen: boolean,
-  onClose: () => void
+  deviceId = '',
+  timeline?: AudioRecordingModalProps['timeline']
 ): AudioRecordingControllerState {
   const state = useAudioRecordingState();
   const refs = useAudioRecordingRefs();
   const resetSession = useRecordingReset(state, refs);
-  useRecordingLifecycle(isOpen, onClose, resetSession, state);
+  useRecordingLifecycle(isOpen, resetSession, state);
   const playbackControls = useRecordingPlaybackControls(state);
-  const captureControls = useRecordingCaptureControls(state, refs, resetSession);
-  const recordedDuration = useMemo(
-    () => Math.max(0, state.trimEnd || state.recordedDuration || state.durationSeconds),
-    [state.durationSeconds, state.recordedDuration, state.trimEnd]
+  const rangeControls = createRecordingRangeControls(state, timeline?.duration);
+  const captureControls = useRecordingCaptureControls(
+    state,
+    refs,
+    resetSession,
+    deviceId,
+    timeline
   );
+  const recordedDuration = Math.max(0, state.recordedDuration || state.durationSeconds);
 
   return {
     save: {
@@ -244,25 +263,28 @@ export function useAudioRecordingSession(
       trimStart: state.trimStart,
     },
     transport: {
+      elapsedSeconds: state.durationSeconds,
       durationLabel: formatDurationLabel(state.durationSeconds),
       error: state.error,
       startRecording: captureControls.startRecording,
       status: state.status,
       stopRecording: captureControls.stopRecording,
     },
-    trim: state.audioUrl
-      ? {
-          audioRef: state.audioRef,
-          audioUrl: state.audioUrl,
-          isPlayingSelection: state.isPlayingSelection,
-          pauseSelection: playbackControls.pauseSelection,
-          playSelection: playbackControls.playSelection,
-          recordedDuration,
-          setTrimEnd: state.setTrimEnd,
-          setTrimStart: state.setTrimStart,
-          trimEnd: state.trimEnd,
-          trimStart: state.trimStart,
-        }
-      : null,
+    trim:
+      state.audioUrl && state.audioBlob
+        ? {
+            audioRef: state.audioRef,
+            audioUrl: state.audioUrl,
+            audioBlob: state.audioBlob,
+            resolveDuration: rangeControls.resolveDuration,
+            selectRange: rangeControls.selectRange,
+            isPlayingSelection: state.isPlayingSelection,
+            pauseSelection: playbackControls.pauseSelection,
+            playSelection: playbackControls.playSelection,
+            recordedDuration,
+            trimEnd: state.trimEnd,
+            trimStart: state.trimStart,
+          }
+        : null,
   };
 }

@@ -24,7 +24,6 @@ function createHeaderProps() {
     onCloseLibraryPanel: vi.fn(),
     onOpenAudioRecordingDialog: vi.fn(),
     onOpenExportDialog: vi.fn(),
-    onOpenGridSettings: vi.fn(),
     onOpenLibraryPanel: vi.fn(),
     onRenameProject: vi.fn(),
     onSelectScene: vi.fn(),
@@ -36,7 +35,7 @@ function createHeaderProps() {
   };
 }
 
-it('renders project identity and keeps export/library actions in the floating document bar', () => {
+it('renders editable project identity without duplicated workspace commands', () => {
   hookMocks.header.mockReturnValue(createHeaderProps());
   hookMocks.history.mockReturnValue({
     canUndo: false,
@@ -49,12 +48,12 @@ it('renders project identity and keeps export/library actions in the floating do
 
   expect(markup).toContain('data-ui="video-editor.floating.document-bar"');
   expect(markup).toContain('Product Demo Recording');
-  expect(markup).toContain('Saved');
-  expect(markup).toContain('videoEditor.app.libraryButton');
-  expect(markup).toContain('videoEditor.app.exportButton');
-  expect(markup).toContain('video-editor.floating.document-bar.undo');
-  expect(markup).toContain('video-editor.floating.document-bar.redo');
-  expect(markup.match(/disabled/g)).toHaveLength(2);
+  expect(markup).not.toContain('Saved');
+  expect(markup).not.toContain('videoEditor.app.libraryButton');
+  expect(markup).not.toContain('videoEditor.app.exportButton');
+  expect(markup).not.toContain('lucide-pencil');
+  expect(markup).not.toContain('video-editor.floating.document-bar.undo');
+  expect(markup).not.toContain('video-editor.floating.document-bar.redo');
   expect(markup).not.toContain('data-ui="video-editor.floating.document-bar.menu"');
   expect(markup).not.toContain('title="videoEditor.app.title"');
   expect(markup).not.toContain('Sniptale');
@@ -91,4 +90,41 @@ it('exposes an explicit retry action for an autosave error', () => {
 
   expect(markup).toContain('common.actions.retry');
   expect(markup).toContain('<button');
+});
+
+it.each(['dirty', 'saving', 'saved', 'idle'])(
+  'keeps routine %s persistence state out of the toolbar',
+  (state) => {
+    hookMocks.header.mockReturnValue({
+      ...createHeaderProps(),
+      saveStateMeta: { state, label: 'Routine save state', className: '' },
+    });
+    hookMocks.history.mockReturnValue({
+      canUndo: false,
+      canRedo: false,
+      error: null,
+      onUndo: vi.fn(),
+      onRedo: vi.fn(),
+    });
+    const markup = renderToStaticMarkup(<VideoEditorFloatingDocumentBar />);
+    expect(markup).not.toContain('Routine save state');
+    expect(markup).not.toContain('role="alert"');
+  }
+);
+
+it('replaces project identity with source navigation without hiding recovery errors', () => {
+  hookMocks.header.mockReturnValue({
+    ...createHeaderProps(),
+    saveStateMeta: { state: 'error', label: 'Failed', className: '' },
+  });
+  hookMocks.history.mockReturnValue({ error: null });
+  const markup = renderToStaticMarkup(
+    <VideoEditorFloatingDocumentBar>
+      <button>Source / Montage</button>
+    </VideoEditorFloatingDocumentBar>
+  );
+  expect(markup).toContain('Source / Montage');
+  expect(markup).not.toContain('Product Demo Recording');
+  expect(markup).not.toContain('<input');
+  expect(markup).toContain('common.actions.retry');
 });

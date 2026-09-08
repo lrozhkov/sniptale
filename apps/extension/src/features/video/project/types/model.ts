@@ -1,5 +1,8 @@
+import type { CameraAppearance } from '../camera/appearance';
+import type { CameraPosition } from '../camera/animation';
 import type {
   VideoProjectActionEvent,
+  VideoProjectActionPresentation,
   VideoProjectCursorTrack,
   VideoProjectMotionRegion,
   VideoProjectSource,
@@ -105,6 +108,8 @@ export type VideoProjectAssetSource =
       kind: 'project-asset';
       projectAssetId: string;
       originRecordingId?: string;
+      /** Library provenance for repeat-import detection; rendering uses the project-owned copy. */
+      originMediaId?: string;
     }
   | {
       kind: 'scenario-asset';
@@ -127,6 +132,11 @@ export interface VideoProjectAsset {
   name: string;
   source: VideoProjectAssetSource;
   metadata: VideoProjectAssetMetadata;
+  /** Source composition survives deleting montage clips; groupId belongs to each insertion. */
+  recordingPart?: {
+    recordingId: string;
+    role: 'primary' | 'camera' | 'video' | 'audio';
+  };
   createdAt: number;
 }
 
@@ -189,8 +199,12 @@ export interface VideoProjectUtilityLanes {
 }
 
 export interface VideoProjectVideoClip extends VideoProjectBaseClip, VideoProjectMediaVisualFields {
+  cameraPositions?: CameraPosition[];
+  cameraAppearance?: CameraAppearance;
   type: typeof VideoProjectClipType.VIDEO;
   assetId: string;
+  /** A placement's identity survives cuts and timing edits; a duplicate gets a new identity. */
+  sourceInstanceId?: string;
   playbackRate?: number;
   sourceStart: number;
   sourceDuration: number;
@@ -282,4 +296,5 @@ export interface VideoProject {
   motionRegions?: VideoProjectMotionRegion[];
   cursorTrack: VideoProjectCursorTrack | null;
   actionEvents: VideoProjectActionEvent[];
+  actionPresentation?: VideoProjectActionPresentation;
 }

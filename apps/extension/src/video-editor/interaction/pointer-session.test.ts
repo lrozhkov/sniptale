@@ -41,3 +41,54 @@ it('runs the end handler exactly once for pointerup and pointercancel', () => {
 
   expect(onEnd).toHaveBeenCalledTimes(1);
 });
+
+it.each(['pointercancel', 'blur', 'Escape'])(
+  'routes %s to cancellation exactly once',
+  (trigger) => {
+    const onMove = vi.fn();
+    const onEnd = vi.fn();
+    const onCancel = vi.fn();
+    startWindowPointerSession({ onMove, onEnd, onCancel });
+    window.dispatchEvent(
+      trigger === 'Escape'
+        ? new KeyboardEvent('keydown', { key: 'Escape', cancelable: true })
+        : new Event(trigger)
+    );
+    window.dispatchEvent(new Event('pointerup'));
+    dispatchPointerMove(10, 20);
+    expect(onCancel).toHaveBeenCalledOnce();
+    expect(onEnd).not.toHaveBeenCalled();
+    expect(onMove).not.toHaveBeenCalled();
+  }
+);
+
+it.each(['pointerup', 'pointercancel', 'blur', 'Escape', 'cleanup'])(
+  'holds a document cursor until %s and removes its override',
+  (trigger) => {
+    const cleanup = startWindowPointerSession({
+      cursor: 'grabbing',
+      onMove: vi.fn(),
+      onCancel: vi.fn(),
+    });
+    const style = document.querySelector('style[data-video-editor-pointer-cursor]');
+    expect(style?.textContent).toContain('cursor: grabbing !important');
+    if (trigger === 'cleanup') cleanup();
+    else
+      window.dispatchEvent(
+        trigger === 'Escape' ? new KeyboardEvent('keydown', { key: 'Escape' }) : new Event(trigger)
+      );
+    expect(document.querySelector('style[data-video-editor-pointer-cursor]')).toBeNull();
+    cleanup();
+  }
+);
+
+it('does not release another session cursor when an older session is cleaned up', () => {
+  const first = startWindowPointerSession({ cursor: 'grabbing', onMove: vi.fn() });
+  const second = startWindowPointerSession({ cursor: 'ew-resize', onMove: vi.fn() });
+  first();
+  expect(document.querySelector('style[data-video-editor-pointer-cursor]')?.textContent).toContain(
+    'cursor: ew-resize !important'
+  );
+  second();
+  expect(document.querySelector('style[data-video-editor-pointer-cursor]')).toBeNull();
+});

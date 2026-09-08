@@ -146,7 +146,15 @@ it('draws standalone frames through their ordinary host layer', () => {
       state: createEffectRuntimeDrawState(),
     })
   ).toBe(true);
-  expect(drawLayerBitmap).toHaveBeenCalledWith(context, hostLayer, scene.bitmap, 2, 3, 0.5);
+  expect(drawLayerBitmap).toHaveBeenCalledWith(
+    context,
+    hostLayer,
+    scene.bitmap,
+    2,
+    3,
+    0.5,
+    undefined
+  );
   expect(
     drawEffectRuntimeVisualLayer({
       context: getContext(),

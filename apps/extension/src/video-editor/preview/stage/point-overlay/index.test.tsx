@@ -1,10 +1,21 @@
 // @vitest-environment jsdom
 
+import { createVideoClipFromAsset } from '../../../../features/video/project/factories/clip';
+import { resolveVideoProjectActionOccurrences } from '../../../../features/video/project/action-occurrences';
+import {
+  canEditActionOccurrenceOnCanvas,
+  mapActionOccurrencePointToScene,
+  mapScenePointToActionOccurrence,
+} from '../canvas/geometry';
+
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import type React from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectAsset,
+} from '../../../../features/video/project/factories/creation';
 import { VideoMotionFocusMode } from '../../../../features/video/project/types';
 import {
   createActionPointPlacementMode,
@@ -83,18 +94,29 @@ describe('preview stage point overlay', () => {
 
 function verifyActionPointPlacement() {
   const project = createEmptyVideoProject('Overlay', 200, 100);
+  project.actionEvents = [
+    {
+      id: 'action-1',
+      anchor: { kind: 'project', time: 0 },
+      kind: 'CLICK',
+      label: 'Click',
+      data: {},
+      point: null,
+    },
+  ];
   const onClearPlacementMode = vi.fn();
   const onUpdateActionEventDetails = vi.fn();
   const stage = createStage(220, 140);
 
   const handled = handleStagePointPlacement(createPointEvent(55, 37), {
     camera: createCamera(),
+    currentTime: 1,
     onClearPlacementMode,
     onUpdateActionEventDetails,
     onUpdateMotionRegion: vi.fn(),
-    placementMode: createActionPointPlacementMode('action-1'),
+    placementMode: createActionPointPlacementMode('action-1', null),
     project,
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedMotionRegion: null,
     stageRef: { current: stage },
   });
@@ -124,7 +146,7 @@ function verifyObjectTrackAnchorPlacement() {
     onUpsertObjectTrackCorrectionAnchor,
     placementMode: createObjectTrackAnchorPlacementMode('visual-cursor'),
     project,
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedMotionRegion: null,
     stageRef: { current: stage },
   });
@@ -148,12 +170,13 @@ function verifyMotionFocusDrag() {
     root?.render(
       <PreviewStagePointOverlay
         camera={createCamera()}
+        currentTime={1}
         onClearPlacementMode={vi.fn()}
         onUpdateActionEventDetails={vi.fn()}
         onUpdateMotionRegion={onUpdateMotionRegion}
         placementMode={null}
         project={project}
-        selectedActionEvent={null}
+        selectedActionOccurrence={null}
         selectedMotionRegion={project.motionRegions?.[0] ?? null}
         stageRef={{ current: stage }}
       />
@@ -178,12 +201,13 @@ function verifyPointHandleViewportFit() {
     root?.render(
       <PreviewStagePointOverlay
         camera={createCamera()}
+        currentTime={1}
         onClearPlacementMode={vi.fn()}
         onUpdateActionEventDetails={vi.fn()}
         onUpdateMotionRegion={vi.fn()}
         placementMode={null}
         project={project}
-        selectedActionEvent={null}
+        selectedActionOccurrence={null}
         selectedMotionRegion={project.motionRegions?.[0] ?? null}
         stageRef={{ current: stage }}
       />
@@ -208,7 +232,7 @@ function createPointOverlayProject() {
       motionBlurAmount: 0,
       scale: 1.4,
       startTime: 0,
-      targetActionEventId: null,
+      targetAction: null,
       zoomInDuration: 0.2,
       zoomOutDuration: 0.2,
     },
@@ -242,3 +266,225 @@ function dragRenderedPointHandle(
     window.dispatchEvent(new Event('pointerup'));
   });
 }
+
+function createCapturedOverlayFixture() {
+  const project = createEmptyVideoProject('Captured point', 200, 100);
+  const asset = createVideoProjectAsset(
+    'Source',
+    'VIDEO',
+    { kind: 'recording', recordingId: 'recording' },
+    {
+      width: 200,
+      height: 100,
+      duration: 3,
+      mimeType: 'video/mp4',
+      size: 10,
+      hasAudio: false,
+      audioPeaks: null,
+    }
+  );
+  const clip = createVideoClipFromAsset(project.tracks[0]!.id, asset, 200, 100, 0);
+  if (clip.type !== 'VIDEO') throw new Error('Expected video');
+  clip.sourceInstanceId = 'instance';
+  clip.transform = { x: 20, y: 20, width: 80, height: 40, opacity: 1, rotation: 0 };
+  const repeat = { ...clip, id: 'repeat', transform: { ...clip.transform, x: 120 } };
+  project.assets = [asset];
+  project.clips = [clip, repeat];
+  project.duration = 3;
+  project.actionEvents = [
+    {
+      id: 'fact',
+      anchor: {
+        kind: 'recording-source',
+        recordingId: 'recording',
+        sourceInstanceId: 'instance',
+        sourceEventId: 'raw',
+        sourceTime: 1,
+      },
+      kind: 'CLICK',
+      label: 'Click',
+      point: { x: 0.5, y: 0.5 },
+      data: {},
+    },
+  ];
+  const occurrences = () => resolveVideoProjectActionOccurrences(project);
+  return { project, clip, repeat, occurrences };
+}
+
+it('places a source-normalized point on the exact repeated occurrence', () => {
+  const { project, repeat, occurrences } = createCapturedOverlayFixture();
+  const onUpdateActionEventDetails = vi.fn();
+  handleStagePointPlacement(createPointEvent(140, 40), {
+    camera: createCamera(),
+    currentTime: 1,
+    project,
+    stageRef: { current: createStage() },
+    placementMode: createActionPointPlacementMode('fact', repeat.id),
+    selectedActionOccurrence: occurrences().find((item) => item.clipId === repeat.id)!,
+    selectedMotionRegion: null,
+    onClearPlacementMode: vi.fn(),
+    onUpdateActionEventDetails,
+    onUpdateMotionRegion: vi.fn(),
+  });
+  expect(onUpdateActionEventDetails).toHaveBeenCalledWith('fact', {
+    point: { x: 0.25, y: 0.5 },
+    clipId: repeat.id,
+  });
+  expect(project.actionEvents[0]?.point).toEqual({ x: 0.5, y: 0.5 });
+});
+
+it('maps a viewport-locked source point during zoom-out without clamping the intermediate scene point', () => {
+  const { project, clip, occurrences } = createCapturedOverlayFixture();
+  project.tracks[0]!.role = 'CAMERA';
+  const onUpdateActionEventDetails = vi.fn();
+  handleStagePointPlacement(createPointEvent(28, 24), {
+    camera: { ...createCamera(), scale: 0.5, viewportX: -100, viewportY: -50 },
+    currentTime: 1,
+    project,
+    stageRef: { current: createStage() },
+    placementMode: createActionPointPlacementMode('fact', clip.id),
+    selectedActionOccurrence: occurrences().find((item) => item.clipId === clip.id)!,
+    selectedMotionRegion: null,
+    onClearPlacementMode: vi.fn(),
+    onUpdateActionEventDetails,
+    onUpdateMotionRegion: vi.fn(),
+  });
+  expect(onUpdateActionEventDetails).toHaveBeenCalledWith('fact', {
+    point: { x: expect.closeTo(0.1, 8), y: expect.closeTo(0.1, 8) },
+    clipId: clip.id,
+  });
+});
+
+it('round-trips fitted and rotated source points and rejects crop/letterbox positions', () => {
+  const { project, clip, occurrences } = createCapturedOverlayFixture();
+  project.clips = [clip];
+  clip.transform = { ...clip.transform, width: 80, height: 80, rotation: 30 };
+  const camera = { ...createCamera(), scale: 1.8, viewportX: 20, viewportY: 10 };
+  for (const fitMode of ['CONTAIN', 'COVER', 'STRETCH', 'SOURCE_100'] as const) {
+    clip.fitMode = fitMode;
+    const occurrence = occurrences()[0]!;
+    const scene = mapActionOccurrencePointToScene(project, occurrence, 1, camera);
+    expect(scene).not.toBeNull();
+    if (!scene) throw new Error('Missing mapped point');
+    const restored = mapScenePointToActionOccurrence(project, occurrence, 1, camera, scene);
+    expect(restored?.x).toBeCloseTo(0.5);
+    expect(restored?.y).toBeCloseTo(0.5);
+  }
+  clip.transform.rotation = 0;
+  clip.fitMode = 'CONTAIN';
+  expect(
+    mapScenePointToActionOccurrence(project, occurrences()[0]!, 1, camera, { x: 60, y: 22 })
+  ).toBeNull();
+  clip.fitMode = 'COVER';
+  project.actionEvents[0]!.point = { x: 0.05, y: 0.5 };
+  expect(mapActionOccurrencePointToScene(project, occurrences()[0]!, 1, camera)).toBeNull();
+});
+
+it('does not invent a handle for a missing point and rejects stale or invalid-time placement', () => {
+  const { project, clip, occurrences } = createCapturedOverlayFixture();
+  project.actionEvents[0]!.point = null;
+  const occurrence = occurrences()[0]!;
+  act(() =>
+    root?.render(
+      <PreviewStagePointOverlay
+        camera={createCamera()}
+        currentTime={1}
+        project={project}
+        selectedActionOccurrence={occurrence}
+        selectedMotionRegion={null}
+        placementMode={null}
+        stageRef={{ current: createStage() }}
+        onClearPlacementMode={vi.fn()}
+        onUpdateActionEventDetails={vi.fn()}
+        onUpdateMotionRegion={vi.fn()}
+      />
+    )
+  );
+  expect(container?.querySelector('[data-preview-stage-point-handle]')).toBeNull();
+  expect(
+    mapScenePointToActionOccurrence(project, occurrence, NaN, createCamera(), { x: 40, y: 30 })
+  ).toBeNull();
+  project.clips = project.clips.filter((item) => item.id !== clip.id);
+  const update = vi.fn();
+  handleStagePointPlacement(createPointEvent(40, 30), {
+    camera: createCamera(),
+    currentTime: 1,
+    project,
+    stageRef: { current: createStage() },
+    placementMode: createActionPointPlacementMode('fact', clip.id),
+    selectedActionOccurrence: occurrence,
+    selectedMotionRegion: null,
+    onClearPlacementMode: vi.fn(),
+    onUpdateActionEventDetails: update,
+    onUpdateMotionRegion: vi.fn(),
+  });
+  expect(update).not.toHaveBeenCalled();
+});
+
+it('blocks only active clip effects or transitions affecting the selected source', () => {
+  const { project, clip, repeat, occurrences } = createCapturedOverlayFixture();
+  const occurrence = occurrences().find((item) => item.clipId === clip.id)!;
+  const effect = {
+    id: 'effect',
+    kind: 'targetEffect' as const,
+    snapshotId: 'snapshot',
+    controls: {},
+    startTime: 0,
+    duration: 2,
+    enabled: true,
+    playbackRate: 1,
+    target: { kind: 'clip' as const, clipId: repeat.id },
+  };
+  project.effectInstances = [effect];
+  expect(canEditActionOccurrenceOnCanvas(project, occurrence, 1)).toBe(true);
+  effect.target.clipId = clip.id;
+  expect(canEditActionOccurrenceOnCanvas(project, occurrence, 1)).toBe(false);
+  effect.enabled = false;
+  expect(canEditActionOccurrenceOnCanvas(project, occurrence, 1)).toBe(true);
+  effect.enabled = true;
+  expect(canEditActionOccurrenceOnCanvas(project, occurrence, 2.5)).toBe(true);
+  project.transitions = [
+    {
+      id: 'transition',
+      leadingClipId: clip.id,
+      trailingClipId: repeat.id,
+      duration: 1,
+      easing: 'LINEAR',
+      kind: 'CROSSFADE',
+    },
+  ];
+  project.effectInstances = [
+    { ...effect, kind: 'transition', target: { kind: 'transition', transitionId: 'transition' } },
+  ];
+  expect(canEditActionOccurrenceOnCanvas(project, occurrence, 1)).toBe(false);
+  project.transitions[0]!.leadingClipId = 'unrelated';
+  project.transitions[0]!.trailingClipId = 'other';
+  expect(canEditActionOccurrenceOnCanvas(project, occurrence, 1)).toBe(true);
+});
+
+it('drags the selected repeated occurrence in source coordinates and preserves its exact pair', () => {
+  const { project, repeat, occurrences } = createCapturedOverlayFixture();
+  const update = vi.fn();
+  act(() =>
+    root?.render(
+      <PreviewStagePointOverlay
+        camera={createCamera()}
+        currentTime={1}
+        project={project}
+        selectedActionOccurrence={occurrences().find((item) => item.clipId === repeat.id)!}
+        selectedMotionRegion={null}
+        placementMode={null}
+        stageRef={{ current: createStage() }}
+        grid={{ enabled: false, size: 10, snapEnabled: false, magnetEnabled: false, color: '#fff' }}
+        onClearPlacementMode={vi.fn()}
+        onUpdateActionEventDetails={update}
+        onUpdateMotionRegion={vi.fn()}
+      />
+    )
+  );
+  dragRenderedPointHandle(160, 40, 140, 40);
+  expect(update).toHaveBeenLastCalledWith('fact', {
+    point: { x: 0.25, y: 0.5 },
+    clipId: repeat.id,
+  });
+});

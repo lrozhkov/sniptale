@@ -16,6 +16,7 @@ function createProject() {
     duration: 6,
     clips: [
       {
+        id: 'clip-1',
         assetId: 'asset-1',
         duration: 1,
         fadeInMs: 0,
@@ -40,7 +41,7 @@ it('collects only renderable audio clips', () => {
     throw new Error('Expected project fixture clip');
   }
 
-  project.clips.push({ ...firstClip, assetId: 'asset-2', muted: true });
+  project.clips.push({ ...firstClip, id: 'clip-2', assetId: 'asset-2', muted: true });
 
   getAssetByIdMock.mockImplementation((_, assetId: string) => {
     if (assetId === 'asset-1') {
@@ -170,4 +171,35 @@ it('clips EffectV1 audio with the same playback-rate source mapping used by expo
       startTime: 0,
     })
   );
+});
+
+it('retains crossfade phase when exporting a range inside the audio overlap', () => {
+  const project = createProject();
+  const first = { ...project.clips[0]!, duration: 4, sourceDuration: 4 };
+  project.clips = [first, { ...first, id: 'clip-2', startTime: 3 }];
+  const withTransition = {
+    ...project,
+    transitions: [
+      {
+        id: 'fade',
+        leadingClipId: 'clip-1',
+        trailingClipId: 'clip-2',
+        duration: 1,
+        kind: 'CROSSFADE',
+        easing: 'LINEAR',
+      },
+    ],
+  };
+  getAssetByIdMock.mockReturnValue({ metadata: { hasAudio: true } });
+  const clips = collectRenderableAudioClips(withTransition as never, {
+    rangeStartSeconds: 3.25,
+    rangeEndSeconds: 3.75,
+  });
+  expect(clips).toHaveLength(2);
+  expect(clips[0]?.audioTransitions).toEqual([
+    { start: -0.25, end: 0.75, easing: 'LINEAR', incoming: false },
+  ]);
+  expect(clips[1]?.audioTransitions).toEqual([
+    { start: -0.25, end: 0.75, easing: 'LINEAR', incoming: true },
+  ]);
 });

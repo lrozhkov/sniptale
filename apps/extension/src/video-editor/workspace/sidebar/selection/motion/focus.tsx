@@ -1,3 +1,4 @@
+import { InspectorDetails } from '../shared/details';
 import { translate } from '../../../../../platform/i18n';
 import { VideoMotionFocusMode } from '../../../../../features/video/project/types';
 import { VideoEditorPlacementModeKind } from '../../../../contracts/placement';
@@ -85,16 +86,20 @@ export function ManualFocusFields(props: {
 
   return (
     <div className="grid grid-cols-1 gap-3">
-      <MotionFocusCoordinateFields
-        focusPoint={focusPoint}
-        motionRegionId={props.motionRegionId}
-        panel={props.panel}
-      />
       <MotionFocusButtons
         isPickingOnStage={isPickingOnStage}
         motionRegionId={props.motionRegionId}
         panel={props.panel}
       />
+      <InspectorDetails label={translate('videoEditor.sidebar.inspectorExactPlacement')}>
+        <div className="pt-2">
+          <MotionFocusCoordinateFields
+            focusPoint={focusPoint}
+            motionRegionId={props.motionRegionId}
+            panel={props.panel}
+          />
+        </div>
+      </InspectorDetails>
     </div>
   );
 }

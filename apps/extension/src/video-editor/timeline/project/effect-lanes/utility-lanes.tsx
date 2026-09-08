@@ -1,76 +1,138 @@
-import { useState } from 'react';
-
 import { buildVideoCompositionMotionSegments } from '../../../../features/video/composition/timeline/lanes';
 import { getVideoProjectUtilityLanes } from '../../../../features/video/project/utility-lanes';
 import { translate } from '../../../../platform/i18n';
 import type { TimelineEffectDragTarget } from '../types';
-import { ProjectTimelineActionsLane } from './action-lane';
-import { ProjectTimelineCursorLane } from './cursor-lane';
-import {
-  ProjectTimelineMotionLaneAddPreview,
-  type MotionLaneAddPreview,
-} from './motion-add-preview';
-import { resolveMotionLaneAddPreview } from './motion-add-preview-model';
-import { buildTimelineMotionSegments } from './segments';
+import { buildTimelineMotionSegments, getTimelineUtilityRowPresence } from './segments';
 import type { UtilityLaneProps } from './utility-lane-types';
 import { isSelectedEffectSegment, ProjectTimelineEffectSegment } from './segment';
 import { ProjectTimelineEffectLaneEmptyLabel, ProjectTimelineEffectLaneRow } from './ui';
+import { resolveMotionConnectionSource } from '../../../../features/video/project/motion';
+import { VideoTemporalEasing } from '../../../../features/video/project/types';
+import { VideoEditorSelectionKind } from '../../../contracts/selection';
+import { projectTimelineInterval } from '../interaction-state/projection';
+import { MoveRight, Plus, ZoomIn, ZoomOut } from 'lucide-react';
 
 const MOTION_LANE_SEGMENT_CLASS_NAME = [
-  'border-[color:color-mix(in_srgb,var(--sniptale-color-warning)_28%,var(--sniptale-color-border-soft)_72%)]',
-  'bg-[linear-gradient(',
-  '135deg,color-mix(in_srgb,var(--sniptale-color-warning-soft)_82%,transparent),',
-  'color-mix(in_srgb,var(--sniptale-color-accent-soft)_24%,transparent))]',
+  'border-[var(--sniptale-color-border-soft)]',
+  'bg-[var(--sniptale-color-surface-input)]',
 ].join(' ');
 
 export function ProjectTimelineEffectCanvasRows(
   props: UtilityLaneProps & {
     cursorLaneVisible?: boolean;
     selection?: import('../../../contracts/selection').VideoEditorSelection;
-    onSelectActionSegment?: (actionEventId: string) => void;
+    onSelectActionOccurrence?: (eventId: string, clipId: string | null) => void;
     onSelectCursorSegment?: (sampleId: string) => void;
-    onSelectMotionRegion?: (motionRegionId: string) => void;
+    onSelectMotionRegion?: (motionRegionId: string, part?: 'connection') => void;
     onSelectObjectTrack?: (objectTrackId: string) => void;
     onSelectTransition?: (transitionId: string) => void;
   }
 ): React.JSX.Element {
   const utilityLanes = getVideoProjectUtilityLanes(props.project);
+  const rows = getTimelineUtilityRowPresence(props.project);
   return (
     <>
-      {props.cursorLaneVisible !== false ? <ProjectTimelineCursorLane {...props} /> : null}
-      <ProjectTimelineActionsLane {...props} laneVisible={utilityLanes.actions.visible} />
-      <ProjectTimelineMotionLane
-        {...props}
-        laneLocked={utilityLanes.camera.locked}
-        laneVisible={utilityLanes.camera.visible}
-      />
+      {rows.motion ? (
+        <ProjectTimelineMotionLane {...props} laneVisible={utilityLanes.camera.visible} />
+      ) : null}
     </>
   );
 }
 
-function ProjectTimelineMotionLane(
-  props: UtilityLaneProps & { laneLocked: boolean; laneVisible: boolean }
-) {
-  const [addPreview, setAddPreview] = useState<MotionLaneAddPreview | null>(null);
-  const segments = props.laneVisible
-    ? buildVideoCompositionMotionSegments(props.project)
-    : buildTimelineMotionSegments(props.project);
-  const previewHandler = createMotionLanePreviewHandler(props, setAddPreview);
+function ProjectTimelineMotionLane(props: UtilityLaneProps & { laneVisible: boolean }) {
+  const segments = resolveMotionLaneSegments(props);
   return (
     <ProjectTimelineEffectLaneRow
-      onClick={previewHandler}
-      onMouseLeave={() => setAddPreview(null)}
-      onMouseMove={previewHandler}
+      muted={!props.laneVisible}
+      onPointerDown={props.onBeginRangeSelection}
     >
-      {segments.length === 0 ? <ProjectTimelineEffectLaneEmptyLabel /> : null}
-      <ProjectTimelineMotionLaneAddPreview
-        preview={addPreview}
-        onAddMotionRegion={props.onAddMotionRegion}
-        onClearPreview={() => setAddPreview(null)}
-      />
+      <MotionLaneEmptyState visible={segments.length === 0} />
+      <MotionConnections {...props} />
       <MotionSegments {...props} segments={segments} />
     </ProjectTimelineEffectLaneRow>
   );
+}
+
+function MotionConnections(props: UtilityLaneProps & { laneVisible: boolean }) {
+  const states = (props.project.motionRegions ?? [])
+    .filter((region) => region.duration > 0)
+    .sort((a, b) => a.startTime - b.startTime);
+  const locked = getVideoProjectUtilityLanes(props.project).camera.locked;
+  return states.slice(1).map((destination, index) => {
+    const previous = states[index]!;
+    const source = resolveMotionConnectionSource(props.project, {
+      ...destination,
+      incomingConnection: { fromRegionId: previous.id, easing: VideoTemporalEasing.EASE_IN_OUT },
+    });
+    if (!source) return null;
+    const start = source.startTime + source.duration;
+    const end = destination.startTime;
+    const geometry = props.projection
+      ? projectTimelineInterval(props.projection, start, end)
+      : {
+          left: start * props.pixelsPerSecond,
+          width: (end - start) * props.pixelsPerSecond,
+        };
+    if (!geometry || geometry.width <= 0) return null;
+    const connected = resolveMotionConnectionSource(props.project, destination) !== null;
+    const selected =
+      props.selection?.kind === VideoEditorSelectionKind.MOTION_CONNECTION &&
+      props.selection.motionRegionId === destination.id;
+    const label = translate(
+      connected ? 'videoEditor.timeline.framingConnection' : 'videoEditor.timeline.connectFraming'
+    );
+    return (
+      <button
+        key={destination.id}
+        type="button"
+        data-ui="video-editor.timeline.framing-connection"
+        data-framing-destination={destination.id}
+        aria-label={label}
+        aria-pressed={connected ? selected : undefined}
+        title={label}
+        disabled={!connected && (locked || !props.laneVisible || !props.onConnectMotionRegions)}
+        className={[
+          `absolute top-1/2 flex h-7 -translate-y-1/2 items-center justify-center
+overflow-hidden rounded border text-xs transition-opacity`,
+          '!cursor-pointer disabled:pointer-events-none disabled:opacity-40',
+          connected ? 'video-editor-timeline-item' : '',
+          selected ? 'video-editor-timeline-item-selected' : '',
+          'border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-secondary)]',
+          connected
+            ? 'bg-[var(--sniptale-color-surface-panel)]'
+            : 'border-dashed opacity-0 hover:opacity-100 focus-visible:opacity-100',
+        ].join(' ')}
+        style={{ left: geometry.left, width: geometry.width }}
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          if (connected) props.onSelectMotionRegion?.(destination.id, 'connection');
+          else props.onConnectMotionRegions?.(source.id, destination.id);
+        }}
+      >
+        {connected ? (
+          <MoveRight size={16} aria-hidden="true" />
+        ) : (
+          <Plus size={16} aria-hidden="true" />
+        )}
+        {geometry.width > 180 ? <span className="ml-1.5 truncate">{label}</span> : null}
+      </button>
+    );
+  });
+}
+
+function resolveMotionLaneSegments(props: UtilityLaneProps & { laneVisible: boolean }) {
+  return props.laneVisible
+    ? buildVideoCompositionMotionSegments(props.project)
+    : buildTimelineMotionSegments(props.project);
+}
+
+function MotionLaneEmptyState({ visible }: { visible: boolean }) {
+  return visible ? (
+    <ProjectTimelineEffectLaneEmptyLabel
+      label={translate('videoEditor.timeline.emptyZoomLaneLabel')}
+    />
+  ) : null;
 }
 
 function MotionSegments(
@@ -80,18 +142,30 @@ function MotionSegments(
   }
 ) {
   return props.segments.map((segment) => {
-    const subtitle =
-      segment.region.cameraMode === 'PATH'
-        ? `${segment.region.path?.stops.length ?? 0} ${translate('videoEditor.sidebar.motionPathStopCountUnit')}`
-        : `${segment.region.scale.toFixed(2)}x`;
+    const subtitle = `${segment.region.scale.toFixed(2)}x`;
     return (
       <ProjectTimelineEffectSegment
         key={segment.id}
+        segmentId={segment.id}
+        movable={!getVideoProjectUtilityLanes(props.project).camera.locked}
         className={MOTION_LANE_SEGMENT_CLASS_NAME}
-        hidden={!props.laneVisible}
+        height={28}
         isSelected={isSelectedEffectSegment(props.selectedEffectSelection, 'motion', segment.id)}
         label={translate('videoEditor.timeline.motionLane')}
-        left={segment.start * props.pixelsPerSecond}
+        hideLabel
+        leadingIcon={
+          segment.region.scale < 1 ? (
+            <ZoomOut size={14} aria-hidden="true" />
+          ) : (
+            <ZoomIn size={14} aria-hidden="true" />
+          )
+        }
+        title={`${translate('videoEditor.timeline.motionLane')} · ${subtitle}`}
+        startTime={segment.start}
+        endTime={segment.end}
+        pixelsPerSecond={props.pixelsPerSecond}
+        projection={props.projection}
+        minimumWidth={20}
         onBeginEffectInteraction={(event) =>
           props.onBeginEffectInteraction(event, createMotionDragTarget(segment, 'move'))
         }
@@ -102,7 +176,6 @@ function MotionSegments(
           props.onBeginEffectInteraction(event, createMotionDragTarget(segment, 'resize-end'))
         }
         subtitle={subtitle}
-        width={Math.max(20, (segment.end - segment.start) * props.pixelsPerSecond)}
       />
     );
   });
@@ -119,24 +192,5 @@ function createMotionDragTarget(
     originalDuration: segment.region.duration,
     originalStart: segment.start,
     segmentId: segment.id,
-  };
-}
-
-function createMotionLanePreviewHandler(
-  props: UtilityLaneProps & { laneLocked: boolean; laneVisible: boolean },
-  setAddPreview: React.Dispatch<React.SetStateAction<MotionLaneAddPreview | null>>
-): React.MouseEventHandler<HTMLDivElement> {
-  return (event) => {
-    if (props.laneLocked || !props.laneVisible) return;
-    const timeline = props.timelineRef?.current;
-    if (!timeline) return;
-    setAddPreview((currentPreview) =>
-      resolveMotionLaneAddPreview({
-        clientX: event.clientX,
-        currentPreview,
-        pixelsPerSecond: props.pixelsPerSecond,
-        timeline,
-      })
-    );
   };
 }

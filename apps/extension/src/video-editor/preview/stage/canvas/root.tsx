@@ -1,4 +1,6 @@
+import { PreviewEffectHandles } from './effect-handles';
 import React from 'react';
+import { usePreviewCanvasInteractionFocus } from './interaction-focus';
 import { CanvasInsertPreviewOverlay } from '@sniptale/ui/canvas-tools';
 import { PreviewStageAnnotationTargetOverlay } from '../annotation-target-overlay/index';
 import { usePreviewStageImageBank } from '../media/video-bank';
@@ -16,6 +18,7 @@ import { PreviewStageCanvasLayer, PreviewStageOverlayLayer } from './layers';
 import type { PreviewStageRootProps, PreviewStageRootSurfaceProps } from './types';
 
 export function PreviewStageRootSurface(params: PreviewStageRootSurfaceProps) {
+  const canvasInteractionActive = usePreviewCanvasInteractionFocus(params.stageRef);
   const gridProps = params.grid ? { grid: params.grid } : {};
   const onGuideChange = params.onGuideChange ?? (() => undefined);
   const { insertPointerHandlers, insertPreviewFrame } = usePreviewStageInsertSession(
@@ -26,7 +29,11 @@ export function PreviewStageRootSurface(params: PreviewStageRootSurfaceProps) {
     <div
       ref={params.stageRef as React.RefObject<HTMLDivElement>}
       data-ui="video.preview.stage.root"
-      className="relative m-auto shrink-0 overflow-hidden bg-[color:var(--sniptale-color-surface-panel)]"
+      data-canvas-interaction-active={canvasInteractionActive}
+      className={[
+        'relative m-auto shrink-0 overflow-hidden bg-[color:var(--sniptale-color-surface-panel)]',
+        params.activeInsertKind ? 'cursor-crosshair' : 'cursor-default',
+      ].join(' ')}
       style={params.stageSizeStyle}
       onPointerDownCapture={insertPointerHandlers.onPointerDownCapture}
       onPointerDown={insertPointerHandlers.onPointerDown}
@@ -38,6 +45,7 @@ export function PreviewStageRootSurface(params: PreviewStageRootSurfaceProps) {
     >
       <PreviewStageRootMediaLayer params={params} />
       <PreviewStageRootOverlayLayer
+        canvasInteractionActive={canvasInteractionActive}
         gridProps={gridProps}
         onGuideChange={onGuideChange}
         params={params}
@@ -85,7 +93,7 @@ function createPreviewStageInsertFallbackPointerParams(
     onUpdateMotionRegion: params.onUpdateMotionRegion,
     placementMode: params.placementMode,
     project: params.project,
-    selectedActionEvent: params.selectedActionEvent,
+    selectedActionOccurrence: params.selectedActionOccurrence,
     selectedMotionRegion: params.selectedMotionRegion,
     stageRef: params.stageRef,
     ...(params.grid ? { grid: params.grid } : {}),
@@ -116,6 +124,7 @@ function PreviewStageRootMediaLayer(props: { params: PreviewStageRootSurfaceProp
 }
 
 function PreviewStageRootOverlayLayer(props: {
+  canvasInteractionActive: boolean;
   gridProps: Pick<PreviewStageRootSurfaceProps, 'grid'> | Record<string, never>;
   onGuideChange: NonNullable<PreviewStageRootSurfaceProps['onGuideChange']>;
   params: PreviewStageRootSurfaceProps;
@@ -136,9 +145,9 @@ function PreviewStageRootOverlayLayer(props: {
         placementMode={params.placementMode}
         project={params.project}
         onGuideChange={onGuideChange}
-        selectionOverlay={params.selectionOverlay}
-        selectedActionEvent={params.selectedActionEvent}
-        targetOverlay={params.targetOverlay}
+        selectionOverlay={props.canvasInteractionActive ? params.selectionOverlay : null}
+        selectedActionOccurrence={params.selectedActionOccurrence}
+        targetOverlay={props.canvasInteractionActive ? params.targetOverlay : null}
         selectedMotionRegion={params.selectedMotionRegion}
         stageRef={params.stageRef}
         {...gridProps}
@@ -194,6 +203,8 @@ export function PreviewStageRoot(params: PreviewStageRootProps) {
 export function createPreviewStageSelectionOverlay(
   params: Pick<
     PreviewStageCanvasProps,
+    | 'onUpdateEffectInstance'
+    | 'onPreviewEffectAnchors'
     | 'beginInteraction'
     | 'camera'
     | 'mode'
@@ -208,14 +219,17 @@ export function createPreviewStageSelectionOverlay(
   }
 
   return (
-    <PreviewStageSelectionOverlay
-      beginInteraction={params.beginInteraction}
-      camera={params.camera}
-      project={params.project}
-      selectedClip={params.selectedClip}
-      selectedClipLocked={params.selectedClipLocked}
-      stageRef={params.stageRef}
-    />
+    <>
+      <PreviewStageSelectionOverlay
+        beginInteraction={params.beginInteraction}
+        camera={params.camera}
+        project={params.project}
+        selectedClip={params.selectedClip}
+        selectedClipLocked={params.selectedClipLocked}
+        stageRef={params.stageRef}
+      />
+      <PreviewEffectHandles {...params} />
+    </>
   );
 }
 

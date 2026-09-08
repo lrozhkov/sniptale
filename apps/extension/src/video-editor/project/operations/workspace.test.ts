@@ -8,7 +8,6 @@ import { loadInitialProjectFromLocation, openPersistedProject } from './workspac
 import { createPersistedLegacyRecordingProject } from './workspace.test-support';
 
 const {
-  autoTransformRecordingProjectMock,
   deleteProjectAsset,
   getRecording,
   getRecordingTelemetry,
@@ -16,7 +15,6 @@ const {
   importRecordingProjectAssetMock,
   saveVideoProject,
 } = vi.hoisted(() => ({
-  autoTransformRecordingProjectMock: vi.fn(),
   deleteProjectAsset: vi.fn(),
   getRecording: vi.fn(),
   getRecordingTelemetry: vi.fn(),
@@ -63,12 +61,11 @@ vi.mock('./assets', async (importOriginal) => {
   return {
     ...actual,
     importRecordingProjectAsset: importRecordingProjectAssetMock,
+    ensureRecordingAssets: async (_project: unknown, recordingId: string) => [
+      await importRecordingProjectAssetMock(recordingId),
+    ],
   };
 });
-
-vi.mock('./auto-transform', () => ({
-  autoTransformRecordingProject: autoTransformRecordingProjectMock,
-}));
 
 async function mockRecordingProjectLoad() {
   const recordingEntry = {
@@ -194,7 +191,6 @@ async function verifyRecordingHydration() {
     projectAssetId: 'project-asset-1',
     originRecordingId: 'recording-1',
   });
-  expect(autoTransformRecordingProjectMock).not.toHaveBeenCalled();
 }
 
 async function verifyRecordingAssetRollback() {
@@ -235,6 +231,8 @@ async function verifyPersistedRecordingMigration() {
     originRecordingId: 'recording-1',
   });
   expect(project.assets[0]?.id).toBeTruthy();
+  expect(project.assets[0]?.recordingPart).toEqual(persistedProject.assets[0]?.recordingPart);
+  expect(project.assets[0]?.recordingPart).toEqual({ recordingId: 'recording-1', role: 'primary' });
   expect(saveVideoProject).toHaveBeenCalledWith(
     expect.objectContaining({
       id: project.id,
@@ -295,3 +293,31 @@ async function verifyProjectQueryMigrationPath() {
     originRecordingId: 'recording-1',
   });
 }
+
+it('retains an existing temporary project before presenting it for editing', async () => {
+  const project = createEmptyVideoProject();
+  getVideoProject.mockResolvedValue({
+    status: 'ready',
+    project,
+    workspaceRevision: 4,
+    lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: project.updatedAt },
+  });
+  saveVideoProject.mockResolvedValue(project);
+  await expect(openPersistedProject(project.id)).resolves.toEqual(project);
+  expect(saveVideoProject).toHaveBeenCalledWith(project, {
+    baseRevision: project.updatedAt,
+    expectedWorkspaceRevision: 4,
+  });
+});
+
+it('does not open a temporary project as saved when library retention fails', async () => {
+  const project = createEmptyVideoProject();
+  getVideoProject.mockResolvedValue({
+    status: 'ready',
+    project,
+    workspaceRevision: 4,
+    lifecycle: { storageClass: 'temporary', savedAt: null, updatedAt: project.updatedAt },
+  });
+  saveVideoProject.mockRejectedValue(new Error('Storage unavailable'));
+  await expect(openPersistedProject(project.id)).rejects.toThrow('Storage unavailable');
+});

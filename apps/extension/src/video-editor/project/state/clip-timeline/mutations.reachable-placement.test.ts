@@ -9,6 +9,7 @@ import {
   type VideoProjectVideoClip,
 } from '../../../../features/video/project/types';
 import { moveProjectClip } from './mutations';
+import { resolveReachableClipStartTime } from './reachable-placement';
 
 function createVideoClip(overrides: Partial<VideoProjectVideoClip> = {}): VideoProjectVideoClip {
   return {
@@ -97,4 +98,63 @@ it('persists intermediate logical lanes when a clip is moved onto a new line', (
   expect(movedProject.clips.find((clip) => clip.id === 'moving')).toEqual(
     expect.objectContaining({ timelineLaneId: 'line-4' })
   );
+});
+
+it.each([VideoProjectClipType.VIDEO, VideoProjectClipType.AUDIO])(
+  'does not insert %s across a joined pair when moving between lanes',
+  (type) => {
+    const project = createTimelineProject();
+    project.clips = [
+      { ...createVideoClip({ id: 'first', duration: 4 }), type },
+      { ...createVideoClip({ id: 'second', startTime: 4, duration: 4 }), type },
+      { ...createVideoClip({ id: 'moving', startTime: 10, timelineLaneId: 'line-2' }), type },
+    ];
+    const operation = { clip: project.clips[2]!, clipIdSet: new Set(['moving']) };
+    const startTime = resolveReachableClipStartTime({
+      project,
+      operation,
+      startTime: 3,
+      timelineLaneId: null,
+    });
+    expect(startTime).toBeGreaterThan(6);
+    expect(startTime).toBeLessThanOrEqual(8);
+  }
+);
+
+it('does not introduce a third layer over an existing transition', () => {
+  const project = createTimelineProject();
+  project.clips = [
+    createVideoClip({ id: 'first', duration: 5 }),
+    createVideoClip({ id: 'second', startTime: 3, duration: 5 }),
+    createVideoClip({ id: 'moving', startTime: 10, duration: 4, timelineLaneId: 'line-2' }),
+  ];
+  const startTime = resolveReachableClipStartTime({
+    project,
+    operation: { clip: project.clips[2]!, clipIdSet: new Set(['moving']) },
+    startTime: 2,
+    timelineLaneId: null,
+  });
+  expect(startTime).toBeGreaterThanOrEqual(5);
+});
+
+it('checks the destination of linked companions before applying one shared movement delta', () => {
+  const project = createTimelineProject();
+  project.clips = [
+    createVideoClip({ id: 'anchor', startTime: 10, timelineLaneId: 'line-2' }),
+    createVideoClip({ id: 'linked', startTime: 11, trackId: 'audio' }),
+    createVideoClip({ id: 'first', duration: 4, trackId: 'audio' }),
+    createVideoClip({ id: 'second', startTime: 4, duration: 4, trackId: 'audio' }),
+  ];
+  const start = resolveReachableClipStartTime({
+    project,
+    operation: { clip: project.clips[0]!, clipIdSet: new Set(['anchor', 'linked']) },
+    startTime: 2,
+  });
+  expect(start + 1).toBeGreaterThan(6);
+});
+
+it('keeps a legal two-clip overlap unchanged', () => {
+  const project = createTimelineProject();
+  const moved = moveProjectClip(project, 'moving', 4);
+  expect(moved.clips.find((clip) => clip.id === 'moving')?.startTime).toBe(4);
 });

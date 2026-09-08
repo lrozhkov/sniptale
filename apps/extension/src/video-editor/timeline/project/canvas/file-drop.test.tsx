@@ -1,9 +1,13 @@
 // @vitest-environment jsdom
+import { VideoTrackKind } from '../../../../features/video/project/types';
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../features/video/project/factories/creation';
 import type { VideoEditorImportPlacement } from '../../../contracts/insertion';
 import { createSceneSelection } from '../../../project/selection/model';
 import { ProjectTimelineCanvas } from './';
@@ -42,9 +46,10 @@ it('drops a compatible video file on a timeline track with captured placement', 
 
 it('auto-routes an incompatible dropped image file while preserving drop time', () => {
   const onImportImage = vi.fn();
-  const { project, trackId } = renderCanvas({
+  const { project } = renderCanvas({
     onImportTimelineFile: createImportHandlers({ image: onImportImage }),
   });
+  const trackId = project.tracks[1]!.id;
 
   dispatchTimelineFileDrop(trackId, new File(['image'], 'shot.png', { type: 'image/png' }), 290);
 
@@ -71,6 +76,8 @@ function renderCanvas(options: {
   onUnsupportedTimelineFileDrop?: () => void;
 }) {
   const project = createEmptyVideoProject('Canvas drop');
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.PRIMARY));
 
   act(() => {
     root?.render(
@@ -95,12 +102,14 @@ function createCanvasProps(
 ): React.ComponentProps<typeof ProjectTimelineCanvas> {
   return {
     currentTime: 0,
+    consumeCompletedScrubClick: () => false,
     dragGhost: null,
     playbackRange: null,
     pixelsPerSecond: 90,
     project,
-    recordingTelemetry: null,
+    recordingTelemetry: [],
     selection: createSceneSelection(),
+    snapGuideTime: null,
     hoveredClipId: null,
     selectedClipId: null,
     selectedEffectSelection: null,
@@ -119,6 +128,9 @@ function createCanvasActionProps(options: { onUnsupportedTimelineFileDrop?: () =
   return {
     onBeginClipInteraction: vi.fn(),
     onBeginEffectInteraction: vi.fn(),
+    onBeginPlayheadScrub: vi.fn(),
+    onStepToNextFrame: vi.fn(),
+    onStepToPreviousFrame: vi.fn(),
     onBeginEffectRangeSelection: vi.fn(),
     onBeginRangeSelection: vi.fn(),
     onBeginTrackRangeSelection: () => vi.fn(),
@@ -126,7 +138,8 @@ function createCanvasActionProps(options: { onUnsupportedTimelineFileDrop?: () =
     onCloseTrackGap: vi.fn(),
     onImportTimelineFile: createImportHandlers({}),
     onSeek: vi.fn(),
-    onSelectActionSegment: vi.fn(),
+    onSeekTime: vi.fn(),
+    onSelectActionOccurrence: vi.fn(),
     onSelectClip: vi.fn(),
     onSelectCursorSegment: vi.fn(),
     onSelectMotionRegion: vi.fn(),
@@ -136,7 +149,7 @@ function createCanvasActionProps(options: { onUnsupportedTimelineFileDrop?: () =
     onSelectTransition: vi.fn(),
     onSetHoveredClipId: vi.fn(),
     onTimelinePreviewViewportChange: vi.fn(),
-    onResizeActionEvent: vi.fn(),
+
     onResizeMotionRegion: vi.fn(),
     onScroll: vi.fn(),
     onUnsupportedTimelineFileDrop: options.onUnsupportedTimelineFileDrop ?? vi.fn(),

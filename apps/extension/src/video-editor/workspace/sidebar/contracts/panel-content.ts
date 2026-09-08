@@ -3,7 +3,6 @@ import type { WorkspaceSidebarProps } from './props';
 
 type WorkspaceSidebarPanelContentPropKeys =
   | 'activeProjectId'
-  | 'diagnosticsContent'
   | 'gridSettings'
   | 'inspectorMode'
   | 'onAddActionEvent'
@@ -18,9 +17,11 @@ type WorkspaceSidebarPanelContentPropKeys =
   | 'onDeleteMotionRegion'
   | 'onDeleteObjectTrack'
   | 'onSelectObjectTrack'
-  | 'onGenerateMotionPathFromCursor'
   | 'onDeleteProject'
   | 'onDeleteTrack'
+  | 'onSwapClip'
+  | 'onTrimClipStart'
+  | 'onTrimClipEnd'
   | 'onDetachClipGroup'
   | 'onEnableCursorTrack'
   | 'onInsertCursorSample'
@@ -35,9 +36,8 @@ type WorkspaceSidebarPanelContentPropKeys =
   | 'onStartActionPointPlacement'
   | 'onStartMotionAreaPlacement'
   | 'onStartMotionFocusPlacement'
-  | 'onStartMotionPathStopAreaPlacement'
-  | 'onStartMotionPathStopPointPlacement'
   | 'onStartObjectTrackAnchorPlacement'
+  | 'onUpdateActionPresentation'
   | 'onUpdateActionEventDetails'
   | 'onUpdateAnnotationClipContent'
   | 'onUpdateAnnotationClipStyle'
@@ -46,6 +46,8 @@ type WorkspaceSidebarPanelContentPropKeys =
   | 'onUpdateClipFades'
   | 'onUpdateClipPlaybackRate'
   | 'onUpdateClipMuted'
+  | 'onApplyCameraLayout'
+  | 'onEditCameraPosition'
   | 'onUpdateClipTransform'
   | 'onUpdateClipVolume'
   | 'onUpdateCursorSampleInterpolation'
@@ -77,7 +79,12 @@ type WorkspaceSidebarPanelContentPropKeys =
   | 'recentColors'
   | 'recordingId'
   | 'recordings'
-  | 'selectedActionEvent'
+  | 'currentTime'
+  | 'typingProject'
+  | 'recordingTelemetry'
+  | 'onApplyTypingCompression'
+  | 'selectedActionOccurrence'
+  | 'canAddCameraPosition'
   | 'selectedClip'
   | 'selectedCursorSample'
   | 'selectedMotionRegion'
@@ -90,10 +97,7 @@ export interface WorkspaceSidebarPanelContentSharedProps extends Pick<
   WorkspaceSidebarProps,
   WorkspaceSidebarPanelContentPropKeys
 > {
-  diagnosticsMeta: string;
-  diagnosticsSectionOpen: boolean;
   inputRefs: VideoEditorFileInputRefs;
-  onToggleDiagnosticsSection: () => void;
   onToggleProjectsOpen: () => void;
   onToggleRecordingsOpen: () => void;
   projectsOpen: boolean;

@@ -1,6 +1,22 @@
 import { defineMessageSource } from '../../source';
 
 export const videoEditorSidebarLibraryMessages = defineMessageSource({
+  materialsSearch: { ru: 'Поиск материалов', en: 'Search materials' },
+  materialsCloseSearch: { ru: 'Закрыть и сбросить поиск', en: 'Close and clear search' },
+  materialsCategory: { ru: 'Тип материалов', en: 'Material type' },
+  materialsAll: { ru: 'Все материалы', en: 'All materials' },
+  materialsHideUsed: { ru: 'Скрыть используемые', en: 'Hide used materials' },
+  materialsNoMatches: { ru: 'Нет подходящих материалов', en: 'No matching materials' },
+  materialsShowUses: { ru: 'Показать в монтаже', en: 'Show in timeline' },
+  materialsSceneUse: { ru: 'Фон сцены', en: 'Scene background' },
+  librarySavedFilters: { ru: 'Сохранённые фильтры', en: 'Saved filters' },
+  libraryRefresh: { ru: 'Обновить список', en: 'Refresh list' },
+  libraryScreenshots: { ru: 'Скриншоты', en: 'Screenshots' },
+  libraryAddedMaterials: { ru: 'В материалах', en: 'In materials' },
+  libraryMediaUnavailable: {
+    ru: 'Не удалось загрузить актуальную версию материала из библиотеки. Обновите список и повторите попытку.',
+    en: 'The current library media is unavailable. Refresh the list and try again.',
+  },
   newProject: {
     ru: 'Новый проект',
     en: 'New project',
@@ -154,12 +170,12 @@ export const videoEditorSidebarLibraryMessages = defineMessageSource({
     en: 'Back to timeline',
   },
   librarySearchPlaceholder: {
-    ru: 'Найти проект или запись',
-    en: 'Find a project or recording',
+    ru: 'Найти видео или скриншот',
+    en: 'Find a video or screenshot',
   },
   librarySearchDescription: {
-    ru: 'Быстрый поиск по сохранённым проектам и записям библиотеки.',
-    en: 'Quick search across saved projects and library recordings.',
+    ru: 'Поиск видео и скриншотов в библиотеке.',
+    en: 'Search videos and screenshots in the library.',
   },
   libraryRecentProjectsTitle: {
     ru: 'Недавние проекты',
@@ -198,20 +214,36 @@ export const videoEditorSidebarLibraryMessages = defineMessageSource({
     en: 'Recordings',
   },
   recordingsInDbSuffix: {
-    ru: 'в базе',
-    en: 'in database',
+    ru: 'в библиотеке',
+    en: 'in library',
   },
   recordingsEmpty: {
-    ru: 'В локальном хранилище пока нет сохранённых записей.',
-    en: 'There are no saved recordings in IndexedDB yet.',
+    ru: 'В библиотеке пока нет записей.',
+    en: 'There are no recordings in the library yet.',
   },
   libraryRecordingsDescription: {
-    ru: 'Записи из библиотеки добавляются в текущий проект как отдельные копии.',
-    en: 'Library recordings are added into the current project as separate project-owned copies.',
+    ru: 'Добавьте запись в материалы, затем выберите фрагмент для монтажа. Исходная запись останется в библиотеке.',
+    en: 'Add a recording to materials, then choose a range for your edit. The original stays in the library.',
   },
   libraryMediaPreviewTitle: {
     ru: 'Превью медиа',
     en: 'Media preview',
+  },
+  mediaPreviewSeek: {
+    ru: 'Позиция просмотра',
+    en: 'Preview position',
+  },
+  mediaPreviewMute: {
+    ru: 'Выключить звук превью',
+    en: 'Mute preview',
+  },
+  mediaPreviewUnmute: {
+    ru: 'Включить звук превью',
+    en: 'Unmute preview',
+  },
+  mediaPreviewActionFailed: {
+    ru: 'Не удалось выполнить действие с превью. Попробуйте ещё раз.',
+    en: 'The preview action failed. Please try again.',
   },
   libraryMediaPreviewEmpty: {
     ru: 'Выберите запись в списке, чтобы увидеть превью и параметры.',
@@ -242,8 +274,8 @@ export const videoEditorSidebarLibraryMessages = defineMessageSource({
     en: 'Frame',
   },
   addToTimeline: {
-    ru: 'Добавить в проект',
-    en: 'Add to project',
+    ru: 'Добавить в материалы',
+    en: 'Add to materials',
   },
   libraryDiagnosticsDescription: {
     ru: 'Диагностика относится только к текущей записи и не меняет содержимое проекта.',

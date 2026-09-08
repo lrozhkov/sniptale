@@ -89,6 +89,42 @@ describe('anchor visibility gate', () => {
     expect(measureAnchorVisibility(target).presentation).toBe('offscreen');
   });
 
+  it('keeps a partially visible anchor available inside an internal scroll viewport', () => {
+    const viewport = document.createElement('div');
+    viewport.style.overflowY = 'auto';
+    const target = document.createElement('section');
+    viewport.append(target);
+    document.body.append(viewport);
+    installRect(viewport, { x: 100, y: 80, width: 600, height: 400 });
+    installRect(target, { x: 120, y: 100, width: 560, height: 900 });
+
+    expect(measureAnchorVisibility(target)).toMatchObject({
+      presentation: 'visible',
+      reason: 'visible',
+    });
+
+    vi.restoreAllMocks();
+    installRect(viewport, { x: 100, y: 80, width: 600, height: 400 });
+    installRect(target, { x: 120, y: 520, width: 560, height: 900 });
+    expect(measureAnchorVisibility(target).presentation).toBe('offscreen');
+  });
+
+  it('still suspends additional clipping outside an internal scroll viewport', () => {
+    const outerClip = document.createElement('div');
+    outerClip.style.overflow = 'hidden';
+    const viewport = document.createElement('div');
+    viewport.style.overflowY = 'auto';
+    const target = document.createElement('section');
+    viewport.append(target);
+    outerClip.append(viewport);
+    document.body.append(outerClip);
+    installRect(outerClip, { x: 100, y: 80, width: 300, height: 400 });
+    installRect(viewport, { x: 100, y: 80, width: 600, height: 400 });
+    installRect(target, { x: 120, y: 100, width: 560, height: 900 });
+
+    expect(measureAnchorVisibility(target).presentation).toBe('suspended');
+  });
+
   it('applies hidden and clipping gates through the containing iframe chain', () => {
     const outer = document.createElement('div');
     const iframe = document.createElement('iframe');

@@ -1,3 +1,4 @@
+import { getTransitionProgress } from '../../../../features/video/project/transition/runtime';
 import { clampClipPlaybackRate } from '../../../../features/video/project/timeline';
 import type { OfflineAudioRenderableClip } from '../clip-audio/index';
 
@@ -34,7 +35,37 @@ export function scheduleOfflineAudioClipMix(
   const gain = offlineContext.createGain();
   gain.gain.setValueAtTime(0, 0);
   source.connect(gain);
-  gain.connect(offlineContext.destination);
+  if (clip.audioTransitions?.length) {
+    const transitionGain = offlineContext.createGain();
+    gain.connect(transitionGain);
+    transitionGain.connect(offlineContext.destination);
+    transitionGain.gain.setValueAtTime(1, 0);
+    for (const transition of clip.audioTransitions) {
+      const start = Math.max(0, clip.startTime, transition.start);
+      const end = Math.min(clip.startTime + clip.duration, transition.end);
+      if (end <= start) continue;
+      const steps = 128;
+      for (let index = 0; index <= steps; index++) {
+        const time = start + ((end - start) * index) / steps;
+        const progress =
+          time >= transition.end
+            ? 1
+            : (getTransitionProgress(
+                {
+                  start: transition.start,
+                  end: transition.end,
+                  transition: { easing: transition.easing },
+                },
+                time
+              ) ?? 0);
+        const value = transition.incoming ? progress : 1 - progress;
+        if (index === 0) transitionGain.gain.setValueAtTime(value, time);
+        else transitionGain.gain.linearRampToValueAtTime(value, time);
+      }
+    }
+  } else {
+    gain.connect(offlineContext.destination);
+  }
 
   const clipStart = Math.max(0, clip.startTime);
   const clipEnd = Math.max(clipStart, clip.startTime + clip.duration);

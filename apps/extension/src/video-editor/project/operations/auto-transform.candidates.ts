@@ -8,7 +8,7 @@ import { buildStableSignalIntersections, mergeTimeRanges, type TimeRange } from 
 
 const OVERLAP_MERGE_GAP_SECONDS = 0;
 
-export type AutoTransformCandidate = {
+type AutoTransformCandidate = {
   action: VideoAutoProcessingAction;
   endTime: number;
   playbackRate: number;

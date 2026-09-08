@@ -42,8 +42,7 @@ export function getLoadedSourceTimes(loader: {
 
 export function getPlannedVideoSlotCount(project: VideoProject): number {
   return (
-    buildTimelinePreviewPlans(project, { 'asset-video': 'blob:video' }, null)[0]?.slotKeys.length ??
-    0
+    buildTimelinePreviewPlans(project, { 'asset-video': 'blob:video' }, null)[0]?.slots.length ?? 0
   );
 }
 

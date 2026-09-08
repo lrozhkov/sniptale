@@ -40,9 +40,10 @@ function createPlaybackParams(): UseVideoEditorRuntimeParams['playback'] {
     isPlaying: false,
     playbackRange: null,
     projectHistoryTransactionActive: false,
+    shortcutsEnabled: true,
     placementMode: null,
     selection: { kind: VideoEditorSelectionKind.SCENE },
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedClipId: null,
     selectedMotionRegion: null,
     deleteSelection: {
@@ -52,6 +53,7 @@ function createPlaybackParams(): UseVideoEditorRuntimeParams['playback'] {
       motionRegion: fn(),
       objectTrack: fn(),
     },
+    duplicateClip: fn(),
     clearPlacementMode: fn(),
     setCurrentTime: fn(),
     setPlaying: fn(),
@@ -70,7 +72,6 @@ function createProjectState(): UseVideoEditorRuntimeParams['projectState'] {
     setReady: fn(),
     setError: fn(),
     setSaveState: fn(),
-    setDiagnosticsOpen: fn(),
   };
 }
 
@@ -111,8 +112,10 @@ it('composes asset, preview, playback, load, and lifecycle owners into one runti
   const params = createParams();
   const applyLoadedProject = vi.fn();
   const playback = {
+    pausePlayback: vi.fn(),
     registerPreviewRuntime: vi.fn(),
     seekTo: vi.fn(),
+    stepByFrames: vi.fn(),
     setPlaybackPlaying: vi.fn(),
     togglePlayback: vi.fn(),
   };
@@ -138,10 +141,14 @@ it('composes asset, preview, playback, load, and lifecycle owners into one runti
     timelinePreviews: { 'clip-1': 'blob:preview-1' },
     registerPreviewRuntime: playback.registerPreviewRuntime,
     seekTo: playback.seekTo,
+    stepByFrames: playback.stepByFrames,
     setPlaybackPlaying: playback.setPlaybackPlaying,
     togglePlayback: playback.togglePlayback,
   });
   expect(mocks.useVideoEditorPlayback).toHaveBeenCalledOnce();
+  expect(mocks.useVideoEditorPlayback.mock.calls[0]?.[2]).toEqual(
+    expect.objectContaining({ duplicateClip: params.playback.duplicateClip })
+  );
   expect(mocks.useVideoEditorRuntimeEffects).toHaveBeenCalledWith(
     expect.objectContaining({
       project: params.project,
@@ -152,8 +159,7 @@ it('composes asset, preview, playback, load, and lifecycle owners into one runti
   renderedController.applyLoadedProject(params.project!, 'recording-2');
   expect(mocks.createApplyLoadedProject).toHaveBeenCalledWith(
     params.projectState.setProject,
-    params.projectState.setError,
-    params.projectState.setDiagnosticsOpen
+    params.projectState.setError
   );
   expect(applyLoadedProject).toHaveBeenCalledWith(params.project, 'recording-2');
 });

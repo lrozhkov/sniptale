@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
-import { Bug, ChevronRight, FileAudio2, FilePlus2, Film, ImagePlus } from 'lucide-react';
+import { ChevronRight, FileAudio2, FilePlus2, Film, ImagePlus } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
-import { cx, getDiagnosticsToggleTitle } from './helpers';
+import { cx } from './helpers';
 import {
   SIDEBAR_BUTTON_ACCENT_CLASS_NAME,
   SIDEBAR_BUTTON_ACCENT_HOVER_CLASS_NAME,
@@ -58,13 +58,11 @@ function SidebarIconButton({
 }
 
 export function renderCollapsedRailButtons(props: {
-  diagnosticsOpen: boolean;
   onToggleCollapsed: () => void;
   onCreateProject: () => void | Promise<void>;
   onImportImage: () => void;
   onImportVideo: () => void;
   onImportAudio: () => void;
-  onToggleDiagnostics: () => void;
 }) {
   return (
     <>
@@ -93,12 +91,6 @@ export function renderCollapsedRailButtons(props: {
         title={translate('videoEditor.sidebar.importAudio')}
         onClick={props.onImportAudio}
         icon={<FileAudio2 size={17} strokeWidth={2} />}
-      />
-      <SidebarIconButton
-        title={getDiagnosticsToggleTitle(props.diagnosticsOpen)}
-        onClick={props.onToggleDiagnostics}
-        icon={<Bug size={17} strokeWidth={2} />}
-        active={props.diagnosticsOpen}
       />
     </>
   );

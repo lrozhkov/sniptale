@@ -21,13 +21,14 @@ function renderRangeHarness(
   handlers: {
     onSeek: (time: number) => void;
     onSetPlaybackRange: (range: { end: number; start: number } | null) => void;
+    playbackRange?: { end: number; start: number };
   }
 ) {
   const Harness = () => {
     const timelineRef = React.useRef<HTMLDivElement | null>(null);
     const range = useProjectTimelineRangeSelection({
       pixelsPerSecond: 60,
-      playbackRange: null,
+      playbackRange: handlers.playbackRange ?? null,
       projectDuration: 10,
       timelineRef,
       onSeek: handlers.onSeek,
@@ -187,4 +188,74 @@ it('supports surface-owned simple click handlers for empty lane interactions', (
   expect(onSetPlaybackRange).not.toHaveBeenCalled();
   expect(onTrackSimpleClick).toHaveBeenCalledWith(3);
   expect(onSeek).not.toHaveBeenCalled();
+});
+
+it.each(['Escape', 'pointercancel', 'blur'])(
+  'discards a range draft on %s and ignores late release',
+  (cancel) => {
+    const onSeek = vi.fn();
+    const onSetPlaybackRange = vi.fn();
+    const previous = { start: 6, end: 8 };
+    renderRangeHarness(
+      root,
+      (state) => {
+        harnessState = state;
+      },
+      {
+        onSeek,
+        onSetPlaybackRange,
+        playbackRange: previous,
+      }
+    );
+    act(() => {
+      dispatchPointerEvent(harnessState!.timelineRef.current!, 'pointerdown', 120);
+      dispatchPointerEvent(window, 'pointermove', 240);
+    });
+    expect(harnessState!.playbackRange).toEqual({ start: 2, end: 4 });
+    expect(onSetPlaybackRange).not.toHaveBeenCalled();
+    act(() => {
+      window.dispatchEvent(
+        cancel === 'Escape'
+          ? new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+          : new Event(cancel)
+      );
+      dispatchPointerEvent(window, 'pointermove', 300);
+      dispatchPointerEvent(window, 'pointerup', 300);
+    });
+    expect(harnessState!.playbackRange).toEqual(previous);
+    expect(onSetPlaybackRange).not.toHaveBeenCalled();
+    expect(onSeek).not.toHaveBeenCalled();
+    act(() => {
+      dispatchPointerEvent(harnessState!.timelineRef.current!, 'pointerdown', 60);
+      dispatchPointerEvent(window, 'pointermove', 180);
+      dispatchPointerEvent(window, 'pointerup', 180);
+    });
+    expect(onSetPlaybackRange).toHaveBeenCalledExactlyOnceWith({ start: 1, end: 3 });
+    expect(onSeek).toHaveBeenCalledExactlyOnceWith(1);
+  }
+);
+
+it('publishes a replacement range after seeking so stale seek policy cannot erase it', () => {
+  let selected: { start: number; end: number } | null = { start: 1, end: 2 };
+  renderRangeHarness(
+    root,
+    (state) => {
+      harnessState = state;
+    },
+    {
+      playbackRange: selected,
+      onSeek: (time) => {
+        if (time < 1 || time > 2) selected = null;
+      },
+      onSetPlaybackRange: (range) => {
+        selected = range;
+      },
+    }
+  );
+  act(() => {
+    dispatchPointerEvent(harnessState!.timelineRef.current!, 'pointerdown', 240);
+    dispatchPointerEvent(window, 'pointermove', 360);
+    dispatchPointerEvent(window, 'pointerup', 360);
+  });
+  expect(selected).toEqual({ start: 4, end: 6 });
 });

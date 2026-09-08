@@ -6,7 +6,6 @@ import type { VideoEditorState } from './types';
 function createSelectionStore(project = createEmptyVideoProject('Selection')) {
   let state = {
     currentTime: 0,
-    diagnosticsOpen: false,
     error: null,
     exportState: {
       dialogOpen: false,
@@ -66,7 +65,7 @@ it('resets selection and placement when track or clip selection is cleared', () 
   const store = createSelectionStore();
   const trackId = store.getState().project!.tracks[0]!.id;
 
-  store.actions.startActionPointPlacement('action-1');
+  store.actions.startActionPointPlacement('action-1', null);
   store.actions.selectTrack(null);
   expect(store.getState()).toMatchObject({
     placementMode: null,

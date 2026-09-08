@@ -34,7 +34,7 @@ it('opens the media library as a modal drawer with a dismissible dimmed remainde
   const modal = drawer?.closest('.sniptale-modal');
   expect(drawer).not.toBeNull();
   expect(modal?.className).toContain('!bottom-0');
-  expect((modal as HTMLElement | null)?.style.width).toContain('860px');
+  expect((modal as HTMLElement | null)?.style.width).toContain('1600px');
   expect(drawer?.getAttribute('aria-modal')).toBe('true');
   expect(container?.querySelector('.sniptale-modal-backdrop')).not.toBeNull();
   expect(container?.querySelector('.sniptale-modal-accent-sm')).toBeNull();
@@ -64,23 +64,14 @@ function renderPanel(isOpen: boolean) {
   act(() => {
     root?.render(
       <VideoEditorLibraryPanel
-        activeProjectId=""
-        diagnosticsContent={null}
-        diagnosticsOpen={false}
         isOpen={isOpen}
-        onAddRecording={vi.fn()}
+        savedViews={[]}
+        items={[]}
+        loading={false}
+        error={null}
+        onRefresh={vi.fn(async () => undefined)}
+        onAddMedia={vi.fn(async () => undefined)}
         onClose={vi.fn()}
-        onCreateProject={vi.fn()}
-        onDeleteProject={vi.fn()}
-        onImportAudio={vi.fn()}
-        onImportImage={vi.fn()}
-        onImportVideo={vi.fn()}
-        onOpenAudioRecordingDialog={vi.fn()}
-        onOpenProject={vi.fn()}
-        onToggleDiagnostics={vi.fn()}
-        projects={[]}
-        recordingId={null}
-        recordings={[]}
       />
     );
   });

@@ -1,9 +1,9 @@
+import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { CompactSelect } from '../../../../../ui/compact-inspector-controls';
 import type { CompactSelectOption } from '../../../../../ui/compact-inspector-controls';
 import { translate } from '../../../../../platform/i18n';
 import {
   ColorField as CompactInspectorColorField,
-  OptionRow,
   SelectField as CompactInspectorSelectField,
   StatusRow,
 } from '../../../../../ui/compact-inspector-controls';
@@ -45,6 +45,7 @@ export function SelectInput<T extends string>({
   if (label !== undefined) {
     return (
       <CompactInspectorSelectField
+        className="min-h-8! border-transparent! bg-transparent! px-0! py-0!"
         label={label}
         value={value}
         onChange={onChange}
@@ -91,6 +92,7 @@ function DisabledColorPreview(props: { label: string; value: string }) {
 }
 
 export function ColorField({
+  className,
   disabled = false,
   label,
   onChange,
@@ -98,6 +100,7 @@ export function ColorField({
   recentColors,
   value,
 }: {
+  className?: string;
   disabled?: boolean;
   label: string;
   onChange: (value: string) => void;
@@ -121,7 +124,9 @@ export function ColorField({
     ...(recentColors ? { recentColors } : {}),
   };
 
-  return <CompactInspectorColorField {...colorSelectorProps} />;
+  return (
+    <CompactInspectorColorField {...colorSelectorProps} {...(className ? { className } : {})} />
+  );
 }
 
 export function ToggleField(props: {
@@ -131,11 +136,17 @@ export function ToggleField(props: {
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <OptionRow
-      active={props.checked}
-      disabled={props.disabled}
-      label={props.label}
-      onToggle={() => props.onChange(!props.checked)}
-    />
+    <div className="flex min-h-9 items-center justify-between gap-3">
+      <span className="min-w-0 text-[length:var(--sniptale-compact-font-size,12px)]">
+        {props.label}
+      </span>
+      <ProductGlassSwitch
+        aria-label={props.label}
+        on={props.checked}
+        aria-pressed={props.checked}
+        disabled={props.disabled}
+        onClick={() => props.onChange(!props.checked)}
+      />
+    </div>
   );
 }

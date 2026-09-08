@@ -3,12 +3,13 @@ import { convertTextClipToAnnotationClip } from './annotation/conversion';
 import { createAnnotationClip, createTextClip } from './factories/overlay-clip';
 import {
   createEmptyVideoProject,
+  createVideoProjectTrack,
   createVideoProjectFromRecording,
   getDefaultTrackName,
 } from './factories/creation';
 import { getSortedTracks, isAnnotationClip } from './timeline';
 import { getVideoProjectUtilityLanes } from './utility-lanes';
-import { isLegacyScrollActionEvent, mapSourceRangeToProjectSpans } from './timeline/source-time';
+import { isScrollActionEvent, mapSourceRangeToProjectSpans } from './timeline/source-time';
 import { resolveAnnotationPresentation } from './annotation/template';
 import {
   VideoOverlayTemplateKind,
@@ -49,17 +50,13 @@ function verifyPublicFacadeSourceTimeExports() {
     },
   ]);
   expect(
-    isLegacyScrollActionEvent({
+    isScrollActionEvent({
       kind: VideoProjectActionEventKind.SCROLL,
-      preset: VideoProjectActionPreset.SCROLL_EMPHASIS,
+      presentation: { preset: VideoProjectActionPreset.SCROLL_EMPHASIS },
     })
   ).toBe(true);
   expect(primaryTrack?.kind).toBe(VideoTrackKind.PRIMARY);
-  expect(sortedTracks.map((track) => track.kind)).toEqual([
-    VideoTrackKind.OVERLAY,
-    VideoTrackKind.PRIMARY,
-    VideoTrackKind.AUDIO,
-  ]);
+  expect(sortedTracks.map((track) => track.kind)).toEqual([VideoTrackKind.PRIMARY]);
   expect(getVideoProjectUtilityLanes(project)).toEqual({
     actions: { visible: true, locked: false },
     camera: { visible: true, locked: false },
@@ -111,7 +108,7 @@ function verifyRecordingSidecarVideos() {
   const videoClips = project.clips.filter((clip) => clip.type === VideoProjectClipType.VIDEO);
 
   expect(project.baseRecordingId).toBe('rec-1');
-  expect(project.duration).toBe(8);
+  expect(project.duration).toBe(6);
   expect(project.assets.map((asset) => asset.name)).toEqual(['demo.webm', 'webcam.webm']);
   expect(project.clips.map((clip) => clip.type)).toEqual(['VIDEO', 'AUDIO', 'VIDEO']);
   expect(videoClips[1]).toEqual(
@@ -125,8 +122,9 @@ function verifyRecordingSidecarVideos() {
 
 function verifyAnnotationFacadeExports() {
   const project = createEmptyVideoProject('Templates');
-  const annotationClip = createAnnotationClip(project.tracks[2]!.id, 1280, 720, 1);
-  const textClip = createTextClip(project.tracks[2]!.id, 1280, 720, 2);
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.PRIMARY));
+  const annotationClip = createAnnotationClip(project.tracks[1]!.id, 1280, 720, 1);
+  const textClip = createTextClip(project.tracks[1]!.id, 1280, 720, 2);
 
   expect(isAnnotationClip(annotationClip)).toBe(true);
   expect(resolveAnnotationPresentation(project, annotationClip, 1.25)).toEqual(

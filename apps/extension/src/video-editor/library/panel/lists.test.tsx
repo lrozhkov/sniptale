@@ -1,165 +1,63 @@
 // @vitest-environment jsdom
-
-import { createRoot, type Root } from 'react-dom/client';
 import { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { ProjectsSection, RecordingsSection } from './lists';
-import type { ProjectListItem, RecordingListItem } from '../contracts/items';
-
-vi.mock('../../../platform/i18n', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('../../../platform/i18n')>();
-  return {
-    ...actual,
-    formatDateTime: () => 'formatted-date',
-    formatNumber: (value: number) => String(value),
-    translate: (key: string) => key,
-  };
-});
-
-let container: HTMLDivElement | null = null;
-let root: Root | null = null;
-
-function createProject(overrides: Partial<ProjectListItem> = {}): ProjectListItem {
-  return {
-    clipCount: 2,
-    createdAt: 1,
-    duration: 10,
-    height: 720,
-    id: 'project-1',
-    name: 'Project',
-    thumbnailId: 'video-project:project-1',
-    thumbnailSourceMediaId: null,
-    trackCount: 3,
-    updatedAt: 2,
-    width: 1280,
-    ...overrides,
-  };
-}
-
-function createRecording(overrides: Partial<RecordingListItem> = {}): RecordingListItem {
-  return {
-    createdAt: 1,
-    duration: null,
-    filename: 'clip.webm',
-    height: null,
-    id: 'recording-1',
-    mimeType: 'video/webm',
-    size: 1024,
-    thumbnailId: 'recording:recording-1',
-    width: null,
-    ...overrides,
-  };
-}
-
+import type { MediaLibraryItem } from '../../../composition/persistence/media-library/contracts';
+import { LibraryMediaSection } from './lists';
+vi.mock('./media-preview', () => ({
+  MediaPreviewPane: ({ item }: { item: MediaLibraryItem | null }) => (
+    <div data-ui="selected">{item?.filename ?? 'empty'}</div>
+  ),
+}));
+let container: HTMLDivElement;
+let root: Root;
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   container = document.createElement('div');
-  document.body.appendChild(container);
+  document.body.append(container);
   root = createRoot(container);
 });
-
 afterEach(() => {
-  root?.unmount();
-  root = null;
-  container?.remove();
-  container = null;
+  act(() => root.unmount());
+  container.remove();
   vi.unstubAllGlobals();
 });
-
-it('keeps project and recording lists in bounded internal scroll regions', () => {
-  act(() => {
-    root?.render(
-      <>
-        <ProjectsSection
-          activeProjectId="project-1"
-          hasQuery={false}
-          onDeleteProject={vi.fn()}
-          onOpenProject={vi.fn()}
-          projects={[createProject()]}
-          projectRemainder={[createProject()]}
-          recentProjects={[]}
-          thumbnails={{}}
-        />
-        <RecordingsSection
-          hasQuery={false}
-          onAddRecording={vi.fn()}
-          recordingRemainder={[createRecording()]}
-          recordings={[createRecording()]}
-          recentRecordings={[]}
-          thumbnails={{}}
-        />
-      </>
-    );
-  });
-
-  expect(container?.querySelector('[data-ui="projects-scroll"]')?.className).toContain('max-h-');
-  expect(container?.querySelector('[data-ui="recordings-scroll"]')?.className).toContain(
-    'overflow-y-auto'
+function item(id: string): MediaLibraryItem {
+  return {
+    id,
+    kind: 'recording',
+    source: { kind: 'recording', recordingId: id },
+    filename: id,
+    originalFilename: id,
+    mimeType: 'video/webm',
+    createdAt: 1,
+    updatedAt: 1,
+    size: 100,
+    width: 320,
+    height: 180,
+    duration: 3,
+    sourceUrl: null,
+    sourceTitle: null,
+    sourceFavicon: null,
+    tags: [],
+    hasThumbnail: false,
+  };
+}
+function render(items: MediaLibraryItem[]) {
+  act(() =>
+    root.render(<LibraryMediaSection items={items} thumbnails={{}} onAddMedia={vi.fn()} />)
   );
-});
-
-it('renders generated thumbnail URLs in dense library rows', () => {
-  act(() => {
-    root?.render(
-      <ProjectsSection
-        activeProjectId="project-x"
-        hasQuery={false}
-        onDeleteProject={vi.fn()}
-        onOpenProject={vi.fn()}
-        projects={[createProject()]}
-        projectRemainder={[createProject()]}
-        recentProjects={[]}
-        thumbnails={{ 'video-project:project-1': { status: 'ready', url: 'blob:project-1' } }}
-      />
-    );
-  });
-
-  expect(container?.querySelector('img')?.getAttribute('src')).toBe('blob:project-1');
-});
-
-it('shows a media preview pane and switches it from the selected recording row', () => {
-  act(() => {
-    root?.render(
-      <RecordingsSection
-        hasQuery={false}
-        onAddRecording={vi.fn()}
-        recordingRemainder={[
-          createRecording({ id: 'recording-1', filename: 'first.webm' }),
-          createRecording({
-            id: 'recording-2',
-            filename: 'second.webm',
-            thumbnailId: 'recording:recording-2',
-          }),
-        ]}
-        recordings={[
-          createRecording({ id: 'recording-1', filename: 'first.webm' }),
-          createRecording({
-            id: 'recording-2',
-            filename: 'second.webm',
-            thumbnailId: 'recording:recording-2',
-          }),
-        ]}
-        recentRecordings={[]}
-        thumbnails={{
-          'recording:recording-1': { status: 'ready', url: 'blob:first' },
-          'recording:recording-2': { status: 'ready', url: 'blob:second' },
-        }}
-      />
-    );
-  });
-
-  expect(container?.querySelector('[data-ui="video-editor.library.media-preview"]')).not.toBeNull();
-  expect(container?.textContent).toContain('first.webm');
-
-  act(() => {
-    Array.from(container?.querySelectorAll('[role="button"]') ?? [])
-      .find((node) => node.textContent?.includes('second.webm'))
-      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  });
-
-  expect(
-    container
-      ?.querySelector('[data-ui="video-editor.library.media-preview"] img')
-      ?.getAttribute('src')
-  ).toBe('blob:second');
+}
+it('selects media and recovers selection when a filter removes the selected item', () => {
+  const items = [item('first'), item('second')];
+  render(items);
+  act(() => container.querySelectorAll<HTMLButtonElement>('button[aria-pressed]')[1]!.click());
+  expect(container.querySelector('[data-ui=selected]')?.textContent).toBe('second');
+  expect(container.querySelectorAll('button[aria-pressed]')[1]?.getAttribute('aria-pressed')).toBe(
+    'true'
+  );
+  render(items.slice(0, 1));
+  expect(container.querySelector('[data-ui=selected]')?.textContent).toBe('first');
+  render([]);
+  expect(container.querySelector('[data-ui=selected]')?.textContent).toBe('empty');
 });

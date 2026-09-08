@@ -2,6 +2,7 @@
 // recording writers hold exclusive object locks, and privacy erasure invalidates their local state.
 import type {
   AssetObjectWriter,
+  SeekableAssetObjectWriter,
   AssetReadyJournal,
   AssetRef,
   PreparedAssetObject,
@@ -288,10 +289,19 @@ async function initializeAssetWriter(
   }
 }
 
-export async function createAssetObjectWriter(
+/** Existing consumers retain the append-only capability and its lifecycle contract. */
+export function createAssetObjectWriter(
   input: { assetId?: string; mimeType: string },
   options: AssetOpfsOptions = {}
 ): Promise<AssetObjectWriter> {
+  return createSeekableAssetObjectWriter(input, options);
+}
+
+/** One writer authority owns append and positioned staging, finalization, and cleanup. */
+export async function createSeekableAssetObjectWriter(
+  input: { assetId?: string; mimeType: string },
+  options: AssetOpfsOptions = {}
+): Promise<SeekableAssetObjectWriter> {
   if (input.mimeType.trim().length === 0) throw new Error('Asset MIME type must not be empty.');
   const assetId = input.assetId ?? (options.createId ?? defaultCreateId)();
   const { objectHandle, objects, writable, writing } = await initializeAssetWriter(
@@ -331,6 +341,19 @@ export async function createAssetObjectWriter(
       if (phase !== 'open') throw new Error(`Asset writer is ${phase}.`);
       await writable.write(chunk);
       writtenBytes += chunk.size;
+    },
+    async writeAt(position, chunk) {
+      if (phase !== 'open') throw new Error(`Asset writer is ${phase}.`);
+      if (
+        !Number.isSafeInteger(position) ||
+        position < 0 ||
+        !Number.isSafeInteger(position + chunk.size)
+      )
+        throw new Error('Asset write position is invalid.');
+      await writable.write({ type: 'write', position, data: chunk });
+      writtenBytes = Math.max(writtenBytes, position + chunk.size);
+      // Preserve append semantics after header rewrites; extent differs from the stream cursor.
+      await writable.seek(writtenBytes);
     },
     async finalize(): Promise<PreparedAssetObject> {
       if (phase !== 'open') throw new Error(`Asset writer is ${phase}.`);

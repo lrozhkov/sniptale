@@ -1,9 +1,10 @@
 import { expect, it } from 'vitest';
 import { createAnnotationClip } from './template';
 import { resolveAnimationState } from './presentation';
-import { createEmptyVideoProject } from '../factories/creation';
+import { createEmptyVideoProject, createVideoProjectTrack } from '../factories/creation';
 import { resolveAnnotationPresentation } from './template';
 import {
+  VideoTrackKind,
   VideoOverlayAnimationKind,
   VideoOverlayTemplateKind,
   VideoTemplateDirection,
@@ -11,7 +12,8 @@ import {
 
 function createClip() {
   const project = createEmptyVideoProject('Templates', 1280, 720);
-  const clip = createAnnotationClip(project.tracks[2]!.id, project.width, project.height, 1);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
+  const clip = createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 1);
   clip.duration = 3;
   clip.introDurationMs = 500;
   clip.outroDurationMs = 500;
@@ -223,7 +225,7 @@ function createTemplatePresentationClip(
   templateKind: VideoOverlayTemplateKind
 ) {
   const clip = createAnnotationClip(
-    project.tracks[2]!.id,
+    project.tracks[1]!.id,
     project.width,
     project.height,
     1,
@@ -236,6 +238,7 @@ function createTemplatePresentationClip(
 
 it('applies template-specific reveal profiles to presentation effects', () => {
   const project = createEmptyVideoProject('Templates', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const accentClip = createTemplatePresentationClip(
     project,
     VideoOverlayTemplateKind.LOWER_THIRD_ACCENT
@@ -253,8 +256,9 @@ it('applies template-specific reveal profiles to presentation effects', () => {
 
 it('aligns side reveal panels to the selected edge and slides from outside it', () => {
   const project = createEmptyVideoProject('Templates', 1200, 600);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(
-    project.tracks[2]!.id,
+    project.tracks[1]!.id,
     project.width,
     project.height,
     1,
@@ -277,7 +281,8 @@ it('aligns side reveal panels to the selected edge and slides from outside it', 
 
 it('keeps steady-state lower-thirds sharp while preserving blur-based intro motion', () => {
   const project = createEmptyVideoProject('Templates', 1280, 720);
-  const steadyClip = createAnnotationClip(project.tracks[2]!.id, project.width, project.height, 1);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
+  const steadyClip = createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 1);
   steadyClip.duration = 4;
   steadyClip.introAnimation = VideoOverlayAnimationKind.SLIDE_UP_FADE;
   steadyClip.outroAnimation = VideoOverlayAnimationKind.REVEAL_MASK;

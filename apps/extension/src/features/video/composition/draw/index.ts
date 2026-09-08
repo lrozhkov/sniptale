@@ -1,3 +1,4 @@
+export { drawSceneActionCompositionStates } from './effects/actions';
 export { drawActionCompositionState, drawCursorCompositionState } from './effects/index';
 export {
   drawFittedMediaFrame,

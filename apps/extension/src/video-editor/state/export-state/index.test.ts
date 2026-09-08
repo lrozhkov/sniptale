@@ -17,6 +17,7 @@ import {
   startExportState,
   updateExportSettingsState,
 } from './index';
+import { failExportCancellationState } from './transitions';
 import { useVideoEditorStore } from '../store';
 
 describe('video editor store export state defaults', () => {
@@ -280,3 +281,14 @@ function createStoreState() {
     project,
   };
 }
+
+it('clears cancellation failure after a successful repeat cancellation', () => {
+  const running = startExportState(createInitialExportState(), 'retry-cancel');
+  const failed = failExportCancellationState(running, 'Cancel transport unavailable');
+  expect(failed.isRunning).toBe(true);
+  const cancelled = cancelExportState(failed);
+  expect(cancelled.error).toBeNull();
+  expect(cancelled.isRunning).toBe(false);
+  expect(cancelled.status?.phase).toBe(VideoProjectExportPhase.CANCELLED);
+  expect(cancelled.settings).toEqual(running.settings);
+});

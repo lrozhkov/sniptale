@@ -29,7 +29,7 @@ function createTrackPanelPrefs(): VideoEditorTrackPanelPrefs {
     collapsedCursorLaneVisible: true,
     collapsedTelemetryLaneVisible: true,
     compactRows: true,
-    panelExpanded: false,
+    hideTrackNames: true,
     trackHeightByTrackId: { 'track-a': 3 },
   };
 }
@@ -41,7 +41,6 @@ describe('video editor track panel ui-state storage reads', () => {
     localGetMock.mockResolvedValueOnce({
       'sniptale_video_editor_track_panel_prefs:project-a': {
         collapsedCursorLaneVisible: false,
-        panelExpanded: true,
         trackHeightByTrackId: {
           'track-a': 2,
           'track-old': 3,
@@ -53,9 +52,9 @@ describe('video editor track panel ui-state storage reads', () => {
       loadVideoEditorTrackPanelPrefs('project-a', new Set(['track-a']))
     ).resolves.toEqual({
       collapsedCursorLaneVisible: false,
-      collapsedTelemetryLaneVisible: false,
+      collapsedTelemetryLaneVisible: true,
       compactRows: false,
-      panelExpanded: true,
+      hideTrackNames: false,
       trackHeightByTrackId: {
         'track-a': 2,
       },
@@ -69,10 +68,22 @@ describe('video editor track panel ui-state storage reads', () => {
       loadVideoEditorTrackPanelPrefs('project-a', new Set(['track-a']))
     ).resolves.toEqual({
       collapsedCursorLaneVisible: true,
-      collapsedTelemetryLaneVisible: false,
+      collapsedTelemetryLaneVisible: true,
       compactRows: false,
-      panelExpanded: false,
+      hideTrackNames: false,
       trackHeightByTrackId: {},
+    });
+  });
+
+  it('preserves an explicit choice to collapse history', async () => {
+    localGetMock.mockResolvedValueOnce({
+      'sniptale_video_editor_track_panel_prefs:project-a': {
+        collapsedTelemetryLaneVisible: false,
+      },
+    });
+
+    await expect(loadVideoEditorTrackPanelPrefs('project-a', new Set())).resolves.toMatchObject({
+      collapsedTelemetryLaneVisible: false,
     });
   });
 });
@@ -90,9 +101,9 @@ describe('video editor track panel invalid storage reads', () => {
       loadVideoEditorTrackPanelPrefs('project-a', new Set(['track-a']))
     ).resolves.toEqual({
       collapsedCursorLaneVisible: true,
-      collapsedTelemetryLaneVisible: false,
+      collapsedTelemetryLaneVisible: true,
       compactRows: false,
-      panelExpanded: false,
+      hideTrackNames: false,
       trackHeightByTrackId: {},
     });
     expect(warnSpy).toHaveBeenCalledWith(
@@ -116,9 +127,9 @@ describe('video editor track panel ui-state storage writes', () => {
     await expect(
       saveVideoEditorTrackPanelPrefs('project-a', {
         collapsedCursorLaneVisible: true,
-        collapsedTelemetryLaneVisible: false,
+        collapsedTelemetryLaneVisible: true,
         compactRows: false,
-        panelExpanded: true,
+        hideTrackNames: false,
         trackHeightByTrackId: {},
       })
     ).resolves.toBeUndefined();
@@ -132,4 +143,34 @@ describe('video editor track panel ui-state storage writes', () => {
       expect.objectContaining({ projectId: 'project-a' })
     );
   });
+});
+
+it('restores name visibility independently and ignores malformed name preference', async () => {
+  localGetMock.mockResolvedValueOnce({
+    'sniptale_video_editor_track_panel_prefs:names': { hideTrackNames: true, compactRows: false },
+  });
+  expect(await loadVideoEditorTrackPanelPrefs('names', new Set())).toMatchObject({
+    hideTrackNames: true,
+    compactRows: false,
+  });
+  localGetMock.mockResolvedValueOnce({
+    'sniptale_video_editor_track_panel_prefs:names': { hideTrackNames: 'false', compactRows: true },
+  });
+  expect(await loadVideoEditorTrackPanelPrefs('names', new Set())).toMatchObject({
+    hideTrackNames: false,
+    compactRows: true,
+  });
+});
+
+it('restores caption visibility only for current tracks with boolean settings', async () => {
+  localGetMock.mockResolvedValue({
+    'sniptale_video_editor_track_panel_prefs:captions': {
+      hiddenClipNamesByTrackId: { video: true, audio: false, stale: true, invalid: 'yes' },
+    },
+  });
+  const prefs = await loadVideoEditorTrackPanelPrefs(
+    'captions',
+    new Set(['video', 'audio', 'invalid'])
+  );
+  expect(prefs.hiddenClipNamesByTrackId).toEqual({ video: true, audio: false });
 });

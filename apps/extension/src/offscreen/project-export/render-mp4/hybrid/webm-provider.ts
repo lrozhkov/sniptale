@@ -50,18 +50,30 @@ async function createWebmVideoSampleSink(asset: VideoProjectAsset): Promise<{
     formats: [WEBM],
     source: new BlobSource(await loadBlobForAsset(asset)),
   });
-  const track = await input.getPrimaryVideoTrack();
-  if (!track) {
-    input.dispose();
-    throw new Error('WebM source has no video track.');
-  }
+  try {
+    const track = await input.getPrimaryVideoTrack();
+    if (!track) {
+      throw new Error('WebM source has no video track.');
+    }
 
-  if (!(await track.canDecode())) {
-    input.dispose();
-    return null;
-  }
+    if (!(await track.canDecode())) {
+      input.dispose();
+      return null;
+    }
 
-  return { input, sink: new VideoSampleSink(track) };
+    const config = await track.getDecoderConfig();
+    // Native decoding can assume BT.709 for untagged VP8 instead of its BT.601 default.
+    // Use the media-element fallback to retain the preview's color interpretation.
+    if (config?.codec === 'vp8' && !config.colorSpace?.matrix) {
+      input.dispose();
+      return null;
+    }
+
+    return { input, sink: new VideoSampleSink(track) };
+  } catch (error) {
+    input.dispose();
+    throw error;
+  }
 }
 
 function createProviderFromSink(params: {

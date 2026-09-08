@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import JSZip from 'jszip';
+import { installSnapshotFrameLayoutPolicy } from './frame-layout';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { WebSnapshotManifest } from '@sniptale/runtime-contracts/web-snapshot';
 import {
@@ -606,4 +607,20 @@ it('rejects package manifests that do not match the saved record authority', asy
   );
 
   expect(URL.createObjectURL).not.toHaveBeenCalled();
+});
+
+it('keeps frame layout installation safe before attachment and cleans its own policy', () => {
+  expect(installSnapshotFrameLayoutPolicy(null)).not.toThrow();
+  const frame = document.createElement('iframe');
+  expect(installSnapshotFrameLayoutPolicy(frame)).not.toThrow();
+  document.body.appendChild(frame);
+  const dispose = installSnapshotFrameLayoutPolicy(frame);
+  expect(
+    frame.contentDocument!.querySelectorAll('[data-sniptale-viewer-layout-policy]')
+  ).toHaveLength(1);
+  dispose();
+  expect(
+    frame.contentDocument!.querySelectorAll('[data-sniptale-viewer-layout-policy]')
+  ).toHaveLength(0);
+  frame.remove();
 });

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { resolveVideoProjectActionOccurrences } from '../../../../../features/video/project/action-occurrences';
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -27,13 +28,14 @@ function createProject() {
   project.actionEvents = [
     {
       data: {},
-      duration: 0.5,
+
       id: 'action-1',
       kind: VideoProjectActionEventKind.CLICK,
       label: 'Action',
       point: { x: 900, y: 420 },
-      preset: VideoProjectActionPreset.CLICK_RIPPLE,
-      time: 1.2,
+
+      anchor: { kind: 'project', time: 1.2 },
+      presentation: { duration: 0.5, preset: VideoProjectActionPreset.CLICK_RIPPLE },
     } as WorkspaceSidebarSelectionPanelProps['project']['actionEvents'][number],
   ];
   project.motionRegions = [
@@ -47,7 +49,7 @@ function createProject() {
       motionBlurAmount: 0.2,
       scale: 1.6,
       startTime: 0.5,
-      targetActionEventId: null,
+      targetAction: null,
       zoomInDuration: 0.35,
       zoomOutDuration: 0.35,
     },
@@ -108,7 +110,7 @@ function createPanelProps(): WorkspaceSidebarSelectionPanelProps {
     placementMode: null,
     project,
     recentColors: [],
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedClip: null,
     selectedCursorSample: null,
     selectedMotionRegion,
@@ -197,19 +199,21 @@ function registerMotionFocusControlTests() {
 }
 
 function registerMotionFocusActionTests() {
-  it('switches into action-follow mode using the first available action target', async () => {
+  it('switches into action-follow mode using the selected exact occurrence', async () => {
     const props = createPanelProps();
     props.project.actionEvents.unshift({
       data: {},
-      duration: 0.4,
       id: 'legacy-scroll',
       kind: VideoProjectActionEventKind.SCROLL,
       label: 'Legacy scroll',
       point: null,
-      preset: VideoProjectActionPreset.SCROLL_EMPHASIS,
-      time: 0.6,
+      presentation: { preset: VideoProjectActionPreset.SCROLL_EMPHASIS, duration: 0.4 },
+      anchor: { kind: 'project', time: 0.6 },
     } as WorkspaceSidebarSelectionPanelProps['project']['actionEvents'][number]);
 
+    props.selectedActionOccurrence = resolveVideoProjectActionOccurrences(props.project).find(
+      (row) => row.eventId === 'action-1'
+    )!;
     await renderActions(props);
     await act(async () => {
       findButton('videoEditor.sidebar.motionFocusAction')?.click();
@@ -217,7 +221,7 @@ function registerMotionFocusActionTests() {
 
     expect(props.onUpdateMotionRegion).toHaveBeenCalledWith('motion-1', {
       focusMode: VideoMotionFocusMode.ACTION,
-      targetActionEventId: 'action-1',
+      targetAction: { eventId: 'action-1', clipId: null },
     });
   });
 }

@@ -21,7 +21,6 @@ describe('VideoEditorCommandPalette', () => {
     renderToStaticMarkup(
       <VideoEditorCommandPalette
         controller={{
-          diagnosticsOpen: false,
           isPlaying: false,
           leftSidebarCollapsed: false,
           onAddShapeOverlay: vi.fn(),
@@ -31,7 +30,6 @@ describe('VideoEditorCommandPalette', () => {
           onOpenExportDialog: vi.fn(),
           onSplitSelectedClip: vi.fn(),
           selectedClipId: null,
-          toggleDiagnostics: vi.fn(),
           togglePlaying: vi.fn(),
           toggleSidebarCollapsed: vi.fn(),
         }}

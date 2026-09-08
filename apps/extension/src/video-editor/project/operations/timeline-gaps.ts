@@ -171,7 +171,8 @@ function getNearestLeadingClipIds(
   units: VideoEditorTrackTimingUnit[],
   trailingStart: number
 ): string[] {
-  const leadingUnits = units.filter((unit) => unit.end <= trailingStart - TIMELINE_GAP_EPSILON);
+  // Touching and spanning units occupy the boundary; do not fall back past them to an older clip.
+  const leadingUnits = units.filter((unit) => unit.start < trailingStart - TIMELINE_GAP_EPSILON);
   if (leadingUnits.length === 0) {
     return [];
   }
@@ -195,5 +196,27 @@ export function isMatchingTrackGapCandidate(
   return (
     Math.abs(candidate.start - gapStart) <= TIMELINE_GAP_EPSILON &&
     Math.abs(candidate.end - gapEnd) <= TIMELINE_GAP_EPSILON
+  );
+}
+
+/** A voice take must fit wholly into an unoccupied, editable audio interval. */
+export function isAudioRecordingRangeAvailable(
+  project: VideoProject,
+  trackId: string,
+  start: number,
+  end: number
+): boolean {
+  const track = project.tracks.find((item) => item.id === trackId);
+  return (
+    track?.kind === 'AUDIO' &&
+    !track.locked &&
+    Number.isFinite(start) &&
+    Number.isFinite(end) &&
+    start >= 0 &&
+    end <= project.duration &&
+    end - start >= 1 &&
+    !project.clips.some(
+      (clip) => clip.trackId === trackId && clip.startTime < end && getClipEndTime(clip) > start
+    )
   );
 }

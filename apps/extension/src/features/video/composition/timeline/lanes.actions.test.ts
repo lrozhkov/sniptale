@@ -2,14 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { createEmptyVideoProject } from '../../project/factories/creation';
 import {
   VideoCursorCaptureMode,
-  VideoProjectActionEventKind,
-  VideoProjectActionPreset,
   VideoTemporalEasing,
   VideoTransitionEasing,
   VideoTransitionKind,
 } from '../../project/types/index';
 import {
-  buildVideoCompositionActionSegments,
   buildVideoCompositionCursorSegments,
   buildVideoCompositionMotionSegments,
   buildVideoCompositionTransitionSegments,
@@ -38,7 +35,7 @@ function createLaneMotionRegions() {
       id: 'motion-1',
       scale: 1.5,
       startTime: 0.5,
-      targetActionEventId: null,
+      targetAction: null,
       zoomInDuration: 0.2,
       zoomOutDuration: 0.2,
     },
@@ -50,36 +47,11 @@ function createLaneMotionRegions() {
       id: 'motion-zero',
       scale: 1.2,
       startTime: 2,
-      targetActionEventId: null,
+      targetAction: null,
       zoomInDuration: 0.2,
       zoomOutDuration: 0.2,
     },
   ] as never;
-}
-
-function createLaneActionEvents() {
-  return [
-    {
-      data: {},
-      duration: 0,
-      id: 'legacy-scroll',
-      kind: VideoProjectActionEventKind.SCROLL,
-      label: 'Legacy scroll',
-      point: null,
-      preset: VideoProjectActionPreset.SCROLL_EMPHASIS,
-      time: 1.5,
-    },
-    {
-      data: {},
-      duration: 0,
-      id: 'click-1',
-      kind: VideoProjectActionEventKind.CLICK,
-      label: 'Click',
-      point: { x: 110, y: 160 },
-      preset: VideoProjectActionPreset.CLICK_RIPPLE,
-      time: 3,
-    },
-  ];
 }
 
 function createLaneProject() {
@@ -101,7 +73,6 @@ function createLaneProject() {
   ];
   project.cursorTrack = createLaneCursorTrack();
   project.motionRegions = createLaneMotionRegions();
-  project.actionEvents = createLaneActionEvents();
   return project;
 }
 
@@ -136,13 +107,6 @@ function verifyTransitionAndCursorLanes() {
 function verifyActionAndMotionLanes() {
   const project = createLaneProject();
 
-  expect(buildVideoCompositionActionSegments(project)).toEqual([
-    expect.objectContaining({
-      end: 3.7,
-      id: 'click-1',
-      start: 3,
-    }),
-  ]);
   expect(buildVideoCompositionMotionSegments(project)).toEqual([
     expect.objectContaining({
       end: 2,
@@ -170,13 +134,12 @@ function verifyEmptyAndInvalidLaneBranches() {
 
   expect(buildVideoCompositionTransitionSegments(project)).toEqual([]);
   expect(buildVideoCompositionCursorSegments(project)).toEqual([]);
-  expect(buildVideoCompositionActionSegments(project)).toEqual([]);
   expect(buildVideoCompositionMotionSegments(project)).toEqual([]);
 }
 
 describe('video composition lanes', () => {
   it('builds transition and merged cursor segments', verifyTransitionAndCursorLanes);
-  it('filters legacy scroll actions and zero-length motion regions', verifyActionAndMotionLanes);
+  it('filters zero-length motion regions', verifyActionAndMotionLanes);
   it(
     'returns empty lane output for missing or empty temporal owners',
     verifyEmptyAndInvalidLaneBranches

@@ -1,3 +1,5 @@
+import type { VideoProjectEffectInstancePatch } from '../../contracts/commands/patches';
+import type { VideoProjectActionOccurrence } from '../../../features/video/project/action-occurrences';
 import type React from 'react';
 
 import type { VideoCompositionCameraState } from '../../../features/video/composition/types';
@@ -14,7 +16,10 @@ import type {
   VideoTrackKind,
 } from '../../../features/video/project/types/index';
 import type { VideoProjectAnnotationTemplatePatch } from '../../../features/video/project/annotation/contract';
-import type { VideoEditorMotionRegionPatch } from '../../contracts/commands/patches';
+import type {
+  VideoEditorActionEventPatch,
+  VideoEditorMotionRegionPatch,
+} from '../../contracts/commands/patches';
 import type { VideoEditorObjectTrackActions } from '../../contracts/commands/object-tracks';
 import type { PreviewStageGuide } from './canvas/snap';
 import type { PreviewStageImportHandlers } from '../../contracts/insertion';
@@ -82,18 +87,19 @@ export interface PreviewStageCanvasProps {
   onClearActiveInsertKind: () => void;
   onClearPlacementMode: () => void;
   onSelectClip: (clipId: string | null) => void;
-  onUpdateActionEventDetails: (
-    actionEventId: string,
-    patch: Partial<
-      Pick<VideoProject['actionEvents'][number], 'duration' | 'label' | 'point' | 'preset'>
-    >
-  ) => void;
+  onUpdateActionEventDetails: (actionEventId: string, patch: VideoEditorActionEventPatch) => void;
   onUpdateMotionRegion: (motionRegionId: string, patch: VideoEditorMotionRegionPatch) => void;
   onUpsertObjectTrackCorrectionAnchor?:
     | VideoEditorObjectTrackActions['upsertObjectTrackCorrectionAnchor']
     | undefined;
   onAddShapeOverlay: (shapeType: VideoProjectShapeType) => string | null;
   onAddTextOverlay: () => string | null;
+  onPreviewEffectAnchors?:
+    | ((instanceId: string, anchors: Record<string, { x: number; y: number }> | null) => void)
+    | undefined;
+  onUpdateEffectInstance?:
+    | ((instanceId: string, patch: VideoProjectEffectInstancePatch) => void)
+    | undefined;
   onUpdateClipTransform: (clipId: string, patch: Partial<VideoProjectClip['transform']>) => void;
   onUpdateAnnotationClipTemplate: (
     clipId: string,
@@ -106,7 +112,7 @@ export interface PreviewStageCanvasProps {
   previewExactFrameCache: VideoPreviewExactFrameCache;
   renderGenerationRef?: React.MutableRefObject<number>;
   project: VideoProject;
-  selectedActionEvent: VideoProject['actionEvents'][number] | null;
+  selectedActionOccurrence: VideoProjectActionOccurrence | null;
   selectedClip: VideoProjectClip | null;
   selectedClipId: string | null;
   selectedClipLocked: boolean;
@@ -117,7 +123,16 @@ export interface PreviewStageCanvasProps {
   videoRefs: PreviewStageVideoRefs;
 }
 
+/** A workspace-owned alternate viewer kept mounted alongside the montage canvas. */
+export interface PreviewStageAlternateView {
+  active: boolean;
+  content: React.ReactNode;
+}
+
 export interface PreviewStageSurfaceProps extends PreviewStageCanvasProps {
+  alternateView?: PreviewStageAlternateView | undefined;
+  headerContent?: React.ReactNode;
+  headerActions?: React.ReactNode;
   isPlaying: boolean;
   playbackRange: VideoEditorPlaybackRange | null;
   onAddActionEvent: (preset: VideoProjectActionPreset) => void;
@@ -155,6 +170,7 @@ export interface PreviewStageAnnotationTargetOverlayProps {
 }
 
 export interface PreviewStageVideoSyncParams {
+  assetUrls: Record<string, string>;
   activeClips: VideoProjectClip[];
   currentTime: number;
   isPlaying: boolean;

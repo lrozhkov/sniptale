@@ -42,3 +42,10 @@ export type {
   EffectV1SvgPartTransform,
   EffectV1ValidationResult,
 } from './model/types.js';
+
+export {
+  resolveEffectV1ObjectRenderBounds,
+  mapEffectV1ObjectPoint,
+  mapEffectV1ScenePoint,
+} from './object-layout/geometry.js';
+export type { EffectV1ObjectLayout, EffectV1ObjectHandle } from './model/types.js';

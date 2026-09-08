@@ -26,12 +26,16 @@ export type VideoProjectEffectTarget =
   | { kind: 'transition'; transitionId: string };
 
 export interface VideoProjectEffectInstance {
+  /** Authoritative logical scene positions; local handle controls are derived at render time. */
+  sceneAnchors?: Record<string, { x: number; y: number }>;
   controls: Record<string, number | string>;
   duration: number;
   enabled: boolean;
   id: string;
   kind: EffectV1Kind;
   playbackRate: number;
+  /** First retained document time, in seconds. Omission starts at the document beginning. */
+  sourceStart?: number;
   snapshotId: string;
   startTime: number;
   target: VideoProjectEffectTarget;

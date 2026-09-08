@@ -26,13 +26,11 @@ interface RuntimeEffectsParams {
 
 export function createApplyLoadedProject(
   setProject: VideoEditorSessionActions['setProject'],
-  setError: VideoEditorSessionActions['setError'],
-  setDiagnosticsOpen: VideoEditorSessionActions['setDiagnosticsOpen']
+  setError: VideoEditorSessionActions['setError']
 ): ApplyLoadedProject {
   return (project, recordingId) => {
     setProject(project, recordingId);
     setError(null);
-    setDiagnosticsOpen(false);
     replaceVideoEditorUrl(project.id, recordingId);
   };
 }

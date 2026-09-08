@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { VideoProjectActionPreset } from '../../../../../features/video/project/types';
 import { VideoEditorPlacementModeKind } from '../../../../contracts/placement';
-import { ActionDetailsFields } from './fields';
+import { ActionPointButtons, ActionPrimaryFields } from './fields';
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
@@ -13,49 +13,39 @@ vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
 }));
 
 describe('workspace-sidebar/selection/effect-fields', () => {
-  it('renders action details with canonical text input and preset controls', () => {
+  it('shows presentation timing including signed offsets without captured text editing', () => {
     const markup = renderToStaticMarkup(
-      <ActionDetailsFields
-        actionEventId="action-1"
+      <ActionPrimaryFields
         duration={0.9}
-        label="Click here"
-        placementModeKind={null}
-        point={{ x: 120, y: 240 }}
+        offset={-0.25}
         preset={VideoProjectActionPreset.SCROLL_EMPHASIS}
-        projectHeight={1080}
-        projectWidth={1920}
-        onClearPlacementMode={vi.fn()}
-        onStartActionPointPlacement={vi.fn()}
-        onUpdateActionEventDetails={vi.fn()}
+        disabled={false}
+        onChange={vi.fn()}
       />
     );
-
     expect(markup).toContain('videoEditor.sidebar.actionPresetLabel');
-    expect(markup).toContain('videoEditor.sidebar.textLabel');
-    expect(markup).toContain('value="Click here"');
+    expect(markup).toContain('videoEditor.sidebar.historyDuration');
+    expect(markup).toContain('videoEditor.sidebar.historyOffset');
+    expect(markup).toContain('-0.25');
+    expect(markup).not.toContain('videoEditor.sidebar.textLabel');
     expect(markup).toContain('videoEditor.sidebar.actionPresetScrollEmphasis');
-    expect(markup).toContain('type="range"');
-    expect(markup).toContain('videoEditor.sidebar.selectPointOnStage');
   });
 
-  it('renders action point placement as a shared compact toggle action', () => {
+  it('disables both placement actions while locked and retains active placement feedback', () => {
     const markup = renderToStaticMarkup(
-      <ActionDetailsFields
+      <ActionPointButtons
         actionEventId="action-1"
-        duration={0.9}
-        label="Click here"
         placementModeKind={VideoEditorPlacementModeKind.ACTION_POINT}
-        point={{ x: 120, y: 240 }}
-        preset={VideoProjectActionPreset.CLICK_RIPPLE}
         projectHeight={1080}
         projectWidth={1920}
+        disabled={true}
         onClearPlacementMode={vi.fn()}
         onStartActionPointPlacement={vi.fn()}
-        onUpdateActionEventDetails={vi.fn()}
+        onChange={vi.fn()}
       />
     );
-
     expect(markup).toContain('aria-pressed="true"');
-    expect(markup).toContain('shadow-[inset_0_0_0_1px_color-mix');
+    expect(markup.match(/disabled=""/g)).toHaveLength(2);
+    expect(markup).toContain('videoEditor.sidebar.selectPointOnStage');
   });
 });

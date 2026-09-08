@@ -26,7 +26,10 @@ import {
 import { resetVideoEditorProjectHistory } from '../history';
 
 function createLinkedProject(): VideoProject {
-  const project = createEmptyVideoProject('Helpers');
+  const project = ensureTrackForKind(
+    createEmptyVideoProject('Helpers'),
+    VideoTrackKind.AUDIO
+  ).project;
   const [primaryTrack, audioTrack] = project.tracks;
   project.clips = [
     {
@@ -93,15 +96,16 @@ function verifyEnsureTrackForKind(): void {
     project,
     trackId: project.tracks[0]!.id,
   });
-  expect(ensureTrackForKind(project, VideoTrackKind.AUDIO, null)).toEqual({
-    project,
-    trackId: project.tracks[1]!.id,
-  });
+  const audio = ensureTrackForKind(project, VideoTrackKind.AUDIO);
+  expect(audio.project.tracks).toHaveLength(2);
+  expect(audio.project.tracks[1]?.order).toBeGreaterThan(project.tracks[0]!.order);
+  expect(ensureTrackForKind(audio.project, VideoTrackKind.AUDIO).project).toBe(audio.project);
 
-  const withoutOverlay = { ...project, tracks: project.tracks.slice(0, 2) };
-  const created = ensureTrackForKind(withoutOverlay, VideoTrackKind.OVERLAY, null);
-  expect(created.project.tracks).toHaveLength(3);
+  const created = ensureTrackForKind(project, VideoTrackKind.SUBTITLE);
+  expect(created.project.tracks).toHaveLength(2);
+  expect(created.project.tracks[1]?.order).toBeLessThan(project.tracks[0]!.order);
   expect(created.project.updatedAt).toBe(100);
+  expect(project.tracks).toHaveLength(1);
 }
 
 function verifyProjectHelperGuards(): void {
@@ -199,7 +203,7 @@ function expectMotionSelectionCleanup(project: VideoProject): void {
         id: 'motion-1',
         scale: 1.2,
         startTime: 0,
-        targetActionEventId: null,
+        targetAction: null,
         zoomInDuration: 0.2,
         zoomOutDuration: 0.2,
       },
@@ -230,23 +234,23 @@ function expectActionPlacementPreserved(project: VideoProject): void {
     actionEvents: [
       {
         data: {},
-        duration: 0.2,
+        capturedDuration: 0.2,
         id: 'action-1',
         kind: 'CLICK',
         label: 'Action',
         point: { x: 10, y: 20 },
-        preset: 'CLICK_RIPPLE',
-        time: 0.1,
+        presentation: { preset: 'CLICK_RIPPLE' },
+        anchor: { kind: 'project' as const, time: 0.1 },
       },
     ],
   } as VideoEditorProjectState['project'];
   const actionState = applyProjectUpdate(
     {
       currentTime: 1,
-      placementMode: createActionPointPlacementMode('action-1'),
+      placementMode: createActionPointPlacementMode('action-1', null),
       project: actionProject,
       projectHistory: resetVideoEditorProjectHistory(project.id),
-      selection: { kind: 'action-segment', actionEventId: 'action-1' },
+      selection: { kind: 'action-occurrence', clipId: null, eventId: 'action-1' },
       selectedTrackId: project.tracks[0]!.id,
     } as VideoEditorProjectState,
     (currentProject) => ({
@@ -255,7 +259,7 @@ function expectActionPlacementPreserved(project: VideoProject): void {
     })
   );
 
-  expect(actionState.placementMode).toEqual(createActionPointPlacementMode('action-1'));
+  expect(actionState.placementMode).toEqual(createActionPointPlacementMode('action-1', null));
 }
 
 function expectMotionPlacementModeCleanupOnFocusModeChange(project: VideoProject): void {
@@ -270,7 +274,7 @@ function expectMotionPlacementModeCleanupOnFocusModeChange(project: VideoProject
         id: 'motion-1',
         scale: 1.2,
         startTime: 0,
-        targetActionEventId: null,
+        targetAction: null,
         zoomInDuration: 0.2,
         zoomOutDuration: 0.2,
       },

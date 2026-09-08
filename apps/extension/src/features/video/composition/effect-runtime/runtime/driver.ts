@@ -221,6 +221,7 @@ function toRenderedFrame(
 ): EffectRuntimeRenderedFrame {
   return {
     bitmap,
+    ...(plan.bitmapBounds ? { bitmapBounds: plan.bitmapBounds } : {}),
     effectInstanceId: plan.effectInstanceId,
     height: bitmap.height,
     kind: plan.kind,

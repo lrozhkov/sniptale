@@ -1,10 +1,13 @@
+import { resolveVideoProjectActionOccurrences } from '../../features/video/project/action-occurrences';
+import { clampTimelineScale } from '../contracts/timeline-scale';
 import type { StateCreator } from 'zustand';
 import { clampNumber } from '../../features/video/project/hydration';
 import { resolvePlacementModeAfterSelectionChange } from '../project/selection/placement';
-import { createSceneSelection } from '../project/selection/model';
+import { createSceneSelection, selectVideoEditorClip } from '../project/selection/model';
 import { VideoEditorSelectionKind } from '../contracts/selection';
 import { createPlacementStateActions } from './placement-actions';
 import type { VideoEditorState } from './types';
+import { resolveTypingSpanSource } from '../project/state/clip-timeline/source-range';
 
 type VideoEditorStoreSet = Parameters<StateCreator<VideoEditorState>>[0];
 
@@ -18,17 +21,49 @@ export function createSelectionStateActions(set: VideoEditorStoreSet) {
     setPlaying: (isPlaying: boolean) => set({ isPlaying }),
     togglePlaying: () => set((state) => ({ isPlaying: !state.isPlaying })),
     setPixelsPerSecond: (pixelsPerSecond: number) =>
-      set({ pixelsPerSecond: clampNumber(pixelsPerSecond, 12, 320) }),
+      set({ pixelsPerSecond: clampTimelineScale(pixelsPerSecond) }),
     selectScene: createSelectSceneAction(set),
     selectTrack: createSelectTrackAction(set),
     selectClip: createSelectClipAction(set),
     selectTransition: createSelectTransitionAction(set),
     selectCursorSegment: createSelectCursorSegmentAction(set),
     selectObjectTrack: createSelectObjectTrackAction(set),
-    selectActionSegment: createSelectActionSegmentAction(set),
+    selectActionOccurrence: createSelectActionOccurrenceAction(set),
+    selectHistorySpan: ((target) =>
+      set((state) => {
+        if (
+          !state.project ||
+          !resolveTypingSpanSource(state.project, state.recordingTelemetry, target)
+        )
+          return state;
+        return {
+          selection: { kind: VideoEditorSelectionKind.HISTORY_SPAN, ...target },
+          selectedTrackId: null,
+          placementMode: null,
+        };
+      })) satisfies VideoEditorState['selectHistorySpan'],
     selectMotionRegion: createSelectMotionRegionAction(set),
+    selectHistoryLane: () =>
+      set((state) =>
+        state.project
+          ? {
+              selection: { kind: VideoEditorSelectionKind.HISTORY_LANE },
+              selectedTrackId: null,
+              placementMode: null,
+            }
+          : state
+      ),
+    selectMotionLane: () =>
+      set((state) =>
+        (state.project?.motionRegions?.length ?? 0) > 0
+          ? {
+              selection: { kind: VideoEditorSelectionKind.MOTION_LANE },
+              selectedTrackId: null,
+              placementMode: null,
+            }
+          : state
+      ),
     ...createPlacementStateActions(set),
-    setDiagnosticsOpen: (diagnosticsOpen: boolean) => set({ diagnosticsOpen }),
   };
 }
 
@@ -90,8 +125,24 @@ function createSelectTrackAction(set: VideoEditorStoreSet): VideoEditorState['se
 }
 
 function createSelectClipAction(set: VideoEditorStoreSet): VideoEditorState['selectClip'] {
-  return (selectedClipId) =>
+  return (selectedClipId, intent = 'replace') =>
     set((state): Partial<VideoEditorState> => {
+      if (selectedClipId && intent !== 'replace' && state.project) {
+        const ordered = [...state.project.clips]
+          .sort((a, b) => {
+            const trackA =
+              state.project!.tracks.find((track) => track.id === a.trackId)?.order ?? 0;
+            const trackB =
+              state.project!.tracks.find((track) => track.id === b.trackId)?.order ?? 0;
+            return trackA - trackB || a.startTime - b.startTime || a.id.localeCompare(b.id);
+          })
+          .map((clip) => clip.id);
+        return {
+          selection: selectVideoEditorClip(state.selection, selectedClipId, ordered, intent),
+          selectedTrackId: null,
+          placementMode: null,
+        };
+      }
       const selection =
         selectedClipId === null
           ? createSceneSelection()
@@ -163,14 +214,22 @@ function createSelectObjectTrackAction(
     });
 }
 
-function createSelectActionSegmentAction(
+function createSelectActionOccurrenceAction(
   set: VideoEditorStoreSet
-): VideoEditorState['selectActionSegment'] {
-  return (actionEventId) =>
+): VideoEditorState['selectActionOccurrence'] {
+  return (eventId, clipId) =>
     set((state): Partial<VideoEditorState> => {
+      if (
+        !state.project ||
+        !resolveVideoProjectActionOccurrences(state.project).some(
+          (item) => item.eventId === eventId && item.clipId === clipId
+        )
+      )
+        return {};
       const selection = {
-        kind: VideoEditorSelectionKind.ACTION_SEGMENT,
-        actionEventId,
+        kind: VideoEditorSelectionKind.ACTION_OCCURRENCE,
+        eventId,
+        clipId,
       } as const;
 
       return {
@@ -184,10 +243,13 @@ function createSelectActionSegmentAction(
 function createSelectMotionRegionAction(
   set: VideoEditorStoreSet
 ): VideoEditorState['selectMotionRegion'] {
-  return (motionRegionId) =>
+  return (motionRegionId, part) =>
     set((state): Partial<VideoEditorState> => {
       const selection = {
-        kind: VideoEditorSelectionKind.MOTION_REGION,
+        kind:
+          part === 'connection'
+            ? VideoEditorSelectionKind.MOTION_CONNECTION
+            : VideoEditorSelectionKind.MOTION_REGION,
         motionRegionId,
       } as const;
 

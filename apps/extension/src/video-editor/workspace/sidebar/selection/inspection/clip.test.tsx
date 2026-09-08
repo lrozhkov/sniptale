@@ -13,7 +13,11 @@ import {
   createTextClip,
 } from '../../../../../features/video/project/factories/overlay-clip';
 import { createVideoClipFromAsset } from '../../../../../features/video/project/factories/clip';
-import { VideoProjectAssetType, VideoTrackKind } from '../../../../../features/video/project/types';
+import {
+  VideoProjectAssetType,
+  VideoProjectTrackRole,
+  VideoTrackKind,
+} from '../../../../../features/video/project/types';
 import { VideoEditorSelectionKind } from '../../../../contracts/selection';
 import { WorkspaceSidebarInspectPanel } from '../inspect';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
@@ -76,6 +80,9 @@ function createSelectionHandlers() {
     onUpdateClipFades: vi.fn(),
     onUpdateClipMuted: vi.fn(),
     onUpdateClipTransform: vi.fn(),
+    onApplyCameraLayout: vi.fn(),
+    onEditCameraPosition: vi.fn(),
+    canAddCameraPosition: true,
     onUpdateClipVolume: vi.fn(),
     onUpdateCursorSampleInterpolation: vi.fn(),
     onUpdateCursorSampleSkinOverride: vi.fn(),
@@ -95,12 +102,14 @@ function createSelectionHandlers() {
   };
 }
 
-function createVideoProps(): WorkspaceSidebarSelectionPanelProps {
+function createVideoProps(
+  assetType: 'VIDEO' | 'IMAGE' = VideoProjectAssetType.VIDEO
+): WorkspaceSidebarSelectionPanelProps {
   const project = createEmptyVideoProject('Video frame controls');
   const trackId = project.tracks.find((track) => track.kind === VideoTrackKind.PRIMARY)?.id;
   const asset = createVideoProjectAsset(
     'Video',
-    VideoProjectAssetType.VIDEO,
+    assetType,
     { kind: 'project-asset', projectAssetId: 'asset-video' },
     {
       audioPeaks: null,
@@ -126,7 +135,7 @@ function createVideoProps(): WorkspaceSidebarSelectionPanelProps {
     placementMode: null,
     project,
     recentColors: [],
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedClip: clip,
     selectedCursorSample: null,
     selectedMotionRegion: null,
@@ -143,7 +152,8 @@ function createVideoProps(): WorkspaceSidebarSelectionPanelProps {
 
 function createProps(): WorkspaceSidebarSelectionPanelProps {
   const project = createEmptyVideoProject('Text template upgrade');
-  const overlayTrackId = project.tracks.find((track) => track.kind === 'OVERLAY')?.id ?? 'overlay';
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.PRIMARY));
+  const overlayTrackId = project.tracks.find((track) => track.name === 'Overlay')?.id ?? 'overlay';
   const clip = createTextClip(overlayTrackId, project.width, project.height, 0);
   project.clips.push(clip);
 
@@ -151,7 +161,7 @@ function createProps(): WorkspaceSidebarSelectionPanelProps {
     placementMode: null,
     project,
     recentColors: [],
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedClip: clip,
     selectedCursorSample: null,
     selectedMotionRegion: null,
@@ -167,10 +177,16 @@ function createProps(): WorkspaceSidebarSelectionPanelProps {
 }
 
 describe('workspace-sidebar/selection/inspect-core', () => {
-  it('opens the clip summary group by default', () => {
+  it('opens editable clip content before file metadata', () => {
     renderInspectPanel(createProps());
 
-    expect(container?.textContent).toContain('videoEditor.sidebar.clipTypeText');
+    expect(container?.textContent).toContain('videoEditor.sidebar.textLabel');
+    expect(
+      container?.querySelector('[aria-label="videoEditor.sidebar.inspectorGroupFraming"]')
+    ).toBeNull();
+    expect(container?.textContent).not.toContain('videoEditor.sidebar.clipTypeText');
+    clickGroup('videoEditor.sidebar.inspectorGroupSummary');
+    expect(container?.textContent).toContain('videoEditor.sidebar.inspectorGroupSummary');
   });
 
   it('renders text-to-template upgrade controls for manual text overlays', () => {
@@ -195,29 +211,132 @@ describe('workspace-sidebar/selection/inspect-core', () => {
     expect(container?.textContent).toContain('videoEditor.sidebar.lockedTrackDescription');
   });
 
-  it('keeps media frame controls in the frame group instead of timing', () => {
-    renderInspectPanel(createVideoProps());
+  it.each(['VIDEO', 'IMAGE'] as const)(
+    'opens framing for %s and separates geometry and timing',
+    (assetType) => {
+      renderInspectPanel(createVideoProps(assetType));
 
-    clickGroup('videoEditor.sidebar.inspectorGroupTiming');
+      expect(container?.textContent).toContain('videoEditor.sidebar.fitModeLabel');
+      expect(container?.textContent).not.toContain('videoEditor.sidebar.rotationLabel');
 
-    expect(container?.textContent).toContain('videoEditor.sidebar.fadeInLabel');
-    expect(container?.textContent).toContain('videoEditor.sidebar.playbackRateLabel');
-    expect(container?.textContent).not.toContain('videoEditor.sidebar.fitModeLabel');
-    expect(container?.textContent).not.toContain('videoEditor.sidebar.fitScalePercentLabel');
-    expect(container?.textContent).not.toContain('videoEditor.sidebar.mediaShadowIntensityLabel');
+      clickGroup('videoEditor.sidebar.inspectorGroupTiming');
 
-    clickGroup('videoEditor.sidebar.inspectorGroupTransform');
+      expect(container?.textContent).not.toContain('videoEditor.sidebar.fadeInLabel');
+      if (assetType === VideoProjectAssetType.VIDEO) {
+        expect(container?.textContent).toContain('videoEditor.sidebar.playbackRateLabel');
+      } else {
+        expect(container?.textContent).not.toContain('videoEditor.sidebar.playbackRateLabel');
+      }
+      expect(container?.textContent).not.toContain('videoEditor.sidebar.fitModeLabel');
+      expect(container?.textContent).not.toContain('videoEditor.sidebar.fitScalePercentLabel');
+      expect(container?.textContent).not.toContain('videoEditor.sidebar.mediaShadowIntensityLabel');
 
-    expect(container?.textContent).toContain('videoEditor.sidebar.fitModeLabel');
-    expect(container?.textContent).toContain('videoEditor.sidebar.fitScalePercentLabel');
-    expect(container?.textContent).toContain('videoEditor.sidebar.mediaShadowIntensityLabel');
-  });
+      clickGroup('videoEditor.sidebar.inspectorGroupAnimation');
+      expect(container?.textContent).toContain('videoEditor.sidebar.fadeInLabel');
+      clickGroup('videoEditor.sidebar.inspectorGroupTransform');
+      expect(container?.textContent).toContain('videoEditor.sidebar.rotationLabel');
+      expect(container?.textContent).not.toContain('videoEditor.sidebar.fitModeLabel');
+
+      clickGroup('videoEditor.sidebar.inspectorGroupFraming');
+
+      expect(container?.textContent).toContain('videoEditor.sidebar.fitModeLabel');
+      expect(container?.textContent).toContain('videoEditor.sidebar.fitScalePercentLabel');
+      expect(container?.textContent).toContain('videoEditor.sidebar.mediaShadowIntensityLabel');
+    }
+  );
+
+  it.each(['VIDEO', 'IMAGE'] as const)(
+    'opens framing after switching from text to %s',
+    (assetType) => {
+      renderInspectPanel(createProps());
+      expect(container?.textContent).toContain('videoEditor.sidebar.textLabel');
+      renderInspectPanel(createVideoProps(assetType));
+      expect(container?.textContent).toContain('videoEditor.sidebar.fitModeLabel');
+      expect(container?.textContent).not.toContain('videoEditor.sidebar.projectTitle');
+    }
+  );
 
   it('keeps cursor-recognition controls out of video clip inspection', () => {
     renderInspectPanel(createVideoProps());
 
     expect(container?.textContent).not.toContain('videoEditor.sidebar.inspectorGroupTracking');
     expect(container?.textContent).not.toContain('videoEditor.sidebar.cursorDetectionRun');
+  });
+
+  it('opens camera layout by default and sends the selected interval to the atomic layout command', () => {
+    const props = createVideoProps();
+    props.project.tracks = props.project.tracks.map((track) =>
+      track.id === props.selectedClip?.trackId
+        ? { ...track, role: VideoProjectTrackRole.CAMERA }
+        : track
+    );
+
+    renderInspectPanel(props);
+
+    expect(
+      container?.querySelector('[data-ui="video-editor.camera-placement-controls"]')
+    ).not.toBeNull();
+    const bottomLeft = Array.from(container?.querySelectorAll('button') ?? []).find(
+      (button) =>
+        button.getAttribute('aria-label') === 'videoEditor.sidebar.cameraPlacementBottomLeft'
+    );
+    act(() => bottomLeft?.click());
+    expect(props.onApplyCameraLayout).toHaveBeenCalledWith(
+      props.selectedClip?.id,
+      'OVERLAY',
+      'BOTTOM_LEFT'
+    );
+    expect(props.onUpdateClipTransform).not.toHaveBeenCalled();
+  });
+
+  it('preserves a manual group within one clip context and resets when it becomes a camera', () => {
+    const props = createVideoProps();
+
+    renderInspectPanel(props);
+    clickGroup('videoEditor.sidebar.inspectorGroupTransform');
+    expect(container?.textContent).toContain('videoEditor.sidebar.rotationLabel');
+
+    renderInspectPanel({ ...props });
+    expect(container?.textContent).toContain('videoEditor.sidebar.rotationLabel');
+
+    props.project.tracks = props.project.tracks.map((track) =>
+      track.id === props.selectedClip?.trackId
+        ? { ...track, role: VideoProjectTrackRole.CAMERA }
+        : track
+    );
+    renderInspectPanel({ ...props });
+
+    expect(
+      container?.querySelector('[data-ui="video-editor.camera-placement-controls"]')
+    ).not.toBeNull();
+    expect(container?.textContent).not.toContain('videoEditor.sidebar.rotationLabel');
+  });
+
+  it('keeps camera-specific controls out of ordinary video inspection', () => {
+    renderInspectPanel(createVideoProps());
+
+    expect(container?.textContent).not.toContain('videoEditor.sidebar.inspectorGroupCamera');
+  });
+
+  it('disables camera placement actions on a locked camera track', () => {
+    const props = createVideoProps();
+    props.project.tracks = props.project.tracks.map((track) =>
+      track.id === props.selectedClip?.trackId
+        ? { ...track, locked: true, role: VideoProjectTrackRole.CAMERA }
+        : track
+    );
+
+    renderInspectPanel(props);
+    clickGroup('videoEditor.sidebar.inspectorGroupCamera');
+
+    const placementControls = container?.querySelector(
+      '[data-ui="video-editor.camera-placement-controls"]'
+    );
+    expect(
+      Array.from(placementControls?.querySelectorAll('button') ?? []).every(
+        (button) => button.disabled
+      )
+    ).toBe(true);
   });
 
   it('keeps persisted subtitle clips out of clip inspection', () => {
@@ -248,8 +367,9 @@ function renderInspectPanel(props: WorkspaceSidebarSelectionPanelProps) {
 }
 
 function clickGroup(title: string) {
-  const button = container?.querySelector<HTMLButtonElement>(`button[title="${title}"]`);
+  const button = container?.querySelector<HTMLElement>(`nav button[title="${title}"]`);
   act(() => {
-    button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    if (!button?.parentElement?.hasAttribute('open'))
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 }

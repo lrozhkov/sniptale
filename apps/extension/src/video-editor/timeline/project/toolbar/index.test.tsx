@@ -9,6 +9,21 @@ vi.mock('../../../../platform/i18n', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 
+const history = vi.hoisted(() => ({
+  canUndo: true,
+  canRedo: false,
+  onUndo: vi.fn(),
+  onRedo: vi.fn(),
+}));
+vi.mock('../../../runtime/controller/composition/hooks', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../runtime/controller/composition/hooks')>()),
+  useVideoEditorHistoryController: () => history,
+  useVideoEditorHeaderController: () => ({
+    grid: { magnetEnabled: true, onToggleMagnet: vi.fn() },
+    onOpenExportDialog: vi.fn(),
+  }),
+}));
+
 import { ProjectTimelineToolbar } from './index';
 
 type ProjectTimelineToolbarTestProps = ComponentProps<typeof ProjectTimelineToolbar>;
@@ -49,33 +64,33 @@ function createInsertionActions() {
 
 function createToolbarProps(): ProjectTimelineToolbarTestProps {
   return {
-    canAutoTransformRecording: true,
-    currentTime: 12,
-    duration: 45,
+    playback: {
+      currentTime: 0,
+      duration: 8,
+      isPlaying: false,
+      playbackRange: null,
+      onSeekToEnd: vi.fn(),
+      onSeekToStart: vi.fn(),
+      onTogglePlay: vi.fn(),
+      onClearPlaybackRange: vi.fn(),
+      onStepToNextFrame: vi.fn(),
+      onStepToPreviousFrame: vi.fn(),
+    },
+    canAddMotionRegion: true,
+    canDeleteSelectedClip: true,
+    canEditSelectedClip: true,
+    canSplitSelectedClip: true,
     fitSelectionDuration: 8,
     insertion: createInsertionActions(),
-    isPlaying: false,
-    onAutoTransformRecording: vi.fn(),
-    onClearPlaybackRange: vi.fn(),
     onDeleteSelectedClip: vi.fn(),
     onDuplicateSelectedClip: vi.fn(),
     onFitProject: vi.fn(),
     onFitSelection: vi.fn(),
-    onSeekToStart: vi.fn(),
     onSplitSelectedClip: vi.fn(),
     onTimelinePreviewSuspendedChange: vi.fn(),
-    onTogglePlay: vi.fn(),
     onZoomChange: vi.fn(),
     pixelsPerSecond: 120,
-    playbackRange: null,
     selectedClip: true,
-    trackView: {
-      compactRows: false,
-      panelExpanded: false,
-      onCompactRowsChange: vi.fn(),
-      onPanelExpandedChange: vi.fn(),
-    },
-    visibleRangeSeconds: 8,
   };
 }
 
@@ -92,23 +107,40 @@ function renderToolbar() {
   return nextContainer;
 }
 
-it('keeps add actions left, playback center, and zoom on the right', () => {
+it('keeps editing, playback and view controls together in the timeline header', () => {
   const renderedContainer = renderToolbar();
 
   const toolbar = renderedContainer.firstElementChild as HTMLDivElement | null;
   const regions = toolbar ? Array.from(toolbar.children) : [];
-  expect(toolbar?.className).toContain('max-[720px]:grid-cols-1');
-  expect(regions[0]?.querySelector('div')?.className).toContain('max-[720px]:gap-1');
-  expect(regions[1]?.className).toContain('max-[720px]:justify-start');
-  expect(regions[2]?.className).toContain('max-[720px]:justify-start');
   expect(regions[0]?.textContent).not.toContain('videoEditor.timeline.addButton');
-  expect(regions[0]?.textContent).toContain('videoEditor.timeline.addTrack');
-  expect(regions[0]?.textContent).not.toContain('videoEditor.timeline.addZoomRegion');
+  expect(regions[0]?.textContent).not.toContain('videoEditor.timeline.addTrack');
+  expect(regions[0]?.textContent).toContain('videoEditor.timeline.addZoomRegion');
   expect(regions[0]?.textContent).toContain('videoEditor.timeline.split');
-  expect(regions[1]?.textContent).toContain('0:12.0 / 0:45.0');
+  expect(regions).toHaveLength(3);
+  expect(toolbar?.querySelector('[data-playback-counter]')).not.toBeNull();
   expect(regions[2]?.textContent).not.toContain('videoEditor.timeline.telemetryToggle');
   expect(
     regions[2]?.querySelector('[data-ui="video-editor.timeline.toolbar.fit-project"]')
   ).not.toBeNull();
   expect(regions[2]?.querySelector('input[aria-label="videoEditor.timeline.zoom"]')).not.toBeNull();
+});
+
+it('routes available history actions from the timeline and disables unavailable redo', () => {
+  const rendered = renderToolbar();
+  const undo = rendered.querySelector<HTMLButtonElement>(
+    '[data-ui="video-editor.timeline.toolbar.undo"]'
+  );
+  const redo = rendered.querySelector<HTMLButtonElement>(
+    '[data-ui="video-editor.timeline.toolbar.redo"]'
+  );
+  expect(undo).not.toBeNull();
+  expect(redo).not.toBeNull();
+  expect(undo?.disabled).toBe(false);
+  expect(redo?.disabled).toBe(true);
+  act(() => {
+    undo?.click();
+    redo?.click();
+  });
+  expect(history.onUndo).toHaveBeenCalledTimes(1);
+  expect(history.onRedo).not.toHaveBeenCalled();
 });

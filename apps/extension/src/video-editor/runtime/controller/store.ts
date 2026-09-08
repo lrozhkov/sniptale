@@ -2,7 +2,7 @@ import { useShallow } from 'zustand/react/shallow';
 import type {
   AnnotationEditingPort,
   ClipSelectionPort,
-  DiagnosticsTelemetryPort,
+  RecordingTelemetryPort,
   EffectEditingPort,
   ExportPort,
   HistoryPort,
@@ -55,6 +55,10 @@ function selectPlaybackPort(state: VideoEditorState): PlaybackPort {
 
 function selectTimelineEditingPort(state: VideoEditorState): TimelineEditingPort {
   return {
+    applyTypingCompression: state.applyTypingCompression,
+    appendMaterial: state.appendMaterial,
+    insertMaterial: state.insertMaterial,
+    overlayMaterial: state.overlayMaterial,
     addAssetClip: state.addAssetClip,
     addTrack: state.addTrack,
     addTrackLogicalLane: state.addTrackLogicalLane,
@@ -73,6 +77,7 @@ function selectTimelineEditingPort(state: VideoEditorState): TimelineEditingPort
     duplicateClip: state.duplicateClip,
     insertCursorSample: state.insertCursorSample,
     moveClip: state.moveClip,
+    swapClip: state.swapClip,
     moveTrack: state.moveTrack,
     pixelsPerSecond: state.pixelsPerSecond,
     renameTrack: state.renameTrack,
@@ -84,6 +89,7 @@ function selectTimelineEditingPort(state: VideoEditorState): TimelineEditingPort
     toggleUtilityLaneVisibility: state.toggleUtilityLaneVisibility,
     trimClipEnd: state.trimClipEnd,
     trimClipStart: state.trimClipStart,
+    updateActionPresentation: state.updateActionPresentation,
     updateActionEventDetails: state.updateActionEventDetails,
     updateClipAudioEnvelope: state.updateClipAudioEnvelope,
     updateClipFades: state.updateClipFades,
@@ -105,6 +111,8 @@ function selectTimelineEditingPort(state: VideoEditorState): TimelineEditingPort
     updateTransitionEasing: state.updateTransitionEasing,
     updateTransitionTemplate: state.updateTransitionTemplate,
     upsertAsset: state.upsertAsset,
+    upsertAssets: state.upsertAssets,
+    removeUnusedAssets: state.removeUnusedAssets,
     upsertObjectTrack: state.upsertObjectTrack,
     upsertObjectTrackCorrectionAnchor: state.upsertObjectTrackCorrectionAnchor,
   };
@@ -115,10 +123,13 @@ function selectClipSelectionPort(state: VideoEditorState): ClipSelectionPort {
     selectedClipId: resolveSelectedClipId(state.selection),
     selectedTrackId: state.selectedTrackId,
     selection: state.selection,
-    selectActionSegment: state.selectActionSegment,
+    selectHistorySpan: state.selectHistorySpan,
+    selectActionOccurrence: state.selectActionOccurrence,
     selectClip: state.selectClip,
     selectCursorSegment: state.selectCursorSegment,
     selectMotionRegion: state.selectMotionRegion,
+    selectHistoryLane: state.selectHistoryLane,
+    selectMotionLane: state.selectMotionLane,
     selectObjectTrack: state.selectObjectTrack,
     selectScene: state.selectScene,
     selectTrack: state.selectTrack,
@@ -203,20 +214,15 @@ function selectRuntimeSessionPort(state: VideoEditorState): RuntimeSessionPort {
     startActionPointPlacement: state.startActionPointPlacement,
     startMotionAreaPlacement: state.startMotionAreaPlacement,
     startMotionFocusPlacement: state.startMotionFocusPlacement,
-    startMotionPathStopAreaPlacement: state.startMotionPathStopAreaPlacement,
-    startMotionPathStopPointPlacement: state.startMotionPathStopPointPlacement,
+
     startObjectTrackAnchorPlacement: state.startObjectTrackAnchorPlacement,
   };
 }
 
-function selectDiagnosticsTelemetryPort(state: VideoEditorState): DiagnosticsTelemetryPort {
+function selectRecordingTelemetryPort(state: VideoEditorState): RecordingTelemetryPort {
   return {
-    diagnosticsOpen: state.diagnosticsOpen,
     recordingTelemetry: state.recordingTelemetry,
-    setDiagnosticsOpen: state.setDiagnosticsOpen,
     setRecordingTelemetry: state.setRecordingTelemetry,
-    telemetryLaneVisible: state.telemetryLaneVisible,
-    toggleTelemetryLaneVisibility: state.toggleTelemetryLaneVisibility,
   };
 }
 
@@ -274,15 +280,16 @@ export function useVideoEditorRuntimeSessionPort<Selection>(
   return usePort(selectRuntimeSessionPort, selector);
 }
 
-export function useVideoEditorDiagnosticsTelemetryPort<Selection>(
-  selector: PortSelector<DiagnosticsTelemetryPort, Selection>
+export function useVideoEditorRecordingTelemetryPort<Selection>(
+  selector: PortSelector<RecordingTelemetryPort, Selection>
 ): Selection {
-  return usePort(selectDiagnosticsTelemetryPort, selector);
+  return usePort(selectRecordingTelemetryPort, selector);
 }
 
 export function useVideoEditorProjectStorageStatus(): VideoEditorProjectStorageStatus {
   return useVideoEditorStore(
     useShallow((state) => ({
+      projectId: state.project?.id ?? null,
       projectUpdatedAt: state.project?.updatedAt ?? null,
       saveState: state.saveState,
     }))

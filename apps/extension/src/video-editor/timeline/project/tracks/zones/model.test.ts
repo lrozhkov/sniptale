@@ -9,6 +9,26 @@ import {
 import { createTimelineZoneAsset } from './test-support';
 import { buildTrackGapZones } from './model';
 
+it.each([
+  ['touching', 10],
+  ['overlapping', 9],
+  ['nested', 7],
+])('does not project a gap over a %s middle clip', (_kind, trailingStart) => {
+  const project = createEmptyVideoProject('Sequential gaps');
+  const trackId = project.tracks[0]!.id;
+  const asset = createTimelineZoneAsset('asset-gap');
+  project.assets = [asset];
+  project.clips = [0, 6, trailingStart].map((start, index) => ({
+    ...createVideoClipFromAsset(trackId, asset, 1280, 720, start),
+    id: `clip-${index}`,
+    duration: index === 2 && trailingStart === 7 ? 1 : 4,
+  }));
+
+  expect(buildTrackGapZones(project, trackId)).toEqual([
+    { end: 6, id: `gap:${trackId}:clip-0:clip-1`, start: 4, trackId },
+  ]);
+});
+
 it('derives gap zones from the nearest preceding clip end across logical lanes', () => {
   const project = createLogicalLaneGapProject();
   const trackId = project.tracks[0]!.id;

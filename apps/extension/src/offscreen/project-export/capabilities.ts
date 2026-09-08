@@ -15,7 +15,7 @@ import type { SupportedMp4VideoEncoder } from './codecs/types';
 export async function getProjectExportCapabilities(
   settings: VideoProjectExportSettings
 ): Promise<VideoExportCapabilities> {
-  const webmAvailable = typeof MediaRecorder !== 'undefined';
+  const webmAvailable = typeof VideoEncoder !== 'undefined';
   const videoEncoderAvailable = typeof VideoEncoder !== 'undefined';
   const supportedMp4Profiles: SupportedMp4VideoEncoder[] = videoEncoderAvailable
     ? await getSupportedMp4VideoCodecProfiles(settings)

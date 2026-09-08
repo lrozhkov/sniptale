@@ -1,6 +1,6 @@
 import type {
   RecordingTelemetrySignal,
-  VideoProjectActionEvent,
+  RecordingActionEvent,
   VideoProjectCursorTrack,
 } from '../../features/video/project/types';
 import type { ViewportInfo } from '@sniptale/runtime-contracts/video/types/types';
@@ -15,6 +15,6 @@ export interface NativeRecordingTimebase {
 export interface NativeRecordingTelemetrySnapshot {
   viewport: ViewportInfo | null;
   cursorTrack: VideoProjectCursorTrack | null;
-  actionEvents: VideoProjectActionEvent[];
+  actionEvents: RecordingActionEvent[];
   signals: RecordingTelemetrySignal[];
 }

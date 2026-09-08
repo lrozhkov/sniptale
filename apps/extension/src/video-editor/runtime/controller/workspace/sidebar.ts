@@ -1,4 +1,16 @@
-import type React from 'react';
+import {
+  applyVideoProjectCameraLayout,
+  type VideoProjectCameraLayout,
+  type VideoProjectCameraPlacement,
+} from '../../../../features/video/project/camera/placement';
+import {
+  canAddCameraPosition,
+  type CameraPositionEdit,
+} from '../../../../features/video/project/camera/animation';
+import {
+  editCameraPosition,
+  cameraPositionSeekTime,
+} from '../../../../features/video/project/camera/editing';
 import type { VideoEditorLibrariesState } from '../../app-model/types';
 import type { VideoEditorActionHandlers } from '../../commands';
 import type { VideoEditorSelections } from '../selections';
@@ -6,23 +18,26 @@ import type { VideoEditorWorkspaceState } from '../workspace-state';
 import type {
   AnnotationEditingPort,
   ClipSelectionPort,
-  DiagnosticsTelemetryPort,
+  RecordingTelemetryPort,
   EffectEditingPort,
   ProjectLifecyclePort,
+  PlaybackPort,
   RuntimeSessionPort,
   TimelineEditingPort,
 } from '../../../contracts/controller-store';
 
 type EditorStore = AnnotationEditingPort &
   ClipSelectionPort &
-  DiagnosticsTelemetryPort &
+  RecordingTelemetryPort &
   EffectEditingPort &
   RuntimeSessionPort &
   TimelineEditingPort &
-  Pick<ProjectLifecyclePort, 'project' | 'recordingId'>;
+  Pick<ProjectLifecyclePort, 'project' | 'recordingId'> &
+  Pick<PlaybackPort, 'currentTime' | 'setCurrentTime' | 'setPlaying'>;
 type SidebarCommandHandlers = Pick<
   VideoEditorActionHandlers,
   | 'handleAddRecording'
+  | 'handleAddLibraryMedia'
   | 'handleCreateProject'
   | 'handleDeleteProject'
   | 'handleImportAudio'
@@ -38,7 +53,6 @@ import { createWorkspaceSidebarPlacementActions } from './sidebar-placement-acti
 
 interface CreateWorkspaceSidebarArgs {
   actions: SidebarCommandHandlers;
-  diagnosticsContent: React.ReactNode;
   libraries: VideoEditorLibrariesState;
   selections: VideoEditorSelections;
   store: EditorStore;
@@ -60,6 +74,9 @@ function createWorkspaceSidebarClipActions(store: EditorStore) {
     onApplyMediaClipVisualsToTrack: store.applyMediaClipVisualsToTrack,
     onConvertTextClipToAnnotation: store.convertTextClipToAnnotation,
     onDetachClipGroup: store.detachClipGroup,
+    onSwapClip: store.swapClip,
+    onTrimClipStart: store.trimClipStart,
+    onTrimClipEnd: store.trimClipEnd,
     onUpdateAnnotationClipContent: store.updateAnnotationClipContent,
     onUpdateAnnotationClipStyle: store.updateAnnotationClipStyle,
     onUpdateAnnotationClipTemplate: store.updateAnnotationClipTemplate,
@@ -67,6 +84,40 @@ function createWorkspaceSidebarClipActions(store: EditorStore) {
     onUpdateClipFades: store.updateClipFades,
     onUpdateClipPlaybackRate: store.updateClipPlaybackRate,
     onUpdateClipMuted: store.updateClipMuted,
+    onApplyCameraLayout: (
+      clipId: string,
+      layout: VideoProjectCameraLayout,
+      placement?: VideoProjectCameraPlacement
+    ) => {
+      store.updateProject((project) =>
+        applyVideoProjectCameraLayout(project, clipId, layout, placement, store.currentTime)
+      );
+      if (store.project)
+        store.setCurrentTime(cameraPositionSeekTime(store.project, clipId, store.currentTime));
+    },
+    onEditCameraPosition: (clipId: string, edit: CameraPositionEdit) => {
+      if (!store.project) return;
+      store.setPlaying(false);
+      if (edit.kind === 'select') {
+        store.setCurrentTime(
+          cameraPositionSeekTime(store.project, clipId, store.currentTime, edit.id)
+        );
+        return;
+      }
+      let nextTime = store.currentTime;
+      store.updateProject((project) => {
+        const next = editCameraPosition(project, clipId, store.currentTime, edit);
+        if (next !== project && (edit.kind === 'add' || edit.kind === 'update'))
+          nextTime = cameraPositionSeekTime(
+            next,
+            clipId,
+            store.currentTime,
+            edit.kind === 'update' ? edit.id : undefined
+          );
+        return next;
+      });
+      if (nextTime !== store.currentTime) store.setCurrentTime(nextTime);
+    },
     onUpdateClipTransform: store.updateClipTransform,
     onUpdateClipVolume: store.updateClipVolume,
     onUpdateMediaClipFitMode: store.updateMediaClipFitMode,
@@ -89,9 +140,11 @@ function createWorkspaceSidebarProjectActions(args: {
   return {
     ...createWorkspaceSidebarPlacementActions(args.store),
     ...createWorkspaceSidebarCursorActions(args),
+    onApplyTypingCompression: args.store.applyTypingCompression,
     onAddActionEvent: args.projectUpdaters.addActionEvent,
     onAddMotionRegion: args.projectUpdaters.addMotionRegion,
     onAddRecording: args.actions.handleAddRecording,
+    onAddLibraryMedia: args.actions.handleAddLibraryMedia,
     onAddTrack: args.store.addTrack,
     onApplyEffectDocument: args.store.applyEffectDocument,
     onCreateProject: args.actions.handleCreateProject,
@@ -105,14 +158,14 @@ function createWorkspaceSidebarProjectActions(args: {
     onImportRecordedAudio: args.actions.handleImportRecordedAudio,
     onImportVideo: args.actions.handleImportVideo,
     onOpenProject: args.actions.handleOpenProject,
-    onRenameTrack: args.store.renameTrack,
+    ...createWorkspaceSidebarTrackActions(args.store),
     onResizeProject: args.projectUpdaters.resizeProject,
     ...createWorkspaceSidebarBackgroundActions(args),
     onToggleCollapsed: args.workspace.toggleSidebarCollapsed,
-    onToggleDiagnostics: args.store.setDiagnosticsOpen,
+    onUpdateActionPresentation: args.projectUpdaters.updateActionPresentation,
     onUpdateActionEventDetails: args.projectUpdaters.updateActionEventDetails,
     onDeleteMotionRegion: args.projectUpdaters.deleteMotionRegion,
-    onGenerateMotionPathFromCursor: args.projectUpdaters.generateMotionPathFromCursor,
+
     onUpdateMotionRegion: args.projectUpdaters.updateMotionRegion,
     onUpdateTransitionDuration: args.projectUpdaters.updateTransitionDuration,
     onUpdateTransitionEasing: args.projectUpdaters.updateTransitionEasing,
@@ -122,6 +175,27 @@ function createWorkspaceSidebarProjectActions(args: {
     onMoveEffectInstance: args.projectUpdaters.moveEffectInstance,
     onUpdateEffectInstance: args.projectUpdaters.updateEffectInstance,
     onUpsertObjectTrackCorrectionAnchor: args.projectUpdaters.upsertObjectTrackCorrectionAnchor,
+  };
+}
+
+export function createWorkspaceSidebarTrackActions(
+  store: Pick<
+    EditorStore,
+    | 'renameTrack'
+    | 'toggleTrackLock'
+    | 'toggleTrackVisibility'
+    | 'toggleUtilityLaneVisibility'
+    | 'toggleUtilityLaneLock'
+    | 'clearUtilityLane'
+  >
+) {
+  return {
+    onRenameTrack: store.renameTrack,
+    onToggleTrackLock: store.toggleTrackLock,
+    onToggleUtilityLaneVisibility: store.toggleUtilityLaneVisibility,
+    onToggleUtilityLaneLock: store.toggleUtilityLaneLock,
+    onClearUtilityLane: store.clearUtilityLane,
+    onToggleTrackVisibility: store.toggleTrackVisibility,
   };
 }
 
@@ -155,7 +229,6 @@ function createWorkspaceSidebarBackgroundActions(args: {
 }
 
 function createWorkspaceSidebarState(args: {
-  diagnosticsContent: React.ReactNode;
   libraries: VideoEditorLibrariesState;
   project: NonNullable<EditorStore['project']>;
   selections: VideoEditorSelections;
@@ -165,8 +238,6 @@ function createWorkspaceSidebarState(args: {
   return {
     activeProjectId: args.project.id,
     collapsed: args.workspace.leftSidebarCollapsed,
-    diagnosticsContent: args.diagnosticsContent,
-    diagnosticsOpen: args.store.diagnosticsOpen,
     gridSettings: {
       color: args.workspace.grid.gridColor,
       enabled: args.workspace.grid.gridEnabled,
@@ -185,7 +256,13 @@ function createWorkspaceSidebarState(args: {
     recordingId: args.store.recordingId,
     recordings: args.libraries.recordings,
     selection: args.selections.selection ?? { kind: 'scene' },
-    selectedActionEvent: args.selections.selectedActionEvent ?? null,
+    ...(args.store.project ? { typingProject: args.store.project } : {}),
+    recordingTelemetry: args.store.recordingTelemetry,
+    currentTime: args.store.currentTime,
+    selectedActionOccurrence: args.selections.selectedActionOccurrence ?? null,
+    canAddCameraPosition:
+      !!args.selections.selectedClip &&
+      canAddCameraPosition(args.project, args.selections.selectedClip.id, args.store.currentTime),
     selectedClip: args.selections.selectedClip,
     selectedCursorSample: args.selections.selectedCursorSample ?? null,
     selectedMotionRegion: args.selections.selectedMotionRegion ?? null,
@@ -208,7 +285,6 @@ export function createWorkspaceSidebarController(
       workspace: args.workspace,
     }),
     state: createWorkspaceSidebarState({
-      diagnosticsContent: args.diagnosticsContent,
       libraries: args.libraries,
       project,
       selections: args.selections,

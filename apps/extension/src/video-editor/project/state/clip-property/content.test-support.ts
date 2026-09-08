@@ -1,6 +1,10 @@
 import { createAnnotationClip } from '../../../../features/video/project/factories/overlay-clip';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../features/video/project/factories/creation';
+import {
+  VideoTrackKind,
   VideoClipLinkMode,
   VideoClipTransitionKind,
   VideoMediaFitMode,
@@ -137,7 +141,7 @@ function createTextClip(trackId: string) {
 }
 
 function createProjectClips(project: VideoProject): VideoProject['clips'] {
-  const [primaryTrack, , overlayTrack] = project.tracks;
+  const [primaryTrack, overlayTrack] = project.tracks;
 
   return [
     createVideoClip(primaryTrack!.id),
@@ -149,6 +153,7 @@ function createProjectClips(project: VideoProject): VideoProject['clips'] {
 
 export function createProjectWithMediaTrack(): VideoProject {
   const project = createEmptyVideoProject('Fit');
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   project.assets = createProjectAssets();
   project.clips = createProjectClips(project);
   return project;

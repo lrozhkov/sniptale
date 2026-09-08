@@ -8,7 +8,7 @@ describe('workspace-sidebar/selection/audio-controls', () => {
       <AudioMuteToggle checked disabled={false} label="Sound" onChange={vi.fn()} />
     );
 
-    expect(markup).toContain('data-ui="shared.ui.compact-inspector.option-row"');
+    expect(markup).toContain('class="sniptale-glass-switch sniptale-glass-switch--on"');
     expect(markup).toContain('aria-pressed="true"');
     expect(markup).not.toContain('type="checkbox"');
     expect(markup).toContain('Sound');

@@ -1,3 +1,5 @@
+import { useWorkspacePreference } from './workspace-preferences';
+import type { VideoEditorAudioRecordingTarget } from '../../contracts/insertion';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { loadRecentColors, pushRecentColor } from '../../../composition/persistence/recent-colors';
 import type { VideoProjectSceneBackground } from '../../../features/video/project/types/index';
@@ -30,12 +32,15 @@ interface VideoEditorWorkspaceConfirmState {
 
 interface VideoEditorWorkspaceInspectorState {
   mode: VideoEditorInspectorMode;
-  openGridSettings: () => void;
   openSelection: () => void;
 }
 
 export interface VideoEditorWorkspaceState {
+  autoProcessingModalOpen: boolean;
+  setAutoProcessingModalOpen: (open: boolean) => void;
   audioRecordingDialogOpen: boolean;
+  audioRecordingTarget: VideoEditorAudioRecordingTarget | null;
+  openTrackAudioRecordingDialog: (target: VideoEditorAudioRecordingTarget) => void;
   confirm: VideoEditorWorkspaceConfirmState;
   inspector: VideoEditorWorkspaceInspectorState;
   libraryPanelOpen: boolean;
@@ -102,11 +107,25 @@ function useVideoEditorLibraryPanelState() {
 function useAudioRecordingDialogState() {
   const [audioRecordingDialogOpen, setAudioRecordingDialogOpen] = useState(false);
 
-  const closeAudioRecordingDialog = useCallback(() => setAudioRecordingDialogOpen(false), []);
-  const openAudioRecordingDialog = useCallback(() => setAudioRecordingDialogOpen(true), []);
+  const [audioRecordingTarget, setAudioRecordingTarget] =
+    useState<VideoEditorAudioRecordingTarget | null>(null);
+  const closeAudioRecordingDialog = useCallback(() => {
+    setAudioRecordingDialogOpen(false);
+    setAudioRecordingTarget(null);
+  }, []);
+  const openAudioRecordingDialog = useCallback(() => {
+    setAudioRecordingTarget(null);
+    setAudioRecordingDialogOpen(true);
+  }, []);
+  const openTrackAudioRecordingDialog = useCallback((target: VideoEditorAudioRecordingTarget) => {
+    setAudioRecordingTarget({ ...target });
+    setAudioRecordingDialogOpen(true);
+  }, []);
 
   return {
     audioRecordingDialogOpen,
+    audioRecordingTarget,
+    openTrackAudioRecordingDialog,
     closeAudioRecordingDialog,
     openAudioRecordingDialog,
   };
@@ -168,35 +187,38 @@ function useSceneBackgroundColorState(): VideoEditorWorkspaceColorState {
   );
 }
 
-function useVideoEditorInspectorState(): VideoEditorWorkspaceInspectorState {
+function useVideoEditorInspectorState(
+  setCollapsed: (collapsed: boolean) => void
+): VideoEditorWorkspaceInspectorState {
   const [mode, setMode] = useState<VideoEditorInspectorMode>('selection');
 
-  const openGridSettings = useCallback(() => setMode('grid'), []);
-  const openSelection = useCallback(() => setMode('selection'), []);
+  const openSelection = useCallback(() => {
+    setMode('selection');
+    setCollapsed(false);
+  }, [setCollapsed]);
 
-  return useMemo(
-    () => ({ mode, openGridSettings, openSelection }),
-    [mode, openGridSettings, openSelection]
-  );
+  return useMemo(() => ({ mode, openSelection }), [mode, openSelection]);
 }
 
 /**
  * Holds local shell-only UI state such as sidebar collapse and preview resizing.
  */
 export function useVideoEditorWorkspaceState(): VideoEditorWorkspaceState {
+  const [autoProcessingModalOpen, setAutoProcessingModalOpen] = useState(false);
   const confirmDialog = useVideoEditorConfirmDialogState();
   const libraryPanel = useVideoEditorLibraryPanelState();
   const audioRecordingDialog = useAudioRecordingDialogState();
   const sceneBackgroundColors = useSceneBackgroundColorState();
-  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false);
-  const inspector = useVideoEditorInspectorState();
+  const [leftSidebarCollapsed, setLeftSidebarCollapsed] =
+    useWorkspacePreference('inspectorCollapsed');
+  const inspector = useVideoEditorInspectorState(setLeftSidebarCollapsed);
   const [playbackRange, setPlaybackRange] = useState<VideoEditorPlaybackRange | null>(null);
   const preview = useVideoEditorWorkspacePreviewState();
   const grid = useWorkspaceGridState();
 
   const toggleSidebarCollapsed = useCallback(() => {
     setLeftSidebarCollapsed((value) => !value);
-  }, []);
+  }, [setLeftSidebarCollapsed]);
 
   const clearPlaybackRange = useCallback(() => setPlaybackRange(null), []);
   const confirm = useMemo(
@@ -216,7 +238,11 @@ export function useVideoEditorWorkspaceState(): VideoEditorWorkspaceState {
 
   return useMemo(
     () => ({
+      autoProcessingModalOpen,
+      setAutoProcessingModalOpen,
       audioRecordingDialogOpen: audioRecordingDialog.audioRecordingDialogOpen,
+      audioRecordingTarget: audioRecordingDialog.audioRecordingTarget,
+      openTrackAudioRecordingDialog: audioRecordingDialog.openTrackAudioRecordingDialog,
       confirm,
       inspector,
       libraryPanelOpen: libraryPanel.libraryPanelOpen,
@@ -235,7 +261,10 @@ export function useVideoEditorWorkspaceState(): VideoEditorWorkspaceState {
       toggleSidebarCollapsed,
     }),
     [
+      autoProcessingModalOpen,
       audioRecordingDialog.audioRecordingDialogOpen,
+      audioRecordingDialog.audioRecordingTarget,
+      audioRecordingDialog.openTrackAudioRecordingDialog,
       audioRecordingDialog.closeAudioRecordingDialog,
       audioRecordingDialog.openAudioRecordingDialog,
       clearPlaybackRange,

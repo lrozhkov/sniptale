@@ -1,3 +1,7 @@
+import {
+  readVideoReviewForBackup,
+  type VideoReviewBackupDatabase,
+} from '../../../../composition/persistence/review-workspaces/backup-restore';
 import type { ArchivePathAllocator } from '../../../../composition/archive-transfer';
 import { parseMediaThumbnailEntry } from '../../../../composition/persistence/media-library/read-guards';
 import {
@@ -32,6 +36,8 @@ import {
 import { METADATA_ROOT, withDraftRoot } from '../layout';
 import { buildPortableAggregatePresentation } from './presentation';
 
+interface VideoInventoryDatabase extends InventoryDatabase, VideoReviewBackupDatabase {}
+
 function selected(
   id: string,
   lifecycle: { storageClass: string } | undefined,
@@ -62,7 +68,7 @@ function readSelectedVideoProjects(
 }
 
 async function buildProjectAssets(
-  db: InventoryDatabase,
+  db: VideoInventoryDatabase,
   entry: VideoProjectEntry,
   collector: ReturnType<typeof createObjectCollector>
 ) {
@@ -83,8 +89,16 @@ async function buildProjectAssets(
     const filename = media?.filename ?? createReadableAssetFilename(index, asset.mimeType);
     const file = await readInventoryAssetFile(db, asset.assetId, filename);
     const { assetId: _assetId, ...portable } = asset;
+    const videoReview = asset.mimeType.startsWith('video/')
+      ? await readVideoReviewForBackup({
+          db,
+          aggregateId: createProjectAssetMediaId(asset.id),
+          sourceAssetId: asset.assetId,
+        })
+      : undefined;
     output.push({
       entry: portable,
+      ...(videoReview ? { videoReview } : {}),
       filename,
       objectId: collector.addObject(
         file,
@@ -103,7 +117,7 @@ async function buildProjectAssets(
 }
 
 async function buildProjectExports(
-  db: InventoryDatabase,
+  db: VideoInventoryDatabase,
   entry: VideoProjectEntry,
   collector: ReturnType<typeof createObjectCollector>
 ) {
@@ -118,8 +132,16 @@ async function buildProjectExports(
     const thumbnail = parseMediaThumbnailEntry(
       await db.get(THUMBNAILS_STORE, `export:${exportEntry.id}`)
     );
+    const videoReview = (exportEntry.mimeType ?? 'video/webm').startsWith('video/')
+      ? await readVideoReviewForBackup({
+          db,
+          aggregateId: `export:${exportEntry.id}`,
+          sourceAssetId: exportEntry.assetId,
+        })
+      : undefined;
     output.push({
       entry: portable,
+      ...(videoReview ? { videoReview } : {}),
       objectId: collector.addObject(
         file,
         exportEntry.filename,
@@ -163,7 +185,7 @@ function buildPortableEffectSnapshots(
 }
 
 async function buildVideoProjectRoot(args: {
-  db: InventoryDatabase;
+  db: VideoInventoryDatabase;
   entry: VideoProjectEntry;
   index: number;
   paths: ArchivePathAllocator;
@@ -230,7 +252,7 @@ async function buildVideoProjectRoot(args: {
 }
 
 export async function buildVideoProjectRootInventory(args: {
-  db: InventoryDatabase;
+  db: VideoInventoryDatabase;
   options: MediaHubBackupExportOptions;
   paths: ArchivePathAllocator;
 }): Promise<MediaHubBackupRootInventoryItem[]> {

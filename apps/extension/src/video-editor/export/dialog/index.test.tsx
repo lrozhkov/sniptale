@@ -98,7 +98,7 @@ it('renders inside the shared modal shell and wires close, export, select, and t
   const { onChange, onClose, onExport } = renderDialog();
 
   expect(container?.querySelector('[role="dialog"]')).not.toBeNull();
-  expect(container?.textContent).toContain('videoEditor.exportDialog.titlePrefix');
+  expect(container?.textContent).toContain('videoEditor.exportDialog.title');
   expect(container?.textContent).not.toContain('videoEditor.exportDialog.exportSubtitleFiles');
   expect(container?.textContent).not.toContain('videoEditor.exportDialog.burnInSubtitles');
 
@@ -234,4 +234,64 @@ it('restores the default MP4 codec when switching back from WebM during the same
     format: VideoExportFormat.MP4,
     mp4VideoCodec: VideoMp4Codec.HEVC,
   });
+});
+
+it('names the dialog, keeps Tab inside it and restores its opener on unmount', () => {
+  const opener = document.createElement('button');
+  document.body.append(opener);
+  opener.focus();
+  renderDialog();
+  const dialog = container!.querySelector<HTMLElement>('[role="dialog"]')!;
+  const titleId = dialog.getAttribute('aria-labelledby');
+  expect(titleId).toBeTruthy();
+  expect(document.getElementById(titleId!)?.textContent).toContain(
+    'videoEditor.exportDialog.title'
+  );
+  const buttons = dialog.querySelectorAll<HTMLButtonElement>('button:not([disabled])');
+  const first = buttons[0]!;
+  const last = buttons[buttons.length - 1]!;
+  expect(document.activeElement).toBe(first);
+  act(() =>
+    first.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true })
+    )
+  );
+  expect(document.activeElement).toBe(last);
+  act(() =>
+    last.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+    )
+  );
+  expect(document.activeElement).toBe(first);
+  act(() => root!.render(null));
+  expect(document.activeElement).toBe(opener);
+  opener.remove();
+});
+
+it('leaves a portaled select for the adjacent form control on Tab in either direction', () => {
+  renderDialog();
+  const trigger = container!.querySelector<HTMLButtonElement>(
+    '[aria-label="videoEditor.exportDialog.formatLabel"]'
+  )!;
+  const scope = container!.querySelector<HTMLButtonElement>(
+    '[aria-label="videoEditor.exportDialog.scopeLabel"]'
+  )!;
+  const resolution = container!.querySelector<HTMLButtonElement>(
+    '[aria-label="videoEditor.exportDialog.resolutionLabel"]'
+  )!;
+  for (const [shiftKey, expected] of [
+    [false, resolution],
+    [true, scope],
+  ] as const) {
+    act(() => trigger.click());
+    const option = document.querySelector<HTMLButtonElement>('[role="option"]')!;
+    act(() => {
+      option.focus();
+      option.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Tab', shiftKey, bubbles: true, cancelable: true })
+      );
+    });
+    expect(document.activeElement).toBe(expected);
+    expect(document.querySelector('[role="listbox"]')).toBeNull();
+  }
 });

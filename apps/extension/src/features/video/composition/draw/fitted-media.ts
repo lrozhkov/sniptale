@@ -1,5 +1,6 @@
+import { cameraContentFrame, type CameraAppearance } from '../../project/camera/appearance';
 import { VideoMediaFitMode, type VideoMediaShadowMode } from '../../project/types/index';
-import { drawMediaFrameShadow } from './media-shadow';
+import { drawMediaFrameShadow, traceCameraShape } from './media-shadow';
 
 interface MediaFrame {
   height: number;
@@ -157,6 +158,8 @@ export function drawFittedMediaFrame(
 }
 
 export function drawFittedMediaLayer(params: {
+  cameraAppearance?: CameraAppearance;
+  camera?: boolean;
   context: CanvasRenderingContext2D;
   displayScale: number;
   fitMode: VideoMediaFitMode;
@@ -186,7 +189,128 @@ export function drawFittedMediaLayer(params: {
     params.shadowIntensity,
     params.shadowMode,
     params.frame,
-    params.displayScale
+    params.displayScale,
+    params.cameraAppearance,
+    params.camera
   );
-  drawFitted(params.render);
+  if (params.cameraAppearance) {
+    const content = cameraContentFrame(
+      params.frame.width,
+      params.frame.height,
+      params.sourceWidth,
+      params.sourceHeight,
+      params.cameraAppearance,
+      params.fitMode === VideoMediaFitMode.STRETCH
+    );
+    params.context.save();
+    traceCameraShape(params.context, params.frame, params.cameraAppearance);
+    params.context.clip();
+    params.render(
+      params.frame.x + content.x,
+      params.frame.y + content.y,
+      content.width,
+      content.height
+    );
+    params.context.restore();
+  } else drawFitted(params.render);
+}
+
+/** Source coordinates and the exact media-layer transform, before viewport/camera mapping. */
+export interface VisualLayerSourcePointMapping {
+  point: { x: number; y: number };
+  frame: MediaFrame & { rotation: number };
+  fitMode: VideoMediaFitMode;
+  sourceWidth: number;
+  sourceHeight: number;
+  renderState: { translateX: number; translateY: number; scaleX: number; scaleY: number };
+}
+
+function isValidPointMapping(params: VisualLayerSourcePointMapping): boolean {
+  return (
+    [
+      ...Object.values(params.point),
+      params.frame.x,
+      params.frame.y,
+      params.frame.width,
+      params.frame.height,
+      params.frame.rotation,
+      ...Object.values(params.renderState),
+      params.sourceWidth,
+      params.sourceHeight,
+    ].every(Number.isFinite) &&
+    params.frame.width > 0 &&
+    params.frame.height > 0 &&
+    params.sourceWidth > 0 &&
+    params.sourceHeight > 0 &&
+    params.renderState.scaleX !== 0 &&
+    params.renderState.scaleY !== 0
+  );
+}
+
+function isInsideFrame(point: SourcePoint, frame: MediaFrame): boolean {
+  const epsilon = 1e-9;
+  return (
+    point.x >= frame.x - epsilon &&
+    point.x <= frame.x + frame.width + epsilon &&
+    point.y >= frame.y - epsilon &&
+    point.y <= frame.y + frame.height + epsilon
+  );
+}
+
+/** Map a visible source point through fit, rotation and the transition's affine transform. */
+export function mapSourceNormalizedPointToVisualLayer(
+  params: VisualLayerSourcePointMapping
+): SourcePoint | null {
+  if (
+    !isValidPointMapping(params) ||
+    !isInsideFrame(params.point, { x: 0, y: 0, width: 1, height: 1 })
+  )
+    return null;
+  const content = getFittedMediaContentFrame(params);
+  const point = {
+    x: content.x + params.point.x * content.width,
+    y: content.y + params.point.y * content.height,
+  };
+  if (!isInsideFrame(point, params.frame)) return null;
+  const center = {
+    x: params.frame.x + params.frame.width / 2,
+    y: params.frame.y + params.frame.height / 2,
+  };
+  const angle = (params.frame.rotation * Math.PI) / 180;
+  const x = point.x - center.x;
+  const y = point.y - center.y;
+  return {
+    x:
+      center.x +
+      params.renderState.translateX +
+      params.renderState.scaleX * (x * Math.cos(angle) - y * Math.sin(angle)),
+    y:
+      center.y +
+      params.renderState.translateY +
+      params.renderState.scaleY * (x * Math.sin(angle) + y * Math.cos(angle)),
+  };
+}
+
+/** Inverse mapping rejects cropped content and letterboxing instead of moving a different point. */
+export function mapVisualLayerPointToSourceNormalized(
+  params: VisualLayerSourcePointMapping
+): SourcePoint | null {
+  if (!isValidPointMapping(params)) return null;
+  const center = {
+    x: params.frame.x + params.frame.width / 2,
+    y: params.frame.y + params.frame.height / 2,
+  };
+  const angle = (params.frame.rotation * Math.PI) / 180;
+  const x = (params.point.x - center.x - params.renderState.translateX) / params.renderState.scaleX;
+  const y = (params.point.y - center.y - params.renderState.translateY) / params.renderState.scaleY;
+  const point = {
+    x: center.x + x * Math.cos(angle) + y * Math.sin(angle),
+    y: center.y - x * Math.sin(angle) + y * Math.cos(angle),
+  };
+  const content = getFittedMediaContentFrame(params);
+  if (!isInsideFrame(point, params.frame) || !isInsideFrame(point, content)) return null;
+  return {
+    x: Math.min(1, Math.max(0, (point.x - content.x) / content.width)),
+    y: Math.min(1, Math.max(0, (point.y - content.y) / content.height)),
+  };
 }

@@ -1,5 +1,4 @@
 export {
-  createWorkspaceDiagnosticsController,
   createWorkspaceHeaderController,
   createWorkspaceLayoutController,
   createWorkspacePreviewController,

@@ -14,17 +14,23 @@ import type { PortableEditorDocumentV3 } from './editor-document';
 import type { PortableAggregatePresentation, PortableMediaThumbnail } from './media';
 import { isScenarioProjectV3 } from '../../../../features/scenario/project/v3';
 import type { JsonValue } from '../contracts';
+import {
+  parsePortableVideoReview,
+  type PortableVideoReview,
+} from '../../../../composition/persistence/review-workspaces/backup-restore';
 
 interface PortableProjectAsset {
   entry: Omit<StoredProjectAssetEntry, 'assetId'>;
   filename: string;
   objectId: string;
+  videoReview?: PortableVideoReview;
 }
 
 interface PortableProjectExport {
   entry: Omit<StoredProjectExportEntry, 'assetId'>;
   objectId: string;
   thumbnail?: PortableMediaThumbnail;
+  videoReview?: PortableVideoReview;
 }
 
 interface PortableEffectSnapshot extends Omit<VideoProjectEffectSnapshot, 'assets'> {
@@ -232,7 +238,28 @@ export function parsePortableVideoProjectMetadata(value: unknown): PortableVideo
   if (!isPortableVideoProjectMetadata(value)) {
     throw new Error('Portable video project children are invalid.');
   }
-  return value;
+  const projectAssets = value.projectAssets.map((asset) => {
+    if (asset.videoReview === undefined) return asset;
+    if (typeof asset.entry.mimeType !== 'string' || !asset.entry.mimeType.startsWith('video/'))
+      throw new Error('Video review requires video media.');
+    const videoReview = parsePortableVideoReview(
+      asset.videoReview,
+      `project-asset:${asset.entry.id}`
+    );
+    if (videoReview.workspace.source.size !== asset.entry.size)
+      throw new Error('Video review source size is inconsistent.');
+    return { ...asset, videoReview };
+  });
+  const projectExports = value.projectExports.map((item) => {
+    if (item.videoReview === undefined) return item;
+    if (!(item.entry.mimeType ?? 'video/webm').startsWith('video/'))
+      throw new Error('Video review requires video media.');
+    const videoReview = parsePortableVideoReview(item.videoReview, `export:${item.entry.id}`);
+    if (videoReview.workspace.source.size !== item.entry.size)
+      throw new Error('Video review source size is inconsistent.');
+    return { ...item, videoReview };
+  });
+  return { ...value, projectAssets, projectExports };
 }
 
 export function parsePortableScenarioProjectMetadata(

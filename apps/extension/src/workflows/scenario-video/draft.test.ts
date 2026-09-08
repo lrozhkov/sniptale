@@ -129,7 +129,10 @@ it('materializes a scenario draft into a video project with scenario assets and 
     scale: 1.18,
     shadow: true,
   });
-  expect(draft.actionEvents.map((event) => event.preset)).toEqual(['CLICK_RIPPLE', 'CLICK_RIPPLE']);
+  expect(draft.actionEvents.map((event) => event.presentation?.preset)).toEqual([
+    'CLICK_RIPPLE',
+    'CLICK_RIPPLE',
+  ]);
 });
 
 it('creates an empty draft when the scenario has no capture steps', () => {

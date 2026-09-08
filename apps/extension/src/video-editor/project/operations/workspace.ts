@@ -14,8 +14,12 @@ import { resolveVideoProjectReadResult } from '../../../composition/persistence/
 import { commitVideoProjectMutation } from '../../../composition/persistence/projects/index-mutations';
 import { translate } from '../../../platform/i18n';
 import { buildWebcamRecordingId } from '@sniptale/runtime-contracts/video/types/sidecar';
-import type { VideoProject, VideoProjectAsset } from '../../../features/video/project/types';
-import { importRecordingProjectAsset } from './assets';
+import {
+  VideoProjectTrackRole,
+  type VideoProject,
+  type VideoProjectAsset,
+} from '../../../features/video/project/types';
+import { ensureRecordingAssets, importRecordingProjectAsset } from './assets';
 import { loadVideoMetadata } from '../media-metadata';
 import {
   normalizeRecordingActionEventsToProjectSpace,
@@ -60,7 +64,7 @@ async function buildRecordingProject(
     ...(telemetry?.actionEvents === undefined
       ? {}
       : {
-          actionEvents: normalizeRecordingActionEventsToProjectSpace(
+          sourceNormalizedActionEvents: normalizeRecordingActionEventsToProjectSpace(
             telemetry.actionEvents,
             normalizedTelemetryParams
           ),
@@ -82,30 +86,21 @@ function collectProjectAssetId(asset: VideoProjectAsset, projectAssetIds: string
   }
 }
 
-async function loadWebcamSidecarVideos(
-  sourceRecordingId: string,
-  projectAssetIds: string[]
-): Promise<RecordingSidecarVideoProjectInput[]> {
-  const webcamRecordingId = buildWebcamRecordingId(sourceRecordingId);
-  const entry = await getRecording(webcamRecordingId);
-  if (!entry) {
-    return [];
-  }
-
-  const asset = await importRecordingProjectAsset(webcamRecordingId);
-  collectProjectAssetId(asset, projectAssetIds);
-  return [
-    {
-      recordingId: webcamRecordingId,
-      filename: entry.filename,
-      width: asset.metadata.width,
-      height: asset.metadata.height,
-      duration: asset.metadata.duration ?? 0.1,
-      mimeType: asset.metadata.mimeType,
-      size: entry.size,
-      asset,
-    },
-  ];
+function buildWebcamSidecarVideo(
+  asset: VideoProjectAsset,
+  sourceRecordingId: string
+): RecordingSidecarVideoProjectInput {
+  return {
+    recordingId: buildWebcamRecordingId(sourceRecordingId),
+    filename: asset.name,
+    width: asset.metadata.width,
+    height: asset.metadata.height,
+    duration: asset.metadata.duration ?? 0.1,
+    mimeType: asset.metadata.mimeType,
+    size: asset.metadata.size,
+    asset,
+    trackRole: VideoProjectTrackRole.CAMERA,
+  };
 }
 
 /**
@@ -127,9 +122,12 @@ async function createProjectFromRecordingId(sourceRecordingId: string): Promise<
   const createdProjectAssetIds: string[] = [];
 
   try {
-    const asset = await importRecordingProjectAsset(sourceRecordingId);
-    collectProjectAssetId(asset, createdProjectAssetIds);
-    const sidecarVideos = await loadWebcamSidecarVideos(sourceRecordingId, createdProjectAssetIds);
+    const assets = await ensureRecordingAssets(createEmptyVideoProject(), sourceRecordingId);
+    for (const acquired of assets) collectProjectAssetId(acquired, createdProjectAssetIds);
+    const asset = assets[0]!;
+    const sidecarVideos = assets
+      .slice(1)
+      .map((camera) => buildWebcamSidecarVideo(camera, sourceRecordingId));
     const nextProject = await buildRecordingProject(asset, entry, sourceRecordingId, sidecarVideos);
     return await commitVideoProjectMutation(nextProject, { baseRevision: null });
   } catch (saveError) {
@@ -154,6 +152,7 @@ function mergeMigratedRecordingAsset(
     id: asset.id,
     name: asset.name,
     createdAt: asset.createdAt,
+    ...(asset.recordingPart ? { recordingPart: asset.recordingPart } : {}),
   };
 }
 
@@ -254,5 +253,12 @@ export async function openPersistedProject(projectId: string): Promise<VideoProj
     );
   }
 
-  return migratePersistedRecordingAssets(persistedProject);
+  const retainedProject =
+    result.status === 'ready' && result.lifecycle?.storageClass === 'temporary'
+      ? await commitVideoProjectMutation(persistedProject, {
+          baseRevision: persistedProject.updatedAt,
+          expectedWorkspaceRevision: result.workspaceRevision,
+        })
+      : persistedProject;
+  return migratePersistedRecordingAssets(retainedProject);
 }

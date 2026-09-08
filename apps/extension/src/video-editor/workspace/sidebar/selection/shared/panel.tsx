@@ -5,7 +5,7 @@ export const PANEL_SECTION_CLASS_NAME = 'space-y-3';
 export const PANEL_HEADING_CLASS_NAME =
   'text-sm font-semibold text-[var(--sniptale-color-text-primary)]';
 export const PANEL_META_CLASS_NAME =
-  'text-xs uppercase tracking-[0.12em] text-[var(--sniptale-color-text-muted)]';
+  'text-[length:var(--sniptale-compact-font-size,12px)] text-[var(--sniptale-color-text-secondary)]';
 export const PANEL_DIVIDER_CLASS_NAME =
   'border-t border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_58%,transparent)]';
 
@@ -21,12 +21,17 @@ export function DetailItem({ label, value }: { label: string; value: ReactNode }
         py-1.5 last:border-b-0"
     >
       <span
-        className="text-[10px] font-semibold uppercase tracking-[0.14em]
+        className="text-[length:var(--sniptale-compact-font-size,12px)]
           text-[var(--sniptale-color-text-muted-strong)]"
       >
         {label}
       </span>
-      <span className="text-right text-sm text-[var(--sniptale-color-text-primary)]">{value}</span>
+      <span
+        className="min-w-0 break-words text-right text-[length:var(--sniptale-compact-font-size,12px)]
+          text-[var(--sniptale-color-text-primary)]"
+      >
+        {value}
+      </span>
     </div>
   );
 }

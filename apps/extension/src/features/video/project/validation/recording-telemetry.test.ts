@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import type { RecordingActionEvent } from '../types';
 
 import {
   isRecordingTelemetrySignal,
   isRecordingTelemetrySnapshot,
-  isVideoProjectActionEvent,
+  isRecordingActionEvent,
   isVideoProjectCursorTrack,
   isViewportInfo,
 } from './recording-telemetry';
@@ -23,7 +24,7 @@ function createCursorTrack() {
   } as const;
 }
 
-function createActionEvent() {
+function createActionEvent(): RecordingActionEvent {
   return {
     data: { button: 0 },
     duration: 0.4,
@@ -59,7 +60,7 @@ describe('recording telemetry validation', () => {
       })
     ).toBe(true);
     expect(isVideoProjectCursorTrack(createCursorTrack())).toBe(true);
-    expect(isVideoProjectActionEvent(createActionEvent())).toBe(true);
+    expect(isRecordingActionEvent(createActionEvent())).toBe(true);
     expect(isRecordingTelemetrySignal(createSignal())).toBe(true);
   });
 
@@ -84,4 +85,33 @@ describe('recording telemetry validation', () => {
       })
     ).toBe(false);
   });
+});
+
+it('requires raw time/duration/preset rather than an authored montage anchor', () => {
+  const raw = createActionEvent();
+  const { time, duration, preset, ...common } = raw;
+  expect(isRecordingActionEvent({ ...common, anchor: { kind: 'project', time } })).toBe(false);
+  expect(isRecordingActionEvent({ ...raw, time: undefined })).toBe(false);
+  expect(isRecordingActionEvent({ ...raw, duration: undefined })).toBe(false);
+  expect(isRecordingActionEvent({ ...raw, preset: undefined })).toBe(false);
+  expect(isRecordingActionEvent({ ...common, time, duration, preset })).toBe(true);
+});
+
+it('accepts normalized recording points without changing raw client coordinates', () => {
+  for (const recordingPoint of [null, { x: 0, y: 1 }, { x: 0.25, y: 0.75 }]) {
+    const event = { ...createActionEvent(), recordingPoint };
+    expect(isRecordingActionEvent(event)).toBe(true);
+    expect(event.point).toEqual({ x: 10, y: 20 });
+  }
+});
+
+it.each([
+  { x: NaN, y: 0.5 },
+  { x: 0.5, y: Infinity },
+  { x: -0.01, y: 0.5 },
+  { x: 0.5, y: 1.01 },
+  { x: '0.5', y: 0.5 },
+  { x: 0.5 },
+])('rejects malformed supplied recordingPoint %j', (recordingPoint) => {
+  expect(isRecordingActionEvent({ ...createActionEvent(), recordingPoint })).toBe(false);
 });

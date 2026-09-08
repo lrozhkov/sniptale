@@ -123,3 +123,50 @@ it('treats release below the threshold as a cancelled transform', () => {
   expect(callbacks.onCommit).not.toHaveBeenCalled();
   expect(callbacks.onRestore).toHaveBeenCalledWith('clip-1');
 });
+
+it.each([false, true])(
+  'cancels Escape before late pointer release (activated: %s)',
+  (activated) => {
+    const { callbacks, cleanup, state } = createHarness();
+    try {
+      if (activated) dispatchPointer('pointermove', 18, 29);
+      const pendingFrame = animationFrame;
+      const escape = new KeyboardEvent('keydown', {
+        key: 'Escape',
+        bubbles: true,
+        cancelable: true,
+      });
+      window.dispatchEvent(escape);
+      expect(escape.defaultPrevented).toBe(true);
+      expect(state.finished).toBe(true);
+      pendingFrame?.(10);
+      dispatchPointer('pointermove', 30, 40);
+      dispatchPointer('pointerup', 30, 40);
+      expect(callbacks.onCommit).not.toHaveBeenCalled();
+      expect(callbacks.onRestore).toHaveBeenCalledExactlyOnceWith('clip-1');
+      expect(callbacks.onSettle).toHaveBeenCalledExactlyOnceWith('cancel');
+      expect(callbacks.onCacheBypassChange.mock.calls).toEqual([[true], [false]]);
+      const idleEscape = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true });
+      window.dispatchEvent(idleEscape);
+      expect(idleEscape.defaultPrevented).toBe(false);
+    } finally {
+      cleanup();
+    }
+  }
+);
+
+it('releases Escape after commit and cleanup, and allows a fresh gesture', () => {
+  for (const finish of ['commit', 'cleanup']) {
+    const { callbacks, cleanup } = createHarness();
+    const otherKey = new KeyboardEvent('keydown', { key: 'Enter', cancelable: true });
+    window.dispatchEvent(otherKey);
+    expect(otherKey.defaultPrevented).toBe(false);
+    if (finish === 'commit') {
+      dispatchPointer('pointerup', 18, 29);
+      expect(callbacks.onCommit).toHaveBeenCalledOnce();
+    } else cleanup();
+    const escape = new KeyboardEvent('keydown', { key: 'Escape', cancelable: true });
+    window.dispatchEvent(escape);
+    expect(escape.defaultPrevented).toBe(false);
+  }
+});

@@ -12,7 +12,7 @@ function createMotionCallbacks() {
     onDeleteActionEvent: () => undefined,
     onDeleteCursorSample: () => undefined,
     onDeleteMotionRegion: () => undefined,
-    onGenerateMotionPathFromCursor: () => undefined,
+
     onDetachClipGroup: () => undefined,
     onEnableCursorTrack: () => undefined,
     onInsertCursorSample: () => undefined,
@@ -25,8 +25,7 @@ function createMotionCallbacks() {
     onStartActionPointPlacement: () => undefined,
     onStartMotionAreaPlacement: () => undefined,
     onStartMotionFocusPlacement: () => undefined,
-    onStartMotionPathStopAreaPlacement: () => undefined,
-    onStartMotionPathStopPointPlacement: () => undefined,
+
     onUpdateActionEventDetails: () => undefined,
     onUpdateClipAudioEnvelope: () => undefined,
     onUpdateClipFades: () => undefined,
@@ -62,7 +61,7 @@ export function createMotionPanelProps(
     placementMode: null,
     project,
     recentColors: [],
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedClip: null,
     selectedCursorSample: null,
     selectedMotionRegion: motionRegion,

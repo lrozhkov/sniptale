@@ -5,7 +5,7 @@ export interface TimelinePreviewPlan {
   assetUrl: string;
   clipId: string;
   kind: 'image' | 'video';
-  slotKeys: readonly string[];
+  slots: readonly { cacheKey: string; sourceStart: number; sourceEnd: number }[];
 }
 
 export function createTimelinePreviewMap(
@@ -16,14 +16,17 @@ export function createTimelinePreviewMap(
 
   for (const plan of plans) {
     if (plan.kind === 'image') {
-      previews[plan.clipId] = { kind: 'image', urls: [plan.assetUrl] };
+      previews[plan.clipId] = { kind: 'image', url: plan.assetUrl };
       continue;
     }
 
-    const urls = plan.slotKeys.flatMap((key) => generatedUrlCache.get(key)?.url ?? []);
-    if (urls.length > 0) {
-      previews[plan.clipId] = { kind: 'video', urls };
-    }
+    const frames = plan.slots.flatMap((slot) => {
+      const frame = generatedUrlCache.get(slot.cacheKey);
+      return frame
+        ? [{ sourceStart: slot.sourceStart, sourceEnd: slot.sourceEnd, url: frame.url }]
+        : [];
+    });
+    if (frames.length > 0) previews[plan.clipId] = { kind: 'video', frames };
   }
 
   return previews;
@@ -59,4 +62,18 @@ export function revokeCachedPreviewUrls(
 
 export function revokePreviewUrls(urls: readonly string[]): void {
   urls.forEach((url) => URL.revokeObjectURL(url));
+}
+
+/** Keep current viewport frames and a bounded reserve for nearby edits and zoom levels. */
+export function pruneUnusedTimelineFrames(
+  cache: Map<string, TimelinePreviewFrame>,
+  plans: readonly TimelinePreviewPlan[]
+): void {
+  const active = new Set(plans.flatMap((plan) => plan.slots.map((slot) => slot.cacheKey)));
+  const unused = [...cache.keys()].filter((key) => !active.has(key));
+  for (const key of unused.slice(0, Math.max(0, unused.length - 120))) {
+    const frame = cache.get(key);
+    if (frame) URL.revokeObjectURL(frame.url);
+    cache.delete(key);
+  }
 }

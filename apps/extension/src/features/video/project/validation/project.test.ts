@@ -6,10 +6,15 @@ import {
   createTextClip,
 } from '../factories/overlay-clip';
 import { createAudioClipFromAsset, createVideoClipFromAsset } from '../factories/clip';
-import { createEmptyVideoProject, createVideoProjectAsset } from '../factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+  createVideoProjectAsset,
+} from '../factories/creation';
 import { createVideoProjectCursorTrack } from '../defaults';
 import { createVideoProjectMotionRegion } from '../motion/index';
 import {
+  VideoTrackKind,
   type VideoProject,
   type VideoProjectActionEvent,
   type VideoProjectAsset,
@@ -53,13 +58,13 @@ function createAssetWithSource(
 function createActionEvent(): VideoProjectActionEvent {
   return {
     data: { button: 'primary' },
-    duration: 0.2,
+    capturedDuration: 0.2,
     id: 'action-1',
     kind: VideoProjectActionEventKind.CLICK,
     label: 'Click',
     point: { x: 100, y: 120 },
-    preset: VideoProjectActionPreset.CLICK_RIPPLE,
-    time: 1,
+    presentation: { preset: VideoProjectActionPreset.CLICK_RIPPLE },
+    anchor: { kind: 'project', time: 1 },
   };
 }
 
@@ -128,7 +133,7 @@ function createProject(): VideoProject {
     motionRegions: [
       {
         ...createVideoProjectMotionRegion(project, 1),
-        targetActionEventId: actionEvent.id,
+        targetAction: { eventId: actionEvent.id, clipId: null },
       },
     ],
   };
@@ -142,6 +147,56 @@ it('accepts real project factory output at hydration and export boundaries', () 
   expect(isExportReadyVideoProject(project)).toBe(true);
 });
 
+it('validates captured fact provenance while retaining out-of-range known source history', () => {
+  const project = createProject();
+  const recordingId = 'recording-1';
+  const anchor = {
+    kind: 'recording-source' as const,
+    recordingId,
+    sourceInstanceId: 'instance',
+    sourceEventId: 'raw',
+    sourceTime: 1,
+  };
+  const recordingProject = {
+    ...project,
+    assets: [{ ...project.assets[0]!, source: { kind: 'recording' as const, recordingId } }],
+    clips: project.clips.map((clip) =>
+      clip.type === 'VIDEO' ? { ...clip, sourceInstanceId: 'instance' } : clip
+    ),
+    actionEvents: [{ ...project.actionEvents[0]!, point: { x: 0.4, y: 0.5 }, anchor }],
+    motionRegions: [],
+  };
+  expect(isExportReadyVideoProject(recordingProject)).toBe(true);
+  expect(
+    isExportReadyVideoProject({
+      ...recordingProject,
+      actionEvents: [
+        { ...recordingProject.actionEvents[0]!, anchor: { ...anchor, sourceTime: 10 } },
+      ],
+    })
+  ).toBe(true);
+  for (const invalidAnchor of [
+    { ...anchor, recordingId: 'foreign' },
+    { ...anchor, sourceInstanceId: 'missing' },
+  ]) {
+    const invalidProject = {
+      ...recordingProject,
+      actionEvents: [{ ...recordingProject.actionEvents[0]!, anchor: invalidAnchor }],
+    };
+    expect(isHydratableVideoProject(invalidProject)).toBe(true);
+    expect(isExportReadyVideoProject(invalidProject)).toBe(false);
+  }
+  expect(
+    isExportReadyVideoProject({
+      ...recordingProject,
+      actionEvents: [
+        recordingProject.actionEvents[0]!,
+        { ...recordingProject.actionEvents[0]!, id: 'duplicate-fact' },
+      ],
+    })
+  ).toBe(false);
+});
+
 it('rejects pre-public v1 projects at the hydration boundary', () => {
   const project = createProject();
 
@@ -151,6 +206,8 @@ it('rejects pre-public v1 projects at the hydration boundary', () => {
 
 it('accepts all supported asset sources and clip variants', () => {
   const project = createEmptyVideoProject('Variants', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.PRIMARY));
   const assets = createVariantAssets();
   const clips = createVariantClips(project, assets);
 
@@ -193,6 +250,12 @@ it('rejects malformed nested clip, asset, track, cursor, and motion fields', () 
   expect(
     isHydratableVideoProject({
       ...project,
+      actionEvents: [{ ...project.actionEvents[0]!, anchor: { kind: 'source', time: 1 } }],
+    })
+  ).toBe(false);
+  expect(
+    isHydratableVideoProject({
+      ...project,
       tracks: [{ ...project.tracks[0]!, locked: 'false' }],
     })
   ).toBe(false);
@@ -202,6 +265,42 @@ it('rejects malformed nested clip, asset, track, cursor, and motion fields', () 
       cursorTrack: {
         ...project.cursorTrack!,
         samples: [{ ...project.cursorTrack!.samples[0]!, time: Number.POSITIVE_INFINITY }],
+      },
+    })
+  ).toBe(false);
+  expect(
+    isHydratableVideoProject({
+      ...project,
+      actionEvents: [
+        {
+          ...project.actionEvents[0]!,
+          anchor: {
+            kind: 'recording-source',
+            recordingId: 'recording-1',
+            sourceInstanceId: 'instance',
+            sourceEventId: 'raw',
+            sourceTime: Number.POSITIVE_INFINITY,
+          },
+        },
+      ],
+    })
+  ).toBe(false);
+  expect(
+    isHydratableVideoProject({
+      ...project,
+      cursorTrack: {
+        ...project.cursorTrack!,
+        samples: [
+          {
+            ...project.cursorTrack!.samples[0]!,
+            sourceAnchor: {
+              kind: 'project-time',
+              recordingId: 'recording-1',
+              sourceClipId: project.clips[0]!.id,
+              sourceTime: 1,
+            },
+          },
+        ],
       },
     })
   ).toBe(false);
@@ -225,6 +324,8 @@ it('rejects invalid top-level enums and numeric bounds', () => {
 
 it('rejects malformed annotation clip fields', () => {
   const project = createEmptyVideoProject('Annotation', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO));
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.PRIMARY));
   const annotationClip = createAnnotationClip(project.tracks[2]!.id, 1280, 720, 0);
 
   expect(isHydratableVideoProject({ ...project, clips: [annotationClip] })).toBe(true);
@@ -267,7 +368,9 @@ it('allows persisted hydration with missing references but rejects export-ready 
   };
   const missingActionReference = {
     ...project,
-    motionRegions: [{ ...project.motionRegions![0]!, targetActionEventId: 'missing-action' }],
+    motionRegions: [
+      { ...project.motionRegions![0]!, targetAction: { eventId: 'missing-action', clipId: null } },
+    ],
   };
 
   expect(isHydratableVideoProject(missingTrackReference)).toBe(true);
@@ -278,4 +381,52 @@ it('allows persisted hydration with missing references but rejects export-ready 
   expect(isExportReadyVideoProject(missingAssetReference)).toBe(false);
   expect(isHydratableVideoProject(missingActionReference)).toBe(true);
   expect(isExportReadyVideoProject(missingActionReference)).toBe(false);
+});
+
+it('accepts canonical gradient presets and rejects malformed or superseded gradient payloads', async () => {
+  const { getShowcaseGradient } = await import('../../../highlighter/showcase-resources');
+  const project = createEmptyVideoProject('Paint');
+  for (const id of ['system-ocean', 'system-radial-glow', 'system-conic-spectrum'] as const) {
+    project.sceneBackground = { kind: 'gradient', gradient: getShowcaseGradient(id) };
+    expect(parseHydratableVideoProject(project)?.sceneBackground).toEqual(project.sceneBackground);
+  }
+  expect(
+    isHydratableVideoProject({
+      ...project,
+      sceneBackground: {
+        kind: 'gradient',
+        from: '#000',
+        to: '#fff',
+        angle: 90,
+      },
+    })
+  ).toBe(false);
+  const gradient = getShowcaseGradient('system-ocean');
+  for (const invalid of [
+    null,
+    {},
+    { ...gradient, stops: [] },
+    {
+      ...gradient,
+      stops: [gradient.stops[0], gradient.stops[0]],
+    },
+    {
+      ...gradient,
+      stops: gradient.stops.map((stop) => ({ ...stop, color: 'url(https://example.com)' })),
+    },
+  ]) {
+    expect(
+      isHydratableVideoProject({
+        ...project,
+        sceneBackground: { kind: 'gradient', gradient: invalid },
+      })
+    ).toBe(false);
+  }
+});
+
+it('rejects removed annotation track kinds at project admission', () => {
+  const project = createEmptyVideoProject('Removed track');
+  const payload = { ...project, tracks: [{ ...project.tracks[0], kind: 'OVERLAY' }] };
+  expect(isHydratableVideoProject(payload)).toBe(false);
+  expect(isExportReadyVideoProject(payload)).toBe(false);
 });

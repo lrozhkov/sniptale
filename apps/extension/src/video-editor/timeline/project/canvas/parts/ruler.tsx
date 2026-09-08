@@ -1,10 +1,17 @@
-import { formatPreciseTime, formatTimelineRulerLabel } from '../../interaction-state/helpers';
+import {
+  projectTimelinePoint,
+  timelineTimeToViewportX,
+  type TimelineProjection,
+} from '../../interaction-state/projection';
+import { formatPreciseTime } from '../../interaction-state/helpers';
 import type { VideoEditorPlaybackRange } from '../../../../interaction/playback/range';
 
 export function ProjectTimelineRuler(props: {
+  children?: React.ReactNode;
   onBeginRangeSelection: (event: React.PointerEvent<HTMLDivElement>) => void;
   playbackRange: VideoEditorPlaybackRange | null;
   pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
   rulerMarkers: {
     id: string;
     isMajor: boolean;
@@ -15,8 +22,9 @@ export function ProjectTimelineRuler(props: {
 }) {
   return (
     <div
+      data-ui="video-editor.timeline.ruler"
       className={[
-        'sticky top-0 z-20 flex h-[30px] items-end border-b',
+        'sticky top-0 z-40 flex h-[30px] items-end overflow-hidden border-b',
         'border-[var(--sniptale-color-border-soft)]',
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent)]',
         'relative px-0',
@@ -26,22 +34,29 @@ export function ProjectTimelineRuler(props: {
     >
       <ProjectTimelineRulerRangeMarkers
         pixelsPerSecond={props.pixelsPerSecond}
+        projection={props.projection}
         playbackRange={props.playbackRange}
       />
+      {props.children}
       {props.rulerMarkers.map((marker) => (
         <div
           key={marker.id}
           className={[
-            'relative h-full border-l',
+            'absolute top-0 h-full border-l',
             marker.isMajor
               ? 'border-[var(--sniptale-color-border-soft)]'
               : 'border-[var(--sniptale-color-border-subtle)]',
           ].join(' ')}
-          style={{ width: marker.spanSeconds * props.pixelsPerSecond }}
+          style={{
+            left: props.projection
+              ? timelineTimeToViewportX(props.projection, marker.second)
+              : marker.second * props.pixelsPerSecond,
+            width: marker.spanSeconds * props.pixelsPerSecond,
+          }}
         >
           {marker.label ? (
             <span className="absolute left-1 top-1 text-[10px] font-medium text-[var(--sniptale-color-text-dim)]">
-              {formatTimelineRulerLabel(marker.second)}
+              {marker.label}
             </span>
           ) : null}
         </div>
@@ -52,6 +67,7 @@ export function ProjectTimelineRuler(props: {
 
 function ProjectTimelineRulerRangeMarkers(props: {
   pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
   playbackRange: VideoEditorPlaybackRange | null;
 }) {
   if (!props.playbackRange) {
@@ -63,12 +79,20 @@ function ProjectTimelineRulerRangeMarkers(props: {
       <ProjectTimelineRulerRangeMarker
         align="left"
         label={formatPreciseTime(props.playbackRange.start)}
-        left={props.playbackRange.start * props.pixelsPerSecond}
+        left={
+          props.projection
+            ? projectTimelinePoint(props.projection, props.playbackRange.start)
+            : props.playbackRange.start * props.pixelsPerSecond
+        }
       />
       <ProjectTimelineRulerRangeMarker
         align="right"
         label={formatPreciseTime(props.playbackRange.end)}
-        left={props.playbackRange.end * props.pixelsPerSecond}
+        left={
+          props.projection
+            ? projectTimelinePoint(props.projection, props.playbackRange.end)
+            : props.playbackRange.end * props.pixelsPerSecond
+        }
       />
     </>
   );
@@ -77,12 +101,14 @@ function ProjectTimelineRulerRangeMarkers(props: {
 function ProjectTimelineRulerRangeMarker(props: {
   align: 'left' | 'right';
   label: string;
-  left: number;
+  left: number | null;
 }) {
+  if (props.left === null) return null;
   return (
     <div
       aria-hidden="true"
       className="pointer-events-none absolute inset-y-0 z-10"
+      data-ui={`video-editor.timeline.range-marker.${props.align === 'left' ? 'start' : 'end'}`}
       style={{ left: props.left }}
     >
       <div className="absolute inset-y-0 left-0 w-px bg-[var(--sniptale-color-accent-emphasis)]" />
@@ -92,7 +118,7 @@ function ProjectTimelineRulerRangeMarker(props: {
           'border-[color:color-mix(in_srgb,var(--sniptale-color-border-accent-strong)_45%,transparent)]',
           'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_94%,var(--sniptale-color-accent-soft)_6%)]',
           'text-[var(--sniptale-color-accent-emphasis)]',
-          props.align === 'left' ? 'left-1' : 'right-1 -translate-x-full',
+          props.align === 'left' ? 'left-1' : 'right-1',
         ].join(' ')}
       >
         {props.label}

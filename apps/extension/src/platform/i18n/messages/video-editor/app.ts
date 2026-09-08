@@ -1,6 +1,128 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorAppMessages = defineMessageSource({
+  recordAudioMicrophone: { ru: 'Запись с микрофона', en: 'Record microphone' },
+  recordAudioVoiceover: { ru: 'Озвучка', en: 'Voiceover' },
+  recordAudioLimit: { ru: 'Максимум', en: 'Maximum' },
+  recordAudioRemaining: { ru: 'Осталось', en: 'Remaining' },
+  recordAudioInsert: { ru: 'Вставить в промежуток', en: 'Insert into gap' },
+  recordAudioSaveMaterial: { ru: 'Сохранить в материалы', en: 'Save to materials' },
+  recordAudioStartFailed: {
+    ru: 'Не удалось начать запись. Попробуйте ещё раз.',
+    en: 'Recording could not start. Try again.',
+  },
+  recordAudioPreparing: { ru: 'Подготовка записи…', en: 'Preparing recording…' },
+  recordAudioDevice: { ru: 'Микрофон', en: 'Microphone' },
+  recordAudioDefaultDevice: { ru: 'По умолчанию', en: 'Default device' },
+  saveChangesFailed: { ru: 'Не удалось сохранить изменения', en: 'Changes could not be saved' },
+  clipOrder: { ru: 'Порядок клипа', en: 'Clip order' },
+  clipEarlier: { ru: 'Раньше', en: 'Earlier' },
+  clipLater: { ru: 'Позже', en: 'Later' },
+  clipSwapNeighbor: { ru: 'Поменять местами с «{name}»', en: 'Swap with “{name}”' },
+  clipSwapNoNeighbor: {
+    ru: 'Нет соседнего клипа в этом направлении',
+    en: 'No neighboring clip in this direction',
+  },
+  clipSwapOverlap: {
+    ru: 'Сначала устраните пересечение связанных фрагментов',
+    en: 'Resolve overlapping linked groups first',
+  },
+  clipSwapLocked: {
+    ru: 'Связанная дорожка или интервал заблокированы',
+    en: 'A linked track or interval is locked',
+  },
+  clipSwapCollision: {
+    ru: 'На связанной дорожке занято место назначения',
+    en: 'The destination is occupied on a linked track',
+  },
+  clipSwapLinkedHint: {
+    ru: 'Камера и звук, связанные по времени, перемещаются вместе с клипом.',
+    en: 'Temporally linked camera and audio move with the clip.',
+  },
+
+  inspectorShowAll: { ru: 'Показать все разделы', en: 'Show all sections' },
+  inspectorShowSelected: { ru: 'Показывать по разделам', en: 'Show one section at a time' },
+  panelFullHeight: { ru: 'Развернуть панель по высоте', en: 'Expand panel to full height' },
+  panelRestoreHeight: {
+    ru: 'Вернуть панель к высоте просмотра',
+    en: 'Restore panel to viewer height',
+  },
+  trackOrder: { ru: 'Порядок дорожки', en: 'Track order' },
+  resizeMaterials: { ru: 'Ширина материалов', en: 'Materials width' },
+  resizeTimeline: { ru: 'Высота просмотра', en: 'Viewer height' },
+  sourceInLabel: { ru: 'In', en: 'In' },
+  sourceOutLabel: { ru: 'Out', en: 'Out' },
+  closeSource: { ru: 'Закрыть исходник', en: 'Close source' },
+  sourceViewer: { ru: 'Исходник', en: 'Source' },
+  montageViewer: { ru: 'Монтаж', en: 'Timeline' },
+  viewerSwitch: { ru: 'Просмотр', en: 'Viewer' },
+  sourcePosition: { ru: 'Позиция в исходнике', en: 'Source position' },
+  sourceMarkIn: { ru: 'Начало фрагмента (I)', en: 'Mark In (I)' },
+  sourceMarkOut: { ru: 'Последний кадр фрагмента (O)', en: 'Mark Out (O)' },
+  sourceReset: { ru: 'Выбрать исходник целиком', en: 'Use entire source' },
+  sourceEntireSource: { ru: 'Весь исходник', en: 'Entire source' },
+  sourceSelectedRange: { ru: 'Выбранный фрагмент', en: 'Selected range' },
+  sourceRangeHint: {
+    ru: 'Клик — позиция · потяните для выделения',
+    en: 'Click to seek · drag to select',
+  },
+  sourceLoading: { ru: 'Загружаем исходник…', en: 'Loading source…' },
+  sourceMediaFailed: {
+    ru: 'Не удалось прочитать исходник. Повторите загрузку или выберите другой материал.',
+    en: 'Could not read this source. Reload it or select another material.',
+  },
+  sourcePlayFailed: {
+    ru: 'Не удалось начать воспроизведение. Нажмите Play ещё раз.',
+    en: 'Could not start playback. Press Play to try again.',
+  },
+  sourceInvalidRange: {
+    ru: 'Выберите фрагмент длиной хотя бы в один кадр.',
+    en: 'Select a range of at least one frame.',
+  },
+  sourceRetry: { ru: 'Повторить', en: 'Retry' },
+  sourceAppend: { ru: 'В конец', en: 'Append' },
+  sourceInsert: { ru: 'Вставить', en: 'Insert' },
+  sourceOverlay: { ru: 'Наложить', en: 'Overlay' },
+  materialsImport: { ru: 'Импорт', en: 'Import' },
+  materialsFromLibrary: { ru: 'Из библиотеки', en: 'Library' },
+  materialsFromDisk: { ru: 'С компьютера', en: 'Local files' },
+  materialsRemove: { ru: 'Убрать из проекта', en: 'Remove from project' },
+  materialsRemoveUnused: { ru: 'Убрать неиспользуемые', en: 'Remove unused' },
+  materialsUsed: { ru: 'Используется', en: 'In use' },
+  materialsUnused: { ru: 'Не используется', en: 'Unused' },
+  materialsTitle: { ru: 'Материалы', en: 'Materials' },
+  materialsLocked: {
+    ru: 'Дорожка заблокирована. Разблокируйте её и повторите добавление.',
+    en: 'A destination track is locked. Unlock it and try again.',
+  },
+  materialsUnavailable: {
+    ru: 'Материал больше недоступен в этом проекте. Выберите другой исходник.',
+    en: 'This material is no longer available in this project. Select another source.',
+  },
+  materialsHint: {
+    ru: 'Импортируйте исходники, затем добавьте их в монтаж.',
+    en: 'Import sources, then add them to your timeline.',
+  },
+  materialsVideo: { ru: 'Видео', en: 'Video' },
+  materialsImage: { ru: 'Изображение', en: 'Image' },
+  materialsAudio: { ru: 'Аудио', en: 'Audio' },
+  materialsImportFailed: {
+    ru: 'Не удалось импортировать файл. Проверьте, что он открывается, и попробуйте снова или выберите другой.',
+    en: 'Could not import this file. Check that it opens, then try again or choose another file.',
+  },
+  materialsLoading: { ru: 'Импортируем материал…', en: 'Importing material…' },
+  materialsAppend: { ru: 'Добавить в конец', en: 'Append to timeline' },
+  materialsInsert: { ru: 'Вставить со сдвигом', en: 'Insert at playhead' },
+  materialsInsertHint: {
+    ru: 'Вставка раздвинет монтаж в текущий момент. Наложение добавит отдельный слой.',
+    en: 'Insert makes room at the playhead. Overlay adds a separate layer.',
+  },
+  materialsInvalidCut: {
+    ru: 'Недостаточно места для разреза. Переместите указатель дальше от края клипа.',
+    en: 'Not enough room to split here. Move the playhead farther from the clip edge.',
+  },
+  materialsOverlay: { ru: 'Наложить в текущий момент', en: 'Overlay at playhead' },
+  materialsEmpty: { ru: 'В проекте пока нет материалов.', en: 'No materials in this project yet.' },
   documentTitle: {
     ru: 'Sniptale — Видео-редактор',
     en: 'Sniptale — Video editor',
@@ -121,6 +243,22 @@ export const videoEditorAppMessages = defineMessageSource({
     ru: 'Медиа',
     en: 'Media',
   },
+  textToolButton: {
+    ru: 'Добавить текст',
+    en: 'Add text',
+  },
+  shapeToolButton: {
+    ru: 'Нарисовать фигуру',
+    en: 'Draw shape',
+  },
+  arrowToolButton: {
+    ru: 'Нарисовать стрелку',
+    en: 'Draw arrow',
+  },
+  lineToolButton: {
+    ru: 'Нарисовать линию',
+    en: 'Draw line',
+  },
   gridButton: {
     ru: 'Сетка',
     en: 'Grid',
@@ -170,8 +308,13 @@ export const videoEditorAppMessages = defineMessageSource({
     en: 'Record audio',
   },
   recordAudioDescription: {
-    ru: 'Запишите голос прямо из проекта, сразу прослушайте результат и обрежьте нужный фрагмент перед вставкой на таймлайн.',
-    en: 'Record voice directly from the project, audition it immediately, and trim the desired segment before adding it to the timeline.',
+    ru: 'Запишите звук и выделите на шкале фрагмент, который хотите добавить в монтаж.',
+    en: 'Record audio and select the range you want to add to the project.',
+  },
+  recordAudioAgain: { ru: 'Записать заново', en: 'Record again' },
+  recordAudioWaveformUnavailable: {
+    ru: 'Аудиопики недоступны. Выбор и сохранение фрагмента работают.',
+    en: 'Waveform unavailable. You can still select and save a range.',
   },
   recordAudioStart: {
     ru: 'Начать запись',

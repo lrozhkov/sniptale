@@ -13,7 +13,7 @@ import {
   VideoProjectAssetType,
   VideoTemporalEasing,
 } from '../../project/types/index';
-import { getVideoCompositionActionDuration, resolveVideoCompositionFrame } from './frame/index';
+import { resolveVideoCompositionFrame } from './frame/index';
 
 function createImageAsset(id: string, name: string) {
   return createMediaAsset(id, name, VideoProjectAssetType.IMAGE, null, false);
@@ -67,6 +67,7 @@ function createCompositionProject(): VideoProject {
 
   return {
     ...project,
+    duration: 9,
     assets: [firstAsset, secondAsset],
     clips: [firstClip, secondClip],
     cursorTrack: {
@@ -80,12 +81,11 @@ function createCompositionProject(): VideoProject {
       {
         id: 'action-1',
         kind: VideoProjectActionEventKind.PAUSE,
-        time: 4.2,
-        duration: 0,
+        anchor: { kind: 'project', time: 4.2 },
         point: { x: 150, y: 200 },
         label: 'Zoom focus',
         data: {},
-        preset: VideoProjectActionPreset.DWELL_ZOOM,
+        presentation: { preset: VideoProjectActionPreset.DWELL_ZOOM },
       },
     ],
   };
@@ -108,7 +108,7 @@ function expectCrossfadeFrame(frame: ReturnType<typeof resolveVideoCompositionFr
     })
   );
   expect(frame.actions).toEqual([expect.objectContaining({ point: { x: 150, y: 200 } })]);
-  expect(frame.actions[0]?.progress).toBeCloseTo((4.5 - 4.2) / 1.3, 5);
+  expect(frame.actions[0]?.progress).toBeCloseTo((4.5 - 4.2) / 0.7, 5);
 }
 
 it('resolves crossfaded layers with interpolated cursor and active actions', () => {
@@ -125,15 +125,7 @@ it('returns empty cursor state when the track is hidden and resolves preset dura
   const frame = resolveVideoCompositionFrame(project, 4.5);
 
   expect(frame.cursor).toBeNull();
-  expect(getVideoCompositionActionDuration(project.actionEvents[0]!)).toBe(1.3);
-  expect(
-    getVideoCompositionActionDuration({
-      ...project.actionEvents[0]!,
-      duration: 0,
-      kind: VideoProjectActionEventKind.CLICK,
-      preset: VideoProjectActionPreset.CLICK_RIPPLE,
-    })
-  ).toBe(0.7);
+  expect(frame.actions[0]?.duration).toBe(0.7);
 });
 
 it('falls back to the last visible cursor sample and default NONE durations', () => {
@@ -147,12 +139,11 @@ it('falls back to the last visible cursor sample and default NONE durations', ()
     {
       id: 'action-none',
       kind: VideoProjectActionEventKind.CLICK,
-      time: 10,
-      duration: 0,
+      anchor: { kind: 'project', time: 10 },
       point: null,
       label: 'No animation',
       data: {},
-      preset: VideoProjectActionPreset.NONE,
+      presentation: { preset: VideoProjectActionPreset.NONE },
     },
   ] as VideoProjectActionEvent[];
 
@@ -160,16 +151,9 @@ it('falls back to the last visible cursor sample and default NONE durations', ()
 
   expect(frame.cursor).toEqual(expect.objectContaining({ x: 260, y: 320 }));
   expect(frame.actions).toEqual([]);
-  expect(getVideoCompositionActionDuration(project.actionEvents[0]!)).toBe(0.6);
-  expect(
-    getVideoCompositionActionDuration({
-      ...project.actionEvents[0]!,
-      kind: VideoProjectActionEventKind.PAUSE,
-    })
-  ).toBe(0.5);
 });
 
-it('suppresses cursor output when interpolation reaches a hidden sample', () => {
+it('preserves cursor output until the hidden key time', () => {
   const project = createCompositionProject();
 
   project.cursorTrack = {
@@ -180,7 +164,9 @@ it('suppresses cursor output when interpolation reaches a hidden sample', () => 
     ],
   };
 
-  expect(resolveVideoCompositionFrame(project, 4.5).cursor).toBeNull();
+  expect(resolveVideoCompositionFrame(project, 4.5).cursor).toMatchObject({ x: 150, y: 200 });
+  expect(resolveVideoCompositionFrame(project, 5).cursor).toBeNull();
+  expect(resolveVideoCompositionFrame(project, 5.5).cursor).toBeNull();
 });
 
 it('uses the latest embedded cursor sample without smoothing when raw video already contains the cursor', () => {
@@ -269,7 +255,7 @@ it('applies cursor interpolation easing and resolves camera focus from motion re
       id: 'motion-1',
       scale: 2,
       startTime: 4,
-      targetActionEventId: null,
+      targetAction: null,
       zoomInDuration: 0.5,
       zoomOutDuration: 0.5,
     },
@@ -287,4 +273,13 @@ it('applies cursor interpolation easing and resolves camera focus from motion re
       motionBlurAmount: 0,
     })
   );
+});
+
+it('uses a visual preset override for cursor emphasis without changing the authored action kind', () => {
+  const project = createCompositionProject();
+  project.actionEvents[0]!.presentation = { preset: VideoProjectActionPreset.CLICK_RIPPLE };
+  const frame = resolveVideoCompositionFrame(project, 4.5);
+  expect(frame.cursor?.scale).toBe(1);
+  expect(frame.actions[0]?.event.kind).toBe(VideoProjectActionEventKind.PAUSE);
+  expect(frame.actions[0]?.preset).toBe(VideoProjectActionPreset.CLICK_RIPPLE);
 });

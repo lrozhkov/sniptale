@@ -1,19 +1,22 @@
+import type { TimelineProjection } from '../interaction-state/projection';
 import type React from 'react';
 import type { VideoProject, VideoProjectClip } from '../../../../features/video/project/types';
 import type { TimelineClipPreview } from '../../../contracts/timeline-preview';
 import type { DragMode } from '../types';
 
 export interface ProjectTimelineClipProps {
+  hideClipNames?: boolean;
   clip: VideoProjectClip;
   isHovered: boolean;
   isSelected: boolean;
   pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
   preview?: TimelineClipPreview;
   project: VideoProject;
   trackClipTop?: number;
   trackClipRowHeight?: number;
   trackLocked: boolean;
-  onSelectClip: (clipId: string | null) => void;
+  onSelectClip: (clipId: string | null, intent?: 'replace' | 'toggle' | 'range') => void;
   onClipHoverChange: (clipId: string | null) => void;
   onBeginClipInteraction: (
     event: React.PointerEvent,
@@ -23,18 +26,22 @@ export interface ProjectTimelineClipProps {
 }
 
 export interface ProjectTimelineClipViewModel {
+  visible: boolean;
+  includesStart: boolean;
+  includesEnd: boolean;
+  offsetSeconds: number;
+  visibleDuration: number;
+  bodyInsetLeft: number;
+  bodyInsetRight: number;
   clipClassName: string;
   edgeClassName: string;
   fadeInOverlayWidth: number;
+  fadeInOverlayStyle: React.CSSProperties;
   fadeOutOverlayWidth: number;
-  hasIncomingCrossfade: boolean;
-  hasOutgoingCrossfade: boolean;
-  incomingCrossfadeOverlayWidth: number;
-  incomingCrossfadeTitle: string;
+  fadeOutOverlayStyle: React.CSSProperties;
+  labelHeight: number;
   labelStyle: React.CSSProperties;
   left: number;
-  outgoingCrossfadeOverlayWidth: number;
-  outgoingCrossfadeTitle: string;
   style: React.CSSProperties;
   previewTileWidth: number;
   trimHandleClassName: string;

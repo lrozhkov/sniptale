@@ -203,3 +203,31 @@ describe('Paint serialization', () => {
     expect(css === 'transparent' || css.includes('#000000ff')).toBe(true);
   });
 });
+
+it('matches the CSS exponential transition hint away from the midpoint', () => {
+  const gradient: Gradient = {
+    type: 'linear',
+    angle: 90,
+    interpolation: 'srgb',
+    repeat: { enabled: false, span: 1 },
+    stops: [
+      { id: 'black', color: '#000000ff', position: 0, midpoint: 0.25 },
+      { id: 'white', color: '#ffffffff', position: 1, midpoint: 0.5 },
+    ],
+  };
+  expect(sampleGradient(gradient, 0.0625)).toBe('#404040ff');
+  expect(sampleGradient(gradient, 0.25)).toBe('#808080ff');
+  expect(sampleGradient(gradient, 0.5625)).toBe('#bfbfbfff');
+});
+
+it('extends endpoint colors outside stop bounds and keeps fully transparent blends transparent', () => {
+  const gradient = linearGradient();
+  gradient.stops[0]!.position = 0.2;
+  gradient.stops[1]!.position = 0.8;
+  gradient.stops[1]!.color = '#ff000000';
+  expect(sampleGradient(gradient, 0)).toBe('#00000000');
+  expect(sampleGradient(gradient, 1)).toBe('#ff000000');
+  for (const interpolation of ['srgb', 'srgb-linear', 'oklab', 'oklch'] as const) {
+    expect(sampleGradient({ ...gradient, interpolation }, 0.5)).toBe('#00000000');
+  }
+});

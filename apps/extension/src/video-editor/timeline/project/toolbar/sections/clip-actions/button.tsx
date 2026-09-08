@@ -1,7 +1,7 @@
 import type { JSX } from 'react';
 
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { toolbarButtonClassName } from '../../constants';
+import { toolbarIconButtonClassName } from '../../constants';
 
 type ProjectTimelineToolbarActionButtonProps = {
   danger?: boolean;
@@ -23,14 +23,20 @@ export function ProjectTimelineToolbarActionButton({
   return (
     <ContentToolbarButton
       type="button"
-      className={toolbarButtonClassName}
+      aria-label={label}
+      className={[
+        toolbarIconButtonClassName,
+        '@min-[1600px]/timeline:!w-auto @min-[1600px]/timeline:!gap-2 @min-[1600px]/timeline:!px-2.5',
+      ].join(' ')}
       disabled={disabled}
       onClick={onClick}
       title={title}
       tone={danger ? 'danger' : 'default'}
     >
       {icon}
-      <span>{label}</span>
+      <span className="sr-only @min-[1600px]/timeline:not-sr-only @min-[1600px]/timeline:text-[13px]">
+        {label}
+      </span>
     </ContentToolbarButton>
   );
 }

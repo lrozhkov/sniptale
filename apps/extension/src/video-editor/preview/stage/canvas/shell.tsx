@@ -1,4 +1,5 @@
 import React from 'react';
+import type { PreviewStageAlternateView } from '../types';
 import { Expand, Minimize2 } from 'lucide-react';
 import { translate } from '../../../../platform/i18n/index';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -16,12 +17,15 @@ import { PreviewStageZoomNavigator } from './navigator';
 const PREVIEW_STAGE_CONTENT_BOX_CLASS_NAME = 'absolute inset-4 min-h-0';
 
 const STAGE_CONTROL_BUTTON_CLASS_NAME = '!h-9 !w-9 !min-w-9 !px-0';
-const STAGE_OVERLAY_CONTROLS_CLASS_NAME = [
-  'pointer-events-none absolute right-4 top-4 z-20 flex',
-  'max-w-[calc(100%-2rem)] flex-nowrap items-center justify-end gap-2',
+const STAGE_HEADER_CLASS_NAME = [
+  'flex shrink-0 items-center justify-end gap-2 border-b px-3 py-2',
+  'border-[color:var(--sniptale-color-border-soft)]',
 ].join(' ');
 
 export interface PreviewStageShellLayoutProps {
+  alternateView?: PreviewStageAlternateView | undefined;
+  headerContent?: React.ReactNode;
+  headerActions?: React.ReactNode;
   children: React.ReactNode;
   currentTime: number;
   duration: number;
@@ -141,25 +145,36 @@ function PreviewStageFullscreenButton(props: {
 
 function PreviewStageShellControls(
   props: ResolvedPreviewStageControls & {
+    headerContent?: React.ReactNode;
+    headerActions?: React.ReactNode;
+    alternateActive?: boolean | undefined;
     isFullscreen: boolean;
     onCloseFullscreen?: () => void;
     onOpenFullscreen?: () => void;
   }
 ) {
   return (
-    <div className={STAGE_OVERLAY_CONTROLS_CLASS_NAME}>
-      <PreviewStageControls
-        mode={props.previewMode}
-        onModeChange={props.onPreviewModeChange}
-        onPreferencesRetry={props.onPreviewPreferencesRetry}
-        onRasterPresetChange={props.onPreviewRasterPresetChange}
-        onZoomChange={props.onPreviewZoomChange}
-        rasterPreset={props.previewRasterPreset}
-        preferencesSaveFailed={props.previewPreferencesSaveFailed}
-        zoom={props.previewZoom}
-        status={props.previewStatus}
-      />
-      <PreviewStageFullscreenButton {...props} />
+    <div className={STAGE_HEADER_CLASS_NAME} data-ui="video.preview.header">
+      <div className="flex min-h-9 min-w-0 flex-1 items-center">
+        {props.isFullscreen ? null : props.headerContent}
+      </div>
+      <div hidden={props.alternateActive}>
+        <PreviewStageControls
+          mode={props.previewMode}
+          onModeChange={props.onPreviewModeChange}
+          onPreferencesRetry={props.onPreviewPreferencesRetry}
+          onRasterPresetChange={props.onPreviewRasterPresetChange}
+          onZoomChange={props.onPreviewZoomChange}
+          rasterPreset={props.previewRasterPreset}
+          preferencesSaveFailed={props.previewPreferencesSaveFailed}
+          zoom={props.previewZoom}
+          status={props.previewStatus}
+        />
+      </div>
+      {!props.isFullscreen && props.headerActions}
+      <div hidden={props.alternateActive}>
+        <PreviewStageFullscreenButton {...props} />
+      </div>
     </div>
   );
 }
@@ -167,6 +182,9 @@ function PreviewStageShellControls(
 type StageShellMainPaneProps = Pick<
   PreviewStageShellLayoutProps,
   | 'children'
+  | 'headerContent'
+  | 'headerActions'
+  | 'alternateView'
   | 'currentTime'
   | 'duration'
   | 'isFullscreen'
@@ -189,17 +207,29 @@ type StageShellMainPaneProps = Pick<
 
 function StageShellMainPane(props: StageShellMainPaneProps) {
   return (
-    <div className="relative min-w-0 flex-1">
+    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
       <PreviewStageShellControls
+        headerContent={props.headerContent}
+        headerActions={props.headerActions}
+        alternateActive={props.alternateView?.active}
         {...resolvePreviewStageControls(props)}
         isFullscreen={props.isFullscreen}
         {...(props.onCloseFullscreen ? { onCloseFullscreen: props.onCloseFullscreen } : {})}
         {...(props.onOpenFullscreen ? { onOpenFullscreen: props.onOpenFullscreen } : {})}
       />
-      <PreviewStageContent previewZoom={props.previewZoom ?? 'fit'}>
-        {props.children}
-      </PreviewStageContent>
-      <StageShellFullscreenTransport {...props} />
+      <div className="relative min-h-0 flex-1">
+        <div className="relative h-full" hidden={props.alternateView?.active}>
+          <PreviewStageContent previewZoom={props.previewZoom ?? 'fit'}>
+            {props.children}
+          </PreviewStageContent>
+          <StageShellFullscreenTransport {...props} />
+        </div>
+        {props.alternateView ? (
+          <div className="absolute inset-0" hidden={!props.alternateView.active}>
+            {props.alternateView.content}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

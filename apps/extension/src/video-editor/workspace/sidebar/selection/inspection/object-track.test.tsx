@@ -50,7 +50,8 @@ describe('workspace-sidebar/selection/inspect-object-track', () => {
     project.objectTracks = [objectTrack];
 
     renderInspectPanel(project, objectTrack);
-    expect(container?.textContent).toContain('videoEditor.sidebar.objectTrackKindVisualCursor');
+    clickGroup('videoEditor.sidebar.inspectorGroupSummary');
+    expect(container?.textContent).toContain('videoEditor.sidebar.objectTrackConfidenceLabel');
     expect(container?.textContent).not.toContain(
       'videoEditor.sidebar.inspectorGroupFollowInstances'
     );
@@ -63,7 +64,8 @@ describe('workspace-sidebar/selection/inspect-object-track', () => {
 
     renderSelectionPanel(project, objectTrack);
 
-    expect(container?.textContent).toContain('videoEditor.sidebar.objectTrackKindVisualCursor');
+    clickGroup('videoEditor.sidebar.inspectorGroupSummary');
+    expect(container?.textContent).toContain('videoEditor.sidebar.objectTrackConfidenceLabel');
   });
 });
 
@@ -82,7 +84,8 @@ describe('workspace-sidebar/selection/object-track-status', () => {
     renderInspectPanel(project, null);
     clickGroup('videoEditor.sidebar.inspectorGroupObjectTracks');
 
-    expect(container?.textContent).toContain(visibleTrack.id);
+    expect(container?.textContent).toContain('videoEditor.sidebar.objectTrackKindVisualCursor');
+    expect(container?.querySelectorAll('[data-section] button')).toHaveLength(2);
     expect(container?.textContent).not.toContain(hiddenTrack.id);
   });
 
@@ -92,12 +95,12 @@ describe('workspace-sidebar/selection/object-track-status', () => {
     project.objectTracks = [objectTrack];
 
     renderInspectPanel(project, objectTrack);
-    clickGroup('videoEditor.sidebar.inspectorGroupStatus');
+    clickGroup('videoEditor.sidebar.inspectorGroupObjectTracking');
 
     const confidenceSegments = container?.querySelectorAll(
       '[data-ui="video-editor.object-track.confidence-segment"]'
     );
-    expect(confidenceSegments?.length).toBeLessThanOrEqual(160);
+    expect(confidenceSegments?.length).toBe(160);
   });
 });
 
@@ -190,8 +193,9 @@ function createSelectionPanelSource(args: {
 }
 
 function clickGroup(title: string) {
-  const button = container?.querySelector<HTMLButtonElement>(`button[title="${title}"]`);
+  const button = container?.querySelector<HTMLElement>(`nav button[title="${title}"]`);
   act(() => {
-    button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    if (!button?.parentElement?.hasAttribute('open'))
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 }

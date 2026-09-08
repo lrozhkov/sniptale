@@ -1,3 +1,4 @@
+import type { TimelineProjection } from '../../interaction-state/projection';
 import { buildVideoCompositionTransitionSegments } from '../../../../../features/video/composition/timeline/lanes';
 import { getTrackClips } from '../../../../../features/video/project/timeline';
 import type { VideoProject } from '../../../../../features/video/project/types';
@@ -12,10 +13,13 @@ import {
 import type { DragMode, TimelineEffectDragTarget, TimelineEffectSelection } from '../../types';
 
 export function ProjectTimelineTrackClipStack(props: {
+  hideClipNames?: boolean;
   hoveredClipId: string | null;
   pixelsPerSecond: number;
+  projection?: TimelineProjection | undefined;
   project: VideoProject;
   selectedClipId: string | null;
+  selectedClipIds?: readonly string[];
   selectedEffectSelection: TimelineEffectSelection | null;
   timelinePreviews: TimelineClipPreviewMap;
   trackId: string;
@@ -27,7 +31,7 @@ export function ProjectTimelineTrackClipStack(props: {
     mode: DragMode
   ) => void;
   onBeginEffectInteraction: (event: React.PointerEvent, target: TimelineEffectDragTarget) => void;
-  onSelectClip: (clipId: string | null) => void;
+  onSelectClip: (clipId: string | null, intent?: 'replace' | 'toggle' | 'range') => void;
   onSetHoveredClipId: (clipId: string | null) => void;
 }) {
   const stackLayout = getTrackClipStackLayout(props);
@@ -77,9 +81,11 @@ function ProjectTimelineTrackClipItems(
       <ProjectTimelineClip
         key={clip.id}
         clip={clip}
+        hideClipNames={props.hideClipNames ?? false}
         isHovered={props.hoveredClipId === clip.id}
-        isSelected={props.selectedClipId === clip.id}
+        isSelected={props.selectedClipId === clip.id || !!props.selectedClipIds?.includes(clip.id)}
         pixelsPerSecond={props.pixelsPerSecond}
+        projection={props.projection}
         {...(props.timelinePreviews[clip.id] ? { preview: props.timelinePreviews[clip.id] } : {})}
         project={props.project}
         trackLocked={props.trackLocked}

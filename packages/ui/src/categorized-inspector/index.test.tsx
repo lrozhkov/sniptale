@@ -170,3 +170,24 @@ it('falls back when the active category disappears and renders nothing without c
   });
   expect(container.innerHTML).toBe('');
 });
+
+it('reports user selection for both pointer and keyboard without reporting initialization', () => {
+  const onSectionChange = vi.fn();
+  act(() =>
+    root.render(
+      <CategorizedInspector
+        ariaLabel="Sections"
+        initialSection="outline"
+        sections={sections}
+        renderSection={(id) => id}
+        onSectionChange={onSectionChange}
+      />
+    )
+  );
+  expect(onSectionChange).not.toHaveBeenCalled();
+  const fill = container.querySelector<HTMLButtonElement>('[aria-label="Fill"]')!;
+  act(() => fill.click());
+  expect(onSectionChange).toHaveBeenLastCalledWith('fill');
+  act(() => fill.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true })));
+  expect(onSectionChange).toHaveBeenLastCalledWith('effects');
+});

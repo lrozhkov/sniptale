@@ -183,6 +183,10 @@ it('removes standalone media dependency graphs and aggregate sidecars atomically
     deletedIds: [recordingMedia.id, projectAssetMedia.id],
   });
   expect(deletes).toHaveBeenCalledWith('recordings', recording.id);
+  for (const id of [recordingMedia.id, projectAssetMedia.id]) {
+    expect(deletes).toHaveBeenCalledWith('video_workspaces', id);
+    expect(deletes).toHaveBeenCalledWith('video_workspace_drafts', id);
+  }
   expect(deletes).toHaveBeenCalledWith('recording_telemetry', recording.id);
   expect(deletes).toHaveBeenCalledWith('project_assets', 'asset-1');
   expect(deletes).toHaveBeenCalledWith('image_workspaces', recordingMedia.id);

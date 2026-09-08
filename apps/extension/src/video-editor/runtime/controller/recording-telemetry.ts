@@ -1,17 +1,28 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { getRecordingTelemetry } from '../../../composition/persistence/recordings/telemetry';
 import { subscribeToMediaHubEvents } from '../../../features/media-hub/events';
-import type { DiagnosticsTelemetryPort } from '../../contracts/controller-store';
+import type { RecordingTelemetryPort } from '../../contracts/controller-store';
+import type { VideoProject } from '../../../features/video/project/types';
+import { collectProjectRecordingIds } from '../../project/operations/source-timed-clips';
 
 export function useRecordingTelemetry(
-  sourceRecordingId: string | null,
-  setRecordingTelemetry: DiagnosticsTelemetryPort['setRecordingTelemetry']
+  project: VideoProject | null,
+  setRecordingTelemetry: RecordingTelemetryPort['setRecordingTelemetry']
 ) {
+  const sourceIds = collectProjectRecordingIds(project);
+  const stableIds = useRef(sourceIds);
+  if (
+    sourceIds.length !== stableIds.current.length ||
+    sourceIds.some((id, index) => id !== stableIds.current[index])
+  )
+    stableIds.current = sourceIds;
+  const recordingIds = stableIds.current;
+  const projectId = project?.id;
   useEffect(() => {
     let disposed = false;
     let loadRevision = 0;
-    setRecordingTelemetry(null);
-    if (!sourceRecordingId) {
+    setRecordingTelemetry([]);
+    if (recordingIds.length === 0) {
       return () => {
         disposed = true;
       };
@@ -20,26 +31,27 @@ export function useRecordingTelemetry(
     const load = () => {
       const revision = loadRevision + 1;
       loadRevision = revision;
-      void getRecordingTelemetry(sourceRecordingId)
-        .then((recordingTelemetry) => {
-          if (!disposed && revision === loadRevision) {
-            setRecordingTelemetry(
-              recordingTelemetry?.recordingId === sourceRecordingId ? recordingTelemetry : null
-            );
+      void Promise.all(
+        recordingIds.map(async (id) => {
+          try {
+            const entry = await getRecordingTelemetry(id);
+            return entry?.recordingId === id ? [entry] : [];
+          } catch {
+            return [];
           }
         })
-        .catch(() => {
-          if (!disposed && revision === loadRevision) {
-            setRecordingTelemetry(null);
-          }
-        });
+      ).then((entries) => {
+        if (!disposed && revision === loadRevision) {
+          setRecordingTelemetry(entries.flat());
+        }
+      });
     };
 
     load();
     const unsubscribe = subscribeToMediaHubEvents((event) => {
       if (
         event.type === 'library-changed' &&
-        event.assetIds.includes(`recording:${sourceRecordingId}`)
+        recordingIds.some((id) => event.assetIds.includes(`recording:${id}`))
       ) {
         load();
       }
@@ -49,5 +61,5 @@ export function useRecordingTelemetry(
       loadRevision += 1;
       unsubscribe();
     };
-  }, [setRecordingTelemetry, sourceRecordingId]);
+  }, [setRecordingTelemetry, projectId, recordingIds]);
 }

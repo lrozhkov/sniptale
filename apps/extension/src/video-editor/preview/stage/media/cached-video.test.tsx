@@ -113,3 +113,31 @@ it('appends cached fragments in sequence and releases the MediaSource URL', asyn
   expect(revokeObjectURL).toHaveBeenCalledWith('blob:cached-preview');
   root = createRoot(container);
 });
+
+it.each([30, 60, 240])(
+  'seeks each paused cached frame at %ifps in both directions',
+  async (fps) => {
+    const source = {
+      codec: 'avc1.640033',
+      endTime: 6,
+      mimeType: 'video/mp4',
+      segments: [new BufferBackedBlob(new Uint8Array([1]))],
+      startTime: 2,
+    };
+    const renderTime = async (currentTime: number) => {
+      await act(async () =>
+        root.render(
+          <PreviewStageCachedVideo currentTime={currentTime} isPlaying={false} source={source} />
+        )
+      );
+    };
+    await renderTime(2.5);
+    await act(async () => {
+      FakeMediaSource.latest?.open();
+    });
+    for (const currentTime of [2.5 + 1 / fps, 2.5, 2.5 - 1 / fps]) {
+      await renderTime(currentTime);
+      expect(container.querySelector('video')?.currentTime).toBeCloseTo(currentTime - 2, 10);
+    }
+  }
+);

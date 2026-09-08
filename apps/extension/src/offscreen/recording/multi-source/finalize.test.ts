@@ -164,7 +164,6 @@ describe('multi-source finalization', () => {
     });
     expect(commitProjectMock).toHaveBeenCalledWith(expect.objectContaining({ id: 'project-1' }), {
       baseRevision: null,
-      storageClass: 'temporary',
     });
     expect(saveBatchMock.mock.invocationCallOrder[0]).toBeLessThan(
       commitProjectMock.mock.invocationCallOrder[0]!

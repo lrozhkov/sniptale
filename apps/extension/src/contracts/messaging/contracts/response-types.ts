@@ -3,7 +3,8 @@ import type { CaptureActionType } from '../../settings';
 import type { ProjectExportCapabilitiesPayload } from './types';
 import type {
   RecordingTelemetrySignal,
-  VideoProjectActionEvent,
+  RecordingViewportObservation,
+  RecordingActionEvent,
   VideoProjectCursorTrack,
 } from '../../../features/video/project/types';
 import type {
@@ -101,9 +102,10 @@ export type ViewportCoordsResponse = RuntimeMessageResponse<{
 }>;
 
 export type RecordingTelemetrySnapshot = {
+  viewportObservation?: RecordingViewportObservation | null;
   viewport: ViewportInfo | null;
   cursorTrack: VideoProjectCursorTrack | null;
-  actionEvents: VideoProjectActionEvent[];
+  actionEvents: RecordingActionEvent[];
   signals: RecordingTelemetrySignal[];
 };
 

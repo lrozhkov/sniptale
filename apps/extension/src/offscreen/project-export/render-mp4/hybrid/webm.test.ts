@@ -88,7 +88,12 @@ async function* createSamples(samples: unknown[]) {
 beforeEach(() => {
   vi.clearAllMocks();
   inputDisposeMocks.length = 0;
-  getPrimaryVideoTrackMock.mockResolvedValue({ canDecode: canDecodeMock });
+  getPrimaryVideoTrackMock.mockResolvedValue({
+    canDecode: canDecodeMock,
+    getDecoderConfig: vi
+      .fn()
+      .mockResolvedValue({ codec: 'vp8', colorSpace: { matrix: 'smpte170m' } }),
+  });
   canDecodeMock.mockResolvedValue(true);
   loadBlobForAssetMock.mockResolvedValue(new Blob([new Uint8Array([1, 2, 3])]));
   pauseRenderLoopMediaElementsMock.mockResolvedValue(undefined);
@@ -200,5 +205,17 @@ it('closes yielded samples when pipeline failure interrupts accelerated WebM ren
   await expect(renderAcceleratedCompositeWebmSpan(args)).rejects.toThrow('encode failed');
 
   expect(sample.close).toHaveBeenCalledOnce();
+  expect(inputDisposeMocks[0]).toHaveBeenCalledOnce();
+});
+
+it('defers untagged VP8 to the media-element renderer before encoding any frames', async () => {
+  getPrimaryVideoTrackMock.mockResolvedValueOnce({
+    canDecode: canDecodeMock,
+    getDecoderConfig: vi.fn().mockResolvedValue({ codec: 'vp8' }),
+  });
+  const args = createArgs();
+  await expect(renderAcceleratedCompositeWebmSpan(args)).resolves.toBe(false);
+  expect(args.videoEncoder.encode).not.toHaveBeenCalled();
+  expect(drawProjectFrameMock).not.toHaveBeenCalled();
   expect(inputDisposeMocks[0]).toHaveBeenCalledOnce();
 });

@@ -1,6 +1,10 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorTimelineLaneMessages = defineMessageSource({
+  hideTrackNames: {
+    ru: 'Скрыть названия дорожек',
+    en: 'Hide track names',
+  },
   transitionLane: {
     ru: 'Переходы',
     en: 'Transitions',
@@ -34,9 +38,22 @@ export const videoEditorTimelineLaneMessages = defineMessageSource({
     en: 'Actions',
   },
   motionLane: {
-    ru: 'Камера',
-    en: 'Camera',
+    ru: 'Зум',
+    en: 'Zoom',
   },
+  historyClick: { ru: 'Клик', en: 'Click' },
+  historyKeys: { ru: 'Клавиши', en: 'Keys' },
+  historyScroll: { ru: 'Прокрутка', en: 'Scroll' },
+  historyPause: { ru: 'Пауза', en: 'Pause' },
+  historyCallout: { ru: 'Акцент', en: 'Accent' },
+  historyAddClick: { ru: 'Добавить клик', en: 'Add click' },
+  historyOriginalTime: { ru: 'Исходное время', en: 'Original time' },
+  historyTyping: { ru: 'Ввод текста', en: 'Typing' },
+  historyStable: { ru: 'Без изменений', en: 'Stable interval' },
+  historyEnabled: { ru: 'Визуализация включена', en: 'Visualization enabled' },
+  historyDisabled: { ru: 'Визуализация выключена', en: 'Visualization disabled' },
+  historySuppressed: { ru: 'Повтор подавлен', en: 'Repeated event suppressed' },
+  historyOverride: { ru: 'Индивидуальные настройки', en: 'Custom settings' },
   telemetryLane: {
     ru: 'История действий',
     en: 'Action history',
@@ -46,8 +63,8 @@ export const videoEditorTimelineLaneMessages = defineMessageSource({
     en: 'Captured events',
   },
   telemetryLaneEmpty: {
-    ru: 'Полезные сигналы записи появятся здесь, когда для проекта доступна телеметрия.',
-    en: 'Useful recording signals will appear here when telemetry is available for the project.',
+    ru: 'События и интервалы записи появятся здесь.',
+    en: 'Recording events and intervals appear here.',
   },
   telemetryToggle: {
     ru: 'История действий',

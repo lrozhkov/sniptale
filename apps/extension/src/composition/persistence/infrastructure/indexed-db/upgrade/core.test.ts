@@ -1,5 +1,10 @@
 import { expect, it, vi } from 'vitest';
-import { EXPECTED_INDEXES, EXPECTED_STORES, SCHEMA_CONTRACTS_STORE } from '../core.stores.ts';
+import {
+  DB_VERSION,
+  EXPECTED_INDEXES,
+  EXPECTED_STORES,
+  SCHEMA_CONTRACTS_STORE,
+} from '../core.stores.ts';
 import { CURRENT_SCHEMA_CONTRACTS, type DatabaseMigrationDescriptor } from '../schema-contracts.ts';
 import { executeDatabaseUpgrade, handleDatabaseUpgrade } from './core.ts';
 
@@ -33,10 +38,10 @@ function createUpgradeHarness() {
   return { db, stores, transaction };
 }
 
-it('creates the complete beta-v1 schema and persists every domain contract', () => {
+it('creates the complete current beta schema and persists every domain contract', () => {
   const harness = createUpgradeHarness();
 
-  handleDatabaseUpgrade(harness.db, 0, 1, harness.transaction);
+  handleDatabaseUpgrade(harness.db, 0, DB_VERSION, harness.transaction);
 
   expect(harness.db.createObjectStore.mock.calls.map(([name]) => name)).toEqual(EXPECTED_STORES);
   for (const [storeName, expectedIndexes] of Object.entries(EXPECTED_INDEXES)) {

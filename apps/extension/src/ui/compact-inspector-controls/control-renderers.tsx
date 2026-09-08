@@ -40,7 +40,10 @@ function SegmentedOption<T extends string>(props: {
       compact
       tone="toggle"
       active={props.active}
-      className="min-w-0 !h-auto !min-h-10 !whitespace-normal !px-2 py-2 text-center !text-[11px] !leading-tight"
+      className={[
+        'min-w-0 !h-auto !min-h-10 !whitespace-normal !px-2 py-2 text-center',
+        '!text-[length:var(--sniptale-compact-font-size,11px)] !leading-tight',
+      ].join(' ')}
       aria-pressed={props.active}
       disabled={props.option.disabled === true}
       title={props.option.label}
@@ -57,7 +60,12 @@ export function OptionRowValue({ value }: { value?: React.ReactNode | undefined 
   }
 
   return (
-    <span className="text-[12px] font-semibold text-[color:var(--sniptale-color-text-muted)]">
+    <span
+      className={[
+        'text-[length:var(--sniptale-compact-font-size,12px)] font-semibold',
+        'text-[color:var(--sniptale-color-text-muted)]',
+      ].join(' ')}
+    >
       {value}
     </span>
   );

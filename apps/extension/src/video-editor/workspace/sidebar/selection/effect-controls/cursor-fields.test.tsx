@@ -35,7 +35,15 @@ describe('workspace-sidebar/selection/cursor-fields', () => {
 
     expect(markup).toContain('data-ui="shared.ui.color-selector"');
     expect(markup).toContain('videoEditor.sidebar.cursorCaptureModeLabel');
-    expect(markup).toContain('videoEditor.sidebar.cursorCaptureModeFallback');
+    expect(markup).toContain('videoEditor.sidebar.cursorCaptureModeSeparate');
+    expect(markup).not.toContain('videoEditor.sidebar.cursorCaptureModeFallback');
+    const surface = document.createElement('div');
+    surface.innerHTML = markup;
+    expect(
+      Array.from(surface.querySelectorAll('button')).some((button) =>
+        button.textContent?.includes('cursorCaptureMode')
+      )
+    ).toBe(false);
     expect(markup).toContain('videoEditor.sidebar.cursorPresetLabel');
     expect(markup).toContain('videoEditor.sidebar.cursorAnimationLabel');
     expect(markup).toContain('videoEditor.sidebar.cursorColorLabel');

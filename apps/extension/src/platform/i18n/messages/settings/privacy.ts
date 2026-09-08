@@ -18,8 +18,8 @@ export const settingsPrivacyMessages = defineMessageSource({
     en: 'Cleared data classes',
   },
   dataClasses: {
-    ru: 'Скриншоты, записи, веб-снимки, проекты, черновики редакторов, телеметрия, диагностика, история AI-запросов и временные задания.',
-    en: 'Screenshots, recordings, web snapshots, projects, editor drafts, telemetry, diagnostics, AI request history, and temporary jobs.',
+    ru: 'Скриншоты, записи, веб-снимки, проекты, черновики редакторов, история действий, диагностика, история AI-запросов и временные задания.',
+    en: 'Screenshots, recordings, web snapshots, projects, editor drafts, action history, diagnostics, AI request history, and temporary jobs.',
   },
   deleteLocalDataTitle: {
     ru: 'Удалить локальные данные',

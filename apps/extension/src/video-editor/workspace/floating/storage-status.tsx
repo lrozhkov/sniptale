@@ -1,40 +1,12 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Check, CloudUpload } from 'lucide-react';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { getVideoProject } from '../../../composition/persistence/projects';
-import { translate } from '../../../platform/i18n';
+import { useCallback, useEffect } from 'react';
 import { connectAggregateEditorPresence } from '../../../workflows/aggregate-editor-presence/client';
 import { useVideoEditorProjectStorageStatus } from '../../runtime/controller/store';
 import { promoteOpenVideoProject, refreshSavedVideoProjectPresentation } from './storage-promotion';
 
 export function VideoProjectStorageStatus() {
-  const projectId =
-    typeof window === 'undefined'
-      ? null
-      : new URLSearchParams(window.location.search).get('project');
-  const [temporary, setTemporary] = useState<boolean | null>(null);
-  const [promotionState, setPromotionState] = useState<'idle' | 'saving' | 'error'>('idle');
-  const { projectUpdatedAt, saveState } = useVideoEditorProjectStorageStatus();
+  const { projectId, projectUpdatedAt, saveState } = useVideoEditorProjectStorageStatus();
   const promote = useCallback(async () => {
-    if (!projectId) return;
-    setPromotionState('saving');
-    try {
-      await promoteOpenVideoProject(projectId);
-      setTemporary(false);
-      setPromotionState('idle');
-    } catch (error) {
-      setPromotionState('error');
-      throw error;
-    }
-  }, [projectId]);
-
-  useEffect(() => {
-    if (!projectId) return;
-    void getVideoProject(projectId)
-      .then((result) => {
-        setTemporary(result.status === 'ready' && result.lifecycle?.storageClass === 'temporary');
-      })
-      .catch(() => setTemporary(null));
+    if (projectId) await promoteOpenVideoProject(projectId);
   }, [projectId]);
 
   useEffect(() => {
@@ -51,36 +23,5 @@ export function VideoProjectStorageStatus() {
     return () => presence.dispose();
   }, [projectId, promote]);
 
-  if (!projectId || temporary === null) return null;
-
-  if (!temporary) {
-    return (
-      <span className="flex items-center gap-1.5 text-xs text-[var(--sniptale-color-text-secondary)]">
-        <Check size={14} aria-hidden />
-        {translate('editor.documentActions.inLibrary')}
-      </span>
-    );
-  }
-
-  return (
-    <div className="flex min-w-0 items-center gap-2">
-      <ProductActionButton
-        compact
-        tone="secondary"
-        disabled={promotionState === 'saving'}
-        onClick={() => void promote().catch(() => undefined)}
-        className="gap-1.5 whitespace-nowrap"
-      >
-        <CloudUpload size={14} aria-hidden />
-        {promotionState === 'saving'
-          ? translate('common.states.saving')
-          : translate('editor.documentActions.saveToLibrary')}
-      </ProductActionButton>
-      {promotionState === 'error' ? (
-        <span className="max-w-56 text-xs text-[var(--sniptale-color-danger)]" role="alert">
-          {translate('editor.documentActions.saveToLibraryError')}
-        </span>
-      ) : null}
-    </div>
-  );
+  return null;
 }

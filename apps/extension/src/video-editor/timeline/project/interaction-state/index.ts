@@ -1,4 +1,5 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useTimelineClipReveal } from './reveal';
+import { useMemo, useRef, useState } from 'react';
 import type { VideoEditorTrackHeightMultiplier } from '../../../persistence/track-panel';
 import { useProjectTimelineEffectInteractions } from '../effect-lanes/interactions';
 import type { ProjectTimelineProps } from '../types';
@@ -7,7 +8,7 @@ import { useProjectTimelineRangeSelection } from './range';
 import { useProjectTimelineScrollSync } from './scroll-sync';
 import { useTimelineSelectedTrackAutoScroll } from './selected-track-scroll';
 import { useProjectTimelineSeek } from './seek';
-import { resolveTimelineFitPixelsPerSecond, useTimelineViewportWidth } from './viewport';
+import { useProjectTimelineViewState, useTimelineViewportWidth } from './viewport';
 
 type TimelineRangeSelectionProps = Pick<
   ProjectTimelineProps,
@@ -23,49 +24,58 @@ type TrackHeightState = Record<string, VideoEditorTrackHeightMultiplier>;
 
 function useProjectTimelineInteractions(
   props: ProjectTimelineProps,
-  trackHeightByTrackId: TrackHeightState
+  trackHeightByTrackId: TrackHeightState,
+  readTimelineStartTime: () => number
 ) {
   const pointerSessionCleanupRef = useRef<(() => void) | null>(null);
-  const { beginClipInteraction, dragGhost, trackLayoutModel, tracks } = useProjectTimelineDrag({
-    historyTransaction: props.historyTransaction,
-    pointerSessionCleanupRef,
-    pixelsPerSecond: props.pixelsPerSecond,
-    project: props.project,
-    trackHeightByTrackId,
-    onMoveClip: props.onMoveClip,
-    onSelectClip: props.onSelectClip,
-    onSelectTrack: props.onSelectTrack,
-    onTimelinePreviewSuspendedChange: props.onTimelinePreviewSuspendedChange,
-    onTrimClipEnd: props.onTrimClipEnd,
-    onTrimClipStart: props.onTrimClipStart,
-  });
-  const { beginEffectInteraction, selectedEffectSelection } = useProjectTimelineEffectInteractions({
-    historyTransaction: props.historyTransaction,
-    pointerSessionCleanupRef,
-    magnetEnabled: props.magnetEnabled,
-    pixelsPerSecond: props.pixelsPerSecond,
-    project: props.project,
-    selection: props.selection,
-    onMoveActionEvent: props.onMoveActionEvent,
-    onResizeActionEvent: props.onResizeActionEvent,
-    onMoveCursorSegment: props.onMoveCursorSegment,
-    onMoveMotionRegion: props.onMoveMotionRegion,
-    onResizeMotionRegion: props.onResizeMotionRegion,
-    onMoveTransitionSegment: props.onMoveTransitionSegment,
-    onUpdateEffectInstance: props.onUpdateEffectInstance,
-    onSelectActionSegment: props.onSelectActionSegment,
-    onSelectClip: props.onSelectClip,
-    onSelectCursorSegment: props.onSelectCursorSegment,
-    onSelectMotionRegion: props.onSelectMotionRegion,
-    onSelectObjectTrack: props.onSelectObjectTrack,
-    onSelectScene: props.onSelectScene,
-    onSelectTransition: props.onSelectTransition,
-  });
+  const { beginClipInteraction, dragGhost, snapGuideTime, trackLayoutModel, tracks } =
+    useProjectTimelineDrag({
+      currentTime: props.currentTime,
+      historyTransaction: props.historyTransaction,
+      magnetEnabled: props.magnetEnabled,
+      pointerSessionCleanupRef,
+      pixelsPerSecond: props.pixelsPerSecond,
+      readTimelineStartTime,
+      project: props.project,
+      trackHeightByTrackId,
+      onSwapClip: props.onSwapClip,
+      onMoveClip: props.onMoveClip,
+      onSelectClip: props.onSelectClip,
+      onSelectTrack: props.onSelectTrack,
+      onTimelinePreviewSuspendedChange: props.onTimelinePreviewSuspendedChange,
+      onTrimClipEnd: props.onTrimClipEnd,
+      onTrimClipStart: props.onTrimClipStart,
+    });
+  const { beginEffectInteraction, selectedEffectSelection, effectDragDraft } =
+    useProjectTimelineEffectInteractions({
+      historyTransaction: props.historyTransaction,
+      pointerSessionCleanupRef,
+      magnetEnabled: props.magnetEnabled,
+      pixelsPerSecond: props.pixelsPerSecond,
+      readTimelineStartTime,
+      project: props.project,
+      selection: props.selection,
+      onMoveCursorSegment: props.onMoveCursorSegment,
+      onMoveActionOccurrence: props.onMoveActionOccurrence,
+      onMoveMotionRegion: props.onMoveMotionRegion,
+      onResizeMotionRegion: props.onResizeMotionRegion,
+      onMoveTransitionSegment: props.onMoveTransitionSegment,
+      onUpdateEffectInstance: props.onUpdateEffectInstance,
+      onSelectClip: props.onSelectClip,
+      onSelectActionOccurrence: props.onSelectActionOccurrence,
+      onSelectCursorSegment: props.onSelectCursorSegment,
+      onSelectMotionRegion: props.onSelectMotionRegion,
+      onSelectObjectTrack: props.onSelectObjectTrack,
+      onSelectScene: props.onSelectScene,
+      onSelectTransition: props.onSelectTransition,
+    });
 
   return {
     beginClipInteraction,
     dragGhost,
+    snapGuideTime,
     beginEffectInteraction,
+    effectDragDraft,
     selectedEffectSelection,
     trackLayoutModel,
     tracks,
@@ -74,13 +84,15 @@ function useProjectTimelineInteractions(
 
 function useTimelineRangeSelectionState(
   props: TimelineRangeSelectionProps,
-  timelineRef: React.MutableRefObject<HTMLDivElement | null>
+  timelineRef: React.MutableRefObject<HTMLDivElement | null>,
+  readTimelineStartTime: () => number
 ) {
   const { onSeek, onSelectScene, onSetPlaybackRange, pixelsPerSecond, playbackRange, project } =
     props;
   const { beginRangeSelection, createSurfaceRangeSelectionStartHandler, visiblePlaybackRange } =
     useProjectTimelineRangeSelection({
       pixelsPerSecond,
+      readTimelineStartTime,
       playbackRange,
       projectDuration: project.duration,
       timelineRef,
@@ -112,23 +124,32 @@ function useTimelineRangeSelectionState(
   };
 }
 
-function useProjectTimelinePlaybackState(props: TimelineRangeSelectionProps) {
+function useProjectTimelinePlaybackState(
+  props: TimelineRangeSelectionProps,
+  scroll: ReturnType<typeof useProjectTimelineScrollSync>,
+  readTimelineStartTime: () => number
+) {
   const { onSeek, pixelsPerSecond } = props;
-  const { timelineRef, trackListRef, syncTracksScroll } = useProjectTimelineScrollSync();
-  const { handleTimelineSeek, seekToClientX } = useProjectTimelineSeek({
-    pixelsPerSecond,
-    timelineRef,
-    onSeek,
-  });
+  const { timelineRef, trackListRef, syncTracksScroll } = scroll;
+  const { beginPlayheadScrub, consumeCompletedScrubClick, handleTimelineSeek, seekToClientX } =
+    useProjectTimelineSeek({
+      pixelsPerSecond,
+      readTimelineStartTime,
+      projectDuration: props.project.duration,
+      timelineRef,
+      onSeek,
+    });
   const {
     beginEffectRangeSelection,
     beginRangeSelection,
     beginTrackRangeSelection,
     visiblePlaybackRange,
-  } = useTimelineRangeSelectionState(props, timelineRef);
+  } = useTimelineRangeSelectionState(props, timelineRef, readTimelineStartTime);
 
   return {
     beginEffectRangeSelection,
+    beginPlayheadScrub,
+    consumeCompletedScrubClick,
     beginRangeSelection,
     beginTrackRangeSelection,
     handleTimelineSeek,
@@ -143,46 +164,16 @@ function useProjectTimelinePlaybackState(props: TimelineRangeSelectionProps) {
 function useProjectTimelineDerivedState(
   project: ProjectTimelineProps['project'],
   pixelsPerSecond: number,
-  selectedClipId: string | null
+  selectedClipId: string | null,
+  viewportWidth: number
 ) {
   const timelineWidth = useMemo(
-    () => Math.max(project.duration + 5, 10) * pixelsPerSecond,
-    [pixelsPerSecond, project.duration]
+    () => Math.max(Math.max(project.duration + 5, 10) * pixelsPerSecond, viewportWidth - 120),
+    [pixelsPerSecond, project.duration, viewportWidth]
   );
   const selectedClip = project.clips.find((clip) => clip.id === selectedClipId) ?? null;
 
   return { selectedClip, timelineWidth };
-}
-
-function useProjectTimelineViewState(
-  {
-    onZoomChange,
-    pixelsPerSecond,
-    project,
-  }: Pick<ProjectTimelineProps, 'onZoomChange' | 'pixelsPerSecond' | 'project'>,
-  selectedClip: ReturnType<typeof useProjectTimelineDerivedState>['selectedClip'],
-  timelineRef: React.MutableRefObject<HTMLDivElement | null>
-) {
-  const viewportWidth = useTimelineViewportWidth(timelineRef);
-  const fitSelectionDuration = selectedClip?.duration ?? null;
-  const visibleRangeSeconds = viewportWidth / Math.max(1, pixelsPerSecond);
-  const onFitProject = useCallback(() => {
-    onZoomChange(resolveTimelineFitPixelsPerSecond(project.duration, viewportWidth));
-  }, [onZoomChange, project.duration, viewportWidth]);
-  const onFitSelection = useCallback(() => {
-    if (fitSelectionDuration === null) {
-      return;
-    }
-
-    onZoomChange(resolveTimelineFitPixelsPerSecond(fitSelectionDuration, viewportWidth));
-  }, [fitSelectionDuration, onZoomChange, viewportWidth]);
-
-  return {
-    fitSelectionDuration,
-    onFitProject,
-    onFitSelection,
-    visibleRangeSeconds,
-  };
 }
 
 export function useProjectTimelineState(
@@ -190,14 +181,35 @@ export function useProjectTimelineState(
   trackHeightByTrackId: TrackHeightState
 ) {
   const { pixelsPerSecond, project, selectedClipId } = props;
-  const interactions = useProjectTimelineInteractions(props, trackHeightByTrackId);
-  const playback = useProjectTimelinePlaybackState(props);
+  const scroll = useProjectTimelineScrollSync();
+  const viewportWidth = useTimelineViewportWidth(scroll.timelineRef);
   const { selectedClip, timelineWidth } = useProjectTimelineDerivedState(
     project,
     pixelsPerSecond,
-    selectedClipId
+    selectedClipId,
+    viewportWidth
   );
-  const viewState = useProjectTimelineViewState(props, selectedClip, playback.timelineRef);
+  const viewState = useProjectTimelineViewState(
+    props,
+    selectedClip,
+    viewportWidth,
+    scroll.timelineRef
+  );
+  const playback = useProjectTimelinePlaybackState(props, scroll, viewState.readTimelineStartTime);
+  const interactions = useProjectTimelineInteractions(
+    props,
+    trackHeightByTrackId,
+    viewState.readTimelineStartTime
+  );
+  useTimelineClipReveal({
+    request: props.revealClipRequest,
+    clips: project.clips,
+    pixelsPerSecond,
+    viewportWidth,
+    navigateTo: viewState.navigateTo,
+    timelineRef: scroll.timelineRef,
+    trackListRef: scroll.trackListRef,
+  });
   const [hoveredClipId, setHoveredClipId] = useState<string | null>(null);
   useTimelineSelectedTrackAutoScroll({
     selectedTrackId: props.selectedTrackId,

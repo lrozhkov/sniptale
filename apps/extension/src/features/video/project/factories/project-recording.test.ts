@@ -1,10 +1,20 @@
 import { expect, it } from 'vitest';
+import {
+  getVideoProjectActionPresentation,
+  resolveVideoProjectActionPresentations,
+} from '../action-presentation';
+import { isExportReadyVideoProject } from '../validation/root';
+import { resolveVideoCompositionFrame } from '../../composition/timeline/frame';
 
 import { createVideoProjectFromRecording } from './creation';
 import { createRecordingProjectDocument } from './project-recording';
 import {
+  VideoCursorCaptureMode,
+  VideoProjectActionEventKind,
+  VideoProjectActionPreset,
   VideoProjectAssetType,
   VideoProjectClipType,
+  VideoProjectTrackRole,
   VideoTrackKind,
   type VideoProjectAsset,
 } from '../types/index';
@@ -45,11 +55,87 @@ it('creates a silent recording project and clamps tiny source duration', () => {
   expect(project.baseRecordingId).toBe('rec-silent');
   expect(project.assets).toHaveLength(1);
   expect(project.clips.map((clip) => clip.type)).toEqual([VideoProjectClipType.VIDEO]);
-  expect(project.tracks.map((track) => track.kind)).toEqual([
-    VideoTrackKind.PRIMARY,
-    VideoTrackKind.AUDIO,
-    VideoTrackKind.OVERLAY,
-  ]);
+  expect(project.tracks.map((track) => track.kind)).toEqual([VideoTrackKind.PRIMARY]);
+});
+
+it('anchors recording interactions to the independent source clip', () => {
+  const project = createVideoProjectFromRecording({
+    sourceNormalizedActionEvents: [
+      {
+        data: {},
+        duration: 0,
+        id: 'click-1',
+        kind: VideoProjectActionEventKind.CLICK,
+        label: 'Click',
+        point: { x: 0.25, y: 0.5 },
+        preset: VideoProjectActionPreset.CLICK_RIPPLE,
+        time: 2,
+      },
+      {
+        data: {},
+        duration: 0,
+        id: 'manual-click',
+        kind: VideoProjectActionEventKind.CLICK,
+        label: 'Manual click',
+        point: null,
+        preset: VideoProjectActionPreset.CLICK_RIPPLE,
+        time: 3,
+      },
+    ],
+    cursorTrack: {
+      captureMode: VideoCursorCaptureMode.SEPARATE,
+      samples: [
+        { id: 'cursor-1', time: 1, visible: true, x: 10, y: 20 },
+        {
+          id: 'manual-cursor',
+          time: 3,
+          timeBasis: 'project',
+          visible: true,
+          x: 30,
+          y: 40,
+        },
+      ],
+      skin: {
+        animationPreset: 'NONE',
+        color: '#fff',
+        hidden: false,
+        preset: 'ARROW',
+        scale: 1,
+        shadow: true,
+      },
+    },
+    duration: 4,
+    filename: 'anchored.webm',
+    height: 720,
+    mimeType: 'video/webm',
+    recordingId: 'rec-anchored',
+    size: 1024,
+    width: 1280,
+  });
+  const sourceClipId = project.clips.find((clip) => clip.type === VideoProjectClipType.VIDEO)?.id;
+
+  expect(project.actionEvents[0]?.point).toEqual({ x: 0.25, y: 0.5 });
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  expect(project.actionEvents[0]?.anchor).toEqual({
+    kind: 'recording-source',
+    recordingId: 'rec-anchored',
+    sourceInstanceId: project.clips.find((clip) => clip.type === VideoProjectClipType.VIDEO)
+      ?.sourceInstanceId,
+    sourceEventId: 'click-1',
+    sourceTime: 2,
+  });
+  expect(project.cursorTrack?.samples[0]?.sourceAnchor).toEqual({
+    kind: 'recording-source',
+    recordingId: 'rec-anchored',
+    sourceClipId,
+    sourceTime: 1,
+  });
+  expect(project.actionEvents[1]?.anchor).toMatchObject({
+    kind: 'recording-source',
+    sourceEventId: 'manual-click',
+    sourceTime: 3,
+  });
+  expect(project.cursorTrack?.samples[1]).not.toHaveProperty('sourceAnchor');
 });
 
 it('keeps provided recording assets, audio clips, and sidecar tracks together', () => {
@@ -64,9 +150,45 @@ it('keeps provided recording assets, audio clips, and sidecar tracks together', 
   expect(project.clips[0]).toEqual(expect.objectContaining({ muted: true }));
   expect(project.clips[1]?.groupId).toBe(project.clips[0]?.groupId);
   expect(project.tracks.filter((track) => track.kind === VideoTrackKind.PRIMARY)).toHaveLength(2);
+  expect(
+    project.tracks
+      .filter((track) => track.kind === VideoTrackKind.PRIMARY)
+      .map((track) => track.order)
+  ).toEqual([1, 2]);
+  expect(project.tracks.some((track) => track.role !== undefined)).toBe(false);
 });
 
-function createProjectWithSidecarRecording() {
+it('creates an explicitly independent camera track with a safe overlay placement', () => {
+  const project = createProjectWithSidecarRecording(VideoProjectTrackRole.CAMERA);
+  const cameraTrack = project.tracks.find((track) => track.role === VideoProjectTrackRole.CAMERA);
+  const cameraClip = project.clips.find((clip) => clip.trackId === cameraTrack?.id);
+
+  expect(cameraTrack).toEqual(expect.objectContaining({ kind: VideoTrackKind.PRIMARY }));
+  expect(cameraClip).toEqual(
+    expect.objectContaining({
+      muted: true,
+      transform: expect.objectContaining({
+        height: expect.any(Number),
+        width: expect.any(Number),
+        x: expect.any(Number),
+        y: expect.any(Number),
+      }),
+    })
+  );
+  expect(cameraClip?.transform.width).toBeLessThan(project.width / 2);
+  expect(cameraClip?.transform.x).toBeGreaterThan(project.width / 2);
+  const screenClip = project.clips.find(
+    (clip) => clip.type === VideoProjectClipType.VIDEO && clip.assetId === 'asset-main'
+  );
+  const frame = resolveVideoCompositionFrame(project, 1);
+  const screenLayer = frame.visualLayers.find((layer) => layer.clipId === screenClip?.id);
+  const cameraLayer = frame.visualLayers.find((layer) => layer.clipId === cameraClip?.id);
+  expect(cameraTrack?.order).toBeGreaterThan(0);
+  expect(cameraTrack?.order).toBeLessThan(1);
+  expect(cameraLayer?.zIndex).toBeGreaterThan(screenLayer?.zIndex ?? -1);
+});
+
+function createProjectWithSidecarRecording(trackRole?: VideoProjectTrackRole) {
   const sidecarAsset = createRecordingAsset({
     id: 'asset-sidecar',
     name: 'camera.webm',
@@ -92,7 +214,7 @@ function createProjectWithSidecarRecording() {
     size: 4096,
     hasAudio: true,
     audioPeaks: [0.25, 0.75],
-    actionEvents: [],
+    sourceNormalizedActionEvents: [],
     asset: createRecordingAsset(),
     sidecarVideos: [
       {
@@ -104,6 +226,7 @@ function createProjectWithSidecarRecording() {
         mimeType: 'video/webm',
         size: 2048,
         asset: sidecarAsset,
+        ...(trackRole ? { trackRole } : {}),
       },
     ],
   });
@@ -111,7 +234,7 @@ function createProjectWithSidecarRecording() {
 
 it('omits optional motion regions when recording metadata has none', () => {
   const project = createRecordingProjectDocument({
-    actionEvents: [],
+    sourceNormalizedActionEvents: [],
     asset: createRecordingAsset(),
     clips: [],
     cursorTrack: null,
@@ -128,4 +251,57 @@ it('omits optional motion regions when recording metadata has none', () => {
 
   expect(project).not.toHaveProperty('motionRegions');
   expect(project.duration).toBe(0.1);
+});
+
+it('keeps source-normalized points, retains unavailable facts, and lets captured keys inherit track defaults', () => {
+  const project = createVideoProjectFromRecording({
+    recordingId: 'r',
+    filename: 'capture.webm',
+    width: 1280,
+    height: 720,
+    duration: 5,
+    mimeType: 'video/webm',
+    size: 10,
+    sourceNormalizedActionEvents: [
+      {
+        id: 'valid',
+        kind: 'CLICK',
+        time: 1,
+        duration: 0,
+        point: { x: 0.2, y: 0.8 },
+        label: 'Click',
+        data: {},
+        preset: 'CLICK_RIPPLE',
+      },
+      {
+        id: 'invalid',
+        kind: 'CLICK',
+        time: 2,
+        duration: 0,
+        point: { x: 10, y: 20 },
+        label: 'Click',
+        data: {},
+        preset: 'CLICK_RIPPLE',
+      },
+      {
+        id: 'key',
+        kind: 'KEY',
+        time: 3,
+        duration: 0,
+        point: null,
+        label: 'Ctrl + K',
+        data: {},
+        preset: 'NONE',
+      },
+    ],
+  });
+  expect(project.actionEvents.map(({ point }) => point)).toEqual([{ x: 0.2, y: 0.8 }, null, null]);
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  project.actionPresentation = {
+    ...getVideoProjectActionPresentation(project),
+    showKeystrokes: true,
+  };
+  expect(
+    resolveVideoProjectActionPresentations(project).find(({ event }) => event.kind === 'KEY')
+  ).toMatchObject({ enabled: true, renderKind: 'keystroke' });
 });

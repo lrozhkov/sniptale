@@ -89,6 +89,10 @@ export const videoEditorStageMessages = defineMessageSource({
     ru: 'Выйти из полного экрана',
     en: 'Exit fullscreen',
   },
+  displaySettings: {
+    ru: 'Настройки просмотра',
+    en: 'Display settings',
+  },
   previewMode: {
     ru: 'Режим превью',
     en: 'Preview mode',

@@ -1,6 +1,7 @@
+import { resolveVideoProjectActionOccurrences } from '../../../features/video/project/action-occurrences';
 import { createSha256Digest } from '@sniptale/platform/security/digest';
 
-import { getVideoCompositionActionDuration } from '../../../features/video/composition/timeline/frame/actions';
+import { resolveVideoProjectActionPresentations } from '../../../features/video/project/action-presentation';
 import type { VideoProject } from '../../../features/video/project/types';
 
 interface VideoPreviewSegmentRange {
@@ -81,9 +82,26 @@ function selectTemporalSamples<const Sample extends { time: number }>(
   return [...(predecessor ? [predecessor] : []), ...selected, ...(successor ? [successor] : [])];
 }
 
-function selectSegmentDependencies(project: VideoProject, rangeStart: number, rangeEnd: number) {
-  const clips = project.clips.filter((clip) =>
-    overlapsRange(clip.startTime, clip.duration, rangeStart, rangeEnd)
+function selectSegmentDependencies(
+  project: VideoProject,
+  rangeStart: number,
+  rangeEnd: number,
+  motionRegions: NonNullable<VideoProject['motionRegions']>
+) {
+  const occurrences = resolveVideoProjectActionOccurrences(project);
+  const targetClipIds = new Set(
+    motionRegions.flatMap((region) => {
+      const target = region.targetAction;
+      return target?.clipId &&
+        occurrences.some((item) => item.eventId === target.eventId && item.clipId === target.clipId)
+        ? [target.clipId]
+        : [];
+    })
+  );
+  const clips = project.clips.filter(
+    (clip) =>
+      overlapsRange(clip.startTime, clip.duration, rangeStart, rangeEnd) ||
+      targetClipIds.has(clip.id)
   );
   const clipIds = new Set(clips.map((clip) => clip.id));
   const transitions = (project.transitions ?? []).filter(
@@ -121,14 +139,40 @@ function selectSegmentActionEvents(
 ) {
   const targetedActionIds = new Set(
     motionRegions
-      .map(({ targetActionEventId }) => targetActionEventId)
+      .map(({ targetAction }) => targetAction?.eventId)
       .filter((id): id is string => typeof id === 'string')
   );
-  return project.actionEvents.filter(
-    (event) =>
-      targetedActionIds.has(event.id) ||
-      overlapsRange(event.time, getVideoCompositionActionDuration(event), rangeStart, rangeEnd)
+  const presentations = resolveVideoProjectActionPresentations(project).filter((item) =>
+    item.renderIntervals.some((interval) =>
+      overlapsRange(interval.start, interval.end - interval.start, rangeStart, rangeEnd)
+    )
   );
+  const visibleIds = new Set(presentations.map((item) => item.event.id));
+  return {
+    events: project.actionEvents.filter(
+      (event) => targetedActionIds.has(event.id) || visibleIds.has(event.id)
+    ),
+    // Resolved admission and timing depend on run neighbours and suppression leaders
+    // that may be outside this segment; their unrelated visual fields do not.
+    renderStates: presentations.map((item) => ({
+      eventId: item.event.id,
+      enabled: item.enabled,
+      preset: item.preset,
+      point: item.point,
+      duration: item.duration,
+      animationStart: item.animationStart,
+      renderKind: item.renderKind,
+      intervals: item.renderIntervals
+        .filter((interval) =>
+          overlapsRange(interval.start, interval.end - interval.start, rangeStart, rangeEnd)
+        )
+        .map((interval) => ({
+          clipId: interval.clipId,
+          start: Math.max(rangeStart, interval.start),
+          end: Math.min(rangeEnd, interval.end),
+        })),
+    })),
+  };
 }
 
 function projectVideoPreviewSegmentRenderState(
@@ -138,14 +182,16 @@ function projectVideoPreviewSegmentRenderState(
   const rangeStart = range.startFrame / Math.max(1, project.fps);
   const rangeEnd = range.endFrame / Math.max(1, project.fps);
   const fullState = projectVideoPreviewRenderState(project) as Record<string, unknown>;
-  const selected = selectSegmentDependencies(project, rangeStart, rangeEnd);
   const motionRegions = (project.motionRegions ?? []).filter((region) =>
     overlapsRange(region.startTime, region.duration, rangeStart, rangeEnd)
   );
+  const selected = selectSegmentDependencies(project, rangeStart, rangeEnd, motionRegions);
+  const actions = selectSegmentActionEvents(project, motionRegions, rangeStart, rangeEnd);
 
   return {
     ...fullState,
-    actionEvents: selectSegmentActionEvents(project, motionRegions, rangeStart, rangeEnd),
+    actionEvents: actions.events,
+    actionRenderStates: actions.renderStates,
     assets: (fullState['assets'] as Array<{ id: string }>).filter((asset) =>
       selected.assetIds.has(asset.id)
     ),

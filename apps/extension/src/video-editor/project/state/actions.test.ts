@@ -1,3 +1,4 @@
+import { undoVideoEditorProjectHistory, redoVideoEditorProjectHistory } from '../history';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import {
@@ -23,6 +24,33 @@ describe('video editor store project track and asset actions', () => {
     vi.spyOn(Date, 'now').mockReturnValue(500);
   });
 
+  it('publishes all recording parts in one observable update and history entry', () => {
+    const store = createVideoEditorTestStore();
+    const project = createEmptyVideoProject();
+    store.getState().setProject(project);
+    const screen = createVideoAsset('screen', true);
+    const camera = createVideoAsset('camera', false);
+    const seen: number[] = [];
+    const unsubscribe = store.subscribe((state) => seen.push(state.project?.assets.length ?? 0));
+    store.getState().upsertAssets([screen, camera]);
+    unsubscribe();
+    expect(seen).toEqual([2]);
+    const after = store.getState();
+    expect(after.project?.clips).toHaveLength(0);
+    expect(after.projectHistory.past).toHaveLength(1);
+    const undo = undoVideoEditorProjectHistory(after.projectHistory, after.project!);
+    if (undo?.status !== 'applied') throw new Error('Expected undo');
+    expect(undo.project.assets).toHaveLength(0);
+    const redo = redoVideoEditorProjectHistory(undo.history, undo.project);
+    if (redo?.status !== 'applied') throw new Error('Expected redo');
+    expect(redo.project.assets).toEqual([screen, camera]);
+    store.getState().upsertAssets([{ ...screen, name: 'Updated screen' }, camera]);
+    expect(store.getState().project?.assets.map(({ name }) => name)).toEqual([
+      'Updated screen',
+      camera.name,
+    ]);
+  });
+
   it(
     'applies track and asset structure mutations through one project update seam',
     verifyTrackAndAssetMutations
@@ -32,11 +60,11 @@ describe('video editor store project track and asset actions', () => {
     const project = createEmptyVideoProject('Delete track');
 
     store.getState().setProject(project);
-    const audioTrackId = project.tracks[1]!.id;
-    store.getState().addTrack(VideoTrackKind.OVERLAY);
+    store.getState().addTrack(VideoTrackKind.PRIMARY);
     const extraOverlayTrackId = store.getState().project!.tracks.at(-1)!.id;
     const overlayClipId = store.getState().addTextOverlay(extraOverlayTrackId, 1);
     store.getState().addTrack(VideoTrackKind.AUDIO);
+    const audioTrackId = store.getState().selectedTrackId!;
     store.getState().selectClip(overlayClipId!);
     store.getState().deleteTrack(extraOverlayTrackId);
     store.getState().deleteTrack(audioTrackId);
@@ -88,7 +116,7 @@ function verifyTrackAndAssetMutations(): void {
 
   const nextProject = store.getState().project;
   expect(nextProject?.name).toBe('Edited');
-  expect(nextProject?.tracks).toHaveLength(5);
+  expect(nextProject?.tracks).toHaveLength(3);
   expect(nextProject?.tracks.find((track) => track.id === primaryTrackId)).toEqual(
     expect.objectContaining({
       locked: true,
@@ -141,7 +169,7 @@ function expectUtilityLaneMutationResults(
   nextProject: NonNullable<VideoEditorProjectState['project']> | null
 ): void {
   expect(nextProject?.utilityLanes).toEqual({
-    actions: { visible: false, locked: false },
+    actions: { visible: true, locked: false },
     camera: { visible: true, locked: true },
   });
 }
@@ -172,14 +200,17 @@ function verifyClipTimelineMutations(): void {
 
   store.getState().setProject(project);
   const videoClipId = store.getState().addAssetClip(groupedVideoAsset, project.tracks[0]!.id, 1);
-  const textClipId = store.getState().addTextOverlay(project.tracks[2]!.id, 4);
+  const textClipId = store.getState().addTextOverlay(null, 4);
   expect(videoClipId).toBeTruthy();
   expect(textClipId).toBeTruthy();
 
+  const overlayTrackId = store
+    .getState()
+    .project!.clips.find((clip) => clip.id === textClipId)!.trackId;
   store.getState().detachClipGroup(videoClipId!);
   store.getState().duplicateClip(textClipId!);
   expect(
-    store.getState().project!.clips.filter((clip) => clip.trackId === project.tracks[2]!.id).length
+    store.getState().project!.clips.filter((clip) => clip.trackId === overlayTrackId).length
   ).toBeGreaterThan(1);
   store.getState().moveClip(textClipId!, 5);
   store.getState().trimClipStart(textClipId!, 5.2);
@@ -193,7 +224,7 @@ function verifyClipTimelineMutations(): void {
   expect(groupedClips.every((clip) => clip.linkMode === 'DETACHED')).toBe(true);
   expect(nextProject.clips.some((clip) => clip.id === textClipId)).toBe(false);
   expect(
-    nextProject.clips.filter((clip) => clip.trackId === project.tracks[2]!.id).length
+    nextProject.clips.filter((clip) => clip.trackId === overlayTrackId).length
   ).toBeGreaterThan(0);
   expect(nextProject.updatedAt).toBe(500);
 }
@@ -223,16 +254,14 @@ function verifyCloseGapAction(): void {
 function verifyClipPropertyMutations(): void {
   const store = createVideoEditorTestStore();
   const project = createEmptyVideoProject('Draft');
-  const [primaryTrack, , overlayTrack] = project.tracks;
+  const [primaryTrack] = project.tracks;
   const groupedVideoAsset = createVideoAsset('clip-b', true);
 
   store.getState().setProject(project);
   const videoClipId = store.getState().addAssetClip(groupedVideoAsset, primaryTrack!.id, 1);
-  const annotationClipId = store.getState().addAnnotationOverlay(overlayTrack!.id, 1.5);
-  const textClipId = store.getState().addTextOverlay(overlayTrack!.id, 2);
-  const shapeClipId = store
-    .getState()
-    .addShapeOverlay(VideoProjectShapeType.RECTANGLE, overlayTrack!.id, 3);
+  const annotationClipId = store.getState().addAnnotationOverlay(null, 1.5);
+  const textClipId = store.getState().addTextOverlay(null, 2);
+  const shapeClipId = store.getState().addShapeOverlay(VideoProjectShapeType.RECTANGLE, null, 3);
 
   expect(videoClipId).toBeTruthy();
   expect(annotationClipId).toBeTruthy();
@@ -252,16 +281,14 @@ function verifyClipPropertyMutations(): void {
 function verifyNumericGuardPaths(): void {
   const store = createVideoEditorTestStore();
   const project = createEmptyVideoProject('Numeric guards');
-  const [primaryTrack, , overlayTrack] = project.tracks;
+  const [primaryTrack] = project.tracks;
 
   store.getState().setProject(project);
   const videoClipId = store
     .getState()
     .addAssetClip(createVideoAsset('clip-guard', true), primaryTrack!.id, 1);
-  const textClipId = store.getState().addTextOverlay(overlayTrack!.id, 2);
-  const shapeClipId = store
-    .getState()
-    .addShapeOverlay(VideoProjectShapeType.RECTANGLE, overlayTrack!.id, 3);
+  const textClipId = store.getState().addTextOverlay(null, 2);
+  const shapeClipId = store.getState().addShapeOverlay(VideoProjectShapeType.RECTANGLE, null, 3);
 
   store.getState().updateClipTransform(videoClipId!, { x: Number.NaN, width: Number.NaN });
   store.getState().updateClipVolume(videoClipId!, Number.NaN);
@@ -279,3 +306,33 @@ function verifyNumericGuardPaths(): void {
   expect(textClip.type === 'TEXT' && textClip.style.fontSize).toBe(40);
   expect(shapeClip.type === 'SHAPE' && shapeClip.style.borderRadius).toBe(18);
 }
+
+it('removes only unused requested materials and records one reversible project mutation', () => {
+  const store = createVideoEditorTestStore();
+  const used = createVideoAsset('Used');
+  const unused = { ...used, id: 'unused' };
+  const retained = { ...used, id: 'retained' };
+  store
+    .getState()
+    .setProject({ ...createEmptyVideoProject('Materials'), assets: [used, unused, retained] });
+  store.getState().addAssetClip(used);
+  const before = store.getState().project!;
+  store.getState().removeUnusedAssets([used.id, unused.id]);
+  expect(store.getState().project?.assets.map(({ id }) => id)).toEqual([used.id, retained.id]);
+  expect(before.assets).toHaveLength(3);
+  const after = store.getState().project;
+  const history = store.getState().projectHistory;
+  const undo = undoVideoEditorProjectHistory(history, after!);
+  expect(undo?.status).toBe('applied');
+  if (undo?.status !== 'applied') throw new Error('Expected undo');
+  expect(undo.project.assets.map(({ id }) => id)).toEqual([used.id, unused.id, retained.id]);
+  const redo = redoVideoEditorProjectHistory(undo.history, undo.project);
+  expect(redo?.status).toBe('applied');
+  if (redo?.status !== 'applied') throw new Error('Expected redo');
+  expect(redo.project.assets.map(({ id }) => id)).toEqual([used.id, retained.id]);
+  store.getState().removeUnusedAssets([used.id, 'missing']);
+  expect(store.getState().project).toBe(after);
+  expect(store.getState().projectHistory).toBe(history);
+  store.getState().removeUnusedAssets();
+  expect(store.getState().project?.assets).toEqual([used]);
+});

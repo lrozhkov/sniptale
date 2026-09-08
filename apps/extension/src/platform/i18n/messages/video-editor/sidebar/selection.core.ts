@@ -3,6 +3,53 @@ import { videoEditorSidebarSelectionAnnotationMessages } from './selection.annot
 import { videoEditorSidebarSelectionStyleMessages } from './selection.core-style.ts';
 
 export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
+  cameraLayoutCustom: { ru: 'Произвольное вписывание', en: 'Custom fit' },
+  cameraShape: { ru: 'Форма', en: 'Shape' },
+  cameraShapeRounded: { ru: 'Прямоугольник', en: 'Rectangle' },
+  cameraShapeSoft: { ru: 'Мягкая форма', en: 'Soft shape' },
+  cameraShapeEllipse: { ru: 'Овал', en: 'Oval' },
+  cameraRoundness: { ru: 'Скругление', en: 'Roundness' },
+  cameraCropPreview: {
+    ru: 'Кадрирование камеры: перетащите изображение или используйте стрелки',
+    en: 'Camera framing: drag the image or use arrow keys',
+  },
+  cameraCropZoom: { ru: 'Приближение', en: 'Zoom in' },
+  cameraCropCenter: { ru: 'Центрировать изображение', en: 'Center image' },
+
+  typingSelection: { ru: 'Набор текста', en: 'Typing interval' },
+  typingCurrentRate: { ru: 'Текущая скорость', en: 'Current speed' },
+  typingTargetRate: { ru: 'Новая скорость', en: 'Target speed' },
+  typingPreview: { ru: 'Рассчитать', en: 'Calculate' },
+  typingApply: { ru: 'Применить', en: 'Apply' },
+  typingUnavailable: { ru: 'Интервал недоступен', en: 'Interval unavailable' },
+  typingLocked: { ru: 'Дорожка заблокирована', en: 'Track is locked' },
+  typingStale: {
+    ru: 'Проект изменился. Рассчитайте изменения заново.',
+    en: 'The project changed. Preview changes again.',
+  },
+  typingDuration: { ru: 'Длительность интервала', en: 'Interval duration' },
+  typingTail: { ru: 'Сдвиг следующих клипов', en: 'Following clips shifted' },
+  typingProjectDelta: { ru: 'Сокращение проекта', en: 'Project shortened by' },
+  typingLinked: { ru: 'Затронутые клипы', en: 'Affected clips' },
+  typingSeconds: { ru: 'с', en: 's' },
+  typingUnchanged: {
+    ru: 'Скорость уже совпадает — изменений нет.',
+    en: 'Speed already matches. No changes.',
+  },
+  typingBlocked: {
+    ru: 'Ускорение недоступно для этого интервала: проверьте блокировки, переходы и связанные клипы.',
+    en: 'This interval cannot be accelerated. Check locks, transitions and linked clips.',
+  },
+  actionSharedOccurrencesHint: {
+    en: 'Settings apply to every appearance of this action in this source instance.',
+    ru: 'Настройки действуют на все появления этого действия в данном экземпляре источника.',
+  },
+  sourceIn: { ru: 'In исходника', en: 'Source In' },
+  sourceOut: { ru: 'Out исходника', en: 'Source Out' },
+  sourceRangeHint: {
+    ru: 'Время в исходнике. Out — граница окончания фрагмента.',
+    en: 'Source time. Out is the boundary after the selected range.',
+  },
   nothingSelected: {
     ru: 'Ничего не выбрано',
     en: 'Nothing selected',
@@ -30,6 +77,14 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
   clipTypeShape: {
     ru: 'Фигура',
     en: 'Shape',
+  },
+  clipGroupHint: {
+    ru: 'Удаление применяется ко всем выбранным клипам. Для изменения параметров выберите один клип обычным кликом.',
+    en: 'Delete applies to all selected clips. Click a single clip to edit its properties.',
+  },
+  clipGroup: {
+    ru: 'Выбранные клипы',
+    en: 'Selected clips',
   },
   sceneProperties: {
     ru: 'Свойства сцены',
@@ -104,8 +159,8 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
     en: 'Independent clip',
   },
   linkedPairDescription: {
-    ru: 'Обрезка, разрезание и удаление применяются к связанным клипам вместе.',
-    en: 'Trim, split, and delete apply to linked clips together.',
+    ru: 'Перемещение, обрезка и разрезание применяются вместе. Удаляется только выбранный фрагмент.',
+    en: 'Move, trim and split apply together. Delete removes only the selected clip.',
   },
   detachedClipDescription: {
     ru: 'Клип редактируется отдельно от других дорожек.',
@@ -134,6 +189,41 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
   opacityLabel: {
     ru: 'Непрозрачность',
     en: 'Opacity',
+  },
+  cameraLayoutLabel: { ru: 'Вид камеры', en: 'Camera layout' },
+  cameraLayoutOverlay: { ru: 'В углу', en: 'Overlay' },
+  cameraLayoutFullframe: { ru: 'На весь кадр', en: 'Full frame' },
+  cameraLayoutHidden: { ru: 'Скрыта', en: 'Hidden' },
+  cameraPlacementLabel: { ru: 'Положение камеры', en: 'Camera position' },
+  cameraIntervalHint: {
+    ru: 'Для выбранного фрагмента камеры. Разделите его у курсора, чтобы изменить вид следующего интервала.',
+    en: 'Applies to the selected camera clip. Split at the playhead to change the next interval’s layout.',
+  },
+  cameraPosition: { ru: 'Позиция', en: 'Position' },
+  cameraPositionInitial: { ru: 'Начало', en: 'Initial' },
+  cameraAddPosition: { ru: 'Добавить позицию у курсора', en: 'Add position at playhead' },
+  cameraRemovePosition: { ru: 'Удалить позицию', en: 'Remove position' },
+  cameraPositionTime: { ru: 'Начало перехода', en: 'Transition starts' },
+  cameraTransition: { ru: 'Переход', en: 'Transition' },
+  cameraTransitionInstant: { ru: 'Мгновенно', en: 'Instant' },
+  cameraTransitionSmooth: { ru: 'Плавно', en: 'Smooth' },
+  cameraTransitionShrink: { ru: 'Уменьшение', en: 'Shrink' },
+  cameraTransitionDuration: { ru: 'Длительность', en: 'Duration' },
+  cameraPlacementTopLeft: {
+    ru: 'Слева сверху',
+    en: 'Top left',
+  },
+  cameraPlacementTopRight: {
+    ru: 'Справа сверху',
+    en: 'Top right',
+  },
+  cameraPlacementBottomLeft: {
+    ru: 'Слева снизу',
+    en: 'Bottom left',
+  },
+  cameraPlacementBottomRight: {
+    ru: 'Справа снизу',
+    en: 'Bottom right',
   },
   fitModeLabel: {
     ru: 'Вписывание',
@@ -167,6 +257,18 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
     ru: 'Название дорожки',
     en: 'Track name',
   },
+  trackTypeLabel: {
+    ru: 'Тип дорожки',
+    en: 'Track type',
+  },
+  trackVisibilityLabel: {
+    ru: 'Видимость',
+    en: 'Visibility',
+  },
+  trackLockLabel: {
+    ru: 'Блокировка',
+    en: 'Lock',
+  },
   fitModeContain: {
     ru: 'Вписать',
     en: 'Contain',
@@ -192,16 +294,16 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
     en: 'Stretch',
   },
   fadeInLabel: {
-    ru: 'Плавное появление, мс',
-    en: 'Fade in, ms',
+    ru: 'Плавное появление',
+    en: 'Fade in',
   },
   playbackRateLabel: {
     ru: 'Скорость, x',
     en: 'Speed, x',
   },
   fadeOutLabel: {
-    ru: 'Плавное исчезание, мс',
-    en: 'Fade out, ms',
+    ru: 'Плавное исчезание',
+    en: 'Fade out',
   },
   transitionInLabel: {
     ru: 'Переход входа',
@@ -244,12 +346,12 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
     en: 'Linked clips:',
   },
   linkedClipsDescription: {
-    ru: 'Плавные появления, переходы и монтажные операции синхронизируются между видео и аудио до явного разъединения.',
-    en: 'Fade, transition, and editing operations stay synchronized between video and audio until an explicit detach.',
+    ru: 'Перемещаются и обрабатываются вместе. Удаляется только выбранный фрагмент.',
+    en: 'Move and process together. Delete removes only the selected clip.',
   },
   videoSoundLabel: {
-    ru: 'Звук видео',
-    en: 'Video sound',
+    ru: 'Звук',
+    en: 'Sound',
   },
   linkedAudioLabel: {
     ru: 'Связанное аудио',

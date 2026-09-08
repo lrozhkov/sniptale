@@ -1,3 +1,4 @@
+import type { RecordingPointTransform } from '../../../features/video/project/types';
 import type { AudioMixer } from '../stream/audio-mixer';
 import { sendRuntimeMessageBestEffort } from '../../runtime-messaging/best-effort';
 import { createDurationTracker } from '../duration';
@@ -18,7 +19,7 @@ type RecordingSourceBinding = {
 };
 
 export type RecordingStopOutcome =
-  | { result: 'stopped' }
+  | { result: 'stopped'; recordingPointTransform?: RecordingPointTransform | null }
   | { error: string; result: 'terminal-failure' };
 
 interface StopRequestHandlers {
@@ -39,6 +40,12 @@ class OffscreenRecordingContext {
   sourceVideoHeight: number | null = null;
   sourceVideoWidth: number | null = null;
   tabOutputGeometry: TabOutputGeometry | null = null;
+  recordingPointObservation: {
+    transform: RecordingPointTransform | null;
+    stable: boolean;
+    sawFrame: boolean;
+    frameShape: readonly number[] | null;
+  } | null = null;
   stopRecordingResolve: ((outcome?: RecordingStopOutcome) => void) | null = null;
   stopRecordingReject: ((reason?: unknown) => void) | null = null;
   discardOnStop = false;
@@ -82,6 +89,7 @@ class OffscreenRecordingContext {
     this.sourceVideoHeight = null;
     this.sourceVideoWidth = null;
     this.tabOutputGeometry = null;
+    this.recordingPointObservation = null;
   }
 
   bindStreamInstance(binding: {
@@ -232,6 +240,7 @@ class OffscreenRecordingContext {
     this.sourceVideoHeight = null;
     this.sourceVideoWidth = null;
     this.tabOutputGeometry = null;
+    this.recordingPointObservation = null;
     this.artifactSession = null;
     this.stagingCoordinator = null;
     this.discardOnStop = false;

@@ -1,23 +1,18 @@
-import { Clapperboard, FolderKanban, Pencil, Redo2, Undo2 } from 'lucide-react';
-import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { EditorDivider, ValueBadge } from '@sniptale/ui/editor-chrome';
-import { FloatingChromeToolbar, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
+import type { ReactNode } from 'react';
+import { ValueBadge } from '@sniptale/ui/editor-chrome';
 import { translate } from '../../../platform/i18n';
 import {
   useVideoEditorHeaderController,
   useVideoEditorHistoryController,
 } from '../../runtime/controller/composition/hooks';
 import type { VideoEditorHeaderController } from '../../runtime/controller/contracts/header';
-import { VideoProjectStorageStatus } from './storage-status';
 import { requestVideoEditorSaveRetry } from '../../runtime/session/save-retry';
 
-const DOCUMENT_BAR_CLASS_NAME = floatingChromeClassNames(
-  'absolute left-3 top-3 z-50 flex max-w-[calc(100vw-1.5rem)] items-center'
-);
+const DOCUMENT_BAR_CLASS_NAME = 'flex min-w-0 flex-1 items-center justify-start gap-2';
 
 const PROJECT_TITLE_CLASS_NAME = [
-  'h-9 min-w-[12rem] max-w-[18rem] rounded-[8px] border border-transparent bg-transparent',
-  'px-2 text-sm font-semibold text-[var(--sniptale-color-text-primary)] outline-none transition',
+  'h-9 min-w-0 w-full rounded-[8px] border border-transparent bg-transparent',
+  'px-2 text-left text-sm font-semibold text-[var(--sniptale-color-text-primary)] outline-none transition',
   'hover:border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_76%,transparent)]',
   'focus:border-[color:var(--sniptale-color-border-accent-strong)]',
   'focus:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_70%,transparent)]',
@@ -33,18 +28,25 @@ function VideoEditorProjectTitle({
   projectName,
 }: Pick<VideoEditorDocumentBarProps['header'], 'onRenameProject' | 'projectName'>) {
   return (
-    <label className="flex min-w-0 items-center gap-1.5">
+    <label
+      className={['grid min-w-[6rem] max-w-full shrink items-center', 'focus-within:flex-1'].join(
+        ' '
+      )}
+    >
+      <span
+        aria-hidden="true"
+        className={[
+          'invisible col-start-1 row-start-1 min-w-0 overflow-hidden whitespace-pre border',
+          'border-transparent pl-2 pr-2.5 text-sm font-semibold',
+        ].join(' ')}
+      >
+        {projectName || ' '}
+      </span>
       <input
         aria-label={translate('videoEditor.app.title')}
         value={projectName}
         onChange={(event) => onRenameProject(event.currentTarget.value)}
-        className={PROJECT_TITLE_CLASS_NAME}
-      />
-      <Pencil
-        aria-hidden="true"
-        className="shrink-0 text-[var(--sniptale-color-text-muted)]"
-        size={14}
-        strokeWidth={2}
+        className={`${PROJECT_TITLE_CLASS_NAME} col-start-1 row-start-1 text-ellipsis focus:text-clip`}
       />
     </label>
   );
@@ -53,19 +55,11 @@ function VideoEditorProjectTitle({
 function VideoEditorSaveStateBadge({
   saveStateMeta,
 }: Pick<VideoEditorDocumentBarProps['header'], 'saveStateMeta'>) {
-  const dotClassName =
-    saveStateMeta.state === 'error'
-      ? 'bg-[var(--sniptale-color-danger)]'
-      : saveStateMeta.state === 'saving'
-        ? 'animate-pulse bg-[var(--sniptale-color-info)]'
-        : saveStateMeta.state === 'dirty'
-          ? 'bg-[var(--sniptale-color-warning)]'
-          : 'bg-[var(--sniptale-color-success)]';
+  if (saveStateMeta.state !== 'error') return null;
   return (
-    <ValueBadge className={saveStateMeta.className}>
-      <span aria-hidden="true" className={`mr-1.5 h-1.5 w-1.5 rounded-full ${dotClassName}`} />
-      <span aria-live="polite">{saveStateMeta.label}</span>
-      {saveStateMeta.state === 'error' ? (
+    <span role="alert">
+      <ValueBadge className={saveStateMeta.className}>
+        {translate('videoEditor.app.saveChangesFailed')}
         <button
           type="button"
           className="ml-2 font-semibold underline underline-offset-2"
@@ -73,68 +67,32 @@ function VideoEditorSaveStateBadge({
         >
           {translate('common.actions.retry')}
         </button>
-      ) : null}
-    </ValueBadge>
+      </ValueBadge>
+    </span>
   );
 }
 
-export function VideoEditorFloatingDocumentBar() {
+export function VideoEditorFloatingDocumentBar({ children }: { children?: ReactNode } = {}) {
   const header = useVideoEditorHeaderController();
   const history = useVideoEditorHistoryController();
   if (!header) return null;
   return (
     <div data-ui="video-editor.floating.document-bar" className={DOCUMENT_BAR_CLASS_NAME}>
-      <FloatingChromeToolbar
-        dataUi="video-editor.floating.document-bar.surface"
-        className="items-center gap-1.5"
-      >
+      {children}
+      {!children && (
         <VideoEditorProjectTitle
           projectName={header.projectName}
           onRenameProject={header.onRenameProject}
         />
-        <VideoEditorSaveStateBadge saveStateMeta={header.saveStateMeta} />
-        <VideoProjectStorageStatus />
-        <EditorDivider className="mx-1 h-7" />
-        <ContentToolbarButton
-          title={`${translate('videoEditor.app.undo')} (${translate('videoEditor.app.undoShortcut')})`}
-          disabled={!history.canUndo}
-          onClick={history.onUndo}
-          dataUi="video-editor.floating.document-bar.undo"
-        >
-          <Undo2 size={17} strokeWidth={2.1} />
-        </ContentToolbarButton>
-        <ContentToolbarButton
-          title={`${translate('videoEditor.app.redo')} (${translate('videoEditor.app.redoShortcut')})`}
-          disabled={!history.canRedo}
-          onClick={history.onRedo}
-          dataUi="video-editor.floating.document-bar.redo"
-        >
-          <Redo2 size={17} strokeWidth={2.1} />
-        </ContentToolbarButton>
-        {history.error ? (
-          <span role="alert">
-            <ValueBadge className="text-[var(--sniptale-color-danger)]">
-              {translate('videoEditor.app.historyError')}
-            </ValueBadge>
-          </span>
-        ) : null}
-        <EditorDivider className="mx-1 h-7" />
-        <ContentToolbarButton
-          title={translate('videoEditor.app.libraryButton')}
-          active={header.libraryPanelOpen}
-          onClick={header.onToggleLibraryPanel}
-          dataUi="video-editor.floating.document-bar.library"
-        >
-          <FolderKanban size={17} strokeWidth={2.1} />
-        </ContentToolbarButton>
-        <ContentToolbarButton
-          title={translate('videoEditor.app.exportButton')}
-          onClick={header.onOpenExportDialog}
-          dataUi="video-editor.floating.document-bar.export"
-        >
-          <Clapperboard size={17} strokeWidth={2.1} />
-        </ContentToolbarButton>
-      </FloatingChromeToolbar>
+      )}
+      <VideoEditorSaveStateBadge saveStateMeta={header.saveStateMeta} />
+      {history.error && (
+        <span role="alert">
+          <ValueBadge className="text-[var(--sniptale-color-danger)]">
+            {translate('videoEditor.app.historyError')}
+          </ValueBadge>
+        </span>
+      )}
     </div>
   );
 }

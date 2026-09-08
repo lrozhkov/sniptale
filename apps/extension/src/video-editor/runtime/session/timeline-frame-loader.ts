@@ -1,5 +1,5 @@
-const TIMELINE_PREVIEW_FRAME_WIDTH = 96;
-const TIMELINE_PREVIEW_FRAME_HEIGHT = 54;
+const TIMELINE_PREVIEW_FRAME_WIDTH = 320;
+const TIMELINE_PREVIEW_FRAME_HEIGHT = 180;
 const TIMELINE_PREVIEW_FRAME_QUALITY = 0.72;
 
 export interface TimelineVideoFrameLoadPlan {
@@ -48,7 +48,7 @@ export async function loadTimelineVideoPreviewFrames(
 
 function createTimelinePreviewVideoElement(assetUrl: string) {
   const video = document.createElement('video');
-  video.preload = 'metadata';
+  video.preload = 'auto';
   video.muted = true;
   video.playsInline = true;
   video.src = assetUrl;
@@ -61,12 +61,10 @@ async function seekTimelinePreviewVideo(
   signal: AbortSignal | undefined
 ) {
   const safeTime = Number.isFinite(sampleTime) ? Math.max(0, sampleTime) : 0;
-  if (Math.abs(video.currentTime - safeTime) <= 0.01) {
-    return;
-  }
-
+  // Metadata readiness can precede usable pixels at time zero in Chromium.
+  const seeked = waitForVideoEvent(video, 'seeked', signal);
   video.currentTime = safeTime;
-  await waitForVideoEvent(video, 'seeked', signal);
+  await seeked;
 }
 
 function drawTimelinePreviewFrame(video: HTMLVideoElement): HTMLCanvasElement {
@@ -78,7 +76,12 @@ function drawTimelinePreviewFrame(video: HTMLVideoElement): HTMLCanvasElement {
     throw new Error('Timeline preview canvas context unavailable');
   }
 
-  context.drawImage(video, 0, 0, TIMELINE_PREVIEW_FRAME_WIDTH, TIMELINE_PREVIEW_FRAME_HEIGHT);
+  const sourceWidth = video.videoWidth || TIMELINE_PREVIEW_FRAME_WIDTH;
+  const sourceHeight = video.videoHeight || TIMELINE_PREVIEW_FRAME_HEIGHT;
+  const scale = Math.min(canvas.width / sourceWidth, canvas.height / sourceHeight);
+  const width = sourceWidth * scale;
+  const height = sourceHeight * scale;
+  context.drawImage(video, (canvas.width - width) / 2, (canvas.height - height) / 2, width, height);
   return canvas;
 }
 

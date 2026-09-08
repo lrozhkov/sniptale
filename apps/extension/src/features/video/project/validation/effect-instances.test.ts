@@ -7,14 +7,19 @@ import {
   validateEffectV1Document,
 } from '@sniptale/runtime-contracts/effect-v1';
 
-import { createEmptyVideoProject } from '../factories/creation';
+import { createEmptyVideoProject, createVideoProjectTrack } from '../factories/creation';
 import { createEffectHostClip } from '../factories/overlay-clip';
 import { createRecordingBaseClip, createRecordingProjectAsset } from '../factories/recording';
 import type {
   VideoProjectEffectInstance,
   VideoProjectEffectSnapshot,
 } from '../effect-instance/types';
-import { VideoTransitionEasing, VideoTransitionKind, type VideoProject } from '../types';
+import {
+  VideoTrackKind,
+  VideoTransitionEasing,
+  VideoTransitionKind,
+  type VideoProject,
+} from '../types';
 import {
   hasValidEffectProjectReferences,
   isEffectProjectBranches,
@@ -22,6 +27,14 @@ import {
 } from './effect-instances';
 
 describe('EffectV1 project branch boundary', () => {
+  it('admits source offsets and refuses malformed offset fields in persisted instances', async () => {
+    const snapshot = await createSnapshot('neutral-standalone.sniptale-effect.json');
+    const instance = createInstance(snapshot, { kind: 'scene' });
+    expect(isEffectProjectBranches([snapshot], [{ ...instance, sourceStart: 1 }])).toBe(true);
+    for (const sourceStart of [-1, NaN, Infinity, '1', null]) {
+      expect(isEffectProjectBranches([snapshot], [{ ...instance, sourceStart }])).toBe(false);
+    }
+  });
   it('accepts absent or exact snapshot and instance branches', async () => {
     const snapshot = await createSnapshot('neutral-standalone.sniptale-effect.json');
     const instance = createInstance(snapshot, { kind: 'scene' });
@@ -174,7 +187,7 @@ function createHost(project: VideoProject, instance: VideoProjectEffectInstance)
     projectHeight: project.height,
     projectWidth: project.width,
     startTime: instance.startTime,
-    trackId: project.tracks.find(({ kind }) => kind === 'OVERLAY')!.id,
+    trackId: project.tracks.find(({ name }) => name === 'Overlay')!.id,
   });
 }
 
@@ -198,6 +211,7 @@ function createInstance(
 
 function createProjectWithTargets(): VideoProject {
   const project = createEmptyVideoProject('references');
+  project.tracks.push(createVideoProjectTrack('Overlay', 0, VideoTrackKind.PRIMARY));
   const asset = createRecordingProjectAsset({
     duration: 9,
     filename: 'recording.webm',

@@ -1,3 +1,12 @@
+import {
+  constrainMotionTiming,
+  getMotionInsertionRange,
+} from '../../../features/video/project/motion/placement';
+import { bindMotionRegionToClip } from '../../../features/video/project/motion/source-binding';
+import { getVideoProjectUtilityLanes } from '../../../features/video/project/utility-lanes';
+import { resolveVideoProjectActionOccurrences } from '../../../features/video/project/action-occurrences';
+import { resolveVideoCompositionActionSourceMapping } from '../../../features/video/composition/timeline/frame/actions';
+import { mapSourceNormalizedPointToVisualLayer } from '../../../features/video/composition/draw/fitted-media';
 import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
 import {
   createVideoProjectMotionRegion,
@@ -5,7 +14,6 @@ import {
 } from '../../../features/video/project/motion';
 import type {
   VideoProject,
-  VideoProjectActionEvent as ActionEvent,
   VideoProjectActionPoint as ActionPoint,
   VideoProjectMotionRegion as MotionRegion,
 } from '../../../features/video/project/types';
@@ -15,15 +23,10 @@ import {
   VideoMotionFocusMode,
   VideoProjectActionEventKind,
 } from '../../../features/video/project/types/interaction';
-import { mapSourceTimeToProjectTime } from './auto-transform.clip-timeline';
 import {
   resolveAutoZoomProfileVariant,
   type AutoZoomProfile,
 } from './auto-transform.zoom-profiles';
-import {
-  createRecordingTelemetryNormalizationParams,
-  normalizeRecordingActionEventsToProjectSpace,
-} from './telemetry';
 
 const AUTO_ZOOM_THROTTLE = 4;
 const AUTO_ZOOM_MIN_DURATION = 3;
@@ -33,6 +36,11 @@ const AUTO_ZOOM_REUSE_WINDOW = 1.8;
 
 type Click = {
   id: string;
+  eventId: string;
+  clipId: string;
+  recordingId: string;
+  runId: string;
+  runEnd: number;
   point: ActionPoint;
   sourceTime: number;
   time: number;
@@ -42,6 +50,7 @@ type BuildParams = {
   project: VideoProject;
   recordingId: string;
   telemetry: RecordingTelemetryEntry;
+  clipIds?: ReadonlySet<string>;
 };
 
 function getTelemetryTypingSignals(signals: TelemetrySignal[]) {
@@ -83,41 +92,61 @@ function resolveAutoZoomProfile(
 function buildNormalizedRecordingClicks(params: {
   project: VideoProject;
   recordingId: string;
-  telemetry: RecordingTelemetryEntry;
+  clipIds?: ReadonlySet<string>;
 }): Click[] {
-  return normalizeRecordingActionEventsToProjectSpace(
-    params.telemetry.actionEvents,
-    createRecordingTelemetryNormalizationParams(params.telemetry, params.project)
-  )
-    .filter(
-      (event): event is ActionEvent & { point: ActionPoint } =>
-        event.kind === VideoProjectActionEventKind.CLICK && event.point !== null
-    )
-    .map((event) => {
-      const time = mapSourceTimeToProjectTime(params.project, params.recordingId, event.time);
-      if (time === null) {
-        return null;
-      }
-
-      return {
-        id: event.id,
-        point: event.point,
-        sourceTime: event.time,
-        time,
-      };
+  return resolveVideoProjectActionOccurrences(params.project)
+    .flatMap<Click>((occurrence) => {
+      if (params.clipIds && (!occurrence.clipId || !params.clipIds.has(occurrence.clipId)))
+        return [];
+      const event = occurrence.event;
+      const point = event.presentation?.point ?? event.point;
+      if (
+        event.kind !== VideoProjectActionEventKind.CLICK ||
+        !point ||
+        !occurrence.clipId ||
+        event.anchor.kind !== 'recording-source' ||
+        event.anchor.recordingId !== params.recordingId
+      )
+        return [];
+      const sourceClip = params.project.clips.find((clip) => clip.id === occurrence.clipId);
+      if (
+        params.project.tracks.find((track) => track.id === sourceClip?.trackId)?.role === 'CAMERA'
+      )
+        return [];
+      const mapping = resolveVideoCompositionActionSourceMapping(
+        params.project,
+        occurrence,
+        occurrence.time
+      );
+      const scenePoint = mapping && mapSourceNormalizedPointToVisualLayer({ ...mapping, point });
+      if (!scenePoint) return [];
+      return [
+        {
+          id: JSON.stringify([occurrence.eventId, occurrence.clipId]),
+          eventId: occurrence.eventId,
+          clipId: occurrence.clipId,
+          recordingId: params.recordingId,
+          runId: occurrence.playbackRun?.id ?? occurrence.clipId,
+          runEnd: Math.max(
+            ...params.project.clips
+              .filter((clip) =>
+                (occurrence.playbackRun?.clipIds ?? [occurrence.clipId]).includes(clip.id)
+              )
+              .map((clip) => clip.startTime + clip.duration)
+          ),
+          point: scenePoint,
+          sourceTime: event.anchor.sourceTime,
+          time: occurrence.time,
+        },
+      ];
     })
-    .filter((event): event is Click => event !== null)
-    .sort((left, right) => left.time - right.time);
+    .sort((left, right) => left.time - right.time || left.id.localeCompare(right.id));
 }
 
 function hasEquivalentManualRegion(region: MotionRegion, click: Click): boolean {
-  if (region.focusPoint === null) {
-    return false;
-  }
-
-  if (region.targetActionEventId === click.id) {
+  if (region.targetAction?.eventId === click.eventId && region.targetAction.clipId === click.clipId)
     return true;
-  }
+  if (region.focusPoint === null) return false;
 
   if (click.time < region.startTime || click.time > region.startTime + region.duration) {
     return false;
@@ -154,16 +183,27 @@ function extendAutoRegion(
     region.duration,
     click.time - region.startTime + AUTO_ZOOM_MIN_DURATION
   );
-  const clampedDuration = Math.min(nextDuration, project.duration - region.startTime);
+  const clampedDuration = Math.min(
+    nextDuration,
+    project.duration - region.startTime,
+    click.runEnd - region.startTime
+  );
 
-  return normalizeVideoProjectMotionRegion(project, {
+  const normalized = normalizeVideoProjectMotionRegion(project, {
     ...region,
-    duration: clampedDuration,
+    ...constrainMotionTiming(
+      project,
+      region,
+      { startTime: region.startTime, duration: clampedDuration },
+      false
+    ),
     motionBlurAmount: Math.max(region.motionBlurAmount ?? 0, profile.motionBlurAmount),
     scale: Math.max(region.scale, profile.scale),
     zoomInDuration: Math.max(region.zoomInDuration, profile.zoomInDuration),
     zoomOutDuration: Math.max(region.zoomOutDuration, profile.zoomOutDuration),
   });
+  const clip = project.clips.find((item) => item.id === region.targetAction?.clipId);
+  return clip?.type === 'VIDEO' ? bindMotionRegionToClip(normalized, clip) : region;
 }
 
 function createAutoRegion(
@@ -171,12 +211,19 @@ function createAutoRegion(
   click: Click,
   profile: AutoZoomProfile
 ): MotionRegion | null {
-  const duration = Math.min(profile.duration, project.duration - click.time);
+  const free = getMotionInsertionRange(project, click.time);
+  if (!free) return null;
+  const duration = Math.min(
+    free.duration,
+    profile.duration,
+    project.duration - click.time,
+    click.runEnd - click.time
+  );
   if (duration < AUTO_ZOOM_MIN_DURATION) {
     return null;
   }
 
-  return normalizeVideoProjectMotionRegion(project, {
+  const normalized = normalizeVideoProjectMotionRegion(project, {
     ...createVideoProjectMotionRegion(project, click.time),
     id: `auto-motion:${click.id}`,
     duration,
@@ -184,57 +231,73 @@ function createAutoRegion(
     focusPoint: click.point,
     motionBlurAmount: profile.motionBlurAmount,
     scale: profile.scale,
-    targetActionEventId: click.id,
+    targetAction: { eventId: click.eventId, clipId: click.clipId },
     zoomInDuration: Math.max(AUTO_ZOOM_MIN_RAMP, profile.zoomInDuration),
     zoomOutDuration: Math.max(AUTO_ZOOM_MIN_RAMP, profile.zoomOutDuration),
   });
+  const clip = project.clips.find((item) => item.id === click.clipId);
+  return clip?.type === 'VIDEO' ? bindMotionRegionToClip(normalized, clip) : null;
 }
 
 export function buildAutoZoomRegions(params: BuildParams): MotionRegion[] {
+  if (getVideoProjectUtilityLanes(params.project).camera.locked)
+    return params.project.motionRegions ?? [];
   const clicks = buildNormalizedRecordingClicks(params);
   const typingSignals = getTelemetryTypingSignals(params.telemetry.signals);
   const project = params.project;
-  const baseRegions = project.motionRegions ?? [];
-  const manualRegions = baseRegions.filter((region) => !region.id.startsWith('auto-motion:'));
+  // Once added to the montage, framing is authored content, regardless of how it was created.
+  const manualRegions = project.motionRegions ?? [];
   const autoRegions: MotionRegion[] = [];
-  let lastAutoZoomTime = -Infinity;
+  const lastAutoZoomTimes = new Map<string, number>();
 
   for (const [index, click] of clicks.entries()) {
     if (manualRegions.some((region) => hasEquivalentManualRegion(region, click))) {
+      lastAutoZoomTimes.set(click.runId, click.time);
       continue;
     }
 
-    const previousClick = index > 0 ? clicks[index - 1]! : null;
+    const previousClick =
+      clicks.slice(0, index).findLast((item) => item.runId === click.runId) ?? null;
     const profile = resolveAutoZoomProfile(
       click,
       typingSignals,
       previousClick,
-      clicks[index + 1] ?? null
+      clicks.slice(index + 1).find((item) => item.runId === click.runId) ?? null
     );
-    const reusableRegion = findReusableAutoRegion(autoRegions, click);
+    const sameRunIds = new Set(
+      clicks.filter((item) => item.runId === click.runId).map((item) => item.id)
+    );
+    const reusableRegion = findReusableAutoRegion(
+      autoRegions.filter((region) => sameRunIds.has(region.id.slice('auto-motion:'.length))),
+      click
+    );
     const isRepeatedNearby =
       previousClick !== null &&
       click.time - previousClick.time <= AUTO_ZOOM_REUSE_WINDOW &&
       getPointDistance(previousClick.point, click.point) <= AUTO_ZOOM_REUSE_DISTANCE;
 
     if (reusableRegion && isRepeatedNearby) {
-      autoRegions[autoRegions.length - 1] = extendAutoRegion(
+      autoRegions[autoRegions.indexOf(reusableRegion)] = extendAutoRegion(
         reusableRegion,
-        project,
+        { ...project, motionRegions: [...manualRegions, ...autoRegions] },
         click,
         profile
       );
       continue;
     }
 
-    if (click.time - lastAutoZoomTime < AUTO_ZOOM_THROTTLE) {
+    if (click.time - (lastAutoZoomTimes.get(click.runId) ?? -Infinity) < AUTO_ZOOM_THROTTLE) {
       continue;
     }
 
-    const region = createAutoRegion(project, click, profile);
+    const region = createAutoRegion(
+      { ...project, motionRegions: [...manualRegions, ...autoRegions] },
+      click,
+      profile
+    );
     if (region) {
       autoRegions.push(region);
-      lastAutoZoomTime = click.time;
+      lastAutoZoomTimes.set(click.runId, click.time);
     }
   }
 

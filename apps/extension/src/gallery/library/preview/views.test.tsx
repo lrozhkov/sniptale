@@ -23,6 +23,7 @@ vi.mock('../../../platform/i18n/format-bytes', async (importOriginal) => ({
   formatBytes: formatBytesMock,
 }));
 
+import { PreviewPanel } from './index';
 import { PreviewMedia } from './media';
 import { PreviewActions, PreviewMetadataCards, PreviewTagEditor } from './sidebar-sections';
 import type { PreviewPanelProps } from './types';
@@ -537,4 +538,17 @@ it('wires interactive preview actions and tag editing handlers', () => {
   expect(onDownload).toHaveBeenCalledTimes(1);
   expect(onCopy).toHaveBeenCalledTimes(1);
   expect(onDelete).toHaveBeenCalledTimes(1);
+});
+
+it('offers gallery quick review only for a video media item with an available source', () => {
+  const video = createItem({ kind: 'recording', mimeType: 'video/webm', filename: 'clip.webm' });
+  expect(renderToStaticMarkup(<PreviewPanel {...createProps({ item: video })} />)).toContain(
+    'gallery.videoReview.enter'
+  );
+  expect(
+    renderToStaticMarkup(<PreviewPanel {...createProps({ item: video, previewUrl: null })} />)
+  ).not.toContain('gallery.videoReview.enter');
+  expect(renderToStaticMarkup(<PreviewPanel {...createProps()} />)).not.toContain(
+    'gallery.videoReview.enter'
+  );
 });

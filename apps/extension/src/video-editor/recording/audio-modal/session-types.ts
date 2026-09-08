@@ -1,5 +1,6 @@
 import type React from 'react';
-import type { AudioRecordingStatus } from './shared';
+import type { AudioRecordingStatus, AudioRecordingModalProps } from './shared';
+import type { VideoEditorMaterialSourceRange } from '../../contracts/insertion';
 
 export interface AudioRecordingState {
   audioBlob: Blob | null;
@@ -39,6 +40,7 @@ interface AudioRecordingSaveController {
 }
 
 interface AudioRecordingTransportController {
+  elapsedSeconds: number;
   durationLabel: string;
   error: string | null;
   startRecording: () => Promise<void>;
@@ -47,14 +49,15 @@ interface AudioRecordingTransportController {
 }
 
 export interface AudioRecordingTrimController {
+  audioBlob: Blob;
+  resolveDuration: (duration: number) => void;
+  selectRange: (range: VideoEditorMaterialSourceRange) => void;
   audioRef: React.RefObject<HTMLAudioElement | null>;
   audioUrl: string;
   isPlayingSelection: boolean;
   pauseSelection: () => void;
   playSelection: () => Promise<void>;
   recordedDuration: number;
-  setTrimEnd: React.Dispatch<React.SetStateAction<number>>;
-  setTrimStart: React.Dispatch<React.SetStateAction<number>>;
   trimEnd: number;
   trimStart: number;
 }
@@ -66,6 +69,8 @@ export interface AudioRecordingControllerState {
 }
 
 export interface RecordingSessionArgs {
+  deviceId?: string;
+  timeline?: AudioRecordingModalProps['timeline'];
   clearTimer: () => void;
   mimeType: string;
   refs: AudioRecordingRefs;

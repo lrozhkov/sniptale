@@ -41,6 +41,12 @@ function runPlaybackTick(
   if (!playback || !latest.project) return false;
   const nextTime = resolvePlaybackTickTime(params.playbackRef, now);
   if (isPlaybackRangeRestart(nextTime, latest.playbackRange)) {
+    if (latest.playbackRange.loop === false) {
+      params.previewRuntimeRef.current?.present(latest.playbackRange.end);
+      params.handlersRef.current.setPlaying(false);
+      params.handlersRef.current.setCurrentTime(latest.playbackRange.end);
+      return false;
+    }
     restartPlaybackRange(params.playbackRef, params.handlersRef, latest.playbackRange);
     params.previewRuntimeRef.current?.present(latest.playbackRange.start);
     state.lastPresentedTime = latest.playbackRange.start;

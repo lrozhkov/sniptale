@@ -72,3 +72,16 @@ it('keeps media shadow updates as no-ops when the owning track is locked', () =>
   expect(clip).toEqual(expect.objectContaining({ shadowIntensity: 0 }));
   expect(clip).not.toEqual(expect.objectContaining({ shadowMode: VideoMediaShadowMode.GLOW }));
 });
+
+it('does not publish unchanged shadow input after a fit scale edit', () => {
+  const store = createContentStore();
+  store.getState().setProject(createProjectWithMediaTrack());
+  store.getState().updateMediaClipFitScalePercent('clip-video', 50);
+  const scaled = store.getState().project;
+  const history = store.getState().projectHistory;
+
+  store.getState().updateMediaClipShadowIntensity('clip-video', 0);
+
+  expect(store.getState().project).toBe(scaled);
+  expect(store.getState().projectHistory).toBe(history);
+});

@@ -12,6 +12,7 @@ function createProjectCrudActions(): Pick<
   | 'onDeleteProject'
   | 'onOpenProject'
   | 'onAddRecording'
+  | 'onAddLibraryMedia'
   | 'onImportAudio'
   | 'onImportImage'
   | 'onImportRecordedAudio'
@@ -19,6 +20,7 @@ function createProjectCrudActions(): Pick<
 > {
   return {
     onAddRecording: noop(),
+    onAddLibraryMedia: vi.fn(async () => undefined),
     onCreateProject: noop(),
     onDeleteProject: noop(),
     onImportAudio: noop(),
@@ -37,8 +39,6 @@ function createProjectPlacementActions(): Pick<
   | 'onStartActionPointPlacement'
   | 'onStartMotionAreaPlacement'
   | 'onStartMotionFocusPlacement'
-  | 'onStartMotionPathStopAreaPlacement'
-  | 'onStartMotionPathStopPointPlacement'
   | 'onStartObjectTrackAnchorPlacement'
 > {
   return {
@@ -48,8 +48,7 @@ function createProjectPlacementActions(): Pick<
     onStartActionPointPlacement: noop(),
     onStartMotionAreaPlacement: noop(),
     onStartMotionFocusPlacement: noop(),
-    onStartMotionPathStopAreaPlacement: noop(),
-    onStartMotionPathStopPointPlacement: noop(),
+
     onStartObjectTrackAnchorPlacement: noop(),
   };
 }
@@ -71,7 +70,7 @@ function createProjectEditActions(): Omit<
     onDeleteEffectInstance: noop(),
     onDuplicateEffectInstance: noop(),
     onEnableCursorTrack: noop(),
-    onGenerateMotionPathFromCursor: noop(),
+
     onInsertCursorSample: noop(),
     onMoveEffectInstance: noop(),
     onPreviewSceneBackground: noop(),
@@ -82,8 +81,13 @@ function createProjectEditActions(): Omit<
     onSelectObjectTrack: noop(),
     onSetCursorCaptureMode: noop(),
     onSetSceneBackground: noop(),
+    onToggleUtilityLaneVisibility: noop(),
+    onToggleUtilityLaneLock: noop(),
+    onClearUtilityLane: noop(),
+    onToggleTrackLock: noop(),
+    onToggleTrackVisibility: noop(),
     onToggleCollapsed: noop(),
-    onToggleDiagnostics: noop(),
+    onUpdateActionPresentation: vi.fn(),
     onUpdateActionEventDetails: noop(),
     onUpdateCursorSampleInterpolation: noop(),
     onUpdateCursorSampleSkinOverride: noop(),
@@ -110,6 +114,9 @@ function createClipActions(): VideoEditorSidebarController['clipActions'] {
   return {
     onApplyMediaClipVisualsToTrack: noop(),
     onConvertTextClipToAnnotation: noop(),
+    onSwapClip: vi.fn(),
+    onTrimClipStart: vi.fn(),
+    onTrimClipEnd: vi.fn(),
     onDetachClipGroup: noop(),
     onUpdateAnnotationClipContent: noop(),
     onUpdateAnnotationClipStyle: noop(),
@@ -140,8 +147,6 @@ export function createSidebarController(
     state: {
       activeProjectId: project.id,
       collapsed: false,
-      diagnosticsContent: null,
-      diagnosticsOpen: false,
       gridSettings: {
         color: '#94a3b8',
         enabled: false,
@@ -159,7 +164,7 @@ export function createSidebarController(
       recentColors: [],
       recordingId: null,
       recordings: [],
-      selectedActionEvent: null,
+      selectedActionOccurrence: null,
       selectedClip: null,
       selectedCursorSample: null,
       selectedMotionRegion: null,

@@ -1,6 +1,5 @@
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
-import { getVideoProjectUtilityLanes } from '../../../../features/video/project/utility-lanes';
 import { createProjectTrackToggleActions } from './groups';
 import type { VideoEditorProjectState } from '../contracts';
 import { resetVideoEditorProjectHistory } from '../../history';
@@ -38,10 +37,11 @@ it('updates utility lane visibility, lock, and clear state through project updat
 
   seedUtilityLaneOwners(runtime);
   toggles.toggleUtilityLaneVisibility('actions');
-  expect(getVideoProjectUtilityLanes(runtime.getState().project!).actions.visible).toBe(false);
+  expect(runtime.getState().project!.actionPresentation?.enabled).toBe(false);
   expect(runtime.getState().selection).toEqual({
-    kind: 'action-segment',
-    actionEventId: 'action-1',
+    kind: 'action-occurrence',
+    clipId: null,
+    eventId: 'action-1',
   });
 
   toggles.clearUtilityLane('actions');
@@ -63,20 +63,20 @@ function seedUtilityLaneOwners(runtime: ReturnType<typeof createMutableState>) {
       actionEvents: [createUtilityLaneActionEvent()],
       motionRegions: [createUtilityLaneMotionRegion()],
     },
-    selection: { kind: 'action-segment', actionEventId: 'action-1' },
+    selection: { kind: 'action-occurrence', clipId: null, eventId: 'action-1' },
   });
 }
 
 function createUtilityLaneActionEvent() {
   return {
     data: {},
-    duration: 0.7,
+    capturedDuration: 0.7,
     id: 'action-1',
     kind: 'CLICK',
     label: 'Click',
     point: null,
-    preset: 'CLICK_RIPPLE',
-    time: 1,
+    presentation: { preset: 'CLICK_RIPPLE' },
+    anchor: { kind: 'project' as const, time: 1 },
   } as never;
 }
 
@@ -89,7 +89,7 @@ function createUtilityLaneMotionRegion() {
     id: 'motion-1',
     scale: 1.2,
     startTime: 0,
-    targetActionEventId: null,
+    targetAction: null,
     zoomInDuration: 0,
     zoomOutDuration: 0,
   } as never;

@@ -1,7 +1,10 @@
+import { initializeEffectSceneAnchors } from './layout';
+import type { EffectV1ObjectLayout } from '@sniptale/runtime-contracts/effect-v1';
 import type { EffectBundleCatalogEntry } from '../effect-bundle/catalog';
 import type { VideoProject } from '../types';
-import { VideoProjectClipType, VideoTrackKind } from '../types';
+import { VideoProjectClipType } from '../types';
 import { createEffectHostClip } from '../factories/overlay-clip';
+import { resolveVideoOverlayTrack } from '../factories/creation';
 import { buildProjectTransitionSegments } from '../transition/project';
 import { readVerifiedCatalogDocument, type VerifiedCatalogAsset } from './catalog-reader';
 import { ApplyEffectInstanceError } from './errors';
@@ -48,16 +51,39 @@ export async function applyEffectCatalogDocument(args: {
     startTime: timing.startTime,
     target: args.target,
   };
-  const clips =
+  const overlayTrack =
     document.kind === 'standalone'
-      ? [
-          ...args.project.clips,
-          createStandaloneHostClip(args.project, instance, catalogDocument.id),
-        ]
-      : args.project.clips;
+      ? resolveVideoOverlayTrack(args.project, timing.startTime, timing.duration)
+      : null;
+  const clips = overlayTrack
+    ? [
+        ...args.project.clips,
+        createStandaloneHostClip(
+          args.project,
+          instance,
+          catalogDocument.id,
+          overlayTrack.id,
+          document.objectLayout
+        ),
+      ]
+    : args.project.clips;
+  const host = clips.find(
+    (clip) => clip.type === 'EFFECT' && clip.effectInstanceId === instance.id
+  );
+  if (host && document.objectLayout?.handles?.length) {
+    instance.sceneAnchors = initializeEffectSceneAnchors(document, host.transform, args.project)!;
+    for (const handle of document.objectLayout.handles) {
+      delete instance.controls[handle.xControl];
+      delete instance.controls[handle.yControl];
+    }
+  }
   return {
     ...args.project,
     clips,
+    tracks:
+      overlayTrack && !args.project.tracks.includes(overlayTrack)
+        ? [...args.project.tracks, overlayTrack]
+        : args.project.tracks,
     effectInstances: [...(args.project.effectInstances ?? []), instance],
     effectSnapshots: snapshots,
   };
@@ -66,18 +92,19 @@ export async function applyEffectCatalogDocument(args: {
 function createStandaloneHostClip(
   project: VideoProject,
   instance: VideoProjectEffectInstance,
-  name: string
+  name: string,
+  trackId: string,
+  objectLayout: EffectV1ObjectLayout | undefined
 ) {
-  const overlayTrack = project.tracks.find(({ kind }) => kind === VideoTrackKind.OVERLAY);
-  if (!overlayTrack) throw new ApplyEffectInstanceError('effectTargetMissing');
   return createEffectHostClip({
+    objectLayout,
     duration: instance.duration,
     effectInstanceId: instance.id,
     name,
     projectHeight: project.height,
     projectWidth: project.width,
     startTime: instance.startTime,
-    trackId: overlayTrack.id,
+    trackId,
   });
 }
 

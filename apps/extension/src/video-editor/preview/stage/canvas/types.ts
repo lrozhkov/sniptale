@@ -52,7 +52,7 @@ export type PreviewStageRootSurfaceProps = Pick<
   | 'previewRasterSize'
   | 'project'
   | 'renderGenerationRef'
-  | 'selectedActionEvent'
+  | 'selectedActionOccurrence'
   | 'selectedClipId'
   | 'selectedMotionRegion'
   | 'stageRef'

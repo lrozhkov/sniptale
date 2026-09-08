@@ -1,8 +1,14 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { createAnnotationClip } from '../../../../../features/video/project/factories/overlay-clip';
-import { createEmptyVideoProject } from '../../../../../features/video/project/factories/creation';
-import { VideoOverlayTemplateKind } from '../../../../../features/video/project/types';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../../features/video/project/factories/creation';
+import {
+  VideoTrackKind,
+  VideoOverlayTemplateKind,
+} from '../../../../../features/video/project/types';
 import {
   renderAnnotationAppearanceFields,
   renderAnnotationContentFields,
@@ -22,8 +28,9 @@ vi.stubGlobal('ShadowRoot', class ShadowRoot {});
 
 function createProps(templateKind: VideoOverlayTemplateKind): AnnotationFieldsSectionProps {
   const project = createEmptyVideoProject('Annotation section fields');
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(
-    project.tracks[2]!.id,
+    project.tracks[1]!.id,
     project.width,
     project.height,
     0,

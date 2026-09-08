@@ -226,6 +226,10 @@ function createVideoMediaClipFromAsset(
     fitScalePercent: 100,
     shadowIntensity: 0,
     shadowMode: VideoMediaShadowMode.BACKDROP,
+    ...(asset.source.kind === 'recording' ||
+    (asset.source.kind === 'project-asset' && asset.source.originRecordingId)
+      ? { sourceInstanceId: crypto.randomUUID() }
+      : {}),
     playbackRate: 1,
     sourceStart: 0,
     sourceDuration: duration,

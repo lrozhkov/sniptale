@@ -35,11 +35,27 @@ describe('sanitizeRecordingSettings webcam presentation', () => {
   );
 
   it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
-    'preserves embedded presentation for %s',
+    'uses a separate camera track by default for %s',
     (captureMode) => {
       expect(
         sanitizeRecordingSettings(DEFAULT_VIDEO_SETTINGS, captureMode).webcamPresentation?.mode
-      ).toBe(WebcamPresentationMode.EMBEDDED);
+      ).toBe(WebcamPresentationMode.SEPARATE_TRACK);
+    }
+  );
+  it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
+    'preserves an explicit embedded choice for %s',
+    (captureMode) => {
+      const settings = {
+        ...DEFAULT_VIDEO_SETTINGS,
+        webcamPresentation: {
+          ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!,
+          mode: WebcamPresentationMode.EMBEDDED,
+        },
+      };
+      expect(sanitizeRecordingSettings(settings, captureMode).webcamPresentation?.mode).toBe(
+        WebcamPresentationMode.EMBEDDED
+      );
+      expect(settings.webcamPresentation.mode).toBe(WebcamPresentationMode.EMBEDDED);
     }
   );
 });

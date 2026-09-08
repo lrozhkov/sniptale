@@ -1,3 +1,8 @@
+import type {
+  LibraryFacetId,
+  LibraryFacetFilters,
+  LibraryFilterScope,
+} from '../../features/media-hub/library-filters';
 import type { GalleryItem } from './items';
 
 export type FolderFilter =
@@ -13,21 +18,14 @@ export type GalleryFolderCounts = Record<Exclude<FolderFilter, 'web-snapshot'>, 
 };
 
 export type SortMode = 'newest' | 'oldest' | 'name-asc' | 'name-desc' | 'size-desc';
-export type GalleryScope = 'all' | 'library' | 'temporary';
+export type GalleryScope = LibraryFilterScope;
 export type GalleryViewMode = 'list' | 'compact-grid' | 'large-grid';
 
-export type GalleryDateFacetFilterId = 'created' | 'updated';
-export type GalleryFacetFilterId =
-  | 'format'
-  | 'size'
-  | 'resolution'
-  | 'duration'
-  | 'source'
-  | GalleryDateFacetFilterId;
+export type GalleryFacetFilterId = LibraryFacetId;
 
 export type GalleryFacetId = 'status' | 'tags' | GalleryFacetFilterId;
 
-export type GalleryFacetFilters = Record<GalleryFacetFilterId, string[]>;
+export type GalleryFacetFilters = LibraryFacetFilters;
 
 interface GalleryFacetOption {
   count: number;

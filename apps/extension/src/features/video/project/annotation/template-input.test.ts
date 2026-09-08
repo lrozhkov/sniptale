@@ -7,8 +7,8 @@ import {
   VideoAnnotationTargetBindingKind,
   type VideoAnnotationTemplate,
 } from '../annotation-engine';
-import { createEmptyVideoProject } from '../factories/creation';
-import { VideoOverlayTemplateKind } from '../types/index';
+import { createEmptyVideoProject, createVideoProjectTrack } from '../factories/creation';
+import { VideoTrackKind, VideoOverlayTemplateKind } from '../types/index';
 import { createAnnotationClip } from './template';
 import {
   createTemplateRefAnnotationClip,
@@ -97,8 +97,9 @@ function registerTemplateInputSnapshotTests() {
 
 function createClipFor(template: VideoAnnotationTemplate) {
   const project = createEmptyVideoProject('Template input', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   return createTemplateRefAnnotationClip(createInput(template), (templateKind) =>
-    createAnnotationClip(project.tracks[2]!.id, project.width, project.height, 0, templateKind)
+    createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 0, templateKind)
   );
 }
 

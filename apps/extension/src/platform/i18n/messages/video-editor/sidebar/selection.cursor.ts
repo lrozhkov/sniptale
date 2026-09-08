@@ -22,12 +22,12 @@ export const videoEditorSidebarSelectionCursorMessages = defineMessageSource({
     en: 'Capture mode',
   },
   cursorCaptureModeSeparate: {
-    ru: 'Отдельный трек',
-    en: 'Separate track',
+    ru: 'Редактируемый слой курсора',
+    en: 'Editable cursor layer',
   },
   cursorCaptureModeFallback: {
-    ru: 'Резерв из видео',
-    en: 'Embedded fallback',
+    ru: 'Дополнительный курсор поверх видео',
+    en: 'Additional cursor over video',
   },
   cursorColorLabel: {
     ru: 'Цвет курсора',
@@ -114,8 +114,8 @@ export const videoEditorSidebarSelectionCursorMessages = defineMessageSource({
     en: 'Manual markup',
   },
   objectTrackSourceTelemetry: {
-    ru: 'Телеметрия',
-    en: 'Telemetry',
+    ru: 'История действий',
+    en: 'Action history',
   },
   objectTrackSourceVisualDetection: {
     ru: 'По пикселям',
@@ -238,7 +238,7 @@ export const videoEditorSidebarSelectionCursorMessages = defineMessageSource({
     en: 'Restore track settings',
   },
   cursorFallbackHint: {
-    ru: 'Для этого источника курсор пока работает как резервное представление поверх исходного видео.',
-    en: 'For this source the cursor currently behaves as a fallback representation over the source video.',
+    ru: 'Настройки и удаление действуют только на дополнительный курсор. Курсор, записанный в видео, останется: удалить его этими настройками нельзя.',
+    en: 'Settings and deletion affect only the additional cursor. The cursor recorded in the video remains and cannot be removed with these controls.',
   },
 });

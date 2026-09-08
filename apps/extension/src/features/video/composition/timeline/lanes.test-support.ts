@@ -54,13 +54,12 @@ function createLaneTemporalOwners() {
     actionEvents: [
       {
         data: {},
-        duration: 0,
         id: 'action-1',
         kind: VideoProjectActionEventKind.CLICK,
         label: 'Click',
         point: { x: 110, y: 160 },
-        preset: VideoProjectActionPreset.CLICK_RIPPLE,
-        time: 3,
+        presentation: { preset: VideoProjectActionPreset.CLICK_RIPPLE },
+        anchor: { kind: 'project' as const, time: 3 },
       },
     ],
     cursorTrack: {
@@ -79,7 +78,7 @@ function createLaneTemporalOwners() {
         id: 'motion-1',
         scale: 1.8,
         startTime: 2.5,
-        targetActionEventId: null,
+        targetAction: null,
         zoomInDuration: 0.3,
         zoomOutDuration: 0.4,
       },

@@ -37,3 +37,17 @@ it('does not mutate clips when there is no selected clip', () => {
   expect(store.duplicateClip).not.toHaveBeenCalled();
   expect(store.splitClipAt).not.toHaveBeenCalled();
 });
+
+it('routes the explicit group to one delete operation without choosing a single member', () => {
+  const deleteClip = vi.fn();
+  const actions = createSelectedClipActions({
+    currentTime: 0,
+    selectedClipId: null,
+    selection: { kind: 'clip-group', clipIds: ['a', 'b'], anchorClipId: 'a' },
+    deleteClip,
+    duplicateClip: vi.fn(),
+    splitClipAt: vi.fn(),
+  });
+  actions.deleteSelectedClip();
+  expect(deleteClip).toHaveBeenCalledExactlyOnceWith(['a', 'b']);
+});

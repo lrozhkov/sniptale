@@ -1,218 +1,160 @@
-import {
-  ProductModal,
-  ProductModalBody,
-  ProductModalFooter,
-  ProductModalHeader,
-} from '@sniptale/ui/product-modal';
+import { AutoProcessingModal, AutoProcessingLayer } from './auto-transform-modal';
+import { AutoProcessingReview, AutoProcessingFooter } from './auto-transform-steps';
+import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
+import { useState } from 'react';
+import { ArrowLeft, WandSparkles } from 'lucide-react';
+import { ProductModalBody } from '@sniptale/ui/product-modal';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { NumericRow, OptionRow, PanelSection } from '../../../../../ui/compact-inspector-controls';
-import { VideoAutoProcessingAction } from '@sniptale/runtime-contracts/video/types/types';
-import type { VideoAutoProcessingSettings } from '@sniptale/runtime-contracts/video/types/types';
-import { translate } from '../../../../../platform/i18n';
+import { formatNumber, translate, useAppLocale } from '../../../../../platform/i18n';
+import { AutoProcessingSetup } from './auto-transform-setup';
+import {
+  useAutoProcessingWorkflow,
+  type AutoProcessingWorkflowProps,
+} from './auto-transform-workflow';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { toolbarButtonClassName } from './constants/button';
 
-type StableSegmentAction = VideoAutoProcessingSettings['stableSegments']['action'];
-
-const AUTO_TRANSFORM_ACTIONS: StableSegmentAction[] = [
-  VideoAutoProcessingAction.SPEED_UP,
-  VideoAutoProcessingAction.REMOVE,
-  VideoAutoProcessingAction.SKIP,
-];
-
-function getActionLabel(action: StableSegmentAction): string {
-  switch (action) {
-    case VideoAutoProcessingAction.SPEED_UP:
-      return translate('videoEditor.timeline.autoTransformActionSpeedUp');
-    case VideoAutoProcessingAction.REMOVE:
-      return translate('videoEditor.timeline.autoTransformActionRemove');
-    case VideoAutoProcessingAction.SKIP:
-      return translate('videoEditor.timeline.autoTransformActionSkip');
-  }
-}
-
-function getActionDescription(action: StableSegmentAction): string {
-  switch (action) {
-    case VideoAutoProcessingAction.SPEED_UP:
-      return translate('videoEditor.timeline.autoTransformActionSpeedUpDescription');
-    case VideoAutoProcessingAction.REMOVE:
-      return translate('videoEditor.timeline.autoTransformActionRemoveDescription');
-    case VideoAutoProcessingAction.SKIP:
-      return translate('videoEditor.timeline.autoTransformActionSkipDescription');
-  }
-}
-
-function updateStableSegments(
-  settings: VideoAutoProcessingSettings,
-  patch: Partial<VideoAutoProcessingSettings['stableSegments']>
-): VideoAutoProcessingSettings {
-  return {
-    ...settings,
-    stableSegments: {
-      ...settings.stableSegments,
-      ...patch,
-    },
-  };
-}
-
-function NumberField(props: {
-  label: string;
-  min: number;
-  step: number;
-  value: number;
-  onChange: (value: number) => void;
-}) {
+export type AutoProcessingHeaderProps = Omit<AutoProcessingWorkflowProps, 'onClose'> & {
+  onModalVisibilityChange: (visible: boolean) => void;
+};
+export function ProjectTimelineAutoProcessingControl(
+  props: AutoProcessingHeaderProps & { visible?: boolean }
+) {
+  const [open, setOpen] = useState(false);
   return (
-    <NumericRow
-      label={props.label}
-      min={props.min}
-      step={props.step}
-      value={props.value}
-      precision={1}
-      onPreviewValue={props.onChange}
-      onCommitValue={props.onChange}
-    />
-  );
-}
-
-function ActionChoice(props: {
-  action: StableSegmentAction;
-  active: boolean;
-  onSelect: (action: StableSegmentAction) => void;
-}) {
-  return (
-    <OptionRow
-      active={props.active}
-      label={
-        <span className="block min-w-0">
-          <span className="block truncate text-[12px] font-semibold text-[var(--sniptale-color-text-primary)]">
-            {getActionLabel(props.action)}
+    <>
+      {props.visible !== false ? (
+        <ContentToolbarButton
+          className={toolbarButtonClassName}
+          dataUi="video-editor.auto.open"
+          title={translate('videoEditor.timeline.autoTransform')}
+          onClick={() => setOpen(true)}
+        >
+          <WandSparkles size={14} aria-hidden="true" />
+          <span className="@max-[1600px]/timeline:sr-only">
+            {translate('videoEditor.timeline.autoTransform')}
           </span>
-          <span className="mt-1 block text-[10px] leading-snug text-[var(--sniptale-color-text-dim)]">
-            {getActionDescription(props.action)}
-          </span>
-        </span>
-      }
-      onToggle={() => props.onSelect(props.action)}
-    />
+        </ContentToolbarButton>
+      ) : null}
+      {open ? <AutoTransformWizard {...props} onClose={() => setOpen(false)} /> : null}
+    </>
   );
 }
-
-function WizardSignalStep() {
-  return (
-    <section className="space-y-2">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--sniptale-color-text-dim)]">
-        {translate('videoEditor.timeline.autoTransformSignalStep')}
-      </p>
-      <p className="text-[12px] leading-snug text-[var(--sniptale-color-text-secondary)]">
-        {translate('videoEditor.timeline.autoTransformStableDescription')}
-      </p>
-    </section>
-  );
-}
-
-function WizardDecisionStep(props: {
-  draft: VideoAutoProcessingSettings;
-  onDraftChange: (settings: VideoAutoProcessingSettings) => void;
-}) {
-  return (
-    <section className="space-y-2">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--sniptale-color-text-dim)]">
-        {translate('videoEditor.timeline.autoTransformDecisionStep')}
-      </p>
-      <div className="grid gap-2">
-        {AUTO_TRANSFORM_ACTIONS.map((action) => (
-          <ActionChoice
-            key={action}
-            action={action}
-            active={props.draft.stableSegments.action === action}
-            onSelect={(nextAction) =>
-              props.onDraftChange(updateStableSegments(props.draft, { action: nextAction }))
-            }
-          />
-        ))}
+export function AutoTransformWizard(props: AutoProcessingHeaderProps & { onClose: () => void }) {
+  const locale = useAppLocale();
+  const seconds = (value: number) =>
+    `${formatNumber(value, { maximumFractionDigits: 2 }, locale)} ${translate('videoEditor.timeline.autoSeconds')}`;
+  const {
+    choices,
+    scope,
+    settings,
+    camera,
+    analysis,
+    preview,
+    selectedIds,
+    busy,
+    applying,
+    originalInterval,
+    step,
+    stale,
+    status,
+    selectionChanged,
+    prepare,
+    apply,
+    close,
+    setOriginalInterval,
+    setStep,
+    patchSettings,
+    toggleScope,
+    toggleCamera,
+    toggleSuggestion,
+    viewOriginal,
+  } = useAutoProcessingWorkflow(props);
+  const content = originalInterval ? (
+    <FloatingChromePanel
+      dataUi="video-editor.auto.original"
+      className="fixed right-4 top-20 z-50 flex max-w-lg items-center gap-4 p-3 text-sm"
+    >
+      <div className="min-w-0">
+        <p className="font-medium">
+          {translate('videoEditor.timeline.autoOriginal')} · {seconds(originalInterval.start)}–
+          {seconds(originalInterval.end)}
+        </p>
+        <p className="mt-1 text-xs text-[var(--sniptale-color-text-secondary)]">
+          {translate('videoEditor.timeline.autoOriginalPlayback')}
+        </p>
       </div>
-    </section>
-  );
-}
-
-function WizardThresholdsStep(props: {
-  draft: VideoAutoProcessingSettings;
-  onDraftChange: (settings: VideoAutoProcessingSettings) => void;
-}) {
-  return (
-    <section className="grid grid-cols-2 gap-2">
-      <NumberField
-        label={translate('videoEditor.timeline.autoTransformMinDurationLabel')}
-        min={0.1}
-        step={0.1}
-        value={props.draft.stableSegments.minDurationSeconds}
-        onChange={(value) =>
-          props.onDraftChange(updateStableSegments(props.draft, { minDurationSeconds: value }))
-        }
-      />
-      <NumberField
-        label={translate('videoEditor.timeline.autoTransformSpeedLabel')}
-        min={1}
-        step={0.1}
-        value={props.draft.stableSegments.speedUpPlaybackRate}
-        onChange={(value) =>
-          props.onDraftChange(updateStableSegments(props.draft, { speedUpPlaybackRate: value }))
-        }
-      />
-    </section>
-  );
-}
-
-function WizardPreviewStep(props: { draft: VideoAutoProcessingSettings }) {
-  return (
-    <PanelSection
-      label={translate('videoEditor.timeline.autoTransformPreviewStep')}
-      value={getActionLabel(props.draft.stableSegments.action)}
-    >
-      <p className="text-[12px] leading-snug text-[var(--sniptale-color-text-secondary)]">
-        {getActionDescription(props.draft.stableSegments.action)}
-      </p>
-    </PanelSection>
-  );
-}
-
-function WizardFooter(props: { onApply: () => void; onClose: () => void }) {
-  return (
-    <ProductModalFooter compact>
-      <ProductActionButton tone="secondary" compact onClick={props.onClose}>
-        {translate('common.actions.cancel')}
-      </ProductActionButton>
-      <ProductActionButton tone="primary" compact onClick={props.onApply}>
-        {translate('videoEditor.timeline.autoTransformApply')}
-      </ProductActionButton>
-    </ProductModalFooter>
-  );
-}
-
-export function AutoTransformWizard(props: {
-  draft: VideoAutoProcessingSettings;
-  onApply: () => void;
-  onClose: () => void;
-  onDraftChange: (settings: VideoAutoProcessingSettings) => void;
-}) {
-  return (
-    <ProductModal
-      onClose={props.onClose}
-      width="min(460px, calc(100vw - 28px))"
-      maxHeight="calc(100vh - 28px)"
-      scrollable
-    >
-      <ProductModalHeader
+      <ProductActionButton
         compact
-        title={translate('videoEditor.timeline.autoTransformWizardTitle')}
-        onClose={props.onClose}
-      />
-      <ProductModalBody compact className="gap-4">
-        <WizardSignalStep />
-        <WizardDecisionStep draft={props.draft} onDraftChange={props.onDraftChange} />
-        <WizardThresholdsStep draft={props.draft} onDraftChange={props.onDraftChange} />
-        <WizardPreviewStep draft={props.draft} />
+        tone="secondary"
+        data-ui="video-editor.auto.return"
+        onClick={() => setOriginalInterval(null)}
+      >
+        <ArrowLeft size={14} aria-hidden="true" />
+        {translate('videoEditor.timeline.autoReturn')}
+      </ProductActionButton>
+    </FloatingChromePanel>
+  ) : (
+    <AutoProcessingModal
+      onClose={close}
+      applying={applying}
+      step={step}
+      onVisibilityChange={props.onModalVisibilityChange}
+    >
+      <ProductModalBody
+        compact
+        className="min-h-0 max-h-[min(400px,calc(100vh_-_240px))] !gap-0 !p-0"
+      >
+        {step === 'setup' ? (
+          <AutoProcessingSetup
+            choices={choices}
+            scope={scope}
+            settings={settings}
+            camera={camera}
+            busy={busy}
+            seconds={seconds}
+            onToggleScope={toggleScope}
+            onChangeSettings={patchSettings}
+            onToggleCamera={toggleCamera}
+          />
+        ) : (
+          <AutoProcessingReview
+            analysis={analysis}
+            preview={preview}
+            selectedIds={selectedIds}
+            action={settings.stableSegments.action}
+            stale={stale}
+            selectionChanged={selectionChanged}
+            busy={busy}
+            seconds={seconds}
+            onToggleSuggestion={toggleSuggestion}
+            onViewOriginal={viewOriginal}
+          />
+        )}
       </ProductModalBody>
-      <WizardFooter onClose={props.onClose} onApply={props.onApply} />
-    </ProductModal>
+      {status ? (
+        <p
+          role="status"
+          className="shrink-0 border-t border-[var(--sniptale-color-border-soft)] px-5 py-3 text-xs leading-relaxed"
+        >
+          {status}
+        </p>
+      ) : null}
+      <AutoProcessingFooter
+        step={step}
+        busy={busy}
+        applying={applying}
+        selectionChanged={selectionChanged}
+        stale={stale}
+        preview={preview}
+        selectedCount={selectedIds.length}
+        hasScope={scope.length > 0}
+        onBack={() => setStep('setup')}
+        close={close}
+        prepare={prepare}
+        apply={apply}
+      />
+    </AutoProcessingModal>
   );
+  return <AutoProcessingLayer>{content}</AutoProcessingLayer>;
 }

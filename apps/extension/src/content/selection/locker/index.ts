@@ -27,6 +27,10 @@ export function setFullLockMode(fullLockMode: boolean): void {
   navigationLockerOwner.getOwner().setFullLockMode(fullLockMode);
 }
 
+export function setNavigationInputShieldSuspended(suspended: boolean): void {
+  navigationLockerOwner.getOwner().setInputShieldSuspended(suspended);
+}
+
 export function setUIHidden(hidden: boolean): void {
   navigationLockerOwner.getOwner().setUIHidden(hidden);
 }

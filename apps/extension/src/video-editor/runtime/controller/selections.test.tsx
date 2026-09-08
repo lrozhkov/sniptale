@@ -54,7 +54,7 @@ describe('video editor selection derivation', () => {
       ])
     ).toEqual({
       selection: { kind: VideoEditorSelectionKind.CURSOR_SEGMENT, sampleId: 'stale-sample' },
-      selectedActionEvent: null,
+      selectedActionOccurrence: null,
       selectedClip: null,
       selectedCursorSample: null,
       selectedMotionRegion: null,

@@ -1,7 +1,14 @@
 import { expect, it } from 'vitest';
-import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
-import { VideoProjectAssetType, VideoProjectClipType } from '../../../features/video/project/types';
-import { pruneUnusedProjectAssets } from './helpers';
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../features/video/project/factories/creation';
+import {
+  VideoTrackKind,
+  VideoProjectAssetType,
+  VideoProjectClipType,
+} from '../../../features/video/project/types';
+import { deleteProjectTrack } from './track/delete';
 
 function createVideoAsset(id: string, name: string) {
   return {
@@ -72,26 +79,27 @@ function createShapeClipWithEmbeddedAsset(trackId: string) {
   } as never;
 }
 
-it('prunes orphaned assets that are no longer referenced by project clips', () => {
+it('retains both placed and unplaced materials when their track is deleted', () => {
   const project = createEmptyVideoProject('Helpers');
-  const primaryTrackId = project.tracks[0]!.id;
+  const track = createVideoProjectTrack('Video layer', 0, VideoTrackKind.PRIMARY);
+  project.tracks.push(track);
+  const primaryTrackId = track.id;
 
   project.assets = [createVideoAsset('asset-1', 'Kept'), createVideoAsset('asset-2', 'Removed')];
   project.clips = [createReferencedClip(primaryTrackId)];
 
-  const nextProject = pruneUnusedProjectAssets(project);
+  const nextProject = deleteProjectTrack(project, track.id);
 
-  expect(nextProject.assets).toEqual([
-    expect.objectContaining({
-      id: 'asset-1',
-    }),
-  ]);
-  expect(pruneUnusedProjectAssets(nextProject)).toBe(nextProject);
+  expect(nextProject.assets).toBe(project.assets);
+  expect(nextProject.clips).toEqual([]);
+  expect(deleteProjectTrack(nextProject, track.id)).toBe(nextProject);
 });
 
-it('keeps assets referenced by embedded shape template graphics', () => {
+it('retains embedded graphics as materials after deleting their overlay track', () => {
   const project = createEmptyVideoProject('Embedded assets');
-  const overlayTrackId = project.tracks[2]!.id;
+  const overlayTrack = createVideoProjectTrack('Graphics', 0, VideoTrackKind.PRIMARY);
+  project.tracks.push(overlayTrack);
+  const overlayTrackId = overlayTrack.id;
 
   project.assets = [
     createVideoAsset('badge-asset', 'Kept badge'),
@@ -99,7 +107,5 @@ it('keeps assets referenced by embedded shape template graphics', () => {
   ];
   project.clips = [createShapeClipWithEmbeddedAsset(overlayTrackId)];
 
-  expect(pruneUnusedProjectAssets(project).assets).toEqual([
-    expect.objectContaining({ id: 'badge-asset' }),
-  ]);
+  expect(deleteProjectTrack(project, overlayTrackId).assets).toBe(project.assets);
 });

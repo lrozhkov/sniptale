@@ -224,7 +224,7 @@ async function stopActiveRecording(
     return waitForExistingArtifactStop();
   }
 
-  const { artifactSession, durationTracker } = recordingContext;
+  const { artifactSession, durationTracker, recordingPointObservation } = recordingContext;
   const hadActiveSession = hasActiveRecordingSession();
   if (!artifactSession || artifactSession.state === 'inactive') {
     return handleStopWithoutActiveRecorder(hadActiveSession);
@@ -260,7 +260,19 @@ async function stopActiveRecording(
       resolve: (outcome = { result: 'stopped' }) => {
         clearRecorderTerminalDeadline();
         clearPendingStopRequest();
-        resolve(outcome);
+        resolve(
+          outcome.result === 'stopped'
+            ? {
+                ...outcome,
+                recordingPointTransform:
+                  !discard &&
+                  recordingPointObservation?.sawFrame &&
+                  recordingPointObservation.stable
+                    ? recordingPointObservation.transform
+                    : null,
+              }
+            : outcome
+        );
       },
       reject: (error) => {
         clearRecorderTerminalDeadline();

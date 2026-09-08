@@ -8,6 +8,12 @@ export function canCreateTransitionBoundary(
     return false;
   }
 
+  if (
+    (leadingClip.type === VideoProjectClipType.AUDIO) !==
+    (trailingClip.type === VideoProjectClipType.AUDIO)
+  )
+    return false;
+
   const leadingEnd = getClipEndTime(leadingClip);
   const trailingEnd = getClipEndTime(trailingClip);
   return (
@@ -18,11 +24,7 @@ export function canCreateTransitionBoundary(
 }
 
 function isTransitionExcludedClip(clip: VideoProjectClip): boolean {
-  return (
-    clip.type === VideoProjectClipType.ANNOTATION ||
-    clip.type === VideoProjectClipType.EFFECT ||
-    clip.type === VideoProjectClipType.AUDIO
-  );
+  return clip.type === VideoProjectClipType.ANNOTATION || clip.type === VideoProjectClipType.EFFECT;
 }
 
 function getClipEndTime(clip: VideoProjectClip): number {

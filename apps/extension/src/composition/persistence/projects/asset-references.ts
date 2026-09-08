@@ -93,7 +93,9 @@ async function deleteUnreferencedProjectAssets(
   referencedAssetIds: ReadonlySet<string>,
   assetOwnerStore: ProjectAssetOwnerStore,
   assetRefStore: ProjectAssetRefStore,
-  operation: PhysicalDeleteAssetOperation
+  operation: PhysicalDeleteAssetOperation,
+  videoWorkspaceStore: ProjectAssetRefStore,
+  videoDraftStore: ProjectAssetRefStore
 ): Promise<string[]> {
   const deletedAssetIds: string[] = [];
 
@@ -111,6 +113,8 @@ async function deleteUnreferencedProjectAssets(
     const projectAsset = parseProjectAssetEntry(await projectAssetStore.get(projectAssetId));
     await projectAssetStore.delete(projectAssetId);
     await mediaLibraryStore.delete(mediaId);
+    await videoWorkspaceStore.delete(mediaId);
+    await videoDraftStore.delete(mediaId);
     if (projectAsset) {
       await assetOwnerStore.delete([
         PROJECT_ASSET_OWNER_KIND,
@@ -136,6 +140,8 @@ export async function deleteProjectAssetsUnreferencedByOtherProjects(args: {
   ownerProjectId: string;
   projectAssetIds: string[];
   projectAssetStore: ProjectAssetDeleteStore;
+  videoWorkspaceStore: ProjectAssetRefStore;
+  videoDraftStore: ProjectAssetRefStore;
   projectStore: ProjectAssetReferenceProjectStore;
 }): Promise<string[]> {
   const referencedAssetIds =
@@ -154,7 +160,9 @@ export async function deleteProjectAssetsUnreferencedByOtherProjects(args: {
     referencedAssetIds,
     args.assetOwnerStore,
     args.assetRefStore,
-    args.operation
+    args.operation,
+    args.videoWorkspaceStore,
+    args.videoDraftStore
   );
 }
 

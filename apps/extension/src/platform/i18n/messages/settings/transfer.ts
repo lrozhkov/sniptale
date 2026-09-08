@@ -133,7 +133,7 @@ export const settingsTransferMessages = defineMessageSource({
     mode: message('Режим', 'Mode'),
     capture: message('Захват', 'Capture'),
     tray: message('Команды tray', 'Tray commands'),
-    telemetry: message('Телеметрия', 'Telemetry'),
+    telemetry: message('История действий', 'Action history'),
     authenticated: message('Авторизованные ресурсы', 'Authenticated assets'),
     anonymous: message('Анонимные ресурсы', 'Anonymous assets'),
   },

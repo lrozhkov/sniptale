@@ -10,7 +10,7 @@ import {
   getCurrentVideoEditorSelectedClipId,
   useVideoEditorAnnotationEditingPort,
   useVideoEditorClipSelectionPort,
-  useVideoEditorDiagnosticsTelemetryPort,
+  useVideoEditorRecordingTelemetryPort,
   useVideoEditorEffectEditingPort,
   useVideoEditorExportPort,
   useVideoEditorHistoryPort,
@@ -35,14 +35,7 @@ const expectedKeys = {
     'updateTextClipContent',
     'updateTextClipStyle',
   ],
-  diagnostics: [
-    'diagnosticsOpen',
-    'recordingTelemetry',
-    'setDiagnosticsOpen',
-    'setRecordingTelemetry',
-    'telemetryLaneVisible',
-    'toggleTelemetryLaneVisibility',
-  ],
+  telemetry: ['recordingTelemetry', 'setRecordingTelemetry'],
   effects: [
     'applyEffectDocument',
     'deleteEffectInstance',
@@ -91,14 +84,16 @@ const expectedKeys = {
     'startActionPointPlacement',
     'startMotionAreaPlacement',
     'startMotionFocusPlacement',
-    'startMotionPathStopAreaPlacement',
-    'startMotionPathStopPointPlacement',
+
     'startObjectTrackAnchorPlacement',
   ],
   selection: [
-    'selectActionSegment',
+    'selectActionOccurrence',
     'selectClip',
     'selectCursorSegment',
+    'selectHistoryLane',
+    'selectHistorySpan',
+    'selectMotionLane',
     'selectMotionRegion',
     'selectObjectTrack',
     'selectScene',
@@ -109,11 +104,15 @@ const expectedKeys = {
     'selection',
   ],
   timeline: [
+    'appendMaterial',
+    'insertMaterial',
+    'overlayMaterial',
     'addAssetClip',
     'addTrack',
     'addTrackLogicalLane',
     'addVideoBlock',
     'applyMediaClipVisualsToTrack',
+    'applyTypingCompression',
     'clearCursorSampleSkinOverride',
     'clearUtilityLane',
     'closeTrackGap',
@@ -132,12 +131,14 @@ const expectedKeys = {
     'renameTrack',
     'setPixelsPerSecond',
     'splitClipAt',
+    'swapClip',
     'toggleTrackLock',
     'toggleTrackVisibility',
     'toggleUtilityLaneLock',
     'toggleUtilityLaneVisibility',
     'trimClipEnd',
     'trimClipStart',
+    'updateActionPresentation',
     'updateActionEventDetails',
     'updateClipAudioEnvelope',
     'updateClipFades',
@@ -159,6 +160,8 @@ const expectedKeys = {
     'updateTransitionEasing',
     'updateTransitionTemplate',
     'upsertAsset',
+    'upsertAssets',
+    'removeUnusedAssets',
     'upsertObjectTrack',
     'upsertObjectTrackCorrectionAnchor',
   ],
@@ -184,7 +187,7 @@ it('projects every adapter key into exactly one capability', () => {
   function Probe() {
     keys = {
       annotation: Object.keys(useVideoEditorAnnotationEditingPort((port) => port)),
-      diagnostics: Object.keys(useVideoEditorDiagnosticsTelemetryPort((port) => port)),
+      telemetry: Object.keys(useVideoEditorRecordingTelemetryPort((port) => port)),
       effects: Object.keys(useVideoEditorEffectEditingPort((port) => port)),
       export: Object.keys(useVideoEditorExportPort((port) => port)),
       history: Object.keys(useVideoEditorHistoryPort((port) => port)),
@@ -210,7 +213,6 @@ it('projects every adapter key into exactly one capability', () => {
 it('keeps leaf projection identity and render isolation across unrelated updates', () => {
   const playbackSelections: object[] = [];
   const lifecycleSelections: object[] = [];
-  const diagnosticsSelections: object[] = [];
   const telemetrySelections: object[] = [];
   const timelineSelections: object[] = [];
 
@@ -222,16 +224,10 @@ it('keeps leaf projection identity and render isolation across unrelated updates
     lifecycleSelections.push(useVideoEditorProjectLifecyclePort(({ isReady }) => ({ isReady })));
     return null;
   }
-  function DiagnosticsProbe() {
-    diagnosticsSelections.push(
-      useVideoEditorDiagnosticsTelemetryPort(({ diagnosticsOpen }) => ({ diagnosticsOpen }))
-    );
-    return null;
-  }
   function TelemetryProbe() {
     telemetrySelections.push(
-      useVideoEditorDiagnosticsTelemetryPort(({ telemetryLaneVisible }) => ({
-        telemetryLaneVisible,
+      useVideoEditorRecordingTelemetryPort(({ recordingTelemetry }) => ({
+        recordingTelemetry,
       }))
     );
     return null;
@@ -248,30 +244,27 @@ it('keeps leaf projection identity and render isolation across unrelated updates
       <>
         <PlaybackProbe />
         <LifecycleProbe />
-        <DiagnosticsProbe />
         <TelemetryProbe />
         <TimelineProbe />
       </>
     )
   );
   const initialPlayback = playbackSelections[0];
-  act(() => useVideoEditorStore.getState().setDiagnosticsOpen(true));
+  act(() =>
+    useVideoEditorStore.setState({
+      recordingTelemetry: [...useVideoEditorStore.getState().recordingTelemetry],
+    })
+  );
   expect(playbackSelections).toHaveLength(1);
   expect(lifecycleSelections).toHaveLength(1);
-  expect(diagnosticsSelections).toHaveLength(2);
-  expect(telemetrySelections).toHaveLength(1);
-  expect(timelineSelections).toHaveLength(1);
-  expect(playbackSelections[0]).toBe(initialPlayback);
-
-  act(() => useVideoEditorStore.setState({ telemetryLaneVisible: true }));
-  expect(diagnosticsSelections).toHaveLength(2);
   expect(telemetrySelections).toHaveLength(2);
   expect(timelineSelections).toHaveLength(1);
+  expect(playbackSelections[0]).toBe(initialPlayback);
 
   act(() => useVideoEditorStore.setState({ currentTime: 250 }));
   expect(playbackSelections).toHaveLength(2);
   expect(lifecycleSelections).toHaveLength(1);
-  expect(diagnosticsSelections).toHaveLength(2);
+  expect(telemetrySelections).toHaveLength(2);
   expect(timelineSelections).toHaveLength(1);
 });
 
@@ -309,7 +302,7 @@ function useAssertSelectorsRequireAProjection() {
   // @ts-expect-error Capability hooks intentionally have no full-port overload.
   useVideoEditorRuntimeSessionPort();
   // @ts-expect-error Capability hooks intentionally have no full-port overload.
-  useVideoEditorDiagnosticsTelemetryPort();
+  useVideoEditorRecordingTelemetryPort();
 }
 
 void useAssertSelectorsRequireAProjection;

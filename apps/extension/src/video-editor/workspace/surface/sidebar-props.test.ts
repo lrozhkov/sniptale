@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createFloatingWorkspaceController } from '../floating/top-panels.test-support';
 import { getWorkspaceSidebarProps } from './sidebar-props';
 
@@ -7,7 +7,18 @@ describe('workspace/sidebar-props', () => {
     const controller = createFloatingWorkspaceController().sidebar;
     const props = getWorkspaceSidebarProps(controller);
 
+    expect(props.onSwapClip).toBe(controller.clipActions.onSwapClip);
+    props.onSwapClip?.('clip-1', 'right');
+    expect(controller.clipActions.onSwapClip).toHaveBeenCalledWith('clip-1', 'right');
+
+    expect(props.onToggleUtilityLaneVisibility).toBe(
+      controller.projectActions.onToggleUtilityLaneVisibility
+    );
+    expect(props.onToggleUtilityLaneLock).toBe(controller.projectActions.onToggleUtilityLaneLock);
+    expect(props.onClearUtilityLane).toBe(controller.projectActions.onClearUtilityLane);
     expect(props.onRenameTrack).toBe(controller.projectActions.onRenameTrack);
+    expect(props.onToggleTrackLock).toBe(controller.projectActions.onToggleTrackLock);
+    expect(props.onToggleTrackVisibility).toBe(controller.projectActions.onToggleTrackVisibility);
     expect(props.gridSettings).toBe(controller.state.gridSettings);
     expect(props.onApplyMediaClipVisualsToTrack).toBe(
       controller.clipActions.onApplyMediaClipVisualsToTrack
@@ -42,4 +53,18 @@ describe('workspace/sidebar-props', () => {
       color: '#fff',
     });
   });
+});
+
+it('forwards camera layout actions and preserves false split eligibility', () => {
+  const controller = createFloatingWorkspaceController().sidebar;
+  const onApplyCameraLayout = vi.fn();
+  const onEditCameraPosition = vi.fn();
+  controller.clipActions.onApplyCameraLayout = onApplyCameraLayout;
+  controller.clipActions.onEditCameraPosition = onEditCameraPosition;
+  controller.state.canAddCameraPosition = false;
+  const props = getWorkspaceSidebarProps(controller);
+  expect(props.canAddCameraPosition).toBe(false);
+  props.onApplyCameraLayout?.('camera', 'OVERLAY', 'TOP_RIGHT');
+  expect(onApplyCameraLayout).toHaveBeenCalledWith('camera', 'OVERLAY', 'TOP_RIGHT');
+  expect(props.onEditCameraPosition).toBe(onEditCameraPosition);
 });

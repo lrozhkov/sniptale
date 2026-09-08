@@ -14,10 +14,8 @@ interface VideoEditorTimelineState extends VideoEditorProjectSliceState {
   saveState: VideoEditorSaveState;
   isPlaying: boolean;
   pixelsPerSecond: number;
-  diagnosticsOpen: boolean;
   exportState: VideoEditorExportRuntimeState;
-  recordingTelemetry: RecordingTelemetryEntry | null;
-  telemetryLaneVisible: boolean;
+  recordingTelemetry: readonly RecordingTelemetryEntry[];
 }
 
 export interface VideoEditorState

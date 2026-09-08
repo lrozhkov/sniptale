@@ -1,3 +1,5 @@
+import { updateCameraPositionVisual } from '../../../../features/video/project/camera/animation';
+import { resolveEffectClipTransformPatch } from '../../../../features/video/project/effect-instance/layout';
 import { clampNumber } from '../../../../features/video/project/timeline/basics';
 import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
 import { getClipGainRange } from '../../../../features/video/project/timeline/basics';
@@ -87,10 +89,23 @@ function updateClipTransform(
     }
 
     return applyProjectUpdate(state, (project) =>
-      updateClipWithProjectGuard(project, clipId, (item) => ({
-        ...item,
-        transform: { ...item.transform, ...normalizedPatch },
-      }))
+      updateClipWithProjectGuard(project, clipId, (item) =>
+        item.type === 'VIDEO' &&
+        project.tracks.some((track) => track.id === item.trackId && track.role === 'CAMERA')
+          ? updateCameraPositionVisual(item, state.currentTime, { transform: normalizedPatch })
+          : {
+              ...item,
+              transform: {
+                ...item.transform,
+                ...resolveEffectClipTransformPatch(
+                  project,
+                  item,
+                  normalizedPatch,
+                  VIDEO_CLIP_PROPERTY_LIMITS.transformSize
+                ),
+              },
+            }
+      )
     );
   });
 }

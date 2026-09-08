@@ -1,6 +1,9 @@
 import { translate } from '../../../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { VideoTemporalEasing } from '../../../../../features/video/project/types';
+import {
+  VideoCursorCaptureMode,
+  VideoTemporalEasing,
+} from '../../../../../features/video/project/types';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import {
   CursorPositionFields,
@@ -10,13 +13,7 @@ import {
 import { DangerButton, TemporalEasingSelect } from '../effect-controls/fields';
 import { InspectorGroupedPanel } from '../grouped-inspector';
 import { SelectionEmptyState } from './helpers';
-import {
-  DetailItem,
-  DetailList,
-  PANEL_HEADING_CLASS_NAME,
-  PANEL_META_CLASS_NAME,
-  PANEL_SECTION_CLASS_NAME,
-} from '../shared/panel';
+import { DetailItem, DetailList, PANEL_SECTION_CLASS_NAME } from '../shared/panel';
 
 export function InspectCursorPanel(props: WorkspaceSidebarSelectionPanelProps) {
   const sample = props.selectedCursorSample;
@@ -34,7 +31,7 @@ export function InspectCursorPanel(props: WorkspaceSidebarSelectionPanelProps) {
         groups={createCursorGroups(props, sample, cursorTrack, usesTrackAppearance, effectiveSkin)}
       />
       <DangerButton
-        className="mt-3 w-full"
+        className="mt-3"
         onClick={() => props.onDeleteCursorSample(sample.id)}
         label={translate('common.actions.delete')}
       />
@@ -54,28 +51,58 @@ function createCursorGroups(
   return [
     {
       id: 'info',
+      semantic: 'info' as const,
       label: translate('videoEditor.sidebar.inspectorGroupInfo'),
       content: (
         <CursorOverview
           appearanceMode={usesTrackAppearance ? 'track' : 'override'}
           time={sample.time}
+          x={sample.x}
+          y={sample.y}
         />
       ),
     },
     {
       id: 'behavior',
-      label: translate('videoEditor.sidebar.inspectorGroupBehavior'),
-      defaultActive: true,
-      content: <CursorBehaviorSection {...createCursorBehaviorProps(props, sample)} />,
+      semantic: 'animation' as const,
+      label: translate('videoEditor.sidebar.inspectorGroupAnimation'),
+      content: (
+        <>
+          <CursorBehaviorSection {...createCursorBehaviorProps(props, sample)} />
+          <CursorSkinFields
+            {...createCursorAppearanceProps(props, sample, cursorTrack, usesTrackAppearance)}
+            part="animation"
+            animationPreset={effectiveSkin.animationPreset}
+            color={effectiveSkin.color}
+            hidden={effectiveSkin.hidden}
+            preset={effectiveSkin.preset}
+            scale={effectiveSkin.scale}
+            shadow={effectiveSkin.shadow}
+            onUpdateCursorSkin={resolveCursorSkinUpdater({
+              ...createCursorAppearanceProps(props, sample, cursorTrack, usesTrackAppearance),
+              skin: effectiveSkin,
+            })}
+            showCaptureCapability={false}
+          />
+        </>
+      ),
     },
     {
       id: 'appearance',
+      semantic: 'appearance' as const,
+      defaultActive: true,
       label: translate('videoEditor.sidebar.inspectorGroupAppearance'),
       content: (
-        <CursorAppearanceSection
-          {...createCursorAppearanceProps(props, sample, cursorTrack, usesTrackAppearance)}
-          skin={effectiveSkin}
-        />
+        <>
+          <CursorVisibilityField
+            visible={sample.visible}
+            onChange={(visible) => props.onUpdateCursorSampleVisibility(sample.id, visible)}
+          />
+          <CursorAppearanceSection
+            {...createCursorAppearanceProps(props, sample, cursorTrack, usesTrackAppearance)}
+            skin={effectiveSkin}
+          />
+        </>
       ),
     },
   ] as const;
@@ -87,6 +114,7 @@ function createCursorBehaviorProps(
 ) {
   return {
     sample,
+    canInterpolate: props.project.cursorTrack?.captureMode === VideoCursorCaptureMode.SEPARATE,
     onUpdateCursorSampleInterpolation: props.onUpdateCursorSampleInterpolation,
     onUpdateCursorSampleVisibility: props.onUpdateCursorSampleVisibility,
   };
@@ -112,22 +140,20 @@ function createCursorAppearanceProps(
 }
 
 function CursorBehaviorSection(props: {
+  canInterpolate: boolean;
   sample: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedCursorSample']>;
   onUpdateCursorSampleInterpolation: WorkspaceSidebarSelectionPanelProps['onUpdateCursorSampleInterpolation'];
   onUpdateCursorSampleVisibility: WorkspaceSidebarSelectionPanelProps['onUpdateCursorSampleVisibility'];
 }) {
   return (
     <div className="space-y-3">
-      <CursorPositionFields x={props.sample.x} y={props.sample.y} />
-      <CursorVisibilityField
-        visible={props.sample.visible}
-        onChange={(visible) => props.onUpdateCursorSampleVisibility(props.sample.id, visible)}
-      />
-      <TemporalEasingSelect
-        label={translate('videoEditor.sidebar.cursorInterpolationLabel')}
-        value={props.sample.interpolation ?? VideoTemporalEasing.LINEAR}
-        onChange={(value) => props.onUpdateCursorSampleInterpolation(props.sample.id, value)}
-      />
+      {props.canInterpolate ? (
+        <TemporalEasingSelect
+          label={translate('videoEditor.sidebar.cursorInterpolationLabel')}
+          value={props.sample.interpolation ?? VideoTemporalEasing.LINEAR}
+          onChange={(value) => props.onUpdateCursorSampleInterpolation(props.sample.id, value)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -150,7 +176,6 @@ function CursorAppearanceSection(props: {
 }) {
   return (
     <>
-      <CursorAppearanceHeading usesTrackAppearance={props.usesTrackAppearance} />
       <CursorAppearanceModeButton
         sampleId={props.sampleId}
         skin={props.skin}
@@ -160,6 +185,8 @@ function CursorAppearanceSection(props: {
       />
       <div className="mt-3">
         <CursorSkinFields
+          part="appearance"
+          showCaptureCapability={true}
           animationPreset={props.skin.animationPreset}
           captureMode={props.captureMode}
           color={props.skin.color}
@@ -174,23 +201,6 @@ function CursorAppearanceSection(props: {
         />
       </div>
     </>
-  );
-}
-
-function CursorAppearanceHeading(props: { usesTrackAppearance: boolean }) {
-  return (
-    <div className="mt-3">
-      <p className={PANEL_HEADING_CLASS_NAME}>
-        {translate('videoEditor.sidebar.cursorTrackAppearanceTitle')}
-      </p>
-      <p className={`mt-1 ${PANEL_META_CLASS_NAME}`}>
-        {translate(
-          props.usesTrackAppearance
-            ? 'videoEditor.sidebar.cursorAppearanceTrackLinkHint'
-            : 'videoEditor.sidebar.cursorAppearanceOverrideHint'
-        )}
-      </p>
-    </div>
   );
 }
 
@@ -242,10 +252,15 @@ function CursorAppearanceModeButton(props: {
   );
 }
 
-function CursorOverview(props: { appearanceMode: 'override' | 'track'; time: number }) {
+function CursorOverview(props: {
+  appearanceMode: 'override' | 'track';
+  time: number;
+  x: number;
+  y: number;
+}) {
   return (
     <>
-      <p className={PANEL_HEADING_CLASS_NAME}>{translate('videoEditor.timeline.cursorLane')}</p>
+      <CursorPositionFields x={props.x} y={props.y} />
       <div className="mt-3">
         <DetailList>
           <DetailItem

@@ -1,3 +1,5 @@
+import type { RecordingPointTransform } from '../../../features/video/project/types';
+import { isRecordingPointTransform } from '../../../features/video/project/validation/recording-telemetry';
 import { attachOffscreenCommandCapability } from '@sniptale/platform/security/offscreen-command-capability';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { RuntimeMessagingTransport } from '../../../platform/runtime-messaging';
@@ -11,6 +13,7 @@ export type RecordingSourceBinding = {
 
 type OffscreenRecordingStopAcknowledgement = {
   terminalError: string | null;
+  recordingPointTransform: RecordingPointTransform | null;
 };
 
 export async function requestBoundOffscreenRecordingStop(
@@ -30,7 +33,12 @@ export async function requestBoundOffscreenRecordingStop(
   if (response?.success !== true) {
     throw new Error(response?.error ?? 'Offscreen recording stop acknowledgement missing');
   }
+  const transform = 'recordingPointTransform' in response ? response.recordingPointTransform : null;
   return {
+    recordingPointTransform:
+      !discard && response.result !== 'terminal-failure' && isRecordingPointTransform(transform)
+        ? transform
+        : null,
     terminalError:
       response.result === 'terminal-failure'
         ? (response.error ?? 'The recording stopped after a terminal recorder failure')

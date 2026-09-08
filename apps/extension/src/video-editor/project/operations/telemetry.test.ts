@@ -4,7 +4,7 @@ import {
   VideoCursorAnimationPreset,
   VideoCursorCaptureMode,
   VideoCursorVisualPreset,
-  type VideoProjectActionEvent,
+  type RecordingActionEvent,
   type VideoProjectCursorTrack,
 } from '../../../features/video/project/types/interaction';
 import { CaptureMode, type ViewportInfo } from '@sniptale/runtime-contracts/video/types/types';
@@ -42,7 +42,7 @@ function createCursorTrack(): VideoProjectCursorTrack {
   };
 }
 
-function createActionEvents(): VideoProjectActionEvent[] {
+function createActionEvents(): RecordingActionEvent[] {
   return [
     {
       data: { button: 0 },
@@ -57,7 +57,7 @@ function createActionEvents(): VideoProjectActionEvent[] {
   ];
 }
 
-it('normalizes screen telemetry into recorded project coordinates including browser chrome offsets', () => {
+it('keeps unproven actions nonspatial while cursor coordinates retain project units', () => {
   const params = {
     captureMode: CaptureMode.SCREEN,
     displaySurface: 'window' as const,
@@ -72,7 +72,7 @@ it('normalizes screen telemetry into recorded project coordinates including brow
     })
   );
   expect(normalizeRecordingActionEventsToProjectSpace(createActionEvents(), params)).toEqual([
-    expect.objectContaining({ point: { x: 135, y: 415 } }),
+    expect.objectContaining({ point: null }),
   ]);
 });
 
@@ -106,4 +106,65 @@ it('keeps screen-selected browser tabs in viewport space without window chrome o
       samples: [expect.objectContaining({ x: 202.02020202020202, y: 400 })],
     })
   );
+});
+
+it('keeps captured facts when geometry is unavailable and refuses to clamp out-of-source points', () => {
+  const events = createActionEvents();
+  const original = structuredClone(events);
+  const params = {
+    captureMode: CaptureMode.TAB,
+    displaySurface: null,
+    projectHeight: 900,
+    projectWidth: 1584,
+    viewport: createViewportInfo(),
+  };
+  for (const patch of [{ viewport: null }, { captureMode: CaptureMode.TAB_CROP }]) {
+    expect(normalizeRecordingActionEventsToProjectSpace(events, { ...params, ...patch })).toEqual([
+      { ...events[0], point: null },
+    ]);
+  }
+  expect(
+    normalizeRecordingActionEventsToProjectSpace(
+      [{ ...events[0]!, point: { x: -1, y: 20 } }],
+      params
+    )[0]?.point
+  ).toBeNull();
+  expect(events).toEqual(original);
+});
+
+it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
+  'imports immutable recordingPoint for %s without reconstructing from final viewport',
+  (captureMode) => {
+    const events = [{ ...createActionEvents()[0]!, recordingPoint: { x: 0.25, y: 0.75 } }];
+    const original = structuredClone(events);
+    for (const viewport of [null, createViewportInfo(), { ...createViewportInfo(), width: 500 }]) {
+      const result = normalizeRecordingActionEventsToProjectSpace(events, {
+        captureMode,
+        displaySurface: null,
+        projectWidth: 1920,
+        projectHeight: 1080,
+        viewport,
+      });
+      expect(result[0]?.point).toEqual({ x: 0.25, y: 0.75 });
+      expect(result[0]?.id).toBe(events[0]!.id);
+      expect(result[0]?.time).toBe(events[0]!.time);
+    }
+    expect(events).toEqual(original);
+  }
+);
+
+it('keeps TAB history nonspatial when recordingPoint is absent or explicitly unavailable', () => {
+  const raw = createActionEvents()[0]!;
+  const events = [raw, { ...raw, id: 'unavailable', recordingPoint: null }];
+  const result = normalizeRecordingActionEventsToProjectSpace(events, {
+    captureMode: CaptureMode.TAB,
+    displaySurface: null,
+    projectWidth: 1584,
+    projectHeight: 900,
+    viewport: createViewportInfo(),
+  });
+  expect(result.map((event) => ({ id: event.id, point: event.point }))).toEqual([
+    { id: raw.id, point: null },
+    { id: 'unavailable', point: null },
+  ]);
 });

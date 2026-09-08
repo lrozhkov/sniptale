@@ -1,21 +1,16 @@
 export const EFFECT_SEGMENT_BASE_CLASS_NAME = [
-  'group absolute inset-0 overflow-hidden rounded-[12px] border',
+  'video-editor-timeline-item group absolute inset-0 overflow-hidden rounded-md border',
   'transition-[border-color,box-shadow,background-color]',
-  'cursor-grab active:cursor-grabbing',
 ].join(' ');
 
 export const EFFECT_SEGMENT_HANDLE_CLASS_NAME = [
   'absolute inset-y-0 z-10 w-2 rounded-full',
   'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_28%,transparent)]',
   'hover:bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_44%,transparent)]',
-  'cursor-ew-resize',
+  '!cursor-ew-resize',
 ].join(' ');
 
-export const EFFECT_SEGMENT_SELECTED_CLASS_NAME = [
-  'border-[color:var(--sniptale-color-border-accent-strong)]',
-  'shadow-[0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-border-accent-strong)_55%,transparent),',
-  '0_0_18px_color-mix(in_srgb,var(--sniptale-color-accent-soft)_22%,transparent)]',
-].join(' ');
+export const EFFECT_SEGMENT_SELECTED_CLASS_NAME = 'video-editor-timeline-item-selected';
 
 export const EFFECT_SEGMENT_WARNING_CLASS_NAME = [
   'border-dashed',

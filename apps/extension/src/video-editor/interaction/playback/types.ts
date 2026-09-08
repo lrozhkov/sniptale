@@ -1,3 +1,4 @@
+import type { VideoProjectActionOccurrence } from '../../../features/video/project/action-occurrences';
 import type { VideoProject, VideoProjectClip } from '../../../features/video/project/types/index';
 import type {
   VideoEditorActionEventPatch,
@@ -24,7 +25,7 @@ export interface PlaybackLatestState {
   project: VideoProject | null;
   projectHistoryTransactionActive: boolean;
   selection: VideoEditorSelection;
-  selectedActionEvent: NonNullable<NonNullable<VideoProject['actionEvents']>[number]> | null;
+  selectedActionOccurrence: VideoProjectActionOccurrence | null;
   selectedClipId: string | null;
   selectedMotionRegion: NonNullable<NonNullable<VideoProject['motionRegions']>[number]> | null;
 }
@@ -32,10 +33,11 @@ export interface PlaybackLatestState {
 export interface PlaybackHandlers {
   clearPlacementMode: () => void;
   deleteActionEvent: (actionEventId: string) => void;
-  deleteClip: (clipId: string) => void;
+  deleteClip: (clipId: string | readonly string[]) => void;
   deleteCursorSample: (sampleId: string) => void;
   deleteMotionRegion: (motionRegionId: string) => void;
   deleteObjectTrack: (objectTrackId: string) => void;
+  duplicateClip: (clipId: string) => void;
   setCurrentTime: (time: number) => void;
   setPlaying: (playing: boolean) => void;
   splitClipAt: (clipId: string, time: number) => void;

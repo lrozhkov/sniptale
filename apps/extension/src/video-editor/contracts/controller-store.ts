@@ -38,9 +38,15 @@ type TimelineTrackAction =
   | 'clearUtilityLane';
 
 type TimelineClipAction =
+  | 'appendMaterial'
+  | 'insertMaterial'
+  | 'overlayMaterial'
   | 'upsertAsset'
+  | 'upsertAssets'
+  | 'removeUnusedAssets'
   | 'addAssetClip'
   | 'addVideoBlock'
+  | 'swapClip'
   | 'moveClip'
   | 'trimClipStart'
   | 'trimClipEnd'
@@ -73,7 +79,10 @@ export interface TimelineEditingPort
     Pick<VideoEditorProjectActions, TimelineTrackAction | TimelineClipAction>,
     VideoEditorTemporalActions,
     Pick<VideoEditorObjectTrackActions, TimelineObjectTrackAction>,
-    Pick<VideoEditorSessionActions, 'setPixelsPerSecond' | 'updateProject'> {
+    Pick<
+      VideoEditorSessionActions,
+      'setPixelsPerSecond' | 'updateProject' | 'applyTypingCompression'
+    > {
   pixelsPerSecond: number;
 }
 
@@ -84,8 +93,11 @@ type SelectionAction =
   | 'selectTransition'
   | 'selectCursorSegment'
   | 'selectObjectTrack'
-  | 'selectActionSegment'
-  | 'selectMotionRegion';
+  | 'selectActionOccurrence'
+  | 'selectMotionRegion'
+  | 'selectHistoryLane'
+  | 'selectHistorySpan'
+  | 'selectMotionLane';
 
 /** Selection state and selection mutations. */
 export interface ClipSelectionPort extends Pick<VideoEditorSessionActions, SelectionAction> {
@@ -146,9 +158,7 @@ type PlacementAction =
   | 'clearPlacementMode'
   | 'startActionPointPlacement'
   | 'startMotionFocusPlacement'
-  | 'startMotionAreaPlacement'
-  | 'startMotionPathStopAreaPlacement'
-  | 'startMotionPathStopPointPlacement';
+  | 'startMotionAreaPlacement';
 
 /** Point-authoring and placement-mode capability. */
 export interface RuntimeSessionPort
@@ -158,17 +168,16 @@ export interface RuntimeSessionPort
   placementMode: VideoEditorPlacementMode | null;
 }
 
-/** Diagnostics visibility and recording telemetry capability. */
-export interface DiagnosticsTelemetryPort extends Pick<
+/** Recording telemetry capability. */
+export interface RecordingTelemetryPort extends Pick<
   VideoEditorSessionActions,
-  'setDiagnosticsOpen' | 'setRecordingTelemetry' | 'toggleTelemetryLaneVisibility'
+  'setRecordingTelemetry'
 > {
-  diagnosticsOpen: boolean;
-  recordingTelemetry: RecordingTelemetryEntry | null;
-  telemetryLaneVisible: boolean;
+  recordingTelemetry: readonly RecordingTelemetryEntry[];
 }
 
 export interface VideoEditorProjectStorageStatus {
+  projectId: string | null;
   projectUpdatedAt: number | null;
   saveState: VideoEditorSaveState;
 }

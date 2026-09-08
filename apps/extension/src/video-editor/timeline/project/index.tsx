@@ -1,14 +1,34 @@
+import { useMemo } from 'react';
+import { TimelineEffectDraftContext } from './effect-lanes/segment';
 import { ProjectTimelineBody } from './body';
 import { ProjectTimelineSurface } from './surface';
 import type { ProjectTimelineProps } from './types';
-import { useProjectTimelinePanelPrefs } from './panel/prefs';
+import type { useProjectTimelinePanelPrefs } from './panel/prefs';
 import { useProjectTimelineState } from './interaction-state/index';
 
-export const ProjectTimeline = (props: ProjectTimelineProps) => {
-  const panelPrefs = useProjectTimelinePanelPrefs(props.project);
-  const timelineState = useProjectTimelineState(props, panelPrefs.prefs.trackHeightByTrackId);
+export const ProjectTimeline = (
+  props: ProjectTimelineProps & { panelPrefs: ReturnType<typeof useProjectTimelinePanelPrefs> }
+) => {
+  const { panelPrefs } = props;
+  const heights = useMemo(
+    () =>
+      panelPrefs.prefs.compactRows
+        ? Object.fromEntries(
+            props.project.tracks.map(({ id }) => [
+              id,
+              Math.max(0.5, (panelPrefs.prefs.trackHeightByTrackId[id] ?? 1) * 0.75),
+            ])
+          )
+        : panelPrefs.prefs.trackHeightByTrackId,
+    [panelPrefs.prefs, props.project.tracks]
+  );
+  const timelineState = useProjectTimelineState(props, heights);
 
-  return <ProjectTimelineLayout {...props} {...timelineState} panelPrefs={panelPrefs} />;
+  return (
+    <TimelineEffectDraftContext.Provider value={timelineState.effectDragDraft}>
+      <ProjectTimelineLayout {...props} {...timelineState} panelPrefs={panelPrefs} />
+    </TimelineEffectDraftContext.Provider>
+  );
 };
 
 function ProjectTimelineLayout(
@@ -23,9 +43,8 @@ function ProjectTimelineLayout(
         {...props}
         cursorLaneVisible={props.panelPrefs.cursorLaneVisible}
         telemetryLaneVisible={
-          props.telemetryLaneVisible &&
-          props.recordingTelemetry !== null &&
-          props.panelPrefs.telemetryLaneVisible
+          props.panelPrefs.telemetryLaneVisible &&
+          (props.project.actionEvents.length > 0 || props.recordingTelemetry.length > 0)
         }
         trackPanelPrefs={props.panelPrefs}
       />

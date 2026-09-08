@@ -1,3 +1,5 @@
+import type { VideoEditorProjectActions } from '../../contracts/commands/project';
+import type { AutoProcessingActions } from '../../project/operations/auto-transform';
 import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
 import type {
   VideoBlockKind,
@@ -5,9 +7,7 @@ import type {
   VideoProjectActionPreset,
   VideoProjectClip,
   VideoProjectShapeType,
-  VideoTrackKind,
 } from '../../../features/video/project/types';
-import type { VideoAutoProcessingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import type { VideoProjectUtilityLaneKind } from '../../../features/video/project/utility-lanes';
 import type { VideoEditorPlaybackRange } from '../../interaction/playback/range';
 import type { VideoEditorSelection } from '../../contracts/selection';
@@ -20,6 +20,10 @@ import type { VideoProjectEffectInstancePatch } from '../../contracts/commands/p
 import type { VideoProjectEffectTarget } from '../../../features/video/project/effect-instance/types';
 import type { VideoEditorEffectDocumentDragPayload } from '../../contracts/effect-document-drag';
 import type { VideoEditorProjectHistoryTransactionActions } from '../../contracts/commands/history';
+import type {
+  VideoEditorMoveClipAction,
+  VideoEditorTrimClipAction,
+} from '../../contracts/commands/timeline';
 
 export interface ProjectTimelineInsertionActions {
   onAddActionEvent: (preset: VideoProjectActionPreset) => void;
@@ -28,7 +32,7 @@ export interface ProjectTimelineInsertionActions {
   onAddShapeOverlay: (shapeType: VideoProjectShapeType) => void;
   onAddSubtitleOverlay?: () => void;
   onAddTextOverlay: () => void;
-  onAddTrack: (kind?: VideoTrackKind) => void;
+  onAddTrack: VideoEditorProjectActions['addTrack'];
   onEnableCursorTrack: () => void;
   onImport: {
     audio: (file: File, placement?: VideoEditorImportPlacement) => void | Promise<void>;
@@ -38,7 +42,16 @@ export interface ProjectTimelineInsertionActions {
   onUnsupportedFileDrop: () => void;
 }
 
+export interface TimelineClipRevealRequest {
+  clipId: string;
+  serial: number;
+}
+
 export interface ProjectTimelineProps {
+  revealClipRequest?: TimelineClipRevealRequest | undefined;
+  canDeleteSelectedClip: boolean;
+  canEditSelectedClip: boolean;
+  canSplitSelectedClip: boolean;
   historyTransaction: VideoEditorProjectHistoryTransactionActions;
   project: VideoProject;
   currentTime: number;
@@ -47,21 +60,22 @@ export interface ProjectTimelineProps {
   insertion: ProjectTimelineInsertionActions;
   magnetEnabled: boolean;
   playbackRange: VideoEditorPlaybackRange | null;
-  recordingTelemetry: RecordingTelemetryEntry | null;
+  recordingTelemetry: readonly RecordingTelemetryEntry[];
   selection: VideoEditorSelection;
   selectedClipId: string | null;
   selectedTrackId: string | null;
-  telemetryLaneVisible: boolean;
   timelinePreviews: TimelineClipPreviewMap;
-  onSeek: (time: number) => void;
+  onSeekToEnd: () => void;
   onSeekToStart: () => void;
-  onZoomChange: (value: number) => void;
   onTogglePlay: () => void;
-  onSetPlaybackRange: (range: VideoEditorPlaybackRange | null) => void;
   onClearPlaybackRange: () => void;
-  onToggleTelemetryLaneVisibility: () => void;
+  onStepToNextFrame: () => void;
+  onStepToPreviousFrame: () => void;
+  onSeek: (time: number) => void;
+  onZoomChange: (value: number) => void;
+  onSetPlaybackRange: (range: VideoEditorPlaybackRange | null) => void;
   onSelectScene: () => void;
-  onSelectClip: (clipId: string | null) => void;
+  onSelectClip: (clipId: string | null, intent?: 'replace' | 'toggle' | 'range') => void;
   onSelectTrack: (trackId: string | null) => void;
   onSelectTransition: (transitionId: string) => void;
   onDropEffectDocument?: (
@@ -70,33 +84,32 @@ export interface ProjectTimelineProps {
     startTime: number
   ) => void;
   onSelectCursorSegment: (sampleId: string) => void;
-  onSelectActionSegment: (actionEventId: string) => void;
-  onSelectMotionRegion: (motionRegionId: string) => void;
-  onSelectObjectTrack: (objectTrackId: string) => void;
-  onMoveClip: (
-    clipId: string,
-    startTime: number,
-    trackId?: string,
-    timelineLaneId?: string | null
+  onSelectHistorySpan?: (
+    target: import('../../contracts/commands/timeline').VideoEditorTypingSpanTarget
   ) => void;
+  onSelectActionOccurrence: (eventId: string, clipId: string | null) => void;
+  onSelectHistoryLane?: (() => void) | undefined;
+  onSelectMotionLane?: (() => void) | undefined;
+  onSelectMotionRegion: (motionRegionId: string, part?: 'connection') => void;
+  onConnectMotionRegions?: ((fromRegionId: string, toRegionId: string) => void) | undefined;
+  onSelectObjectTrack: (objectTrackId: string) => void;
+  onSwapClip: (clipId: string, direction: 'left' | 'right') => void;
+  onMoveClip: VideoEditorMoveClipAction;
   onCloseTrackGap: (trackId: string, gapStart: number, gapEnd: number) => void;
   onAddTrackLogicalLane: (trackId: string) => void;
   onRenameTrack: (trackId: string, name: string) => void;
-  onTrimClipStart: (clipId: string, nextStartTime: number) => void;
-  onTrimClipEnd: (clipId: string, nextEndTime: number) => void;
+  onTrimClipStart: VideoEditorTrimClipAction;
+  onTrimClipEnd: VideoEditorTrimClipAction;
   onSplitSelectedClip: () => void;
   onDuplicateSelectedClip: () => void;
   onDeleteSelectedClip: () => void;
   onUpdateSelectedClipPlaybackRate: (playbackRate: number) => void;
-  onAutoTransformRecording: (settings: VideoAutoProcessingSettings) => void;
+  autoProcessing: AutoProcessingActions;
+  onAutoProcessingModalVisibilityChange: (open: boolean) => void;
   onDeleteSelectedTimelineObject: () => void;
-  onDeleteTrack: (trackId: string) => void;
-  onMoveTrack: (trackId: string, direction: 'up' | 'down') => void;
   onToggleUtilityLaneVisibility: (lane: VideoProjectUtilityLaneKind) => void;
   onToggleUtilityLaneLock: (lane: VideoProjectUtilityLaneKind) => void;
   onClearUtilityLane: (lane: VideoProjectUtilityLaneKind) => void;
-  onMoveActionEvent: (actionEventId: string, time: number) => void;
-  onResizeActionEvent: (actionEventId: string, duration: number) => void;
   onMoveCursorSegment: (
     sampleId: string,
     nextSampleId: string | null,
@@ -104,6 +117,9 @@ export interface ProjectTimelineProps {
     endTime: number | null
   ) => void;
   onMoveTransitionSegment: (transitionId: string, startTime: number) => void;
+  onMoveActionOccurrence?:
+    | ((eventId: string, clipId: string | null, time: number) => void)
+    | undefined;
   onMoveMotionRegion: (motionRegionId: string, startTime: number) => void;
   onResizeMotionRegion: (motionRegionId: string, startTime: number, duration: number) => void;
   onUpdateEffectInstance: (instanceId: string, patch: VideoProjectEffectInstancePatch) => void;
@@ -114,21 +130,35 @@ export interface ProjectTimelineProps {
 }
 
 export type DragMode = 'move' | 'trim-start' | 'trim-end';
-type EffectLaneKind = 'transition' | 'cursor' | 'action' | 'motion' | 'effect-instance';
+type EffectLaneKind = 'transition' | 'cursor' | 'motion' | 'effect-instance' | 'action';
 
 export interface TimelineEffectSelection {
   kind: EffectLaneKind;
   segmentId: string;
 }
 
+/** Transient timeline geometry; the project changes only when the gesture commits. */
+export interface TimelineEffectDragDraft {
+  segmentId: string;
+  cursorSampleTimes?: {
+    sampleId: string;
+    nextSampleId: string | null;
+    startTime: number;
+    endTime: number | null;
+  };
+  startTime?: number;
+  duration?: number;
+}
+
 export type TimelineEffectDragTarget =
   | {
       kind: 'action';
-      mode: 'move' | 'resize-end';
+      eventId: string;
+      clipId: string | null;
       segmentId: string;
-      actionEventId: string;
-      originalDuration: number;
-      originalTime: number;
+      originalStart: number;
+      minimumTime: number;
+      maximumTime: number;
     }
   | {
       kind: 'cursor';
@@ -176,13 +206,25 @@ export interface TimelineInteraction {
   startClientY: number;
 }
 
-export interface TimelineClipDragGhost {
+export interface TimelineClipDragPlacement {
   clipId: string;
   duration: number;
   name: string;
   startTime: number;
   timelineLaneId: string | null;
   trackId: string;
+}
+
+export interface TimelineClipReorderSlot {
+  direction: 'left' | 'right';
+  startTime: number;
+  neighborName: string;
+}
+
+export interface TimelineClipDragGhost extends TimelineClipDragPlacement {
+  reorderSlots?: TimelineClipReorderSlot[];
+  activeReorder?: 'left' | 'right';
+  relatedClips?: TimelineClipDragPlacement[];
 }
 
 export interface AudioClipWaveformProps {

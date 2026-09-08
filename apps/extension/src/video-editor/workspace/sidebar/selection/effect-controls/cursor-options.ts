@@ -2,23 +2,8 @@ import { translate } from '../../../../../platform/i18n';
 import type { GlassSelectOption } from '../../../../../ui/glass-select';
 import {
   VideoCursorAnimationPreset,
-  VideoCursorCaptureMode,
   VideoCursorVisualPreset,
 } from '../../../../../features/video/project/types';
-
-export function getCursorCaptureModeOptions() {
-  const options: GlassSelectOption<VideoCursorCaptureMode>[] = [
-    {
-      value: VideoCursorCaptureMode.SEPARATE,
-      label: translate('videoEditor.sidebar.cursorCaptureModeSeparate'),
-    },
-    {
-      value: VideoCursorCaptureMode.EMBEDDED_FALLBACK,
-      label: translate('videoEditor.sidebar.cursorCaptureModeFallback'),
-    },
-  ];
-  return options;
-}
 
 export function getCursorPresetOptions() {
   const options: GlassSelectOption<VideoCursorVisualPreset>[] = [

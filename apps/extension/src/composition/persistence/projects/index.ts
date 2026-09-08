@@ -1,3 +1,7 @@
+import {
+  VIDEO_WORKSPACES_STORE,
+  VIDEO_WORKSPACE_DRAFTS_STORE,
+} from '../infrastructure/indexed-db/core.stores';
 import type { VideoProject } from '../../../features/video/project/types';
 import {
   ASSET_OPERATIONS_STORE,
@@ -60,7 +64,11 @@ import {
 } from './read-guards';
 import { isHydratableVideoProject } from '../../../features/video/project/validation';
 import { verifyVideoProjectEffectSnapshotIntegrity } from '../../../features/video/project/effect-instance';
-import { createLibraryLifecycle, updateLibraryLifecycle } from '../library-lifecycle/contracts';
+import {
+  createLibraryLifecycle,
+  promoteLibraryLifecycle,
+  updateLibraryLifecycle,
+} from '../library-lifecycle/contracts';
 
 export { deleteVideoProject } from './index.delete.ts';
 export * from './index.exports.ts';
@@ -78,6 +86,8 @@ export async function saveVideoProject(
       assetOwnerStore,
       assetRefStore,
       mediaLibraryStore,
+      videoWorkspaceStore,
+      videoDraftStore,
       projectAssetStore,
       projectStore,
       tx,
@@ -104,12 +114,7 @@ export async function saveVideoProject(
       },
       createdAt: existing?.createdAt ?? candidate.createdAt,
       updatedAt: now,
-      lifecycle: existing
-        ? updateLibraryLifecycle(
-            existing.lifecycle ?? createLibraryLifecycle('library', existing.updatedAt),
-            now
-          )
-        : createLibraryLifecycle(options.storageClass ?? 'library', now),
+      lifecycle: buildSavedProjectLifecycle(existing, options, now),
       workspaceRevision: (existing?.workspaceRevision ?? 0) + 1,
     };
 
@@ -126,6 +131,8 @@ export async function saveVideoProject(
       assetOwnerStore,
       assetRefStore,
       mediaLibraryStore,
+      videoWorkspaceStore,
+      videoDraftStore,
       operation: physicalDelete,
       ownerProjectId: project.id,
       projectAssetIds: removedProjectAssetIds,
@@ -141,6 +148,20 @@ export async function saveVideoProject(
   });
   if (physicalDelete.assetIds.length > 0) await completePhysicalDeleteOperation(physicalDelete);
   return saved;
+}
+
+function buildSavedProjectLifecycle(
+  existing: VideoProjectEntry | null,
+  options: SaveVideoProjectOptions,
+  now: number
+) {
+  const lifecycle = existing
+    ? (existing.lifecycle ?? createLibraryLifecycle('library', existing.updatedAt))
+    : createLibraryLifecycle(options.storageClass ?? 'library', now);
+  return updateLibraryLifecycle(
+    options.storageClass === 'library' ? promoteLibraryLifecycle(lifecycle, now) : lifecycle,
+    now
+  );
 }
 
 async function prepareVideoProjectSave(project: VideoProject): Promise<VideoProject> {
@@ -314,6 +335,8 @@ export async function deleteProjectAsset(id: string): Promise<void> {
       [
         PROJECT_ASSETS_STORE,
         MEDIA_LIBRARY_STORE,
+        VIDEO_WORKSPACES_STORE,
+        VIDEO_WORKSPACE_DRAFTS_STORE,
         ASSET_OWNERS_STORE,
         ASSET_REFS_STORE,
         ASSET_OPERATIONS_STORE,
@@ -328,8 +351,11 @@ export async function deleteProjectAsset(id: string): Promise<void> {
       deleteAssetOwner: () =>
         ownerStore.delete([PROJECT_ASSET_OWNER_KIND, id, PROJECT_MEDIA_ASSET_ROLE]),
       deleteAssetRef: (assetId) => tx.objectStore(ASSET_REFS_STORE).delete(assetId),
-      deleteMediaEntry: () =>
-        tx.objectStore(MEDIA_LIBRARY_STORE).delete(createProjectAssetMediaId(id)),
+      deleteMediaEntry: async () => {
+        await tx.objectStore(MEDIA_LIBRARY_STORE).delete(createProjectAssetMediaId(id));
+        await tx.objectStore(VIDEO_WORKSPACES_STORE).delete(createProjectAssetMediaId(id));
+        await tx.objectStore(VIDEO_WORKSPACE_DRAFTS_STORE).delete(createProjectAssetMediaId(id));
+      },
       entry,
       operation: physicalDelete,
       recordOperation: () => tx.objectStore(ASSET_OPERATIONS_STORE).put(physicalDelete),

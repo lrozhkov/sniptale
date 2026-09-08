@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import { syncProjectTransitions } from './project';
 import {
   resolveClipTransitionAudioMultiplier,
   resolveClipTransitionVisualState,
@@ -295,3 +296,21 @@ function createTransitionFixture(
     ...overrides,
   };
 }
+
+it('creates an audio crossfade with complementary gains', () => {
+  const source = createBaseProject();
+  source.clips = source.clips.map((clip) => {
+    if (clip.type !== 'VIDEO') throw new Error('Expected source video fixture');
+    return { ...clip, type: 'AUDIO' };
+  });
+  const project = syncProjectTransitions(source);
+  expect(project.transitions).toHaveLength(1);
+  const reloaded = project;
+  for (const time of [3, 3.25, 3.5, 3.75]) {
+    const outgoing = getClipCompositeAudioGain(reloaded, reloaded.clips[0]!, time);
+    const incoming = getClipCompositeAudioGain(reloaded, reloaded.clips[1]!, time);
+    expect(outgoing).toBeCloseTo(4 - time);
+    expect(incoming).toBeCloseTo(time - 3);
+    expect(outgoing + incoming).toBeCloseTo(1);
+  }
+});

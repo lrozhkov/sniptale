@@ -31,6 +31,7 @@ vi.mock('../../selection/locker', () => ({
   disableNavigationLock,
   enableNavigationLock,
   setFullLockMode,
+  setNavigationInputShieldSuspended: vi.fn(),
 }));
 
 vi.mock('../../selection/quick-edit', () => ({

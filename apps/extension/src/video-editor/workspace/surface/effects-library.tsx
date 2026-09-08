@@ -13,7 +13,6 @@ export function VideoEditorWorkspaceEffectsLibrary(props: {
   effectBundles: WorkspaceEffectBundlesState;
   effectOperations: EffectLibraryOperations;
   isOpen: boolean;
-  onOpenChange(open: boolean): void;
 }): React.JSX.Element | null {
   const preview = useVideoEditorPreviewController();
   const selections = useVideoEditorSelectionsContext();
@@ -36,7 +35,6 @@ export function VideoEditorWorkspaceEffectsLibrary(props: {
       isOpen={props.isOpen}
       operations={props.effectOperations}
       onApplyEffect={onApplyEffect}
-      onClose={() => props.onOpenChange(false)}
       onDeleteEffectBundle={props.effectBundles.onDeleteEffectBundle}
       onImportEffectFile={props.effectBundles.onImportEffectFile}
       onSetEffectBundleEnabled={props.effectBundles.onSetEffectBundleEnabled}

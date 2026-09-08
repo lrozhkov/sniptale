@@ -1,3 +1,4 @@
+import type { VideoProject } from '../../../features/video/project/types/model';
 import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
 import {
   normalizeVideoObjectTrack,
@@ -52,8 +53,12 @@ export function createObjectTrackCorrectionAnchorUpserter(set: VideoEditorStoreS
           return project;
         }
 
+        const sourceClipId = resolveCorrectionSourceClipId(project, track, anchorInput.time);
+        if (track.analysis && !sourceClipId) return project;
+
         const anchor: VideoObjectTrackCorrectionAnchor = {
           ...anchorInput,
+          ...(sourceClipId === undefined ? {} : { sourceClipId }),
           confidence: anchorInput.confidence ?? 1,
           id: anchorInput.id ?? crypto.randomUUID(),
         };
@@ -95,6 +100,7 @@ function upsertSampleAtAnchor(
   anchor: VideoObjectTrackCorrectionAnchor
 ): VideoObjectTrack['samples'] {
   const sample: VideoObjectTrackSample = {
+    ...(anchor.sourceClipId === undefined ? {} : { sourceClipId: anchor.sourceClipId }),
     confidence: anchor.confidence ?? 1,
     time: anchor.time,
     visible: true,
@@ -108,4 +114,27 @@ function upsertSampleAtAnchor(
   return samples.some((item) => matchesTime(item.time))
     ? samples.map((item) => (matchesTime(item.time) ? sample : item))
     : [...samples, sample];
+}
+
+function resolveCorrectionSourceClipId(
+  project: VideoProject,
+  track: VideoObjectTrack,
+  time: number
+): string | undefined {
+  if (!track.analysis) return undefined;
+  const ownerIds = new Set([
+    track.analysis.sourceClipId,
+    ...track.samples.map((sample) => sample.sourceClipId),
+    ...(track.correctionAnchors ?? []).map((anchor) => anchor.sourceClipId),
+  ]);
+  return project.clips
+    .filter(
+      (clip) =>
+        'assetId' in clip &&
+        clip.assetId === track.analysis!.sourceAssetId &&
+        ownerIds.has(clip.id) &&
+        time >= clip.startTime &&
+        time <= clip.startTime + clip.duration
+    )
+    .sort((left, right) => right.startTime - left.startTime)[0]?.id;
 }

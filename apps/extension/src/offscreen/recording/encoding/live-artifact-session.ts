@@ -12,6 +12,7 @@ interface CreateLiveRecordingArtifactSessionInput {
   encoding: LiveRecordingEncodingConfig;
   filename: string;
   frameTransform?: LiveVideoFrameTransform | undefined;
+  onVideoFrameGeometry?: (frame: VideoFrame) => void;
   mimeType: string;
   stream: MediaStream;
 }
@@ -32,6 +33,7 @@ export async function createLiveRecordingArtifactSession(
   });
   const ownerInput = {
     artifactId: input.artifactId,
+    ...(input.onVideoFrameGeometry ? { onVideoFrameGeometry: input.onVideoFrameGeometry } : {}),
     coordinator: input.coordinator,
     encoding: input.encoding,
     ...(input.frameTransform ? { frameTransform: input.frameTransform } : {}),

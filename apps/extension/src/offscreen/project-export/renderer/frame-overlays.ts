@@ -1,5 +1,5 @@
 import {
-  drawActionCompositionState,
+  drawSceneActionCompositionStates,
   drawCursorCompositionState,
 } from '../../../features/video/composition/draw';
 import type { resolveVideoCompositionRenderPasses } from '../../../features/video/composition/timeline/render';
@@ -15,20 +15,22 @@ export function drawExportOverlayPass(
   const scaledCursor = overlayFrame.cursor
     ? {
         ...overlayFrame.cursor,
-        x: overlayFrame.cursor.x * scaleX,
-        y: overlayFrame.cursor.y * scaleY,
+        x:
+          (overlayFrame.cursor.x - overlayFrame.camera.viewportX) *
+          overlayFrame.camera.scale *
+          scaleX,
+        y:
+          (overlayFrame.cursor.y - overlayFrame.camera.viewportY) *
+          overlayFrame.camera.scale *
+          scaleY,
+        scale: (overlayFrame.cursor.scale * overlayFrame.camera.scale * (scaleX + scaleY)) / 2,
       }
     : null;
-  const scaledCursorPoint = scaledCursor ? { x: scaledCursor.x, y: scaledCursor.y } : null;
-  for (const action of overlayFrame.actions) {
-    drawActionCompositionState(
-      context,
-      {
-        ...action,
-        point: action.point ? { x: action.point.x * scaleX, y: action.point.y * scaleY } : null,
-      },
-      scaledCursorPoint
-    );
-  }
+  drawSceneActionCompositionStates(context, overlayFrame.actions, overlayFrame.camera, {
+    offsetX: 0,
+    offsetY: 0,
+    scaleX,
+    scaleY,
+  });
   if (scaledCursor) drawCursorCompositionState(context, scaledCursor);
 }

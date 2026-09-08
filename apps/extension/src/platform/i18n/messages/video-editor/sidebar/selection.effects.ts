@@ -1,6 +1,40 @@
 import { defineMessageSource } from '../../source';
 
 export const videoEditorSidebarSelectionEffectMessages = defineMessageSource({
+  historyDuration: { ru: 'Длительность', en: 'Duration' },
+  historyOffset: { ru: 'Смещение', en: 'Offset' },
+  historyEventMode: { ru: 'Визуализация', en: 'Visualization' },
+  historyInherit: { ru: 'Настройки истории', en: 'History settings' },
+  historyForceOn: { ru: 'Включено для события', en: 'Enabled for event' },
+  historyForceOff: { ru: 'Отключено для события', en: 'Disabled for event' },
+  historyReset: { ru: 'Сбросить изменения события', en: 'Reset event overrides' },
+  historyEventLabel: { ru: 'Событие', en: 'Event' },
+  historyEventKind: { ru: 'Тип события', en: 'Event type' },
+  historySettings: { ru: 'Настройки', en: 'Settings' },
+  historyOverridden: { ru: 'Индивидуальные', en: 'Custom' },
+  historyTrackDisabled: { ru: 'История отключена', en: 'History disabled' },
+  historySuppressed: { ru: 'Пропущено: близкое событие', en: 'Suppressed: nearby event' },
+  historyKeysDisabled: { ru: 'Клавиши скрыты', en: 'Keystrokes hidden' },
+  historyUnsupported: { ru: 'Без визуализации', en: 'No visualization' },
+  historyOutsideSource: { ru: 'Вне исходного фрагмента', en: 'Outside source clip' },
+  historyVisible: { ru: 'Отображается', en: 'Visible' },
+  historyEnabled: { ru: 'Визуализация истории', en: 'History visualization' },
+  historySuppression: { ru: 'Интервал между акцентами', en: 'Accent interval' },
+  historyShowKeys: { ru: 'Показывать нажатия клавиш', en: 'Show keystrokes' },
+  framingBinding: { ru: 'Привязка', en: 'Binding' },
+  framingBindingScene: { ru: 'Сцена', en: 'Scene' },
+  framingExactPosition: { ru: 'Точное положение', en: 'Exact position' },
+  framingPreviewLabel: { ru: 'Положение области кадрирования', en: 'Framing area position' },
+  framingAreaPreviewHint: {
+    ru: 'Перетащите область или её углы. Сплошная рамка — итоговый кадр.',
+    en: 'Drag the area or its corners. The solid outline shows the resulting frame.',
+  },
+  framingPreviewHint: {
+    ru: 'Переместите область мышью или стрелками',
+    en: 'Move the area with the pointer or arrow keys',
+  },
+  framingPreviewLoading: { ru: 'Загрузка кадра…', en: 'Loading frame…' },
+  framingPreviewFailed: { ru: 'Не удалось загрузить кадр', en: 'Could not load frame' },
   projectSourceLabel: {
     ru: 'Источник проекта',
     en: 'Project source',
@@ -58,12 +92,12 @@ export const videoEditorSidebarSelectionEffectMessages = defineMessageSource({
     en: 'Instant',
   },
   motionScaleLabel: {
-    ru: 'Масштаб камеры',
-    en: 'Camera scale',
+    ru: 'Масштаб зума',
+    en: 'Zoom scale',
   },
   motionCameraModeLabel: {
-    ru: 'Режим камеры',
-    en: 'Camera mode',
+    ru: 'Режим зума',
+    en: 'Zoom mode',
   },
   motionCameraModeStatic: {
     ru: 'Статика',

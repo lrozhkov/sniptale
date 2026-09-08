@@ -15,22 +15,23 @@ export interface VideoEditorTrackPanelPrefs {
   collapsedCursorLaneVisible: boolean;
   collapsedTelemetryLaneVisible: boolean;
   compactRows: boolean;
-  panelExpanded: boolean;
+  hideTrackNames: boolean;
+  hiddenClipNamesByTrackId?: Record<string, boolean>;
   trackHeightByTrackId: Record<string, VideoEditorTrackHeightMultiplier>;
 }
 
 const TRACK_PANEL_BOOLEAN_FIELDS = [
-  'panelExpanded',
   'compactRows',
+  'hideTrackNames',
   'collapsedCursorLaneVisible',
   'collapsedTelemetryLaneVisible',
 ] as const;
 
 export const DEFAULT_VIDEO_EDITOR_TRACK_PANEL_PREFS: VideoEditorTrackPanelPrefs = {
   collapsedCursorLaneVisible: true,
-  collapsedTelemetryLaneVisible: false,
+  collapsedTelemetryLaneVisible: true,
   compactRows: false,
-  panelExpanded: false,
+  hideTrackNames: false,
   trackHeightByTrackId: {},
 };
 
@@ -56,6 +57,9 @@ function parseStoredTrackPanelPrefs(
     if (isBoolean(value[field])) parsed[field] = value[field];
     else if (value[field] !== undefined) invalidFieldCount += 1;
   }
+  const hiddenNames = parseHiddenClipNames(value['hiddenClipNamesByTrackId'], currentTrackIds);
+  if (hiddenNames !== undefined) parsed.hiddenClipNamesByTrackId = hiddenNames;
+  else if (value['hiddenClipNamesByTrackId'] !== undefined) invalidFieldCount += 1;
   const heights = parseTrackHeights(value['trackHeightByTrackId'], currentTrackIds);
   if (value['trackHeightByTrackId'] !== undefined) parsed.trackHeightByTrackId = heights.value;
   return {
@@ -64,6 +68,15 @@ function parseStoredTrackPanelPrefs(
     staleTrackIdCount: heights.staleTrackIdCount,
     value: parsed,
   };
+}
+
+function parseHiddenClipNames(value: unknown, currentTrackIds: ReadonlySet<string>) {
+  if (!isRecord(value)) return undefined;
+  const parsed: Record<string, boolean> = {};
+  for (const [id, flag] of Object.entries(value)) {
+    if (currentTrackIds.has(id) && isBoolean(flag)) parsed[id] = flag;
+  }
+  return parsed;
 }
 
 function parseTrackHeights(value: unknown, currentTrackIds: ReadonlySet<string>) {

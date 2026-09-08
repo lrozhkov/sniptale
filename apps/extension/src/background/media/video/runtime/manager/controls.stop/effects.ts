@@ -1,12 +1,20 @@
+import { mergeTelemetrySnapshots } from '../../../session-state/controlled-cursor';
+import type {
+  RecordingPointTransform,
+  RecordingActionEvent,
+} from '../../../../../../features/video/project/types';
+import {
+  isRecordingPoint,
+  isRecordingPointTransform,
+} from '../../../../../../features/video/project/validation/recording-telemetry';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { VideoCursorCaptureMode } from '../../../../../../features/video/project/types';
-import type { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
+import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
 import { awaitBestEffort, runBestEffort } from '@sniptale/foundation/best-effort';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import { saveRecordingTelemetrySafely } from '../../../../../../workflows/media-hub/store';
 import { getBackgroundRuntimeMessaging } from '../../../../../routing-contracts/runtime-messaging/services';
 import {
-  appendControlledCursorTelemetry,
   getControlledCursorDisplaySurface,
   getControlledCursorVerifiedMode,
   getControlledCursorTelemetry,
@@ -32,6 +40,11 @@ type StopContext = {
   tabId: number | null;
 };
 
+type StopTelemetryOptions = {
+  discard?: boolean;
+  recordingPointTransform?: Promise<RecordingPointTransform | null>;
+};
+
 let pendingStopSideEffects: Promise<void> = Promise.resolve();
 
 function resolvePersistedCursorCaptureMode(): VideoCursorCaptureMode {
@@ -39,13 +52,14 @@ function resolvePersistedCursorCaptureMode(): VideoCursorCaptureMode {
 }
 
 function normalizeTelemetrySnapshot(
-  telemetry: NonNullable<ReturnType<typeof getControlledCursorTelemetry>>
+  telemetry: NonNullable<ReturnType<typeof getControlledCursorTelemetry>>,
+  captureEnabled: boolean,
+  captureMode: VideoCursorCaptureMode
 ) {
-  if (!isControlledCursorCaptureEnabled()) {
+  if (!captureEnabled) {
     return telemetry;
   }
 
-  const captureMode = resolvePersistedCursorCaptureMode();
   return {
     ...telemetry,
     cursorTrack:
@@ -62,67 +76,131 @@ function normalizeTelemetrySnapshot(
   };
 }
 
-async function disableAnnotationsAndPersistTelemetry(
+function collectAndPersistTelemetry(
   context: StopContext,
-  failureLogger: StopFailureLogger
-): Promise<void> {
+  failureLogger: StopFailureLogger,
+  options: StopTelemetryOptions
+): { collected: Promise<void>; persisted: Promise<void> } {
   const { mode, tabId } = context;
-  if (!tabId) {
-    return;
-  }
-
-  const surface = getVideoRecordingSurfaceLeaseSnapshot();
-  if (surface?.tabId === tabId) {
-    await updateVideoRecordingSurface(surface.surfaceSessionId, { recordingId: null });
-  }
-
   const recordingId = getVideoRecordingId();
-  const telemetry = await collectTelemetrySnapshot(tabId, failureLogger);
+  const displaySurface = getControlledCursorDisplaySurface();
+  const captureEnabled = isControlledCursorCaptureEnabled();
+  const cursorMode = resolvePersistedCursorCaptureMode();
+  const priorTelemetry = getControlledCursorTelemetry();
+  const navigationPending = isControlledCursorNavigationPending();
+  const collection = (async () => {
+    if (!tabId) return null;
+    const telemetryPromise = collectTelemetrySnapshot(tabId, mode, failureLogger, {
+      priorTelemetry,
+      navigationPending,
+      captureEnabled,
+    });
+    const surface = getVideoRecordingSurfaceLeaseSnapshot();
+    if (surface?.tabId === tabId) {
+      await updateVideoRecordingSurface(surface.surfaceSessionId, { recordingId: null });
+    }
+    const telemetry = await telemetryPromise;
+    return telemetry === null
+      ? null
+      : normalizeTelemetrySnapshot(telemetry, captureEnabled, cursorMode);
+  })();
+  return {
+    collected: collection.then(
+      () => undefined,
+      () => undefined
+    ),
+    persisted: (async () => {
+      const telemetry = await collection;
+      const transform = await (options.recordingPointTransform ?? Promise.resolve(null));
+      if (!recordingId || telemetry === null || options.discard) return;
+      const timestamp = Date.now();
+      await saveRecordingTelemetrySafely({
+        recordingId,
+        createdAt: timestamp,
+        updatedAt: timestamp,
+        captureMode: mode,
+        displaySurface,
+        viewport: telemetry.viewport,
+        cursorTrack: telemetry.cursorTrack,
+        actionEvents: resolveRecordingActionPoints(telemetry, transform),
+        signals: telemetry.signals,
+      });
+    })(),
+  };
+}
 
-  if (!recordingId || telemetry === null) {
-    return;
-  }
-
-  const normalizedTelemetry = normalizeTelemetrySnapshot(telemetry);
-  const timestamp = Date.now();
-  await saveRecordingTelemetrySafely({
-    recordingId,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-    captureMode: mode,
-    displaySurface: getControlledCursorDisplaySurface(),
-    viewport: normalizedTelemetry.viewport,
-    cursorTrack: normalizedTelemetry.cursorTrack,
-    actionEvents: normalizedTelemetry.actionEvents,
-    signals: normalizedTelemetry.signals,
+function resolveRecordingActionPoints(
+  telemetry: NonNullable<ReturnType<typeof getControlledCursorTelemetry>>,
+  transform: RecordingPointTransform | null
+): RecordingActionEvent[] {
+  const observation = telemetry.viewportObservation;
+  const admitted =
+    isRecordingPointTransform(transform) &&
+    !!observation?.stable &&
+    Object.entries(transform.viewport).every(([key, value]) =>
+      Object.entries(observation.initial).some(
+        ([observedKey, observedValue]) => key === observedKey && value === observedValue
+      )
+    );
+  return telemetry.actionEvents.map((event) => {
+    let recordingPoint = null;
+    if (admitted && transform && event.point) {
+      const { x, y } = event.point;
+      const rect = transform.visibleClientRect;
+      const point = {
+        x: x * transform.scaleX + transform.offsetX,
+        y: y * transform.scaleY + transform.offsetY,
+      };
+      if (
+        x >= rect.x &&
+        y >= rect.y &&
+        x <= rect.x + rect.width &&
+        y <= rect.y + rect.height &&
+        isRecordingPoint(point)
+      ) {
+        recordingPoint = point;
+      }
+    }
+    return { ...event, point: event.point ? { ...event.point } : null, recordingPoint };
   });
 }
 
 async function collectTelemetrySnapshot(
   tabId: number,
-  failureLogger: StopFailureLogger
+  mode: CaptureMode | null,
+  failureLogger: StopFailureLogger,
+  frozen: {
+    priorTelemetry: ReturnType<typeof getControlledCursorTelemetry>;
+    navigationPending: boolean;
+    captureEnabled: boolean;
+  }
 ): Promise<ReturnType<typeof getControlledCursorTelemetry> | null> {
-  if (!isControlledCursorCaptureEnabled()) {
+  if (!frozen.captureEnabled && mode !== CaptureMode.TAB && mode !== CaptureMode.TAB_CROP) {
     return null;
   }
 
-  if (!isControlledCursorNavigationPending()) {
+  if (!frozen.navigationPending) {
     try {
-      appendControlledCursorTelemetry(await disableControlledCursorCapture(tabId));
+      const segment = await disableControlledCursorCapture(tabId);
+      return segment === null
+        ? frozen.priorTelemetry
+        : mergeTelemetrySnapshots(frozen.priorTelemetry, segment);
     } catch (error) {
       failureLogger.warn('Failed to disable controlled cursor capture during stop', error);
     }
   }
 
-  return getControlledCursorTelemetry();
+  return frozen.priorTelemetry;
 }
 
 export function runStopSideEffects(
   context: StopContext,
-  failureLogging: StopFailureLogging = 'detailed'
-): void {
+  failureLogging: StopFailureLogging = 'detailed',
+  options: StopTelemetryOptions = {}
+): Promise<void> {
   const failureLogger = resolveStopFailureLogger(failureLogging, logger);
   let backgroundSideEffects: Promise<void>;
+  let collected: Promise<void> = Promise.resolve();
   if (context.tabId) {
     runBestEffort(
       getBackgroundRuntimeMessaging().sendTabMessage(context.tabId, {
@@ -140,8 +218,10 @@ export function runStopSideEffects(
       'Failed to hide recording region overlay',
       { tabId: context.tabId }
     );
+    const telemetry = collectAndPersistTelemetry(context, failureLogger, options);
+    collected = telemetry.collected;
     backgroundSideEffects = awaitBestEffort(
-      disableAnnotationsAndPersistTelemetry(context, failureLogger),
+      telemetry.persisted,
       failureLogger,
       'Failed to disable recording annotations overlay',
       { tabId: context.tabId }
@@ -151,6 +231,7 @@ export function runStopSideEffects(
   }
 
   pendingStopSideEffects = backgroundSideEffects;
+  return collected;
 }
 
 export function waitForStopSideEffects(): Promise<void> {

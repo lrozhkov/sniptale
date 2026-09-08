@@ -16,7 +16,6 @@ export interface VideoEditorHeaderController {
   onOpenAudioRecordingDialog: () => void;
   onCloseLibraryPanel: () => void;
   onOpenExportDialog: VideoEditorExportActions['openExportDialog'];
-  onOpenGridSettings: () => void;
   onOpenLibraryPanel: () => void;
   onRenameProject: VideoEditorProjectActions['renameProject'];
   onSelectScene: VideoEditorSessionActions['selectScene'];

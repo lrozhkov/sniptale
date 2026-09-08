@@ -1,9 +1,9 @@
 import { expect, it } from 'vitest';
 import { createAnnotationClip } from '../factories/overlay-clip';
-import { createEmptyVideoProject } from '../factories/creation';
+import { createEmptyVideoProject, createVideoProjectTrack } from '../factories/creation';
 import { resolveAnnotationPresentation } from './template';
 import { resolveAnnotationRenderMetrics } from './render-metrics';
-import { VideoOverlayTemplateKind } from '../types/index';
+import { VideoTrackKind, VideoOverlayTemplateKind } from '../types/index';
 
 function createPresentationFixture() {
   return {
@@ -45,8 +45,9 @@ function createPresentationFixture() {
 
 it('shrinks annotation typography continuously for tiny preview scales', () => {
   const project = createEmptyVideoProject('Render metrics', 1280, 720);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const clip = createAnnotationClip(
-    project.tracks[2]!.id,
+    project.tracks[1]!.id,
     project.width,
     project.height,
     0,

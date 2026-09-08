@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { type VideoProjectActionOccurrence } from '../../../features/video/project/action-occurrences';
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -6,7 +7,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import type { VideoEditorPlaybackRange } from '../../interaction/playback/range';
 import type { VideoEditorPlacementMode } from '../../contracts/placement';
-import { VideoEditorSelectionKind } from '../../contracts/selection';
+import { VideoEditorSelectionKind, type VideoEditorSelection } from '../../contracts/selection';
 import {
   VideoClipLinkMode,
   VideoClipTransitionKind,
@@ -54,17 +55,19 @@ interface PlaybackHarnessProps {
   clearPlacementMode: () => void;
   currentTime: number;
   deleteActionEvent: (actionEventId: string) => void;
-  deleteClip: (clipId: string) => void;
+  deleteClip: (clipId: string | readonly string[]) => void;
   deleteCursorSample: (sampleId: string) => void;
   deleteMotionRegion: (motionRegionId: string) => void;
   deleteObjectTrack: (objectTrackId: string) => void;
+  duplicateClip?: (clipId: string) => void;
   isPlaying: boolean;
   playbackRange?: VideoEditorPlaybackRange | null;
   placementMode?: VideoEditorPlacementMode | null;
   project: ReturnType<typeof createEmptyVideoProject>;
   projectHistoryTransactionActive?: boolean;
-  selection: { kind: string; clipId?: string; actionEventId?: string; motionRegionId?: string };
-  selectedActionEvent?: PlaybackHarnessActionEvent | null;
+  shortcutsEnabled?: boolean;
+  selection: VideoEditorSelection;
+  selectedActionOccurrence?: PlaybackHarnessActionEvent | null;
   selectedClipId: string | null;
   selectedMotionRegion?: PlaybackHarnessMotionRegion | null;
   setCurrentTime: (time: number) => void;
@@ -75,11 +78,10 @@ interface PlaybackHarnessProps {
   updateMotionRegion: (motionRegionId: string, patch: Record<string, unknown>) => void;
   useVideoEditorPlayback: (typeof import('./playback'))['useVideoEditorPlayback'];
   onSeekReady?: (seekTo: (time: number) => void) => void;
+  onStepReady?: (stepByFrames: (frameDelta: number) => void) => void;
 }
 
-type PlaybackHarnessActionEvent = ReturnType<
-  typeof createEmptyVideoProject
->['actionEvents'][number];
+type PlaybackHarnessActionEvent = VideoProjectActionOccurrence;
 type PlaybackHarnessMotionRegion = NonNullable<
   ReturnType<typeof createEmptyVideoProject>['motionRegions']
 >[number];
@@ -91,11 +93,12 @@ function PlaybackHarness(props: PlaybackHarnessProps) {
       currentTime: props.currentTime,
       isPlaying: props.isPlaying,
       playbackRange: props.playbackRange ?? null,
-      selection: props.selection as never,
+      selection: props.selection,
       placementMode: props.placementMode ?? null,
       projectHistoryTransactionActive: props.projectHistoryTransactionActive ?? false,
+      shortcutsEnabled: props.shortcutsEnabled ?? true,
       selectedClipId: props.selectedClipId,
-      selectedActionEvent: props.selectedActionEvent ?? null,
+      selectedActionOccurrence: props.selectedActionOccurrence ?? null,
       selectedMotionRegion: props.selectedMotionRegion ?? null,
     },
     {
@@ -103,6 +106,7 @@ function PlaybackHarness(props: PlaybackHarnessProps) {
       setPlaying: props.setPlaying,
       splitClipAt: props.splitClipAt,
       deleteClip: props.deleteClip,
+      duplicateClip: props.duplicateClip ?? vi.fn(),
       deleteActionEvent: props.deleteActionEvent,
       deleteCursorSample: props.deleteCursorSample,
       deleteMotionRegion: props.deleteMotionRegion,
@@ -114,6 +118,7 @@ function PlaybackHarness(props: PlaybackHarnessProps) {
     }
   );
   props.onSeekReady?.(playback.seekTo);
+  props.onStepReady?.(playback.stepByFrames);
   return null;
 }
 
@@ -126,6 +131,7 @@ function renderPlaybackHarness(root: Root | null, props: PlaybackHarnessProps) {
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 let seekTo: ((time: number) => void) | null = null;
+let stepByFrames: ((frameDelta: number) => void) | null = null;
 let frameCallback: FrameRequestCallback | null = null;
 
 beforeEach(() => {
@@ -134,6 +140,7 @@ beforeEach(() => {
   root = createRoot(container);
   frameCallback = null;
   seekTo = null;
+  stepByFrames = null;
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   vi.spyOn(performance, 'now').mockReturnValue(1000);
   vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
@@ -141,6 +148,48 @@ beforeEach(() => {
     return 1;
   });
   vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => undefined);
+});
+
+it('settles active playback before a paused one-frame seek', async () => {
+  const useVideoEditorPlayback = await importPlaybackHook();
+  const project = createEmptyVideoProject('Playback frame step');
+  project.duration = 2;
+  project.fps = 30;
+  const setCurrentTime = vi.fn<(time: number) => void>();
+  const setPlaying = vi.fn<(playing: boolean) => void>();
+  renderPlaybackHarness(root, {
+    currentTime: 0.2,
+    clearPlacementMode: vi.fn(),
+    deleteActionEvent: vi.fn(),
+    deleteClip: vi.fn(),
+    deleteCursorSample: vi.fn(),
+    deleteMotionRegion: vi.fn(),
+    deleteObjectTrack: vi.fn(),
+    isPlaying: true,
+    onStepReady: (value) => {
+      stepByFrames = value;
+    },
+    project,
+    selection: { kind: VideoEditorSelectionKind.SCENE },
+    selectedClipId: null,
+    setCurrentTime,
+    setPlaying,
+    splitClipAt: vi.fn(),
+    updateActionEventDetails: vi.fn(),
+    updateClipTransform: vi.fn(),
+    updateMotionRegion: vi.fn(),
+    useVideoEditorPlayback,
+  });
+  vi.spyOn(performance, 'now').mockReturnValue(1250);
+
+  act(() => {
+    stepByFrames?.(1);
+  });
+
+  expect(setPlaying).toHaveBeenCalledWith(false);
+  expect(setCurrentTime).toHaveBeenCalledWith(14 / 30);
+  expect(setCurrentTime).toHaveBeenLastCalledWith(15 / 30);
+  expect(setPlaying).not.toHaveBeenLastCalledWith(true);
 });
 
 afterEach(() => {
@@ -165,7 +214,7 @@ it('returns playback to the session start when the project duration is reached',
     currentTime: 0.2,
     clearPlacementMode: vi.fn(),
     deleteActionEvent: vi.fn<(actionEventId: string) => void>(),
-    deleteClip: vi.fn<(clipId: string) => void>(),
+    deleteClip: vi.fn<(clipId: string | readonly string[]) => void>(),
     deleteCursorSample: vi.fn<(sampleId: string) => void>(),
     deleteMotionRegion: vi.fn<(motionRegionId: string) => void>(),
     deleteObjectTrack: vi.fn<(objectTrackId: string) => void>(),
@@ -210,7 +259,9 @@ it('routes playback shortcuts through the supplied callbacks', async () => {
   project.clips = [createVideoClip(project.tracks[0]!.id)];
   const setPlaying = vi.fn<(playing: boolean) => void>();
   const splitClipAt = vi.fn<(clipId: string, time: number) => void>();
-  const deleteClip = vi.fn<(clipId: string) => void>();
+  const deleteClip = vi.fn<(clipId: string | readonly string[]) => void>();
+  const duplicateClip = vi.fn<(clipId: string) => void>();
+  const setCurrentTime = vi.fn<(time: number) => void>();
   const updateClipTransform = vi.fn<(clipId: string, patch: Record<string, unknown>) => void>();
   renderPlaybackHarness(root, {
     currentTime: 0.75,
@@ -220,13 +271,14 @@ it('routes playback shortcuts through the supplied callbacks', async () => {
     deleteCursorSample: vi.fn<(sampleId: string) => void>(),
     deleteMotionRegion: vi.fn<(motionRegionId: string) => void>(),
     deleteObjectTrack: vi.fn<(objectTrackId: string) => void>(),
+    duplicateClip,
     isPlaying: false,
     playbackRange: null,
     placementMode: null,
     project,
     selection: { kind: VideoEditorSelectionKind.CLIP, clipId: 'clip-1' },
     selectedClipId: 'clip-1',
-    setCurrentTime: vi.fn<(time: number) => void>(),
+    setCurrentTime,
     setPlaying,
     splitClipAt,
     updateActionEventDetails: vi.fn(),
@@ -239,13 +291,21 @@ it('routes playback shortcuts through the supplied callbacks', async () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true }));
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyK', bubbles: true }));
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyS', bubbles: true }));
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { code: 'KeyD', ctrlKey: true, bubbles: true })
+    );
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowRight', bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Home', bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'End', bubbles: true }));
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Delete', bubbles: true }));
   });
 
   expect(setPlaying).toHaveBeenCalledWith(true);
   expect(splitClipAt).toHaveBeenCalledWith('clip-1', 0.75);
+  expect(duplicateClip).toHaveBeenCalledWith('clip-1');
   expect(updateClipTransform).toHaveBeenCalledWith('clip-1', { x: 1, y: 0 });
+  expect(setCurrentTime).toHaveBeenCalledWith(0);
+  expect(setCurrentTime).toHaveBeenCalledWith(2);
   expect(deleteClip).toHaveBeenCalledWith('clip-1');
 });
 
@@ -254,7 +314,8 @@ it('blocks editor mutation shortcuts while a project-history transaction is acti
   const project = createEmptyVideoProject('Blocked transaction shortcuts');
   project.duration = 2;
   project.clips = [createVideoClip(project.tracks[0]!.id)];
-  const deleteClip = vi.fn<(clipId: string) => void>();
+  const deleteClip = vi.fn<(clipId: string | readonly string[]) => void>();
+  const duplicateClip = vi.fn<(clipId: string) => void>();
   const splitClipAt = vi.fn<(clipId: string, time: number) => void>();
   const updateClipTransform = vi.fn<(clipId: string, patch: Record<string, unknown>) => void>();
   const setPlaying = vi.fn<(playing: boolean) => void>();
@@ -266,6 +327,7 @@ it('blocks editor mutation shortcuts while a project-history transaction is acti
     deleteCursorSample: vi.fn(),
     deleteMotionRegion: vi.fn(),
     deleteObjectTrack: vi.fn(),
+    duplicateClip,
     isPlaying: false,
     project,
     projectHistoryTransactionActive: true,
@@ -283,11 +345,15 @@ it('blocks editor mutation shortcuts while a project-history transaction is acti
   act(() => {
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true }));
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyS', bubbles: true }));
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { code: 'KeyD', ctrlKey: true, bubbles: true })
+    );
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowRight', bubbles: true }));
     window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Delete', bubbles: true }));
   });
 
   expect(splitClipAt).not.toHaveBeenCalled();
+  expect(duplicateClip).not.toHaveBeenCalled();
   expect(updateClipTransform).not.toHaveBeenCalled();
   expect(deleteClip).not.toHaveBeenCalled();
   expect(setPlaying).toHaveBeenCalledWith(true);
@@ -303,7 +369,7 @@ it('keeps modified arrow shortcuts inert for selection nudging', async () => {
     currentTime: 0.75,
     clearPlacementMode: vi.fn(),
     deleteActionEvent: vi.fn<(actionEventId: string) => void>(),
-    deleteClip: vi.fn<(clipId: string) => void>(),
+    deleteClip: vi.fn<(clipId: string | readonly string[]) => void>(),
     deleteCursorSample: vi.fn<(sampleId: string) => void>(),
     deleteMotionRegion: vi.fn<(motionRegionId: string) => void>(),
     deleteObjectTrack: vi.fn<(objectTrackId: string) => void>(),
@@ -335,4 +401,110 @@ it('keeps modified arrow shortcuts inert for selection nudging', async () => {
   });
 
   expect(updateClipTransform).not.toHaveBeenCalled();
+});
+
+it('deletes a selected group with one callback and leaves single-clip commands inactive', async () => {
+  const useVideoEditorPlayback = await importPlaybackHook();
+  const project = createEmptyVideoProject('Playback shortcuts');
+  project.duration = 2;
+  project.clips = [createVideoClip(project.tracks[0]!.id)];
+  const setPlaying = vi.fn<(playing: boolean) => void>();
+  const splitClipAt = vi.fn<(clipId: string, time: number) => void>();
+  const deleteClip = vi.fn<(clipId: string | readonly string[]) => void>();
+  const duplicateClip = vi.fn<(clipId: string) => void>();
+  const setCurrentTime = vi.fn<(time: number) => void>();
+  const updateClipTransform = vi.fn<(clipId: string, patch: Record<string, unknown>) => void>();
+  renderPlaybackHarness(root, {
+    currentTime: 0.75,
+    clearPlacementMode: vi.fn(),
+    deleteActionEvent: vi.fn<(actionEventId: string) => void>(),
+    deleteClip,
+    deleteCursorSample: vi.fn<(sampleId: string) => void>(),
+    deleteMotionRegion: vi.fn<(motionRegionId: string) => void>(),
+    deleteObjectTrack: vi.fn<(objectTrackId: string) => void>(),
+    duplicateClip,
+    isPlaying: false,
+    playbackRange: null,
+    placementMode: null,
+    project,
+    selection: {
+      kind: VideoEditorSelectionKind.CLIP_GROUP,
+      clipIds: ['clip-1', 'clip-2'],
+      anchorClipId: 'clip-1',
+    },
+    selectedClipId: null,
+    setCurrentTime,
+    setPlaying,
+    splitClipAt,
+    updateActionEventDetails: vi.fn(),
+    updateClipTransform,
+    updateMotionRegion: vi.fn(),
+    useVideoEditorPlayback,
+  });
+
+  act(() => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space', bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyK', bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyS', bubbles: true }));
+    window.dispatchEvent(
+      new KeyboardEvent('keydown', { code: 'KeyD', ctrlKey: true, bubbles: true })
+    );
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'ArrowRight', bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Home', bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'End', bubbles: true }));
+    window.dispatchEvent(new KeyboardEvent('keydown', { code: 'Delete', bubbles: true }));
+  });
+
+  expect(setPlaying).toHaveBeenCalledWith(true);
+  expect(splitClipAt).not.toHaveBeenCalled();
+  expect(duplicateClip).not.toHaveBeenCalled();
+  expect(updateClipTransform).not.toHaveBeenCalled();
+  expect(setCurrentTime).toHaveBeenCalledWith(0);
+  expect(setCurrentTime).toHaveBeenCalledWith(2);
+  expect(deleteClip).toHaveBeenCalledExactlyOnceWith(['clip-1', 'clip-2']);
+});
+
+it('stops a voice-over range at its end without restarting', async () => {
+  const useVideoEditorPlayback = await importPlaybackHook();
+  const project = createEmptyVideoProject('Playback');
+  project.duration = 2;
+  project.clips = [createVideoClip(project.tracks[0]!.id)];
+  const setCurrentTime = vi.fn<(time: number) => void>();
+  const setPlaying = vi.fn<(playing: boolean) => void>();
+  renderPlaybackHarness(root, {
+    currentTime: 0.2,
+    clearPlacementMode: vi.fn(),
+    deleteActionEvent: vi.fn<(actionEventId: string) => void>(),
+    deleteClip: vi.fn<(clipId: string | readonly string[]) => void>(),
+    deleteCursorSample: vi.fn<(sampleId: string) => void>(),
+    deleteMotionRegion: vi.fn<(motionRegionId: string) => void>(),
+    deleteObjectTrack: vi.fn<(objectTrackId: string) => void>(),
+    isPlaying: true,
+    playbackRange: { start: 0.2, end: 0.5, loop: false },
+    placementMode: null,
+    onSeekReady: (value) => {
+      seekTo = value;
+    },
+    project,
+    selection: { kind: VideoEditorSelectionKind.CLIP, clipId: 'clip-1' },
+    selectedClipId: 'clip-1',
+    setCurrentTime,
+    setPlaying,
+    splitClipAt: vi.fn<(clipId: string, time: number) => void>(),
+    updateActionEventDetails: vi.fn(),
+    updateClipTransform: vi.fn(),
+    updateMotionRegion: vi.fn(),
+    useVideoEditorPlayback,
+  });
+
+  expect(frameCallback).not.toBeNull();
+
+  act(() => {
+    frameCallback?.(1600);
+  });
+
+  expect(setPlaying).toHaveBeenCalledWith(false);
+  expect(setCurrentTime).toHaveBeenLastCalledWith(0.5);
+
+  expect(setCurrentTime).not.toHaveBeenCalledWith(0.2);
 });

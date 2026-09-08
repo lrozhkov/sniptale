@@ -3,11 +3,16 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import { resolveEffectRuntimeFramePlans } from '../../composition/effect-runtime/frame/plan';
-import { createEmptyVideoProject } from '../factories/creation';
+import { createEmptyVideoProject, createVideoProjectTrack } from '../factories/creation';
 import { createRecordingBaseClip, createRecordingProjectAsset } from '../factories/recording';
 import { createEffectHostClip } from '../factories/overlay-clip';
 import { syncProjectDuration } from '../timeline/basics';
-import { VideoTransitionEasing, VideoTransitionKind, type VideoProject } from '../types';
+import {
+  VideoTrackKind,
+  VideoTransitionEasing,
+  VideoTransitionKind,
+  type VideoProject,
+} from '../types';
 import { isHydratableVideoProject } from '../validation';
 import type { VideoProjectEffectInstance, VideoProjectEffectSnapshot } from './types';
 
@@ -118,8 +123,9 @@ function createRecordingFixture(project: VideoProject) {
 }
 
 function createStandaloneHost(project: VideoProject, duration: number) {
-  const trackId = project.tracks.find(({ kind }) => kind === 'OVERLAY')?.id;
-  if (!trackId) throw new Error('Expected overlay track');
+  const track = createVideoProjectTrack('Effects', 0, VideoTrackKind.PRIMARY);
+  project.tracks.push(track);
+  const trackId = track.id;
   return createEffectHostClip({
     duration,
     effectInstanceId: 'scene',

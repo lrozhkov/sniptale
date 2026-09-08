@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { VideoProjectActionEventKind } from '../../../features/video/project/types';
+import {
+  type RecordingActionEvent,
+  VideoProjectActionEventKind,
+} from '../../../features/video/project/types';
 import { createVideoTelemetryController } from './controller';
 
 function createPointerLikeEvent(clientX: number, clientY: number): MouseEvent {
@@ -44,6 +47,16 @@ it('records cursor samples and click actions across enable pause resume and disa
   expect(
     snapshot?.actionEvents.some((event) => event.kind === VideoProjectActionEventKind.SCROLL)
   ).toBe(false);
+  const click: RecordingActionEvent | undefined = snapshot?.actionEvents.find(
+    (event) => event.kind === VideoProjectActionEventKind.CLICK
+  );
+  expect(click).toMatchObject({
+    time: expect.any(Number),
+    duration: expect.any(Number),
+    preset: 'CLICK_RIPPLE',
+    point: { x: 40, y: 60 },
+  });
+  expect(click).not.toHaveProperty('anchor');
   expect(document.getElementById('sniptale-controlled-cursor-overlay')).toBeNull();
 });
 
@@ -89,4 +102,35 @@ it('throttles high-frequency pointer samples while preserving click capture', ()
 
   expect(snapshot?.cursorTrack?.samples.length).toBeGreaterThanOrEqual(3);
   expect(snapshot?.cursorTrack?.samples.at(-1)).toEqual(expect.objectContaining({ x: 12, y: 12 }));
+});
+
+it('returns stable initial viewport proof for an unchanged recording', () => {
+  const controller = createVideoTelemetryController();
+  controller.enable('static-recording');
+  document.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 40, clientY: 60 }));
+  expect(controller.disable()).toMatchObject({
+    viewportObservation: {
+      initial: {
+        width: window.innerWidth,
+        height: window.innerHeight,
+        devicePixelRatio: window.devicePixelRatio,
+      },
+      stable: true,
+    },
+  });
+});
+
+it.each([false, true])('invalidates resize-back even while paused=%s', (paused) => {
+  const initialWidth = window.innerWidth;
+  const controller = createVideoTelemetryController();
+  controller.enable('changed-recording');
+  if (paused) controller.pause();
+  vi.stubGlobal('innerWidth', initialWidth + 100);
+  window.dispatchEvent(new Event('resize'));
+  vi.stubGlobal('innerWidth', initialWidth);
+  window.dispatchEvent(new Event('resize'));
+  if (paused) controller.resume();
+  expect(controller.disable()).toMatchObject({
+    viewportObservation: { initial: { width: initialWidth }, stable: false },
+  });
 });

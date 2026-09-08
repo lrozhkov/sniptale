@@ -148,7 +148,7 @@ export const settingsNavigationMessages = defineMessageSource({
     connection: { ru: 'Подключение', en: 'Connection' },
     capture: { ru: 'Захват', en: 'Capture' },
     commands: { ru: 'Команды', en: 'Commands' },
-    telemetry: { ru: 'Телеметрия', en: 'Telemetry' },
+    telemetry: { ru: 'История действий', en: 'Action history' },
     permissions: { ru: 'Разрешения', en: 'Permissions' },
     privacy: { ru: 'Конфиденциальность', en: 'Privacy' },
   },

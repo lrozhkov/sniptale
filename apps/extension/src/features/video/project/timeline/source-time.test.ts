@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { isLegacyScrollActionEvent, mapSourceRangeToProjectSpans } from './source-time';
+import {
+  isScrollActionEvent,
+  mapProjectTimeToSourcePoint,
+  mapSourceRangeToProjectSpans,
+  mapSourceTimeToProjectPoint,
+} from './source-time';
 import { VideoProjectActionEventKind, VideoProjectActionPreset } from '../types/interaction';
 import { createVideoClip } from './project-meta.test.helpers.ts';
 
@@ -88,17 +93,17 @@ function verifyNormalizedSourceRanges() {
   ).toEqual([]);
 }
 
-function verifyLegacyScrollCompatibility() {
+function verifyScrollAdmission() {
   expect(
-    isLegacyScrollActionEvent({
+    isScrollActionEvent({
       kind: VideoProjectActionEventKind.SCROLL,
-      preset: VideoProjectActionPreset.SCROLL_EMPHASIS,
+      presentation: { preset: VideoProjectActionPreset.SCROLL_EMPHASIS },
     })
   ).toBe(true);
   expect(
-    isLegacyScrollActionEvent({
+    isScrollActionEvent({
       kind: VideoProjectActionEventKind.CLICK,
-      preset: VideoProjectActionPreset.CLICK_RIPPLE,
+      presentation: { preset: VideoProjectActionPreset.CLICK_RIPPLE },
     })
   ).toBe(false);
 }
@@ -109,5 +114,36 @@ describe('timeline source-time helpers', () => {
     'normalizes reversed inputs and drops source ranges outside the current clip timeline',
     verifyNormalizedSourceRanges
   );
-  it('treats scroll actions as legacy-only compatibility data', verifyLegacyScrollCompatibility);
+  it('treats scroll actions as legacy-only compatibility data', verifyScrollAdmission);
+  it('maps source and project points bidirectionally with a stable preferred clip', () => {
+    const clips = [
+      createVideoClip({
+        duration: 4,
+        id: 'original',
+        playbackRate: 2,
+        sourceDuration: 8,
+        sourceStart: 0,
+        startTime: 3,
+      }),
+      createVideoClip({
+        duration: 4,
+        id: 'duplicate',
+        playbackRate: 2,
+        sourceDuration: 8,
+        sourceStart: 0,
+        startTime: 10,
+      }),
+    ];
+
+    expect(mapProjectTimeToSourcePoint(clips, 5)).toEqual({
+      clipId: 'original',
+      sourceTime: 4,
+      time: 5,
+    });
+    expect(mapSourceTimeToProjectPoint(clips, 4, 'duplicate')).toEqual({
+      clipId: 'duplicate',
+      sourceTime: 4,
+      time: 12,
+    });
+  });
 });

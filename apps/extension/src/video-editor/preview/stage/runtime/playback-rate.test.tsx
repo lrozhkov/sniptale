@@ -54,13 +54,19 @@ function createVideoElement(overrides: Partial<HTMLVideoElement> = {}) {
   } as unknown as HTMLVideoElement;
 }
 
+const EMPTY_ASSET_URLS: Record<string, string> = {};
+
 function PreviewStageVideoSyncHarness(props: {
   activeClips: VideoProjectVideoClip[];
   currentTime: number;
   isPlaying: boolean;
   videoRefs: PreviewStageVideoRefs;
 }) {
-  usePreviewStageVideoSync({ ...props, syncedClips: props.activeClips });
+  usePreviewStageVideoSync({
+    ...props,
+    assetUrls: EMPTY_ASSET_URLS,
+    syncedClips: props.activeClips,
+  });
   return null;
 }
 

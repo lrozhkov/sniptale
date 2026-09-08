@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { WorkspaceSidebarSelectionBody } from './body';
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -96,7 +97,7 @@ function createProps() {
     selectedClip: null,
     selectedTransition: null,
     selectedCursorSample: null,
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedMotionRegion: null,
     selectedTrack: null,
     placementMode: null,
@@ -126,7 +127,7 @@ function verifiesSceneMetadataFocus() {
   renderInspectPanel(createProps());
   clickGroup('videoEditor.sidebar.inspectorGroupSummary');
 
-  expect(container?.textContent).toContain('videoEditor.sidebar.projectSourceLabel');
+  expect(container?.textContent).not.toContain('videoEditor.sidebar.projectSourceLabel');
   expect(container?.textContent).not.toContain('videoEditor.sidebar.timelinePlacementLabel');
   expect(container?.textContent).not.toContain('videoEditor.sidebar.actionsTitle');
 }
@@ -141,31 +142,32 @@ function verifiesRecordingBackedSummaries() {
   clickGroup('videoEditor.sidebar.inspectorGroupSummary');
 
   expect(container?.textContent).not.toContain('videoEditor.sidebar.cursorTrackUnavailable');
-  expect(container?.textContent).toContain('videoEditor.timeline.actionsLane');
-  expect(container?.textContent).toContain('videoEditor.sidebar.actionTrackUnavailable');
+  expect(container?.textContent).not.toContain('videoEditor.timeline.actionsLane');
+  expect(container?.textContent).not.toContain('videoEditor.sidebar.actionTrackUnavailable');
 }
 
-function verifiesLegacyScrollIsIgnored() {
+function verifiesAuthoredEventSummary() {
   const props = createProps();
   props.project.source = { kind: VideoProjectSourceKind.RECORDING, recordingId: 'rec-1' };
   props.project.actionEvents = [
     {
       data: {},
-      duration: 0.6,
+
       id: 'legacy-scroll',
       kind: VideoProjectActionEventKind.SCROLL,
       label: 'Legacy scroll',
       point: null,
-      preset: VideoProjectActionPreset.SCROLL_EMPHASIS,
-      time: 0.5,
+
+      anchor: { kind: 'project', time: 0.5 },
+      presentation: { duration: 0.6, preset: VideoProjectActionPreset.SCROLL_EMPHASIS },
     },
   ];
 
   renderInspectPanel(props);
   clickGroup('videoEditor.sidebar.inspectorGroupSummary');
 
-  expect(container?.textContent).toContain('videoEditor.sidebar.actionTrackUnavailable');
-  expect(container?.innerHTML).not.toContain('>1<');
+  expect(container?.textContent).not.toContain('videoEditor.sidebar.actionTrackUnavailable');
+  expect(container?.textContent).toContain('1920×1080');
 }
 
 function verifiesSceneBackgroundSelectLabels() {
@@ -207,7 +209,7 @@ describe('workspace-sidebar/selection/inspect-scene', () => {
     verifiesRecordingBackedSummaries
   );
 
-  it('ignores legacy scroll actions in the scene summary count', verifiesLegacyScrollIsIgnored);
+  it('counts authored scroll events in the scene summary', verifiesAuthoredEventSummary);
 
   it(
     'renders canonical scene background select labels for image backgrounds',
@@ -222,8 +224,40 @@ function renderInspectPanel(props: WorkspaceSidebarSelectionPanelProps) {
 }
 
 function clickGroup(title: string) {
-  const button = container?.querySelector<HTMLButtonElement>(`button[title="${title}"]`);
+  const button = container?.querySelector<HTMLElement>(`nav button[title="${title}"]`);
   act(() => {
-    button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    if (!button?.parentElement?.hasAttribute('open'))
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 }
+
+it('shows grid as a Canvas parameter through the complete selection body', () => {
+  const gridSettings = {
+    enabled: false,
+    snapEnabled: true,
+    size: 80,
+    color: '#94a3b8',
+    onSetEnabled: vi.fn(),
+    onSetSnapEnabled: vi.fn(),
+    onSetSize: vi.fn(),
+    onSetColor: vi.fn(),
+  };
+  const render = () =>
+    act(() =>
+      root?.render(<WorkspaceSidebarSelectionBody {...createProps()} gridSettings={gridSettings} />)
+    );
+  render();
+  const grid = () => container!.querySelector('[data-ui="video-editor.scene.grid-settings"]')!;
+  expect(grid()).not.toBeNull();
+  expect(grid().textContent).not.toContain('videoEditor.app.gridSizeLabel');
+  act(() =>
+    grid()
+      .querySelector<HTMLButtonElement>('[aria-label="videoEditor.app.gridVisibleToggle"]')!
+      .click()
+  );
+  expect(gridSettings.onSetEnabled).toHaveBeenCalledWith(true);
+  gridSettings.enabled = true;
+  render();
+  expect(grid().textContent).toContain('videoEditor.app.gridSizeLabel');
+  expect(grid().textContent).toContain('videoEditor.app.gridColorLabel');
+});

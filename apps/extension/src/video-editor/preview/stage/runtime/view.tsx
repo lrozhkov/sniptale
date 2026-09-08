@@ -21,6 +21,9 @@ function buildPreviewStageSurfaceProps(
   runtime: ReturnType<typeof usePreviewStageRuntime>
 ): PreviewStageSurfaceProps {
   return {
+    alternateView: props.alternateView,
+    headerContent: props.headerContent,
+    headerActions: props.headerActions,
     activeClips: runtime.surface.activeClips,
     activeInsertKind: props.activeInsertKind,
     audioBankClips: runtime.media.audioBankClips,
@@ -47,7 +50,7 @@ function buildPreviewStageSurfaceProps(
     previewStatus: runtime.media.previewStatus,
     project: runtime.render.project,
     renderGenerationRef: runtime.render.renderGenerationRef,
-    selectedActionEvent: props.selectedActionEvent,
+    selectedActionOccurrence: props.selectedActionOccurrence,
     selectedClip: runtime.surface.selectedClip,
     selectedClipId: props.selectedClipId,
     selectedClipLocked: runtime.surface.selectedClipLocked,
@@ -87,6 +90,8 @@ function buildPreviewStageSurfaceActionProps(
     onUpdateActionEventDetails: props.onUpdateActionEventDetails,
     onUpdateAnnotationClipTemplate: props.onUpdateAnnotationClipTemplate,
     onUpdateClipTransform: props.onUpdateClipTransform,
+    onUpdateEffectInstance: props.onUpdateEffectInstance,
+    onPreviewEffectAnchors: runtime.render.onPreviewEffectAnchors,
     onUpdateMotionRegion: props.onUpdateMotionRegion,
     onUpsertObjectTrackCorrectionAnchor: props.onUpsertObjectTrackCorrectionAnchor,
   };

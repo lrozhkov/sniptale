@@ -26,6 +26,7 @@ import type { PreviewStageVideoRefs } from '../types';
 
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
+const EMPTY_ASSET_URLS: Record<string, string> = {};
 
 function createVideoClip(overrides: Partial<VideoProjectVideoClip> = {}): VideoProjectVideoClip {
   return {
@@ -73,6 +74,7 @@ function createVideoElement(overrides: Partial<HTMLVideoElement> = {}) {
 }
 
 function PreviewStageVideoSyncHarness(props: {
+  assetUrls: Record<string, string>;
   activeClips: VideoProjectVideoClip[];
   currentTime: number;
   isPlaying: boolean;
@@ -84,6 +86,7 @@ function PreviewStageVideoSyncHarness(props: {
 }
 
 async function renderHarness(props: {
+  assetUrls?: Record<string, string>;
   activeClips: VideoProjectVideoClip[];
   currentTime: number;
   isPlaying: boolean;
@@ -100,6 +103,7 @@ async function renderHarness(props: {
     root?.render(
       <PreviewStageVideoSyncHarness
         {...props}
+        assetUrls={props.assetUrls ?? EMPTY_ASSET_URLS}
         syncedClips={props.syncedClips ?? props.activeClips}
       />
     );
@@ -293,4 +297,17 @@ describe('preview-stage-runtime', () => {
   );
   it('keeps prewarmed transition videos paused but source-synced', verifiesPrewarmedVideoSync);
   it('logs a low-noise debug trace when preview video play() rejects', verifiesPlayRejectionTrace);
+});
+
+it('synchronizes a late-mounted video when its URL arrives after the last paused seek', async () => {
+  const clip = createVideoClip({ startTime: 0, sourceStart: 0 });
+  const activeClips = [clip];
+  const videoRefs: PreviewStageVideoRefs = { current: {} };
+  const props = { activeClips, currentTime: 0.5, isPlaying: false, videoRefs };
+  await renderHarness(props);
+  const video = createVideoElement();
+  videoRefs.current[clip.id] = video;
+  await renderHarness({ ...props, assetUrls: { [clip.assetId]: 'blob:ready-video' } });
+  expect(video.currentTime).toBe(0.5);
+  expect(video.play).not.toHaveBeenCalled();
 });

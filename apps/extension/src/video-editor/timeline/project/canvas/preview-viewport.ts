@@ -1,3 +1,4 @@
+import { clampTimelineScale } from '../../../contracts/timeline-scale';
 import { useCallback, useEffect, useRef } from 'react';
 import type { TimelinePreviewViewport } from '../../../contracts/timeline-preview';
 
@@ -6,14 +7,19 @@ export function useTimelinePreviewViewportReporter(params: {
   pixelsPerSecond: number;
   timelineRef: React.MutableRefObject<HTMLDivElement | null>;
   timelineWidth: number;
+  startTime?: number | undefined;
 }): () => void {
-  const { onViewportChange, pixelsPerSecond, timelineRef, timelineWidth } = params;
+  const { onViewportChange, pixelsPerSecond, timelineRef, timelineWidth, startTime } = params;
   const previewViewportFrameRef = useRef(0);
   const lastPublishedViewportRef = useRef<TimelinePreviewViewport | null>(null);
   const publishPreviewViewport = useCallback(() => {
     window.cancelAnimationFrame(previewViewportFrameRef.current);
     previewViewportFrameRef.current = window.requestAnimationFrame(() => {
-      const viewport = resolveTimelinePreviewViewport(timelineRef.current, pixelsPerSecond);
+      const viewport = resolveTimelinePreviewViewport(
+        timelineRef.current,
+        pixelsPerSecond,
+        startTime
+      );
       if (
         lastPublishedViewportRef.current &&
         areTimelinePreviewViewportsEqual(lastPublishedViewportRef.current, viewport)
@@ -23,33 +29,47 @@ export function useTimelinePreviewViewportReporter(params: {
       lastPublishedViewportRef.current = viewport;
       onViewportChange(viewport);
     });
-  }, [onViewportChange, pixelsPerSecond, timelineRef]);
+  }, [onViewportChange, pixelsPerSecond, startTime, timelineRef]);
 
   useEffect(() => {
     publishPreviewViewport();
-    return () => window.cancelAnimationFrame(previewViewportFrameRef.current);
-  }, [publishPreviewViewport, timelineWidth]);
+    const node = timelineRef.current;
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(publishPreviewViewport);
+    if (node) observer?.observe(node);
+    window.addEventListener('resize', publishPreviewViewport);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', publishPreviewViewport);
+      window.cancelAnimationFrame(previewViewportFrameRef.current);
+    };
+  }, [publishPreviewViewport, timelineWidth, timelineRef]);
 
   return publishPreviewViewport;
 }
 
 function resolveTimelinePreviewViewport(
   timelineElement: HTMLDivElement | null,
-  pixelsPerSecond: number
+  pixelsPerSecond: number,
+  preciseStartTime?: number
 ): TimelinePreviewViewport {
   if (!timelineElement) {
-    return { endTime: 0, startTime: 0 };
+    return { endTime: 0, startTime: 0, pixelsPerSecond };
   }
 
-  const pixelsPerSecondSafe = Math.max(1, pixelsPerSecond);
-  const startTime = timelineElement.scrollLeft / pixelsPerSecondSafe;
-  const endTime = (timelineElement.scrollLeft + timelineElement.clientWidth) / pixelsPerSecondSafe;
-  return { endTime: Math.max(startTime, endTime), startTime };
+  const pixelsPerSecondSafe = clampTimelineScale(pixelsPerSecond);
+  const startTime = preciseStartTime ?? timelineElement.scrollLeft / pixelsPerSecondSafe;
+  const endTime = startTime + timelineElement.clientWidth / pixelsPerSecondSafe;
+  return { endTime: Math.max(startTime, endTime), startTime, pixelsPerSecond: pixelsPerSecondSafe };
 }
 
 function areTimelinePreviewViewportsEqual(
   first: TimelinePreviewViewport,
   second: TimelinePreviewViewport
 ): boolean {
-  return first.endTime === second.endTime && first.startTime === second.startTime;
+  return (
+    first.endTime === second.endTime &&
+    first.startTime === second.startTime &&
+    first.pixelsPerSecond === second.pixelsPerSecond
+  );
 }

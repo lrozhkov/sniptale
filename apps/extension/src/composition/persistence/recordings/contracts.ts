@@ -5,7 +5,7 @@ import type {
 } from '@sniptale/runtime-contracts/video/types/types';
 import type {
   RecordingTelemetrySignal,
-  VideoProjectActionEvent,
+  RecordingActionEvent,
   VideoProjectCursorTrack,
 } from '../../../features/video/project/types';
 import type { LibraryLifecycle } from '../library-lifecycle/contracts';
@@ -33,6 +33,13 @@ export interface RecordingEntry extends StoredRecordingEntry {
 }
 
 export interface RecordingTelemetryEntry {
+  /** Present only when source time semantics were verified at native ingestion. */
+  provenance?: {
+    source: 'native';
+    normalizationVersion: 1;
+    timeUnit: 'seconds';
+    coordinateSpace: 'desktop';
+  };
   recordingId: string;
   createdAt: number;
   updatedAt: number;
@@ -40,6 +47,6 @@ export interface RecordingTelemetryEntry {
   displaySurface?: VideoDisplaySurface | null;
   viewport: ViewportInfo | null;
   cursorTrack: VideoProjectCursorTrack | null;
-  actionEvents: VideoProjectActionEvent[];
+  actionEvents: RecordingActionEvent[];
   signals: RecordingTelemetrySignal[];
 }

@@ -34,7 +34,7 @@ export const DEFAULT_VIDEO_SETTINGS: VideoRecordingSettings = {
     cursorClickAnimationEnabled: false,
   },
   webcamPresentation: {
-    mode: WebcamPresentationMode.EMBEDDED,
+    mode: WebcamPresentationMode.SEPARATE_TRACK,
     shape: WebcamPresentationShape.CIRCLE,
     center: { x: 0.86, y: 0.82 },
     sizeFraction: 0.22,

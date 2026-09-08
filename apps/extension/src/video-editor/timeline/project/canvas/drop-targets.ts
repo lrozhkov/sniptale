@@ -6,7 +6,7 @@ export type TimelineDropImportKind = 'audio' | 'image' | 'video';
 
 const TRACK_KIND_BY_IMPORT_KIND = {
   audio: VideoTrackKind.AUDIO,
-  image: VideoTrackKind.OVERLAY,
+  image: VideoTrackKind.PRIMARY,
   video: VideoTrackKind.PRIMARY,
 } as const satisfies Record<TimelineDropImportKind, VideoTrackKind>;
 

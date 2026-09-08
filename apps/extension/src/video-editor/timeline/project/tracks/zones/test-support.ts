@@ -24,7 +24,7 @@ export function createTimelineZoneProject() {
   const cutTrack = createVideoProjectTrack(
     'Видео cut',
     project.tracks.length + 1,
-    VideoTrackKind.OVERLAY
+    VideoTrackKind.PRIMARY
   );
   const secondaryTrack = layeredTrack.id;
   const cutTrackId = cutTrack.id;

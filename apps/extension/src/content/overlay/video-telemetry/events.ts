@@ -1,4 +1,4 @@
-import { translate } from '../../../platform/i18n';
+import { describeTelemetryTarget } from './target';
 import { createVideoProjectCursorTrack } from '../../../features/video/project/defaults';
 import {
   VideoProjectActionEventKind,
@@ -50,6 +50,7 @@ function recordCursorSample(
   event: Pick<PointerEvent, 'clientX' | 'clientY' | 'timeStamp'>,
   options: { force?: boolean; visible?: boolean } = {}
 ): void {
+  state.viewportObserver?.();
   const visible = options.visible ?? true;
   if (options.force !== true && shouldSkipCursorSample(state, event, visible)) {
     return;
@@ -89,9 +90,8 @@ function recordLastKnownPointerBoundary(
   );
 }
 
-function resolveActionEvent(
-  event: (Pick<MouseEvent, 'button' | 'clientX' | 'clientY'> & { timeStamp: number }) | null
-) {
+function resolveActionEvent(event: MouseEvent | null) {
+  const target = describeTelemetryTarget(event).data;
   return {
     timeStamp: event?.timeStamp ?? performance.now(),
     point: event
@@ -100,14 +100,13 @@ function resolveActionEvent(
           y: event.clientY,
         }
       : null,
-    data: { button: event?.button ?? 0 },
+    data: { button: event?.button ?? 0, ...target },
+    label: target['targetName'] ?? '',
   };
 }
 
-function recordActionEvent(
-  state: TelemetryState,
-  event: (Pick<MouseEvent, 'button' | 'clientX' | 'clientY'> & { timeStamp: number }) | null
-): void {
+function recordActionEvent(state: TelemetryState, event: MouseEvent | null): void {
+  state.viewportObserver?.();
   const resolvedEvent = resolveActionEvent(event);
   state.actionEvents.push({
     id: crypto.randomUUID(),
@@ -115,7 +114,7 @@ function recordActionEvent(
     time: getElapsedSeconds(state, resolvedEvent.timeStamp),
     duration: 0.45,
     point: resolvedEvent.point,
-    label: translate('videoEditor.sidebar.actionPresetClickRipple'),
+    label: resolvedEvent.label,
     data: resolvedEvent.data,
     preset: VideoProjectActionPreset.CLICK_RIPPLE,
   });

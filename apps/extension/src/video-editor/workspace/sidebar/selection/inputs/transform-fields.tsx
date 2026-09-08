@@ -1,3 +1,4 @@
+import { InspectorDetails } from '../shared/details';
 import { translate } from '../../../../../platform/i18n';
 import { isAudioClip } from '../../../../../features/video/project/timeline';
 import type { WorkspaceSidebarProps } from '../../contracts/props';
@@ -14,12 +15,7 @@ export function renderTransformFields(
 ) {
   if (!selectedClip || isAudioClip(selectedClip)) return null;
   return (
-    <div className="space-y-3">
-      <TransformGeometryFields
-        clip={selectedClip}
-        disabled={selectedTrackLocked}
-        onUpdateClipTransform={onUpdateClipTransform}
-      />
+    <div className="space-y-1">
       <NumberInput
         label={translate('videoEditor.sidebar.rotationLabel')}
         disabled={selectedTrackLocked}
@@ -41,6 +37,13 @@ export function renderTransformFields(
         formatValue={(value) => `${Math.round(value * 100)}%`}
         onChange={(value) => onUpdateClipTransform(selectedClip.id, { opacity: value })}
       />
+      <InspectorDetails label={translate('videoEditor.sidebar.inspectorExactPlacement')}>
+        <TransformGeometryFields
+          clip={selectedClip}
+          disabled={selectedTrackLocked}
+          onUpdateClipTransform={onUpdateClipTransform}
+        />
+      </InspectorDetails>
     </div>
   );
 }

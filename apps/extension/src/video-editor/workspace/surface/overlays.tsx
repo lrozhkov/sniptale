@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useId, useRef } from 'react';
+import { useExportDialogFocus } from '../../export/dialog/focus';
 import { ExportDialog } from '../../export/dialog';
 import { ExportProgressOverlay } from '../../export/progress-overlay';
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
@@ -47,13 +48,13 @@ export function VideoEditorWorkspaceOverlays({
       ) : null}
       {controller.exportProgress.isRunning && controller.exportProgress.status ? (
         <ExportProgressOverlay
+          cancellationFailed={Boolean(controller.exportFailure.error)}
           status={controller.exportProgress.status}
           onCancel={controller.exportProgress.onCancel}
         />
       ) : null}
-      {controller.exportFailure.error ? (
+      {controller.exportFailure.error && !controller.exportProgress.isRunning ? (
         <ExportFailureOverlay
-          error={controller.exportFailure.error}
           onClose={controller.exportFailure.onClose}
           onRetry={controller.exportFailure.onRetry}
         />
@@ -63,40 +64,44 @@ export function VideoEditorWorkspaceOverlays({
 }
 
 function ExportFailureOverlay(props: {
-  error: string;
   onClose(): void;
   onRetry(): void | Promise<void>;
 }): React.JSX.Element {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const titleId = useId();
+  useExportDialogFocus(rootRef);
   return (
-    <ProductModal
-      labelledBy="video-editor-export-failure-title"
-      onClose={props.onClose}
-      role="alertdialog"
-      width="min(520px, calc(100vw - 32px))"
-    >
-      <ProductModalHeader
-        compact
-        title={
-          <span id="video-editor-export-failure-title">
-            {translate('videoEditor.exportDialog.failureTitle')}
-          </span>
-        }
+    <div ref={rootRef} className="contents">
+      <ProductModal
+        labelledBy={titleId}
         onClose={props.onClose}
-      />
-      <ProductModalBody compact className="gap-3">
-        <p>{translate('videoEditor.exportDialog.failureDescription')}</p>
-        <p role="alert" className="break-words text-xs text-[var(--sniptale-color-danger)]">
-          {props.error.slice(0, 512)}
-        </p>
-      </ProductModalBody>
-      <ProductModalFooter compact className="justify-end gap-2">
-        <ProductActionButton compact tone="secondary" onClick={props.onClose}>
-          {translate('videoEditor.exportDialog.failureClose')}
-        </ProductActionButton>
-        <ProductActionButton compact tone="primary" onClick={() => void props.onRetry()}>
-          {translate('videoEditor.exportDialog.failureRetry')}
-        </ProductActionButton>
-      </ProductModalFooter>
-    </ProductModal>
+        role="alertdialog"
+        onKeyDown={(event) => {
+          if (event.key !== 'Escape' || event.defaultPrevented) return;
+          event.preventDefault();
+          event.stopPropagation();
+          props.onClose();
+        }}
+        width="min(520px, calc(100vw - 32px))"
+      >
+        <ProductModalHeader
+          compact
+          title={<span id={titleId}>{translate('videoEditor.exportDialog.failureTitle')}</span>}
+          onClose={props.onClose}
+          closeTitle={translate('common.actions.close')}
+        />
+        <ProductModalBody compact className="gap-3">
+          <p>{translate('videoEditor.exportDialog.failureDescription')}</p>
+        </ProductModalBody>
+        <ProductModalFooter compact className="justify-end gap-2">
+          <ProductActionButton compact tone="secondary" onClick={props.onClose}>
+            {translate('videoEditor.exportDialog.failureClose')}
+          </ProductActionButton>
+          <ProductActionButton compact tone="primary" onClick={() => void props.onRetry()}>
+            {translate('videoEditor.exportDialog.failureRetry')}
+          </ProductActionButton>
+        </ProductModalFooter>
+      </ProductModal>
+    </div>
   );
 }

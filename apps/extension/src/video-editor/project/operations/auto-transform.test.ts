@@ -1,264 +1,289 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createVideoProjectMotionRegion } from '../../../features/video/project/motion';
-import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import { beforeEach, expect, it, vi } from 'vitest';
 import {
-  VideoMotionFocusMode,
-  VideoProjectActionEventKind,
-} from '../../../features/video/project/types/interaction';
-
-const {
-  applyAutoTransformClipTimelineMock,
-  getRecordingTelemetryMock,
-  mapSourceTimeToProjectTimeMock,
-  normalizeRecordingActionEventsToProjectSpaceMock,
-  normalizeRecordingCursorTrackToProjectSpaceMock,
-  telemetryEligibilityMock,
-} = vi.hoisted(() => ({
-  applyAutoTransformClipTimelineMock: vi.fn(),
-  getRecordingTelemetryMock: vi.fn(),
-  mapSourceTimeToProjectTimeMock: vi.fn(),
-  normalizeRecordingActionEventsToProjectSpaceMock: vi.fn(),
-  normalizeRecordingCursorTrackToProjectSpaceMock: vi.fn(),
-  telemetryEligibilityMock: vi.fn(),
-}));
-
+  createProject,
+  createVideoClip,
+  createTrack,
+} from '../../../features/video/project/timeline/project-meta.test.helpers';
+import { DEFAULT_VIDEO_AUTO_PROCESSING_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
+import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
+import { RecordingTelemetrySignalKind } from '../../../features/video/project/types';
+const { getTelemetry } = vi.hoisted(() => ({ getTelemetry: vi.fn() }));
 vi.mock('../../../composition/persistence/recordings/telemetry', async (importOriginal) => ({
   ...(await importOriginal<
     typeof import('../../../composition/persistence/recordings/telemetry')
   >()),
-  getRecordingTelemetry: getRecordingTelemetryMock,
+  getRecordingTelemetry: getTelemetry,
 }));
-
-vi.mock('./auto-transform.clip-timeline', () => ({
-  applyAutoTransformClipTimeline: applyAutoTransformClipTimelineMock,
-  mapSourceTimeToProjectTime: mapSourceTimeToProjectTimeMock,
-}));
-
-vi.mock('./telemetry-eligibility', () => ({
-  isRecordingTelemetryEligibleForAutoProcessing: telemetryEligibilityMock,
-}));
-
-vi.mock('./telemetry', () => ({
-  createRecordingTelemetryNormalizationParams: vi.fn((_telemetry, project) => ({
-    captureMode: 'TAB',
-    displaySurface: null,
-    projectHeight: project.height,
-    projectWidth: project.width,
-    viewport: null,
-  })),
-  normalizeRecordingActionEventsToProjectSpace: normalizeRecordingActionEventsToProjectSpaceMock,
-  normalizeRecordingCursorTrackToProjectSpace: normalizeRecordingCursorTrackToProjectSpaceMock,
-}));
-
-import { autoTransformRecordingProject } from './auto-transform';
-
-function createTelemetryActionEvent() {
+import {
+  prepareAutoProcessing,
+  getAutoProcessingClipChoices,
+  type AutoProcessingRequest,
+} from './auto-transform';
+function telemetry(recordingId = 'rec-asset-video'): RecordingTelemetryEntry {
   return {
-    data: {},
-    duration: 0.2,
-    id: 'click-1',
-    kind: VideoProjectActionEventKind.CLICK,
-    label: 'Click',
-    point: { x: 120, y: 240 },
-    preset: 'CLICK_RIPPLE',
-    time: 1,
-  } as const;
-}
-
-function createTelemetryEntry() {
-  return {
-    actionEvents: [createTelemetryActionEvent()],
+    recordingId,
     captureMode: 'TAB',
     createdAt: 1,
-    cursorTrack: null,
-    displaySurface: null,
-    recordingId: 'recording-1',
-    signals: [],
     updatedAt: 2,
     viewport: null,
+    cursorTrack: null,
+    actionEvents: [],
+    signals: [
+      RecordingTelemetrySignalKind.CURSOR_IDLE,
+      RecordingTelemetrySignalKind.STATIC_FRAME,
+    ].map((kind, index) => ({
+      id: `signal-${index}`,
+      kind,
+      startTime: 2,
+      endTime: 6,
+      point: null,
+      data: {},
+    })),
   };
 }
-
-function createMotionProject(name: string) {
-  const project = createEmptyVideoProject(name);
-  project.duration = 12;
+function fixture() {
+  const project = createProject([
+    createVideoClip({ id: 'screen', sourceInstanceId: 'instance' }),
+    createVideoClip({ id: 'repeat', sourceInstanceId: 'repeat-instance', startTime: 10 }),
+  ]);
+  project.baseRecordingId = 'unrelated-base';
+  project.duration = 18;
   return project;
 }
-
-function registerFailureHandlingTests() {
-  it('returns null when recording telemetry is unavailable', async () => {
-    getRecordingTelemetryMock.mockResolvedValue(null);
-    const project = createMotionProject('Auto transform');
-
-    await expect(autoTransformRecordingProject(project, 'recording-1')).resolves.toBeNull();
-    expect(applyAutoTransformClipTimelineMock).not.toHaveBeenCalled();
+const request: AutoProcessingRequest = {
+  targets: [{ clipId: 'screen', recordingId: 'rec-asset-video', sourceInstanceId: 'instance' }],
+  camera: false,
+  settings: {
+    ...DEFAULT_VIDEO_AUTO_PROCESSING_SETTINGS,
+    enabled: true,
+    stableSegments: {
+      ...DEFAULT_VIDEO_AUTO_PROCESSING_SETTINGS.stableSegments,
+      shoulderSeconds: 0,
+      speedUpPlaybackRate: 2,
+    },
+  },
+};
+beforeEach(() => {
+  vi.clearAllMocks();
+  getTelemetry.mockImplementation(async (id: string) => telemetry(id));
+});
+it('C4 acceptance: never infers scope from baseRecordingId and returns no candidate for empty scope', async () => {
+  const project = fixture();
+  const result = await prepareAutoProcessing(project, { ...request, targets: [] });
+  expect(result.status).toBe('unchanged');
+  expect(result.project).toBe(project);
+  expect(getTelemetry).not.toHaveBeenCalled();
+});
+it('prepares a real immutable candidate for exactly the selected placement', async () => {
+  const project = fixture();
+  const before = structuredClone(project);
+  const result = await prepareAutoProcessing(project, request);
+  expect(result.status).toBe('ready');
+  expect(result.summary).toMatchObject({
+    beforeDuration: 18,
+    afterDuration: 16,
+    removedDuration: 2,
   });
-}
-
-function createManualMotionRegion(project: ReturnType<typeof createEmptyVideoProject>) {
-  return {
-    ...createVideoProjectMotionRegion(project, 6),
-    id: 'manual-motion:click-3',
-    focusMode: VideoMotionFocusMode.ACTION,
-    focusPoint: { x: 220, y: 180 },
-    targetActionEventId: 'click-3',
+  expect(result.project?.clips.find((clip) => clip.id === 'repeat')).toMatchObject({
+    startTime: 8,
+    duration: 8,
+    sourceDuration: 8,
+  });
+  expect(result.selectedIds).toHaveLength(1);
+  expect(result.suggestions[0]).toMatchObject({
+    beforeDuration: 4,
+    afterDuration: 2,
+    status: 'available',
+  });
+  expect(project).toEqual(before);
+  expect(getTelemetry).toHaveBeenCalledWith('rec-asset-video');
+});
+it('shows blocked rows but defaults to the applicable subset, with explicit deselection yielding no-op', async () => {
+  const project = fixture();
+  project.tracks.push({ ...createTrack('locked', 1), locked: true });
+  project.clips[1]!.trackId = 'locked';
+  const both = {
+    ...request,
+    targets: [
+      ...request.targets,
+      { clipId: 'repeat', recordingId: 'rec-asset-video', sourceInstanceId: 'repeat-instance' },
+    ],
   };
-}
-
-function createThrottledTelemetryActionEvents() {
-  const click1 = createTelemetryActionEvent();
-  const click2 = {
-    ...createTelemetryActionEvent(),
-    id: 'click-2',
-    point: null,
-    time: 3,
-  } as const;
-  const click3 = {
-    ...createTelemetryActionEvent(),
-    id: 'click-3',
-    point: { x: 220, y: 180 },
-    time: 6,
-  } as const;
-  const click4 = {
-    ...createTelemetryActionEvent(),
-    id: 'click-4',
-    point: { x: 420, y: 120 },
-    time: 7.5,
-  } as const;
-  const click5 = {
-    ...createTelemetryActionEvent(),
-    id: 'click-5',
-    point: { x: 460, y: 140 },
-    time: 10.2,
-  } as const;
-
-  return [click1, click2, click3, click4, click5];
-}
-
-function registerAutoMotionRebuildTest() {
-  it('rebuilds auto-motion zooms instead of dropping existing auto-generated targets', async () => {
-    const project = createMotionProject('Auto transform');
-    project.motionRegions = [
+  const result = await prepareAutoProcessing(project, both);
+  expect(result.suggestions.map((row) => row.status)).toEqual(['available', 'blocked']);
+  expect(result.selectedIds).toHaveLength(1);
+  expect(result.status).toBe('ready');
+  const blocked = await prepareAutoProcessing(
+    project,
+    both,
+    result.suggestions.map((row) => row.id)
+  );
+  expect(blocked.status).toBe('blocked');
+  expect(blocked.project).toBeNull();
+  const empty = await prepareAutoProcessing(project, both, []);
+  expect(empty.status).toBe('unchanged');
+  expect(empty.project).toBe(project);
+});
+it('rejects disappeared selected suggestions instead of applying the surviving prefix', async () => {
+  const result = await prepareAutoProcessing(fixture(), request, ['no-longer-present']);
+  expect(result.status).toBe('blocked');
+  expect(result.project).toBeNull();
+});
+it('supports multiple recordings while leaving unselected repeated source settings intact', async () => {
+  const project = fixture();
+  project.assets.push({
+    ...project.assets[0]!,
+    id: 'second-asset',
+    source: { kind: 'recording', recordingId: 'second' },
+  });
+  project.clips.push(
+    createVideoClip({
+      id: 'second',
+      assetId: 'second-asset',
+      sourceInstanceId: 'second-instance',
+      startTime: 20,
+    })
+  );
+  project.duration = 28;
+  const result = await prepareAutoProcessing(project, {
+    ...request,
+    targets: [
+      ...request.targets,
+      { clipId: 'second', recordingId: 'second', sourceInstanceId: 'second-instance' },
+    ],
+  });
+  expect(result.status).toBe('ready');
+  expect(result.summary.afterDuration).toBe(24);
+  expect(getTelemetry.mock.calls.map((call) => call[0])).toEqual(['rec-asset-video', 'second']);
+  expect(result.project?.clips.find((clip) => clip.id === 'repeat')).toMatchObject({
+    duration: 8,
+    sourceDuration: 8,
+  });
+});
+it('does not offer camera-only tracks as duplicate screen targets', () => {
+  const project = fixture();
+  project.tracks.find((track) => track.id === 'track-video')!.role = 'CAMERA';
+  expect(getAutoProcessingClipChoices(project)).toEqual([]);
+});
+it('keeps unavailable telemetry visible without inventing a preview', async () => {
+  getTelemetry.mockResolvedValue(undefined);
+  const result = await prepareAutoProcessing(fixture(), request);
+  expect(result.status).toBe('unchanged');
+  expect(result.suggestions[0]).toMatchObject({ status: 'blocked', reason: 'missing-source' });
+});
+it.each([false, true])(
+  'camera is opt-in and repeat processing is stable (nearby second click: %s)',
+  async (nearby) => {
+    const project = fixture();
+    project.actionEvents = [
       {
-        ...createVideoProjectMotionRegion(project, 1),
-        id: 'auto-motion:click-1',
-        focusMode: VideoMotionFocusMode.ACTION,
-        focusPoint: { x: 120, y: 240 },
-        targetActionEventId: 'click-1',
-      },
-    ];
-    getRecordingTelemetryMock.mockResolvedValue(createTelemetryEntry());
-
-    const result = await autoTransformRecordingProject(project, 'recording-1');
-
-    expect(result?.motionRegions).toEqual([
-      expect.objectContaining({
-        id: 'auto-motion:click-1',
-        targetActionEventId: 'click-1',
-      }),
-    ]);
-  });
-}
-
-function registerZoomThrottleTests() {
-  it('throttles auto zooms, skips click events without points, and preserves manual targets', async () => {
-    const project = createMotionProject('Auto transform');
-    project.motionRegions = [createManualMotionRegion(project)];
-    const actionEvents = createThrottledTelemetryActionEvents();
-    getRecordingTelemetryMock.mockResolvedValue({
-      ...createTelemetryEntry(),
-      actionEvents,
-    });
-    normalizeRecordingActionEventsToProjectSpaceMock.mockReturnValue(actionEvents);
-
-    const result = await autoTransformRecordingProject(project, 'recording-1');
-    expect(result).not.toBeNull();
-    const motionRegions = result!.motionRegions ?? [];
-
-    expect(motionRegions).toEqual([
-      expect.objectContaining({
-        id: 'manual-motion:click-3',
-        targetActionEventId: 'click-3',
-      }),
-      expect.objectContaining({
-        duration: expect.any(Number),
-        id: 'auto-motion:click-1',
-        targetActionEventId: 'click-1',
-        zoomInDuration: expect.any(Number),
-        zoomOutDuration: expect.any(Number),
-      }),
-      expect.objectContaining({
-        duration: expect.any(Number),
-        id: 'auto-motion:click-4',
-        targetActionEventId: 'click-4',
-        zoomInDuration: expect.any(Number),
-        zoomOutDuration: expect.any(Number),
-      }),
-    ]);
-    expect(motionRegions.slice(1).every((region) => region.duration >= 3)).toBe(true);
-    expect(motionRegions.slice(1).every((region) => region.zoomInDuration >= 0.45)).toBe(true);
-    expect(motionRegions.slice(1).every((region) => region.zoomOutDuration >= 0.45)).toBe(true);
-  });
-}
-
-function registerMotionRegionTests() {
-  registerAutoMotionRebuildTest();
-  registerZoomThrottleTests();
-}
-
-function registerCursorRemapTests() {
-  it('remaps cursor samples into compacted project time and drops samples from removed ranges', async () => {
-    const project = createMotionProject('Auto transform');
-    getRecordingTelemetryMock.mockResolvedValue({
-      ...createTelemetryEntry(),
-      cursorTrack: {
-        captureMode: 'separate',
-        samples: [
-          { id: 'cursor-1', time: 1, x: 10, y: 20, visible: true },
-          { id: 'cursor-2', time: 3, x: 30, y: 40, visible: true },
-        ],
-        skin: {
-          animationPreset: 'NONE',
-          color: '#fff',
-          hidden: false,
-          preset: 'ARROW',
-          scale: 1,
-          shadow: true,
+        id: 'click',
+        kind: 'CLICK',
+        label: 'Click',
+        data: {},
+        point: { x: 0.5, y: 0.5 },
+        anchor: {
+          kind: 'recording-source',
+          recordingId: 'rec-asset-video',
+          sourceInstanceId: 'instance',
+          sourceEventId: 'raw',
+          sourceTime: 1,
         },
       },
+    ];
+    if (nearby)
+      project.actionEvents.push({
+        ...project.actionEvents[0]!,
+        id: 'nearby',
+        point: { x: 0.9, y: 0.9 },
+        anchor: {
+          kind: 'recording-source',
+          recordingId: 'rec-asset-video',
+          sourceInstanceId: 'instance',
+          sourceEventId: 'nearby-raw',
+          sourceTime: 3,
+        },
+      });
+    const cameraRequest = {
+      ...request,
+      settings: {
+        ...request.settings,
+        stableSegments: { ...request.settings.stableSegments, action: 'skip' as const },
+      },
+    };
+    const off = await prepareAutoProcessing(project, cameraRequest);
+    expect(off.status).toBe('unchanged');
+    expect(off.project).toBe(project);
+    const on = await prepareAutoProcessing(project, { ...cameraRequest, camera: true });
+    expect(on.status).toBe('ready');
+    expect(on.suggestions).toHaveLength(1);
+    expect(on.project?.motionRegions?.[0]?.targetAction).toEqual({
+      eventId: 'click',
+      clipId: 'screen',
     });
-    mapSourceTimeToProjectTimeMock.mockImplementation(
-      (_project: unknown, _recordingId: unknown, sourceTime: number) =>
-        sourceTime === 3 ? null : sourceTime + 0.5
-    );
-
-    const result = await autoTransformRecordingProject(project, 'recording-1');
-
-    expect(result?.cursorTrack?.samples).toEqual([
-      { id: 'cursor-1', time: 1.5, x: 10, y: 20, visible: true },
-    ]);
-  });
-}
-
-describe('auto transform recording project', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    applyAutoTransformClipTimelineMock.mockImplementation((project) => project);
-    mapSourceTimeToProjectTimeMock.mockImplementation(
-      (_project: unknown, _recordingId: unknown, sourceTime: number) => sourceTime
-    );
-    normalizeRecordingActionEventsToProjectSpaceMock.mockReturnValue([
-      createTelemetryActionEvent(),
-    ]);
-    normalizeRecordingCursorTrackToProjectSpaceMock.mockImplementation(
-      (cursorTrack: unknown) => cursorTrack
-    );
-    telemetryEligibilityMock.mockImplementation(
-      (_project: unknown, telemetry: unknown) => telemetry !== null && telemetry !== undefined
-    );
-  });
-
-  registerFailureHandlingTests();
-  registerMotionRegionTests();
-  registerCursorRemapTests();
+    const reapplied = await prepareAutoProcessing(on.project!, { ...cameraRequest, camera: true });
+    expect(reapplied.status).toBe('unchanged');
+    expect(reapplied.project).toBe(on.project);
+    expect(reapplied.suggestions.every((row) => row.status !== 'available')).toBe(true);
+    const edited = {
+      ...on.project!,
+      motionRegions: on.project!.motionRegions!.map((region) => ({
+        ...region,
+        scale: 3,
+        zoomInDuration: 0.8,
+      })),
+    };
+    const reprocessed = await prepareAutoProcessing(edited, { ...cameraRequest, camera: true });
+    expect(reprocessed.status).toBe('unchanged');
+    expect(reprocessed.project?.motionRegions).toEqual(edited.motionRegions);
+    const empty = await prepareAutoProcessing(project, { ...cameraRequest, camera: true }, []);
+    expect(empty.status).toBe('unchanged');
+    expect(empty.project).toBe(project);
+  }
+);
+it('binds camera before time edits and preserves exact split lineage', async () => {
+  const project = fixture();
+  project.actionEvents = [
+    {
+      id: 'click',
+      kind: 'CLICK',
+      label: 'Click',
+      data: {},
+      point: { x: 0.5, y: 0.5 },
+      anchor: {
+        kind: 'recording-source',
+        recordingId: 'rec-asset-video',
+        sourceInstanceId: 'instance',
+        sourceEventId: 'raw',
+        sourceTime: 3,
+      },
+    },
+  ];
+  const result = await prepareAutoProcessing(project, { ...request, camera: true });
+  expect(result.status).toBe('ready');
+  const middle = result.project!.clips.find(
+    (clip) => clip.type === 'VIDEO' && clip.sourceStart === 2 && clip.playbackRate === 2
+  )!;
+  const camera = result.project!.motionRegions?.find(
+    (region) => region.duration > 0 && region.sourceBinding?.clipId === middle.id
+  );
+  expect(camera).toBeDefined();
+  expect(camera?.targetAction?.clipId).toBe(middle.id);
+  expect(camera?.startTime).toBe(2.5);
+  expect(camera?.duration).toBe(1.5);
+  const dormant = result.project!.motionRegions?.find(
+    (region) => region.sourceBinding?.clipId === 'screen'
+  );
+  expect(dormant?.duration).toBe(0);
+  expect(dormant?.sourceBinding?.sourceStart).toBe(3);
+});
+it('keeps sourceless video visible as an unavailable choice instead of hiding the reason', () => {
+  const project = fixture();
+  project.assets[0]!.source = {
+    kind: 'project-asset',
+    projectAssetId: 'uploaded-without-recording',
+  };
+  expect(getAutoProcessingClipChoices(project)).toEqual(
+    expect.arrayContaining([expect.objectContaining({ clipId: 'screen', recordingId: '' })])
+  );
 });

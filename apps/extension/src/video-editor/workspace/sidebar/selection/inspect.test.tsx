@@ -1,3 +1,4 @@
+import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -18,7 +19,8 @@ vi.mock('./inspection/effects', () => ({
 vi.mock('./inspection/clip', () => ({
   InspectClipPanel: () => <div data-panel="clip" />,
 }));
-vi.mock('./inspection/motion', () => ({
+vi.mock('./inspection/motion', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./inspection/motion')>()),
   InspectMotionPanel: () => <div data-panel="motion" />,
 }));
 vi.mock('./inspection/object-track', () => ({
@@ -34,7 +36,7 @@ vi.mock('./inspection/track', () => ({
 import { WorkspaceSidebarInspectPanel } from './inspect';
 
 const selectedDefaults = {
-  selectedActionEvent: null,
+  selectedActionOccurrence: null,
   selectedClip: null,
   selectedCursorSample: null,
   selectedMotionRegion: null,
@@ -48,6 +50,7 @@ function renderSelection(
   selected: Readonly<Record<string, unknown>> = {}
 ): string {
   const props = {
+    project: createEmptyVideoProject(),
     ...selectedDefaults,
     ...selected,
     selection,
@@ -77,8 +80,8 @@ describe('workspace sidebar selection routing', () => {
       'object-track',
     ],
     [
-      { kind: VideoEditorSelectionKind.ACTION_SEGMENT, actionEventId: 'action-1' },
-      { selectedActionEvent: {} },
+      { kind: VideoEditorSelectionKind.ACTION_OCCURRENCE, clipId: null, eventId: 'action-1' },
+      { selectedActionOccurrence: {} },
       'action',
     ],
     [

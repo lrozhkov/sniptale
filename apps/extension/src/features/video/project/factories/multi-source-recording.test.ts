@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { resolveVideoCompositionFrame } from '../../composition/timeline/frame';
 
 import { createVideoProjectFromMultiSourceRecording } from './multi-source-recording';
-import { VideoMediaFitMode, VideoProjectClipType, VideoTrackKind } from '../types/index';
+import {
+  VideoMediaFitMode,
+  VideoProjectClipType,
+  VideoProjectTrackRole,
+  VideoTrackKind,
+} from '../types/index';
 
 function createVideoInput(
   recordingId: string,
@@ -85,9 +91,19 @@ function registerMultiSourceWebcamTests() {
       },
     });
     const videoClips = project.clips.filter((clip) => clip.type === VideoProjectClipType.VIDEO);
+    const cameraTrack = project.tracks.find((track) => track.role === VideoProjectTrackRole.CAMERA);
 
     expect(project.baseRecordingId).toBe('rec-1');
-    expect(project.duration).toBe(14);
+    expect(project.duration).toBe(12);
+    expect(project.clips.map((clip) => clip.duration)).toEqual([12, 10, 12, 12]);
+    expect(new Set(project.clips.map((clip) => clip.groupId)).size).toBe(1);
+    expect(project.clips[0]!.groupId).not.toBeNull();
+    expect(project.assets.map((asset) => asset.recordingPart)).toEqual([
+      { recordingId: 'rec-1', role: 'primary' },
+      { recordingId: 'rec-1', role: 'video' },
+      { recordingId: 'rec-1', role: 'camera' },
+      { recordingId: 'rec-1', role: 'audio' },
+    ]);
     expect(project.assets.map((asset) => asset.name)).toEqual([
       'window-1.webm',
       'window-2.webm',
@@ -104,9 +120,23 @@ function registerMultiSourceWebcamTests() {
       expect.objectContaining({
         muted: true,
         startTime: 0,
-        transform: expect.objectContaining({ height: 360, width: 640, x: 0, y: 0 }),
+        trackId: cameraTrack?.id,
+        transform: expect.objectContaining({
+          height: expect.any(Number),
+          width: expect.any(Number),
+          x: expect.any(Number),
+          y: expect.any(Number),
+        }),
       })
     );
+    expect(videoClips[2]?.transform.width).toBeLessThan(project.width / 2);
+    expect(project.tracks.filter((track) => track.role === undefined)).toHaveLength(3);
+    const frame = resolveVideoCompositionFrame(project, 1);
+    const screenLayer = frame.visualLayers.find((layer) => layer.clipId === videoClips[0]?.id);
+    const cameraLayer = frame.visualLayers.find((layer) => layer.clipId === videoClips[2]?.id);
+    expect(cameraTrack?.order).toBeGreaterThan(0);
+    expect(cameraTrack?.order).toBeLessThan(1);
+    expect(cameraLayer?.zIndex).toBeGreaterThan(screenLayer?.zIndex ?? -1);
   });
 }
 
@@ -143,7 +173,7 @@ describe('multi-source recording project factory edge cases', () => {
 
     expect(project.width).toBe(1280);
     expect(project.height).toBe(720);
-    expect(project.tracks.filter((track) => track.kind === VideoTrackKind.AUDIO)).toHaveLength(1);
+    expect(project.tracks.filter((track) => track.kind === VideoTrackKind.AUDIO)).toHaveLength(0);
     expect(project.clips.map((clip) => clip.type)).toEqual([VideoProjectClipType.VIDEO]);
     expect(project.duration).toBe(5);
   });
@@ -159,4 +189,15 @@ describe('multi-source recording project factory edge cases', () => {
     expect(project.duration).toBe(0.1);
     expect(project.clips).toHaveLength(0);
   });
+});
+
+it('keeps a camera-only capture explicitly camera-typed when no screen source is finalized', () => {
+  const project = createVideoProjectFromMultiSourceRecording({
+    name: 'Camera only',
+    videos: [],
+    webcamVideo: createVideoInput('camera', 'camera.webm', 4),
+  });
+  expect(project.assets[0]?.recordingPart).toEqual({ recordingId: 'camera', role: 'camera' });
+  expect(project.tracks[0]?.role).toBe(VideoProjectTrackRole.CAMERA);
+  expect(project.duration).toBe(4);
 });

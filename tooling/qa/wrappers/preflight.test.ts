@@ -1,4 +1,17 @@
 import { expect, it } from 'vitest';
+import { createPreflightAnalysis } from './preflight.mjs';
+import { parsePreflightContext } from '../runtime/observability/analysis-schema.mjs';
+
+it('bounds structured consumer summaries for large merges without modifying the full report', () => {
+  const consumers = Array.from({ length: 700 }, (_, index) => `consumer-${index}`);
+  const report = { context: { targetFiles: [] }, transitiveConsumerHints: consumers };
+  const summary = createPreflightAnalysis(report);
+  expect(() => parsePreflightContext(summary)).not.toThrow();
+  expect(summary.consumers).toHaveLength(500);
+  expect(summary.consumers[499]).toContain('201');
+  expect(summary.consumers[499]).toContain('full preflight log');
+  expect(report.transitiveConsumerHints).toEqual(consumers);
+});
 
 import {
   createTempRoot,
@@ -548,4 +561,27 @@ it('does not route markdown docs through structural analysis', async () => {
   expect(result.context.codeFiles).toEqual([]);
   expect(result.structuralPressure).toEqual([]);
   expect(result.structuralReport.files).toEqual([]);
+});
+
+it('preserves large boundary inventories within the observability text limits', async () => {
+  const { collectContractChecklist } = await import('./preflight/preflight-contract-report.mjs');
+  const { parsePreflightContext } = await import('../runtime/observability/analysis-schema.mjs');
+  const files = Array.from(
+    { length: 200 },
+    (_, index) => `apps/extension/src/video-editor/runtime/consumer-${index}.ts`
+  );
+  const consumers = collectContractChecklist({ codeFiles: files });
+  const analysis = {
+    owners: [],
+    runtimes: [],
+    riskAreas: [],
+    documents: [],
+    consumers,
+    proofRequirements: [],
+    structuralContext: [],
+  };
+  expect(() => parsePreflightContext(analysis)).not.toThrow();
+  for (const file of files) {
+    expect(consumers).toContain(`runtime/import boundary files: ${file}`);
+  }
 });

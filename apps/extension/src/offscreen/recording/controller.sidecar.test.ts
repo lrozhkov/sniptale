@@ -167,7 +167,10 @@ it('delegates main and sidecar finalization to the artifact lifecycle owner', as
   recordingContext.bindStreamInstance(binding);
   const artifactStop = bindActiveArtifactSession(binding);
 
-  await expect(stopRecording(binding)).resolves.toEqual({ result: 'stopped' });
+  await expect(stopRecording(binding)).resolves.toEqual({
+    result: 'stopped',
+    recordingPointTransform: null,
+  });
 
   expect(artifactStop).toHaveBeenCalledOnce();
   expect(stopActiveSidecarRecordersWithFlushMock).not.toHaveBeenCalled();
@@ -184,7 +187,10 @@ it('does not start a competing sidecar stop when the artifact lifecycle owns com
   recordingContext.bindStreamInstance(binding);
   const artifactStop = bindActiveArtifactSession(binding);
 
-  await expect(stopRecording(binding)).resolves.toEqual({ result: 'stopped' });
+  await expect(stopRecording(binding)).resolves.toEqual({
+    result: 'stopped',
+    recordingPointTransform: null,
+  });
 
   expect(artifactStop).toHaveBeenCalledOnce();
   expect(stopActiveSidecarRecordersWithFlushMock).not.toHaveBeenCalled();

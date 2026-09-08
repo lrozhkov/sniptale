@@ -39,7 +39,8 @@ function renderTrailingActions() {
     onCompactRowsChange: vi.fn(),
     onFitProject: vi.fn(),
     onFitSelection: vi.fn(),
-    onPanelExpandedChange: vi.fn(),
+    onCursorLaneVisibleChange: vi.fn(),
+    onTelemetryLaneVisibleChange: vi.fn(),
     onZoomChange: vi.fn(),
   };
 
@@ -48,13 +49,6 @@ function renderTrailingActions() {
       <ProjectTimelineToolbarTrailingActions
         fitSelectionDuration={4}
         pixelsPerSecond={120}
-        trackView={{
-          compactRows: false,
-          panelExpanded: false,
-          onCompactRowsChange: handlers.onCompactRowsChange,
-          onPanelExpandedChange: handlers.onPanelExpandedChange,
-        }}
-        visibleRangeSeconds={8}
         onFitProject={handlers.onFitProject}
         onFitSelection={handlers.onFitSelection}
         onTimelinePreviewSuspendedChange={vi.fn()}
@@ -80,7 +74,7 @@ it('renders zoom without the removed speed and telemetry controls', () => {
   ).not.toBeNull();
   expect(
     container?.querySelector('[data-ui="video-editor.timeline.toolbar.compact-tracks"]')
-  ).not.toBeNull();
+  ).toBeNull();
 });
 
 it('routes timeline view actions from the trailing side', () => {
@@ -93,18 +87,10 @@ it('routes timeline view actions from the trailing side', () => {
     container
       ?.querySelector<HTMLButtonElement>('[data-ui="video-editor.timeline.toolbar.fit-selection"]')
       ?.click();
-    container
-      ?.querySelector<HTMLButtonElement>('[data-ui="video-editor.timeline.toolbar.compact-tracks"]')
-      ?.click();
-    container
-      ?.querySelector<HTMLButtonElement>(
-        '[data-ui="video-editor.timeline.toolbar.expand-track-panel"]'
-      )
-      ?.click();
   });
 
   expect(handlers.onFitProject).toHaveBeenCalledTimes(1);
   expect(handlers.onFitSelection).toHaveBeenCalledTimes(1);
-  expect(handlers.onCompactRowsChange).toHaveBeenCalledWith(true);
-  expect(handlers.onPanelExpandedChange).toHaveBeenCalledWith(true);
+  expect(handlers.onCompactRowsChange).not.toHaveBeenCalled();
+  expect(handlers.onCursorLaneVisibleChange).not.toHaveBeenCalled();
 });

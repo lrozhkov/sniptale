@@ -8,18 +8,17 @@ export function MotionPlacementButtonGroup(props: {
   resetLabel: string;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="flex flex-wrap items-center gap-1">
       <ProductActionButton
         compact
         tone="toggle"
         active={props.isPickingOnStage}
         aria-pressed={props.isPickingOnStage}
-        className="w-full"
         onClick={props.onPick}
       >
         {props.pickLabel}
       </ProductActionButton>
-      <ProductActionButton compact tone="secondary" className="w-full" onClick={props.onReset}>
+      <ProductActionButton compact tone="secondary" onClick={props.onReset}>
         {props.resetLabel}
       </ProductActionButton>
     </div>

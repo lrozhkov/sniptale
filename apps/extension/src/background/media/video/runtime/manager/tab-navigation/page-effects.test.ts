@@ -109,15 +109,23 @@ beforeEach(() => {
   mocks.updateSurface.mockResolvedValue(undefined);
 });
 
-it('does not touch page access for a plain window-sized TAB recording', async () => {
+it('restores action history independently of cursor rendering for a plain TAB recording', async () => {
   const effects = resolveTabNavigationPageEffects();
-  expect(effects).toEqual({ contentSurface: false, controlledCursor: false, cropOverlay: false });
+  expect(effects).toEqual({
+    contentSurface: false,
+    controlledCursor: false,
+    cropOverlay: false,
+    telemetry: true,
+  });
 
   await suspendTabNavigationPageEffects(effects, binding);
   await expect(
     restoreTabNavigationPageEffects(effects, binding, mocks.ensurePageAccess)
   ).resolves.toEqual({ controlledCursorRestored: true, liveViewport: null });
-  expect(mocks.ensurePageAccess).not.toHaveBeenCalled();
+  expect(mocks.ensurePageAccess).toHaveBeenCalled();
+  expect(mocks.suspendCursor).toHaveBeenCalledWith(binding);
+  expect(mocks.restoreCursor).toHaveBeenCalledWith(binding);
+  expect(mocks.readViewport).not.toHaveBeenCalled();
 });
 
 it('rebinds an optional content surface without gating the media stream', async () => {

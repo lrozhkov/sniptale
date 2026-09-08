@@ -1,6 +1,6 @@
+import type { VideoProjectActionOccurrence } from '../../../features/video/project/action-occurrences';
 import type {
   VideoProject,
-  VideoProjectActionEvent,
   VideoProjectMotionRegion,
 } from '../../../features/video/project/types/index';
 import type { VideoEditorLibrariesState } from '../app-model/types';
@@ -22,9 +22,10 @@ export interface UseVideoEditorRuntimeParams {
     isPlaying: boolean;
     playbackRange: VideoEditorPlaybackRange | null;
     projectHistoryTransactionActive: boolean;
+    shortcutsEnabled: boolean;
     placementMode: VideoEditorPlacementMode | null;
     selection: VideoEditorSelection;
-    selectedActionEvent: VideoProjectActionEvent | null;
+    selectedActionOccurrence: VideoProjectActionOccurrence | null;
     selectedClipId: string | null;
     selectedMotionRegion: VideoProjectMotionRegion | null;
     deleteSelection: {
@@ -37,6 +38,7 @@ export interface UseVideoEditorRuntimeParams {
     clearPlacementMode: VideoEditorSessionActions['clearPlacementMode'];
     setCurrentTime: VideoEditorSessionActions['setCurrentTime'];
     setPlaying: VideoEditorSessionActions['setPlaying'];
+    duplicateClip: VideoEditorProjectActions['duplicateClip'];
     splitClipAt: VideoEditorProjectActions['splitClipAt'];
     updateActionEventDetails: VideoEditorProjectActions['updateActionEventDetails'];
     updateClipTransform: VideoEditorProjectActions['updateClipTransform'];
@@ -49,7 +51,6 @@ export interface UseVideoEditorRuntimeParams {
     setReady: VideoEditorSessionActions['setReady'];
     setError: VideoEditorSessionActions['setError'];
     setSaveState: VideoEditorSessionActions['setSaveState'];
-    setDiagnosticsOpen: VideoEditorSessionActions['setDiagnosticsOpen'];
   };
   exportState: {
     getActiveJobId: () => string | null;

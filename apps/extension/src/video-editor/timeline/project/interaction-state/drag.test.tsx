@@ -4,8 +4,12 @@ import type React from 'react';
 import { act, useRef } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../features/video/project/factories/creation';
+import {
+  VideoTrackKind,
   VideoClipLinkMode,
   VideoClipTransitionKind,
   VideoMediaFitMode,
@@ -51,7 +55,10 @@ function createClip(trackId: string): VideoProjectClip {
 }
 
 function createTimelineHarness(props: {
+  currentTime?: number;
+  readTimelineStartTime?: (() => number) | undefined;
   historyTransaction?: VideoEditorProjectHistoryTransactionActions;
+  magnetEnabled?: boolean;
   project: ReturnType<typeof createEmptyVideoProject>;
   onMoveClip: (
     clipId: string,
@@ -68,12 +75,16 @@ function createTimelineHarness(props: {
   return function TimelineHarness() {
     const fallbackLease = Symbol('test-history-transaction');
     const timelineDrag = useProjectTimelineDrag({
+      onSwapClip: vi.fn(),
+      currentTime: props.currentTime ?? 0,
       historyTransaction: props.historyTransaction ?? {
         beginProjectHistoryTransaction: () => fallbackLease,
         endProjectHistoryTransaction: () => undefined,
         isProjectHistoryTransactionCurrent: (lease) => lease === fallbackLease,
       },
       pixelsPerSecond: 10,
+      readTimelineStartTime: props.readTimelineStartTime,
+      magnetEnabled: props.magnetEnabled ?? false,
       project: props.project,
       ...(props.trackHeightByTrackId ? { trackHeightByTrackId: props.trackHeightByTrackId } : {}),
       onMoveClip: props.onMoveClip,
@@ -90,10 +101,11 @@ function createTimelineHarness(props: {
   };
 }
 
-function dispatchTimelinePointerMove(clientX: number, clientY: number) {
+function dispatchTimelinePointerMove(clientX: number, clientY: number, altKey = false) {
   const moveEvent = new Event('pointermove');
   Object.defineProperty(moveEvent, 'clientX', { value: clientX });
   Object.defineProperty(moveEvent, 'clientY', { value: clientY });
+  Object.defineProperty(moveEvent, 'altKey', { value: altKey });
   window.dispatchEvent(moveEvent);
 }
 
@@ -114,7 +126,7 @@ function createPlaybackShortcutState(state: VideoEditorState): PlaybackLatestSta
     playbackRange: null,
     project: state.project,
     projectHistoryTransactionActive: state.projectHistory.transaction !== null,
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedClipId: resolveSelectedClipId(state.selection),
     selectedMotionRegion: null,
     selection: state.selection,
@@ -126,6 +138,7 @@ function createPlaybackShortcutHandlers(state: VideoEditorState): PlaybackHandle
     clearPlacementMode: state.clearPlacementMode,
     deleteActionEvent: state.deleteActionEvent,
     deleteClip: state.deleteClip,
+    duplicateClip: state.duplicateClip,
     deleteCursorSample: state.deleteCursorSample,
     deleteMotionRegion: state.deleteMotionRegion,
     deleteObjectTrack: state.deleteObjectTrack,
@@ -208,7 +221,8 @@ it('moves the selected clip through pointer listeners and clears interaction on 
     window.dispatchEvent(new Event('pointerup'));
   });
 
-  expect(onMoveClip).toHaveBeenCalledWith('clip-1', 10, project.tracks[0]!.id, 'line-1');
+  expect(onMoveClip).toHaveBeenCalledOnce();
+  expect(onMoveClip).toHaveBeenCalledWith('clip-1', 11, project.tracks[0]!.id, 'line-1');
   expect(onTrimClipStart).not.toHaveBeenCalled();
   expect(onTrimClipEnd).not.toHaveBeenCalled();
   expect(beginProjectHistoryTransaction).toHaveBeenCalledOnce();
@@ -335,6 +349,39 @@ it('preserves redo when an activated drag is clamped to its original position', 
   expect(useVideoEditorStore.getState().projectHistory.future).toHaveLength(1);
 });
 
+it.each(['trim-start', 'trim-end'] as const)('keeps the clip selected when starting %s', (mode) => {
+  const project = createEmptyVideoProject('Edge selection');
+  project.clips = [createClip(project.tracks[0]!.id)];
+  project.duration = 8;
+  useVideoEditorStore.getState().setProject(project);
+  useVideoEditorStore.getState().selectTrack(project.tracks[0]!.id);
+  let begin: ReturnType<typeof useProjectTimelineDrag>['beginClipInteraction'] | undefined;
+  function Harness() {
+    const state = useVideoEditorStore();
+    begin = useProjectTimelineDrag({
+      project: state.project!,
+      currentTime: 0,
+      pixelsPerSecond: 10,
+      magnetEnabled: false,
+      historyTransaction: state,
+      onSwapClip: state.swapClip,
+      onMoveClip: state.moveClip,
+      onSelectClip: state.selectClip,
+      onSelectTrack: state.selectTrack,
+      onTimelinePreviewSuspendedChange: vi.fn(),
+      onTrimClipStart: state.trimClipStart,
+      onTrimClipEnd: state.trimClipEnd,
+    }).beginClipInteraction;
+    return null;
+  }
+  act(() => root?.render(<Harness />));
+  act(() => begin?.(createPointerEvent(100, 40), project.clips[0]!, mode));
+  expect(resolveSelectedClipId(useVideoEditorStore.getState().selection)).toBe('clip-1');
+  act(() => window.dispatchEvent(new Event('pointerup')));
+  expect(resolveSelectedClipId(useVideoEditorStore.getState().selection)).toBe('clip-1');
+  expect(useVideoEditorStore.getState().projectHistory.past).toHaveLength(0);
+});
+
 it('keeps an independent delete shortcut outside an active drag transaction', () => {
   const project = createEmptyVideoProject('Interrupted drag');
   project.clips = [createClip(project.tracks[0]!.id)];
@@ -351,13 +398,16 @@ it('keeps an independent delete shortcut outside an active drag transaction', ()
     const handlersRef = useRef<PlaybackHandlers>(createPlaybackShortcutHandlers(state));
     latestStateRef.current = createPlaybackShortcutState(state);
     handlersRef.current = createPlaybackShortcutHandlers(state);
-    usePlaybackShortcuts(latestStateRef, handlersRef, vi.fn());
+    usePlaybackShortcuts(latestStateRef, handlersRef, vi.fn(), vi.fn(), vi.fn());
     const timelineDrag = useProjectTimelineDrag({
+      onSwapClip: vi.fn(),
+      currentTime: state.currentTime,
       historyTransaction: {
         beginProjectHistoryTransaction: state.beginProjectHistoryTransaction,
         endProjectHistoryTransaction: state.endProjectHistoryTransaction,
         isProjectHistoryTransactionCurrent: state.isProjectHistoryTransactionCurrent,
       },
+      magnetEnabled: false,
       pixelsPerSecond: 10,
       project: state.project!,
       onMoveClip: state.moveClip,
@@ -403,11 +453,14 @@ it('rejects stale pointer movement after same-id project replacement', () => {
   function Harness() {
     const state = useVideoEditorStore();
     const timelineDrag = useProjectTimelineDrag({
+      onSwapClip: vi.fn(),
+      currentTime: state.currentTime,
       historyTransaction: {
         beginProjectHistoryTransaction: state.beginProjectHistoryTransaction,
         endProjectHistoryTransaction: state.endProjectHistoryTransaction,
         isProjectHistoryTransactionCurrent: state.isProjectHistoryTransactionCurrent,
       },
+      magnetEnabled: false,
       pixelsPerSecond: 10,
       project: state.project!,
       onMoveClip: state.moveClip,
@@ -475,6 +528,7 @@ it('cleans up drag listeners when the timeline unmounts mid-interaction', () => 
 
 it('moves clips to the intended track when rows have mixed heights', () => {
   const project = createEmptyVideoProject('Mixed heights');
+  project.tracks.push(createVideoProjectTrack('Video 2', 2, VideoTrackKind.PRIMARY));
   const clip = createClip(project.tracks[0]!.id);
   project.clips = [clip];
   const onMoveClip =
@@ -502,11 +556,14 @@ it('moves clips to the intended track when rows have mixed heights', () => {
     dispatchTimelinePointerMove(100, 120);
   });
 
+  expect(onMoveClip).not.toHaveBeenCalled();
+  act(() => window.dispatchEvent(new Event('pointerup')));
   expect(onMoveClip).toHaveBeenLastCalledWith('clip-1', 5, project.tracks[1]!.id, 'line-1');
 });
 
 it('maps vertical movement to the physical track and its base lane', () => {
   const project = createEmptyVideoProject('Drag ghost');
+  project.tracks.push(createVideoProjectTrack('Video 2', 2, VideoTrackKind.PRIMARY));
   const clip = createClip(project.tracks[0]!.id);
   project.tracks[0] = {
     ...project.tracks[0]!,
@@ -537,6 +594,8 @@ it('maps vertical movement to the physical track and its base lane', () => {
     dispatchTimelinePointerMove(130, 53);
   });
 
+  expect(onMoveClip).not.toHaveBeenCalled();
+  act(() => window.dispatchEvent(new Event('pointerup')));
   expect(onMoveClip).toHaveBeenLastCalledWith('clip-1', 8, project.tracks[1]!.id, 'line-1');
 });
 
@@ -573,5 +632,39 @@ it('keeps the current logical lane during horizontal clip drags', () => {
     dispatchTimelinePointerMove(150, 20);
   });
 
+  expect(onMoveClip).not.toHaveBeenCalled();
+  act(() => window.dispatchEvent(new Event('pointerup')));
   expect(onMoveClip).toHaveBeenLastCalledWith('clip-1', 10, project.tracks[0]!.id, 'line-1');
+});
+
+it('keeps a held clip under the pointer when the visible time window scrolls and returns', () => {
+  const project = createEmptyVideoProject('Scrolled gesture');
+  const clip = createClip(project.tracks[0]!.id);
+  project.clips = [clip];
+  project.duration = 20;
+  let startTime = 43200;
+  const onMoveClip = vi.fn();
+  const onGhostChange = vi.fn();
+  const Harness = createTimelineHarness({
+    project,
+    onMoveClip,
+    onGhostChange,
+    readTimelineStartTime: () => startTime,
+    onTrimClipStart: vi.fn(),
+    onTrimClipEnd: vi.fn(),
+    onReady: (value) => {
+      beginClipInteraction = value;
+    },
+  });
+  act(() => root?.render(<Harness />));
+  act(() => beginClipInteraction?.(createPointerEvent(100, 20), clip, 'move'));
+  startTime += 3;
+  act(() => dispatchTimelinePointerMove(120, 20));
+  expect(onGhostChange).toHaveBeenLastCalledWith(expect.objectContaining({ startTime: 10 }));
+  startTime -= 3;
+  act(() => root?.render(<Harness />));
+  expect(onGhostChange).toHaveBeenLastCalledWith(expect.objectContaining({ startTime: 7 }));
+  expect(onMoveClip).not.toHaveBeenCalled();
+  act(() => window.dispatchEvent(new Event('pointerup')));
+  expect(onMoveClip).toHaveBeenCalledWith(clip.id, 7, clip.trackId, 'line-1');
 });

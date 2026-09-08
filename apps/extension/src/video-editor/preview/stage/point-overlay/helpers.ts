@@ -1,14 +1,9 @@
+import { resolveVideoProjectActionOccurrences } from '../../../../features/video/project/action-occurrences';
 import type React from 'react';
 
 import { translate } from '../../../../platform/i18n';
-import {
-  createMotionPathPointTarget,
-  resolveMotionPathStopScale,
-} from '../../../../features/video/project/motion/path-targets';
-import {
-  VideoMotionCameraMode,
-  VideoMotionFocusMode,
-} from '../../../../features/video/project/types/index';
+
+import { VideoMotionFocusMode } from '../../../../features/video/project/types/index';
 import type { VideoEditorPlacementMode } from '../../../contracts/placement';
 import { clampStagePoint, getProjectCenter } from '../../../interaction/placement-geometry';
 import {
@@ -16,8 +11,10 @@ import {
   createMotionFocusPlacementMode,
 } from '../../../project/selection/placement';
 import { VideoEditorPlacementModeKind } from '../../../contracts/placement';
-import { resolveMotionPath, updateMotionPathStop } from '../../../project/motion-path/core';
+
 import {
+  mapActionOccurrencePointToScene,
+  mapScenePointToActionOccurrence,
   getCompositionPointStageStyle,
   mapClientPointToCompositionPoint,
 } from '../canvas/geometry';
@@ -41,7 +38,8 @@ export function resolvePointFromPointer(
   clientY: number,
   stage: HTMLDivElement,
   project: PreviewStageCanvasProps['project'],
-  camera: PreviewStageCanvasProps['camera']
+  camera: PreviewStageCanvasProps['camera'],
+  preserveOutsideScene = false
 ): StagePoint | null {
   const point = mapClientPointToCompositionPoint({
     camera,
@@ -55,7 +53,7 @@ export function resolvePointFromPointer(
     return null;
   }
 
-  return clampStagePoint(project, point);
+  return preserveOutsideScene ? point : clampStagePoint(project, point);
 }
 
 export function updatePlacementPoint(
@@ -64,22 +62,34 @@ export function updatePlacementPoint(
   params: PointPlacementParams
 ): void {
   switch (placementMode.kind) {
-    case VideoEditorPlacementModeKind.ACTION_POINT:
-      params.onUpdateActionEventDetails(placementMode.actionEventId, { point });
+    case VideoEditorPlacementModeKind.ACTION_POINT: {
+      const occurrence = resolveVideoProjectActionOccurrences(params.project).find(
+        (item) => item.eventId === placementMode.eventId && item.clipId === placementMode.clipId
+      );
+      if (!occurrence) return;
+      const mapped = mapScenePointToActionOccurrence(
+        params.project,
+        occurrence,
+        params.currentTime,
+        params.camera,
+        point
+      );
+      if (mapped)
+        params.onUpdateActionEventDetails(placementMode.eventId, {
+          point: mapped,
+          clipId: occurrence.clipId,
+        });
       return;
+    }
     case VideoEditorPlacementModeKind.MOTION_FOCUS:
       params.onUpdateMotionRegion(placementMode.motionRegionId, { focusPoint: point });
       return;
     case VideoEditorPlacementModeKind.MOTION_AREA:
-    case VideoEditorPlacementModeKind.MOTION_PATH_STOP_AREA:
-      return;
-    case VideoEditorPlacementModeKind.MOTION_PATH_STOP_POINT:
-      updateMotionPathStopPoint(params, placementMode.motionRegionId, placementMode.stopId, point);
       return;
     case VideoEditorPlacementModeKind.OBJECT_TRACK_ANCHOR:
       params.onUpsertObjectTrackCorrectionAnchor?.(placementMode.objectTrackId, {
         confidence: 1,
-        time: params.currentTime ?? 0,
+        time: params.currentTime,
         x: point.x,
         y: point.y,
       });
@@ -107,14 +117,18 @@ export function getPointHandleStyle(
 export function getSelectedPoint(params: PointOverlayParams): StagePoint | null {
   if (
     params.selectedMotionRegion &&
-    params.selectedMotionRegion.cameraMode !== VideoMotionCameraMode.PATH &&
     params.selectedMotionRegion.focusMode === VideoMotionFocusMode.MANUAL
   ) {
     return params.selectedMotionRegion.focusPoint ?? getProjectCenter(params.project);
   }
 
-  if (params.selectedActionEvent) {
-    return params.selectedActionEvent.point ?? getProjectCenter(params.project);
+  if (params.selectedActionOccurrence) {
+    return mapActionOccurrencePointToScene(
+      params.project,
+      params.selectedActionOccurrence,
+      params.currentTime,
+      params.camera
+    );
   }
 
   return null;
@@ -125,14 +139,16 @@ export function getSelectedPointTarget(
 ): VideoEditorPlacementMode | null {
   if (
     params.selectedMotionRegion &&
-    params.selectedMotionRegion.cameraMode !== VideoMotionCameraMode.PATH &&
     params.selectedMotionRegion.focusMode === VideoMotionFocusMode.MANUAL
   ) {
     return createMotionFocusPlacementMode(params.selectedMotionRegion.id);
   }
 
-  if (params.selectedActionEvent) {
-    return createActionPointPlacementMode(params.selectedActionEvent.id);
+  if (params.selectedActionOccurrence) {
+    return createActionPointPlacementMode(
+      params.selectedActionOccurrence.eventId,
+      params.selectedActionOccurrence.clipId
+    );
   }
 
   return null;
@@ -149,9 +165,7 @@ export function getPlacementHint(placementMode: VideoEditorPlacementMode | null)
     case VideoEditorPlacementModeKind.MOTION_FOCUS:
       return translate('videoEditor.sidebar.motionFocusPickHint');
     case VideoEditorPlacementModeKind.MOTION_AREA:
-    case VideoEditorPlacementModeKind.MOTION_PATH_STOP_AREA:
-    case VideoEditorPlacementModeKind.MOTION_PATH_STOP_POINT:
-      return null;
+      return translate('videoEditor.sidebar.motionAreaPickHint');
     case VideoEditorPlacementModeKind.OBJECT_TRACK_ANCHOR:
       return translate('videoEditor.sidebar.objectTrackAnchorPickHint');
   }
@@ -159,37 +173,8 @@ export function getPlacementHint(placementMode: VideoEditorPlacementMode | null)
 
 export function canRenderSelectedPoint(params: PointOverlayParams): boolean {
   if (params.selectedMotionRegion) {
-    return (
-      params.selectedMotionRegion.cameraMode !== VideoMotionCameraMode.PATH &&
-      params.selectedMotionRegion.focusMode === VideoMotionFocusMode.MANUAL
-    );
+    return params.selectedMotionRegion.focusMode === VideoMotionFocusMode.MANUAL;
   }
 
-  return params.selectedActionEvent !== null;
-}
-
-function updateMotionPathStopPoint(
-  params: PointPlacementParams,
-  motionRegionId: string,
-  stopId: string,
-  point: StagePoint
-) {
-  if (!params.selectedMotionRegion || params.selectedMotionRegion.id !== motionRegionId) {
-    return;
-  }
-
-  const path = resolveMotionPath(params.project, params.selectedMotionRegion);
-  const nextPath = updateMotionPathStop(path, stopId, (stop) => ({
-    ...stop,
-    target: createMotionPathPointTarget(
-      params.project,
-      point,
-      resolveMotionPathStopScale(params.project, stop)
-    ),
-  }));
-
-  params.onUpdateMotionRegion(motionRegionId, {
-    cameraMode: VideoMotionCameraMode.PATH,
-    path: nextPath,
-  });
+  return params.selectedActionOccurrence !== null;
 }

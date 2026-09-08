@@ -1,3 +1,4 @@
+import { describeTelemetryTarget } from './target';
 import {
   RecordingTelemetrySignalKind,
   VideoProjectActionEventKind,
@@ -29,6 +30,7 @@ function pushCompletedSignal(
       ? {
           eventCount: signal.data.eventCount,
           eventType: signal.data.eventType,
+          ...signal.data.targetDescription,
         }
       : {
           dwellMs: signal.data.dwellMs,
@@ -49,6 +51,7 @@ function finalizeTypingSignal(state: TelemetryState, timestampMs: number): void 
 
   pushCompletedSignal(state, state.typingSignal, timestampMs);
   state.typingSignal = null;
+  state.typingTarget = null;
 }
 
 function finalizeCursorIdleSignal(state: TelemetryState, timestampMs: number): void {
@@ -123,9 +126,11 @@ export function recordTypingActivity(state: TelemetryState, event: Event): void 
   const timestampMs = event.timeStamp || performance.now();
   const elapsedSeconds = getElapsedSeconds(state, timestampMs);
   const lastEventTimeMs = state.typingSignal?.data.lastEventTimeMs ?? null;
+  const target = describeTelemetryTarget(event);
 
   if (
     state.typingSignal !== null &&
+    state.typingTarget === target.element &&
     lastEventTimeMs !== null &&
     timestampMs - lastEventTimeMs <= TYPING_MERGE_GAP_MS
   ) {
@@ -142,6 +147,7 @@ export function recordTypingActivity(state: TelemetryState, event: Event): void 
   }
 
   finalizeTypingSignal(state, timestampMs);
+  state.typingTarget = target.element;
   state.typingSignal = {
     id: crypto.randomUUID(),
     kind: RecordingTelemetrySignalKind.TYPING,
@@ -151,6 +157,7 @@ export function recordTypingActivity(state: TelemetryState, event: Event): void 
     data: {
       eventCount: 1,
       eventType: event.type,
+      targetDescription: target.data,
       lastEventTimeMs: timestampMs,
     },
   };

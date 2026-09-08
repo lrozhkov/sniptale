@@ -1,3 +1,4 @@
+import type { VideoProjectActionPreset } from '../../../../features/video/project/types';
 import type { VideoEditorActionHandlers } from '../../commands';
 import type { VideoBlockKind } from '../../../../features/video/project/types/index';
 import type {
@@ -16,11 +17,7 @@ export function createWorkspaceTimelineInsertionActions(
     'handleImportAudio' | 'handleImportImage' | 'handleImportVideo'
   >,
   projectUpdaters: {
-    addActionEvent: (
-      preset: NonNullable<
-        NonNullable<ProjectLifecyclePort['project']>['actionEvents'][number]['preset']
-      >
-    ) => void;
+    addActionEvent: (preset: VideoProjectActionPreset) => void;
     addMotionRegion: (startTime?: number) => void;
     enableCursorTrack: () => void;
   }

@@ -1,6 +1,11 @@
 import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
 import type { VideoProject } from '../../../features/video/project/types/index';
 import type { VideoEditorSaveState } from '../session-state';
+import type {
+  VideoEditorTypingSpanTarget,
+  VideoEditorTypingCompressionRequest,
+  VideoEditorTypingCompressionResult,
+} from './timeline';
 
 export interface VideoEditorSessionActions {
   setProject: (project: VideoProject, recordingId?: string | null) => void;
@@ -16,18 +21,22 @@ export interface VideoEditorSessionActions {
   clearPlacementMode: () => void;
   selectScene: () => void;
   selectTrack: (trackId: string | null) => void;
-  selectClip: (clipId: string | null) => void;
+  selectClip: (clipId: string | null, intent?: 'replace' | 'toggle' | 'range') => void;
   selectTransition: (transitionId: string) => void;
   selectCursorSegment: (sampleId: string) => void;
   selectObjectTrack: (objectTrackId: string) => void;
-  selectActionSegment: (actionEventId: string) => void;
-  selectMotionRegion: (motionRegionId: string) => void;
-  startActionPointPlacement: (actionEventId: string) => void;
+  selectActionOccurrence: (eventId: string, clipId: string | null) => void;
+  selectHistoryLane: () => void;
+  selectHistorySpan: (target: VideoEditorTypingSpanTarget) => void;
+  applyTypingCompression: (
+    request: VideoEditorTypingCompressionRequest,
+    expectedProject: VideoProject
+  ) => VideoEditorTypingCompressionResult;
+  selectMotionLane: () => void;
+  selectMotionRegion: (motionRegionId: string, part?: 'connection') => void;
+  startActionPointPlacement: (eventId: string, clipId: string | null) => void;
   startMotionFocusPlacement: (motionRegionId: string) => void;
   startMotionAreaPlacement: (motionRegionId: string) => void;
-  startMotionPathStopAreaPlacement: (motionRegionId: string, stopId: string) => void;
-  startMotionPathStopPointPlacement: (motionRegionId: string, stopId: string) => void;
-  setDiagnosticsOpen: (open: boolean) => void;
-  setRecordingTelemetry: (recordingTelemetry: RecordingTelemetryEntry | null) => void;
-  toggleTelemetryLaneVisibility: () => void;
+
+  setRecordingTelemetry: (recordingTelemetry: readonly RecordingTelemetryEntry[]) => void;
 }

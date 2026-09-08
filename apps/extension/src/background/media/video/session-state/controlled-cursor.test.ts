@@ -192,7 +192,18 @@ function expectMergedTelemetry(telemetry: ReturnType<typeof getControlledCursorT
     scale: 1.2,
     shadow: false,
   });
-  expect(telemetry?.actionEvents).toHaveLength(1);
+  expect(telemetry?.actionEvents).toEqual([
+    {
+      id: 'action-1',
+      kind: VideoProjectActionEventKind.CLICK,
+      time: 1.5,
+      duration: 0.45,
+      point: { x: 20, y: 30 },
+      label: 'Click',
+      data: { button: 0 },
+      preset: VideoProjectActionPreset.CLICK_RIPPLE,
+    },
+  ]);
   expect(telemetry?.viewport).toEqual({
     devicePixelRatio: 2,
     height: 1080,
@@ -201,3 +212,35 @@ function expectMergedTelemetry(telemetry: ReturnType<typeof getControlledCursorT
     width: 1920,
   });
 }
+
+it('preserves same-geometry navigation proof and never recovers after a changed segment', () => {
+  const initial = {
+    width: 1000,
+    height: 800,
+    devicePixelRatio: 1,
+    visualViewportScale: 1,
+    visualViewportOffsetX: 0,
+    visualViewportOffsetY: 0,
+  };
+  const segment = {
+    viewport: createViewport(1, 1000, 800),
+    cursorTrack: null,
+    actionEvents: [],
+    signals: [],
+    viewportObservation: { initial, stable: true },
+  };
+  appendControlledCursorTelemetry(segment);
+  beginControlledCursorNavigation();
+  appendControlledCursorTelemetry(structuredClone(segment));
+  expect(getControlledCursorTelemetry()).toMatchObject({
+    viewportObservation: { initial, stable: true },
+  });
+  appendControlledCursorTelemetry({
+    ...segment,
+    viewportObservation: { initial: { ...initial, width: 1200 }, stable: true },
+  });
+  appendControlledCursorTelemetry(segment);
+  expect(getControlledCursorTelemetry()).toMatchObject({
+    viewportObservation: { initial, stable: false },
+  });
+});

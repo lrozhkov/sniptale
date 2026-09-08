@@ -1,4 +1,4 @@
-import { createVideoProjectSource, DEFAULT_VIDEO_ACTION_EVENTS } from '../defaults';
+import { createVideoProjectSource } from '../defaults';
 import { getDefaultCursorHidden, normalizeVideoProjectCursorSkin } from '../cursor';
 import { normalizeClip } from './clip';
 import { normalizeHydratedTracks } from './tracks';
@@ -15,6 +15,7 @@ import {
   VideoTemporalEasing,
   VideoTimelinePlacementMode,
 } from '../types/index';
+import { hydrateRecordingInteractionAnchors } from './interaction-anchors';
 
 interface VideoProjectHydrationOptions {
   legacyClipNames?: ReadonlyMap<string, string>;
@@ -97,20 +98,7 @@ function normalizeCursorTrack(project: VideoProject): VideoProject['cursorTrack'
 }
 
 function normalizeActionEvents(project: VideoProject): VideoProject['actionEvents'] {
-  return Array.isArray(project.actionEvents)
-    ? project.actionEvents
-        .filter((event) => typeof event.id === 'string' && Number.isFinite(event.time))
-        .map((event) => ({
-          ...event,
-          duration: typeof event.duration === 'number' ? Math.max(0, event.duration) : 0,
-          label: typeof event.label === 'string' ? event.label : '',
-          data: event.data ?? {},
-          point:
-            event.point && Number.isFinite(event.point.x) && Number.isFinite(event.point.y)
-              ? event.point
-              : null,
-        }))
-    : [...DEFAULT_VIDEO_ACTION_EVENTS];
+  return project.actionEvents;
 }
 
 function normalizeMotionRegions(project: VideoProject): NonNullable<VideoProject['motionRegions']> {
@@ -191,7 +179,9 @@ export function hydrateVideoProject(
     utilityLanes: getVideoProjectUtilityLanes(project),
   } satisfies VideoProject;
 
-  const synchronizedProject = syncProjectTransitions(hydratedProject);
+  const synchronizedProject = syncProjectTransitions(
+    hydrateRecordingInteractionAnchors(hydratedProject)
+  );
   return {
     ...synchronizedProject,
     // Hydration normalizes a durable snapshot; merely opening it is not a workspace mutation.

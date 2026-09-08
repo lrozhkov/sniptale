@@ -2,14 +2,16 @@ import { useMemo } from 'react';
 import { getProjectTransitionById } from '../../../features/video/project/transition/project';
 import type {
   VideoProject,
-  VideoProjectActionEvent,
   VideoProjectClip,
   VideoProjectCursorSample,
   VideoProjectMotionRegion,
   VideoProjectTrack,
   VideoProjectTransition,
 } from '../../../features/video/project/types/index';
-import { findVisibleProjectActionEvent } from '../../project/operations/action-events';
+import {
+  resolveVideoProjectActionOccurrences,
+  type VideoProjectActionOccurrence,
+} from '../../../features/video/project/action-occurrences';
 import type { VideoObjectTrack } from '../../../features/video/project/object-tracks';
 import { VideoEditorSelectionKind, type VideoEditorSelection } from '../../contracts/selection';
 import {
@@ -21,7 +23,7 @@ export interface VideoEditorSelections {
   selection: VideoEditorSelection;
   selectedClip: VideoProjectClip | null;
   selectedTrack: VideoProjectTrack | null;
-  selectedActionEvent: VideoProjectActionEvent | null;
+  selectedActionOccurrence: VideoProjectActionOccurrence | null;
   selectedCursorSample: VideoProjectCursorSample | null;
   selectedTransition: VideoProjectTransition | null;
   selectedMotionRegion: VideoProjectMotionRegion | null;
@@ -48,12 +50,17 @@ function useSelectedCursorSample(project: VideoProject | null, selection: VideoE
   );
 }
 
-function useSelectedActionEvent(project: VideoProject | null, selection: VideoEditorSelection) {
+function useSelectedActionOccurrence(
+  project: VideoProject | null,
+  selection: VideoEditorSelection
+) {
   return useMemo(
     () =>
-      selection.kind === VideoEditorSelectionKind.ACTION_SEGMENT
+      selection.kind === VideoEditorSelectionKind.ACTION_OCCURRENCE
         ? project
-          ? findVisibleProjectActionEvent(project, selection.actionEventId)
+          ? (resolveVideoProjectActionOccurrences(project).find(
+              (item) => item.eventId === selection.eventId && item.clipId === selection.clipId
+            ) ?? null)
           : null
         : null,
     [project, selection]
@@ -108,14 +115,14 @@ export function useVideoEditorSelections(
   );
   const selectedTransition = useSelectedTransition(project, selection);
   const selectedCursorSample = useSelectedCursorSample(project, selection);
-  const selectedActionEvent = useSelectedActionEvent(project, selection);
+  const selectedActionOccurrence = useSelectedActionOccurrence(project, selection);
   const selectedMotionRegion = useSelectedMotionRegion(project, selection);
   const selectedObjectTrack = useSelectedObjectTrack(project, selection);
 
   return useMemo(
     () => ({
       selection,
-      selectedActionEvent,
+      selectedActionOccurrence,
       selectedClip,
       selectedCursorSample,
       selectedMotionRegion,
@@ -125,7 +132,7 @@ export function useVideoEditorSelections(
     }),
     [
       selection,
-      selectedActionEvent,
+      selectedActionOccurrence,
       selectedClip,
       selectedCursorSample,
       selectedMotionRegion,

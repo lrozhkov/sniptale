@@ -1,7 +1,9 @@
+import { isRecordingPointTransform } from '../../../features/video/project/validation/recording-telemetry';
 import { describe, expect, it } from 'vitest';
 import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 import {
   isSameTabOutputGeometry,
+  resolveRecordingPointTransform,
   remapTabOutputGeometry,
   remapTabOutputGeometryFromObservedViewport,
   resolveTabOutputGeometry,
@@ -264,3 +266,54 @@ describe('tab recording geometry', () => {
     expect(isSameTabOutputGeometry(geometry, { ...geometry })).toBe(true);
   });
 });
+
+it.each([VideoResolutionPreset.SOURCE, VideoResolutionPreset.P720])(
+  'projects the actual crop sample into %s output pixels',
+  (resolution) => {
+    const geometry = resolveTabOutputGeometry(
+      { x: 100, y: 200, width: 400, height: 200 },
+      { width: 2000, height: 1600 },
+      { width: 1000, height: 800, devicePixelRatio: 2 },
+      { frameRateCap: 30, resolution, tracksFullViewport: false }
+    );
+    const transform = resolveRecordingPointTransform(geometry, {
+      x: 0,
+      y: 0,
+      ...geometry.outputSize,
+    });
+    expect(300 * transform.scaleX + transform.offsetX).toBeCloseTo(0.5);
+    expect(300 * transform.scaleY + transform.offsetY).toBeCloseTo(0.5);
+    expect(transform.visibleClientRect).toEqual({ x: 100, y: 200, width: 400, height: 200 });
+  }
+);
+
+it.each([VideoResolutionPreset.SOURCE, VideoResolutionPreset.P720])(
+  'admits fractional-DPR full and edge-crop transforms at the response boundary for %s',
+  (resolution) => {
+    const viewport = { width: 1001, height: 701, devicePixelRatio: 1.25 };
+    for (const crop of [
+      { x: 0, y: 0, width: 1001, height: 701 },
+      { x: 301, y: 201, width: 700, height: 500 },
+    ]) {
+      const geometry = resolveTabOutputGeometry(crop, { width: 1250, height: 876 }, viewport, {
+        frameRateCap: 30,
+        resolution,
+        tracksFullViewport: crop.x === 0,
+      });
+      const transform = resolveRecordingPointTransform(geometry, {
+        x: 0,
+        y: 0,
+        ...geometry.outputSize,
+      });
+      expect(isRecordingPointTransform(transform)).toBe(true);
+      const rect = transform.visibleClientRect;
+      expect(rect.x + rect.width).toBeLessThanOrEqual(viewport.width);
+      expect(rect.y + rect.height).toBeLessThanOrEqual(viewport.height);
+      expect((rect.x + rect.width / 2) * transform.scaleX + transform.offsetX).toBeCloseTo(0.5, 12);
+      expect((rect.y + rect.height / 2) * transform.scaleY + transform.offsetY).toBeCloseTo(
+        0.5,
+        12
+      );
+    }
+  }
+);

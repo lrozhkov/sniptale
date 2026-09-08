@@ -1,7 +1,10 @@
 import { clampNumber } from '../../../features/video/project/hydration';
 import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
 import { normalizeVideoProjectCursorSkin } from '../../../features/video/project/cursor';
-import { VideoTemporalEasing } from '../../../features/video/project/types/index';
+import {
+  VideoProjectInteractionTimeBasis,
+  VideoTemporalEasing,
+} from '../../../features/video/project/types/index';
 import { createSceneSelection } from '../selection/model';
 import { VideoEditorSelectionKind } from '../../contracts/selection';
 import type { VideoEditorProjectState, VideoEditorProjectSliceSet } from './contracts';
@@ -20,6 +23,7 @@ function createInsertedCursorSample(
     id: crypto.randomUUID(),
     interpolation: previousSample?.interpolation ?? VideoTemporalEasing.LINEAR,
     skinOverride: previousSample?.skinOverride ? { ...previousSample.skinOverride } : null,
+    timeBasis: VideoProjectInteractionTimeBasis.PROJECT,
     time,
     visible: previousSample?.visible ?? true,
     x: previousSample?.x ?? project.width / 2,

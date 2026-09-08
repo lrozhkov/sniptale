@@ -1,3 +1,4 @@
+import { resolveVideoProjectActionOccurrences } from '../../../features/video/project/action-occurrences';
 import type { VideoProject } from '../../../features/video/project/types/index';
 import { VideoMotionFocusMode } from '../../../features/video/project/types/index';
 import {
@@ -6,10 +7,14 @@ import {
 } from '../../contracts/placement';
 import { VideoEditorSelectionKind, type VideoEditorSelection } from '../../contracts/selection';
 
-export function createActionPointPlacementMode(actionEventId: string): VideoEditorPlacementMode {
+export function createActionPointPlacementMode(
+  eventId: string,
+  clipId: string | null
+): VideoEditorPlacementMode {
   return {
     kind: VideoEditorPlacementModeKind.ACTION_POINT,
-    actionEventId,
+    eventId,
+    clipId,
   };
 }
 
@@ -24,28 +29,6 @@ export function createMotionAreaPlacementMode(motionRegionId: string): VideoEdit
   return {
     kind: VideoEditorPlacementModeKind.MOTION_AREA,
     motionRegionId,
-  };
-}
-
-export function createMotionPathStopPointPlacementMode(
-  motionRegionId: string,
-  stopId: string
-): VideoEditorPlacementMode {
-  return {
-    kind: VideoEditorPlacementModeKind.MOTION_PATH_STOP_POINT,
-    motionRegionId,
-    stopId,
-  };
-}
-
-export function createMotionPathStopAreaPlacementMode(
-  motionRegionId: string,
-  stopId: string
-): VideoEditorPlacementMode {
-  return {
-    kind: VideoEditorPlacementModeKind.MOTION_PATH_STOP_AREA,
-    motionRegionId,
-    stopId,
   };
 }
 
@@ -68,14 +51,13 @@ export function resolvePlacementModeAfterSelectionChange(
 
   switch (placementMode.kind) {
     case VideoEditorPlacementModeKind.ACTION_POINT:
-      return selection.kind === VideoEditorSelectionKind.ACTION_SEGMENT &&
-        selection.actionEventId === placementMode.actionEventId
+      return selection.kind === VideoEditorSelectionKind.ACTION_OCCURRENCE &&
+        selection.eventId === placementMode.eventId &&
+        selection.clipId === placementMode.clipId
         ? placementMode
         : null;
     case VideoEditorPlacementModeKind.MOTION_FOCUS:
     case VideoEditorPlacementModeKind.MOTION_AREA:
-    case VideoEditorPlacementModeKind.MOTION_PATH_STOP_POINT:
-    case VideoEditorPlacementModeKind.MOTION_PATH_STOP_AREA:
       return selection.kind === VideoEditorSelectionKind.MOTION_REGION &&
         selection.motionRegionId === placementMode.motionRegionId
         ? placementMode
@@ -98,7 +80,9 @@ export function resolvePlacementModeAfterProjectUpdate(
 
   switch (placementMode.kind) {
     case VideoEditorPlacementModeKind.ACTION_POINT:
-      return project.actionEvents.some((event) => event.id === placementMode.actionEventId)
+      return resolveVideoProjectActionOccurrences(project).some(
+        (item) => item.eventId === placementMode.eventId && item.clipId === placementMode.clipId
+      )
         ? placementMode
         : null;
     case VideoEditorPlacementModeKind.MOTION_FOCUS:
@@ -117,20 +101,7 @@ export function resolvePlacementModeAfterProjectUpdate(
       )
         ? placementMode
         : null;
-    case VideoEditorPlacementModeKind.MOTION_PATH_STOP_POINT:
-    case VideoEditorPlacementModeKind.MOTION_PATH_STOP_AREA:
-      return (project.motionRegions ?? []).some((region) => {
-        const stop = region.path?.stops.find((item) => item.id === placementMode.stopId);
-        if (region.id !== placementMode.motionRegionId || !stop) {
-          return false;
-        }
 
-        return placementMode.kind === VideoEditorPlacementModeKind.MOTION_PATH_STOP_AREA
-          ? stop.target.kind === 'AREA'
-          : stop.target.kind === 'POINT';
-      })
-        ? placementMode
-        : null;
     case VideoEditorPlacementModeKind.OBJECT_TRACK_ANCHOR:
       return (project.objectTracks ?? []).some((track) => track.id === placementMode.objectTrackId)
         ? placementMode

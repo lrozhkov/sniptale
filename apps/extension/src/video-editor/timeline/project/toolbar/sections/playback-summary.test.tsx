@@ -36,7 +36,11 @@ function renderPlaybackSummary(isPlaying: boolean, withRange = false) {
   }
 
   const onTogglePlay = vi.fn();
+  const onClearPlaybackRange = vi.fn();
+  const onSeekToEnd = vi.fn();
   const onSeekToStart = vi.fn();
+  const onStepToNextFrame = vi.fn();
+  const onStepToPreviousFrame = vi.fn();
   act(() => {
     root?.render(
       <ProjectTimelinePlaybackSummary
@@ -44,22 +48,35 @@ function renderPlaybackSummary(isPlaying: boolean, withRange = false) {
         duration={45.678}
         isPlaying={isPlaying}
         playbackRange={withRange ? { start: 4.5, end: 6.75 } : null}
-        onClearPlaybackRange={onTogglePlay}
+        onSeekToEnd={onSeekToEnd}
         onSeekToStart={onSeekToStart}
+        onStepToNextFrame={onStepToNextFrame}
+        onStepToPreviousFrame={onStepToPreviousFrame}
         onTogglePlay={onTogglePlay}
+        onClearPlaybackRange={onClearPlaybackRange}
       />
     );
   });
 
-  return { onSeekToStart, onTogglePlay };
+  return {
+    onSeekToEnd,
+    onSeekToStart,
+    onStepToNextFrame,
+    onStepToPreviousFrame,
+    onTogglePlay,
+    onClearPlaybackRange,
+  };
 }
 
 it('renders playback summary metadata and toggles play state', () => {
   const { onTogglePlay } = renderPlaybackSummary(true);
-  expect(container?.textContent).toContain('0:12.3 / 0:45.7');
+  expect(container?.textContent).toContain('0:12.340 / 0:45.678');
+  const pauseButton = Array.from(
+    container?.querySelectorAll<HTMLButtonElement>('button') ?? []
+  ).find((button) => button.getAttribute('aria-label') === 'videoEditor.timeline.pause');
 
   act(() => {
-    container?.querySelector<HTMLButtonElement>('button')?.click();
+    pauseButton?.click();
   });
 
   expect(onTogglePlay).toHaveBeenCalledTimes(1);
@@ -67,19 +84,58 @@ it('renders playback summary metadata and toggles play state', () => {
 
 it('seeks to the start from the playback summary control', () => {
   const { onSeekToStart } = renderPlaybackSummary(false);
+  const startButton = Array.from(
+    container?.querySelectorAll<HTMLButtonElement>('button') ?? []
+  ).find((button) => button.getAttribute('aria-label') === 'videoEditor.timeline.seekToStart');
 
   act(() => {
-    container?.querySelectorAll<HTMLButtonElement>('button')[1]?.click();
+    startButton?.click();
   });
 
+  expect(startButton).toBeDefined();
   expect(onSeekToStart).toHaveBeenCalledTimes(1);
+});
+
+it('seeks to the end from the symmetric playback summary control', () => {
+  const { onSeekToEnd } = renderPlaybackSummary(false);
+  const endButton = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+    (button) => button.getAttribute('aria-label') === 'videoEditor.timeline.seekToEnd'
+  );
+
+  act(() => endButton?.click());
+
+  expect(endButton).toBeDefined();
+  expect(onSeekToEnd).toHaveBeenCalledTimes(1);
+});
+
+it('steps to the previous and next project frames from the transport', () => {
+  const { onStepToNextFrame, onStepToPreviousFrame } = renderPlaybackSummary(false);
+  const buttons = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []);
+  const previousButton = buttons.find(
+    (button) => button.getAttribute('aria-label') === 'videoEditor.timeline.previousFrame'
+  );
+  const nextButton = buttons.find(
+    (button) => button.getAttribute('aria-label') === 'videoEditor.timeline.nextFrame'
+  );
+
+  act(() => {
+    previousButton?.click();
+    nextButton?.click();
+  });
+
+  expect(previousButton).toBeDefined();
+  expect(nextButton).toBeDefined();
+  expect(onStepToPreviousFrame).toHaveBeenCalledTimes(1);
+  expect(onStepToNextFrame).toHaveBeenCalledTimes(1);
 });
 
 it('renders a play label when playback is idle', () => {
   renderPlaybackSummary(false);
-  expect(container?.querySelector<HTMLButtonElement>('button')?.getAttribute('aria-label')).toBe(
-    'videoEditor.timeline.play'
-  );
+  expect(
+    Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).some(
+      (button) => button.getAttribute('aria-label') === 'videoEditor.timeline.play'
+    )
+  ).toBe(true);
 });
 
 it('uses the shared content toolbar button chrome', () => {
@@ -87,27 +143,48 @@ it('uses the shared content toolbar button chrome', () => {
   const button = container?.querySelector<HTMLButtonElement>('button');
   expect(button?.dataset['ui']).toBe('shared.ui.content-toolbar-button');
   expect(button?.className).toContain('sniptale-glass-toolbar-button');
-  expect(button?.className).toContain('!w-9');
+  expect(button?.className).toContain('!w-6');
 });
 
 it('renders the active loop range when playback range is selected', () => {
   renderPlaybackSummary(false, true);
-  expect(container?.textContent).toContain('(0:04.5-0:06.8)');
+  expect(container?.textContent).toContain('(0:04.500-0:06.750)');
 });
 
-it('keeps playback control slots stable when the range reset is unavailable', () => {
+it('keeps transport controls and adds a reset beside the selected range', () => {
   renderPlaybackSummary(false, false);
   const buttonsWithoutRange = container?.querySelectorAll<HTMLButtonElement>('button');
 
   renderPlaybackSummary(false, true);
   const buttonsWithRange = container?.querySelectorAll<HTMLButtonElement>('button');
 
-  expect(buttonsWithoutRange).toHaveLength(3);
-  expect(buttonsWithRange).toHaveLength(3);
+  expect(buttonsWithoutRange).toHaveLength(5);
+  expect(buttonsWithRange).toHaveLength(6);
   expect(container?.querySelector('[data-playback-counter]')?.className).toContain('tabular-nums');
 });
 
-it('formats whole seconds and minute rollover with one decimal digit', () => {
-  expect(formatPlaybackCounterTime(12)).toBe('0:12.0');
-  expect(formatPlaybackCounterTime(59.96)).toBe('1:00.0');
+it('formats elapsed milliseconds without rounding into a later second', () => {
+  expect(formatPlaybackCounterTime(12)).toBe('0:12.000');
+  expect(formatPlaybackCounterTime(59.96)).toBe('0:59.960');
+});
+
+it('keeps short frames nonzero and long project time readable', () => {
+  expect(formatPlaybackCounterTime(1 / 30)).toBe('0:00.033');
+  expect(formatPlaybackCounterTime(1 / 60)).toBe('0:00.017');
+  expect(formatPlaybackCounterTime(1 / 240)).toBe('0:00.004');
+  expect(formatPlaybackCounterTime(43200 + 1 / 240)).toBe('12:00:00.004');
+  expect(formatPlaybackCounterTime(3599.9996)).toBe('1:00:00.000');
+});
+
+it('clears a selected range without changing transport', () => {
+  const actions = renderPlaybackSummary(false, true);
+  const reset = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="video-editor.timeline.toolbar.clear-range"]'
+  );
+  expect(reset?.closest('[data-playback-counter]')?.textContent).toContain('(0:04.500-0:06.750)');
+  act(() => reset?.click());
+  expect(actions.onClearPlaybackRange).toHaveBeenCalledOnce();
+  expect(actions.onTogglePlay).not.toHaveBeenCalled();
+  expect(actions.onSeekToStart).not.toHaveBeenCalled();
+  expect(actions.onSeekToEnd).not.toHaveBeenCalled();
 });

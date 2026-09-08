@@ -1,6 +1,5 @@
 import type React from 'react';
 import { useMemo, useRef, useState } from 'react';
-import { translate } from '../../../platform/i18n';
 import type { VideoEditorFileInputRefs } from '../../chrome/file-inputs';
 import { createSceneSelection } from '../../project/selection/model';
 import type { VideoEditorSelection } from '../../contracts/selection';
@@ -12,21 +11,16 @@ interface WorkspaceSidebarViewState {
   selectionIcon: React.ReactNode;
   selectionLabel: string;
   selectionTitle: string;
-  diagnosticsMeta: string;
   projectsOpen: boolean;
   recordingsOpen: boolean;
-  diagnosticsSectionOpen: boolean;
   toggleProjectsOpen: () => void;
   toggleRecordingsOpen: () => void;
-  toggleDiagnosticsSection: () => void;
 }
 
 export function useWorkspaceSidebarState(
   selection: VideoEditorSelection | null | undefined = createSceneSelection(),
   selectedClip: WorkspaceSidebarProps['selectedClip'],
-  recordingId: string | null,
-  diagnosticsOpen: boolean,
-  onToggleDiagnostics: (open: boolean) => void = () => undefined
+  selectedTrack?: WorkspaceSidebarProps['selectedTrack']
 ): WorkspaceSidebarViewState {
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
@@ -34,7 +28,11 @@ export function useWorkspaceSidebarState(
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [recordingsOpen, setRecordingsOpen] = useState(true);
 
-  const selectionMeta = getSelectionMeta(selection ?? createSceneSelection(), selectedClip);
+  const selectionMeta = getSelectionMeta(
+    selection ?? createSceneSelection(),
+    selectedClip,
+    selectedTrack
+  );
 
   return {
     inputRefs: {
@@ -45,14 +43,9 @@ export function useWorkspaceSidebarState(
     selectionIcon: selectionMeta.icon,
     selectionLabel: selectionMeta.label,
     selectionTitle: useMemo(() => selectionMeta.title, [selectionMeta]),
-    diagnosticsMeta: recordingId
-      ? translate('videoEditor.sidebar.diagnosticsAttached')
-      : translate('videoEditor.sidebar.diagnosticsMissing'),
     projectsOpen,
     recordingsOpen,
-    diagnosticsSectionOpen: diagnosticsOpen,
     toggleProjectsOpen: () => setProjectsOpen((value) => !value),
     toggleRecordingsOpen: () => setRecordingsOpen((value) => !value),
-    toggleDiagnosticsSection: () => onToggleDiagnostics(!diagnosticsOpen),
   };
 }

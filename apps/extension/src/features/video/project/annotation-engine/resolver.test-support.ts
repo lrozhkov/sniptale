@@ -1,6 +1,7 @@
+import { VideoTrackKind } from '../types';
 import { expect } from 'vitest';
 import { createAnnotationClip } from '../annotation/template';
-import { createEmptyVideoProject } from '../factories/creation';
+import { createEmptyVideoProject, createVideoProjectTrack } from '../factories/creation';
 import type { VideoProject, VideoProjectAnnotationClip } from '../types/index';
 import { resolveAnnotationScene, type ResolvedAnnotationScene } from './index';
 import {
@@ -15,7 +16,8 @@ import { createSceneTimeline } from './resolver.timeline.test-support.ts';
 
 export function createProjectAndClip() {
   const project = createEmptyVideoProject('Annotation scene', 1280, 720);
-  const clip = createAnnotationClip(project.tracks[2]!.id, project.width, project.height, 1);
+  project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
+  const clip = createAnnotationClip(project.tracks[1]!.id, project.width, project.height, 1);
   clip.duration = 3;
   clip.introDurationMs = 500;
   clip.outroDurationMs = 500;

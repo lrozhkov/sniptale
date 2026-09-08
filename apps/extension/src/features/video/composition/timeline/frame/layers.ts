@@ -1,3 +1,5 @@
+import { resolveCameraVisualClip } from '../../../project/camera/animation';
+import { resolveVideoCompositionActions } from './actions';
 import {
   getClipCompositeVisualOpacity,
   isClipActiveAtTime,
@@ -10,9 +12,13 @@ import {
   resolveSubtitleClipStyle,
   resolveTextualClipStyle,
 } from '../../../project/text/subtitle-track';
-import type { VideoProject, VideoProjectClip } from '../../../project/types/index';
+import {
+  VideoProjectTrackRole,
+  type VideoProject,
+  type VideoProjectClip,
+} from '../../../project/types/index';
 import type { EffectRuntimeFramePlan } from '../../effect-runtime/runtime/types';
-import type { VideoCompositionVisualLayer } from '../../types';
+import type { VideoCompositionVisualLayer, VideoCompositionActionState } from '../../types';
 import { createAnnotationVisualLayer } from './annotation-layer';
 import {
   createVideoCompositionTimelineIndex,
@@ -49,8 +55,13 @@ function createVisualLayer(
   currentTime: number,
   project: VideoProject,
   zIndex: number,
-  options: { includeSubtitles: boolean; includeTransparent: boolean }
+  options: {
+    includeSubtitles: boolean;
+    includeTransparent: boolean;
+    actions: readonly VideoCompositionActionState[];
+  }
 ): VideoCompositionVisualLayer | null {
+  clip = resolveCameraVisualClip(project, clip, currentTime);
   if (!isVisualClip(clip)) {
     return null;
   }
@@ -68,7 +79,16 @@ function createVisualLayer(
 
   switch (clip.type) {
     case 'VIDEO':
-      return { ...resolvedBaseLayer, clip, kind: 'video' };
+      return {
+        ...resolvedBaseLayer,
+        clip,
+        kind: 'video',
+        actions: options.actions.filter((action) => action.clipId === clip.id),
+        ...(project.tracks.find((track) => track.id === clip.trackId)?.role ===
+        VideoProjectTrackRole.CAMERA
+          ? { trackRole: VideoProjectTrackRole.CAMERA }
+          : {}),
+      };
     case 'IMAGE':
       return { ...resolvedBaseLayer, clip, kind: 'image' };
     case 'TEXT':
@@ -104,11 +124,16 @@ function createTextVisualLayer(
 export function resolveVideoCompositionVisualLayers(
   project: VideoProject,
   currentTime: number,
-  options: { includeSubtitles?: boolean; timelineIndex?: VideoCompositionTimelineIndex } = {}
+  options: {
+    includeSubtitles?: boolean;
+    timelineIndex?: VideoCompositionTimelineIndex;
+    actions?: readonly VideoCompositionActionState[];
+  } = {}
 ): VideoCompositionVisualLayer[] {
   const resolvedOptions = {
     includeSubtitles: options.includeSubtitles ?? true,
     includeTransparent: false,
+    actions: options.actions ?? resolveVideoCompositionActions(project, currentTime),
   };
   const timelineIndex = options.timelineIndex ?? createVideoCompositionTimelineIndex(project);
   const visualLayers: VideoCompositionVisualLayer[] = [];
@@ -139,12 +164,17 @@ export function resolveVideoCompositionEffectInputLayers(
   project: VideoProject,
   currentTime: number,
   plans: readonly EffectRuntimeFramePlan[],
-  options: { includeSubtitles?: boolean; timelineIndex?: VideoCompositionTimelineIndex } = {}
+  options: {
+    includeSubtitles?: boolean;
+    timelineIndex?: VideoCompositionTimelineIndex;
+    actions?: readonly VideoCompositionActionState[];
+  } = {}
 ): VideoCompositionVisualLayer[] {
   const requestedClipIds = collectEffectInputClipIds(plans);
   if (requestedClipIds.size === 0) return [];
   const timelineIndex = options.timelineIndex ?? createVideoCompositionTimelineIndex(project);
   const layers: VideoCompositionVisualLayer[] = [];
+  const actions = options.actions ?? resolveVideoCompositionActions(project, currentTime);
   let zIndex = 0;
   for (const track of timelineIndex.tracksInRenderOrder) {
     if (!track.visible) continue;
@@ -153,6 +183,7 @@ export function resolveVideoCompositionEffectInputLayers(
       const layer = createVisualLayer(clip, currentTime, project, zIndex, {
         includeSubtitles: options.includeSubtitles ?? true,
         includeTransparent: true,
+        actions,
       });
       if (layer) layers.push(layer);
       zIndex += 1;

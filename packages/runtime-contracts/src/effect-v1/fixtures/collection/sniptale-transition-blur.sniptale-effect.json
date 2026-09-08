@@ -1,0 +1,394 @@
+{
+  "schemaVersion": "sniptale.effect.v1",
+  "id": "sniptale-transition-blur",
+  "kind": "transition",
+  "duration": 0.8,
+  "label": {
+    "ru": "Размытие",
+    "en": "Blur dissolve"
+  },
+  "description": {
+    "ru": "Переход с точными начальным и конечным кадрами.",
+    "en": "A transition with exact start and end frames."
+  },
+  "assets": [],
+  "controls": [
+    {
+      "id": "curve",
+      "kind": "number",
+      "label": {
+        "ru": "Плавность (%)",
+        "en": "Easing (%)"
+      },
+      "defaultValue": 85,
+      "min": 0,
+      "max": 100,
+      "step": 1
+    },
+    {
+      "id": "strength",
+      "kind": "number",
+      "label": {
+        "ru": "Размытие в пике",
+        "en": "Peak blur"
+      },
+      "defaultValue": 12,
+      "min": 0,
+      "max": 24,
+      "step": 1
+    }
+  ],
+  "layers": [],
+  "clips": [],
+  "scenes": [
+    {
+      "id": "main",
+      "start": 0,
+      "duration": 0.8
+    }
+  ],
+  "timeline": {
+    "phases": [],
+    "tracks": []
+  },
+  "program": {
+    "kind": "graph",
+    "version": 1,
+    "definitions": {
+      "s": {
+        "op": "div",
+        "args": [
+          {
+            "op": "min",
+            "args": [
+              {
+                "op": "read",
+                "path": "width"
+              },
+              {
+                "op": "read",
+                "path": "height"
+              }
+            ]
+          },
+          720
+        ]
+      },
+      "q": {
+        "op": "mix",
+        "args": [
+          {
+            "op": "read",
+            "path": "progress"
+          },
+          {
+            "op": "inOut",
+            "args": [
+              {
+                "op": "read",
+                "path": "progress"
+              }
+            ]
+          },
+          {
+            "op": "div",
+            "args": [
+              {
+                "op": "read",
+                "path": "controls.curve"
+              },
+              100
+            ]
+          }
+        ]
+      },
+      "pulse": {
+        "op": "mul",
+        "args": [
+          4,
+          {
+            "op": "read",
+            "path": "defs.q"
+          },
+          {
+            "op": "sub",
+            "args": [
+              1,
+              {
+                "op": "read",
+                "path": "defs.q"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "commands": [
+      {
+        "op": "clear"
+      },
+      {
+        "op": "image",
+        "input": "from",
+        "x": 0,
+        "y": 0,
+        "width": {
+          "op": "read",
+          "path": "width"
+        },
+        "height": {
+          "op": "read",
+          "path": "height"
+        },
+        "fit": "cover"
+      },
+      {
+        "op": "image",
+        "input": "to",
+        "x": 0,
+        "y": 0,
+        "width": {
+          "op": "read",
+          "path": "width"
+        },
+        "height": {
+          "op": "read",
+          "path": "height"
+        },
+        "fit": "cover",
+        "alpha": {
+          "op": "read",
+          "path": "defs.q"
+        }
+      },
+      {
+        "op": "when",
+        "condition": {
+          "op": "and",
+          "args": [
+            {
+              "op": "gt",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.pulse"
+                },
+                0
+              ]
+            },
+            {
+              "op": "gt",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "controls.strength"
+                },
+                0
+              ]
+            }
+          ]
+        },
+        "commands": [
+          {
+            "op": "renderPass",
+            "id": "soft-from",
+            "width": {
+              "op": "div",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "width"
+                },
+                4
+              ]
+            },
+            "height": {
+              "op": "div",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "height"
+                },
+                4
+              ]
+            },
+            "commands": [
+              {
+                "op": "group",
+                "commands": [
+                  {
+                    "op": "image",
+                    "input": "from",
+                    "x": 0,
+                    "y": 0,
+                    "width": {
+                      "op": "read",
+                      "path": "width"
+                    },
+                    "height": {
+                      "op": "read",
+                      "path": "height"
+                    },
+                    "fit": "cover",
+                    "filter": {
+                      "blur": {
+                        "op": "mul",
+                        "args": [
+                          {
+                            "op": "mul",
+                            "args": [
+                              {
+                                "op": "read",
+                                "path": "controls.strength"
+                              },
+                              {
+                                "op": "read",
+                                "path": "defs.s"
+                              }
+                            ]
+                          },
+                          0.25
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "scaleX": 0.25,
+                "scaleY": 0.25
+              }
+            ]
+          },
+          {
+            "op": "renderPass",
+            "id": "soft-to",
+            "width": {
+              "op": "div",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "width"
+                },
+                4
+              ]
+            },
+            "height": {
+              "op": "div",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "height"
+                },
+                4
+              ]
+            },
+            "commands": [
+              {
+                "op": "group",
+                "commands": [
+                  {
+                    "op": "image",
+                    "input": "to",
+                    "x": 0,
+                    "y": 0,
+                    "width": {
+                      "op": "read",
+                      "path": "width"
+                    },
+                    "height": {
+                      "op": "read",
+                      "path": "height"
+                    },
+                    "fit": "cover",
+                    "filter": {
+                      "blur": {
+                        "op": "mul",
+                        "args": [
+                          {
+                            "op": "mul",
+                            "args": [
+                              {
+                                "op": "read",
+                                "path": "controls.strength"
+                              },
+                              {
+                                "op": "read",
+                                "path": "defs.s"
+                              }
+                            ]
+                          },
+                          0.25
+                        ]
+                      }
+                    }
+                  }
+                ],
+                "scaleX": 0.25,
+                "scaleY": 0.25
+              }
+            ]
+          },
+          {
+            "op": "compositePass",
+            "passId": "soft-from",
+            "x": 0,
+            "y": 0,
+            "width": {
+              "op": "read",
+              "path": "width"
+            },
+            "height": {
+              "op": "read",
+              "path": "height"
+            },
+            "alpha": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.pulse"
+                },
+                {
+                  "op": "sub",
+                  "args": [
+                    1,
+                    {
+                      "op": "read",
+                      "path": "defs.q"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "op": "compositePass",
+            "passId": "soft-to",
+            "x": 0,
+            "y": 0,
+            "width": {
+              "op": "read",
+              "path": "width"
+            },
+            "height": {
+              "op": "read",
+              "path": "height"
+            },
+            "alpha": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.pulse"
+                },
+                {
+                  "op": "read",
+                  "path": "defs.q"
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

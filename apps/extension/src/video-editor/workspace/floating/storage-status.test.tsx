@@ -5,7 +5,11 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
-  connectPresence: vi.fn(() => ({ dispose: vi.fn() })),
+  connectPresence: vi.fn(
+    (_options: { aggregate: { id: string; kind: string }; promote: () => Promise<void> }) => ({
+      dispose: vi.fn(),
+    })
+  ),
   getVideoProject: vi.fn(),
   promoteOpenProject: vi.fn(),
   refreshPresentation: vi.fn(),
@@ -26,6 +30,7 @@ vi.mock('../../../workflows/aggregate-editor-presence/client', async (importOrig
 vi.mock('../../runtime/controller/store', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../runtime/controller/store')>()),
   useVideoEditorProjectStorageStatus: () => ({
+    projectId: mocks.videoState.project?.id ?? null,
     projectUpdatedAt: mocks.videoState.project?.updatedAt ?? null,
     saveState: mocks.videoState.saveState,
   }),
@@ -62,33 +67,22 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('refreshes the saved revision and promotes the same open project', async () => {
-  await act(async () => {
-    root.render(<VideoProjectStorageStatus />);
-    await Promise.resolve();
-  });
-
+it('silently refreshes the active project without relying on a project URL', async () => {
+  window.history.replaceState(null, '', '/video-editor');
+  await act(async () => root.render(<VideoProjectStorageStatus />));
   expect(mocks.refreshPresentation).toHaveBeenCalledWith('video-1', 20);
   expect(mocks.connectPresence).toHaveBeenCalledWith(
     expect.objectContaining({ aggregate: { id: 'video-1', kind: 'video-project' } })
   );
-  const button = container.querySelector<HTMLButtonElement>('button');
-  expect(button).not.toBeNull();
-  await act(async () => button?.click());
-
+  expect(container.childElementCount).toBe(0);
+  expect(mocks.getVideoProject).not.toHaveBeenCalled();
+  await mocks.connectPresence.mock.calls[0]![0].promote();
   expect(mocks.promoteOpenProject).toHaveBeenCalledWith('video-1');
-  expect(container.querySelector('button')).toBeNull();
 });
 
-it('reports promotion failure while keeping the draft action available', async () => {
-  mocks.promoteOpenProject.mockRejectedValueOnce(new Error('cover failed'));
-  await act(async () => {
-    root.render(<VideoProjectStorageStatus />);
-    await Promise.resolve();
-  });
-  const button = container.querySelector<HTMLButtonElement>('button');
-  await act(async () => button?.click());
-
-  expect(container.querySelector('[role="alert"]')).not.toBeNull();
-  expect(container.querySelector('button')).not.toBeNull();
+it('keeps advisory cover failures silent without blocking the saved project', async () => {
+  mocks.refreshPresentation.mockRejectedValueOnce(new Error('cover failed'));
+  await act(async () => root.render(<VideoProjectStorageStatus />));
+  expect(container.childElementCount).toBe(0);
+  expect(mocks.promoteOpenProject).not.toHaveBeenCalled();
 });

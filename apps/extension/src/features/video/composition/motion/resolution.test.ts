@@ -1,7 +1,6 @@
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject } from '../../project/factories/creation';
 import {
-  VideoMotionCameraMode,
   VideoMotionFocusMode,
   VideoMotionOverlayZoomMode,
   VideoTemporalEasing,
@@ -27,7 +26,7 @@ function createBaseRegion(): VideoProjectMotionRegion {
     overlayZoomMode: VideoMotionOverlayZoomMode.LOCK_OVERLAYS,
     scale: 2,
     startTime: 0,
-    targetActionEventId: null,
+    targetAction: null,
     zoomInDuration: 0,
     zoomOutDuration: 0,
   };
@@ -137,37 +136,8 @@ it('applies zoom-in progress during the intro phase of a static motion region', 
 
   expect(camera.focusPoint).toEqual({ x: 600, y: 400 });
   expect(camera.scale).toBe(1.5);
-  expect(camera.viewportX).toBe(200);
-  expect(camera.viewportY).toBe(125);
-});
-
-it('routes moving zoom regions through the path camera resolver', () => {
-  const project = createEmptyVideoProject('Camera', 800, 600);
-  project.motionRegions = [
-    createRegion({
-      cameraMode: VideoMotionCameraMode.PATH,
-      path: {
-        segments: [
-          { durationWeight: 1, easing: VideoTemporalEasing.LINEAR, trajectoryPreset: 'LINEAR' },
-        ],
-        stops: [
-          { id: 'stop-1', offset: 0, target: { kind: 'POINT', scale: 2, x: 500, y: 320 } },
-          { id: 'stop-2', offset: 1, target: { kind: 'POINT', scale: 2.4, x: 600, y: 360 } },
-        ],
-      },
-      zoomInDuration: 0.2,
-      zoomOutDuration: 0.2,
-    }),
-  ];
-
-  expect(
-    resolveVideoCompositionCamera({
-      actions: [],
-      cursorSample: null,
-      currentTime: 1,
-      project,
-    })
-  ).toEqual(expect.objectContaining({ regionId: 'motion-1', scale: 2.2 }));
+  expect(camera.viewportX * camera.scale).toBeCloseTo(400);
+  expect(camera.viewportY * camera.scale).toBeCloseTo(250);
 });
 
 it('falls back to the project center for manual focus when no focus point is provided', () => {

@@ -41,6 +41,100 @@ const sidebarContractMappings = SIDEBAR_CONTRACT_FILES.map((productionFile) => (
 
 export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
   ...controllerContractMappings,
+  ...[
+    'body.tsx',
+    'index.tsx',
+    'canvas/parts/clip-stack.tsx',
+    'canvas/parts/drag-ghost.tsx',
+    'canvas/parts/playback-range.tsx',
+    'canvas/parts/track-lanes.tsx',
+  ].map((path) => ({
+    owner: 'video-editor-composed-timeline',
+    productionFile: `apps/extension/src/video-editor/timeline/project/${path}`,
+    reason:
+      'Real timeline root, body and canvas exercise precise fit, clip and effect drafts, cancellation, commit and projected range geometry.',
+    testFiles: [
+      'apps/extension/src/video-editor/timeline/project/index.test.tsx',
+      'apps/extension/src/video-editor/timeline/project/canvas/index.test.tsx',
+    ],
+  })),
+  {
+    owner: 'video-editor-integrated-ui-proof',
+    productionFile: 'apps/extension/src/ui/compact-inspector-controls/numeric.tsx',
+    reason:
+      'Compact numeric editing, keyboard commit, range clamping and invalid-value recovery execute the numeric control.',
+    testFiles: [
+      'apps/extension/src/ui/compact-inspector-controls/numeric-interactions.test.tsx',
+      'apps/extension/src/ui/compact-inspector-controls/numeric-range.test.tsx',
+      'apps/extension/src/ui/compact-inspector-controls/numeric-edge.test.tsx',
+    ],
+  },
+  {
+    owner: 'video-editor-integrated-ui-proof',
+    productionFile: 'apps/extension/src/ui/compact-inspector-controls/numeric-value-state.ts',
+    reason:
+      'The real numeric control invokes value-state parsing, commit and recovery through its interaction suites.',
+    testFiles: [
+      'apps/extension/src/ui/compact-inspector-controls/numeric-interactions.test.tsx',
+      'apps/extension/src/ui/compact-inspector-controls/numeric-range.test.tsx',
+      'apps/extension/src/ui/compact-inspector-controls/numeric-edge.test.tsx',
+    ],
+  },
+  {
+    owner: 'video-editor-integrated-ui-proof',
+    productionFile: 'apps/extension/src/video-editor/timeline/project/canvas/parts/playhead.tsx',
+    reason:
+      'The real timeline canvas verifies playhead placement and height across contextual lane states.',
+    testFiles: ['apps/extension/src/video-editor/timeline/project/canvas/index.test.tsx'],
+  },
+  {
+    owner: 'video-editor-integrated-ui-proof',
+    productionFile: 'apps/extension/src/video-editor/timeline/project/canvas/parts/ruler.tsx',
+    reason:
+      'Canvas interaction tests render the real ruler and exercise timeline scale and seek behavior.',
+    testFiles: ['apps/extension/src/video-editor/timeline/project/canvas/index.test.tsx'],
+  },
+  {
+    owner: 'video-editor-integrated-ui-proof',
+    productionFile: 'apps/extension/src/video-editor/workspace/sidebar/panel-content/index.tsx',
+    reason:
+      'Sidebar panel routing is exercised through its parent owner suite and actual content adapter.',
+    testFiles: ['apps/extension/src/video-editor/workspace/sidebar/panel-content.test.tsx'],
+  },
+  {
+    owner: 'video-editor-integrated-ui-proof',
+    productionFile:
+      'apps/extension/src/video-editor/workspace/sidebar/selection/motion/content.tsx',
+    reason:
+      'The real motion inspection panel renders camera mode, path, timing and focus groups from this adapter.',
+    testFiles: [
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inspection/motion.test.tsx',
+    ],
+  },
+  {
+    owner: 'video-project-asset-validation',
+    productionFile: 'apps/extension/src/features/video/project/validation/assets.ts',
+    reason:
+      'Recording membership and existing source variants are validated through the asset and project boundary suites.',
+    testFiles: [
+      'apps/extension/src/features/video/project/validation/assets.test.ts',
+      'apps/extension/src/features/video/project/validation/project.test.ts',
+      'apps/extension/src/features/video/project/validation/optional-branches.test.ts',
+    ],
+  },
+  {
+    owner: 'video-editor-clip-timing-mutations',
+    productionFile: 'apps/extension/src/video-editor/project/state/clip-timeline/mutations.ts',
+    reason:
+      'Linked clip edges, source limits, locks and gap closure use the same timing mutation owner.',
+    testFiles: [
+      'apps/extension/src/video-editor/project/state/clip-timeline/actions.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-timeline/mutations.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-timeline/mutations.gap.test.ts',
+      'apps/extension/src/video-editor/project/state/clip-timeline/mutations.gap.logical-lanes.test.ts',
+      'apps/extension/src/video-editor/project/state/insertion/material-recording.test.ts',
+    ],
+  },
   {
     allowCrossOwner: true,
     owner: 'video-editor-preview-preferences-contract',
@@ -110,6 +204,40 @@ export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
     testFiles: [
       'apps/extension/src/video-editor/timeline/project/canvas/index.test.tsx',
       'apps/extension/src/video-editor/timeline/project/tracks/list.test.tsx',
+    ],
+  },
+  {
+    owner: 'video-editor-timeline-add-controls',
+    productionFile:
+      'apps/extension/src/video-editor/timeline/project/toolbar/sections/add-controls.tsx',
+    reason:
+      'Leading toolbar tests exercise add commands, disabled admission, menu dismissal and focus restoration.',
+    testFiles: [
+      'apps/extension/src/video-editor/timeline/project/toolbar/sections/leading.test.tsx',
+      'apps/extension/src/video-editor/timeline/project/toolbar/index.test.tsx',
+    ],
+  },
+  {
+    owner: 'video-editor-timeline-zoom-control',
+    productionFile:
+      'apps/extension/src/video-editor/timeline/project/toolbar/sections/zoom-control.tsx',
+    reason:
+      'Trailing and complete toolbar tests render the real zoom control alongside timeline view actions.',
+    testFiles: [
+      'apps/extension/src/video-editor/timeline/project/toolbar/sections/trailing.test.tsx',
+      'apps/extension/src/video-editor/timeline/project/toolbar/index.test.tsx',
+    ],
+  },
+  {
+    owner: 'video-editor-inspector-slider-fields',
+    productionFile:
+      'apps/extension/src/video-editor/workspace/sidebar/selection/shared/sliders.tsx',
+    reason:
+      'Shared controls prove display mapping and commit deduplication; timing and media-frame tests exercise consumers.',
+    testFiles: [
+      'apps/extension/src/video-editor/workspace/sidebar/selection/shared/controls.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inputs/clip-timing.test.tsx',
+      'apps/extension/src/video-editor/workspace/sidebar/selection/inputs/media-frame.test.tsx',
     ],
   },
   ...sidebarContractMappings,

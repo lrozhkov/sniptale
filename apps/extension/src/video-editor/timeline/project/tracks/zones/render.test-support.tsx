@@ -20,11 +20,11 @@ const JUNCTION_ZONES = [
     zoneSelectedClassName: 'transition-zone-selected',
   },
 ];
-const STACKED_OVERLAP_ZONES = [{ end: 4.5, id: 'stacked-zone-a|stacked-zone-b', start: 3.5 }];
 
-export function renderTrackZones(root: Root | null) {
+export function renderTrackZones(root: Root | null, locked = false) {
   const onDropEffectDocument = vi.fn();
   const onSelectTransition = vi.fn();
+  const onBeginTransitionTrim = vi.fn();
   act(() => {
     root?.render(
       <div className="relative h-20">
@@ -34,15 +34,15 @@ export function renderTrackZones(root: Root | null) {
           junctionZones={JUNCTION_ZONES}
           pixelsPerSecond={20}
           selectedTransitionId={null}
-          stackedOverlapZones={STACKED_OVERLAP_ZONES}
           onCloseTrackGap={vi.fn()}
           onDropEffectDocument={onDropEffectDocument}
           onSelectTransition={onSelectTransition}
+          onBeginTransitionTrim={locked ? undefined : onBeginTransitionTrim}
         />
       </div>
     );
   });
-  return { onDropEffectDocument, onSelectTransition };
+  return { onDropEffectDocument, onSelectTransition, onBeginTransitionTrim };
 }
 
 export function createEffectDocumentDataTransfer(): VideoEditorEffectDocumentDataTransfer {

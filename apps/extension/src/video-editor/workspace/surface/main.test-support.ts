@@ -8,7 +8,6 @@ export function createHeaderController() {
     onCloseLibraryPanel: vi.fn(),
     onOpenAudioRecordingDialog: vi.fn(),
     onOpenExportDialog: vi.fn(),
-    onOpenGridSettings: vi.fn(),
     onOpenLibraryPanel: vi.fn(),
     onRenameProject: vi.fn(),
     onSelectScene: vi.fn(),
@@ -47,7 +46,7 @@ export function createPreviewController() {
       onUpsertObjectTrackCorrectionAnchor: vi.fn(),
     },
     preferences: createPreviewPreferencesController(),
-    project: { clips: [], id: 'project-1', tracks: [], transitions: [] },
+    project: { assets: [], clips: [], id: 'project-1', tracks: [], transitions: [] },
     transport: {
       currentTime: 8,
       isPlaying: false,
@@ -79,7 +78,7 @@ function createPreviewSelectionController() {
     onSelectClip: vi.fn(),
     onSelectScene: vi.fn(),
     placementMode: null,
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedClipId: 'clip-1',
     selectedMotionRegion: null,
   };
