@@ -83,7 +83,7 @@ interface ProjectTimelineCanvasProps {
     target: import('../../../contracts/commands/timeline').VideoEditorTypingSpanTarget
   ) => void;
   onSelectActionOccurrence: (eventId: string, clipId: string | null) => void;
-  onSelectClip: (clipId: string | null) => void;
+  onSelectClip: (clipId: string | null, intent?: 'replace' | 'toggle' | 'range') => void;
   onSelectCursorSegment: (sampleId: string) => void;
   onSelectMotionRegion: (motionRegionId: string, part?: 'connection') => void;
   onConnectMotionRegions?: ((fromRegionId: string, toRegionId: string) => void) | undefined;

@@ -65,6 +65,14 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
     ru: 'Фигура',
     en: 'Shape',
   },
+  clipGroupHint: {
+    ru: 'Удаление применяется ко всем выбранным клипам. Для изменения параметров выберите один клип обычным кликом.',
+    en: 'Delete applies to all selected clips. Click a single clip to edit its properties.',
+  },
+  clipGroup: {
+    ru: 'Выбранные клипы',
+    en: 'Selected clips',
+  },
   sceneProperties: {
     ru: 'Свойства сцены',
     en: 'Scene properties',

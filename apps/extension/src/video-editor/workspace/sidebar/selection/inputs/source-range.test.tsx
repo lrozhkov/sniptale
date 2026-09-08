@@ -82,7 +82,7 @@ it.each([
       expect(clip.duration).toBe(duration);
       expect(h.inputs()[index]!.value).toBe(value);
       expect(h.store.getState().projectHistory.past).toHaveLength(1);
-      expect(h.store.getState().projectHistory.past[0]!.clips).toEqual(before.clips);
+      expect(h.store.getState().projectHistory.past[0]!.project.clips).toEqual(before.clips);
     } finally {
       h.dispose();
     }

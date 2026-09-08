@@ -134,6 +134,7 @@ it('selects the exact captured typing instance and previews without publishing e
 
 it('applies both splits and rate as one Undo step with exact cursor, motion and object anchors', () => {
   const { store, request } = fixture();
+  store.getState().selectClip('repeat');
   const before = store.getState();
   const facts = structuredClone(before.project!.actionEvents);
   expect(store.getState().applyTypingCompression(request, before.project!).status).toBe('applied');
@@ -184,9 +185,11 @@ it('applies both splits and rate as one Undo step with exact cursor, motion and 
     sourceDuration: 6,
   });
   store.getState().undoProject();
+  expect(store.getState().selection).toEqual(before.selection);
   expect(store.getState().project!.actionEvents).toEqual(facts);
   expect(store.getState().project!.clips).toEqual(before.project!.clips);
   store.getState().redoProject();
+  expect(store.getState().selection).toEqual(after.selection);
   expect(store.getState().project!.clips).toEqual(after.project!.clips);
   store.getState().setProject(structuredClone(store.getState().project!));
   expect(store.getState().recordingTelemetry).toEqual([]);

@@ -84,7 +84,7 @@ export interface VideoEditorProjectActions
   trimClipStart: VideoEditorTrimClipAction;
   trimClipEnd: VideoEditorTrimClipAction;
   splitClipAt: (clipId: string, splitTime: number) => void;
-  deleteClip: (clipId: string) => void;
+  deleteClip: (clipId: string | readonly string[]) => void;
   duplicateClip: (clipId: string) => void;
   detachClipGroup: (clipId: string) => void;
   updateClipTransform: (clipId: string, patch: Partial<VideoProjectClip['transform']>) => void;

@@ -179,5 +179,5 @@ it('records source-anchor reprojection in the same project history action', () =
   expect(update.project?.actionEvents).toEqual(project.actionEvents);
   expect(resolveVideoProjectActionOccurrences(update.project!)[0]?.time).toBe(4);
   expect(update.projectHistory?.past).toHaveLength(1);
-  expect(update.projectHistory?.past[0]?.actionEvents).toEqual(project.actionEvents);
+  expect(update.projectHistory?.past[0]?.project.actionEvents).toEqual(project.actionEvents);
 });

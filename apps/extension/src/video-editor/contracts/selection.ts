@@ -1,6 +1,7 @@
 export const VideoEditorSelectionKind = {
   SCENE: 'scene',
   CLIP: 'clip',
+  CLIP_GROUP: 'clip-group',
   TRACK: 'track',
   TRANSITION_JUNCTION: 'transition-junction',
   CURSOR_SEGMENT: 'cursor-segment',
@@ -25,6 +26,7 @@ export type VideoEditorSelection =
     } & import('./commands/timeline').VideoEditorTypingSpanTarget)
   | { kind: typeof VideoEditorSelectionKind.MOTION_CONNECTION; motionRegionId: string }
   | { kind: typeof VideoEditorSelectionKind.CLIP; clipId: string }
+  | { kind: typeof VideoEditorSelectionKind.CLIP_GROUP; clipIds: string[]; anchorClipId: string }
   | { kind: typeof VideoEditorSelectionKind.TRACK; trackId: string }
   | {
       kind: typeof VideoEditorSelectionKind.TRANSITION_JUNCTION;

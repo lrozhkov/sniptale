@@ -64,7 +64,7 @@ it.each([1, 2])(
     });
     expect(clips[1]!.sourceStart).toBe(0);
     expect(clamped.projectHistory.past).toHaveLength(1);
-    expect(clamped.projectHistory.past[0]!.clips).toEqual(project.clips);
+    expect(clamped.projectHistory.past[0]!.project.clips).toEqual(project.clips);
     store.getState().trimClipStart(project.clips[0]!.id, 1.5);
     expect(store.getState().project).toBe(clamped.project);
     expect(store.getState().projectHistory).toBe(clamped.projectHistory);
@@ -84,7 +84,7 @@ it('can expand to exact source zero while keeping both project and source Out fi
   });
   expect(clips[1]!.sourceStart).toBe(0);
   expect(store.getState().projectHistory.past).toHaveLength(1);
-  expect(store.getState().projectHistory.past[0]!.clips).toEqual(project.clips);
+  expect(store.getState().projectHistory.past[0]!.project.clips).toEqual(project.clips);
 });
 
 it('does not constrain a start trim by a linked companion whose start edge is elsewhere', () => {

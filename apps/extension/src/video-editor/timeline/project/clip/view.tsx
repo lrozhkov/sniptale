@@ -39,13 +39,31 @@ export function ProjectTimelineClipLayout({
       title={clip.name?.trim() || buildClipLabel(project, clip)}
       className={viewModel.clipClassName}
       style={{ ...viewModel.style, left: viewModel.left, width: viewModel.width }}
-      onClick={(event) => selectTimelineClip(event, clip.id, onSelectClip)}
+      onClick={(event) => {
+        event.stopPropagation();
+        if (event.detail === 0) selectTimelineClip(event, clip.id, onSelectClip);
+      }}
       onPointerEnter={() => onClipHoverChange(clip.id)}
       onPointerLeave={() => onClipHoverChange(null)}
-      onPointerDownCapture={() => onSelectClip(clip.id)}
+      onPointerDownCapture={(event) => {
+        if (event.button !== 0) return;
+        if (event.ctrlKey || event.metaKey || event.shiftKey) {
+          event.stopPropagation();
+          event.preventDefault();
+        }
+        if (event.ctrlKey || event.metaKey) onSelectClip(clip.id, 'toggle');
+        else if (event.shiftKey) onSelectClip(clip.id, 'range');
+        else onSelectClip(clip.id);
+      }}
       onPointerDown={(event) => {
         event.stopPropagation();
-        if (!trackLocked) {
+        if (
+          !trackLocked &&
+          event.button === 0 &&
+          !event.ctrlKey &&
+          !event.metaKey &&
+          !event.shiftKey
+        ) {
           onBeginClipInteraction(event, clip, 'move');
         }
       }}

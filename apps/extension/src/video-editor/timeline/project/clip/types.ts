@@ -15,7 +15,7 @@ export interface ProjectTimelineClipProps {
   trackClipTop?: number;
   trackClipRowHeight?: number;
   trackLocked: boolean;
-  onSelectClip: (clipId: string | null) => void;
+  onSelectClip: (clipId: string | null, intent?: 'replace' | 'toggle' | 'range') => void;
   onClipHoverChange: (clipId: string | null) => void;
   onBeginClipInteraction: (
     event: React.PointerEvent,

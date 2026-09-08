@@ -95,7 +95,8 @@ export function applyProjectUpdate(
     projectHistory: recordVideoEditorProjectHistory(
       state.projectHistory,
       state.project,
-      nextProject
+      nextProject,
+      state.selection
     ),
   };
 }

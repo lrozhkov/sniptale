@@ -242,3 +242,48 @@ function createRecordingTelemetryEntry(recordingId: string): RecordingTelemetryE
     signals: [],
   };
 }
+
+it('restores the deleted group selection with the project in one Undo', () => {
+  const store = createTimelineStore();
+  const project = createProject([
+    createVideoClip(),
+    createVideoClip({ id: 'second', startTime: 10 }),
+  ]);
+  store.getState().setProject(project);
+  const ids = store.getState().project!.clips.map((clip) => clip.id);
+  store.getState().selectClip(ids[0]!);
+  store.getState().selectClip(ids[1]!, 'toggle');
+  const selected = store.getState().selection;
+  expect(selected.kind).toBe('clip-group');
+  store.getState().deleteClip(ids);
+  expect(store.getState().selection.kind).toBe('scene');
+  store.getState().undoProject();
+  expect(store.getState().project?.clips.map((clip) => clip.id)).toEqual(ids);
+  expect(store.getState().selection).toEqual(selected);
+  store.getState().redoProject();
+  expect(store.getState().selection.kind).toBe('scene');
+});
+
+it('repairs group membership and anchor after selected clips disappear', () => {
+  const store = createTimelineStore();
+  store
+    .getState()
+    .setProject(
+      createProject([
+        createVideoClip({ id: 'a' }),
+        createVideoClip({ id: 'b', startTime: 10 }),
+        createVideoClip({ id: 'c', startTime: 20 }),
+      ])
+    );
+  store.setState({
+    selection: { kind: 'clip-group', clipIds: ['a', 'b', 'c'], anchorClipId: 'a' },
+  });
+  store.getState().deleteClip('a');
+  expect(store.getState().selection).toEqual({
+    kind: 'clip-group',
+    clipIds: ['b', 'c'],
+    anchorClipId: 'b',
+  });
+  store.getState().deleteClip('b');
+  expect(store.getState().selection).toEqual({ kind: 'clip', clipId: 'c' });
+});

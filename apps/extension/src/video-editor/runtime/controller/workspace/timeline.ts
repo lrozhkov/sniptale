@@ -85,7 +85,10 @@ function createWorkspaceTimelineState(
 ) {
   return {
     canDeleteSelectedClip:
-      store.selectedClipId !== null && areProjectClipsEditable(project, [store.selectedClipId]),
+      store.selection.kind === 'clip-group'
+        ? store.selection.clipIds.length > 0 &&
+          areProjectClipsEditable(project, store.selection.clipIds)
+        : store.selectedClipId !== null && areProjectClipsEditable(project, [store.selectedClipId]),
     canEditSelectedClip:
       store.selectedClipId !== null && canEditProjectClip(project, store.selectedClipId),
     canSplitSelectedClip:

@@ -129,6 +129,7 @@ function deleteSelectedTimelineObject(
     case VideoEditorSelectionKind.TRACK:
     case VideoEditorSelectionKind.TRANSITION_JUNCTION:
       return;
+    case VideoEditorSelectionKind.CLIP_GROUP:
     case VideoEditorSelectionKind.CLIP:
       selectedClipActions.deleteSelectedClip();
       return;

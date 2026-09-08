@@ -138,3 +138,11 @@ it('allows local Delete when only the linked companion is locked', () => {
   act(() => buttons[2]!.click());
   expect(handlers.onDeleteSelectedClip).toHaveBeenCalledOnce();
 });
+
+it('allows an admitted group delete without a single selected clip', () => {
+  const handlers = renderClipActions(false, false, false, true);
+  const buttons = Array.from(container!.querySelectorAll<HTMLButtonElement>('button'));
+  expect(buttons[2]!.disabled).toBe(false);
+  act(() => buttons[2]!.click());
+  expect(handlers.onDeleteSelectedClip).toHaveBeenCalledOnce();
+});

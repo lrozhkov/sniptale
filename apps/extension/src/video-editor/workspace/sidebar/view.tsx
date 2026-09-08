@@ -82,6 +82,8 @@ export function getSelectionMeta(
   switch (selection.kind) {
     case VideoEditorSelectionKind.SCENE:
       return createStaticSelectionMeta(SlidersHorizontal, 'videoEditor.sidebar.sceneProperties');
+    case VideoEditorSelectionKind.CLIP_GROUP:
+      return createStaticSelectionMeta(Film, 'videoEditor.sidebar.clipGroup');
     case VideoEditorSelectionKind.CLIP:
       return {
         icon: getClipSelectionIcon(clip),

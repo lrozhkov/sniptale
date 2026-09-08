@@ -34,7 +34,8 @@ export function createProjectStateActions(set: VideoEditorStoreSet) {
           projectHistory: recordVideoEditorProjectHistory(
             state.projectHistory,
             state.project,
-            plan.project
+            plan.project,
+            state.selection
           ),
           selection: {
             kind: VideoEditorSelectionKind.HISTORY_SPAN,

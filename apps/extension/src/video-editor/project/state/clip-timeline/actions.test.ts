@@ -485,3 +485,24 @@ it('selects the duplicated standalone effect host and its paired instance', () =
     true
   );
 });
+
+it('deletes an explicitly selected group in one history step and refuses locked members atomically', () => {
+  const runtime = createMutableState();
+  seedLinkedClipState(runtime);
+  const actions = createVideoEditorProjectClipTimelineActions(runtime.set);
+  const original = runtime.getState().project!;
+  const locked = {
+    ...original,
+    tracks: original.tracks.map((track, index) => ({ ...track, locked: index === 0 })),
+  };
+  runtime.set({ project: locked });
+  actions.deleteClip(['video-1', 'audio-1']);
+  expect(runtime.getState().project).toBe(locked);
+  expect(runtime.getState().projectHistory.past).toHaveLength(0);
+  runtime.set({ project: original });
+  actions.deleteClip(['video-1', 'audio-1']);
+  expect(runtime.getState().project?.clips).toHaveLength(0);
+  expect(runtime.getState().projectHistory.past).toHaveLength(1);
+  expect(runtime.getState().projectHistory.past[0]?.project.clips).toEqual(original.clips);
+  expect(runtime.getState().project?.assets).toEqual(original.assets);
+});

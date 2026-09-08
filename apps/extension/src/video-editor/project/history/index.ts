@@ -1,3 +1,4 @@
+import type { VideoEditorSelection } from '../../contracts/selection';
 import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
 import type { VideoProject } from '../../../features/video/project/types';
 import type {
@@ -8,23 +9,33 @@ import type {
 /** Maximum number of project-edit actions retained for undo in the active editor session. */
 export const VIDEO_EDITOR_PROJECT_HISTORY_ACTION_LIMIT = 100;
 
+interface VideoEditorHistorySnapshot {
+  project: VideoProject;
+  selection: VideoEditorSelection;
+}
+
 export interface VideoEditorProjectHistoryState {
   projectId: string | null;
-  past: VideoProject[];
-  future: VideoProject[];
+  past: VideoEditorHistorySnapshot[];
+  future: VideoEditorHistorySnapshot[];
   error: VideoEditorProjectHistoryError | null;
   transaction: VideoEditorProjectHistoryTransaction | null;
 }
 
 interface VideoEditorProjectHistoryTransaction {
-  before: VideoProject | null;
+  before: VideoEditorHistorySnapshot | null;
   changed: boolean;
   lease: VideoEditorProjectHistoryTransactionLease;
   projectId: string;
 }
 
 type VideoEditorProjectHistoryTransition =
-  | { status: 'applied'; history: VideoEditorProjectHistoryState; project: VideoProject }
+  | {
+      status: 'applied';
+      history: VideoEditorProjectHistoryState;
+      project: VideoProject;
+      selection: VideoEditorSelection;
+    }
   | { status: 'failed'; history: VideoEditorProjectHistoryState };
 
 export function createEmptyVideoEditorProjectHistory(): VideoEditorProjectHistoryState {
@@ -37,7 +48,8 @@ export function resetVideoEditorProjectHistory(projectId: string): VideoEditorPr
 
 export function beginVideoEditorProjectHistoryTransaction(
   history: VideoEditorProjectHistoryState,
-  currentProject: VideoProject
+  currentProject: VideoProject,
+  selection: VideoEditorSelection = { kind: 'scene' }
 ): VideoEditorProjectHistoryState {
   if (history.transaction) return history;
   if (history.projectId !== currentProject.id) {
@@ -49,7 +61,7 @@ export function beginVideoEditorProjectHistoryTransaction(
       ...history,
       error: null,
       transaction: {
-        before: structuredClone(currentProject),
+        before: structuredClone({ project: currentProject, selection }),
         changed: false,
         lease: Symbol('video-editor-project-history-transaction'),
         projectId: currentProject.id,
@@ -72,7 +84,7 @@ export function endVideoEditorProjectHistoryTransaction(
   if (!transaction.changed || !transaction.before) {
     return { ...history, transaction: null };
   }
-  if (areVideoProjectsHistoryEquivalent(transaction.before, currentProject)) {
+  if (areVideoProjectsHistoryEquivalent(transaction.before.project, currentProject)) {
     return { ...history, transaction: null };
   }
 
@@ -94,7 +106,8 @@ function areVideoProjectsHistoryEquivalent(left: VideoProject, right: VideoProje
 export function recordVideoEditorProjectHistory(
   history: VideoEditorProjectHistoryState,
   currentProject: VideoProject,
-  nextProject: VideoProject
+  nextProject: VideoProject,
+  selection: VideoEditorSelection = { kind: 'scene' }
 ): VideoEditorProjectHistoryState {
   if (currentProject.id !== nextProject.id || history.projectId !== currentProject.id) {
     return failedHistory(nextProject.id, 'projectMismatch');
@@ -112,7 +125,7 @@ export function recordVideoEditorProjectHistory(
   try {
     return {
       projectId: currentProject.id,
-      past: [...history.past, structuredClone(currentProject)].slice(
+      past: [...history.past, structuredClone({ project: currentProject, selection })].slice(
         -VIDEO_EDITOR_PROJECT_HISTORY_ACTION_LIMIT
       ),
       future: [],
@@ -126,7 +139,8 @@ export function recordVideoEditorProjectHistory(
 
 export function undoVideoEditorProjectHistory(
   history: VideoEditorProjectHistoryState,
-  currentProject: VideoProject
+  currentProject: VideoProject,
+  selection: VideoEditorSelection = { kind: 'scene' }
 ): VideoEditorProjectHistoryTransition | null {
   if (history.transaction) return null;
   if (history.past.length === 0) return null;
@@ -138,7 +152,7 @@ export function undoVideoEditorProjectHistory(
   }
 
   const target = history.past.at(-1);
-  if (!target || target.id !== currentProject.id) {
+  if (!target || target.project.id !== currentProject.id) {
     return {
       status: 'failed',
       history: failedHistory(currentProject.id, 'projectMismatch'),
@@ -151,11 +165,12 @@ export function undoVideoEditorProjectHistory(
       history: {
         projectId: currentProject.id,
         past: history.past.slice(0, -1),
-        future: [structuredClone(currentProject), ...history.future],
+        future: [structuredClone({ project: currentProject, selection }), ...history.future],
         error: null,
         transaction: null,
       },
-      project: applyVideoProjectMutationPatch(structuredClone(target), {}),
+      project: applyVideoProjectMutationPatch(structuredClone(target.project), {}),
+      selection: structuredClone(target.selection),
     };
   } catch {
     return { status: 'failed', history: failedHistory(currentProject.id, 'snapshotFailed') };
@@ -164,7 +179,8 @@ export function undoVideoEditorProjectHistory(
 
 export function redoVideoEditorProjectHistory(
   history: VideoEditorProjectHistoryState,
-  currentProject: VideoProject
+  currentProject: VideoProject,
+  selection: VideoEditorSelection = { kind: 'scene' }
 ): VideoEditorProjectHistoryTransition | null {
   if (history.transaction) return null;
   if (history.future.length === 0) return null;
@@ -176,7 +192,7 @@ export function redoVideoEditorProjectHistory(
   }
 
   const [target, ...remainingFuture] = history.future;
-  if (!target || target.id !== currentProject.id) {
+  if (!target || target.project.id !== currentProject.id) {
     return {
       status: 'failed',
       history: failedHistory(currentProject.id, 'projectMismatch'),
@@ -188,14 +204,15 @@ export function redoVideoEditorProjectHistory(
       status: 'applied',
       history: {
         projectId: currentProject.id,
-        past: [...history.past, structuredClone(currentProject)].slice(
+        past: [...history.past, structuredClone({ project: currentProject, selection })].slice(
           -VIDEO_EDITOR_PROJECT_HISTORY_ACTION_LIMIT
         ),
         future: remainingFuture,
         error: null,
         transaction: null,
       },
-      project: applyVideoProjectMutationPatch(structuredClone(target), {}),
+      project: applyVideoProjectMutationPatch(structuredClone(target.project), {}),
+      selection: structuredClone(target.selection),
     };
   } catch {
     return { status: 'failed', history: failedHistory(currentProject.id, 'snapshotFailed') };

@@ -167,7 +167,7 @@ describe('video editor project history', () => {
     useVideoEditorStore.setState({
       projectHistory: {
         projectId: stale.id,
-        past: [stale],
+        past: [{ project: stale, selection: { kind: 'scene' } }],
         future: [],
         error: null,
         transaction: null,

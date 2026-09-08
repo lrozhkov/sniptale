@@ -26,3 +26,31 @@ it('skips a persisted subtitle-first clip when choosing the initial selection', 
     kind: VideoEditorSelectionKind.CLIP,
   });
 });
+
+it('toggles independent clips and preserves a stable range anchor', async () => {
+  const { selectVideoEditorClip } = await import('./model');
+  const order = ['a', 'b', 'c'];
+  const first = selectVideoEditorClip({ kind: 'scene' }, 'a', order, 'replace');
+  const group = selectVideoEditorClip(first, 'c', order, 'toggle');
+  expect(group).toEqual({ kind: 'clip-group', clipIds: ['a', 'c'], anchorClipId: 'a' });
+  expect(selectVideoEditorClip(group, 'b', order, 'range')).toEqual({
+    kind: 'clip-group',
+    clipIds: ['a', 'b'],
+    anchorClipId: 'a',
+  });
+  expect(selectVideoEditorClip(group, 'c', order, 'toggle')).toEqual({ kind: 'clip', clipId: 'a' });
+  expect(selectVideoEditorClip(first, 'a', order, 'toggle')).toEqual({ kind: 'scene' });
+});
+
+it('discards missing members and never selects an unknown clip', async () => {
+  const { selectVideoEditorClip } = await import('./model');
+  const selection = { kind: 'clip-group' as const, clipIds: ['gone', 'a'], anchorClipId: 'gone' };
+  expect(selectVideoEditorClip(selection, 'b', ['a', 'b'], 'toggle')).toEqual({
+    kind: 'clip-group',
+    clipIds: ['a', 'b'],
+    anchorClipId: 'a',
+  });
+  expect(selectVideoEditorClip({ kind: 'clip', clipId: 'a' }, 'missing', ['a'], 'replace')).toEqual(
+    { kind: 'clip', clipId: 'a' }
+  );
+});

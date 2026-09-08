@@ -53,7 +53,7 @@ interface ProjectTimelineTrackLanesProps {
   onCloseTrackGap: (trackId: string, gapStart: number, gapEnd: number) => void;
   onDropTimelineFile: (params: TimelineFileDropParams) => void;
   onDropEffectDocument?: ProjectTimelineProps['onDropEffectDocument'];
-  onSelectClip: (clipId: string | null) => void;
+  onSelectClip: (clipId: string | null, intent?: 'replace' | 'toggle' | 'range') => void;
   onSelectTransition: (transitionId: string) => void;
   onSetHoveredClipId: (clipId: string | null) => void;
   onUnsupportedTimelineFileDrop: () => void;
@@ -138,6 +138,7 @@ function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
         selectedClipId={
           props.dragGhost?.activeReorder ? props.dragGhost.clipId : props.selectedClipId
         }
+        selectedClipIds={props.selection.kind === 'clip-group' ? props.selection.clipIds : []}
         selectedEffectSelection={props.selectedEffectSelection}
         timelinePreviews={props.timelinePreviews}
         trackId={props.track.id}

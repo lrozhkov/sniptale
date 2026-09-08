@@ -353,3 +353,38 @@ it('uses complete thumbnail cells rather than narrow frame slices on the tallest
   const frame = container?.querySelector<HTMLElement>('[data-timeline-frame-source="0"]');
   expect(Number.parseFloat(frame?.style.width ?? '0')).toBeCloseTo((148 * 16) / 9);
 });
+
+it.each(['ctrlKey', 'metaKey', 'shiftKey'] as const)(
+  'selects at the trim edge with %s without starting a trim',
+  (modifier) => {
+    const project = createEmptyVideoProject('Timeline');
+    const onSelectClip = vi.fn();
+    const onBeginClipInteraction = vi.fn();
+    act(() => {
+      root?.render(
+        <ProjectTimelineClip
+          clip={createClip(project.tracks[0]!.id)}
+          isHovered={false}
+          isSelected={false}
+          pixelsPerSecond={24}
+          project={project}
+          trackLocked={false}
+          onClipHoverChange={vi.fn()}
+          onSelectClip={onSelectClip}
+          onBeginClipInteraction={onBeginClipInteraction}
+        />
+      );
+    });
+    const edge = container?.querySelector('button');
+    expect(edge).toBeTruthy();
+    act(() => {
+      edge?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, [modifier]: true }));
+      edge?.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1, [modifier]: true }));
+    });
+    expect(onSelectClip).toHaveBeenCalledExactlyOnceWith(
+      'clip-1',
+      modifier === 'shiftKey' ? 'range' : 'toggle'
+    );
+    expect(onBeginClipInteraction).not.toHaveBeenCalled();
+  }
+);

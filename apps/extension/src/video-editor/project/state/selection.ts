@@ -33,6 +33,20 @@ export function resolveSelectionAfterProjectUpdate(
       return selection;
     case VideoEditorSelectionKind.MOTION_LANE:
       return (project.motionRegions?.length ?? 0) > 0 ? selection : createSceneSelection();
+    case VideoEditorSelectionKind.CLIP_GROUP: {
+      const clipIds = selection.clipIds.filter((id) =>
+        project.clips.some((clip) => clip.id === id)
+      );
+      if (clipIds.length === 0) return createSceneSelection();
+      if (clipIds.length === 1) return { kind: VideoEditorSelectionKind.CLIP, clipId: clipIds[0]! };
+      return {
+        ...selection,
+        clipIds,
+        anchorClipId: clipIds.includes(selection.anchorClipId)
+          ? selection.anchorClipId
+          : clipIds[0]!,
+      };
+    }
     case VideoEditorSelectionKind.CLIP:
       return project.clips.some((clip) => clip.id === selection.clipId)
         ? selection
@@ -88,6 +102,7 @@ export function resolveSelectedTrackIdFromSelection(
     case VideoEditorSelectionKind.HISTORY_SPAN:
     case VideoEditorSelectionKind.SCENE:
     case VideoEditorSelectionKind.MOTION_LANE:
+    case VideoEditorSelectionKind.CLIP_GROUP:
     case VideoEditorSelectionKind.CURSOR_SEGMENT:
     case VideoEditorSelectionKind.OBJECT_TRACK:
     case VideoEditorSelectionKind.ACTION_OCCURRENCE:

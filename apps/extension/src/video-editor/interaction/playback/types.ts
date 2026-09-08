@@ -33,7 +33,7 @@ export interface PlaybackLatestState {
 export interface PlaybackHandlers {
   clearPlacementMode: () => void;
   deleteActionEvent: (actionEventId: string) => void;
-  deleteClip: (clipId: string) => void;
+  deleteClip: (clipId: string | readonly string[]) => void;
   deleteCursorSample: (sampleId: string) => void;
   deleteMotionRegion: (motionRegionId: string) => void;
   deleteObjectTrack: (objectTrackId: string) => void;

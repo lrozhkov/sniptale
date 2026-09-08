@@ -25,6 +25,9 @@ function handleSelectionDelete(
     case VideoEditorSelectionKind.TRACK:
     case VideoEditorSelectionKind.TRANSITION_JUNCTION:
       return;
+    case VideoEditorSelectionKind.CLIP_GROUP:
+      handlersRef.current.deleteClip(latestState.selection.clipIds);
+      return;
     case VideoEditorSelectionKind.CLIP:
       if (latestState.selectedClipId) {
         handlersRef.current.deleteClip(latestState.selectedClipId);

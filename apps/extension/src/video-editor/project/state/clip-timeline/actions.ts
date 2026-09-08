@@ -139,13 +139,14 @@ function createDeleteClipAction(set: VideoEditorStoreSet): VideoEditorProjectSta
         return {};
       }
 
-      if (!areClipTracksEditable(project, [clipId])) {
+      const clipIds = typeof clipId === 'string' ? [clipId] : [...new Set(clipId)];
+      if (clipIds.length === 0 || !areClipTracksEditable(project, clipIds)) {
         return {};
       }
 
       return applyProjectUpdate(state, () =>
         applyVideoProjectMutationPatch(project, {
-          clips: project.clips.filter((item) => item.id !== clipId),
+          clips: project.clips.filter((item) => !clipIds.includes(item.id)),
         })
       );
     });

@@ -3,7 +3,7 @@ import { clampTimelineScale } from '../contracts/timeline-scale';
 import type { StateCreator } from 'zustand';
 import { clampNumber } from '../../features/video/project/hydration';
 import { resolvePlacementModeAfterSelectionChange } from '../project/selection/placement';
-import { createSceneSelection } from '../project/selection/model';
+import { createSceneSelection, selectVideoEditorClip } from '../project/selection/model';
 import { VideoEditorSelectionKind } from '../contracts/selection';
 import { createPlacementStateActions } from './placement-actions';
 import type { VideoEditorState } from './types';
@@ -125,8 +125,24 @@ function createSelectTrackAction(set: VideoEditorStoreSet): VideoEditorState['se
 }
 
 function createSelectClipAction(set: VideoEditorStoreSet): VideoEditorState['selectClip'] {
-  return (selectedClipId) =>
+  return (selectedClipId, intent = 'replace') =>
     set((state): Partial<VideoEditorState> => {
+      if (selectedClipId && intent !== 'replace' && state.project) {
+        const ordered = [...state.project.clips]
+          .sort((a, b) => {
+            const trackA =
+              state.project!.tracks.find((track) => track.id === a.trackId)?.order ?? 0;
+            const trackB =
+              state.project!.tracks.find((track) => track.id === b.trackId)?.order ?? 0;
+            return trackA - trackB || a.startTime - b.startTime || a.id.localeCompare(b.id);
+          })
+          .map((clip) => clip.id);
+        return {
+          selection: selectVideoEditorClip(state.selection, selectedClipId, ordered, intent),
+          selectedTrackId: null,
+          placementMode: null,
+        };
+      }
       const selection =
         selectedClipId === null
           ? createSceneSelection()

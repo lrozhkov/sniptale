@@ -23,7 +23,8 @@ export function createVideoEditorProjectHistoryActions(
         if (!state.project) return {};
         const projectHistory = beginVideoEditorProjectHistoryTransaction(
           state.projectHistory,
-          state.project
+          state.project,
+          state.selection
         );
         lease = projectHistory.transaction?.lease ?? null;
         return { projectHistory };
@@ -54,12 +55,12 @@ function applyHistoryTransition(
   if (!state.project) return {};
   const transition =
     direction === 'undo'
-      ? undoVideoEditorProjectHistory(state.projectHistory, state.project)
-      : redoVideoEditorProjectHistory(state.projectHistory, state.project);
+      ? undoVideoEditorProjectHistory(state.projectHistory, state.project, state.selection)
+      : redoVideoEditorProjectHistory(state.projectHistory, state.project, state.selection);
   if (!transition) return {};
   if (transition.status === 'failed') return { projectHistory: transition.history };
   return {
-    ...applyProjectSnapshot(state, transition.project),
+    ...applyProjectSnapshot({ ...state, selection: transition.selection }, transition.project),
     projectHistory: transition.history,
   };
 }

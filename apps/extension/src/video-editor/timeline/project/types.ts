@@ -69,7 +69,7 @@ export interface ProjectTimelineProps {
   onZoomChange: (value: number) => void;
   onSetPlaybackRange: (range: VideoEditorPlaybackRange | null) => void;
   onSelectScene: () => void;
-  onSelectClip: (clipId: string | null) => void;
+  onSelectClip: (clipId: string | null, intent?: 'replace' | 'toggle' | 'range') => void;
   onSelectTrack: (trackId: string | null) => void;
   onSelectTransition: (transitionId: string) => void;
   onDropEffectDocument?: (

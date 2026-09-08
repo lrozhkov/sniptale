@@ -21,7 +21,7 @@ export interface VideoEditorSessionActions {
   clearPlacementMode: () => void;
   selectScene: () => void;
   selectTrack: (trackId: string | null) => void;
-  selectClip: (clipId: string | null) => void;
+  selectClip: (clipId: string | null, intent?: 'replace' | 'toggle' | 'range') => void;
   selectTransition: (transitionId: string) => void;
   selectCursorSegment: (sampleId: string) => void;
   selectObjectTrack: (objectTrackId: string) => void;

@@ -46,15 +46,11 @@ export function ProjectTimelineClipActions({
       />
       <ProjectTimelineToolbarActionButton
         danger
-        disabled={!selectedClip || !canDeleteSelectedClip}
+        disabled={!canDeleteSelectedClip}
         icon={<Trash2 size={14} strokeWidth={2} />}
         label={getClipActionLabel('delete')}
         onClick={onDeleteSelectedClip}
-        title={getClipActionTitle(
-          'delete',
-          !selectedClip || !canDeleteSelectedClip,
-          canDeleteSelectedClip
-        )}
+        title={getClipActionTitle('delete', !canDeleteSelectedClip, canDeleteSelectedClip)}
       />
     </>
   );
