@@ -3,7 +3,11 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { CaptureMode, VideoQuality } from '@sniptale/runtime-contracts/video/types/types';
+import {
+  CaptureMode,
+  VideoQuality,
+  WebcamPresentationMode,
+} from '@sniptale/runtime-contracts/video/types/types';
 import { createPopupPreviewStream } from './webcam-preview.test-support';
 import { WebcamSettingsPanel } from './webcam-settings-panel';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
@@ -31,7 +35,11 @@ function createSettings() {
   };
 }
 
-async function renderPanel(onSettingsChange = vi.fn(), captureMode: CaptureMode = CaptureMode.TAB) {
+async function renderPanel(
+  onSettingsChange = vi.fn(),
+  captureMode: CaptureMode = CaptureMode.TAB,
+  settings = createSettings()
+) {
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -40,7 +48,7 @@ async function renderPanel(onSettingsChange = vi.fn(), captureMode: CaptureMode 
       <WebcamSettingsPanel
         captureMode={captureMode}
         currentDeviceId="cam-1"
-        settings={createSettings()}
+        settings={settings}
         onSettingsChange={onSettingsChange}
       />
     )
@@ -71,7 +79,8 @@ it('renders camera settings and emits quality changes', async () => {
   expect(container?.textContent).not.toContain('popup.video.webcamQualityBrowserNotice');
   expect(
     container?.querySelector('[data-ui="popup.video.webcam-preview-mask"]')?.className
-  ).toContain('rounded-full');
+  ).not.toContain('rounded-full');
+  expect(container?.textContent).not.toContain('popup.video.webcamPresentationShapeLabel');
 
   await act(async () => {
     Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? [])
@@ -84,8 +93,14 @@ it('renders camera settings and emits quality changes', async () => {
   });
 });
 
-it('shows embedded presentation controls for tab recording', async () => {
-  const onSettingsChange = await renderPanel();
+it('shows embedded presentation controls when explicitly selected for tab recording', async () => {
+  const onSettingsChange = await renderPanel(vi.fn(), CaptureMode.TAB, {
+    ...createSettings(),
+    webcamPresentation: {
+      ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!,
+      mode: WebcamPresentationMode.EMBEDDED,
+    },
+  });
 
   expect(container?.textContent).toContain('popup.video.webcamPresentationEmbedded');
   expect(container?.textContent).toContain('popup.video.webcamPresentationCircle');

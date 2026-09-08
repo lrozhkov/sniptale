@@ -10,7 +10,7 @@ import {
 } from './types';
 import { DEFAULT_VIDEO_SETTINGS } from './defaults';
 
-it('keeps webcam recording disabled for a fresh user', () => {
+it('keeps webcam disabled and independently editable when a fresh user enables it', () => {
   expect(DEFAULT_VIDEO_SETTINGS.webcamEnabled).toBe(false);
   expect(DEFAULT_VIDEO_SETTINGS.autoFadeDelay).toBe(0);
   expect(DEFAULT_VIDEO_SETTINGS.recordingSurface).toEqual({
@@ -20,7 +20,7 @@ it('keeps webcam recording disabled for a fresh user', () => {
     cursorClickAnimationEnabled: false,
   });
   expect(DEFAULT_VIDEO_SETTINGS.webcamPresentation).toEqual(
-    expect.objectContaining({ mode: 'embedded', shape: 'circle', sizeFraction: 0.22 })
+    expect.objectContaining({ mode: 'separate-track', shape: 'circle', sizeFraction: 0.22 })
   );
 });
 
