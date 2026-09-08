@@ -19,7 +19,7 @@ import {
   type VideoProject,
   type VideoProjectAsset,
 } from '../../../features/video/project/types';
-import { importRecordingProjectAsset } from './assets';
+import { ensureRecordingAssets, importRecordingProjectAsset } from './assets';
 import { loadVideoMetadata } from '../media-metadata';
 import {
   normalizeRecordingActionEventsToProjectSpace,
@@ -86,31 +86,21 @@ function collectProjectAssetId(asset: VideoProjectAsset, projectAssetIds: string
   }
 }
 
-async function loadWebcamSidecarVideos(
-  sourceRecordingId: string,
-  projectAssetIds: string[]
-): Promise<RecordingSidecarVideoProjectInput[]> {
-  const webcamRecordingId = buildWebcamRecordingId(sourceRecordingId);
-  const entry = await getRecording(webcamRecordingId);
-  if (!entry) {
-    return [];
-  }
-
-  const asset = await importRecordingProjectAsset(webcamRecordingId);
-  collectProjectAssetId(asset, projectAssetIds);
-  return [
-    {
-      recordingId: webcamRecordingId,
-      filename: entry.filename,
-      width: asset.metadata.width,
-      height: asset.metadata.height,
-      duration: asset.metadata.duration ?? 0.1,
-      mimeType: asset.metadata.mimeType,
-      size: entry.size,
-      asset,
-      trackRole: VideoProjectTrackRole.CAMERA,
-    },
-  ];
+function buildWebcamSidecarVideo(
+  asset: VideoProjectAsset,
+  sourceRecordingId: string
+): RecordingSidecarVideoProjectInput {
+  return {
+    recordingId: buildWebcamRecordingId(sourceRecordingId),
+    filename: asset.name,
+    width: asset.metadata.width,
+    height: asset.metadata.height,
+    duration: asset.metadata.duration ?? 0.1,
+    mimeType: asset.metadata.mimeType,
+    size: asset.metadata.size,
+    asset,
+    trackRole: VideoProjectTrackRole.CAMERA,
+  };
 }
 
 /**
@@ -132,9 +122,12 @@ async function createProjectFromRecordingId(sourceRecordingId: string): Promise<
   const createdProjectAssetIds: string[] = [];
 
   try {
-    const asset = await importRecordingProjectAsset(sourceRecordingId);
-    collectProjectAssetId(asset, createdProjectAssetIds);
-    const sidecarVideos = await loadWebcamSidecarVideos(sourceRecordingId, createdProjectAssetIds);
+    const assets = await ensureRecordingAssets(createEmptyVideoProject(), sourceRecordingId);
+    for (const acquired of assets) collectProjectAssetId(acquired, createdProjectAssetIds);
+    const asset = assets[0]!;
+    const sidecarVideos = assets
+      .slice(1)
+      .map((camera) => buildWebcamSidecarVideo(camera, sourceRecordingId));
     const nextProject = await buildRecordingProject(asset, entry, sourceRecordingId, sidecarVideos);
     return await commitVideoProjectMutation(nextProject, { baseRevision: null });
   } catch (saveError) {

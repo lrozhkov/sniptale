@@ -42,6 +42,7 @@ type TimelineClipAction =
   | 'insertMaterial'
   | 'overlayMaterial'
   | 'upsertAsset'
+  | 'upsertAssets'
   | 'removeUnusedAssets'
   | 'addAssetClip'
   | 'addVideoBlock'

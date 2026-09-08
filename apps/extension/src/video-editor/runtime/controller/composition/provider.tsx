@@ -160,6 +160,7 @@ function useVideoEditorCommandComposition(
       getCurrentTime: getCurrentVideoEditorCurrentTime,
       setError: lifecycle.setError,
       upsertAsset: timeline.upsertAsset,
+      upsertAssets: timeline.upsertAssets,
       addAssetClip: timeline.addAssetClip,
       moveClip: timeline.moveClip,
       trimClipEnd: timeline.trimClipEnd,
@@ -174,6 +175,7 @@ function useVideoEditorCommandComposition(
       timeline.trimClipEnd,
       timeline.trimClipStart,
       timeline.upsertAsset,
+      timeline.upsertAssets,
     ]
   );
   const exportCommandPort = useMemo(

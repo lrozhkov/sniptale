@@ -61,6 +61,9 @@ vi.mock('./assets', async (importOriginal) => {
   return {
     ...actual,
     importRecordingProjectAsset: importRecordingProjectAssetMock,
+    ensureRecordingAssets: async (_project: unknown, recordingId: string) => [
+      await importRecordingProjectAssetMock(recordingId),
+    ],
   };
 });
 

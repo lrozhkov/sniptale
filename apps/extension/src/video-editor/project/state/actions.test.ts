@@ -24,6 +24,33 @@ describe('video editor store project track and asset actions', () => {
     vi.spyOn(Date, 'now').mockReturnValue(500);
   });
 
+  it('publishes all recording parts in one observable update and history entry', () => {
+    const store = createVideoEditorTestStore();
+    const project = createEmptyVideoProject();
+    store.getState().setProject(project);
+    const screen = createVideoAsset('screen', true);
+    const camera = createVideoAsset('camera', false);
+    const seen: number[] = [];
+    const unsubscribe = store.subscribe((state) => seen.push(state.project?.assets.length ?? 0));
+    store.getState().upsertAssets([screen, camera]);
+    unsubscribe();
+    expect(seen).toEqual([2]);
+    const after = store.getState();
+    expect(after.project?.clips).toHaveLength(0);
+    expect(after.projectHistory.past).toHaveLength(1);
+    const undo = undoVideoEditorProjectHistory(after.projectHistory, after.project!);
+    if (undo?.status !== 'applied') throw new Error('Expected undo');
+    expect(undo.project.assets).toHaveLength(0);
+    const redo = redoVideoEditorProjectHistory(undo.history, undo.project);
+    if (redo?.status !== 'applied') throw new Error('Expected redo');
+    expect(redo.project.assets).toEqual([screen, camera]);
+    store.getState().upsertAssets([{ ...screen, name: 'Updated screen' }, camera]);
+    expect(store.getState().project?.assets.map(({ name }) => name)).toEqual([
+      'Updated screen',
+      camera.name,
+    ]);
+  });
+
   it(
     'applies track and asset structure mutations through one project update seam',
     verifyTrackAndAssetMutations

@@ -111,6 +111,7 @@ function selectTimelineEditingPort(state: VideoEditorState): TimelineEditingPort
     updateTransitionEasing: state.updateTransitionEasing,
     updateTransitionTemplate: state.updateTransitionTemplate,
     upsertAsset: state.upsertAsset,
+    upsertAssets: state.upsertAssets,
     removeUnusedAssets: state.removeUnusedAssets,
     upsertObjectTrack: state.upsertObjectTrack,
     upsertObjectTrackCorrectionAnchor: state.upsertObjectTrackCorrectionAnchor,

@@ -1,4 +1,7 @@
 import { getRecording } from '../../../composition/persistence/recordings/index';
+import { deleteProjectAsset } from '../../../composition/persistence/projects/index';
+import { buildWebcamRecordingId } from '@sniptale/runtime-contracts/video/types/sidecar';
+import { createLogger } from '@sniptale/platform/observability/logger';
 import { getAggregatePresentation } from '../../../composition/persistence/aggregate-presentations';
 import {
   getMediaAssetBlob,
@@ -6,6 +9,7 @@ import {
 } from '../../../composition/persistence/media-library/index';
 import type { MediaLibraryEntry } from '../../../composition/persistence/media-library/contracts';
 import { createVideoProjectAsset } from '../../../features/video/project/factories/creation';
+import { createRecordingMediaId } from '../../../features/media-hub/media-id';
 import { saveProjectAssetSafely } from '../../../workflows/media-hub/store';
 import { translate } from '../../../platform/i18n';
 import {
@@ -15,6 +19,8 @@ import {
 } from '../../../features/video/project/types';
 import { loadAudioMetadata, loadImageMetadata, loadVideoMetadata } from '../media-metadata';
 import { assertImportableProjectAssetFile } from './import-validation';
+
+const logger = createLogger({ namespace: 'VideoEditorRecordingAssets' });
 
 type ImportableProjectAssetType =
   | typeof VideoProjectAssetType.IMAGE
@@ -72,25 +78,55 @@ async function buildProjectRecordingAsset(
   );
 }
 
-/**
- * Ensures a project contains a media asset wrapper for a recording.
- */
-export async function ensureRecordingAsset(
+/** Acquires the complete recording material before the caller publishes it to its project. */
+export async function ensureRecordingAssets(
   project: VideoProject,
   sourceRecordingId: string
-): Promise<VideoProjectAsset | null> {
-  const existing = findExistingRecordingAsset(project, sourceRecordingId);
-
-  if (existing) {
-    return existing;
+): Promise<VideoProjectAsset[]> {
+  const acquired: VideoProjectAsset[] = [];
+  try {
+    acquired.push(
+      findExistingRecordingAsset(project, sourceRecordingId) ??
+        (await importRecordingProjectAsset(sourceRecordingId))
+    );
+    const webcamId = buildWebcamRecordingId(sourceRecordingId);
+    const existingCamera = findExistingRecordingAsset(project, webcamId);
+    if (existingCamera) acquired.push(existingCamera);
+    else {
+      const camera = await getRecording(webcamId);
+      if (camera) {
+        acquired.push(await buildProjectRecordingAsset(webcamId, camera.file, camera.filename));
+      } else {
+        const unavailable = await getMediaLibraryEntry(createRecordingMediaId(webcamId));
+        if (
+          unavailable?.source.kind === 'recording' &&
+          unavailable.source.recordingId === webcamId
+        ) {
+          throw new Error(translate('videoEditor.sidebar.libraryMediaUnavailable'));
+        }
+      }
+    }
+    return acquired.map((asset, index) => ({
+      ...asset,
+      recordingPart: { recordingId: sourceRecordingId, role: index === 0 ? 'primary' : 'camera' },
+    }));
+  } catch (error) {
+    await Promise.all(
+      acquired.map(async (asset) => {
+        if (
+          project.assets.some(({ id }) => id === asset.id) ||
+          asset.source.kind !== 'project-asset'
+        )
+          return;
+        try {
+          await deleteProjectAsset(asset.source.projectAssetId);
+        } catch (cleanupError) {
+          logger.warn('Failed to clean up an uncommitted recording copy', cleanupError);
+        }
+      })
+    );
+    throw error;
   }
-
-  const entry = await getRecording(sourceRecordingId);
-  if (!entry) {
-    throw new Error(translate('videoEditor.app.recordingNotFound'));
-  }
-
-  return buildProjectRecordingAsset(sourceRecordingId, entry.file, entry.filename);
 }
 
 export async function importRecordingProjectAsset(
@@ -105,20 +141,20 @@ export async function importRecordingProjectAsset(
 }
 
 /** Copies library media into the project, preserving recording telemetry provenance. */
-export async function ensureLibraryMediaAsset(
+export async function ensureLibraryMediaAssets(
   project: VideoProject,
   mediaId: string
-): Promise<VideoProjectAsset | null> {
+): Promise<VideoProjectAsset[]> {
   const existing = project.assets.find(
     (asset) => asset.source.kind === 'project-asset' && asset.source.originMediaId === mediaId
   );
-  if (existing) return existing;
+  if (existing) return [existing];
 
   const entry = await getMediaLibraryEntry(mediaId);
   if (!entry) throw new Error(translate('videoEditor.sidebar.libraryMediaUnavailable'));
   const assetType = getLibraryImportType(entry);
   if (entry.source.kind === 'recording') {
-    return ensureRecordingAsset(project, entry.source.recordingId);
+    return ensureRecordingAssets(project, entry.source.recordingId);
   }
 
   const blob = await readLibraryImportBlob(entry, assetType);
@@ -128,7 +164,7 @@ export async function ensureLibraryMediaAsset(
   if (asset.source.kind === 'project-asset') {
     asset.source.originMediaId = mediaId;
   }
-  return asset;
+  return [asset];
 }
 
 function getLibraryImportType(entry: MediaLibraryEntry): ImportableProjectAssetType {

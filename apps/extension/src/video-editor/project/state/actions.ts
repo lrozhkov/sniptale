@@ -36,6 +36,7 @@ type VideoEditorProjectActionKeys =
   | 'toggleUtilityLaneLock'
   | 'clearUtilityLane'
   | 'upsertAsset'
+  | 'upsertAssets'
   | 'removeUnusedAssets'
   | 'addAssetClip'
   | 'appendMaterial'
@@ -112,20 +113,26 @@ export function createVideoEditorProjectActions(
   const deleteObjectTrack = createObjectTrackDeleter(set);
   const upsertObjectTrackCorrectionAnchor = createObjectTrackCorrectionAnchorUpserter(set);
   const startObjectTrackAnchorPlacement = createObjectTrackAnchorPlacementStarter(set);
-  const upsertAsset: VideoEditorProjectState['upsertAsset'] = (asset) =>
+  const upsertAssets: VideoEditorProjectState['upsertAssets'] = (assets) => {
+    if (assets.length === 0) return;
     set((state) =>
-      applyProjectUpdate(state, (project) =>
-        applyVideoProjectMutationPatch(project, {
-          assets: project.assets.some((item) => item.id === asset.id)
-            ? project.assets.map((item) => (item.id === asset.id ? asset : item))
-            : [...project.assets, asset],
-        })
-      )
+      applyProjectUpdate(state, (project) => {
+        const replacements = new Map(assets.map((asset) => [asset.id, asset]));
+        const nextAssets = project.assets.map((asset) => {
+          const replacement = replacements.get(asset.id) ?? asset;
+          replacements.delete(asset.id);
+          return replacement;
+        });
+        nextAssets.push(...replacements.values());
+        return applyVideoProjectMutationPatch(project, { assets: nextAssets });
+      })
     );
+  };
 
   return {
     ...trackActions,
-    upsertAsset,
+    upsertAsset: (asset) => upsertAssets([asset]),
+    upsertAssets,
     removeUnusedAssets: (assetIds) =>
       set((state) =>
         applyProjectUpdate(state, (project) => {

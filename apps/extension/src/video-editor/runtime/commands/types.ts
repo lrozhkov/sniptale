@@ -44,6 +44,7 @@ export interface AssetHandlerPort
   getCurrentProjectId: () => string | null;
   getCurrentTime: () => number;
   upsertAsset: VideoEditorProjectActions['upsertAsset'];
+  upsertAssets: VideoEditorProjectActions['upsertAssets'];
   addAssetClip: VideoEditorProjectActions['addAssetClip'];
   moveClip: VideoEditorProjectActions['moveClip'];
   trimClipEnd: VideoEditorProjectActions['trimClipEnd'];

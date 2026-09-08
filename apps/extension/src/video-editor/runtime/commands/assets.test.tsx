@@ -9,7 +9,7 @@ import {
 } from '../../../features/video/project/factories/creation';
 import { VideoProjectAssetType, VideoTrackKind } from '../../../features/video/project/types';
 import { useAssetHandlers } from './assets';
-import { ensureLibraryMediaAsset, ensureRecordingAsset } from '../../project/operations/ops';
+import { ensureLibraryMediaAssets, ensureRecordingAssets } from '../../project/operations/ops';
 
 const { deleteProjectAssetMock, importProjectAssetMock, toastErrorMock } = vi.hoisted(() => ({
   toastErrorMock: vi.fn(),
@@ -30,8 +30,8 @@ vi.mock('../../project/operations/ops', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../project/operations/ops')>();
   return {
     ...actual,
-    ensureRecordingAsset: vi.fn(),
-    ensureLibraryMediaAsset: vi.fn(),
+    ensureRecordingAssets: vi.fn(),
+    ensureLibraryMediaAssets: vi.fn(),
     importProjectAsset: importProjectAssetMock,
   };
 });
@@ -74,6 +74,7 @@ function createParams(): TestAssetHandlerPort {
     trimClipEnd: vi.fn(),
     trimClipStart: vi.fn(),
     upsertAsset: vi.fn(),
+    upsertAssets: vi.fn(),
   };
   return params;
 }
@@ -226,33 +227,69 @@ describe('library material import', () => {
   it('coalesces concurrent library insertion and never places a timeline clip', async () => {
     const params = createParams();
     const asset = await importProjectAssetMock();
-    vi.mocked(ensureLibraryMediaAsset).mockResolvedValue(asset);
+    const camera = {
+      ...asset,
+      id: 'camera',
+      source: { kind: 'project-asset', projectAssetId: 'camera' },
+    };
+    vi.mocked(ensureLibraryMediaAssets).mockResolvedValue([asset, camera]);
     renderHook(params);
     const first = latestHandlers!.handleAddLibraryMedia('library-image');
     const second = latestHandlers!.handleAddLibraryMedia('library-image');
     expect(second).toBe(first);
     await act(async () => first);
-    expect(ensureLibraryMediaAsset).toHaveBeenCalledOnce();
-    expect(params.upsertAsset).toHaveBeenCalledExactlyOnceWith(asset);
+    expect(ensureLibraryMediaAssets).toHaveBeenCalledOnce();
+    expect(params.upsertAssets).toHaveBeenCalledExactlyOnceWith([asset, camera]);
+    expect(params.upsertAsset).not.toHaveBeenCalled();
     expect(params.addAssetClip).not.toHaveBeenCalled();
   });
+
+  it.each(['library', 'recording'])(
+    'discards only new camera copies after unmount during %s import',
+    async (kind) => {
+      const params = createParams();
+      const screen = await importProjectAssetMock();
+      const camera = {
+        ...screen,
+        id: 'camera',
+        source: { kind: 'project-asset', projectAssetId: 'camera' },
+      };
+      params.getCurrentProject()!.assets.push(screen);
+      vi.mocked(ensureLibraryMediaAssets).mockResolvedValue([screen, camera]);
+      vi.mocked(ensureRecordingAssets).mockResolvedValue([screen, camera]);
+      renderHook(params);
+      const pending =
+        kind === 'library'
+          ? latestHandlers!.handleAddLibraryMedia('source')
+          : latestHandlers!.handleAddRecording('source');
+      act(() => {
+        root?.unmount();
+        root = null;
+      });
+      if (kind === 'library') await expect(pending).rejects.toThrow();
+      else await pending;
+      expect(deleteProjectAssetMock).toHaveBeenCalledExactlyOnceWith('camera');
+      expect(params.upsertAssets).not.toHaveBeenCalled();
+      expect(params.setError).not.toHaveBeenCalled();
+    }
+  );
 
   it('propagates library insertion failure and allows retry', async () => {
     const params = createParams();
     const asset = await importProjectAssetMock();
-    vi.mocked(ensureLibraryMediaAsset).mockRejectedValueOnce(new Error('Unavailable'));
+    vi.mocked(ensureLibraryMediaAssets).mockRejectedValueOnce(new Error('Unavailable'));
     renderHook(params);
     await expect(latestHandlers!.handleAddLibraryMedia('image')).rejects.toThrow('Unavailable');
-    expect(params.upsertAsset).not.toHaveBeenCalled();
-    vi.mocked(ensureLibraryMediaAsset).mockResolvedValueOnce(asset);
+    expect(params.upsertAssets).not.toHaveBeenCalled();
+    vi.mocked(ensureLibraryMediaAssets).mockResolvedValueOnce([asset]);
     await act(async () => latestHandlers!.handleAddLibraryMedia('image'));
-    expect(params.upsertAsset).toHaveBeenCalledExactlyOnceWith(asset);
+    expect(params.upsertAssets).toHaveBeenCalledExactlyOnceWith([asset]);
   });
 
   it.each(['switch', 'unmount'])('cleans a new library copy after %s', async (reason) => {
     const params = createParams();
     const asset = await importProjectAssetMock();
-    vi.mocked(ensureLibraryMediaAsset).mockResolvedValueOnce(asset);
+    vi.mocked(ensureLibraryMediaAssets).mockResolvedValueOnce([asset]);
     renderHook(params);
     const pending = latestHandlers!.handleAddLibraryMedia('image');
     if (reason === 'switch') params.getCurrentProjectId = () => 'other-project';
@@ -263,29 +300,29 @@ describe('library material import', () => {
       });
     await expect(pending).rejects.toThrow();
     expect(deleteProjectAssetMock).toHaveBeenCalledExactlyOnceWith('asset-1');
-    expect(params.upsertAsset).not.toHaveBeenCalled();
+    expect(params.upsertAssets).not.toHaveBeenCalled();
   });
 
   it('retains an existing library copy after target changes', async () => {
     const params = createParams();
     const asset = await importProjectAssetMock();
     params.getCurrentProject()!.assets.push(asset);
-    vi.mocked(ensureLibraryMediaAsset).mockResolvedValueOnce(asset);
+    vi.mocked(ensureLibraryMediaAssets).mockResolvedValueOnce([asset]);
     renderHook(params);
     const pending = latestHandlers!.handleAddLibraryMedia('image');
     params.getCurrentProjectId = () => 'other-project';
     await expect(pending).rejects.toThrow();
     expect(deleteProjectAssetMock).not.toHaveBeenCalled();
-    expect(params.upsertAsset).not.toHaveBeenCalled();
+    expect(params.upsertAssets).not.toHaveBeenCalled();
   });
 
   it('adds the recording to materials without placing any clip', async () => {
     const params = createParams();
     const asset = await importProjectAssetMock();
-    vi.mocked(ensureRecordingAsset).mockResolvedValue(asset);
+    vi.mocked(ensureRecordingAssets).mockResolvedValue([asset]);
     renderHook(params);
     await act(async () => latestHandlers!.handleAddRecording('recording'));
-    expect(params.upsertAsset).toHaveBeenCalledWith(asset);
+    expect(params.upsertAssets).toHaveBeenCalledWith([asset]);
     expect(params.addAssetClip).not.toHaveBeenCalled();
   });
 
@@ -293,7 +330,7 @@ describe('library material import', () => {
     const params = createParams();
     const asset = await importProjectAssetMock();
     let resolve!: (value: typeof asset) => void;
-    vi.mocked(ensureRecordingAsset).mockReturnValue(
+    vi.mocked(ensureRecordingAssets).mockReturnValue(
       new Promise((done) => {
         resolve = done;
       })
@@ -302,10 +339,10 @@ describe('library material import', () => {
     const pending = latestHandlers!.handleAddRecording('recording');
     params.getCurrentProjectId = () => 'another-project';
     await act(async () => {
-      resolve(asset);
+      resolve([asset]);
       await pending;
     });
-    expect(params.upsertAsset).not.toHaveBeenCalled();
+    expect(params.upsertAssets).not.toHaveBeenCalled();
     expect(params.addAssetClip).not.toHaveBeenCalled();
     expect(deleteProjectAssetMock).toHaveBeenCalledWith('asset-1');
   });
@@ -314,12 +351,12 @@ describe('library material import', () => {
     const params = createParams();
     const asset = await importProjectAssetMock();
     params.getCurrentProject()!.assets.push(asset);
-    vi.mocked(ensureRecordingAsset).mockResolvedValue(asset);
+    vi.mocked(ensureRecordingAssets).mockResolvedValue([asset]);
     renderHook(params);
     const pending = latestHandlers!.handleAddRecording('recording');
     params.getCurrentProjectId = () => 'another-project';
     await act(async () => pending);
-    expect(params.upsertAsset).not.toHaveBeenCalled();
+    expect(params.upsertAssets).not.toHaveBeenCalled();
     expect(deleteProjectAssetMock).not.toHaveBeenCalled();
   });
 });

@@ -35,6 +35,7 @@ it('keeps each command family stable across unrelated parent renders', () => {
     trimClipEnd: initial.trimClipEnd,
     trimClipStart: initial.trimClipStart,
     upsertAsset: initial.upsertAsset,
+    upsertAssets: initial.upsertAssets,
   };
   const exportPort: ExportHandlerPort = {
     cancelExport: initial.cancelExport,

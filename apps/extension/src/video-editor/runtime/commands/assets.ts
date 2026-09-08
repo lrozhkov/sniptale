@@ -9,8 +9,8 @@ import {
   type VideoProjectAsset,
 } from '../../../features/video/project/types/index';
 import {
-  ensureLibraryMediaAsset,
-  ensureRecordingAsset,
+  ensureLibraryMediaAssets,
+  ensureRecordingAssets,
   importProjectAsset,
 } from '../../project/operations/ops';
 import type {
@@ -147,32 +147,18 @@ async function importRecordedAudioFile(
 }
 
 function useRecordingAssetHandler(port: AssetHandlerPort) {
+  const acquire = useMaterialAssetHandler(port, 'recording');
   return useCallback(
     async (sourceRecordingId: string) => {
-      const project = port.getCurrentProject();
-      if (!project) {
-        return;
-      }
-
       try {
-        const asset = await ensureRecordingAsset(project, sourceRecordingId);
-        if (!asset) {
-          return;
-        }
-
-        if (port.getCurrentProjectId() !== project.id) {
-          if (!project.assets.some(({ id }) => id === asset.id)) {
-            await cleanupStaleImportedAsset(asset);
-          }
-          return;
-        }
-        port.upsertAsset(asset);
+        await acquire(sourceRecordingId);
       } catch (assetError) {
+        if (assetError instanceof DOMException && assetError.name === 'AbortError') return;
         logger.error('Failed to add recording', assetError);
         port.setError(toErrorMessage(assetError, 'common.errors.actionFailed'));
       }
     },
-    [port]
+    [acquire, port]
   );
 }
 
@@ -194,7 +180,7 @@ function useProjectAssetImportHandler(
   );
 }
 
-function useLibraryMediaAssetHandler(port: AssetHandlerPort) {
+function useMaterialAssetHandler(port: AssetHandlerPort, kind: 'library' | 'recording') {
   const pending = useRef(new Map<string, Promise<void>>());
   const lifecycle = useRef(0);
   useEffect(() => {
@@ -215,20 +201,25 @@ function useLibraryMediaAssetHandler(port: AssetHandlerPort) {
       if (existing) return existing;
       const generation = lifecycle.current;
       const task = (async () => {
-        const asset = await ensureLibraryMediaAsset(project, mediaId);
-        if (!asset) throw new Error(translate('videoEditor.sidebar.libraryMediaUnavailable'));
+        const assets = await (
+          kind === 'library' ? ensureLibraryMediaAssets : ensureRecordingAssets
+        )(project, mediaId);
+        if (assets.length === 0)
+          throw new Error(translate('videoEditor.sidebar.libraryMediaUnavailable'));
         if (lifecycle.current !== generation || port.getCurrentProjectId() !== project.id) {
-          if (!project.assets.some(({ id }) => id === asset.id)) {
-            await cleanupStaleImportedAsset(asset);
-          }
-          throw new Error(translate('videoEditor.app.materialsUnavailable'));
+          await Promise.all(
+            assets
+              .filter((asset) => !project.assets.some(({ id }) => id === asset.id))
+              .map(cleanupStaleImportedAsset)
+          );
+          throw new DOMException(translate('videoEditor.app.materialsUnavailable'), 'AbortError');
         }
-        port.upsertAsset(asset);
+        port.upsertAssets(assets);
       })().finally(() => pending.current.delete(key));
       pending.current.set(key, task);
       return task;
     },
-    [port]
+    [kind, port]
   );
 }
 
@@ -244,7 +235,7 @@ export function useAssetHandlers(
   | 'handleImportVideo'
 > {
   const handleAddRecording = useRecordingAssetHandler(port);
-  const handleAddLibraryMedia = useLibraryMediaAssetHandler(port);
+  const handleAddLibraryMedia = useMaterialAssetHandler(port, 'library');
   const handleImportImage = useProjectAssetImportHandler(
     VideoProjectAssetType.IMAGE,
     'image',

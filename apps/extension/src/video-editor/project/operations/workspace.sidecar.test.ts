@@ -14,12 +14,14 @@ const {
   getRecordingTelemetry,
   getVideoProject,
   importRecordingProjectAssetMock,
+  ensureRecordingAssetsMock,
   saveVideoProject,
 } = vi.hoisted(() => ({
   getRecording: vi.fn(),
   getRecordingTelemetry: vi.fn(),
   getVideoProject: vi.fn(),
   importRecordingProjectAssetMock: vi.fn(),
+  ensureRecordingAssetsMock: vi.fn(),
   saveVideoProject: vi.fn(),
 }));
 
@@ -55,8 +57,8 @@ vi.mock('../media-metadata', () => ({
 }));
 
 vi.mock('./assets', () => ({
-  ensureLibraryMediaAsset: vi.fn(),
-  ensureRecordingAsset: vi.fn(),
+  ensureLibraryMediaAssets: vi.fn(),
+  ensureRecordingAssets: ensureRecordingAssetsMock,
   importProjectAsset: vi.fn(),
   importRecordingProjectAsset: importRecordingProjectAssetMock,
 }));
@@ -111,6 +113,10 @@ beforeEach(async () => {
       createdAt: 1,
     })
   );
+  ensureRecordingAssetsMock.mockImplementation(async (_project, id: string) => [
+    await importRecordingProjectAssetMock(id),
+    await importRecordingProjectAssetMock(`${id}-webcam`),
+  ]);
   const { loadVideoMetadata } = await import('../media-metadata');
   vi.mocked(loadVideoMetadata).mockResolvedValue({
     audioPeaks: null,

@@ -160,6 +160,7 @@ const expectedKeys = {
     'updateTransitionEasing',
     'updateTransitionTemplate',
     'upsertAsset',
+    'upsertAssets',
     'removeUnusedAssets',
     'upsertObjectTrack',
     'upsertObjectTrackCorrectionAnchor',
