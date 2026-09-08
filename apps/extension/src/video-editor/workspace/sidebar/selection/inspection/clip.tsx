@@ -1,3 +1,4 @@
+import { CameraAppearanceControls } from '../inputs/camera-appearance';
 import { activeCameraPosition } from '../../../../../features/video/project/camera/animation';
 import type React from 'react';
 import { translate } from '../../../../../platform/i18n';
@@ -18,7 +19,7 @@ import { ClipTimingControls, ClipFadeFields } from '../inputs/clip-timing';
 import { InspectorGroupedPanel } from '../grouped-inspector';
 import { createSelectionRuntime, SelectionEmptyState } from './helpers';
 import { renderAudioFields } from '../inputs/audio-fields';
-import { MediaFrameControls } from '../inputs/media-frame';
+import { MediaFrameControls, MediaShadowControls } from '../inputs/media-frame';
 import { PANEL_SECTION_CLASS_NAME } from '../shared/panel';
 import {
   renderShapeStyleFields,
@@ -29,7 +30,7 @@ import { renderTransformFields } from '../inputs/transform-fields';
 import { createEffectInstanceGroup } from '../effect-instance/groups';
 import { ClipInfo, resolveClipAsset } from './clip-info';
 import { isVideoEditorPresentedClip } from '../../../../project/operations/presented-tracks';
-import { CameraLayoutControls } from '../inputs/camera-layout';
+import { CameraLayoutControls, CameraFitControls } from '../inputs/camera-layout';
 
 export function InspectClipPanel(props: WorkspaceSidebarSelectionPanelProps) {
   const clip = props.selectedClip;
@@ -196,9 +197,6 @@ function createCameraPlacementGroup(
   locked: boolean
 ) {
   const isCameraClip = isCameraRoleVideoClip(props.project, clip);
-  const position = isCameraClip
-    ? activeCameraPosition(clip, props.currentTime ?? clip.startTime)
-    : undefined;
 
   return {
     id: 'camera',
@@ -208,6 +206,8 @@ function createCameraPlacementGroup(
     content: isCameraClip ? (
       <>
         <CameraLayoutControls
+          key={`${clip.id}:${activeCameraPosition(clip, props.currentTime ?? clip.startTime)?.id ?? 'initial'}`}
+          customControls={<CameraFitControls {...props} clip={clip} disabled={locked} />}
           currentTime={props.currentTime ?? clip.startTime}
           clip={clip}
           disabled={locked}
@@ -220,10 +220,23 @@ function createCameraPlacementGroup(
             ? {}
             : { canAddCameraPosition: props.canAddCameraPosition })}
         />
-        <MediaFrameControls
-          {...props}
-          clip={position ? { ...clip, fitMode: position.fitMode } : clip}
-          locked={locked}
+        <CameraAppearanceControls
+          clip={clip}
+          currentTime={props.currentTime ?? clip.startTime}
+          disabled={locked}
+          {...(props.onEditCameraPosition ? { onEdit: props.onEditCameraPosition } : {})}
+        />
+        <MediaShadowControls
+          clipId={clip.id}
+          disabled={locked}
+          shadowIntensity={clip.shadowIntensity ?? 0}
+          shadowMode={clip.shadowMode ?? 'BACKDROP'}
+          {...(props.onUpdateMediaClipShadowIntensity
+            ? { onUpdateMediaClipShadowIntensity: props.onUpdateMediaClipShadowIntensity }
+            : {})}
+          {...(props.onUpdateMediaClipShadowMode
+            ? { onUpdateMediaClipShadowMode: props.onUpdateMediaClipShadowMode }
+            : {})}
         />
       </>
     ) : null,

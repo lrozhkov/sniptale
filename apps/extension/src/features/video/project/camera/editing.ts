@@ -1,3 +1,4 @@
+import { isCameraAppearance } from './appearance';
 import { applyVideoProjectClipsPatch } from '../mutation';
 import type { VideoProject, VideoProjectVideoClip } from '../types';
 import {
@@ -24,6 +25,15 @@ export function editCameraPosition(
     )
   )
     return project;
+  if (edit.kind === 'appearance') {
+    if (!isCameraAppearance(edit.appearance)) return project;
+    return applyVideoProjectClipsPatch(
+      project,
+      project.clips.map((item) =>
+        item.id === clipId ? { ...clip, cameraAppearance: { ...edit.appearance } } : item
+      )
+    );
+  }
   let positions = clip.cameraPositions ?? [];
   if (edit.kind === 'add') {
     if (!canAddCameraPosition(project, clipId, time)) return project;

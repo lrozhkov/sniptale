@@ -1,3 +1,4 @@
+import type { CameraAppearance } from '../camera/appearance';
 import type { CameraPosition } from '../camera/animation';
 import type {
   VideoProjectActionEvent,
@@ -199,6 +200,7 @@ export interface VideoProjectUtilityLanes {
 
 export interface VideoProjectVideoClip extends VideoProjectBaseClip, VideoProjectMediaVisualFields {
   cameraPositions?: CameraPosition[];
+  cameraAppearance?: CameraAppearance;
   type: typeof VideoProjectClipType.VIDEO;
   assetId: string;
   /** A placement's identity survives cuts and timing edits; a duplicate gets a new identity. */

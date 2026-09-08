@@ -1,3 +1,4 @@
+import { isCameraAppearance } from '../camera/appearance';
 import type { VideoProjectClip } from '../types/index';
 import {
   VideoClipLinkMode,
@@ -161,6 +162,8 @@ export function isVideoProjectClip(value: unknown): value is VideoProjectClip {
       (value['type'] === VideoProjectClipType.AUDIO ||
         (hasMediaVisualFields(value) &&
           hasCameraPositions(value['cameraPositions']) &&
+          (value['cameraAppearance'] === undefined ||
+            isCameraAppearance(value['cameraAppearance'])) &&
           (value['sourceInstanceId'] === undefined || isString(value['sourceInstanceId']))))
     );
   }

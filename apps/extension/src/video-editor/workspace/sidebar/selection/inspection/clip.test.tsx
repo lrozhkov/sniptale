@@ -273,7 +273,9 @@ describe('workspace-sidebar/selection/inspect-core', () => {
 
     renderInspectPanel(props);
 
-    expect(container?.textContent).toContain('videoEditor.sidebar.cameraLayoutOverlay');
+    expect(
+      container?.querySelector('[data-ui="video-editor.camera-placement-controls"]')
+    ).not.toBeNull();
     const bottomLeft = Array.from(container?.querySelectorAll('button') ?? []).find(
       (button) =>
         button.getAttribute('aria-label') === 'videoEditor.sidebar.cameraPlacementBottomLeft'
@@ -304,7 +306,9 @@ describe('workspace-sidebar/selection/inspect-core', () => {
     );
     renderInspectPanel({ ...props });
 
-    expect(container?.textContent).toContain('videoEditor.sidebar.cameraLayoutOverlay');
+    expect(
+      container?.querySelector('[data-ui="video-editor.camera-placement-controls"]')
+    ).not.toBeNull();
     expect(container?.textContent).not.toContain('videoEditor.sidebar.rotationLabel');
   });
 

@@ -10,7 +10,10 @@ import {
 } from '../../../../../features/video/project/factories/creation';
 import { createVideoClipFromAsset } from '../../../../../features/video/project/factories/clip';
 import { VideoProjectAssetType } from '../../../../../features/video/project/types';
-import { VideoProjectCameraLayout } from '../../../../../features/video/project/camera/placement';
+import {
+  VideoProjectCameraLayout,
+  resolveVideoProjectCameraPlacement,
+} from '../../../../../features/video/project/camera/placement';
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
@@ -68,18 +71,18 @@ function button(suffix: string) {
 }
 
 describe('camera interval controls', () => {
-  it('restores a hidden camera through the layout selector', () => {
+  it('restores a hidden camera through the full-frame preset', () => {
     const props = createProps();
     props.clip.transform.opacity = 0;
     act(() => root.render(<CameraLayoutControls {...props} />));
-    expect(layoutButton().textContent).toContain('videoEditor.sidebar.cameraLayoutHidden');
-    chooseLayout('videoEditor.sidebar.cameraLayoutFullframe');
+    expect(button('layout-hidden').getAttribute('aria-pressed')).toBe('true');
+    act(() => button('layout-fullframe').click());
     expect(props.onApplyCameraLayout).toHaveBeenCalledWith(
       props.clip.id,
       VideoProjectCameraLayout.FULLFRAME
     );
     expect(props.clip.transform.opacity).toBe(0);
-    expect(layoutButton().textContent).toContain('videoEditor.sidebar.cameraLayoutHidden');
+    expect(button('layout-hidden').getAttribute('aria-pressed')).toBe('true');
   });
 
   it('targets the camera for placement and adding a position with accessible corner names', () => {
@@ -98,13 +101,13 @@ describe('camera interval controls', () => {
     const props = createProps();
     act(() => root.render(<CameraLayoutControls {...props} canAddCameraPosition={false} />));
     expect(button('add-position').disabled).toBe(true);
-    expect(layoutButton().disabled).toBe(false);
+    expect(button('layout-fullframe').disabled).toBe(false);
     act(() => root.render(<CameraLayoutControls {...props} disabled />));
     expect(Array.from(container.querySelectorAll('button')).every((item) => item.disabled)).toBe(
       true
     );
     act(() => {
-      layoutButton().click();
+      button('layout-fullframe').click();
       button('add-position').click();
     });
     expect(props.onApplyCameraLayout).not.toHaveBeenCalled();
@@ -112,16 +115,35 @@ describe('camera interval controls', () => {
   });
 });
 
-function layoutButton() {
-  return container.querySelector<HTMLButtonElement>(
-    '[aria-label="videoEditor.sidebar.cameraLayoutLabel"]'
-  )!;
-}
-function chooseLayout(label: string) {
-  act(() => layoutButton().click());
-  const option = Array.from(document.querySelectorAll<HTMLButtonElement>('[role="option"]')).find(
-    (item) => item.textContent?.includes(label)
-  );
-  expect(option).toBeDefined();
-  act(() => option!.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 })));
-}
+it('reveals custom fitting only on demand and closes it after choosing a corner', () => {
+  const props = createProps();
+  props.clip.transform = {
+    x: 1313.6,
+    y: 701.2,
+    width: 460.8,
+    height: 345.6,
+    rotation: 0,
+    opacity: 1,
+  };
+  const render = () =>
+    root.render(
+      <CameraLayoutControls {...props} customControls={<span>Custom fitting controls</span>} />
+    );
+  // Use the same source-aspect corner preset as the production geometry owner.
+  const expected = resolveVideoProjectCameraPlacement({
+    placement: 'BOTTOM_RIGHT',
+    projectWidth: props.project.width,
+    projectHeight: props.project.height,
+    sourceWidth: 640,
+    sourceHeight: 480,
+  });
+  props.clip.transform = { ...props.clip.transform, ...expected };
+  act(render);
+  expect(container.textContent).not.toContain('Custom fitting controls');
+  act(() => button('layout-custom').click());
+  expect(container.textContent).toContain('Custom fitting controls');
+  expect(button('placement-bottom_right').getAttribute('aria-pressed')).toBe('false');
+  act(() => button('placement-top_left').click());
+  expect(container.textContent).not.toContain('Custom fitting controls');
+  expect(props.onApplyCameraLayout).toHaveBeenLastCalledWith(props.clip.id, 'OVERLAY', 'TOP_LEFT');
+});

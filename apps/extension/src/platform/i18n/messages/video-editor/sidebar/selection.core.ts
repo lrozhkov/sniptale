@@ -3,6 +3,19 @@ import { videoEditorSidebarSelectionAnnotationMessages } from './selection.annot
 import { videoEditorSidebarSelectionStyleMessages } from './selection.core-style.ts';
 
 export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
+  cameraLayoutCustom: { ru: 'Произвольное вписывание', en: 'Custom fit' },
+  cameraShape: { ru: 'Форма', en: 'Shape' },
+  cameraShapeRounded: { ru: 'Прямоугольник', en: 'Rectangle' },
+  cameraShapeSoft: { ru: 'Мягкая форма', en: 'Soft shape' },
+  cameraShapeEllipse: { ru: 'Овал', en: 'Oval' },
+  cameraRoundness: { ru: 'Скругление', en: 'Roundness' },
+  cameraCropPreview: {
+    ru: 'Кадрирование камеры: перетащите изображение или используйте стрелки',
+    en: 'Camera framing: drag the image or use arrow keys',
+  },
+  cameraCropZoom: { ru: 'Приближение', en: 'Zoom in' },
+  cameraCropCenter: { ru: 'Центрировать изображение', en: 'Center image' },
+
   typingSelection: { ru: 'Набор текста', en: 'Typing interval' },
   typingCurrentRate: { ru: 'Текущая скорость', en: 'Current speed' },
   typingTargetRate: { ru: 'Новая скорость', en: 'Target speed' },

@@ -1,3 +1,4 @@
+import type { CameraAppearance } from './appearance';
 import type { VideoProjectClip, VideoProjectVideoClip, VideoProject } from '../types';
 import type { VideoProjectTransform } from '../types/layout';
 import type { VideoMediaFitMode } from '../types/media';
@@ -12,6 +13,7 @@ export interface CameraPosition {
 }
 
 export type CameraPositionEdit =
+  | { kind: 'appearance'; appearance: CameraAppearance }
   | { kind: 'add' }
   | { kind: 'select'; id: string | null }
   | { kind: 'remove'; id: string }

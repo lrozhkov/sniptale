@@ -209,6 +209,10 @@ function drawVideoLayer(
     displayScale,
     fitMode: layer.clip.fitMode,
     frame,
+    camera: layer.trackRole === 'CAMERA',
+    ...(layer.trackRole === 'CAMERA' && layer.clip.cameraAppearance
+      ? { cameraAppearance: layer.clip.cameraAppearance }
+      : {}),
     shadowIntensity: layer.clip.shadowIntensity,
     shadowMode: layer.clip.shadowMode,
     sourceHeight: source instanceof HTMLVideoElement ? source.videoHeight : source.sourceHeight,

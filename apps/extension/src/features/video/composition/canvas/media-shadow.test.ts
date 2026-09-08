@@ -41,3 +41,16 @@ it('resolves glow shadows without a dark offset underlay', () => {
     paint: { color: 'rgba(255, 255, 255, 1)', kind: 'outer-shadow' },
   });
 });
+
+it('gives camera shadows and glow a strong upper range without changing other media', () => {
+  for (const mode of ['BACKDROP', 'GLOW'] as const) {
+    const normal = resolveVideoMediaShadowParams(100, 1, mode)!;
+    const strong = resolveVideoMediaShadowParams(100, 1, mode, true)!;
+    expect(strong.color).toContain('0.95');
+    expect(strong.blur).toBeLessThan(normal.blur);
+    expect(resolveVideoMediaShadowParams(0, 1, mode, true)).toBeNull();
+    const scaled = resolveVideoMediaShadowParams(100, 2, mode, true)!;
+    expect(scaled.blur).toBe(strong.blur * 2);
+    expect(scaled.offsetY).toBe(strong.offsetY * 2);
+  }
+});

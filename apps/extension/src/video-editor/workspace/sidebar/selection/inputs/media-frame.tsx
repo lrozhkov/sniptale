@@ -85,7 +85,7 @@ export function MediaFrameControls(props: MediaFrameControlsProps) {
   );
 }
 
-function MediaFitModeSelect(
+export function MediaFitModeSelect(
   props: Pick<MediaFrameFieldProps, 'clipId' | 'disabled' | 'fitMode' | 'onUpdateMediaClipFitMode'>
 ) {
   return (
@@ -99,7 +99,7 @@ function MediaFitModeSelect(
   );
 }
 
-function MediaFitScaleControls(
+export function MediaFitScaleControls(
   props: Pick<
     MediaFrameFieldProps,
     'clipId' | 'disabled' | 'fitScalePercent' | 'onUpdateMediaClipFitScalePercent'
@@ -119,7 +119,7 @@ function MediaFitScaleControls(
   );
 }
 
-function MediaShadowControls(
+export function MediaShadowControls(
   props: Pick<
     MediaFrameFieldProps,
     | 'clipId'

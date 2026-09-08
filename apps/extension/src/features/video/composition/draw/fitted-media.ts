@@ -1,5 +1,6 @@
+import { cameraContentFrame, type CameraAppearance } from '../../project/camera/appearance';
 import { VideoMediaFitMode, type VideoMediaShadowMode } from '../../project/types/index';
-import { drawMediaFrameShadow } from './media-shadow';
+import { drawMediaFrameShadow, traceCameraShape } from './media-shadow';
 
 interface MediaFrame {
   height: number;
@@ -157,6 +158,8 @@ export function drawFittedMediaFrame(
 }
 
 export function drawFittedMediaLayer(params: {
+  cameraAppearance?: CameraAppearance;
+  camera?: boolean;
   context: CanvasRenderingContext2D;
   displayScale: number;
   fitMode: VideoMediaFitMode;
@@ -186,9 +189,30 @@ export function drawFittedMediaLayer(params: {
     params.shadowIntensity,
     params.shadowMode,
     params.frame,
-    params.displayScale
+    params.displayScale,
+    params.cameraAppearance,
+    params.camera
   );
-  drawFitted(params.render);
+  if (params.cameraAppearance) {
+    const content = cameraContentFrame(
+      params.frame.width,
+      params.frame.height,
+      params.sourceWidth,
+      params.sourceHeight,
+      params.cameraAppearance,
+      params.fitMode === VideoMediaFitMode.STRETCH
+    );
+    params.context.save();
+    traceCameraShape(params.context, params.frame, params.cameraAppearance);
+    params.context.clip();
+    params.render(
+      params.frame.x + content.x,
+      params.frame.y + content.y,
+      content.width,
+      content.height
+    );
+    params.context.restore();
+  } else drawFitted(params.render);
 }
 
 /** Source coordinates and the exact media-layer transform, before viewport/camera mapping. */
