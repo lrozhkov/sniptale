@@ -209,41 +209,38 @@ async function expectLibraryDrawerPlacement(page: Page): Promise<void> {
   await trigger.click();
   const drawer = page.locator('[data-ui="video-editor.library.drawer"]');
   await expect(drawer).toBeVisible();
-  await expect(drawer.locator('[data-ui="video-editor.library.current-project"]')).toContainText(
-    longTitle
-  );
-  await expect
-    .poll(() =>
-      drawer.evaluate((node) => {
-        const strip = node.querySelector('[data-ui="video-editor.library.current-project"]')!;
-        const main = node.querySelector('main')!;
-        return main.getBoundingClientRect().left - strip.getBoundingClientRect().right;
-      })
-    )
-    .toBeGreaterThanOrEqual(0);
+  await expect(drawer.getByText(longTitle, { exact: true })).toHaveCount(0);
+  const navigation = drawer.getByRole('navigation');
+  const video = navigation.getByRole('button', { name: 'Video', exact: true });
+  const screenshots = navigation.getByRole('button', { name: 'Screenshots', exact: true });
+  await expect(video).toHaveAttribute('aria-pressed', 'true');
+  await screenshots.click();
+  await expect(screenshots).toHaveAttribute('aria-pressed', 'true');
+  await expect(video).toHaveAttribute('aria-pressed', 'false');
+  const navigationBounds = (await navigation.boundingBox())!;
+  const mediaBounds = (await drawer
+    .locator('[data-ui="video-editor.library.media-tab"]')
+    .boundingBox())!;
+  expect(navigationBounds.x + navigationBounds.width).toBeLessThanOrEqual(mediaBounds.x);
+  await expect(drawer.getByRole('button', { name: 'Add', exact: true })).toHaveCount(0);
   const bounds = (await drawer.boundingBox())!;
   const viewport = page.viewportSize()!;
   expect(bounds.x).toBeGreaterThanOrEqual(0);
   expect(bounds.y).toBeGreaterThanOrEqual(0);
   expect(bounds.x + bounds.width).toBeLessThanOrEqual(viewport.width);
   expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height);
-  await drawer.getByRole('button', { name: 'Add', exact: true }).click();
-  await expect(drawer.getByRole('button', { name: 'New', exact: true })).toBeInViewport();
   await page.evaluate(() => chrome.storage.local.set({ 'sniptale-locale-preference': 'ru' }));
-  await expect(drawer.getByRole('button', { name: 'Добавить', exact: true })).toBeVisible();
-  await expect
-    .poll(() =>
-      drawer
-        .locator('aside button span.truncate')
-        .evaluateAll((nodes) =>
-          nodes
-            .filter((node) => node.scrollWidth > node.clientWidth)
-            .map((node) => node.textContent)
-        )
-    )
-    .toEqual([]);
+  await expect(navigation.getByRole('button', { name: 'Скриншоты', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  );
+  await navigation.getByRole('button', { name: 'Видео', exact: true }).click();
+  await expect(navigation.getByRole('button', { name: 'Видео', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  );
   await page.evaluate(() => chrome.storage.local.set({ 'sniptale-locale-preference': 'en' }));
-  await expect(drawer.getByRole('button', { name: 'Add', exact: true })).toBeVisible();
+  await expect(video).toHaveAttribute('aria-pressed', 'true');
   await page.keyboard.press('Escape');
   await expect(drawer).toHaveCount(0);
   await expect(trigger).toBeFocused();

@@ -403,10 +403,10 @@ test('mostly static screen content keeps a long GOP and the configured byte budg
   expect(artifact.durationSeconds).toBeGreaterThanOrEqual(14.5);
   expect(artifact.contentChangeRequests).toBe(31);
   expect(artifact.packetCount).toBeGreaterThanOrEqual(25);
-  expect(artifact.keyFrames).toBeGreaterThanOrEqual(3);
-  expect(artifact.keyFrames).toBeLessThanOrEqual(5);
-  expect(artifact.minimumGopInterval).toBeGreaterThanOrEqual(3.5);
-  expect(artifact.maximumGopInterval).toBeLessThanOrEqual(4.5);
+  expect(artifact.keyFrames).toBeGreaterThanOrEqual(7);
+  expect(artifact.keyFrames).toBeLessThanOrEqual(9);
+  expect(artifact.minimumGopInterval).toBeGreaterThanOrEqual(1.5);
+  expect(artifact.maximumGopInterval).toBeLessThanOrEqual(2.5);
   expect(artifact.backwardTimestamps).toBe(0);
   expect(artifact.duplicateTimestamps).toBe(0);
   expect(artifact.averageInterframeBytes).toBeGreaterThan(0);

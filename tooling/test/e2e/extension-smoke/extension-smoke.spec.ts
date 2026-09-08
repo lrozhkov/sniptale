@@ -717,7 +717,7 @@ test('video editor keeps webcam independent with camera timeline and inspector c
   await page.keyboard.press('Enter');
   await expect(cameraGroup).toHaveAttribute('aria-pressed', 'true');
   await expect(
-    inspector.getByText(translate('videoEditor.sidebar.cameraPlacementDescription', 'ru'))
+    inspector.getByText(translate('videoEditor.sidebar.cameraIntervalHint', 'ru'))
   ).toBeVisible();
   await inspector
     .getByRole('button', {

@@ -1,3 +1,4 @@
+import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { copyFile, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { expect, type Page, type TestInfo } from '@playwright/test';
@@ -156,7 +157,12 @@ async function expectVideoExportProgress(page: Page, jobId: string, progress: nu
     targetSenderUrl,
   });
 
-  await expect(page.getByText(VideoProjectExportPhase.RENDERING, { exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('progressbar', {
+      name: translate('videoEditor.progress.rendering', 'ru'),
+      exact: true,
+    })
+  ).toHaveAttribute('aria-valuenow', String(progress));
   await expect(
     page.getByRole('button', { name: VIDEO_EDITOR_PROGRESS_CANCEL_LABEL, exact: true })
   ).toBeVisible();

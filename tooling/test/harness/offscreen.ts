@@ -14,7 +14,14 @@ import {
   readAssetFile,
   type AssetObjectWriter,
 } from '../../../apps/extension/src/composition/persistence/assets';
-import { BlobSource, EncodedPacketSink, Input, WEBM } from 'mediabunny';
+import {
+  ALL_FORMATS,
+  BlobSource,
+  EncodedPacketSink,
+  Input,
+  VideoSampleSink,
+  WEBM,
+} from 'mediabunny';
 
 type HarnessMediaRecorderState = 'inactive' | 'recording' | 'paused';
 
@@ -442,60 +449,32 @@ async function readBlobVideoMetrics(blob: Blob): Promise<{
   centerPixel: StaticCanvasRecordingResult['centerPixel'];
   decodedDurationMs: number;
 }> {
-  const video = document.createElement('video');
-  const url = URL.createObjectURL(blob);
+  const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(blob) });
   try {
-    video.muted = true;
-    video.preload = 'metadata';
-    video.src = url;
-    await new Promise<void>((resolve, reject) => {
-      video.onloadedmetadata = () => resolve();
-      video.onerror = () => reject(new Error('The static canvas artifact is not decodable'));
-    });
-    let durationSeconds = video.duration;
-    if (!Number.isFinite(durationSeconds)) {
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(
-          () => reject(new Error('Timed out resolving static canvas artifact duration')),
-          5_000
-        );
-        video.ontimeupdate = () => {
-          clearTimeout(timeout);
-          resolve();
-        };
-        video.currentTime = Number.MAX_SAFE_INTEGER;
-      });
-      durationSeconds = video.currentTime;
+    const track = await input.getPrimaryVideoTrack();
+    if (!track) throw new Error('The static canvas artifact has no video track');
+    const durationSeconds = await input.computeDuration();
+    const sample = await new VideoSampleSink(track).getSample(
+      Math.min(0.5, Math.max(0, durationSeconds / 2))
+    );
+    if (!sample) throw new Error('The static canvas artifact has no decodable sample');
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1;
+      canvas.height = 1;
+      const context = canvas.getContext('2d', { alpha: false });
+      if (!context) throw new Error('The browser exposes no canvas for artifact sampling');
+      sample.draw(context, 0, 0, 1, 1);
+      const [red = 0, green = 0, blue = 0, alpha = 0] = context.getImageData(0, 0, 1, 1).data;
+      return {
+        centerPixel: { alpha, blue, green, red },
+        decodedDurationMs: durationSeconds * 1000,
+      };
+    } finally {
+      sample.close();
     }
-    const sampleTime = Math.min(0.5, Math.max(0, durationSeconds / 2));
-    if (sampleTime > 0) {
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(
-          () => reject(new Error('Timed out seeking the static canvas artifact')),
-          5_000
-        );
-        video.onseeked = () => {
-          clearTimeout(timeout);
-          resolve();
-        };
-        video.currentTime = sampleTime;
-      });
-    }
-    const sampleCanvas = document.createElement('canvas');
-    sampleCanvas.width = 1;
-    sampleCanvas.height = 1;
-    const sampleContext = sampleCanvas.getContext('2d', { alpha: false });
-    if (!sampleContext) throw new Error('The browser exposes no canvas for artifact sampling');
-    sampleContext.drawImage(video, 0, 0, 1, 1);
-    const [red = 0, green = 0, blue = 0, alpha = 0] = sampleContext.getImageData(0, 0, 1, 1).data;
-    return {
-      centerPixel: { alpha, blue, green, red },
-      decodedDurationMs: durationSeconds * 1000,
-    };
   } finally {
-    video.removeAttribute('src');
-    video.load();
-    URL.revokeObjectURL(url);
+    input.dispose();
   }
 }
 
