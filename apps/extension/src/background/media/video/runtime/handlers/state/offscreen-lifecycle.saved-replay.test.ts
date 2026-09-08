@@ -158,7 +158,10 @@ beforeEach(() => {
   readStoredVideoPostRecordResultMock.mockResolvedValue(null);
   removeVideoRecordingCompletionOutboxMock.mockResolvedValue(true);
   clearActiveVideoRecordingLeaseMock.mockResolvedValue(undefined);
-  upsertProjectExportJobLedgerEntryMock.mockResolvedValue({ status: 'running' });
+  upsertProjectExportJobLedgerEntryMock.mockImplementation(async (entry) => ({
+    ...entry,
+    status: 'running',
+  }));
   loadActiveProjectExportJobLedgerEntryMock.mockResolvedValue({
     status: 'running',
     abortController: new AbortController(),

@@ -1,5 +1,5 @@
 import { createLogger } from '@sniptale/platform/observability/logger';
-import type { VideoProjectExportPhase } from '../../features/video/project/types';
+import { VideoProjectExportPhase } from '../../features/video/project/types';
 import { VideoWebmCodec } from '../../features/video/project/types';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import {
@@ -7,10 +7,6 @@ import {
   VideoOutputContainer,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { sendRuntimeMessageBestEffort } from '../runtime-messaging/best-effort';
-import {
-  loadActiveProjectExportJobLedgerEntry,
-  upsertProjectExportJobLedgerEntry,
-} from '../../composition/persistence/export-ledger';
 import type { ProjectExportRuntimeState } from './types';
 export { waitForDelay } from './timing';
 
@@ -40,15 +36,16 @@ export async function sendProgress(
   progress: number,
   message: string
 ): Promise<void> {
-  const activeLedgerEntry = await loadActiveProjectExportJobLedgerEntry();
-  if (activeLedgerEntry?.jobId === jobId) {
-    await upsertProjectExportJobLedgerEntry({
-      jobId,
-      projectId: activeLedgerEntry.projectId,
-      phase,
-      progress: Math.max(0, Math.min(100, progress)),
-    });
-  }
+  const local = Number.isFinite(progress) ? Math.max(0, Math.min(100, progress)) : 0;
+  const bands = {
+    PREPARING: [0, 5],
+    RENDERING: [5, 90],
+    TRANSCODING: [90, 97],
+    SAVING: [97, 99],
+  } as const;
+  const band = phase in bands ? bands[phase as keyof typeof bands] : null;
+  const mapped = band ? band[0] + ((band[1] - band[0]) * local) / 100 : local;
+  const overall = phase === VideoProjectExportPhase.DONE ? 100 : Math.min(99, mapped);
 
   sendRuntimeMessageBestEffort({
     context: { jobId, phase },
@@ -59,7 +56,7 @@ export async function sendProgress(
       jobId,
       status: {
         phase,
-        progress: Math.max(0, Math.min(100, progress)),
+        progress: overall,
         message,
       },
     },

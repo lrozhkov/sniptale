@@ -35,7 +35,7 @@ it('sends the muxer initialization progress event', async () => {
 
   expect(sendProgressMock).toHaveBeenCalledWith(
     'job-1',
-    VideoProjectExportPhase.TRANSCODING,
+    VideoProjectExportPhase.PREPARING,
     0,
     expect.stringContaining('Opus fallback')
   );

@@ -17,4 +17,5 @@ export interface ProjectExportRuntimeState {
 export interface ExportJobState extends ProjectExportRuntimeState {
   jobId: string;
   cancelled: boolean;
+  renderProgressRange?: { start: number; end: number };
 }

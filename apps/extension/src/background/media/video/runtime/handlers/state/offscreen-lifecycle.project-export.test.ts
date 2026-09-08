@@ -51,7 +51,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   routeResponses.length = 0;
   markTerminalMock.mockImplementation(async (_jobId, status) => ({ status }));
-  upsertLedgerMock.mockResolvedValue({ status: 'running' });
+  upsertLedgerMock.mockImplementation(async (entry) => ({ ...entry, status: 'running' }));
   sendRuntimeMessageMock.mockResolvedValue(undefined);
   loadActiveProjectExportJobLedgerEntryMock.mockResolvedValue({
     status: 'running',
@@ -301,4 +301,22 @@ it('does not accept completion for a different project', async () => {
   await flushAsyncRoute();
   expect(markTerminalMock).not.toHaveBeenCalled();
   expect(sendRuntimeMessageMock).not.toHaveBeenCalled();
+});
+
+it('forwards the committed percentage when a retry reports earlier progress', async () => {
+  upsertLedgerMock.mockResolvedValue({ phase: 'RENDERING', progress: 80, status: 'running' });
+  handleProjectExportLifecycleMessage(
+    {
+      type: VideoMessageType.PROJECT_EXPORT_PROGRESS,
+      jobId: 'job-1',
+      status: { phase: 'RENDERING', progress: 20, message: 'Retry' },
+    },
+    createSendResponse()
+  );
+  await flushAsyncRoute();
+  expect(sendRuntimeMessageMock).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      status: { phase: 'RENDERING', progress: 80, message: 'Retry' },
+    })
+  );
 });

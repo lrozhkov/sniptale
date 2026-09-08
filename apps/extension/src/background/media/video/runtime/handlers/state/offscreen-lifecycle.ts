@@ -448,13 +448,16 @@ async function persistProjectExportLifecycleMessage(
   // Offscreen documents cannot write chrome.storage; commit the ledger before notifying the editor.
   if (message.type === VideoMessageType.PROJECT_EXPORT_PROGRESS) {
     if (ledger.status !== 'running') return null;
-    await upsertProjectExportJobLedgerEntry({
+    const committed = await upsertProjectExportJobLedgerEntry({
       jobId: ledger.jobId,
       projectId: ledger.projectId,
       phase: message.status.phase,
       progress: message.status.progress,
     });
-    return message;
+    return {
+      ...message,
+      status: { ...message.status, phase: committed.phase, progress: committed.progress },
+    };
   }
   const status =
     message.type === VideoMessageType.PROJECT_EXPORT_COMPLETED

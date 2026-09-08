@@ -225,3 +225,22 @@ it('does not mask cancellation before rendering the next span', async () => {
   );
   expect(runFrameDrivenCompositeRenderLoopMock).not.toHaveBeenCalled();
 });
+
+it('weights unequal spans by duration and clears their progress range after rendering', async () => {
+  planMp4VideoRenderSpansMock.mockReturnValue([
+    { kind: 'composite', reason: 'cursor-overlay', start: 2, end: 3 },
+    { kind: 'composite', reason: 'cursor-overlay', start: 3, end: 6 },
+  ]);
+  const ranges: unknown[] = [];
+  runFrameDrivenCompositeRenderLoopMock.mockImplementation(async (job) => {
+    ranges.push(job.renderProgressRange);
+  });
+  const args = createArgs();
+  await runMp4HybridVideoPipeline(args as never);
+  expect(ranges).toEqual([
+    { start: 0, end: 25 },
+    { start: 25, end: 100 },
+  ]);
+  expect(args.job).not.toHaveProperty('renderProgressRange');
+  expect(sendProgressMock).toHaveBeenLastCalledWith('job-1', 'RENDERING', 100, expect.any(String));
+});

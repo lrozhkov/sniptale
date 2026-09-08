@@ -16,6 +16,12 @@ export async function maybeSendFrameDrivenProgress(args: {
     return lastProgressFrame;
   }
 
-  await sendFrameDrivenProgress(job.jobId, frameIndex, totalFrames, messageDetail);
+  await sendFrameDrivenProgress(
+    job.jobId,
+    frameIndex,
+    totalFrames,
+    messageDetail,
+    job.renderProgressRange
+  );
   return frameIndex;
 }

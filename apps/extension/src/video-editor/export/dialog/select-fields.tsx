@@ -1,3 +1,4 @@
+import { FileVideo, SlidersHorizontal } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { NumericRow, SelectField, StatusRow } from '../../../ui/compact-inspector-controls';
 import {
@@ -184,48 +185,68 @@ export function ExportDialogSelectFields(params: ExportDialogFieldParams) {
         onChange={(scope) => onChange({ scope })}
         options={scopeOptions}
       />
-      <SelectField
-        className={EXPORT_FIELD_CLASS_NAME}
-        label={translate('videoEditor.exportDialog.formatLabel')}
-        value={settings.format}
-        onChange={(format) => onChange(buildFormatPatch({ capabilities, format, settings }))}
-        options={formatOptions}
-      />
-      {settings.format === VideoExportFormat.MP4 && codecOptions.length > 0 ? (
-        <ExportDialogCodecField
-          codecOptions={codecOptions}
-          currentCodec={currentCodec}
-          onChange={(mp4VideoCodec) => onChange({ mp4VideoCodec })}
+      <section className="border-t border-[var(--sniptale-color-border-soft)] pt-3">
+        <h3 className="mb-1 flex items-center gap-2 text-xs font-medium text-[var(--sniptale-color-text-muted)]">
+          <FileVideo size={15} aria-hidden />
+          {translate('videoEditor.exportDialog.fileSection')}
+        </h3>
+        <SelectField
+          className={EXPORT_FIELD_CLASS_NAME}
+          label={translate('videoEditor.exportDialog.formatLabel')}
+          value={settings.format}
+          onChange={(format) => onChange(buildFormatPatch({ capabilities, format, settings }))}
+          options={formatOptions}
         />
-      ) : null}
-      {settings.format === VideoExportFormat.WEBM ? (
-        <ExportDialogCodecField
-          codecOptions={WEBM_CODEC_OPTIONS}
-          currentCodec={settings.webmVideoCodec}
-          onChange={(webmVideoCodec) => onChange({ webmVideoCodec })}
+        {settings.format === VideoExportFormat.MP4 && codecOptions.length > 0 ? (
+          <ExportDialogCodecField
+            codecOptions={codecOptions}
+            currentCodec={currentCodec}
+            onChange={(mp4VideoCodec) => onChange({ mp4VideoCodec })}
+          />
+        ) : null}
+        {settings.format === VideoExportFormat.WEBM ? (
+          <ExportDialogCodecField
+            codecOptions={WEBM_CODEC_OPTIONS}
+            currentCodec={settings.webmVideoCodec}
+            onChange={(webmVideoCodec) => onChange({ webmVideoCodec })}
+          />
+        ) : null}
+      </section>
+      <section className="border-t border-[var(--sniptale-color-border-soft)] pt-3">
+        <h3 className="mb-1 flex items-center gap-2 text-xs font-medium text-[var(--sniptale-color-text-muted)]">
+          <SlidersHorizontal size={15} aria-hidden />
+          {translate('videoEditor.exportDialog.pictureSection')}
+        </h3>
+        <SelectField
+          className={EXPORT_FIELD_CLASS_NAME}
+          label={translate('videoEditor.exportDialog.resolutionLabel')}
+          value={currentResolution}
+          onChange={(resolution) => {
+            const dimensions = resolveVideoOutputDimensions(
+              sourceDimensions.width,
+              sourceDimensions.height,
+              resolution
+            );
+            onChange({ resolution, ...dimensions });
+          }}
+          options={getExportResolutionOptions()}
         />
-      ) : null}
-      <SelectField
-        className={EXPORT_FIELD_CLASS_NAME}
-        label={translate('videoEditor.exportDialog.resolutionLabel')}
-        value={currentResolution}
-        onChange={(resolution) => {
-          const dimensions = resolveVideoOutputDimensions(
-            sourceDimensions.width,
-            sourceDimensions.height,
-            resolution
-          );
-          onChange({ resolution, ...dimensions });
-        }}
-        options={getExportResolutionOptions()}
-      />
-      <SelectField
-        className={EXPORT_FIELD_CLASS_NAME}
-        label={translate('videoEditor.exportDialog.qualityLabel')}
-        value={settings.quality}
-        onChange={(quality) => onChange({ quality })}
-        options={getExportQualityOptions()}
-      />
+        <SelectField
+          className={EXPORT_FIELD_CLASS_NAME}
+          label={translate('videoEditor.exportDialog.qualityLabel')}
+          value={settings.quality}
+          onChange={(quality) => onChange({ quality })}
+          options={getExportQualityOptions()}
+        />
+        <ExportDialogNumberField
+          label={translate('videoEditor.exportDialog.fpsLabel')}
+          min={12}
+          max={60}
+          step={1}
+          value={settings.fps}
+          onChange={(fps) => onChange({ fps })}
+        />
+      </section>
     </>
   );
 }

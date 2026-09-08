@@ -89,7 +89,7 @@ it('selects supported MP4 video and audio encoder candidates', async () => {
     expect.objectContaining({
       bitrate: 5_000_000,
       bitrateMode: 'variable',
-      codec: 'avc1.4D401F',
+      codec: 'avc1.4D4028',
       framerate: 30,
       height: 1080,
       width: 1920,
