@@ -189,15 +189,26 @@ export function projectMotionSourceBinding(
   const end = Math.min(binding.sourceEnd, clip.sourceStart + clip.sourceDuration);
   if (end <= start) return { ...region, startTime: clip.startTime, duration: 0 };
   const rate = normalizeClipPlaybackRate(clip.playbackRate ?? 1);
-  const clockScale =
-    (binding.animation.end - binding.animation.start) / (binding.sourceEnd - binding.sourceStart);
+  const animationTime = (sourceTime: number): number => {
+    // Preserve exact authored endpoints: multiply-by-clock-scale can overshoot by one ULP.
+    if (sourceTime === binding.sourceStart) return binding.animation.start;
+    if (sourceTime === binding.sourceEnd) return binding.animation.end;
+    const progress = (sourceTime - binding.sourceStart) / (binding.sourceEnd - binding.sourceStart);
+    return Math.max(
+      binding.animation.start,
+      Math.min(
+        binding.animation.end,
+        binding.animation.start + progress * (binding.animation.end - binding.animation.start)
+      )
+    );
+  };
   return {
     ...region,
     startTime: clip.startTime + (start - clip.sourceStart) / rate,
     duration: (end - start) / rate,
     animation: {
-      start: binding.animation.start + (start - binding.sourceStart) * clockScale,
-      end: binding.animation.start + (end - binding.sourceStart) * clockScale,
+      start: animationTime(start),
+      end: animationTime(end),
       duration: binding.animation.duration,
     },
   };

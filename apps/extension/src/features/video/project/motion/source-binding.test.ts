@@ -2,12 +2,66 @@ import { expect, it } from 'vitest';
 import { resolveVideoCompositionCamera } from '../../composition/motion';
 import { createProject, createVideoClip } from '../timeline/project-meta.test.helpers';
 import { createVideoProjectMotionRegion, normalizeVideoProjectMotionRegion } from './index';
+import { isExportReadyVideoProject, isHydratableVideoProject } from '../validation/root';
 import {
   parseMotionSourceBinding,
   projectMotionSourceBinding,
   reconcileMotionSourceBindings,
   bindMotionRegionToUniqueVideo,
+  bindMotionRegionToClip,
 } from './source-binding';
+
+it.each([0.5, 2, 3.2])(
+  'keeps fractional-frame framing valid for saving and export at %sx',
+  (rate) => {
+    const clip = createVideoClip();
+    const project = createProject([clip]);
+    const region = bindMotionRegionToClip(
+      { ...createVideoProjectMotionRegion(project, 13 / 30), duration: 1.6 },
+      clip
+    );
+    project.motionRegions = [region];
+    expect(isExportReadyVideoProject(project)).toBe(true);
+    const changed = reconcileMotionSourceBindings(project, {
+      ...project,
+      clips: [{ ...clip, playbackRate: rate, duration: clip.duration / rate }],
+    });
+    expect(isHydratableVideoProject(changed)).toBe(true);
+    expect(isExportReadyVideoProject(changed)).toBe(true);
+    expect(changed.motionRegions?.[0]?.animation).toEqual({ start: 0, end: 1.6, duration: 1.6 });
+    const reopened = JSON.parse(JSON.stringify(changed));
+    expect(isExportReadyVideoProject(reopened)).toBe(true);
+  }
+);
+
+it('retains fractional authored endpoints through partial trims and untrim', () => {
+  const clip = createVideoClip();
+  const project = createProject([clip]);
+  const start = 13 / 30;
+  const region = bindMotionRegionToClip(
+    { ...createVideoProjectMotionRegion(project, start), duration: 1.6 },
+    clip
+  );
+  for (const [sourceStart, sourceEnd] of [
+    [start, start + 0.8],
+    [start + 0.8, start + 1.6],
+    [start + 0.4, start + 1.2],
+  ]) {
+    const trimmed = {
+      ...project,
+      clips: [{ ...clip, sourceStart: sourceStart!, sourceDuration: sourceEnd! - sourceStart! }],
+    };
+    const projected = projectMotionSourceBinding(trimmed, region);
+    expect(isExportReadyVideoProject({ ...trimmed, motionRegions: [projected] })).toBe(true);
+    expect(projected.animation!.start).toBeCloseTo(sourceStart! - start);
+    expect(projected.animation!.end).toBeCloseTo(sourceEnd! - start);
+    expect(projectMotionSourceBinding(project, projected).animation).toEqual({
+      start: 0,
+      end: 1.6,
+      duration: 1.6,
+    });
+  }
+});
 
 function fixture() {
   const clip = createVideoClip({
