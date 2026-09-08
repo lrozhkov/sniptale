@@ -65,16 +65,23 @@ export function ManualAreaFields(props: {
 
   return (
     <div className="grid grid-cols-1 gap-3">
-      <MotionAreaCoordinateSection
-        focusArea={focusArea}
-        motionRegionId={props.motionRegionId}
-        panel={props.panel}
-      />
       <MotionAreaButtons
         isPickingOnStage={isPickingOnStage}
         motionRegionId={props.motionRegionId}
         panel={props.panel}
       />
+      <details className="text-xs text-[var(--sniptale-color-text-secondary)]">
+        <summary className="cursor-pointer py-2">
+          {translate('videoEditor.sidebar.framingExactPosition')}
+        </summary>
+        <div className="pt-2">
+          <MotionAreaCoordinateSection
+            focusArea={focusArea}
+            motionRegionId={props.motionRegionId}
+            panel={props.panel}
+          />
+        </div>
+      </details>
     </div>
   );
 }

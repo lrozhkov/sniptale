@@ -17,10 +17,6 @@ vi.mock('../area-overlay/index', () => ({
   handleStageAreaPlacement: handleStageAreaPlacementMock,
 }));
 
-vi.mock('../motion-path/index', () => ({
-  PreviewStageMotionPathOverlay: () => null,
-}));
-
 vi.mock('../point-overlay/index', () => ({
   PreviewStagePointOverlay: () => null,
   handleStagePointPlacement: handleStagePointPlacementMock,
@@ -41,6 +37,7 @@ function createPointerParams(
   overrides: Partial<Parameters<typeof handlePreviewStageRootPointerDown>[1]> = {}
 ): Parameters<typeof handlePreviewStageRootPointerDown>[1] {
   return {
+    currentTime: 0,
     activeClips: [],
     beginInteraction: vi.fn(),
     camera: {
@@ -60,7 +57,7 @@ function createPointerParams(
     onUpdateMotionRegion: vi.fn(),
     placementMode: null,
     project: createEmptyVideoProject('Canvas', 100, 100),
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedMotionRegion: null,
     stageRef: { current: document.createElement('div') },
     ...overrides,

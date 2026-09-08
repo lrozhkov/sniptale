@@ -127,3 +127,37 @@ it('requires a complete source binding for every offscreen stop', () => {
     expect(() => contract.parseRequest(invalid)).toThrow(/OFFSCREEN_STOP_RECORDING/);
   }
 });
+
+it('retains valid static recording geometry and rejects malformed stop geometry', () => {
+  const contract =
+    runtimeVideoOffscreenControlMessageContracts[VideoMessageType.OFFSCREEN_STOP_RECORDING];
+  const recordingPointTransform = {
+    viewport: {
+      width: 1000,
+      height: 800,
+      devicePixelRatio: 1,
+      visualViewportScale: 1,
+      visualViewportOffsetX: 0,
+      visualViewportOffsetY: 0,
+    },
+    visibleClientRect: { x: 0, y: 0, width: 1000, height: 800 },
+    scaleX: 0.001,
+    scaleY: 0.00125,
+    offsetX: 0,
+    offsetY: 0,
+  };
+  const response = { success: true, result: 'stopped', recordingPointTransform };
+  expect(contract.parseResponse(response)).toEqual(response);
+  for (const patch of [
+    { scaleX: Infinity },
+    { scaleY: -1 },
+    { viewport: { ...recordingPointTransform.viewport, visualViewportScale: 2 } },
+  ]) {
+    expect(() =>
+      contract.parseResponse({
+        ...response,
+        recordingPointTransform: { ...recordingPointTransform, ...patch },
+      })
+    ).toThrow();
+  }
+});

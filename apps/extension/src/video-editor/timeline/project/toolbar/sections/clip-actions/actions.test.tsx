@@ -31,7 +31,8 @@ afterEach(() => {
 function renderClipActions(
   selectedClip: boolean,
   canSplitSelectedClip = selectedClip,
-  canEditSelectedClip = selectedClip
+  canEditSelectedClip = selectedClip,
+  canDeleteSelectedClip = canEditSelectedClip
 ) {
   if (!container) {
     container = document.createElement('div');
@@ -46,6 +47,7 @@ function renderClipActions(
   act(() => {
     root?.render(
       <ProjectTimelineClipActions
+        canDeleteSelectedClip={canDeleteSelectedClip}
         canEditSelectedClip={canEditSelectedClip}
         canSplitSelectedClip={canSplitSelectedClip}
         selectedClip={selectedClip}
@@ -127,4 +129,12 @@ it('disables every edit action for a locked clip while preserving accessible nam
   expect(handlers.onSplitSelectedClip).not.toHaveBeenCalled();
   expect(handlers.onDuplicateSelectedClip).not.toHaveBeenCalled();
   expect(handlers.onDeleteSelectedClip).not.toHaveBeenCalled();
+});
+
+it('allows local Delete when only the linked companion is locked', () => {
+  const handlers = renderClipActions(true, false, false, true);
+  const buttons = Array.from(container!.querySelectorAll<HTMLButtonElement>('button'));
+  expect(buttons.map((button) => button.disabled)).toEqual([true, true, false]);
+  act(() => buttons[2]!.click());
+  expect(handlers.onDeleteSelectedClip).toHaveBeenCalledOnce();
 });

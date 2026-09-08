@@ -64,6 +64,7 @@ function useVideoEditorRuntimeComposition(
   );
   const blockingOverlayOpen =
     commandPaletteOpen ||
+    workspace.autoProcessingModalOpen ||
     workspace.confirm.dialog !== null ||
     workspace.audioRecordingDialogOpen ||
     workspace.libraryPanelOpen ||
@@ -96,7 +97,7 @@ function useVideoEditorRuntimeComposition(
       projectHistoryTransactionActive: history.projectHistoryTransactionActive,
       shortcutsEnabled: !blockingOverlayOpen && !workspace.preview.sourceViewerActive,
       selection: selection.selection,
-      selectedActionEvent: selections.selectedActionEvent,
+      selectedActionOccurrence: selections.selectedActionOccurrence,
       selectedClipId: selection.selectedClipId,
       selectedMotionRegion: selections.selectedMotionRegion,
       deleteSelection: {
@@ -139,10 +140,7 @@ function useVideoEditorRuntimeComposition(
     isPlaying: playback.isPlaying,
     setPlaybackPlaying: runtime.setPlaybackPlaying,
   });
-  useRecordingTelemetry(
-    lifecycle.project?.baseRecordingId ?? null,
-    telemetry.setRecordingTelemetry
-  );
+  useRecordingTelemetry(lifecycle.project, telemetry.setRecordingTelemetry);
 
   return { blockingOverlayOpen, exportPort, history, lifecycle, runtime, selections, timeline };
 }
@@ -229,6 +227,7 @@ function useVideoEditorContextProjections(
 ) {
   const workspaceDialogs = useMemo(
     () => ({
+      setAutoProcessingModalOpen: workspace.setAutoProcessingModalOpen,
       audioRecordingDialogOpen: workspace.audioRecordingDialogOpen,
       audioRecordingTarget: workspace.audioRecordingTarget,
       openTrackAudioRecordingDialog: workspace.openTrackAudioRecordingDialog,
@@ -241,6 +240,7 @@ function useVideoEditorContextProjections(
       toggleLibraryPanel: workspace.toggleLibraryPanel,
     }),
     [
+      workspace.setAutoProcessingModalOpen,
       workspace.audioRecordingDialogOpen,
       workspace.audioRecordingTarget,
       workspace.openTrackAudioRecordingDialog,

@@ -1,6 +1,6 @@
 import { formatDateTime, formatNumber, translate } from '../../platform/i18n';
-import { VideoProjectClipType } from '../../features/video/project/types';
-import type { VideoProjectClip } from '../../features/video/project/types';
+import { VideoProjectClipType, VideoProjectActionPreset } from '../../features/video/project/types';
+import type { VideoProjectClip, VideoProjectActionEvent } from '../../features/video/project/types';
 
 export function formatDate(timestamp: number): string {
   return formatDateTime(timestamp, {
@@ -47,4 +47,45 @@ export function getClipTypeLabel(clip: VideoProjectClip | null): string {
     case VideoProjectClipType.SHAPE:
       return translate('videoEditor.sidebar.clipTypeShape');
   }
+}
+
+/** Describes the captured target independently of its selected animation preset. */
+export function getActionEventLabel(
+  event: Pick<VideoProjectActionEvent, 'kind' | 'data' | 'label'>
+): string {
+  const kind = translate(
+    (
+      {
+        CLICK: 'videoEditor.timeline.historyClick',
+        KEY: 'videoEditor.timeline.historyKeys',
+        SCROLL: 'videoEditor.timeline.historyScroll',
+        PAUSE: 'videoEditor.timeline.historyPause',
+        CALLOUT: 'videoEditor.timeline.historyCallout',
+      } as const
+    )[event.kind]
+  );
+  const presetLabels = new Set<string>([
+    ...Object.values(VideoProjectActionPreset),
+    translate('videoEditor.sidebar.actionPresetClickRipple', 'en'),
+    translate('videoEditor.sidebar.actionPresetClickRipple', 'ru'),
+  ]);
+  const label = event.label.trim();
+  const name =
+    typeof event.data['targetName'] === 'string'
+      ? event.data['targetName'].trim().slice(0, 120)
+      : event.kind !== 'KEY' && !presetLabels.has(label)
+        ? label.slice(0, 120)
+        : '';
+  const tag =
+    typeof event.data['targetTag'] === 'string' ? event.data['targetTag'].slice(0, 32) : '';
+  const role =
+    typeof event.data['targetRole'] === 'string' ? event.data['targetRole'].slice(0, 32) : '';
+  const target = [name, tag ? `<${tag}${role ? ` role="${role}"` : ''}>` : role]
+    .filter(Boolean)
+    .join(' · ');
+  const shortcut =
+    event.kind === 'KEY'
+      ? event.label || (typeof event.data['code'] === 'string' ? event.data['code'] : '')
+      : '';
+  return [kind, shortcut, target].filter(Boolean).join(' · ');
 }

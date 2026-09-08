@@ -9,8 +9,6 @@ vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
-import { DEFAULT_VIDEO_AUTO_PROCESSING_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
-import { VideoAutoProcessingAction } from '@sniptale/runtime-contracts/video/types/types';
 import { VideoTrackKind } from '../../../../../features/video/project/types';
 import { ProjectTimelineToolbarLeadingControls } from './leading';
 
@@ -40,7 +38,7 @@ afterEach(() => {
 
 function renderLeadingControls(options?: {
   canAddMotionRegion?: boolean;
-  canAutoTransformRecording?: boolean;
+  canDeleteSelectedClip?: boolean;
   canEditSelectedClip?: boolean;
   canSplitSelectedClip?: boolean;
   selectedClip?: boolean;
@@ -64,7 +62,7 @@ function renderLeadingControls(options?: {
         <ProjectTimelineAddTrackControl onAddTrack={handlers.onAddTrack} />
         <ProjectTimelineToolbarLeadingControls
           canAddMotionRegion={options?.canAddMotionRegion ?? true}
-          canAutoTransformRecording={options?.canAutoTransformRecording ?? false}
+          canDeleteSelectedClip={options?.canDeleteSelectedClip ?? options?.selectedClip ?? false}
           canEditSelectedClip={options?.canEditSelectedClip ?? options?.selectedClip ?? false}
           canSplitSelectedClip={options?.canSplitSelectedClip ?? options?.selectedClip ?? false}
           insertion={{
@@ -82,7 +80,6 @@ function renderLeadingControls(options?: {
             onUnsupportedFileDrop: vi.fn(),
           }}
           selectedClip={options?.selectedClip ?? false}
-          onAutoTransformRecording={handlers.onToggleTelemetryLaneVisibility}
           onDeleteSelectedClip={vi.fn()}
           onDuplicateSelectedClip={vi.fn()}
           onSplitSelectedClip={handlers.onZoomChange}
@@ -106,12 +103,12 @@ function getButtonByText(label: string): HTMLButtonElement {
   return button;
 }
 
-it('renders timeline-specific actions on the leading side without the shared insert menu', () => {
-  renderLeadingControls({ canAutoTransformRecording: true });
+it('renders clip actions without the history auto-processing control in the toolbar', () => {
+  renderLeadingControls();
 
   expect(container?.textContent).not.toContain('videoEditor.timeline.addButton');
   expect(container?.textContent).toContain('videoEditor.timeline.addTrack');
-  expect(container?.textContent).toContain('videoEditor.timeline.autoTransform');
+  expect(container?.textContent).not.toContain('videoEditor.timeline.autoTransform');
   expect(getButtonByText('videoEditor.timeline.split').disabled).toBe(true);
 });
 
@@ -125,75 +122,8 @@ it('reveals clip actions only for an active clip selection', () => {
   expect(container?.textContent).toContain('videoEditor.timeline.delete');
 });
 
-it('opens the auto-transform wizard before applying transform settings', () => {
-  const handlers = renderLeadingControls({
-    canAutoTransformRecording: true,
-    selectedClip: true,
-  });
-
-  act(() => {
-    getButtonByText('videoEditor.timeline.autoTransform').click();
-  });
-
-  expect(container?.textContent).toContain('videoEditor.timeline.autoTransformWizardTitle');
-  expect(
-    container?.querySelectorAll('[data-ui="shared.ui.compact-inspector.option-row"]')
-  ).toHaveLength(3);
-  expect(
-    container?.querySelectorAll('[data-ui="shared.ui.compact-inspector.numeric-row"]')
-  ).toHaveLength(2);
-  expect(handlers.onToggleTelemetryLaneVisibility).not.toHaveBeenCalled();
-
-  act(() => {
-    getButtonByText('videoEditor.timeline.autoTransformActionRemove').click();
-  });
-
-  act(() => {
-    getButtonByText('videoEditor.timeline.autoTransformApply').click();
-  });
-
-  expect(handlers.onToggleTelemetryLaneVisibility).toHaveBeenCalledWith({
-    ...DEFAULT_VIDEO_AUTO_PROCESSING_SETTINGS,
-    enabled: true,
-    stableSegments: {
-      ...DEFAULT_VIDEO_AUTO_PROCESSING_SETTINGS.stableSegments,
-      action: VideoAutoProcessingAction.REMOVE,
-    },
-  });
-  expect(container?.textContent).not.toContain('videoEditor.timeline.autoTransformWizardTitle');
-});
-
-it('does not transform when the auto-transform wizard is cancelled or skipped', () => {
-  const handlers = renderLeadingControls({ canAutoTransformRecording: true });
-
-  act(() => {
-    getButtonByText('videoEditor.timeline.autoTransform').click();
-  });
-
-  act(() => {
-    getButtonByText('common.actions.cancel').click();
-  });
-
-  expect(handlers.onToggleTelemetryLaneVisibility).not.toHaveBeenCalled();
-
-  act(() => {
-    getButtonByText('videoEditor.timeline.autoTransform').click();
-  });
-
-  act(() => {
-    getButtonByText('videoEditor.timeline.autoTransformActionSkip').click();
-  });
-
-  act(() => {
-    getButtonByText('videoEditor.timeline.autoTransformApply').click();
-  });
-
-  expect(handlers.onToggleTelemetryLaneVisibility).not.toHaveBeenCalled();
-});
-
 it('wires clip actions from the leading side', () => {
   const handlers = renderLeadingControls({
-    canAutoTransformRecording: true,
     selectedClip: true,
   });
 

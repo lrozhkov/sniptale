@@ -94,7 +94,7 @@ it('preserves current track selection for cursor and action segments', () => {
   timeline.getState().selectCursorSegment('sample-1');
   expect(timeline.getState().selectedTrackId).toBe(primaryTrack!.id);
 
-  timeline.getState().selectActionSegment('action-1');
+  timeline.getState().selectActionOccurrence('action-1', null);
   expect(timeline.getState().selectedTrackId).toBe(primaryTrack!.id);
 });
 

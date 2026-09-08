@@ -54,7 +54,7 @@ function createPreviewStageInteractionState(params: {
     stage,
     project,
     camera,
-    shouldLockPreviewClipToViewport(clip, camera)
+    shouldLockPreviewClipToViewport(clip, camera, project)
   );
   const gestureState = createPreviewTransformGestureState({
     clipId: clip.id,

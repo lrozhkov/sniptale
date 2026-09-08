@@ -5,7 +5,11 @@ import { applyProjectUpdate } from '../helpers';
 import { buildMaterialPlacement, isMaterialSourceRangeValid } from './material-plan';
 import { makeRoomForMaterial } from './material-insert';
 import { reconcileRecordingInteractionAnchors } from '../../operations/source-timed-clips';
-import { areMaterialInsertActionsLocked, insertMaterialActionGap } from './material-actions';
+import {
+  addMaterialCapturedActions,
+  areMaterialInsertActionsLocked,
+  insertMaterialActionGap,
+} from './material-actions';
 import { insertMaterialCursorGap } from './material-cursor';
 
 /** Places an existing source with one admitted project and selection transition. */
@@ -13,7 +17,7 @@ export function createMaterialPlacementAction(
   set: VideoEditorProjectSliceSet,
   mode: 'append' | 'overlay' | 'insert'
 ): VideoEditorProjectState['appendMaterial'] {
-  return (assetId, range) => {
+  return (assetId, range, telemetry) => {
     let outcome: VideoEditorMaterialPlacementResult = { status: 'rejected', reason: 'no-project' };
     set((state) => {
       const project = state.project;
@@ -52,6 +56,7 @@ export function createMaterialPlacementAction(
         outcome = { status: 'rejected', reason: 'missing-material' };
         return state;
       }
+      let splitLineage: ReadonlyMap<string, string> | undefined;
       if (mode === 'insert') {
         if (areMaterialInsertActionsLocked(project, state.currentTime)) {
           outcome = { status: 'rejected', reason: 'locked-track' };
@@ -63,6 +68,7 @@ export function createMaterialPlacementAction(
           outcome = room;
           return state;
         }
+        splitLineage = room.trailingClipIdsBySourceId;
         result.project = {
           // Resolve old-source lineage before a repeated material can become an anchor candidate.
           ...insertMaterialActionGap(
@@ -72,8 +78,7 @@ export function createMaterialPlacementAction(
               room.trailingClipIdsBySourceId
             ),
             state.currentTime,
-            duration,
-            room.trailingClipIdsBySourceId
+            duration
           ),
           tracks: result.project.tracks,
           clips: [...room.project.clips, ...addedClips],
@@ -86,9 +91,10 @@ export function createMaterialPlacementAction(
           room.trailingClipIdsBySourceId
         );
       }
+      result.project = addMaterialCapturedActions(result.project, addedClips, telemetry);
       outcome = { status: 'placed', clipId: result.selectedClipId };
       return {
-        ...applyProjectUpdate(state, () => result.project),
+        ...applyProjectUpdate(state, () => result.project, splitLineage),
         selection: { kind: VideoEditorSelectionKind.CLIP, clipId: result.selectedClipId },
         selectedTrackId: result.selectedTrackId,
       };

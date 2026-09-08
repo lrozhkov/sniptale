@@ -19,20 +19,24 @@ type ProjectTimelineBodyProps = Pick<
   | 'dragGhost'
   | 'handleTimelineSeek'
   | 'hoveredClipId'
+  | 'autoProcessing'
+  | 'onAutoProcessingModalVisibilityChange'
   | 'insertion'
   | 'onCloseTrackGap'
   | 'onDropEffectDocument'
   | 'onClearUtilityLane'
-  | 'onSelectActionSegment'
+  | 'onSelectHistorySpan'
+  | 'onSelectActionOccurrence'
   | 'onSelectClip'
   | 'onSelectCursorSegment'
   | 'onSelectMotionRegion'
+  | 'onConnectMotionRegions'
   | 'onSelectMotionLane'
+  | 'onSelectHistoryLane'
   | 'onSelectObjectTrack'
   | 'onSelectScene'
   | 'onSelectTrack'
   | 'onSelectTransition'
-  | 'onResizeActionEvent'
   | 'onResizeMotionRegion'
   | 'onSeek'
   | 'onStepToNextFrame'
@@ -52,7 +56,6 @@ type ProjectTimelineBodyProps = Pick<
   | 'selectedEffectSelection'
   | 'selectedTrackId'
   | 'setHoveredClipId'
-  | 'telemetryLaneVisible'
   | 'timelinePreviews'
   | 'trackLayoutModel'
   | 'syncTracksScroll'
@@ -64,6 +67,7 @@ type ProjectTimelineBodyProps = Pick<
   | 'tracks'
   | 'visiblePlaybackRange'
 > & {
+  telemetryLaneVisible: boolean;
   cursorLaneVisible: boolean;
   trackPanelPrefs: ReturnType<typeof useProjectTimelinePanelPrefs>;
 };
@@ -97,7 +101,17 @@ function ProjectTimelineBodyCanvas(props: ProjectTimelineBodyProps) {
 
 function createTrackListProps(props: ProjectTimelineBodyProps): ProjectTimelineBodyTrackListProps {
   return {
-    canShowTelemetryLane: props.recordingTelemetry !== null,
+    canShowTelemetryLane: true,
+    recordingTelemetry: props.recordingTelemetry,
+    autoProcessing: {
+      project: props.project,
+      selection: props.selection,
+      actions: props.autoProcessing,
+      onSeek: props.onSeek,
+      onModalVisibilityChange: props.onAutoProcessingModalVisibilityChange,
+    },
+    onSelectHistoryLane: props.onSelectHistoryLane,
+    historyLaneSelected: props.selection?.kind === VideoEditorSelectionKind.HISTORY_LANE,
     onSelectMotionLane: props.onSelectMotionLane,
     motionLaneSelected: props.selection?.kind === VideoEditorSelectionKind.MOTION_LANE,
     cursorLaneVisible: props.cursorLaneVisible,
@@ -155,17 +169,18 @@ function createCanvasProps(props: ProjectTimelineBodyProps): ProjectTimelineBody
     onCloseTrackGap: props.onCloseTrackGap,
     ...(props.onDropEffectDocument ? { onDropEffectDocument: props.onDropEffectDocument } : {}),
     onImportTimelineFile: props.insertion.onImport,
-    onResizeActionEvent: props.onResizeActionEvent,
     onResizeMotionRegion: props.onResizeMotionRegion,
     onScroll: () => props.syncTracksScroll('timeline'),
     onSeek: props.handleTimelineSeek,
     onSeekTime: props.onSeek,
     onStepToNextFrame: props.onStepToNextFrame,
     onStepToPreviousFrame: props.onStepToPreviousFrame,
-    onSelectActionSegment: props.onSelectActionSegment,
+    ...(props.onSelectHistorySpan ? { onSelectHistorySpan: props.onSelectHistorySpan } : {}),
+    onSelectActionOccurrence: props.onSelectActionOccurrence,
     onSelectClip: props.onSelectClip,
     onSelectCursorSegment: props.onSelectCursorSegment,
     onSelectMotionRegion: props.onSelectMotionRegion,
+    onConnectMotionRegions: props.onConnectMotionRegions,
     onSelectObjectTrack: props.onSelectObjectTrack,
     onSelectScene: props.onSelectScene,
     onSelectTrack: props.onSelectTrack,

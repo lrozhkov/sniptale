@@ -96,7 +96,7 @@ function createVisibleRectSample(
   );
 }
 
-function resolveDestinationRect(
+export function resolveDestinationRect(
   source: Readonly<{ height: number; width: number }>,
   output: Readonly<{ height: number; width: number }>,
   fit: LiveVideoFrameTransform['fit']

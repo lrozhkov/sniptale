@@ -85,16 +85,23 @@ export function ManualFocusFields(props: {
 
   return (
     <div className="grid grid-cols-1 gap-3">
-      <MotionFocusCoordinateFields
-        focusPoint={focusPoint}
-        motionRegionId={props.motionRegionId}
-        panel={props.panel}
-      />
       <MotionFocusButtons
         isPickingOnStage={isPickingOnStage}
         motionRegionId={props.motionRegionId}
         panel={props.panel}
       />
+      <details className="text-xs text-[var(--sniptale-color-text-secondary)]">
+        <summary className="cursor-pointer py-2">
+          {translate('videoEditor.sidebar.framingExactPosition')}
+        </summary>
+        <div className="pt-2">
+          <MotionFocusCoordinateFields
+            focusPoint={focusPoint}
+            motionRegionId={props.motionRegionId}
+            panel={props.panel}
+          />
+        </div>
+      </details>
     </div>
   );
 }

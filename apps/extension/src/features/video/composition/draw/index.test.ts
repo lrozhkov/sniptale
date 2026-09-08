@@ -177,6 +177,8 @@ it('renders visible cursor and active action preset overlays', () => {
       {
         duration: 1,
         event: { preset },
+        preset,
+        renderKind: preset === 'NONE' ? null : 'accent',
         point: { x: 40, y: 50 },
         progress: 0.5,
         start: 0,

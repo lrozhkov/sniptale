@@ -1,3 +1,4 @@
+import { drawActionCompositionState } from './effects/actions';
 import { IDENTITY_TRANSITION_VISUAL_STATE } from '../../project/transition/presentation.types.ts';
 import type { VideoCompositionVisualLayer } from '../types';
 import { drawAnnotationCompositionLayer } from './annotation';
@@ -214,9 +215,42 @@ function drawVideoLayer(
     render: (drawX, drawY, drawWidth, drawHeight) => {
       if (source instanceof HTMLVideoElement) {
         context.drawImage(source, drawX, drawY, drawWidth, drawHeight);
-        return;
+      } else {
+        source.draw(context, drawX, drawY, drawWidth, drawHeight);
       }
-      source.draw(context, drawX, drawY, drawWidth, drawHeight);
+      context.save();
+      context.beginPath();
+      const contentBounds = {
+        x: Math.max(frame.x, drawX),
+        y: Math.max(frame.y, drawY),
+        width: Math.max(
+          0,
+          Math.min(frame.x + frame.width, drawX + drawWidth) - Math.max(frame.x, drawX)
+        ),
+        height: Math.max(
+          0,
+          Math.min(frame.y + frame.height, drawY + drawHeight) - Math.max(frame.y, drawY)
+        ),
+      };
+      context.rect(contentBounds.x, contentBounds.y, contentBounds.width, contentBounds.height);
+      context.clip();
+      const sourceWidth =
+        source instanceof HTMLVideoElement ? source.videoWidth : source.sourceWidth;
+      const sourceHeight =
+        source instanceof HTMLVideoElement ? source.videoHeight : source.sourceHeight;
+      const actionScale = (drawWidth / sourceWidth + drawHeight / sourceHeight) / 2;
+      for (const action of layer.actions ?? []) {
+        const point = action.point
+          ? { x: drawX + action.point.x * drawWidth, y: drawY + action.point.y * drawHeight }
+          : action.renderKind === 'keystroke'
+            ? {
+                x: contentBounds.x + 12 * Math.max(0.2, actionScale),
+                y: contentBounds.y + 24 * Math.max(0.2, actionScale),
+              }
+            : null;
+        drawActionCompositionState(context, { ...action, point }, null, actionScale, contentBounds);
+      }
+      context.restore();
     },
   });
 }

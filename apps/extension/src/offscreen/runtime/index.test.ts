@@ -356,7 +356,25 @@ async function verifiesDuplicateBoundStopsShareOneDeferredOutcome() {
   const listener = await captureSubscriptionListener();
   const firstResponse = vi.fn();
   const duplicateResponse = vi.fn();
-  const stop = createDeferred<{ result: 'stopped' }>();
+  const recordingPointTransform = {
+    viewport: {
+      width: 1280,
+      height: 800,
+      devicePixelRatio: 1,
+      visualViewportScale: 1,
+      visualViewportOffsetX: 0,
+      visualViewportOffsetY: 0,
+    },
+    visibleClientRect: { x: 0, y: 0, width: 1280, height: 800 },
+    scaleX: 1 / 1280,
+    scaleY: 1 / 800,
+    offsetX: 0,
+    offsetY: 0,
+  };
+  const stop = createDeferred<{
+    result: 'stopped';
+    recordingPointTransform: typeof recordingPointTransform;
+  }>();
   parseOffscreenRuntimeMessageMock.mockImplementation((message: unknown) => message);
   stopRecordingMock.mockReturnValueOnce(stop.promise);
   const command = attachOffscreenCommandCapability({
@@ -379,11 +397,12 @@ async function verifiesDuplicateBoundStopsShareOneDeferredOutcome() {
   expect(emitStop('duplicate-stop-second', duplicateResponse)).toBe(true);
   expect(stopRecordingMock).toHaveBeenCalledOnce();
 
-  stop.resolve({ result: 'stopped' });
+  stop.resolve({ result: 'stopped', recordingPointTransform });
   await flushRuntimeRouting();
 
-  expect(firstResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
-  expect(duplicateResponse).toHaveBeenCalledWith({ success: true, result: 'accepted' });
+  const expected = { success: true, result: 'accepted', recordingPointTransform };
+  expect(firstResponse).toHaveBeenCalledWith(expected);
+  expect(duplicateResponse).toHaveBeenCalledWith(expected);
 }
 
 async function verifiesTerminalStopFailuresUseAnAcceptedTerminalResponse() {

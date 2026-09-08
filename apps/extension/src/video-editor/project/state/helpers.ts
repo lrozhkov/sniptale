@@ -1,3 +1,4 @@
+import { reconcileMotionSourceBindings } from '../../../features/video/project/motion/source-binding';
 import {
   createVideoProjectTrack,
   getDefaultTrackName,
@@ -77,7 +78,8 @@ export function ensureTrackForKind(
 
 export function applyProjectUpdate(
   state: VideoEditorProjectState,
-  updater: (project: VideoProject) => VideoProject
+  updater: (project: VideoProject) => VideoProject,
+  splitLineage?: ReadonlyMap<string, string>
 ): Partial<VideoEditorProjectState> {
   if (!state.project) {
     return {};
@@ -87,11 +89,9 @@ export function applyProjectUpdate(
   if (updatedProject === state.project) {
     return {};
   }
-  const nextProject = syncProjectDuration(
-    reconcileRecordingInteractionAnchors(state.project, updatedProject)
-  );
+  const nextProject = reconcileProjectMutation(state.project, updatedProject, splitLineage);
   return {
-    ...applyProjectSnapshot(state, nextProject),
+    ...applyProjectSnapshot(state, nextProject, splitLineage),
     projectHistory: recordVideoEditorProjectHistory(
       state.projectHistory,
       state.project,
@@ -100,15 +100,31 @@ export function applyProjectUpdate(
   };
 }
 
+/** Reconcile each temporal mutation before the next split, without publishing history. */
+export function reconcileProjectMutation(
+  previousProject: VideoProject,
+  updatedProject: VideoProject,
+  splitLineage?: ReadonlyMap<string, string>
+): VideoProject {
+  return syncProjectDuration(
+    reconcileMotionSourceBindings(
+      previousProject,
+      reconcileRecordingInteractionAnchors(previousProject, updatedProject, splitLineage),
+      splitLineage
+    )
+  );
+}
+
 export function applyProjectSnapshot(
   state: VideoEditorProjectState,
-  nextProject: VideoProject
+  nextProject: VideoProject,
+  splitLineage?: ReadonlyMap<string, string>
 ): Partial<VideoEditorProjectState> {
   const nextTime = clampNumber(state.currentTime, 0, Math.max(0, nextProject.duration));
   const selectedTrackStillExists = state.selectedTrackId
     ? nextProject.tracks.some((track) => track.id === state.selectedTrackId)
     : false;
-  const selection = resolveSelectionAfterProjectUpdate(nextProject, state.selection);
+  const selection = resolveSelectionAfterProjectUpdate(nextProject, state.selection, splitLineage);
   const selectedTrackId =
     resolveSelectedTrackIdFromSelection(nextProject, selection) ??
     (selectedTrackStillExists ? state.selectedTrackId : (nextProject.tracks[0]?.id ?? null));

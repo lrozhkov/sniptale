@@ -1,3 +1,4 @@
+import { resolveVideoProjectActionOccurrences } from '../../../../features/video/project/action-occurrences';
 import { describe, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import { VideoMotionFocusMode } from '../../../../features/video/project/types';
@@ -39,7 +40,7 @@ function createMotionRegion(
     motionBlurAmount: 0,
     scale: 1.2,
     startTime: 0,
-    targetActionEventId: null,
+    targetAction: null,
     zoomInDuration: 0.2,
     zoomOutDuration: 0.2,
     ...overrides,
@@ -118,7 +119,7 @@ function registerClipNudgeTest() {
         {
           ...createLatestState(project),
           selection: { kind: VideoEditorSelectionKind.CLIP, clipId: 'clip-1' },
-          selectedActionEvent: null,
+          selectedActionOccurrence: null,
           selectedClipId: 'clip-1',
           selectedMotionRegion: null,
         },
@@ -132,27 +133,31 @@ function registerClipNudgeTest() {
 }
 
 function registerActionPointNudgeTest() {
-  it('updates a selected action point from the project center when it is unset', () => {
+  it('nudges the selected manual occurrence using its authored point', () => {
     const project = createEmptyVideoProject('Playback nudge');
     project.actionEvents = [
       {
-        duration: 1,
         id: 'action-1',
         kind: 'CLICK',
         label: 'Action',
-        point: null,
-        preset: 'NONE',
-        startTime: 0,
+        point: { x: 40, y: 30 },
+        data: {},
+        presentation: { preset: 'NONE', duration: 1 },
+        anchor: { kind: 'project', time: 0 },
       },
-    ] as never;
+    ];
     const handlers = createHandlers();
 
     expect(
       applyPlaybackSelectionNudge(
         {
           ...createLatestState(project),
-          selection: { kind: VideoEditorSelectionKind.ACTION_SEGMENT, actionEventId: 'action-1' },
-          selectedActionEvent: project.actionEvents[0] ?? null,
+          selection: {
+            kind: VideoEditorSelectionKind.ACTION_OCCURRENCE,
+            clipId: null,
+            eventId: 'action-1',
+          },
+          selectedActionOccurrence: resolveVideoProjectActionOccurrences(project)[0] ?? null,
           selectedClipId: null,
           selectedMotionRegion: null,
         },
@@ -161,7 +166,8 @@ function registerActionPointNudgeTest() {
       )
     ).toBe(true);
     expect(handlers.updateActionEventDetails).toHaveBeenCalledWith('action-1', {
-      point: { x: project.width / 2 + 5, y: project.height / 2 },
+      clipId: null,
+      point: { x: 45, y: 30 },
     });
   });
 }
@@ -177,7 +183,7 @@ function registerManualFocusNudgeTest() {
         {
           ...createLatestState(project),
           selection: { kind: VideoEditorSelectionKind.MOTION_REGION, motionRegionId: 'motion-1' },
-          selectedActionEvent: null,
+          selectedActionOccurrence: null,
           selectedClipId: null,
           selectedMotionRegion: project.motionRegions?.[0] ?? null,
         },
@@ -208,7 +214,7 @@ function registerManualAreaNudgeTest() {
         {
           ...createLatestState(project),
           selection: { kind: VideoEditorSelectionKind.MOTION_REGION, motionRegionId: 'motion-2' },
-          selectedActionEvent: null,
+          selectedActionOccurrence: null,
           selectedClipId: null,
           selectedMotionRegion: project.motionRegions?.[0] ?? null,
         },
@@ -233,7 +239,7 @@ function registerInertSelectionNudgeTest() {
         {
           ...createLatestState(project),
           selection: { kind: VideoEditorSelectionKind.SCENE },
-          selectedActionEvent: null,
+          selectedActionOccurrence: null,
           selectedClipId: null,
           selectedMotionRegion: null,
         },
@@ -245,8 +251,12 @@ function registerInertSelectionNudgeTest() {
       applyPlaybackSelectionNudge(
         {
           ...createLatestState(project),
-          selection: { kind: VideoEditorSelectionKind.ACTION_SEGMENT, actionEventId: 'missing' },
-          selectedActionEvent: null,
+          selection: {
+            kind: VideoEditorSelectionKind.ACTION_OCCURRENCE,
+            clipId: null,
+            eventId: 'missing',
+          },
+          selectedActionOccurrence: null,
           selectedClipId: null,
           selectedMotionRegion: null,
         },

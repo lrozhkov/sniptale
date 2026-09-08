@@ -101,7 +101,7 @@ export function useVideoEditorRuntime(
       selection: params.playback.selection,
       placementMode: params.playback.placementMode,
       selectedClipId: params.playback.selectedClipId,
-      selectedActionEvent: params.playback.selectedActionEvent,
+      selectedActionOccurrence: params.playback.selectedActionOccurrence,
       selectedMotionRegion: params.playback.selectedMotionRegion,
     },
     {

@@ -1,5 +1,5 @@
+import { parseMotionSourceBinding, projectMotionSourceBinding } from './source-binding';
 import {
-  VideoMotionCameraMode,
   VideoMotionFocusMode,
   VideoMotionOverlayZoomMode,
   VideoTemporalEasing,
@@ -16,15 +16,71 @@ import {
 } from './focus-area';
 import {
   resolveMotionBlurAmount,
-  resolveMotionCameraMode,
   resolveMotionFocusMode,
-  resolveMotionPath,
   resolveMotionScale,
   resolveMotionStartTime,
 } from './normalization';
 import { isMotionAnimation } from './timing';
 
 export const DEFAULT_VIDEO_MOTION_OVERLAY_ZOOM_MODE = VideoMotionOverlayZoomMode.LOCK_OVERLAYS;
+
+function normalizeMotionConnection(value: unknown): VideoProjectMotionRegion['incomingConnection'] {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('fromRegionId' in value) ||
+    typeof value.fromRegionId !== 'string' ||
+    !value.fromRegionId ||
+    !('easing' in value)
+  )
+    return undefined;
+  const easing = Object.values(VideoTemporalEasing).find((candidate) => candidate === value.easing);
+  return easing ? { fromRegionId: value.fromRegionId, easing } : undefined;
+}
+
+/** Resolves a connection against current neighbours, never a second persisted timeline. */
+export function resolveMotionConnectionSource(
+  project: Pick<VideoProject, 'motionRegions'>,
+  destination: VideoProjectMotionRegion
+): VideoProjectMotionRegion | null {
+  if (
+    destination.duration <= 0 ||
+    !destination.incomingConnection ||
+    !isFixedMotionState(destination)
+  )
+    return null;
+  let previous: VideoProjectMotionRegion | null = null;
+  for (const region of project.motionRegions ?? []) {
+    if (
+      region.duration <= 0 ||
+      region.id === destination.id ||
+      region.startTime > destination.startTime
+    )
+      continue;
+    if (!previous || region.startTime > previous.startTime) previous = region;
+  }
+  const authoredSource = project.motionRegions?.find(
+    (region) => region.id === destination.incomingConnection?.fromRegionId
+  );
+  const sourceGroup = authoredSource?.sourceBinding?.animationGroupId;
+  const matchesSource =
+    previous &&
+    (previous.id === destination.incomingConnection.fromRegionId ||
+      (sourceGroup && previous.sourceBinding?.animationGroupId === sourceGroup));
+  return previous &&
+    matchesSource &&
+    previous.startTime + previous.duration <= destination.startTime &&
+    isFixedMotionState(previous)
+    ? previous
+    : null;
+}
+
+function isFixedMotionState(region: VideoProjectMotionRegion): boolean {
+  return (
+    region.focusMode === VideoMotionFocusMode.MANUAL ||
+    region.focusMode === VideoMotionFocusMode.MANUAL_AREA
+  );
+}
 
 export function createMotionFocusAreaFromPointScale(
   project: Pick<VideoProject, 'height' | 'width'>,
@@ -79,13 +135,24 @@ function resolveMotionFocusPoint(
     : getProjectCenter(project);
 }
 
-function resolveMotionTargetActionId(
-  project: Pick<VideoProject, 'actionEvents'>,
-  targetActionEventId: VideoProjectMotionRegion['targetActionEventId']
+function resolveMotionTargetAction(
+  project: Pick<VideoProject, 'actionEvents' | 'clips'>,
+  target: VideoProjectMotionRegion['targetAction']
 ) {
-  return typeof targetActionEventId === 'string' &&
-    project.actionEvents.some((event) => event.id === targetActionEventId)
-    ? targetActionEventId
+  if (!target) return null;
+  const event = project.actionEvents.find((item) => item.id === target.eventId);
+  if (!event) return null;
+  const anchor = event.anchor;
+  if (anchor.kind === 'project') return target.clipId === null ? target : null;
+  return project.clips.some(
+    (clip) =>
+      clip.type === 'VIDEO' &&
+      clip.id === target.clipId &&
+      clip.sourceInstanceId === anchor.sourceInstanceId &&
+      anchor.sourceTime >= clip.sourceStart &&
+      anchor.sourceTime < clip.sourceStart + clip.sourceDuration
+  )
+    ? target
     : null;
 }
 
@@ -104,7 +171,6 @@ export function createVideoProjectMotionRegion(
   startTime: number
 ): VideoProjectMotionRegion {
   return {
-    cameraMode: VideoMotionCameraMode.STATIC,
     duration: 2.8,
     easing: VideoTemporalEasing.EASE_IN_OUT,
     focusArea: null,
@@ -113,39 +179,36 @@ export function createVideoProjectMotionRegion(
     id: crypto.randomUUID(),
     motionBlurAmount: 0,
     overlayZoomMode: DEFAULT_VIDEO_MOTION_OVERLAY_ZOOM_MODE,
-    path: null,
+
     scale: 1.35,
     startTime: Math.max(0, startTime),
-    targetActionEventId: null,
+    targetAction: null,
     zoomInDuration: 0.35,
     zoomOutDuration: 0.35,
   };
 }
 
 export function normalizeVideoProjectMotionRegion(
-  project: Pick<VideoProject, 'actionEvents' | 'duration' | 'height' | 'width'>,
+  project: Pick<VideoProject, 'actionEvents' | 'clips' | 'duration' | 'height' | 'width'>,
   region: VideoProjectMotionRegion
 ): VideoProjectMotionRegion {
+  const sourceBinding = parseMotionSourceBinding(region.sourceBinding);
   const duration = resolveMotionDuration(project, region.duration);
   const animation = isMotionAnimation(region.animation) ? region.animation : undefined;
-  const animationDuration = animation?.duration ?? duration;
+  const animationDuration = sourceBinding?.animation.duration ?? animation?.duration ?? duration;
   const focusArea = normalizeMotionFocusArea(project, region.focusArea);
   const focusPoint = resolveMotionFocusPoint(project, region);
-  const targetActionEventId = resolveMotionTargetActionId(project, region.targetActionEventId);
+  const targetAction = resolveMotionTargetAction(project, region.targetAction);
   const focusMode = resolveMotionFocusMode(region.focusMode);
   const scale = resolveMotionScale(region.scale);
-  const cameraMode = resolveMotionCameraMode(region.cameraMode);
+  const incomingConnection = normalizeMotionConnection(region.incomingConnection);
   const startTime = resolveMotionStartTime(project.duration, region.startTime, duration);
-  const path = resolveMotionPath(project, region.path, cameraMode, {
-    focusArea,
-    focusMode,
-    focusPoint,
-    scale,
-  });
 
-  return {
+  return projectMotionSourceBinding(project, {
+    ...(sourceBinding ? { sourceBinding } : {}),
     ...(animation ? { animation } : {}),
-    cameraMode,
+    ...(incomingConnection ? { incomingConnection } : {}),
+
     duration,
     easing: Object.values(VideoTemporalEasing).includes(region.easing)
       ? region.easing
@@ -156,10 +219,10 @@ export function normalizeVideoProjectMotionRegion(
     id: region.id,
     motionBlurAmount: resolveMotionBlurAmount(region.motionBlurAmount),
     overlayZoomMode: resolveMotionOverlayZoomMode(region.overlayZoomMode),
-    path,
+
     scale,
     startTime,
-    targetActionEventId,
+    targetAction,
     zoomInDuration: clampNumber(
       Number.isFinite(region.zoomInDuration) ? region.zoomInDuration : 0,
       0,
@@ -170,5 +233,5 @@ export function normalizeVideoProjectMotionRegion(
       0,
       animationDuration
     ),
-  };
+  });
 }

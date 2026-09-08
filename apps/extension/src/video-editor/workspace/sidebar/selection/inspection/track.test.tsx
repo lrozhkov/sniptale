@@ -80,7 +80,7 @@ function createProps(kind: VideoTrackKind = VideoTrackKind.SUBTITLE, isRoot = fa
     selectedClip: null,
     selectedTransition: null,
     selectedCursorSample: null,
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedMotionRegion: null,
     selectedTrack,
     placementMode: null,

@@ -50,9 +50,10 @@ function createHeaderController(): VideoEditorHeaderController {
 
 function createTimelineSelectionActions(): Pick<
   TimelineActions,
-  | 'onSelectActionSegment'
+  | 'onSelectActionOccurrence'
   | 'onSelectClip'
   | 'onSelectCursorSegment'
+  | 'onSelectHistoryLane'
   | 'onSelectMotionLane'
   | 'onSelectMotionRegion'
   | 'onSelectObjectTrack'
@@ -61,9 +62,10 @@ function createTimelineSelectionActions(): Pick<
   | 'onSelectTransition'
 > {
   return {
-    onSelectActionSegment: noop(),
+    onSelectActionOccurrence: noop(),
     onSelectClip: noop(),
     onSelectCursorSegment: noop(),
+    onSelectHistoryLane: noop(),
     onSelectMotionLane: noop(),
     onSelectMotionRegion: noop(),
     onSelectObjectTrack: noop(),
@@ -84,14 +86,19 @@ function createTimelineEditActions(): Omit<
       isProjectHistoryTransactionCurrent: () => true,
     },
     onAddTrackLogicalLane: noop(),
-    onAutoTransformRecording: noop(),
+    onConnectMotionRegions: noop(),
+    onAutoProcessingModalVisibilityChange: noop(),
+    autoProcessing: {
+      prepare: async () => ({ status: 'stale' as const }),
+      apply: async () => 'stale' as const,
+      isCurrent: () => false,
+    },
     onClearUtilityLane: noop(),
     onCloseTrackGap: noop(),
     onDeleteSelectedClip: noop(),
     onDeleteSelectedTimelineObject: noop(),
     onDeleteTrack: noop(),
     onDuplicateSelectedClip: noop(),
-    onMoveActionEvent: noop(),
     onSwapClip: vi.fn(),
     onMoveClip: noop(),
     onMoveCursorSegment: noop(),
@@ -99,7 +106,6 @@ function createTimelineEditActions(): Omit<
     onMoveTrack: noop(),
     onMoveTransitionSegment: noop(),
     onRenameTrack: noop(),
-    onResizeActionEvent: noop(),
     onResizeMotionRegion: noop(),
     onSeek: noop(),
     onClearPlaybackRange: noop(),
@@ -112,7 +118,6 @@ function createTimelineEditActions(): Omit<
     onTimelinePreviewSuspendedChange: noop(),
     onTimelinePreviewViewportChange: noop(),
     onTogglePlay: noop(),
-    onToggleTelemetryLaneVisibility: noop(),
     onToggleTrackLock: noop(),
     onToggleTrackVisibility: noop(),
     onToggleUtilityLaneLock: noop(),
@@ -136,6 +141,7 @@ function createTimelineController(
       ...createTimelineSelectionActions(),
     },
     state: {
+      canDeleteSelectedClip: false,
       canEditSelectedClip: false,
       canSplitSelectedClip: false,
       currentTime: 0,
@@ -144,11 +150,10 @@ function createTimelineController(
       pixelsPerSecond: 90,
       playbackRange: null,
       project,
-      recordingTelemetry: null,
+      recordingTelemetry: [],
       selectedClipId: null,
       selectedTrackId: null,
       selection: createSceneSelection(),
-      telemetryLaneVisible: false,
       timelinePreviews: {},
     },
   };
@@ -211,7 +216,7 @@ function createFloatingPreviewPreferences() {
 function createFloatingPreviewSelection() {
   return {
     placementMode: null,
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedClipId: null,
     selectedMotionRegion: null,
     onSelectClip: noop(),

@@ -1,7 +1,72 @@
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject } from '../factories/creation';
-import { createVideoProjectMotionRegion } from '../motion';
-import { isMotionRegion } from './interaction';
+import { createVideoProjectMotionRegion, normalizeVideoProjectMotionRegion } from '../motion';
+import { isActionEvent, isMotionRegion } from './interaction';
+
+it('rejects malformed presentation overrides while admitting sparse signed offsets', () => {
+  const event = {
+    id: 'a',
+    anchor: { kind: 'project', time: 0 },
+    capturedDuration: 1,
+    kind: 'KEY',
+    label: 'Ctrl + K',
+    data: {},
+    point: null,
+  };
+  expect(isActionEvent({ ...event, presentation: { offset: -0.5, enabled: true } })).toBe(true);
+  for (const presentation of [
+    null,
+    { enabled: 1 },
+    { preset: 'unknown' },
+    { duration: 0 },
+    { duration: -1 },
+    { duration: Infinity },
+    { offset: NaN },
+    { offset: '0' },
+    { point: null },
+    { point: { x: Infinity, y: 2 } },
+  ]) {
+    expect(isActionEvent({ ...event, presentation })).toBe(false);
+  }
+});
+
+it('rejects the removed path model and emits only supported framing fields', () => {
+  const project = createEmptyVideoProject('Framing');
+  const region = createVideoProjectMotionRegion(project, 0);
+  expect(region).not.toHaveProperty('cameraMode');
+  expect(region).not.toHaveProperty('path');
+  expect(isMotionRegion({ ...region, cameraMode: 'PATH' })).toBe(false);
+  expect(isMotionRegion({ ...region, path: { stops: [], segments: [] } })).toBe(false);
+  const inactiveMetadata = { ...region, cameraMode: 'STATIC', path: null };
+  expect(isMotionRegion(inactiveMetadata)).toBe(true);
+  expect(normalizeVideoProjectMotionRegion(project, inactiveMetadata)).toEqual(
+    normalizeVideoProjectMotionRegion(project, region)
+  );
+});
+
+it('admits retained source bindings, including temporarily invisible regions', () => {
+  const region = createVideoProjectMotionRegion(createEmptyVideoProject('Bound zoom'), 0);
+  const sourceBinding = {
+    clipId: 'source',
+    sourceStart: 2,
+    sourceEnd: 4,
+    animation: { start: 0, end: 2, duration: 2 },
+  };
+  expect(isMotionRegion({ ...region, duration: 0, sourceBinding })).toBe(true);
+  expect(isMotionRegion({ ...region, sourceBinding: { ...sourceBinding, sourceEnd: 1 } })).toBe(
+    false
+  );
+});
+
+it('persists the complete framing scale range and rejects invalid scales', () => {
+  const region = createVideoProjectMotionRegion(createEmptyVideoProject('Zoom'), 0);
+  for (const scale of [0.1, 0.5, 1, 4]) {
+    expect(isMotionRegion({ ...region, scale }), `scale ${scale}`).toBe(true);
+  }
+  for (const scale of [0, -1, 0.09, 4.01, NaN, Infinity, '0.1']) {
+    expect(isMotionRegion({ ...region, scale }), `scale ${scale}`).toBe(false);
+  }
+});
 
 it('accepts an authored zoom interval and rejects malformed persisted intervals', () => {
   const region = createVideoProjectMotionRegion(createEmptyVideoProject('Zoom'), 0);
@@ -21,30 +86,22 @@ it('accepts an authored zoom interval and rejects malformed persisted intervals'
   }
 });
 
-it('validates retained action animation intervals at the persistence boundary', async () => {
-  const { isActionEvent } = await import('./interaction');
+it('validates captured duration independently from presentation duration', () => {
   const event = {
     id: 'click',
     kind: 'CLICK',
-    time: 2,
-    duration: 1,
+    anchor: { kind: 'project', time: 2 },
     point: null,
     label: '',
     data: {},
-    preset: 'CLICK_RIPPLE',
   };
   expect(isActionEvent(event)).toBe(true);
-  expect(isActionEvent({ ...event, animation: { start: 1, end: 2, duration: 4 } })).toBe(true);
-  for (const animation of [
-    null,
-    {},
-    { start: '1', end: 2, duration: 4 },
-    { start: -1, end: 2, duration: 4 },
-    { start: 2, end: 2, duration: 4 },
-    { start: 1, end: 5, duration: 4 },
-    { start: 1, end: 2, duration: Infinity },
-  ]) {
-    expect(isActionEvent({ ...event, animation })).toBe(false);
+  expect(isActionEvent({ ...event, capturedDuration: 0 })).toBe(true);
+  expect(isActionEvent({ ...event, capturedDuration: 4, presentation: { duration: 0.7 } })).toBe(
+    true
+  );
+  for (const capturedDuration of [null, '1', -1, Infinity, NaN]) {
+    expect(isActionEvent({ ...event, capturedDuration })).toBe(false);
   }
 });
 
@@ -74,5 +131,57 @@ it('validates retained cursor easing ranges at the persistence boundary', async 
     { start: NaN, end: 1 },
   ]) {
     expect(isCursorTrack({ ...track, samples: [{ ...sample, interpolationRange }] })).toBe(false);
+  }
+});
+
+it('admits source facts without a project-time cache and rejects malformed discriminated anchors', () => {
+  const fact = {
+    id: 'fact',
+    kind: 'CLICK',
+    label: 'Click',
+    data: {},
+    point: { x: 0.4, y: 0.5 },
+    anchor: {
+      kind: 'recording-source',
+      recordingId: 'r',
+      sourceInstanceId: 'i',
+      sourceEventId: 'raw',
+      sourceTime: 2,
+    },
+    capturedDuration: 0.2,
+  };
+  expect(isActionEvent(fact)).toBe(true);
+  expect(isActionEvent({ ...fact, anchor: { kind: 'project', time: 2 } })).toBe(true);
+  for (const anchor of [
+    null,
+    { kind: 'project', time: NaN },
+    { ...fact.anchor, sourceInstanceId: '' },
+    { ...fact.anchor, sourceEventId: '' },
+    { ...fact.anchor, sourceTime: -1 },
+  ]) {
+    expect(isActionEvent({ ...fact, anchor })).toBe(false);
+  }
+  expect(isActionEvent({ ...fact, point: { x: 1.1, y: 0.5 } })).toBe(false);
+  expect(isActionEvent({ ...fact, presentation: { point: { x: -0.1, y: 0.5 } } })).toBe(false);
+});
+
+it('rejects removed authored action timing authorities rather than accepting a mixed contract', () => {
+  const event = {
+    id: 'a',
+    kind: 'CLICK',
+    label: 'Click',
+    data: {},
+    point: null,
+    anchor: { kind: 'project', time: 1 },
+  };
+  for (const removed of [
+    { time: 1 },
+    { duration: 1 },
+    { preset: 'CLICK_RIPPLE' },
+    { timeBasis: 'project' },
+    { sourceAnchor: null },
+    { animation: { start: 0, end: 1, duration: 1 } },
+  ]) {
+    expect(isActionEvent({ ...event, ...removed })).toBe(false);
   }
 });

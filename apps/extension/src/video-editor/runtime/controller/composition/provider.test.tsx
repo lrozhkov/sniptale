@@ -10,7 +10,7 @@ const mocks = vi.hoisted(() => {
   const lifecycle = {
     error: null,
     isReady: false,
-    project: null,
+    project: null as import('../../../../features/video/project/types').VideoProject | null,
     recordingId: null,
     renameProject: action,
     saveState: 'saved',
@@ -66,6 +66,8 @@ const mocks = vi.hoisted(() => {
     refreshRecordings: action,
   };
   const workspace = {
+    autoProcessingModalOpen: false,
+    setAutoProcessingModalOpen: action,
     audioRecordingDialogOpen: false,
     audioRecordingTarget: null,
     openTrackAudioRecordingDialog: action,
@@ -142,7 +144,7 @@ vi.mock('../recording-telemetry', () => ({ useRecordingTelemetry: vi.fn() }));
 vi.mock('../selections', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../selections')>()),
   useVideoEditorSelections: () => ({
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedClip: null,
     selectedCursorSample: null,
     selectedMotionRegion: null,
@@ -184,12 +186,16 @@ vi.mock('../store', async (importOriginal) => ({
 
 import { VideoEditorBlockingOverlayContext, VideoEditorLibrariesContext } from './contexts';
 import { VideoEditorCompositionProvider } from './provider';
+import { useVideoEditorSidebarController } from './hooks';
+import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 
 let container: HTMLDivElement;
 let root: Root;
 
 beforeEach(() => {
+  mocks.workspace.autoProcessingModalOpen = false;
   mocks.playback.currentTime = 0;
+  mocks.lifecycle.project = null;
   mocks.workspace.preview.sourceViewerActive = false;
   mocks.exportPort.exportState = { dialogOpen: false, error: null, isRunning: false };
   mocks.runtimeHook.mockClear();
@@ -265,6 +271,36 @@ it('admits montage shortcuts only when the montage viewer is active and no overl
   act(render);
   expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(false);
   mocks.exportPort.exportState.dialogOpen = false;
+  act(render);
+  expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(true);
+});
+
+it('keeps inspector time on the live playback port across seeks', () => {
+  const snapshots: (number | undefined)[] = [];
+  function InspectorConsumer() {
+    const controller = useVideoEditorSidebarController();
+    snapshots.push(controller?.state.currentTime);
+    return null;
+  }
+  const render = () =>
+    root.render(
+      <VideoEditorCompositionProvider>
+        <InspectorConsumer />
+      </VideoEditorCompositionProvider>
+    );
+  mocks.lifecycle.project = createEmptyVideoProject('Inspector clock');
+  act(render);
+  mocks.playback.currentTime = 3.5;
+  act(render);
+  expect(snapshots).toEqual([0, 3.5]);
+});
+
+it('suspends montage shortcuts while auto-processing owns the modal', () => {
+  const render = () => root.render(<VideoEditorCompositionProvider />);
+  mocks.workspace.autoProcessingModalOpen = true;
+  act(render);
+  expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(false);
+  mocks.workspace.autoProcessingModalOpen = false;
   act(render);
   expect(mocks.runtimeHook.mock.lastCall?.[0].playback.shortcutsEnabled).toBe(true);
 });

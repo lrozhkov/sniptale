@@ -250,6 +250,7 @@ export function useVideoEditorPreviewController() {
     getCurrentTime: getCurrentVideoEditorCurrentTime,
     selectMotionRegion: selection.selectMotionRegion,
     clearCursorSampleSkinOverride: timeline.clearCursorSampleSkinOverride,
+    updateActionPresentation: timeline.updateActionPresentation,
     updateActionEventDetails: timeline.updateActionEventDetails,
     updateCursorSampleInterpolation: timeline.updateCursorSampleInterpolation,
     updateCursorSampleSkinOverride: timeline.updateCursorSampleSkinOverride,
@@ -272,6 +273,7 @@ export function useVideoEditorPreviewController() {
 
 export function useVideoEditorSidebarController() {
   const project = usePresentedProject();
+  const currentTime = useVideoEditorPlaybackPort((port) => port.currentTime);
   const lifecycle = useVideoEditorProjectLifecyclePort(({ project, recordingId }) => ({
     project,
     recordingId,
@@ -296,6 +298,7 @@ export function useVideoEditorSidebarController() {
   const actions = useSidebarCommandHandlers();
   if (!project || !lifecycle.project) return null;
   const store = {
+    currentTime,
     ...annotation,
     ...selection,
     ...telemetry,
@@ -319,13 +322,9 @@ export function useVideoEditorTimelineController() {
   const lifecycle = useVideoEditorProjectLifecyclePort((port) => port.project);
   const playback = useVideoEditorPlaybackPort((port) => port);
   const selection = useVideoEditorClipSelectionPort((port) => port);
-  const telemetry = useVideoEditorRecordingTelemetryPort(
-    ({ recordingTelemetry, telemetryLaneVisible, toggleTelemetryLaneVisibility }) => ({
-      recordingTelemetry,
-      telemetryLaneVisible,
-      toggleTelemetryLaneVisibility,
-    })
-  );
+  const telemetry = useVideoEditorRecordingTelemetryPort(({ recordingTelemetry }) => ({
+    recordingTelemetry,
+  }));
   const annotation = useVideoEditorAnnotationEditingPort((port) => port);
   const effects = useVideoEditorEffectEditingPort((port) => port);
   const history = useVideoEditorHistoryPort((port) => port);
@@ -337,8 +336,14 @@ export function useVideoEditorTimelineController() {
   const inspector = useWorkspaceInspectorContext();
   const playbackRange = useWorkspacePlaybackRangeContext();
   const workspace = useMemo(
-    () => ({ ...playbackRange, confirm: dialogs.confirm, grid, inspector }),
-    [dialogs.confirm, grid, inspector, playbackRange]
+    () => ({
+      ...playbackRange,
+      confirm: dialogs.confirm,
+      grid,
+      inspector,
+      setAutoProcessingModalOpen: dialogs.setAutoProcessingModalOpen,
+    }),
+    [dialogs.confirm, dialogs.setAutoProcessingModalOpen, grid, inspector, playbackRange]
   );
   const assets = useAssetCommandContext();
   if (!lifecycle) return null;

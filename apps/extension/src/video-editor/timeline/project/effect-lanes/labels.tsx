@@ -3,16 +3,14 @@ import { Eye, EyeOff, Lock, Plus, Unlock, Trash2 } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import { getVideoProjectUtilityLanes } from '../../../../features/video/project/utility-lanes';
 import type { VideoProjectUtilityLaneKind } from '../../../../features/video/project/utility-lanes';
-import { VideoProjectActionPreset } from '../../../../features/video/project/types';
 import type { VideoProjectUtilityLanes } from '../../../../features/video/project/types';
 import type { VideoProject } from '../../../../features/video/project/types';
 import { ProjectTimelineEffectLaneLabelRow } from './ui';
-import { getCursorLaneIcon, getUtilityLaneIcon } from '../tracks/lane-icons';
+import { getUtilityLaneIcon } from '../tracks/lane-icons';
 import { TimelineIconButton } from '../controls/icon-button';
 
 export function ProjectTimelineEffectLaneLabelRows({
   compactRows,
-  cursorLaneVisible,
   onToggleUtilityLaneLock,
   onClearUtilityLane,
   onToggleUtilityLaneVisibility,
@@ -36,22 +34,6 @@ export function ProjectTimelineEffectLaneLabelRows({
 
   return (
     <>
-      <ProjectTimelineCoreLaneLabelRows
-        compactRows={compactRows}
-        cursorLaneVisible={cursorLaneVisible}
-        project={project}
-      />
-      {rows.actions ? (
-        <ProjectTimelineUtilityLaneLabelRow
-          compactRows={compactRows}
-          label={translate('videoEditor.timeline.actionsLane')}
-          lane="actions"
-          state={utilityLanes.actions}
-          onClearUtilityLane={onClearUtilityLane}
-          onToggleUtilityLaneLock={onToggleUtilityLaneLock}
-          onToggleUtilityLaneVisibility={onToggleUtilityLaneVisibility}
-        />
-      ) : null}
       {rows.motion ? (
         <ProjectTimelineUtilityLaneLabelRow
           compactRows={compactRows}
@@ -64,24 +46,6 @@ export function ProjectTimelineEffectLaneLabelRows({
           onClearUtilityLane={onClearUtilityLane}
           onToggleUtilityLaneLock={onToggleUtilityLaneLock}
           onToggleUtilityLaneVisibility={onToggleUtilityLaneVisibility}
-        />
-      ) : null}
-    </>
-  );
-}
-
-function ProjectTimelineCoreLaneLabelRows(props: {
-  compactRows: boolean;
-  cursorLaneVisible: boolean;
-  project: VideoProject;
-}) {
-  return (
-    <>
-      {props.cursorLaneVisible ? (
-        <ProjectTimelineEffectLaneLabelRow
-          compactRows={props.compactRows}
-          icon={getCursorLaneIcon()}
-          title={translate('videoEditor.timeline.cursorLane')}
         />
       ) : null}
     </>
@@ -180,19 +144,4 @@ function UtilityLaneStateControls(props: {
       ) : null}
     </>
   );
-}
-
-export function getActionPresetLabel(preset: VideoProjectActionPreset): string {
-  switch (preset) {
-    case VideoProjectActionPreset.NONE:
-      return translate('videoEditor.sidebar.actionPresetNone');
-    case VideoProjectActionPreset.CLICK_RIPPLE:
-      return translate('videoEditor.sidebar.actionPresetClickRipple');
-    case VideoProjectActionPreset.SPOTLIGHT:
-      return translate('videoEditor.sidebar.actionPresetSpotlight');
-    case VideoProjectActionPreset.DWELL_ZOOM:
-      return translate('videoEditor.sidebar.actionPresetDwellZoom');
-    case VideoProjectActionPreset.SCROLL_EMPHASIS:
-      return translate('videoEditor.sidebar.actionPresetNone');
-  }
 }

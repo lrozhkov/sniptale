@@ -2,7 +2,7 @@ import type React from 'react';
 
 import { handleStageAreaPlacement, PreviewStageMotionAreaOverlay } from '../area-overlay/index';
 import { PreviewStageCanvasBanks } from '../media/banks';
-import { PreviewStageMotionPathOverlay } from '../motion-path/index';
+
 import { PreviewStagePointOverlay, handleStagePointPlacement } from '../point-overlay/index';
 import { handleStagePointerDown } from './selection-overlay';
 import type { PreviewStageCanvasProps } from '../types';
@@ -46,6 +46,7 @@ export function handlePreviewStageRootPointerDown(
   event: React.PointerEvent<HTMLDivElement>,
   params: Pick<
     PreviewStageCanvasProps,
+    | 'currentTime'
     | 'activeClips'
     | 'beginInteraction'
     | 'camera'
@@ -59,10 +60,10 @@ export function handlePreviewStageRootPointerDown(
     | 'onUpsertObjectTrackCorrectionAnchor'
     | 'placementMode'
     | 'project'
-    | 'selectedActionEvent'
+    | 'selectedActionOccurrence'
     | 'selectedMotionRegion'
     | 'stageRef'
-  > & { currentTime?: PreviewStageCanvasProps['currentTime'] }
+  >
 ): void {
   if (params.mode === 'player') {
     return;
@@ -94,7 +95,7 @@ export function PreviewStageOverlayLayer(
     | 'onUpsertObjectTrackCorrectionAnchor'
     | 'placementMode'
     | 'project'
-    | 'selectedActionEvent'
+    | 'selectedActionOccurrence'
     | 'selectedMotionRegion'
     | 'stageRef'
   > & {
@@ -121,16 +122,6 @@ function PreviewStageInteractiveOverlays(params: Parameters<typeof PreviewStageO
 
   return (
     <>
-      <PreviewStageMotionPathOverlay
-        camera={params.camera}
-        onUpdateMotionRegion={params.onUpdateMotionRegion}
-        placementMode={params.placementMode}
-        project={params.project}
-        selectedMotionRegion={params.selectedMotionRegion}
-        stageRef={params.stageRef}
-        {...gridProps}
-        {...guideProps}
-      />
       <PreviewStageMotionAreaOverlay
         camera={params.camera}
         onClearPlacementMode={params.onClearPlacementMode}
@@ -153,7 +144,7 @@ function PreviewStageInteractiveOverlays(params: Parameters<typeof PreviewStageO
           : {})}
         placementMode={params.placementMode}
         project={params.project}
-        selectedActionEvent={params.selectedActionEvent}
+        selectedActionOccurrence={params.selectedActionOccurrence}
         selectedMotionRegion={params.selectedMotionRegion}
         stageRef={params.stageRef}
         {...gridProps}

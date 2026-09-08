@@ -1,13 +1,10 @@
 import { translate } from '../../../../../platform/i18n';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
-import {
-  getCursorAnimationOptions,
-  getCursorCaptureModeOptions,
-  getCursorPresetOptions,
-} from './cursor-options';
+import { getCursorAnimationOptions, getCursorPresetOptions } from './cursor-options';
 import { NumberInput } from '../inputs/number';
 import { ColorField, SelectInput, ToggleField } from '../shared/controls';
-import { OptionButtonsField } from '../shared/option-buttons';
+import { DetailItem, DetailList, PANEL_META_CLASS_NAME } from '../shared/panel';
+import { VideoCursorCaptureMode } from '../../../../../features/video/project/types';
 import { SliderField } from '../shared/sliders';
 
 type CursorTrackCaptureMode = NonNullable<
@@ -39,6 +36,7 @@ export function CursorVisibilityField(props: {
 }
 
 export function CursorSkinFields(props: {
+  showCaptureCapability?: boolean;
   animationPreset: NonNullable<
     NonNullable<WorkspaceSidebarSelectionPanelProps['project']['cursorTrack']>['skin']
   >['animationPreset'];
@@ -57,10 +55,9 @@ export function CursorSkinFields(props: {
 }) {
   return (
     <div className="grid grid-cols-1 gap-3">
-      <CursorCaptureModeField
-        captureMode={props.captureMode}
-        onSetCursorCaptureMode={props.onSetCursorCaptureMode}
-      />
+      {props.showCaptureCapability !== false ? (
+        <CursorCaptureCapability captureMode={props.captureMode} />
+      ) : null}
       <CursorAppearanceFields
         animationPreset={props.animationPreset}
         color={props.color}
@@ -79,17 +76,26 @@ export function CursorSkinFields(props: {
   );
 }
 
-function CursorCaptureModeField(props: {
-  captureMode: CursorTrackCaptureMode;
-  onSetCursorCaptureMode: WorkspaceSidebarSelectionPanelProps['onSetCursorCaptureMode'];
-}) {
+export function CursorCaptureCapability(props: { captureMode: CursorTrackCaptureMode }) {
+  const embedded = props.captureMode === VideoCursorCaptureMode.EMBEDDED_FALLBACK;
   return (
-    <OptionButtonsField
-      label={translate('videoEditor.sidebar.cursorCaptureModeLabel')}
-      value={props.captureMode}
-      onChange={props.onSetCursorCaptureMode}
-      options={getCursorCaptureModeOptions()}
-    />
+    <div>
+      <DetailList>
+        <DetailItem
+          label={translate('videoEditor.sidebar.cursorCaptureModeLabel')}
+          value={translate(
+            embedded
+              ? 'videoEditor.sidebar.cursorCaptureModeFallback'
+              : 'videoEditor.sidebar.cursorCaptureModeSeparate'
+          )}
+        />
+      </DetailList>
+      {embedded ? (
+        <p className={`mt-1 ${PANEL_META_CLASS_NAME}`}>
+          {translate('videoEditor.sidebar.cursorFallbackHint')}
+        </p>
+      ) : null}
+    </div>
   );
 }
 

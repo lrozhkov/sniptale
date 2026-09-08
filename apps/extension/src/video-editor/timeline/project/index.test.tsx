@@ -86,12 +86,12 @@ function createProps(): ComponentProps<typeof ProjectTimeline> {
     isPlaying: false,
     magnetEnabled: false,
     playbackRange: { start: 43200, end: 43200 + 1 / 240 },
-    recordingTelemetry: null,
+    recordingTelemetry: [],
     selection: createSceneSelection(),
     selectedClipId: 'clip',
     selectedTrackId: null,
-    telemetryLaneVisible: false,
     timelinePreviews: {},
+    canDeleteSelectedClip: true,
     canEditSelectedClip: true,
     canSplitSelectedClip: false,
     panelPrefs: {
@@ -128,13 +128,12 @@ function createProps(): ComponentProps<typeof ProjectTimeline> {
     onSeek: vi.fn(),
     onZoomChange: idle,
     onSetPlaybackRange: vi.fn(),
-    onToggleTelemetryLaneVisibility: idle,
     onSelectScene: idle,
     onSelectClip: idle,
     onSelectTrack: idle,
     onSelectTransition: idle,
     onSelectCursorSegment: idle,
-    onSelectActionSegment: idle,
+    onSelectActionOccurrence: idle,
     onSelectMotionRegion: idle,
     onSelectObjectTrack: idle,
     onSwapClip: idle,
@@ -148,13 +147,16 @@ function createProps(): ComponentProps<typeof ProjectTimeline> {
     onDuplicateSelectedClip: idle,
     onDeleteSelectedClip: idle,
     onUpdateSelectedClipPlaybackRate: idle,
-    onAutoTransformRecording: idle,
+    onAutoProcessingModalVisibilityChange: vi.fn(),
+    autoProcessing: {
+      prepare: async () => ({ status: 'stale' as const }),
+      apply: async () => 'stale' as const,
+      isCurrent: () => false,
+    },
     onDeleteSelectedTimelineObject: idle,
     onToggleUtilityLaneVisibility: idle,
     onToggleUtilityLaneLock: idle,
     onClearUtilityLane: idle,
-    onMoveActionEvent: idle,
-    onResizeActionEvent: idle,
     onMoveCursorSegment: idle,
     onMoveTransitionSegment: idle,
     onMoveMotionRegion: vi.fn(),
@@ -234,7 +236,7 @@ it('publishes an effect draft through the root context and restores its original
   expect(segment).not.toBeNull();
   const originalLeft = segment.style.left;
   const button = segment.querySelector<HTMLButtonElement>(
-    '[aria-label="videoEditor.timeline.motionLane"]'
+    '[aria-label^="videoEditor.timeline.motionLane ·"]'
   )!;
   act(() => {
     pointer(button, 'pointerdown', 480);
@@ -257,4 +259,42 @@ it('publishes an effect draft through the root context and restores its original
     'motion',
     expect.closeTo(43200 + 1 / 240, 6)
   );
+});
+
+it('shows authored history by default without a sidecar and respects explicit collapse', () => {
+  const props = createProps();
+  props.panelPrefs.telemetryLaneVisible =
+    DEFAULT_VIDEO_EDITOR_TRACK_PANEL_PREFS.collapsedTelemetryLaneVisible;
+  props.project.actionEvents = [
+    {
+      id: 'captured',
+      anchor: { kind: 'project', time: 43200 },
+
+      kind: 'CLICK',
+
+      label: 'Open',
+      point: null,
+      data: {},
+      presentation: { duration: 0.4, preset: 'CLICK_RIPPLE' },
+    },
+  ];
+  mountTimeline(props);
+  expect(container.querySelector('[data-ui="video-editor.timeline.history-row"]')).not.toBeNull();
+  act(() =>
+    root.render(
+      <ProjectTimeline
+        {...props}
+        panelPrefs={{ ...props.panelPrefs, telemetryLaneVisible: false }}
+      />
+    )
+  );
+  expect(container.querySelector('[data-ui="video-editor.timeline.history-row"]')).toBeNull();
+  expect(props.project.actionEvents).toHaveLength(1);
+});
+
+it('keeps an empty project compact until history data exists', () => {
+  const props = createProps();
+  props.panelPrefs.telemetryLaneVisible = true;
+  mountTimeline(props);
+  expect(container.querySelector('[data-ui="video-editor.timeline.history-row"]')).toBeNull();
 });

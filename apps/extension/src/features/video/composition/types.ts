@@ -1,3 +1,4 @@
+import type { VideoProjectActionOccurrence } from '../project/action-occurrences';
 import type { ResolvedAnnotationPresentation } from '../project/annotation/template';
 import type { ResolvedAnnotationScene } from '../project/annotation-engine';
 import type {
@@ -18,6 +19,7 @@ import type {
 import type {
   VideoMotionOverlayZoomMode,
   VideoProjectActionEvent,
+  VideoProjectActionPreset,
   VideoProjectAnnotationClip,
   VideoProjectCursorTrack,
   VideoProjectEffectClip,
@@ -27,6 +29,7 @@ import type {
   VideoProjectTextStyle,
   VideoProjectTransitionSegment,
   VideoProjectVideoClip,
+  VideoProjectTrackRole,
 } from '../project/types/index';
 import type { EffectRuntimeFramePlan } from './effect-runtime/runtime/types';
 
@@ -68,7 +71,11 @@ export interface VideoCompositionResolvedAnnotationClip {
 }
 
 export type VideoCompositionVisualLayer =
-  | VideoCompositionLayerBase<VideoProjectVideoClip, 'video'>
+  | (VideoCompositionLayerBase<VideoProjectVideoClip, 'video'> & {
+      /** Role of the source track, retained for independent camera composition. */
+      trackRole?: VideoProjectTrackRole;
+      actions?: readonly VideoCompositionActionState[];
+    })
   | VideoCompositionLayerBase<VideoProjectImageClip, 'image'>
   | VideoCompositionLayerBase<VideoCompositionResolvedTextClip, 'text'>
   | VideoCompositionLayerBase<VideoCompositionResolvedAnnotationClip, 'annotation'>
@@ -89,6 +96,10 @@ export interface VideoCompositionCursorState {
 }
 
 export interface VideoCompositionActionState {
+  preset: VideoProjectActionPreset;
+  occurrence: VideoProjectActionOccurrence;
+  clipId: string | null;
+  renderKind: 'accent' | 'keystroke' | null;
   duration: number;
   event: VideoProjectActionEvent;
   point: VideoProjectActionEvent['point'];
@@ -132,14 +143,6 @@ export interface VideoCompositionCursorSegment {
   sampleIds: string[];
   start: number;
   visible: boolean;
-}
-
-export interface VideoCompositionActionSegment {
-  end: number;
-  event: VideoProjectActionEvent;
-  id: string;
-  point: VideoProjectActionEvent['point'];
-  start: number;
 }
 
 export interface VideoCompositionMotionSegment {

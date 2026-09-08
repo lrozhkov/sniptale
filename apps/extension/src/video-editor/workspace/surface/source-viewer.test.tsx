@@ -107,7 +107,11 @@ it('keeps source inspection independent and inserts the marked displayed frames 
   expect(props.onInsert).not.toHaveBeenCalled();
   expect(marks()).toEqual({ start: 1, end: 2 + 1 / 30 });
   act(() => button('videoEditor.app.sourceInsert').click());
-  expect(props.onInsert).toHaveBeenCalledWith(props.asset!.id, { start: 1, end: 2 + 1 / 30 });
+  expect(props.onInsert).toHaveBeenCalledWith(
+    props.asset!.id,
+    { start: 1, end: 2 + 1 / 30 },
+    expect.any(AbortSignal)
+  );
   expect(props.onAppend).not.toHaveBeenCalled();
   expect(props.onPlaced).toHaveBeenCalledOnce();
 });
@@ -209,13 +213,17 @@ it('places an image as a whole asset without timing controls and admits separate
   act(() => container.querySelector('img')!.dispatchEvent(new Event('load')));
   expect(container.querySelector('[data-ui="video-editor.source-range"]')).toBeNull();
   act(() => button('videoEditor.app.sourceOverlay').click());
-  expect(props.onOverlay).toHaveBeenCalledWith(props.asset!.id, undefined);
+  expect(props.onOverlay).toHaveBeenCalledWith(props.asset!.id, undefined, expect.any(AbortSignal));
   render({ asset: asset('Mic.webm', VideoProjectAssetType.AUDIO), assetUrl: 'blob:audio' });
   ready();
   at(1);
   key('KeyI');
   act(() => button('videoEditor.app.sourceOverlay').click());
-  expect(props.onOverlay).toHaveBeenLastCalledWith(props.asset!.id, { start: 1, end: 4 });
+  expect(props.onOverlay).toHaveBeenLastCalledWith(
+    props.asset!.id,
+    { start: 1, end: 4 },
+    expect.any(AbortSignal)
+  );
 });
 
 it('aligns marks made during playback with the displayed frame and stops at admitted source duration', () => {
@@ -335,4 +343,36 @@ it('owns Space globally while active, preserves text input, and releases it when
     outside.remove();
     text.remove();
   }
+});
+it('blocks duplicate placement and aborts pending placement when the source closes', async () => {
+  let finish: (result: { status: 'placed'; clipId: string }) => void = () => undefined;
+  const append = vi.fn<Props['onAppend']>(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  render({ onAppend: append });
+  ready();
+  act(() => button('videoEditor.app.sourceAppend').click());
+  expect(button('videoEditor.app.sourceAppend').disabled).toBe(true);
+  act(() => button('videoEditor.app.sourceAppend').click());
+  expect(append).toHaveBeenCalledTimes(1);
+  const signal = append.mock.calls[0]![2]!;
+  render({ active: false });
+  expect(signal.aborted).toBe(true);
+  await act(async () => {
+    finish({ status: 'placed', clipId: 'late' });
+  });
+  expect(props.onPlaced).not.toHaveBeenCalled();
+});
+
+it('keeps the source range recoverable after an asynchronous read failure', async () => {
+  const append = vi.fn<Props['onAppend']>().mockRejectedValue(new Error('Read failed'));
+  render({ onAppend: append });
+  ready();
+  await act(async () => button('videoEditor.app.sourceAppend').click());
+  expect(container.textContent).toContain(translate('common.errors.actionFailed'));
+  expect(button('videoEditor.app.sourceAppend').disabled).toBe(false);
+  expect(props.onPlaced).not.toHaveBeenCalled();
 });

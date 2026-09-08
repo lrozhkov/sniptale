@@ -5,7 +5,6 @@ import {
   buildVideoCompositionTransitionSegments,
 } from '../../../../features/video/composition/timeline/lanes';
 import type { VideoProject } from '../../../../features/video/project/types';
-import { findVisibleProjectActionEvent } from '../../../project/operations/action-events';
 import { VideoEditorSelectionKind, type VideoEditorSelection } from '../../../contracts/selection';
 import type {
   ProjectTimelineProps,
@@ -34,17 +33,18 @@ function getTimelineEffectSelection(
       );
       return segment ? { kind: 'cursor', segmentId: segment.id } : null;
     }
-    case VideoEditorSelectionKind.ACTION_SEGMENT:
-      return findVisibleProjectActionEvent(project, selection.actionEventId)
-        ? { kind: 'action', segmentId: selection.actionEventId }
-        : null;
+    case VideoEditorSelectionKind.ACTION_OCCURRENCE:
+      return { kind: 'action', segmentId: JSON.stringify([selection.eventId, selection.clipId]) };
     case VideoEditorSelectionKind.MOTION_REGION:
       return buildVideoCompositionMotionSegments(project).some(
         (segment) => segment.id === selection.motionRegionId
       )
         ? { kind: 'motion', segmentId: selection.motionRegionId }
         : null;
+    case VideoEditorSelectionKind.HISTORY_SPAN:
+    case VideoEditorSelectionKind.HISTORY_LANE:
     case VideoEditorSelectionKind.MOTION_LANE:
+    case VideoEditorSelectionKind.MOTION_CONNECTION:
     case VideoEditorSelectionKind.SCENE:
     case VideoEditorSelectionKind.CLIP:
     case VideoEditorSelectionKind.TRACK:
@@ -61,7 +61,6 @@ export function createEffectSelection(target: TimelineEffectDragTarget): Timelin
 }
 
 type EffectSelectionCallbackKey =
-  | 'onSelectActionSegment'
   | 'onSelectClip'
   | 'onSelectCursorSegment'
   | 'onSelectMotionRegion'
@@ -71,6 +70,8 @@ type EffectSelectionCallbackKey =
 
 export type EffectSelectionCallbacks = {
   [Key in EffectSelectionCallbackKey]: ProjectTimelineProps[Key] | undefined;
+} & {
+  onSelectActionOccurrence?: ProjectTimelineProps['onSelectActionOccurrence'] | undefined;
 };
 
 export function selectEffectTarget(
@@ -79,7 +80,7 @@ export function selectEffectTarget(
 ) {
   switch (target.kind) {
     case 'action':
-      callbacks.onSelectActionSegment?.(target.actionEventId);
+      callbacks.onSelectActionOccurrence?.(target.eventId, target.clipId);
       return;
     case 'cursor':
       callbacks.onSelectCursorSegment?.(target.sampleId);

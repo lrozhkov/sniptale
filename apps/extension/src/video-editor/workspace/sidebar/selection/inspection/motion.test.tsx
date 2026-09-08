@@ -3,11 +3,8 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  VideoMotionCameraMode,
-  VideoMotionPathTargetKind,
-} from '../../../../../features/video/project/types';
-import { InspectMotionPanel } from './motion';
+import { InspectMotionPanel, InspectMotionConnectionPanel } from './motion';
+import { VideoTemporalEasing } from '../../../../../features/video/project/types';
 import { createMotionPanelProps } from '../motion/test-support';
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
@@ -38,6 +35,34 @@ afterEach(() => {
 });
 
 describe('workspace-sidebar/selection/inspect-motion', () => {
+  it('disconnects the selected transition without deleting either framing state', () => {
+    const props = createMotionPanelProps();
+    props.onUpdateMotionRegion = vi.fn();
+    props.onDeleteMotionRegion = vi.fn();
+    const first = { ...props.selectedMotionRegion!, id: 'first', startTime: 0, duration: 1 };
+    const second = {
+      ...first,
+      id: 'second',
+      startTime: 3,
+      incomingConnection: { fromRegionId: 'first', easing: VideoTemporalEasing.LINEAR },
+    };
+    props.project.motionRegions = [first, second];
+    props.selection = { kind: 'motion-connection', motionRegionId: 'second' };
+    act(() => root?.render(<InspectMotionConnectionPanel {...props} />));
+    const remove = Array.from(container!.querySelectorAll('button')).find(
+      (button) => button.textContent === 'videoEditor.timeline.disconnectFraming'
+    )!;
+    expect(remove).toBeDefined();
+    act(() => remove.click());
+    expect(props.onUpdateMotionRegion).toHaveBeenCalledWith('second', { incomingConnection: null });
+    expect(props.onDeleteMotionRegion).not.toHaveBeenCalled();
+    props.project.utilityLanes = {
+      actions: { visible: true, locked: false },
+      camera: { visible: true, locked: true },
+    };
+    act(() => root?.render(<InspectMotionConnectionPanel {...props} />));
+    expect(container!.querySelector('fieldset')!.disabled).toBe(true);
+  });
   it('keeps the default zoom workflow together and moves timing and behavior to focused groups', () => {
     renderPanel(createMotionPanelProps());
 
@@ -74,13 +99,18 @@ describe('workspace-sidebar/selection/inspect-motion', () => {
     expect(deleteButton?.disabled).toBe(true);
   });
 
-  it('renders moving zoom path controls for editable stops and segments', () => {
-    renderPanel(createMovingZoomPanelProps());
-    clickGroup('videoEditor.sidebar.inspectorGroupPath');
-
-    expect(container?.textContent).toContain('videoEditor.sidebar.motionPathAddStop');
-    expect(container?.textContent).toContain('videoEditor.sidebar.motionPathTrajectoryLabel');
-    expect(container?.textContent).toContain('videoEditor.sidebar.motionPathPickStopArea');
+  it('uses framing states without a parallel moving-path editor and keeps precise coordinates collapsed', () => {
+    renderPanel(createMotionPanelProps());
+    expect(container?.textContent).not.toContain('videoEditor.sidebar.motionCameraModeLabel');
+    expect(
+      container?.querySelector('nav button[title="videoEditor.sidebar.inspectorGroupPath"]')
+    ).toBeNull();
+    expect(container?.textContent).not.toContain('videoEditor.sidebar.motionPathAddStop');
+    const details = container?.querySelector('details');
+    expect(details).not.toBeNull();
+    expect(details?.open).toBe(false);
+    expect(details?.textContent).toContain('videoEditor.sidebar.motionFocusXLabel');
+    expect(details?.textContent).toContain('videoEditor.sidebar.motionFocusYLabel');
   });
 
   it('renders the delete motion action with the shared danger action style', () => {
@@ -106,26 +136,5 @@ function clickGroup(title: string) {
   act(() => {
     if (!button?.parentElement?.hasAttribute('open'))
       button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-  });
-}
-
-function createMovingZoomPanelProps() {
-  return createMotionPanelProps({
-    cameraMode: VideoMotionCameraMode.PATH,
-    path: {
-      segments: [{ durationWeight: 1, easing: 'EASE_IN_OUT', trajectoryPreset: 'SOFT_ARC' }],
-      stops: [
-        {
-          id: 'stop-1',
-          offset: 0,
-          target: { kind: VideoMotionPathTargetKind.POINT, scale: 1.5, x: 320, y: 180 },
-        },
-        {
-          id: 'stop-2',
-          offset: 1,
-          target: { height: 180, kind: VideoMotionPathTargetKind.AREA, width: 280, x: 400, y: 220 },
-        },
-      ],
-    },
   });
 }

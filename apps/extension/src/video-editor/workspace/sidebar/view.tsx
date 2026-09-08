@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   Camera,
+  Keyboard,
   Film,
   ImageIcon,
   MousePointer2,
@@ -107,11 +108,17 @@ export function getSelectionMeta(
       return createStaticSelectionMeta(MousePointer2, 'videoEditor.timeline.cursorLane');
     case VideoEditorSelectionKind.OBJECT_TRACK:
       return createStaticSelectionMeta(CircleDot, 'videoEditor.sidebar.objectTracksTitle');
-    case VideoEditorSelectionKind.ACTION_SEGMENT:
+    case VideoEditorSelectionKind.ACTION_OCCURRENCE:
       return createStaticSelectionMeta(Sparkles, 'videoEditor.timeline.actionsLane');
+    case VideoEditorSelectionKind.HISTORY_SPAN:
+      return createStaticSelectionMeta(Keyboard, 'videoEditor.timeline.historyTyping');
+    case VideoEditorSelectionKind.HISTORY_LANE:
+      return createStaticSelectionMeta(Sparkles, 'videoEditor.timeline.telemetryLane');
     case VideoEditorSelectionKind.MOTION_LANE:
     case VideoEditorSelectionKind.MOTION_REGION:
       return createStaticSelectionMeta(Search, 'videoEditor.timeline.motionLane');
+    case VideoEditorSelectionKind.MOTION_CONNECTION:
+      return createStaticSelectionMeta(Search, 'videoEditor.timeline.framingConnection');
   }
 }
 

@@ -48,7 +48,13 @@ function expectSuggestedEventShape(
   time: number,
   point: { x: number; y: number } | null
 ) {
-  return expect.objectContaining({ id, kind, point, preset, time });
+  return expect.objectContaining({
+    id,
+    kind,
+    point,
+    presentation: { preset },
+    anchor: { kind: 'project', time },
+  });
 }
 
 it('creates click accents only for capture steps with a resolved interaction point', () => {
@@ -74,8 +80,8 @@ it('creates click accents only for capture steps with a resolved interaction poi
     expect.objectContaining({
       id: 'capture-1:click',
       point: { x: 30, y: 40 },
-      preset: 'CLICK_RIPPLE',
-      time: 0.35,
+      presentation: { preset: 'CLICK_RIPPLE' },
+      anchor: { kind: 'project', time: 0.35 },
     }),
   ]);
 });

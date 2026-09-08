@@ -1,13 +1,15 @@
+import { InspectHistorySpanPanel } from './inspection/history-span';
 import { VideoEditorSelectionKind } from '../../../contracts/selection';
 import type { WorkspaceSidebarSelectionPanelProps } from '../contracts/selection-panel';
 import { SelectionEmptyState } from './inspection/helpers';
 import { InspectCursorPanel } from './inspection/cursor';
 import { InspectActionPanel, InspectTransitionPanel } from './inspection/effects';
 import { InspectClipPanel } from './inspection/clip';
-import { InspectMotionPanel } from './inspection/motion';
+import { InspectMotionPanel, InspectMotionConnectionPanel } from './inspection/motion';
 import { InspectObjectTrackPanel } from './inspection/object-track';
 import { InspectScenePanel } from './inspection/scene';
 import { InspectTrackPanel } from './inspection/track';
+import { InspectHistoryLanePanel } from './inspection/history-lane';
 import { InspectMotionLanePanel } from './inspection/motion-lane';
 
 const PANEL_STACK_CLASS_NAME = 'space-y-3';
@@ -24,6 +26,18 @@ export function WorkspaceSidebarInspectPanel(props: WorkspaceSidebarSelectionPan
 
 function SelectionBody(props: WorkspaceSidebarSelectionPanelProps) {
   switch (props.selection.kind) {
+    case VideoEditorSelectionKind.HISTORY_SPAN:
+      return (
+        <InspectHistorySpanPanel
+          key={JSON.stringify(props.selection)}
+          {...props}
+          target={props.selection}
+        />
+      );
+    case VideoEditorSelectionKind.HISTORY_LANE:
+      return <InspectHistoryLanePanel {...props} />;
+    case VideoEditorSelectionKind.MOTION_CONNECTION:
+      return <InspectMotionConnectionPanel {...props} />;
     case VideoEditorSelectionKind.MOTION_LANE:
       return <InspectMotionLanePanel {...props} />;
     case VideoEditorSelectionKind.SCENE:
@@ -50,8 +64,8 @@ function SelectionBody(props: WorkspaceSidebarSelectionPanelProps) {
       ) : (
         <SelectionEmptyState />
       );
-    case VideoEditorSelectionKind.ACTION_SEGMENT:
-      return props.selectedActionEvent ? (
+    case VideoEditorSelectionKind.ACTION_OCCURRENCE:
+      return props.selectedActionOccurrence ? (
         <InspectActionPanel {...props} />
       ) : (
         <SelectionEmptyState />

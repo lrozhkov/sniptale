@@ -1,5 +1,4 @@
 import type React from 'react';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../../../../platform/i18n';
 import {
   isAnnotationClip,
@@ -29,29 +28,7 @@ import { renderTransformFields } from '../inputs/transform-fields';
 import { createEffectInstanceGroup } from '../effect-instance/groups';
 import { ClipInfo, resolveClipAsset } from './clip-info';
 import { isVideoEditorPresentedClip } from '../../../../project/operations/presented-tracks';
-import {
-  resolveVideoProjectCameraPlacement,
-  VideoProjectCameraPlacement,
-} from '../../../../../features/video/project/camera/placement';
-
-const CAMERA_PLACEMENT_OPTIONS = [
-  {
-    labelKey: 'videoEditor.sidebar.cameraPlacementTopLeft',
-    placement: VideoProjectCameraPlacement.TOP_LEFT,
-  },
-  {
-    labelKey: 'videoEditor.sidebar.cameraPlacementTopRight',
-    placement: VideoProjectCameraPlacement.TOP_RIGHT,
-  },
-  {
-    labelKey: 'videoEditor.sidebar.cameraPlacementBottomLeft',
-    placement: VideoProjectCameraPlacement.BOTTOM_LEFT,
-  },
-  {
-    labelKey: 'videoEditor.sidebar.cameraPlacementBottomRight',
-    placement: VideoProjectCameraPlacement.BOTTOM_RIGHT,
-  },
-] as const;
+import { CameraLayoutControls } from '../inputs/camera-layout';
 
 export function InspectClipPanel(props: WorkspaceSidebarSelectionPanelProps) {
   const clip = props.selectedClip;
@@ -151,15 +128,7 @@ function createStandardClipGroups(
     runtime.selectedTrackLocked,
     props.onUpdateClipTransform
   );
-  const audioContent = renderAudioFields(
-    clip,
-    runtime.linkedAudioClip,
-    runtime.linkedVideoClip,
-    runtime.selectedTrackLocked,
-    props.onUpdateClipMuted,
-    props.onUpdateClipVolume,
-    props.onUpdateClipAudioEnvelope
-  );
+  const audioContent = renderAudioFields(props);
   const contentFields = renderClipContentFields(props, clip, runtime);
   const styleFields = renderClipStyleFields(props, clip, runtime);
 
@@ -197,11 +166,17 @@ function createCameraPlacementGroup(
     label: translate('videoEditor.sidebar.inspectorGroupCamera'),
     defaultActive: isCameraClip,
     content: isCameraClip ? (
-      <CameraPlacementControls
+      <CameraLayoutControls
         clip={clip}
         disabled={locked}
         project={props.project}
-        onUpdateClipTransform={props.onUpdateClipTransform}
+        {...(props.onApplyCameraLayout ? { onApplyCameraLayout: props.onApplyCameraLayout } : {})}
+        {...(props.onSplitCameraInterval
+          ? { onSplitCameraInterval: props.onSplitCameraInterval }
+          : {})}
+        {...(props.canSplitCameraInterval === undefined
+          ? {}
+          : { canSplitCameraInterval: props.canSplitCameraInterval })}
       />
     ) : null,
     visible: isCameraClip,
@@ -217,49 +192,6 @@ function isCameraRoleVideoClip(
 > {
   const track = project.tracks.find((item) => item.id === clip.trackId);
   return clip.type === VideoProjectClipType.VIDEO && track?.role === VideoProjectTrackRole.CAMERA;
-}
-
-function CameraPlacementControls(props: {
-  clip: Extract<WorkspaceSidebarSelectionPanelProps['project']['clips'][number], { type: 'VIDEO' }>;
-  disabled: boolean;
-  onUpdateClipTransform: WorkspaceSidebarSelectionPanelProps['onUpdateClipTransform'];
-  project: WorkspaceSidebarSelectionPanelProps['project'];
-}) {
-  const asset = props.project.assets.find((item) => item.id === props.clip.assetId);
-  const sourceWidth = asset?.metadata.width ?? props.clip.transform.width;
-  const sourceHeight = asset?.metadata.height ?? props.clip.transform.height;
-
-  return (
-    <div className="space-y-2" data-ui="video-editor.camera-placement-controls">
-      <p className="text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
-        {translate('videoEditor.sidebar.cameraPlacementDescription')}
-      </p>
-      <div className="grid grid-cols-2 gap-2">
-        {CAMERA_PLACEMENT_OPTIONS.map((option) => (
-          <ProductActionButton
-            key={option.placement}
-            compact
-            disabled={props.disabled}
-            tone="secondary"
-            onClick={() =>
-              props.onUpdateClipTransform(
-                props.clip.id,
-                resolveVideoProjectCameraPlacement({
-                  placement: option.placement,
-                  projectHeight: props.project.height,
-                  projectWidth: props.project.width,
-                  sourceHeight,
-                  sourceWidth,
-                })
-              )
-            }
-          >
-            {translate(option.labelKey)}
-          </ProductActionButton>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 function createFramingGroup(

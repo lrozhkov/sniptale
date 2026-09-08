@@ -1,5 +1,5 @@
-import { WorkspaceSidebarSelectionBody } from './body';
 // @vitest-environment jsdom
+import { WorkspaceSidebarSelectionBody } from './body';
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -97,7 +97,7 @@ function createProps() {
     selectedClip: null,
     selectedTransition: null,
     selectedCursorSample: null,
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedMotionRegion: null,
     selectedTrack: null,
     placementMode: null,
@@ -146,27 +146,28 @@ function verifiesRecordingBackedSummaries() {
   expect(container?.textContent).toContain('videoEditor.sidebar.actionTrackUnavailable');
 }
 
-function verifiesLegacyScrollIsIgnored() {
+function verifiesAuthoredEventSummary() {
   const props = createProps();
   props.project.source = { kind: VideoProjectSourceKind.RECORDING, recordingId: 'rec-1' };
   props.project.actionEvents = [
     {
       data: {},
-      duration: 0.6,
+
       id: 'legacy-scroll',
       kind: VideoProjectActionEventKind.SCROLL,
       label: 'Legacy scroll',
       point: null,
-      preset: VideoProjectActionPreset.SCROLL_EMPHASIS,
-      time: 0.5,
+
+      anchor: { kind: 'project', time: 0.5 },
+      presentation: { duration: 0.6, preset: VideoProjectActionPreset.SCROLL_EMPHASIS },
     },
   ];
 
   renderInspectPanel(props);
   clickGroup('videoEditor.sidebar.inspectorGroupSummary');
 
-  expect(container?.textContent).toContain('videoEditor.sidebar.actionTrackUnavailable');
-  expect(container?.innerHTML).not.toContain('>1<');
+  expect(container?.textContent).not.toContain('videoEditor.sidebar.actionTrackUnavailable');
+  expect(container?.innerHTML).toContain('>1<');
 }
 
 function verifiesSceneBackgroundSelectLabels() {
@@ -208,7 +209,7 @@ describe('workspace-sidebar/selection/inspect-scene', () => {
     verifiesRecordingBackedSummaries
   );
 
-  it('ignores legacy scroll actions in the scene summary count', verifiesLegacyScrollIsIgnored);
+  it('counts authored scroll events in the scene summary', verifiesAuthoredEventSummary);
 
   it(
     'renders canonical scene background select labels for image backgrounds',

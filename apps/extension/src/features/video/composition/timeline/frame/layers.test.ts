@@ -19,8 +19,116 @@ import {
   VideoProjectAssetType,
   VideoProjectShapeType,
   VideoTrackKind,
+  VideoProjectTrackRole,
+  VideoMotionOverlayZoomMode,
 } from '../../../project/types/index';
 import { resolveVideoCompositionFrame } from './index';
+import { shouldLockVisualLayerToViewport } from '../../motion/layer-camera';
+import { resolveVideoCompositionEffectInputLayers } from './layers';
+import type { EffectRuntimeFramePlan } from '../../effect-runtime/runtime/types';
+
+function createInputPlan(target: EffectRuntimeFramePlan['target']): EffectRuntimeFramePlan {
+  return {
+    assets: [],
+    controls: {},
+    dimensions: { width: 1280, height: 720 },
+    documentSha256: 'test-document',
+    documentSource: '',
+    duration: 4,
+    effectInstanceId: 'input-effect',
+    fps: 30,
+    frameIndex: 30,
+    kind: target.kind === 'transition' ? 'transition' : 'targetEffect',
+    progress: 0.25,
+    renderDimensions: { width: 1280, height: 720 },
+    snapshotId: 'snapshot',
+    target,
+    time: 1,
+  };
+}
+
+it('retains camera coordinates for effect inputs including transparent transition endpoints', () => {
+  const project = createEmptyVideoProject();
+  const asset = createMediaAsset('camera', 'Camera', VideoProjectAssetType.VIDEO, 4, false);
+  const screenTrack = project.tracks[0]!;
+  const cameraTrack = {
+    ...screenTrack,
+    id: 'camera-track',
+    order: 0.5,
+    role: VideoProjectTrackRole.CAMERA,
+  };
+  const screen = createVideoClipFromAsset(screenTrack.id, asset, 1280, 720, 0);
+  const camera = createVideoClipFromAsset(cameraTrack.id, asset, 1280, 720, 0);
+  camera.transform.opacity = 0;
+  project.tracks.push(cameraTrack);
+  project.assets = [asset];
+  project.clips = [screen, camera];
+  const plan = createInputPlan({
+    kind: 'transition',
+    leadingClipId: screen.id,
+    trailingClipId: camera.id,
+    transitionId: 'transition',
+  });
+  const layers = resolveVideoCompositionEffectInputLayers(project, 1, [plan]);
+  expect(layers.map((layer) => layer.clipId)).toEqual([screen.id, camera.id]);
+  expect(layers[1]).toMatchObject({ trackRole: VideoProjectTrackRole.CAMERA, opacity: 0 });
+  const zoom = { ...resolveVideoCompositionFrame(project, 1).camera, scale: 2 };
+  expect(shouldLockVisualLayerToViewport(layers[0]!, zoom)).toBe(false);
+  expect(shouldLockVisualLayerToViewport(layers[1]!, zoom)).toBe(true);
+  expect(resolveVideoCompositionEffectInputLayers(project, 5, [plan])).toEqual([]);
+  cameraTrack.visible = false;
+  expect(
+    resolveVideoCompositionEffectInputLayers(project, 1, [plan]).map((layer) => layer.clipId)
+  ).toEqual([screen.id]);
+  cameraTrack.visible = true;
+  const clipPlan = createInputPlan({
+    kind: 'clip',
+    clipId: camera.id,
+    chainIndex: 0,
+    placement: { width: 1280, height: 720, x: 0, y: 0, opacity: 1, rotation: 0 },
+  });
+  expect(
+    resolveVideoCompositionEffectInputLayers(project, 1, [clipPlan]).map((layer) => layer.clipId)
+  ).toEqual([camera.id]);
+  expect(
+    resolveVideoCompositionEffectInputLayers(project, 1, [
+      createInputPlan({ kind: 'scene', clipId: 'scene-effect' }),
+    ])
+  ).toEqual([]);
+});
+
+it('keeps camera-role video in viewport space independently of the overlay zoom preference', () => {
+  const project = createEmptyVideoProject();
+  const asset = createMediaAsset('camera', 'Camera', VideoProjectAssetType.VIDEO, 4, false);
+  const screenTrack = project.tracks[0]!;
+  const cameraTrack: (typeof project.tracks)[number] = {
+    ...screenTrack,
+    id: 'camera-track',
+    role: VideoProjectTrackRole.CAMERA,
+  };
+  project.tracks.push(cameraTrack);
+  project.assets = [asset];
+  project.clips = [
+    createVideoClipFromAsset(screenTrack.id, asset, project.width, project.height, 0),
+    createVideoClipFromAsset(cameraTrack.id, asset, project.width, project.height, 0),
+  ];
+  const frame = resolveVideoCompositionFrame(project, 1);
+  const cameraLayer = frame.visualLayers.find((layer) => layer.clip.trackId === cameraTrack.id)!;
+  const screenLayer = frame.visualLayers.find((layer) => layer.clip.trackId === screenTrack.id)!;
+  for (const overlayZoomMode of Object.values(VideoMotionOverlayZoomMode)) {
+    const zoom = { ...frame.camera, scale: 2, overlayZoomMode };
+    expect(shouldLockVisualLayerToViewport(cameraLayer, zoom)).toBe(true);
+    expect(shouldLockVisualLayerToViewport(screenLayer, zoom)).toBe(false);
+  }
+  delete cameraTrack.role;
+  const moved = resolveVideoCompositionFrame(project, 1);
+  expect(
+    shouldLockVisualLayerToViewport(
+      moved.visualLayers.find((layer) => layer.clip.trackId === cameraTrack.id)!,
+      moved.camera
+    )
+  ).toBe(false);
+});
 
 function createMediaAsset(
   id: string,
@@ -282,4 +390,67 @@ it('gives upper timeline tracks higher visual priority than lower tracks', () =>
   const lowerLayer = frame.visualLayers.find((layer) => layer.clipId === lowerClip.id);
 
   expect(upperLayer?.zIndex).toBeGreaterThan(lowerLayer?.zIndex ?? -1);
+});
+
+it('keeps exact actions on visible and isolated input layers across repeated source ranges', () => {
+  const project = createEmptyVideoProject('Action input layers');
+  const asset = createMediaAsset('source', 'Source', VideoProjectAssetType.VIDEO, 4, false);
+  asset.source = { kind: 'recording', recordingId: 'recording' };
+  const first = createVideoClipFromAsset(
+    project.tracks[0]!.id,
+    asset,
+    project.width,
+    project.height,
+    0
+  );
+  if (first.type !== 'VIDEO') throw new Error('Expected source video');
+  first.sourceInstanceId = 'instance';
+  const upper = createVideoProjectTrack('Repeat', 1, VideoTrackKind.PRIMARY);
+  const second = {
+    ...first,
+    id: 'repeat',
+    trackId: upper.id,
+    transform: { ...first.transform, x: 200, y: 100, width: 200, height: 120 },
+  };
+  project.tracks.push(upper);
+  project.assets = [asset];
+  project.clips = [first, second];
+  project.duration = 4;
+  project.actionEvents = [
+    {
+      id: 'fact',
+      kind: 'CLICK',
+      label: 'Click',
+      data: {},
+      point: { x: 0.25, y: 0.5 },
+      anchor: {
+        kind: 'recording-source',
+        recordingId: 'recording',
+        sourceInstanceId: 'instance',
+        sourceEventId: 'raw',
+        sourceTime: 1,
+      },
+    },
+  ];
+  const visible = resolveVideoCompositionFrame(project, 1.2);
+  expect(visible.actions).toEqual([]);
+  expect(
+    visible.visualLayers.map((layer) => layer.kind === 'video' && layer.actions?.[0]?.clipId)
+  ).toEqual([first.id, second.id]);
+  const plan = createInputPlan({
+    kind: 'clip',
+    clipId: second.id,
+    chainIndex: 0,
+    placement: { ...second.transform },
+  });
+  const inputs = resolveVideoCompositionEffectInputLayers(project, 1.2, [plan]);
+  expect(inputs).toHaveLength(1);
+  expect(inputs[0]).toMatchObject({
+    clipId: second.id,
+    x: 200,
+    y: 100,
+    actions: [{ occurrence: { eventId: 'fact', clipId: second.id }, point: { x: 0.25, y: 0.5 } }],
+  });
+  upper.visible = false;
+  expect(resolveVideoCompositionEffectInputLayers(project, 1.2, [plan])).toEqual([]);
 });

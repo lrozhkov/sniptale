@@ -8,7 +8,6 @@ import { loadInitialProjectFromLocation, openPersistedProject } from './workspac
 import { createPersistedLegacyRecordingProject } from './workspace.test-support';
 
 const {
-  autoTransformRecordingProjectMock,
   deleteProjectAsset,
   getRecording,
   getRecordingTelemetry,
@@ -16,7 +15,6 @@ const {
   importRecordingProjectAssetMock,
   saveVideoProject,
 } = vi.hoisted(() => ({
-  autoTransformRecordingProjectMock: vi.fn(),
   deleteProjectAsset: vi.fn(),
   getRecording: vi.fn(),
   getRecordingTelemetry: vi.fn(),
@@ -65,10 +63,6 @@ vi.mock('./assets', async (importOriginal) => {
     importRecordingProjectAsset: importRecordingProjectAssetMock,
   };
 });
-
-vi.mock('./auto-transform', () => ({
-  autoTransformRecordingProject: autoTransformRecordingProjectMock,
-}));
 
 async function mockRecordingProjectLoad() {
   const recordingEntry = {
@@ -194,7 +188,6 @@ async function verifyRecordingHydration() {
     projectAssetId: 'project-asset-1',
     originRecordingId: 'recording-1',
   });
-  expect(autoTransformRecordingProjectMock).not.toHaveBeenCalled();
 }
 
 async function verifyRecordingAssetRollback() {

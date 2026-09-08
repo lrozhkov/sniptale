@@ -36,7 +36,7 @@ function getSelectionOverlayStyle(
     project,
     transform,
     camera,
-    shouldLockPreviewClipToViewport(selectedClip, camera),
+    shouldLockPreviewClipToViewport(selectedClip, camera, project),
     stage
   );
   return {
@@ -109,7 +109,7 @@ function getTopmostClipAtPointer(
       camera,
       clientX: event.clientX,
       clientY: event.clientY,
-      lockToViewport: shouldLockPreviewClipToViewport(clip, camera),
+      lockToViewport: shouldLockPreviewClipToViewport(clip, camera, project),
       project,
       stage,
     });

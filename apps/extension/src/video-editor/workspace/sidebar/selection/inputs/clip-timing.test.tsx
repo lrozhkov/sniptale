@@ -128,7 +128,7 @@ function createPanelProps(
     placementMode: null,
     project: createEmptyVideoProject('Clip timing'),
     recentColors: [],
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedClip: clip,
     selectedCursorSample: null,
     selectedMotionRegion: null,

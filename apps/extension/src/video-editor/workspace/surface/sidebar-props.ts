@@ -51,6 +51,7 @@ function getWorkspaceSidebarProjectActionProps(
   controller: VideoEditorSidebarController
 ): Pick<
   WorkspaceSidebarProps,
+  | 'onApplyTypingCompression'
   | 'onAddActionEvent'
   | 'onAddMotionRegion'
   | 'onAddRecording'
@@ -77,6 +78,9 @@ function getWorkspaceSidebarProjectActionProps(
   | 'onSetCursorCaptureMode'
 > {
   return {
+    ...(controller.projectActions.onApplyTypingCompression
+      ? { onApplyTypingCompression: controller.projectActions.onApplyTypingCompression }
+      : {}),
     onAddActionEvent: controller.projectActions.onAddActionEvent,
     onAddMotionRegion: controller.projectActions.onAddMotionRegion,
     onAddRecording: controller.projectActions.onAddRecording,
@@ -123,29 +127,31 @@ function getWorkspaceSidebarSceneBackgroundActionProps(
 
 function getWorkspaceSidebarProjectEffectProps(
   controller: VideoEditorSidebarController
-): Pick<
-  WorkspaceSidebarProps,
-  | 'onToggleCollapsed'
-  | 'onUpdateActionEventDetails'
-  | 'onUpdateCursorSampleInterpolation'
-  | 'onUpdateCursorSampleSkinOverride'
-  | 'onUpdateCursorSampleVisibility'
-  | 'onClearCursorSampleSkinOverride'
-  | 'onUpdateCursorSkin'
-  | 'onClearPlacementMode'
-  | 'onUpdateMotionRegion'
-  | 'onUpdateTransitionDuration'
-  | 'onUpdateTransitionEasing'
-  | 'onUpdateTransitionTemplate'
-  | 'onDeleteEffectInstance'
-  | 'onDuplicateEffectInstance'
-  | 'onMoveEffectInstance'
-  | 'onUpdateEffectInstance'
-> {
+): Required<Pick<WorkspaceSidebarProps, 'onUpdateActionPresentation'>> &
+  Pick<
+    WorkspaceSidebarProps,
+    | 'onToggleCollapsed'
+    | 'onUpdateActionEventDetails'
+    | 'onUpdateCursorSampleInterpolation'
+    | 'onUpdateCursorSampleSkinOverride'
+    | 'onUpdateCursorSampleVisibility'
+    | 'onClearCursorSampleSkinOverride'
+    | 'onUpdateCursorSkin'
+    | 'onClearPlacementMode'
+    | 'onUpdateMotionRegion'
+    | 'onUpdateTransitionDuration'
+    | 'onUpdateTransitionEasing'
+    | 'onUpdateTransitionTemplate'
+    | 'onDeleteEffectInstance'
+    | 'onDuplicateEffectInstance'
+    | 'onMoveEffectInstance'
+    | 'onUpdateEffectInstance'
+  > {
   return {
     onToggleCollapsed: controller.projectActions.onToggleCollapsed,
     onClearPlacementMode: controller.projectActions.onClearPlacementMode,
     onClearCursorSampleSkinOverride: controller.projectActions.onClearCursorSampleSkinOverride,
+    onUpdateActionPresentation: controller.projectActions.onUpdateActionPresentation,
     onUpdateActionEventDetails: controller.projectActions.onUpdateActionEventDetails,
     onUpdateCursorSampleInterpolation: controller.projectActions.onUpdateCursorSampleInterpolation,
     onUpdateCursorSampleSkinOverride: controller.projectActions.onUpdateCursorSampleSkinOverride,
@@ -191,6 +197,8 @@ type WorkspaceSidebarClipActionProps = Pick<
   | 'onUpdateClipFades'
   | 'onUpdateClipPlaybackRate'
   | 'onUpdateClipMuted'
+  | 'onApplyCameraLayout'
+  | 'onSplitCameraInterval'
   | 'onUpdateClipTransform'
   | 'onUpdateClipVolume'
   | 'onUpdateMediaClipFitMode'
@@ -222,6 +230,10 @@ function getWorkspaceSidebarClipActionProps(
     onUpdateClipPlaybackRate: (clipId, playbackRate) =>
       actions.onUpdateClipPlaybackRate(clipId, playbackRate),
     onUpdateClipMuted: actions.onUpdateClipMuted,
+    ...(actions.onApplyCameraLayout ? { onApplyCameraLayout: actions.onApplyCameraLayout } : {}),
+    ...(actions.onSplitCameraInterval
+      ? { onSplitCameraInterval: actions.onSplitCameraInterval }
+      : {}),
     onUpdateClipTransform: actions.onUpdateClipTransform,
     onUpdateClipVolume: actions.onUpdateClipVolume,
     onUpdateMediaClipFitMode: actions.onUpdateMediaClipFitMode,
@@ -240,7 +252,11 @@ function getWorkspaceSidebarSelectionProps(
   controller: VideoEditorSidebarController
 ): Pick<
   WorkspaceSidebarProps,
-  | 'selectedActionEvent'
+  | 'typingProject'
+  | 'recordingTelemetry'
+  | 'currentTime'
+  | 'selectedActionOccurrence'
+  | 'canSplitCameraInterval'
   | 'selectedClip'
   | 'selectedCursorSample'
   | 'selectedMotionRegion'
@@ -249,7 +265,15 @@ function getWorkspaceSidebarSelectionProps(
   | 'selectedTransition'
 > {
   return {
-    selectedActionEvent: controller.state.selectedActionEvent ?? null,
+    ...(controller.state.currentTime === undefined
+      ? {}
+      : { currentTime: controller.state.currentTime }),
+    ...(controller.state.typingProject ? { typingProject: controller.state.typingProject } : {}),
+    ...(controller.state.recordingTelemetry
+      ? { recordingTelemetry: controller.state.recordingTelemetry }
+      : {}),
+    selectedActionOccurrence: controller.state.selectedActionOccurrence ?? null,
+    canSplitCameraInterval: controller.state.canSplitCameraInterval ?? false,
     selectedClip: controller.state.selectedClip,
     selectedCursorSample: controller.state.selectedCursorSample ?? null,
     selectedMotionRegion: controller.state.selectedMotionRegion ?? null,

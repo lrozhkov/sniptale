@@ -124,7 +124,8 @@ it('accepts privacy erasure stop only after the offscreen recorder settles', asy
   );
   expect(runStopSideEffectsMock).toHaveBeenCalledWith(
     { mode: CaptureMode.TAB, shouldResetImmediately: false, tabId: 9 },
-    'fixed'
+    'fixed',
+    expect.objectContaining({ discard: true, recordingPointTransform: expect.any(Promise) })
   );
 });
 

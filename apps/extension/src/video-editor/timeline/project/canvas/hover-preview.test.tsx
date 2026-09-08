@@ -78,7 +78,7 @@ function renderCanvas() {
         playbackRange={null}
         pixelsPerSecond={90}
         project={project}
-        recordingTelemetry={null}
+        recordingTelemetry={[]}
         selection={createSceneSelection()}
         snapGuideTime={null}
         hoveredClipId={null}
@@ -114,7 +114,7 @@ function createCanvasTestActions() {
     onImportTimelineFile: { audio: vi.fn(), image: vi.fn(), video: vi.fn() },
     onSeek: vi.fn(),
     onSeekTime: vi.fn(),
-    onSelectActionSegment: vi.fn(),
+    onSelectActionOccurrence: vi.fn(),
     onSelectClip: vi.fn(),
     onSelectCursorSegment: vi.fn(),
     onSelectMotionRegion: vi.fn(),
@@ -124,7 +124,7 @@ function createCanvasTestActions() {
     onSelectTransition: vi.fn(),
     onSetHoveredClipId: vi.fn(),
     onTimelinePreviewViewportChange: vi.fn(),
-    onResizeActionEvent: vi.fn(),
+
     onResizeMotionRegion: vi.fn(),
     onScroll: vi.fn(),
     onUnsupportedTimelineFileDrop: vi.fn(),

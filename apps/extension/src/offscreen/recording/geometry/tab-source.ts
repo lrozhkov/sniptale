@@ -1,3 +1,4 @@
+import type { RecordingPointTransform } from '../../../features/video/project/types';
 import type {
   VideoFrameRate,
   VideoResolutionPreset,
@@ -362,4 +363,36 @@ export function revalidateTabOutputGeometry(
   } catch {
     return false;
   }
+}
+
+export function resolveRecordingPointTransform(
+  geometry: TabOutputGeometry,
+  destination: Readonly<{ x: number; y: number; width: number; height: number }>
+): RecordingPointTransform {
+  const { coordinateSpace, sourceSize, sourceRect, outputSize } = geometry;
+  const rawScaleX = sourceSize.width / coordinateSpace.width;
+  const rawScaleY = sourceSize.height / coordinateSpace.height;
+  const clientX = sourceRect.x / rawScaleX;
+  const clientY = sourceRect.y / rawScaleY;
+  return {
+    viewport: {
+      ...coordinateSpace,
+      visualViewportScale: 1,
+      visualViewportOffsetX: 0,
+      visualViewportOffsetY: 0,
+    },
+    visibleClientRect: {
+      x: clientX,
+      y: clientY,
+      // Fractional raster density can round a full-viewport extent past its boundary.
+      width: Math.min(sourceRect.width / rawScaleX, coordinateSpace.width - clientX),
+      height: Math.min(sourceRect.height / rawScaleY, coordinateSpace.height - clientY),
+    },
+    scaleX: (rawScaleX * destination.width) / sourceRect.width / outputSize.width,
+    scaleY: (rawScaleY * destination.height) / sourceRect.height / outputSize.height,
+    offsetX:
+      (destination.x - (sourceRect.x * destination.width) / sourceRect.width) / outputSize.width,
+    offsetY:
+      (destination.y - (sourceRect.y * destination.height) / sourceRect.height) / outputSize.height,
+  };
 }

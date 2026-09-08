@@ -1,3 +1,5 @@
+import { bindMotionRegionToClip } from '../../../../features/video/project/motion/source-binding';
+import { resolveVideoProjectActionOccurrences } from '../../../../features/video/project/action-occurrences';
 import { expect, it, vi } from 'vitest';
 import { createVideoProjectTrack } from '../../../../features/video/project/factories/creation';
 import { VideoProjectAssetType, VideoTrackKind } from '../../../../features/video/project/types';
@@ -215,23 +217,22 @@ it('keeps source anchors on the original tail when inserting the same recording 
   asset.source = { kind: 'recording', recordingId: 'recording-a' };
   store.getState().appendMaterial(asset.id);
   const project = store.getState().project!;
-  const sourceClipId = project.clips[0]!.id;
   store.setState({
     project: {
       ...project,
       actionEvents: [0, 3, 5].map((time) => ({
         id: `event-${time}`,
         kind: 'CLICK',
-        time,
-        duration: 0.1,
+        capturedDuration: 0.1,
         point: null,
         label: '',
         data: {},
-        preset: 'NONE',
-        sourceAnchor: {
+        presentation: { preset: 'NONE' },
+        anchor: {
           kind: 'recording-source',
           recordingId: 'recording-a',
-          sourceClipId,
+          sourceInstanceId: project.clips.find((clip) => clip.type === 'VIDEO')!.sourceInstanceId!,
+          sourceEventId: `raw-${time}`,
           sourceTime: time,
         },
       })),
@@ -240,10 +241,10 @@ it('keeps source anchors on the original tail when inserting the same recording 
   const result = store.getState().insertMaterial(asset.id);
   expect(result.status).toBe('placed');
   const after = store.getState().project!;
-  expect(after.actionEvents.map(({ time }) => time)).toEqual([0, 9, 11]);
+  expect(resolveVideoProjectActionOccurrences(after).map(({ time }) => time)).toEqual([0, 9, 11]);
   if (result.status === 'placed') {
     expect(
-      after.actionEvents.every((event) => event.sourceAnchor?.sourceClipId !== result.clipId)
+      resolveVideoProjectActionOccurrences(after).every((event) => event.clipId !== result.clipId)
     ).toBe(true);
   }
 });
@@ -361,9 +362,9 @@ it('keeps a standalone effect document phase across the inserted interval', () =
   expect(resolveEffectInstanceTime(effects[1]!, 10, 9.5)).toMatchObject({ effectTime: 6 });
 });
 
-it.each(['STATIC', 'PATH'] as const)(
-  'preserves %s camera geometry across insertion and reload',
-  (cameraMode) => {
+it.each([false, true])(
+  'preserves framing geometry across insertion and reload (source bound: %s)',
+  (bound) => {
     const { store, asset } = setup();
     store.getState().appendMaterial(asset.id);
     const project = store.getState().project!;
@@ -373,18 +374,13 @@ it.each(['STATIC', 'PATH'] as const)(
       scale: 2,
       zoomInDuration: 2,
       zoomOutDuration: 2,
-      cameraMode,
-      path: {
-        segments: [
-          { durationWeight: 1, easing: 'LINEAR' as const, trajectoryPreset: 'LINEAR' as const },
-        ],
-        stops: [
-          { id: 'a', offset: 0, target: { kind: 'POINT' as const, x: 400, y: 300, scale: 2 } },
-          { id: 'b', offset: 1, target: { kind: 'POINT' as const, x: 800, y: 400, scale: 3 } },
-        ],
-      },
     };
-    const before = { ...project, motionRegions: [region] };
+    const clip = project.clips[0]!;
+    if (clip.type !== 'VIDEO') throw new Error('Expected video');
+    const before = {
+      ...project,
+      motionRegions: [bound ? bindMotionRegionToClip(region, clip) : region],
+    };
     store.setState({ project: before });
     expect(store.getState().insertMaterial(asset.id).status).toBe('placed');
     const after = hydrateVideoProject(store.getState().project!);

@@ -1,6 +1,6 @@
+import type { VideoProjectActionOccurrence } from '../../../features/video/project/action-occurrences';
 import type {
   VideoProject,
-  VideoProjectActionEvent,
   VideoProjectMotionRegion,
 } from '../../../features/video/project/types/index';
 import type { VideoEditorLibrariesState } from '../app-model/types';
@@ -25,7 +25,7 @@ export interface UseVideoEditorRuntimeParams {
     shortcutsEnabled: boolean;
     placementMode: VideoEditorPlacementMode | null;
     selection: VideoEditorSelection;
-    selectedActionEvent: VideoProjectActionEvent | null;
+    selectedActionOccurrence: VideoProjectActionOccurrence | null;
     selectedClipId: string | null;
     selectedMotionRegion: VideoProjectMotionRegion | null;
     deleteSelection: {

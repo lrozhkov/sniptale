@@ -1,92 +1,111 @@
-import { expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import { DEFAULT_VIDEO_AUTO_PROCESSING_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
-import { VideoAutoProcessingAction } from '@sniptale/runtime-contracts/video/types/types';
-import { createAutoTransformRecordingAction } from './timeline-auto-transform';
-
-const { autoTransformRecordingProjectMock } = vi.hoisted(() => ({
-  autoTransformRecordingProjectMock: vi.fn(),
+import { createAutoProcessingActions } from './timeline-auto-transform';
+import type {
+  AutoProcessingPreview,
+  AutoProcessingRequest,
+} from '../../../project/operations/auto-transform';
+const { prepare, currentTelemetry } = vi.hoisted(() => ({
+  prepare: vi.fn(),
+  currentTelemetry: vi.fn(),
 }));
-
-vi.mock('../../../project/operations/auto-transform', () => ({
-  autoTransformRecordingProject: autoTransformRecordingProjectMock,
+vi.mock('../../../project/operations/auto-transform', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../project/operations/auto-transform')>()),
+  prepareAutoProcessing: prepare,
+  isAutoProcessingTelemetryCurrent: currentTelemetry,
 }));
-
-function createStore(project = createEmptyVideoProject('Timeline actions')) {
-  project.baseRecordingId = 'recording-1';
+const request: AutoProcessingRequest = {
+  targets: [],
+  camera: false,
+  settings: DEFAULT_VIDEO_AUTO_PROCESSING_SETTINGS,
+};
+function fixture() {
+  const project = createEmptyVideoProject('Original');
+  project.baseRecordingId = 'implicit-base';
   const authority = { project };
   const store = {
-    project,
-    recordingId: 'recording-1',
-    setError: vi.fn(),
-    updateProject: vi.fn((updater: (currentProject: typeof project) => typeof project) => {
+    updateProject: vi.fn((updater: (current: typeof project) => typeof project) => {
       authority.project = updater(authority.project);
     }),
   };
-  return { authority, store };
-}
-
-function createRemoveSettings() {
-  return {
-    ...DEFAULT_VIDEO_AUTO_PROCESSING_SETTINGS,
-    enabled: true,
-    stableSegments: {
-      ...DEFAULT_VIDEO_AUTO_PROCESSING_SETTINGS.stableSegments,
-      action: VideoAutoProcessingAction.REMOVE,
+  const preview: AutoProcessingPreview = {
+    status: 'ready',
+    sourceProject: project,
+    project: { ...project, name: 'Processed' },
+    request,
+    suggestions: [],
+    selectedIds: ['change'],
+    telemetry: [],
+    summary: {
+      beforeDuration: 8,
+      afterDuration: 6,
+      affectedCount: 1,
+      shiftedCount: 1,
+      removedDuration: 2,
     },
   };
+  return {
+    authority,
+    store,
+    preview,
+    actions: createAutoProcessingActions(store, () => authority.project),
+  };
 }
-
-it('passes wizard settings into the recording auto-transform action', async () => {
-  const { authority, store } = createStore();
-  const settings = createRemoveSettings();
-  const nextProject = { ...store.project, name: 'Transformed' };
-
-  autoTransformRecordingProjectMock.mockResolvedValue(nextProject);
-  createAutoTransformRecordingAction(store, () => authority.project)(settings);
-  await Promise.resolve();
-
-  expect(autoTransformRecordingProjectMock).toHaveBeenCalledWith(
-    expect.objectContaining({ id: store.project.id }),
-    'recording-1',
-    settings
+beforeEach(() => {
+  vi.clearAllMocks();
+  currentTelemetry.mockResolvedValue(true);
+});
+it('forwards empty scope without inferring a recording or applying during preparation', async () => {
+  const f = fixture();
+  prepare.mockResolvedValue({
+    ...f.preview,
+    status: 'unchanged',
+    selectedIds: [],
+    project: f.authority.project,
+  });
+  await f.actions.prepare(request);
+  expect(prepare).toHaveBeenCalledWith(f.authority.project, request, undefined);
+  expect(request.targets).toEqual([]);
+  expect(f.store.updateProject).not.toHaveBeenCalled();
+});
+it('applies the reviewed snapshot once after telemetry admission', async () => {
+  const f = fixture();
+  expect(await f.actions.apply(f.preview)).toBe('applied');
+  expect(f.store.updateProject).toHaveBeenCalledOnce();
+  expect(f.authority.project).toBe(f.preview.project);
+  expect(await f.actions.apply(f.preview)).toBe('stale');
+  expect(f.store.updateProject).toHaveBeenCalledOnce();
+});
+it('rejects a same-id same-timestamp different project reference after asynchronous preparation', async () => {
+  const f = fixture();
+  prepare.mockResolvedValue(f.preview);
+  const pending = f.actions.prepare(request);
+  f.authority.project = { ...f.authority.project };
+  expect(await pending).toEqual({ status: 'stale' });
+  expect(f.store.updateProject).not.toHaveBeenCalled();
+});
+it('rejects telemetry changes or project edits during apply admission', async () => {
+  const f = fixture();
+  currentTelemetry.mockResolvedValueOnce(false);
+  expect(await f.actions.apply(f.preview)).toBe('stale');
+  currentTelemetry.mockImplementationOnce(async () => {
+    f.authority.project = { ...f.authority.project };
+    return true;
+  });
+  expect(await f.actions.apply(f.preview)).toBe('stale');
+  expect(f.store.updateProject).not.toHaveBeenCalled();
+});
+it('rechecks identity inside the commit callback and makes empty candidates no-ops', async () => {
+  const f = fixture();
+  expect(await f.actions.apply({ ...f.preview, status: 'unchanged', selectedIds: [] })).toBe(
+    'unchanged'
   );
-  expect(store.updateProject).toHaveBeenCalledTimes(1);
-  expect(authority.project.name).toBe('Transformed');
+  expect(f.store.updateProject).not.toHaveBeenCalled();
+  f.store.updateProject.mockImplementation((updater) => {
+    f.authority.project = { ...f.authority.project, name: 'Race winner' };
+    f.authority.project = updater(f.authority.project);
+  });
+  expect(await f.actions.apply(f.preview)).toBe('stale');
+  expect(f.authority.project.name).toBe('Race winner');
 });
-
-it('keeps the stale project guard for async auto-transform results', async () => {
-  const project = createEmptyVideoProject('Original');
-  const { authority, store } = createStore(project);
-  const nextProject = { ...project, name: 'Late transform' };
-
-  autoTransformRecordingProjectMock.mockResolvedValue(nextProject);
-  createAutoTransformRecordingAction(store, () => authority.project)(createRemoveSettings());
-  authority.project = { ...project, updatedAt: project.updatedAt + 1 };
-  await Promise.resolve();
-
-  expect(store.updateProject).toHaveBeenCalledOnce();
-  expect(store.project).toBe(project);
-  expect(authority.project.name).toBe('Original');
-  expect(authority.project.updatedAt).toBe(project.updatedAt + 1);
-});
-
-it.each(['unavailable', 'rejected'] as const)(
-  'suppresses stale %s feedback after project replacement',
-  async (outcome) => {
-    const project = createEmptyVideoProject('Original');
-    const { authority, store } = createStore(project);
-    if (outcome === 'unavailable') {
-      autoTransformRecordingProjectMock.mockResolvedValue(null);
-    } else {
-      autoTransformRecordingProjectMock.mockRejectedValue(new Error('late failure'));
-    }
-
-    createAutoTransformRecordingAction(store, () => authority.project)(createRemoveSettings());
-    authority.project = { ...project, id: 'replacement-project' };
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(store.setError).not.toHaveBeenCalled();
-  }
-);

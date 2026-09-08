@@ -176,14 +176,14 @@ function createScenarioNormalizationProject() {
   project.cursorTrack = createScenarioCursorTrack();
   project.actionEvents = [
     {
-      data: null as never,
-      duration: -1,
+      data: {},
+      capturedDuration: 0.2,
       id: 'action-1',
-      kind: 'CLICK' as never,
-      label: 42 as never,
-      point: { x: Number.NaN, y: 10 },
-      preset: 'CLICK_RIPPLE' as never,
-      time: 2,
+      kind: 'CLICK' as const,
+      label: 'Click',
+      point: null,
+      presentation: { preset: 'CLICK_RIPPLE' as const },
+      anchor: { kind: 'project', time: 2 },
     },
   ];
   return project;
@@ -227,8 +227,8 @@ function expectScenarioNormalization(hydrated: ReturnType<typeof hydrateVideoPro
   expect(hydrated.actionEvents).toEqual([
     expect.objectContaining({
       data: {},
-      duration: 0,
-      label: '',
+      capturedDuration: 0.2,
+      label: 'Click',
       point: null,
     }),
   ]);
@@ -265,7 +265,7 @@ it('backfills recording source metadata without inventing a cursor track', () =>
   project.source = undefined as never;
   project.baseRecordingId = 'recording-1';
   project.cursorTrack = null;
-  project.actionEvents = undefined as never;
+  project.actionEvents = [];
 
   const hydrated = hydrateVideoProject(project);
 

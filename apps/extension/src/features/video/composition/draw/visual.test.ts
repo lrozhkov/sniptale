@@ -1,3 +1,6 @@
+import { createEmptyVideoProject, createVideoProjectAsset } from '../../project/factories/creation';
+import { createVideoClipFromAsset } from '../../project/factories/clip';
+import { resolveVideoCompositionFrame } from '../timeline/frame';
 import { beforeEach, expect, it, vi } from 'vitest';
 import { drawCompositionVisualLayer, drawFittedMediaFrame } from './index';
 import { drawCompositionVisualLayerBitmap } from './visual';
@@ -236,3 +239,116 @@ it('covers fitted media branches used by the shared visual owner', () => {
   expect(context.rect).toHaveBeenCalledWith(0, 0, 40, 20);
   expect(context.clip).toHaveBeenCalledTimes(1);
 });
+
+it('draws a captured point inside its fitted video with the same alpha, rotation and content clipping', () => {
+  const context = createContext();
+  context.arc = vi.fn();
+  const layer = createCapturedVideoLayer();
+  const video = new FakeHTMLVideoElement();
+  drawCompositionVisualLayer(
+    context,
+    layer,
+    1,
+    1,
+    {},
+    new Map([[layer.clipId, video as unknown as HTMLVideoElement]])
+  );
+  expect(context.globalAlpha).toBe(0.4);
+  expect(context.rotate).toHaveBeenCalledWith(Math.PI / 2);
+  expect(context.arc).toHaveBeenCalledWith(35, 70, 16, 0, Math.PI * 2);
+  expect(context.rect).toHaveBeenCalledWith(10, 40, 100, 60);
+  expect(vi.mocked(context.drawImage).mock.invocationCallOrder[0]).toBeLessThan(
+    vi.mocked(context.arc).mock.invocationCallOrder[0]!
+  );
+});
+
+it('keeps a point-less KEY badge within CONTAIN content rather than the letterbox', () => {
+  const context = createContext();
+  const layer = createCapturedVideoLayer();
+  layer.rotation = 0;
+  const action = layer.actions![0]!;
+  layer.actions = [
+    {
+      ...action,
+      event: { ...action.event, kind: 'KEY', label: 'Ctrl + K', point: null },
+      point: null,
+      renderKind: 'keystroke',
+      preset: 'NONE',
+    },
+  ];
+  drawCompositionVisualLayer(
+    context,
+    layer,
+    1,
+    1,
+    {},
+    new Map([[layer.clipId, new FakeHTMLVideoElement() as unknown as HTMLVideoElement]])
+  );
+  expect(context.fillText).toHaveBeenCalledWith('Ctrl + K', 22, 52, 10);
+  expect(context.rect).toHaveBeenCalledWith(10, 40, 100, 60);
+});
+
+it('omits orphan captured pixels when source is unavailable and never draws accents again on an effect bitmap', () => {
+  const context = createContext();
+  context.arc = vi.fn();
+  const layer = createCapturedVideoLayer();
+  drawCompositionVisualLayer(context, layer, 1, 1, {}, new Map());
+  expect(context.arc).not.toHaveBeenCalled();
+  drawCompositionVisualLayerBitmap(context, layer, new FakeBitmap(100, 100), 1, 1);
+  expect(context.drawImage).toHaveBeenCalledOnce();
+  expect(context.arc).not.toHaveBeenCalled();
+});
+
+function createCapturedVideoLayer(): Extract<
+  import('../types').VideoCompositionVisualLayer,
+  { kind: 'video' }
+> {
+  const project = createEmptyVideoProject('Captured layer', 200, 120);
+  const asset = createVideoProjectAsset(
+    'Video',
+    'VIDEO',
+    { kind: 'recording', recordingId: 'recording' },
+    {
+      width: 200,
+      height: 120,
+      duration: 3,
+      mimeType: 'video/mp4',
+      size: 10,
+      hasAudio: false,
+      audioPeaks: null,
+    }
+  );
+  const clip = createVideoClipFromAsset(
+    project.tracks[0]!.id,
+    asset,
+    project.width,
+    project.height,
+    0
+  );
+  if (clip.type !== 'VIDEO') throw new Error('Expected video');
+  clip.sourceInstanceId = 'instance';
+  clip.transform = { x: 10, y: 20, width: 100, height: 100, rotation: 90, opacity: 0.4 };
+  project.assets = [asset];
+  project.clips = [clip];
+  project.duration = 3;
+  project.actionEvents = [
+    {
+      id: 'action',
+      kind: 'CLICK',
+      label: 'Click',
+      data: {},
+      point: { x: 0.25, y: 0.5 },
+      anchor: {
+        kind: 'recording-source',
+        recordingId: 'recording',
+        sourceInstanceId: 'instance',
+        sourceEventId: 'raw',
+        sourceTime: 1,
+      },
+      presentation: { duration: 1 },
+    },
+  ];
+  const layer = resolveVideoCompositionFrame(project, 1.5).visualLayers[0];
+  if (layer?.kind !== 'video') throw new Error('Expected video layer');
+  return layer;
+}

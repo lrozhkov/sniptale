@@ -1,5 +1,5 @@
-import { createTimelineProjection } from '../interaction-state/projection';
 // @vitest-environment jsdom
+import { createTimelineProjection } from '../interaction-state/projection';
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -240,35 +240,80 @@ it('renders ruler loop markers when a playback range is active', () => {
   expect(container?.textContent).toContain('0:03.500');
 });
 
-it('renders the telemetry lane only when timeline visibility and telemetry are available', () => {
+it('renders the history lane with and without a telemetry sidecar', () => {
   renderCanvas({
-    recordingTelemetry: {
-      actionEvents: [],
-      captureMode: 'TAB',
-      createdAt: 1,
-      cursorTrack: null,
-      displaySurface: null,
-      recordingId: 'recording-1',
-      signals: [],
-      updatedAt: 2,
-      viewport: null,
-    },
+    recordingTelemetry: [
+      {
+        actionEvents: [],
+        captureMode: 'TAB',
+        createdAt: 1,
+        cursorTrack: null,
+        displaySurface: null,
+        recordingId: 'recording-1',
+        signals: [],
+        updatedAt: 2,
+        viewport: null,
+      },
+    ],
     telemetryLaneVisible: true,
   });
 
   expect(container?.textContent).toContain('videoEditor.timeline.telemetryLaneEmpty');
 
   renderCanvas({
-    recordingTelemetry: null,
+    recordingTelemetry: [],
     telemetryLaneVisible: true,
   });
 
-  expect(container?.textContent).not.toContain('videoEditor.timeline.telemetryLaneEmpty');
+  expect(container?.textContent).toContain('videoEditor.timeline.telemetryLaneEmpty');
+  expect(
+    container?.querySelector<HTMLElement>('[data-ui="video-editor.timeline.history-row"]')?.style
+      .height
+  ).toBe('56px');
+});
+
+it('counts one history row in playhead height independently of authored action count', () => {
+  const project = createEmptyVideoProject('History height');
+  const render = (visible: boolean) =>
+    act(() =>
+      root?.render(
+        <ProjectTimelineCanvas
+          {...createCanvasProps(project, { snapGuideTime: 1, telemetryLaneVisible: visible })}
+        />
+      )
+    );
+  const height = () =>
+    parseFloat(
+      container?.querySelector<HTMLElement>('[data-ui="video-editor.timeline.snap-guide"]')?.style
+        .height ?? '0'
+    );
+  render(false);
+  const collapsedHeight = height();
+  render(true);
+  expect(height()).toBe(collapsedHeight + 56);
+  project.actionEvents = [
+    {
+      id: 'click',
+      kind: 'CLICK',
+
+      anchor: { kind: 'project', time: 1 },
+
+      label: 'Click',
+      point: null,
+      data: {},
+      presentation: { duration: 1, preset: 'CLICK_RIPPLE' },
+    },
+  ];
+  render(true);
+  expect(height()).toBe(collapsedHeight + 56);
+  expect(container?.querySelectorAll('[data-project-timeline-effect-lane-row]')).toHaveLength(0);
+  render(false);
+  expect(height()).toBe(collapsedHeight);
 });
 
 it('does not render telemetry empty text when the telemetry lane is hidden', () => {
   renderCanvas({
-    recordingTelemetry: null,
+    recordingTelemetry: [],
     telemetryLaneVisible: false,
   });
 
@@ -341,7 +386,7 @@ function createCanvasProps(
     playbackRange: overrides.playbackRange ?? null,
     pixelsPerSecond: 90,
     project,
-    recordingTelemetry: overrides.recordingTelemetry ?? null,
+    recordingTelemetry: overrides.recordingTelemetry ?? [],
     selection: createSceneSelection(),
     snapGuideTime: overrides.snapGuideTime ?? null,
     hoveredClipId: null,
@@ -385,7 +430,7 @@ function createCanvasActionProps(overrides: {
     onCloseTrackGap: vi.fn(),
     onImportTimelineFile: overrides.onImportTimelineFile ?? createImportHandlers({}),
     onSeek: overrides.onSeek ?? vi.fn(),
-    onSelectActionSegment: vi.fn(),
+    onSelectActionOccurrence: vi.fn(),
     onSelectClip: vi.fn(),
     onSelectCursorSegment: vi.fn(),
     onSelectMotionRegion: vi.fn(),
@@ -395,7 +440,7 @@ function createCanvasActionProps(overrides: {
     onSelectTransition: vi.fn(),
     onSetHoveredClipId: vi.fn(),
     onTimelinePreviewViewportChange: vi.fn(),
-    onResizeActionEvent: vi.fn(),
+
     onResizeMotionRegion: vi.fn(),
     onScroll: vi.fn(),
     onUnsupportedTimelineFileDrop: overrides.onUnsupportedTimelineFileDrop ?? vi.fn(),
@@ -455,7 +500,7 @@ it('projects clip, motion, range and playhead together in a distant viewport wit
   );
   expect(parseFloat(playhead?.style.left ?? '')).toBeCloseTo(500, 5);
   const motion = container?.querySelector<HTMLElement>(
-    '[aria-label="videoEditor.timeline.motionLane"]'
+    '[aria-label^="videoEditor.timeline.motionLane ·"]'
   )?.parentElement;
   expect(parseFloat(motion?.style.width ?? '')).toBeCloseTo(1240, 5);
   expect(

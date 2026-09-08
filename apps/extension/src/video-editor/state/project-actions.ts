@@ -8,31 +8,53 @@ import { createInitialExportState } from './export-state';
 import { applyProjectUpdate } from '../project/state/actions';
 import { isVideoEditorPresentedTrack } from '../project/operations/presented-tracks';
 import { resetVideoEditorProjectHistory } from '../project/history';
+import { collectProjectRecordingIds } from '../project/operations/source-timed-clips';
+import { planTypingCompression } from '../project/state/clip-timeline/source-range';
+import { applyProjectSnapshot } from '../project/state/helpers';
+import { recordVideoEditorProjectHistory } from '../project/history';
 
 type VideoEditorStoreSet = Parameters<StateCreator<VideoEditorState>>[0];
 type RecordingTelemetryState = Parameters<VideoEditorState['setRecordingTelemetry']>[0];
 
-function resolveTelemetryLaneVisibility(
-  currentTelemetry: RecordingTelemetryState,
-  nextTelemetry: RecordingTelemetryState,
-  telemetryLaneVisible: boolean
-) {
-  if (nextTelemetry === null) {
-    return false;
-  }
-
-  return currentTelemetry?.recordingId === nextTelemetry.recordingId ? telemetryLaneVisible : true;
-}
-
 export function createProjectStateActions(set: VideoEditorStoreSet) {
   return {
+    applyTypingCompression: ((request, expectedProject) => {
+      let result: ReturnType<VideoEditorState['applyTypingCompression']> = { status: 'stale' };
+      set((state) => {
+        if (!state.project || state.project !== expectedProject) return state;
+        const plan = planTypingCompression(state.project, state.recordingTelemetry, request);
+        if (plan.status !== 'ready') {
+          result = { status: plan.status };
+          return state;
+        }
+        result = { status: 'applied', clipId: plan.clipId };
+        const clip = plan.project.clips.find((item) => item.id === plan.clipId);
+        return {
+          ...applyProjectSnapshot(state, plan.project),
+          projectHistory: recordVideoEditorProjectHistory(
+            state.projectHistory,
+            state.project,
+            plan.project
+          ),
+          selection: {
+            kind: VideoEditorSelectionKind.HISTORY_SPAN,
+            recordingId: request.recordingId,
+            sourceInstanceId: request.sourceInstanceId,
+            signalId: request.signalId,
+            clipId: plan.clipId,
+          },
+          selectedTrackId: clip?.trackId ?? null,
+          currentTime: clip?.startTime ?? state.currentTime,
+          placementMode: null,
+        };
+      });
+      return result;
+    }) satisfies VideoEditorState['applyTypingCompression'],
     setProject: (
       project: Parameters<VideoEditorState['setProject']>[0],
       recordingId: Parameters<VideoEditorState['setProject']>[1] = null
     ) => {
-      const hydratedProject = hydrateVideoProject(project, {
-        inferLegacyInteractionAnchors: true,
-      });
+      const hydratedProject = hydrateVideoProject(project);
       const selection = resolveInitialVideoEditorSelection(hydratedProject);
       const selectedClip =
         selection.kind === VideoEditorSelectionKind.CLIP
@@ -48,13 +70,12 @@ export function createProjectStateActions(set: VideoEditorStoreSet) {
         currentTime: 0,
         isPlaying: false,
         placementMode: null,
-        recordingTelemetry: null,
+        recordingTelemetry: [],
         selection,
         selectedTrackId:
           selectedClip?.trackId ??
           hydratedProject.tracks.find(isVideoEditorPresentedTrack)?.id ??
           null,
-        telemetryLaneVisible: false,
         exportState: {
           ...createInitialExportState(),
           settings: getDefaultExportSettings(hydratedProject),
@@ -83,23 +104,16 @@ export function createProjectStateActions(set: VideoEditorStoreSet) {
     setSaveState: (saveState: VideoEditorState['saveState']) => set({ saveState }),
     setRecordingTelemetry: (recordingTelemetry: RecordingTelemetryState) =>
       set((state) => {
-        const matchingTelemetry =
-          recordingTelemetry?.recordingId === state.project?.baseRecordingId
-            ? recordingTelemetry
-            : null;
+        const allowedIds = new Set(collectProjectRecordingIds(state.project));
+        const seen = new Set<string>();
+        const matchingTelemetry = recordingTelemetry.filter((entry) => {
+          if (!allowedIds.has(entry.recordingId) || seen.has(entry.recordingId)) return false;
+          seen.add(entry.recordingId);
+          return true;
+        });
         return {
           recordingTelemetry: matchingTelemetry,
-          telemetryLaneVisible: resolveTelemetryLaneVisibility(
-            state.recordingTelemetry,
-            matchingTelemetry,
-            state.telemetryLaneVisible
-          ),
         };
       }),
-    toggleTelemetryLaneVisibility: () =>
-      set((state) => ({
-        telemetryLaneVisible:
-          state.recordingTelemetry === null ? false : !state.telemetryLaneVisible,
-      })),
   };
 }

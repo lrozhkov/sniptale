@@ -7,13 +7,14 @@ export type { StagePoint };
 
 export type PointPlacementParams = Pick<
   PreviewStageCanvasProps,
+  | 'camera'
   | 'onUpdateActionEventDetails'
   | 'onUpdateMotionRegion'
   | 'onUpsertObjectTrackCorrectionAnchor'
   | 'project'
   | 'selectedMotionRegion'
 > & {
-  currentTime?: PreviewStageCanvasProps['currentTime'];
+  currentTime: PreviewStageCanvasProps['currentTime'];
 };
 
 export type PointOverlayParams = Pick<
@@ -22,7 +23,7 @@ export type PointOverlayParams = Pick<
   | 'grid'
   | 'placementMode'
   | 'project'
-  | 'selectedActionEvent'
+  | 'selectedActionOccurrence'
   | 'selectedMotionRegion'
   | 'stageRef'
   | 'onGuideChange'
@@ -31,7 +32,7 @@ export type PointOverlayParams = Pick<
   | 'onUpdateMotionRegion'
   | 'onUpsertObjectTrackCorrectionAnchor'
 > & {
-  currentTime?: PreviewStageCanvasProps['currentTime'];
+  currentTime: PreviewStageCanvasProps['currentTime'];
 };
 
 export interface PointDragParams

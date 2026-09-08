@@ -1,149 +1,67 @@
-import { syncProjectDuration } from '../../../features/video/project/timeline';
-import { normalizeClipPlaybackRate } from '../../../features/video/project/timeline/basics';
-import type { VideoProject } from '../../../features/video/project/types/model';
-import { VideoAutoProcessingAction } from '@sniptale/runtime-contracts/video/types/types';
-import type { AutoTransformCandidate } from './auto-transform.candidates';
+import type { VideoProject } from '../../../features/video/project/types';
 import {
-  AUTO_TRANSFORM_SOURCE_EPSILON,
-  cloneSourceTimedClip,
-  collectSourceUnits,
-  getSourceEnd,
-  getSourceUnitKey,
-  isRecordingSourceTimedClip,
-  splitUnitsAtSourceTime,
-  type SourceTimedClip,
-} from './auto-transform.clip-units';
+  VideoAutoProcessingAction,
+  type VideoAutoProcessingAction as ProcessingAction,
+} from '@sniptale/runtime-contracts/video/types/types';
+import {
+  planSourceRangeCompression,
+  planSourceRangeRemoval,
+} from '../state/clip-timeline/source-range';
 
-function applyRates(
+export interface AutoProcessingTarget {
+  clipId: string;
+  recordingId: string;
+  sourceInstanceId: string;
+}
+export interface AutoProcessingTimingRequest {
+  id: string;
+  target: AutoProcessingTarget;
+  sourceStart: number;
+  sourceEnd: number;
+  action: ProcessingAction;
+  playbackRate: number;
+}
+export function planAutoProcessingInterval(
   project: VideoProject,
-  recordingId: string,
-  candidates: AutoTransformCandidate[]
+  item: AutoProcessingTimingRequest
 ) {
-  const speedCandidates = candidates.filter(
-    (candidate) => candidate.action === VideoAutoProcessingAction.SPEED_UP
-  );
-
-  return {
-    ...project,
-    clips: project.clips.map((clip) => {
-      if (!isRecordingSourceTimedClip(project, clip, recordingId)) {
-        return clip;
-      }
-
-      const candidate = speedCandidates.find(
-        (item) =>
-          clip.sourceStart >= item.startTime - AUTO_TRANSFORM_SOURCE_EPSILON &&
-          getSourceEnd(clip) <= item.endTime + AUTO_TRANSFORM_SOURCE_EPSILON
-      );
-
-      return candidate
-        ? cloneSourceTimedClip(clip, { playbackRate: candidate.playbackRate })
-        : clip;
-    }),
-  };
+  const request = { ...item.target, sourceStart: item.sourceStart, sourceEnd: item.sourceEnd };
+  return item.action === VideoAutoProcessingAction.REMOVE
+    ? planSourceRangeRemoval(project, request)
+    : item.action === VideoAutoProcessingAction.SKIP
+      ? { status: 'unchanged' as const }
+      : planSourceRangeCompression(project, { ...request, targetPlaybackRate: item.playbackRate });
 }
 
-function isClipInRemovedRange(
-  clip: SourceTimedClip,
-  candidates: AutoTransformCandidate[]
-): boolean {
-  return candidates.some(
-    (candidate) =>
-      candidate.action === VideoAutoProcessingAction.REMOVE &&
-      clip.sourceStart >= candidate.startTime - AUTO_TRANSFORM_SOURCE_EPSILON &&
-      getSourceEnd(clip) <= candidate.endTime + AUTO_TRANSFORM_SOURCE_EPSILON
-  );
-}
-
-function removeCandidateRanges(
+/** Applies an explicitly reviewed set atomically through the single temporal owner. */
+export function applyAutoProcessingTiming(
   project: VideoProject,
-  recordingId: string,
-  candidates: AutoTransformCandidate[]
+  items: readonly AutoProcessingTimingRequest[]
 ) {
-  return {
-    ...project,
-    clips: project.clips.filter(
-      (clip) =>
-        !isRecordingSourceTimedClip(project, clip, recordingId) ||
-        !isClipInRemovedRange(clip, candidates)
-    ),
-  };
-}
-
-function compactTimeline(project: VideoProject, recordingId: string) {
-  const startTimes = new Map<string, number>();
-  let cursor = 0;
-
-  for (const unit of collectSourceUnits(project, recordingId)) {
-    const representative = unit[0];
-    if (!representative) {
-      continue;
-    }
-
-    startTimes.set(getSourceUnitKey(representative), cursor);
-    cursor += representative.duration;
-  }
-
-  return {
-    ...project,
-    clips: project.clips.map((clip) => {
-      if (!isRecordingSourceTimedClip(project, clip, recordingId)) {
-        return clip;
-      }
-
-      const startTime = startTimes.get(getSourceUnitKey(clip));
-      return startTime === undefined ? clip : { ...clip, startTime };
-    }),
-  };
-}
-
-function findClipBySourceTime(project: VideoProject, recordingId: string, sourceTime: number) {
-  for (const clip of collectSourceUnits(project, recordingId).flat()) {
-    if (
-      sourceTime >= clip.sourceStart - AUTO_TRANSFORM_SOURCE_EPSILON &&
-      sourceTime <= getSourceEnd(clip) + AUTO_TRANSFORM_SOURCE_EPSILON
-    ) {
-      return clip;
+  let candidate = project;
+  const affected = new Set<string>();
+  const shifted = new Set<string>();
+  let removedDuration = 0;
+  const ordered = [...items].sort(
+    (left, right) =>
+      left.target.clipId.localeCompare(right.target.clipId) || right.sourceStart - left.sourceStart
+  );
+  for (const item of ordered) {
+    const result = planAutoProcessingInterval(candidate, item);
+    if (result.status === 'blocked')
+      return { status: 'blocked' as const, id: item.id, reason: result.reason };
+    if (result.status === 'ready') {
+      candidate = result.project;
+      result.affectedClipIds.forEach((id) => affected.add(id));
+      result.shiftedClipIds.forEach((id) => shifted.add(id));
+      removedDuration += result.removedDuration;
     }
   }
-
-  return null;
-}
-
-export function applyAutoTransformClipTimeline(
-  project: VideoProject,
-  recordingId: string,
-  candidates: AutoTransformCandidate[]
-): VideoProject {
-  let nextProject = project;
-
-  for (const candidate of candidates) {
-    nextProject = splitUnitsAtSourceTime(nextProject, recordingId, candidate.startTime);
-    nextProject = splitUnitsAtSourceTime(nextProject, recordingId, candidate.endTime);
-  }
-
-  return syncProjectDuration(
-    compactTimeline(
-      applyRates(
-        removeCandidateRanges(nextProject, recordingId, candidates),
-        recordingId,
-        candidates
-      ),
-      recordingId
-    )
-  );
-}
-
-export function mapSourceTimeToProjectTime(
-  project: VideoProject,
-  recordingId: string,
-  sourceTime: number
-): number | null {
-  const clip = findClipBySourceTime(project, recordingId, sourceTime);
-  if (!clip) {
-    return null;
-  }
-
-  const sourceOffset = Math.min(Math.max(0, sourceTime - clip.sourceStart), clip.sourceDuration);
-  return clip.startTime + sourceOffset / normalizeClipPlaybackRate(clip.playbackRate ?? 1);
+  return {
+    status: 'ready' as const,
+    project: candidate,
+    affectedClipIds: [...affected],
+    shiftedClipIds: [...shifted],
+    removedDuration,
+  };
 }

@@ -5,6 +5,7 @@ import { translate } from '../../../../platform/i18n';
 import type { VideoProject } from '../../../../features/video/project/types';
 import { buildCursorSegmentMeta } from './meta';
 import { formatTime } from '../interaction-state/helpers';
+import { getCursorLaneIcon } from '../tracks/lane-icons';
 import {
   isSelectedEffectSegment,
   ProjectTimelineEffectSegment,
@@ -41,6 +42,7 @@ type CursorSegment = ReturnType<typeof buildVideoCompositionCursorSegments>[numb
 type CursorSegmentMetaMap = ReturnType<typeof buildCursorSegmentMeta>;
 
 export function ProjectTimelineCursorLane(props: {
+  embedded?: boolean;
   pixelsPerSecond: number;
   projection?: TimelineProjection | undefined;
   project: VideoProject;
@@ -52,8 +54,8 @@ export function ProjectTimelineCursorLane(props: {
   const segments = buildVideoCompositionCursorSegments(displayProject);
   const cursorMetaById = buildCursorSegmentMeta(displayProject, segments);
 
-  return (
-    <ProjectTimelineEffectLaneRow>
+  const content = (
+    <>
       {segments.length === 0 ? <ProjectTimelineEffectLaneEmptyLabel /> : null}
       {segments.map((segment) => (
         <ProjectTimelineCursorSegment
@@ -66,7 +68,17 @@ export function ProjectTimelineCursorLane(props: {
           selectedEffectSelection={props.selectedEffectSelection}
         />
       ))}
-    </ProjectTimelineEffectLaneRow>
+    </>
+  );
+  return props.embedded ? (
+    <div
+      className="relative h-8 border-t border-[var(--sniptale-color-border-subtle)]"
+      data-ui="video-editor.timeline.history-cursor-row"
+    >
+      {content}
+    </div>
+  ) : (
+    <ProjectTimelineEffectLaneRow>{content}</ProjectTimelineEffectLaneRow>
   );
 }
 
@@ -90,6 +102,8 @@ function ProjectTimelineCursorSegment(props: {
         props.segment.id
       )}
       label={translate('videoEditor.timeline.cursorLane')}
+      hideLabel
+      leadingIcon={getCursorLaneIcon()}
       startTime={props.segment.start}
       endTime={props.segment.end}
       pixelsPerSecond={props.pixelsPerSecond}

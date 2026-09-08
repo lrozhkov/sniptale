@@ -25,28 +25,37 @@ export type VideoEditorCursorSkinPatch = Partial<
   NonNullable<NonNullable<VideoProject['cursorTrack']>['skin']>
 >;
 
-export type VideoEditorActionEventPatch = Partial<
-  Pick<NonNullable<VideoProject['actionEvents'][number]>, 'duration' | 'label' | 'point' | 'preset'>
->;
+export type VideoEditorActionEventPatch = {
+  /** Moves the presentation of this appearance, retaining its captured anchor. */
+  time?: number;
+  /** Exact current appearance that authorizes a point edit. */
+  clipId?: string | null;
+  /** Point placement updates the visual override, preserving the captured point. */
+  point?: VideoProject['actionEvents'][number]['point'];
+  /** Replaces the sparse override; null restores all inherited settings. */
+  presentation?:
+    | import('../../../features/video/project/types').VideoProjectActionPresentationOverride
+    | null;
+};
 
 export type VideoEditorMotionRegionPatch = Partial<
   Pick<
     VideoProjectMotionRegion,
+    | 'startTime'
     | 'duration'
-    | 'cameraMode'
+    | 'incomingConnection'
     | 'easing'
     | 'focusArea'
     | 'focusMode'
     | 'motionBlurAmount'
     | 'overlayZoomMode'
-    | 'path'
     | 'focusPoint'
     | 'scale'
-    | 'targetActionEventId'
+    | 'targetAction'
     | 'zoomInDuration'
     | 'zoomOutDuration'
   >
->;
+> & { sourceClipId?: string | null };
 
 export type VideoEditorTransitionTemplatePatch = Partial<
   Pick<VideoProjectTransition, 'direction' | 'highlightColor' | 'intensity' | 'templateKind'>

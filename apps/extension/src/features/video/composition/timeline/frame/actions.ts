@@ -1,58 +1,40 @@
-import { isLegacyScrollActionEvent } from '../../../project/timeline/source-time';
-import { isVideoProjectUtilityLaneVisible } from '../../../project/utility-lanes';
-import type { VideoProject, VideoProjectActionEvent } from '../../../project/types/index';
+import type { VideoProjectActionOccurrence } from '../../../project/action-occurrences';
+import { resolveClipTransitionVisualState } from '../../../project/transition/presentation';
+import type { VisualLayerSourcePointMapping } from '../../draw/fitted-media';
+import {
+  resolveVideoProjectActionPresentations,
+  type ResolvedVideoProjectActionPresentation,
+} from '../../../project/action-presentation';
+import type { VideoProject } from '../../../project/types/index';
 import type { VideoCompositionActionState } from '../../types';
 
 function clampProgress(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
-export function getVideoCompositionActionDuration(event: VideoProjectActionEvent): number {
-  if (event.duration > 0) {
-    return event.duration;
-  }
-
-  switch (event.preset) {
-    case 'CLICK_RIPPLE':
-      return 0.7;
-    case 'SPOTLIGHT':
-      return 1.1;
-    case 'DWELL_ZOOM':
-      return 1.3;
-    case 'SCROLL_EMPHASIS':
-      return 0.9;
-    case 'NONE':
-      return event.kind === 'CLICK' ? 0.6 : 0.5;
-  }
-}
-
 function resolveActionState(
-  event: VideoProjectActionEvent,
+  presentation: ResolvedVideoProjectActionPresentation,
   currentTime: number
 ): VideoCompositionActionState | null {
-  const duration = getVideoCompositionActionDuration(event);
-  if (isLegacyScrollActionEvent(event)) {
-    return null;
-  }
-  const end = event.time + duration;
-
-  if (currentTime < event.time || currentTime >= end) {
+  const { event, duration, animationStart, start, end } = presentation;
+  if (!presentation.enabled || currentTime < start || currentTime >= end) {
     return null;
   }
 
+  const interval = presentation.renderIntervals.find(
+    (item) => currentTime >= item.start && currentTime < item.end
+  );
+  if (!interval) return null;
   return {
+    occurrence: presentation.occurrence,
+    clipId: interval.clipId,
     duration,
     event,
-    point: event.point,
-    progress: clampProgress(
-      event.animation
-        ? (event.animation.start +
-            ((currentTime - event.time) / duration) *
-              (event.animation.end - event.animation.start)) /
-            event.animation.duration
-        : (currentTime - event.time) / duration
-    ),
-    start: event.time,
+    preset: presentation.preset,
+    renderKind: presentation.renderKind,
+    point: presentation.point,
+    progress: clampProgress((currentTime - animationStart) / duration),
+    start,
   };
 }
 
@@ -60,16 +42,39 @@ export function resolveVideoCompositionActions(
   project: VideoProject,
   currentTime: number
 ): VideoCompositionActionState[] {
-  if (!isVideoProjectUtilityLaneVisible(project, 'actions')) {
-    return [];
-  }
-
   const states: VideoCompositionActionState[] = [];
-  for (const event of project.actionEvents) {
-    const state = resolveActionState(event, currentTime);
+  for (const presentation of resolveVideoProjectActionPresentations(project)) {
+    const state = resolveActionState(presentation, currentTime);
     if (state) {
       states.push(state);
     }
   }
   return states;
+}
+
+/** Exact media geometry for this appearance, shared by framing and direct point editing. */
+export function resolveVideoCompositionActionSourceMapping(
+  project: VideoProject,
+  occurrence: VideoProjectActionOccurrence,
+  currentTime: number
+): Omit<VisualLayerSourcePointMapping, 'point'> | null {
+  const anchor = occurrence.event.anchor;
+  if (anchor.kind !== 'recording-source') return null;
+  const clip = project.clips.find((item) => item.id === occurrence.clipId);
+  if (
+    clip?.type !== 'VIDEO' ||
+    clip.sourceInstanceId !== anchor.sourceInstanceId ||
+    anchor.sourceTime < clip.sourceStart ||
+    anchor.sourceTime >= clip.sourceStart + clip.sourceDuration
+  )
+    return null;
+  const asset = project.assets.find((item) => item.id === clip.assetId);
+  if (!asset) return null;
+  return {
+    frame: clip.transform,
+    fitMode: clip.fitMode,
+    sourceWidth: asset.metadata.width,
+    sourceHeight: asset.metadata.height,
+    renderState: resolveClipTransitionVisualState(project, clip, currentTime),
+  };
 }

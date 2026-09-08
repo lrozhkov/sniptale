@@ -3,6 +3,34 @@ import { videoEditorSidebarSelectionAnnotationMessages } from './selection.annot
 import { videoEditorSidebarSelectionStyleMessages } from './selection.core-style.ts';
 
 export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
+  typingSelection: { ru: 'Набор текста', en: 'Typing interval' },
+  typingCurrentRate: { ru: 'Текущая скорость', en: 'Current speed' },
+  typingTargetRate: { ru: 'Новая скорость', en: 'Target speed' },
+  typingPreview: { ru: 'Рассчитать', en: 'Calculate' },
+  typingApply: { ru: 'Применить', en: 'Apply' },
+  typingUnavailable: { ru: 'Интервал недоступен', en: 'Interval unavailable' },
+  typingLocked: { ru: 'Дорожка заблокирована', en: 'Track is locked' },
+  typingStale: {
+    ru: 'Проект изменился. Рассчитайте изменения заново.',
+    en: 'The project changed. Preview changes again.',
+  },
+  typingDuration: { ru: 'Длительность интервала', en: 'Interval duration' },
+  typingTail: { ru: 'Сдвиг следующих клипов', en: 'Following clips shifted' },
+  typingProjectDelta: { ru: 'Сокращение проекта', en: 'Project shortened by' },
+  typingLinked: { ru: 'Затронутые клипы', en: 'Affected clips' },
+  typingSeconds: { ru: 'с', en: 's' },
+  typingUnchanged: {
+    ru: 'Скорость уже совпадает — изменений нет.',
+    en: 'Speed already matches. No changes.',
+  },
+  typingBlocked: {
+    ru: 'Ускорение недоступно для этого интервала: проверьте блокировки, переходы и связанные клипы.',
+    en: 'This interval cannot be accelerated. Check locks, transitions and linked clips.',
+  },
+  actionSharedOccurrencesHint: {
+    en: 'Settings apply to every appearance of this action in this source instance.',
+    ru: 'Настройки действуют на все появления этого действия в данном экземпляре источника.',
+  },
   sourceIn: { ru: 'In исходника', en: 'Source In' },
   sourceOut: { ru: 'Out исходника', en: 'Source Out' },
   sourceRangeHint: {
@@ -110,8 +138,8 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
     en: 'Independent clip',
   },
   linkedPairDescription: {
-    ru: 'Обрезка, разрезание и удаление применяются к связанным клипам вместе.',
-    en: 'Trim, split, and delete apply to linked clips together.',
+    ru: 'Перемещение, обрезка и разрезание применяются вместе. Удаляется только выбранный фрагмент.',
+    en: 'Move, trim and split apply together. Delete removes only the selected clip.',
   },
   detachedClipDescription: {
     ru: 'Клип редактируется отдельно от других дорожек.',
@@ -141,10 +169,16 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
     ru: 'Непрозрачность',
     en: 'Opacity',
   },
-  cameraPlacementDescription: {
-    ru: 'Быстро расположите независимый трек камеры. Размер и позицию можно точно настроить в разделе «Трансформация» или прямо на холсте.',
-    en: 'Place the independent camera track, then fine-tune its size and position in Transform or directly on the canvas.',
+  cameraLayoutLabel: { ru: 'Вид камеры', en: 'Camera layout' },
+  cameraLayoutOverlay: { ru: 'В углу', en: 'Overlay' },
+  cameraLayoutFullframe: { ru: 'На весь кадр', en: 'Full frame' },
+  cameraLayoutHidden: { ru: 'Скрыта', en: 'Hidden' },
+  cameraPlacementLabel: { ru: 'Положение камеры', en: 'Camera position' },
+  cameraIntervalHint: {
+    ru: 'Для выбранного фрагмента камеры. Разделите его у курсора, чтобы изменить вид следующего интервала.',
+    en: 'Applies to the selected camera clip. Split at the playhead to change the next interval’s layout.',
   },
+  cameraSplitInterval: { ru: 'Разделить у курсора', en: 'Split at playhead' },
   cameraPlacementTopLeft: {
     ru: 'Слева сверху',
     en: 'Top left',
@@ -282,12 +316,12 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
     en: 'Linked clips:',
   },
   linkedClipsDescription: {
-    ru: 'Плавные появления, переходы и монтажные операции синхронизируются между видео и аудио до явного разъединения.',
-    en: 'Fade, transition, and editing operations stay synchronized between video and audio until an explicit detach.',
+    ru: 'Перемещаются и обрабатываются вместе. Удаляется только выбранный фрагмент.',
+    en: 'Move and process together. Delete removes only the selected clip.',
   },
   videoSoundLabel: {
-    ru: 'Звук видео',
-    en: 'Video sound',
+    ru: 'Звук',
+    en: 'Sound',
   },
   linkedAudioLabel: {
     ru: 'Связанное аудио',

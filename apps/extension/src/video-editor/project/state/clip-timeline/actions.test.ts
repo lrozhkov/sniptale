@@ -165,6 +165,56 @@ function seedLinkedClipState(runtime: ReturnType<typeof createMutableState>) {
   });
 }
 
+it.each(['audio-1', 'video-1'])('deletes only %s from a linked interval', (selectedId) => {
+  const runtime = createMutableState();
+  seedLinkedClipState(runtime);
+  const before = runtime.getState().project!;
+  const actions = createVideoEditorProjectClipTimelineActions(runtime.set);
+  actions.splitClipAt(selectedId, 2);
+  const afterFirstCut = runtime.getState();
+  const middleId = afterFirstCut.selection.kind === 'clip' ? afterFirstCut.selection.clipId : '';
+  actions.splitClipAt(middleId, 3);
+  const pairedPieces = runtime.getState().project!;
+  const counterpartType =
+    selectedId === 'audio-1' ? VideoProjectClipType.VIDEO : VideoProjectClipType.AUDIO;
+  const counterparts = pairedPieces.clips.filter((clip) => clip.type === counterpartType);
+  const historyCount = runtime.getState().projectHistory.past.length;
+
+  actions.deleteClip(middleId);
+
+  const after = runtime.getState().project!;
+  expect(after.clips).toHaveLength(5);
+  expect(after.clips.filter((clip) => clip.type === counterpartType)).toEqual(counterparts);
+  expect(after.clips.some((clip) => clip.id === middleId)).toBe(false);
+  expect(after.assets).toEqual(before.assets);
+  expect(runtime.getState().projectHistory.past).toHaveLength(historyCount + 1);
+  expect(pairedPieces.clips).toHaveLength(6);
+});
+
+it('allows local deletion beside a locked companion, while linked moves stay blocked', () => {
+  const runtime = createMutableState();
+  seedLinkedClipState(runtime);
+  const project = runtime.getState().project!;
+  const video = project.clips.find((clip) => clip.id === 'video-1')!;
+  runtime.set({
+    project: {
+      ...project,
+      tracks: project.tracks.map((track) => ({
+        ...track,
+        locked: track.id === video.trackId,
+      })),
+    },
+  });
+  const actions = createVideoEditorProjectClipTimelineActions(runtime.set);
+  const before = runtime.getState().project;
+  actions.moveClip('audio-1', 5);
+  expect(runtime.getState().project).toBe(before);
+  actions.deleteClip('video-1');
+  expect(runtime.getState().project).toBe(before);
+  actions.deleteClip('audio-1');
+  expect(runtime.getState().project?.clips).toEqual([video]);
+});
+
 function expectClipDeletionKeepsMaterials(runtime: ReturnType<typeof createMutableState>) {
   expect(runtime.getState().project?.clips).toEqual([]);
   expect(runtime.getState().project?.assets).toHaveLength(1);

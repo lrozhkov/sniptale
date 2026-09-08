@@ -1,3 +1,4 @@
+import type { VideoProjectActionOccurrence } from '../../../features/video/project/action-occurrences';
 import type { VideoProject, VideoProjectClip } from '../../../features/video/project/types/index';
 import type {
   VideoEditorActionEventPatch,
@@ -24,7 +25,7 @@ export interface PlaybackLatestState {
   project: VideoProject | null;
   projectHistoryTransactionActive: boolean;
   selection: VideoEditorSelection;
-  selectedActionEvent: NonNullable<NonNullable<VideoProject['actionEvents']>[number]> | null;
+  selectedActionOccurrence: VideoProjectActionOccurrence | null;
   selectedClipId: string | null;
   selectedMotionRegion: NonNullable<NonNullable<VideoProject['motionRegions']>[number]> | null;
 }

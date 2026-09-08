@@ -20,6 +20,7 @@ interface ProjectTimelineEffectSegmentProps {
   hidden?: boolean;
   isSelected: boolean;
   label: string;
+  hideLabel?: boolean | undefined;
   leadingIcon?: React.ReactNode;
   startTime: number;
   endTime: number;
@@ -74,6 +75,7 @@ export function ProjectTimelineEffectSegment(props: ProjectTimelineEffectSegment
         hidden={props.hidden ?? false}
         isSelected={props.isSelected}
         label={props.label}
+        hideLabel={props.hideLabel}
         leadingIcon={props.leadingIcon}
         onBeginEffectInteraction={props.onBeginEffectInteraction}
         stateIcon={props.stateIcon}
@@ -95,6 +97,7 @@ function ProjectTimelineEffectSegmentButton(props: {
   hidden: boolean;
   isSelected: boolean;
   label: string;
+  hideLabel?: boolean | undefined;
   leadingIcon?: React.ReactNode;
   onBeginEffectInteraction: React.PointerEventHandler<HTMLButtonElement>;
   stateIcon?: React.ReactNode;
@@ -120,6 +123,7 @@ function ProjectTimelineEffectSegmentButton(props: {
     >
       <ProjectTimelineEffectSegmentBody
         label={props.label}
+        hideLabel={props.hideLabel}
         leadingIcon={props.leadingIcon}
         stateIcon={props.stateIcon}
         {...(props.subtitle ? { subtitle: props.subtitle } : {})}
@@ -130,11 +134,13 @@ function ProjectTimelineEffectSegmentButton(props: {
 
 function ProjectTimelineEffectSegmentBody({
   label,
+  hideLabel,
   leadingIcon,
   stateIcon,
   subtitle,
 }: {
   label: string;
+  hideLabel?: boolean | undefined;
   leadingIcon?: React.ReactNode;
   stateIcon?: React.ReactNode;
   subtitle?: string;
@@ -145,13 +151,13 @@ function ProjectTimelineEffectSegmentBody({
       <div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
         <div
           className={[
-            'min-w-0 truncate text-[10px] font-semibold leading-none',
+            hideLabel ? 'sr-only' : 'min-w-0 truncate text-[10px] font-semibold leading-none',
             'text-[var(--sniptale-color-text-primary)]',
           ].join(' ')}
         >
           {label}
         </div>
-        <ProjectTimelineEffectSegmentSubtitle subtitle={subtitle} />
+        <ProjectTimelineEffectSegmentSubtitle subtitle={subtitle} separator={!hideLabel} />
       </div>
       <ProjectTimelineEffectSegmentIcon icon={stateIcon} tone="warning" />
     </div>
@@ -177,17 +183,25 @@ function ProjectTimelineEffectSegmentIcon(props: {
   );
 }
 
-function ProjectTimelineEffectSegmentSubtitle({ subtitle }: { subtitle: string | undefined }) {
+function ProjectTimelineEffectSegmentSubtitle({
+  subtitle,
+  separator,
+}: {
+  subtitle: string | undefined;
+  separator: boolean;
+}) {
   if (!subtitle) return null;
   return (
     <>
-      <div className="shrink-0 text-[10px] leading-none text-[var(--sniptale-color-text-dim)]">
-        ·
-      </div>
+      {separator ? (
+        <div className="shrink-0 text-[10px] leading-none text-[var(--sniptale-color-text-dim)]">
+          ·
+        </div>
+      ) : null}
       <div
         className={[
-          'min-w-0 truncate text-[9px] uppercase leading-none',
-          'text-[var(--sniptale-color-text-dim)]',
+          'min-w-0 truncate text-[11px] tabular-nums leading-none',
+          'text-[var(--sniptale-color-text-secondary)]',
         ].join(' ')}
       >
         {subtitle}

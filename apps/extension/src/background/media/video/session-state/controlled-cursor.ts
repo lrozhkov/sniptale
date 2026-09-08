@@ -2,7 +2,7 @@ import type { RecordingTelemetrySnapshot } from '../../../../contracts/messaging
 import type {
   RecordingTelemetrySignal,
   VideoCursorCaptureMode,
-  VideoProjectActionEvent,
+  RecordingActionEvent,
   VideoProjectCursorSample,
   VideoProjectCursorTrack,
 } from '../../../../features/video/project/types';
@@ -27,10 +27,11 @@ function cloneCursorTrack(track: VideoProjectCursorTrack | null): VideoProjectCu
   };
 }
 
-function cloneActionEvents(events: readonly VideoProjectActionEvent[]): VideoProjectActionEvent[] {
+function cloneActionEvents(events: readonly RecordingActionEvent[]): RecordingActionEvent[] {
   return events.map((event) => ({
     ...event,
     ...(event.point === null ? {} : { point: { ...event.point } }),
+    ...(event.recordingPoint ? { recordingPoint: { ...event.recordingPoint } } : {}),
     data: { ...event.data },
   }));
 }
@@ -47,6 +48,9 @@ function cloneTelemetrySignals(
 
 function cloneTelemetrySnapshot(snapshot: RecordingTelemetrySnapshot): RecordingTelemetrySnapshot {
   return {
+    viewportObservation: snapshot.viewportObservation
+      ? { ...snapshot.viewportObservation, initial: { ...snapshot.viewportObservation.initial } }
+      : null,
     actionEvents: cloneActionEvents(snapshot.actionEvents),
     cursorTrack: cloneCursorTrack(snapshot.cursorTrack),
     signals: cloneTelemetrySignals(snapshot.signals),
@@ -73,7 +77,7 @@ function mergeCursorTrack(
   };
 }
 
-function mergeTelemetrySnapshots(
+export function mergeTelemetrySnapshots(
   current: RecordingTelemetrySnapshot | null,
   next: RecordingTelemetrySnapshot
 ): RecordingTelemetrySnapshot {
@@ -82,6 +86,19 @@ function mergeTelemetrySnapshots(
   }
 
   return {
+    viewportObservation: current.viewportObservation
+      ? {
+          initial: { ...current.viewportObservation.initial },
+          stable:
+            current.viewportObservation.stable &&
+            !!next.viewportObservation?.stable &&
+            Object.entries(current.viewportObservation.initial).every(([key, value]) =>
+              Object.entries(next.viewportObservation?.initial ?? {}).some(
+                ([nextKey, nextValue]) => key === nextKey && value === nextValue
+              )
+            ),
+        }
+      : null,
     actionEvents: [
       ...cloneActionEvents(current.actionEvents),
       ...cloneActionEvents(next.actionEvents),

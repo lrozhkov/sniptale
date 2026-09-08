@@ -1,127 +1,99 @@
-import { getVideoCompositionActionDuration } from '../../../../features/video/composition/timeline/frame/actions';
+import { resolveVideoProjectActionOccurrences } from '../../../../features/video/project/action-occurrences';
+import { isVideoProjectUtilityLaneLocked } from '../../../../features/video/project/utility-lanes';
+import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
+import {
+  normalizeRecordingActionEventsToProjectSpace,
+  createRecordingTelemetryNormalizationParams,
+} from '../../operations/telemetry';
+import type { VideoProjectClip } from '../../../../features/video/project/types';
 import type {
   VideoProject,
   VideoProjectActionEvent,
 } from '../../../../features/video/project/types';
-import { isVideoProjectUtilityLaneLocked } from '../../../../features/video/project/utility-lanes';
-import { isSourceTimedClip } from '../../operations/source-timed-clips';
 
-/** A ripple insert may not alter an affected locked action interval. */
+/** A locked history prevents moving an existing event point at or after the insertion. */
 export function areMaterialInsertActionsLocked(project: VideoProject, time: number): boolean {
   return (
     isVideoProjectUtilityLaneLocked(project, 'actions') &&
-    project.actionEvents.some(
-      (event) => event.time + getVideoCompositionActionDuration(event) > time
-    )
+    resolveVideoProjectActionOccurrences(project).some((occurrence) => occurrence.time >= time)
   );
 }
 
-/** Preserves effect phases after source-bound points have been reconciled. */
+/** Anchored points are already reconciled; only unbound project-time points need a shift. */
 export function insertMaterialActionGap(
   project: VideoProject,
   time: number,
-  duration: number,
-  trailingClipIdsBySourceId: ReadonlyMap<string, string>
+  duration: number
 ): VideoProject {
-  const trailingIds = new Map<string, string>();
-  const actionEvents = project.actionEvents
-    .flatMap((event) => {
-      if (event.sourceAnchor) {
-        const visibleDuration = getVideoCompositionActionDuration(event);
-        if (event.time + visibleDuration <= time) return [event];
-        const owner = project.clips.find(({ id }) => id === event.sourceAnchor?.sourceClipId);
-        const trailingId = trailingClipIdsBySourceId.get(event.sourceAnchor.sourceClipId);
-        const tail = project.clips.find(({ id }) => id === trailingId);
-        const fragments: VideoProjectActionEvent[] = [];
-        if (owner) {
-          const retainedDuration = Math.min(
-            visibleDuration,
-            owner.startTime + owner.duration - event.time
-          );
-          if (retainedDuration > 0)
-            fragments.push(
-              retainedDuration === visibleDuration ? event : sliceAction(event, 0, retainedDuration)
-            );
-        }
-        if (
-          tail &&
-          isSourceTimedClip(tail) &&
-          event.time < time &&
-          event.time + visibleDuration > time
-        ) {
-          const retainedDuration = Math.min(event.time + visibleDuration - time, tail.duration);
-          const tailEventId = crypto.randomUUID();
-          trailingIds.set(event.id, tailEventId);
-          fragments.push({
-            ...sliceAction(event, time - event.time, retainedDuration),
-            id: tailEventId,
-            time: time + duration,
-            sourceAnchor: {
-              ...event.sourceAnchor,
-              sourceClipId: tail.id,
-              sourceTime: tail.sourceStart,
-            },
-          });
-        }
-        return fragments;
-      }
-      const visibleDuration = getVideoCompositionActionDuration(event);
-      if (event.time + visibleDuration <= time) return [event];
-      if (event.time >= time)
-        return [{ ...event, time: event.time + duration, timeBasis: 'project' as const }];
-      const offset = time - event.time;
-      const trailingId = crypto.randomUUID();
-      trailingIds.set(event.id, trailingId);
-      return [
-        {
-          ...sliceAction(event, 0, offset),
-          timeBasis: 'project' as const,
-        },
-        {
-          ...sliceAction(event, offset, visibleDuration - offset),
-          id: trailingId,
-          timeBasis: 'project' as const,
-          time: time + duration,
-        },
-      ];
-    })
-    .sort((left, right) => left.time - right.time);
   return {
     ...project,
-    actionEvents,
-    ...(project.motionRegions
-      ? {
-          motionRegions: project.motionRegions.map((region) => {
-            const target =
-              region.targetActionEventId && trailingIds.get(region.targetActionEventId);
-            return target && region.startTime >= time + duration
-              ? { ...region, targetActionEventId: target }
-              : region;
-          }),
-        }
-      : {}),
+    actionEvents: project.actionEvents.map((event) =>
+      event.anchor.kind === 'project' && event.anchor.time >= time
+        ? { ...event, anchor: { kind: 'project' as const, time: event.anchor.time + duration } }
+        : event
+    ),
   };
 }
 
-function sliceAction(
-  event: VideoProjectActionEvent,
-  offset: number,
-  duration: number
-): VideoProjectActionEvent {
-  const visibleDuration = getVideoCompositionActionDuration(event);
-  const animation = event.animation ?? {
-    start: 0,
-    end: visibleDuration,
-    duration: visibleDuration,
-  };
-  const clockRate = (animation.end - animation.start) / visibleDuration;
-  return {
-    ...event,
-    duration,
-    animation: {
-      ...animation,
-      start: animation.start + offset * clockRate,
-      end: Math.min(animation.end, animation.start + (offset + duration) * clockRate),
-    },
-  };
+/** Instantiates captured events only for the newly placed video, never its linked audio. */
+export function addMaterialCapturedActions(
+  project: VideoProject,
+  addedClips: readonly VideoProjectClip[],
+  telemetry: RecordingTelemetryEntry | undefined
+): VideoProject {
+  if (!telemetry) return project;
+  const events = normalizeRecordingActionEventsToProjectSpace(
+    telemetry.actionEvents,
+    createRecordingTelemetryNormalizationParams(telemetry, project)
+  );
+  const added = addedClips.flatMap((clip) => {
+    if (clip.type !== 'VIDEO' || !clip.sourceInstanceId) return [];
+    const asset = project.assets.find((item) => item.id === clip.assetId);
+    const recordingId =
+      asset?.source.kind === 'recording'
+        ? asset.source.recordingId
+        : asset?.source.kind === 'project-asset'
+          ? asset.source.originRecordingId
+          : null;
+    if (recordingId !== telemetry.recordingId) return [];
+    const sourceInstanceId = clip.sourceInstanceId;
+    return events.flatMap<VideoProjectActionEvent>((event) => {
+      if (
+        project.actionEvents.some(
+          (fact) =>
+            fact.anchor.kind === 'recording-source' &&
+            fact.anchor.recordingId === recordingId &&
+            fact.anchor.sourceInstanceId === sourceInstanceId &&
+            fact.anchor.sourceEventId === event.id
+        )
+      )
+        return [];
+      return [
+        {
+          id: crypto.randomUUID(),
+          kind: event.kind,
+          label: event.label,
+          data: { ...event.data },
+          point: event.point ? { ...event.point } : null,
+          capturedDuration: event.duration,
+          ...(event.kind !== 'CLICK' && event.kind !== 'KEY'
+            ? { presentation: { preset: event.preset } }
+            : {}),
+          anchor: {
+            kind: 'recording-source',
+            recordingId,
+            sourceInstanceId,
+            sourceEventId: event.id,
+            sourceTime: event.time,
+          },
+        },
+      ];
+    });
+  });
+  return added.length === 0
+    ? project
+    : {
+        ...project,
+        actionEvents: [...project.actionEvents, ...added],
+      };
 }

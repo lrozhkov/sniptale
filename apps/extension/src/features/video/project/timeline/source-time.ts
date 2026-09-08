@@ -133,8 +133,11 @@ function resolvePreferredPointClip(
   return [...clips].sort(compare)[0] ?? null;
 }
 
-export function isLegacyScrollActionEvent(
-  event: Pick<VideoProjectActionEvent, 'kind' | 'preset'>
+export function isScrollActionEvent(
+  event: Pick<VideoProjectActionEvent, 'kind' | 'presentation'>
 ): boolean {
-  return event.kind === 'SCROLL' || event.preset === VideoProjectActionPreset.SCROLL_EMPHASIS;
+  return (
+    event.kind === 'SCROLL' ||
+    event.presentation?.preset === VideoProjectActionPreset.SCROLL_EMPHASIS
+  );
 }

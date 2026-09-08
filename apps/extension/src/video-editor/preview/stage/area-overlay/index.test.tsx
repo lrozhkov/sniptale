@@ -171,7 +171,7 @@ function createAreaDragProject() {
       motionBlurAmount: 0,
       scale: 1.5,
       startTime: 0,
-      targetActionEventId: null,
+      targetAction: null,
       zoomInDuration: 0.2,
       zoomOutDuration: 0.2,
     },

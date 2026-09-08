@@ -4,7 +4,6 @@ import { ProjectTimelineToolbar } from './toolbar';
 import type { ProjectTimelineProps } from './types';
 import type { useProjectTimelinePanelPrefs } from './panel/prefs';
 import type { useProjectTimelineState } from './interaction-state/index';
-import { isRecordingTelemetryEligibleForAutoProcessing } from '../../project/operations/telemetry-eligibility';
 
 type ProjectTimelineSurfaceProps = Pick<
   ProjectTimelineProps & ReturnType<typeof useProjectTimelineState>,
@@ -17,11 +16,11 @@ type ProjectTimelineSurfaceProps = Pick<
   | 'onClearPlaybackRange'
   | 'onStepToNextFrame'
   | 'onStepToPreviousFrame'
+  | 'canDeleteSelectedClip'
   | 'canEditSelectedClip'
   | 'canSplitSelectedClip'
   | 'fitSelectionDuration'
   | 'insertion'
-  | 'onAutoTransformRecording'
   | 'onDeleteSelectedClip'
   | 'onDuplicateSelectedClip'
   | 'onFitProject'
@@ -66,17 +65,13 @@ export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
           props.project.duration > 0 &&
           (!hasMotionRegions || (motionLane.visible && !motionLane.locked))
         }
+        canDeleteSelectedClip={props.canDeleteSelectedClip}
         canEditSelectedClip={props.canEditSelectedClip}
         canSplitSelectedClip={props.canSplitSelectedClip}
         fitSelectionDuration={props.fitSelectionDuration}
         insertion={props.insertion}
         pixelsPerSecond={props.pixelsPerSecond}
         selectedClip={Boolean(props.selectedClip)}
-        canAutoTransformRecording={isRecordingTelemetryEligibleForAutoProcessing(
-          props.project,
-          props.recordingTelemetry
-        )}
-        onAutoTransformRecording={props.onAutoTransformRecording}
         onFitProject={props.onFitProject}
         onFitSelection={props.onFitSelection}
         onTimelinePreviewSuspendedChange={props.onTimelinePreviewSuspendedChange}

@@ -1,10 +1,10 @@
+// @vitest-environment jsdom
 import {
   createWorkspaceLayoutController,
   createWorkspaceHeaderController,
   createWorkspacePreviewController,
 } from './workspace/core';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
-// @vitest-environment jsdom
 
 import type React from 'react';
 import { act } from 'react';
@@ -201,7 +201,7 @@ it('keeps the recording destination independent of viewer selection, transport a
     {
       workspace: workspaceState!,
       store,
-      selections: { selectedActionEvent: null, selectedMotionRegion: null },
+      selections: { selectedActionOccurrence: null, selectedMotionRegion: null },
       actions: {
         handleImportAudio: vi.fn(),
         handleImportImage: vi.fn(),

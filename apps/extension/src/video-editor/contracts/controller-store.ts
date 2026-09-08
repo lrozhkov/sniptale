@@ -78,7 +78,10 @@ export interface TimelineEditingPort
     Pick<VideoEditorProjectActions, TimelineTrackAction | TimelineClipAction>,
     VideoEditorTemporalActions,
     Pick<VideoEditorObjectTrackActions, TimelineObjectTrackAction>,
-    Pick<VideoEditorSessionActions, 'setPixelsPerSecond' | 'updateProject'> {
+    Pick<
+      VideoEditorSessionActions,
+      'setPixelsPerSecond' | 'updateProject' | 'applyTypingCompression'
+    > {
   pixelsPerSecond: number;
 }
 
@@ -89,8 +92,10 @@ type SelectionAction =
   | 'selectTransition'
   | 'selectCursorSegment'
   | 'selectObjectTrack'
-  | 'selectActionSegment'
+  | 'selectActionOccurrence'
   | 'selectMotionRegion'
+  | 'selectHistoryLane'
+  | 'selectHistorySpan'
   | 'selectMotionLane';
 
 /** Selection state and selection mutations. */
@@ -152,9 +157,7 @@ type PlacementAction =
   | 'clearPlacementMode'
   | 'startActionPointPlacement'
   | 'startMotionFocusPlacement'
-  | 'startMotionAreaPlacement'
-  | 'startMotionPathStopAreaPlacement'
-  | 'startMotionPathStopPointPlacement';
+  | 'startMotionAreaPlacement';
 
 /** Point-authoring and placement-mode capability. */
 export interface RuntimeSessionPort
@@ -167,10 +170,9 @@ export interface RuntimeSessionPort
 /** Recording telemetry capability. */
 export interface RecordingTelemetryPort extends Pick<
   VideoEditorSessionActions,
-  'setRecordingTelemetry' | 'toggleTelemetryLaneVisibility'
+  'setRecordingTelemetry'
 > {
-  recordingTelemetry: RecordingTelemetryEntry | null;
-  telemetryLaneVisible: boolean;
+  recordingTelemetry: readonly RecordingTelemetryEntry[];
 }
 
 export interface VideoEditorProjectStorageStatus {

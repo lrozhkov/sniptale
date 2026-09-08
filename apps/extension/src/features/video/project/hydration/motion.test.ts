@@ -10,13 +10,13 @@ it('normalizes motion regions alongside cursor interpolation metadata', () => {
   project.actionEvents = [
     {
       data: {},
-      duration: 0.4,
+      capturedDuration: 0.4,
       id: 'action-1',
       kind: 'CLICK' as never,
       label: 'Click',
       point: { x: 20, y: 30 },
-      preset: 'CLICK_RIPPLE' as never,
-      time: 1,
+      presentation: { preset: 'CLICK_RIPPLE' as never },
+      anchor: { kind: 'project', time: 1 },
     },
   ];
   project.motionRegions = [
@@ -29,7 +29,7 @@ it('normalizes motion regions alongside cursor interpolation metadata', () => {
       motionBlurAmount: 2,
       scale: 8,
       startTime: 10,
-      targetActionEventId: 'action-1',
+      targetAction: { eventId: 'action-1', clipId: null },
       zoomInDuration: 99,
       zoomOutDuration: 99,
     },
@@ -45,7 +45,7 @@ it('normalizes motion regions alongside cursor interpolation metadata', () => {
       motionBlurAmount: 1,
       scale: 4,
       startTime: 3.9,
-      targetActionEventId: 'action-1',
+      targetAction: { eventId: 'action-1', clipId: null },
       zoomInDuration: 0.1,
       zoomOutDuration: 0.1,
     }),

@@ -3,6 +3,9 @@ import { videoEditorTimelineAutoTransformMessages } from './timeline-auto-transf
 import { videoEditorTimelineLaneMessages } from './timeline-lanes';
 
 export const videoEditorTimelineMessages = defineMessageSource({
+  framingConnection: { ru: 'Переход кадрирования', en: 'Framing transition' },
+  connectFraming: { ru: 'Соединить состояния', en: 'Connect framing states' },
+  disconnectFraming: { ru: 'Убрать переход', en: 'Remove framing transition' },
   trackKindPrimary: {
     ru: 'Видео',
     en: 'Video',

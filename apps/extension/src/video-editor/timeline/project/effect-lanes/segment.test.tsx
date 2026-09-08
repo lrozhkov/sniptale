@@ -1,6 +1,66 @@
 // @vitest-environment jsdom
 import { useProjectTimelineEffectInteractions } from './interactions';
-import { ProjectTimelineActionsLane } from './action-lane';
+import { ProjectTimelineTelemetryLane } from './telemetry-lane';
+import { ProjectTimelineEffectCanvasRows } from './utility-lanes';
+import { createVideoProjectMotionRegion } from '../../../../features/video/project/motion';
+import { VideoTemporalEasing } from '../../../../features/video/project/types';
+
+it('adds a framing connection from the gap and selects the connection independently', () => {
+  const project = createEmptyVideoProject();
+  project.duration = 8;
+  const first = { ...createVideoProjectMotionRegion(project, 0), id: 'first', duration: 2 };
+  const second = { ...createVideoProjectMotionRegion(project, 4), id: 'second', duration: 2 };
+  project.motionRegions = [first, second];
+  const props = {
+    project,
+    pixelsPerSecond: 100,
+    selectedEffectSelection: null,
+    onBeginRangeSelection: vi.fn(),
+    onBeginEffectInteraction: vi.fn(),
+
+    onResizeMotionRegion: vi.fn(),
+    onConnectMotionRegions: vi.fn(),
+    onSelectMotionRegion: vi.fn(),
+  };
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  const button = () =>
+    container.querySelector<HTMLButtonElement>(
+      '[data-ui="video-editor.timeline.framing-connection"]'
+    )!;
+  try {
+    act(() => root.render(<ProjectTimelineEffectCanvasRows {...props} />));
+    expect(button().style.left).toBe('200px');
+    expect(button().style.width).toBe('200px');
+    act(() => button().click());
+    expect(props.onConnectMotionRegions).toHaveBeenCalledWith('first', 'second');
+    expect(props.onBeginRangeSelection).not.toHaveBeenCalled();
+    project.motionRegions[1] = {
+      ...second,
+      incomingConnection: { fromRegionId: 'first', easing: VideoTemporalEasing.LINEAR },
+    };
+    act(() =>
+      root.render(
+        <ProjectTimelineEffectCanvasRows
+          {...props}
+          selection={{ kind: 'motion-connection', motionRegionId: 'second' }}
+        />
+      )
+    );
+    expect(button().getAttribute('aria-pressed')).toBe('true');
+    act(() => button().click());
+    expect(props.onSelectMotionRegion).toHaveBeenCalledWith('second', 'connection');
+    project.utilityLanes = {
+      actions: { visible: true, locked: false },
+      camera: { visible: true, locked: true },
+    };
+    project.motionRegions = [first, second];
+    act(() => root.render(<ProjectTimelineEffectCanvasRows {...props} />));
+    expect(button().disabled).toBe(true);
+  } finally {
+    act(() => root.unmount());
+  }
+});
 
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -154,13 +214,14 @@ function createDraftSemanticsProject() {
   project.actionEvents = [
     {
       id: 'a',
-      time: 2,
-      duration: 0.4,
+      anchor: { kind: 'project', time: 2 },
+
       data: {},
       label: 'Click',
       kind: VideoProjectActionEventKind.CLICK,
-      preset: VideoProjectActionPreset.CLICK_RIPPLE,
+
       point: { x: 10, y: 20 },
+      presentation: { duration: 0.4, preset: VideoProjectActionPreset.CLICK_RIPPLE },
     },
   ];
   return { ...project, cursorTrack: project.cursorTrack };
@@ -168,20 +229,18 @@ function createDraftSemanticsProject() {
 
 function EffectLaneHarness({
   project,
-  kind,
   cursorMove,
-  actionResize,
+
   historyTransaction,
 }: {
   project: ReturnType<typeof createEmptyVideoProject>;
-  kind: 'cursor' | 'action';
   cursorMove: (
     sampleId: string,
     nextSampleId: string | null,
     startTime: number,
     endTime: number | null
   ) => void;
-  actionResize: (actionEventId: string, duration: number) => void;
+
   historyTransaction: {
     beginProjectHistoryTransaction: () => symbol;
     endProjectHistoryTransaction: (lease: symbol) => void;
@@ -193,9 +252,9 @@ function EffectLaneHarness({
     pixelsPerSecond: 100,
     magnetEnabled: false,
     historyTransaction,
-    onMoveActionEvent: vi.fn(),
+
     onMoveCursorSegment: cursorMove,
-    onResizeActionEvent: actionResize,
+
     onMoveMotionRegion: vi.fn(),
     onMoveTransitionSegment: vi.fn(),
     onResizeMotionRegion: vi.fn(),
@@ -203,116 +262,100 @@ function EffectLaneHarness({
   });
   return (
     <TimelineEffectDraftContext.Provider value={state.effectDragDraft}>
-      {kind === 'cursor' ? (
-        <ProjectTimelineCursorLane
-          project={project}
-          pixelsPerSecond={100}
-          selectedEffectSelection={null}
-          onBeginEffectInteraction={state.beginEffectInteraction}
-        />
-      ) : (
-        <ProjectTimelineActionsLane
-          project={project}
-          pixelsPerSecond={100}
-          laneVisible={true}
-          projection={createTimelineProjection({
-            extentSeconds: 10,
-            pixelsPerSecond: 100,
-            viewportWidth: 1000,
-            startTime: 0,
-          })}
-          selectedEffectSelection={null}
-          onBeginEffectInteraction={state.beginEffectInteraction}
-          onBeginRangeSelection={vi.fn()}
-          onResizeActionEvent={actionResize}
-          onResizeMotionRegion={vi.fn()}
-        />
-      )}
+      <ProjectTimelineCursorLane
+        project={project}
+        pixelsPerSecond={100}
+        selectedEffectSelection={null}
+        onBeginEffectInteraction={state.beginEffectInteraction}
+      />
     </TimelineEffectDraftContext.Provider>
   );
 }
 
-it.each(['cursor', 'action'] as const)(
-  'keeps %s draft geometry equal to composed commit and restores on Escape',
-  (kind) => {
-    for (const finish of ['commit', 'cancel']) {
-      const project = createDraftSemanticsProject();
-      const container = document.createElement('div');
-      document.body.append(container);
-      const root = createRoot(container);
-      const cursorMove = vi.fn();
-      const actionResize = vi.fn();
-      const lease = Symbol('draft');
-      const historyTransaction = {
-        beginProjectHistoryTransaction: () => lease,
-        endProjectHistoryTransaction: vi.fn(),
-        isProjectHistoryTransactionCurrent: () => true,
-      };
-      try {
+it('keeps cursor draft geometry equal to composed commit and restores on Escape', () => {
+  for (const finish of ['commit', 'cancel']) {
+    const project = createDraftSemanticsProject();
+    const container = document.createElement('div');
+    document.body.append(container);
+    const root = createRoot(container);
+    const cursorMove = vi.fn();
+
+    const lease = Symbol('draft');
+    const historyTransaction = {
+      beginProjectHistoryTransaction: () => lease,
+      endProjectHistoryTransaction: vi.fn(),
+      isProjectHistoryTransactionCurrent: () => true,
+    };
+    try {
+      act(() =>
+        root.render(<EffectLaneHarness {...{ project, cursorMove, historyTransaction }} />)
+      );
+      const button = container.querySelector('button');
+      act(() =>
+        button?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 250 }))
+      );
+      act(() => window.dispatchEvent(new MouseEvent('pointermove', { clientX: 350 })));
+      const geometry = () =>
+        container.querySelector<HTMLElement>('[data-timeline-effect-segment="c0"]');
+      expect(geometry()?.style.left).toBe('0px');
+      expect(parseFloat(geometry()?.style.width ?? '')).toBeCloseTo(600, 5);
+      expect(cursorMove).not.toHaveBeenCalled();
+
+      act(() =>
+        window.dispatchEvent(
+          finish === 'cancel'
+            ? new KeyboardEvent('keydown', { key: 'Escape', cancelable: true })
+            : new Event('pointerup')
+        )
+      );
+      if (finish === 'commit') {
+        expect(cursorMove).toHaveBeenCalledWith('c2', 'c4', 3, 5);
+        project.cursorTrack.samples[1]!.time = 3;
+        project.cursorTrack.samples[2]!.time = 5;
         act(() =>
-          root.render(
-            <EffectLaneHarness
-              {...{ project, kind, cursorMove, actionResize, historyTransaction }}
-            />
-          )
+          root.render(<EffectLaneHarness {...{ project, cursorMove, historyTransaction }} />)
         );
-        const button =
-          kind === 'cursor'
-            ? container.querySelector('button')
-            : container.querySelector('[aria-label="Click:resize-end"]');
-        act(() =>
-          button?.dispatchEvent(
-            new MouseEvent('pointerdown', { bubbles: true, clientX: kind === 'cursor' ? 250 : 240 })
-          )
-        );
-        act(() =>
-          window.dispatchEvent(
-            new MouseEvent('pointermove', { clientX: kind === 'cursor' ? 350 : 190 })
-          )
-        );
-        const geometry = () =>
-          container.querySelector<HTMLElement>(
-            `[data-timeline-effect-segment="${kind === 'cursor' ? 'c0' : 'a'}"]`
-          );
-        expect(geometry()?.style.left).toBe(kind === 'cursor' ? '0px' : '200px');
-        expect(parseFloat(geometry()?.style.width ?? '')).toBeCloseTo(
-          kind === 'cursor' ? 600 : 70,
-          5
-        );
-        expect(cursorMove).not.toHaveBeenCalled();
-        expect(actionResize).not.toHaveBeenCalled();
-        act(() =>
-          window.dispatchEvent(
-            finish === 'cancel'
-              ? new KeyboardEvent('keydown', { key: 'Escape', cancelable: true })
-              : new Event('pointerup')
-          )
-        );
-        if (finish === 'commit') {
-          if (kind === 'cursor') {
-            expect(cursorMove).toHaveBeenCalledWith('c2', 'c4', 3, 5);
-            project.cursorTrack.samples[1]!.time = 3;
-            project.cursorTrack.samples[2]!.time = 5;
-          } else {
-            expect(actionResize).toHaveBeenCalledWith('a', 0);
-            project.actionEvents[0]!.duration = 0;
-          }
-          act(() =>
-            root.render(
-              <EffectLaneHarness
-                {...{ project, kind, cursorMove, actionResize, historyTransaction }}
-              />
-            )
-          );
-        }
-        expect(parseFloat(geometry()?.style.width ?? '')).toBeCloseTo(
-          kind === 'cursor' ? 600 : finish === 'cancel' ? 40 : 70,
-          5
-        );
-      } finally {
-        act(() => root.unmount());
-        container.remove();
       }
+      expect(parseFloat(geometry()?.style.width ?? '')).toBeCloseTo(600, 5);
+    } finally {
+      act(() => root.unmount());
+      container.remove();
     }
   }
-);
+});
+
+it('renders action history once without a duplicate duration-bar utility lane', () => {
+  const project = createDraftSemanticsProject();
+  const container = document.createElement('div');
+  const root = createRoot(container);
+  try {
+    act(() =>
+      root.render(
+        <>
+          <ProjectTimelineTelemetryLane
+            project={project}
+            recordingTelemetry={[]}
+            pixelsPerSecond={100}
+            onSeek={vi.fn()}
+            onSelectActionOccurrence={vi.fn()}
+          />
+          <ProjectTimelineEffectCanvasRows
+            project={project}
+            pixelsPerSecond={100}
+            cursorLaneVisible={false}
+            selectedEffectSelection={null}
+            onBeginRangeSelection={vi.fn()}
+            onBeginEffectInteraction={vi.fn()}
+
+            onResizeMotionRegion={vi.fn()}
+          />
+        </>
+      )
+    );
+    expect(container.querySelectorAll('[data-action-id="a"]')).toHaveLength(1);
+    expect(container.querySelector('[data-timeline-effect-segment="a"]')).toBeNull();
+    expect(container.querySelectorAll('[data-project-timeline-effect-lane-row]')).toHaveLength(0);
+  } finally {
+    act(() => root.unmount());
+  }
+});

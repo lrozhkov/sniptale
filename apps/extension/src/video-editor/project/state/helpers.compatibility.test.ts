@@ -1,3 +1,4 @@
+import { resolveVideoProjectActionOccurrences } from '../../../features/video/project/action-occurrences';
 import { expect, it } from 'vitest';
 import {
   createEmptyVideoProject,
@@ -141,22 +142,24 @@ it('records source-anchor reprojection in the same project history action', () =
       type: VideoProjectAssetType.RECORDING,
     },
   ];
+  project.clips = project.clips.map((clip) =>
+    clip.type === 'VIDEO' ? { ...clip, sourceInstanceId: 'instance' } : clip
+  );
   project.actionEvents = [
     {
       data: {},
-      duration: 0,
+      capturedDuration: 0,
       id: 'anchored-action',
       kind: 'CLICK',
       label: 'Click',
       point: null,
-      preset: 'CLICK_RIPPLE',
-      sourceAnchor: {
+      anchor: {
         kind: 'recording-source',
         recordingId: 'recording-1',
-        sourceClipId: 'video-1',
+        sourceInstanceId: 'instance',
+        sourceEventId: 'raw',
         sourceTime: 1,
       },
-      time: 1,
     },
   ];
   const state = {
@@ -173,7 +176,8 @@ it('records source-anchor reprojection in the same project history action', () =
     clips: currentProject.clips.map((clip) => ({ ...clip, startTime: 3 })),
   }));
 
-  expect(update.project?.actionEvents[0]?.time).toBe(4);
+  expect(update.project?.actionEvents).toEqual(project.actionEvents);
+  expect(resolveVideoProjectActionOccurrences(update.project!)[0]?.time).toBe(4);
   expect(update.projectHistory?.past).toHaveLength(1);
-  expect(update.projectHistory?.past[0]?.actionEvents[0]?.time).toBe(1);
+  expect(update.projectHistory?.past[0]?.actionEvents).toEqual(project.actionEvents);
 });

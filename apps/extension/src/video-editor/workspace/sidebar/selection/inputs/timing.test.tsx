@@ -1,3 +1,7 @@
+import {
+  createEmptyVideoProject,
+  createVideoProjectTrack,
+} from '../../../../../features/video/project/factories/creation';
 // @vitest-environment jsdom
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -160,19 +164,19 @@ async function verifyTimingFields() {
 
 async function verifyAudioControls() {
   const onUpdateClipMuted = vi.fn();
+  const project = createEmptyVideoProject();
+  const audio = createAudioClip();
+  project.clips = [audio];
+  project.tracks = [{ ...createVideoProjectTrack('Audio', 1, 'AUDIO'), id: audio.trackId }];
   await renderNode(
-    renderAudioFields(
-      createAudioClip(),
-      null,
-      {
-        ...createVideoClip(),
-        trackId: 'track-video',
-      },
-      false,
+    renderAudioFields({
+      project,
+      selectedClip: audio,
       onUpdateClipMuted,
-      vi.fn(),
-      vi.fn()
-    )
+      onUpdateClipVolume: vi.fn(),
+      onUpdateClipAudioEnvelope: vi.fn(),
+      onDetachClipGroup: vi.fn(),
+    })
   );
 
   const muteToggle = container?.querySelector<HTMLButtonElement>(

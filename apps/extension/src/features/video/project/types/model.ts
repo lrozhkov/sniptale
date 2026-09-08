@@ -1,5 +1,6 @@
 import type {
   VideoProjectActionEvent,
+  VideoProjectActionPresentation,
   VideoProjectCursorTrack,
   VideoProjectMotionRegion,
   VideoProjectSource,
@@ -198,6 +199,8 @@ export interface VideoProjectUtilityLanes {
 export interface VideoProjectVideoClip extends VideoProjectBaseClip, VideoProjectMediaVisualFields {
   type: typeof VideoProjectClipType.VIDEO;
   assetId: string;
+  /** A placement's identity survives cuts and timing edits; a duplicate gets a new identity. */
+  sourceInstanceId?: string;
   playbackRate?: number;
   sourceStart: number;
   sourceDuration: number;
@@ -289,4 +292,5 @@ export interface VideoProject {
   motionRegions?: VideoProjectMotionRegion[];
   cursorTrack: VideoProjectCursorTrack | null;
   actionEvents: VideoProjectActionEvent[];
+  actionPresentation?: VideoProjectActionPresentation;
 }

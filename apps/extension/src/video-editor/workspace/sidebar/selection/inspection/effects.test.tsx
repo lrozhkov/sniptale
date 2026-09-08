@@ -101,7 +101,7 @@ function createProps() {
       trailingClipId: 'clip-b',
     },
     selectedCursorSample: null,
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedMotionRegion: null,
     selectedTrack: null,
     placementMode: null,
@@ -111,6 +111,23 @@ function createProps() {
 }
 
 describe('workspace-sidebar/selection/inspect-effects', () => {
+  it('routes an empty history lane to project presentation defaults', () => {
+    const props = createProps();
+    act(() =>
+      root?.render(
+        <WorkspaceSidebarInspectPanel
+          {...props}
+          selection={{ kind: VideoEditorSelectionKind.HISTORY_LANE }}
+          onUpdateActionPresentation={vi.fn()}
+        />
+      )
+    );
+    expect(
+      container?.querySelector('[data-ui="video-editor.inspector.history-lane"]')
+    ).not.toBeNull();
+    expect(container?.textContent).toContain('videoEditor.sidebar.historyEnabled');
+  });
+
   it('renders grouped transition inspector metadata for non-crossfade presets', () => {
     renderInspectPanel();
 

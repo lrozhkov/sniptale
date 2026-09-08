@@ -10,12 +10,19 @@ type WorkspaceSidebarSelectionBodyProps = Partial<
   Pick<
     WorkspaceSidebarProps,
     | 'gridSettings'
+    | 'typingProject'
+    | 'recordingTelemetry'
+    | 'onApplyTypingCompression'
     | 'project'
     | 'selection'
     | 'selectedClip'
+    | 'onApplyCameraLayout'
+    | 'onSplitCameraInterval'
+    | 'canSplitCameraInterval'
     | 'selectedTransition'
     | 'selectedCursorSample'
-    | 'selectedActionEvent'
+    | 'currentTime'
+    | 'selectedActionOccurrence'
     | 'selectedMotionRegion'
     | 'selectedObjectTrack'
     | 'selectedTrack'
@@ -38,10 +45,10 @@ type WorkspaceSidebarSelectionBodyProps = Partial<
     | 'onDeleteCursorSample'
     | 'onDeleteObjectTrack'
     | 'onSelectObjectTrack'
-    | 'onGenerateMotionPathFromCursor'
     | 'onInsertCursorSample'
     | 'onUpdateCursorSampleInterpolation'
     | 'onUpdateCursorSampleVisibility'
+    | 'onUpdateActionPresentation'
     | 'onUpdateActionEventDetails'
     | 'onUpdateAnnotationClipContent'
     | 'onUpdateAnnotationClipStyle'
@@ -50,8 +57,6 @@ type WorkspaceSidebarSelectionBodyProps = Partial<
     | 'onStartActionPointPlacement'
     | 'onStartMotionAreaPlacement'
     | 'onStartMotionFocusPlacement'
-    | 'onStartMotionPathStopAreaPlacement'
-    | 'onStartMotionPathStopPointPlacement'
     | 'onStartObjectTrackAnchorPlacement'
     | 'onClearPlacementMode'
     | 'onUpdateMotionRegion'
@@ -128,10 +133,19 @@ export function WorkspaceSidebarSelectionBody(props: WorkspaceSidebarSelectionBo
 function createInspectPanelProps(props: WorkspaceSidebarSelectionBodyProps) {
   return {
     ...(props.gridSettings ? { gridSettings: props.gridSettings } : {}),
+    ...(props.typingProject ? { typingProject: props.typingProject } : {}),
+    ...(props.recordingTelemetry ? { recordingTelemetry: props.recordingTelemetry } : {}),
+    ...(props.onApplyTypingCompression
+      ? { onApplyTypingCompression: props.onApplyTypingCompression }
+      : {}),
     project: props.project,
     selection: props.selection ?? createSceneSelection(),
     selectedClip: props.selectedClip ?? null,
-    selectedActionEvent: props.selectedActionEvent ?? null,
+    ...(props.onApplyCameraLayout ? { onApplyCameraLayout: props.onApplyCameraLayout } : {}),
+    ...(props.onSplitCameraInterval ? { onSplitCameraInterval: props.onSplitCameraInterval } : {}),
+    canSplitCameraInterval: props.canSplitCameraInterval ?? false,
+    ...(props.currentTime === undefined ? {} : { currentTime: props.currentTime }),
+    selectedActionOccurrence: props.selectedActionOccurrence ?? null,
     selectedCursorSample: props.selectedCursorSample ?? null,
     selectedMotionRegion: props.selectedMotionRegion ?? null,
     selectedObjectTrack: props.selectedObjectTrack ?? null,
@@ -168,7 +182,7 @@ function createInspectPanelOptionalProps(props: WorkspaceSidebarSelectionBodyPro
     onDeleteCursorSample: props.onDeleteCursorSample ?? (() => undefined),
     onDeleteObjectTrack: props.onDeleteObjectTrack ?? (() => undefined),
     onSelectObjectTrack: props.onSelectObjectTrack ?? (() => undefined),
-    onGenerateMotionPathFromCursor: props.onGenerateMotionPathFromCursor ?? (() => undefined),
+
     onEnableCursorTrack: props.onEnableCursorTrack ?? (() => undefined),
     onInsertCursorSample: props.onInsertCursorSample ?? (() => undefined),
     onSetCursorCaptureMode: props.onSetCursorCaptureMode ?? (() => undefined),
@@ -183,15 +197,15 @@ function createInspectPanelEffectProps(props: WorkspaceSidebarSelectionBodyProps
   return {
     onUpdateCursorSampleInterpolation: props.onUpdateCursorSampleInterpolation ?? (() => undefined),
     onUpdateCursorSampleVisibility: props.onUpdateCursorSampleVisibility ?? (() => undefined),
+    ...(props.onUpdateActionPresentation
+      ? { onUpdateActionPresentation: props.onUpdateActionPresentation }
+      : {}),
     onUpdateActionEventDetails: props.onUpdateActionEventDetails ?? (() => undefined),
     onDeleteMotionRegion: props.onDeleteMotionRegion ?? (() => undefined),
     onStartActionPointPlacement: props.onStartActionPointPlacement ?? (() => undefined),
     onStartMotionAreaPlacement: props.onStartMotionAreaPlacement ?? (() => undefined),
     onStartMotionFocusPlacement: props.onStartMotionFocusPlacement ?? (() => undefined),
-    onStartMotionPathStopAreaPlacement:
-      props.onStartMotionPathStopAreaPlacement ?? (() => undefined),
-    onStartMotionPathStopPointPlacement:
-      props.onStartMotionPathStopPointPlacement ?? (() => undefined),
+
     onStartObjectTrackAnchorPlacement: props.onStartObjectTrackAnchorPlacement ?? (() => undefined),
     onClearPlacementMode: props.onClearPlacementMode ?? (() => undefined),
     onUpdateMotionRegion: props.onUpdateMotionRegion ?? (() => undefined),

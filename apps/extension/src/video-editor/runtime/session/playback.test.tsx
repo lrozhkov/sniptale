@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { type VideoProjectActionOccurrence } from '../../../features/video/project/action-occurrences';
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -66,7 +67,7 @@ interface PlaybackHarnessProps {
   projectHistoryTransactionActive?: boolean;
   shortcutsEnabled?: boolean;
   selection: { kind: string; clipId?: string; actionEventId?: string; motionRegionId?: string };
-  selectedActionEvent?: PlaybackHarnessActionEvent | null;
+  selectedActionOccurrence?: PlaybackHarnessActionEvent | null;
   selectedClipId: string | null;
   selectedMotionRegion?: PlaybackHarnessMotionRegion | null;
   setCurrentTime: (time: number) => void;
@@ -80,9 +81,7 @@ interface PlaybackHarnessProps {
   onStepReady?: (stepByFrames: (frameDelta: number) => void) => void;
 }
 
-type PlaybackHarnessActionEvent = ReturnType<
-  typeof createEmptyVideoProject
->['actionEvents'][number];
+type PlaybackHarnessActionEvent = VideoProjectActionOccurrence;
 type PlaybackHarnessMotionRegion = NonNullable<
   ReturnType<typeof createEmptyVideoProject>['motionRegions']
 >[number];
@@ -99,7 +98,7 @@ function PlaybackHarness(props: PlaybackHarnessProps) {
       projectHistoryTransactionActive: props.projectHistoryTransactionActive ?? false,
       shortcutsEnabled: props.shortcutsEnabled ?? true,
       selectedClipId: props.selectedClipId,
-      selectedActionEvent: props.selectedActionEvent ?? null,
+      selectedActionOccurrence: props.selectedActionOccurrence ?? null,
       selectedMotionRegion: props.selectedMotionRegion ?? null,
     },
     {

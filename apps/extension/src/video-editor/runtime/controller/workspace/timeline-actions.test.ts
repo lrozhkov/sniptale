@@ -1,3 +1,5 @@
+import { createVideoProjectMotionRegion } from '../../../../features/video/project/motion';
+import { bindMotionRegionToClip } from '../../../../features/video/project/motion/source-binding';
 import { expect, it, vi } from 'vitest';
 import { createEmptyVideoProject } from '../../../../features/video/project/factories/creation';
 import {
@@ -25,6 +27,7 @@ function createStore(project = createEmptyVideoProject('Timeline actions')) {
     selection: { kind: VideoEditorSelectionKind.SCENE },
     setError: vi.fn(),
     updateClipPlaybackRate: vi.fn(),
+    updateActionEventDetails: vi.fn(),
     updateProject: vi.fn((updater: (currentProject: typeof project) => typeof project) => {
       const currentProject = store.project;
       if (currentProject) store.project = updater(currentProject);
@@ -36,9 +39,15 @@ function createStore(project = createEmptyVideoProject('Timeline actions')) {
 
 function createWorkspace(): Pick<
   VideoEditorWorkspaceState,
-  'clearPlaybackRange' | 'confirm' | 'inspector' | 'playbackRange' | 'setPlaybackRange'
+  | 'setAutoProcessingModalOpen'
+  | 'clearPlaybackRange'
+  | 'confirm'
+  | 'inspector'
+  | 'playbackRange'
+  | 'setPlaybackRange'
 > {
   return {
+    setAutoProcessingModalOpen: vi.fn(),
     clearPlaybackRange: vi.fn(),
     playbackRange: null,
     inspector: { mode: 'selection', openSelection: vi.fn() },
@@ -147,26 +156,25 @@ it('deletes the selected object track from timeline delete actions', () => {
   expect(store.deleteObjectTrack).toHaveBeenCalledWith('visual-cursor');
 });
 
-it('moves anchored interactions into durable project time before later source edits', () => {
-  const project = createProject([createVideoClip()]);
+it('preserves captured facts while cursor moves remain explicit', () => {
+  const project = createProject([createVideoClip({ sourceInstanceId: 'instance-video' })]);
   project.baseRecordingId = 'rec-asset-video';
   project.source = { kind: 'recording', recordingId: 'rec-asset-video' };
   project.actionEvents = [
     {
       data: {},
-      duration: 0,
       id: 'action-1',
       kind: 'CLICK',
       label: 'Click',
       point: null,
-      preset: 'CLICK_RIPPLE',
-      sourceAnchor: {
+      presentation: { preset: 'CLICK_RIPPLE' },
+      anchor: {
         kind: 'recording-source',
         recordingId: 'rec-asset-video',
-        sourceClipId: 'clip-video',
+        sourceInstanceId: 'instance-video',
+        sourceEventId: 'raw-click',
         sourceTime: 1,
       },
-      time: 1,
     },
   ];
   project.cursorTrack = {
@@ -202,7 +210,6 @@ it('moves anchored interactions into durable project time before later source ed
     createSelectedClipActions()
   );
 
-  actions.onMoveActionEvent('action-1', 5);
   actions.onMoveCursorSegment('cursor-1', null, 4, null);
   const detachedProject = store.project!;
   const sourceEdited = reconcileRecordingInteractionAnchors(detachedProject, {
@@ -210,10 +217,8 @@ it('moves anchored interactions into durable project time before later source ed
     clips: detachedProject.clips.map((clip) => ({ ...clip, startTime: 2 })),
   });
 
-  expect(sourceEdited.actionEvents[0]).toEqual(
-    expect.objectContaining({ time: 5, timeBasis: 'project' })
-  );
-  expect(sourceEdited.actionEvents[0]).not.toHaveProperty('sourceAnchor');
+  expect(sourceEdited.actionEvents).toEqual(project.actionEvents);
+  expect(store.updateActionEventDetails).not.toHaveBeenCalled();
   expect(sourceEdited.cursorTrack?.samples[0]).toEqual(
     expect.objectContaining({ time: 4, timeBasis: 'project' })
   );
@@ -240,4 +245,39 @@ it('clears the playback interval only for seeks outside its inclusive boundaries
   actions.onSeekToEnd();
   expect(workspace.clearPlaybackRange).toHaveBeenCalledTimes(4);
   expect(seekTo.mock.calls).toEqual([[2], [3], [5], [1], [6], [0], [10]]);
+});
+
+it('commits timeline framing gestures through the real project state', () => {
+  const originalState = useVideoEditorStore.getState();
+  const clip = createVideoClip({ startTime: 2, duration: 8, sourceDuration: 8 });
+  const project = createProject([clip]);
+  const region = bindMotionRegionToClip(
+    { ...createVideoProjectMotionRegion(project, 3), duration: 2 },
+    clip
+  );
+  project.motionRegions = [region];
+  try {
+    useVideoEditorStore.getState().setProject(project);
+    const actions = createWorkspaceTimelineEditingActions(
+      { ...useVideoEditorStore.getState(), selectedClipId: null },
+      createWorkspace(),
+      createSelectedClipActions()
+    );
+    actions.onMoveMotionRegion(region.id, 6);
+    expect(useVideoEditorStore.getState().project?.motionRegions?.[0]).toMatchObject({
+      startTime: 6,
+      duration: 2,
+    });
+    actions.onResizeMotionRegion(region.id, 5, 3);
+    expect(useVideoEditorStore.getState().project?.motionRegions?.[0]).toMatchObject({
+      startTime: 5,
+      duration: 3,
+    });
+    useVideoEditorStore.getState().toggleUtilityLaneLock('camera');
+    const locked = useVideoEditorStore.getState().project;
+    actions.onMoveMotionRegion(region.id, 4);
+    expect(useVideoEditorStore.getState().project).toBe(locked);
+  } finally {
+    useVideoEditorStore.setState(originalState, true);
+  }
 });

@@ -104,13 +104,13 @@ function createSelectionCursorTrack(): NonNullable<
 function createSelectionActionEvent() {
   return {
     data: {},
-    duration: 0.4,
+    capturedDuration: 0.4,
     id: 'action-1',
     kind: VideoProjectActionEventKind.CLICK,
     label: 'Click',
     point: { x: 10, y: 20 },
-    preset: VideoProjectActionPreset.CLICK_RIPPLE,
-    time: 0.2,
+    presentation: { preset: VideoProjectActionPreset.CLICK_RIPPLE },
+    anchor: { kind: 'project' as const, time: 0.2 },
   };
 }
 
@@ -123,7 +123,7 @@ function createSelectionMotionRegion() {
     id: 'motion-1',
     scale: 1.5,
     startTime: 0.1,
-    targetActionEventId: null,
+    targetAction: null,
     zoomInDuration: 0.2,
     zoomOutDuration: 0.2,
   };
@@ -143,7 +143,7 @@ function createSelectionProject() {
 }
 
 describe('video editor project helper selection cleanup', () => {
-  it('falls back to scene selection when transition, cursor, action, or motion targets disappear', () => {
+  it('reconciles missing targets to the scene or history lane', () => {
     const project = createSelectionProject();
     const selectedTrackId = project.tracks[0]!.id;
 
@@ -165,7 +165,7 @@ describe('video editor project helper selection cleanup', () => {
     expectSceneSelectionAfterProjectUpdate(
       project,
       selectedTrackId,
-      { actionEventId: 'action-1', kind: 'action-segment' },
+      { eventId: 'action-1', clipId: null, kind: 'action-occurrence' },
       (currentProject) => ({ ...currentProject, actionEvents: [] })
     );
     expectSceneSelectionAfterProjectUpdate(
@@ -196,5 +196,5 @@ function expectSceneSelectionAfterProjectUpdate(
       } as VideoEditorProjectState,
       updater
     ).selection
-  ).toEqual({ kind: 'scene' });
+  ).toEqual({ kind: selection.kind === 'action-occurrence' ? 'history-lane' : 'scene' });
 }

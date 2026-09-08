@@ -4,6 +4,50 @@ import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import type { HandledOffscreenRuntimeMessageType } from './message-types';
 import { buildOffscreenCommandResponse } from './command-response';
 
+const pointTransform = {
+  viewport: {
+    width: 1280,
+    height: 800,
+    devicePixelRatio: 1,
+    visualViewportScale: 1,
+    visualViewportOffsetX: 0,
+    visualViewportOffsetY: 0,
+  },
+  visibleClientRect: { x: 0, y: 0, width: 1280, height: 800 },
+  scaleX: 1 / 1280,
+  scaleY: 1 / 800,
+  offsetX: 0,
+  offsetY: 0,
+};
+
+it.each([null, pointTransform])(
+  'preserves admitted recording geometry in the stop response: %j',
+  (recordingPointTransform) => {
+    expect(
+      buildOffscreenCommandResponse(VideoMessageType.OFFSCREEN_STOP_RECORDING, {
+        result: 'stopped',
+        recordingPointTransform,
+      })
+    ).toEqual({
+      success: true,
+      result: 'accepted',
+      recordingPointTransform,
+    });
+  }
+);
+
+it.each([{}, { ...pointTransform, scaleX: Infinity }, { ...pointTransform, viewport: null }])(
+  'rejects malformed geometry instead of acknowledging it',
+  (recordingPointTransform) => {
+    expect(() =>
+      buildOffscreenCommandResponse(VideoMessageType.OFFSCREEN_STOP_RECORDING, {
+        result: 'stopped',
+        recordingPointTransform,
+      })
+    ).toThrow('Invalid OFFSCREEN_STOP_RECORDING completion');
+  }
+);
+
 const validCompletions = [
   [
     MessageType.OFFSCREEN_CREATE_PAGE_PACKAGE_DOWNLOAD_LEASE,

@@ -55,6 +55,7 @@ function selectPlaybackPort(state: VideoEditorState): PlaybackPort {
 
 function selectTimelineEditingPort(state: VideoEditorState): TimelineEditingPort {
   return {
+    applyTypingCompression: state.applyTypingCompression,
     appendMaterial: state.appendMaterial,
     insertMaterial: state.insertMaterial,
     overlayMaterial: state.overlayMaterial,
@@ -88,6 +89,7 @@ function selectTimelineEditingPort(state: VideoEditorState): TimelineEditingPort
     toggleUtilityLaneVisibility: state.toggleUtilityLaneVisibility,
     trimClipEnd: state.trimClipEnd,
     trimClipStart: state.trimClipStart,
+    updateActionPresentation: state.updateActionPresentation,
     updateActionEventDetails: state.updateActionEventDetails,
     updateClipAudioEnvelope: state.updateClipAudioEnvelope,
     updateClipFades: state.updateClipFades,
@@ -120,10 +122,12 @@ function selectClipSelectionPort(state: VideoEditorState): ClipSelectionPort {
     selectedClipId: resolveSelectedClipId(state.selection),
     selectedTrackId: state.selectedTrackId,
     selection: state.selection,
-    selectActionSegment: state.selectActionSegment,
+    selectHistorySpan: state.selectHistorySpan,
+    selectActionOccurrence: state.selectActionOccurrence,
     selectClip: state.selectClip,
     selectCursorSegment: state.selectCursorSegment,
     selectMotionRegion: state.selectMotionRegion,
+    selectHistoryLane: state.selectHistoryLane,
     selectMotionLane: state.selectMotionLane,
     selectObjectTrack: state.selectObjectTrack,
     selectScene: state.selectScene,
@@ -209,8 +213,7 @@ function selectRuntimeSessionPort(state: VideoEditorState): RuntimeSessionPort {
     startActionPointPlacement: state.startActionPointPlacement,
     startMotionAreaPlacement: state.startMotionAreaPlacement,
     startMotionFocusPlacement: state.startMotionFocusPlacement,
-    startMotionPathStopAreaPlacement: state.startMotionPathStopAreaPlacement,
-    startMotionPathStopPointPlacement: state.startMotionPathStopPointPlacement,
+
     startObjectTrackAnchorPlacement: state.startObjectTrackAnchorPlacement,
   };
 }
@@ -219,8 +222,6 @@ function selectRecordingTelemetryPort(state: VideoEditorState): RecordingTelemet
   return {
     recordingTelemetry: state.recordingTelemetry,
     setRecordingTelemetry: state.setRecordingTelemetry,
-    telemetryLaneVisible: state.telemetryLaneVisible,
-    toggleTelemetryLaneVisibility: state.toggleTelemetryLaneVisibility,
   };
 }
 

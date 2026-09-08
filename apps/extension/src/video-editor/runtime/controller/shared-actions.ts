@@ -1,15 +1,16 @@
 import { getVideoProjectUtilityLanes } from '../../../features/video/project/utility-lanes';
+import { getVideoProjectActionPresentation } from '../../../features/video/project/action-presentation';
 import { createVideoProjectMotionRegion } from '../../../features/video/project/motion';
+import { bindMotionRegionToUniqueVideo } from '../../../features/video/project/motion/source-binding';
 import { createVideoProjectCursorTrack } from '../../../features/video/project/defaults';
 import { syncProjectSceneBackground } from '../../../features/video/project/scene/background';
-import { isCameraCursorObjectTrack } from '../../../features/video/project/object-tracks';
 import { normalizeVideoProjectCursorSkin } from '../../../features/video/project/cursor';
 import {
   VideoCursorCaptureMode,
   type VideoProject,
   VideoProjectInteractionTimeBasis,
   VideoProjectSourceKind,
-  type VideoProjectActionEvent,
+  type VideoProjectActionPreset,
   type VideoProjectCursorTrack,
   type VideoProjectSceneBackground,
 } from '../../../features/video/project/types/index';
@@ -21,16 +22,13 @@ import type {
   ProjectLifecyclePort,
   TimelineEditingPort,
 } from '../../contracts/controller-store';
-import {
-  canGenerateMotionPathFromCursorTrack,
-  createGeneratedMotionPathFromCursorTrack,
-} from '../../project/motion-path/cursor-track';
-import { createGeneratedMotionPathFromTelemetry } from '../../project/motion-path/telemetry';
+
 import { resolveActionKindForPreset } from '../../../workflows/scenario-video/actions';
 
 type SharedTimelineAction =
   | 'clearCursorSampleSkinOverride'
   | 'deleteMotionRegion'
+  | 'updateActionPresentation'
   | 'updateActionEventDetails'
   | 'updateCursorSampleInterpolation'
   | 'updateCursorSampleSkinOverride'
@@ -55,6 +53,7 @@ type PreviewProjectUpdaterStore = Pick<ProjectLifecyclePort, 'project'> & {
   Pick<
     TimelineEditingPort,
     | 'clearCursorSampleSkinOverride'
+    | 'updateActionPresentation'
     | 'updateActionEventDetails'
     | 'updateCursorSampleInterpolation'
     | 'updateCursorSampleSkinOverride'
@@ -66,7 +65,7 @@ type ProjectMutationStore = Pick<ProjectLifecyclePort, 'project'> & {
   getCurrentTime: () => number;
 } & Pick<TimelineEditingPort, 'updateProject'>;
 type ActionEventUpdaterStore = ProjectMutationStore &
-  Pick<TimelineEditingPort, 'updateActionEventDetails'>;
+  Pick<TimelineEditingPort, 'updateActionEventDetails' | 'updateActionPresentation'>;
 type CursorUpdaterStore = ProjectMutationStore &
   Pick<
     TimelineEditingPort,
@@ -130,46 +129,40 @@ function createInitialCursorTrack(store: ProjectMutationStore, project: VideoPro
 
 function createActionEventUpdaters(store: ActionEventUpdaterStore) {
   return {
-    addActionEvent(preset: VideoProjectActionEvent['preset']) {
-      store.updateProject((project) => ({
-        ...project,
-        actionEvents: [
-          ...project.actionEvents,
-          {
-            data: {},
-            duration: 0,
-            id: crypto.randomUUID(),
-            kind: resolveActionKindForPreset(preset),
-            label: preset,
-            point: resolveDefaultActionPoint(store),
-            preset,
-            timeBasis: VideoProjectInteractionTimeBasis.PROJECT,
-            time: store.getCurrentTime(),
-          },
-        ],
-      }));
+    addActionEvent(preset: VideoProjectActionPreset) {
+      store.updateProject((project) =>
+        getVideoProjectUtilityLanes(project).actions.locked
+          ? project
+          : {
+              ...project,
+              actionEvents: [
+                ...project.actionEvents,
+                {
+                  data: {},
+                  id: crypto.randomUUID(),
+                  kind: resolveActionKindForPreset(preset),
+                  label: '',
+                  point: resolveDefaultActionPoint(store),
+                  ...(preset === getVideoProjectActionPresentation(project).clickPreset
+                    ? {}
+                    : { presentation: { preset } }),
+                  anchor: { kind: 'project', time: store.getCurrentTime() },
+                },
+              ],
+            }
+      );
     },
     deleteActionEvent(actionEventId: string) {
-      store.updateProject((project) => ({
-        ...project,
-        actionEvents: project.actionEvents.filter((event) => event.id !== actionEventId),
-      }));
+      store.updateProject((project) =>
+        getVideoProjectUtilityLanes(project).actions.locked
+          ? project
+          : {
+              ...project,
+              actionEvents: project.actionEvents.filter((event) => event.id !== actionEventId),
+            }
+      );
     },
-    updateActionEventPreset(actionEventId: string, preset: VideoProjectActionEvent['preset']) {
-      store.updateProject((project) => ({
-        ...project,
-        actionEvents: project.actionEvents.map((event) =>
-          event.id === actionEventId
-            ? {
-                ...event,
-                kind: resolveActionKindForPreset(preset),
-                label: preset,
-                preset,
-              }
-            : event
-        ),
-      }));
-    },
+    updateActionPresentation: store.updateActionPresentation,
     updateActionEventDetails: store.updateActionEventDetails,
   };
 }
@@ -226,20 +219,7 @@ function createMotionRegionUpdaters(store: WorkspaceProjectUpdaterStore) {
     deleteMotionRegion(motionRegionId: string) {
       store.deleteMotionRegion(motionRegionId);
     },
-    generateMotionPathFromCursor(motionRegionId: string) {
-      store.updateProject((project) => ({
-        ...project,
-        motionRegions: (project.motionRegions ?? []).map((region) =>
-          region.id === motionRegionId
-            ? {
-                ...region,
-                cameraMode: 'PATH',
-                path: createGeneratedMotionPathForRegion(project, region, store),
-              }
-            : region
-        ),
-      }));
-    },
+
     updateMotionRegion: store.updateMotionRegion,
   };
 }
@@ -247,7 +227,10 @@ function createMotionRegionUpdaters(store: WorkspaceProjectUpdaterStore) {
 function createMotionRegionAdder(store: PreviewProjectUpdaterStore) {
   return (startTime?: number) => {
     store.updateProject((project) => {
-      const region = createVideoProjectMotionRegion(project, startTime ?? store.getCurrentTime());
+      const region = bindMotionRegionToUniqueVideo(
+        project,
+        createVideoProjectMotionRegion(project, startTime ?? store.getCurrentTime())
+      );
       queueMicrotask(() => store.selectMotionRegion(region.id));
       return {
         ...project,
@@ -263,32 +246,6 @@ function createMotionRegionAdder(store: PreviewProjectUpdaterStore) {
       };
     });
   };
-}
-
-function createGeneratedMotionPathForRegion(
-  project: VideoProject,
-  region: Parameters<typeof createGeneratedMotionPathFromTelemetry>[0]['region'],
-  store: WorkspaceProjectUpdaterStore
-) {
-  const cameraCursorTrack = (project.objectTracks ?? []).find(isCameraCursorObjectTrack) ?? null;
-  if (
-    canGenerateMotionPathFromCursorTrack({
-      project,
-      region,
-      track: cameraCursorTrack,
-    })
-  ) {
-    return createGeneratedMotionPathFromCursorTrack({
-      project,
-      region,
-      track: cameraCursorTrack,
-    });
-  }
-  return createGeneratedMotionPathFromTelemetry({
-    project,
-    region,
-    telemetry: store.recordingTelemetry,
-  });
 }
 
 function createProjectPresentationUpdaters(store: WorkspaceProjectUpdaterStore) {

@@ -9,6 +9,7 @@ import { createEmptyVideoEditorProjectHistory } from '../project/history';
 type VideoEditorStoreSet = Parameters<StateCreator<VideoEditorState>>[0];
 
 export function createVideoEditorTimelineState(set: VideoEditorStoreSet) {
+  const recordingTelemetry: VideoEditorState['recordingTelemetry'] = [];
   return {
     project: null,
     projectHistory: createEmptyVideoEditorProjectHistory(),
@@ -23,8 +24,7 @@ export function createVideoEditorTimelineState(set: VideoEditorStoreSet) {
     selection: createSceneSelection(),
     selectedTrackId: null,
     exportState: createInitialExportState(),
-    recordingTelemetry: null,
-    telemetryLaneVisible: false,
+    recordingTelemetry,
     ...createProjectStateActions(set),
     ...createTimelineSelectionStateActions(set),
   };

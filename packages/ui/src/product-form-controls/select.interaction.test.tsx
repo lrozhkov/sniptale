@@ -32,6 +32,7 @@ afterEach(() => {
   root = null;
   container?.remove();
   container = null;
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -190,4 +191,32 @@ it('renders the placeholder copy when the current value is missing from the opti
   );
 
   expect(container?.querySelector('button')?.textContent).toContain('Choose language');
+});
+
+it('routes explicit menu width through ProductSelect while keeping its compact trigger and option selection', () => {
+  vi.stubGlobal('innerWidth', 1000);
+  vi.stubGlobal('innerHeight', 800);
+  const onChange = vi.fn();
+  renderLanguageSelect({ menuWidth: 360, style: { width: 40, height: 24 }, onChange });
+  const shell = container!.querySelector<HTMLDivElement>('[data-ui="shared.ui.product-select"]')!;
+  vi.spyOn(shell, 'getBoundingClientRect').mockReturnValue({
+    x: 960,
+    y: 100,
+    top: 100,
+    bottom: 124,
+    left: 960,
+    right: 1000,
+    width: 40,
+    height: 24,
+    toJSON: () => ({}),
+  });
+  openRenderedSelect();
+  const menu = getRenderedMenu() as HTMLElement;
+  expect(menu.style.width).toBe('360px');
+  expect(menu.style.left).toBe('632px');
+  expect(container!.querySelector('button')!.style.width).toBe('40px');
+  const english = getRenderedOptions().find((option) => option.textContent?.includes('English'))!;
+  act(() => english.click());
+  expect(onChange).toHaveBeenCalledWith('en');
+  expect(getRenderedMenu()).toBeNull();
 });

@@ -16,8 +16,9 @@ export interface SourceDraft {
 
 type SourcePlacement = (
   assetId: string,
-  range?: VideoEditorMaterialSourceRange
-) => VideoEditorMaterialPlacementResult;
+  range?: VideoEditorMaterialSourceRange,
+  signal?: AbortSignal
+) => VideoEditorMaterialPlacementResult | Promise<VideoEditorMaterialPlacementResult>;
 
 export interface SourceViewerProps {
   asset: VideoProjectAsset | null;
@@ -99,17 +100,14 @@ export function useSourceMediaViewer(props: SourceMediaViewerProps) {
     const next = markSourceRange(range, markAt, duration, frame, edge);
     props.onDraftChange({ ...props.draft, cursor: markAt, range: next });
   };
-  const place = (action: SourcePlacement) => {
-    if (!usable || (!image && !validRange)) return;
-    pause();
-    const result = action(props.asset.id, image ? undefined : range);
-    if (result.status === 'placed') {
-      setError(null);
-      props.onPlaced();
-      return;
-    }
-    setError(getSourcePlacementError(result.reason));
-  };
+  const { placing, place } = useSourcePlacement(props, {
+    usable,
+    image,
+    validRange,
+    range,
+    pause,
+    setError,
+  });
   const mediaEvents = {
     onLoadedData: () => {
       setReady(true);
@@ -152,6 +150,7 @@ export function useSourceMediaViewer(props: SourceMediaViewerProps) {
     range,
     validRange,
     usable,
+    placing,
     seek,
     step,
     toggle,
@@ -243,4 +242,61 @@ function getSourceTiming(props: Pick<SourceMediaViewerProps, 'asset' | 'draft' |
 function sourceFrameTime(time: number, fps: number, lastFrame: number): number {
   // Chromium exposes native seek times in microseconds, including values just below a frame edge.
   return Math.max(0, Math.min(lastFrame, Math.floor((time + 1e-6) * fps) / fps));
+}
+
+function useSourcePlacement(
+  props: SourceMediaViewerProps,
+  {
+    usable,
+    image,
+    validRange,
+    range,
+    pause,
+    setError,
+  }: {
+    usable: boolean;
+    image: boolean;
+    validRange: boolean;
+    range: VideoEditorMaterialSourceRange;
+    pause: () => void;
+    setError: (error: string | null) => void;
+  }
+) {
+  const [placing, setPlacing] = useState(false);
+  const placement = useRef<AbortController | null>(null);
+  useEffect(() => {
+    if (!props.active) {
+      placement.current?.abort();
+      placement.current = null;
+      setPlacing(false);
+    }
+    return () => {
+      placement.current?.abort();
+      placement.current = null;
+    };
+  }, [props.active, props.asset.id]);
+  const place = async (action: SourcePlacement) => {
+    if (!usable || placement.current || (!image && !validRange)) return;
+    pause();
+    const request = new AbortController();
+    placement.current = request;
+    setPlacing(true);
+    try {
+      const pending = action(props.asset.id, image ? undefined : range, request.signal);
+      const result = pending instanceof Promise ? await pending : pending;
+      if (request.signal.aborted) return;
+      if (result.status === 'placed') {
+        setError(null);
+        props.onPlaced();
+      } else setError(getSourcePlacementError(result.reason));
+    } catch {
+      if (!request.signal.aborted) setError(translate('common.errors.actionFailed'));
+    } finally {
+      if (placement.current === request) {
+        placement.current = null;
+        setPlacing(false);
+      }
+    }
+  };
+  return { placing, place };
 }

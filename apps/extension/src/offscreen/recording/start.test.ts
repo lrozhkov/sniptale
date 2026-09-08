@@ -15,7 +15,8 @@ const {
   cleanupResourcesMock: vi.fn(),
   createRecordingStagingCoordinatorMock: vi.fn(),
   durationTrackerMock: { publishDuration: vi.fn() },
-  finalizeRecordingBootstrapMock: vi.fn(),
+  finalizeRecordingBootstrapMock:
+    vi.fn<typeof import('./start/recorder').finalizeRecordingBootstrap>(),
   handleRecordingStartErrorMock: vi.fn((error: unknown) => error),
   initializeRecordingSessionMock: vi.fn(() => 'recording-1'),
   initializeSidecarRecordersMock: vi.fn(),
@@ -29,6 +30,8 @@ const {
     sourceVideoHeight: null as number | null,
     sourceVideoWidth: null as number | null,
     tabOutputGeometry: null as unknown,
+    recordingPointObservation:
+      null as typeof import('./context').recordingContext.recordingPointObservation,
   },
   sendRuntimeMessageMock: vi.fn(),
 }));
@@ -277,3 +280,50 @@ it('routes setup errors through the shared start-error path', async () => {
   ).rejects.toThrow('stream failed');
   expect(handleRecordingStartErrorMock).toHaveBeenCalledWith(expect.any(Error), 'recording-error');
 });
+
+it.each([
+  { displayWidth: 1200 },
+  { displayHeight: 700 },
+  { codedWidth: 1300 },
+  { codedHeight: 740 },
+  { visibleRect: null },
+  { visibleRect: { x: 1, y: 0, width: 1280, height: 720 } },
+  { visibleRect: { x: 0, y: 1, width: 1280, height: 720 } },
+  { visibleRect: { x: 0, y: 0, width: 1278, height: 720 } },
+  { visibleRect: { x: 0, y: 0, width: 1280, height: 718 } },
+])(
+  'invalidates captured geometry for the whole recording after frame mismatch: %j',
+  async (mismatch) => {
+    await startRecording(
+      {
+        captureMode: CaptureMode.TAB,
+        generation: 3,
+        recordingId: 'recording-1',
+        streamInstanceId: 'stream-instance-1',
+        settings: createSettings(),
+        streamId: 'stream-1',
+      },
+      messaging
+    );
+    const observe = finalizeRecordingBootstrapMock.mock.calls[0]![0].onVideoFrameGeometry!;
+    const frame = {
+      codedWidth: 1280,
+      codedHeight: 720,
+      displayWidth: 1280,
+      displayHeight: 720,
+      visibleRect: { x: 0, y: 0, width: 1280, height: 720 },
+    };
+    observe(frame as VideoFrame);
+    observe(frame as VideoFrame);
+    expect(recordingContextMock.recordingPointObservation).toMatchObject({
+      stable: true,
+      sawFrame: true,
+    });
+    observe({ ...frame, ...mismatch } as VideoFrame);
+    observe(frame as VideoFrame);
+    expect(recordingContextMock.recordingPointObservation).toMatchObject({
+      stable: false,
+      sawFrame: true,
+    });
+  }
+);

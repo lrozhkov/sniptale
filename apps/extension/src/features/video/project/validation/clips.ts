@@ -124,7 +124,9 @@ export function isVideoProjectClip(value: unknown): value is VideoProjectClip {
       isBoundedNumber(value['sourceStart'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
       isBoundedNumber(value['sourceDuration'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
       (value['playbackRate'] === undefined || isPlaybackRate(value['playbackRate'])) &&
-      (value['type'] === VideoProjectClipType.AUDIO || hasMediaVisualFields(value))
+      (value['type'] === VideoProjectClipType.AUDIO ||
+        (hasMediaVisualFields(value) &&
+          (value['sourceInstanceId'] === undefined || isString(value['sourceInstanceId']))))
     );
   }
   if (value['type'] === VideoProjectClipType.IMAGE) {

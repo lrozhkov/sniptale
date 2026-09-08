@@ -18,3 +18,19 @@ export type VideoEditorTrimClipAction = (
   clipId: string,
   edgeTime: number
 ) => VideoEditorClipTimingResult | null;
+
+/** Identity of one captured typing interval as it appears in a particular clip. */
+export interface VideoEditorTypingSpanTarget {
+  recordingId: string;
+  sourceInstanceId: string;
+  signalId: string;
+  clipId: string;
+}
+
+export interface VideoEditorTypingCompressionRequest extends VideoEditorTypingSpanTarget {
+  targetPlaybackRate: number;
+}
+
+export type VideoEditorTypingCompressionResult =
+  | { status: 'applied'; clipId: string }
+  | { status: 'stale' | 'blocked' | 'unchanged' };

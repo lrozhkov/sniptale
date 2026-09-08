@@ -1,3 +1,8 @@
+import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
+import type {
+  VideoProjectCameraLayout,
+  VideoProjectCameraPlacement,
+} from '../../../../features/video/project/camera/placement';
 import type { VideoEditorPlacementMode } from '../../../contracts/placement';
 import type { VideoEditorSelection } from '../../../contracts/selection';
 import type { VideoEditorProjectActions } from '../../../contracts/commands/project';
@@ -16,6 +21,8 @@ import type { VideoEditorLibrariesState } from '../../app-model/types';
 interface VideoEditorSidebarCommands extends VideoEditorProjectActions, VideoEditorSessionActions {}
 
 interface VideoEditorSidebarState {
+  typingProject?: VideoProject;
+  recordingTelemetry?: readonly RecordingTelemetryEntry[];
   activeProjectId: string;
   collapsed: boolean;
   gridSettings: {
@@ -35,7 +42,9 @@ interface VideoEditorSidebarState {
   recentColors: string[];
   recordingId: string | null;
   recordings: VideoEditorLibrariesState['recordings'];
-  selectedActionEvent: VideoEditorSelections['selectedActionEvent'];
+  currentTime?: number;
+  selectedActionOccurrence: VideoEditorSelections['selectedActionOccurrence'];
+  canSplitCameraInterval?: boolean;
   selectedClip: VideoEditorSelections['selectedClip'];
   selectedCursorSample: VideoEditorSelections['selectedCursorSample'];
   selectedMotionRegion: VideoEditorSelections['selectedMotionRegion'];
@@ -45,6 +54,7 @@ interface VideoEditorSidebarState {
 }
 
 interface VideoEditorSidebarProjectActions {
+  onApplyTypingCompression?: VideoEditorSessionActions['applyTypingCompression'];
   onAddActionEvent: (preset: VideoProjectActionPreset) => void;
   onAddMotionRegion: () => void;
   onAddRecording: VideoEditorActionHandlers['handleAddRecording'];
@@ -59,7 +69,7 @@ interface VideoEditorSidebarProjectActions {
   onDeleteMotionRegion: VideoEditorSidebarCommands['deleteMotionRegion'];
   onDeleteObjectTrack: VideoEditorSidebarCommands['deleteObjectTrack'];
   onSelectObjectTrack: VideoEditorSidebarCommands['selectObjectTrack'];
-  onGenerateMotionPathFromCursor: (motionRegionId: string) => void;
+
   onDeleteProject: VideoEditorActionHandlers['handleDeleteProject'];
   onDeleteTrack: (trackId: string) => void;
   onEnableCursorTrack: () => void;
@@ -84,10 +94,10 @@ interface VideoEditorSidebarProjectActions {
   onStartActionPointPlacement: VideoEditorSidebarCommands['startActionPointPlacement'];
   onStartMotionAreaPlacement: VideoEditorSidebarCommands['startMotionAreaPlacement'];
   onStartMotionFocusPlacement: VideoEditorSidebarCommands['startMotionFocusPlacement'];
-  onStartMotionPathStopAreaPlacement: VideoEditorSidebarCommands['startMotionPathStopAreaPlacement'];
-  onStartMotionPathStopPointPlacement: VideoEditorSidebarCommands['startMotionPathStopPointPlacement'];
+
   onStartObjectTrackAnchorPlacement: VideoEditorSidebarCommands['startObjectTrackAnchorPlacement'];
   onToggleCollapsed: VideoEditorWorkspaceState['toggleSidebarCollapsed'];
+  onUpdateActionPresentation: VideoEditorSidebarCommands['updateActionPresentation'];
   onUpdateActionEventDetails: VideoEditorSidebarCommands['updateActionEventDetails'];
   onUpdateCursorSampleInterpolation: VideoEditorSidebarCommands['updateCursorSampleInterpolation'];
   onUpdateCursorSampleSkinOverride: VideoEditorSidebarCommands['updateCursorSampleSkinOverride'];
@@ -114,6 +124,12 @@ interface VideoEditorSidebarClipActions {
   onUpdateClipFades: VideoEditorSidebarCommands['updateClipFades'];
   onUpdateClipPlaybackRate: VideoEditorSidebarCommands['updateClipPlaybackRate'];
   onUpdateClipMuted: VideoEditorSidebarCommands['updateClipMuted'];
+  onApplyCameraLayout?: (
+    clipId: string,
+    layout: VideoProjectCameraLayout,
+    placement?: VideoProjectCameraPlacement
+  ) => void;
+  onSplitCameraInterval?: (clipId: string) => void;
   onUpdateClipTransform: VideoEditorSidebarCommands['updateClipTransform'];
   onUpdateClipVolume: VideoEditorSidebarCommands['updateClipVolume'];
   onApplyMediaClipVisualsToTrack: VideoEditorSidebarCommands['applyMediaClipVisualsToTrack'];

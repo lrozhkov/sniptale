@@ -126,7 +126,7 @@ function createPlaybackShortcutState(state: VideoEditorState): PlaybackLatestSta
     playbackRange: null,
     project: state.project,
     projectHistoryTransactionActive: state.projectHistory.transaction !== null,
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedClipId: resolveSelectedClipId(state.selection),
     selectedMotionRegion: null,
     selection: state.selection,

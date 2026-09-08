@@ -1,7 +1,11 @@
 import { getReachableClipTimingBounds } from './reachable-placement';
 import { clampNumber } from '../../../../features/video/project/timeline/basics';
 import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
-import { getLinkedClipIds, getTrackClips } from '../../../../features/video/project/timeline';
+import {
+  getLinkedClipIds,
+  getTrackClips,
+  resolveClipLogicalLaneId,
+} from '../../../../features/video/project/timeline';
 import {
   buildVideoEditorTrackGapCandidates,
   isMatchingTrackGapCandidate,
@@ -24,6 +28,52 @@ export { duplicateProjectClips, splitProjectClipsAtTime } from './split';
 
 type EditableClipOperation = NonNullable<ReturnType<typeof resolveEditableClipOperation>>;
 const TIMELINE_GAP_EPSILON = 0.0001;
+
+/** Shift only the declared tail and its explicit links, preserving existing gaps. */
+export function shiftProjectTrackTailBy(
+  project: VideoProject,
+  trackId: string,
+  startTime: number,
+  delta: number
+): { project: VideoProject; clipIds: string[] } | { reason: 'locked' | 'overlap' } {
+  const tail = getTrackClips(project, trackId).filter(
+    (clip) => clip.startTime >= startTime - TIMELINE_GAP_EPSILON
+  );
+  const clipIds = collectLinkedClipIds(
+    project,
+    tail.map((clip) => clip.id)
+  );
+  if (!areClipTracksEditable(project, [...clipIds])) return { reason: 'locked' };
+  if (clipIds.size === 0 || delta === 0) return { project, clipIds: [] };
+  for (const clip of project.clips) {
+    if (!clipIds.has(clip.id)) continue;
+    const nextStart = clip.startTime + delta;
+    if (nextStart < -TIMELINE_GAP_EPSILON) return { reason: 'overlap' };
+    for (const neighbor of project.clips) {
+      if (
+        clipIds.has(neighbor.id) ||
+        clip.trackId !== neighbor.trackId ||
+        resolveClipLogicalLaneId(clip) !== resolveClipLogicalLaneId(neighbor)
+      )
+        continue;
+      const overlap = (start: number) =>
+        Math.max(
+          0,
+          Math.min(start + clip.duration, neighbor.startTime + neighbor.duration) -
+            Math.max(start, neighbor.startTime)
+        );
+      if (overlap(nextStart) > overlap(clip.startTime) + TIMELINE_GAP_EPSILON)
+        return { reason: 'overlap' };
+    }
+  }
+  return {
+    project: applyVideoProjectMutationPatch(
+      project,
+      createShiftedClipStartPatch({ clipIds, delta, project })
+    ),
+    clipIds: [...clipIds],
+  };
+}
 
 export function closeProjectTrackGap(
   project: VideoProject,

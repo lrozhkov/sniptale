@@ -3,7 +3,8 @@ import type { VideoProject } from '../../project/types/index';
 type ProjectFrame = Pick<VideoProject, 'height' | 'width'>;
 
 function clampViewportOffset(offset: number, viewportSize: number, projectSize: number): number {
-  return Math.min(Math.max(0, offset), Math.max(0, projectSize - viewportSize));
+  const availableOffset = projectSize - viewportSize;
+  return Math.min(Math.max(Math.min(0, availableOffset), offset), Math.max(0, availableOffset));
 }
 
 export function resolveCameraViewportFrame(

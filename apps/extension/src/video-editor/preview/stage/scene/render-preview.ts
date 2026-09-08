@@ -1,5 +1,5 @@
 import {
-  drawActionCompositionState,
+  drawSceneActionCompositionStates,
   drawCursorCompositionState,
 } from '../../../../features/video/composition/draw';
 import {
@@ -61,21 +61,12 @@ function drawPreviewSceneOverlays(params: {
         scale: params.frame.cursor.scale * overlayScale,
       }
     : null;
-  const fallbackPoint = scaledCursor ? { x: scaledCursor.x, y: scaledCursor.y } : null;
-
-  for (const action of params.frame.actions) {
-    drawActionCompositionState(
-      params.context,
-      {
-        ...action,
-        point: action.point
-          ? mapPreviewScenePoint(action.point, params.camera, params.viewport)
-          : null,
-      },
-      fallbackPoint,
-      overlayScale
-    );
-  }
+  drawSceneActionCompositionStates(params.context, params.frame.actions, params.camera, {
+    offsetX: params.viewport.offsetX,
+    offsetY: params.viewport.offsetY,
+    scaleX: params.viewport.scale,
+    scaleY: params.viewport.scale,
+  });
 
   if (scaledCursor) {
     drawCursorCompositionState(params.context, scaledCursor);

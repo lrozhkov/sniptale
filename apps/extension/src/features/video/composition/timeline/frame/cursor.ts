@@ -75,7 +75,7 @@ export function resolveCursorSample(
 }
 
 function getCursorScaleBoost(actions: VideoCompositionActionState[]): number {
-  return actions.some((action) => action.event.preset === 'DWELL_ZOOM') ? 1.28 : 1;
+  return actions.some((action) => action.preset === 'DWELL_ZOOM') ? 1.28 : 1;
 }
 
 function resolveCursorSkin(project: VideoProject, sample: VideoProjectCursorSample) {

@@ -1,3 +1,6 @@
+import { resolveVideoCompositionActionSourceMapping } from '../../../features/video/composition/timeline/frame/actions';
+import { mapSourceNormalizedPointToVisualLayer } from '../../../features/video/composition/draw/fitted-media';
+import { resolveVideoProjectActionOccurrences } from '../../../features/video/project/action-occurrences';
 import {
   getSourceTimedClipProjectDuration,
   normalizeClipPlaybackRate,
@@ -17,14 +20,27 @@ import {
   VideoClipLinkMode,
   VideoProjectClipType,
 } from '../../../features/video/project/types/model';
-import {
-  projectSourceTimeAnchor,
-  type AnchorProjection,
-  type SourceTimedClip,
-} from './source-timed-anchor-projection';
+import { projectSourceTimeAnchor, type SourceTimedClip } from './source-timed-anchor-projection';
 import { reconcileSourceBoundObjectTracks } from './source-timed-object-tracks';
 
 export type { SourceTimedClip } from './source-timed-anchor-projection';
+
+/** Distinct captured sources available through project materials, including its initial source. */
+export function collectProjectRecordingIds(project: VideoProject | null): string[] {
+  if (!project) return [];
+  const ids = new Set<string>();
+  if (project.baseRecordingId) ids.add(project.baseRecordingId);
+  for (const asset of project.assets) {
+    const id =
+      asset.source.kind === 'recording'
+        ? asset.source.recordingId
+        : asset.source.kind === 'project-asset'
+          ? asset.source.originRecordingId
+          : null;
+    if (id) ids.add(id);
+  }
+  return [...ids].sort();
+}
 
 export function isSourceTimedClip(clip: VideoProjectClip): clip is SourceTimedClip {
   return clip.type === VideoProjectClipType.VIDEO || clip.type === VideoProjectClipType.AUDIO;
@@ -176,58 +192,20 @@ function hasSourceTimelineChanged(
   });
 }
 
-function reconcileActionEvents(
-  previousProject: VideoProject,
-  nextProject: VideoProject,
-  timelines: Map<string, RecordingClipTimeline>,
-  splitLineage?: ReadonlyMap<string, string>
-): {
-  events: VideoProjectActionEvent[];
-  projections: Map<string, AnchorProjection>;
-} {
-  if (nextProject.actionEvents !== previousProject.actionEvents) {
-    return { events: nextProject.actionEvents, projections: new Map() };
-  }
-
-  const projections = new Map<string, AnchorProjection>();
-  const events = nextProject.actionEvents
-    .flatMap((event) => {
-      if (!event.sourceAnchor) {
-        return [event];
-      }
-      const recordingId = event.sourceAnchor.recordingId;
-      const { previousClips, nextClips } = timelines.get(recordingId) ?? {
-        previousClips: [],
-        nextClips: [],
-      };
-      if (!isValidPreviousAnchor(event.sourceAnchor, recordingId, previousClips)) {
-        return [withoutSourceAnchor(event)];
-      }
-
-      const projection = projectSourceTimeAnchor(
-        event.sourceAnchor,
-        recordingId,
-        previousClips,
-        nextClips,
-        splitLineage
-      );
-      if (!projection) {
-        return [];
-      }
-
-      projections.set(event.id, projection);
-      return [
-        {
-          ...event,
-          duration: event.duration * projection.timeScale,
-          sourceAnchor: projection.anchor,
-          time: projection.time,
-        },
-      ];
-    })
-    .sort((left, right) => left.time - right.time);
-
-  return { events, projections };
+function reconcileActionEvents(nextProject: VideoProject): VideoProjectActionEvent[] {
+  const events = nextProject.actionEvents.filter((event) => {
+    const anchor = event.anchor;
+    return (
+      anchor.kind === 'project' ||
+      nextProject.clips.some(
+        (clip) =>
+          clip.type === 'VIDEO' &&
+          clip.sourceInstanceId === anchor.sourceInstanceId &&
+          isRecordingSourceTimedClip(nextProject, clip, anchor.recordingId)
+      )
+    );
+  });
+  return events.length === nextProject.actionEvents.length ? nextProject.actionEvents : events;
 }
 
 function reconcileCursorTrack(
@@ -273,47 +251,52 @@ function reconcileCursorTrack(
 function reconcileMotionRegions(
   previousProject: VideoProject,
   nextProject: VideoProject,
-  nextEvents: VideoProjectActionEvent[],
-  actionProjections: Map<string, AnchorProjection>
+  splitLineage?: ReadonlyMap<string, string>
 ): VideoProject['motionRegions'] {
-  if (nextProject.motionRegions !== previousProject.motionRegions) {
-    return nextProject.motionRegions;
-  }
-
-  const previousEvents = new Map(previousProject.actionEvents.map((event) => [event.id, event]));
-  const nextEventIds = new Set(nextEvents.map((event) => event.id));
-  return (nextProject.motionRegions ?? []).flatMap((region) => {
-    if (!region.targetActionEventId) {
-      return [region];
-    }
-
-    const previousEvent = previousEvents.get(region.targetActionEventId);
-    if (!previousEvent?.sourceAnchor) {
-      return [region];
-    }
-    if (!nextEventIds.has(region.targetActionEventId)) {
-      return [];
-    }
-
-    const projection = actionProjections.get(region.targetActionEventId);
-    if (!projection) {
-      return [region];
-    }
-
-    return [
-      {
+  const occurrences = resolveVideoProjectActionOccurrences(nextProject);
+  const regions = nextProject.motionRegions;
+  const nextRegions = regions?.map((region) => {
+    const target = region.targetAction;
+    if (!target) return region;
+    if (
+      occurrences.some((item) => item.eventId === target.eventId && item.clipId === target.clipId)
+    )
+      return region;
+    const trailingClipId = target.clipId ? splitLineage?.get(target.clipId) : null;
+    const descendant =
+      trailingClipId &&
+      occurrences.find((item) => item.eventId === target.eventId && item.clipId === trailingClipId);
+    if (descendant)
+      return {
         ...region,
-        duration: region.duration * projection.timeScale,
-        startTime: projection.time + (region.startTime - previousEvent.time) * projection.timeScale,
-        zoomInDuration: region.animation
-          ? region.zoomInDuration
-          : region.zoomInDuration * projection.timeScale,
-        zoomOutDuration: region.animation
-          ? region.zoomOutDuration
-          : region.zoomOutDuration * projection.timeScale,
-      },
-    ];
+        targetAction: { eventId: descendant.eventId, clipId: descendant.clipId },
+      };
+    const previous = previousProject.motionRegions?.find((item) => item.id === region.id);
+    const previousOccurrence = resolveVideoProjectActionOccurrences(previousProject).find(
+      (item) => item.eventId === target.eventId && item.clipId === target.clipId
+    );
+    const point = previousOccurrence?.event.presentation?.point ?? previousOccurrence?.event.point;
+    const mapping =
+      previousOccurrence &&
+      resolveVideoCompositionActionSourceMapping(
+        previousProject,
+        previousOccurrence,
+        previousOccurrence.time
+      );
+    const frozenPoint =
+      point && previousOccurrence?.clipId === null
+        ? point
+        : mapping && point
+          ? mapSourceNormalizedPointToVisualLayer({ ...mapping, point })
+          : null;
+    return {
+      ...region,
+      targetAction: null,
+      focusMode: 'MANUAL' as const,
+      focusPoint: frozenPoint ?? previous?.focusPoint ?? region.focusPoint,
+    };
   });
+  return nextRegions?.every((region, index) => region === regions?.[index]) ? regions : nextRegions;
 }
 
 interface RecordingClipTimeline {
@@ -350,20 +333,12 @@ export function reconcileRecordingInteractionAnchors(
 ): VideoProject {
   if (previousProject.id !== nextProject.id) return nextProject;
   const timelines = collectRecordingClipTimelines(previousProject, nextProject);
-  if (
-    ![...timelines.values()].some(({ previousClips, nextClips }) =>
-      hasSourceTimelineChanged(previousClips, nextClips)
-    )
-  ) {
-    return nextProject;
-  }
-  const { events, projections } = reconcileActionEvents(
+  const events = reconcileActionEvents(nextProject);
+  const motionRegions = reconcileMotionRegions(
     previousProject,
-    nextProject,
-    timelines,
+    { ...nextProject, actionEvents: events },
     splitLineage
   );
-  const motionRegions = reconcileMotionRegions(previousProject, nextProject, events, projections);
   let objectTracks = nextProject.objectTracks;
   if (objectTracks !== undefined && objectTracks === previousProject.objectTracks) {
     for (const [recordingId, { previousClips, nextClips }] of timelines) {

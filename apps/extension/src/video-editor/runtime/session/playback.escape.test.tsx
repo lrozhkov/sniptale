@@ -18,7 +18,7 @@ function PlaybackEscapeHarness(props: { clearPlacementMode: () => void }) {
       selection: { kind: 'motion-region', motionRegionId: 'motion-1' },
       placementMode: { kind: 'motion-focus', motionRegionId: 'motion-1' },
       selectedClipId: null,
-      selectedActionEvent: null,
+      selectedActionOccurrence: null,
       selectedMotionRegion: null,
     },
     {

@@ -1,3 +1,4 @@
+import type { AutoProcessingActions } from '../../project/operations/auto-transform';
 import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
 import type {
   VideoBlockKind,
@@ -7,7 +8,6 @@ import type {
   VideoProjectShapeType,
   VideoTrackKind,
 } from '../../../features/video/project/types';
-import type { VideoAutoProcessingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import type { VideoProjectUtilityLaneKind } from '../../../features/video/project/utility-lanes';
 import type { VideoEditorPlaybackRange } from '../../interaction/playback/range';
 import type { VideoEditorSelection } from '../../contracts/selection';
@@ -43,6 +43,7 @@ export interface ProjectTimelineInsertionActions {
 }
 
 export interface ProjectTimelineProps {
+  canDeleteSelectedClip: boolean;
   canEditSelectedClip: boolean;
   canSplitSelectedClip: boolean;
   historyTransaction: VideoEditorProjectHistoryTransactionActions;
@@ -53,11 +54,10 @@ export interface ProjectTimelineProps {
   insertion: ProjectTimelineInsertionActions;
   magnetEnabled: boolean;
   playbackRange: VideoEditorPlaybackRange | null;
-  recordingTelemetry: RecordingTelemetryEntry | null;
+  recordingTelemetry: readonly RecordingTelemetryEntry[];
   selection: VideoEditorSelection;
   selectedClipId: string | null;
   selectedTrackId: string | null;
-  telemetryLaneVisible: boolean;
   timelinePreviews: TimelineClipPreviewMap;
   onSeekToEnd: () => void;
   onSeekToStart: () => void;
@@ -68,7 +68,6 @@ export interface ProjectTimelineProps {
   onSeek: (time: number) => void;
   onZoomChange: (value: number) => void;
   onSetPlaybackRange: (range: VideoEditorPlaybackRange | null) => void;
-  onToggleTelemetryLaneVisibility: () => void;
   onSelectScene: () => void;
   onSelectClip: (clipId: string | null) => void;
   onSelectTrack: (trackId: string | null) => void;
@@ -79,9 +78,14 @@ export interface ProjectTimelineProps {
     startTime: number
   ) => void;
   onSelectCursorSegment: (sampleId: string) => void;
-  onSelectActionSegment: (actionEventId: string) => void;
+  onSelectHistorySpan?: (
+    target: import('../../contracts/commands/timeline').VideoEditorTypingSpanTarget
+  ) => void;
+  onSelectActionOccurrence: (eventId: string, clipId: string | null) => void;
+  onSelectHistoryLane?: (() => void) | undefined;
   onSelectMotionLane?: (() => void) | undefined;
-  onSelectMotionRegion: (motionRegionId: string) => void;
+  onSelectMotionRegion: (motionRegionId: string, part?: 'connection') => void;
+  onConnectMotionRegions?: ((fromRegionId: string, toRegionId: string) => void) | undefined;
   onSelectObjectTrack: (objectTrackId: string) => void;
   onSwapClip: (clipId: string, direction: 'left' | 'right') => void;
   onMoveClip: VideoEditorMoveClipAction;
@@ -94,13 +98,12 @@ export interface ProjectTimelineProps {
   onDuplicateSelectedClip: () => void;
   onDeleteSelectedClip: () => void;
   onUpdateSelectedClipPlaybackRate: (playbackRate: number) => void;
-  onAutoTransformRecording: (settings: VideoAutoProcessingSettings) => void;
+  autoProcessing: AutoProcessingActions;
+  onAutoProcessingModalVisibilityChange: (open: boolean) => void;
   onDeleteSelectedTimelineObject: () => void;
   onToggleUtilityLaneVisibility: (lane: VideoProjectUtilityLaneKind) => void;
   onToggleUtilityLaneLock: (lane: VideoProjectUtilityLaneKind) => void;
   onClearUtilityLane: (lane: VideoProjectUtilityLaneKind) => void;
-  onMoveActionEvent: (actionEventId: string, time: number) => void;
-  onResizeActionEvent: (actionEventId: string, duration: number) => void;
   onMoveCursorSegment: (
     sampleId: string,
     nextSampleId: string | null,
@@ -108,6 +111,9 @@ export interface ProjectTimelineProps {
     endTime: number | null
   ) => void;
   onMoveTransitionSegment: (transitionId: string, startTime: number) => void;
+  onMoveActionOccurrence?:
+    | ((eventId: string, clipId: string | null, time: number) => void)
+    | undefined;
   onMoveMotionRegion: (motionRegionId: string, startTime: number) => void;
   onResizeMotionRegion: (motionRegionId: string, startTime: number, duration: number) => void;
   onUpdateEffectInstance: (instanceId: string, patch: VideoProjectEffectInstancePatch) => void;
@@ -118,7 +124,7 @@ export interface ProjectTimelineProps {
 }
 
 export type DragMode = 'move' | 'trim-start' | 'trim-end';
-type EffectLaneKind = 'transition' | 'cursor' | 'action' | 'motion' | 'effect-instance';
+type EffectLaneKind = 'transition' | 'cursor' | 'motion' | 'effect-instance' | 'action';
 
 export interface TimelineEffectSelection {
   kind: EffectLaneKind;
@@ -141,11 +147,12 @@ export interface TimelineEffectDragDraft {
 export type TimelineEffectDragTarget =
   | {
       kind: 'action';
-      mode: 'move' | 'resize-end';
+      eventId: string;
+      clipId: string | null;
       segmentId: string;
-      actionEventId: string;
-      originalDuration: number;
-      originalTime: number;
+      originalStart: number;
+      minimumTime: number;
+      maximumTime: number;
     }
   | {
       kind: 'cursor';

@@ -43,9 +43,8 @@ function ProjectTimelineLayout(
         {...props}
         cursorLaneVisible={props.panelPrefs.cursorLaneVisible}
         telemetryLaneVisible={
-          props.telemetryLaneVisible &&
-          props.recordingTelemetry !== null &&
-          props.panelPrefs.telemetryLaneVisible
+          props.panelPrefs.telemetryLaneVisible &&
+          (props.project.actionEvents.length > 0 || props.recordingTelemetry.length > 0)
         }
         trackPanelPrefs={props.panelPrefs}
       />

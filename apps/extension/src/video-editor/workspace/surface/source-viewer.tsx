@@ -72,11 +72,12 @@ function SourceMediaViewer(props: SourceMediaViewerProps) {
   usePlaybackSpaceShortcut(() => {
     if (!image) toggle();
   }, props.active);
-  const canPlace = usable && (image || validRange);
+  const canPlace = usable && !viewer.placing && (image || validRange);
   return (
     <div
       ref={viewerRef}
       data-ui="video-editor.source-viewer"
+      aria-busy={viewer.placing}
       tabIndex={0}
       onKeyDown={onKeyDown}
       aria-label={translate('videoEditor.app.sourceViewer')}

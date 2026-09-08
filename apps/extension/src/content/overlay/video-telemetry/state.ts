@@ -21,7 +21,10 @@ export function createInitialState(): TelemetryState {
     segmentStartedAtTimestamp: 0,
     signals: [],
     typingSignal: null,
+    typingTarget: null,
     viewport: null,
+    viewportObservation: null,
+    viewportObserver: null,
   };
 }
 
@@ -88,7 +91,10 @@ export function resetTelemetryState(
   state.segmentStartedAtTimestamp = performance.now();
   state.signals = [];
   state.typingSignal = null;
+  state.typingTarget = null;
   state.viewport = buildViewportSnapshot();
+  state.viewportObservation = { initial: buildRecordingViewportGeometry(), stable: true };
+  observeViewportGeometry(state);
 }
 
 export function attachListeners(state: TelemetryState): void {
@@ -102,4 +108,52 @@ export function attachListeners(state: TelemetryState): void {
   window.addEventListener('scroll', state.listeners.scroll, true);
   document.addEventListener('visibilitychange', state.listeners.visibilityChange, true);
   state.idleTimerId = window.setInterval(() => tickCursorIdleTelemetry(state), 250);
+}
+
+function buildRecordingViewportGeometry() {
+  return {
+    width: window.innerWidth,
+    height: window.innerHeight,
+    devicePixelRatio: window.devicePixelRatio,
+    visualViewportScale: window.visualViewport?.scale ?? 1,
+    visualViewportOffsetX: window.visualViewport?.offsetLeft ?? 0,
+    visualViewportOffsetY: window.visualViewport?.offsetTop ?? 0,
+  };
+}
+
+export function observeViewportGeometry(state: TelemetryState): void {
+  const observation = state.viewportObservation;
+  if (!observation) return;
+  const current = buildRecordingViewportGeometry();
+  const initial = observation.initial;
+  state.viewportObservation = {
+    initial,
+    stable:
+      observation.stable &&
+      current.width === initial.width &&
+      current.height === initial.height &&
+      current.devicePixelRatio === initial.devicePixelRatio &&
+      current.visualViewportScale === 1 &&
+      current.visualViewportOffsetX === 0 &&
+      current.visualViewportOffsetY === 0 &&
+      current.width > 0 &&
+      current.height > 0 &&
+      Number.isFinite(current.devicePixelRatio) &&
+      current.devicePixelRatio > 0,
+  };
+}
+
+export function attachViewportObserver(state: TelemetryState): void {
+  state.viewportObserver = () => observeViewportGeometry(state);
+  window.addEventListener('resize', state.viewportObserver);
+  window.visualViewport?.addEventListener('resize', state.viewportObserver);
+  window.visualViewport?.addEventListener('scroll', state.viewportObserver);
+}
+
+export function removeViewportObserver(state: TelemetryState): void {
+  if (!state.viewportObserver) return;
+  window.removeEventListener('resize', state.viewportObserver);
+  window.visualViewport?.removeEventListener('resize', state.viewportObserver);
+  window.visualViewport?.removeEventListener('scroll', state.viewportObserver);
+  state.viewportObserver = null;
 }

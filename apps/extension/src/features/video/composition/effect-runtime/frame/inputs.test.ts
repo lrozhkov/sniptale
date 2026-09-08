@@ -225,3 +225,79 @@ function createLayer(clipId: string): VideoCompositionVisualLayer {
     zIndex: 0,
   };
 }
+
+it('bakes captured actions into isolated effect input once without appending to the bitmap', async () => {
+  const { drawCompositionVisualLayer, drawCompositionVisualLayerBitmap } =
+    await import('../../draw/visual');
+  const { createVisualTestContext } = await import('../../draw/visual.test-support');
+  Object.assign(context, createVisualTestContext(), { clearRect, arc: vi.fn() });
+  drawLayer.mockImplementation(drawCompositionVisualLayer);
+  const base = createLayer('captured');
+  if (base.kind !== 'image') throw new Error('Expected media fixture');
+  const event = {
+    id: 'fact',
+    kind: 'CLICK' as const,
+    label: 'Click',
+    data: {},
+    point: { x: 0.25, y: 0.5 },
+    anchor: {
+      kind: 'recording-source' as const,
+      recordingId: 'recording',
+      sourceInstanceId: 'instance',
+      sourceEventId: 'raw',
+      sourceTime: 0.5,
+    },
+  };
+  const layer: Extract<VideoCompositionVisualLayer, { kind: 'video' }> = {
+    ...base,
+    kind: 'video',
+    clip: {
+      ...base.clip,
+      type: 'VIDEO',
+      sourceInstanceId: 'instance',
+      sourceStart: 0,
+      sourceDuration: 2,
+    },
+    actions: [
+      {
+        event,
+        clipId: base.clipId,
+        occurrence: {
+          event,
+          eventId: event.id,
+          clipId: base.clipId,
+          time: 0.5,
+          sourceInstanceId: 'instance',
+          playbackRun: { id: base.clipId, clipIds: [base.clipId] },
+        },
+        duration: 1,
+        point: event.point,
+        preset: 'CLICK_RIPPLE',
+        renderKind: 'accent',
+        progress: 0.5,
+        start: 0.5,
+      },
+    ],
+  };
+  const source = { sourceWidth: 20, sourceHeight: 10, draw: vi.fn() };
+  const materializer = createEffectRuntimeInputMaterializer({
+    clipMediaElements: new Map([[layer.clipId, source]]),
+    imageBank: {},
+    visualLayers: [layer],
+    createBitmap: vi.fn().mockResolvedValue(new FakeBitmap(20, 10)),
+  });
+  const bitmap = await materializer.materializeTargetSource(
+    createPlan({
+      kind: 'clip',
+      chainIndex: 0,
+      clipId: layer.clipId,
+      placement: { x: 0, y: 0, width: 20, height: 10, rotation: 0, opacity: 1 },
+    })
+  );
+  expect(source.draw).toHaveBeenCalledOnce();
+  expect(context.arc).toHaveBeenCalledTimes(1);
+  expect(context.arc).toHaveBeenCalledWith(5, 5, 32, 0, Math.PI * 2);
+  drawCompositionVisualLayerBitmap(context as CanvasRenderingContext2D, layer, bitmap, 1, 1);
+  expect(context.arc).toHaveBeenCalledTimes(1);
+  bitmap.close();
+});

@@ -61,30 +61,6 @@ export const VideoMotionOverlayZoomMode = {
 export type VideoMotionOverlayZoomMode =
   (typeof VideoMotionOverlayZoomMode)[keyof typeof VideoMotionOverlayZoomMode];
 
-export const VideoMotionCameraMode = {
-  STATIC: 'STATIC',
-  PATH: 'PATH',
-} as const;
-
-export type VideoMotionCameraMode =
-  (typeof VideoMotionCameraMode)[keyof typeof VideoMotionCameraMode];
-
-export const VideoMotionPathTargetKind = {
-  POINT: 'POINT',
-  AREA: 'AREA',
-} as const;
-
-export type VideoMotionPathTargetKind =
-  (typeof VideoMotionPathTargetKind)[keyof typeof VideoMotionPathTargetKind];
-
-export const VideoMotionPathTrajectoryPreset = {
-  LINEAR: 'LINEAR',
-  SOFT_ARC: 'SOFT_ARC',
-} as const;
-
-export type VideoMotionPathTrajectoryPreset =
-  (typeof VideoMotionPathTrajectoryPreset)[keyof typeof VideoMotionPathTrajectoryPreset];
-
 export const VideoProjectActionEventKind = {
   CLICK: 'CLICK',
   SCROLL: 'SCROLL',
@@ -173,8 +149,51 @@ export interface VideoProjectActionPoint {
   y: number;
 }
 
-export interface VideoProjectActionEvent {
-  /** Retained authored effect clock, mapped onto this event's visible duration. */
+/** Project-wide presentation defaults; captured event facts remain independent. */
+export interface VideoProjectActionPresentation {
+  enabled: boolean;
+  clickPreset: VideoProjectActionPreset;
+  duration: number;
+  offset: number;
+  clickSuppressionInterval: number;
+  showKeystrokes: boolean;
+}
+
+/** Missing properties inherit the current project presentation defaults. */
+export interface VideoProjectActionPresentationOverride {
+  enabled?: boolean;
+  preset?: VideoProjectActionPreset;
+  duration?: number;
+  offset?: number;
+  point?: VideoProjectActionPoint;
+}
+
+/** Raw recording telemetry. Its clock and coordinates belong to the capture. */
+export type RecordingViewportGeometry = Readonly<{
+  width: number;
+  height: number;
+  devicePixelRatio: number;
+  visualViewportScale: number;
+  visualViewportOffsetX: number;
+  visualViewportOffsetY: number;
+}>;
+
+export type RecordingViewportObservation = Readonly<{
+  initial: RecordingViewportGeometry;
+  stable: boolean;
+}>;
+
+export type RecordingPointTransform = Readonly<{
+  viewport: RecordingViewportGeometry;
+  visibleClientRect: Readonly<{ x: number; y: number; width: number; height: number }>;
+  scaleX: number;
+  scaleY: number;
+  offsetX: number;
+  offsetY: number;
+}>;
+
+export interface RecordingActionEvent {
+  readonly recordingPoint?: Readonly<{ x: number; y: number }> | null;
   animation?: { start: number; end: number; duration: number };
   id: string;
   kind: VideoProjectActionEventKind;
@@ -186,6 +205,34 @@ export interface VideoProjectActionEvent {
   preset: VideoProjectActionPreset;
   sourceAnchor?: VideoProjectSourceTimeAnchor;
   timeBasis?: VideoProjectInteractionTimeBasis;
+}
+
+/** Capture facts after explicit source geometry projection; point is normalized [0, 1] or unavailable. */
+export type SourceNormalizedRecordingActionEvent = Pick<
+  RecordingActionEvent,
+  'id' | 'kind' | 'time' | 'duration' | 'point' | 'label' | 'data' | 'preset'
+>;
+
+export type VideoProjectActionAnchor =
+  | { kind: 'project'; time: number }
+  | {
+      kind: 'recording-source';
+      recordingId: string;
+      sourceInstanceId: string;
+      sourceEventId: string;
+      sourceTime: number;
+    };
+
+/** Authored fact; visible occurrences are derived from the current source fragments. */
+export interface VideoProjectActionEvent {
+  id: string;
+  anchor: VideoProjectActionAnchor;
+  kind: VideoProjectActionEventKind;
+  label: string;
+  data: Record<string, string | number | boolean | null>;
+  point: VideoProjectActionPoint | null;
+  capturedDuration?: number;
+  presentation?: VideoProjectActionPresentationOverride;
 }
 
 export const RecordingTelemetrySignalKind = {
@@ -218,46 +265,20 @@ export interface VideoProjectMotionArea {
   y: number;
 }
 
-export interface VideoProjectMotionPathPointTarget {
-  kind: typeof VideoMotionPathTargetKind.POINT;
-  scale: number;
-  x: number;
-  y: number;
-}
-
-export interface VideoProjectMotionPathAreaTarget {
-  height: number;
-  kind: typeof VideoMotionPathTargetKind.AREA;
-  width: number;
-  x: number;
-  y: number;
-}
-
-export type VideoProjectMotionPathTarget =
-  | VideoProjectMotionPathAreaTarget
-  | VideoProjectMotionPathPointTarget;
-
-export interface VideoProjectMotionPathStop {
-  id: string;
-  offset: number;
-  target: VideoProjectMotionPathTarget;
-}
-
-export interface VideoProjectMotionPathSegment {
-  durationWeight: number;
-  easing: VideoTemporalEasing;
-  trajectoryPreset: VideoMotionPathTrajectoryPreset;
-}
-
-export interface VideoProjectMotionPath {
-  segments: VideoProjectMotionPathSegment[];
-  stops: VideoProjectMotionPathStop[];
-}
-
 export interface VideoProjectMotionRegion {
+  /** Authored interval tied to one source clip, retained while its visible part is trimmed. */
+  sourceBinding?: {
+    animationGroupId?: string;
+    clipId: string;
+    sourceStart: number;
+    sourceEnd: number;
+    animation: { start: number; end: number; duration: number };
+  };
+  /** Transition from the preceding held state; timing is derived from both endpoints. */
+  incomingConnection?: { fromRegionId: string; easing: VideoTemporalEasing } | null;
   /** Retained interval within the original zoom animation, independent of timeline placement. */
   animation?: { start: number; end: number; duration: number };
-  cameraMode?: VideoMotionCameraMode;
+
   duration: number;
   easing: VideoTemporalEasing;
   focusArea?: VideoProjectMotionArea | null;
@@ -266,10 +287,10 @@ export interface VideoProjectMotionRegion {
   id: string;
   motionBlurAmount?: number;
   overlayZoomMode?: VideoMotionOverlayZoomMode;
-  path?: VideoProjectMotionPath | null;
+
   scale: number;
   startTime: number;
-  targetActionEventId: string | null;
+  targetAction: { eventId: string; clipId: string | null } | null;
   zoomInDuration: number;
   zoomOutDuration: number;
 }

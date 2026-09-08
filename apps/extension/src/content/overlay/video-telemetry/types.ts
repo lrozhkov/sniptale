@@ -25,12 +25,13 @@ export type CursorIdleTelemetrySignal = TelemetrySignal & {
   };
 };
 
-export type TypingTelemetrySignal = TelemetrySignal & {
+export type TypingTelemetrySignal = Omit<TelemetrySignal, 'data'> & {
   kind: 'typing';
   data: {
     eventCount: number;
     eventType: string;
     lastEventTimeMs: number;
+    targetDescription?: Record<string, string>;
   };
 };
 
@@ -51,5 +52,8 @@ export type TelemetryState = {
   segmentStartedAtTimestamp: number;
   signals: RecordingTelemetrySnapshot['signals'];
   typingSignal: TypingTelemetrySignal | null;
+  typingTarget: Element | null;
+  viewportObservation: RecordingTelemetrySnapshot['viewportObservation'];
+  viewportObserver: (() => void) | null;
   viewport: RecordingTelemetrySnapshot['viewport'];
 };

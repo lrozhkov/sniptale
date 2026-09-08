@@ -4,7 +4,7 @@ import {
   VideoMotionOverlayZoomMode,
 } from '../../../../../features/video/project/types';
 import type { VideoTemporalEasing } from '../../../../../features/video/project/types';
-import { getVisibleProjectActionEvents } from '../../../../project/operations/action-events';
+import { resolveVideoProjectActionOccurrences } from '../../../../../features/video/project/action-occurrences';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import {
   getMotionOverlayZoomModeOptions,
@@ -126,27 +126,36 @@ export function MotionOverlayZoomField(props: {
 export function MotionTargetActionField(props: {
   motionRegionId: string;
   panel: WorkspaceSidebarSelectionPanelProps;
-  value: string | null;
+  value: import('../../../../../features/video/project/types').VideoProjectMotionRegion['targetAction'];
 }) {
-  const actionEvents = getVisibleProjectActionEvents(props.panel.project);
+  const actionEvents = resolveVideoProjectActionOccurrences(props.panel.project).filter((item) => {
+    const clip = props.panel.project.clips.find((clip) => clip.id === item.clipId);
+    return (
+      (item.event.presentation?.point ?? item.event.point) !== null &&
+      props.panel.project.tracks.find((track) => track.id === clip?.trackId)?.role !== 'CAMERA'
+    );
+  });
 
   return (
     <SelectInput
       label={translate('videoEditor.sidebar.motionTargetActionLabel')}
-      value={props.value ?? ''}
-      onChange={(value) =>
+      value={props.value ? JSON.stringify([props.value.eventId, props.value.clipId]) : ''}
+      onChange={(value) => {
+        const item = actionEvents.find(
+          (item) => JSON.stringify([item.eventId, item.clipId]) === value
+        );
         props.panel.onUpdateMotionRegion(props.motionRegionId, {
-          targetActionEventId: value || null,
-        })
-      }
+          targetAction: item ? { eventId: item.eventId, clipId: item.clipId } : null,
+        });
+      }}
       options={[
         {
           value: '',
           label: translate('videoEditor.sidebar.motionTargetActionNone'),
         },
         ...actionEvents.map((event) => ({
-          value: event.id,
-          label: event.label,
+          value: JSON.stringify([event.eventId, event.clipId]),
+          label: `${event.event.label} · ${event.time.toFixed(2)} s`,
         })),
       ]}
     />

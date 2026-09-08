@@ -170,6 +170,7 @@ it('serializes full native telemetry and speed intent in microseconds, retaining
           time: 1.25,
           duration: 0.1,
           animation: { start: 1.25, end: 1.35, duration: 0.1 },
+          timeBasis: 'project',
           sourceAnchor,
           point: { x: -200, y: 100 },
           label: 'Click',
@@ -198,7 +199,23 @@ it('serializes full native telemetry and speed intent in microseconds, retaining
     },
   });
   const payload = JSON.parse(report.split('```json\n')[1]!.split('\n```')[0]!);
-  expect(payload.telemetry.actionEvents[0].animation.durationUs).toBe(100000);
+  expect(payload.telemetry.actionEvents[0]).toMatchObject({
+    id: 'click',
+    timeUs: 1250000,
+    durationUs: 100000,
+    preset: 'NONE',
+    timeBasis: 'project',
+    animation: { startUs: 1250000, endUs: 1350000, durationUs: 100000 },
+    sourceAnchor: {
+      kind: 'recording-source',
+      recordingId: 'r',
+      sourceClipId: 'clip',
+      sourceTimeUs: 1250000,
+    },
+  });
+  expect(payload.telemetry.actionEvents[0]).not.toHaveProperty('anchor');
+  expect(payload.telemetry.actionEvents[0]).not.toHaveProperty('time');
+  expect(payload.telemetry.actionEvents[0]).not.toHaveProperty('duration');
   expect(payload.telemetry.cursorTrack.samples[0].sourceAnchor.sourceTimeUs).toBe(1250000);
   expect(payload.telemetry.cursorTrack.samples).toHaveLength(2);
   expect(payload.annotations[0].anchor).toEqual({ kind: 'range', startUs: 0, endUs: 3000000 });

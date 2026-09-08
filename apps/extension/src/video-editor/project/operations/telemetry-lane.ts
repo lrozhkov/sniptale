@@ -1,41 +1,25 @@
 import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
-import {
-  isLegacyScrollActionEvent,
-  type SourceTimedProjectSpan,
-} from '../../../features/video/project/timeline/source-time';
+import { type SourceTimedProjectSpan } from '../../../features/video/project/timeline/source-time';
 import { mapSourceRangeToProjectSpans } from '../../../features/video/project/timeline/source-time';
-import type { VideoProject, VideoProjectActionEvent } from '../../../features/video/project/types';
-import {
-  RecordingTelemetrySignalKind,
-  VideoProjectActionEventKind,
-} from '../../../features/video/project/types/interaction';
-import { mapSourceTimeToProjectTime } from './auto-transform.clip-timeline';
-import {
-  createRecordingTelemetryNormalizationParams,
-  normalizeRecordingActionEventsToProjectSpace,
-} from './telemetry';
+import type { VideoProject } from '../../../features/video/project/types';
+import { RecordingTelemetrySignalKind } from '../../../features/video/project/types/interaction';
 import { collectRepresentativeRecordingSourceClips } from './source-timed-clips';
 import { buildStableSignalIntersections, mergeTimeRanges } from './time-ranges';
-
-interface TimelineTelemetryLaneMarker {
-  id: string;
-  kind: 'click' | 'key';
-  label: string;
-  point: VideoProjectActionEvent['point'];
-  time: number;
-}
 
 interface TimelineTelemetryLaneSpan {
   endTime: number;
   id: string;
   kind: 'stable' | 'typing';
+  clipId: string;
+  recordingId: string;
+  sourceInstanceId: string;
+  signalId: string | null;
   sourceEnd: number;
   sourceStart: number;
   startTime: number;
 }
 
 interface TimelineTelemetryLaneData {
-  markers: TimelineTelemetryLaneMarker[];
   spans: TimelineTelemetryLaneSpan[];
 }
 
@@ -49,11 +33,20 @@ function buildTelemetryLaneSpans(
     idPrefix: string,
     kind: TimelineTelemetryLaneSpan['kind']
   ) =>
-    spans.map<TimelineTelemetryLaneSpan>((span) => ({
-      ...span,
-      id: `${idPrefix}:${span.clipId}`,
-      kind,
-    }));
+    spans.flatMap<TimelineTelemetryLaneSpan>((span) => {
+      const clip = clips.find((item) => item.id === span.clipId);
+      if (!clip?.sourceInstanceId) return [];
+      return [
+        {
+          ...span,
+          id: JSON.stringify([recordingId, idPrefix, span.clipId]),
+          kind,
+          recordingId,
+          sourceInstanceId: clip.sourceInstanceId,
+          signalId: kind === 'typing' ? idPrefix : null,
+        },
+      ];
+    });
   const clips = collectRepresentativeRecordingSourceClips(project, recordingId);
   const typingSignals = telemetry.signals.filter(
     (signal) => signal.kind === RecordingTelemetrySignalKind.TYPING
@@ -81,48 +74,13 @@ function buildTelemetryLaneSpans(
   );
 }
 
-function buildTelemetryLaneMarkers(
-  project: VideoProject,
-  recordingId: string,
-  telemetry: RecordingTelemetryEntry
-): TimelineTelemetryLaneMarker[] {
-  const normalizedActionEvents = normalizeRecordingActionEventsToProjectSpace(
-    telemetry.actionEvents,
-    createRecordingTelemetryNormalizationParams(telemetry, project)
-  );
-
-  return normalizedActionEvents
-    .filter((event) => !isLegacyScrollActionEvent(event))
-    .filter(
-      (event) =>
-        event.kind === VideoProjectActionEventKind.CLICK ||
-        event.kind === VideoProjectActionEventKind.KEY
-    )
-    .map<TimelineTelemetryLaneMarker | null>((event) => {
-      const time = mapSourceTimeToProjectTime(project, recordingId, event.time);
-      if (time === null) {
-        return null;
-      }
-
-      return {
-        id: event.id,
-        kind: event.kind === VideoProjectActionEventKind.KEY ? 'key' : 'click',
-        label: event.label,
-        point: event.point,
-        time,
-      };
-    })
-    .filter((marker): marker is TimelineTelemetryLaneMarker => marker !== null)
-    .sort((left, right) => left.time - right.time);
-}
-
 export function buildTimelineTelemetryLaneData(
   project: VideoProject,
   recordingId: string,
   telemetry: RecordingTelemetryEntry
 ): TimelineTelemetryLaneData {
+  if (telemetry.recordingId !== recordingId) return { spans: [] };
   return {
-    markers: buildTelemetryLaneMarkers(project, recordingId, telemetry),
     spans: buildTelemetryLaneSpans(project, recordingId, telemetry),
   };
 }

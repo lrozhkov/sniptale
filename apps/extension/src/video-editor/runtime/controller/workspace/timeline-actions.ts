@@ -1,5 +1,6 @@
-import { clampNumber } from '../../../../features/video/project/timeline/basics';
-import { normalizeVideoProjectMotionRegion } from '../../../../features/video/project/motion';
+import { resolveMotionConnectionSource } from '../../../../features/video/project/motion';
+import { VideoTemporalEasing } from '../../../../features/video/project/types';
+import { isVideoProjectUtilityLaneLocked } from '../../../../features/video/project/utility-lanes';
 import { getClipEndTime } from '../../../../features/video/project/timeline';
 import { getProjectTransitionById } from '../../../../features/video/project/transition/project';
 import { VideoEditorSelectionKind } from '../../../contracts/selection';
@@ -7,14 +8,13 @@ import { VideoProjectInteractionTimeBasis } from '../../../../features/video/pro
 import type { VideoEditorRuntimeController } from '../../session';
 import type {
   ClipSelectionPort,
-  RecordingTelemetryPort,
   HistoryPort,
   ProjectLifecyclePort,
   TimelineEditingPort,
 } from '../../../contracts/controller-store';
 import type { VideoEditorWorkspaceState } from '../workspace-state';
 import { createTimelineTrackActions } from './timeline-track-actions';
-import { createAutoTransformRecordingAction } from './timeline-auto-transform';
+import { createAutoProcessingActions } from './timeline-auto-transform';
 import { getCurrentVideoEditorProjectSnapshot } from '../store';
 
 type TimelineWorkspace = Pick<
@@ -29,7 +29,6 @@ type SelectedClipActions = {
 
 type TimelineActionStore = TimelineEditingPort &
   ClipSelectionPort &
-  Pick<RecordingTelemetryPort, 'toggleTelemetryLaneVisibility'> &
   Pick<
     HistoryPort,
     | 'beginProjectHistoryTransaction'
@@ -48,25 +47,6 @@ function moveInteractionToProjectTime<
   };
   delete nextInteraction.sourceAnchor;
   return nextInteraction;
-}
-
-function createActionEventMover(store: TimelineActionStore) {
-  return (actionEventId: string, time: number) => {
-    store.updateProject((project) => ({
-      ...project,
-      actionEvents: project.actionEvents.map((event) =>
-        event.id === actionEventId
-          ? moveInteractionToProjectTime(event, clampNumber(time, 0, project.duration))
-          : event
-      ),
-    }));
-  };
-}
-
-function createActionEventResizer(store: TimelineActionStore) {
-  return (actionEventId: string, duration: number) => {
-    store.updateActionEventDetails(actionEventId, { duration });
-  };
 }
 
 function createCursorSegmentMover(store: TimelineActionStore) {
@@ -124,29 +104,13 @@ function createTransitionMover(store: TimelineActionStore) {
 }
 
 function createMotionRegionMover(store: TimelineActionStore) {
-  return (motionRegionId: string, startTime: number) => {
-    store.updateProject((project) => ({
-      ...project,
-      motionRegions: (project.motionRegions ?? []).map((region) =>
-        region.id === motionRegionId
-          ? normalizeVideoProjectMotionRegion(project, { ...region, startTime })
-          : region
-      ),
-    }));
-  };
+  return (motionRegionId: string, startTime: number) =>
+    store.updateMotionRegion(motionRegionId, { startTime });
 }
 
 function createMotionRegionResizer(store: TimelineActionStore) {
-  return (motionRegionId: string, startTime: number, duration: number) => {
-    store.updateProject((project) => ({
-      ...project,
-      motionRegions: (project.motionRegions ?? []).map((region) =>
-        region.id === motionRegionId
-          ? normalizeVideoProjectMotionRegion(project, { ...region, duration, startTime })
-          : region
-      ),
-    }));
-  };
+  return (motionRegionId: string, startTime: number, duration: number) =>
+    store.updateMotionRegion(motionRegionId, { startTime, duration });
 }
 
 function deleteSelectedTimelineObject(
@@ -155,6 +119,11 @@ function deleteSelectedTimelineObject(
   selectedClipActions: Pick<SelectedClipActions, 'deleteSelectedClip'>
 ) {
   switch (selection.kind) {
+    case VideoEditorSelectionKind.MOTION_CONNECTION:
+      store.updateMotionRegion(selection.motionRegionId, { incomingConnection: null });
+      return;
+    case VideoEditorSelectionKind.HISTORY_SPAN:
+    case VideoEditorSelectionKind.HISTORY_LANE:
     case VideoEditorSelectionKind.MOTION_LANE:
     case VideoEditorSelectionKind.SCENE:
     case VideoEditorSelectionKind.TRACK:
@@ -163,9 +132,14 @@ function deleteSelectedTimelineObject(
     case VideoEditorSelectionKind.CLIP:
       selectedClipActions.deleteSelectedClip();
       return;
-    case VideoEditorSelectionKind.ACTION_SEGMENT:
-      store.deleteActionEvent(selection.actionEventId);
+    case VideoEditorSelectionKind.ACTION_OCCURRENCE: {
+      const event = store.project?.actionEvents.find((item) => item.id === selection.eventId);
+      if (event)
+        store.updateActionEventDetails(event.id, {
+          presentation: { ...event.presentation, enabled: false },
+        });
       return;
+    }
     case VideoEditorSelectionKind.CURSOR_SEGMENT:
       store.deleteCursorSample(selection.sampleId);
       return;
@@ -193,17 +167,14 @@ export function createWorkspaceTimelineEditingActions(
       deleteSelectedTimelineObject(store.selection, store, selectedClipActions),
     onDuplicateSelectedClip: selectedClipActions.duplicateSelectedClip,
     onUpdateSelectedClipPlaybackRate: createSelectedClipPlaybackRateAction(store),
-    onAutoTransformRecording: createAutoTransformRecordingAction(
-      store,
-      getCurrentVideoEditorProjectSnapshot
-    ),
-    onMoveActionEvent: createActionEventMover(store),
-    onResizeActionEvent: createActionEventResizer(store),
+    autoProcessing: createAutoProcessingActions(store, getCurrentVideoEditorProjectSnapshot),
     onCloseTrackGap: store.closeTrackGap,
     onSwapClip: store.swapClip,
     onMoveClip: store.moveClip,
     onRenameTrack: store.renameTrack,
     onMoveCursorSegment: createCursorSegmentMover(store),
+    onMoveActionOccurrence: (eventId: string, clipId: string | null, time: number) =>
+      store.updateActionEventDetails(eventId, { clipId, time }),
     onMoveMotionRegion: createMotionRegionMover(store),
     onResizeMotionRegion: createMotionRegionResizer(store),
     ...createTimelineTrackActions(store, workspace),
@@ -212,7 +183,6 @@ export function createWorkspaceTimelineEditingActions(
     onClearUtilityLane: store.clearUtilityLane,
     onMoveTransitionSegment: createTransitionMover(store),
     onSplitSelectedClip: selectedClipActions.splitSelectedClip,
-    onToggleTelemetryLaneVisibility: store.toggleTelemetryLaneVisibility,
     onTrimClipEnd: store.trimClipEnd,
     onTrimClipStart: store.trimClipStart,
   };
@@ -254,10 +224,34 @@ export function createWorkspaceTimelineSelectionActions(
     onStepToPreviousFrame: () => runtime.stepByFrames(-1),
     onSetPlaybackRange: workspace.setPlaybackRange,
     onClearPlaybackRange: workspace.clearPlaybackRange,
-    onSelectActionSegment: selectWithInspector(store.selectActionSegment),
+    onSelectHistorySpan: selectWithInspector(store.selectHistorySpan),
+    onSelectActionOccurrence: selectWithInspector(store.selectActionOccurrence),
     onSelectClip: selectWithInspector(store.selectClip),
     onSelectCursorSegment: selectWithInspector(store.selectCursorSegment),
-    onSelectMotionRegion: selectWithInspector(store.selectMotionRegion),
+    onSelectMotionRegion: (motionRegionId: string, part?: 'connection') => {
+      selectWithInspector(store.selectMotionRegion)(motionRegionId, part);
+      const destination = store.project?.motionRegions?.find(
+        (region) => region.id === motionRegionId
+      );
+      const source =
+        destination && store.project
+          ? resolveMotionConnectionSource(store.project, destination)
+          : null;
+      if (part && destination && source)
+        seekOutsideRange((source.startTime + source.duration + destination.startTime) / 2);
+    },
+    onConnectMotionRegions: (fromRegionId: string, motionRegionId: string) => {
+      const project = store.project;
+      const destination = project?.motionRegions?.find((region) => region.id === motionRegionId);
+      if (!project || !destination || isVideoProjectUtilityLaneLocked(project, 'camera')) return;
+      const incomingConnection = { fromRegionId, easing: VideoTemporalEasing.EASE_IN_OUT };
+      const source = resolveMotionConnectionSource(project, { ...destination, incomingConnection });
+      if (!source) return;
+      store.updateMotionRegion(motionRegionId, { incomingConnection });
+      selectWithInspector(store.selectMotionRegion)(motionRegionId, 'connection');
+      seekOutsideRange((source.startTime + source.duration + destination.startTime) / 2);
+    },
+    onSelectHistoryLane: selectWithInspector(store.selectHistoryLane),
     onSelectMotionLane: selectWithInspector(store.selectMotionLane),
     onSelectObjectTrack: selectWithInspector(store.selectObjectTrack),
     onSelectScene: selectWithInspector(store.selectScene),

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  isLegacyScrollActionEvent,
+  isScrollActionEvent,
   mapProjectTimeToSourcePoint,
   mapSourceRangeToProjectSpans,
   mapSourceTimeToProjectPoint,
@@ -93,17 +93,17 @@ function verifyNormalizedSourceRanges() {
   ).toEqual([]);
 }
 
-function verifyLegacyScrollCompatibility() {
+function verifyScrollAdmission() {
   expect(
-    isLegacyScrollActionEvent({
+    isScrollActionEvent({
       kind: VideoProjectActionEventKind.SCROLL,
-      preset: VideoProjectActionPreset.SCROLL_EMPHASIS,
+      presentation: { preset: VideoProjectActionPreset.SCROLL_EMPHASIS },
     })
   ).toBe(true);
   expect(
-    isLegacyScrollActionEvent({
+    isScrollActionEvent({
       kind: VideoProjectActionEventKind.CLICK,
-      preset: VideoProjectActionPreset.CLICK_RIPPLE,
+      presentation: { preset: VideoProjectActionPreset.CLICK_RIPPLE },
     })
   ).toBe(false);
 }
@@ -114,7 +114,7 @@ describe('timeline source-time helpers', () => {
     'normalizes reversed inputs and drops source ranges outside the current clip timeline',
     verifyNormalizedSourceRanges
   );
-  it('treats scroll actions as legacy-only compatibility data', verifyLegacyScrollCompatibility);
+  it('treats scroll actions as legacy-only compatibility data', verifyScrollAdmission);
   it('maps source and project points bidirectionally with a stable preferred clip', () => {
     const clips = [
       createVideoClip({

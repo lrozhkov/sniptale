@@ -1,3 +1,4 @@
+import type { VideoProjectActionOccurrence } from '../../../features/video/project/action-occurrences';
 import type React from 'react';
 
 import type { VideoCompositionCameraState } from '../../../features/video/composition/types';
@@ -14,7 +15,10 @@ import type {
   VideoTrackKind,
 } from '../../../features/video/project/types/index';
 import type { VideoProjectAnnotationTemplatePatch } from '../../../features/video/project/annotation/contract';
-import type { VideoEditorMotionRegionPatch } from '../../contracts/commands/patches';
+import type {
+  VideoEditorActionEventPatch,
+  VideoEditorMotionRegionPatch,
+} from '../../contracts/commands/patches';
 import type { VideoEditorObjectTrackActions } from '../../contracts/commands/object-tracks';
 import type { PreviewStageGuide } from './canvas/snap';
 import type { PreviewStageImportHandlers } from '../../contracts/insertion';
@@ -82,12 +86,7 @@ export interface PreviewStageCanvasProps {
   onClearActiveInsertKind: () => void;
   onClearPlacementMode: () => void;
   onSelectClip: (clipId: string | null) => void;
-  onUpdateActionEventDetails: (
-    actionEventId: string,
-    patch: Partial<
-      Pick<VideoProject['actionEvents'][number], 'duration' | 'label' | 'point' | 'preset'>
-    >
-  ) => void;
+  onUpdateActionEventDetails: (actionEventId: string, patch: VideoEditorActionEventPatch) => void;
   onUpdateMotionRegion: (motionRegionId: string, patch: VideoEditorMotionRegionPatch) => void;
   onUpsertObjectTrackCorrectionAnchor?:
     | VideoEditorObjectTrackActions['upsertObjectTrackCorrectionAnchor']
@@ -106,7 +105,7 @@ export interface PreviewStageCanvasProps {
   previewExactFrameCache: VideoPreviewExactFrameCache;
   renderGenerationRef?: React.MutableRefObject<number>;
   project: VideoProject;
-  selectedActionEvent: VideoProject['actionEvents'][number] | null;
+  selectedActionOccurrence: VideoProjectActionOccurrence | null;
   selectedClip: VideoProjectClip | null;
   selectedClipId: string | null;
   selectedClipLocked: boolean;

@@ -1,10 +1,18 @@
+import { resolveVideoProjectActionOccurrences } from '../../../features/video/project/action-occurrences';
+import { getVideoProjectActionPresentation } from '../../../features/video/project/action-presentation';
+import {
+  isVideoProjectActionPresentation,
+  isVideoProjectActionPresentationOverride,
+} from '../../../features/video/project/validation/interaction';
 import { normalizeVideoProjectMotionRegion } from '../../../features/video/project/motion';
+import {
+  bindMotionRegionToClip,
+  clampMotionRegionStartTime,
+  getMotionBindingCandidates,
+} from '../../../features/video/project/motion/source-binding';
 import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
 import { isVideoProjectUtilityLaneLocked } from '../../../features/video/project/utility-lanes';
-import {
-  VideoProjectActionEventKind,
-  VideoProjectActionPreset,
-} from '../../../features/video/project/types/index';
+import { VideoProjectClipType } from '../../../features/video/project/types/index';
 import { resolvePlacementModeAfterProjectUpdate } from '../selection/placement';
 import { createSceneSelection } from '../selection/model';
 import { VideoEditorSelectionKind } from '../../contracts/selection';
@@ -42,6 +50,7 @@ type VideoEditorProjectEffectActionSurface = Pick<
   | 'duplicateEffectInstance'
   | 'insertCursorSample'
   | 'moveEffectInstance'
+  | 'updateActionPresentation'
   | 'updateActionEventDetails'
   | 'updateCursorSampleInterpolation'
   | 'updateCursorSampleSkinOverride'
@@ -52,22 +61,6 @@ type VideoEditorProjectEffectActionSurface = Pick<
   | 'updateTransitionTemplate'
   | 'updateEffectInstance'
 >;
-
-function resolveActionKindForPreset(
-  preset: NonNullable<VideoEditorProjectState['project']>['actionEvents'][number]['preset']
-) {
-  switch (preset) {
-    case VideoProjectActionPreset.SCROLL_EMPHASIS:
-      return VideoProjectActionEventKind.SCROLL;
-    case VideoProjectActionPreset.DWELL_ZOOM:
-      return VideoProjectActionEventKind.PAUSE;
-    case VideoProjectActionPreset.SPOTLIGHT:
-      return VideoProjectActionEventKind.CALLOUT;
-    case VideoProjectActionPreset.NONE:
-    case VideoProjectActionPreset.CLICK_RIPPLE:
-      return VideoProjectActionEventKind.CLICK;
-  }
-}
 
 export function createVideoEditorProjectEffectActions(
   set: VideoEditorStoreSet,
@@ -85,6 +78,7 @@ export function createVideoEditorProjectEffectActions(
   const updateCursorSampleSkinOverride = createCursorSkinOverrideUpdater(set);
   const deleteActionEvent = createActionDeleter(set);
   const updateActionEventDetails = createActionDetailsUpdater(set);
+  const updateActionPresentation = createActionPresentationUpdater(set);
   const updateMotionRegion = createMotionRegionUpdater(set);
   const deleteMotionRegion = createMotionRegionDeleter(set);
 
@@ -95,6 +89,7 @@ export function createVideoEditorProjectEffectActions(
     deleteCursorSample,
     deleteMotionRegion,
     insertCursorSample,
+    updateActionPresentation,
     updateActionEventDetails,
     updateCursorSampleInterpolation,
     updateCursorSampleSkinOverride,
@@ -106,33 +101,90 @@ export function createVideoEditorProjectEffectActions(
   };
 }
 
+function createActionPresentationUpdater(set: VideoEditorStoreSet) {
+  return (patch: Parameters<VideoEditorProjectState['updateActionPresentation']>[0]) =>
+    set((state) =>
+      applyProjectUpdate(state, (project) => {
+        if (isVideoProjectUtilityLaneLocked(project, 'actions')) return project;
+        const actionPresentation = { ...getVideoProjectActionPresentation(project), ...patch };
+        return isVideoProjectActionPresentation(actionPresentation)
+          ? applyVideoProjectMutationPatch(project, { actionPresentation })
+          : project;
+      })
+    );
+}
+
 function createActionDetailsUpdater(set: VideoEditorStoreSet) {
   return (
     actionEventId: string,
     patch: Parameters<VideoEditorProjectState['updateActionEventDetails']>[1]
   ) =>
     set((state) =>
-      applyProjectUpdate(state, (project) =>
-        isVideoProjectUtilityLaneLocked(project, 'actions')
-          ? project
-          : applyVideoProjectMutationPatch(project, {
-              actionEvents: project.actionEvents.map((event) => {
-                if (event.id !== actionEventId) {
-                  return event;
-                }
-
-                const preset = patch.preset ?? event.preset;
-                return {
-                  ...event,
-                  duration: patch.duration ?? event.duration,
-                  kind: resolveActionKindForPreset(preset),
-                  label: patch.label ?? event.label,
-                  point: resolveActionPoint(project, patch.point ?? event.point),
-                  preset,
-                };
-              }),
-            })
-      )
+      applyProjectUpdate(state, (project) => {
+        if (isVideoProjectUtilityLaneLocked(project, 'actions')) return project;
+        const event = project.actionEvents.find((item) => item.id === actionEventId);
+        if (
+          !event ||
+          (patch.presentation === undefined &&
+            patch.point === undefined &&
+            patch.time === undefined)
+        )
+          return project;
+        if (
+          (patch.point !== undefined || patch.presentation?.point !== undefined) &&
+          !resolveVideoProjectActionOccurrences(project).some(
+            (item) => item.eventId === actionEventId && item.clipId === patch.clipId
+          )
+        )
+          return project;
+        const occurrence =
+          patch.time === undefined
+            ? null
+            : resolveVideoProjectActionOccurrences(project).find(
+                (item) => item.eventId === actionEventId && item.clipId === patch.clipId
+              );
+        if (patch.time !== undefined && (!Number.isFinite(patch.time) || !occurrence))
+          return project;
+        const bounds = event.anchor.kind === 'recording-source' ? { width: 1, height: 1 } : project;
+        let presentation =
+          patch.presentation === null ? undefined : (patch.presentation ?? event.presentation);
+        if (presentation && !isVideoProjectActionPresentationOverride(presentation)) return project;
+        if (patch.point !== undefined) {
+          const point = resolveActionPoint(bounds, patch.point);
+          if (point) presentation = { ...presentation, point };
+          else if (patch.point === null && presentation) {
+            const { point: _point, ...remaining } = presentation;
+            presentation = remaining;
+          } else return project;
+        }
+        if (patch.time !== undefined && occurrence) {
+          const clips = occurrence.playbackRun
+            ? project.clips.filter((clip) => occurrence.playbackRun!.clipIds.includes(clip.id))
+            : [];
+          const start = clips.length ? Math.min(...clips.map((clip) => clip.startTime)) : 0;
+          const end = clips.length
+            ? Math.max(...clips.map((clip) => clip.startTime + clip.duration))
+            : project.duration;
+          const time = Math.max(
+            start,
+            Math.min(Math.max(start, end - 1 / project.fps), patch.time)
+          );
+          presentation = { ...presentation, offset: time - occurrence.time };
+        }
+        if (presentation?.point)
+          presentation = {
+            ...presentation,
+            point: resolveActionPoint(bounds, presentation.point)!,
+          };
+        const { presentation: _previous, ...captured } = event;
+        const updated =
+          presentation && Object.keys(presentation).length > 0
+            ? { ...captured, presentation }
+            : captured;
+        return applyVideoProjectMutationPatch(project, {
+          actionEvents: project.actionEvents.map((item) => (item.id === event.id ? updated : item)),
+        });
+      })
     );
 }
 
@@ -155,8 +207,8 @@ function createActionDeleter(set: VideoEditorStoreSet) {
           ? resolvePlacementModeAfterProjectUpdate(nextState.project, state.placementMode)
           : null,
         selection:
-          state.selection.kind === VideoEditorSelectionKind.ACTION_SEGMENT &&
-          state.selection.actionEventId === actionEventId
+          state.selection.kind === VideoEditorSelectionKind.ACTION_OCCURRENCE &&
+          state.selection.eventId === actionEventId
             ? createSceneSelection()
             : state.selection,
       };
@@ -173,11 +225,49 @@ function createMotionRegionUpdater(set: VideoEditorStoreSet) {
         isVideoProjectUtilityLaneLocked(project, 'camera')
           ? project
           : applyVideoProjectMutationPatch(project, {
-              motionRegions: (project.motionRegions ?? []).map((region) =>
-                region.id === motionRegionId
-                  ? normalizeVideoProjectMotionRegion(project, { ...region, ...patch })
-                  : region
-              ),
+              motionRegions: (project.motionRegions ?? []).map((region) => {
+                if (region.id !== motionRegionId) {
+                  const groupId = project.motionRegions?.find((item) => item.id === motionRegionId)
+                    ?.sourceBinding?.animationGroupId;
+                  return groupId &&
+                    region.sourceBinding?.animationGroupId === groupId &&
+                    patch.incomingConnection !== undefined
+                    ? normalizeVideoProjectMotionRegion(project, {
+                        ...region,
+                        incomingConnection: patch.incomingConnection,
+                      })
+                    : region;
+                }
+                const { sourceClipId, ...properties } = patch;
+                if (sourceClipId !== undefined && region.duration <= 0) return region;
+                let updated = { ...region, ...properties };
+                if (sourceClipId === null) {
+                  const { sourceBinding: _binding, ...sceneRegion } = updated;
+                  updated = sceneRegion;
+                } else if (sourceClipId !== undefined) {
+                  const source = getMotionBindingCandidates(project, updated).find(
+                    (item) => item.id === sourceClipId
+                  );
+                  if (!source) return region;
+                  updated = bindMotionRegionToClip(updated, source);
+                }
+                const clip = project.clips.find(
+                  (item) => item.id === updated.sourceBinding?.clipId
+                );
+                if (
+                  clip?.type === VideoProjectClipType.VIDEO &&
+                  (patch.duration !== undefined || patch.startTime !== undefined)
+                ) {
+                  if (patch.startTime !== undefined && patch.duration === undefined) {
+                    updated = {
+                      ...updated,
+                      startTime: clampMotionRegionStartTime(project, updated, patch.startTime),
+                    };
+                  }
+                  updated = bindMotionRegionToClip(updated, clip);
+                }
+                return normalizeVideoProjectMotionRegion(project, updated);
+              }),
             })
       )
     );
@@ -192,9 +282,13 @@ function createMotionRegionDeleter(set: VideoEditorStoreSet) {
 
       const nextState = applyProjectUpdate(state, (project) =>
         applyVideoProjectMutationPatch(project, {
-          motionRegions: (project.motionRegions ?? []).filter(
-            (region) => region.id !== motionRegionId
-          ),
+          motionRegions: (project.motionRegions ?? [])
+            .filter((region) => region.id !== motionRegionId)
+            .map((region) =>
+              region.incomingConnection?.fromRegionId === motionRegionId
+                ? { ...region, incomingConnection: null }
+                : region
+            ),
         })
       );
 
@@ -207,13 +301,13 @@ function createMotionRegionDeleter(set: VideoEditorStoreSet) {
           state.selection.kind === VideoEditorSelectionKind.MOTION_REGION &&
           state.selection.motionRegionId === motionRegionId
             ? createSceneSelection()
-            : state.selection,
+            : (nextState.selection ?? state.selection),
       };
     });
 }
 
 function resolveActionPoint(
-  project: NonNullable<VideoEditorProjectState['project']>,
+  project: Pick<NonNullable<VideoEditorProjectState['project']>, 'width' | 'height'>,
   point: NonNullable<
     NonNullable<VideoEditorProjectState['project']>['actionEvents'][number]['point']
   > | null

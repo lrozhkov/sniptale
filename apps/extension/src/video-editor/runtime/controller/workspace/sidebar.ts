@@ -1,3 +1,9 @@
+import {
+  applyVideoProjectCameraLayout,
+  type VideoProjectCameraLayout,
+  type VideoProjectCameraPlacement,
+} from '../../../../features/video/project/camera/placement';
+import { canSplitProjectClipAtTime } from '../../../../features/video/project/timeline';
 import type { VideoEditorLibrariesState } from '../../app-model/types';
 import type { VideoEditorActionHandlers } from '../../commands';
 import type { VideoEditorSelections } from '../selections';
@@ -8,6 +14,7 @@ import type {
   RecordingTelemetryPort,
   EffectEditingPort,
   ProjectLifecyclePort,
+  PlaybackPort,
   RuntimeSessionPort,
   TimelineEditingPort,
 } from '../../../contracts/controller-store';
@@ -18,7 +25,8 @@ type EditorStore = AnnotationEditingPort &
   EffectEditingPort &
   RuntimeSessionPort &
   TimelineEditingPort &
-  Pick<ProjectLifecyclePort, 'project' | 'recordingId'>;
+  Pick<ProjectLifecyclePort, 'project' | 'recordingId'> &
+  Pick<PlaybackPort, 'currentTime'>;
 type SidebarCommandHandlers = Pick<
   VideoEditorActionHandlers,
   | 'handleAddRecording'
@@ -54,6 +62,19 @@ type SidebarWorkspace = Pick<
   | 'toggleSidebarCollapsed'
 >;
 
+function canSplitCameraInterval(
+  project: NonNullable<EditorStore['project']>,
+  clipId: string,
+  time: number
+) {
+  const clip = project.clips.find((item) => item.id === clipId);
+  return (
+    clip?.type === 'VIDEO' &&
+    project.tracks.some((track) => track.id === clip.trackId && track.role === 'CAMERA') &&
+    canSplitProjectClipAtTime(project, clipId, time)
+  );
+}
+
 function createWorkspaceSidebarClipActions(store: EditorStore) {
   return {
     onApplyMediaClipVisualsToTrack: store.applyMediaClipVisualsToTrack,
@@ -69,6 +90,19 @@ function createWorkspaceSidebarClipActions(store: EditorStore) {
     onUpdateClipFades: store.updateClipFades,
     onUpdateClipPlaybackRate: store.updateClipPlaybackRate,
     onUpdateClipMuted: store.updateClipMuted,
+    onApplyCameraLayout: (
+      clipId: string,
+      layout: VideoProjectCameraLayout,
+      placement?: VideoProjectCameraPlacement
+    ) =>
+      store.updateProject((project) =>
+        applyVideoProjectCameraLayout(project, clipId, layout, placement)
+      ),
+    onSplitCameraInterval: (clipId: string) => {
+      if (store.project && canSplitCameraInterval(store.project, clipId, store.currentTime)) {
+        store.splitClipAt(clipId, store.currentTime);
+      }
+    },
     onUpdateClipTransform: store.updateClipTransform,
     onUpdateClipVolume: store.updateClipVolume,
     onUpdateMediaClipFitMode: store.updateMediaClipFitMode,
@@ -91,6 +125,7 @@ function createWorkspaceSidebarProjectActions(args: {
   return {
     ...createWorkspaceSidebarPlacementActions(args.store),
     ...createWorkspaceSidebarCursorActions(args),
+    onApplyTypingCompression: args.store.applyTypingCompression,
     onAddActionEvent: args.projectUpdaters.addActionEvent,
     onAddMotionRegion: args.projectUpdaters.addMotionRegion,
     onAddRecording: args.actions.handleAddRecording,
@@ -112,9 +147,10 @@ function createWorkspaceSidebarProjectActions(args: {
     onResizeProject: args.projectUpdaters.resizeProject,
     ...createWorkspaceSidebarBackgroundActions(args),
     onToggleCollapsed: args.workspace.toggleSidebarCollapsed,
+    onUpdateActionPresentation: args.projectUpdaters.updateActionPresentation,
     onUpdateActionEventDetails: args.projectUpdaters.updateActionEventDetails,
     onDeleteMotionRegion: args.projectUpdaters.deleteMotionRegion,
-    onGenerateMotionPathFromCursor: args.projectUpdaters.generateMotionPathFromCursor,
+
     onUpdateMotionRegion: args.projectUpdaters.updateMotionRegion,
     onUpdateTransitionDuration: args.projectUpdaters.updateTransitionDuration,
     onUpdateTransitionEasing: args.projectUpdaters.updateTransitionEasing,
@@ -205,7 +241,13 @@ function createWorkspaceSidebarState(args: {
     recordingId: args.store.recordingId,
     recordings: args.libraries.recordings,
     selection: args.selections.selection ?? { kind: 'scene' },
-    selectedActionEvent: args.selections.selectedActionEvent ?? null,
+    ...(args.store.project ? { typingProject: args.store.project } : {}),
+    recordingTelemetry: args.store.recordingTelemetry,
+    currentTime: args.store.currentTime,
+    selectedActionOccurrence: args.selections.selectedActionOccurrence ?? null,
+    canSplitCameraInterval:
+      !!args.selections.selectedClip &&
+      canSplitCameraInterval(args.project, args.selections.selectedClip.id, args.store.currentTime),
     selectedClip: args.selections.selectedClip,
     selectedCursorSample: args.selections.selectedCursorSample ?? null,
     selectedMotionRegion: args.selections.selectedMotionRegion ?? null,

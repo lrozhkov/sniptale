@@ -1,8 +1,5 @@
 import { translate } from '../../../../platform/i18n';
-import {
-  VideoMotionCameraMode,
-  VideoMotionFocusMode,
-} from '../../../../features/video/project/types/index';
+import { VideoMotionFocusMode } from '../../../../features/video/project/types/index';
 import { VideoEditorPlacementModeKind } from '../../../contracts/placement';
 import { getAreaCenterStyle, getAreaHandleStyle, getAreaStyle } from './geometry';
 import { beginAreaDrag } from './drag';
@@ -19,10 +16,7 @@ export { handleStageAreaPlacement } from './placement';
 export function PreviewStageMotionAreaOverlay(params: AreaOverlayParams) {
   const motionRegion = params.selectedMotionRegion;
   const area =
-    motionRegion?.cameraMode !== VideoMotionCameraMode.PATH &&
-    motionRegion?.focusMode === VideoMotionFocusMode.MANUAL_AREA
-      ? motionRegion.focusArea
-      : null;
+    motionRegion?.focusMode === VideoMotionFocusMode.MANUAL_AREA ? motionRegion.focusArea : null;
   const isPickingArea = params.placementMode?.kind === VideoEditorPlacementModeKind.MOTION_AREA;
   const stage = params.stageRef.current;
   if (!area && !isPickingArea) {

@@ -26,36 +26,33 @@ type ToolbarTrailingControlsInput = Pick<
 
 function createToolbarLeadingControlsProps({
   canAddMotionRegion,
+  canDeleteSelectedClip,
   canEditSelectedClip,
   insertion,
   canSplitSelectedClip,
   selectedClip,
-  canAutoTransformRecording,
-  onAutoTransformRecording,
   onDeleteSelectedClip,
   onDuplicateSelectedClip,
   onSplitSelectedClip,
 }: Pick<
   ProjectTimelineToolbarProps,
   | 'canAddMotionRegion'
+  | 'canDeleteSelectedClip'
   | 'canEditSelectedClip'
   | 'insertion'
   | 'canSplitSelectedClip'
   | 'selectedClip'
-  | 'canAutoTransformRecording'
-  | 'onAutoTransformRecording'
   | 'onDeleteSelectedClip'
   | 'onDuplicateSelectedClip'
   | 'onSplitSelectedClip'
 >) {
   return {
     canAddMotionRegion,
+    canDeleteSelectedClip,
     canEditSelectedClip,
     insertion,
     canSplitSelectedClip,
     selectedClip,
-    canAutoTransformRecording: canAutoTransformRecording ?? false,
-    ...(onAutoTransformRecording ? { onAutoTransformRecording } : {}),
     onDeleteSelectedClip,
     onDuplicateSelectedClip,
     onSplitSelectedClip,

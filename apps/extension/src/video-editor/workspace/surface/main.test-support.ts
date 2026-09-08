@@ -78,7 +78,7 @@ function createPreviewSelectionController() {
     onSelectClip: vi.fn(),
     onSelectScene: vi.fn(),
     placementMode: null,
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedClipId: 'clip-1',
     selectedMotionRegion: null,
   };

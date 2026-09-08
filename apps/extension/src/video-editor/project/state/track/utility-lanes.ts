@@ -1,3 +1,4 @@
+import { getVideoProjectActionPresentation } from '../../../../features/video/project/action-presentation';
 import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
 import {
   getVideoProjectUtilityLanes,
@@ -31,6 +32,13 @@ export function createUtilityLaneVisibilityToggle(set: VideoEditorStoreSet) {
   return (lane: VideoProjectUtilityLaneKind) =>
     set((state) =>
       applyProjectUpdate(state, (project) => {
+        if (lane === 'actions') {
+          if (getVideoProjectUtilityLanes(project).actions.locked) return project;
+          const presentation = getVideoProjectActionPresentation(project);
+          return applyVideoProjectMutationPatch(project, {
+            actionPresentation: { ...presentation, enabled: !presentation.enabled },
+          });
+        }
         const utilityLanes = getVideoProjectUtilityLanes(project);
         return updateUtilityLane(project, lane, { visible: !utilityLanes[lane].visible });
       })
@@ -77,11 +85,15 @@ function clearRemovedUtilityLaneSelection(
   state: Partial<VideoEditorProjectState>,
   lane: VideoProjectUtilityLaneKind
 ): Partial<VideoEditorProjectState> {
-  if (lane === 'actions' && state.selection?.kind === VideoEditorSelectionKind.ACTION_SEGMENT) {
+  if (lane === 'actions' && state.selection?.kind === VideoEditorSelectionKind.ACTION_OCCURRENCE) {
     return { ...state, placementMode: null, selection: createSceneSelection() };
   }
 
-  if (lane === 'camera' && state.selection?.kind === VideoEditorSelectionKind.MOTION_REGION) {
+  if (
+    lane === 'camera' &&
+    (state.selection?.kind === VideoEditorSelectionKind.MOTION_REGION ||
+      state.selection?.kind === VideoEditorSelectionKind.MOTION_CONNECTION)
+  ) {
     return { ...state, placementMode: null, selection: createSceneSelection() };
   }
 

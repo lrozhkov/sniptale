@@ -1,3 +1,4 @@
+import type { VideoProjectActionOccurrence } from '../../../../features/video/project/action-occurrences';
 import type { VideoEditorPlacementMode } from '../../../contracts/placement';
 import type { VideoEditorSelection } from '../../../contracts/selection';
 import type { VideoObjectTrack } from '../../../../features/video/project/object-tracks';
@@ -12,6 +13,10 @@ import type {
 import type { WorkspaceSidebarProps } from './props';
 
 export interface WorkspaceSidebarSelectionPanelProps {
+  typingProject?: VideoProject;
+  recordingTelemetry?: WorkspaceSidebarProps['recordingTelemetry'];
+  onApplyTypingCompression?: WorkspaceSidebarProps['onApplyTypingCompression'];
+  currentTime?: number;
   /** Workspace grid controls apply only to scene inspection. */
   gridSettings?: WorkspaceSidebarProps['gridSettings'];
   onAddActionEvent: WorkspaceSidebarProps['onAddActionEvent'];
@@ -25,7 +30,7 @@ export interface WorkspaceSidebarSelectionPanelProps {
   onDeleteMotionRegion: NonNullable<WorkspaceSidebarProps['onDeleteMotionRegion']>;
   onDeleteObjectTrack?: WorkspaceSidebarProps['onDeleteObjectTrack'];
   onSelectObjectTrack?: WorkspaceSidebarProps['onSelectObjectTrack'];
-  onGenerateMotionPathFromCursor?: WorkspaceSidebarProps['onGenerateMotionPathFromCursor'];
+
   onDeleteTrack?: WorkspaceSidebarProps['onDeleteTrack'];
   onSwapClip?: WorkspaceSidebarProps['onSwapClip'];
   onTrimClipStart?: WorkspaceSidebarProps['onTrimClipStart'];
@@ -50,9 +55,9 @@ export interface WorkspaceSidebarSelectionPanelProps {
   onStartActionPointPlacement: NonNullable<WorkspaceSidebarProps['onStartActionPointPlacement']>;
   onStartMotionAreaPlacement: NonNullable<WorkspaceSidebarProps['onStartMotionAreaPlacement']>;
   onStartMotionFocusPlacement: NonNullable<WorkspaceSidebarProps['onStartMotionFocusPlacement']>;
-  onStartMotionPathStopAreaPlacement?: WorkspaceSidebarProps['onStartMotionPathStopAreaPlacement'];
-  onStartMotionPathStopPointPlacement?: WorkspaceSidebarProps['onStartMotionPathStopPointPlacement'];
+
   onStartObjectTrackAnchorPlacement?: WorkspaceSidebarProps['onStartObjectTrackAnchorPlacement'];
+  onUpdateActionPresentation?: WorkspaceSidebarProps['onUpdateActionPresentation'];
   onUpdateActionEventDetails: NonNullable<WorkspaceSidebarProps['onUpdateActionEventDetails']>;
   onUpdateAnnotationClipContent?: WorkspaceSidebarProps['onUpdateAnnotationClipContent'];
   onUpdateAnnotationClipStyle?: WorkspaceSidebarProps['onUpdateAnnotationClipStyle'];
@@ -61,6 +66,8 @@ export interface WorkspaceSidebarSelectionPanelProps {
   onUpdateClipFades: WorkspaceSidebarProps['onUpdateClipFades'];
   onUpdateClipPlaybackRate?: WorkspaceSidebarProps['onUpdateClipPlaybackRate'];
   onUpdateClipMuted: WorkspaceSidebarProps['onUpdateClipMuted'];
+  onApplyCameraLayout?: WorkspaceSidebarProps['onApplyCameraLayout'];
+  onSplitCameraInterval?: WorkspaceSidebarProps['onSplitCameraInterval'];
   onUpdateClipTransform: WorkspaceSidebarProps['onUpdateClipTransform'];
   onUpdateClipVolume: WorkspaceSidebarProps['onUpdateClipVolume'];
   onUpdateCursorSampleInterpolation: NonNullable<
@@ -95,7 +102,8 @@ export interface WorkspaceSidebarSelectionPanelProps {
   placementMode: VideoEditorPlacementMode | null;
   project: VideoProject;
   recentColors: string[];
-  selectedActionEvent: VideoProject['actionEvents'][number] | null;
+  selectedActionOccurrence: VideoProjectActionOccurrence | null;
+  canSplitCameraInterval?: boolean;
   selectedClip: VideoProjectClip | null;
   selectedCursorSample: VideoProjectCursorSample | null;
   selectedMotionRegion: VideoProjectMotionRegion | null;

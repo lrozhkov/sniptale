@@ -1,10 +1,7 @@
 import { buildProjectTransitionSegments } from '../../project/transition/project';
 import { isVideoProjectUtilityLaneVisible } from '../../project/utility-lanes';
-import { isLegacyScrollActionEvent } from '../../project/timeline/source-time';
 import { type VideoProject } from '../../project/types/index';
-import { getVideoCompositionActionDuration } from './frame/actions';
 import type {
-  VideoCompositionActionSegment,
   VideoCompositionCursorSegment,
   VideoCompositionMotionSegment,
   VideoCompositionTransitionSegment,
@@ -48,30 +45,6 @@ export function buildVideoCompositionCursorSegments(
     previousSegment.sampleIds.push(...segment.sampleIds);
     return segments;
   }, []);
-}
-
-export function buildVideoCompositionActionSegments(
-  project: VideoProject
-): VideoCompositionActionSegment[] {
-  if (!isVideoProjectUtilityLaneVisible(project, 'actions')) {
-    return [];
-  }
-
-  return buildVideoCompositionActionSegmentsFromEvents(project.actionEvents);
-}
-
-export function buildVideoCompositionActionSegmentsFromEvents(
-  actionEvents: VideoProject['actionEvents']
-): VideoCompositionActionSegment[] {
-  return actionEvents
-    .filter((event) => !isLegacyScrollActionEvent(event))
-    .map((event) => ({
-      end: event.time + getVideoCompositionActionDuration(event),
-      event,
-      id: event.id,
-      point: event.point,
-      start: event.time,
-    }));
 }
 
 export function buildVideoCompositionMotionSegments(

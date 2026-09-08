@@ -24,7 +24,7 @@ Keep project history in memory with a maximum of 100 actions. Reset it after acc
 
 Controlled-tab and native capture produce `RecordingTelemetryEntry` values and commit them through `saveRecordingTelemetrySafely`. Static-frame analysis may update the same sidecar. The `recording_telemetry` IndexedDB store is the only durable authority. Parse entries before writes, after reads, and during backup restore.
 
-Load telemetry by `project.baseRecordingId`. Reject mismatched or late results. Normalize project coordinates in `video-editor/project/operations/telemetry.ts`.
+Load telemetry for the distinct recording origins in project materials and `project.baseRecordingId`. Keep the loaded collection disposable; `recording_telemetry` remains the sole durable captured-sidecar authority. Reject mismatched, foreign, or late results when the project or its source set changes. One unavailable source must not discard other available sources. Refresh on matching media-hub sidecar updates, not on timeline playback or timing edits. Normalize project coordinates in `video-editor/project/operations/telemetry.ts`. Project history projection enumerates concrete source clip instances and namespaces marker identity by source and instance.
 
 Permit auto-processing only when the project still contains source-timed clips for the recording and telemetry contains an action, cursor sample, or overlapping idle or static range. Use the same predicate for UI availability and mutation admission.
 

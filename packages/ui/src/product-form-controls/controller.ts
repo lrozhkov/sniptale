@@ -23,6 +23,7 @@ import {
 interface ProductSelectControllerArgs<T extends ProductSelectControllerOption> {
   disabled: boolean;
   menuPlacement?: 'auto' | 'bottom';
+  menuWidth?: number;
   onChange: (value: string) => void;
   options: readonly T[];
   value: string;
@@ -35,7 +36,8 @@ function resolveSelectedIndex(options: readonly ProductSelectControllerOption[],
 function useProductSelectOverlay(
   isOpen: boolean,
   setIsOpen: Dispatch<SetStateAction<boolean>>,
-  placement: 'auto' | 'bottom'
+  placement: 'auto' | 'bottom',
+  menuWidth?: number
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -49,6 +51,7 @@ function useProductSelectOverlay(
     containerRef,
     menuRef,
     placement,
+    ...(menuWidth === undefined ? {} : { menuWidth }),
   });
 
   return {
@@ -225,7 +228,12 @@ export function useProductSelectController<T extends ProductSelectControllerOpti
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const menuId = useId();
-  const overlayState = useProductSelectOverlay(isOpen, setIsOpen, args.menuPlacement ?? 'auto');
+  const overlayState = useProductSelectOverlay(
+    isOpen,
+    setIsOpen,
+    args.menuPlacement ?? 'auto',
+    args.menuWidth
+  );
   const { selectedIndex, selectedOption } = useSelectedOption(args.options, args.value);
   const closeMenu = createCloseMenu({
     setActiveIndex,

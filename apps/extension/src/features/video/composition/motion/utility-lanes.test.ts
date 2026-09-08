@@ -39,7 +39,7 @@ it('falls back to the full viewport when the camera lane is hidden', () => {
   );
 });
 
-it('ignores project action events for action-focused camera regions when actions are hidden', () => {
+it('preserves explicit framing targets when action visualization is hidden', () => {
   const project = applyVideoProjectMutationPatch(createCameraProject(), {
     utilityLanes: {
       actions: { visible: false, locked: false },
@@ -56,7 +56,7 @@ it('ignores project action events for action-focused camera regions when actions
     })
   ).toEqual(
     expect.objectContaining({
-      focusPoint: { x: 10, y: 20 },
+      focusPoint: { x: 750, y: 500 },
       regionId: 'motion-action',
     })
   );
@@ -104,7 +104,7 @@ it('resolves cursor-focused camera regions while easing out near the region end'
       id: 'motion-cursor',
       scale: 2,
       startTime: 1,
-      targetActionEventId: null,
+      targetAction: null,
       zoomInDuration: 0.2,
       zoomOutDuration: 0.5,
     },
@@ -138,7 +138,7 @@ it('resolves manual-area camera regions with target-scale clamping', () => {
       id: 'motion-area',
       scale: 1.5,
       startTime: 1,
-      targetActionEventId: null,
+      targetAction: null,
       zoomInDuration: 0,
       zoomOutDuration: 0,
     },
@@ -165,13 +165,12 @@ function createCameraProject() {
   project.actionEvents = [
     {
       data: {},
-      duration: 0.6,
       id: 'action-1',
       kind: VideoProjectActionEventKind.CLICK,
       label: 'Action',
       point: { x: 750, y: 500 },
-      preset: VideoProjectActionPreset.CLICK_RIPPLE,
-      time: 2.1,
+      presentation: { preset: VideoProjectActionPreset.CLICK_RIPPLE },
+      anchor: { kind: 'project', time: 2.1 },
     },
   ];
   project.motionRegions = [
@@ -183,7 +182,7 @@ function createCameraProject() {
       id: 'motion-cursor',
       scale: 2,
       startTime: 1,
-      targetActionEventId: null,
+      targetAction: null,
       zoomInDuration: 0.5,
       zoomOutDuration: 0.5,
     },
@@ -195,7 +194,7 @@ function createCameraProject() {
       id: 'motion-action',
       scale: 1.5,
       startTime: 5,
-      targetActionEventId: 'action-1',
+      targetAction: { eventId: 'action-1', clipId: null },
       zoomInDuration: 0.2,
       zoomOutDuration: 0.2,
     },

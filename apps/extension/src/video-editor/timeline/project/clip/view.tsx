@@ -1,8 +1,9 @@
 import type React from 'react';
+import { Link2 } from 'lucide-react';
 
 import { translate } from '../../../../platform/i18n';
 import { normalizeClipPlaybackRate } from '../../../../features/video/project/timeline/basics';
-import { buildClipLabel } from '../../../../features/video/project/timeline';
+import { buildClipLabel, getLinkedClipIds } from '../../../../features/video/project/timeline';
 import { VideoProjectClipType } from '../../../../features/video/project/types';
 import type { VideoProjectClip } from '../../../../features/video/project/types';
 import { AudioClipWaveform } from './waveform';
@@ -276,6 +277,7 @@ function ProjectTimelineClipLabel({
 }: Pick<ProjectTimelineClipLayoutProps, 'clip' | 'project' | 'viewModel'>) {
   if (viewModel.labelHeight === 0) return null;
   const label = clip.name?.trim() || buildClipLabel(project, clip);
+  const linked = getLinkedClipIds(project, clip.id).length > 1;
   return (
     <div
       className={[
@@ -285,6 +287,14 @@ function ProjectTimelineClipLabel({
       data-project-timeline-clip-label={clip.id}
     >
       <div className="absolute inset-y-0 flex min-w-0 items-center" style={viewModel.labelStyle}>
+        {linked ? (
+          <Link2
+            data-ui="video-editor.timeline.clip-link"
+            aria-label={translate('videoEditor.sidebar.linkedClipsTitlePrefix')}
+            size={12}
+            className="mr-1 shrink-0"
+          />
+        ) : null}
         <p className="truncate text-xs font-medium">{label}</p>
       </div>
     </div>

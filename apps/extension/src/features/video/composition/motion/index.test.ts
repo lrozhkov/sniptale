@@ -1,5 +1,7 @@
+import { createVideoClipFromAsset } from '../../project/factories/clip';
+import { resolveVideoCompositionActions } from '../timeline/frame/actions';
 import { expect, it } from 'vitest';
-import { createEmptyVideoProject } from '../../project/factories/creation';
+import { createEmptyVideoProject, createVideoProjectAsset } from '../../project/factories/creation';
 import {
   VideoMotionFocusMode,
   VideoMotionOverlayZoomMode,
@@ -19,13 +21,12 @@ function createCameraProject() {
   project.actionEvents = [
     {
       data: {},
-      duration: 0.6,
       id: 'action-1',
       kind: VideoProjectActionEventKind.CLICK,
       label: 'Action',
       point: { x: 750, y: 500 },
-      preset: VideoProjectActionPreset.CLICK_RIPPLE,
-      time: 2.1,
+      presentation: { preset: VideoProjectActionPreset.CLICK_RIPPLE },
+      anchor: { kind: 'project', time: 2.1 },
     },
   ];
   project.motionRegions = [
@@ -39,7 +40,7 @@ function createCameraProject() {
       overlayZoomMode: VideoMotionOverlayZoomMode.LOCK_OVERLAYS,
       scale: 2,
       startTime: 1,
-      targetActionEventId: null,
+      targetAction: null,
       zoomInDuration: 0.5,
       zoomOutDuration: 0.5,
     },
@@ -53,7 +54,7 @@ function createCameraProject() {
       overlayZoomMode: VideoMotionOverlayZoomMode.LOCK_OVERLAYS,
       scale: 1.5,
       startTime: 5,
-      targetActionEventId: 'action-1',
+      targetAction: { eventId: 'action-1', clipId: null },
       zoomInDuration: 0.2,
       zoomOutDuration: 0.2,
     },
@@ -78,15 +79,7 @@ function createCursorCameraProjectResult() {
 function createActionCameraProjectResult() {
   const project = createCameraProject();
   return resolveVideoCompositionCamera({
-    actions: [
-      {
-        duration: 0.6,
-        event: project.actionEvents[0]!,
-        point: { x: 750, y: 500 },
-        progress: 0.5,
-        start: 2.1,
-      },
-    ],
+    actions: [],
     cursorSample: null,
     currentTime: 5.5,
     project,
@@ -104,28 +97,9 @@ function createActionFocusMotionRegion() {
     overlayZoomMode: VideoMotionOverlayZoomMode.LOCK_OVERLAYS,
     scale: 2,
     startTime: 1,
-    targetActionEventId: null,
+    targetAction: null,
     zoomInDuration: 0.2,
     zoomOutDuration: 0.5,
-  };
-}
-
-function createFallbackAction() {
-  return {
-    duration: 0.7,
-    event: {
-      data: {},
-      duration: 0.7,
-      id: 'action-1',
-      kind: VideoProjectActionEventKind.CLICK,
-      label: 'Action',
-      point: { x: 700, y: 450 },
-      preset: VideoProjectActionPreset.CLICK_RIPPLE,
-      time: 2,
-    },
-    point: { x: 700, y: 450 },
-    progress: 0.5,
-    start: 2,
   };
 }
 
@@ -179,12 +153,23 @@ it('falls back to the full project viewport when no motion region is active', ()
   });
 });
 
-it('falls back to the first action point and eases zoom back out near region end', () => {
+it('uses the authored fallback rather than an arbitrary active event while easing out', () => {
   const project = createEmptyVideoProject('Camera', 800, 600);
   project.motionRegions = [createActionFocusMotionRegion()];
+  project.duration = 4;
+  project.actionEvents = [
+    {
+      id: 'unrelated',
+      kind: 'CLICK',
+      label: 'Other',
+      data: {},
+      anchor: { kind: 'project', time: 2.5 },
+      point: { x: 700, y: 450 },
+    },
+  ];
 
   const camera = resolveVideoCompositionCamera({
-    actions: [createFallbackAction()],
+    actions: resolveVideoCompositionActions(project, 2.9),
     cursorSample: null,
     currentTime: 2.9,
     project,
@@ -192,7 +177,7 @@ it('falls back to the first action point and eases zoom back out near region end
 
   expect(camera).toEqual(
     expect.objectContaining({
-      focusPoint: { x: 700, y: 450 },
+      focusPoint: { x: 100, y: 150 },
       regionId: 'motion-1',
     })
   );
@@ -212,7 +197,7 @@ it('prefers the latest overlapping region and falls back to the project center w
       overlayZoomMode: VideoMotionOverlayZoomMode.LOCK_OVERLAYS,
       scale: 1.4,
       startTime: 1,
-      targetActionEventId: null,
+      targetAction: null,
       zoomInDuration: 0,
       zoomOutDuration: 0,
     },
@@ -226,7 +211,7 @@ it('prefers the latest overlapping region and falls back to the project center w
       overlayZoomMode: VideoMotionOverlayZoomMode.LOCK_OVERLAYS,
       scale: 1.8,
       startTime: 2,
-      targetActionEventId: null,
+      targetAction: null,
       zoomInDuration: 0,
       zoomOutDuration: 0,
     },
@@ -275,4 +260,84 @@ it('maps points and rectangles through the active camera viewport', () => {
   });
   expect(mapViewportPointToComposition({ x: 100, y: 100 }, camera)).toEqual({ x: 150, y: 100 });
   expect(mapViewportPointToComposition({ x: 0, y: 0 }, camera)).toEqual({ x: 100, y: 50 });
+});
+
+it('keeps an explicit framing target while history visualization is hidden and uses its point override', () => {
+  const project = createCameraProject();
+  project.utilityLanes = {
+    actions: { visible: false, locked: false },
+    camera: { visible: true, locked: false },
+  };
+  project.actionEvents[0]!.presentation = { enabled: false, point: { x: 400, y: 300 } };
+  const result = resolveVideoCompositionCamera({
+    project,
+    currentTime: 5.5,
+    actions: [],
+    cursorSample: null,
+  });
+  expect(result.focusPoint).toEqual({ x: 400, y: 300 });
+  expect(project.actionEvents[0]!.point).toEqual({ x: 750, y: 500 });
+});
+
+it('frames only the named source occurrence, maps its layer geometry and never retargets another repeat', () => {
+  const project = createCameraProject();
+  const asset = createVideoProjectAsset(
+    'Source',
+    'VIDEO',
+    { kind: 'recording', recordingId: 'recording' },
+    {
+      width: 400,
+      height: 200,
+      duration: 8,
+      mimeType: 'video/mp4',
+      size: 10,
+      hasAudio: false,
+      audioPeaks: null,
+    }
+  );
+  const clip = createVideoClipFromAsset(
+    project.tracks[0]!.id,
+    asset,
+    project.width,
+    project.height,
+    0
+  );
+  if (clip.type !== 'VIDEO') throw new Error('Expected source video');
+  clip.sourceInstanceId = 'instance';
+  const first = {
+    ...clip,
+    id: 'first',
+    transform: { x: 100, y: 100, width: 200, height: 100, rotation: 0, opacity: 1 },
+  };
+  const second = { ...clip, id: 'repeat', transform: { ...first.transform, x: 500, y: 300 } };
+  project.assets = [asset];
+  project.clips = [first, second];
+  project.duration = 8;
+  project.actionEvents = [
+    {
+      id: 'captured',
+      kind: 'CLICK',
+      label: 'Captured',
+      data: {},
+      point: { x: 0.25, y: 0.75 },
+      anchor: {
+        kind: 'recording-source',
+        recordingId: 'recording',
+        sourceInstanceId: 'instance',
+        sourceEventId: 'raw',
+        sourceTime: 2,
+      },
+      presentation: { enabled: false },
+    },
+  ];
+  project.motionRegions![1]!.targetAction = { eventId: 'captured', clipId: second.id };
+  const resolve = () =>
+    resolveVideoCompositionCamera({ project, actions: [], cursorSample: null, currentTime: 5.5 });
+  expect(resolve().focusPoint).toEqual({ x: 550, y: 375 });
+  project.clips = [first];
+  expect(resolve().focusPoint).toEqual({ x: 10, y: 20 });
+  project.motionRegions![1]!.targetAction = { eventId: 'captured', clipId: first.id };
+  expect(resolve().focusPoint).toEqual({ x: 150, y: 175 });
+  project.tracks[0]!.role = 'CAMERA';
+  expect(resolve().focusPoint).toEqual({ x: 10, y: 20 });
 });

@@ -80,6 +80,9 @@ function createSelectionHandlers() {
     onUpdateClipFades: vi.fn(),
     onUpdateClipMuted: vi.fn(),
     onUpdateClipTransform: vi.fn(),
+    onApplyCameraLayout: vi.fn(),
+    onSplitCameraInterval: vi.fn(),
+    canSplitCameraInterval: true,
     onUpdateClipVolume: vi.fn(),
     onUpdateCursorSampleInterpolation: vi.fn(),
     onUpdateCursorSampleSkinOverride: vi.fn(),
@@ -132,7 +135,7 @@ function createVideoProps(
     placementMode: null,
     project,
     recentColors: [],
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedClip: clip,
     selectedCursorSample: null,
     selectedMotionRegion: null,
@@ -158,7 +161,7 @@ function createProps(): WorkspaceSidebarSelectionPanelProps {
     placementMode: null,
     project,
     recentColors: [],
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedClip: clip,
     selectedCursorSample: null,
     selectedMotionRegion: null,
@@ -258,7 +261,7 @@ describe('workspace-sidebar/selection/inspect-core', () => {
     expect(container?.textContent).not.toContain('videoEditor.sidebar.cursorDetectionRun');
   });
 
-  it('opens camera placement by default for a camera-role clip and reuses the transform command', () => {
+  it('opens camera layout by default and sends the selected interval to the atomic layout command', () => {
     const props = createVideoProps();
     props.project.tracks = props.project.tracks.map((track) =>
       track.id === props.selectedClip?.trackId
@@ -268,15 +271,18 @@ describe('workspace-sidebar/selection/inspect-core', () => {
 
     renderInspectPanel(props);
 
-    expect(container?.textContent).toContain('videoEditor.sidebar.cameraPlacementDescription');
+    expect(container?.textContent).toContain('videoEditor.sidebar.cameraIntervalHint');
     const bottomLeft = Array.from(container?.querySelectorAll('button') ?? []).find(
-      (button) => button.textContent === 'videoEditor.sidebar.cameraPlacementBottomLeft'
+      (button) =>
+        button.getAttribute('aria-label') === 'videoEditor.sidebar.cameraPlacementBottomLeft'
     );
     act(() => bottomLeft?.click());
-    expect(props.onUpdateClipTransform).toHaveBeenCalledWith(
+    expect(props.onApplyCameraLayout).toHaveBeenCalledWith(
       props.selectedClip?.id,
-      expect.objectContaining({ height: expect.any(Number), width: expect.any(Number) })
+      'OVERLAY',
+      'BOTTOM_LEFT'
     );
+    expect(props.onUpdateClipTransform).not.toHaveBeenCalled();
   });
 
   it('preserves a manual group within one clip context and resets when it becomes a camera', () => {
@@ -296,7 +302,7 @@ describe('workspace-sidebar/selection/inspect-core', () => {
     );
     renderInspectPanel({ ...props });
 
-    expect(container?.textContent).toContain('videoEditor.sidebar.cameraPlacementDescription');
+    expect(container?.textContent).toContain('videoEditor.sidebar.cameraIntervalHint');
     expect(container?.textContent).not.toContain('videoEditor.sidebar.rotationLabel');
   });
 

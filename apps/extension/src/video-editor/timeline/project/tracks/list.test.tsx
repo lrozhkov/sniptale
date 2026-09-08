@@ -88,12 +88,13 @@ it('keeps hidden utility lanes visible in the track rail with state controls', (
     {
       id: 'click',
       kind: VideoProjectActionEventKind.CLICK,
-      preset: VideoProjectActionPreset.CLICK_RIPPLE,
-      time: 12,
-      duration: 1,
+
+      anchor: { kind: 'project', time: 12 },
+
       label: 'Click',
       point: { x: 10, y: 10 },
       data: {},
+      presentation: { duration: 1, preset: VideoProjectActionPreset.CLICK_RIPPLE },
     },
   ];
   project.utilityLanes = {
@@ -103,7 +104,8 @@ it('keeps hidden utility lanes visible in the track rail with state controls', (
 
   renderTrackList(project, { showTelemetryLane: true });
 
-  expect(container?.textContent).toContain('videoEditor.timeline.actionsLane');
+  expect(container?.textContent).not.toContain('videoEditor.timeline.actionsLane');
+  expect(container?.querySelector('[data-ui="video-editor.timeline.history-lane"]')).not.toBeNull();
   expect(container?.textContent).toContain('videoEditor.timeline.motionLane');
   expect(container?.querySelectorAll('[data-ui="timeline.utility-lane-state"]').length).toBe(4);
   expect(
@@ -180,7 +182,7 @@ it('keeps track names and state controls readable in compact mode', () => {
   expect(scrollArea?.style.gridTemplateColumns).toBe('');
   expect(container?.textContent).toContain(project.tracks[0]!.name);
   expect(container?.textContent).toContain('videoEditor.timeline.telemetryLane');
-  expect(container?.querySelectorAll('[data-ui="timeline.utility-lane-state"]')).toHaveLength(0);
+  expect(container?.querySelectorAll('[data-ui="timeline.utility-lane-state"]')).toHaveLength(2);
   expect(
     container?.querySelectorAll('[data-ui="timeline.track-kind-icon"]').length
   ).toBeGreaterThan(0);
@@ -247,6 +249,17 @@ function renderTrackList(
         motionLaneSelected={options.motionLaneSelected}
         canShowTelemetryLane={options.showTelemetryLane}
         cursorLaneVisible={options.cursorLaneVisible ?? true}
+        autoProcessing={{
+          project,
+          selection: null,
+          actions: {
+            prepare: async () => ({ status: 'stale' }),
+            apply: async () => 'stale',
+            isCurrent: () => false,
+          },
+          onSeek: vi.fn(),
+          onModalVisibilityChange: vi.fn(),
+        }}
         project={project}
         selectedTrackId={project.tracks[0]?.id ?? null}
         showTelemetryLane={options.showTelemetryLane}
@@ -398,4 +411,16 @@ it('collapses only the common header controls when both compact display options 
         .length
     ).toBeGreaterThanOrEqual(3);
   }
+});
+
+it('opens auto processing from the history header with no implicit selected source', () => {
+  const project = createEmptyVideoProject('History');
+  renderTrackList(project, { showTelemetryLane: true, compactRows: true, hideTrackNames: true });
+  const button = document.querySelector<HTMLButtonElement>('[data-ui="video-editor.auto.open"]');
+  expect(button).not.toBeNull();
+  act(() => button?.click());
+  expect(document.querySelector('.sniptale-modal')).not.toBeNull();
+  expect(
+    document.querySelector<HTMLButtonElement>('[data-ui="video-editor.auto.review"]')?.disabled
+  ).toBe(true);
 });

@@ -13,7 +13,7 @@ import {
   type VideoCompositionTimelineIndex,
 } from './composition-index';
 
-export { getVideoCompositionActionDuration, resolveVideoCompositionActions } from './actions';
+export { resolveVideoCompositionActions } from './actions';
 export { createVideoCompositionTimelineIndex } from './composition-index';
 export type { VideoCompositionTimelineIndex } from './composition-index';
 export { resolveVideoCompositionCursor } from './cursor';
@@ -27,10 +27,10 @@ export function resolveVideoCompositionFrame(
   const actions = resolveVideoCompositionActions(project, currentTime);
   const cursorSample = resolveCursorSample(project, currentTime);
   const effectRuntimePlans = resolveEffectRuntimeFramePlans(project, currentTime);
-  const layerOptions = { ...options, timelineIndex };
+  const layerOptions = { ...options, timelineIndex, actions };
 
   return {
-    actions,
+    actions: actions.filter((action) => action.clipId === null),
     camera: resolveVideoCompositionCamera({
       actions,
       cursorSample,

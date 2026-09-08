@@ -92,7 +92,7 @@ function createPreviewStageInsertFallbackPointerParams(
     onUpdateMotionRegion: params.onUpdateMotionRegion,
     placementMode: params.placementMode,
     project: params.project,
-    selectedActionEvent: params.selectedActionEvent,
+    selectedActionOccurrence: params.selectedActionOccurrence,
     selectedMotionRegion: params.selectedMotionRegion,
     stageRef: params.stageRef,
     ...(params.grid ? { grid: params.grid } : {}),
@@ -145,7 +145,7 @@ function PreviewStageRootOverlayLayer(props: {
         project={params.project}
         onGuideChange={onGuideChange}
         selectionOverlay={props.canvasInteractionActive ? params.selectionOverlay : null}
-        selectedActionEvent={params.selectedActionEvent}
+        selectedActionOccurrence={params.selectedActionOccurrence}
         targetOverlay={props.canvasInteractionActive ? params.targetOverlay : null}
         selectedMotionRegion={params.selectedMotionRegion}
         stageRef={params.stageRef}

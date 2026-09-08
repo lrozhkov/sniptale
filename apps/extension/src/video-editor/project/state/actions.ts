@@ -94,6 +94,7 @@ type VideoEditorProjectActionKeys =
   | 'updateCursorSampleInterpolation'
   | 'updateCursorSampleSkinOverride'
   | 'deleteActionEvent'
+  | 'updateActionPresentation'
   | 'updateActionEventDetails'
   | 'updateMotionRegion'
   | 'deleteMotionRegion';

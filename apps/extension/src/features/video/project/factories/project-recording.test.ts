@@ -1,4 +1,9 @@
 import { expect, it } from 'vitest';
+import {
+  getVideoProjectActionPresentation,
+  resolveVideoProjectActionPresentations,
+} from '../action-presentation';
+import { isExportReadyVideoProject } from '../validation/root';
 import { resolveVideoCompositionFrame } from '../../composition/timeline/frame';
 
 import { createVideoProjectFromRecording } from './creation';
@@ -55,14 +60,14 @@ it('creates a silent recording project and clamps tiny source duration', () => {
 
 it('anchors recording interactions to the independent source clip', () => {
   const project = createVideoProjectFromRecording({
-    actionEvents: [
+    sourceNormalizedActionEvents: [
       {
         data: {},
         duration: 0,
         id: 'click-1',
         kind: VideoProjectActionEventKind.CLICK,
         label: 'Click',
-        point: { x: 10, y: 20 },
+        point: { x: 0.25, y: 0.5 },
         preset: VideoProjectActionPreset.CLICK_RIPPLE,
         time: 2,
       },
@@ -75,7 +80,6 @@ it('anchors recording interactions to the independent source clip', () => {
         point: null,
         preset: VideoProjectActionPreset.CLICK_RIPPLE,
         time: 3,
-        timeBasis: 'project',
       },
     ],
     cursorTrack: {
@@ -110,10 +114,14 @@ it('anchors recording interactions to the independent source clip', () => {
   });
   const sourceClipId = project.clips.find((clip) => clip.type === VideoProjectClipType.VIDEO)?.id;
 
-  expect(project.actionEvents[0]?.sourceAnchor).toEqual({
+  expect(project.actionEvents[0]?.point).toEqual({ x: 0.25, y: 0.5 });
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  expect(project.actionEvents[0]?.anchor).toEqual({
     kind: 'recording-source',
     recordingId: 'rec-anchored',
-    sourceClipId,
+    sourceInstanceId: project.clips.find((clip) => clip.type === VideoProjectClipType.VIDEO)
+      ?.sourceInstanceId,
+    sourceEventId: 'click-1',
     sourceTime: 2,
   });
   expect(project.cursorTrack?.samples[0]?.sourceAnchor).toEqual({
@@ -122,7 +130,11 @@ it('anchors recording interactions to the independent source clip', () => {
     sourceClipId,
     sourceTime: 1,
   });
-  expect(project.actionEvents[1]).not.toHaveProperty('sourceAnchor');
+  expect(project.actionEvents[1]?.anchor).toMatchObject({
+    kind: 'recording-source',
+    sourceEventId: 'manual-click',
+    sourceTime: 3,
+  });
   expect(project.cursorTrack?.samples[1]).not.toHaveProperty('sourceAnchor');
 });
 
@@ -202,7 +214,7 @@ function createProjectWithSidecarRecording(trackRole?: VideoProjectTrackRole) {
     size: 4096,
     hasAudio: true,
     audioPeaks: [0.25, 0.75],
-    actionEvents: [],
+    sourceNormalizedActionEvents: [],
     asset: createRecordingAsset(),
     sidecarVideos: [
       {
@@ -222,7 +234,7 @@ function createProjectWithSidecarRecording(trackRole?: VideoProjectTrackRole) {
 
 it('omits optional motion regions when recording metadata has none', () => {
   const project = createRecordingProjectDocument({
-    actionEvents: [],
+    sourceNormalizedActionEvents: [],
     asset: createRecordingAsset(),
     clips: [],
     cursorTrack: null,
@@ -239,4 +251,57 @@ it('omits optional motion regions when recording metadata has none', () => {
 
   expect(project).not.toHaveProperty('motionRegions');
   expect(project.duration).toBe(0.1);
+});
+
+it('keeps source-normalized points, retains unavailable facts, and lets captured keys inherit track defaults', () => {
+  const project = createVideoProjectFromRecording({
+    recordingId: 'r',
+    filename: 'capture.webm',
+    width: 1280,
+    height: 720,
+    duration: 5,
+    mimeType: 'video/webm',
+    size: 10,
+    sourceNormalizedActionEvents: [
+      {
+        id: 'valid',
+        kind: 'CLICK',
+        time: 1,
+        duration: 0,
+        point: { x: 0.2, y: 0.8 },
+        label: 'Click',
+        data: {},
+        preset: 'CLICK_RIPPLE',
+      },
+      {
+        id: 'invalid',
+        kind: 'CLICK',
+        time: 2,
+        duration: 0,
+        point: { x: 10, y: 20 },
+        label: 'Click',
+        data: {},
+        preset: 'CLICK_RIPPLE',
+      },
+      {
+        id: 'key',
+        kind: 'KEY',
+        time: 3,
+        duration: 0,
+        point: null,
+        label: 'Ctrl + K',
+        data: {},
+        preset: 'NONE',
+      },
+    ],
+  });
+  expect(project.actionEvents.map(({ point }) => point)).toEqual([{ x: 0.2, y: 0.8 }, null, null]);
+  expect(isExportReadyVideoProject(project)).toBe(true);
+  project.actionPresentation = {
+    ...getVideoProjectActionPresentation(project),
+    showKeystrokes: true,
+  };
+  expect(
+    resolveVideoProjectActionPresentations(project).find(({ event }) => event.kind === 'KEY')
+  ).toMatchObject({ enabled: true, renderKind: 'keystroke' });
 });

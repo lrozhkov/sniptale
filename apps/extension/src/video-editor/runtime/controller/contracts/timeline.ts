@@ -1,5 +1,5 @@
+import type { AutoProcessingActions } from '../../../project/operations/auto-transform';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
-import type { VideoAutoProcessingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import type { TimelinePreviewViewport } from '../../../contracts/timeline-preview';
 import type { VideoEditorPlaybackRange } from '../../../interaction/playback/range';
 import type { VideoEditorSelection } from '../../../contracts/selection';
@@ -12,6 +12,7 @@ import type { VideoEditorWorkspaceState } from '../workspace-state';
 import type { VideoEditorInsertionActions } from './insertion';
 
 interface VideoEditorTimelineState {
+  canDeleteSelectedClip: boolean;
   canEditSelectedClip: boolean;
   canSplitSelectedClip: boolean;
   currentTime: number;
@@ -20,11 +21,10 @@ interface VideoEditorTimelineState {
   pixelsPerSecond: number;
   playbackRange: VideoEditorPlaybackRange | null;
   project: VideoProject;
-  recordingTelemetry: RecordingTelemetryEntry | null;
+  recordingTelemetry: readonly RecordingTelemetryEntry[];
   selectedClipId: string | null;
   selectedTrackId: string | null;
   selection: VideoEditorSelection;
-  telemetryLaneVisible: boolean;
   timelinePreviews: VideoEditorRuntimeController['timelinePreviews'];
 }
 
@@ -42,8 +42,8 @@ interface VideoEditorTimelineActions {
   onClearUtilityLane: VideoEditorProjectActions['clearUtilityLane'];
   onDuplicateSelectedClip: () => void;
   onUpdateSelectedClipPlaybackRate: (playbackRate: number) => void;
-  onAutoTransformRecording: (settings: VideoAutoProcessingSettings) => void;
-  onMoveActionEvent: (actionEventId: string, time: number) => void;
+  autoProcessing: AutoProcessingActions;
+  onAutoProcessingModalVisibilityChange: (open: boolean) => void;
   onCloseTrackGap: VideoEditorProjectActions['closeTrackGap'];
   onSwapClip: VideoEditorProjectActions['swapClip'];
   onMoveClip: VideoEditorProjectActions['moveClip'];
@@ -54,10 +54,12 @@ interface VideoEditorTimelineActions {
     startTime: number,
     endTime: number | null
   ) => void;
+  onMoveActionOccurrence?:
+    | ((eventId: string, clipId: string | null, time: number) => void)
+    | undefined;
   onMoveMotionRegion: (motionRegionId: string, startTime: number) => void;
   onMoveTrack: VideoEditorProjectActions['moveTrack'];
   onMoveTransitionSegment: (transitionId: string, startTime: number) => void;
-  onResizeActionEvent: (actionEventId: string, duration: number) => void;
   onResizeMotionRegion: (motionRegionId: string, startTime: number, duration: number) => void;
   onUpdateEffectInstance: VideoEditorProjectActions['updateEffectInstance'];
   onSeek: VideoEditorRuntimeController['seekTo'];
@@ -66,10 +68,13 @@ interface VideoEditorTimelineActions {
   onClearPlaybackRange: () => void;
   onStepToNextFrame: () => void;
   onStepToPreviousFrame: () => void;
-  onSelectActionSegment: VideoEditorSessionActions['selectActionSegment'];
+  onSelectHistorySpan?: VideoEditorSessionActions['selectHistorySpan'];
+  onSelectActionOccurrence: VideoEditorSessionActions['selectActionOccurrence'];
   onSelectClip: VideoEditorSessionActions['selectClip'];
   onSelectCursorSegment: VideoEditorSessionActions['selectCursorSegment'];
   onSelectMotionRegion: VideoEditorSessionActions['selectMotionRegion'];
+  onConnectMotionRegions: (fromRegionId: string, toRegionId: string) => void;
+  onSelectHistoryLane: VideoEditorSessionActions['selectHistoryLane'];
   onSelectMotionLane: VideoEditorSessionActions['selectMotionLane'];
   onSelectObjectTrack: VideoEditorSessionActions['selectObjectTrack'];
   onSelectScene: VideoEditorSessionActions['selectScene'];
@@ -77,7 +82,6 @@ interface VideoEditorTimelineActions {
   onSelectTransition: VideoEditorSessionActions['selectTransition'];
   onSetPlaybackRange: VideoEditorWorkspaceState['setPlaybackRange'];
   onSplitSelectedClip: () => void;
-  onToggleTelemetryLaneVisibility: () => void;
   onTogglePlay: () => void;
   onToggleTrackLock: VideoEditorProjectActions['toggleTrackLock'];
   onToggleTrackVisibility: VideoEditorProjectActions['toggleTrackVisibility'];

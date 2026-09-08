@@ -28,14 +28,16 @@ vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => 
   }),
 }));
 
-it('shows auto-processing only for eligible telemetry on the base recording', () => {
+it('keeps auto-processing out of the top toolbar regardless of base-recording telemetry', () => {
   const project = createProject(
     [createVideoClip({ assetId: 'asset-video', trackId: 'track-video' })],
     [createTrack('track-video', 0)]
   );
   project.baseRecordingId = 'rec-asset-video';
 
-  expect(renderSurface(project, createTelemetry())).toContain('videoEditor.timeline.autoTransform');
+  expect(renderSurface(project, createTelemetry())).not.toContain(
+    'videoEditor.timeline.autoTransform'
+  );
   expect(renderSurface(project, createTelemetry({ actionEvents: [] }))).not.toContain(
     'videoEditor.timeline.autoTransform'
   );
@@ -59,11 +61,11 @@ function renderSurface(
       onClearPlaybackRange={vi.fn()}
       onStepToNextFrame={vi.fn()}
       onStepToPreviousFrame={vi.fn()}
+      canDeleteSelectedClip={false}
       canEditSelectedClip={false}
       canSplitSelectedClip={false}
       fitSelectionDuration={null}
       insertion={createInsertionActions()}
-      onAutoTransformRecording={vi.fn()}
       onDeleteSelectedClip={vi.fn()}
       onDuplicateSelectedClip={vi.fn()}
       onFitProject={vi.fn()}
@@ -74,7 +76,7 @@ function renderSurface(
       panelPrefs={createPanelPrefs()}
       pixelsPerSecond={90}
       project={project}
-      recordingTelemetry={recordingTelemetry}
+      recordingTelemetry={[recordingTelemetry]}
       selectedClip={null}
     >
       <div>Timeline</div>

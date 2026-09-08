@@ -60,20 +60,30 @@ export function splitProjectClipsAtTimeWithResult(
   const secondGroupId = operation.clipIds.length > 1 ? createClipGroupId() : null;
   let trailingClipId: string | null = null;
   const trailingClipIdsBySourceId = new Map<string, string>();
+  const clips = project.clips.flatMap((item) => {
+    if (!operation.clipIdSet.has(item.id)) {
+      return [item];
+    }
+
+    if (item.startTime + item.duration <= splitTime) return [item];
+    if (item.startTime >= splitTime) return [{ ...item, groupId: secondGroupId }];
+
+    const splitClips = splitProjectClip(item, offsets.get(item.id) ?? 0, secondGroupId);
+    if (splitClips[1]) trailingClipIdsBySourceId.set(item.id, splitClips[1].id);
+    if (item.id === clipId) trailingClipId = splitClips[1]?.id ?? null;
+    return splitClips;
+  });
   const nextProject = applyVideoProjectMutationPatch(project, {
-    clips: project.clips.flatMap((item) => {
-      if (!operation.clipIdSet.has(item.id)) {
-        return [item];
-      }
-
-      if (item.startTime + item.duration <= splitTime) return [item];
-      if (item.startTime >= splitTime) return [{ ...item, groupId: secondGroupId }];
-
-      const splitClips = splitProjectClip(item, offsets.get(item.id) ?? 0, secondGroupId);
-      if (splitClips[1]) trailingClipIdsBySourceId.set(item.id, splitClips[1].id);
-      if (item.id === clipId) trailingClipId = splitClips[1]?.id ?? null;
-      return splitClips;
-    }),
+    clips,
+    ...(project.effectInstances
+      ? {
+          effectInstances: splitClipEffects(
+            project.effectInstances,
+            splitTime,
+            trailingClipIdsBySourceId
+          ),
+        }
+      : {}),
   });
   const trailingClip = nextProject.clips.find((clip) => clip.id === trailingClipId);
   return trailingClip
@@ -84,6 +94,38 @@ export function splitProjectClipsAtTimeWithResult(
         trailingClipIdsBySourceId,
       }
     : null;
+}
+
+function splitClipEffects(
+  instances: NonNullable<VideoProject['effectInstances']>,
+  splitTime: number,
+  trailingIds: ReadonlyMap<string, string>
+): NonNullable<VideoProject['effectInstances']> {
+  return instances.flatMap((instance) => {
+    if (instance.target.kind !== 'clip') return [instance];
+    const trailingId = trailingIds.get(instance.target.clipId);
+    if (!trailingId) return [instance];
+    const end = instance.startTime + instance.duration;
+    const leadingDuration = Math.min(splitTime, end) - instance.startTime;
+    const trailingStart = Math.max(splitTime, instance.startTime);
+    const leading = leadingDuration > 0 ? [{ ...instance, duration: leadingDuration }] : [];
+    return end > trailingStart
+      ? [
+          ...leading,
+          {
+            ...instance,
+            id: leading.length ? crypto.randomUUID() : instance.id,
+            target: { kind: 'clip' as const, clipId: trailingId },
+            controls: { ...instance.controls },
+            startTime: trailingStart,
+            duration: end - trailingStart,
+            sourceStart:
+              (instance.sourceStart ?? 0) +
+              (trailingStart - instance.startTime) * instance.playbackRate,
+          },
+        ]
+      : leading;
+  });
 }
 
 export function duplicateProjectClips(project: VideoProject, clipId: string): VideoProject {
@@ -116,6 +158,7 @@ export function duplicateProjectClipsWithResult(
 
   const duplicateGroupId = operation.clipIds.length > 1 ? createClipGroupId() : null;
   const duplicateIds: string[] = [];
+  const sourceInstances = new Map<string, string>();
   let duplicateClipId: string | null = null;
   const nextProject = applyVideoProjectMutationPatch(project, {
     clips: project.clips.flatMap((item) => {
@@ -133,11 +176,35 @@ export function duplicateProjectClipsWithResult(
         name: `${item.name} ${translate('shared.projectActions.copySuffix')}`,
       } as VideoProjectClip;
 
+      if (item.type === 'VIDEO' && duplicate.type === 'VIDEO' && item.sourceInstanceId) {
+        const sourceInstanceId = sourceInstances.get(item.sourceInstanceId) ?? crypto.randomUUID();
+        sourceInstances.set(item.sourceInstanceId, sourceInstanceId);
+        duplicate.sourceInstanceId = sourceInstanceId;
+      }
       duplicateIds.push(duplicate.id);
       if (item.id === clipId) duplicateClipId = duplicate.id;
       return [item, duplicate];
     }),
   });
+  nextProject.actionEvents = [
+    ...project.actionEvents,
+    ...project.actionEvents.flatMap((event) => {
+      if (event.anchor.kind !== 'recording-source') return [];
+      const sourceInstanceId = sourceInstances.get(event.anchor.sourceInstanceId);
+      return sourceInstanceId
+        ? [
+            {
+              ...event,
+              id: crypto.randomUUID(),
+              anchor: { ...event.anchor, sourceInstanceId },
+              data: { ...event.data },
+              point: event.point ? { ...event.point } : null,
+              ...(event.presentation ? { presentation: { ...event.presentation } } : {}),
+            },
+          ]
+        : [];
+    }),
+  ];
   const placedProject = applyTimelinePlacementPolicy(nextProject, duplicateIds);
   const selectedDuplicate = placedProject.clips.find((clip) => clip.id === duplicateClipId);
   return selectedDuplicate

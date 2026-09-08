@@ -1,4 +1,8 @@
 // @vitest-environment jsdom
+import {
+  resolveVideoProjectActionOccurrences,
+  type VideoProjectActionOccurrence,
+} from '../../../features/video/project/action-occurrences';
 
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -12,8 +16,8 @@ async function importPlaybackHook() {
 
 interface PlaybackHarnessProps {
   project: ReturnType<typeof createEmptyVideoProject>;
-  selection: { kind: string; actionEventId?: string; motionRegionId?: string };
-  selectedActionEvent?: ReturnType<typeof createEmptyVideoProject>['actionEvents'][number] | null;
+  selection: { kind: string; eventId?: string; clipId?: string | null; motionRegionId?: string };
+  selectedActionOccurrence?: VideoProjectActionOccurrence | null;
   selectedMotionRegion?:
     | NonNullable<ReturnType<typeof createEmptyVideoProject>['motionRegions']>[number]
     | null;
@@ -34,7 +38,7 @@ function PlaybackHarness(props: PlaybackHarnessProps) {
       selection: props.selection as never,
       placementMode: null,
       selectedClipId: null,
-      selectedActionEvent: props.selectedActionEvent ?? null,
+      selectedActionOccurrence: props.selectedActionOccurrence ?? null,
       selectedMotionRegion: props.selectedMotionRegion ?? null,
     },
     {
@@ -66,13 +70,13 @@ function createMotionProject() {
   const project = createEmptyVideoProject('Playback nudge');
   project.actionEvents = [
     {
-      duration: 1,
       id: 'action-1',
       kind: 'CLICK',
       label: 'Action',
+      data: {},
       point: { x: 40, y: 30 },
-      preset: 'NONE',
-      startTime: 0,
+      presentation: { preset: 'NONE', duration: 1 },
+      anchor: { kind: 'project', time: 0 },
     },
   ] as never;
   project.motionRegions = [
@@ -86,7 +90,7 @@ function createMotionProject() {
       motionBlurAmount: 0,
       scale: 1.2,
       startTime: 0,
-      targetActionEventId: null,
+      targetAction: null,
       zoomInDuration: 0.2,
       zoomOutDuration: 0.2,
     },
@@ -100,7 +104,7 @@ function createMotionProject() {
       motionBlurAmount: 0,
       scale: 1.2,
       startTime: 0,
-      targetActionEventId: null,
+      targetAction: null,
       zoomInDuration: 0.2,
       zoomOutDuration: 0.2,
     },
@@ -137,8 +141,12 @@ function registerActionPointNudgeTest() {
 
     renderPlaybackHarness(root, {
       project,
-      selection: { kind: VideoEditorSelectionKind.ACTION_SEGMENT, actionEventId: 'action-1' },
-      selectedActionEvent: project.actionEvents[0] ?? null,
+      selection: {
+        kind: VideoEditorSelectionKind.ACTION_OCCURRENCE,
+        clipId: null,
+        eventId: 'action-1',
+      },
+      selectedActionOccurrence: resolveVideoProjectActionOccurrences(project)[0] ?? null,
       selectedMotionRegion: null,
       updateActionEventDetails,
       updateMotionRegion: vi.fn(),
@@ -150,6 +158,7 @@ function registerActionPointNudgeTest() {
     });
 
     expect(updateActionEventDetails).toHaveBeenCalledWith('action-1', {
+      clipId: null,
       point: { x: 40, y: 29 },
     });
   });
@@ -164,7 +173,7 @@ function registerManualFocusNudgeTest() {
     renderPlaybackHarness(root, {
       project,
       selection: { kind: VideoEditorSelectionKind.MOTION_REGION, motionRegionId: 'motion-1' },
-      selectedActionEvent: null,
+      selectedActionOccurrence: null,
       selectedMotionRegion: project.motionRegions?.[0] ?? null,
       updateActionEventDetails: vi.fn(),
       updateMotionRegion,
@@ -192,7 +201,7 @@ function registerManualAreaNudgeTest() {
     renderPlaybackHarness(root, {
       project,
       selection: { kind: VideoEditorSelectionKind.MOTION_REGION, motionRegionId: 'motion-2' },
-      selectedActionEvent: null,
+      selectedActionOccurrence: null,
       selectedMotionRegion: project.motionRegions?.[1] ?? null,
       updateActionEventDetails: vi.fn(),
       updateMotionRegion,

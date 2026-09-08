@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createTextClip } from '../../../features/video/project/factories/overlay-clip';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
+import { createVideoProjectMotionRegion } from '../../../features/video/project/motion';
 import { VideoEditorSelectionKind } from '../../contracts/selection';
 import { usePlaybackShortcuts, usePlaybackSpaceShortcut } from './playback/shortcuts';
 import type { PlaybackHandlers, PlaybackLatestState } from '../../interaction/playback/types';
@@ -38,7 +39,7 @@ function createLatestState(): PlaybackLatestState {
     playbackRange: null,
     project: createEmptyVideoProject('Playback shortcut ownership'),
     projectHistoryTransactionActive: false,
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedClipId: null,
     selectedMotionRegion: null,
     selection: { kind: VideoEditorSelectionKind.SCENE },
@@ -158,6 +159,40 @@ it('owns plain Home and End while leaving modified and text-entry navigation nat
 
   expect(seekTo.mock.calls).toEqual([[0], [12]]);
   input.remove();
+});
+
+it('leaves spatial-control arrows local while retaining global Space playback', () => {
+  const stepByFrames = vi.fn();
+  const togglePlayback = vi.fn();
+  const state = createLatestState();
+  state.selectedMotionRegion = createVideoProjectMotionRegion(state.project!, 0);
+  state.selection = {
+    kind: VideoEditorSelectionKind.MOTION_REGION,
+    motionRegionId: state.selectedMotionRegion.id,
+  };
+  const handlers = createHandlers();
+  act(() =>
+    root!.render(
+      <ShortcutHarness
+        handlers={handlers}
+        latestState={state}
+        seekTo={vi.fn()}
+        stepByFrames={stepByFrames}
+        togglePlayback={togglePlayback}
+      />
+    )
+  );
+  const control = document.createElement('button');
+  control.dataset['videoEditorLocalNavigation'] = 'true';
+  document.body.append(control);
+  act(() => {
+    control.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, code: 'ArrowRight' }));
+    control.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, code: 'Space' }));
+  });
+  expect(stepByFrames).not.toHaveBeenCalled();
+  expect(handlers.updateMotionRegion).not.toHaveBeenCalled();
+  expect(togglePlayback).toHaveBeenCalledOnce();
+  control.remove();
 });
 
 it('owns plain Comma and Period for symmetric frame stepping', () => {

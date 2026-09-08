@@ -1,4 +1,5 @@
 import { expect, it } from 'vitest';
+import type { RecordingActionEvent } from '../project/types';
 import { projectReviewTelemetry } from './telemetry';
 
 it('distinguishes actual idle ranges from zero-length native backend warnings', () => {
@@ -91,4 +92,33 @@ it('excludes invalid times and hidden cursor samples while preserving source coo
     { kind: 'action', id: 'click' },
   ]);
   expect(projectReviewTelemetry(input, 4).markers).toHaveLength(1);
+});
+
+it('projects raw capture time even when optional animation and source anchor differ', () => {
+  const event: RecordingActionEvent = {
+    id: 'raw',
+    kind: 'CLICK',
+    time: 2,
+    duration: 0.25,
+    point: null,
+    label: 'Click',
+    data: {},
+    preset: 'NONE',
+    animation: { start: 1, end: 3, duration: 2 },
+    sourceAnchor: {
+      kind: 'recording-source',
+      recordingId: 'r',
+      sourceClipId: 'raw-source',
+      sourceTime: 9,
+    },
+    timeBasis: 'project',
+  };
+  const before = structuredClone(event);
+  expect(
+    projectReviewTelemetry({ actionEvents: [event], signals: [], cursorTrack: null }, 10)
+  ).toEqual({
+    markers: [{ ref: { kind: 'action', id: 'raw' }, eventType: 'CLICK', start: 2, end: 2.25 }],
+    warnings: 0,
+  });
+  expect(event).toEqual(before);
 });

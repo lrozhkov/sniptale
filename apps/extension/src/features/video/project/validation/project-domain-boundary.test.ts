@@ -155,7 +155,13 @@ it('rejects out-of-range cursor, action, and motion values', () => {
   expect(
     isHydratableVideoProject({
       ...project,
-      actionEvents: [{ ...createActionEvent(), point: { x: 65_537, y: 10 }, time: 86_401 }],
+      actionEvents: [
+        {
+          ...createActionEvent(),
+          point: { x: 65_537, y: 10 },
+          anchor: { kind: 'project', time: 86_401 },
+        },
+      ],
     })
   ).toBe(false);
   expect(

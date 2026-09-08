@@ -1,3 +1,9 @@
+import type { VideoEditorAnnotationActions } from './annotation';
+import type { VideoEditorObjectTrackActions } from './object-tracks';
+import type { VideoEditorTemporalActions } from './temporal';
+import type { VideoEditorEffectInstanceActions } from './effect-instance';
+import type { VideoEditorMoveClipAction, VideoEditorTrimClipAction } from './timeline';
+import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
 import type {
   VideoBlockKind,
   VideoMediaFitMode,
@@ -13,11 +19,6 @@ import type {
   VideoEditorFadePatch,
   VideoEditorTransitionPatch,
 } from './patches';
-import type { VideoEditorAnnotationActions } from './annotation';
-import type { VideoEditorObjectTrackActions } from './object-tracks';
-import type { VideoEditorTemporalActions } from './temporal';
-import type { VideoEditorEffectInstanceActions } from './effect-instance';
-import type { VideoEditorMoveClipAction, VideoEditorTrimClipAction } from './timeline';
 import type {
   VideoEditorMaterialPlacementResult,
   VideoEditorMaterialSourceRange,
@@ -45,16 +46,19 @@ export interface VideoEditorProjectActions
   removeUnusedAssets: (assetIds?: readonly string[]) => void;
   appendMaterial: (
     assetId: string,
-    range?: VideoEditorMaterialSourceRange
+    range?: VideoEditorMaterialSourceRange,
+    telemetry?: RecordingTelemetryEntry
   ) => VideoEditorMaterialPlacementResult;
   /** Inserts at the playhead and opens an equal gap across the montage. */
   insertMaterial: (
     assetId: string,
-    range?: VideoEditorMaterialSourceRange
+    range?: VideoEditorMaterialSourceRange,
+    telemetry?: RecordingTelemetryEntry
   ) => VideoEditorMaterialPlacementResult;
   overlayMaterial: (
     assetId: string,
-    range?: VideoEditorMaterialSourceRange
+    range?: VideoEditorMaterialSourceRange,
+    telemetry?: RecordingTelemetryEntry
   ) => VideoEditorMaterialPlacementResult;
   addAssetClip: (
     asset: VideoProjectAsset,

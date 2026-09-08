@@ -72,7 +72,7 @@ function createProps(
     previewMode: 'live',
     previewRasterSize: { height: 100, width: 200 },
     project,
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedClipId: null,
     selectedMotionRegion: null,
     selectionOverlay: null,
@@ -132,9 +132,11 @@ it('prioritizes active insert tools over existing preview overlays', () => {
     ),
   });
   const stage = renderRoot(props);
+  act(() => stage.focus());
   const overlay = container?.querySelector<HTMLButtonElement>(
     '[data-ui="video.preview.existing-overlay"]'
   );
+  expect(overlay).not.toBeNull();
 
   act(() => {
     overlay?.dispatchEvent(pointerEvent('pointerdown', 200, 100));

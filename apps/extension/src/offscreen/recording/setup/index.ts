@@ -1,3 +1,6 @@
+import type { RecordingPointTransform } from '../../../features/video/project/types';
+import { resolveRecordingPointTransform } from '../geometry/tab-source';
+import { resolveDestinationRect } from '../encoding/live-video-frame-transform';
 import type { VideoCursorCaptureMode } from '../../../features/video/project/types/interaction';
 import {
   CaptureMode,
@@ -41,6 +44,7 @@ type RecordingSetupParams = {
 };
 
 export type RecordingSetupResult = {
+  recordingPointTransform?: RecordingPointTransform | null;
   encoderFrameTransform: LiveVideoFrameTransform | null;
   cursorCaptureMode: VideoCursorCaptureMode | null;
   rawTrackSettings: MediaTrackSettings;
@@ -403,6 +407,21 @@ export async function prepareRecordingStream(
     output.frameRate,
     { allowEncoderTransform: output.encoderFrameTransform !== null }
   );
+  const recordingPointTransform =
+    output.tabOutputGeometry &&
+    (tabSourceGeometry.fidelity === 'native-grid' ||
+      tabSourceGeometry.fidelity === 'chromium-even-grid')
+      ? resolveRecordingPointTransform(
+          output.tabOutputGeometry,
+          output.encoderFrameTransform
+            ? resolveDestinationRect(
+                output.encoderFrameTransform.sourceRect,
+                output.encoderFrameTransform.outputSize,
+                output.encoderFrameTransform.fit
+              )
+            : { x: 0, y: 0, ...output.outputSize }
+        )
+      : null;
   const pipelineDiagnostic = createPipelineDiagnostic(params, raw, output, tabSourceGeometry);
   logger.info(`TAB_RECORDING_DIAGNOSTIC pipeline ${JSON.stringify(pipelineDiagnostic)}`);
   logger.debug('Resolved recording video pipeline', pipelineDiagnostic);
@@ -410,6 +429,7 @@ export async function prepareRecordingStream(
   await attachRecordingAudio(params);
   applyVideoTrackContentHint(outputTrack, resolveRecordingContentHint(params.captureMode));
   return {
+    recordingPointTransform,
     encoderFrameTransform: output.encoderFrameTransform,
     cursorCaptureMode,
     rawTrackSettings: raw.trackSettings,

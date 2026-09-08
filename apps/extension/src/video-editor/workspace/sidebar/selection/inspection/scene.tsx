@@ -2,7 +2,7 @@ import { GridSettingsPanel } from '../../settings';
 import { translate } from '../../../../../platform/i18n';
 import { getProjectSceneBackground } from '../../../../../features/video/project/scene/background';
 import { VideoProjectAssetType } from '../../../../../features/video/project/types';
-import { getVisibleProjectActionEvents } from '../../../../project/operations/action-events';
+import { resolveVideoProjectActionOccurrences } from '../../../../../features/video/project/action-occurrences';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { InspectorGroupedPanel } from '../grouped-inspector';
 import { NumberInput } from '../inputs/number';
@@ -182,7 +182,7 @@ function getProjectSourceLabel(
 }
 
 function getActionSummaryLabel(project: WorkspaceSidebarSelectionPanelProps['project']) {
-  const actionEvents = getVisibleProjectActionEvents(project);
+  const actionEvents = resolveVideoProjectActionOccurrences(project);
   if (actionEvents.length > 0) {
     return String(actionEvents.length);
   }

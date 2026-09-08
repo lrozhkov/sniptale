@@ -1,15 +1,5 @@
-import {
-  VideoEditorWorkspaceHeader,
-  VideoEditorLibraryNavigation,
-  WorkspacePanelCloseButton,
-} from '../floating';
 import { VideoEditorWorkspaceHeaderActions } from '../floating/top-panels';
 import { useWorkspaceTrackPresentation } from './track-presentation';
-import {
-  WorkspacePanelDockToggle,
-  WorkspacePanelResizeHandle,
-  type WorkspacePanelResize,
-} from '../floating/panel-layout';
 import React, { useEffect, useState } from 'react';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
@@ -18,6 +8,31 @@ import { VideoEditorSourceViewer } from './source-viewer';
 import type { VideoProjectAsset } from '../../../features/video/project/types';
 import { ProjectTimeline } from '../../timeline/project';
 import { PreviewStage } from '../../preview/stage';
+import { VideoEditorMaterials } from './materials';
+import type { VideoPreviewCanvasInsertKind } from '../../preview/stage/types';
+import { VideoEditorWorkspaceEffectsLibrary } from './effects-library';
+import type { WorkspaceEffectBundlesState } from './effect-bundles';
+import { getProjectTimelineProps } from './timeline-props';
+import type { VideoEditorEffectDocumentDragPayload } from '../../contracts/effect-document-drag';
+import type { VideoProjectEffectTarget } from '../../../features/video/project/effect-instance/types';
+import type { EffectLibraryOperations } from '../../library/effects-dock/operations';
+import type { VideoEditorEffectCatalogItem } from '../../library/effects-dock/types';
+import type { EffectEditingPort } from '../../contracts/controller-store';
+import { placeMaterialWithTelemetry } from '../../runtime/commands/material-placement';
+import {
+  getCurrentVideoEditorProjectSnapshot,
+  getCurrentVideoEditorCurrentTime,
+} from '../../runtime/controller/store';
+import {
+  VideoEditorWorkspaceHeader,
+  VideoEditorLibraryNavigation,
+  WorkspacePanelCloseButton,
+} from '../floating';
+import {
+  WorkspacePanelDockToggle,
+  WorkspacePanelResizeHandle,
+  type WorkspacePanelResize,
+} from '../floating/panel-layout';
 import {
   useVideoEditorHeaderController,
   useWorkspacePreviewContext,
@@ -30,16 +45,6 @@ import {
   useVideoEditorEffectEditingPort,
   useVideoEditorTimelineEditingPort,
 } from '../../runtime/controller/store';
-import { VideoEditorMaterials } from './materials';
-import type { VideoPreviewCanvasInsertKind } from '../../preview/stage/types';
-import { VideoEditorWorkspaceEffectsLibrary } from './effects-library';
-import type { WorkspaceEffectBundlesState } from './effect-bundles';
-import { getProjectTimelineProps } from './timeline-props';
-import type { VideoEditorEffectDocumentDragPayload } from '../../contracts/effect-document-drag';
-import type { VideoProjectEffectTarget } from '../../../features/video/project/effect-instance/types';
-import type { EffectLibraryOperations } from '../../library/effects-dock/operations';
-import type { VideoEditorEffectCatalogItem } from '../../library/effects-dock/types';
-import type { EffectEditingPort } from '../../contracts/controller-store';
 
 export function VideoEditorWorkspaceCanvas(props: VideoEditorWorkspaceCanvasProps) {
   const layout = useVideoEditorLayoutController();
@@ -217,9 +222,36 @@ function VideoEditorWorkspaceUpper(props: VideoEditorWorkspaceCanvasProps) {
                 assetUrl={source ? preview.assetUrls[source.id] : undefined}
                 active={sourceActive && !blocking}
                 fps={preview.project.fps}
-                onAppend={appendMaterial}
-                onInsert={insertMaterial}
-                onOverlay={overlayMaterial}
+                onAppend={(assetId, range, signal) =>
+                  placeMaterialWithTelemetry({
+                    assetId,
+                    range,
+                    signal,
+                    getProject: getCurrentVideoEditorProjectSnapshot,
+                    getCurrentTime: getCurrentVideoEditorCurrentTime,
+                    place: appendMaterial,
+                  })
+                }
+                onInsert={(assetId, range, signal) =>
+                  placeMaterialWithTelemetry({
+                    assetId,
+                    range,
+                    signal,
+                    getProject: getCurrentVideoEditorProjectSnapshot,
+                    getCurrentTime: getCurrentVideoEditorCurrentTime,
+                    place: insertMaterial,
+                  })
+                }
+                onOverlay={(assetId, range, signal) =>
+                  placeMaterialWithTelemetry({
+                    assetId,
+                    range,
+                    signal,
+                    getProject: getCurrentVideoEditorProjectSnapshot,
+                    getCurrentTime: getCurrentVideoEditorCurrentTime,
+                    place: overlayMaterial,
+                  })
+                }
                 onPlaced={() => setSourceActive(false)}
               />
             ),
@@ -316,7 +348,7 @@ function createWorkspacePreviewProps(
     previewRasterPreset: preview.preferences.rasterPreset,
     previewZoom: preview.preferences.zoom,
     registerPreviewRuntime: preview.transport.registerPreviewRuntime,
-    selectedActionEvent: preview.selection.selectedActionEvent,
+    selectedActionOccurrence: preview.selection.selectedActionOccurrence,
     selectedClipId: preview.selection.selectedClipId,
     selectedMotionRegion: preview.selection.selectedMotionRegion,
     onClearActiveInsertKind: props.onClearActiveInsertKind,

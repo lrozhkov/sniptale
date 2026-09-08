@@ -1,8 +1,12 @@
 import { translate } from '../../../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { VideoTemporalEasing } from '../../../../../features/video/project/types';
+import {
+  VideoCursorCaptureMode,
+  VideoTemporalEasing,
+} from '../../../../../features/video/project/types';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import {
+  CursorCaptureCapability,
   CursorPositionFields,
   CursorSkinFields,
   CursorVisibilityField,
@@ -30,6 +34,7 @@ export function InspectCursorPanel(props: WorkspaceSidebarSelectionPanelProps) {
 
   return (
     <section className={PANEL_SECTION_CLASS_NAME}>
+      <CursorCaptureCapability captureMode={cursorTrack.captureMode} />
       <InspectorGroupedPanel
         groups={createCursorGroups(props, sample, cursorTrack, usesTrackAppearance, effectiveSkin)}
       />
@@ -87,6 +92,7 @@ function createCursorBehaviorProps(
 ) {
   return {
     sample,
+    canInterpolate: props.project.cursorTrack?.captureMode === VideoCursorCaptureMode.SEPARATE,
     onUpdateCursorSampleInterpolation: props.onUpdateCursorSampleInterpolation,
     onUpdateCursorSampleVisibility: props.onUpdateCursorSampleVisibility,
   };
@@ -112,6 +118,7 @@ function createCursorAppearanceProps(
 }
 
 function CursorBehaviorSection(props: {
+  canInterpolate: boolean;
   sample: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedCursorSample']>;
   onUpdateCursorSampleInterpolation: WorkspaceSidebarSelectionPanelProps['onUpdateCursorSampleInterpolation'];
   onUpdateCursorSampleVisibility: WorkspaceSidebarSelectionPanelProps['onUpdateCursorSampleVisibility'];
@@ -123,11 +130,13 @@ function CursorBehaviorSection(props: {
         visible={props.sample.visible}
         onChange={(visible) => props.onUpdateCursorSampleVisibility(props.sample.id, visible)}
       />
-      <TemporalEasingSelect
-        label={translate('videoEditor.sidebar.cursorInterpolationLabel')}
-        value={props.sample.interpolation ?? VideoTemporalEasing.LINEAR}
-        onChange={(value) => props.onUpdateCursorSampleInterpolation(props.sample.id, value)}
-      />
+      {props.canInterpolate ? (
+        <TemporalEasingSelect
+          label={translate('videoEditor.sidebar.cursorInterpolationLabel')}
+          value={props.sample.interpolation ?? VideoTemporalEasing.LINEAR}
+          onChange={(value) => props.onUpdateCursorSampleInterpolation(props.sample.id, value)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -160,6 +169,7 @@ function CursorAppearanceSection(props: {
       />
       <div className="mt-3">
         <CursorSkinFields
+          showCaptureCapability={false}
           animationPreset={props.skin.animationPreset}
           captureMode={props.captureMode}
           color={props.skin.color}

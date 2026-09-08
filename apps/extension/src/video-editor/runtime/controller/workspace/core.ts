@@ -1,3 +1,4 @@
+import type { VideoProjectActionPreset } from '../../../../features/video/project/types';
 import type { VideoEditorRuntimeController } from '../../session';
 import type { SaveStateMeta, VideoEditorLibrariesState } from '../../app-model/types';
 import type { VideoEditorActionHandlers } from '../../commands';
@@ -53,7 +54,7 @@ interface CreateWorkspacePreviewArgs {
     VideoEditorActionHandlers,
     'handleImportAudio' | 'handleImportImage' | 'handleImportVideo'
   >;
-  selections: Pick<VideoEditorSelections, 'selectedActionEvent' | 'selectedMotionRegion'>;
+  selections: Pick<VideoEditorSelections, 'selectedActionOccurrence' | 'selectedMotionRegion'>;
   store: PreviewStore;
   workspace: Pick<VideoEditorWorkspaceState, 'grid' | 'inspector' | 'playbackRange' | 'preview'>;
 }
@@ -150,7 +151,7 @@ function createWorkspacePreviewTransport(
 function createWorkspacePreviewSelection(args: CreateWorkspacePreviewArgs) {
   return {
     placementMode: args.store.placementMode,
-    selectedActionEvent: args.selections.selectedActionEvent,
+    selectedActionOccurrence: args.selections.selectedActionOccurrence,
     selectedClipId: args.store.selectedClipId,
     selectedMotionRegion: args.selections.selectedMotionRegion,
   };
@@ -188,11 +189,7 @@ export function createWorkspacePreviewController(
   runtime: VideoEditorRuntimeController,
   project: NonNullable<ProjectLifecyclePort['project']>,
   projectUpdaters: {
-    addActionEvent: (
-      preset: NonNullable<
-        NonNullable<ProjectLifecyclePort['project']>['actionEvents'][number]['preset']
-      >
-    ) => void;
+    addActionEvent: (preset: VideoProjectActionPreset) => void;
     addMotionRegion: () => void;
     enableCursorTrack: () => void;
   }

@@ -1,3 +1,10 @@
+import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
+import type { VideoEditorSessionActions } from '../../../contracts/commands/session';
+import type { VideoProjectActionOccurrence } from '../../../../features/video/project/action-occurrences';
+import type {
+  VideoProjectCameraLayout,
+  VideoProjectCameraPlacement,
+} from '../../../../features/video/project/camera/placement';
 import type { VideoEditorProjectActions } from '../../../contracts/commands/project';
 import type {
   VideoProjectAnnotationStylePatch,
@@ -32,6 +39,10 @@ import type {
 import type { ProjectListItem, RecordingListItem } from '../../../library/contracts/items';
 
 export interface WorkspaceSidebarProps {
+  typingProject?: VideoProject;
+  recordingTelemetry?: readonly RecordingTelemetryEntry[];
+  onApplyTypingCompression?: VideoEditorSessionActions['applyTypingCompression'];
+  currentTime?: number;
   activeProjectId: string;
   collapsed: boolean;
   gridSettings: WorkspaceSidebarGridSettings;
@@ -49,7 +60,7 @@ export interface WorkspaceSidebarProps {
   onDeleteMotionRegion?: (motionRegionId: string) => void;
   onDeleteObjectTrack?: (trackId: string) => void;
   onSelectObjectTrack?: (trackId: string) => void;
-  onGenerateMotionPathFromCursor?: (motionRegionId: string) => void;
+
   onDeleteProject: (projectId: string) => void | Promise<void>;
   onDeleteTrack?: (trackId: string) => void;
   onSwapClip?: VideoEditorProjectActions['swapClip'];
@@ -76,18 +87,20 @@ export interface WorkspaceSidebarProps {
   onToggleTrackVisibility?: (trackId: string) => void;
   onSetCursorCaptureMode: (mode: VideoCursorCaptureMode) => void;
   onSetSceneBackground: (sceneBackground: NonNullable<VideoProject['sceneBackground']>) => void;
-  onStartActionPointPlacement?: (actionEventId: string) => void;
+  onStartActionPointPlacement?: (eventId: string, clipId: string | null) => void;
   onStartMotionAreaPlacement?: (motionRegionId: string) => void;
   onStartMotionFocusPlacement?: (motionRegionId: string) => void;
-  onStartMotionPathStopAreaPlacement?: (motionRegionId: string, stopId: string) => void;
-  onStartMotionPathStopPointPlacement?: (motionRegionId: string, stopId: string) => void;
+
   onStartObjectTrackAnchorPlacement?: (objectTrackId: string) => void;
   onToggleCollapsed: () => void;
+  onUpdateActionPresentation?: (
+    patch: Partial<
+      import('../../../../features/video/project/types').VideoProjectActionPresentation
+    >
+  ) => void;
   onUpdateActionEventDetails?: (
     actionEventId: string,
-    patch: Partial<
-      Pick<VideoProject['actionEvents'][number], 'duration' | 'label' | 'point' | 'preset'>
-    >
+    patch: import('../../../contracts/commands/patches').VideoEditorActionEventPatch
   ) => void;
   onUpdateAnnotationClipContent?: (
     clipId: string,
@@ -105,6 +118,12 @@ export interface WorkspaceSidebarProps {
   onUpdateClipFades: (clipId: string, patch: { fadeInMs?: number; fadeOutMs?: number }) => void;
   onUpdateClipPlaybackRate?: (clipId: string, playbackRate: number) => void;
   onUpdateClipMuted: (clipId: string, muted: boolean) => void;
+  onApplyCameraLayout?: (
+    clipId: string,
+    layout: VideoProjectCameraLayout,
+    placement?: VideoProjectCameraPlacement
+  ) => void;
+  onSplitCameraInterval?: (clipId: string) => void;
   onUpdateClipTransform: (clipId: string, patch: Partial<VideoProjectClip['transform']>) => void;
   onUpdateClipVolume: (clipId: string, volume: number) => void;
   onUpdateCursorSampleInterpolation?: (
@@ -153,7 +172,8 @@ export interface WorkspaceSidebarProps {
   recentColors?: string[];
   recordingId: string | null;
   recordings: RecordingListItem[];
-  selectedActionEvent?: VideoProject['actionEvents'][number] | null;
+  selectedActionOccurrence?: VideoProjectActionOccurrence | null;
+  canSplitCameraInterval?: boolean;
   selectedClip: VideoProjectClip | null;
   selectedCursorSample?: VideoProjectCursorSample | null;
   selectedMotionRegion?: VideoProjectMotionRegion | null;

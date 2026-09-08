@@ -4,28 +4,20 @@ import { VideoEditorPlacementModeKind } from '../../../contracts/placement';
 import { createSquareArea } from '../../../interaction/placement-geometry';
 import { updateMotionArea } from '../../../interaction/motion-area';
 import { resolveAreaPointFromPointer } from './geometry';
-import { updateMotionPathAreaStop } from './shared';
+
 import type { AreaOverlayParams } from './types';
 
-type AreaPlacementMode =
-  | Extract<
-      NonNullable<AreaOverlayParams['placementMode']>,
-      { kind: typeof VideoEditorPlacementModeKind.MOTION_AREA }
-    >
-  | Extract<
-      NonNullable<AreaOverlayParams['placementMode']>,
-      { kind: typeof VideoEditorPlacementModeKind.MOTION_PATH_STOP_AREA }
-    >;
+type AreaPlacementMode = Extract<
+  NonNullable<AreaOverlayParams['placementMode']>,
+  { kind: typeof VideoEditorPlacementModeKind.MOTION_AREA }
+>;
 
 export function handleStageAreaPlacement(
   event: React.PointerEvent<HTMLDivElement>,
   params: AreaOverlayParams
 ): boolean {
-  const placementMode = params.placementMode as AreaPlacementMode | null;
-  if (
-    placementMode?.kind !== VideoEditorPlacementModeKind.MOTION_AREA &&
-    placementMode?.kind !== VideoEditorPlacementModeKind.MOTION_PATH_STOP_AREA
-  ) {
+  const placementMode = params.placementMode;
+  if (placementMode?.kind !== VideoEditorPlacementModeKind.MOTION_AREA) {
     return false;
   }
 
@@ -61,25 +53,7 @@ function applyAreaPlacement(
   placementMode: AreaPlacementMode,
   area: ReturnType<typeof createSquareArea>
 ) {
-  if (placementMode.kind === VideoEditorPlacementModeKind.MOTION_AREA) {
-    updateMotionArea(placementMode.motionRegionId, area, params.onUpdateMotionRegion);
-    return;
-  }
-
-  if (
-    !params.selectedMotionRegion ||
-    params.selectedMotionRegion.id !== placementMode.motionRegionId
-  ) {
-    return;
-  }
-
-  updateMotionPathAreaStop({
-    area,
-    motionRegion: params.selectedMotionRegion,
-    onUpdateMotionRegion: params.onUpdateMotionRegion,
-    project: params.project,
-    stopId: placementMode.stopId,
-  });
+  updateMotionArea(placementMode.motionRegionId, area, params.onUpdateMotionRegion);
 }
 
 function startAreaPlacementSession(

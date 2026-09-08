@@ -9,7 +9,7 @@ import { createEmptyVideoEditorProjectHistory, resetVideoEditorProjectHistory } 
 
 interface VideoEditorProjectTestState extends VideoEditorProjectState {
   clearPlacementMode: () => void;
-  selectActionSegment: (actionEventId: string) => void;
+  selectActionOccurrence: (eventId: string, clipId: string | null) => void;
   selectClip: (clipId: string | null) => void;
   selectCursorSegment: (sampleId: string) => void;
   selectMotionRegion: (motionRegionId: string) => void;
@@ -17,7 +17,7 @@ interface VideoEditorProjectTestState extends VideoEditorProjectState {
   selectScene: () => void;
   selectTrack: (trackId: string | null) => void;
   selectTransition: (transitionId: string) => void;
-  startActionPointPlacement: (actionEventId: string) => void;
+  startActionPointPlacement: (eventId: string, clipId: string | null) => void;
   setCurrentTime: (time: number) => void;
   setProject: (project: VideoProject) => void;
 }
@@ -31,8 +31,8 @@ export function createVideoEditorProjectTestStore() {
     selection: createSceneSelection(),
     selectedTrackId: null,
     clearPlacementMode: () => set({ placementMode: null }),
-    selectActionSegment: (actionEventId) =>
-      set({ selection: { kind: 'action-segment', actionEventId } }),
+    selectActionOccurrence: (eventId, clipId) =>
+      set({ selection: { kind: 'action-occurrence', eventId, clipId } }),
     selectClip: (clipId) =>
       set({
         selection: clipId ? { kind: 'clip', clipId } : createSceneSelection(),
@@ -50,13 +50,11 @@ export function createVideoEditorProjectTestStore() {
       }),
     selectTransition: (transitionId) =>
       set({ selection: { kind: 'transition-junction', transitionId } }),
-    startActionPointPlacement: (actionEventId) =>
-      set({ placementMode: createActionPointPlacementMode(actionEventId) }),
+    startActionPointPlacement: (eventId, clipId) =>
+      set({ placementMode: createActionPointPlacementMode(eventId, clipId) }),
     setCurrentTime: (currentTime) => set({ currentTime }),
     setProject: (project) => {
-      const hydratedProject = hydrateVideoProject(project, {
-        inferLegacyInteractionAnchors: true,
-      });
+      const hydratedProject = hydrateVideoProject(project);
       const selection = resolveInitialVideoEditorSelection(hydratedProject);
       set({
         project: hydratedProject,

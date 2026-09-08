@@ -52,7 +52,7 @@ describe('video editor track panel ui-state storage reads', () => {
       loadVideoEditorTrackPanelPrefs('project-a', new Set(['track-a']))
     ).resolves.toEqual({
       collapsedCursorLaneVisible: false,
-      collapsedTelemetryLaneVisible: false,
+      collapsedTelemetryLaneVisible: true,
       compactRows: false,
       hideTrackNames: false,
       trackHeightByTrackId: {
@@ -68,10 +68,22 @@ describe('video editor track panel ui-state storage reads', () => {
       loadVideoEditorTrackPanelPrefs('project-a', new Set(['track-a']))
     ).resolves.toEqual({
       collapsedCursorLaneVisible: true,
-      collapsedTelemetryLaneVisible: false,
+      collapsedTelemetryLaneVisible: true,
       compactRows: false,
       hideTrackNames: false,
       trackHeightByTrackId: {},
+    });
+  });
+
+  it('preserves an explicit choice to collapse history', async () => {
+    localGetMock.mockResolvedValueOnce({
+      'sniptale_video_editor_track_panel_prefs:project-a': {
+        collapsedTelemetryLaneVisible: false,
+      },
+    });
+
+    await expect(loadVideoEditorTrackPanelPrefs('project-a', new Set())).resolves.toMatchObject({
+      collapsedTelemetryLaneVisible: false,
     });
   });
 });
@@ -89,7 +101,7 @@ describe('video editor track panel invalid storage reads', () => {
       loadVideoEditorTrackPanelPrefs('project-a', new Set(['track-a']))
     ).resolves.toEqual({
       collapsedCursorLaneVisible: true,
-      collapsedTelemetryLaneVisible: false,
+      collapsedTelemetryLaneVisible: true,
       compactRows: false,
       hideTrackNames: false,
       trackHeightByTrackId: {},
@@ -115,7 +127,7 @@ describe('video editor track panel ui-state storage writes', () => {
     await expect(
       saveVideoEditorTrackPanelPrefs('project-a', {
         collapsedCursorLaneVisible: true,
-        collapsedTelemetryLaneVisible: false,
+        collapsedTelemetryLaneVisible: true,
         compactRows: false,
         hideTrackNames: false,
         trackHeightByTrackId: {},

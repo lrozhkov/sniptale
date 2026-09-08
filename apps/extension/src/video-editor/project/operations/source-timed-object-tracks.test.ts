@@ -129,10 +129,14 @@ it('keeps object-track lineage through a split and prunes unreachable source sam
     sourceStart: 2,
     startTime: 2,
   };
-  const split = reconcileRecordingInteractionAnchors(project, {
-    ...project,
-    clips: [{ ...sourceClip, duration: 2, sourceDuration: 2 }, trailingClip],
-  });
+  const split = reconcileRecordingInteractionAnchors(
+    project,
+    {
+      ...project,
+      clips: [{ ...sourceClip, duration: 2, sourceDuration: 2 }, trailingClip],
+    },
+    new Map([[sourceClip.id, trailingClip.id]])
+  );
   const afterLeadingRemoval = reconcileRecordingInteractionAnchors(split, {
     ...split,
     clips: [{ ...trailingClip, startTime: 0 }],

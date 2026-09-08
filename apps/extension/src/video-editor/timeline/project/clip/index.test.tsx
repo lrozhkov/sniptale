@@ -131,7 +131,8 @@ it('renders selected clip edge emphasis and fade previews', () => {
     );
   });
 
-  expect(container?.querySelectorAll('[aria-hidden="true"]')).toHaveLength(2);
+  expect(container?.querySelector('span[aria-hidden="true"].left-0')).toBeTruthy();
+  expect(container?.querySelector('span[aria-hidden="true"].right-0')).toBeTruthy();
   expect(container?.querySelector('[title="videoEditor.sidebar.fadeInLabel"]')).toBeTruthy();
   expect(container?.querySelector('[title="videoEditor.sidebar.fadeOutLabel"]')).toBeTruthy();
 });

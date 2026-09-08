@@ -135,6 +135,7 @@ export async function finalizeRecordingBootstrap(params: {
   settings: VideoRecordingSettings;
   cursorCaptureMode?: VideoCursorCaptureMode | null;
   encoderFrameTransform?: LiveVideoFrameTransform | null;
+  onVideoFrameGeometry?: (frame: VideoFrame) => void;
   trackSettings: MediaTrackSettings;
   durationTracker: typeof recordingContext.durationTracker;
   sourceBinding?: RecordingSourceBinding;
@@ -180,6 +181,7 @@ export async function finalizeRecordingBootstrap(params: {
     encoding: encoderConfig,
     filename: buildRecordingFilename(mimeType),
     frameTransform: params.encoderFrameTransform ?? undefined,
+    ...(params.onVideoFrameGeometry ? { onVideoFrameGeometry: params.onVideoFrameGeometry } : {}),
     mimeType,
     stream: videoStream,
   });

@@ -1,10 +1,11 @@
-import { VideoMotionOverlayZoomMode } from '../../project/types/index';
+import { VideoMotionOverlayZoomMode, VideoProjectTrackRole } from '../../project/types/index';
 import type { VideoCompositionCameraState, VideoCompositionVisualLayer } from '../types';
 
 export function shouldLockVisualLayerToViewport(
   layer: VideoCompositionVisualLayer,
   camera: VideoCompositionCameraState
 ): boolean {
+  if (layer.kind === 'video' && layer.trackRole === VideoProjectTrackRole.CAMERA) return true;
   if (
     (camera.overlayZoomMode ?? VideoMotionOverlayZoomMode.LOCK_OVERLAYS) !==
     VideoMotionOverlayZoomMode.LOCK_OVERLAYS

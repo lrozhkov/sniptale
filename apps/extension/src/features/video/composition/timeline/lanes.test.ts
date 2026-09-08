@@ -3,8 +3,6 @@ import { applyVideoProjectMutationPatch } from '../../project/mutation';
 import { createEmptyVideoProject } from '../../project/factories/creation';
 import { VideoTransitionEasing, VideoTransitionKind } from '../../project/types/index';
 import {
-  buildVideoCompositionActionSegments,
-  buildVideoCompositionActionSegmentsFromEvents,
   buildVideoCompositionCursorSegments,
   buildVideoCompositionMotionSegments,
   buildVideoCompositionMotionSegmentsFromRegions,
@@ -59,7 +57,7 @@ it('keeps transition segment ownership aligned with shared project transitions',
   ]);
 });
 
-it('derives cursor visibility and action spans from shared temporal data', () => {
+it('derives cursor visibility and motion spans from shared temporal data', () => {
   const project = createLaneProject();
 
   expect(buildVideoCompositionCursorSegments(project)).toEqual([
@@ -72,14 +70,6 @@ it('derives cursor visibility and action spans from shared temporal data', () =>
       visible: false,
     },
   ]);
-  expect(buildVideoCompositionActionSegments(project)).toEqual([
-    expect.objectContaining({
-      end: 3.7,
-      id: 'action-1',
-      point: { x: 110, y: 160 },
-      start: 3,
-    }),
-  ]);
   expect(buildVideoCompositionMotionSegments(project)).toEqual([
     expect.objectContaining({
       end: 4.3,
@@ -87,24 +77,20 @@ it('derives cursor visibility and action spans from shared temporal data', () =>
       start: 2.5,
     }),
   ]);
-  expect(buildVideoCompositionActionSegmentsFromEvents(project.actionEvents)).toEqual(
-    buildVideoCompositionActionSegments(project)
-  );
   expect(buildVideoCompositionMotionSegmentsFromRegions(project.motionRegions ?? [])).toEqual(
     buildVideoCompositionMotionSegments(project)
   );
 });
 
-it('returns empty lanes when a project has no transition, cursor, or action data', () => {
+it('returns empty lanes when a project has no transition, cursor, or motion data', () => {
   const project = createEmptyVideoProject('Empty lanes');
 
   expect(buildVideoCompositionTransitionSegments(project)).toEqual([]);
   expect(buildVideoCompositionCursorSegments(project)).toEqual([]);
-  expect(buildVideoCompositionActionSegments(project)).toEqual([]);
   expect(buildVideoCompositionMotionSegments(project)).toEqual([]);
 });
 
-it('honors hidden utility lanes for action and camera segments', () => {
+it('keeps history collapse independent and honors camera visibility', () => {
   const project = applyVideoProjectMutationPatch(createLaneProject(), {
     utilityLanes: {
       actions: { visible: false, locked: false },
@@ -112,7 +98,6 @@ it('honors hidden utility lanes for action and camera segments', () => {
     },
   });
 
-  expect(buildVideoCompositionActionSegments(project)).toEqual([]);
   expect(buildVideoCompositionMotionSegments(project)).toEqual([]);
   expect(buildVideoCompositionTransitionSegments(project)).toHaveLength(1);
 });

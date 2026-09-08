@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createFloatingWorkspaceController } from '../floating/top-panels.test-support';
 import { getWorkspaceSidebarProps } from './sidebar-props';
 
@@ -53,4 +53,18 @@ describe('workspace/sidebar-props', () => {
       color: '#fff',
     });
   });
+});
+
+it('forwards camera layout actions and preserves false split eligibility', () => {
+  const controller = createFloatingWorkspaceController().sidebar;
+  const onApplyCameraLayout = vi.fn();
+  const onSplitCameraInterval = vi.fn();
+  controller.clipActions.onApplyCameraLayout = onApplyCameraLayout;
+  controller.clipActions.onSplitCameraInterval = onSplitCameraInterval;
+  controller.state.canSplitCameraInterval = false;
+  const props = getWorkspaceSidebarProps(controller);
+  expect(props.canSplitCameraInterval).toBe(false);
+  props.onApplyCameraLayout?.('camera', 'OVERLAY', 'TOP_RIGHT');
+  expect(onApplyCameraLayout).toHaveBeenCalledWith('camera', 'OVERLAY', 'TOP_RIGHT');
+  expect(props.onSplitCameraInterval).toBe(onSplitCameraInterval);
 });

@@ -11,7 +11,7 @@ import {
 import { createRecordingProjectDocument } from './project-recording';
 import type {
   VideoProject,
-  VideoProjectActionEvent,
+  SourceNormalizedRecordingActionEvent,
   VideoProjectAsset,
   VideoProjectClip,
   VideoProjectCursorTrack,
@@ -30,7 +30,7 @@ export type CreateVideoProjectFromRecordingOptions = {
   size: number;
   hasAudio?: boolean;
   audioPeaks?: number[] | null;
-  actionEvents?: VideoProjectActionEvent[];
+  sourceNormalizedActionEvents?: SourceNormalizedRecordingActionEvent[];
   cursorTrack?: VideoProjectCursorTrack | null;
   motionRegions?: VideoProject['motionRegions'];
   asset?: VideoProjectAsset;
@@ -71,7 +71,7 @@ export function createRecordingVideoProject(
     sidecarTracks: tracks.sidecarTracks,
   });
   return createRecordingProjectDocument({
-    actionEvents: options.actionEvents ?? [],
+    sourceNormalizedActionEvents: options.sourceNormalizedActionEvents ?? [],
     asset,
     clips,
     cursorTrack: options.cursorTrack ?? null,

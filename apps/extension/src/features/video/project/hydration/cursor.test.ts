@@ -49,14 +49,14 @@ function createMixedCursorTrack() {
 function createMixedActionEvents() {
   return [
     {
-      data: null as never,
-      duration: -1,
+      data: {},
+      capturedDuration: 0.2,
       id: 'action-1',
-      kind: 'CLICK' as never,
-      label: 1 as never,
-      point: { x: Number.NaN, y: 20 },
-      preset: 'CLICK_RIPPLE' as never,
-      time: 2,
+      kind: 'CLICK' as const,
+      label: 'Click',
+      point: null,
+      presentation: { preset: 'CLICK_RIPPLE' as const },
+      anchor: { kind: 'project' as const, time: 2 },
     },
   ];
 }
@@ -72,7 +72,7 @@ function createMixedMotionRegions() {
       motionBlurAmount: 0.25,
       scale: 1.2,
       startTime: 0.5,
-      targetActionEventId: null,
+      targetAction: null,
       zoomInDuration: 0.1,
       zoomOutDuration: 0.1,
     },
@@ -85,7 +85,7 @@ function createMixedMotionRegions() {
       motionBlurAmount: 0.25,
       scale: 1.2,
       startTime: 0.5,
-      targetActionEventId: null,
+      targetAction: null,
       zoomInDuration: 0.1,
       zoomOutDuration: 0.1,
     },
@@ -139,8 +139,8 @@ function expectMixedRecordingHydrationShape(hydrated: ReturnType<typeof hydrateV
   );
   expect(hydrated.actionEvents).toEqual([
     expect.objectContaining({
-      duration: 0,
-      label: '',
+      capturedDuration: 0.2,
+      label: 'Click',
       point: null,
     }),
   ]);
@@ -214,13 +214,13 @@ it('preserves explicit hidden cursor flags and valid action points', () => {
   project.actionEvents = [
     {
       data: { button: 0 },
-      duration: 0.4,
+      capturedDuration: 0.4,
       id: 'action-1',
-      kind: 'CLICK' as never,
+      kind: 'CLICK' as const,
       label: 'Click',
       point: { x: 10, y: 20 },
-      preset: 'CLICK_RIPPLE' as never,
-      time: 2,
+      presentation: { preset: 'CLICK_RIPPLE' as const },
+      anchor: { kind: 'project', time: 2 },
     },
   ];
 
@@ -236,7 +236,7 @@ it('preserves explicit hidden cursor flags and valid action points', () => {
   expect(hydrated.actionEvents).toEqual([
     expect.objectContaining({
       data: { button: 0 },
-      duration: 0.4,
+      capturedDuration: 0.4,
       label: 'Click',
       point: { x: 10, y: 20 },
     }),
@@ -252,7 +252,7 @@ it('preserves explicit recording sources and defaults missing editor-only collec
   };
   project.baseRecordingId = 'recording-base';
   project.cursorTrack = null;
-  project.actionEvents = 'invalid' as never;
+  project.actionEvents = [];
   project.motionRegions = 'invalid' as never;
 
   const hydrated = hydrateVideoProject(project);

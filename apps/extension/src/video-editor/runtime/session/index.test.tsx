@@ -43,7 +43,7 @@ function createPlaybackParams(): UseVideoEditorRuntimeParams['playback'] {
     shortcutsEnabled: true,
     placementMode: null,
     selection: { kind: VideoEditorSelectionKind.SCENE },
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedClipId: null,
     selectedMotionRegion: null,
     deleteSelection: {

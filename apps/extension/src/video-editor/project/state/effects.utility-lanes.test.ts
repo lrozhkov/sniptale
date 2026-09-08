@@ -16,7 +16,7 @@ it('keeps locked utility lanes read-only for action and motion mutations', () =>
   const store = createStoreState();
   store.getState().setProject(createUtilityLockedProject());
 
-  store.getState().updateActionEventDetails('action-1', { label: 'Blocked' });
+  store.getState().updateActionEventDetails('action-1', { presentation: { enabled: false } });
   store.getState().deleteActionEvent('action-1');
   store.getState().updateMotionRegion('motion-1', { scale: 3 });
   store.getState().deleteMotionRegion('motion-1');
@@ -32,20 +32,22 @@ it('updates and deletes utility lane effects when lanes are editable', () => {
   store.getState().setProject(createUtilityEditableProject());
 
   store.getState().updateActionEventDetails('action-1', {
-    label: 'Spotlight',
+    clipId: null,
     point: { x: 9999, y: -10 },
-    preset: VideoProjectActionPreset.SPOTLIGHT,
+    presentation: { preset: VideoProjectActionPreset.SPOTLIGHT },
   });
-  expect(store.getState().project?.actionEvents[0]?.kind).toBe(VideoProjectActionEventKind.CALLOUT);
+  expect(store.getState().project?.actionEvents[0]?.kind).toBe(VideoProjectActionEventKind.CLICK);
   store.getState().updateActionEventDetails('action-1', {
-    preset: VideoProjectActionPreset.DWELL_ZOOM,
+    presentation: { preset: VideoProjectActionPreset.DWELL_ZOOM },
   });
-  expect(store.getState().project?.actionEvents[0]?.kind).toBe(VideoProjectActionEventKind.PAUSE);
+  expect(store.getState().project?.actionEvents[0]?.kind).toBe(VideoProjectActionEventKind.CLICK);
   store.getState().updateActionEventDetails('action-1', {
-    preset: VideoProjectActionPreset.SCROLL_EMPHASIS,
+    presentation: { preset: VideoProjectActionPreset.SCROLL_EMPHASIS },
   });
-  expect(store.getState().project?.actionEvents[0]?.kind).toBe(VideoProjectActionEventKind.SCROLL);
-  store.getState().updateActionEventDetails('action-1', { preset: VideoProjectActionPreset.NONE });
+  expect(store.getState().project?.actionEvents[0]?.kind).toBe(VideoProjectActionEventKind.CLICK);
+  store.getState().updateActionEventDetails('action-1', {
+    presentation: { preset: VideoProjectActionPreset.NONE },
+  });
   store.getState().updateMotionRegion('motion-1', {
     duration: 4,
     scale: 5,
@@ -55,8 +57,8 @@ it('updates and deletes utility lane effects when lanes are editable', () => {
   expect(store.getState().project?.actionEvents[0]).toEqual(
     expect.objectContaining({
       kind: VideoProjectActionEventKind.CLICK,
-      label: 'Spotlight',
-      point: { x: 1920, y: 0 },
+      label: 'Click',
+      presentation: { preset: VideoProjectActionPreset.NONE },
     })
   );
   expect(store.getState().project?.motionRegions?.[0]).toEqual(
@@ -87,13 +89,13 @@ function createUtilityEditableProject() {
   project.actionEvents = [
     {
       data: {},
-      duration: 0.7,
+      capturedDuration: 0.7,
       id: 'action-1',
       kind: VideoProjectActionEventKind.CLICK,
       label: 'Click',
       point: null,
-      preset: VideoProjectActionPreset.CLICK_RIPPLE,
-      time: 1,
+      presentation: { preset: VideoProjectActionPreset.CLICK_RIPPLE },
+      anchor: { kind: 'project' as const, time: 1 },
     },
   ];
   project.motionRegions = [
@@ -105,7 +107,7 @@ function createUtilityEditableProject() {
       id: 'motion-1',
       scale: 1.4,
       startTime: 0,
-      targetActionEventId: null,
+      targetAction: null,
       zoomInDuration: 0.2,
       zoomOutDuration: 0.2,
     },

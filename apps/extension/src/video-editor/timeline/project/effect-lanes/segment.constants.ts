@@ -1,5 +1,5 @@
 export const EFFECT_SEGMENT_BASE_CLASS_NAME = [
-  'group absolute inset-0 overflow-hidden rounded-[12px] border',
+  'group absolute inset-0 overflow-hidden rounded-md border',
   'transition-[border-color,box-shadow,background-color]',
   'cursor-grab active:cursor-grabbing',
 ].join(' ');
@@ -13,8 +13,7 @@ export const EFFECT_SEGMENT_HANDLE_CLASS_NAME = [
 
 export const EFFECT_SEGMENT_SELECTED_CLASS_NAME = [
   'border-[color:var(--sniptale-color-border-accent-strong)]',
-  'shadow-[0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-border-accent-strong)_55%,transparent),',
-  '0_0_18px_color-mix(in_srgb,var(--sniptale-color-accent-soft)_22%,transparent)]',
+  'shadow-[inset_0_0_0_1px_var(--sniptale-color-border-accent-strong)]',
 ].join(' ');
 
 export const EFFECT_SEGMENT_WARNING_CLASS_NAME = [

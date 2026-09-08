@@ -203,7 +203,7 @@ function expectMotionSelectionCleanup(project: VideoProject): void {
         id: 'motion-1',
         scale: 1.2,
         startTime: 0,
-        targetActionEventId: null,
+        targetAction: null,
         zoomInDuration: 0.2,
         zoomOutDuration: 0.2,
       },
@@ -234,23 +234,23 @@ function expectActionPlacementPreserved(project: VideoProject): void {
     actionEvents: [
       {
         data: {},
-        duration: 0.2,
+        capturedDuration: 0.2,
         id: 'action-1',
         kind: 'CLICK',
         label: 'Action',
         point: { x: 10, y: 20 },
-        preset: 'CLICK_RIPPLE',
-        time: 0.1,
+        presentation: { preset: 'CLICK_RIPPLE' },
+        anchor: { kind: 'project' as const, time: 0.1 },
       },
     ],
   } as VideoEditorProjectState['project'];
   const actionState = applyProjectUpdate(
     {
       currentTime: 1,
-      placementMode: createActionPointPlacementMode('action-1'),
+      placementMode: createActionPointPlacementMode('action-1', null),
       project: actionProject,
       projectHistory: resetVideoEditorProjectHistory(project.id),
-      selection: { kind: 'action-segment', actionEventId: 'action-1' },
+      selection: { kind: 'action-occurrence', clipId: null, eventId: 'action-1' },
       selectedTrackId: project.tracks[0]!.id,
     } as VideoEditorProjectState,
     (currentProject) => ({
@@ -259,7 +259,7 @@ function expectActionPlacementPreserved(project: VideoProject): void {
     })
   );
 
-  expect(actionState.placementMode).toEqual(createActionPointPlacementMode('action-1'));
+  expect(actionState.placementMode).toEqual(createActionPointPlacementMode('action-1', null));
 }
 
 function expectMotionPlacementModeCleanupOnFocusModeChange(project: VideoProject): void {
@@ -274,7 +274,7 @@ function expectMotionPlacementModeCleanupOnFocusModeChange(project: VideoProject
         id: 'motion-1',
         scale: 1.2,
         startTime: 0,
-        targetActionEventId: null,
+        targetAction: null,
         zoomInDuration: 0.2,
         zoomOutDuration: 0.2,
       },

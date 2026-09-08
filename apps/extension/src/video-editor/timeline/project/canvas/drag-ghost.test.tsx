@@ -1,5 +1,5 @@
-import { createVideoClipFromAsset } from '../../../../features/video/project/factories/clip';
 // @vitest-environment jsdom
+import { createVideoClipFromAsset } from '../../../../features/video/project/factories/clip';
 
 import type React from 'react';
 import { act } from 'react';
@@ -159,7 +159,7 @@ function createCanvasProps(
     pixelsPerSecond: 90,
     playbackRange: null,
     project,
-    recordingTelemetry: null,
+    recordingTelemetry: [],
     selectedClipId: null,
     selectedEffectSelection: null,
     selectedTrackId: null,
@@ -188,12 +188,12 @@ function createCanvasActionProps() {
     onBeginTrackRangeSelection: () => vi.fn(),
     onCloseTrackGap: vi.fn(),
     onImportTimelineFile: createImportHandlers({}),
-    onResizeActionEvent: vi.fn(),
+
     onResizeMotionRegion: vi.fn(),
     onScroll: vi.fn(),
     onSeek: vi.fn(),
     onSeekTime: vi.fn(),
-    onSelectActionSegment: vi.fn(),
+    onSelectActionOccurrence: vi.fn(),
     onSelectClip: vi.fn(),
     onSelectCursorSegment: vi.fn(),
     onSelectMotionRegion: vi.fn(),

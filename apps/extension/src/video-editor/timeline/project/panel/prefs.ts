@@ -45,7 +45,10 @@ export function useProjectTimelinePanelPrefs(
   );
 
   return {
-    cursorLaneVisible: project.cursorTrack !== null && prefs.collapsedCursorLaneVisible,
+    cursorLaneVisible:
+      project.cursorTrack !== null &&
+      prefs.collapsedTelemetryLaneVisible &&
+      prefs.collapsedCursorLaneVisible,
     prefs,
     telemetryLaneVisible: prefs.collapsedTelemetryLaneVisible,
     ...actions,

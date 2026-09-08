@@ -238,7 +238,7 @@ function verifySharedRecordingProjectOverrides() {
     mimeType: 'video/webm',
     size: 512,
     hasAudio: false,
-    actionEvents: [],
+    sourceNormalizedActionEvents: [],
     cursorTrack: customCursorTrack,
     motionRegions: [customMotionRegion],
     asset: customAsset,

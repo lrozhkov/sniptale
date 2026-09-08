@@ -52,7 +52,7 @@ export function makeRoomForMaterial(
     for (const [sourceId, trailingId] of result.trailingClipIdsBySourceId) {
       trailingClipIdsBySourceId.set(sourceId, trailingId);
     }
-    divided = cloneSplitClipEffects(result.project, result.trailingClipIdsBySourceId);
+    divided = result.project;
   }
   const tailIds = new Set(
     divided.clips.filter(({ startTime }) => startTime >= time).map(({ id }) => id)
@@ -69,36 +69,13 @@ export function makeRoomForMaterial(
   };
 }
 
-function cloneSplitClipEffects(
-  project: VideoProject,
-  trailingIds: ReadonlyMap<string, string>
-): VideoProject {
-  if (!project.effectInstances) return project;
-  const effectInstances = project.effectInstances.flatMap((instance) => {
-    if (instance.target.kind !== 'clip') return [instance];
-    const trailingId = trailingIds.get(instance.target.clipId);
-    // Both targets clip the original document clock; shifting clips shifts the tail clock.
-    return trailingId
-      ? [
-          instance,
-          {
-            ...instance,
-            id: crypto.randomUUID(),
-            controls: { ...instance.controls },
-            target: { kind: 'clip' as const, clipId: trailingId },
-          },
-        ]
-      : [instance];
-  });
-  return { ...project, effectInstances };
-}
-
 function insertMotionGap(
   regions: NonNullable<VideoProject['motionRegions']>,
   time: number,
   duration: number
 ) {
   return regions.flatMap((region) => {
+    if (region.sourceBinding) return [region];
     if (region.startTime + region.duration <= time) return [region];
     if (region.startTime >= time) return [{ ...region, startTime: region.startTime + duration }];
     const offset = time - region.startTime;

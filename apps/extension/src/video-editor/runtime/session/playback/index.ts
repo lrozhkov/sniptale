@@ -23,7 +23,7 @@ interface PlaybackHookState {
   projectHistoryTransactionActive: boolean;
   shortcutsEnabled: boolean;
   selectedClipId: string | null;
-  selectedActionEvent: PlaybackLatestState['selectedActionEvent'];
+  selectedActionOccurrence: PlaybackLatestState['selectedActionOccurrence'];
   selectedMotionRegion: PlaybackLatestState['selectedMotionRegion'];
 }
 
@@ -162,7 +162,7 @@ function createPlaybackRuntimeState(
     playback.placementMode,
     playback.projectHistoryTransactionActive,
     playback.selectedClipId,
-    playback.selectedActionEvent,
+    playback.selectedActionOccurrence,
     playback.selectedMotionRegion
   );
 }

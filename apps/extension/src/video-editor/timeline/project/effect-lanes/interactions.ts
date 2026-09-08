@@ -1,3 +1,4 @@
+import { getVideoProjectUtilityLanes } from '../../../../features/video/project/utility-lanes';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { VideoProject } from '../../../../features/video/project/types';
 import type { VideoEditorSelection } from '../../../contracts/selection';
@@ -36,14 +37,13 @@ interface UseProjectTimelineEffectInteractionsOptions {
   readTimelineStartTime?: (() => number) | undefined;
   project: VideoProject;
   selection?: VideoEditorSelection;
-  onMoveActionEvent: ProjectTimelineProps['onMoveActionEvent'];
-  onResizeActionEvent: ProjectTimelineProps['onResizeActionEvent'];
   onMoveCursorSegment: ProjectTimelineProps['onMoveCursorSegment'];
+  onMoveActionOccurrence?: ProjectTimelineProps['onMoveActionOccurrence'];
   onMoveMotionRegion: ProjectTimelineProps['onMoveMotionRegion'];
   onResizeMotionRegion: ProjectTimelineProps['onResizeMotionRegion'];
   onMoveTransitionSegment: ProjectTimelineProps['onMoveTransitionSegment'];
   onUpdateEffectInstance: ProjectTimelineProps['onUpdateEffectInstance'];
-  onSelectActionSegment?: ProjectTimelineProps['onSelectActionSegment'];
+  onSelectActionOccurrence?: ProjectTimelineProps['onSelectActionOccurrence'] | undefined;
   onSelectClip?: ProjectTimelineProps['onSelectClip'];
   onSelectCursorSegment?: ProjectTimelineProps['onSelectCursorSegment'];
   onSelectMotionRegion?: ProjectTimelineProps['onSelectMotionRegion'];
@@ -210,7 +210,7 @@ function createBeginEffectInteraction(options: BeginEffectInteractionOptions) {
 
     options.setOptimisticSelection(createEffectSelection(target));
     selectEffectTarget(target, {
-      onSelectActionSegment: options.onSelectActionSegment,
+      onSelectActionOccurrence: options.onSelectActionOccurrence,
       onSelectClip: options.onSelectClip,
       onSelectCursorSegment: options.onSelectCursorSegment,
       onSelectMotionRegion: options.onSelectMotionRegion,
@@ -219,6 +219,12 @@ function createBeginEffectInteraction(options: BeginEffectInteractionOptions) {
       onSelectTransition: options.onSelectTransition,
     });
 
+    const lanes = getVideoProjectUtilityLanes(options.project);
+    if (
+      (target.kind === 'action' && lanes.actions.locked) ||
+      (target.kind === 'motion' && lanes.camera.locked)
+    )
+      return;
     startEffectInteractionSession({
       setDraft: options.setDraft,
       cleanupRef: options.cleanupRef,
@@ -250,19 +256,17 @@ function useBeginEffectInteractionCallback(options: BeginEffectInteractionOption
 function createEffectMoveCallbacks(
   options: Pick<
     UseProjectTimelineEffectInteractionsOptions,
-    | 'onMoveActionEvent'
     | 'onMoveCursorSegment'
+    | 'onMoveActionOccurrence'
     | 'onMoveMotionRegion'
     | 'onMoveTransitionSegment'
-    | 'onResizeActionEvent'
     | 'onResizeMotionRegion'
     | 'onUpdateEffectInstance'
   >
 ): EffectMoveCallbacks {
   return {
-    onMoveActionEvent: options.onMoveActionEvent,
-    onResizeActionEvent: options.onResizeActionEvent,
     onMoveCursorSegment: options.onMoveCursorSegment,
+    onMoveActionOccurrence: options.onMoveActionOccurrence,
     onMoveMotionRegion: options.onMoveMotionRegion,
     onResizeMotionRegion: options.onResizeMotionRegion,
     onMoveTransitionSegment: options.onMoveTransitionSegment,
@@ -289,7 +293,7 @@ function createBeginEffectInteractionOptions(args: {
     readTimelineStartTime: args.options.readTimelineStartTime,
     project: args.options.project,
     projectDuration: args.options.project.duration,
-    onSelectActionSegment: args.options.onSelectActionSegment,
+    onSelectActionOccurrence: args.options.onSelectActionOccurrence,
     onSelectClip: args.options.onSelectClip,
     onSelectCursorSegment: args.options.onSelectCursorSegment,
     onSelectMotionRegion: args.options.onSelectMotionRegion,

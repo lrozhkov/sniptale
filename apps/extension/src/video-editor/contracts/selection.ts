@@ -5,9 +5,12 @@ export const VideoEditorSelectionKind = {
   TRANSITION_JUNCTION: 'transition-junction',
   CURSOR_SEGMENT: 'cursor-segment',
   OBJECT_TRACK: 'object-track',
-  ACTION_SEGMENT: 'action-segment',
+  ACTION_OCCURRENCE: 'action-occurrence',
   MOTION_REGION: 'motion-region',
+  MOTION_CONNECTION: 'motion-connection',
   MOTION_LANE: 'motion-lane',
+  HISTORY_LANE: 'history-lane',
+  HISTORY_SPAN: 'history-span',
 } as const;
 
 export type VideoEditorSelectionKind =
@@ -16,6 +19,11 @@ export type VideoEditorSelectionKind =
 export type VideoEditorSelection =
   | { kind: typeof VideoEditorSelectionKind.SCENE }
   | { kind: typeof VideoEditorSelectionKind.MOTION_LANE }
+  | { kind: typeof VideoEditorSelectionKind.HISTORY_LANE }
+  | ({
+      kind: typeof VideoEditorSelectionKind.HISTORY_SPAN;
+    } & import('./commands/timeline').VideoEditorTypingSpanTarget)
+  | { kind: typeof VideoEditorSelectionKind.MOTION_CONNECTION; motionRegionId: string }
   | { kind: typeof VideoEditorSelectionKind.CLIP; clipId: string }
   | { kind: typeof VideoEditorSelectionKind.TRACK; trackId: string }
   | {
@@ -31,8 +39,9 @@ export type VideoEditorSelection =
       objectTrackId: string;
     }
   | {
-      kind: typeof VideoEditorSelectionKind.ACTION_SEGMENT;
-      actionEventId: string;
+      kind: typeof VideoEditorSelectionKind.ACTION_OCCURRENCE;
+      eventId: string;
+      clipId: string | null;
     }
   | {
       kind: typeof VideoEditorSelectionKind.MOTION_REGION;

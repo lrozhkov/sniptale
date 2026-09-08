@@ -64,7 +64,7 @@ async function buildRecordingProject(
     ...(telemetry?.actionEvents === undefined
       ? {}
       : {
-          actionEvents: normalizeRecordingActionEventsToProjectSpace(
+          sourceNormalizedActionEvents: normalizeRecordingActionEventsToProjectSpace(
             telemetry.actionEvents,
             normalizedTelemetryParams
           ),

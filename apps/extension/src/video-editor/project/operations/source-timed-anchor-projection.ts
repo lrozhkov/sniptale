@@ -8,7 +8,7 @@ import type {
 
 export type SourceTimedClip = VideoProjectVideoClip | VideoProjectAudioClip;
 
-export interface AnchorProjection {
+interface AnchorProjection {
   anchor: VideoProjectSourceTimeAnchor;
   time: number;
   timeScale: number;
@@ -32,12 +32,9 @@ export function projectSourceTimeAnchor(
     return null;
   }
 
-  const previousClipIds = new Set(previousClips.map((clip) => clip.id));
   const trailingSplitClips = nextClips.filter(
     (clip) =>
-      (splitLineage
-        ? clip.id === splitLineage.get(previousClip.id)
-        : !previousClipIds.has(clip.id)) &&
+      clip.id === splitLineage?.get(previousClip.id) &&
       clip.assetId === previousClip.assetId &&
       Math.abs(clip.sourceStart - anchor.sourceTime) <= SOURCE_SPLIT_BOUNDARY_EPSILON
   );
@@ -56,9 +53,7 @@ export function projectSourceTimeAnchor(
     point = mapSourceTimeToProjectPoint(
       nextClips.filter(
         (clip) =>
-          (splitLineage
-            ? clip.id === splitLineage.get(previousClip.id)
-            : !previousClipIds.has(clip.id)) && clip.assetId === previousClip.assetId
+          clip.id === splitLineage?.get(previousClip.id) && clip.assetId === previousClip.assetId
       ),
       anchor.sourceTime
     );

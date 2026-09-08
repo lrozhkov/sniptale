@@ -55,9 +55,8 @@ function getTimelineMagnetTimes(project: VideoProject, options: TimelineSnapOpti
       .flatMap((clip) => [clip.startTime, getClipEndTime(clip)]),
     ...(options.includeMotionRegions === false
       ? []
-      : (project.motionRegions ?? []).flatMap((region) => [
-          region.startTime,
-          region.startTime + region.duration,
-        ])),
+      : (project.motionRegions ?? [])
+          .filter((region) => region.duration > 0)
+          .flatMap((region) => [region.startTime, region.startTime + region.duration])),
   ];
 }

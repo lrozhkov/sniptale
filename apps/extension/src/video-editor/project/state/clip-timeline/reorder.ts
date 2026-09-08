@@ -1,3 +1,4 @@
+import { resolveVideoProjectActionOccurrences } from '../../../../features/video/project/action-occurrences';
 import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
 import {
   getLinkedClipIds,
@@ -125,15 +126,19 @@ function sameLane(left: VideoProjectClip, right: VideoProjectClip) {
 }
 
 function hasLockedAnchors(project: VideoProject, affected: ReadonlySet<string>): boolean {
-  const events = project.actionEvents.filter(
-    (event) => event.sourceAnchor && affected.has(event.sourceAnchor.sourceClipId)
+  const events = resolveVideoProjectActionOccurrences(project).filter(
+    (item) => item.clipId !== null && affected.has(item.clipId)
   );
   return (
     (events.length > 0 && isVideoProjectUtilityLaneLocked(project, 'actions')) ||
     (isVideoProjectUtilityLaneLocked(project, 'camera') &&
       Boolean(
         project.motionRegions?.some((region) =>
-          events.some((event) => event.id === region.targetActionEventId)
+          events.some(
+            (event) =>
+              event.eventId === region.targetAction?.eventId &&
+              event.clipId === region.targetAction.clipId
+          )
         )
       ))
   );

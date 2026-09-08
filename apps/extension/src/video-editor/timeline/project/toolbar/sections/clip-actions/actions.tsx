@@ -9,6 +9,7 @@ function getActionDisabled(selectedClip: boolean) {
 }
 
 export function ProjectTimelineClipActions({
+  canDeleteSelectedClip,
   canEditSelectedClip,
   canSplitSelectedClip,
   selectedClip,
@@ -17,6 +18,7 @@ export function ProjectTimelineClipActions({
   onSplitSelectedClip,
 }: Pick<
   ProjectTimelineToolbarProps,
+  | 'canDeleteSelectedClip'
   | 'canEditSelectedClip'
   | 'canSplitSelectedClip'
   | 'selectedClip'
@@ -44,11 +46,15 @@ export function ProjectTimelineClipActions({
       />
       <ProjectTimelineToolbarActionButton
         danger
-        disabled={disabled}
+        disabled={!selectedClip || !canDeleteSelectedClip}
         icon={<Trash2 size={14} strokeWidth={2} />}
         label={getClipActionLabel('delete')}
         onClick={onDeleteSelectedClip}
-        title={getClipActionTitle('delete', disabled, canEditSelectedClip)}
+        title={getClipActionTitle(
+          'delete',
+          !selectedClip || !canDeleteSelectedClip,
+          canDeleteSelectedClip
+        )}
       />
     </>
   );

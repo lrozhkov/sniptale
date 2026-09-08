@@ -9,7 +9,7 @@ import {
 } from './factories/creation';
 import { getSortedTracks, isAnnotationClip } from './timeline';
 import { getVideoProjectUtilityLanes } from './utility-lanes';
-import { isLegacyScrollActionEvent, mapSourceRangeToProjectSpans } from './timeline/source-time';
+import { isScrollActionEvent, mapSourceRangeToProjectSpans } from './timeline/source-time';
 import { resolveAnnotationPresentation } from './annotation/template';
 import {
   VideoOverlayTemplateKind,
@@ -50,9 +50,9 @@ function verifyPublicFacadeSourceTimeExports() {
     },
   ]);
   expect(
-    isLegacyScrollActionEvent({
+    isScrollActionEvent({
       kind: VideoProjectActionEventKind.SCROLL,
-      preset: VideoProjectActionPreset.SCROLL_EMPHASIS,
+      presentation: { preset: VideoProjectActionPreset.SCROLL_EMPHASIS },
     })
   ).toBe(true);
   expect(primaryTrack?.kind).toBe(VideoTrackKind.PRIMARY);

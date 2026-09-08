@@ -35,6 +35,8 @@ interface VideoEditorWorkspaceInspectorState {
 }
 
 export interface VideoEditorWorkspaceState {
+  autoProcessingModalOpen: boolean;
+  setAutoProcessingModalOpen: (open: boolean) => void;
   audioRecordingDialogOpen: boolean;
   audioRecordingTarget: VideoEditorAudioRecordingTarget | null;
   openTrackAudioRecordingDialog: (target: VideoEditorAudioRecordingTarget) => void;
@@ -201,6 +203,7 @@ function useVideoEditorInspectorState(
  * Holds local shell-only UI state such as sidebar collapse and preview resizing.
  */
 export function useVideoEditorWorkspaceState(): VideoEditorWorkspaceState {
+  const [autoProcessingModalOpen, setAutoProcessingModalOpen] = useState(false);
   const confirmDialog = useVideoEditorConfirmDialogState();
   const libraryPanel = useVideoEditorLibraryPanelState();
   const audioRecordingDialog = useAudioRecordingDialogState();
@@ -233,6 +236,8 @@ export function useVideoEditorWorkspaceState(): VideoEditorWorkspaceState {
 
   return useMemo(
     () => ({
+      autoProcessingModalOpen,
+      setAutoProcessingModalOpen,
       audioRecordingDialogOpen: audioRecordingDialog.audioRecordingDialogOpen,
       audioRecordingTarget: audioRecordingDialog.audioRecordingTarget,
       openTrackAudioRecordingDialog: audioRecordingDialog.openTrackAudioRecordingDialog,
@@ -254,6 +259,7 @@ export function useVideoEditorWorkspaceState(): VideoEditorWorkspaceState {
       toggleSidebarCollapsed,
     }),
     [
+      autoProcessingModalOpen,
       audioRecordingDialog.audioRecordingDialogOpen,
       audioRecordingDialog.audioRecordingTarget,
       audioRecordingDialog.openTrackAudioRecordingDialog,

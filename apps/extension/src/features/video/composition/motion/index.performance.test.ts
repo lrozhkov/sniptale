@@ -18,7 +18,7 @@ function createMotionRegion(index: number) {
     overlayZoomMode: VideoMotionOverlayZoomMode.LOCK_OVERLAYS,
     scale: 2,
     startTime: index * 0.1,
-    targetActionEventId: null,
+    targetAction: null,
     zoomInDuration: 0.2,
     zoomOutDuration: 0.5,
   };

@@ -13,6 +13,13 @@ function handleSelectionDelete(
   handlersRef: MutableRefObject<PlaybackHandlers>
 ): void {
   switch (latestState.selection.kind) {
+    case VideoEditorSelectionKind.MOTION_CONNECTION:
+      handlersRef.current.updateMotionRegion(latestState.selection.motionRegionId, {
+        incomingConnection: null,
+      });
+      return;
+    case VideoEditorSelectionKind.HISTORY_SPAN:
+    case VideoEditorSelectionKind.HISTORY_LANE:
     case VideoEditorSelectionKind.MOTION_LANE:
     case VideoEditorSelectionKind.SCENE:
     case VideoEditorSelectionKind.TRACK:
@@ -23,8 +30,15 @@ function handleSelectionDelete(
         handlersRef.current.deleteClip(latestState.selectedClipId);
       }
       return;
-    case VideoEditorSelectionKind.ACTION_SEGMENT:
-      handlersRef.current.deleteActionEvent(latestState.selection.actionEventId);
+    case VideoEditorSelectionKind.ACTION_OCCURRENCE:
+      if (latestState.selectedActionOccurrence)
+        handlersRef.current.updateActionEventDetails(latestState.selectedActionOccurrence.eventId, {
+          clipId: latestState.selectedActionOccurrence.clipId,
+          presentation: {
+            ...latestState.selectedActionOccurrence.event.presentation,
+            enabled: false,
+          },
+        });
       return;
     case VideoEditorSelectionKind.CURSOR_SEGMENT:
       handlersRef.current.deleteCursorSample(latestState.selection.sampleId);
@@ -109,6 +123,7 @@ function isControlNavigation(event: KeyboardEvent): boolean {
         '[role="menuitem"]',
         '[role="separator"]',
         '[role="slider"]',
+        '[data-video-editor-local-navigation="true"]',
       ].join(',')
     ) !== null
   );

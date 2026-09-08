@@ -5,7 +5,7 @@ import type {
 } from '@sniptale/runtime-contracts/video/types/types';
 import type {
   RecordingTelemetrySignal,
-  VideoProjectActionEvent,
+  RecordingActionEvent,
   VideoProjectCursorTrack,
 } from '../../../features/video/project/types';
 import type { LibraryLifecycle } from '../library-lifecycle/contracts';
@@ -47,6 +47,6 @@ export interface RecordingTelemetryEntry {
   displaySurface?: VideoDisplaySurface | null;
   viewport: ViewportInfo | null;
   cursorTrack: VideoProjectCursorTrack | null;
-  actionEvents: VideoProjectActionEvent[];
+  actionEvents: RecordingActionEvent[];
   signals: RecordingTelemetrySignal[];
 }

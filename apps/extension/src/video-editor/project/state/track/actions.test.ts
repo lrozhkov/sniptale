@@ -41,7 +41,7 @@ it('combines structure and toggle track actions into one project track owner', (
 
   expect(runtime.getState().project?.tracks).toHaveLength(2);
   expect(runtime.getState().project?.utilityLanes).toEqual({
-    actions: { visible: false, locked: false },
+    actions: { visible: true, locked: false },
     camera: { visible: true, locked: true },
   });
   expect(runtime.getState().project?.tracks.find((track) => track.id === primaryTrackId)).toEqual(

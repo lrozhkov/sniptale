@@ -54,7 +54,7 @@ function createEnvelopeProject() {
       motionBlurAmount: Number.POSITIVE_INFINITY,
       scale: 2,
       startTime: 1,
-      targetActionEventId: null,
+      targetAction: null,
       zoomInDuration: 0.2,
       zoomOutDuration: 0.2,
     },
@@ -118,24 +118,14 @@ function createMixedCursorTrack() {
 function createMixedActionEvents() {
   return [
     {
-      data: null as never,
-      duration: -1,
-      id: 'action-1',
-      kind: 'CLICK' as never,
-      label: 1 as never,
-      point: { x: 10, y: 20 },
-      preset: 'CLICK_RIPPLE' as never,
-      time: 2,
-    },
-    {
       data: {},
-      duration: 1,
-      id: 1 as never,
-      kind: 'CLICK' as never,
-      label: 'skip',
-      point: null,
-      preset: 'NONE' as never,
-      time: Number.NaN,
+      capturedDuration: 0.2,
+      id: 'action-1',
+      kind: 'CLICK' as const,
+      label: 'Click',
+      point: { x: 10, y: 20 },
+      presentation: { preset: 'CLICK_RIPPLE' as const },
+      anchor: { kind: 'project' as const, time: 2 },
     },
   ];
 }
@@ -151,7 +141,7 @@ function createMixedMotionRegions() {
       motionBlurAmount: 0.25,
       scale: 1.2,
       startTime: 0.5,
-      targetActionEventId: null,
+      targetAction: null,
       zoomInDuration: 0.1,
       zoomOutDuration: 0.1,
     },
@@ -164,7 +154,7 @@ function createMixedMotionRegions() {
       motionBlurAmount: 0.25,
       scale: 1.2,
       startTime: 0.5,
-      targetActionEventId: null,
+      targetAction: null,
       zoomInDuration: 0.1,
       zoomOutDuration: 0.1,
     },
@@ -267,7 +257,12 @@ it('normalizes recording-source, cursor, action, clip, and asset branches togeth
     })
   );
   expect(hydrated.actionEvents).toEqual([
-    expect.objectContaining({ data: {}, duration: 0, label: '', point: { x: 10, y: 20 } }),
+    expect.objectContaining({
+      data: {},
+      capturedDuration: 0.2,
+      label: 'Click',
+      point: { x: 10, y: 20 },
+    }),
   ]);
   expect(hydrated.motionRegions).toHaveLength(1);
   expect(hydrated.transitions).toEqual([]);

@@ -142,7 +142,7 @@ function expectUtilityLaneMutationResults(
   nextProject: NonNullable<VideoEditorProjectState['project']> | null
 ): void {
   expect(nextProject?.utilityLanes).toEqual({
-    actions: { visible: false, locked: false },
+    actions: { visible: true, locked: false },
     camera: { visible: true, locked: true },
   });
 }

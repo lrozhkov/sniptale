@@ -107,7 +107,7 @@ function createProps() {
       clipId: clip.id,
       kind: VideoEditorSelectionKind.CLIP,
     },
-    selectedActionEvent: null,
+    selectedActionOccurrence: null,
     selectedClip: clip,
     selectedCursorSample: null,
     selectedMotionRegion: null,

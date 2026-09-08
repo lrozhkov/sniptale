@@ -35,12 +35,7 @@ const expectedKeys = {
     'updateTextClipContent',
     'updateTextClipStyle',
   ],
-  telemetry: [
-    'recordingTelemetry',
-    'setRecordingTelemetry',
-    'telemetryLaneVisible',
-    'toggleTelemetryLaneVisibility',
-  ],
+  telemetry: ['recordingTelemetry', 'setRecordingTelemetry'],
   effects: [
     'applyEffectDocument',
     'deleteEffectInstance',
@@ -89,14 +84,15 @@ const expectedKeys = {
     'startActionPointPlacement',
     'startMotionAreaPlacement',
     'startMotionFocusPlacement',
-    'startMotionPathStopAreaPlacement',
-    'startMotionPathStopPointPlacement',
+
     'startObjectTrackAnchorPlacement',
   ],
   selection: [
-    'selectActionSegment',
+    'selectActionOccurrence',
     'selectClip',
     'selectCursorSegment',
+    'selectHistoryLane',
+    'selectHistorySpan',
     'selectMotionLane',
     'selectMotionRegion',
     'selectObjectTrack',
@@ -116,6 +112,7 @@ const expectedKeys = {
     'addTrackLogicalLane',
     'addVideoBlock',
     'applyMediaClipVisualsToTrack',
+    'applyTypingCompression',
     'clearCursorSampleSkinOverride',
     'clearUtilityLane',
     'closeTrackGap',
@@ -141,6 +138,7 @@ const expectedKeys = {
     'toggleUtilityLaneVisibility',
     'trimClipEnd',
     'trimClipStart',
+    'updateActionPresentation',
     'updateActionEventDetails',
     'updateClipAudioEnvelope',
     'updateClipFades',
@@ -227,8 +225,8 @@ it('keeps leaf projection identity and render isolation across unrelated updates
   }
   function TelemetryProbe() {
     telemetrySelections.push(
-      useVideoEditorRecordingTelemetryPort(({ telemetryLaneVisible }) => ({
-        telemetryLaneVisible,
+      useVideoEditorRecordingTelemetryPort(({ recordingTelemetry }) => ({
+        recordingTelemetry,
       }))
     );
     return null;
@@ -251,7 +249,11 @@ it('keeps leaf projection identity and render isolation across unrelated updates
     )
   );
   const initialPlayback = playbackSelections[0];
-  act(() => useVideoEditorStore.setState({ telemetryLaneVisible: true }));
+  act(() =>
+    useVideoEditorStore.setState({
+      recordingTelemetry: [...useVideoEditorStore.getState().recordingTelemetry],
+    })
+  );
   expect(playbackSelections).toHaveLength(1);
   expect(lifecycleSelections).toHaveLength(1);
   expect(telemetrySelections).toHaveLength(2);

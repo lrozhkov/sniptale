@@ -1,3 +1,4 @@
+import { resolveVideoProjectActionOccurrences } from '../../../features/video/project/action-occurrences';
 import { VideoTrackKind } from '../../../features/video/project/types';
 import { expect, it } from 'vitest';
 import {
@@ -61,6 +62,7 @@ function createClip(id: string, type: VideoProjectClipType, trackId: string): So
 
   return {
     ...clip,
+    sourceInstanceId: `instance-${id}`,
     fitMode: VideoMediaFitMode.CONTAIN,
   } as VideoProjectVideoClip;
 }
@@ -113,6 +115,25 @@ it('normalizes source-timed clips and groups recording source units', () => {
   );
 });
 
+it('preserves captured duration when playback rate reprojects the event point', () => {
+  const project = createAnchoredInteractionProject();
+  const clip = project.clips[0];
+  if (clip?.type !== 'VIDEO') throw new Error('Expected source video');
+  const result = reconcileRecordingInteractionAnchors(project, {
+    ...project,
+    clips: [{ ...clip, duration: clip.duration / 2, playbackRate: 2 }],
+  });
+  expect(result.actionEvents.find(({ id }) => id === 'anchored-action')).toMatchObject({
+    capturedDuration: 0.5,
+    anchor: project.actionEvents[0]?.anchor,
+  });
+  expect(
+    resolveVideoProjectActionOccurrences(result).find(
+      ({ eventId }) => eventId === 'anchored-action'
+    )?.time
+  ).toBe(1);
+});
+
 function createAnchoredInteractionProject(): VideoProject {
   const project = createProject();
   project.baseRecordingId = 'recording-1';
@@ -120,29 +141,28 @@ function createAnchoredInteractionProject(): VideoProject {
   project.actionEvents = [
     {
       data: {},
-      duration: 0.5,
+      capturedDuration: 0.5,
       id: 'anchored-action',
       kind: VideoProjectActionEventKind.CLICK,
       label: 'Click',
-      point: { x: 10, y: 20 },
-      preset: VideoProjectActionPreset.CLICK_RIPPLE,
-      sourceAnchor: {
+      point: { x: 0.1, y: 0.2 },
+      anchor: {
         kind: 'recording-source',
         recordingId: 'recording-1',
-        sourceClipId: 'anchor-clip',
+        sourceInstanceId: 'instance-anchor-clip',
+        sourceEventId: 'raw',
         sourceTime: 2,
       },
-      time: 2,
     },
     {
       data: {},
-      duration: 1,
+      capturedDuration: 1,
       id: 'manual-action',
       kind: VideoProjectActionEventKind.CALLOUT,
       label: 'Manual',
       point: null,
-      preset: VideoProjectActionPreset.SPOTLIGHT,
-      time: 1,
+      presentation: { preset: VideoProjectActionPreset.SPOTLIGHT },
+      anchor: { kind: 'project', time: 1 },
     },
   ];
   project.cursorTrack = {
@@ -181,7 +201,7 @@ function createAnchoredInteractionProject(): VideoProject {
       id: 'anchored-motion',
       scale: 1.4,
       startTime: 1.5,
-      targetActionEventId: 'anchored-action',
+      targetAction: { eventId: 'anchored-action', clipId: 'anchor-clip' },
       zoomInDuration: 0.4,
       zoomOutDuration: 0.4,
     },
@@ -193,7 +213,7 @@ function createAnchoredInteractionProject(): VideoProject {
       id: 'manual-motion',
       scale: 1.2,
       startTime: 0,
-      targetActionEventId: null,
+      targetAction: null,
       zoomInDuration: 0.2,
       zoomOutDuration: 0.2,
     },
@@ -208,7 +228,9 @@ it('reprojects recording interactions across move, rate, split, and removal edit
     ...project,
     clips: [{ ...sourceClip, startTime: 3 }],
   });
-  expect(moved.actionEvents.map(({ id, time }) => ({ id, time }))).toEqual([
+  expect(
+    resolveVideoProjectActionOccurrences(moved).map(({ eventId, time }) => ({ id: eventId, time }))
+  ).toEqual([
     { id: 'manual-action', time: 1 },
     { id: 'anchored-action', time: 5 },
   ]);
@@ -217,7 +239,7 @@ it('reprojects recording interactions across move, rate, split, and removal edit
     { id: 'anchored-cursor', time: 4 },
   ]);
   expect(moved.motionRegions).toEqual([
-    expect.objectContaining({ id: 'anchored-motion', startTime: 4.5 }),
+    expect.objectContaining({ id: 'anchored-motion', startTime: 1.5 }),
     expect.objectContaining({ id: 'manual-motion', startTime: 0 }),
   ]);
 
@@ -226,49 +248,60 @@ it('reprojects recording interactions across move, rate, split, and removal edit
     clips: [{ ...sourceClip, duration: 2, playbackRate: 2 }],
   });
   expect(retimed.actionEvents.find((event) => event.id === 'anchored-action')).toEqual(
-    expect.objectContaining({ duration: 0.25, time: 1 })
+    project.actionEvents[0]
   );
   expect(retimed.motionRegions?.[0]).toEqual(
-    expect.objectContaining({ duration: 1, startTime: 0.75 })
+    expect.objectContaining({ duration: 2, startTime: 1.5 })
   );
 
-  const split = reconcileRecordingInteractionAnchors(project, {
-    ...project,
-    clips: [
-      { ...sourceClip, duration: 1, sourceDuration: 1 },
-      {
-        ...sourceClip,
-        duration: 3,
-        groupId: 'group-2',
-        id: 'anchor-clip-trailing',
-        sourceDuration: 3,
-        sourceStart: 1,
-        startTime: 1,
-      },
-    ],
-  });
-  expect(split.actionEvents.find((event) => event.id === 'anchored-action')?.sourceAnchor).toEqual(
-    expect.objectContaining({ sourceClipId: 'anchor-clip-trailing' })
+  const split = reconcileRecordingInteractionAnchors(
+    project,
+    {
+      ...project,
+      clips: [
+        { ...sourceClip, duration: 1, sourceDuration: 1 },
+        {
+          ...sourceClip,
+          duration: 3,
+          groupId: 'group-2',
+          id: 'anchor-clip-trailing',
+          sourceDuration: 3,
+          sourceStart: 1,
+          startTime: 1,
+        },
+      ],
+    },
+    new Map([[sourceClip.id, 'anchor-clip-trailing']])
   );
+  expect(split.actionEvents).toEqual(project.actionEvents);
+  expect(
+    resolveVideoProjectActionOccurrences(split).find(({ eventId }) => eventId === 'anchored-action')
+      ?.clipId
+  ).toBe('anchor-clip-trailing');
 
   const removed = reconcileRecordingInteractionAnchors(project, {
     ...project,
-    clips: [{ ...sourceClip, id: 'duplicate', startTime: 5 }],
+    clips: [{ ...sourceClip, id: 'duplicate', sourceInstanceId: 'fresh-instance', startTime: 5 }],
   });
   expect(removed.actionEvents.map((event) => event.id)).toEqual(['manual-action']);
   expect(removed.cursorTrack?.samples.map((sample) => sample.id)).toEqual(['manual-cursor']);
-  expect(removed.motionRegions?.map((region) => region.id)).toEqual(['manual-motion']);
+  expect(removed.motionRegions?.[0]).toMatchObject({
+    id: 'anchored-motion',
+    targetAction: null,
+    focusMode: 'MANUAL',
+  });
 });
 
-it('strips dangling anchors fail-soft instead of deleting their interactions on clip edits', () => {
+it('removes orphaned source facts and preserves independent cursor fallback on clip edits', () => {
   const project = createAnchoredInteractionProject();
   const sourceClip = project.clips[0] as VideoProjectVideoClip;
   project.actionEvents[0] = {
     ...project.actionEvents[0]!,
-    sourceAnchor: {
+    anchor: {
       kind: 'recording-source',
       recordingId: 'recording-1',
-      sourceClipId: 'missing-clip',
+      sourceInstanceId: 'missing-instance',
+      sourceEventId: 'raw',
       sourceTime: 2,
     },
   };
@@ -287,11 +320,7 @@ it('strips dangling anchors fail-soft instead of deleting their interactions on 
     clips: [{ ...sourceClip, startTime: 3 }],
   });
 
-  expect(reconciled.actionEvents).toEqual([
-    expect.objectContaining({ id: 'manual-action', time: 1 }),
-    expect.objectContaining({ id: 'anchored-action', time: 2 }),
-  ]);
-  expect(reconciled.actionEvents[1]).not.toHaveProperty('sourceAnchor');
+  expect(reconciled.actionEvents).toEqual([project.actionEvents[1]]);
   expect(reconciled.cursorTrack?.samples).toEqual([
     expect.objectContaining({ id: 'manual-cursor', time: 0.5 }),
     expect.objectContaining({ id: 'anchored-cursor', time: 1 }),
@@ -326,16 +355,24 @@ it('transfers split-boundary action and cursor anchors before the leading half i
     startTime: 2,
   };
 
-  const split = reconcileRecordingInteractionAnchors(project, {
-    ...project,
-    clips: [{ ...sourceClip, duration: 2, sourceDuration: 2 }, trailingClip],
-  });
+  const split = reconcileRecordingInteractionAnchors(
+    project,
+    {
+      ...project,
+      clips: [{ ...sourceClip, duration: 2, sourceDuration: 2 }, trailingClip],
+    },
+    new Map([[sourceClip.id, trailingClip.id]])
+  );
   const afterLeadingRemoval = reconcileRecordingInteractionAnchors(split, {
     ...split,
     clips: [trailingClip],
   });
 
-  expect(split.actionEvents[1]?.sourceAnchor?.sourceClipId).toBe('anchor-clip-trailing');
+  expect(
+    resolveVideoProjectActionOccurrences(split).find(({ eventId }) => eventId === 'anchored-action')
+      ?.clipId
+  ).toBe('anchor-clip-trailing');
+  expect(split.actionEvents).toEqual(project.actionEvents);
   expect(split.cursorTrack?.samples[1]?.sourceAnchor?.sourceClipId).toBe('anchor-clip-trailing');
   expect(afterLeadingRemoval.actionEvents.map((event) => event.id)).toContain('anchored-action');
   expect(afterLeadingRemoval.cursorTrack?.samples.map((sample) => sample.id)).toContain(
@@ -365,6 +402,7 @@ it.each([
     project.clips.push({
       ...firstClip,
       id: 'clip-b',
+      sourceInstanceId: 'instance-b',
       assetId: 'asset-b',
       groupId: null,
       startTime: 10,
@@ -378,8 +416,13 @@ it.each([
     project.actionEvents.push({
       ...project.actionEvents[0]!,
       id: 'action-b',
-      sourceAnchor: anchor,
-      time: 12,
+      anchor: {
+        kind: 'recording-source',
+        recordingId: 'recording-b',
+        sourceInstanceId: 'instance-b',
+        sourceEventId: 'raw-b',
+        sourceTime: 2,
+      },
     });
     project.cursorTrack!.samples.push({
       ...project.cursorTrack!.samples[0]!,
@@ -390,7 +433,7 @@ it.each([
     project.motionRegions!.push({
       ...project.motionRegions![0]!,
       id: 'zoom-b',
-      targetActionEventId: 'action-b',
+      targetAction: { eventId: 'action-b', clipId: 'clip-b' },
       startTime: 11,
     });
     project.objectTracks = [
@@ -435,21 +478,20 @@ it.each([
     expect(next.objectTracks?.find((track) => track.id === 'object-b')?.samples[0]?.time).toBe(
       20 + 2 / rate
     );
-    expect(next.actionEvents.find((event) => event.id === 'action-b')).toMatchObject({
-      time: 20 + 2 / rate,
-      sourceAnchor: anchor,
-    });
+    expect(next.actionEvents).toEqual(project.actionEvents);
+    expect(
+      resolveVideoProjectActionOccurrences(next).find(({ eventId }) => eventId === 'action-b')?.time
+    ).toBe(20 + 2 / rate);
     expect(next.cursorTrack!.samples.find((sample) => sample.id === 'cursor-b')).toMatchObject({
       time: 20 + 2 / rate,
       sourceAnchor: anchor,
     });
-    expect(next.motionRegions!.find((region) => region.id === 'zoom-b')?.startTime).toBe(
-      20 + 1 / rate
-    );
-    expect(next.actionEvents.find((event) => event.id === 'anchored-action')).toEqual({
-      ...project.actionEvents[0],
-      time: 2 + firstOffset,
-    });
+    expect(next.motionRegions!.find((region) => region.id === 'zoom-b')?.startTime).toBe(11);
+    expect(
+      resolveVideoProjectActionOccurrences(next).find(
+        ({ eventId }) => eventId === 'anchored-action'
+      )?.time
+    ).toBe(2 + firstOffset);
   }
 );
 
@@ -470,4 +512,28 @@ it('keeps explicit interaction edits and project replacement authoritative', () 
   expect(next.cursorTrack).toBeNull();
   expect(next.motionRegions).toBe(edited.motionRegions);
   expect(next.objectTracks).toBe(edited.objectTracks);
+});
+
+it('freezes the previous occurrence scene point when deleting its source instead of using stale manual focus', () => {
+  const project = createAnchoredInteractionProject();
+  const clip = project.clips[0];
+  if (clip?.type !== 'VIDEO') throw new Error('Expected video');
+  project.clips = [
+    {
+      ...clip,
+      fitMode: VideoMediaFitMode.STRETCH,
+      transform: { ...clip.transform, x: 100, y: 50, width: 200, height: 100 },
+    },
+  ];
+  project.motionRegions![0] = {
+    ...project.motionRegions![0]!,
+    focusMode: VideoMotionFocusMode.ACTION,
+    focusPoint: { x: 9, y: 9 },
+  };
+  const after = reconcileRecordingInteractionAnchors(project, { ...project, clips: [] });
+  expect(after.motionRegions?.[0]).toMatchObject({
+    targetAction: null,
+    focusMode: VideoMotionFocusMode.MANUAL,
+    focusPoint: { x: 120, y: 70 },
+  });
 });

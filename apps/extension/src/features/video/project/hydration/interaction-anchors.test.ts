@@ -2,6 +2,87 @@ import { expect, it } from 'vitest';
 import { createProject, createVideoClip } from '../timeline/project-meta.test.helpers.ts';
 import { VideoCursorCaptureMode, VideoProjectSourceKind } from '../types/index';
 import { hydrateVideoProject } from './index';
+import { createVideoProjectCursorTrack } from '../defaults';
+import { resolveVideoProjectActionOccurrences } from '../action-occurrences';
+import { isExportReadyVideoProject } from '../validation/root';
+
+it.each([null, 'recording-1'])('preserves explicit multi-source anchors with base %s', (base) => {
+  const project = createProject([
+    createVideoClip(),
+    createVideoClip({
+      id: 'second-instance',
+      sourceInstanceId: 'second-source',
+      assetId: 'second-asset',
+      startTime: 8,
+      sourceStart: 2,
+      sourceDuration: 4,
+      playbackRate: 2,
+      duration: 2,
+    }),
+    createVideoClip({
+      id: 'repeat-instance',
+      sourceInstanceId: 'repeat-source',
+      assetId: 'second-asset',
+      startTime: 12,
+    }),
+  ]);
+  project.baseRecordingId = base;
+  project.duration = 20;
+  project.assets.push({
+    ...project.assets[0]!,
+    id: 'second-asset',
+    source: {
+      kind: 'project-asset',
+      projectAssetId: 'copied',
+      originRecordingId: 'second-recording',
+    },
+  });
+  const anchor = {
+    kind: 'recording-source' as const,
+    recordingId: 'second-recording',
+    sourceClipId: 'second-instance',
+    sourceTime: 4,
+  };
+  const factAnchor = {
+    kind: 'recording-source' as const,
+    recordingId: 'second-recording',
+    sourceInstanceId: 'second-source',
+    sourceEventId: 'raw-click',
+    sourceTime: 4,
+  };
+  project.actionEvents = [
+    {
+      id: 'click',
+      kind: 'CLICK',
+      label: 'Click',
+      point: { x: 0.1, y: 0.1 },
+      data: {},
+      capturedDuration: 0.5,
+      anchor: factAnchor,
+    },
+  ];
+  project.cursorTrack = createVideoProjectCursorTrack();
+  project.cursorTrack.samples = [
+    { id: 'cursor', x: 100, y: 100, visible: true, time: 1, sourceAnchor: anchor },
+  ];
+  const hydrated = hydrateVideoProject(project);
+  expect(hydrated.actionEvents[0]).toEqual(project.actionEvents[0]);
+  expect(resolveVideoProjectActionOccurrences(hydrated)).toMatchObject([
+    { clipId: 'second-instance', time: 9 },
+  ]);
+  expect(hydrated.cursorTrack?.samples[0]).toMatchObject({ sourceAnchor: anchor, time: 9 });
+  expect(isExportReadyVideoProject(hydrated)).toBe(true);
+  expect(hydrateVideoProject(hydrated)).toEqual(hydrated);
+
+  const removed = hydrateVideoProject({
+    ...project,
+    clips: project.clips.filter(({ id }) => id !== 'second-instance'),
+  });
+  expect(removed.actionEvents[0]?.anchor).toEqual(factAnchor);
+  expect(resolveVideoProjectActionOccurrences(removed)).toEqual([]);
+  expect(isExportReadyVideoProject(removed)).toBe(false);
+  expect(removed.cursorTrack?.samples[0]).not.toHaveProperty('sourceAnchor');
+});
 
 function createRecordingInteractionProject() {
   const project = createProject([createVideoClip()]);
@@ -14,7 +95,7 @@ function createRecordingInteractionProject() {
   return project;
 }
 
-it('infers only unclassified legacy interactions and preserves explicit project-time ownership', () => {
+it('does not invent anchors for unbound events and preserves explicit project-time ownership', () => {
   const project = createRecordingInteractionProject();
   project.cursorTrack = {
     captureMode: VideoCursorCaptureMode.SEPARATE,
@@ -40,57 +121,31 @@ it('infers only unclassified legacy interactions and preserves explicit project-
   };
   project.actionEvents = [
     {
-      data: {},
-      duration: 0,
-      id: 'click-legacy',
-      kind: 'CLICK',
-      label: 'Legacy click',
-      point: null,
-      preset: 'CLICK_RIPPLE',
-      time: 1,
-    },
-    {
-      data: {},
-      duration: 0,
       id: 'click-manual',
       kind: 'CLICK',
       label: 'Manual click',
       point: null,
-      preset: 'CLICK_RIPPLE',
-      time: 1.5,
-      timeBasis: 'project',
+      data: {},
+      anchor: { kind: 'project', time: 1.5 },
     },
     {
-      data: {},
-      duration: 1,
       id: 'callout-manual',
       kind: 'CALLOUT',
       label: 'Manual callout',
       point: null,
-      preset: 'SPOTLIGHT',
-      time: 2,
+      data: {},
+      anchor: { kind: 'project', time: 2 },
+      presentation: { preset: 'SPOTLIGHT' },
     },
   ];
 
-  const runtimeHydrated = hydrateVideoProject(project);
-  expect(runtimeHydrated.actionEvents[0]).not.toHaveProperty('sourceAnchor');
-
-  const hydrated = hydrateVideoProject(project, { inferLegacyInteractionAnchors: true });
-  expect(hydrated.actionEvents[0]?.sourceAnchor).toEqual(
-    expect.objectContaining({ recordingId: 'recording-1', sourceTime: 1 })
-  );
-  expect(hydrated.cursorTrack?.samples[0]?.sourceAnchor).toEqual(
-    expect.objectContaining({ recordingId: 'recording-1', sourceTime: 1 })
-  );
-  expect(hydrated.actionEvents[1]).toEqual(
-    expect.objectContaining({ id: 'click-manual', timeBasis: 'project' })
-  );
-  expect(hydrated.actionEvents[1]).not.toHaveProperty('sourceAnchor');
-  expect(hydrated.actionEvents[2]?.timeBasis).toBe('project');
+  const hydrated = hydrateVideoProject(project);
+  expect(hydrated.actionEvents).toEqual(project.actionEvents);
+  expect(hydrated.cursorTrack?.samples[0]).not.toHaveProperty('sourceAnchor');
   expect(hydrated.cursorTrack?.samples[1]).not.toHaveProperty('sourceAnchor');
 });
 
-it('strips dangling explicit source anchors without dropping their interactions', () => {
+it('rejects dangling action instances without silently converting facts to manual points', () => {
   const project = createRecordingInteractionProject();
   project.cursorTrack = {
     captureMode: VideoCursorCaptureMode.SEPARATE,
@@ -120,28 +175,26 @@ it('strips dangling explicit source anchors without dropping their interactions'
   };
   project.actionEvents = [
     {
-      data: {},
-      duration: 0,
       id: 'action-dangling',
       kind: 'CLICK',
       label: 'Click',
       point: null,
-      preset: 'CLICK_RIPPLE',
-      sourceAnchor: {
+      data: {},
+      anchor: {
         kind: 'recording-source',
         recordingId: 'recording-1',
-        sourceClipId: 'missing-clip',
+        sourceInstanceId: 'missing-instance',
+        sourceEventId: 'raw',
         sourceTime: 1,
       },
-      time: 1,
     },
   ];
 
-  const hydrated = hydrateVideoProject(project, { inferLegacyInteractionAnchors: true });
+  const hydrated = hydrateVideoProject(project);
 
   expect(hydrated.actionEvents).toEqual([expect.objectContaining({ id: 'action-dangling' })]);
-  expect(hydrated.actionEvents[0]).not.toHaveProperty('sourceAnchor');
-  expect(hydrated.actionEvents[0]?.timeBasis).toBe('project');
+  expect(hydrated.actionEvents).toEqual(project.actionEvents);
+  expect(isExportReadyVideoProject(hydrated)).toBe(false);
   expect(hydrated.cursorTrack?.samples).toEqual([
     expect.objectContaining({ id: 'cursor-dangling' }),
   ]);

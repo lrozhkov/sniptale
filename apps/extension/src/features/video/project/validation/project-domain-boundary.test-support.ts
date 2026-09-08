@@ -40,13 +40,13 @@ export function createAsset(): VideoProjectAsset {
 export function createActionEvent(): VideoProjectActionEvent {
   return {
     data: { button: 'primary' },
-    duration: 0.2,
+    capturedDuration: 0.2,
     id: 'action-1',
     kind: VideoProjectActionEventKind.CLICK,
     label: 'Click',
     point: { x: 100, y: 120 },
-    preset: VideoProjectActionPreset.CLICK_RIPPLE,
-    time: 1,
+    presentation: { preset: VideoProjectActionPreset.CLICK_RIPPLE },
+    anchor: { kind: 'project', time: 1 },
   };
 }
 
@@ -68,7 +68,7 @@ export function createProject() {
     motionRegions: [
       {
         ...createVideoProjectMotionRegion(project, 1),
-        targetActionEventId: actionEvent.id,
+        targetAction: { eventId: actionEvent.id, clipId: null },
       },
     ],
   };

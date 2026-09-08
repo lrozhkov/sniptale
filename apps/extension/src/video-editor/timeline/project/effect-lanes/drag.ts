@@ -1,4 +1,3 @@
-import { getVideoCompositionActionDuration } from '../../../../features/video/composition/timeline/frame/actions';
 import { clampNumber } from '../../../../features/video/project/hydration';
 import type { VideoProject } from '../../../../features/video/project/types';
 import type {
@@ -7,6 +6,7 @@ import type {
   TimelineEffectDragDraft,
 } from '../types';
 import { snapTimelineTime } from './snap';
+import { clampMotionRegionStartTime } from '../../../../features/video/project/motion/source-binding';
 
 export interface EffectInteraction {
   startClientX: number;
@@ -14,8 +14,7 @@ export interface EffectInteraction {
 }
 
 export interface EffectMoveCallbacks {
-  onMoveActionEvent: ProjectTimelineProps['onMoveActionEvent'];
-  onResizeActionEvent: ProjectTimelineProps['onResizeActionEvent'];
+  onMoveActionOccurrence?: ProjectTimelineProps['onMoveActionOccurrence'];
   onMoveCursorSegment: ProjectTimelineProps['onMoveCursorSegment'];
   onMoveMotionRegion: ProjectTimelineProps['onMoveMotionRegion'];
   onMoveTransitionSegment: ProjectTimelineProps['onMoveTransitionSegment'];
@@ -137,9 +136,19 @@ export function moveEffectTarget(
     (moveEvent.clientX - interaction.startClientX) / pixelsPerSecond + viewportDeltaSeconds;
 
   switch (interaction.target.kind) {
-    case 'action':
-      moveActionEventTarget(interaction.target, delta, projectDuration, callbacks);
+    case 'action': {
+      const target = interaction.target;
+      const requested = target.originalStart + delta;
+      const snapped = magnetEnabled
+        ? snapTimelineTime(requested, project, pixelsPerSecond)
+        : requested;
+      callbacks.onMoveActionOccurrence?.(
+        target.eventId,
+        target.clipId,
+        clampNumber(snapped, target.minimumTime, target.maximumTime)
+      );
       return;
+    }
     case 'cursor':
       moveCursorSegmentTarget(interaction.target, delta, callbacks);
       return;
@@ -165,30 +174,6 @@ export function moveEffectTarget(
       }
       return;
   }
-}
-
-function moveActionEventTarget(
-  target: Extract<TimelineEffectDragTarget, { kind: 'action' }>,
-  delta: number,
-  projectDuration: number,
-  callbacks: EffectMoveCallbacks
-): void {
-  if (target.mode === 'move') {
-    callbacks.onMoveActionEvent(
-      target.actionEventId,
-      clampNumber(target.originalTime + delta, 0, projectDuration)
-    );
-    return;
-  }
-
-  callbacks.onResizeActionEvent(
-    target.actionEventId,
-    clampNumber(
-      target.originalDuration + delta,
-      0,
-      Math.max(0, projectDuration - target.originalTime)
-    )
-  );
 }
 
 function moveCursorSegmentTarget(
@@ -219,15 +204,16 @@ function snapMotionRegionStartTime(params: {
   startTime: number;
   target: MotionDragTarget;
 }): number {
-  if (!params.magnetEnabled) {
-    return params.startTime;
-  }
-
-  const snappedStart = snapTimelineTime(params.startTime, params.project, params.pixelsPerSecond);
-  return clampNumber(
-    snappedStart,
-    0,
-    Math.max(0, params.projectDuration - params.target.originalDuration)
+  const snappedStart = params.magnetEnabled
+    ? snapTimelineTime(params.startTime, params.project, params.pixelsPerSecond)
+    : params.startTime;
+  const region = params.project.motionRegions?.find(
+    (item) => item.id === params.target.motionRegionId
+  );
+  return clampMotionRegionStartTime(
+    params.project,
+    region ?? { duration: params.target.originalDuration },
+    snappedStart
   );
 }
 
@@ -267,10 +253,8 @@ export function createEffectDraftCallbacks(
   stage: (commit: () => void, range: Omit<TimelineEffectDragDraft, 'segmentId'>) => void
 ): EffectMoveCallbacks {
   return {
-    onMoveActionEvent: (id, time) =>
-      stage(() => callbacks.onMoveActionEvent(id, time), { startTime: time }),
-    onResizeActionEvent: (id, duration) =>
-      stage(() => callbacks.onResizeActionEvent(id, duration), { duration }),
+    onMoveActionOccurrence: (id, clipId, startTime) =>
+      stage(() => callbacks.onMoveActionOccurrence?.(id, clipId, startTime), { startTime }),
     onMoveCursorSegment: (id, nextId, startTime, endTime) =>
       stage(
         () => callbacks.onMoveCursorSegment(id, nextId, startTime, endTime),
@@ -295,9 +279,9 @@ export function isEffectDraftChanged(
   target: TimelineEffectDragTarget,
   range: Omit<TimelineEffectDragDraft, 'segmentId'>
 ): boolean {
-  const originalStart = target.kind === 'action' ? target.originalTime : target.originalStart;
+  const originalStart = target.originalStart;
   const originalDuration =
-    target.kind === 'action' || target.kind === 'motion'
+    target.kind === 'motion'
       ? target.originalDuration
       : target.kind === 'cursor'
         ? target.originalEnd - target.originalStart
@@ -312,20 +296,11 @@ export function isEffectDraftChanged(
 
 /** Display uses composition semantics while the deferred command keeps its authored values. */
 export function resolveEffectDisplayDraft(
-  project: VideoProject,
+  _project: VideoProject,
   target: TimelineEffectDragTarget,
   range: Omit<TimelineEffectDragDraft, 'segmentId'>
 ): TimelineEffectDragDraft {
   const draft = { segmentId: target.segmentId, ...range };
-  if (target.kind === 'action' && range.duration !== undefined) {
-    const event = project.actionEvents.find((item) => item.id === target.actionEventId);
-    return event
-      ? {
-          ...draft,
-          duration: getVideoCompositionActionDuration({ ...event, duration: range.duration }),
-        }
-      : draft;
-  }
   if (target.kind === 'cursor') {
     const startTime = range.startTime ?? target.originalStart;
     return {

@@ -212,7 +212,7 @@ it('waits for a delayed start and terminates activation before acknowledging sto
   await start;
   await vi.waitFor(() => expect(stopRecorder).toHaveBeenCalledOnce());
   recordingContext.stopRecordingResolve?.();
-  await expect(stop).resolves.toEqual({ result: 'stopped' });
+  await expect(stop).resolves.toEqual({ result: 'stopped', recordingPointTransform: null });
 });
 
 it('cancels a bound recorder that has not emitted its native start event', async () => {
@@ -263,7 +263,10 @@ it('delegates normal STOP to the artifact session as the only raw recorder stop 
   });
 
   await startRecording(createStartParams());
-  await expect(stopRecording(sourceBinding)).resolves.toEqual({ result: 'stopped' });
+  await expect(stopRecording(sourceBinding)).resolves.toEqual({
+    result: 'stopped',
+    recordingPointTransform: null,
+  });
 
   expect(artifactStop).toHaveBeenCalledOnce();
   expect(rawRecorderStop).not.toHaveBeenCalled();
@@ -332,7 +335,10 @@ it('joins source-ended finalization and keeps the next recording STOP operable',
   });
 
   await expect(startRecording(nextParams)).resolves.toBeUndefined();
-  await expect(stopRecording(nextBinding)).resolves.toEqual({ result: 'stopped' });
+  await expect(stopRecording(nextBinding)).resolves.toEqual({
+    result: 'stopped',
+    recordingPointTransform: null,
+  });
   expect(nextArtifactStop).toHaveBeenCalledOnce();
 });
 
@@ -397,8 +403,11 @@ it('keeps stop pending after recorder terminal progress until durable publicatio
   expect(cleanupResourcesMock).not.toHaveBeenCalled();
 
   releaseDurablePublication();
-  await expect(stop).resolves.toEqual({ result: 'stopped' });
-  await expect(duplicateStop).resolves.toEqual({ result: 'stopped' });
+  await expect(stop).resolves.toEqual({ result: 'stopped', recordingPointTransform: null });
+  await expect(duplicateStop).resolves.toEqual({
+    result: 'stopped',
+    recordingPointTransform: null,
+  });
   expect(stopSettlementCount).toBe(1);
   expect(finalizeAndPublish).toHaveBeenCalledOnce();
 });
@@ -638,3 +647,53 @@ it('rejects delayed pause, resume, and settings commands from another recording 
   completeStart();
   await start;
 });
+
+it.each(['stable', 'late-change', 'no-frame', 'discard'] as const)(
+  'publishes only the bound geometry observed through final drain: %s',
+  async (mode) => {
+    const transform = {
+      viewport: {
+        width: 1000,
+        height: 800,
+        devicePixelRatio: 1,
+        visualViewportScale: 1,
+        visualViewportOffsetX: 0,
+        visualViewportOffsetY: 0,
+      },
+      visibleClientRect: { x: 0, y: 0, width: 1000, height: 800 },
+      scaleX: 0.001,
+      scaleY: 0.00125,
+      offsetX: 0,
+      offsetY: 0,
+    };
+    const observation = {
+      transform,
+      stable: true,
+      sawFrame: mode !== 'no-frame',
+      frameShape: null,
+    };
+    const { recorder, stop: stopRecorder } = createActiveRecorderFixture();
+    startRecordingImplMock.mockImplementationOnce(async () => {
+      recordingContext.beginRecordingSession('recording-delayed', 1);
+      recordingContext.bindStreamInstance(sourceBinding);
+      bindArtifactSession(recorder);
+      recordingContext.recordingPointObservation = observation;
+      recordingContext.activateRecorder(requireBoundArtifactSession(recorder));
+    });
+    await startRecording(createStartParams());
+    const stop = stopRecording(sourceBinding, mode === 'discard');
+    const duplicate = stopRecording(sourceBinding, mode === 'discard');
+    expect(duplicate).toBe(stop);
+    await vi.waitFor(() => expect(stopRecorder).toHaveBeenCalledOnce());
+    const complete = recordingContext.stopRecordingResolve;
+    expect(complete).not.toBeNull();
+    if (mode === 'late-change') observation.stable = false;
+    // Finalization can release global context before resolving the identity-bound stop.
+    recordingContext.resetRecordingSession();
+    complete?.();
+    await expect(stop).resolves.toEqual({
+      result: 'stopped',
+      recordingPointTransform: mode === 'stable' ? transform : null,
+    });
+  }
+);

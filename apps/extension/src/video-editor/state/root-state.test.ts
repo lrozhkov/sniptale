@@ -255,7 +255,7 @@ describe('video editor store timeline control state owner', () => {
         id: 'motion-1',
         scale: 1.2,
         startTime: 0,
-        targetActionEventId: null,
+        targetAction: null,
         zoomInDuration: 0.1,
         zoomOutDuration: 0.1,
       },

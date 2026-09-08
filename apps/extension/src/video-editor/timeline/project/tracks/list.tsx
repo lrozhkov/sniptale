@@ -1,3 +1,6 @@
+import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
+import { getTimelineHistoryLayout } from '../effect-lanes/history-layout';
+import type { AutoProcessingHeaderProps } from '../toolbar/sections/auto-transform-wizard';
 import { Activity, MousePointer2, Rows3, Text } from 'lucide-react';
 import { TimelineIconButton } from '../controls/icon-button';
 import { ProjectTimelineAddTrackControl } from '../toolbar/sections/add-controls';
@@ -17,7 +20,9 @@ import { ProjectTimelineTrackRow } from './row';
 import type { useProjectTimelinePanelPrefs } from '../panel/prefs';
 
 interface ProjectTimelineTrackListProps {
+  recordingTelemetry?: readonly RecordingTelemetryEntry[];
   canShowTelemetryLane: boolean;
+  autoProcessing?: AutoProcessingHeaderProps | undefined;
   cursorLaneVisible: boolean;
   project: VideoProject;
   selectedTrackId: string | null;
@@ -31,6 +36,8 @@ interface ProjectTimelineTrackListProps {
   onClearUtilityLane: (lane: VideoProjectUtilityLaneKind) => void;
   onScroll: () => void;
   onSelectTrack: (trackId: string) => void;
+  onSelectHistoryLane?: (() => void) | undefined;
+  historyLaneSelected?: boolean | undefined;
   onSelectMotionLane?: (() => void) | undefined;
   motionLaneSelected?: boolean | undefined;
   onToggleTrackLock: (trackId: string) => void;
@@ -156,6 +163,8 @@ function ProjectTimelineTrackListScrollArea(props: ProjectTimelineTrackListProps
 }
 
 function ProjectTimelineRailRows(props: {
+  recordingTelemetry?: readonly RecordingTelemetryEntry[];
+  autoProcessing?: AutoProcessingHeaderProps | undefined;
   cursorLaneVisible: boolean;
   project: VideoProject;
   selectedTrackId: string | null;
@@ -166,6 +175,8 @@ function ProjectTimelineRailRows(props: {
   onAddMotionRegion: () => void;
   onClearUtilityLane: (lane: VideoProjectUtilityLaneKind) => void;
   onSelectTrack: (trackId: string) => void;
+  onSelectHistoryLane?: (() => void) | undefined;
+  historyLaneSelected?: boolean | undefined;
   onSelectMotionLane?: (() => void) | undefined;
   motionLaneSelected?: boolean | undefined;
   onToggleTrackLock: (trackId: string) => void;
@@ -176,7 +187,22 @@ function ProjectTimelineRailRows(props: {
   return (
     <div className="min-w-0">
       {props.showTelemetryLane ? (
-        <ProjectTimelineTelemetryLaneLabelRow compactRows={false} />
+        <ProjectTimelineTelemetryLaneLabelRow
+          height={
+            getTimelineHistoryLayout(
+              props.project,
+              props.recordingTelemetry,
+              props.cursorLaneVisible
+            ).height
+          }
+          autoProcessing={props.autoProcessing}
+          compactRows={false}
+          project={props.project}
+          onSelect={props.onSelectHistoryLane}
+          selected={props.historyLaneSelected}
+          onToggleVisibility={() => props.onToggleUtilityLaneVisibility('actions')}
+          onToggleLock={() => props.onToggleUtilityLaneLock('actions')}
+        />
       ) : null}
       {props.tracks.map((track, index) => (
         <ProjectTimelineTrackRow

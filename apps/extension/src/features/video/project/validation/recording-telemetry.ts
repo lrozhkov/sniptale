@@ -1,6 +1,9 @@
 import type {
   RecordingTelemetrySignal,
-  VideoProjectActionEvent,
+  RecordingViewportGeometry,
+  RecordingViewportObservation,
+  RecordingPointTransform,
+  RecordingActionEvent,
   VideoProjectCursorTrack,
 } from '../types';
 import {
@@ -82,7 +85,7 @@ export function isVideoProjectCursorTrack(value: unknown): value is VideoProject
   );
 }
 
-export function isVideoProjectActionEvent(value: unknown): value is VideoProjectActionEvent {
+export function isRecordingActionEvent(value: unknown): value is RecordingActionEvent {
   return (
     isRecord(value) &&
     isString(value['id']) &&
@@ -92,6 +95,9 @@ export function isVideoProjectActionEvent(value: unknown): value is VideoProject
     isString(value['label']) &&
     isString(value['preset']) &&
     isRecord(value['data']) &&
+    (value['recordingPoint'] === undefined ||
+      value['recordingPoint'] === null ||
+      isRecordingPoint(value['recordingPoint'])) &&
     (value['point'] === null || isPoint(value['point']))
   );
 }
@@ -112,11 +118,77 @@ export function isRecordingTelemetrySignal(value: unknown): value is RecordingTe
 export function isRecordingTelemetrySnapshot(value: unknown): boolean {
   return (
     isRecord(value) &&
+    (value['viewportObservation'] === undefined ||
+      value['viewportObservation'] === null ||
+      isRecordingViewportObservation(value['viewportObservation'])) &&
     (value['viewport'] === null || isViewportInfo(value['viewport'])) &&
     (value['cursorTrack'] === null || isVideoProjectCursorTrack(value['cursorTrack'])) &&
     Array.isArray(value['actionEvents']) &&
-    value['actionEvents'].every(isVideoProjectActionEvent) &&
+    value['actionEvents'].every(isRecordingActionEvent) &&
     (value['signals'] === undefined ||
       (Array.isArray(value['signals']) && value['signals'].every(isRecordingTelemetrySignal)))
+  );
+}
+
+export function isRecordingPoint(value: unknown): value is { x: number; y: number } {
+  return (
+    isRecord(value) &&
+    isNumber(value['x']) &&
+    isNumber(value['y']) &&
+    Number.isFinite(value['x']) &&
+    Number.isFinite(value['y']) &&
+    value['x'] >= 0 &&
+    value['x'] <= 1 &&
+    value['y'] >= 0 &&
+    value['y'] <= 1
+  );
+}
+
+function isRecordingViewportGeometry(value: unknown): value is RecordingViewportGeometry {
+  return (
+    isRecord(value) &&
+    ['width', 'height', 'devicePixelRatio', 'visualViewportScale'].every(
+      (key) => typeof value[key] === 'number' && Number.isFinite(value[key]) && value[key] > 0
+    ) &&
+    ['visualViewportOffsetX', 'visualViewportOffsetY'].every(
+      (key) => typeof value[key] === 'number' && Number.isFinite(value[key])
+    )
+  );
+}
+
+function isRecordingViewportObservation(value: unknown): value is RecordingViewportObservation {
+  return (
+    isRecord(value) && isRecordingViewportGeometry(value['initial']) && isBoolean(value['stable'])
+  );
+}
+
+export function isRecordingPointTransform(value: unknown): value is RecordingPointTransform {
+  if (
+    !isRecord(value) ||
+    !isRecordingViewportGeometry(value['viewport']) ||
+    !isRecord(value['visibleClientRect'])
+  )
+    return false;
+  const viewport = value['viewport'];
+  const rect = value['visibleClientRect'];
+  return (
+    viewport.visualViewportScale === 1 &&
+    viewport.visualViewportOffsetX === 0 &&
+    viewport.visualViewportOffsetY === 0 &&
+    ['scaleX', 'scaleY'].every(
+      (key) => typeof value[key] === 'number' && Number.isFinite(value[key]) && value[key] > 0
+    ) &&
+    ['offsetX', 'offsetY'].every(
+      (key) => typeof value[key] === 'number' && Number.isFinite(value[key])
+    ) &&
+    ['x', 'y', 'width', 'height'].every(
+      (key) => typeof rect[key] === 'number' && Number.isFinite(rect[key])
+    ) &&
+    Number(rect['x']) >= 0 &&
+    Number(rect['y']) >= 0 &&
+    Number(rect['width']) > 0 &&
+    Number(rect['height']) > 0 &&
+    Number(rect['x']) + Number(rect['width']) <= viewport.width &&
+    Number(rect['y']) + Number(rect['height']) <= viewport.height
   );
 }

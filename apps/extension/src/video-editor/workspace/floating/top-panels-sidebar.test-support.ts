@@ -39,8 +39,6 @@ function createProjectPlacementActions(): Pick<
   | 'onStartActionPointPlacement'
   | 'onStartMotionAreaPlacement'
   | 'onStartMotionFocusPlacement'
-  | 'onStartMotionPathStopAreaPlacement'
-  | 'onStartMotionPathStopPointPlacement'
   | 'onStartObjectTrackAnchorPlacement'
 > {
   return {
@@ -50,8 +48,7 @@ function createProjectPlacementActions(): Pick<
     onStartActionPointPlacement: noop(),
     onStartMotionAreaPlacement: noop(),
     onStartMotionFocusPlacement: noop(),
-    onStartMotionPathStopAreaPlacement: noop(),
-    onStartMotionPathStopPointPlacement: noop(),
+
     onStartObjectTrackAnchorPlacement: noop(),
   };
 }
@@ -73,7 +70,7 @@ function createProjectEditActions(): Omit<
     onDeleteEffectInstance: noop(),
     onDuplicateEffectInstance: noop(),
     onEnableCursorTrack: noop(),
-    onGenerateMotionPathFromCursor: noop(),
+
     onInsertCursorSample: noop(),
     onMoveEffectInstance: noop(),
     onPreviewSceneBackground: noop(),
@@ -90,6 +87,7 @@ function createProjectEditActions(): Omit<
     onToggleTrackLock: noop(),
     onToggleTrackVisibility: noop(),
     onToggleCollapsed: noop(),
+    onUpdateActionPresentation: vi.fn(),
     onUpdateActionEventDetails: noop(),
     onUpdateCursorSampleInterpolation: noop(),
     onUpdateCursorSampleSkinOverride: noop(),
@@ -166,7 +164,7 @@ export function createSidebarController(
       recentColors: [],
       recordingId: null,
       recordings: [],
-      selectedActionEvent: null,
+      selectedActionOccurrence: null,
       selectedClip: null,
       selectedCursorSample: null,
       selectedMotionRegion: null,

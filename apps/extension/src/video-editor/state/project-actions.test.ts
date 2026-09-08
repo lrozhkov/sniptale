@@ -1,3 +1,4 @@
+import { resolveVideoProjectActionOccurrences } from '../../features/video/project/action-occurrences';
 import { describe, expect, it } from 'vitest';
 import type { RecordingTelemetryEntry } from '../../composition/persistence/recordings/contracts';
 import {
@@ -31,6 +32,82 @@ function createTimelineStore() {
 }
 
 describe('video editor timeline project state', () => {
+  it('keeps another recording instance bound through move, speed, Undo and project replacement', () => {
+    const project = createProject([
+      createVideoClip(),
+      createVideoClip({
+        id: 'second',
+        sourceInstanceId: 'second-source',
+        assetId: 'second-asset',
+        startTime: 10,
+      }),
+      createVideoClip({
+        id: 'repeat',
+        sourceInstanceId: 'repeat-source',
+        assetId: 'second-asset',
+        startTime: 22,
+      }),
+    ]);
+    project.duration = 30;
+    project.assets.push({
+      ...project.assets[0]!,
+      id: 'second-asset',
+      source: {
+        kind: 'project-asset',
+        projectAssetId: 'copied',
+        originRecordingId: 'second-recording',
+      },
+    });
+    const anchor = {
+      kind: 'recording-source' as const,
+      recordingId: 'second-recording',
+      sourceInstanceId: 'second-source',
+      sourceEventId: 'raw',
+      sourceTime: 2,
+    };
+    project.actionEvents = [
+      {
+        id: 'second-click',
+        kind: 'CLICK',
+        point: { x: 0.1, y: 0.1 },
+        label: 'Second click',
+        data: {},
+        capturedDuration: 0.4,
+        anchor,
+      },
+    ];
+    const store = createTimelineStore();
+    store.getState().setProject(project);
+    expect(store.getState().project?.actionEvents[0]?.anchor).toEqual(anchor);
+    store.getState().moveClip('second', 12);
+    expect(store.getState().project?.actionEvents[0]?.anchor).toEqual(anchor);
+    expect(resolveVideoProjectActionOccurrences(store.getState().project!)[0]?.time).toBe(14);
+    store.getState().updateClipPlaybackRate('second', 2);
+    expect(store.getState().project?.actionEvents[0]?.anchor).toEqual(anchor);
+    expect(resolveVideoProjectActionOccurrences(store.getState().project!)[0]?.time).toBe(13);
+    store.getState().undoProject();
+    expect(resolveVideoProjectActionOccurrences(store.getState().project!)[0]?.time).toBe(14);
+    store.getState().undoProject();
+    expect(resolveVideoProjectActionOccurrences(store.getState().project!)[0]?.time).toBe(12);
+    store.getState().setProject(structuredClone(store.getState().project!));
+    expect(store.getState().project?.actionEvents[0]?.anchor).toEqual(anchor);
+    expect(resolveVideoProjectActionOccurrences(store.getState().project!)[0]?.time).toBe(12);
+  });
+  it('admits material-source sidecars once and rejects unrelated recordings', () => {
+    const store = createTimelineStore();
+    store.getState().setProject(createProject([createVideoClip()]));
+    const first = createRecordingTelemetryEntry('rec-asset-video');
+    const second = createRecordingTelemetryEntry('rec-asset-audio');
+    store
+      .getState()
+      .setRecordingTelemetry([first, second, first, createRecordingTelemetryEntry('foreign')]);
+    expect(store.getState().recordingTelemetry).toEqual([first, second]);
+    store.getState().setRecordingTelemetry([second, first]);
+    store.getState().setProject(createEmptyVideoProject('Other'));
+    expect(store.getState().recordingTelemetry).toEqual([]);
+    store.getState().setRecordingTelemetry([first]);
+    expect(store.getState().recordingTelemetry).toEqual([]);
+  });
   it('hydrates loaded projects and keeps project updates on the canonical path', () => {
     const store = createTimelineStore();
     const project = createEmptyVideoProject('Timeline');
@@ -70,14 +147,12 @@ describe('video editor timeline project state', () => {
       actionEvents: [
         {
           data: {},
-          duration: 0,
+          capturedDuration: 0,
           id: 'manual-click',
           kind: 'CLICK',
           label: 'Manual click',
           point: null,
-          preset: 'CLICK_RIPPLE',
-          time: 1,
-          timeBasis: 'project',
+          anchor: { kind: 'project', time: 1 },
         },
       ],
       cursorTrack: {
@@ -106,7 +181,7 @@ describe('video editor timeline project state', () => {
     }));
 
     expect(store.getState().project?.actionEvents).toEqual([
-      expect.objectContaining({ id: 'manual-click', time: 1, timeBasis: 'project' }),
+      expect.objectContaining({ id: 'manual-click', anchor: { kind: 'project', time: 1 } }),
     ]);
     expect(store.getState().project?.actionEvents[0]).not.toHaveProperty('sourceAnchor');
     expect(store.getState().project?.cursorTrack?.samples).toEqual([
@@ -115,28 +190,21 @@ describe('video editor timeline project state', () => {
     expect(store.getState().project?.cursorTrack?.samples[0]).not.toHaveProperty('sourceAnchor');
   });
 
-  it('resets and reopens telemetry lane visibility from recording telemetry lifecycle', () => {
+  it('admits only current recording sources without owning history visibility', () => {
     const store = createTimelineStore();
     const project = createEmptyVideoProject('Timeline');
     project.baseRecordingId = 'rec-1';
     const telemetry = createRecordingTelemetryEntry('rec-1');
 
     store.getState().setProject(project, 'recording-1');
-    store.getState().setRecordingTelemetry(telemetry);
-    expect(store.getState().telemetryLaneVisible).toBe(true);
+    store.getState().setRecordingTelemetry([telemetry]);
 
-    store.getState().toggleTelemetryLaneVisibility();
-    expect(store.getState().telemetryLaneVisible).toBe(false);
+    store.getState().setRecordingTelemetry([{ ...telemetry }]);
 
-    store.getState().setRecordingTelemetry({ ...telemetry });
-    expect(store.getState().telemetryLaneVisible).toBe(false);
+    store.getState().setRecordingTelemetry([createRecordingTelemetryEntry('rec-2')]);
+    expect(store.getState().recordingTelemetry).toEqual([]);
 
-    store.getState().setRecordingTelemetry(createRecordingTelemetryEntry('rec-2'));
-    expect(store.getState().recordingTelemetry).toBeNull();
-    expect(store.getState().telemetryLaneVisible).toBe(false);
-
-    store.getState().setRecordingTelemetry(null);
-    expect(store.getState().telemetryLaneVisible).toBe(false);
+    store.getState().setRecordingTelemetry([]);
   });
 
   it('hydrates subtitle-first projects with one presented selection authority', () => {

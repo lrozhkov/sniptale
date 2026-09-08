@@ -32,7 +32,7 @@ function PlaybackHarness(props: PlaybackHarnessProps) {
       selection: { kind: VideoEditorSelectionKind.CLIP, clipId: 'clip-1' } as never,
       placementMode: null,
       selectedClipId: 'clip-1',
-      selectedActionEvent: null,
+      selectedActionOccurrence: null,
       selectedMotionRegion: null,
     },
     {

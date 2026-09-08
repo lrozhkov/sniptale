@@ -77,13 +77,13 @@ function createSelectionCursorTrack() {
 function createSelectionActionEvent() {
   return {
     data: {},
-    duration: 0.2,
+    capturedDuration: 0.2,
     id: 'action-1',
     kind: 'CLICK',
     label: 'Click',
     point: { x: 10, y: 20 },
-    preset: 'CLICK_RIPPLE',
-    time: 0.2,
+    presentation: { preset: 'CLICK_RIPPLE' },
+    anchor: { kind: 'project' as const, time: 0.2 },
   } as never;
 }
 
@@ -96,7 +96,7 @@ function createSelectionMotionRegion() {
     id: 'motion-1',
     scale: 1.2,
     startTime: 0,
-    targetActionEventId: null,
+    targetAction: null,
     zoomInDuration: 0.1,
     zoomOutDuration: 0.1,
   } as never;
@@ -132,10 +132,11 @@ it('keeps or clears each selection kind according to current project ownership',
   ).toEqual({ kind: 'object-track', objectTrackId: 'visual-cursor' });
   expect(
     resolveSelectionAfterProjectUpdate(project, {
-      actionEventId: 'action-1',
-      kind: 'action-segment',
+      eventId: 'action-1',
+      clipId: null,
+      kind: 'action-occurrence',
     })
-  ).toEqual({ actionEventId: 'action-1', kind: 'action-segment' });
+  ).toEqual({ eventId: 'action-1', clipId: null, kind: 'action-occurrence' });
   expect(
     resolveSelectionAfterProjectUpdate(project, {
       kind: 'motion-region',
@@ -162,10 +163,11 @@ it('keeps utility lane selections when their project lane is hidden', () => {
 
   expect(
     resolveSelectionAfterProjectUpdate(project, {
-      actionEventId: 'action-1',
-      kind: 'action-segment',
+      eventId: 'action-1',
+      clipId: null,
+      kind: 'action-occurrence',
     })
-  ).toEqual({ actionEventId: 'action-1', kind: 'action-segment' });
+  ).toEqual({ eventId: 'action-1', clipId: null, kind: 'action-occurrence' });
   expect(
     resolveSelectionAfterProjectUpdate(project, {
       kind: 'motion-region',
@@ -191,8 +193,9 @@ it('resolves selected tracks from clip and transition selections and clears non-
   expect(resolveSelectedTrackIdFromSelection(project, { kind: 'scene' })).toBeNull();
   expect(
     resolveSelectedTrackIdFromSelection(project, {
-      actionEventId: 'action-1',
-      kind: 'action-segment',
+      eventId: 'action-1',
+      clipId: null,
+      kind: 'action-occurrence',
     })
   ).toBeNull();
   expect(

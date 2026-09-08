@@ -52,6 +52,7 @@ interface ProductSelectShellProps {
     | 'dataUi'
     | 'menuClassName'
     | 'menuPlacement'
+    | 'menuWidth'
     | 'menuScrollable'
     | 'onChange'
     | 'options'
@@ -237,6 +238,7 @@ function useProductSelectShellProps(
     disabled = false,
     menuClassName = '',
     menuPlacement = 'auto',
+    menuWidth,
     menuScrollable = true,
     onChange,
     options,
@@ -248,6 +250,7 @@ function useProductSelectShellProps(
   const selectState = useProductSelectController({
     disabled,
     menuPlacement,
+    ...(menuWidth === undefined ? {} : { menuWidth }),
     onChange,
     options,
     value,

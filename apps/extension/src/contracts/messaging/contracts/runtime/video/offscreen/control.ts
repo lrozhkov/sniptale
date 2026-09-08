@@ -1,3 +1,4 @@
+import { isRecordingPointTransform } from '../../../../../../features/video/project/validation/recording-telemetry';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { createGuardParser } from '@sniptale/runtime-contracts/messaging/parsers/utils';
 import {
@@ -63,7 +64,13 @@ export const runtimeVideoOffscreenControlMessageContracts = {
     ),
     parseResponse: createGuardParser(
       'runtime OFFSCREEN_STOP_RECORDING response',
-      createRuntimeResponseGuard({ allowUndefined: true, optional: { result: isString } })
+      createRuntimeResponseGuard({
+        allowUndefined: true,
+        optional: {
+          result: isString,
+          recordingPointTransform: (value) => value === null || isRecordingPointTransform(value),
+        },
+      })
     ),
   },
   [VideoMessageType.OFFSCREEN_PAUSE_RECORDING]: {

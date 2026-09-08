@@ -58,13 +58,13 @@ function createAssetWithSource(
 function createActionEvent(): VideoProjectActionEvent {
   return {
     data: { button: 'primary' },
-    duration: 0.2,
+    capturedDuration: 0.2,
     id: 'action-1',
     kind: VideoProjectActionEventKind.CLICK,
     label: 'Click',
     point: { x: 100, y: 120 },
-    preset: VideoProjectActionPreset.CLICK_RIPPLE,
-    time: 1,
+    presentation: { preset: VideoProjectActionPreset.CLICK_RIPPLE },
+    anchor: { kind: 'project', time: 1 },
   };
 }
 
@@ -133,7 +133,7 @@ function createProject(): VideoProject {
     motionRegions: [
       {
         ...createVideoProjectMotionRegion(project, 1),
-        targetActionEventId: actionEvent.id,
+        targetAction: { eventId: actionEvent.id, clipId: null },
       },
     ],
   };
@@ -147,73 +147,54 @@ it('accepts real project factory output at hydration and export boundaries', () 
   expect(isExportReadyVideoProject(project)).toBe(true);
 });
 
-it('requires recording anchor provenance and source references only at export readiness', () => {
+it('validates captured fact provenance while retaining out-of-range known source history', () => {
   const project = createProject();
   const recordingId = 'recording-1';
-  const clip = project.clips[0]!;
-  const sourceAnchor = {
+  const anchor = {
     kind: 'recording-source' as const,
     recordingId,
-    sourceClipId: clip.id,
+    sourceInstanceId: 'instance',
+    sourceEventId: 'raw',
     sourceTime: 1,
   };
-  const cursorSourceAnchor = { ...sourceAnchor, sourceTime: 0.5 };
   const recordingProject = {
     ...project,
-    baseRecordingId: recordingId,
-    source: { kind: 'recording' as const, recordingId },
-    assets: [
-      {
-        ...project.assets[0]!,
-        source: { kind: 'recording' as const, recordingId },
-      },
-    ],
-    actionEvents: [{ ...project.actionEvents[0]!, sourceAnchor }],
-    cursorTrack: {
-      ...project.cursorTrack!,
-      samples: [{ ...project.cursorTrack!.samples[0]!, sourceAnchor: cursorSourceAnchor }],
-    },
+    assets: [{ ...project.assets[0]!, source: { kind: 'recording' as const, recordingId } }],
+    clips: project.clips.map((clip) =>
+      clip.type === 'VIDEO' ? { ...clip, sourceInstanceId: 'instance' } : clip
+    ),
+    actionEvents: [{ ...project.actionEvents[0]!, point: { x: 0.4, y: 0.5 }, anchor }],
+    motionRegions: [],
   };
-
   expect(isExportReadyVideoProject(recordingProject)).toBe(true);
   expect(
     isExportReadyVideoProject({
       ...recordingProject,
       actionEvents: [
-        {
-          ...recordingProject.actionEvents[0]!,
-          sourceAnchor: undefined,
-          timeBasis: 'project',
-        },
+        { ...recordingProject.actionEvents[0]!, anchor: { ...anchor, sourceTime: 10 } },
       ],
     })
   ).toBe(true);
-  expect(
-    isExportReadyVideoProject({
-      ...recordingProject,
-      actionEvents: [{ ...recordingProject.actionEvents[0]!, sourceAnchor, timeBasis: 'project' }],
-    })
-  ).toBe(false);
-  expect(
-    isExportReadyVideoProject({
-      ...recordingProject,
-      actionEvents: [{ ...recordingProject.actionEvents[0]!, time: 4 }],
-    })
-  ).toBe(false);
-
   for (const invalidAnchor of [
-    { ...sourceAnchor, recordingId: 'foreign-recording' },
-    { ...sourceAnchor, sourceClipId: 'missing-clip' },
-    { ...sourceAnchor, sourceTime: 10 },
+    { ...anchor, recordingId: 'foreign' },
+    { ...anchor, sourceInstanceId: 'missing' },
   ]) {
     const invalidProject = {
       ...recordingProject,
-      actionEvents: [{ ...recordingProject.actionEvents[0]!, sourceAnchor: invalidAnchor }],
+      actionEvents: [{ ...recordingProject.actionEvents[0]!, anchor: invalidAnchor }],
     };
     expect(isHydratableVideoProject(invalidProject)).toBe(true);
-    expect(parseHydratableVideoProject(invalidProject)).toBe(invalidProject);
     expect(isExportReadyVideoProject(invalidProject)).toBe(false);
   }
+  expect(
+    isExportReadyVideoProject({
+      ...recordingProject,
+      actionEvents: [
+        recordingProject.actionEvents[0]!,
+        { ...recordingProject.actionEvents[0]!, id: 'duplicate-fact' },
+      ],
+    })
+  ).toBe(false);
 });
 
 it('rejects pre-public v1 projects at the hydration boundary', () => {
@@ -269,7 +250,7 @@ it('rejects malformed nested clip, asset, track, cursor, and motion fields', () 
   expect(
     isHydratableVideoProject({
       ...project,
-      actionEvents: [{ ...project.actionEvents[0]!, timeBasis: 'source' }],
+      actionEvents: [{ ...project.actionEvents[0]!, anchor: { kind: 'source', time: 1 } }],
     })
   ).toBe(false);
   expect(
@@ -293,10 +274,11 @@ it('rejects malformed nested clip, asset, track, cursor, and motion fields', () 
       actionEvents: [
         {
           ...project.actionEvents[0]!,
-          sourceAnchor: {
+          anchor: {
             kind: 'recording-source',
             recordingId: 'recording-1',
-            sourceClipId: project.clips[0]!.id,
+            sourceInstanceId: 'instance',
+            sourceEventId: 'raw',
             sourceTime: Number.POSITIVE_INFINITY,
           },
         },
@@ -386,7 +368,9 @@ it('allows persisted hydration with missing references but rejects export-ready 
   };
   const missingActionReference = {
     ...project,
-    motionRegions: [{ ...project.motionRegions![0]!, targetActionEventId: 'missing-action' }],
+    motionRegions: [
+      { ...project.motionRegions![0]!, targetAction: { eventId: 'missing-action', clipId: null } },
+    ],
   };
 
   expect(isHydratableVideoProject(missingTrackReference)).toBe(true);

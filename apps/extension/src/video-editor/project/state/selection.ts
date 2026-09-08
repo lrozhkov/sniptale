@@ -1,13 +1,34 @@
+import { resolveVideoProjectActionOccurrences } from '../../../features/video/project/action-occurrences';
 import { createSceneSelection } from '../selection/model';
 import { VideoEditorSelectionKind } from '../../contracts/selection';
 import type { VideoEditorProjectState } from './contracts';
 import type { VideoProject } from '../../../features/video/project/types/index';
+import { resolveMotionConnectionSource } from '../../../features/video/project/motion';
+import { isRecordingSourceTimedClip } from '../operations/source-timed-clips';
 
 export function resolveSelectionAfterProjectUpdate(
   project: VideoProject,
-  selection: VideoEditorProjectState['selection']
+  selection: VideoEditorProjectState['selection'],
+  splitLineage?: ReadonlyMap<string, string>
 ): VideoEditorProjectState['selection'] {
   switch (selection.kind) {
+    case VideoEditorSelectionKind.HISTORY_SPAN: {
+      const clip = project.clips.find((item) => item.id === selection.clipId);
+      return clip?.type === 'VIDEO' &&
+        clip.sourceInstanceId === selection.sourceInstanceId &&
+        isRecordingSourceTimedClip(project, clip, selection.recordingId)
+        ? selection
+        : { kind: VideoEditorSelectionKind.HISTORY_LANE };
+    }
+    case VideoEditorSelectionKind.MOTION_CONNECTION: {
+      const destination = project.motionRegions?.find(
+        (region) => region.id === selection.motionRegionId
+      );
+      return destination && resolveMotionConnectionSource(project, destination)
+        ? selection
+        : createSceneSelection();
+    }
+    case VideoEditorSelectionKind.HISTORY_LANE:
     case VideoEditorSelectionKind.SCENE:
       return selection;
     case VideoEditorSelectionKind.MOTION_LANE:
@@ -34,10 +55,22 @@ export function resolveSelectionAfterProjectUpdate(
       return (project.objectTracks ?? []).some((track) => track.id === selection.objectTrackId)
         ? selection
         : createSceneSelection();
-    case VideoEditorSelectionKind.ACTION_SEGMENT:
-      return project.actionEvents.some((event) => event.id === selection.actionEventId)
-        ? selection
-        : createSceneSelection();
+    case VideoEditorSelectionKind.ACTION_OCCURRENCE: {
+      const occurrences = resolveVideoProjectActionOccurrences(project);
+      if (
+        occurrences.some(
+          (item) => item.eventId === selection.eventId && item.clipId === selection.clipId
+        )
+      )
+        return selection;
+      const descendantId = selection.clipId ? splitLineage?.get(selection.clipId) : undefined;
+      return descendantId &&
+        occurrences.some(
+          (item) => item.eventId === selection.eventId && item.clipId === descendantId
+        )
+        ? { ...selection, clipId: descendantId }
+        : { kind: VideoEditorSelectionKind.HISTORY_LANE };
+    }
     case VideoEditorSelectionKind.MOTION_REGION:
       return (project.motionRegions ?? []).some((region) => region.id === selection.motionRegionId)
         ? selection
@@ -50,11 +83,14 @@ export function resolveSelectedTrackIdFromSelection(
   selection: VideoEditorProjectState['selection']
 ): string | null {
   switch (selection.kind) {
+    case VideoEditorSelectionKind.MOTION_CONNECTION:
+    case VideoEditorSelectionKind.HISTORY_LANE:
+    case VideoEditorSelectionKind.HISTORY_SPAN:
     case VideoEditorSelectionKind.SCENE:
     case VideoEditorSelectionKind.MOTION_LANE:
     case VideoEditorSelectionKind.CURSOR_SEGMENT:
     case VideoEditorSelectionKind.OBJECT_TRACK:
-    case VideoEditorSelectionKind.ACTION_SEGMENT:
+    case VideoEditorSelectionKind.ACTION_OCCURRENCE:
     case VideoEditorSelectionKind.MOTION_REGION:
       return null;
     case VideoEditorSelectionKind.CLIP:

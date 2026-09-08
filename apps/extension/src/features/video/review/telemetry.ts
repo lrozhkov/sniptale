@@ -1,11 +1,11 @@
 import type {
   RecordingTelemetrySignal,
-  VideoProjectActionEvent,
+  RecordingActionEvent,
   VideoProjectCursorTrack,
 } from '../project/types';
 
 interface ReviewTelemetryInput {
-  actionEvents: readonly VideoProjectActionEvent[];
+  actionEvents: readonly RecordingActionEvent[];
   signals: readonly RecordingTelemetrySignal[];
   cursorTrack: VideoProjectCursorTrack | null;
 }

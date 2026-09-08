@@ -28,7 +28,7 @@ const TRACK_PANEL_BOOLEAN_FIELDS = [
 
 export const DEFAULT_VIDEO_EDITOR_TRACK_PANEL_PREFS: VideoEditorTrackPanelPrefs = {
   collapsedCursorLaneVisible: true,
-  collapsedTelemetryLaneVisible: false,
+  collapsedTelemetryLaneVisible: true,
   compactRows: false,
   hideTrackNames: false,
   trackHeightByTrackId: {},

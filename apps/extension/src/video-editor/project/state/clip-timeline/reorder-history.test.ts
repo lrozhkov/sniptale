@@ -1,3 +1,4 @@
+import { resolveVideoProjectActionOccurrences } from '../../../../features/video/project/action-occurrences';
 import { expect, it } from 'vitest';
 import { setup } from '../insertion/material.test-support';
 import { hydrateVideoProject } from '../../../../features/video/project/hydration';
@@ -13,41 +14,54 @@ it('commits a swap once, retains selection/playhead and reconciles source anchor
   store.getState().appendMaterial(asset.id, { start: 4, end: 6 });
   const base = store.getState().project!;
   const first = base.clips[0]!;
+  if (first.type !== 'VIDEO' || !first.sourceInstanceId)
+    throw new Error('Expected source instance');
+  const cursorAnchor = {
+    kind: 'recording-source' as const,
+    recordingId: 'rec',
+    sourceClipId: first.id,
+    sourceTime: 1,
+  };
   const event = {
     id: 'anchored',
     kind: 'CLICK' as const,
-    time: 1,
-    duration: 0.5,
-    point: { x: 50, y: 50 },
+    capturedDuration: 0.5,
+    point: { x: 0.5, y: 0.5 },
     label: '',
     data: {},
-    preset: 'CLICK_RIPPLE' as const,
-    sourceAnchor: {
+    anchor: {
       kind: 'recording-source' as const,
       recordingId: 'rec',
-      sourceClipId: first.id,
+      sourceInstanceId: first.sourceInstanceId,
+      sourceEventId: 'raw',
       sourceTime: 1,
     },
   };
   const region = {
     ...createVideoProjectMotionRegion(base, 0.75),
     duration: 1,
-    targetActionEventId: event.id,
+    targetAction: { eventId: event.id, clipId: first.id },
+    sourceBinding: {
+      clipId: first.id,
+      sourceStart: 0.75,
+      sourceEnd: 1.75,
+      animation: { start: 0, end: 1, duration: 1 },
+    },
   };
-  const { sourceAnchor: _sourceAnchor, ...manual } = event;
+  const manual = event;
   store.setState({
     selection: { kind: 'clip', clipId: first.id },
     selectedTrackId: first.trackId,
     currentTime: 1.5,
     project: {
       ...base,
-      actionEvents: [event, { ...manual, id: 'manual', time: 0.25, timeBasis: 'project' }],
+      actionEvents: [event, { ...manual, id: 'manual', anchor: { kind: 'project', time: 0.25 } }],
       motionRegions: [region],
       cursorTrack: {
         captureMode: VideoCursorCaptureMode.SEPARATE,
         skin: normalizeVideoProjectCursorSkin(undefined),
         samples: [
-          { id: 'cursor', time: 1, x: 50, y: 50, visible: true, sourceAnchor: event.sourceAnchor },
+          { id: 'cursor', time: 1, x: 50, y: 50, visible: true, sourceAnchor: cursorAnchor },
         ],
       },
       objectTracks: [
@@ -92,15 +106,19 @@ it('commits a swap once, retains selection/playhead and reconciles source anchor
   expect(after.selection).toEqual(before.selection);
   expect(after.currentTime).toBe(1.5);
   expect(after.project!.clips.map((clip) => clip.startTime)).toEqual([2, 0]);
-  expect(after.project!.actionEvents.find((item) => item.id === event.id)).toMatchObject({
-    time: 3,
-    sourceAnchor: event.sourceAnchor,
+  expect(after.project!.actionEvents.find((item) => item.id === event.id)).toEqual(event);
+  expect(
+    resolveVideoProjectActionOccurrences(after.project!).find((item) => item.eventId === event.id)
+      ?.time
+  ).toBe(3);
+  expect(after.project!.actionEvents.find((item) => item.id === 'manual')?.anchor).toEqual({
+    kind: 'project',
+    time: 0.25,
   });
-  expect(after.project!.actionEvents.find((item) => item.id === 'manual')?.time).toBe(0.25);
   expect(after.project!.motionRegions?.[0]).toMatchObject({ startTime: 2.75, duration: 1 });
   expect(after.project!.cursorTrack?.samples[0]).toMatchObject({
     time: 3,
-    sourceAnchor: event.sourceAnchor,
+    sourceAnchor: cursorAnchor,
   });
   expect(after.project!.objectTracks?.[0]?.samples[0]).toMatchObject({
     time: 3,

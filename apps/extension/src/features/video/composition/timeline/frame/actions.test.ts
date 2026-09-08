@@ -1,103 +1,137 @@
 import { describe, expect, it } from 'vitest';
+import { resolveVideoCompositionActions } from './actions';
+import { resolveVideoCompositionFrame } from './index';
+import {
+  createEmptyVideoProject,
+  createVideoProjectAsset,
+} from '../../../project/factories/creation';
+import { createVideoClipFromAsset } from '../../../project/factories/clip';
+import type { VideoProjectActionEvent } from '../../../project/types';
 
-import { getVideoCompositionActionDuration, resolveVideoCompositionActions } from './actions';
-
-function expectActionDuration(
-  event: { duration: number; kind: string; preset: string },
-  value: number
-) {
-  expect(getVideoCompositionActionDuration(event as never)).toBe(value);
-}
-
-function verifyExplicitAndPresetDurations() {
-  expectActionDuration({ duration: 2, kind: 'CLICK', preset: 'CLICK_RIPPLE' }, 2);
-  expectActionDuration({ duration: 0, kind: 'CLICK', preset: 'CLICK_RIPPLE' }, 0.7);
-  expectActionDuration({ duration: 0, kind: 'CALLOUT', preset: 'SPOTLIGHT' }, 1.1);
-}
-
-function verifyCompatibilityDurations() {
-  expectActionDuration({ duration: 0, kind: 'PAUSE', preset: 'DWELL_ZOOM' }, 1.3);
-  expectActionDuration({ duration: 0, kind: 'SCROLL', preset: 'SCROLL_EMPHASIS' }, 0.9);
-  expectActionDuration({ duration: 0, kind: 'CLICK', preset: 'NONE' }, 0.6);
-  expectActionDuration({ duration: 0, kind: 'PAUSE', preset: 'NONE' }, 0.5);
-}
-
-function createActiveActionEvent() {
+function manualEvent(): VideoProjectActionEvent {
   return {
-    data: {},
-    duration: 0.4,
-    id: 'active',
+    id: 'manual',
+    anchor: { kind: 'project', time: 1 },
     kind: 'CLICK',
-    label: 'Active',
+    label: 'Click',
     point: { x: 120, y: 160 },
-    preset: 'CLICK_RIPPLE',
-    time: 1,
-  } as const;
-}
-
-function verifyActiveActionResolution() {
-  const activeEvent = createActiveActionEvent();
-  const legacyScrollEvent = {
     data: {},
-    duration: 0,
-    id: 'legacy-scroll',
-    kind: 'SCROLL',
-    label: 'Legacy scroll',
-    point: null,
-    preset: 'SCROLL_EMPHASIS',
-    time: 1,
-  } as const;
-  const actions = resolveVideoCompositionActions(
+  };
+}
+
+function capturedProject() {
+  const project = createEmptyVideoProject('Source actions', 1000, 800);
+  const asset = createVideoProjectAsset(
+    'Source',
+    'VIDEO',
+    { kind: 'recording', recordingId: 'source' },
     {
-      actionEvents: [activeEvent, legacyScrollEvent],
-    } as never,
-    1.2
+      width: 1000,
+      height: 800,
+      duration: 4,
+      hasAudio: false,
+      audioPeaks: null,
+      mimeType: 'video/mp4',
+      size: 10,
+    }
   );
-
-  expect(actions).toHaveLength(1);
-  expect(actions[0]).toMatchObject({
-    duration: 0.4,
-    event: activeEvent,
-    start: 1,
-  });
-  expect(actions[0]?.progress).toBeCloseTo(0.5, 5);
+  const clip = createVideoClipFromAsset(project.tracks[0]!.id, asset, 1000, 800, 0);
+  if (clip.type !== 'VIDEO') throw new Error('Expected video');
+  clip.sourceInstanceId = 'placement';
+  project.assets = [asset];
+  project.clips = [clip];
+  project.duration = 4;
+  project.actionEvents = [
+    {
+      id: 'captured',
+      kind: 'CLICK',
+      data: {},
+      label: 'Click',
+      point: { x: 0.4, y: 0.6 },
+      anchor: {
+        kind: 'recording-source',
+        recordingId: 'source',
+        sourceInstanceId: 'placement',
+        sourceEventId: 'raw',
+        sourceTime: 2.1,
+      },
+      presentation: { offset: -0.3, duration: 1 },
+    },
+  ];
+  return { project, clip };
 }
 
-function verifyInactiveActionFiltering() {
-  const activeEvent = createActiveActionEvent();
-
-  expect(resolveVideoCompositionActions({ actionEvents: [activeEvent] } as never, 0.5)).toEqual([]);
-  expect(resolveVideoCompositionActions({ actionEvents: [activeEvent] } as never, 1.5)).toEqual([]);
-}
-
-function verifyHiddenActionLaneFiltering() {
-  expect(
-    resolveVideoCompositionActions(
+describe('composition action admission', () => {
+  it('uses effective presentation duration, clipped progress and half-open end for a manual action', () => {
+    const project = createEmptyVideoProject('Offset');
+    project.duration = 3;
+    project.actionEvents = [
       {
-        actionEvents: [createActiveActionEvent()],
-        utilityLanes: {
-          actions: { visible: false, locked: false },
-          camera: { visible: true, locked: false },
-        },
-      } as never,
-      1.2
-    )
-  ).toEqual([]);
-}
+        ...manualEvent(),
+        anchor: { kind: 'project', time: 0.2 },
+        presentation: { offset: -0.5, duration: 1 },
+      },
+    ];
+    expect(resolveVideoCompositionActions(project, 0)[0]?.progress).toBeCloseTo(0.3);
+    expect(resolveVideoCompositionActions(project, 0.69)).toHaveLength(1);
+    expect(resolveVideoCompositionActions(project, 0.7)).toEqual([]);
+    expect(project.actionEvents[0]?.anchor).toEqual({ kind: 'project', time: 0.2 });
+  });
 
-describe('video composition frame actions', () => {
-  it('covers explicit and preset-driven action durations', verifyExplicitAndPresetDurations);
-  it(
-    'keeps compatibility durations for legacy and neutral action presets',
-    verifyCompatibilityDurations
-  );
-  it(
-    'keeps legacy scroll events inert and returns only active composition actions',
-    verifyActiveActionResolution
-  );
-  it(
-    'filters composition actions outside the active playback window',
-    verifyInactiveActionFiltering
-  );
-  it('filters composition actions when the action lane is hidden', verifyHiddenActionLaneFiltering);
+  it('honors project defaults, event overrides and disabling independently of row visibility', () => {
+    const project = createEmptyVideoProject('Presentation');
+    project.duration = 3;
+    project.actionEvents = [manualEvent()];
+    project.utilityLanes = {
+      actions: { visible: false, locked: false },
+      camera: { visible: true, locked: false },
+    };
+    expect(resolveVideoCompositionActions(project, 1.2)[0]?.duration).toBe(0.7);
+    project.actionEvents[0]!.presentation = { duration: 1.4 };
+    expect(resolveVideoCompositionActions(project, 1.2)[0]?.duration).toBe(1.4);
+    project.actionEvents[0]!.presentation = { enabled: false };
+    expect(resolveVideoCompositionActions(project, 1.2)).toEqual([]);
+  });
+
+  it('routes captured accents only into their source layer and manual accents into the scene pass', () => {
+    const { project, clip } = capturedProject();
+    project.actionEvents.push({ ...manualEvent(), anchor: { kind: 'project', time: 2 } });
+    const frame = resolveVideoCompositionFrame(project, 2.2);
+    expect(frame.actions.map((action) => action.event.id)).toEqual(['manual']);
+    const layer = frame.visualLayers.find((item) => item.clipId === clip.id);
+    expect(layer?.kind).toBe('video');
+    if (layer?.kind !== 'video') throw new Error('Expected video layer');
+    expect(layer.actions?.map((action) => action.event.id)).toEqual(['captured']);
+    expect(layer.actions?.[0]?.point).toEqual({ x: 0.4, y: 0.6 });
+  });
+
+  it('keeps progress across a no-op split, including pre-offset pixels in the preceding fragment', () => {
+    const { project, clip } = capturedProject();
+    const before = resolveVideoCompositionActions(project, 1.9)[0]!;
+    project.clips = [
+      { ...clip, duration: 2, sourceDuration: 2 },
+      { ...clip, id: 'right', startTime: 2, duration: 2, sourceStart: 2, sourceDuration: 2 },
+    ];
+    const prefix = resolveVideoCompositionActions(project, 1.9)[0]!;
+    expect(prefix.progress).toBeCloseTo(before.progress);
+    expect(prefix.clipId).toBe(clip.id);
+    expect(prefix.occurrence.clipId).toBe('right');
+    expect(resolveVideoCompositionActions(project, 2)[0]?.clipId).toBe('right');
+    expect(resolveVideoCompositionActions(project, 2)[0]?.progress).toBeCloseTo(0.2);
+    expect(project.actionEvents).toHaveLength(1);
+    expect(project.actionEvents[0]?.anchor).toMatchObject({ sourceTime: 2.1 });
+  });
+
+  it('never paints before source admission or across a gap', () => {
+    const { project, clip } = capturedProject();
+    project.clips = [
+      { ...clip, duration: 2, sourceDuration: 2 },
+      { ...clip, id: 'right', startTime: 3, duration: 2, sourceStart: 2, sourceDuration: 2 },
+    ];
+    project.duration = 5;
+    expect(resolveVideoCompositionActions(project, 2.9)).toEqual([]);
+    expect(resolveVideoCompositionActions(project, 3)[0]?.progress).toBeCloseTo(0.2);
+    project.clips = [{ ...clip, duration: 2, sourceDuration: 2 }];
+    expect(resolveVideoCompositionActions(project, 1.9)).toEqual([]);
+  });
 });

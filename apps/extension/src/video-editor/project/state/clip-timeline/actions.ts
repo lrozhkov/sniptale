@@ -3,7 +3,7 @@ import { applyVideoProjectMutationPatch } from '../../../../features/video/proje
 import type { VideoEditorProjectState, VideoEditorProjectSliceSet } from '../contracts';
 import type { VideoEditorClipTimingResult } from '../../../contracts/commands/timeline';
 import { VideoEditorSelectionKind } from '../../../contracts/selection';
-import { applyProjectUpdate, detachLinkedClips, resolveEditableClipOperation } from '../helpers';
+import { applyProjectUpdate, areClipTracksEditable, detachLinkedClips } from '../helpers';
 import {
   closeProjectTrackGap,
   moveProjectClip,
@@ -67,7 +67,12 @@ function createSplitClipAction(set: VideoEditorStoreSet): VideoEditorProjectStat
       if (!state.project) return {};
       const result = splitProjectClipsAtTimeWithResult(state.project, clipId, splitTime);
       if (!result) return {};
-      const patch = applyProjectUpdate(state, () => result.project);
+      const patch = applyProjectUpdate(
+        state,
+        () => result.project,
+        result.trailingClipIdsBySourceId
+      );
+      if (state.selection.kind === VideoEditorSelectionKind.ACTION_OCCURRENCE) return patch;
       return {
         ...patch,
         selection: { kind: VideoEditorSelectionKind.CLIP, clipId: result.trailingClipId },
@@ -134,14 +139,13 @@ function createDeleteClipAction(set: VideoEditorStoreSet): VideoEditorProjectSta
         return {};
       }
 
-      const operation = resolveEditableClipOperation(project, clipId);
-      if (!operation) {
+      if (!areClipTracksEditable(project, [clipId])) {
         return {};
       }
 
       return applyProjectUpdate(state, () =>
         applyVideoProjectMutationPatch(project, {
-          clips: project.clips.filter((item) => !operation.clipIdSet.has(item.id)),
+          clips: project.clips.filter((item) => item.id !== clipId),
         })
       );
     });

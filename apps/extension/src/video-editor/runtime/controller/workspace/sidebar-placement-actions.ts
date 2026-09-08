@@ -7,8 +7,6 @@ type PlacementCommands = Pick<
   | 'startActionPointPlacement'
   | 'startMotionAreaPlacement'
   | 'startMotionFocusPlacement'
-  | 'startMotionPathStopAreaPlacement'
-  | 'startMotionPathStopPointPlacement'
 > &
   Pick<VideoEditorProjectActions, 'startObjectTrackAnchorPlacement'>;
 
@@ -18,8 +16,7 @@ export function createWorkspaceSidebarPlacementActions(store: PlacementCommands)
     onStartActionPointPlacement: store.startActionPointPlacement,
     onStartMotionAreaPlacement: store.startMotionAreaPlacement,
     onStartMotionFocusPlacement: store.startMotionFocusPlacement,
-    onStartMotionPathStopAreaPlacement: store.startMotionPathStopAreaPlacement,
-    onStartMotionPathStopPointPlacement: store.startMotionPathStopPointPlacement,
+
     onStartObjectTrackAnchorPlacement: store.startObjectTrackAnchorPlacement,
   };
 }

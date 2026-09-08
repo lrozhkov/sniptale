@@ -1,3 +1,5 @@
+import { getTimelineHistoryLayout } from '../effect-lanes/history-layout';
+import { ProjectTimelineCursorLane } from '../effect-lanes/cursor-lane';
 import { projectTimelinePoint, type TimelineProjection } from '../interaction-state/projection';
 import type { TimelinePreviewViewport } from '../../../contracts/timeline-preview';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
@@ -13,11 +15,7 @@ import {
   ProjectTimelineTrackLanes,
 } from './parts/index';
 import { buildProjectTimelineRulerMarkers } from './render-data';
-import {
-  EFFECT_LANE_ROW_HEIGHT,
-  RULER_HEIGHT,
-  TELEMETRY_LANE_ROW_HEIGHT,
-} from '../interaction-state/helpers';
+import { EFFECT_LANE_ROW_HEIGHT, RULER_HEIGHT } from '../interaction-state/helpers';
 import { ProjectTimelineHoverPreview, useTimelineHoverPreview } from './hover-preview';
 import { resolveTimelineTrackLayoutModel, type TimelineTrackLayoutModel } from '../tracks/layout';
 import { useTimelinePreviewViewportReporter } from './preview-viewport';
@@ -42,7 +40,7 @@ interface ProjectTimelineCanvasProps {
   playbackRange: VideoEditorPlaybackRange | null;
   pixelsPerSecond: number;
   project: VideoProject;
-  recordingTelemetry: RecordingTelemetryEntry | null;
+  recordingTelemetry: readonly RecordingTelemetryEntry[];
   selection: VideoEditorSelection;
   snapGuideTime: number | null;
   hoveredClipId: string | null;
@@ -81,10 +79,14 @@ interface ProjectTimelineCanvasProps {
   onSeekTime: (time: number) => void;
   onStepToNextFrame: () => void;
   onStepToPreviousFrame: () => void;
-  onSelectActionSegment: (actionEventId: string) => void;
+  onSelectHistorySpan?: (
+    target: import('../../../contracts/commands/timeline').VideoEditorTypingSpanTarget
+  ) => void;
+  onSelectActionOccurrence: (eventId: string, clipId: string | null) => void;
   onSelectClip: (clipId: string | null) => void;
   onSelectCursorSegment: (sampleId: string) => void;
-  onSelectMotionRegion: (motionRegionId: string) => void;
+  onSelectMotionRegion: (motionRegionId: string, part?: 'connection') => void;
+  onConnectMotionRegions?: ((fromRegionId: string, toRegionId: string) => void) | undefined;
   onSelectObjectTrack: (objectTrackId: string) => void;
   onSelectScene: () => void;
   onSelectTrack: (trackId: string) => void;
@@ -92,7 +94,6 @@ interface ProjectTimelineCanvasProps {
   onSetHoveredClipId: (clipId: string | null) => void;
   onTimelinePreviewViewportChange: (viewport: TimelinePreviewViewport) => void;
   onUnsupportedTimelineFileDrop: () => void;
-  onResizeActionEvent: (actionEventId: string, duration: number) => void;
   onResizeMotionRegion: (motionRegionId: string, startTime: number, duration: number) => void;
   onScroll: () => void;
 }
@@ -100,6 +101,7 @@ interface ProjectTimelineCanvasProps {
 type ProjectTimelineRulerMarker = ReturnType<typeof buildProjectTimelineRulerMarkers>[number];
 
 function resolveTimelinePlayheadHeight(params: {
+  recordingTelemetry: readonly RecordingTelemetryEntry[];
   cursorLaneVisible: boolean;
   project: VideoProject;
   telemetryLaneVisible: boolean;
@@ -107,9 +109,15 @@ function resolveTimelinePlayheadHeight(params: {
 }) {
   return (
     RULER_HEIGHT +
-    (params.telemetryLaneVisible ? TELEMETRY_LANE_ROW_HEIGHT : 0) +
+    (params.telemetryLaneVisible
+      ? getTimelineHistoryLayout(
+          params.project,
+          params.recordingTelemetry,
+          params.cursorLaneVisible
+        ).height
+      : 0) +
     params.trackLayoutModel.totalTrackHeight +
-    getEffectLaneCount(params.cursorLaneVisible, params.project) * EFFECT_LANE_ROW_HEIGHT
+    getEffectLaneCount(params.project) * EFFECT_LANE_ROW_HEIGHT
   );
 }
 
@@ -177,9 +185,13 @@ function useProjectTimelineCanvasModel(props: ProjectTimelineCanvasProps) {
     trackLayoutModel: props.trackLayoutModel,
     tracks: props.tracks,
   });
-  const cursorLaneVisible = props.cursorLaneVisible !== false && props.project.cursorTrack !== null;
-  const telemetryLaneVisible = props.telemetryLaneVisible && props.recordingTelemetry !== null;
+  const cursorLaneVisible =
+    props.telemetryLaneVisible &&
+    props.cursorLaneVisible !== false &&
+    props.project.cursorTrack !== null;
+  const telemetryLaneVisible = props.telemetryLaneVisible;
   const playheadHeight = resolveTimelinePlayheadHeight({
+    recordingTelemetry: props.recordingTelemetry,
     cursorLaneVisible,
     project: props.project,
     telemetryLaneVisible,
@@ -282,7 +294,24 @@ function ProjectTimelineCanvasContent(
         )}
         {props.telemetryLaneVisible ? (
           <ProjectTimelineTelemetryLane
+            cursorLaneVisible={props.cursorLaneVisible}
+            cursorRow={
+              props.cursorLaneVisible ? (
+                <ProjectTimelineCursorLane
+                  embedded
+                  project={props.project}
+                  pixelsPerSecond={props.pixelsPerSecond}
+                  projection={props.projection}
+                  selectedEffectSelection={props.selectedEffectSelection}
+                  onBeginEffectInteraction={props.onBeginEffectInteraction}
+                />
+              ) : null
+            }
+            onBeginEffectInteraction={props.onBeginEffectInteraction}
             onSeek={props.onSeekTime}
+            onSelectHistorySpan={props.onSelectHistorySpan}
+            onSelectActionOccurrence={props.onSelectActionOccurrence}
+            selection={props.selection}
             pixelsPerSecond={props.pixelsPerSecond}
             projection={props.projection}
             project={props.project}
@@ -343,9 +372,9 @@ function createTimelineFileDropHandler(props: ProjectTimelineCanvasProps) {
   };
 }
 
-function getEffectLaneCount(cursorLaneVisible: boolean, project: VideoProject): number {
+function getEffectLaneCount(project: VideoProject): number {
   const rows = getTimelineUtilityRowPresence(project);
-  return Number(rows.actions) + Number(rows.motion) + Number(cursorLaneVisible);
+  return Number(rows.motion);
 }
 
 function focusTimelineWorkingSurface(event: React.PointerEvent<HTMLDivElement>): void {

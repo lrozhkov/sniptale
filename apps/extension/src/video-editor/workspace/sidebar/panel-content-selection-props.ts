@@ -7,6 +7,8 @@ export function createSelectionPanelOptionalUpdateProps(
   props: WorkspaceSidebarSelectionPanelSourceProps
 ) {
   return {
+    ...(props.onApplyCameraLayout ? { onApplyCameraLayout: props.onApplyCameraLayout } : {}),
+    ...(props.onSplitCameraInterval ? { onSplitCameraInterval: props.onSplitCameraInterval } : {}),
     ...(props.onApplyMediaClipVisualsToTrack
       ? { onApplyMediaClipVisualsToTrack: props.onApplyMediaClipVisualsToTrack }
       : {}),
@@ -45,8 +47,6 @@ export function createSelectionPanelOptionalPlacementProps(
   | 'onStartActionPointPlacement'
   | 'onStartMotionAreaPlacement'
   | 'onStartMotionFocusPlacement'
-  | 'onStartMotionPathStopAreaPlacement'
-  | 'onStartMotionPathStopPointPlacement'
   | 'onStartObjectTrackAnchorPlacement'
 > {
   return {
@@ -54,10 +54,7 @@ export function createSelectionPanelOptionalPlacementProps(
     onStartActionPointPlacement: props.onStartActionPointPlacement ?? (() => undefined),
     onStartMotionAreaPlacement: props.onStartMotionAreaPlacement ?? (() => undefined),
     onStartMotionFocusPlacement: props.onStartMotionFocusPlacement ?? (() => undefined),
-    onStartMotionPathStopAreaPlacement:
-      props.onStartMotionPathStopAreaPlacement ?? (() => undefined),
-    onStartMotionPathStopPointPlacement:
-      props.onStartMotionPathStopPointPlacement ?? (() => undefined),
+
     onStartObjectTrackAnchorPlacement: props.onStartObjectTrackAnchorPlacement ?? (() => undefined),
   };
 }
@@ -83,14 +80,15 @@ export function createSelectionPanelOptionalProps(
   props: WorkspaceSidebarSelectionPanelSourceProps
 ): Pick<
   WorkspaceSidebarSelectionPanelProps,
+  | 'onApplyTypingCompression'
   | 'onAddActionEvent'
   | 'onAddMotionRegion'
   | 'onDeleteActionEvent'
   | 'onDeleteCursorSample'
   | 'onDeleteMotionRegion'
   | 'onEnableCursorTrack'
-  | 'onGenerateMotionPathFromCursor'
   | 'onInsertCursorSample'
+  | 'onUpdateActionPresentation'
   | 'onUpdateActionEventDetails'
   | 'onUpdateCursorSampleInterpolation'
   | 'onUpdateCursorSampleVisibility'
@@ -101,14 +99,20 @@ export function createSelectionPanelOptionalProps(
 > &
   Partial<Pick<WorkspaceSidebarSelectionPanelProps, 'onDeleteTrack'>> {
   return {
+    ...(props.onApplyTypingCompression
+      ? { onApplyTypingCompression: props.onApplyTypingCompression }
+      : {}),
     onAddActionEvent: props.onAddActionEvent ?? (() => undefined),
     onAddMotionRegion: props.onAddMotionRegion ?? (() => undefined),
     onDeleteActionEvent: props.onDeleteActionEvent ?? (() => undefined),
     onDeleteCursorSample: props.onDeleteCursorSample ?? (() => undefined),
     onDeleteMotionRegion: props.onDeleteMotionRegion ?? (() => undefined),
     onEnableCursorTrack: props.onEnableCursorTrack ?? (() => undefined),
-    onGenerateMotionPathFromCursor: props.onGenerateMotionPathFromCursor ?? (() => undefined),
+
     onInsertCursorSample: props.onInsertCursorSample ?? (() => undefined),
+    ...(props.onUpdateActionPresentation
+      ? { onUpdateActionPresentation: props.onUpdateActionPresentation }
+      : {}),
     onUpdateActionEventDetails: props.onUpdateActionEventDetails ?? (() => undefined),
     onUpdateCursorSampleInterpolation: props.onUpdateCursorSampleInterpolation ?? (() => undefined),
     onUpdateCursorSampleVisibility: props.onUpdateCursorSampleVisibility ?? (() => undefined),

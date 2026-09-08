@@ -20,7 +20,7 @@ export function createPlaybackLatestState(
   placementMode: VideoEditorPlacementMode | null,
   projectHistoryTransactionActive: boolean,
   selectedClipId: string | null,
-  selectedActionEvent: PlaybackLatestState['selectedActionEvent'],
+  selectedActionOccurrence: PlaybackLatestState['selectedActionOccurrence'],
   selectedMotionRegion: PlaybackLatestState['selectedMotionRegion']
 ): PlaybackLatestState {
   return {
@@ -31,7 +31,7 @@ export function createPlaybackLatestState(
     project,
     projectHistoryTransactionActive,
     selection,
-    selectedActionEvent,
+    selectedActionOccurrence,
     selectedClipId,
     selectedMotionRegion,
   };

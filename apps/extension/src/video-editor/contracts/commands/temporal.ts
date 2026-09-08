@@ -23,6 +23,9 @@ export interface VideoEditorTemporalActions {
   updateCursorSampleInterpolation: (sampleId: string, interpolation: VideoTemporalEasing) => void;
   updateCursorSampleSkinOverride: (sampleId: string, patch: VideoEditorCursorSkinPatch) => void;
   deleteActionEvent: (actionEventId: string) => void;
+  updateActionPresentation: (
+    patch: Partial<import('../../../features/video/project/types').VideoProjectActionPresentation>
+  ) => void;
   updateActionEventDetails: (actionEventId: string, patch: VideoEditorActionEventPatch) => void;
   updateMotionRegion: (motionRegionId: string, patch: VideoEditorMotionRegionPatch) => void;
   deleteMotionRegion: (motionRegionId: string) => void;

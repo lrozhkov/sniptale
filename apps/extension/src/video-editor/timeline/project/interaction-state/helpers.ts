@@ -5,7 +5,6 @@ export { formatPreciseTime, formatTime };
 
 export const TRACK_ROW_HEIGHT = 62;
 export const EFFECT_LANE_ROW_HEIGHT = 46;
-export const TELEMETRY_LANE_ROW_HEIGHT = 42;
 export const RULER_HEIGHT = 30;
 
 export function formatTimelineRulerLabel(value: number, detailed = false): string {

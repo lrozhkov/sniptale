@@ -71,10 +71,17 @@ function createSelectionBodyStateProps(props: WorkspaceSidebarSelectionPanelProp
     ...(props.gridSettings ? { gridSettings: props.gridSettings } : {}),
     project: props.project,
     selection: props.selection,
+    canSplitCameraInterval: props.canSplitCameraInterval ?? false,
     selectedClip: props.selectedClip,
     selectedTransition: props.selectedTransition,
     selectedCursorSample: props.selectedCursorSample,
-    selectedActionEvent: props.selectedActionEvent,
+    ...(props.currentTime === undefined ? {} : { currentTime: props.currentTime }),
+    ...(props.typingProject ? { typingProject: props.typingProject } : {}),
+    ...(props.recordingTelemetry ? { recordingTelemetry: props.recordingTelemetry } : {}),
+    ...(props.onApplyTypingCompression
+      ? { onApplyTypingCompression: props.onApplyTypingCompression }
+      : {}),
+    selectedActionOccurrence: props.selectedActionOccurrence,
     selectedMotionRegion: props.selectedMotionRegion,
     ...(props.selectedObjectTrack === undefined
       ? {}
@@ -101,9 +108,12 @@ function createSelectionBodyActionProps(props: WorkspaceSidebarSelectionPanelPro
     onAddMotionRegion: props.onAddMotionRegion,
     onUpdateCursorSampleInterpolation: props.onUpdateCursorSampleInterpolation,
     onUpdateCursorSampleVisibility: props.onUpdateCursorSampleVisibility,
+    ...(props.onUpdateActionPresentation
+      ? { onUpdateActionPresentation: props.onUpdateActionPresentation }
+      : {}),
     onUpdateActionEventDetails: props.onUpdateActionEventDetails,
     onDeleteMotionRegion: props.onDeleteMotionRegion,
-    onGenerateMotionPathFromCursor: props.onGenerateMotionPathFromCursor ?? (() => undefined),
+
     onStartActionPointPlacement: props.onStartActionPointPlacement,
     onStartMotionAreaPlacement: props.onStartMotionAreaPlacement,
     onStartMotionFocusPlacement: props.onStartMotionFocusPlacement,
@@ -117,6 +127,8 @@ function createSelectionBodyActionProps(props: WorkspaceSidebarSelectionPanelPro
     ...(props.onTrimClipStart ? { onTrimClipStart: props.onTrimClipStart } : {}),
     ...(props.onTrimClipEnd ? { onTrimClipEnd: props.onTrimClipEnd } : {}),
     onDetachClipGroup: props.onDetachClipGroup,
+    ...(props.onApplyCameraLayout ? { onApplyCameraLayout: props.onApplyCameraLayout } : {}),
+    ...(props.onSplitCameraInterval ? { onSplitCameraInterval: props.onSplitCameraInterval } : {}),
     onUpdateClipTransform: props.onUpdateClipTransform,
     onUpdateClipMuted: props.onUpdateClipMuted,
     onUpdateClipVolume: props.onUpdateClipVolume,
@@ -160,7 +172,12 @@ function createSelectionPanelStateProps(
   | 'placementMode'
   | 'project'
   | 'recentColors'
-  | 'selectedActionEvent'
+  | 'currentTime'
+  | 'typingProject'
+  | 'recordingTelemetry'
+  | 'onApplyTypingCompression'
+  | 'selectedActionOccurrence'
+  | 'canSplitCameraInterval'
   | 'selectedClip'
   | 'selectedCursorSample'
   | 'selectedMotionRegion'
@@ -174,8 +191,15 @@ function createSelectionPanelStateProps(
     selection: props.selection ?? createSceneSelection(),
     project: props.project,
     recentColors: props.recentColors ?? [],
+    canSplitCameraInterval: props.canSplitCameraInterval ?? false,
     selectedClip: props.selectedClip,
-    selectedActionEvent: props.selectedActionEvent ?? null,
+    ...(props.currentTime === undefined ? {} : { currentTime: props.currentTime }),
+    ...(props.typingProject ? { typingProject: props.typingProject } : {}),
+    ...(props.recordingTelemetry ? { recordingTelemetry: props.recordingTelemetry } : {}),
+    ...(props.onApplyTypingCompression
+      ? { onApplyTypingCompression: props.onApplyTypingCompression }
+      : {}),
+    selectedActionOccurrence: props.selectedActionOccurrence ?? null,
     selectedCursorSample: props.selectedCursorSample ?? null,
     selectedMotionRegion: props.selectedMotionRegion ?? null,
     selectedObjectTrack: props.selectedObjectTrack ?? null,
@@ -205,6 +229,8 @@ function createSelectionPanelUpdateProps(
   | 'onUpdateClipFades'
   | 'onUpdateClipMuted'
   | 'onUpdateClipPlaybackRate'
+  | 'onApplyCameraLayout'
+  | 'onSplitCameraInterval'
   | 'onUpdateClipTransform'
   | 'onUpdateClipVolume'
   | 'onUpdateCursorSampleSkinOverride'

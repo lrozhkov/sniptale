@@ -1,6 +1,5 @@
 import { translate } from '../../../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { VideoMotionCameraMode } from '../../../../../features/video/project/types';
 import { getVideoProjectUtilityLanes } from '../../../../../features/video/project/utility-lanes';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { InspectorGroupedPanel } from '../grouped-inspector';
@@ -9,10 +8,52 @@ import {
   MotionBehaviorFields,
   MotionCameraFields,
   MotionOverview,
-  MotionPathFields,
   MotionTimingFields,
 } from '../motion/content';
 import { PANEL_SECTION_CLASS_NAME } from '../shared/panel';
+import { VideoEditorSelectionKind } from '../../../../contracts/selection';
+import { resolveMotionConnectionSource } from '../../../../../features/video/project/motion';
+import { SelectInput } from '../shared/controls';
+import { getTemporalEasingOptions } from '../effect-controls/options';
+
+export function InspectMotionConnectionPanel(props: WorkspaceSidebarSelectionPanelProps) {
+  const selection = props.selection;
+  const destination =
+    selection.kind === VideoEditorSelectionKind.MOTION_CONNECTION
+      ? props.project.motionRegions?.find((region) => region.id === selection.motionRegionId)
+      : null;
+  if (
+    !destination?.incomingConnection ||
+    !resolveMotionConnectionSource(props.project, destination)
+  )
+    return <SelectionEmptyState />;
+  const connection = destination.incomingConnection;
+  const locked = getVideoProjectUtilityLanes(props.project).camera.locked;
+  return (
+    <section className={PANEL_SECTION_CLASS_NAME}>
+      <MotionInspectorFieldset locked={locked}>
+        <SelectInput
+          label={translate('videoEditor.sidebar.motionEasingLabel')}
+          value={connection.easing}
+          options={getTemporalEasingOptions()}
+          onChange={(easing) =>
+            props.onUpdateMotionRegion(destination.id, {
+              incomingConnection: { ...connection, easing },
+            })
+          }
+        />
+        <ProductActionButton
+          compact
+          tone="danger"
+          className="mt-4 w-full"
+          onClick={() => props.onUpdateMotionRegion(destination.id, { incomingConnection: null })}
+        >
+          {translate('videoEditor.timeline.disconnectFraming')}
+        </ProductActionButton>
+      </MotionInspectorFieldset>
+    </section>
+  );
+}
 
 export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
   const motionRegion = props.selectedMotionRegion;
@@ -52,16 +93,6 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
                 <MotionTimingFields motionRegion={motionRegion} panel={props} />
               </MotionInspectorFieldset>
             ),
-          },
-          {
-            id: 'path',
-            label: translate('videoEditor.sidebar.inspectorGroupPath'),
-            content: (
-              <MotionInspectorFieldset locked={isLocked}>
-                <MotionPathFields motionRegion={motionRegion} panel={props} />
-              </MotionInspectorFieldset>
-            ),
-            visible: motionRegion.cameraMode === VideoMotionCameraMode.PATH,
           },
           {
             id: 'behavior',
