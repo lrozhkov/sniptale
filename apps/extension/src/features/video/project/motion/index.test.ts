@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { createEmptyVideoProject } from '../factories/creation';
 import { hydrateVideoProject } from '../hydration';
 import { createVideoProjectMotionRegion, normalizeVideoProjectMotionRegion } from './index';
-import { createMotionFocusAreaFromPointScale } from './index';
+import { createMotionFocusAreaFromPointScale, resolveMotionConnectionSource } from './index';
 import { resolveMotionScale } from './normalization';
 
 it('accepts positive zoom-out scales without admitting zero or invalid values', () => {
@@ -21,6 +21,25 @@ import {
   VideoProjectActionPreset,
   VideoTemporalEasing,
 } from '../types/index';
+
+it.each([
+  [VideoMotionFocusMode.MANUAL, VideoMotionFocusMode.ACTION],
+  [VideoMotionFocusMode.ACTION, VideoMotionFocusMode.MANUAL],
+  [VideoMotionFocusMode.ACTION, VideoMotionFocusMode.ACTION],
+])('admits a framing connection from %s to %s', (fromMode, toMode) => {
+  const project = createEmptyVideoProject();
+  project.duration = 6;
+  const first = { ...createVideoProjectMotionRegion(project, 0), duration: 1, focusMode: fromMode };
+  const second = {
+    ...createVideoProjectMotionRegion(project, 2),
+    duration: 1,
+    focusMode: toMode,
+    incomingConnection: { fromRegionId: first.id, easing: VideoTemporalEasing.LINEAR },
+  };
+  project.motionRegions = [first, second];
+  expect(resolveMotionConnectionSource(project, second)).toBe(first);
+  expect(resolveMotionConnectionSource(project, { ...second, startTime: 0.5 })).toBeNull();
+});
 
 it('preserves authored framing connections through hydration and rejects malformed settings', () => {
   const project = createEmptyVideoProject();

@@ -46,7 +46,7 @@ export function resolveMotionConnectionSource(
   if (
     destination.duration <= 0 ||
     !destination.incomingConnection ||
-    !isFixedMotionState(destination)
+    !isConnectableMotionState(destination)
   )
     return null;
   let previous: VideoProjectMotionRegion | null = null;
@@ -70,15 +70,16 @@ export function resolveMotionConnectionSource(
   return previous &&
     matchesSource &&
     previous.startTime + previous.duration <= destination.startTime &&
-    isFixedMotionState(previous)
+    isConnectableMotionState(previous)
     ? previous
     : null;
 }
 
-function isFixedMotionState(region: VideoProjectMotionRegion): boolean {
+function isConnectableMotionState(region: VideoProjectMotionRegion): boolean {
   return (
     region.focusMode === VideoMotionFocusMode.MANUAL ||
-    region.focusMode === VideoMotionFocusMode.MANUAL_AREA
+    region.focusMode === VideoMotionFocusMode.MANUAL_AREA ||
+    region.focusMode === VideoMotionFocusMode.ACTION
   );
 }
 

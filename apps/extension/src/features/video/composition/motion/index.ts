@@ -202,8 +202,8 @@ function resolveConnectingCamera(
       destination.incomingConnection.easing
     );
     const focusPoint = lerpPoint(
-      resolveMotionFocusPoint(params.project, source, null, params.currentTime),
-      resolveMotionFocusPoint(params.project, destination, null, params.currentTime),
+      resolveMotionFocusPoint(params.project, source, null, start),
+      resolveMotionFocusPoint(params.project, destination, null, destination.startTime),
       progress
     );
     const scale = lerpNumber(
