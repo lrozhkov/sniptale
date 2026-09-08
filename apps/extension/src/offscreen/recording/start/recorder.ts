@@ -215,7 +215,16 @@ export async function finalizeRecordingBootstrap(params: {
     cancelStartingRecorder.cancel
   );
   params.durationTracker.reset();
-  artifactSession.start();
+  // Start prepared sources together, before the primary encoder produces its first packet.
+  try {
+    startActiveSidecarRecorders(cancelStartingRecorder.failUnexpectedly);
+  } catch (error) {
+    cancelStartingRecorder.failUnexpectedly(
+      error instanceof Error ? error : new Error(String(error))
+    );
+    return;
+  }
+  if (!cancelStartingRecorder.isTerminal()) artifactSession.start();
 }
 
 function notifyRecordingStarted(params: {
@@ -348,7 +357,7 @@ function attachRecorderLifecycle(params: {
   videoStream: MediaStream;
   webcamSettings: ReturnType<typeof getActiveSidecarWebcamSettings>;
   transformFailure: Promise<never> | null;
-}): { cancel: () => void; failUnexpectedly: (error: Error) => void } {
+}): { cancel: () => void; failUnexpectedly: (error: Error) => void; isTerminal: () => boolean } {
   const { artifactSession, recordingId } = params;
   let phase: 'starting' | 'recording' | 'terminal' = 'starting';
 
@@ -405,8 +414,6 @@ function attachRecorderLifecycle(params: {
     onFailure: failUnexpectedly,
     onStart: () => {
       if (phase !== 'starting') return;
-      startActiveSidecarRecorders(failUnexpectedly);
-      if (isTerminal()) return;
       recordingContext.activateRecorder(artifactSession);
       phase = 'recording';
       params.durationTracker.startSegment();
@@ -464,6 +471,7 @@ function attachRecorderLifecycle(params: {
       void artifactSession.abort().catch(() => undefined);
     },
     failUnexpectedly,
+    isTerminal,
   };
 }
 

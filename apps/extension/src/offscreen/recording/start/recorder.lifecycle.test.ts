@@ -219,6 +219,20 @@ beforeEach(() => {
 });
 
 describe('primary recording artifact lifecycle', () => {
+  it('starts prepared sidecars before waiting for the first encoded primary frame', async () => {
+    const fixture = await bootstrapControllable();
+    expect(startSidecarsMock).toHaveBeenCalledOnce();
+    expect(startSidecarsMock.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(fixture.artifactSession.start).mock.invocationCallOrder[0]!
+    );
+    expect(recordingContext.lifecycleState).toBe('starting');
+    expect(sendRuntimeMessageMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ type: 'OFFSCREEN_RECORDING_STARTED' }),
+      })
+    );
+  });
+
   it('publishes started only after the artifact recorder starts', async () => {
     await bootstrap();
     expect(recordingContext.lifecycleState).toBe('recording');
@@ -255,7 +269,23 @@ describe('primary recording artifact lifecycle', () => {
     fixture.getCallbacks().onStart?.();
 
     expect(recordingContext.lifecycleState).toBe('starting');
+    expect(fixture.artifactSession.start).not.toHaveBeenCalled();
     expect(cleanupResourcesMock).toHaveBeenCalledOnce();
+    expect(sendRuntimeMessageMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ type: 'OFFSCREEN_RECORDING_STARTED' }),
+      })
+    );
+  });
+
+  it('cleans up a thrown sidecar start failure before starting the primary', async () => {
+    startSidecarsMock.mockImplementationOnce(() => {
+      throw new Error('camera start rejected');
+    });
+    const fixture = await bootstrapControllable();
+    expect(fixture.artifactSession.start).not.toHaveBeenCalled();
+    expect(cleanupResourcesMock).toHaveBeenCalledOnce();
+    fixture.getCallbacks().onStart?.();
     expect(sendRuntimeMessageMock).not.toHaveBeenCalledWith(
       expect.objectContaining({
         payload: expect.objectContaining({ type: 'OFFSCREEN_RECORDING_STARTED' }),
