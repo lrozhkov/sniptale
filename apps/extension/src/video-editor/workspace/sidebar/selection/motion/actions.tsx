@@ -3,7 +3,7 @@ import {
   getMotionFocusAreaCenter,
 } from '../../../../../features/video/project/motion/index';
 import { translate } from '../../../../../platform/i18n';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorActionButton } from '../shared/actions';
 import { VideoMotionFocusMode } from '../../../../../features/video/project/types';
 import { resolveVideoProjectActionOccurrences } from '../../../../../features/video/project/action-occurrences';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
@@ -77,7 +77,7 @@ function QuickActionButton(props: {
   onClick: () => void;
 }) {
   return (
-    <ProductActionButton
+    <InspectorActionButton
       compact
       tone="toggle"
       active={props.active}
@@ -87,7 +87,7 @@ function QuickActionButton(props: {
       onClick={props.onClick}
     >
       {props.label}
-    </ProductActionButton>
+    </InspectorActionButton>
   );
 }
 

@@ -1,6 +1,6 @@
 import { useContext } from 'react';
 import { Scan } from 'lucide-react';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorActionButton } from '../shared/actions';
 import {
   activeCameraPosition,
   type CameraPositionEdit,
@@ -101,7 +101,7 @@ export function CameraAppearanceControls(props: {
               onChange={(zoom) => change({ ...value, zoom: zoom / 100 })}
             />
           </div>
-          <ProductActionButton
+          <InspectorActionButton
             compact
             tone="secondary"
             className="h-7! min-h-7! w-7! rounded-md! p-0! shrink-0"
@@ -111,7 +111,7 @@ export function CameraAppearanceControls(props: {
             onClick={() => change({ ...value, panX: 0, panY: 0 })}
           >
             <Scan size={14} />
-          </ProductActionButton>
+          </InspectorActionButton>
         </div>
       </InspectorDetails>
     </div>

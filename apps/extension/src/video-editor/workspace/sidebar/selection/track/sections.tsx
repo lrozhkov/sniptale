@@ -3,7 +3,7 @@ import { VideoTrackKind } from '../../../../../features/video/project/types';
 import { ArrowUp, ArrowDown } from 'lucide-react';
 import { useWorkspaceTrackPresentation } from '../../../surface/track-presentation';
 import { translate } from '../../../../../platform/i18n';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorActionButton } from '../shared/actions';
 import { TextField, NumericRow } from '../../../../../ui/compact-inspector-controls';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { ToggleField } from '../shared/controls';
@@ -56,14 +56,16 @@ export function TrackPanelDeleteButton(props: {
   }
 
   return (
-    <ProductActionButton
+    <InspectorActionButton
       compact
       tone="danger"
+      separated
+      disabled={!props.onDeleteTrack}
       onClick={() => props.onDeleteTrack?.(props.trackId)}
       className="mt-3"
     >
       {translate('videoEditor.timeline.deleteTrackTitle')}
-    </ProductActionButton>
+    </InspectorActionButton>
   );
 }
 
@@ -85,7 +87,7 @@ export function TrackLayoutFields({
           {translate('videoEditor.app.trackOrder')}
         </span>
         <div className="flex gap-1">
-          <ProductActionButton
+          <InspectorActionButton
             compact
             tone="secondary"
             className="!h-8 !min-w-8 !px-1.5"
@@ -94,8 +96,8 @@ export function TrackLayoutFields({
           >
             <ArrowUp size={14} aria-hidden="true" />
             <span className="sr-only">{translate('videoEditor.timeline.moveTrackUp')}</span>
-          </ProductActionButton>
-          <ProductActionButton
+          </InspectorActionButton>
+          <InspectorActionButton
             compact
             tone="secondary"
             className="!h-8 !min-w-8 !px-1.5"
@@ -104,7 +106,7 @@ export function TrackLayoutFields({
           >
             <ArrowDown size={14} aria-hidden="true" />
             <span className="sr-only">{translate('videoEditor.timeline.moveTrackDown')}</span>
-          </ProductActionButton>
+          </InspectorActionButton>
         </div>
       </div>
       <InspectorDetails label={translate('videoEditor.sidebar.inspectorDisplay')}>

@@ -1,3 +1,4 @@
+import './inspector.css';
 import { InspectorSelectionFamilyContext } from './grouped-inspector/presentation';
 import { InspectorDetails } from './shared/details';
 import { translate } from '../../../../platform/i18n';
@@ -31,7 +32,10 @@ export function WorkspaceSidebarInspectPanel(props: WorkspaceSidebarSelectionPan
         : props.selection.kind;
   return (
     <InspectorSelectionFamilyContext.Provider value={family}>
-      <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-3">
+      <div
+        data-ui="video-editor.inspector.content"
+        className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 py-3"
+      >
         <div className={PANEL_STACK_CLASS_NAME}>
           <SelectionBody {...props} />
         </div>

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorActionButton } from '../shared/actions';
 import { createSceneGradientBackground } from '../../../../../features/video/project/scene/background-gradient';
 import { translate } from '../../../../../platform/i18n';
 import { VideoSceneBackgroundKind } from '../../../../../features/video/project/types';
@@ -79,9 +79,9 @@ function ImageBackgroundEditor(props: SceneBackgroundFieldProps) {
               }
             }}
           />
-          <ProductActionButton disabled={busy} onClick={() => input.current?.click()}>
+          <InspectorActionButton separated disabled={busy} onClick={() => input.current?.click()}>
             {translate('videoEditor.sidebar.sceneBackgroundImageUpload')}
-          </ProductActionButton>
+          </InspectorActionButton>
         </>
       )}
       {props.imageAssets.length === 0 && (

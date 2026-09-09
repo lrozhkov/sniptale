@@ -1,7 +1,7 @@
 import { getMediaFramingPresets } from '../../../../../features/video/project/factories/framing-presets';
 import { InspectorDetails } from '../shared/details';
 import { translate } from '../../../../../platform/i18n';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorActionButton } from '../shared/actions';
 import { isVideoClip } from '../../../../../features/video/project/timeline';
 import {
   VideoProjectClipType,
@@ -178,15 +178,16 @@ export function MediaApplyVisualsButton(
 ) {
   return (
     <div className="flex justify-end">
-      <ProductActionButton
+      <InspectorActionButton
         compact
         tone="secondary"
         disabled={props.disabled || !props.onApplyMediaClipVisualsToTrack}
         onClick={() => props.onApplyMediaClipVisualsToTrack?.(props.clip.id)}
-        className="self-end whitespace-nowrap"
+        separated
+        className="self-end"
       >
         {translate('videoEditor.sidebar.fitApplyToTrackLabel')}
-      </ProductActionButton>
+      </InspectorActionButton>
     </div>
   );
 }
@@ -223,7 +224,7 @@ function MediaFramingPresets(props: MediaFrameControlsProps) {
             (key) => Math.abs(clip.transform[key] - transform[key]) < 0.5
           );
         return (
-          <ProductActionButton
+          <InspectorActionButton
             key={preset.id}
             compact
             tone="toggle"
@@ -258,7 +259,7 @@ function MediaFramingPresets(props: MediaFrameControlsProps) {
               </svg>
             </svg>
             <span className="max-w-full truncate text-[11px]">{labels[index]}</span>
-          </ProductActionButton>
+          </InspectorActionButton>
         );
       })}
     </div>

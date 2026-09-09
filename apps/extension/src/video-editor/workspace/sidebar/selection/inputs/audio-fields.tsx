@@ -1,6 +1,6 @@
 import { InspectorDetails } from '../shared/details';
 import { Link2, Unlink } from 'lucide-react';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorActionButton } from '../shared/actions';
 import { translate } from '../../../../../platform/i18n';
 import {
   areProjectClipsEditable,
@@ -85,7 +85,7 @@ export function renderAudioFields(
             >
               {companions.map((item) => item.name).join(', ')}
             </span>
-            <ProductActionButton
+            <InspectorActionButton
               tone="secondary"
               compact
               title={translate('videoEditor.sidebar.detachButton')}
@@ -94,7 +94,7 @@ export function renderAudioFields(
             >
               <Unlink size={14} aria-hidden="true" />
               {translate('videoEditor.sidebar.detachButton')}
-            </ProductActionButton>
+            </InspectorActionButton>
           </div>
         </div>
       ) : null}

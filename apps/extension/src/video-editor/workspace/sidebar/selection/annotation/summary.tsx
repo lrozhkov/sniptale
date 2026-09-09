@@ -1,5 +1,5 @@
 import { translate } from '../../../../../platform/i18n';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorActionButton } from '../shared/actions';
 import {
   createAnnotationTemplateStyle,
   getAnnotationMotionPreset,
@@ -164,7 +164,7 @@ function QuickActionGroup(props: {
       <p className={PANEL_META_CLASS_NAME}>{props.label}</p>
       <div className="flex flex-wrap gap-2">
         {props.actions.map((action) => (
-          <ProductActionButton
+          <InspectorActionButton
             key={action.key}
             compact
             tone="secondary"
@@ -172,7 +172,7 @@ function QuickActionGroup(props: {
             onClick={action.onClick}
           >
             {action.label}
-          </ProductActionButton>
+          </InspectorActionButton>
         ))}
       </div>
     </div>

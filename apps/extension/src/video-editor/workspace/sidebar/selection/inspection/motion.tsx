@@ -1,5 +1,5 @@
 import { translate } from '../../../../../platform/i18n';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorActionButton } from '../shared/actions';
 import { getVideoProjectUtilityLanes } from '../../../../../features/video/project/utility-lanes';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { InspectorGroupedPanel } from '../grouped-inspector';
@@ -42,14 +42,15 @@ export function InspectMotionConnectionPanel(props: WorkspaceSidebarSelectionPan
             })
           }
         />
-        <ProductActionButton
+        <InspectorActionButton
           compact
           tone="danger"
+          separated
           className="mt-3"
           onClick={() => props.onUpdateMotionRegion(destination.id, { incomingConnection: null })}
         >
           {translate('videoEditor.timeline.disconnectFraming')}
-        </ProductActionButton>
+        </InspectorActionButton>
       </MotionInspectorFieldset>
     </section>
   );
@@ -109,15 +110,16 @@ export function InspectMotionPanel(props: WorkspaceSidebarSelectionPanelProps) {
           },
         ]}
       />
-      <ProductActionButton
+      <InspectorActionButton
         compact
         disabled={isLocked}
         tone="danger"
+        separated
         onClick={() => props.onDeleteMotionRegion(motionRegion.id)}
         className="mt-3"
       >
         {translate('common.actions.delete')}
-      </ProductActionButton>
+      </InspectorActionButton>
     </section>
   );
 }

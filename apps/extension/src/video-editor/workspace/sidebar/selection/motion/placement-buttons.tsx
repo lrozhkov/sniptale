@@ -1,4 +1,4 @@
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorActionButton } from '../shared/actions';
 
 export function MotionPlacementButtonGroup(props: {
   isPickingOnStage: boolean;
@@ -8,8 +8,8 @@ export function MotionPlacementButtonGroup(props: {
   resetLabel: string;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1">
-      <ProductActionButton
+    <div data-ui="video-editor.inspector.actions">
+      <InspectorActionButton
         compact
         tone="toggle"
         active={props.isPickingOnStage}
@@ -17,10 +17,10 @@ export function MotionPlacementButtonGroup(props: {
         onClick={props.onPick}
       >
         {props.pickLabel}
-      </ProductActionButton>
-      <ProductActionButton compact tone="secondary" onClick={props.onReset}>
+      </InspectorActionButton>
+      <InspectorActionButton compact tone="secondary" onClick={props.onReset}>
         {props.resetLabel}
-      </ProductActionButton>
+      </InspectorActionButton>
     </div>
   );
 }

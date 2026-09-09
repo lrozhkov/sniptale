@@ -61,8 +61,6 @@ function createLegacyAnnotationGroups(
   props: AnnotationFieldsSectionProps,
   usesTargetGroup: boolean
 ) {
-  const legacyMeta = translate('videoEditor.sidebar.annotationLegacyComparisonLabel');
-
   // Legacy comparison stays isolated from declarative-template controls so a later deletion wave
   // can remove this branch without changing the modern schema-driven inspector.
   return [
@@ -70,16 +68,14 @@ function createLegacyAnnotationGroups(
       id: 'general',
       semantic: 'content' as const,
       label: translate('videoEditor.sidebar.inspectorGroupGeneral'),
-      meta: legacyMeta,
       defaultActive: true,
       content: <AnnotationGeneralContent props={props} usesTargetGroup={usesTargetGroup} />,
     },
-    createLegacyAnnotationContentGroup(props, legacyMeta),
+    createLegacyAnnotationContentGroup(props),
     {
       id: 'style',
       semantic: 'appearance' as const,
       label: translate('videoEditor.sidebar.inspectorGroupStyle'),
-      meta: legacyMeta,
       content: renderAnnotationAppearanceFields(props),
       visible: !usesTargetGroup,
     },
@@ -87,7 +83,6 @@ function createLegacyAnnotationGroups(
       id: 'target',
       semantic: 'placement' as const,
       label: translate('videoEditor.sidebar.inspectorGroupTarget'),
-      meta: legacyMeta,
       content: (
         <AnnotationTargetControls
           clip={props.clip}
@@ -101,21 +96,16 @@ function createLegacyAnnotationGroups(
       id: 'motion',
       semantic: 'animation' as const,
       label: translate('videoEditor.sidebar.inspectorGroupMotion'),
-      meta: legacyMeta,
       content: renderAnnotationMotionFields(props),
     },
   ] as const;
 }
 
-function createLegacyAnnotationContentGroup(
-  props: AnnotationFieldsSectionProps,
-  legacyMeta: string
-) {
+function createLegacyAnnotationContentGroup(props: AnnotationFieldsSectionProps) {
   return {
     id: 'content',
     semantic: 'content' as const,
     label: translate('videoEditor.sidebar.inspectorGroupContent'),
-    meta: legacyMeta,
     content: (
       <>
         {renderAnnotationContentFields(props)}

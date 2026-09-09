@@ -50,6 +50,7 @@ export function SelectInput<T extends string>({
         value={value}
         onChange={onChange}
         options={options}
+        menuClassName="video-editor-inspector-select-menu"
         disabled={disabled}
       />
     );
@@ -61,6 +62,7 @@ export function SelectInput<T extends string>({
       value={value}
       onChange={onChange}
       options={options}
+      menuClassName="video-editor-inspector-select-menu"
       disabled={disabled}
       className="w-full"
     />

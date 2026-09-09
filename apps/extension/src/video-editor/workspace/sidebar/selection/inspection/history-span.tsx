@@ -1,6 +1,6 @@
 import { InspectorDetails } from '../shared/details';
 import { useState } from 'react';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorActionButton } from '../shared/actions';
 import { formatNumber, translate, useAppLocale } from '../../../../../platform/i18n';
 import {
   planTypingCompression,
@@ -115,11 +115,8 @@ export function InspectHistorySpanPanel(props: Props) {
         plan={plan}
         applyStatus={applyStatus}
       />
-      <div
-        className={`flex flex-wrap items-center justify-end gap-1 border-t
-border-[color:var(--sniptale-color-border-soft)] pt-2`}
-      >
-        <ProductActionButton
+      <div data-ui="video-editor.inspector.actions">
+        <InspectorActionButton
           data-ui="video-editor.typing.preview"
           compact
           tone="secondary"
@@ -127,8 +124,8 @@ border-[color:var(--sniptale-color-border-soft)] pt-2`}
           onClick={recalculate}
         >
           {translate('videoEditor.sidebar.typingPreview')}
-        </ProductActionButton>
-        <ProductActionButton
+        </InspectorActionButton>
+        <InspectorActionButton
           data-ui="video-editor.typing.apply"
           compact
           tone="primary"
@@ -136,7 +133,7 @@ border-[color:var(--sniptale-color-border-soft)] pt-2`}
           onClick={apply}
         >
           {translate('videoEditor.sidebar.typingApply')}
-        </ProductActionButton>
+        </InspectorActionButton>
       </div>
     </section>
   );

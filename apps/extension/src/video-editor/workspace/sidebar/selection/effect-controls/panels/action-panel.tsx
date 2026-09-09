@@ -2,7 +2,7 @@ import { ActionClickStyleFields, ActionKeyStyleFields } from '../action-style-fi
 import { InspectorDetails } from '../../shared/details';
 import { getActionEventLabel } from '../../../../../chrome/display';
 import { canEditActionOccurrenceOnCanvas } from '../../../../../preview/stage/canvas/geometry';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorActionButton } from '../../shared/actions';
 import { translate } from '../../../../../../platform/i18n';
 import { resolveVideoProjectActionPresentations } from '../../../../../../features/video/project/action-presentation';
 import { getVideoProjectUtilityLanes } from '../../../../../../features/video/project/utility-lanes';
@@ -62,7 +62,7 @@ export function InspectActionPanel(props: ActionProps) {
           },
           {
             id: 'appearance',
-            semantic: 'appearance' as const,
+            semantic: event.kind === 'KEY' ? ('content' as const) : ('effects' as const),
             label: translate(
               event.kind === 'KEY'
                 ? 'videoEditor.sidebar.historyKeyboard'
@@ -116,10 +116,10 @@ export function InspectActionPanel(props: ActionProps) {
                   disabled={disabled}
                   update={update}
                 />
-                <ProductActionButton
+                <InspectorActionButton
                   compact
                   tone="secondary"
-                  className="mt-3"
+                  separated
                   disabled={disabled || !resolved.overridden}
                   onClick={() =>
                     props.onUpdateActionEventDetails(event.id, {
@@ -129,7 +129,7 @@ export function InspectActionPanel(props: ActionProps) {
                   }
                 >
                   {translate('videoEditor.sidebar.historyReset')}
-                </ProductActionButton>
+                </InspectorActionButton>
               </>
             ),
           },

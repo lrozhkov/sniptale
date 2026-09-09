@@ -123,15 +123,16 @@ describe('workspace-sidebar/selection/media-frame', () => {
   it('renders media apply-to-track as a shared compact secondary action', async () => {
     await renderHarness();
 
-    const applyButton = Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
-      button.className.includes('self-end whitespace-nowrap')
+    const applyButton = Array.from(container?.querySelectorAll('button') ?? []).find(
+      (button) =>
+        button.hasAttribute('data-inspector-action') && button.className.includes('self-end')
     );
 
     expect(container?.textContent).toContain('Вписывание');
     expect(container?.textContent).toContain('Масштаб');
     expect(applyButton).toBeDefined();
     expect(applyButton?.className).toContain('hover:bg-[color:color-mix');
-    expect(applyButton?.className).toContain('rounded-[12px]');
+    expect(applyButton?.closest('[data-ui="video-editor.inspector.actions"]')).not.toBeNull();
   });
 
   it('commits media shadow intensity through the media frame controls', async () => {

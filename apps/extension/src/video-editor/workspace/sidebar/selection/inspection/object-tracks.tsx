@@ -1,5 +1,5 @@
 import { translate } from '../../../../../platform/i18n';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorActionButton } from '../shared/actions';
 import type { VideoObjectTrack } from '../../../../../features/video/project/object-tracks';
 import { isInternalVideoObjectTrack } from '../../../../../features/video/project/object-tracks';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
@@ -58,7 +58,7 @@ export function ObjectTrackSummaryCard(props: {
         </div>
         <div className="flex shrink-0 items-center gap-2">
           {!props.selected ? (
-            <ProductActionButton
+            <InspectorActionButton
               compact
               data-ui="video-editor.object-track.select"
               disabled={props.selected}
@@ -70,15 +70,15 @@ export function ObjectTrackSummaryCard(props: {
                   ? 'videoEditor.sidebar.objectTrackSelectedLabel'
                   : 'videoEditor.sidebar.objectTrackSelectLabel'
               )}
-            </ProductActionButton>
+            </InspectorActionButton>
           ) : null}
-          <DangerButton
-            label={translate('videoEditor.sidebar.objectTrackDeleteLabel')}
-            onClick={() => props.onDeleteObjectTrack?.(props.track.id)}
-          />
         </div>
       </div>
       <SceneObjectTrackDetails detectorVersion={props.track.detectorVersion} summary={summary} />
+      <DangerButton
+        label={translate('videoEditor.sidebar.objectTrackDeleteLabel')}
+        onClick={() => props.onDeleteObjectTrack?.(props.track.id)}
+      />
     </div>
   );
 }

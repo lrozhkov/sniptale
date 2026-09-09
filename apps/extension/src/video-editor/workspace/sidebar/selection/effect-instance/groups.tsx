@@ -196,7 +196,7 @@ function EffectInstanceActions(props: EffectInstanceCardProps): React.JSX.Elemen
           {download.error}
         </p>
       ) : null}
-      <div className="flex items-center justify-end gap-1">
+      <div data-ui="video-editor.inspector.actions">
         {props.instance.target.kind === 'clip' && (
           <>
             <EditorIconButton

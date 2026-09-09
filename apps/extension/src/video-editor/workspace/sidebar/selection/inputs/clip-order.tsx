@@ -1,6 +1,6 @@
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { useId } from 'react';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorActionButton } from '../shared/actions';
 import { translate } from '../../../../../platform/i18n';
 import type { VideoProject } from '../../../../../features/video/project/types';
 import { planClipSwap, type ClipSwapPlan } from '../../../../project/state/clip-timeline/reorder';
@@ -39,7 +39,7 @@ export function ClipOrderControls(props: {
             const Icon = direction === 'left' ? ArrowLeft : ArrowRight;
             return (
               <span key={direction} title={planHint(plan)}>
-                <ProductActionButton
+                <InspectorActionButton
                   compact
                   tone="secondary"
                   className="!h-7 !min-w-7 !px-1.5"
@@ -49,7 +49,7 @@ export function ClipOrderControls(props: {
                 >
                   <Icon size={14} aria-hidden="true" />
                   <span>{label}</span>
-                </ProductActionButton>
+                </InspectorActionButton>
               </span>
             );
           })}

@@ -9,7 +9,7 @@ import { activeCameraPosition } from '../../../../../features/video/project/came
 import { SelectInput } from '../shared/controls';
 import { NumberInput } from './number';
 import type { CameraPositionEdit } from '../../../../../features/video/project/camera/animation';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorActionButton } from '../shared/actions';
 import { translate } from '../../../../../platform/i18n';
 import {
   resolveVideoProjectCameraLayout,
@@ -86,7 +86,7 @@ export function CameraLayoutControls(props: CameraLayoutControlsProps) {
         {PLACEMENT_OPTIONS.map((option) => {
           const active = !custom && matchesCameraPlacement(props.project, clip, option.placement);
           return (
-            <ProductActionButton
+            <InspectorActionButton
               key={option.placement}
               className="h-7! min-h-7! w-7! rounded-md! p-0! shrink-0 [&:not(:focus-visible)]:shadow-none!"
               compact
@@ -112,7 +112,7 @@ export function CameraLayoutControls(props: CameraLayoutControlsProps) {
               >
                 <span className={`absolute h-1 w-2 rounded-sm bg-current ${option.position}`} />
               </span>
-            </ProductActionButton>
+            </InspectorActionButton>
           );
         })}
         {(
@@ -126,7 +126,7 @@ export function CameraLayoutControls(props: CameraLayoutControlsProps) {
             { id: 'CUSTOM', labelKey: 'videoEditor.sidebar.cameraLayoutCustom', icon: Scan },
           ] as const
         ).map(({ id, labelKey, icon: Icon }) => (
-          <ProductActionButton
+          <InspectorActionButton
             key={id}
             compact
             tone="toggle"
@@ -144,7 +144,7 @@ export function CameraLayoutControls(props: CameraLayoutControlsProps) {
             }}
           >
             <Icon size={15} />
-          </ProductActionButton>
+          </InspectorActionButton>
         ))}
       </div>
       {custom ? props.customControls : null}
@@ -228,6 +228,7 @@ function CameraPositionNavigation(props: CameraLayoutControlsProps) {
     <div className="flex min-w-0 items-center gap-1" data-ui="video-editor.camera-positions">
       <div className="min-w-0 flex-1">
         <CompactSelect
+          menuClassName="video-editor-inspector-select-menu"
           appearance="plain"
           className="px-0!"
           aria-label={translate('videoEditor.sidebar.cameraPosition')}
@@ -254,7 +255,7 @@ function CameraPositionNavigation(props: CameraLayoutControlsProps) {
           onChange={(id) => edit({ kind: 'select', id: id || null })}
         />
       </div>
-      <ProductActionButton
+      <InspectorActionButton
         compact
         className="h-7! min-h-7! w-7! rounded-md! shrink-0 p-0!"
         tone="secondary"
@@ -265,8 +266,8 @@ function CameraPositionNavigation(props: CameraLayoutControlsProps) {
         onClick={() => edit({ kind: 'add' })}
       >
         <Plus size={14} />
-      </ProductActionButton>
-      <ProductActionButton
+      </InspectorActionButton>
+      <InspectorActionButton
         compact
         className="h-7! min-h-7! w-7! rounded-md! shrink-0 p-0!"
         tone="secondary"
@@ -275,7 +276,7 @@ function CameraPositionNavigation(props: CameraLayoutControlsProps) {
         onClick={() => position && edit({ kind: 'remove', id: position.id })}
       >
         <Trash2 size={14} />
-      </ProductActionButton>
+      </InspectorActionButton>
     </div>
   );
 }
