@@ -207,20 +207,24 @@ function drawUnlockedOverlayGroup(
       : null;
   const drawContext = passBuffer?.context ?? params.context;
 
-  for (const pass of params.renderPasses.visualPasses) {
-    beginExportCameraPass(drawContext, pass, params);
-    drawVisualPassLayers(
-      drawContext,
-      resolveOrderedVisualPassLayers(layers, pass.frame.visualLayers),
-      pass,
-      params,
-      getEffectRuntimeVisualPassFrames(params.effectRuntimeFrames, pass.time),
-      resolveExportEffectDrawState(effectRuntimeStates, pass.time)
-    );
-    drawContext.restore();
-  }
+  try {
+    for (const pass of params.renderPasses.visualPasses) {
+      beginExportCameraPass(drawContext, pass, params);
+      drawVisualPassLayers(
+        drawContext,
+        resolveOrderedVisualPassLayers(layers, pass.frame.visualLayers),
+        pass,
+        params,
+        getEffectRuntimeVisualPassFrames(params.effectRuntimeFrames, pass.time),
+        resolveExportEffectDrawState(effectRuntimeStates, pass.time)
+      );
+      drawContext.restore();
+    }
 
-  passBuffer?.flush();
+    passBuffer?.flush();
+  } finally {
+    passBuffer?.dispose();
+  }
 }
 
 export function drawProjectFrame(

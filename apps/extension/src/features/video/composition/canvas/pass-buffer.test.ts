@@ -9,6 +9,8 @@ afterEach(() => {
 it('creates a lighter-composition pass buffer and flushes it to the target context', () => {
   const bufferContext = {
     clearRect: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
     globalCompositeOperation: 'source-over',
     setTransform: vi.fn(),
   } as unknown as CanvasRenderingContext2D;
@@ -83,6 +85,8 @@ it('returns null when the requested buffer dimensions are invalid', () => {
 it('falls back to an owner document canvas when OffscreenCanvas is unavailable', () => {
   const bufferContext = {
     clearRect: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
     globalCompositeOperation: 'source-over',
     setTransform: vi.fn(),
   } as unknown as CanvasRenderingContext2D;
@@ -113,4 +117,69 @@ it('falls back to an owner document canvas when OffscreenCanvas is unavailable',
   expect(bufferCanvas.width).toBe(1280);
   expect(bufferCanvas.height).toBe(720);
   expect(result).not.toBeNull();
+});
+
+it('reuses crossfade surfaces across repeated frames', () => {
+  let allocations = 0;
+  class Surface {
+    constructor(
+      public width: number,
+      public height: number
+    ) {
+      allocations++;
+    }
+    getContext() {
+      return {
+        setTransform: vi.fn(),
+        clearRect: vi.fn(),
+        save: vi.fn(),
+        restore: vi.fn(),
+        globalCompositeOperation: 'source-over',
+      };
+    }
+  }
+  vi.stubGlobal('OffscreenCanvas', Surface);
+  const targetContext = { drawImage: vi.fn() } as unknown as CanvasRenderingContext2D;
+  for (let frame = 0; frame < 60; frame++) {
+    createVideoCompositionPassBuffer({
+      bufferWidth: 1280,
+      bufferHeight: 720,
+      drawWidth: 1280,
+      drawHeight: 720,
+      targetContext,
+    })!.flush();
+  }
+  expect(allocations).toBe(1);
+});
+
+it('releases the lease when composing into the target fails', () => {
+  let allocations = 0;
+  class Surface {
+    constructor(
+      public width: number,
+      public height: number
+    ) {
+      allocations++;
+    }
+    getContext() {
+      return { save: vi.fn(), restore: vi.fn(), setTransform: vi.fn(), clearRect: vi.fn() };
+    }
+  }
+  vi.stubGlobal('OffscreenCanvas', Surface);
+  const targetContext = {
+    drawImage: () => {
+      throw new Error('context lost');
+    },
+  } as unknown as CanvasRenderingContext2D;
+  const params = {
+    bufferWidth: 913,
+    bufferHeight: 517,
+    drawWidth: 913,
+    drawHeight: 517,
+    targetContext,
+  };
+  expect(() => createVideoCompositionPassBuffer(params)!.flush()).toThrow('context lost');
+  const next = createVideoCompositionPassBuffer(params)!;
+  expect(allocations).toBe(1);
+  next.dispose();
 });

@@ -211,19 +211,26 @@ function drawPreviewUnlockedLayerGroup(params: {
       ? params.prepared
       : { ...params.prepared, context: passTarget.context };
 
-  for (const pass of params.passes) {
-    drawPreparedPreviewVisualPass({
-      clipMediaElements: params.clipMediaElements,
-      effectRuntimeFrames: getEffectRuntimeVisualPassFrames(params.effectRuntimeFrames, pass.time),
-      effectRuntimeState: resolvePreviewEffectDrawState(params.effectRuntimeStates, pass.time),
-      imageBank: params.imageBank,
-      layers: resolveOrderedPreviewPassLayers(params.layers, pass.frame.visualLayers),
-      pass,
-      prepared: groupedPrepared,
-    });
-  }
+  try {
+    for (const pass of params.passes) {
+      drawPreparedPreviewVisualPass({
+        clipMediaElements: params.clipMediaElements,
+        effectRuntimeFrames: getEffectRuntimeVisualPassFrames(
+          params.effectRuntimeFrames,
+          pass.time
+        ),
+        effectRuntimeState: resolvePreviewEffectDrawState(params.effectRuntimeStates, pass.time),
+        imageBank: params.imageBank,
+        layers: resolveOrderedPreviewPassLayers(params.layers, pass.frame.visualLayers),
+        pass,
+        prepared: groupedPrepared,
+      });
+    }
 
-  passTarget.flush();
+    passTarget.flush();
+  } finally {
+    passTarget.dispose();
+  }
 }
 
 function resolveOrderedPreviewPassLayers(

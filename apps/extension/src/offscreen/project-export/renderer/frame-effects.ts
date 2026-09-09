@@ -47,12 +47,16 @@ export function drawExportTransitionOverlayPasses(
         })
       : null;
   const drawContext = passBuffer?.context ?? context;
-  for (const pass of passes) {
-    for (const overlay of pass.transitionOverlays ?? []) {
-      const frames = getEffectRuntimeVisualPassFrames(effectRuntimeFrames, pass.time);
-      if (hasEffectRuntimeTransitionFrame(frames, overlay.transitionId)) continue;
-      drawTransitionOverlay(drawContext, overlay, settings.width, settings.height, pass.alpha);
+  try {
+    for (const pass of passes) {
+      for (const overlay of pass.transitionOverlays ?? []) {
+        const frames = getEffectRuntimeVisualPassFrames(effectRuntimeFrames, pass.time);
+        if (hasEffectRuntimeTransitionFrame(frames, overlay.transitionId)) continue;
+        drawTransitionOverlay(drawContext, overlay, settings.width, settings.height, pass.alpha);
+      }
     }
+    passBuffer?.flush();
+  } finally {
+    passBuffer?.dispose();
   }
-  passBuffer?.flush();
 }

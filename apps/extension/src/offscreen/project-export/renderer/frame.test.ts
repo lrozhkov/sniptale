@@ -13,14 +13,14 @@ import {
 } from '../../../features/video/project/types';
 import type { LoadedImagesMap } from './types';
 const {
-  drawActionCompositionStateMock,
+  drawSceneActionCompositionStatesMock,
   drawCompositionLayerMock,
   drawCursorCompositionStateMock,
   drawExportSceneBackgroundMock,
   drawTransitionOverlayMock,
   resolveVideoCompositionRenderPassesMock,
 } = vi.hoisted(() => ({
-  drawActionCompositionStateMock: vi.fn(),
+  drawSceneActionCompositionStatesMock: vi.fn(),
   drawCompositionLayerMock: vi.fn(),
   drawCursorCompositionStateMock: vi.fn(),
   drawExportSceneBackgroundMock: vi.fn(),
@@ -30,7 +30,7 @@ const {
 
 vi.mock('../../../features/video/composition/draw', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../features/video/composition/draw')>()),
-  drawActionCompositionState: drawActionCompositionStateMock,
+  drawSceneActionCompositionStates: drawSceneActionCompositionStatesMock,
   drawCursorCompositionState: drawCursorCompositionStateMock,
   drawTransitionOverlay: drawTransitionOverlayMock,
 }));
@@ -301,14 +301,15 @@ function expectFrameRenderingCalls(
     expect.any(Map),
     0.4
   );
-  expect(drawActionCompositionStateMock).toHaveBeenCalledWith(
+  expect(drawSceneActionCompositionStatesMock).toHaveBeenCalledWith(
     context,
-    expect.objectContaining({ point: { x: 40, y: 20 } }),
-    { x: 24, y: 16 }
+    frame.actions,
+    frame.camera,
+    { offsetX: 0, offsetY: 0, scaleX: 2, scaleY: 2 }
   );
   expect(drawCursorCompositionStateMock).toHaveBeenCalledWith(
     context,
-    expect.objectContaining({ x: 24, y: 16 })
+    expect.objectContaining({ x: 6, y: 9 })
   );
   expect(drawTransitionOverlayMock).toHaveBeenCalledWith(
     context,
@@ -390,7 +391,12 @@ it('skips cursor drawing when the composition frame has no cursor state', async 
     new Map()
   );
 
-  expect(drawActionCompositionStateMock).not.toHaveBeenCalled();
+  expect(drawSceneActionCompositionStatesMock).toHaveBeenCalledWith(
+    expect.anything(),
+    [],
+    expect.anything(),
+    expect.anything()
+  );
   expect(drawCursorCompositionStateMock).not.toHaveBeenCalled();
 });
 
