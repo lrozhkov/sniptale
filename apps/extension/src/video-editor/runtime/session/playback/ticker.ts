@@ -91,15 +91,17 @@ export function usePlaybackTicker(
   project: VideoProject | null,
   isPlaying: boolean
 ) {
+  // Inspector edits replace the project object; only a different project restarts the clock.
+  const projectId = project?.id;
   useEffect(() => {
-    if (!project || !isPlaying) {
+    if (!projectId || !isPlaying) {
       playbackRef.current = null;
       return;
     }
 
     startPlaybackSession(playbackRef, handlersRef, latestStateRef);
     return startPlaybackTicker({ handlersRef, latestStateRef, playbackRef, previewRuntimeRef });
-  }, [handlersRef, isPlaying, latestStateRef, playbackRef, previewRuntimeRef, project]);
+  }, [handlersRef, isPlaying, latestStateRef, playbackRef, previewRuntimeRef, projectId]);
 }
 
 export function resolvePlaybackTickTime(
