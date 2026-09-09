@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState } from 'react';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { createSceneGradientBackground } from '../../../../../features/video/project/scene/background-gradient';
 import { translate } from '../../../../../platform/i18n';
 import { VideoSceneBackgroundKind } from '../../../../../features/video/project/types';
@@ -7,15 +9,24 @@ import { SceneBackgroundColorEditor } from './colors';
 import type { SceneBackground, SceneBackgroundFieldProps } from './shared';
 
 export function SceneBackgroundFields(props: SceneBackgroundFieldProps) {
+  const [imageRequested, setImageRequested] = useState(false);
+  useEffect(() => {
+    if (props.sceneBackground.kind === VideoSceneBackgroundKind.IMAGE) setImageRequested(false);
+  }, [props.sceneBackground.kind]);
   return (
     <div className="grid gap-3">
       <SelectInput
         label={translate('videoEditor.sidebar.sceneBackgroundTypeLabel')}
-        value={props.sceneBackground.kind}
-        onChange={(value) => handleSceneBackgroundKindChange(value, props)}
+        value={imageRequested ? VideoSceneBackgroundKind.IMAGE : props.sceneBackground.kind}
+        onChange={(value) => {
+          setImageRequested(
+            value === VideoSceneBackgroundKind.IMAGE && props.imageAssets.length === 0
+          );
+          handleSceneBackgroundKindChange(value, props);
+        }}
         options={getSceneBackgroundKindOptions(props.imageAssets)}
       />
-      <SceneBackgroundEditor {...props} />
+      {imageRequested ? <ImageBackgroundEditor {...props} /> : <SceneBackgroundEditor {...props} />}
     </div>
   );
 }
@@ -32,25 +43,53 @@ function SceneBackgroundEditor(props: SceneBackgroundFieldProps) {
 }
 
 function ImageBackgroundEditor(props: SceneBackgroundFieldProps) {
-  if (props.sceneBackground.kind !== VideoSceneBackgroundKind.IMAGE) {
-    return null;
-  }
-
-  if (props.imageAssets.length === 0) {
-    return (
-      <p className={PANEL_META_CLASS_NAME}>
-        {translate('videoEditor.sidebar.sceneBackgroundImageEmpty')}
-      </p>
-    );
-  }
-
+  const input = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
   return (
-    <SelectInput
-      label={translate('videoEditor.sidebar.sceneBackgroundImageAssetLabel')}
-      value={props.sceneBackground.assetId}
-      onChange={(value) => commitSceneBackgroundImage(value, props)}
-      options={getSceneBackgroundAssetOptions(props.imageAssets)}
-    />
+    <div className="grid gap-3">
+      {props.imageAssets.length > 0 && (
+        <SelectInput
+          label={translate('videoEditor.sidebar.sceneBackgroundImageAssetLabel')}
+          value={
+            props.sceneBackground.kind === VideoSceneBackgroundKind.IMAGE
+              ? props.sceneBackground.assetId
+              : ''
+          }
+          onChange={(value) => commitSceneBackgroundImage(value, props)}
+          options={getSceneBackgroundAssetOptions(props.imageAssets)}
+        />
+      )}
+      {props.onImportImage && (
+        <>
+          <input
+            ref={input}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            aria-label={translate('videoEditor.sidebar.sceneBackgroundImageUpload')}
+            onChange={async (event) => {
+              const file = event.currentTarget.files?.[0];
+              event.currentTarget.value = '';
+              if (!file || busy) return;
+              setBusy(true);
+              try {
+                await props.onImportImage?.(file, { destination: 'background' });
+              } finally {
+                setBusy(false);
+              }
+            }}
+          />
+          <ProductActionButton disabled={busy} onClick={() => input.current?.click()}>
+            {translate('videoEditor.sidebar.sceneBackgroundImageUpload')}
+          </ProductActionButton>
+        </>
+      )}
+      {props.imageAssets.length === 0 && (
+        <p className={PANEL_META_CLASS_NAME}>
+          {translate('videoEditor.sidebar.sceneBackgroundImageEmpty')}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -108,7 +147,7 @@ function commitSceneBackgroundImage(
 }
 
 export function getSceneBackgroundKindOptions(
-  imageAssets: SceneBackgroundFieldProps['imageAssets'] = []
+  _imageAssets: SceneBackgroundFieldProps['imageAssets'] = []
 ) {
   return [
     {
@@ -122,7 +161,7 @@ export function getSceneBackgroundKindOptions(
     {
       value: VideoSceneBackgroundKind.IMAGE,
       label: translate('videoEditor.sidebar.sceneBackgroundImage'),
-      disabled: imageAssets.length === 0,
+      disabled: false,
     },
   ];
 }

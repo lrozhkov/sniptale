@@ -162,6 +162,7 @@ function useVideoEditorCommandComposition(
       getCurrentProjectId: getCurrentVideoEditorProjectId,
       getCurrentTime: getCurrentVideoEditorCurrentTime,
       setError: lifecycle.setError,
+      updateProject: timeline.updateProject,
       upsertAsset: timeline.upsertAsset,
       upsertAssets: timeline.upsertAssets,
       addAssetClip: timeline.addAssetClip,
@@ -177,6 +178,7 @@ function useVideoEditorCommandComposition(
       timeline.moveClip,
       timeline.trimClipEnd,
       timeline.trimClipStart,
+      timeline.updateProject,
       timeline.upsertAsset,
       timeline.upsertAssets,
     ]

@@ -37,6 +37,7 @@ export const VideoSceneGradientAnimationMode = {
   NONE: 'none',
   ROTATE: 'rotate',
   BREATHE: 'breathe',
+  DRIFT: 'drift',
   AUDIO_REACTIVE: 'audioReactive',
 } as const;
 

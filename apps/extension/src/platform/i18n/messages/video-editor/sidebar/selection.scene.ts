@@ -54,12 +54,12 @@ export const videoEditorSidebarSelectionSceneMessages = defineMessageSource({
     en: 'None',
   },
   sceneBackgroundAnimationRotate: {
-    ru: 'Кинематографичный дрейф',
-    en: 'Cinematic drift',
+    ru: 'Вращение',
+    en: 'Rotation',
   },
   sceneBackgroundAnimationBreathe: {
-    ru: 'Смещение света',
-    en: 'Light sweep',
+    ru: 'Дыхание',
+    en: 'Breathing',
   },
   sceneBackgroundAnimationAudioReactive: {
     ru: 'Аудио',
@@ -69,9 +69,11 @@ export const videoEditorSidebarSelectionSceneMessages = defineMessageSource({
     ru: 'Фоновое изображение',
     en: 'Background image',
   },
+  sceneBackgroundImageUpload: { ru: 'Загрузить изображение', en: 'Upload image' },
+  sceneBackgroundAnimationDrift: { ru: 'Перетекание', en: 'Flow' },
   sceneBackgroundImageEmpty: {
-    ru: 'Сначала импортируйте изображение в проект.',
-    en: 'Import an image into the project first.',
+    ru: 'Изображение заполнит фон; оригинал останется в материалах.',
+    en: 'The image fills the background and stays in materials.',
   },
   gridSettingsTitle: {
     ru: 'Сетка',

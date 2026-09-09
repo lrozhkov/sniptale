@@ -67,6 +67,7 @@ function createSceneGroups(
           onPreviewSceneBackground={props.onPreviewSceneBackground}
           onRememberRecentColor={props.onRememberRecentColor}
           onResetSceneBackgroundPreview={props.onResetSceneBackgroundPreview}
+          onImportImage={props.onImportImage}
           onSetSceneBackground={props.onSetSceneBackground}
           recentColors={props.recentColors}
           sceneBackground={sceneBackground}

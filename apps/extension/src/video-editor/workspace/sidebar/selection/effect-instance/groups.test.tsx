@@ -80,6 +80,7 @@ function renderStack(disabled = false, composed = false) {
       onEnableCursorTrack: vi.fn(),
       onResizeProject: vi.fn(),
       onSetCursorCaptureMode: vi.fn(),
+      onImportImage: vi.fn(),
       onSetSceneBackground: vi.fn(),
       onUpdateClipAudioEnvelope: vi.fn(),
       onUpdateClipFades: vi.fn(),

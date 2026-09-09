@@ -32,6 +32,7 @@ type WorkspaceSidebarPanelContentPropKeys =
   | 'onRenameTrack'
   | 'onResizeProject'
   | 'onSetCursorCaptureMode'
+  | 'onImportImage'
   | 'onSetSceneBackground'
   | 'onStartActionPointPlacement'
   | 'onStartMotionAreaPlacement'

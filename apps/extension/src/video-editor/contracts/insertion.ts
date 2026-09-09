@@ -1,5 +1,5 @@
 export interface VideoEditorImportPlacement {
-  destination?: 'materials' | 'timeline';
+  destination?: 'materials' | 'timeline' | 'background';
   startTime?: number;
   timelineLaneId?: string | null;
   trackId?: string | null;

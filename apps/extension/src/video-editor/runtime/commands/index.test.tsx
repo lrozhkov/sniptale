@@ -34,6 +34,7 @@ it('keeps each command family stable across unrelated parent renders', () => {
     setError: initial.setError,
     trimClipEnd: initial.trimClipEnd,
     trimClipStart: initial.trimClipStart,
+    updateProject: vi.fn(),
     upsertAsset: initial.upsertAsset,
     upsertAssets: initial.upsertAssets,
   };

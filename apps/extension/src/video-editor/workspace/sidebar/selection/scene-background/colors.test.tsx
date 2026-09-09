@@ -129,7 +129,13 @@ it('previews and cancels a shared preset without committing, then applies once w
     );
   const preset = () => {
     act(() => getButton('highlighter.paintPicker.presets')!.click());
-    act(() => getButton('Radial')!.click());
+    act(() =>
+      document
+        .querySelector<HTMLButtonElement>(
+          '[data-ui="shared.ui.paint-selector.popup"] button[aria-label="Radial"]'
+        )!
+        .click()
+    );
   };
   open();
   preset();

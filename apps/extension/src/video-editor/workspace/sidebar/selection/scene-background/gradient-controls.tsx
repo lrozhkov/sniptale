@@ -26,26 +26,29 @@ export function GradientAnimationControls(props: GradientControlProps) {
         onChange={(mode) => updateGradientAnimation(props, { ...animation, mode })}
         options={getGradientAnimationModeOptions()}
       />
-      <SliderField
-        disabled={animation.mode === VideoSceneGradientAnimationMode.NONE}
-        label={translate('videoEditor.sidebar.sceneBackgroundAnimationSpeedLabel')}
-        value={animation.speed}
-        min={0}
-        max={100}
-        step={1}
-        onChange={(speed) => updateGradientAnimation(props, { ...animation, speed })}
-        formatValue={(value) => `${Math.round(value)}%`}
-      />
-      <SliderField
-        disabled={animation.mode === VideoSceneGradientAnimationMode.NONE}
-        label={translate('videoEditor.sidebar.sceneBackgroundAnimationIntensityLabel')}
-        value={animation.intensity}
-        min={0}
-        max={100}
-        step={1}
-        onChange={(intensity) => updateGradientAnimation(props, { ...animation, intensity })}
-        formatValue={(value) => `${Math.round(value)}%`}
-      />
+      {animation.mode !== VideoSceneGradientAnimationMode.NONE &&
+        animation.mode !== VideoSceneGradientAnimationMode.AUDIO_REACTIVE && (
+          <SliderField
+            label={translate('videoEditor.sidebar.sceneBackgroundAnimationSpeedLabel')}
+            value={animation.speed}
+            min={0}
+            max={100}
+            step={1}
+            onChange={(speed) => updateGradientAnimation(props, { ...animation, speed })}
+            formatValue={(value) => `${Math.round(value)}%`}
+          />
+        )}
+      {animation.mode !== VideoSceneGradientAnimationMode.NONE && (
+        <SliderField
+          label={translate('videoEditor.sidebar.sceneBackgroundAnimationIntensityLabel')}
+          value={animation.intensity}
+          min={0}
+          max={100}
+          step={1}
+          onChange={(intensity) => updateGradientAnimation(props, { ...animation, intensity })}
+          formatValue={(value) => `${Math.round(value)}%`}
+        />
+      )}
     </div>
   );
 }
@@ -63,6 +66,10 @@ function getGradientAnimationModeOptions() {
     {
       value: VideoSceneGradientAnimationMode.BREATHE,
       label: translate('videoEditor.sidebar.sceneBackgroundAnimationBreathe'),
+    },
+    {
+      value: VideoSceneGradientAnimationMode.DRIFT,
+      label: translate('videoEditor.sidebar.sceneBackgroundAnimationDrift'),
     },
     {
       value: VideoSceneGradientAnimationMode.AUDIO_REACTIVE,

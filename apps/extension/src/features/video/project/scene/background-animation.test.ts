@@ -41,7 +41,7 @@ it('resolves static, light sweep, and transient-reactive animation frames', () =
       audioEnvelope: 0,
       time: 2,
     })
-  ).toEqual({ angle: 90, fromStop: 0, toStop: 100 });
+  ).toMatchObject({ angle: 90, fromStop: 0, toStop: 100 });
   expect(
     resolveGradientAnimationFrame({
       angle: 90,
@@ -49,7 +49,7 @@ it('resolves static, light sweep, and transient-reactive animation frames', () =
       audioEnvelope: 0,
       time: 0,
     })
-  ).toMatchObject({ angle: expect.closeTo(91.1, 1), fromStop: 7.5, toStop: 91.5 });
+  ).toMatchObject({ angle: 90, fromStop: 0, toStop: 100 });
   expect(
     resolveGradientAnimationFrame({
       angle: 90,
@@ -73,5 +73,21 @@ it('resolves static, light sweep, and transient-reactive animation frames', () =
       audioEnvelope: 1,
       time: 0,
     })
-  ).toMatchObject({ angle: 129, fromStop: 15, toStop: 85 });
+  ).toMatchObject({ angle: 135, fromStop: 17.5, toStop: 82.5 });
+});
+
+it('keeps zero speed and zero intensity visually neutral', () => {
+  for (const mode of [
+    VideoSceneGradientAnimationMode.ROTATE,
+    VideoSceneGradientAnimationMode.BREATHE,
+  ]) {
+    for (const animation of [
+      { mode, speed: 0, intensity: 100 },
+      { mode, speed: 100, intensity: 0 },
+    ]) {
+      expect(
+        resolveGradientAnimationFrame({ angle: 90, animation, audioEnvelope: 0, time: 3 })
+      ).toMatchObject({ angle: 90, fromStop: 0, toStop: 100 });
+    }
+  }
 });

@@ -70,7 +70,7 @@ export interface WorkspaceSidebarProps {
   onDetachClipGroup: (clipId: string) => void;
   onEnableCursorTrack: () => void;
   onImportAudio: (file: File) => void;
-  onImportImage: (file: File) => void;
+  onImportImage: import('../../../contracts/insertion').PreviewStageImportHandlers['image'];
   onImportVideo: (file: File) => void;
   onInsertCursorSample?: (time: number) => void;
   onOpenProject: (projectId: string) => void | Promise<void>;
