@@ -34,7 +34,7 @@ export function LibraryMediaSection(props: {
               const Icon = isImage ? Image : Film;
               const thumbnail = props.thumbnails[item.id]?.url;
               return (
-                <div key={item.id} className="relative">
+                <div key={item.id} className="group/library-card relative">
                   <button
                     type="button"
                     onClick={() => setSelectedId(item.id)}
@@ -77,7 +77,13 @@ export function LibraryMediaSection(props: {
                       </span>
                     </span>
                   </button>
-                  <div className="absolute bottom-2 right-2">
+                  <div
+                    className={[
+                      'pointer-events-none absolute bottom-2 right-2 opacity-0',
+                      'group-hover/library-card:pointer-events-auto group-hover/library-card:opacity-100',
+                      'group-focus-within/library-card:pointer-events-auto group-focus-within/library-card:opacity-100',
+                    ].join(' ')}
+                  >
                     <LibraryMediaAdd itemId={item.id} compact onAddMedia={props.onAddMedia} />
                   </div>
                 </div>
