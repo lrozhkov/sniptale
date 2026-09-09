@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
+
 import { createPortal } from 'react-dom';
 import {
   resolveThemeSafePortalTarget,
@@ -9,6 +10,22 @@ import { ProductModal, ProductModalHeader } from '@sniptale/ui/product-modal';
 import { getOwnedFloatingInteractionLayers } from '@sniptale/ui/floating-interactions/ownership';
 import { ArrowRight, Check, WandSparkles } from 'lucide-react';
 import { translate } from '../../../../../platform/i18n';
+
+export const AutoProcessingReviewDockContext = createContext<HTMLElement | null>(null);
+
+export function AutoProcessingReviewDock({ children }: { children: ReactNode }) {
+  const [target, setTarget] = useState<HTMLDivElement | null>(null);
+  return (
+    <AutoProcessingReviewDockContext.Provider value={target}>
+      <div
+        ref={setTarget}
+        className="shrink-0 empty:hidden"
+        data-ui="video-editor.timeline.review-dock"
+      />
+      {children}
+    </AutoProcessingReviewDockContext.Provider>
+  );
+}
 
 /** This modal owns focus while visible; original-interval viewing returns control to the editor. */
 export function AutoProcessingModal(props: {
@@ -143,7 +160,14 @@ bg-[var(--sniptale-color-surface-hover)]`}
 }
 
 /** Owns the editor overlay for the whole wizard, including the temporary original-view step. */
-export function AutoProcessingLayer({ children }: { children: ReactNode }) {
+export function AutoProcessingLayer({
+  children,
+  docked = false,
+}: {
+  children: ReactNode;
+  docked?: boolean;
+}) {
+  const dock = useContext(AutoProcessingReviewDockContext);
   const anchor = useRef<HTMLSpanElement>(null);
   const opener = useRef(
     document.activeElement instanceof HTMLElement ? document.activeElement : null
@@ -168,7 +192,7 @@ export function AutoProcessingLayer({ children }: { children: ReactNode }) {
         >
           {children}
         </div>,
-        resolveThemeSafePortalTarget(anchor.current)
+        docked && dock ? dock : resolveThemeSafePortalTarget(anchor.current)
       )}
     </>
   );

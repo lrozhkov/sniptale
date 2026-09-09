@@ -1,3 +1,4 @@
+import { AutoProcessingReviewDock } from './toolbar/sections/auto-transform-modal';
 import { getMotionInsertionRange } from '../../../features/video/project/motion/placement';
 import { getVideoProjectUtilityLanes } from '../../../features/video/project/utility-lanes';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
@@ -54,47 +55,49 @@ export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
         'backdrop-blur-[10px]',
       ].join(' ')}
     >
-      <ProjectTimelineToolbar
-        historySelected={props.selection?.kind === 'history-lane'}
-        historyActions={{
-          project: props.project,
-          selection: props.selection,
-          actions: props.autoProcessing,
-          onSeek: props.onSeek,
-          onModalVisibilityChange: props.onAutoProcessingModalVisibilityChange,
-        }}
-        playback={{
-          onSeekToEnd: props.onSeekToEnd,
-          onSeekToStart: props.onSeekToStart,
-          onTogglePlay: props.onTogglePlay,
-          currentTime: props.currentTime,
-          isPlaying: props.isPlaying,
-          isPreparingPlayback: props.isPreparingPlayback,
-          playbackRange: props.playbackRange,
-          onClearPlaybackRange: props.onClearPlaybackRange,
-          onStepToNextFrame: props.onStepToNextFrame,
-          onStepToPreviousFrame: props.onStepToPreviousFrame,
-          duration: props.project.duration,
-        }}
-        canAddMotionRegion={
-          getMotionInsertionRange(props.project, props.currentTime) !== null &&
-          (!hasMotionRegions || (motionLane.visible && !motionLane.locked))
-        }
-        canDeleteSelectedClip={props.canDeleteSelectedClip}
-        canEditSelectedClip={props.canEditSelectedClip}
-        canSplitSelectedClip={props.canSplitSelectedClip}
-        fitSelectionDuration={props.fitSelectionDuration}
-        insertion={props.insertion}
-        pixelsPerSecond={props.pixelsPerSecond}
-        selectedClip={Boolean(props.selectedClip)}
-        onFitProject={props.onFitProject}
-        onFitSelection={props.onFitSelection}
-        onTimelinePreviewSuspendedChange={props.onTimelinePreviewSuspendedChange}
-        onZoomChange={props.onZoomChange}
-        onSplitSelectedClip={props.onSplitSelectedClip}
-        onDuplicateSelectedClip={props.onDuplicateSelectedClip}
-        onDeleteSelectedClip={props.onDeleteSelectedClip}
-      />
+      <AutoProcessingReviewDock>
+        <ProjectTimelineToolbar
+          historySelected={props.selection?.kind === 'history-lane'}
+          historyActions={{
+            project: props.project,
+            selection: props.selection,
+            actions: props.autoProcessing,
+            onSeek: props.onSeek,
+            onModalVisibilityChange: props.onAutoProcessingModalVisibilityChange,
+          }}
+          playback={{
+            onSeekToEnd: props.onSeekToEnd,
+            onSeekToStart: props.onSeekToStart,
+            onTogglePlay: props.onTogglePlay,
+            currentTime: props.currentTime,
+            isPlaying: props.isPlaying,
+            isPreparingPlayback: props.isPreparingPlayback,
+            playbackRange: props.playbackRange,
+            onClearPlaybackRange: props.onClearPlaybackRange,
+            onStepToNextFrame: props.onStepToNextFrame,
+            onStepToPreviousFrame: props.onStepToPreviousFrame,
+            duration: props.project.duration,
+          }}
+          canAddMotionRegion={
+            getMotionInsertionRange(props.project, props.currentTime) !== null &&
+            (!hasMotionRegions || (motionLane.visible && !motionLane.locked))
+          }
+          canDeleteSelectedClip={props.canDeleteSelectedClip}
+          canEditSelectedClip={props.canEditSelectedClip}
+          canSplitSelectedClip={props.canSplitSelectedClip}
+          fitSelectionDuration={props.fitSelectionDuration}
+          insertion={props.insertion}
+          pixelsPerSecond={props.pixelsPerSecond}
+          selectedClip={Boolean(props.selectedClip)}
+          onFitProject={props.onFitProject}
+          onFitSelection={props.onFitSelection}
+          onTimelinePreviewSuspendedChange={props.onTimelinePreviewSuspendedChange}
+          onZoomChange={props.onZoomChange}
+          onSplitSelectedClip={props.onSplitSelectedClip}
+          onDuplicateSelectedClip={props.onDuplicateSelectedClip}
+          onDeleteSelectedClip={props.onDeleteSelectedClip}
+        />
+      </AutoProcessingReviewDock>
       {props.children}
     </FloatingChromePanel>
   );

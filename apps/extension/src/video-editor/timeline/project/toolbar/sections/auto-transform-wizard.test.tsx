@@ -1,3 +1,4 @@
+import { AutoProcessingReviewDockContext } from './auto-transform-modal';
 import { usePlaybackShortcuts } from '../../../../runtime/session/playback/shortcuts';
 import { useVideoEditorProjectHistoryShortcuts } from '../../../../runtime/session/history-shortcuts';
 import type { PlaybackLatestState, PlaybackHandlers } from '../../../../interaction/playback/types';
@@ -156,7 +157,15 @@ it('keeps review open during analysis and closes only after explicit application
 });
 it('defaults only the selected exact placement and makes original playback read-only', async () => {
   const f = fixture();
-  act(() => root.render(<AutoTransformWizard {...f.props} onClose={f.close} />));
+  const dock = document.createElement('div');
+  document.body.append(dock);
+  act(() =>
+    root.render(
+      <AutoProcessingReviewDockContext.Provider value={dock}>
+        <AutoTransformWizard {...f.props} onClose={f.close} />
+      </AutoProcessingReviewDockContext.Provider>
+    )
+  );
   await review();
   expect(f.prepare.mock.calls[0]?.[0]).toMatchObject({
     targets: [{ clipId: 'one', recordingId: 'rec-asset-video', sourceInstanceId: 'instance' }],
@@ -173,8 +182,13 @@ it('defaults only the selected exact placement and makes original playback read-
   expect(f.seek).toHaveBeenCalledWith(2);
   expect(f.apply).not.toHaveBeenCalled();
   expect(document.querySelector('[role="dialog"]')).toBeNull();
-  expect(button('return')).not.toBeNull();
+  expect(dock.contains(button('return'))).toBe(true);
+  expect(dock.querySelector('[data-ui="video-editor.auto.original"]')?.className).not.toContain(
+    'fixed'
+  );
   act(() => button('return').click());
+  expect(dock.children).toHaveLength(0);
+  dock.remove();
   expect(button('apply').disabled).toBe(false);
   expect(document.querySelector<HTMLInputElement>('[data-status="available"] input')?.checked).toBe(
     true

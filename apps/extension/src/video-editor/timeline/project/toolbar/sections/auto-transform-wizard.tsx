@@ -1,10 +1,8 @@
 import { AutoProcessingModal, AutoProcessingLayer } from './auto-transform-modal';
 import { AutoProcessingReview, AutoProcessingFooter } from './auto-transform-steps';
-import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { useState } from 'react';
 import { ArrowLeft, WandSparkles } from 'lucide-react';
 import { ProductModalBody } from '@sniptale/ui/product-modal';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { formatNumber, translate, useAppLocale } from '../../../../../platform/i18n';
 import { AutoProcessingSetup } from './auto-transform-setup';
 import {
@@ -75,29 +73,37 @@ export function AutoTransformWizard(props: AutoProcessingHeaderProps & { onClose
     viewOriginal,
   } = useAutoProcessingWorkflow(props);
   const content = originalInterval ? (
-    <FloatingChromePanel
-      dataUi="video-editor.auto.original"
-      className="fixed right-4 top-20 z-50 flex max-w-lg items-center gap-4 p-3 text-sm"
+    <div
+      data-ui="video-editor.auto.original"
+      className={[
+        'flex min-w-0 items-center justify-between gap-4 border-b border-l-2 px-3 py-2 text-sm',
+        'border-b-[var(--sniptale-color-border-soft)] border-l-[var(--sniptale-color-accent-emphasis)]',
+        'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent-emphasis)_8%,var(--sniptale-color-surface-panel))]',
+      ].join(' ')}
     >
-      <div className="min-w-0">
-        <p className="font-medium">
+      <div
+        className="flex min-w-0 items-center gap-2"
+        title={translate('videoEditor.timeline.autoOriginalPlayback')}
+      >
+        <WandSparkles
+          size={16}
+          className="shrink-0 text-[var(--sniptale-color-accent-emphasis)]"
+          aria-hidden
+        />
+        <p className="truncate text-xs font-medium">
           {translate('videoEditor.timeline.autoOriginal')} · {seconds(originalInterval.start)}–
           {seconds(originalInterval.end)}
         </p>
-        <p className="mt-1 text-xs text-[var(--sniptale-color-text-secondary)]">
-          {translate('videoEditor.timeline.autoOriginalPlayback')}
-        </p>
       </div>
-      <ProductActionButton
-        compact
-        tone="secondary"
-        data-ui="video-editor.auto.return"
+      <ContentToolbarButton
+        className="!h-8 shrink-0 gap-2 !px-3 text-xs"
+        dataUi="video-editor.auto.return"
         onClick={() => setOriginalInterval(null)}
       >
         <ArrowLeft size={14} aria-hidden="true" />
-        {translate('videoEditor.timeline.autoReturn')}
-      </ProductActionButton>
-    </FloatingChromePanel>
+        <span className="whitespace-nowrap">{translate('videoEditor.timeline.autoReturn')}</span>
+      </ContentToolbarButton>
+    </div>
   ) : (
     <AutoProcessingModal
       onClose={close}
@@ -164,5 +170,5 @@ export function AutoTransformWizard(props: AutoProcessingHeaderProps & { onClose
       />
     </AutoProcessingModal>
   );
-  return <AutoProcessingLayer>{content}</AutoProcessingLayer>;
+  return <AutoProcessingLayer docked={originalInterval !== null}>{content}</AutoProcessingLayer>;
 }
