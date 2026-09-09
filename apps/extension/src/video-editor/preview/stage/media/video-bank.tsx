@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { getProjectSceneBackgroundImageAssetId } from '../../../../features/video/project/scene/background';
 import { isVideoClip } from '../../../../features/video/project/timeline';
 import type {
@@ -70,27 +70,38 @@ export function PreviewStageVideoBank({
           return null;
         }
 
-        return (
-          <video
-            key={clip.id}
-            ref={(node) => {
-              if (node) {
-                node.defaultMuted = true;
-                node.muted = true;
-                videoRefs.current[clip.id] = node;
-                return;
-              }
-
-              delete videoRefs.current[clip.id];
-            }}
-            src={src}
-            playsInline
-            preload="auto"
-          />
-        );
+        return <PreviewBankVideo key={clip.id} clipId={clip.id} src={src} videoRefs={videoRefs} />;
       })}
     </div>
   );
+}
+
+function PreviewBankVideo({
+  clipId,
+  src,
+  videoRefs,
+}: {
+  clipId: string;
+  src: string;
+  videoRefs: PreviewStageVideoRefs;
+}) {
+  const ref = useRef<HTMLVideoElement>(null);
+  useLayoutEffect(() => {
+    const video = ref.current;
+    if (!video) return;
+    video.defaultMuted = true;
+    video.muted = true;
+    video.src = src;
+    const videos = videoRefs.current;
+    videos[clipId] = video;
+    return () => {
+      if (videos[clipId] === video) delete videos[clipId];
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+    };
+  }, [clipId, src, videoRefs]);
+  return <video ref={ref} playsInline preload="auto" />;
 }
 
 export function usePreviewStageImageBank(
