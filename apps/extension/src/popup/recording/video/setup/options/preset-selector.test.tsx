@@ -338,7 +338,7 @@ it('shows availability progress only when the batch request takes at least 400ms
   expect(container?.textContent).not.toContain('t:viewportPresets.availability.checking');
 });
 
-it('shows the screen limitation once instead of repeating it for every preset', async () => {
+it('queries browser window sizes for desktop capture', async () => {
   renderNode(
     <VideoPresetSelector
       captureMode={CaptureMode.SCREEN}
@@ -373,9 +373,8 @@ it('shows the screen limitation once instead of repeating it for every preset', 
     container?.querySelector<HTMLButtonElement>('button')?.click();
   });
 
-  expect(
-    container?.textContent?.split('t:viewportPresets.availability.screenUnsupported').length
-  ).toBe(2);
+  expect(container?.textContent).not.toContain('t:viewportPresets.availability.screenUnsupported');
+  expect(runtimeMocks.sendRuntimeMessage).toHaveBeenCalled();
   expect(container?.textContent).not.toContain('t:viewportPresets.availability.pendingVideo');
 });
 

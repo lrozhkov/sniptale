@@ -48,11 +48,11 @@ function projectStaticAvailability(args: {
   tabId: number;
   windowId: number | null;
 }): ViewportPresetAvailability | null {
-  const { context, leaseStates, preset, presetId, tabId, windowId } = args;
+  const { leaseStates, preset, presetId, tabId, windowId } = args;
   if (!preset) return unavailable(presetId, 'missing', { target: null });
   const required = { width: preset.width, height: preset.height };
   if (!preset.enabled) return unavailable(preset.id, 'disabled', { required });
-  if (context === 'video-screen' || windowId === null) {
+  if (windowId === null) {
     return unavailable(preset.id, 'unsupported-context', { required });
   }
   if (hasCaptureSurfaceConflict(leaseStates, tabId, windowId)) {
@@ -72,9 +72,7 @@ export async function getCaptureSurfaceAvailabilities(
     presetId,
     preset: presetsById.get(presetId) ?? null,
   }));
-  const needsRuntimeContext = requested.some(
-    ({ preset }) => preset?.enabled && args.context !== 'video-screen'
-  );
+  const needsRuntimeContext = requested.some(({ preset }) => preset?.enabled);
   const tab = needsRuntimeContext ? await browserTabs.get(args.tabId).catch(() => null) : null;
   const windowId = tab?.windowId ?? null;
   const needsMeasurement = requested.some(({ preset, presetId }) =>

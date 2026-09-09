@@ -26,9 +26,7 @@ function resolvePresetDetail(args: {
   availability: ViewportPresetAvailabilityPayload | undefined;
   modeUnavailable: boolean;
   preset: ViewportPreset;
-  screenDisabled: boolean;
 }): string | undefined {
-  if (args.screenDisabled) return undefined;
   if (!args.preset.enabled) return translate('viewportPresets.messages.presetDisabled');
   return args.availability?.status === 'unavailable'
     ? getVideoPresetAvailabilityDescription(args.availability)
@@ -44,14 +42,11 @@ function createPresetOption(args: {
   captureMode: CaptureMode;
   locale: AppLocale;
   preset: ViewportPreset;
-  screenDisabled: boolean;
 }): InlineCurtainOption {
-  const { availability, captureMode, locale, preset, screenDisabled } = args;
+  const { availability, captureMode, locale, preset } = args;
   const modeUnavailable = !isViewportPresetAllowedForVideoCaptureMode(captureMode, preset);
-  const detail = resolvePresetDetail({ availability, modeUnavailable, preset, screenDisabled });
-  const groupDescription = screenDisabled
-    ? undefined
-    : translate(resolvePresetGroupDescriptionKey());
+  const detail = resolvePresetDetail({ availability, modeUnavailable, preset });
+  const groupDescription = translate(resolvePresetGroupDescriptionKey());
   return {
     value: preset.id,
     label: getViewportPresetDisplayName(preset, locale),
@@ -59,7 +54,6 @@ function createPresetOption(args: {
     ...(detail === undefined ? {} : { detail }),
     disabled:
       !preset.enabled ||
-      screenDisabled ||
       modeUnavailable ||
       availability === undefined ||
       availability.status === 'unavailable',
@@ -99,12 +93,7 @@ export function VideoPresetSelector({
     viewportPresets,
     optionsOpen
   );
-  const screenDisabled = captureMode === CaptureMode.SCREEN;
-  const presetsUnavailable = screenDisabled || captureMode === CaptureMode.CAMERA;
-  const screenNotice = screenDisabled
-    ? translate('viewportPresets.availability.screenUnsupported')
-    : undefined;
-  const cropNotice = undefined;
+  const presetsUnavailable = captureMode === CaptureMode.CAMERA;
   const checking =
     !presetsUnavailable &&
     viewportPresets.some(
@@ -120,7 +109,7 @@ export function VideoPresetSelector({
   const checkingNotice = showChecking
     ? translate('viewportPresets.availability.checking')
     : undefined;
-  const notice = screenNotice ?? cropNotice ?? checkingNotice;
+  const notice = checkingNotice;
   const options = [
     {
       value: '',
@@ -132,7 +121,6 @@ export function VideoPresetSelector({
         captureMode,
         locale,
         preset,
-        screenDisabled,
       })
     ),
   ];

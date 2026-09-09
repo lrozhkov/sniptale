@@ -20,6 +20,7 @@ import {
 import { releaseAppliedVideoCaptureSurface } from './release-applied';
 
 function getContext(mode: CaptureMode) {
+  if (mode === CaptureMode.SCREEN) return 'video-screen' as const;
   return mode === CaptureMode.TAB_CROP ? ('video-tab-crop' as const) : ('video-tab' as const);
 }
 
@@ -37,9 +38,6 @@ export async function acquireVideoCaptureSurface(args: {
   });
 
   if (!args.presetId) return null;
-  if (args.captureMode === CaptureMode.SCREEN) {
-    throw new Error('Viewport presets are unavailable for screen recording');
-  }
   if (args.captureMode === CaptureMode.CAMERA || args.tabId === null) {
     throw new Error('Viewport presets are unavailable for camera recording');
   }
@@ -47,7 +45,9 @@ export async function acquireVideoCaptureSurface(args: {
   const tabId = args.tabId;
   const presetId = args.presetId;
   session.acquisition = (async () => {
-    await ensureActivePageAccessRuntime(tabId, 'Page access is required for tab recording.');
+    const tabCapture = args.captureMode !== CaptureMode.SCREEN;
+    if (tabCapture)
+      await ensureActivePageAccessRuntime(tabId, 'Page access is required for tab recording.');
     session.applied = await getCaptureSurfaceService().apply({
       sessionId: args.recordingId,
       generation,
@@ -55,7 +55,7 @@ export async function acquireVideoCaptureSurface(args: {
       tabId,
       presetId,
       context: getContext(args.captureMode),
-      measureVideoViewport: readVideoPresetViewport,
+      ...(tabCapture ? { measureVideoViewport: readVideoPresetViewport } : {}),
     });
     return session.applied;
   })();

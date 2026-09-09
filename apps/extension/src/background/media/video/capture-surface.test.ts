@@ -103,21 +103,18 @@ describe('window-only video capture surface', () => {
     await expect(releaseVideoCaptureSurface('restore-error')).rejects.toThrow('window unavailable');
     await releaseVideoCaptureSurface('restore-error');
   });
-  it.each([CaptureMode.SCREEN, CaptureMode.CAMERA])(
-    'rejects window presets for %s',
-    async (captureMode) => {
-      await expect(
-        acquireVideoCaptureSurface({
-          captureMode,
-          presetId: 'window-hd',
-          recordingId: 'invalid-mode',
-          tabId: 7,
-        })
-      ).rejects.toThrow('unavailable');
-      expect(mocks.apply).not.toHaveBeenCalled();
-      await releaseVideoCaptureSurface('invalid-mode');
-    }
-  );
+  it.each([CaptureMode.CAMERA])('rejects window presets for %s', async (captureMode) => {
+    await expect(
+      acquireVideoCaptureSurface({
+        captureMode,
+        presetId: 'window-hd',
+        recordingId: 'invalid-mode',
+        tabId: 7,
+      })
+    ).rejects.toThrow('unavailable');
+    expect(mocks.apply).not.toHaveBeenCalled();
+    await releaseVideoCaptureSurface('invalid-mode');
+  });
   it('does not mutate the preset when page measurement access is unavailable', async () => {
     mocks.ensurePage.mockRejectedValueOnce(new Error('page access unavailable'));
     await expect(
@@ -231,4 +228,24 @@ describe('window-only video capture surface', () => {
     ).resolves.toBe('DENY');
     await expect(ready).rejects.toThrow('invalid dimensions');
   });
+});
+
+it('resizes the initiating browser window for desktop capture without page access or tab alignment', async () => {
+  await acquireVideoCaptureSurface({
+    captureMode: CaptureMode.SCREEN,
+    presetId: 'window-hd',
+    recordingId: 'desktop',
+    tabId: 7,
+  });
+  expect(mocks.apply).toHaveBeenCalledWith({
+    sessionId: 'desktop',
+    generation: 1,
+    owner: 'video',
+    tabId: 7,
+    presetId: 'window-hd',
+    context: 'video-screen',
+  });
+  expect(mocks.ensurePage).not.toHaveBeenCalled();
+  await releaseVideoCaptureSurface('desktop');
+  expect(mocks.release).toHaveBeenCalledWith(applied);
 });

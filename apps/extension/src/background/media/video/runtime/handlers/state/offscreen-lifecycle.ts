@@ -209,6 +209,7 @@ async function processVideoSavedToIdb(
   const existingState = await readStoredVideoPostRecordResult();
   if (isCompletedPostRecordReplay(existingState, message)) {
     const popupDestination = await resolvePostRecordPopupDestination();
+    await releaseVideoCaptureSurface(message.recordingId);
     await consumeRecordingCompletionOutbox(message, false);
     const openSavedPopup = shouldOpenPostRecordPopup(message.recordingId);
     if (openSavedPopup) await openPostRecordPopup(popupDestination);
@@ -224,6 +225,7 @@ async function processVideoSavedToIdb(
   const synchronized = await synchronizePostRecordResult(message);
   const openSavedPopup = shouldOpenPostRecordPopup(message.recordingId);
   if (synchronized === 'ready' || synchronized === 'acknowledged') {
+    await releaseVideoCaptureSurface(message.recordingId);
     await consumeRecordingCompletionOutbox(message, false);
     if (openSavedPopup) await openPostRecordPopup(popupDestination);
     finalizeSavedRecordingCompletion(message);

@@ -45,7 +45,7 @@ export function useVideoPresetAvailability(
   );
 
   useEffect(() => {
-    if (captureMode === CaptureMode.SCREEN || captureMode === CaptureMode.CAMERA) {
+    if (captureMode === CaptureMode.CAMERA) {
       setAvailabilityById(new Map());
       return;
     }

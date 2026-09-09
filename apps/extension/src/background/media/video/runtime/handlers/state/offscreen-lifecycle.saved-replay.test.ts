@@ -398,7 +398,7 @@ it('does not reset recording B when it becomes current during delayed A cleanup'
 });
 
 it.each(['ready', 'acknowledged'] as const)(
-  'accepts an exact %s replay without republishing or rerunning cleanup',
+  'accepts an exact %s replay without republishing while awaiting idempotent surface cleanup',
   async (status) => {
     const response = createSendResponse();
     getVideoRecordingIdMock.mockReturnValue(null);
@@ -421,7 +421,7 @@ it.each(['ready', 'acknowledged'] as const)(
 
     expect(restoreCurrentRecordingFromLeaseMock).not.toHaveBeenCalled();
     expect(persistPendingVideoPostRecordResultMock).not.toHaveBeenCalled();
-    expect(releaseVideoCaptureSurfaceMock).not.toHaveBeenCalled();
+    expect(releaseVideoCaptureSurfaceMock).toHaveBeenCalledWith('rec-saved-replay');
     expect(response).toHaveBeenCalledWith({ success: true, result: 'accepted' });
   }
 );

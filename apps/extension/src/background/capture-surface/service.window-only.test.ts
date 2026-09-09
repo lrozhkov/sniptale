@@ -476,3 +476,19 @@ describe('window-only capture-surface lifecycle', () => {
     expect(service.hasOwnerLease('screenshot')).toBe(false);
   });
 });
+
+it('applies and restores a browser window lease for desktop capture', async () => {
+  const service = new DefaultCaptureSurfaceService();
+  const surface = await service.apply(request({ owner: 'video', context: 'video-screen' }));
+  expect(mocks.applyPreparedWindowSize).toHaveBeenCalled();
+  await service.release(surface);
+  expect(mocks.restoreWindowSnapshot).toHaveBeenCalledWith(3, prior);
+});
+it('rejects desktop resize if the initiating browser window no longer exists', async () => {
+  mocks.getTab.mockRejectedValue(new Error('closed'));
+  const service = new DefaultCaptureSurfaceService();
+  await expect(
+    service.apply(request({ owner: 'video', context: 'video-screen' }))
+  ).rejects.toMatchObject({ code: 'unsupported-context' });
+  expect(mocks.applyPreparedWindowSize).not.toHaveBeenCalled();
+});
