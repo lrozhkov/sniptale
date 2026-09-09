@@ -1,7 +1,12 @@
 import { useState } from 'react';
-import { Search, Trash2 } from 'lucide-react';
-import { parseEffectV1Source } from '@sniptale/runtime-contracts/effect-v1';
-import { ProductGlassInput, ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
+import { Trash2 } from 'lucide-react';
+import {
+  describeCatalogDocument,
+  queryEffectCatalog,
+  type EffectCatalogFilter,
+} from '../../../features/video/project/effect-bundle/catalog/query';
+import { EffectCatalogControls } from '../../../ui/effect-catalog-controls';
+import { ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
 import { EditorIconButton } from '@sniptale/ui/editor-chrome';
 import type { EffectBundleCatalogEntry } from '../../../features/video/project/effect-bundle/catalog';
 import type { VideoProjectEffectTarget } from '../../../features/video/project/effect-instance/types';
@@ -24,14 +29,15 @@ export function CatalogSection(
       'run'
     >
 ): React.JSX.Element {
-  const [query, setQuery] = useState('');
-  const search = query.trim().toLocaleLowerCase(getCurrentLocale());
-  const matches = (value: string) => value.toLocaleLowerCase(getCurrentLocale()).includes(search);
+  const [filter, setFilter] = useState<EffectCatalogFilter>({
+    query: '',
+    kind: 'all',
+    theme: 'all',
+  });
   const visibleCatalogs = props.catalogs.filter((item) =>
     item.status === 'invalid'
-      ? matches(translate('videoEditor.effectsLibrary.invalidPack'))
-      : matches(readLocalized(item.catalog.label)) ||
-        item.catalog.documents.some((document) => matches(readDocumentLabel(document)))
+      ? filter.kind === 'all' && filter.theme === 'all' && !filter.query
+      : queryEffectCatalog(item.catalog, filter, getCurrentLocale()).length > 0
   );
   return (
     <section
@@ -39,23 +45,7 @@ export function CatalogSection(
       className="space-y-3"
     >
       {props.catalogs.length > 0 && (
-        <div className="relative">
-          <Search
-            size={15}
-            aria-hidden="true"
-            className={[
-              'pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2',
-              'text-[var(--sniptale-color-text-muted)]',
-            ].join(' ')}
-          />
-          <ProductGlassInput
-            className="!h-9 w-full !pl-8"
-            aria-label={translate('videoEditor.effectsLibrary.searchPlaceholder')}
-            placeholder={translate('videoEditor.effectsLibrary.searchPlaceholder')}
-            value={query}
-            onChange={(event) => setQuery(event.currentTarget.value)}
-          />
-        </div>
+        <EffectCatalogControls filter={filter} onChange={setFilter} disabled={props.disabled} />
       )}
       {!props.isLoading && props.catalogs.length === 0 && (
         <p className="px-1 text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
@@ -73,7 +63,7 @@ export function CatalogSection(
             key={item.catalog.packId}
             catalog={item.catalog}
             {...props}
-            search={search}
+            filter={filter}
           />
         ) : (
           <InvalidCatalogEntry key={item.packId} packId={item.packId} {...props} />
@@ -112,18 +102,11 @@ function CatalogEntry(
   props: VideoEditorEffectsLibraryDockProps & {
     catalog: EffectBundleCatalogEntry;
     disabled: boolean;
-    search: string;
+    filter: EffectCatalogFilter;
   } & Pick<EffectLibraryOperations, 'run'>
 ): React.JSX.Element {
   const { catalog } = props;
-  const packMatches = readLocalized(catalog.label)
-    .toLocaleLowerCase(getCurrentLocale())
-    .includes(props.search);
-  const documents = catalog.documents.filter(
-    (document) =>
-      packMatches ||
-      readDocumentLabel(document).toLocaleLowerCase(getCurrentLocale()).includes(props.search)
-  );
+  const documents = queryEffectCatalog(catalog, props.filter, getCurrentLocale());
   return (
     <article className={CATALOG_CARD_CLASS_NAME}>
       <div className="flex min-w-0 items-center justify-between gap-2 px-1">
@@ -273,8 +256,5 @@ function readLocalized(value: { en: string; ru: string }): string {
 }
 
 function readDocumentLabel(document: EffectBundleCatalogEntry['documents'][number]): string {
-  const parsed = parseEffectV1Source(document.source).document;
-  return parsed
-    ? (parsed.label[getCurrentLocale()] ?? parsed.label.en ?? getDocumentKindLabel(document.kind))
-    : getDocumentKindLabel(document.kind);
+  return describeCatalogDocument(document, getCurrentLocale()).label;
 }

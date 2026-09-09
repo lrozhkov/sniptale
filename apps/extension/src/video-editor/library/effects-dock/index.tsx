@@ -43,7 +43,7 @@ export function VideoEditorEffectsLibraryDock(
           data-ui="video-editor.effects-library.footer"
           className="shrink-0 border-t border-[var(--sniptale-color-border-soft)] px-2 py-1"
         >
-          <EffectImportControl disabled={disabled} onImport={props.onImportEffectFile} run={run} />
+          <EffectImportControl disabled={disabled} onImport={props.onImportEffectFiles} run={run} />
         </footer>
       </div>
     </aside>

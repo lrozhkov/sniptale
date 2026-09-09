@@ -121,9 +121,9 @@ it('exposes only targets that are available for each EffectV1 kind', async () =>
   expect(findDocumentButton('transition').disabled).toBe(false);
 });
 
-it('imports only the selected EffectV1 file and clears the native input value', async () => {
-  const onImportEffectFile = vi.fn(async () => undefined);
-  renderDock({ onImportEffectFile });
+it('imports selected EffectV1 files and clears the native input value', async () => {
+  const onImportEffectFiles = vi.fn(async () => []);
+  renderDock({ onImportEffectFiles });
   const input = container?.querySelector<HTMLInputElement>('input[type="file"]');
   const file = new File(['{}'], 'effect.sniptale-effect.json', { type: 'application/json' });
   if (!input) throw new Error('Expected EffectV1 file input');
@@ -131,7 +131,7 @@ it('imports only the selected EffectV1 file and clears the native input value', 
 
   await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
 
-  expect(onImportEffectFile).toHaveBeenCalledWith(file);
+  expect(onImportEffectFiles).toHaveBeenCalledWith([file]);
   expect(input.value).toBe('');
 });
 
@@ -256,7 +256,7 @@ function DroppedEffectOperationHarness(props: {
         operations={operations}
         onApplyEffect={props.onApplyEffect}
         onDeleteEffectBundle={vi.fn(async () => undefined)}
-        onImportEffectFile={vi.fn(async () => undefined)}
+        onImportEffectFiles={vi.fn(async () => [])}
         onSetEffectBundleEnabled={vi.fn(async () => undefined)}
         selectedClipId={null}
         selectedTransitionId={null}
@@ -279,7 +279,7 @@ function renderDock(
         operations={createOperations()}
         onApplyEffect={vi.fn(async () => null)}
         onDeleteEffectBundle={vi.fn(async () => undefined)}
-        onImportEffectFile={vi.fn(async () => undefined)}
+        onImportEffectFiles={vi.fn(async () => [])}
         onSetEffectBundleEnabled={vi.fn(async () => undefined)}
         selectedClipId={null}
         selectedTransitionId={null}
@@ -348,7 +348,7 @@ async function click(button: HTMLButtonElement): Promise<void> {
 }
 
 it('opens the picker, ignores its cancellation and resets it after a selected pack', async () => {
-  const onImport = vi.fn(async () => undefined);
+  const onImport = vi.fn(async () => []);
   const run = vi.fn(async (_kind: 'import', action: () => Promise<unknown>) => {
     await action();
   });
@@ -362,7 +362,7 @@ it('opens the picker, ignores its cancellation and resets it after a selected pa
   const file = new File(['{}'], 'pack.sniptale-effect.json');
   Object.defineProperty(input, 'files', { configurable: true, value: [file] });
   await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
-  expect(onImport).toHaveBeenCalledWith(file);
+  expect(onImport).toHaveBeenCalledWith([file]);
   expect(input.value).toBe('');
   act(() => root?.render(<EffectImportControl disabled onImport={onImport} run={run} />));
   expect(container!.querySelector('button')!.disabled).toBe(true);

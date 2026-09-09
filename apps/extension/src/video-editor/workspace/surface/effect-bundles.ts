@@ -3,10 +3,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   deleteEffectBundle,
   listEffectBundles,
-  saveEffectArtifact,
   setEffectBundleEnabled,
 } from '../../../composition/persistence/effect-bundles';
-import { importEffectArtifact } from '../../../features/video/project/effect-bundle';
+import {
+  importEffectFiles,
+  type EffectFileImportResult,
+} from '../../../composition/persistence/effect-bundles/import-files';
 import type { VideoEditorEffectCatalogItem } from '../../library/effects-dock/types';
 
 export interface WorkspaceEffectBundlesState {
@@ -14,7 +16,7 @@ export interface WorkspaceEffectBundlesState {
   errorCode: 'EFFECT_CATALOG_FAILED' | null;
   isLoading: boolean;
   onDeleteEffectBundle(packId: string): Promise<void>;
-  onImportEffectFile(file: File): Promise<void>;
+  onImportEffectFiles(files: readonly File[]): Promise<EffectFileImportResult[]>;
   onSetEffectBundleEnabled(packId: string, enabled: boolean): Promise<void>;
 }
 
@@ -28,11 +30,10 @@ export function useWorkspaceEffectBundles(): WorkspaceEffectBundlesState {
       await deleteEffectBundle(packId);
       await state.reload();
     },
-    async onImportEffectFile(file) {
-      const result = await importEffectArtifact(file);
-      if (!result.ok) throw new Error(result.primaryCode);
-      await saveEffectArtifact(result.artifact);
+    async onImportEffectFiles(files) {
+      const results = await importEffectFiles(files);
       await state.reload();
+      return results;
     },
     async onSetEffectBundleEnabled(packId, enabled) {
       await setEffectBundleEnabled(packId, enabled);
@@ -75,7 +76,9 @@ function useEffectBundleCatalogState() {
   useEffect(() => {
     mounted.current = true;
     void reload();
+    window.addEventListener('focus', reload);
     return () => {
+      window.removeEventListener('focus', reload);
       mounted.current = false;
       activeRequest.current += 1;
     };

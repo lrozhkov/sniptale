@@ -36,7 +36,7 @@ export function VideoEditorWorkspaceEffectsLibrary(props: {
       operations={props.effectOperations}
       onApplyEffect={onApplyEffect}
       onDeleteEffectBundle={props.effectBundles.onDeleteEffectBundle}
-      onImportEffectFile={props.effectBundles.onImportEffectFile}
+      onImportEffectFiles={props.effectBundles.onImportEffectFiles}
       onSetEffectBundleEnabled={props.effectBundles.onSetEffectBundleEnabled}
       selectedClipId={
         selectedClip &&

@@ -5,6 +5,7 @@ export const SETTINGS_SECTION_IDS = [
   'media-quality',
   'saving',
   'annotations',
+  'video-effects',
   'editor-resources',
   'ai-connections',
   'ai-prompts',
@@ -17,6 +18,7 @@ export const SETTINGS_SECTION_IDS = [
 export type SettingsSectionId = (typeof SETTINGS_SECTION_IDS)[number];
 
 export const SETTINGS_SECTION_VIEWS = {
+  'video-effects': [],
   'interface-browser': [],
   'quick-actions': [],
   'screen-sizes': [],
@@ -34,6 +36,7 @@ export const SETTINGS_SECTION_VIEWS = {
 
 type SettingsRouteWithoutView = {
   section:
+    | 'video-effects'
     | 'interface-browser'
     | 'quick-actions'
     | 'screen-sizes'

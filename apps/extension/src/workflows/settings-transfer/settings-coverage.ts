@@ -1,6 +1,8 @@
 import type { SettingsSectionId } from '../../platform/navigation/extension-pages/settings-route/codec';
 
 export const SETTINGS_TRANSFER_SECTION_COVERAGE = {
+  // Durable effect bundles are covered by Media Hub backup, not the settings preference format.
+  'video-effects': ['action/status'],
   'interface-browser': ['interface.preferences'],
   'quick-actions': ['capture.quick-actions'],
   'screen-sizes': ['capture.viewport-presets'],
@@ -49,6 +51,11 @@ type PersistenceMutationCoverage = {
 };
 
 export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
+  excluded(
+    'styles/video-effects/controller.ts',
+    ['deleteEffectBundle', 'setEffectBundleEnabled'],
+    'action/status'
+  ),
   transferable('ai/connections/controller/chrome-ai.ts', ['saveChromeAiEnabled'], ['ai.chrome']),
   transferable(
     'ai/connections/controller/delete-actions.ts',

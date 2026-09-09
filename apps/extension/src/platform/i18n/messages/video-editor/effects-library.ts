@@ -1,6 +1,37 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorEffectsLibraryMessages = defineMessageSource({
+  category: { ru: 'Категория', en: 'Category' },
+  allCategories: { ru: 'Все категории', en: 'All categories' },
+  annotations: { ru: 'Аннотации', en: 'Annotations' },
+  videoEffects: { ru: 'Видеоэффекты', en: 'Video effects' },
+  transitions: { ru: 'Переходы', en: 'Transitions' },
+  theme: { ru: 'Тема', en: 'Theme' },
+  allThemes: { ru: 'Все темы', en: 'All themes' },
+  lightTheme: { ru: 'Светлая', en: 'Light' },
+  darkTheme: { ru: 'Тёмная', en: 'Dark' },
+  noTheme: { ru: 'Без темы', en: 'Unspecified' },
+  importSummary: {
+    ru: 'Импортировано файлов: {success} из {total}',
+    en: 'Imported files: {success} of {total}',
+  },
+  importFailures: {
+    ru: 'Не удалось импортировать: {count}. Проверьте формат файлов.',
+    en: 'Could not import: {count}. Check the file format.',
+  },
+  importMany: { ru: 'Импорт эффектов', en: 'Import effects' },
+  catalogDescription: {
+    ru: 'Эффекты доступны во всех проектах. Отключение и удаление из каталога не меняют уже добавленные в монтаж эффекты.',
+    en: 'Effects are available across projects. Disabling or removing catalog entries does not change effects already used in a project.',
+  },
+  removeConfirm: { ru: 'Удалить «{name}» из каталога?', en: 'Remove “{name}” from the catalog?' },
+  removeHelp: {
+    ru: 'Для повторного добавления понадобится исходный файл эффекта.',
+    en: 'You will need the original effect file to add it again.',
+  },
+  mixedBundle: { ru: 'Наборы эффектов', en: 'Effect bundles' },
+  documentCount: { ru: 'Эффектов: {count}', en: 'Effects: {count}' },
+
   exportInstance: { ru: 'Экспорт эффекта', en: 'Export effect' },
   exportFailed: { ru: 'Не удалось экспортировать эффект', en: 'Could not export effect' },
   objectText: { ru: 'Текст', en: 'Text' },

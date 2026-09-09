@@ -1,3 +1,4 @@
+import type { EffectFileImportResult } from '../../../composition/persistence/effect-bundles/import-files';
 import type { EffectBundleCatalogEntry } from '../../../features/video/project/effect-bundle/catalog';
 import type { VideoProjectEffectTarget } from '../../../features/video/project/effect-instance/types';
 import type { EffectLibraryOperations } from './operations';
@@ -20,7 +21,7 @@ export interface VideoEditorEffectsLibraryDockProps {
     target: VideoProjectEffectTarget;
   }): Promise<string | null>;
   onDeleteEffectBundle(packId: string): Promise<void>;
-  onImportEffectFile(file: File): Promise<void>;
+  onImportEffectFiles(files: readonly File[]): Promise<EffectFileImportResult[]>;
   onSetEffectBundleEnabled(packId: string, enabled: boolean): Promise<void>;
   selectedClipId: string | null;
   selectedTransitionId: string | null;
