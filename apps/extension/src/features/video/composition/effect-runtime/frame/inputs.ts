@@ -1,3 +1,4 @@
+import { acquireVideoCompositionBuffer } from '../../canvas/buffer-pool';
 import { drawCompositionVisualLayer } from '../../draw/index';
 import type { VideoCompositionMediaSource } from '../../draw/media-source';
 import type { VideoCompositionVisualLayer } from '../../types';
@@ -110,12 +111,18 @@ async function drawIsolatedLayer(args: {
     args.renderDimensions.width,
     args.renderDimensions.height
   );
-  const canvas = args.ownerDocument.createElement('canvas');
-  canvas.width = args.renderDimensions.width;
-  canvas.height = args.renderDimensions.height;
+  let lease: ReturnType<typeof acquireVideoCompositionBuffer> = null;
   try {
-    const context = canvas.getContext('2d');
+    lease = acquireVideoCompositionBuffer(
+      args.renderDimensions.width,
+      args.renderDimensions.height,
+      args.ownerDocument
+    );
+    if (!lease) fail();
+    const canvas = lease.canvas;
+    const context = canvas.getContext('2d') as CanvasRenderingContext2D | null;
     if (!context) fail();
+    context.reset?.();
     context.clearRect(0, 0, canvas.width, canvas.height);
     drawCompositionVisualLayer(
       context,
@@ -138,6 +145,7 @@ async function drawIsolatedLayer(args: {
     }
     return bitmap;
   } finally {
+    lease?.release();
     releaseCanvas();
   }
 }

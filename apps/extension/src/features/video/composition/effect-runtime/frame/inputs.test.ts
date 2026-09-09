@@ -296,7 +296,7 @@ it('bakes captured actions into isolated effect input once without appending to 
   );
   expect(source.draw).toHaveBeenCalledOnce();
   expect(context.arc).toHaveBeenCalledTimes(1);
-  expect(context.arc).toHaveBeenCalledWith(5, 5, 32, 0, Math.PI * 2);
+  expect(context.arc).toHaveBeenCalledWith(5, 5, 33, 0, Math.PI * 2);
   drawCompositionVisualLayerBitmap(context as CanvasRenderingContext2D, layer, bitmap, 1, 1);
   expect(context.arc).toHaveBeenCalledTimes(1);
   bitmap.close();

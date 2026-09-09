@@ -12,6 +12,7 @@ interface CanvasPoolEntry {
   canvas: RuntimeCanvas;
   key: string;
   leased: boolean;
+  timer?: ReturnType<typeof setTimeout>;
 }
 
 interface EffectRuntimeCanvasLease {
@@ -35,7 +36,9 @@ export function createEffectRuntimeCanvasPool(options: {
     options.maxEntries ?? EFFECT_RUNTIME_RESOURCE_LIMITS.maxLiveCanvases
   );
   return {
-    clear: () => entries.splice(0, entries.length),
+    clear: () => {
+      for (const entry of [...entries]) discardCanvas(entries, entry);
+    },
     lease: (key) => leaseCanvas(entries, maxEntries, options.createCanvas, key),
     snapshot: () => ({
       entries: entries.length,
@@ -51,6 +54,7 @@ function leaseCanvas(
   key: CanvasPoolKey
 ): EffectRuntimeCanvasLease {
   const entry = resolveCanvasEntry(entries, maxEntries, createCanvas, key);
+  clearTimeout(entry.timer);
   resetCanvas(entry.canvas, key.width, key.height);
   entry.leased = true;
   let released = false;
@@ -60,6 +64,18 @@ function leaseCanvas(
       if (released) return;
       released = true;
       entry.leased = false;
+      if (!entries.includes(entry)) return;
+      entry.timer = setTimeout(() => discardCanvas(entries, entry), 1000);
+      while (
+        entries
+          .filter((e) => !e.leased)
+          .reduce((sum, e) => sum + e.canvas.width * e.canvas.height * 4, 0) >
+        64 * 1024 * 1024
+      ) {
+        const idle = entries.find((e) => !e.leased);
+        if (!idle) break;
+        discardCanvas(entries, idle);
+      }
     },
   };
 }
@@ -80,10 +96,12 @@ function resolveCanvasEntry(
   if (entries.length >= maxEntries) {
     const idleIndex = entries.findIndex((candidate) => !candidate.leased);
     if (idleIndex < 0) throw new EffectRuntimeResourceError();
-    entries.splice(idleIndex, 1);
+    discardCanvas(entries, entries[idleIndex]!);
   }
   const canvas = createCanvas(key.width, key.height);
   if (canvas.width !== key.width || canvas.height !== key.height || !canvas.getContext('2d')) {
+    canvas.width = 0;
+    canvas.height = 0;
     throw new Error('CANVAS_CREATION_FAILED');
   }
   const entry = { canvas, key: cacheKey, leased: false };
@@ -92,10 +110,13 @@ function resolveCanvasEntry(
 }
 
 function resetCanvas(canvas: RuntimeCanvas, width: number, height: number): void {
-  canvas.width = width;
-  canvas.height = height;
   const context = canvas.getContext('2d');
   if (!context) throw new Error('CANVAS_CONTEXT_UNAVAILABLE');
+  if (context.reset) context.reset();
+  else {
+    canvas.width = width;
+    canvas.height = height;
+  }
   context.setTransform(1, 0, 0, 1, 0, 0);
   context.globalAlpha = 1;
   context.globalCompositeOperation = 'source-over';
@@ -105,4 +126,12 @@ function resetCanvas(canvas: RuntimeCanvas, width: number, height: number): void
 
 function serializeKey(key: CanvasPoolKey): string {
   return `${key.effectInstanceId}:${key.slot}:${key.width}x${key.height}`;
+}
+
+function discardCanvas(entries: CanvasPoolEntry[], entry: CanvasPoolEntry): void {
+  clearTimeout(entry.timer);
+  const index = entries.indexOf(entry);
+  if (index >= 0) entries.splice(index, 1);
+  entry.canvas.width = 0;
+  entry.canvas.height = 0;
 }
