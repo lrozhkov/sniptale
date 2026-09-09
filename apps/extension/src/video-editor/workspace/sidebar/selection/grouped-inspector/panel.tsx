@@ -1,3 +1,4 @@
+import './panel.css';
 import { useWorkspacePreference } from '../../../../runtime/controller/workspace-preferences';
 import { useInspectorSectionMemory } from './presentation';
 import { useEffect, useRef, useState } from 'react';
@@ -105,6 +106,7 @@ export function InspectorGroupedPanel<TId extends string>(props: {
               className="py-4 first:pt-0 last:pb-0 focus:outline-none"
             >
               <h3
+                data-ui="video-editor.inspector.section-heading"
                 className={[
                   'mb-3 flex items-center gap-2 text-[13px] font-semibold',
                   'text-[var(--sniptale-color-text-primary)]',
