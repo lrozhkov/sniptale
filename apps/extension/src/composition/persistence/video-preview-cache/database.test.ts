@@ -19,6 +19,7 @@ function createDatabase() {
     metadata: createStore(),
     'video-previews': createStore(),
     'timeline-thumbnails': createStore(),
+    'effect-posters': createStore(),
   };
   return {
     close: vi.fn(),

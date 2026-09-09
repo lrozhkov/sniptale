@@ -27,3 +27,10 @@ it('keeps filter controls disabled during a catalog operation', () => {
   expect(html).toContain('disabled=""');
   expect(html).toContain('Найти эффект');
 });
+it('exposes an explicit selected All category instead of leaving every category unselected', () => {
+  const html = renderToStaticMarkup(
+    <EffectCatalogControls filter={{ query: '', kind: 'all', theme: 'all' }} onChange={vi.fn()} />
+  );
+  expect(html).toContain('data-category="all"');
+  expect(html.match(/aria-pressed="true"/g)).toHaveLength(1);
+});

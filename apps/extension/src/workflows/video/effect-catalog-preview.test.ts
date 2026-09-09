@@ -80,3 +80,16 @@ it('provides target and transition inputs and releases them when rendering fails
     vi.unstubAllGlobals();
   }
 });
+
+it('gives long entrance/exit animations scrub space while keeping transitions linear', async () => {
+  const { effectPreviewProgress, effectPosterKey } = await import('./effect-catalog-preview');
+  expect(effectPreviewProgress(0.2, 10, 'standalone')).toBeCloseTo(0.05);
+  expect(effectPreviewProgress(0.8, 10, 'standalone')).toBeCloseTo(0.95);
+  expect(effectPreviewProgress(0.2, 10, 'transition')).toBe(0.2);
+  const catalog = await createEffectCatalogEntry(await readValidBundleArtifact(), 1);
+  const entry = catalog.documents[0]!;
+  expect(effectPosterKey(entry)).toBe(effectPosterKey({ ...entry }));
+  expect(effectPosterKey(entry)).not.toBe(
+    effectPosterKey({ ...entry, assets: [{ id: 'replacement', sha256: 'b'.repeat(64) }] })
+  );
+});

@@ -1,6 +1,16 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorEffectsLibraryMessages = defineMessageSource({
+  all: { ru: 'Все', en: 'All' },
+  apply: { ru: 'Применить', en: 'Apply' },
+  dragToClip: {
+    ru: 'Перетащите на клип или выберите клип и нажмите «Применить»',
+    en: 'Drag onto a clip, or select a clip and apply',
+  },
+  dragToTransition: {
+    ru: 'Перетащите на переход или выберите переход и нажмите «Применить»',
+    en: 'Drag onto a transition, or select a transition and apply',
+  },
   category: { ru: 'Категория', en: 'Category' },
   allCategories: { ru: 'Все категории', en: 'All categories' },
   annotations: { ru: 'Аннотации', en: 'Annotations' },

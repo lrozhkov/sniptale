@@ -15,6 +15,10 @@ function fixture() {
   const rows = new Map<string, unknown>();
   const metadata = new Map<string, unknown>();
   const tx: VideoPreviewCacheTransaction = {
+    getPoster: async () => null,
+    listPosterEntries: async () => [],
+    putPoster: async () => {},
+    deletePoster: async () => {},
     getThumbnail: async (key) => rows.get(key),
     listThumbnailEntries: async () => [...rows].map(([key, value]) => ({ key, value })),
     putThumbnail: vi.fn(async (key, value) => {

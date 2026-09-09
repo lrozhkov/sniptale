@@ -23,6 +23,11 @@ import { useEffectLibraryOperations, type EffectLibraryOperations } from './oper
 import { resolveEffectTransitionTargetId } from '../../workspace/surface/effects-library';
 import { applyDroppedEffectDocument } from '../../workspace/surface/canvas';
 
+vi.mock('../../../ui/effect-catalog-preview', () => ({
+  EffectCatalogPreviewProvider: ({ children }: { children: React.ReactNode }) => children,
+  EffectCatalogPreview: () => null,
+}));
+
 let container: HTMLDivElement | null = null;
 let root: Root | null = null;
 
@@ -50,7 +55,7 @@ it('keeps import failure guidance in the padded scrollable content without inter
   });
   const alert = container?.querySelector('[role="alert"]');
   expect(alert?.textContent).toBe(translate('videoEditor.effectsLibrary.importFailed'));
-  expect(alert?.closest('[aria-busy]')?.className).toContain('overflow-y-auto');
+  expect(alert?.closest('[aria-busy]')?.className).toContain('flex-col');
 });
 
 it('shows catalog loading and a safe recovery message instead of diagnostic codes', () => {
@@ -82,13 +87,7 @@ it('uses the compact tokenized dock and user-facing EffectV1 target labels', () 
   expect(dock?.className).not.toContain('absolute');
   expect(documentRows).toHaveLength(3);
   expect(documentRows?.[0]?.className).toContain('var(--sniptale-color-surface-panel)');
-  expect(container?.textContent).toContain(
-    translate('videoEditor.effectsLibrary.documentKindScene')
-  );
-  expect(container?.textContent).toContain(
-    translate('videoEditor.effectsLibrary.documentKindClip')
-  );
-  expect(container?.textContent).toContain(
+  expect(findDocumentButton('target').title).toBe(
     translate('videoEditor.effectsLibrary.selectClipTarget')
   );
   expect(container?.textContent).not.toContain('targetEffect');
@@ -104,8 +103,9 @@ it('exposes only targets that are available for each EffectV1 kind', async () =>
   expect(standalone.disabled).toBe(false);
   expect(target.disabled).toBe(true);
   expect(transition.disabled).toBe(true);
-  expect(standalone.textContent).toBe(translate('videoEditor.effectsLibrary.applyToScene'));
-  expect(target.textContent).toBe(translate('videoEditor.effectsLibrary.selectClipTarget'));
+  expect(standalone.textContent).toBe(translate('common.actions.add'));
+  expect(target.textContent).toBe(translate('videoEditor.effectsLibrary.apply'));
+  expect(target.title).toBe(translate('videoEditor.effectsLibrary.selectClipTarget'));
 
   await click(standalone);
   expect(onApplyEffect).toHaveBeenCalledWith(
@@ -135,19 +135,10 @@ it('imports selected EffectV1 files and clears the native input value', async ()
   expect(input.value).toBe('');
 });
 
-it('keeps an invalid EffectV1 catalog row visible with delete-only recovery', async () => {
-  const onDeleteEffectBundle = vi.fn(async () => undefined);
-  renderDock({
-    catalogs: [{ packId: 'broken-pack', status: 'invalid' }],
-    onDeleteEffectBundle,
-  });
-  const invalidRow = container?.querySelector<HTMLElement>('article[data-state="invalid"]');
-  const buttons = invalidRow?.querySelectorAll('button');
-
-  expect(invalidRow?.textContent).toContain('broken-pack');
-  expect(buttons).toHaveLength(1);
-  await click(buttons?.[0] as HTMLButtonElement);
-  expect(onDeleteEffectBundle).toHaveBeenCalledWith('broken-pack');
+it('keeps catalog management out of the editor for invalid bundles', () => {
+  renderDock({ catalogs: [{ packId: 'broken-pack', status: 'invalid' }] });
+  expect(container?.querySelector('article[data-state="invalid"]')).toBeNull();
+  expect(container?.textContent).toContain(translate('videoEditor.effectsLibrary.noSearchResults'));
 });
 
 it('does not expose a transition that already owns an EffectV1 instance', () => {
@@ -387,6 +378,13 @@ it('filters document names and restores the catalog after an empty search', () =
     'utf8'
   );
   renderDock({ catalogs: [{ catalog, status: 'ready' }] });
+  act(() =>
+    container!
+      .querySelector<HTMLButtonElement>(
+        `button[title="${translate('videoEditor.effectsLibrary.searchPlaceholder')}"]`
+      )!
+      .click()
+  );
   const input = container!.querySelector<HTMLInputElement>('input:not([type="file"])')!;
   const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
   const search = (value: string) =>

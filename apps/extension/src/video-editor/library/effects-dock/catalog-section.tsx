@@ -3,7 +3,7 @@ import {
   EffectCatalogPreviewProvider,
 } from '../../../ui/effect-catalog-preview';
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { Plus, Check, GripVertical } from 'lucide-react';
 import {
   describeCatalogDocument,
   getEffectCatalogThemes,
@@ -22,7 +22,8 @@ import type { VideoEditorEffectsLibraryDockProps } from './types';
 const CATALOG_CARD_CLASS_NAME =
   'space-y-2 border-b border-[var(--sniptale-color-border-soft)] pb-3';
 const DOCUMENT_CARD_CLASS_NAME = [
-  'flex min-w-0 flex-col gap-2 rounded-[8px] border p-2',
+  'effect-catalog-card group grid min-w-0 grid-cols-[minmax(64px,36%)_minmax(0,1fr)] items-center gap-2',
+  'rounded-[6px] border p-1.5 cursor-grab active:cursor-grabbing',
   'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]',
 ].join(' ');
 
@@ -52,10 +53,10 @@ export function CatalogSection(
     <EffectCatalogPreviewProvider>
       <section
         aria-label={translate('videoEditor.effectsLibrary.effectV1Label')}
-        className="space-y-3"
+        className="flex min-h-0 flex-1 flex-col"
       >
         {props.catalogs.length > 0 && (
-          <div className="sticky top-0 z-10 bg-[var(--sniptale-color-surface-panel)] pb-2">
+          <div className="shrink-0 border-b border-[var(--sniptale-color-border-soft)] p-2">
             <EffectCatalogControls
               themes={themes}
               filter={effectiveFilter}
@@ -64,27 +65,29 @@ export function CatalogSection(
             />
           </div>
         )}
-        {!props.isLoading && props.catalogs.length === 0 && (
-          <p className="px-1 text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
-            {translate('videoEditor.effectsLibrary.noImportedPacks')}
-          </p>
-        )}
-        {props.catalogs.length > 0 && visibleCatalogs.length === 0 && (
-          <p
-            role="status"
-            className="px-1 text-xs leading-5 text-[var(--sniptale-color-text-muted)]"
-          >
-            {translate('videoEditor.effectsLibrary.noSearchResults')}
-          </p>
-        )}
-        {visibleCatalogs.map((catalog) => (
-          <CatalogEntry
-            key={catalog.packId}
-            catalog={catalog}
-            {...props}
-            filter={effectiveFilter}
-          />
-        ))}
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
+          {!props.isLoading && props.catalogs.length === 0 && (
+            <p className="px-1 text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
+              {translate('videoEditor.effectsLibrary.noImportedPacks')}
+            </p>
+          )}
+          {props.catalogs.length > 0 && visibleCatalogs.length === 0 && (
+            <p
+              role="status"
+              className="px-1 text-xs leading-5 text-[var(--sniptale-color-text-muted)]"
+            >
+              {translate('videoEditor.effectsLibrary.noSearchResults')}
+            </p>
+          )}
+          {visibleCatalogs.map((catalog) => (
+            <CatalogEntry
+              key={catalog.packId}
+              catalog={catalog}
+              {...props}
+              filter={effectiveFilter}
+            />
+          ))}
+        </div>
       </section>
     </EffectCatalogPreviewProvider>
   );
@@ -141,8 +144,12 @@ function CatalogDocument(
         })
       }
     >
-      <EffectCatalogPreview catalog={props.catalog} document={props.document} />
-      <div className="flex min-w-0 items-center gap-2">
+      <EffectCatalogPreview
+        catalog={props.catalog}
+        document={props.document}
+        captureFrame={props.capturePreviewFrame}
+      />
+      <div className="flex min-w-0 flex-col items-stretch gap-1">
         <div className="min-w-0 flex-1">
           <p className="break-words text-[13px] font-medium text-[var(--sniptale-color-text-primary)]">
             {metadata.label}
@@ -157,28 +164,52 @@ function CatalogDocument(
             </span>
           )}
         </div>
-        <ProductActionButton
-          compact
-          tone="secondary"
-          className="self-end"
-          title={getDocumentActionLabel(props.document.kind, target)}
-          aria-label={getDocumentActionLabel(props.document.kind, target)}
-          disabled={props.disabled || !target}
-          onClick={() =>
-            target &&
-            void props.run('apply', () =>
-              props.onApplyEffect({
-                catalog: props.catalog,
-                documentId: props.document.id,
-                startTime: props.currentTime,
-                target,
-              })
-            )
-          }
-        >
-          <Plus size={14} aria-hidden="true" />
-          {translate('common.actions.add')}
-        </ProductActionButton>
+        <div className="flex items-center justify-between gap-1">
+          {props.document.kind !== 'standalone' && (
+            <span
+              title={translate(
+                props.document.kind === 'targetEffect'
+                  ? 'videoEditor.effectsLibrary.dragToClip'
+                  : 'videoEditor.effectsLibrary.dragToTransition'
+              )}
+              className="shrink-0 text-[var(--sniptale-color-text-muted)]"
+            >
+              <GripVertical size={14} aria-hidden="true" />
+            </span>
+          )}
+          <ProductActionButton
+            compact
+            tone="secondary"
+            className="self-end !min-w-0"
+            title={getDocumentActionLabel(props.document.kind, target)}
+            aria-label={getDocumentActionLabel(props.document.kind, target)}
+            disabled={props.disabled || !target}
+            onClick={() =>
+              target &&
+              void props.run('apply', () =>
+                props.onApplyEffect({
+                  catalog: props.catalog,
+                  documentId: props.document.id,
+                  startTime: props.currentTime,
+                  target,
+                })
+              )
+            }
+          >
+            {props.document.kind === 'standalone' ? (
+              <Plus size={14} aria-hidden="true" />
+            ) : (
+              <Check size={14} aria-hidden="true" />
+            )}
+            <span className="effect-catalog-apply-label">
+              {translate(
+                props.document.kind === 'standalone'
+                  ? 'common.actions.add'
+                  : 'videoEditor.effectsLibrary.apply'
+              )}
+            </span>
+          </ProductActionButton>
+        </div>
       </div>
     </div>
   );

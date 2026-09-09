@@ -69,6 +69,10 @@ class MemoryPreviewCacheDatabase implements VideoPreviewCacheDatabasePort {
 
   private createTransaction(): VideoPreviewCacheTransaction {
     return {
+      getPoster: async () => null,
+      listPosterEntries: async () => [],
+      putPoster: async () => {},
+      deletePoster: async () => {},
       getThumbnail: async (key) => this.thumbnails.get(key),
       listThumbnailEntries: async () =>
         [...this.thumbnails].map(([key, value]) => ({ key, value })),

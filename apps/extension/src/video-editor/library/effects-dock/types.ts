@@ -10,6 +10,7 @@ export type VideoEditorEffectCatalogItem =
 export interface VideoEditorEffectsLibraryDockProps {
   catalogs: readonly VideoEditorEffectCatalogItem[];
   currentTime: number;
+  capturePreviewFrame?: () => HTMLCanvasElement | null;
   errorCode: string | null;
   isLoading: boolean;
   isOpen: boolean;

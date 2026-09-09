@@ -1,5 +1,6 @@
+import './effect-catalog.css';
 import { useRef, useState } from 'react';
-import { Search, X, Sparkles, WandSparkles, ArrowRightLeft } from 'lucide-react';
+import { Search, X, Sparkles, WandSparkles, ArrowRightLeft, LayoutGrid } from 'lucide-react';
 import { EditorIconButton } from '@sniptale/ui/editor-chrome';
 import { ProductGlassInput } from '@sniptale/ui/product-glass-controls';
 import { CompactSelect } from './compact-inspector-controls/primitives';
@@ -21,6 +22,7 @@ export function EffectCatalogControls({
   const searchButton = useRef<HTMLButtonElement>(null);
   const [searching, setSearching] = useState(false);
   const categories = [
+    { value: 'all', Icon: LayoutGrid, label: translate('videoEditor.effectsLibrary.all') },
     {
       value: 'standalone',
       Icon: Sparkles,
@@ -38,7 +40,7 @@ export function EffectCatalogControls({
     },
   ] as const;
   return (
-    <div className="flex w-full min-w-0 max-w-sm flex-col gap-2" data-ui="effect-catalog.filters">
+    <div className="flex w-full min-w-0 flex-col gap-2" data-ui="effect-catalog.filters">
       <div className="flex min-w-0 items-center gap-1">
         {searching ? (
           <ProductGlassInput
@@ -59,22 +61,26 @@ export function EffectCatalogControls({
             }}
           />
         ) : (
-          <div className="flex min-w-0 flex-1 items-center gap-1">
+          <div
+            className="effect-catalog-categories"
+            role="group"
+            aria-label={translate('videoEditor.effectsLibrary.category')}
+          >
             {categories.map(({ value, Icon, label }) => (
-              <EditorIconButton
+              <button
+                type="button"
                 key={value}
                 title={label}
+                aria-label={label}
+                data-category={value}
                 aria-pressed={filter.kind === value}
-                className={
-                  filter.kind === value
-                    ? 'text-[var(--sniptale-color-accent)] bg-[var(--sniptale-color-surface-panel)]'
-                    : ''
-                }
+                className="effect-catalog-category"
                 disabled={disabled}
-                onClick={() => onChange({ ...filter, kind: filter.kind === value ? 'all' : value })}
+                onClick={() => onChange({ ...filter, kind: value })}
               >
-                <Icon size={17} aria-hidden="true" />
-              </EditorIconButton>
+                <Icon size={16} aria-hidden="true" />
+                <span>{label}</span>
+              </button>
             ))}
           </div>
         )}

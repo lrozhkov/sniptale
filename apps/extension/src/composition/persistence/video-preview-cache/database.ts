@@ -1,12 +1,14 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 
 export const VIDEO_PREVIEW_CACHE_DATABASE_NAME = 'sniptale-video-preview-cache';
-const VIDEO_PREVIEW_CACHE_DATABASE_VERSION = 2;
+const VIDEO_PREVIEW_CACHE_DATABASE_VERSION = 3;
 const METADATA_STORE = 'metadata';
 const RECORD_STORE = 'video-previews';
+const POSTER_STORE = 'effect-posters';
 const THUMBNAIL_STORE = 'timeline-thumbnails';
 
 interface VideoPreviewCacheSchema extends DBSchema {
+  'effect-posters': { key: string; value: unknown };
   'timeline-thumbnails': { key: string; value: unknown };
   metadata: {
     key: string;
@@ -36,11 +38,15 @@ export interface VideoPreviewCacheReadTransaction {
   getMetadata(key: string): Promise<unknown>;
   getRecord(key: string): Promise<unknown>;
   listRecordEntries(): Promise<VideoPreviewCacheRecordEntry[]>;
+  getPoster(key: string): Promise<unknown>;
+  listPosterEntries(): Promise<VideoPreviewCacheRecordEntry[]>;
   getThumbnail(key: string): Promise<unknown>;
   listThumbnailEntries(): Promise<VideoPreviewCacheRecordEntry[]>;
 }
 
 export interface VideoPreviewCacheTransaction extends VideoPreviewCacheReadTransaction {
+  deletePoster(key: string): Promise<void>;
+  putPoster(key: string, value: unknown): Promise<void>;
   deleteRecord(key: string): Promise<void>;
   deleteThumbnail(key: string): Promise<void>;
   putThumbnail(key: string, value: unknown): Promise<void>;
@@ -78,18 +84,32 @@ async function databaseExists(): Promise<boolean | null> {
 function createReadTransaction(
   db: IDBPDatabase<VideoPreviewCacheSchema>
 ): VideoPreviewCacheReadTransaction {
-  const transaction = db.transaction([METADATA_STORE, RECORD_STORE, THUMBNAIL_STORE], 'readonly');
+  const transaction = db.transaction(
+    [METADATA_STORE, RECORD_STORE, THUMBNAIL_STORE, POSTER_STORE],
+    'readonly'
+  );
   const metadata = transaction.objectStore(METADATA_STORE);
   const records = transaction.objectStore(RECORD_STORE);
-  return createReadTransactionPort(metadata, records, transaction.objectStore(THUMBNAIL_STORE));
+  return createReadTransactionPort(
+    metadata,
+    records,
+    transaction.objectStore(THUMBNAIL_STORE),
+    transaction.objectStore(POSTER_STORE)
+  );
 }
 
 function createReadTransactionPort(
   metadata: VideoPreviewCacheMetadataStore,
   records: VideoPreviewCacheRecordStore,
-  thumbnails: VideoPreviewCacheRecordStore
+  thumbnails: VideoPreviewCacheRecordStore,
+  posters: VideoPreviewCacheRecordStore
 ): VideoPreviewCacheReadTransaction {
   return {
+    getPoster: (key) => posters.get(key),
+    async listPosterEntries() {
+      const [keys, values] = await Promise.all([posters.getAllKeys(), posters.getAll()]);
+      return keys.map((key, index) => ({ key, value: values[index] }));
+    },
     getThumbnail: (key) => thumbnails.get(key),
     async listThumbnailEntries() {
       const [keys, values] = await Promise.all([thumbnails.getAllKeys(), thumbnails.getAll()]);
@@ -109,19 +129,26 @@ function createMutationTransaction(db: IDBPDatabase<VideoPreviewCacheSchema>): {
   port: VideoPreviewCacheTransaction;
   abort(): void;
 } {
-  const transaction = db.transaction([METADATA_STORE, RECORD_STORE, THUMBNAIL_STORE], 'readwrite');
+  const transaction = db.transaction(
+    [METADATA_STORE, RECORD_STORE, THUMBNAIL_STORE, POSTER_STORE],
+    'readwrite'
+  );
   const metadata = transaction.objectStore(METADATA_STORE);
   const records = transaction.objectStore(RECORD_STORE);
   const readPort = createReadTransactionPort(
     metadata,
     records,
-    transaction.objectStore(THUMBNAIL_STORE)
+    transaction.objectStore(THUMBNAIL_STORE),
+    transaction.objectStore(POSTER_STORE)
   );
   return {
     abort: () => transaction.abort(),
     done: transaction.done,
     port: {
       ...readPort,
+      deletePoster: async (key) => void (await transaction.objectStore(POSTER_STORE).delete(key)),
+      putPoster: async (key, value) =>
+        void (await transaction.objectStore(POSTER_STORE).put(value, key)),
       deleteThumbnail: async (key) =>
         void (await transaction.objectStore(THUMBNAIL_STORE).delete(key)),
       putThumbnail: async (key, value) =>
@@ -192,6 +219,8 @@ function startDatabaseOpen(onBlocking: () => void) {
         onBlocking();
       },
       upgrade(database) {
+        if (!database.objectStoreNames.contains(POSTER_STORE))
+          database.createObjectStore(POSTER_STORE);
         if (!database.objectStoreNames.contains(THUMBNAIL_STORE))
           database.createObjectStore(THUMBNAIL_STORE);
         if (!database.objectStoreNames.contains(METADATA_STORE)) {

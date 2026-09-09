@@ -227,6 +227,20 @@
           ]
         }
       ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/video-preview-cache/effect-posters.ts",
+      "owner": "video-preview-cache",
+      "justification": "Bounded advisory generic effect covers in the existing local preview-cache database.",
+      "reviewNote": "WebP only; 8 MiB, 128 covers, 30 days. No project frames; excluded from backup/export. Existing privacy erasure and instance tokens prevent stale writes.",
+      "storageWrites": [
+        {
+          "sink": "tx.putPoster",
+          "keys": [
+            "key"
+          ]
+        }
+      ]
     }
   ],
   "diagnosticSanitizerOwners": [

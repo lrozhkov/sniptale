@@ -16,7 +16,8 @@ export async function renderEffectCatalogPreview(
   catalog: EffectBundleCatalogEntry,
   entry: EffectBundleCatalogDocumentEntry,
   progress: number,
-  sequenceId: number
+  sequenceId: number,
+  sourceFrame?: HTMLCanvasElement | null
 ): Promise<ImageBitmap> {
   const parsed = parseEffectV1Source(entry.source).document;
   if (!parsed) throw new Error('Invalid preview document');
@@ -57,10 +58,10 @@ export async function renderEffectCatalogPreview(
   };
   const inputs =
     entry.kind === 'targetEffect'
-      ? { source: await sampleFrame(width, height, false) }
+      ? { source: await sampleFrame(width, height, false, sourceFrame) }
       : entry.kind === 'transition'
         ? {
-            from: await sampleFrame(width, height, false),
+            from: await sampleFrame(width, height, false, sourceFrame),
             to: await sampleFrame(width, height, true),
           }
         : {};
@@ -79,10 +80,19 @@ export async function renderEffectCatalogPreview(
   }
 }
 
-async function sampleFrame(width: number, height: number, alternate: boolean) {
+async function sampleFrame(
+  width: number,
+  height: number,
+  alternate: boolean,
+  source?: HTMLCanvasElement | null
+) {
   const canvas = new OffscreenCanvas(width, height);
   const context = canvas.getContext('2d');
   if (!context) throw new Error('Preview canvas unavailable');
+  if (source && source.width && source.height) {
+    context.drawImage(source, 0, 0, width, height);
+    return { bitmap: canvas.transferToImageBitmap(), width, height };
+  }
   context.fillStyle = alternate ? '#203a58' : '#f0ebe5';
   context.fillRect(0, 0, width, height);
   context.fillStyle = alternate ? '#e5c9a2' : '#537993';
@@ -92,4 +102,21 @@ async function sampleFrame(width: number, height: number, alternate: boolean) {
   context.arc(width * 0.72, height * 0.5, height * 0.2, 0, Math.PI * 2);
   context.fill();
   return { bitmap: canvas.transferToImageBitmap(), width, height };
+}
+
+/** Reserve room for entrance and exit instead of spending most of the scrub on a held frame. */
+export function effectPreviewProgress(position: number, duration: number, kind: string): number {
+  const x = Math.max(0, Math.min(0.999, position));
+  if (kind === 'transition' || duration <= 2) return x;
+  const edge = Math.min(0.25, 1 / duration);
+  if (x < 0.4) return (x / 0.4) * edge;
+  if (x > 0.6) return 1 - edge + ((x - 0.6) / 0.4) * edge;
+  return edge + ((x - 0.4) / 0.2) * (1 - 2 * edge);
+}
+
+export function effectPosterKey(entry: EffectBundleCatalogDocumentEntry): string {
+  return `poster-v2-320:${entry.sha256}:${entry.assets
+    .map(({ id, sha256 }) => `${id}:${sha256}`)
+    .sort()
+    .join('|')}`;
 }

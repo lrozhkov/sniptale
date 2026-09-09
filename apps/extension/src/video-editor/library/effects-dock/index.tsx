@@ -15,10 +15,7 @@ export function VideoEditorEffectsLibraryDock(
   return (
     <aside data-ui="video-editor.effects-library.dock" className={EFFECT_LIBRARY_DOCK_CLASS_NAME}>
       <div className="flex h-full min-h-0 w-full flex-col">
-        <div
-          className="min-h-0 flex-1 space-y-3 overflow-y-auto p-2"
-          aria-busy={disabled || props.isLoading}
-        >
+        <div className="flex min-h-0 flex-1 flex-col" aria-busy={disabled || props.isLoading}>
           {props.isLoading && (
             <p
               role="status"

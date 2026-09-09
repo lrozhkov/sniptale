@@ -29,6 +29,7 @@ export function VideoEditorWorkspaceEffectsLibrary(props: {
   return (
     <VideoEditorEffectsLibraryDock
       catalogs={props.effectBundles.catalogs}
+      capturePreviewFrame={captureCatalogFrame}
       currentTime={preview.transport.currentTime}
       errorCode={props.effectBundles.errorCode}
       isLoading={props.effectBundles.isLoading}
@@ -71,4 +72,27 @@ export function resolveEffectTransitionTargetId(
   const active = segments.find(({ end, start }) => currentTime >= start && currentTime < end);
   if (active) return active.id;
   return segments.length === 1 ? segments[0]!.id : null;
+}
+
+/** Snapshot the displayed surface once per hover; never seek or invalidate the preview renderer. */
+function captureCatalogFrame(): HTMLCanvasElement | null {
+  const cached = document.querySelector<HTMLVideoElement>('[data-preview-stage-cached-video]');
+  const live = document.querySelector<HTMLCanvasElement>('[data-preview-stage-canvas]');
+  const source =
+    cached && cached.readyState >= 2 && getComputedStyle(cached).visibility !== 'hidden'
+      ? cached
+      : live;
+  if (!source) return null;
+  const width = source instanceof HTMLVideoElement ? source.videoWidth : source.width;
+  const height = source instanceof HTMLVideoElement ? source.videoHeight : source.height;
+  if (!width || !height) return null;
+  const frame = document.createElement('canvas');
+  frame.width = 320;
+  frame.height = Math.max(1, Math.round((320 * height) / width));
+  try {
+    frame.getContext('2d')?.drawImage(source, 0, 0, frame.width, frame.height);
+    return frame;
+  } catch {
+    return null;
+  }
 }
