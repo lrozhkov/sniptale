@@ -207,3 +207,38 @@ it.each([
     materializer.dispose();
   }
 );
+
+it('reuses the decoded source and media element for camera-only redraws', async () => {
+  vi.useFakeTimers();
+  mockDelayedSeekVideo();
+  const project = createEmptyVideoProject('Framing');
+  project.duration = 1;
+  project.clips = [createVideoClip(project.tracks[0]!.id)];
+  const materializer = createVideoPreviewFrameMaterializer({
+    project,
+    ownerDocument: document,
+    assetUrls: { 'asset-1': 'blob:source' },
+    rasterSize: { width: 480, height: 270 },
+  });
+  const video = document.querySelector('video')!;
+  const seek = vi.spyOn(video, 'currentTime', 'set');
+  const signal = new AbortController().signal;
+  const first = materializer.renderFrame(0.25, signal);
+  await vi.advanceTimersByTimeAsync(120);
+  await first;
+  const cameraOverride = {
+    scale: 0.5,
+    focusPoint: { x: 960, y: 540 },
+    regionId: 'region',
+    motionBlurAmount: 0,
+    viewportX: -960,
+    viewportY: -540,
+    viewportWidth: 3840,
+    viewportHeight: 2160,
+  };
+  await materializer.renderFrame(0.25, signal, cameraOverride);
+  expect(seek).toHaveBeenCalledTimes(1);
+  expect(document.querySelectorAll('video')).toHaveLength(1);
+  expect(renderPreviewScene).toHaveBeenLastCalledWith(expect.objectContaining({ cameraOverride }));
+  materializer.dispose();
+});

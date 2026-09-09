@@ -59,3 +59,22 @@ it('still paints scene backgrounds in timeline gaps', async () => {
   await renderPreviewScene({ ...job, currentTime: 6 });
   expect(drawPreviewVisualPasses).toHaveBeenCalledOnce();
 });
+
+it('renders inspector framing through the shared camera transform instead of scaling a flattened bitmap', async () => {
+  const { job } = setup();
+  const cameraOverride = {
+    focusPoint: { x: 640, y: 360 },
+    scale: 0.5,
+    viewportX: -640,
+    viewportY: -360,
+    viewportWidth: 2560,
+    viewportHeight: 1440,
+    regionId: 'selected',
+    motionBlurAmount: 0,
+    overlayZoomMode: 'LOCK_OVERLAYS' as const,
+  };
+  await renderPreviewScene({ ...job, ...{ cameraOverride } });
+  const args = vi.mocked(drawPreviewVisualPasses).mock.calls[0]![0];
+  expect(args.overlayFrame.camera).toEqual(cameraOverride);
+  expect(args.passes.every((pass) => pass.frame.camera === cameraOverride)).toBe(true);
+});

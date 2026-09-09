@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { createMotionFocusAreaFromPointScale } from '../../../../../features/video/project/motion';
+import {
+  createMotionFocusAreaFromPointScale,
+  resolveMotionOverlayZoomMode,
+} from '../../../../../features/video/project/motion';
 import {
   clampFocusAreaSize,
   normalizeMotionFocusArea,
@@ -24,7 +27,7 @@ export interface FramingPreviewProps {
   onCommitArea?: (area: VideoProjectMotionArea) => void;
 }
 
-export function useFramingInteraction(props: FramingPreviewProps, retry: number) {
+export function useFramingInteraction(props: FramingPreviewProps) {
   const { project, region, assetUrls } = props;
   const gesture = useRef<{
     pointer: number | null;
@@ -48,7 +51,7 @@ export function useFramingInteraction(props: FramingPreviewProps, retry: number)
     setDraft(null);
     gesture.current.area = null;
     setAreaDraft(null);
-  }, [assetUrls, project, region.startTime, region.duration, retry]);
+  }, [assetUrls, project, region.startTime, region.duration]);
 
   const clamp = (point: Point): Point => ({
     x: Math.min(project.width, Math.max(0, point.x)),
@@ -85,6 +88,14 @@ export function useFramingInteraction(props: FramingPreviewProps, retry: number)
   return {
     areaMode,
     area,
+    camera: {
+      ...viewport,
+      focusPoint: focus,
+      scale: project.width / viewport.viewportWidth,
+      regionId: region.id,
+      motionBlurAmount: 0,
+      overlayZoomMode: resolveMotionOverlayZoomMode(region.overlayZoomMode),
+    },
     viewport,
     left,
     top,
@@ -277,10 +288,10 @@ function resolveFramingView(
     ? Math.min(4, Math.max(1, Math.min(project.width / area.width, project.height / area.height)))
     : region.scale;
   const viewport = resolveCameraViewportFrame(project, focus, scale);
-  const left = Math.min(0, viewport.viewportX);
-  const top = Math.min(0, viewport.viewportY);
-  const width = Math.max(project.width, viewport.viewportX + viewport.viewportWidth) - left;
-  const height = Math.max(project.height, viewport.viewportY + viewport.viewportHeight) - top;
+  const left = viewport.viewportX;
+  const top = viewport.viewportY;
+  const width = viewport.viewportWidth;
+  const height = viewport.viewportHeight;
 
   return { areaMode, area, focus, viewport, left, top, width, height };
 }

@@ -2,7 +2,6 @@ import { useContext, useRef } from 'react';
 import { translate } from '../../../../../platform/i18n';
 import {
   VideoMotionFocusMode,
-  type VideoProject,
   type VideoProjectMotionRegion,
   type VideoProjectMotionArea,
 } from '../../../../../features/video/project/types';
@@ -43,13 +42,10 @@ export function MotionFramingPreview(props: {
 }
 
 export function FramingPreviewSurface(props: FramingPreviewProps) {
-  const { project } = props;
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { ready, failed, retry, reload } = useFramingFrame(props, canvasRef);
-  const { areaMode, area, viewport, left, top, width, height, handlers } = useFramingInteraction(
-    props,
-    retry
-  );
+  const { areaMode, area, camera, viewport, left, top, width, height, handlers } =
+    useFramingInteraction(props);
+  const { ready, failed, reload } = useFramingFrame(props, canvasRef, camera);
 
   return (
     <div className="space-y-2" data-ui="video-editor.framing-preview">
@@ -68,7 +64,6 @@ touch-none cursor-move disabled:cursor-default`}
           canvasRef={canvasRef}
           ready={ready}
           failed={failed}
-          project={project}
           area={area}
           viewport={viewport}
           world={{ left, top, width, height }}
@@ -99,7 +94,6 @@ function FramingOverlays({
   canvasRef,
   ready,
   failed,
-  project,
   area,
   viewport,
   world,
@@ -107,7 +101,6 @@ function FramingOverlays({
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   ready: boolean;
   failed: boolean;
-  project: VideoProject;
   area: VideoProjectMotionArea | null;
   viewport: ReturnType<typeof resolveCameraViewportFrame>;
   world: { left: number; top: number; width: number; height: number };
@@ -121,10 +114,9 @@ function FramingOverlays({
         className="absolute pointer-events-none"
         style={{
           visibility: ready ? 'visible' : 'hidden',
-          left: `${(-left / width) * 100}%`,
-          top: `${(-top / height) * 100}%`,
-          width: `${(project.width / width) * 100}%`,
-          height: `${(project.height / height) * 100}%`,
+          inset: 0,
+          width: '100%',
+          height: '100%',
         }}
       />
       {ready && area ? (

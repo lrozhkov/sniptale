@@ -20,6 +20,7 @@ const pending: {
   resolve: (canvas: HTMLCanvasElement) => void;
   reject: (error: Error) => void;
   signal: AbortSignal;
+  camera: { scale: number; overlayZoomMode?: string };
   dispose: ReturnType<typeof vi.fn>;
 }[] = [];
 const project = createEmptyVideoProject('Frame', 800, 600);
@@ -36,6 +37,7 @@ const areaRegion = {
 beforeEach(() => {
   pending.length = 0;
   draw.mockClear();
+  mocks.create.mockClear();
   commit.mockClear();
   commitArea.mockClear();
   host = document.createElement('div');
@@ -50,9 +52,13 @@ beforeEach(() => {
     const dispose = vi.fn();
     return {
       dispose,
-      renderFrame: (_time: number, signal: AbortSignal) =>
+      renderFrame: (
+        _time: number,
+        signal: AbortSignal,
+        camera: { scale: number; overlayZoomMode?: string }
+      ) =>
         new Promise<HTMLCanvasElement>((resolve, reject) =>
-          pending.push({ resolve, reject, signal, dispose })
+          pending.push({ resolve, reject, signal, dispose, camera })
         ),
     };
   });
@@ -93,7 +99,7 @@ function setupBounds() {
   button().releasePointerCapture = vi.fn();
 }
 
-it('renders the actual composition without zoom and commits one completed pointer gesture', async () => {
+it('renders the framed composition and commits a gesture in its displayed scene coordinates', async () => {
   render();
   expect(button().disabled).toBe(true);
   await ready();
@@ -104,7 +110,7 @@ it('renders the actual composition without zoom and commits one completed pointe
   pointer('pointermove', 150, 110);
   expect(commit).not.toHaveBeenCalled();
   pointer('pointerup', 200, 120);
-  expect(commit).toHaveBeenCalledExactlyOnceWith({ x: 600, y: 340 });
+  expect(commit).toHaveBeenCalledExactlyOnceWith({ x: 500, y: 320 });
 });
 
 it('cancels a draft and respects the locked fieldset for pointer and keyboard edits', async () => {
@@ -160,7 +166,7 @@ it('moves the selected area in scene coordinates with one commit and clamps it i
   pointer('pointermove', 200, 125);
   expect(commitArea).not.toHaveBeenCalled();
   pointer('pointerup', 200, 125);
-  expect(commitArea).toHaveBeenCalledExactlyOnceWith({ x: 300, y: 200, width: 400, height: 300 });
+  expect(commitArea).toHaveBeenCalledExactlyOnceWith({ x: 250, y: 175, width: 400, height: 300 });
   expect(commit).not.toHaveBeenCalled();
   commitArea.mockClear();
   pointer('pointerdown', 150, 100);
@@ -178,10 +184,10 @@ it('resizes from a corner while retaining the opposite corner and stops at minim
   pointer('pointermove', 120, 90);
   expect(commitArea).not.toHaveBeenCalled();
   pointer('pointerup', 120, 90);
-  expect(commitArea).toHaveBeenCalledExactlyOnceWith({ x: 240, y: 180, width: 360, height: 270 });
+  expect(commitArea).toHaveBeenCalledExactlyOnceWith({ x: 220, y: 165, width: 380, height: 285 });
   commitArea.mockClear();
   pointer('pointerdown', 100, 75, corner);
-  pointer('pointerup', 400, 300);
+  pointer('pointerup', 800, 600);
   expect(commitArea).toHaveBeenCalledExactlyOnceWith({ x: 552, y: 402, width: 48, height: 48 });
 });
 
@@ -264,8 +270,11 @@ it('retains a decoded frame through focus edits and autosave metadata changes', 
     editedRegion
   );
   expect(button().disabled).toBe(false);
-  expect(pending).toHaveLength(1);
+  expect(pending).toHaveLength(2);
+  expect(mocks.create).toHaveBeenCalledOnce();
   expect(draw).toHaveBeenCalledOnce();
+  await ready(1);
+  expect(draw).toHaveBeenCalledTimes(2);
 });
 
 it('does not cancel a pending decode for focus-only changes', async () => {
@@ -304,3 +313,31 @@ it('reuses equivalent project snapshots but refreshes changed media URLs', async
   await ready(1);
   expect(button().disabled).toBe(false);
 });
+
+it('coalesces camera edits during decoding and never presents a superseded composition', async () => {
+  render(false, project, { ...region, scale: 0.5 });
+  render(false, project, { ...region, scale: 0.75 });
+  render(false, project, { ...region, scale: 1 });
+  expect(pending).toHaveLength(1);
+  expect(mocks.create).toHaveBeenCalledOnce();
+  await ready(0);
+  expect(draw).not.toHaveBeenCalled();
+  expect(pending).toHaveLength(2);
+  expect(pending[1]!.camera.scale).toBe(1);
+  await ready(1);
+  expect(draw).toHaveBeenCalledOnce();
+  expect(button().disabled).toBe(false);
+});
+
+it.each(['LOCK_OVERLAYS', 'FOLLOW_CAMERA'] as const)(
+  'passes %s at 50 percent without shrinking the canvas',
+  async (overlayZoomMode) => {
+    render(false, project, { ...region, scale: 0.5, overlayZoomMode });
+    await ready();
+    expect(pending[0]!.camera).toMatchObject({ scale: 0.5, overlayZoomMode });
+    const canvas = host.querySelector('canvas')!;
+    expect(canvas.style.width).toBe('100%');
+    expect(canvas.style.height).toBe('100%');
+    expect(mocks.create).toHaveBeenCalledOnce();
+  }
+);

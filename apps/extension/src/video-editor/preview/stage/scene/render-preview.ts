@@ -1,3 +1,4 @@
+import type { VideoCompositionCameraState } from '../../../../features/video/composition/types';
 import {
   drawSceneActionCompositionStates,
   drawCursorCompositionState,
@@ -74,6 +75,7 @@ function drawPreviewSceneOverlays(params: {
 }
 
 export async function renderPreviewScene(params: {
+  cameraOverride?: VideoCompositionCameraState;
   canvas: HTMLCanvasElement;
   currentTime: number;
   imageBank: Record<string, HTMLImageElement>;
@@ -89,6 +91,10 @@ export async function renderPreviewScene(params: {
   videoRefs: PreviewStageVideoRefs;
 }): Promise<void | false> {
   const renderPasses = resolveVideoCompositionRenderPasses(params.project, params.currentTime);
+  if (params.cameraOverride) {
+    renderPasses.overlayFrame.camera = params.cameraOverride;
+    for (const pass of renderPasses.visualPasses) pass.frame.camera = params.cameraOverride;
+  }
   const clipMediaElements = createPreviewSceneMediaMap(params.videoRefs);
   const effectRuntimeFrames = await resolvePreviewEffectRuntimeFrames(
     params,
