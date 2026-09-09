@@ -1,11 +1,13 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 
 export const VIDEO_PREVIEW_CACHE_DATABASE_NAME = 'sniptale-video-preview-cache';
-const VIDEO_PREVIEW_CACHE_DATABASE_VERSION = 1;
+const VIDEO_PREVIEW_CACHE_DATABASE_VERSION = 2;
 const METADATA_STORE = 'metadata';
 const RECORD_STORE = 'video-previews';
+const THUMBNAIL_STORE = 'timeline-thumbnails';
 
 interface VideoPreviewCacheSchema extends DBSchema {
+  'timeline-thumbnails': { key: string; value: unknown };
   metadata: {
     key: string;
     value: unknown;
@@ -34,10 +36,14 @@ export interface VideoPreviewCacheReadTransaction {
   getMetadata(key: string): Promise<unknown>;
   getRecord(key: string): Promise<unknown>;
   listRecordEntries(): Promise<VideoPreviewCacheRecordEntry[]>;
+  getThumbnail(key: string): Promise<unknown>;
+  listThumbnailEntries(): Promise<VideoPreviewCacheRecordEntry[]>;
 }
 
 export interface VideoPreviewCacheTransaction extends VideoPreviewCacheReadTransaction {
   deleteRecord(key: string): Promise<void>;
+  deleteThumbnail(key: string): Promise<void>;
+  putThumbnail(key: string, value: unknown): Promise<void>;
   putMetadata(key: string, value: unknown): Promise<void>;
   putRecord(key: string, value: unknown): Promise<void>;
 }
@@ -72,17 +78,23 @@ async function databaseExists(): Promise<boolean | null> {
 function createReadTransaction(
   db: IDBPDatabase<VideoPreviewCacheSchema>
 ): VideoPreviewCacheReadTransaction {
-  const transaction = db.transaction([METADATA_STORE, RECORD_STORE], 'readonly');
+  const transaction = db.transaction([METADATA_STORE, RECORD_STORE, THUMBNAIL_STORE], 'readonly');
   const metadata = transaction.objectStore(METADATA_STORE);
   const records = transaction.objectStore(RECORD_STORE);
-  return createReadTransactionPort(metadata, records);
+  return createReadTransactionPort(metadata, records, transaction.objectStore(THUMBNAIL_STORE));
 }
 
 function createReadTransactionPort(
   metadata: VideoPreviewCacheMetadataStore,
-  records: VideoPreviewCacheRecordStore
+  records: VideoPreviewCacheRecordStore,
+  thumbnails: VideoPreviewCacheRecordStore
 ): VideoPreviewCacheReadTransaction {
   return {
+    getThumbnail: (key) => thumbnails.get(key),
+    async listThumbnailEntries() {
+      const [keys, values] = await Promise.all([thumbnails.getAllKeys(), thumbnails.getAll()]);
+      return keys.map((key, index) => ({ key, value: values[index] }));
+    },
     getMetadata: (key) => metadata.get(key),
     getRecord: (key) => records.get(key),
     async listRecordEntries() {
@@ -97,15 +109,23 @@ function createMutationTransaction(db: IDBPDatabase<VideoPreviewCacheSchema>): {
   port: VideoPreviewCacheTransaction;
   abort(): void;
 } {
-  const transaction = db.transaction([METADATA_STORE, RECORD_STORE], 'readwrite');
+  const transaction = db.transaction([METADATA_STORE, RECORD_STORE, THUMBNAIL_STORE], 'readwrite');
   const metadata = transaction.objectStore(METADATA_STORE);
   const records = transaction.objectStore(RECORD_STORE);
-  const readPort = createReadTransactionPort(metadata, records);
+  const readPort = createReadTransactionPort(
+    metadata,
+    records,
+    transaction.objectStore(THUMBNAIL_STORE)
+  );
   return {
     abort: () => transaction.abort(),
     done: transaction.done,
     port: {
       ...readPort,
+      deleteThumbnail: async (key) =>
+        void (await transaction.objectStore(THUMBNAIL_STORE).delete(key)),
+      putThumbnail: async (key, value) =>
+        void (await transaction.objectStore(THUMBNAIL_STORE).put(value, key)),
       deleteRecord: async (key) => void (await records.delete(key)),
       putMetadata: async (key, value) => void (await metadata.put(value, key)),
       putRecord: async (key, value) => void (await records.put(value, key)),
@@ -172,6 +192,8 @@ function startDatabaseOpen(onBlocking: () => void) {
         onBlocking();
       },
       upgrade(database) {
+        if (!database.objectStoreNames.contains(THUMBNAIL_STORE))
+          database.createObjectStore(THUMBNAIL_STORE);
         if (!database.objectStoreNames.contains(METADATA_STORE)) {
           database.createObjectStore(METADATA_STORE);
         }

@@ -25,7 +25,7 @@ An unlock request may persist session metadata under `AI_SECRET_UNLOCK_REQUESTS_
 - Retain page content or user media only for an explicit product feature and an owner registered in the storage inventory.
 - Keep durable media bytes in immutable OPFS objects. Keep identity, ownership, lifecycle, and publication state in IndexedDB.
 - Publish an OPFS object and its IndexedDB graph atomically through the persistence-transition owner.
-- Treat previews, thumbnails, caches, staging objects, and temporary jobs as non-authoritative.
+- Treat previews, thumbnails, caches, staging objects, and temporary jobs as non-authoritative. Timeline WebP thumbnails use the existing local preview-cache IndexedDB database, bounded to 32 MiB, 2048 frames, and 14 days. Reads do not renew retention; project deletion and local-data erasure remove them and invalidate pending writes.
 - Exclude local media, temporary payloads, and caches from sync, automatic export, diagnostics, and traces.
 - Include data in backup only when the backup contract explicitly names it.
 - Abort active writers before local-data erasure. Remove registered browser storage, IndexedDB, OPFS, caches, staging objects, and legacy stores covered by the erasure contract. Verify absence before reporting success.

@@ -54,7 +54,9 @@ it('waits for decoded zero-time pixels even when currentTime already equals the 
   expect(media.drawImage).not.toHaveBeenCalled();
   expect(media.seek).toHaveBeenCalledExactlyOnceWith(0);
   media.finishSeek();
-  expect(await outcome).toEqual([{ cacheKey: 'first', sourceTime: 0, url: 'blob:decoded-frame' }]);
+  expect(await outcome).toEqual([
+    { cacheKey: 'first', sourceTime: 0, url: 'blob:decoded-frame', blob: expect.any(Blob) },
+  ]);
   expect(media.drawImage).toHaveBeenCalledOnce();
   expect(media.video.getAttribute('src')).toBe('');
 });
@@ -66,7 +68,9 @@ it('subscribes before seeking so an immediately available frame cannot be missed
     samples: [{ cacheKey: 'later', sourceTime: 2 }],
   });
   media.video.dispatchEvent(new Event('loadeddata'));
-  expect(await outcome).toEqual([{ cacheKey: 'later', sourceTime: 2, url: 'blob:decoded-frame' }]);
+  expect(await outcome).toEqual([
+    { cacheKey: 'later', sourceTime: 2, url: 'blob:decoded-frame', blob: expect.any(Blob) },
+  ]);
   expect(media.video.getAttribute('src')).toBe('');
 });
 

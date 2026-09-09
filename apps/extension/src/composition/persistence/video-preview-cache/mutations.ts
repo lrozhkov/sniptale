@@ -1,3 +1,4 @@
+import { deleteProjectThumbnails, pruneTimelineThumbnails } from './thumbnails';
 import {
   runWithPersistenceMutationPermit,
   runWithPersistentDataErasureBarrier,
@@ -59,6 +60,7 @@ function validateNow(now: number): number {
 async function cleanupCache(deps: VideoPreviewCacheServiceDeps) {
   return runWithPersistenceMutationPermit(async () => {
     const result = await deps.database.mutateExisting(async (transaction) => {
+      await pruneTimelineThumbnails(transaction, deps.now());
       const entries = await transaction.listRecordEntries();
       const records = entries.map(parseVideoPreviewCacheEntry).filter((record) => record !== null);
       const invalidKeys = entries
@@ -132,7 +134,9 @@ async function deleteProjectCache(deps: VideoPreviewCacheServiceDeps, projectId:
       if (remaining.some((entry) => readVideoPreviewCacheProjectId(entry.value) === projectId)) {
         throw new Error('Video preview cache project deletion verification failed');
       }
-      return { removedCount };
+      return {
+        removedCount: removedCount + (await deleteProjectThumbnails(transaction, projectId)),
+      };
     });
     return result ?? { removedCount: 0 };
   });

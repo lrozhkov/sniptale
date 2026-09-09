@@ -300,3 +300,34 @@ async function renderHarness(props: React.ComponentProps<typeof TimelinePreviewH
     await Promise.resolve();
   });
 }
+
+it('keeps an in-flight batch alive across unrelated project and equivalent URL-map updates', async () => {
+  const project = createProjectWithVisualClip(VideoProjectAssetType.VIDEO);
+  let finish!: (frames: readonly TimelineVideoFrameLoadResult[]) => void;
+  const loader = vi.fn<TimelineVideoFrameLoader>().mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  const onPreviewsChange = vi.fn();
+  await renderHarness({
+    project,
+    assetUrls: { 'asset-video': 'blob:video' },
+    loadVideoFrames: loader,
+    onPreviewsChange,
+  });
+  const initialPlan = loader.mock.calls[0]![0];
+  await renderHarness({
+    project: { ...project, name: 'Renamed project' },
+    assetUrls: { 'asset-video': 'blob:video' },
+    loadVideoFrames: loader,
+    onPreviewsChange,
+  });
+  expect(initialPlan.signal?.aborted).toBe(false);
+  expect(loader).toHaveBeenCalledTimes(1);
+  await act(async () => finish([createLoadedFrame(initialPlan, 0, 'blob:ready')]));
+  expect(onPreviewsChange).toHaveBeenLastCalledWith({
+    'clip-1': { kind: 'video', frames: [{ url: 'blob:ready', sourceStart: 2, sourceEnd: 6 }] },
+  });
+});

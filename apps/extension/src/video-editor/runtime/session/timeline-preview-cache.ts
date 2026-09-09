@@ -1,6 +1,8 @@
 import type { TimelineClipPreviewMap } from '../../contracts/timeline-preview';
 
 export interface TimelinePreviewPlan {
+  projectId?: string;
+  sourceKey?: string;
   assetId: string;
   assetUrl: string;
   clipId: string;

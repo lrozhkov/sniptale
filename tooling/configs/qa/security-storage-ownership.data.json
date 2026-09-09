@@ -9,7 +9,9 @@
       "storageWrites": [
         {
           "sink": "browserStorage.local.set",
-          "keys": ["AI_PROVIDER_SECRETS_KEY"]
+          "keys": [
+            "AI_PROVIDER_SECRETS_KEY"
+          ]
         }
       ]
     },
@@ -52,7 +54,9 @@
         },
         {
           "sink": "browserStorage.sync.set",
-          "keys": ["LEGACY_AI_SETTINGS_STORAGE_KEY"]
+          "keys": [
+            "LEGACY_AI_SETTINGS_STORAGE_KEY"
+          ]
         }
       ]
     },
@@ -88,7 +92,9 @@
       "storageWrites": [
         {
           "sink": "browserStorage.local.set",
-          "keys": ["AI_SECRET_PROTECTION_TRANSITION_KEY"]
+          "keys": [
+            "AI_SECRET_PROTECTION_TRANSITION_KEY"
+          ]
         }
       ]
     },
@@ -100,7 +106,9 @@
       "storageWrites": [
         {
           "sink": "browserStorage.session.set",
-          "keys": ["AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY"]
+          "keys": [
+            "AI_SECRET_UNLOCK_REQUESTS_STORAGE_KEY"
+          ]
         }
       ]
     },
@@ -112,7 +120,9 @@
       "storageWrites": [
         {
           "sink": "browserStorage.session.set",
-          "keys": ["CAMERA_RECORDER_GRANT_STORAGE_KEY"]
+          "keys": [
+            "CAMERA_RECORDER_GRANT_STORAGE_KEY"
+          ]
         }
       ]
     }
@@ -141,7 +151,9 @@
       "storageWrites": [
         {
           "sink": "browserStorage.local.set",
-          "keys": ["GALLERY_SAVED_VIEWS_STORAGE_KEY"]
+          "keys": [
+            "GALLERY_SAVED_VIEWS_STORAGE_KEY"
+          ]
         }
       ]
     },
@@ -153,7 +165,9 @@
       "storageWrites": [
         {
           "sink": "browserStorage.session.set",
-          "keys": ["createAnnotationForkSessionStorageKey(tabId)"]
+          "keys": [
+            "createAnnotationForkSessionStorageKey(tabId)"
+          ]
         }
       ]
     },
@@ -165,7 +179,9 @@
       "storageWrites": [
         {
           "sink": "store.put",
-          "keys": ["FRAME_ANNOTATION_RASTER_JOBS_STORE"]
+          "keys": [
+            "FRAME_ANNOTATION_RASTER_JOBS_STORE"
+          ]
         }
       ]
     },
@@ -177,7 +193,10 @@
       "storageWrites": [
         {
           "sink": "transaction.putRecord",
-          "keys": ["committed.storageKey", "storageKey"]
+          "keys": [
+            "committed.storageKey",
+            "storageKey"
+          ]
         }
       ]
     },
@@ -189,7 +208,23 @@
       "storageWrites": [
         {
           "sink": "browserStorage.local.set",
-          "keys": ["PROMPT_TEMPLATES_KEY"]
+          "keys": [
+            "PROMPT_TEMPLATES_KEY"
+          ]
+        }
+      ]
+    },
+    {
+      "file": "apps/extension/src/composition/persistence/video-preview-cache/thumbnails.ts",
+      "owner": "video-preview-cache",
+      "justification": "Persist bounded advisory timeline WebP thumbnails in the existing local preview cache database.",
+      "reviewNote": "Source-time rasters only; 32 MiB, 2048 frames, 14 days. Excluded from backup/export; project deletion and privacy erasure invalidate jobs and remove frames.",
+      "storageWrites": [
+        {
+          "sink": "transaction.putThumbnail",
+          "keys": [
+            "key"
+          ]
         }
       ]
     }

@@ -15,7 +15,11 @@ function createStore() {
 }
 
 function createDatabase() {
-  const stores = { metadata: createStore(), 'video-previews': createStore() };
+  const stores = {
+    metadata: createStore(),
+    'video-previews': createStore(),
+    'timeline-thumbnails': createStore(),
+  };
   return {
     close: vi.fn(),
     createObjectStore: vi.fn(),
