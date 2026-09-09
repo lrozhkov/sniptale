@@ -105,3 +105,51 @@ it('registers hidden audio refs for audio clips and audio-capable video clips', 
   expect(audioRefs.current[audioClip.id]).toBeInstanceOf(HTMLAudioElement);
   expect(audioRefs.current[videoClip.id]).toBeInstanceOf(HTMLAudioElement);
 });
+
+it('releases removed audio sources without resetting players on ordinary frame updates', () => {
+  const pause = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+  const load = vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+  const audioRefs: PreviewStageAudioRefs = { current: {} };
+  const clip = createVideoClip();
+  const render = (clips: VideoProjectVideoClip[], src = 'blob:first') =>
+    act(() =>
+      root!.render(
+        <PreviewStageAudioBank
+          assetUrls={{ [clip.assetId]: src }}
+          audioBankClips={clips}
+          audioRefs={audioRefs}
+        />
+      )
+    );
+  try {
+    for (let i = 0; i < 3; i++) {
+      render([clip]);
+      const audio = audioRefs.current[clip.id]!;
+      const loads = load.mock.calls.length;
+      const pauses = pause.mock.calls.length;
+      audio.volume = 0.35;
+      audio.muted = true;
+      render([{ ...clip }]);
+      expect(audio.volume).toBe(0.35);
+      expect(audio.muted).toBe(true);
+      expect(audioRefs.current[clip.id]).toBe(audio);
+      expect(load).toHaveBeenCalledTimes(loads);
+      expect(pause).toHaveBeenCalledTimes(pauses);
+      render([]);
+      expect(audio.hasAttribute('src')).toBe(false);
+      expect(pause).toHaveBeenCalledTimes(pauses + 1);
+      expect(load).toHaveBeenCalledTimes(loads + 1);
+      expect(audioRefs.current[clip.id]).toBeUndefined();
+    }
+    render([clip]);
+    const audio = audioRefs.current[clip.id]!;
+    const loads = load.mock.calls.length;
+    render([clip], 'blob:second');
+    expect(audio.src).toBe('blob:second');
+    expect(load).toHaveBeenCalledTimes(loads + 1);
+    render([]);
+  } finally {
+    pause.mockRestore();
+    load.mockRestore();
+  }
+});

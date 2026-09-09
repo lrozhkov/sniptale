@@ -1,4 +1,4 @@
-import type React from 'react';
+import { useLayoutEffect, useRef } from 'react';
 
 import type { PreviewStageAudioBankClip, PreviewStageAudioRefs } from '../types';
 
@@ -24,25 +24,37 @@ export function PreviewStageAudioBank({
           return null;
         }
 
-        return (
-          <audio
-            key={clip.id}
-            ref={(node) => {
-              if (node) {
-                node.defaultMuted = false;
-                node.muted = false;
-                node.volume = 1;
-                audioRefs.current[clip.id] = node;
-                return;
-              }
-
-              delete audioRefs.current[clip.id];
-            }}
-            src={src}
-            preload="auto"
-          />
-        );
+        return <PreviewBankAudio key={clip.id} clipId={clip.id} src={src} audioRefs={audioRefs} />;
       })}
     </div>
   );
+}
+
+function PreviewBankAudio({
+  clipId,
+  src,
+  audioRefs,
+}: {
+  clipId: string;
+  src: string;
+  audioRefs: PreviewStageAudioRefs;
+}) {
+  const ref = useRef<HTMLAudioElement>(null);
+  useLayoutEffect(() => {
+    const audio = ref.current;
+    if (!audio) return;
+    audio.defaultMuted = false;
+    audio.muted = false;
+    audio.volume = 1;
+    audio.src = src;
+    const audios = audioRefs.current;
+    audios[clipId] = audio;
+    return () => {
+      if (audios[clipId] === audio) delete audios[clipId];
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+    };
+  }, [clipId, src, audioRefs]);
+  return <audio ref={ref} preload="auto" />;
 }
