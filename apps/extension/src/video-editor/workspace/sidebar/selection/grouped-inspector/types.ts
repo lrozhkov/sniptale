@@ -7,6 +7,7 @@ export type InspectorSectionSemantic =
   | 'framing'
   | 'audio'
   | 'canvas'
+  | 'grid'
   | 'background'
   | 'appearance'
   | 'camera'

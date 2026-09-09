@@ -1,6 +1,15 @@
 import { defineMessageSource } from '../../source';
 
 export const videoEditorSidebarSelectionSceneMessages = defineMessageSource({
+  canvasFormatLabel: { ru: 'Пропорции', en: 'Aspect ratio' },
+  canvasResolutionLabel: { ru: 'Разрешение', en: 'Resolution' },
+  canvasFormatWide: { ru: 'Горизонтальный', en: 'Landscape' },
+  canvasFormatVertical: { ru: 'Вертикальный', en: 'Vertical' },
+  canvasFormatSquare: { ru: 'Квадратный', en: 'Square' },
+  canvasFormatPortrait: { ru: 'Портретный', en: 'Portrait' },
+  canvasFormatClassic: { ru: 'Классический', en: 'Classic' },
+  canvasCustom: { ru: 'Произвольные', en: 'Custom' },
+  canvasExactSize: { ru: 'Точные размеры', en: 'Custom dimensions' },
   sceneBackgroundTypeLabel: {
     ru: 'Тип фона',
     en: 'Background type',

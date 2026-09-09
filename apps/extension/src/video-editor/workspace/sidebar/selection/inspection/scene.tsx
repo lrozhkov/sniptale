@@ -4,7 +4,7 @@ import { getProjectSceneBackground } from '../../../../../features/video/project
 import { VideoProjectAssetType } from '../../../../../features/video/project/types';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { InspectorGroupedPanel } from '../grouped-inspector';
-import { NumberInput } from '../inputs/number';
+import { SceneCanvasFields } from './scene-canvas';
 import { SceneObjectTracksPanel } from './object-tracks';
 import { PANEL_META_CLASS_NAME, PANEL_SECTION_CLASS_NAME } from '../shared/panel';
 import { SceneBackgroundFields } from '../scene-background/fields';
@@ -41,20 +41,11 @@ function createSceneGroups(
       label: translate('videoEditor.sidebar.inspectorGroupCanvas'),
       defaultActive: true,
       content: (
-        <>
-          <SceneProjectSizeFields
-            height={props.project.height}
-            onResizeProject={props.onResizeProject}
-            width={props.project.width}
-          />
-          {props.gridSettings && (
-            <GridSettingsPanel
-              grid={props.gridSettings}
-              recentColors={props.recentColors}
-              onRememberRecentColor={props.onRememberRecentColor}
-            />
-          )}
-        </>
+        <SceneCanvasFields
+          height={props.project.height}
+          onResizeProject={props.onResizeProject}
+          width={props.project.width}
+        />
       ),
     },
     {
@@ -73,6 +64,19 @@ function createSceneGroups(
           sceneBackground={sceneBackground}
         />
       ),
+    },
+    {
+      id: 'grid',
+      semantic: 'grid' as const,
+      label: translate('videoEditor.sidebar.gridSettingsTitle'),
+      visible: Boolean(props.gridSettings),
+      content: props.gridSettings ? (
+        <GridSettingsPanel
+          grid={props.gridSettings}
+          recentColors={props.recentColors}
+          onRememberRecentColor={props.onRememberRecentColor}
+        />
+      ) : null,
     },
     createSceneObjectTracksGroup(props, objectTracks),
   ] as const;
@@ -111,7 +115,6 @@ function SceneInfo(props: {
 
 function SceneHeader({ project }: Pick<WorkspaceSidebarSelectionPanelProps, 'project'>) {
   const projectMeta = [
-    `${project.width}×${project.height}`,
     `${project.fps} ${translate('videoEditor.sidebar.projectFpsSuffix')}`,
     `${project.duration.toFixed(1)}${translate('videoEditor.sidebar.projectDurationSecondsSuffix')}`,
   ].join(' · ');
@@ -119,34 +122,6 @@ function SceneHeader({ project }: Pick<WorkspaceSidebarSelectionPanelProps, 'pro
   return (
     <div>
       <p className={`mt-1 ${PANEL_META_CLASS_NAME}`}>{projectMeta}</p>
-    </div>
-  );
-}
-
-function SceneProjectSizeFields(props: {
-  height: number;
-  onResizeProject: WorkspaceSidebarSelectionPanelProps['onResizeProject'];
-  width: number;
-}) {
-  const maxCanvasSize = 7680;
-  return (
-    <div className="space-y-3">
-      <NumberInput
-        label={translate('videoEditor.sidebar.canvasWidthLabel')}
-        value={props.width}
-        min={320}
-        max={maxCanvasSize}
-        scrub
-        onChange={(value) => props.onResizeProject(value, props.height)}
-      />
-      <NumberInput
-        label={translate('videoEditor.sidebar.canvasHeightLabel')}
-        value={props.height}
-        min={180}
-        max={maxCanvasSize}
-        scrub
-        onChange={(value) => props.onResizeProject(props.width, value)}
-      />
     </div>
   );
 }

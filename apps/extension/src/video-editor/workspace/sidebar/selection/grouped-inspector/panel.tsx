@@ -3,6 +3,7 @@ import { useWorkspacePreference } from '../../../../runtime/controller/workspace
 import { useInspectorSectionMemory } from './presentation';
 import { useEffect, useRef, useState } from 'react';
 import {
+  Grid3X3,
   AudioLines,
   Clock3,
   Frame,
@@ -33,6 +34,7 @@ const SECTION_ICONS: Readonly<Record<InspectorSectionSemantic, LucideIcon>> = {
   framing: Frame,
   audio: AudioLines,
   canvas: Scan,
+  grid: Grid3X3,
   background: Paintbrush,
   appearance: Paintbrush,
   camera: Video,
