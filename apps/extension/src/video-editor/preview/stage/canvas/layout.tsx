@@ -23,7 +23,7 @@ export const PreviewStageFrame = React.forwardRef<HTMLDivElement, PreviewStageFr
       <div
         ref={ref}
         style={VIDEO_EDITOR_STAGE_STYLE}
-        className={STAGE_FRAME_CLASS_NAME}
+        className={`${STAGE_FRAME_CLASS_NAME} ${props.isFullscreen ? '!rounded-none !border-0' : ''}`}
         onPointerDown={(event) => {
           if (event.target === event.currentTarget) {
             props.onSelectScene?.();

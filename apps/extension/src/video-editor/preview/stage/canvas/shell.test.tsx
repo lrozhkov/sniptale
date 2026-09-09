@@ -68,8 +68,8 @@ describe('preview-stage/shell', () => {
         </PreviewStageShellLayout>
       );
       expect(markup.includes('Source context')).toBe(!isFullscreen);
-      expect(markup).toContain('video.preview.header');
-      expect(markup).toContain('video.preview.controls');
+      expect(markup.includes('video.preview.header')).toBe(!isFullscreen);
+      expect(markup.includes('video.preview.controls')).toBe(!isFullscreen);
       expect(markup).toContain('Edited image');
     }
   );
@@ -89,8 +89,54 @@ describe('preview-stage/shell', () => {
     );
 
     expect(markup).toContain('videoEditor.stage.enterFullscreen');
-    expect(markup).toContain('data-ui="shared.ui.content-toolbar-button"');
+    expect(markup).toContain('data-ui="video-editor.preview.fullscreen-toggle"');
     expect(markup).toContain('sniptale-glass-toolbar-button');
     expect(markup).toContain('!w-9');
   });
+});
+
+it('keeps the canvas mounted and the footer outside the zoom viewport, with local zoom reset on exit', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const onPreviewZoomChange = vi.fn();
+  const render = (isFullscreen: boolean) =>
+    act(() =>
+      root.render(
+        <PreviewStageShellLayout
+          currentTime={1}
+          duration={10}
+          isFullscreen={isFullscreen}
+          isPlaying={false}
+          playbackRange={null}
+          previewZoom="75%"
+          onPreviewZoomChange={onPreviewZoomChange}
+        >
+          <canvas data-testid="persistent-canvas" />
+        </PreviewStageShellLayout>
+      )
+    );
+  try {
+    await render(false);
+    const canvas = host.querySelector('canvas');
+    await render(true);
+    expect(host.querySelector('canvas')).toBe(canvas);
+    const footer = host.querySelector('[data-ui="video-editor.preview.fullscreen-transport"]');
+    expect(footer?.closest('[data-ui="video.preview.viewport"]')).toBeNull();
+    const zoom = host.querySelector<HTMLInputElement>('input[max="2"]')!;
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    act(() => {
+      setter.call(zoom, '1.5');
+      zoom.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(footer?.textContent).toContain('150%');
+    expect(onPreviewZoomChange).not.toHaveBeenCalled();
+    await render(false);
+    await render(true);
+    expect(host.querySelector<HTMLInputElement>('input[max="2"]')?.value).toBe('1');
+    expect(host.querySelector('canvas')).toBe(canvas);
+  } finally {
+    await act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
 });

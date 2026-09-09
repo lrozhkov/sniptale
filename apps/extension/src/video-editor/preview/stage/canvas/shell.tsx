@@ -4,7 +4,7 @@ import { Expand, Minimize2 } from 'lucide-react';
 import { translate } from '../../../../platform/i18n/index';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { VideoEditorPlaybackRange } from '../../../interaction/playback/range';
-import { PreviewStageFullscreenTransport } from './fullscreen';
+import { PreviewStageFullscreenTransport, useFullscreenPreviewPan } from './fullscreen';
 import type {
   VideoEditorPreviewMode,
   VideoEditorPreviewFrameRate,
@@ -111,6 +111,7 @@ function StageShellActionButton(props: {
     <ContentToolbarButton
       type="button"
       title={props.title}
+      dataUi="video-editor.preview.fullscreen-toggle"
       onClick={(event) => {
         event.stopPropagation();
         props.onClick();
@@ -219,23 +220,34 @@ type StageShellMainPaneProps = Pick<
 >;
 
 function StageShellMainPane(props: StageShellMainPaneProps) {
+  const [fullscreenZoom, setFullscreenZoom] = React.useState(1);
+  React.useEffect(() => {
+    if (!props.isFullscreen) setFullscreenZoom(1);
+  }, [props.isFullscreen]);
   return (
-    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-      <PreviewStageShellControls
-        headerContent={props.headerContent}
-        headerActions={props.headerActions}
-        alternateActive={props.alternateView?.active}
-        {...resolvePreviewStageControls(props)}
-        isFullscreen={props.isFullscreen}
-        {...(props.onCloseFullscreen ? { onCloseFullscreen: props.onCloseFullscreen } : {})}
-        {...(props.onOpenFullscreen ? { onOpenFullscreen: props.onOpenFullscreen } : {})}
-      />
+    <div
+      className={`relative flex min-h-0 min-w-0 flex-1 flex-col ${props.isFullscreen ? 'gap-2 p-3' : ''}`}
+    >
+      {!props.isFullscreen && (
+        <PreviewStageShellControls
+          headerContent={props.headerContent}
+          headerActions={props.headerActions}
+          alternateActive={props.alternateView?.active}
+          {...resolvePreviewStageControls(props)}
+          isFullscreen={props.isFullscreen}
+          {...(props.onCloseFullscreen ? { onCloseFullscreen: props.onCloseFullscreen } : {})}
+          {...(props.onOpenFullscreen ? { onOpenFullscreen: props.onOpenFullscreen } : {})}
+        />
+      )}
       <div className="relative min-h-0 flex-1">
         <div className="relative h-full" hidden={props.alternateView?.active}>
-          <PreviewStageContent previewZoom={props.previewZoom ?? 'fit'}>
+          <PreviewStageContent
+            previewZoom={props.previewZoom ?? 'fit'}
+            fullscreen={props.isFullscreen}
+            fullscreenZoom={fullscreenZoom}
+          >
             {props.children}
           </PreviewStageContent>
-          <StageShellFullscreenTransport {...props} />
         </div>
         {props.alternateView ? (
           <div className="absolute inset-0" hidden={!props.alternateView.active}>
@@ -243,6 +255,11 @@ function StageShellMainPane(props: StageShellMainPaneProps) {
           </div>
         ) : null}
       </div>
+      <StageShellFullscreenTransport
+        {...props}
+        zoom={fullscreenZoom}
+        onZoomChange={setFullscreenZoom}
+      />
     </div>
   );
 }
@@ -250,21 +267,53 @@ function StageShellMainPane(props: StageShellMainPaneProps) {
 function PreviewStageContent(props: {
   children: React.ReactNode;
   previewZoom: VideoEditorPreviewZoom;
+  fullscreen: boolean;
+  fullscreenZoom: number;
 }) {
-  const fit = props.previewZoom === 'fit';
+  const fit = props.fullscreen || props.previewZoom === 'fit';
   const viewportRef = React.useRef<HTMLDivElement | null>(null);
   const contentRef = React.useRef<HTMLDivElement | null>(null);
+  const pan = useFullscreenPreviewPan(viewportRef, props.fullscreenZoom, props.fullscreen);
   return (
-    <div className={PREVIEW_STAGE_CONTENT_BOX_CLASS_NAME}>
+    <div
+      className={
+        props.fullscreen
+          ? 'absolute inset-0 min-h-0 overflow-hidden rounded-lg bg-black'
+          : PREVIEW_STAGE_CONTENT_BOX_CLASS_NAME
+      }
+    >
       <div
         ref={viewportRef}
-        className={`h-full w-full [container-type:size] ${fit ? 'overflow-hidden' : 'overflow-auto'}`}
+        {...pan.handlers}
+        style={{ touchAction: props.fullscreen && props.fullscreenZoom > 1 ? 'none' : undefined }}
+        className={[
+          'h-full w-full [container-type:size]',
+          props.fullscreen || !fit ? 'overflow-auto' : 'overflow-hidden',
+          props.fullscreen && props.fullscreenZoom > 1
+            ? pan.dragging
+              ? '!cursor-grabbing [&_*]:!cursor-grabbing'
+              : '!cursor-grab [&_*]:!cursor-grab'
+            : '',
+        ].join(' ')}
         data-ui="video.preview.viewport"
       >
         <div
           ref={contentRef}
+          style={
+            props.fullscreen
+              ? {
+                  width: `${props.fullscreenZoom * 100}%`,
+                  height: `${props.fullscreenZoom * 100}%`,
+                  containerType: 'size',
+                }
+              : undefined
+          }
           className={
-            fit ? 'flex h-full w-full items-center justify-center' : 'flex min-h-full min-w-full'
+            props.fullscreen
+              ? 'relative flex items-center justify-center'
+              : fit
+                ? 'flex h-full w-full items-center justify-center'
+                : 'flex min-h-full min-w-full'
           }
         >
           {props.children}
@@ -275,9 +324,17 @@ function PreviewStageContent(props: {
   );
 }
 
-function StageShellFullscreenTransport(props: PreviewStageShellLayoutProps) {
+function StageShellFullscreenTransport(
+  props: PreviewStageShellLayoutProps & { zoom: number; onZoomChange: (zoom: number) => void }
+) {
   return props.isFullscreen ? (
     <PreviewStageFullscreenTransport
+      zoom={props.zoom}
+      onZoomChange={props.onZoomChange}
+      isPreparing={
+        props.previewStatus?.phase === 'preparing-frame-cache' ||
+        props.previewStatus?.phase === 'preparing-video-cache'
+      }
       currentTime={props.currentTime}
       duration={props.duration}
       isPlaying={props.isPlaying}

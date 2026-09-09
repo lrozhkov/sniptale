@@ -1,3 +1,4 @@
+import { resolvePreviewStageSizeStyle } from '../sizing/zoom';
 import { PreviewStageCanvas } from './';
 import { usePreviewStageFullscreen } from './fullscreen';
 import { PreviewStageFrame } from './layout';
@@ -38,7 +39,15 @@ export function PreviewStageSurface(params: PreviewStageSurfaceProps) {
         previewStatus={params.previewStatus}
         ref={frameRef}
       >
-        <PreviewStageCanvas {...params} mode={isFullscreen ? 'player' : 'editor'} />
+        <PreviewStageCanvas
+          {...params}
+          stageSizeStyle={
+            isFullscreen
+              ? resolvePreviewStageSizeStyle(params.project, 'fit')
+              : params.stageSizeStyle
+          }
+          mode={isFullscreen ? 'player' : 'editor'}
+        />
         {params.effectRuntimeFeedback.failed ? (
           <PreviewEffectRuntimeError onRetry={params.effectRuntimeFeedback.onRetry} />
         ) : null}
