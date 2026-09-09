@@ -60,15 +60,9 @@ export function normalizeGradientAnimation(
   };
 }
 
-function resolveTransientEnvelope(audioEnvelope: number): number {
+function resolveAudioReactiveAmount(audioEnvelope: number): number {
   const envelope = clampSceneBackgroundNumber(audioEnvelope, 0, 1);
-  const threshold = 0.22;
-  if (envelope <= threshold) {
-    return 0;
-  }
-
-  const normalizedEnvelope = (envelope - threshold) / (1 - threshold);
-  return Math.min(1, Math.pow(normalizedEnvelope, 0.72));
+  return Math.pow(envelope, 0.72);
 }
 
 export function resolveGradientAnimationFrame(params: {
@@ -94,7 +88,7 @@ export function resolveGradientAnimationFrame(params: {
     return neutral;
   const intensity = animation.intensity / 100;
   if (animation.mode === VideoSceneGradientAnimationMode.AUDIO_REACTIVE) {
-    const pulse = resolveTransientEnvelope(params.audioEnvelope) * intensity;
+    const pulse = resolveAudioReactiveAmount(params.audioEnvelope) * intensity;
     return {
       ...neutral,
       angle: clampSceneBackgroundAngle(params.angle + pulse * 90),

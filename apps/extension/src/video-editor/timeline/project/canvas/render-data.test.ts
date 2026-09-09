@@ -22,17 +22,14 @@ describe('project timeline render data', () => {
     ]);
   });
 
-  it('builds a deterministic normalized sharp waveform path', () => {
+  it('builds a deterministic continuous waveform contour', () => {
     expect(buildAudioClipWaveformPath([0.2, 0.75])).toBe(
-      'M 0.4 41.6 L 49.6 41.6 L 49.6 58.4 L 0.4 58.4 Z ' +
-        'M 50.4 18.5 L 99.6 18.5 L 99.6 81.5 L 50.4 81.5 Z'
+      'M 0 41.6 L 100 18.5 L 100 81.5 L 0 58.4 Z'
     );
   });
 
   it('clamps waveform samples into the normalized path bounds', () => {
-    expect(buildAudioClipWaveformPath([-1, 2])).toBe(
-      'M 0.4 46 L 49.6 46 L 49.6 54 L 0.4 54 Z ' + 'M 50.4 8 L 99.6 8 L 99.6 92 L 50.4 92 Z'
-    );
+    expect(buildAudioClipWaveformPath([-1, 2])).toBe('M 0 50 L 100 8 L 100 92 L 0 50 Z');
   });
 
   it('returns an empty waveform path for empty samples', () => {

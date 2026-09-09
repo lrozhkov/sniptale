@@ -1,3 +1,6 @@
+/** Bounded, source-time amplitude envelope stored with each media asset. */
+export const MAX_VIDEO_PROJECT_AUDIO_PEAKS = 30_000;
+
 export const VideoMediaFitMode = {
   CONTAIN: 'CONTAIN',
   SOURCE_100: 'SOURCE_100',

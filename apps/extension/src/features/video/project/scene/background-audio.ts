@@ -33,31 +33,20 @@ function getClipPeakValue(params: {
   peaks: readonly number[];
 }): number {
   const sourceTime = getMediaClipSourceTime(params.clip, params.currentTime);
-  const ratio = clampAudioEnvelope(sourceTime / params.assetDuration);
-  const index = Math.min(params.peaks.length - 1, Math.floor(ratio * params.peaks.length));
-  const current = params.peaks[index] ?? 0;
-  const previous = params.peaks[Math.max(0, index - 1)] ?? 0;
-  const next = params.peaks[Math.min(params.peaks.length - 1, index + 1)] ?? 0;
-  const localAverage = (previous + current + next) / 3;
-  const baseline = getPeakBaseline(params.peaks, index);
-  const transientLift = current - Math.max(previous, next, baseline * 0.82);
-
-  if (current < 0.55 || transientLift < 0.16) {
-    return 0;
-  }
-
-  return clampAudioEnvelope((localAverage * 0.45 + transientLift * 0.95) * 1.35);
-}
-
-function getPeakBaseline(peaks: readonly number[], index: number): number {
-  const start = Math.max(0, index - 4);
-  const end = Math.min(peaks.length, index + 5);
-  const window = peaks.slice(start, end);
-  if (window.length === 0) {
-    return 0;
-  }
-
-  return window.reduce((sum, peak) => sum + peak, 0) / window.length;
+  // A short source-time window keeps sustained music responsive without frame-to-frame spikes.
+  const sampleAt = (time: number) => {
+    if (time < 0 || time >= params.assetDuration) return 0;
+    const position = Math.max(0, (time / params.assetDuration) * params.peaks.length - 0.5);
+    const index = Math.min(params.peaks.length - 1, Math.floor(position));
+    const fraction = position - index;
+    const a = params.peaks[index] ?? 0;
+    const b = params.peaks[Math.min(params.peaks.length - 1, index + 1)] ?? 0;
+    return a + (b - a) * fraction;
+  };
+  const levels = [-0.04, -0.02, 0, 0.02, 0.04].map((offset) => sampleAt(sourceTime + offset));
+  return clampAudioEnvelope(
+    Math.sqrt(levels.reduce((sum, level) => sum + level * level, 0) / levels.length)
+  );
 }
 
 function getClipAudioEnvelope(
@@ -88,8 +77,10 @@ export function resolveSceneBackgroundAudioEnvelope(
       continue;
     }
 
-    envelope = Math.max(envelope, getClipAudioEnvelope(project, clip, currentTime));
+    if (project.tracks?.find((track) => track.id === clip.trackId)?.visible === false) continue;
+    const level = getClipAudioEnvelope(project, clip, currentTime);
+    envelope += level * level;
   }
 
-  return envelope;
+  return clampAudioEnvelope(Math.sqrt(envelope));
 }

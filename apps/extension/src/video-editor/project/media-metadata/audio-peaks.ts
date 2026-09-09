@@ -1,5 +1,6 @@
-const AUDIO_PEAK_BUCKETS = 160;
-const AUDIO_PEAK_SAMPLES_PER_BUCKET = 96;
+import { MAX_VIDEO_PROJECT_AUDIO_PEAKS } from '../../../features/video/project/types';
+
+const AUDIO_PEAKS_PER_SECOND = 100;
 export const AUDIO_PEAK_MAX_DECODE_BLOB_SIZE = 24 * 1024 * 1024;
 export const AUDIO_PEAK_MAX_DECODE_DURATION_SECONDS = 5 * 60;
 
@@ -12,10 +13,9 @@ function getAudioContextConstructor(): typeof AudioContext | undefined {
 }
 
 function getBucketPeak(channelData: Float32Array[], start: number, end: number): number {
-  const stride = Math.max(1, Math.floor((end - start) / AUDIO_PEAK_SAMPLES_PER_BUCKET));
   let peak = 0;
 
-  for (let sampleIndex = start; sampleIndex < end; sampleIndex += stride) {
+  for (let sampleIndex = start; sampleIndex < end; sampleIndex += 1) {
     for (const channel of channelData) {
       peak = Math.max(peak, Math.abs(channel[sampleIndex] ?? 0));
     }
@@ -28,20 +28,23 @@ function getBucketPeak(channelData: Float32Array[], start: number, end: number):
   return Math.min(1, peak);
 }
 
-function buildAudioPeaks(audioBuffer: AudioBuffer): number[] | null {
+function buildAudioPeaks(audioBuffer: AudioBuffer, durationSeconds: number): number[] | null {
   if (audioBuffer.length <= 0 || audioBuffer.numberOfChannels <= 0) {
     return null;
   }
 
-  const bucketCount = Math.max(24, AUDIO_PEAK_BUCKETS);
-  const bucketSize = Math.max(1, Math.ceil(audioBuffer.length / bucketCount));
+  const bucketCount = Math.min(
+    audioBuffer.length,
+    MAX_VIDEO_PROJECT_AUDIO_PEAKS,
+    Math.max(1, Math.ceil(durationSeconds * AUDIO_PEAKS_PER_SECOND))
+  );
   const channelData = Array.from({ length: audioBuffer.numberOfChannels }, (_, index) =>
     audioBuffer.getChannelData(index)
   );
 
   return Array.from({ length: bucketCount }, (_, bucketIndex) => {
-    const start = bucketIndex * bucketSize;
-    const end = Math.min(audioBuffer.length, start + bucketSize);
+    const start = Math.floor((bucketIndex * audioBuffer.length) / bucketCount);
+    const end = Math.floor(((bucketIndex + 1) * audioBuffer.length) / bucketCount);
     return end <= start ? 0 : getBucketPeak(channelData, start, end);
   });
 }
@@ -60,8 +63,14 @@ export async function loadAudioPeaks(
   blob: Blob,
   durationSeconds: number
 ): Promise<number[] | null> {
+  if (blob.size <= 0 || !Number.isFinite(durationSeconds) || durationSeconds <= 0) return null;
   if (!canDecodeAudioPeaks(blob, durationSeconds)) {
-    return null;
+    try {
+      const { loadStreamingAudioPeaks } = await import('./audio-peaks-stream');
+      return await loadStreamingAudioPeaks(blob, durationSeconds);
+    } catch {
+      return null;
+    }
   }
 
   const AudioContextConstructor = getAudioContextConstructor();
@@ -74,7 +83,7 @@ export async function loadAudioPeaks(
     audioContext = new AudioContextConstructor();
     const arrayBuffer = await blob.arrayBuffer();
     const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-    return buildAudioPeaks(audioBuffer);
+    return buildAudioPeaks(audioBuffer, durationSeconds);
   } catch {
     return null;
   } finally {

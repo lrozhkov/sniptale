@@ -33,7 +33,7 @@ it('normalizes angles and invalid animation numbers deterministically', () => {
   });
 });
 
-it('resolves static, light sweep, and transient-reactive animation frames', () => {
+it('resolves static, light sweep, and audio-reactive animation frames', () => {
   expect(
     resolveGradientAnimationFrame({
       angle: 90,
@@ -61,7 +61,7 @@ it('resolves static, light sweep, and transient-reactive animation frames', () =
       audioEnvelope: 0.15,
       time: 0,
     })
-  ).toMatchObject({ angle: 90, fromStop: 0, toStop: 100 });
+  ).not.toMatchObject({ angle: 90, fromStop: 0, toStop: 100 });
   expect(
     resolveGradientAnimationFrame({
       angle: 90,

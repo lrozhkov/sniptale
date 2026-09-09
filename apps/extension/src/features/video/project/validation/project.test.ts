@@ -430,3 +430,27 @@ it('rejects removed annotation track kinds at project admission', () => {
   expect(isHydratableVideoProject(payload)).toBe(false);
   expect(isExportReadyVideoProject(payload)).toBe(false);
 });
+
+it('accepts detailed audio envelopes but rejects oversized or invalid peak payloads', () => {
+  const project = createEmptyVideoProject();
+  const asset = createVideoProjectAsset(
+    'Audio',
+    VideoProjectAssetType.AUDIO,
+    { kind: 'project-asset', projectAssetId: 'audio' },
+    {
+      width: 0,
+      height: 0,
+      duration: 300,
+      mimeType: 'audio/mpeg',
+      size: 100,
+      hasAudio: true,
+      audioPeaks: new Array(30_000).fill(0.25),
+    }
+  );
+  project.assets = [asset];
+  expect(isHydratableVideoProject(project)).toBe(true);
+  asset.metadata.audioPeaks!.push(0.25);
+  expect(isHydratableVideoProject(project)).toBe(false);
+  asset.metadata.audioPeaks = [NaN];
+  expect(isHydratableVideoProject(project)).toBe(false);
+});

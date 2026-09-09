@@ -11,6 +11,7 @@ import type { VideoProject } from '../types/index';
 import { syncProjectTransitions } from '../transition/project';
 import { translate } from '../../../../platform/i18n';
 import {
+  MAX_VIDEO_PROJECT_AUDIO_PEAKS,
   VideoProjectSourceKind,
   VideoTemporalEasing,
   VideoTimelinePlacementMode,
@@ -117,7 +118,7 @@ function normalizeHydratedAssets(project: VideoProject): VideoProject['assets'] 
       audioPeaks: Array.isArray(asset.metadata.audioPeaks)
         ? asset.metadata.audioPeaks
             .map((value) => clampNumber(typeof value === 'number' ? value : 0, 0, 1))
-            .slice(0, 512)
+            .slice(0, MAX_VIDEO_PROJECT_AUDIO_PEAKS)
         : null,
     },
   }));
