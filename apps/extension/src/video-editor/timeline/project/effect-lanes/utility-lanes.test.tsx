@@ -45,6 +45,9 @@ it.each([false, true])(
         '[data-ui="video-editor.timeline.framing-connection"]'
       )!;
       expect(gap).not.toBeNull();
+      expect(
+        gap.querySelector('[data-ui="video-editor.timeline.framing-connection-preview"]') !== null
+      ).toBe(!locked);
       act(() => gap.click());
       expect(connect).not.toHaveBeenCalled();
       act(() => gap.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));

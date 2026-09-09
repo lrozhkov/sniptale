@@ -90,6 +90,17 @@ function MotionConnections(props: UtilityLaneProps & { laneVisible: boolean }) {
           className="group absolute top-1/2 h-7 -translate-y-1/2"
           style={{ left: geometry.left, width: geometry.width }}
         >
+          {!locked && props.laneVisible && props.onConnectMotionRegions ? (
+            <span
+              aria-hidden="true"
+              data-ui="video-editor.timeline.framing-connection-preview"
+              className={[
+                'pointer-events-none absolute inset-0 rounded border border-[var(--sniptale-color-border-soft)]',
+                'bg-[var(--sniptale-color-surface-hover)] opacity-0',
+                'group-hover:opacity-100 group-focus-within:opacity-100',
+              ].join(' ')}
+            />
+          ) : null}
           <button
             type="button"
             data-ui="video-editor.timeline.add-framing-connection"
