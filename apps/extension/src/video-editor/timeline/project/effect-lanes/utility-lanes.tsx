@@ -11,6 +11,7 @@ import { VideoTemporalEasing } from '../../../../features/video/project/types';
 import { VideoEditorSelectionKind } from '../../../contracts/selection';
 import { projectTimelineInterval } from '../interaction-state/projection';
 import { MoveRight, ZoomIn, ZoomOut } from 'lucide-react';
+import { TIMELINE_OBJECT_MARKER_PROPS } from '../canvas/hover-preview';
 
 const MOTION_LANE_SEGMENT_CLASS_NAME = [
   'border-[var(--sniptale-color-border-soft)]',
@@ -95,8 +96,8 @@ function MotionConnections(props: UtilityLaneProps & { laneVisible: boolean }) {
               aria-hidden="true"
               data-ui="video-editor.timeline.framing-connection-preview"
               className={[
-                'pointer-events-none absolute inset-0 rounded border border-[var(--sniptale-color-border-soft)]',
-                'bg-[var(--sniptale-color-surface-hover)] opacity-0',
+                'pointer-events-none absolute inset-0 rounded border border-dashed',
+                'border-[var(--sniptale-color-border-soft)] opacity-0',
                 'group-hover:opacity-100 group-focus-within:opacity-100',
               ].join(' ')}
             />
@@ -104,6 +105,7 @@ function MotionConnections(props: UtilityLaneProps & { laneVisible: boolean }) {
           <button
             type="button"
             data-ui="video-editor.timeline.add-framing-connection"
+            {...TIMELINE_OBJECT_MARKER_PROPS}
             aria-label={label}
             title={label}
             disabled={locked || !props.laneVisible || !props.onConnectMotionRegions}
@@ -132,6 +134,7 @@ function MotionConnections(props: UtilityLaneProps & { laneVisible: boolean }) {
         type="button"
         data-ui="video-editor.timeline.framing-connection"
         data-framing-destination={destination.id}
+        {...TIMELINE_OBJECT_MARKER_PROPS}
         aria-label={label}
         aria-pressed={selected}
         title={label}

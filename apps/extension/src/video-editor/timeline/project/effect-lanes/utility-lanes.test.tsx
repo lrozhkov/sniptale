@@ -53,6 +53,7 @@ it.each([false, true])(
       act(() => gap.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
       expect(seek).toHaveBeenCalledOnce();
       const button = gap.querySelector<HTMLButtonElement>('button')!;
+      expect(button.getAttribute('data-timeline-object')).toBe('true');
       expect(button.disabled).toBe(locked);
       act(() => button.click());
       expect(connect).toHaveBeenCalledTimes(locked ? 0 : 1);
@@ -65,8 +66,12 @@ it.each([false, true])(
       const transition = host.querySelector<HTMLButtonElement>(
         '[data-ui="video-editor.timeline.framing-connection"]'
       )!;
+      expect(transition.getAttribute('data-timeline-object')).toBe('true');
+      seek.mockClear();
+      act(() => transition.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
       act(() => transition.click());
       expect(select).toHaveBeenCalledWith('second', 'connection');
+      expect(seek).not.toHaveBeenCalled();
     } finally {
       act(() => root.unmount());
       vi.unstubAllGlobals();
