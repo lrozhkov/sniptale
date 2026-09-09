@@ -238,3 +238,31 @@ it('aborts stale cache preparation and completes the same play request in the ne
   expect(outcome).toBe('live-ready');
   expect(mocks.prepareCache.mock.calls[0]?.[0].signal.aborted).toBe(true);
 });
+
+it('reuses a completed cache for subsequent seeks until configuration changes', async () => {
+  mocks.prepareCache.mockResolvedValue({ cachedVideo: null, outcome: 'frame-cache-ready' });
+  await act(async () => root.render(<Harness mode="cache" />));
+  const seek = (generation: number) =>
+    runtime!.prepare({
+      generation,
+      isPlaying: false,
+      playbackRange: null,
+      reason: 'seek',
+      signal: new AbortController().signal,
+      time: generation / 10,
+    });
+  await act(async () => {
+    await seek(1);
+  });
+  await act(async () => {
+    await seek(2);
+  });
+  expect(mocks.prepareCache).toHaveBeenCalledOnce();
+  await act(async () =>
+    root.render(<Harness mode="cache" projectOverride={{ ...project, fps: 15 }} />)
+  );
+  await act(async () => {
+    await seek(3);
+  });
+  expect(mocks.prepareCache).toHaveBeenCalledTimes(2);
+});

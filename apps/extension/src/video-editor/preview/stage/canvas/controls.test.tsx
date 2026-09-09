@@ -33,6 +33,7 @@ it('presents cache preparation failure separately from unavailable capability', 
   );
 
   expect(markup).toContain('videoEditor.stage.previewCacheFailed');
+  expect(markup).toContain('>videoEditor.stage.previewCacheFailedShort</span>');
   expect(markup).not.toContain('videoEditor.stage.previewCacheUnavailable');
   expect(markup).toContain('video.preview.display-settings');
   expect(markup).toContain(' · 720p · ');
@@ -84,8 +85,8 @@ it('changes each display setting independently and restores focus when dismissed
       '[data-ui="video.preview.display-settings"]'
     )!;
     act(() => trigger.click());
-    expect(document.querySelectorAll('fieldset')).toHaveLength(3);
-    expect(document.querySelectorAll('input:checked')).toHaveLength(3);
+    expect(document.querySelectorAll('fieldset')).toHaveLength(4);
+    expect(document.querySelectorAll('input:checked')).toHaveLength(4);
     expect(document.activeElement).toBe(document.querySelector('input:checked'));
     for (const value of ['1080p', '75%', 'cache']) {
       act(() => document.querySelector<HTMLInputElement>(`input[value="${value}"]`)!.click());

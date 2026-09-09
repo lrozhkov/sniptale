@@ -229,6 +229,7 @@ it('keeps the recording destination independent of viewer selection, transport a
     preview.preferences.onZoomChange('fit');
     preview.preferences.onModeChange(preview.preferences.mode);
     preview.preferences.onRasterPresetChange(preview.preferences.rasterPreset);
+    preview.preferences.onFrameRateChange('15');
   });
   expect(store.selectClip).toHaveBeenCalledWith('another-clip');
   expect(runtime.seekTo).toHaveBeenCalledWith(20);

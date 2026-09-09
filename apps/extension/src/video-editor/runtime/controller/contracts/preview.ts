@@ -8,6 +8,7 @@ import type { VideoEditorRuntimeController } from '../../session';
 import type { VideoEditorInsertionActions } from './insertion';
 import type {
   VideoEditorPreviewMode,
+  VideoEditorPreviewFrameRate,
   VideoEditorPreviewRasterPreset,
   VideoEditorPreviewZoom,
 } from '../../../../features/video/preview/preferences';
@@ -40,6 +41,8 @@ export interface VideoEditorPreviewController {
     onRasterPresetChange: (rasterPreset: VideoEditorPreviewRasterPreset) => void;
     onRetrySave: () => void;
     onZoomChange: (zoom: VideoEditorPreviewZoom) => void;
+    frameRate: VideoEditorPreviewFrameRate;
+    onFrameRateChange: (frameRate: VideoEditorPreviewFrameRate) => void;
     rasterPreset: VideoEditorPreviewRasterPreset;
     saveFailed: boolean;
     zoom: VideoEditorPreviewZoom;

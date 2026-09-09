@@ -26,6 +26,7 @@ export interface UsePreviewStagePlaybackPreviewRuntimeParams extends PreviewStag
 }
 
 export interface PreviewRuntimeAuthority {
+  completedCacheRef: MutableRefObject<'video-cache-ready' | 'frame-cache-ready' | null>;
   activePreparationRef: MutableRefObject<AbortController | null>;
   configurationRevisionRef: MutableRefObject<number>;
   generationRef: MutableRefObject<number>;

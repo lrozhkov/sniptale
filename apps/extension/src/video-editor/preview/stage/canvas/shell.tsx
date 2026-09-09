@@ -7,6 +7,7 @@ import type { VideoEditorPlaybackRange } from '../../../interaction/playback/ran
 import { PreviewStageFullscreenTransport } from './fullscreen';
 import type {
   VideoEditorPreviewMode,
+  VideoEditorPreviewFrameRate,
   VideoEditorPreviewRasterPreset,
   VideoEditorPreviewZoom,
   VideoEditorPreviewStatus,
@@ -36,12 +37,14 @@ export interface PreviewStageShellLayoutProps {
   onOpenFullscreen?: () => void;
   onPreviewModeChange?: (mode: VideoEditorPreviewMode) => void;
   onPreviewPreferencesRetry?: () => void;
+  onPreviewFrameRateChange?: ((frameRate: VideoEditorPreviewFrameRate) => void) | undefined;
   onPreviewRasterPresetChange?: (preset: VideoEditorPreviewRasterPreset) => void;
   onPreviewZoomChange?: (zoom: VideoEditorPreviewZoom) => void;
   onSeek?: (time: number) => void;
   onTogglePlay?: () => void;
   previewMode?: VideoEditorPreviewMode;
   previewPreferencesSaveFailed?: boolean;
+  previewFrameRate?: VideoEditorPreviewFrameRate | undefined;
   previewRasterPreset?: VideoEditorPreviewRasterPreset;
   previewZoom?: VideoEditorPreviewZoom;
   previewStatus?: VideoEditorPreviewStatus;
@@ -51,10 +54,12 @@ type PreviewStageControlSource = Pick<
   PreviewStageShellLayoutProps,
   | 'onPreviewModeChange'
   | 'onPreviewPreferencesRetry'
+  | 'onPreviewFrameRateChange'
   | 'onPreviewRasterPresetChange'
   | 'onPreviewZoomChange'
   | 'previewMode'
   | 'previewPreferencesSaveFailed'
+  | 'previewFrameRate'
   | 'previewRasterPreset'
   | 'previewZoom'
   | 'previewStatus'
@@ -63,10 +68,12 @@ type PreviewStageControlSource = Pick<
 interface ResolvedPreviewStageControls {
   onPreviewModeChange: (mode: VideoEditorPreviewMode) => void;
   onPreviewPreferencesRetry: () => void;
+  onPreviewFrameRateChange?: ((frameRate: VideoEditorPreviewFrameRate) => void) | undefined;
   onPreviewRasterPresetChange: (preset: VideoEditorPreviewRasterPreset) => void;
   onPreviewZoomChange: (zoom: VideoEditorPreviewZoom) => void;
   previewMode: VideoEditorPreviewMode;
   previewPreferencesSaveFailed: boolean;
+  previewFrameRate?: VideoEditorPreviewFrameRate | undefined;
   previewRasterPreset: VideoEditorPreviewRasterPreset;
   previewZoom: VideoEditorPreviewZoom;
   previewStatus: VideoEditorPreviewStatus;
@@ -78,10 +85,12 @@ export function resolvePreviewStageControls(
   return {
     onPreviewModeChange: props.onPreviewModeChange ?? (() => undefined),
     onPreviewPreferencesRetry: props.onPreviewPreferencesRetry ?? (() => undefined),
+    onPreviewFrameRateChange: props.onPreviewFrameRateChange ?? (() => undefined),
     onPreviewRasterPresetChange: props.onPreviewRasterPresetChange ?? (() => undefined),
     onPreviewZoomChange: props.onPreviewZoomChange ?? (() => undefined),
     previewMode: props.previewMode ?? 'live',
     previewPreferencesSaveFailed: props.previewPreferencesSaveFailed ?? false,
+    previewFrameRate: props.previewFrameRate ?? 'project',
     previewRasterPreset: props.previewRasterPreset ?? '720p',
     previewZoom: props.previewZoom ?? 'fit',
     previewStatus: props.previewStatus ?? {
@@ -165,6 +174,8 @@ function PreviewStageShellControls(
           onPreferencesRetry={props.onPreviewPreferencesRetry}
           onRasterPresetChange={props.onPreviewRasterPresetChange}
           onZoomChange={props.onPreviewZoomChange}
+          frameRate={props.previewFrameRate ?? 'project'}
+          onFrameRateChange={props.onPreviewFrameRateChange ?? (() => undefined)}
           rasterPreset={props.previewRasterPreset}
           preferencesSaveFailed={props.previewPreferencesSaveFailed}
           zoom={props.previewZoom}
@@ -194,12 +205,14 @@ type StageShellMainPaneProps = Pick<
   | 'onOpenFullscreen'
   | 'onPreviewModeChange'
   | 'onPreviewPreferencesRetry'
+  | 'onPreviewFrameRateChange'
   | 'onPreviewRasterPresetChange'
   | 'onPreviewZoomChange'
   | 'onSeek'
   | 'onTogglePlay'
   | 'previewMode'
   | 'previewPreferencesSaveFailed'
+  | 'previewFrameRate'
   | 'previewRasterPreset'
   | 'previewZoom'
   | 'previewStatus'

@@ -1,6 +1,8 @@
+import { LoaderCircle, CircleAlert, Pause } from 'lucide-react';
 import { PreviewDisplaySettings } from './display-settings';
 import { translate } from '../../../../platform/i18n';
 import type {
+  VideoEditorPreviewFrameRate,
   VideoEditorPreviewMode,
   VideoEditorPreviewRasterPreset,
   VideoEditorPreviewZoom,
@@ -8,6 +10,8 @@ import type {
 } from '../../../contracts/preview-runtime';
 
 interface PreviewStageControlsProps {
+  frameRate?: VideoEditorPreviewFrameRate;
+  onFrameRateChange?: (frameRate: VideoEditorPreviewFrameRate) => void;
   mode: VideoEditorPreviewMode;
   onModeChange: (mode: VideoEditorPreviewMode) => void;
   onPreferencesRetry: () => void;
@@ -26,27 +30,22 @@ const RETRY_CLASS_NAME = [
   'focus-visible:outline-none focus-visible:ring-2',
   'focus-visible:ring-[var(--sniptale-color-focus-ring)]',
 ].join(' ');
-const STATUS_CLASS_NAME = [
-  'min-w-0 rounded-[8px] border px-2 py-1 text-[11px] font-semibold',
-  'border-[color:var(--sniptale-color-border-soft)] bg-[color:var(--sniptale-color-surface-panel)]',
-  'text-[color:var(--sniptale-color-text-muted)]',
-].join(' ');
 
 export function PreviewStageControls(props: PreviewStageControlsProps) {
   return (
     <div
-      className="pointer-events-auto flex shrink-0 flex-col items-end gap-1"
+      className="pointer-events-auto flex h-9 shrink-0 items-center gap-2"
       data-ui="video.preview.controls"
       onPointerDown={(event) => event.stopPropagation()}
     >
-      <PreviewDisplaySettings {...props} />
       <div
-        className="flex max-w-[308px] flex-wrap justify-end gap-1 empty:hidden"
+        className="flex h-9 shrink-0 items-center gap-2 empty:hidden"
         data-ui="video.preview.feedback"
       >
         {props.mode === 'cache' ? <PreviewCacheStatus status={props.status} /> : null}
         <PreviewPreferencesRetry {...props} />
       </div>
+      <PreviewDisplaySettings {...props} />
     </div>
   );
 }
@@ -62,6 +61,10 @@ function PreviewPreferencesRetry(props: PreviewStageControlsProps) {
 function PreviewCacheStatus({ status }: { status: VideoEditorPreviewStatus }) {
   const isPreparing =
     status.phase === 'preparing-frame-cache' || status.phase === 'preparing-video-cache';
+  const percent = Math.min(
+    100,
+    Math.round((status.completedFrames / Math.max(1, status.totalFrames)) * 100)
+  );
   const label =
     status.outcome === 'capacity-limited'
       ? translate('videoEditor.stage.previewCacheCapacityLimited')
@@ -70,7 +73,7 @@ function PreviewCacheStatus({ status }: { status: VideoEditorPreviewStatus }) {
         : status.outcome === 'unavailable'
           ? translate('videoEditor.stage.previewCacheUnavailable')
           : isPreparing
-            ? `${translate('videoEditor.stage.previewCachePreparing')} ${status.completedFrames}/${status.totalFrames}`
+            ? `${translate('videoEditor.stage.previewCachePreparing')} ${percent}%`
             : status.phase === 'cached-frame-playback' || status.phase === 'cached-video-playback'
               ? translate('videoEditor.stage.previewCacheReady')
               : status.phase === 'paused-preparation'
@@ -78,5 +81,53 @@ function PreviewCacheStatus({ status }: { status: VideoEditorPreviewStatus }) {
                 : status.phase === 'recovering'
                   ? translate('videoEditor.stage.previewCacheUnavailable')
                   : null;
-  return label ? <span className={STATUS_CLASS_NAME}>{label}</span> : null;
+  if (!label) return null;
+  const ready =
+    status.phase === 'cached-frame-playback' || status.phase === 'cached-video-playback';
+  return (
+    <span
+      role="status"
+      aria-label={label}
+      title={label}
+      className="inline-flex h-9 items-center gap-1.5 text-xs tabular-nums text-[var(--sniptale-color-text-muted)]"
+    >
+      {isPreparing ? (
+        <>
+          <LoaderCircle
+            size={13}
+            className="animate-spin motion-reduce:animate-none"
+            aria-hidden="true"
+          />
+          <span>
+            {Math.min(
+              100,
+              Math.round((status.completedFrames / Math.max(1, status.totalFrames)) * 100)
+            )}
+            %
+          </span>
+        </>
+      ) : ready ? (
+        <span className="h-1.5 w-1.5 rounded-full bg-[var(--sniptale-color-success)]" />
+      ) : status.phase === 'paused-preparation' ? (
+        <Pause size={13} aria-hidden="true" />
+      ) : (
+        <>
+          <CircleAlert
+            size={14}
+            aria-hidden="true"
+            className="text-[var(--sniptale-color-warning)]"
+          />
+          <span className="whitespace-nowrap">
+            {translate(
+              status.outcome === 'failed'
+                ? 'videoEditor.stage.previewCacheFailedShort'
+                : status.outcome === 'capacity-limited'
+                  ? 'videoEditor.stage.previewCacheCapacityShort'
+                  : 'videoEditor.stage.previewCacheUnavailableShort'
+            )}
+          </span>
+        </>
+      )}
+    </span>
+  );
 }

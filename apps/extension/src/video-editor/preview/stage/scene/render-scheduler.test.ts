@@ -65,13 +65,13 @@ it('coalesces playback frames to the latest pending frame cadence', async () => 
   vi.advanceTimersByTime(15);
   expect(render).toHaveBeenCalledTimes(1);
 
-  vi.advanceTimersByTime(1);
+  vi.advanceTimersByTime(2);
   expect(render).toHaveBeenCalledTimes(2);
   expect(render).toHaveBeenLastCalledWith(expect.objectContaining({ currentTime: 2 }));
   vi.useRealTimers();
 });
 
-it('backpressures effect playback to at most thirty preview renders per second', async () => {
+it('uses the configured thirty FPS for effect playback', async () => {
   vi.useFakeTimers();
   const render = vi.fn(async () => undefined);
   const scheduler = createPreviewSceneRenderScheduler({ onError: vi.fn(), render });
@@ -214,7 +214,7 @@ function createJob(
     imageBank: {},
     isEffectRuntimeFrame,
     isPlaybackFrame,
-    project: {} as PreviewSceneRenderJob['project'],
+    project: { fps: isEffectRuntimeFrame ? 30 : 60 } as PreviewSceneRenderJob['project'],
     renderGeneration,
     stage: null,
     videoRefs: { current: {} },

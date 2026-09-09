@@ -25,9 +25,6 @@ interface PreviewSceneRenderSchedulerOptions {
   render: (job: Parameters<typeof renderPreviewScene>[0]) => ReturnType<typeof renderPreviewScene>;
 }
 
-const PLAYBACK_RENDER_MIN_INTERVAL_MS = 16;
-const EFFECT_PLAYBACK_RENDER_MIN_INTERVAL_MS = 1000 / 30;
-
 export function createPreviewSceneRenderScheduler(
   args: PreviewSceneRenderSchedulerOptions
 ): PreviewSceneRenderScheduler {
@@ -144,9 +141,7 @@ function resolveNextPreviewRenderDelay(state: PreviewSceneRenderSchedulerState):
   if (!state.pendingJob?.isPlaybackFrame || state.lastPlaybackRenderStartedAt === null) {
     return 0;
   }
-  const minimumInterval = state.pendingJob.isEffectRuntimeFrame
-    ? EFFECT_PLAYBACK_RENDER_MIN_INTERVAL_MS
-    : PLAYBACK_RENDER_MIN_INTERVAL_MS;
+  const minimumInterval = 1000 / state.pendingJob.project.fps;
   return Math.max(0, minimumInterval - (Date.now() - state.lastPlaybackRenderStartedAt));
 }
 

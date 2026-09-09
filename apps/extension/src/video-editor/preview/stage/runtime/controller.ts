@@ -1,5 +1,6 @@
+import { resolveVideoEditorPreviewFrameRate } from '../../../../features/video/preview/preferences';
 import { resolveCameraCanvasTransform } from './camera-transform';
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 
 import { resolveVideoCompositionFrame } from '../../../../features/video/composition/timeline/frame';
 import type { VideoProject, VideoProjectClip } from '../../../../features/video/project/types';
@@ -96,6 +97,7 @@ function usePreviewStageTimeline(params: PreviewStageProps) {
     currentTime: params.currentTime,
     isPlaying: params.isPlaying,
     projectId: params.project.id,
+    fps: resolveVideoEditorPreviewFrameRate(params.project.fps, params.previewFrameRate),
   });
   const transient = usePreviewStageTransientTransform(params.project, {
     currentTime: presentation.currentTime,
@@ -106,6 +108,16 @@ function usePreviewStageTimeline(params: PreviewStageProps) {
 
 export function usePreviewStageRuntime(params: PreviewStageProps) {
   const { presentation, transient } = usePreviewStageTimeline(params);
+  const previewProject = useMemo(
+    () => ({
+      ...transient.previewProject,
+      fps: resolveVideoEditorPreviewFrameRate(
+        transient.previewProject.fps,
+        params.previewFrameRate
+      ),
+    }),
+    [transient.previewProject, params.previewFrameRate]
+  );
   const renderGenerationRef = useRef(0);
   const effectRuntimeFeedback = usePreviewEffectRuntimeFeedback();
   const previewExactFrameCache = usePreviewSessionExactFrameCache();
@@ -119,9 +131,9 @@ export function usePreviewStageRuntime(params: PreviewStageProps) {
     project: transient.previewProject,
     selectedClipId: params.selectedClipId,
   });
-  const previewRasterSize = resolveVideoEditorPreviewRasterSize(
-    transient.previewProject,
-    params.previewRasterPreset
+  const previewRasterSize = useMemo(
+    () => resolveVideoEditorPreviewRasterSize(previewProject, params.previewRasterPreset),
+    [previewProject, params.previewRasterPreset]
   );
   const media = usePreviewStageMediaRuntime({
     activeClips: surface.activeClips,
@@ -134,7 +146,7 @@ export function usePreviewStageRuntime(params: PreviewStageProps) {
     previewExactFrameCache,
     previewMode: params.previewMode,
     previewRasterSize,
-    project: transient.previewProject,
+    project: previewProject,
     renderGenerationRef,
     registerPreviewRuntime: params.registerPreviewRuntime,
   });
@@ -146,7 +158,7 @@ export function usePreviewStageRuntime(params: PreviewStageProps) {
       onPreviewEffectAnchors: transient.onPreviewEffectAnchors,
       currentTime: transient.currentTime,
       effectRuntimeFeedback,
-      project: transient.previewProject,
+      project: previewProject,
       renderGenerationRef,
     },
     surface,

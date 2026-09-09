@@ -10,12 +10,15 @@ import {
 } from '@sniptale/ui/theme/safe-portal';
 import { translate } from '../../../../platform/i18n';
 import type {
+  VideoEditorPreviewFrameRate,
   VideoEditorPreviewMode,
   VideoEditorPreviewRasterPreset,
   VideoEditorPreviewZoom,
 } from '../../../contracts/preview-runtime';
 
 interface PreviewDisplaySettingsProps {
+  frameRate?: VideoEditorPreviewFrameRate;
+  onFrameRateChange?: (frameRate: VideoEditorPreviewFrameRate) => void;
   mode: VideoEditorPreviewMode;
   onModeChange: (mode: VideoEditorPreviewMode) => void;
   rasterPreset: VideoEditorPreviewRasterPreset;
@@ -75,6 +78,7 @@ export function PreviewDisplaySettings(props: PreviewDisplaySettingsProps) {
       >
         <span>
           {modeLabel} · {props.rasterPreset} · {zoomLabel}
+          {props.frameRate && props.frameRate !== 'project' ? ` · ${props.frameRate} fps` : ''}
         </span>
         <ChevronDown size={14} aria-hidden="true" className={open ? 'rotate-180' : ''} />
       </ContentToolbarButton>
@@ -184,6 +188,26 @@ function PreviewDisplayChoices(props: PreviewDisplaySettingsProps) {
         value={props.rasterPreset}
         onChange={props.onRasterPresetChange}
         options={RASTER_OPTIONS}
+      />
+      <DisplayChoiceSection
+        label={translate('videoEditor.stage.previewFrameRate')}
+        value={props.frameRate ?? 'project'}
+        onChange={props.onFrameRateChange ?? (() => undefined)}
+        options={[
+          { value: 'project', label: translate('videoEditor.stage.previewFrameRateProject') },
+          {
+            value: '30',
+            label: translate('videoEditor.stage.previewFrameRateLimit').replace('{fps}', '30'),
+          },
+          {
+            value: '24',
+            label: translate('videoEditor.stage.previewFrameRateLimit').replace('{fps}', '24'),
+          },
+          {
+            value: '15',
+            label: translate('videoEditor.stage.previewFrameRateLimit').replace('{fps}', '15'),
+          },
+        ]}
       />
       <DisplayChoiceSection
         label={translate('videoEditor.stage.previewZoom')}

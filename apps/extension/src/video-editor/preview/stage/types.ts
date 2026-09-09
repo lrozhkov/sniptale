@@ -25,6 +25,7 @@ import type { PreviewStageGuide } from './canvas/snap';
 import type { PreviewStageImportHandlers } from '../../contracts/insertion';
 import type {
   VideoEditorPreviewMode,
+  VideoEditorPreviewFrameRate,
   VideoEditorPreviewRasterPreset,
   VideoEditorPreviewZoom,
 } from '../../contracts/preview-runtime';
@@ -145,6 +146,7 @@ export interface PreviewStageSurfaceProps extends PreviewStageCanvasProps {
   onImport: PreviewStageImportHandlers;
   onPreviewModeChange: (mode: VideoEditorPreviewMode) => void;
   onPreviewPreferencesRetry: () => void;
+  onPreviewFrameRateChange?: ((frameRate: VideoEditorPreviewFrameRate) => void) | undefined;
   onPreviewRasterPresetChange: (preset: VideoEditorPreviewRasterPreset) => void;
   onPreviewZoomChange: (zoom: VideoEditorPreviewZoom) => void;
   onSeek: (time: number) => void;
@@ -152,6 +154,7 @@ export interface PreviewStageSurfaceProps extends PreviewStageCanvasProps {
   onTogglePlay: () => void;
   previewMode: VideoEditorPreviewMode;
   previewPreferencesSaveFailed: boolean;
+  previewFrameRate?: VideoEditorPreviewFrameRate | undefined;
   previewRasterPreset: VideoEditorPreviewRasterPreset;
   previewZoom: VideoEditorPreviewZoom;
   previewStatus: VideoEditorPreviewStatus;

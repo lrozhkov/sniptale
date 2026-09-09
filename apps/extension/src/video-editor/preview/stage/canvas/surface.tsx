@@ -31,6 +31,8 @@ export function PreviewStageSurface(params: PreviewStageSurfaceProps) {
         onTogglePlay={params.onTogglePlay}
         previewMode={params.previewMode}
         previewPreferencesSaveFailed={params.previewPreferencesSaveFailed}
+        previewFrameRate={params.previewFrameRate}
+        onPreviewFrameRateChange={params.onPreviewFrameRateChange}
         previewRasterPreset={params.previewRasterPreset}
         previewZoom={params.previewZoom}
         previewStatus={params.previewStatus}

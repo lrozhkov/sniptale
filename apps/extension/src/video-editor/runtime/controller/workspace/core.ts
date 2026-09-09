@@ -170,6 +170,9 @@ function createWorkspacePreviewPreferences(workspace: Pick<VideoEditorWorkspaceS
     onRetrySave: previewPreferences.retrySave,
     onZoomChange: (zoom: typeof previewPreferences.preferences.zoom) =>
       previewPreferences.updatePreferences({ zoom }),
+    frameRate: previewPreferences.preferences.frameRate,
+    onFrameRateChange: (frameRate: typeof previewPreferences.preferences.frameRate) =>
+      previewPreferences.updatePreferences({ frameRate }),
     rasterPreset: previewPreferences.preferences.rasterPreset,
     saveFailed: previewPreferences.saveFailed,
     zoom: previewPreferences.preferences.zoom,
