@@ -12,6 +12,7 @@ export function ExportDialogFields(params: ExportDialogFieldParams) {
         sourceDimensions={sourceDimensions}
         onChange={onChange}
         selectedClipAvailable={selectedClipAvailable}
+        selectedRangeAvailable={params.selectedRangeAvailable ?? false}
       />
     </div>
   );

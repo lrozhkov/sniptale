@@ -188,6 +188,7 @@ function useVideoEditorCommandComposition(
     () => ({
       getCurrentProject: getCurrentVideoEditorProjectSnapshot,
       getCurrentSelectedClipId: getCurrentVideoEditorSelectedClipId,
+      getCurrentPlaybackRange: () => workspace.playbackRange,
       getCurrentExportState: getCurrentVideoEditorExportStateSnapshot,
       startExport: exportPort.startExport,
       failExport: exportPort.failExport,
@@ -195,6 +196,7 @@ function useVideoEditorCommandComposition(
       cancelExport: exportPort.cancelExport,
     }),
     [
+      workspace.playbackRange,
       exportPort.cancelExport,
       exportPort.failExport,
       exportPort.failExportCancellation,

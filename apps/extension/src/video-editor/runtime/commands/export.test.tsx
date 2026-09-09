@@ -122,6 +122,7 @@ function createParams(): TestExportHandlerPort {
     getCurrentExportState: () => params.exportState,
     getCurrentProject: () => params.project,
     getCurrentSelectedClipId: () => params.selectedClipId,
+    getCurrentPlaybackRange: () => null,
     project,
     selectedClipId: 'clip-1',
     startExport: vi.fn(),
@@ -253,4 +254,59 @@ it('clears the active export state only after cancellation is accepted', async (
   expect(cancelProjectExportMock).toHaveBeenCalledWith('job-1');
   expect(params.cancelExport).toHaveBeenCalledOnce();
   expect(params.failExport).not.toHaveBeenCalled();
+});
+
+it('exports the timeline range across all tracks without requiring a selected clip', async () => {
+  const params = createParams();
+  params.project.duration = 10;
+  params.selectedClipId = null;
+  params.exportState.settings = { ...params.exportState.settings!, scope: 'selected-range' };
+  renderHook({ ...params, getCurrentPlaybackRange: () => ({ start: 2, end: 5 }) });
+  await act(async () => {
+    await latestHandlers?.handleStartExport();
+  });
+  expect(startProjectExportMock).toHaveBeenCalledWith(
+    'job-1',
+    params.project,
+    expect.objectContaining({ scope: 'selected-range', rangeStartSeconds: 2, rangeEndSeconds: 5 })
+  );
+  expect(startProjectExportMock.mock.calls[0]?.[2].selectedClipIds).toBeUndefined();
+});
+
+it.each([null, { start: 4, end: 4 }, { start: 0, end: 11 }])(
+  'rejects a missing or stale selected range before starting a job: %j',
+  async (range) => {
+    const params = createParams();
+    params.project.duration = 10;
+    params.exportState.settings = { ...params.exportState.settings!, scope: 'selected-range' };
+    renderHook({ ...params, getCurrentPlaybackRange: () => range });
+    await act(async () => {
+      await latestHandlers?.handleStartExport();
+    });
+    expect(params.failExport).toHaveBeenCalledWith(
+      translate('videoEditor.exportDialog.selectedRangeMissing')
+    );
+    expect(params.startExport).not.toHaveBeenCalled();
+    expect(startProjectExportMock).not.toHaveBeenCalled();
+  }
+);
+
+it('does not carry previous range or clip restrictions into whole-project export', async () => {
+  const params = createParams();
+  params.exportState.settings = {
+    ...params.exportState.settings!,
+    scope: 'project',
+    selectedClipIds: ['clip-1'],
+    rangeStartSeconds: 2,
+    rangeEndSeconds: 5,
+  };
+  renderHook(params);
+  await act(async () => {
+    await latestHandlers?.handleStartExport();
+  });
+  const settings = startProjectExportMock.mock.calls[0]?.[2];
+  expect(settings).toBeDefined();
+  expect(settings?.rangeStartSeconds).toBeUndefined();
+  expect(settings?.rangeEndSeconds).toBeUndefined();
+  expect(settings?.selectedClipIds).toBeUndefined();
 });

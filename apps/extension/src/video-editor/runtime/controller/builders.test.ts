@@ -80,6 +80,7 @@ it('suspends history actions for blocking overlays and restores them when editin
 it('retains export retry and cancel routes with and without a loaded project', () => {
   const actions = { handleStartExport: vi.fn(), handleCancelExport: vi.fn() };
   const workspace = {
+    playbackRange: { start: 1, end: 3 },
     confirm: { dialog: null, onCancel: vi.fn(), onConfirm: vi.fn(), request: vi.fn() },
   };
   const project = createEmptyVideoProject('Export');
@@ -90,6 +91,7 @@ it('retains export retry and cancel routes with and without a loaded project', (
     height: project.height,
   });
   expect(controller.exportDialog.selectedClipId).toBe('clip-1');
+  expect(controller.exportDialog.selectedRangeAvailable).toBe(true);
   controller.exportFailure.onRetry();
   controller.exportProgress.onCancel();
   expect(actions.handleStartExport).toHaveBeenCalledOnce();

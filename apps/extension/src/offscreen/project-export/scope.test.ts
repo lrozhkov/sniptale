@@ -117,3 +117,16 @@ it('rejects selected-clip exports with empty or stale clip ids', () => {
     )
   ).toThrow('Invalid video project export settings');
 });
+
+it('preserves the complete scene for selected-range exports', () => {
+  const project = createProject([
+    createClip('video', VideoProjectClipType.VIDEO),
+    createClip('audio', VideoProjectClipType.AUDIO),
+  ]);
+  expect(
+    resolveProjectRenderScope(
+      project,
+      createSettings({ scope: 'selected-range', rangeStartSeconds: 1, rangeEndSeconds: 2 })
+    )
+  ).toBe(project);
+});

@@ -38,7 +38,8 @@ export function VideoEditorWorkspaceOverlays({
       controller.exportDialog.settings &&
       controller.exportDialog.sourceDimensions ? (
         <ExportDialog
-          selectedClipAvailable={controller.exportDialog.selectedClipId !== null}
+          selectedClipAvailable={controller.exportDialog.selectedClipId != null}
+          selectedRangeAvailable={controller.exportDialog.selectedRangeAvailable ?? false}
           settings={controller.exportDialog.settings}
           sourceDimensions={controller.exportDialog.sourceDimensions}
           onClose={controller.exportDialog.onClose}

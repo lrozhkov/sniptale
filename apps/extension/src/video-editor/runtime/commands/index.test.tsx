@@ -45,6 +45,7 @@ it('keeps each command family stable across unrelated parent renders', () => {
     getCurrentExportState: () => initial.exportState,
     getCurrentProject: () => null,
     getCurrentSelectedClipId: () => null,
+    getCurrentPlaybackRange: () => null,
     startExport: initial.startExport,
   };
   const project: ProjectHandlerPort = {

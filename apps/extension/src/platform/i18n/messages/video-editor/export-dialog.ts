@@ -19,6 +19,11 @@ export const videoEditorExportDialogMessages = defineMessageSource({
     ru: 'Весь проект',
     en: 'Whole project',
   },
+  scopeSelectedRangeLabel: { ru: 'Выбранный диапазон', en: 'Selected range' },
+  selectedRangeMissing: {
+    ru: 'Выделите диапазон на таймлайне перед экспортом.',
+    en: 'Select a timeline range before exporting.',
+  },
   scopeSelectedClipLabel: {
     ru: 'Только выделенный фрагмент',
     en: 'Selected clip only',

@@ -9,6 +9,7 @@ import type { VideoEditorExportActions } from '../../contracts/commands/export';
 import type { VideoEditorProjectActions } from '../../contracts/commands/project';
 import type { VideoEditorSessionActions } from '../../contracts/commands/session';
 import type { VideoEditorLibrariesState, ProjectListItem } from '../app-model/types';
+import type { VideoEditorPlaybackRange } from '../../interaction/playback/range';
 import type { ApplyLoadedProject } from '../session/types';
 
 export interface VideoEditorActionHandlers {
@@ -55,6 +56,7 @@ export interface AssetHandlerPort
 export interface ExportHandlerPort {
   getCurrentProject: () => VideoProject | null;
   getCurrentSelectedClipId: () => string | null;
+  getCurrentPlaybackRange: () => VideoEditorPlaybackRange | null;
   getCurrentExportState: () => VideoEditorExportRuntimeState;
   startExport: VideoEditorExportActions['startExport'];
   failExport: VideoEditorExportActions['failExport'];

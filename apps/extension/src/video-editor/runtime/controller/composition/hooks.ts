@@ -131,7 +131,9 @@ export function useVideoEditorOverlaysController() {
   const exportPort = useVideoEditorExportPort((port) => port);
   const project = useVideoEditorProjectLifecyclePort((port) => port.project);
   const selectedClipId = useVideoEditorClipSelectionPort((port) => port.selectedClipId);
-  const workspace = useWorkspaceDialogsContext();
+  const dialogs = useWorkspaceDialogsContext();
+  const { playbackRange } = useWorkspacePlaybackRangeContext();
+  const workspace = { ...dialogs, playbackRange };
   const actions = useExportCommandContext();
   return createVideoEditorOverlaysController({
     actions,

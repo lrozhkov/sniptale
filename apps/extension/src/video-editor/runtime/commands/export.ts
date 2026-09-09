@@ -64,8 +64,29 @@ function resolveExportSettings(
     return null;
   }
 
-  if (exportState.settings.scope !== VideoExportScope.SELECTED_CLIP) {
-    return exportState.settings;
+  const {
+    selectedClipIds: _clipIds,
+    rangeStartSeconds: _start,
+    rangeEndSeconds: _end,
+    ...settings
+  } = exportState.settings;
+  if (settings.scope === VideoExportScope.SELECTED_RANGE) {
+    const range = port.getCurrentPlaybackRange();
+    if (
+      !range ||
+      !Number.isFinite(range.start) ||
+      !Number.isFinite(range.end) ||
+      range.start < 0 ||
+      range.end <= range.start ||
+      range.end > project.duration
+    ) {
+      port.failExport(translate('videoEditor.exportDialog.selectedRangeMissing'));
+      return null;
+    }
+    return { ...settings, rangeStartSeconds: range.start, rangeEndSeconds: range.end };
+  }
+  if (settings.scope !== VideoExportScope.SELECTED_CLIP) {
+    return settings;
   }
 
   if (!selectedClipId) {

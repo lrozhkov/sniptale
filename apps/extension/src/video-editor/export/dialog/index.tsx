@@ -21,6 +21,7 @@ import { useExportDialogFocus } from './focus';
 
 interface ExportDialogProps {
   selectedClipAvailable?: boolean;
+  selectedRangeAvailable?: boolean;
   settings: VideoProjectExportSettings;
   sourceDimensions: { height: number; width: number };
   onClose: () => void;
@@ -128,6 +129,7 @@ function ExportDialogActions(props: {
 
 export const ExportDialog: React.FC<ExportDialogProps> = ({
   selectedClipAvailable = false,
+  selectedRangeAvailable = false,
   settings,
   sourceDimensions,
   onClose,
@@ -165,6 +167,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
             sourceDimensions={sourceDimensions}
             onChange={onChange}
             selectedClipAvailable={selectedClipAvailable}
+            selectedRangeAvailable={selectedRangeAvailable}
           />
           <ExportDialogHintCard
             capabilities={capabilities}

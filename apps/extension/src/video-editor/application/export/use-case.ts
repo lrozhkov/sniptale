@@ -163,9 +163,16 @@ export function getProjectExportCapabilities(
   settings: VideoProjectExportSettings,
   client: VideoProjectExportClient = getDefaultVideoProjectExportClient()
 ): Promise<ProjectExportCapabilitiesResponse> {
+  const {
+    scope: _scope,
+    selectedClipIds: _clipIds,
+    rangeStartSeconds: _start,
+    rangeEndSeconds: _end,
+    ...encodingSettings
+  } = settings;
   return client.sendRuntimeMessage({
     type: VideoMessageType.GET_PROJECT_EXPORT_CAPABILITIES,
-    settings,
+    settings: encodingSettings,
   });
 }
 

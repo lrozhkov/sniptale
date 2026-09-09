@@ -33,7 +33,7 @@ export function createVideoEditorOverlaysController(args: {
   store: ExportPort &
     Pick<ProjectLifecyclePort, 'project'> &
     Pick<ClipSelectionPort, 'selectedClipId'>;
-  workspace: Pick<VideoEditorWorkspaceState, 'confirm'>;
+  workspace: Pick<VideoEditorWorkspaceState, 'confirm' | 'playbackRange'>;
 }): VideoEditorOverlaysController {
   return {
     confirmDialog: args.workspace.confirm.dialog,
@@ -45,6 +45,7 @@ export function createVideoEditorOverlaysController(args: {
       onClose: args.store.closeExportDialog,
       onExport: args.actions.handleStartExport,
       selectedClipId: args.store.selectedClipId,
+      selectedRangeAvailable: args.workspace.playbackRange !== null,
       settings: args.store.exportState.settings,
       sourceDimensions: args.store.project
         ? { height: args.store.project.height, width: args.store.project.width }

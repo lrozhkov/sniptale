@@ -125,3 +125,12 @@ it('validates video project export settings payloads', () => {
     })
   ).toBe(false);
 });
+
+it('admits a selected timeline range only with both valid bounds', () => {
+  const settings = { ...createExportSettings(), scope: VideoExportScope.SELECTED_RANGE };
+  expect(isVideoProjectExportSettings(settings)).toBe(false);
+  expect(isVideoProjectExportSettings({ ...settings, rangeStartSeconds: 1 })).toBe(false);
+  expect(
+    isVideoProjectExportSettings({ ...settings, rangeStartSeconds: 1, rangeEndSeconds: 3 })
+  ).toBe(true);
+});

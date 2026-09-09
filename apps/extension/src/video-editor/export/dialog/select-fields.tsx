@@ -72,12 +72,20 @@ const WEBM_CODEC_OPTIONS = [
   { value: VideoWebmCodec.VP8, label: 'VP8' },
 ] as const;
 
-function getExportScopeOptions(selectedClipAvailable: boolean) {
+function getExportScopeOptions(selectedClipAvailable: boolean, selectedRangeAvailable: boolean) {
   return [
     {
       value: VideoExportScope.PROJECT,
       label: translate('videoEditor.exportDialog.scopeProjectLabel'),
     },
+    ...(selectedRangeAvailable
+      ? [
+          {
+            value: VideoExportScope.SELECTED_RANGE,
+            label: translate('videoEditor.exportDialog.scopeSelectedRangeLabel'),
+          },
+        ]
+      : []),
     ...(selectedClipAvailable
       ? [
           {
@@ -169,7 +177,10 @@ function buildFormatPatch(args: {
 
 export function ExportDialogSelectFields(params: ExportDialogFieldParams) {
   const { capabilities, onChange, selectedClipAvailable, settings, sourceDimensions } = params;
-  const scopeOptions = getExportScopeOptions(selectedClipAvailable);
+  const scopeOptions = getExportScopeOptions(
+    selectedClipAvailable,
+    params.selectedRangeAvailable ?? false
+  );
   const currentScope = settings.scope ?? VideoExportScope.PROJECT;
   const formatOptions = getExportFormatOptions(capabilities);
   const codecOptions = capabilities ? getMp4CodecOptions(capabilities) : [];
