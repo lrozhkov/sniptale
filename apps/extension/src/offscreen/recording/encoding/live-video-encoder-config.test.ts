@@ -10,7 +10,6 @@ import {
   canUseNativeEncoderTransform,
   resolveLiveEncoderContentHint,
   resolveLiveEncodingDimensions,
-  resolveLiveVideoBitrateMode,
 } from './live-video-encoder-config';
 
 const fillTransform = {
@@ -38,10 +37,9 @@ describe('live video encoder configuration', () => {
     const contentHint = resolveLiveEncoderContentHint(track);
     const config = buildNativeVideoEncoderConfig(input, dimensions, contentHint);
 
-    expect(resolveLiveVideoBitrateMode(input)).toBe('constant');
     expect(config).toEqual(
       expect.objectContaining({
-        bitrateMode: 'constant',
+        bitrateMode: 'variable',
         codec: 'vp09.00.50.08',
         contentHint: 'text',
         displayHeight: 1080,
@@ -64,13 +62,6 @@ describe('live video encoder configuration', () => {
   });
 
   it('keeps pass-through and AVC on variable rate control', () => {
-    expect(resolveLiveVideoBitrateMode({ encoding: vp9Encoding })).toBe('variable');
-    expect(
-      resolveLiveVideoBitrateMode({
-        encoding: { ...vp9Encoding, container: 'mp4', videoCodec: 'avc' },
-        frameTransform: fillTransform,
-      })
-    ).toBe('variable');
     expect(
       buildExactVideoEncoderConfig(
         {
@@ -162,4 +153,27 @@ describe('live video encoder configuration', () => {
       assertLiveVideoEncoderConfig({ ...input, actual: { ...base, width: 1918 } })
     ).toThrow('selected video configuration');
   });
+});
+
+it('keeps scene-change rate control independent from technical cropping', () => {
+  expect(
+    buildNativeVideoEncoderConfig(
+      { encoding: vp9Encoding, frameTransform: fillTransform },
+      { width: 1920, height: 1080 },
+      'detail'
+    )?.bitrateMode
+  ).toBe('variable');
+});
+it('selects VP9 level using sample rate and maximum dimension', () => {
+  expect(
+    buildNativeVideoEncoderConfig(
+      { encoding: { ...vp9Encoding, frameRate: 60 } },
+      { width: 1920, height: 1080 },
+      'detail'
+    )?.codec
+  ).toBe('vp09.00.41.08');
+  expect(
+    buildNativeVideoEncoderConfig({ encoding: vp9Encoding }, { width: 5000, height: 200 }, 'detail')
+      ?.codec
+  ).toBe('vp09.00.50.08');
 });

@@ -57,13 +57,13 @@ describe('recording resource budget', () => {
     ).toThrow('positive integers');
   });
 
-  it('rejects a fixed 2160p profile above its canonical 24 fps tier', () => {
+  it('allows fixed 2160p30 within the live pixel budget', () => {
     expect(() =>
       assertRecordingResourceBudget({
         artifacts: [{ dimensions: { height: 2160, width: 3840 }, frameRate: 30 }],
         frameRate: VideoFrameRate.FPS30,
         resolution: VideoResolutionPreset.P2160,
       })
-    ).toThrow('unsupported for its resolution');
+    ).not.toThrow();
   });
 });

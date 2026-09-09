@@ -104,6 +104,7 @@ export async function createFixedVideoOutputStream(
       frameRateCap: outputProfile.frameRate,
       outputBasis: { height: video.videoHeight, width: video.videoWidth },
       resolution: outputProfile.resolution,
+      presetScaleMode: 'avoid-upscale',
       sourceRect: { x: 0, y: 0, height: video.videoHeight, width: video.videoWidth },
     });
     const sourceRect = resolveAspectMatchedSourceFrame(geometry.sourceRect, geometry.outputSize);

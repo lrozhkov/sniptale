@@ -105,7 +105,7 @@ it('keeps TAB capture off Region Capture and requests the viewport-sized source'
         chromeMediaSource: 'tab',
         chromeMediaSourceId: 'region-tab-stream',
         maxFrameRate: 60,
-        maxHeight: 1309,
+        maxHeight: 1310,
         maxWidth: 2560,
         minFrameRate: 60,
       },
@@ -144,7 +144,7 @@ it('requests TAB viewport dimensions from Chromium capture', async () => {
         chromeMediaSourceId: 'tab-stream-controlled',
         maxFrameRate: 30,
         maxHeight: 1184,
-        maxWidth: 2399,
+        maxWidth: 2400,
         minFrameRate: 30,
       },
     },
@@ -408,7 +408,7 @@ it.each([
 );
 
 it.each([
-  { devicePixelRatio: 1, height: 1080, width: 16_384 },
+  { devicePixelRatio: 1, height: 1080, width: 16_383 },
   { devicePixelRatio: 2, height: 8192, width: 1280 },
 ])('rejects TAB dimensions Chromium would silently replace: $width × $height', async (viewport) => {
   const getUserMedia = vi.fn();

@@ -59,6 +59,8 @@ function parseEntry(value: unknown): CaptureSurfaceJournalEntry | null {
   if (!isRecord(value)) return null;
   const prior = parseSnapshot(value['prior']);
   const applied = parseSnapshot(value['applied']);
+  const alignmentFrom =
+    value['alignmentFrom'] === undefined ? undefined : parseSnapshot(value['alignmentFrom']);
   if (
     value['version'] !== 1 ||
     typeof value['sessionId'] !== 'string' ||
@@ -72,6 +74,9 @@ function parseEntry(value: unknown): CaptureSurfaceJournalEntry | null {
     value['target'] !== 'window' ||
     !prior ||
     !applied ||
+    alignmentFrom === null ||
+    (alignmentFrom !== undefined &&
+      (value['owner'] !== 'video' || value['phase'] !== 'prepared')) ||
     typeof value['phase'] !== 'string' ||
     !phases.has(value['phase'] as CaptureSurfaceJournalPhase) ||
     (value['parentLeaseId'] !== null && typeof value['parentLeaseId'] !== 'string') ||
@@ -93,6 +98,7 @@ function parseEntry(value: unknown): CaptureSurfaceJournalEntry | null {
     target: 'window',
     prior,
     applied,
+    ...(alignmentFrom === undefined ? {} : { alignmentFrom }),
     phase: value['phase'] as CaptureSurfaceJournalPhase,
     parentLeaseId: value['parentLeaseId'],
     updatedAt: value['updatedAt'],

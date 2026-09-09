@@ -110,6 +110,91 @@ function request(overrides: Record<string, unknown> = {}) {
 }
 
 describe('window-only capture-surface application', () => {
+  it('aligns measured tab pixels, journals both native sizes, and restores the original window', async () => {
+    let current = applied;
+    const snapshots: unknown[] = [];
+    mocks.writeJournal.mockImplementation(async (entries) => {
+      snapshots.push(structuredClone(entries));
+    });
+    mocks.getWindowSnapshot.mockImplementation(async () => current);
+    mocks.getWindowWorkArea.mockImplementation(async () => ({
+      snapshot: current,
+      workArea: { width: 1920, height: 1040 },
+    }));
+    mocks.applyPreparedWindowSize.mockImplementation(async (_id, _prior, next) => {
+      current = next;
+      return next;
+    });
+    const measure = vi.fn(async () => ({
+      width: current.width,
+      height: current.height - 87,
+      scale: 1,
+      windowId: 3,
+    }));
+    const service = new DefaultCaptureSurfaceService();
+    const binding = await service.apply(
+      request({ owner: 'video', context: 'video-tab', measureVideoViewport: measure })
+    );
+    expect(binding.height).toBe(719);
+    expect(snapshots).toContainEqual([
+      expect.objectContaining({
+        phase: 'prepared',
+        alignmentFrom: applied,
+        applied: { ...applied, height: 719 },
+        prior,
+      }),
+    ]);
+    expect(snapshots.at(-1)).toEqual([
+      expect.not.objectContaining({ alignmentFrom: expect.anything() }),
+    ]);
+    await service.release(binding);
+    expect(mocks.restoreWindowSnapshot).toHaveBeenCalledWith(3, prior);
+  });
+
+  it('rolls back when the tab raster does not follow the correction', async () => {
+    let current = applied;
+    mocks.getWindowSnapshot.mockImplementation(async () => current);
+    mocks.getWindowWorkArea.mockImplementation(async () => ({
+      snapshot: current,
+      workArea: { width: 1920, height: 1040 },
+    }));
+    mocks.applyPreparedWindowSize.mockImplementation(async (_id, _prior, next) => {
+      current = next;
+      return next;
+    });
+    const measure = vi.fn(async () => ({ width: 1280, height: 633, scale: 1, windowId: 3 }));
+    await expect(
+      new DefaultCaptureSurfaceService().apply(
+        request({ owner: 'video', context: 'video-tab', measureVideoViewport: measure })
+      )
+    ).rejects.toMatchObject({ code: 'verification-failed' });
+    expect(mocks.restoreWindowSnapshot).toHaveBeenCalledWith(3, prior);
+  });
+
+  it('does not mutate again if the alignment journal cannot be written', async () => {
+    mocks.getWindowWorkArea.mockResolvedValue({
+      snapshot: applied,
+      workArea: { width: 1920, height: 1040 },
+    });
+    mocks.writeJournal
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('storage failed'));
+    const measure = vi.fn(async () => ({ width: 1280, height: 633, scale: 1, windowId: 3 }));
+    await expect(
+      new DefaultCaptureSurfaceService().apply(
+        request({ owner: 'video', context: 'video-tab', measureVideoViewport: measure })
+      )
+    ).rejects.toThrow('storage failed');
+    expect(mocks.applyPreparedWindowSize).toHaveBeenCalledOnce();
+    expect(mocks.restoreWindowSnapshot).toHaveBeenCalledWith(3, prior);
+  });
+
+  it('rejects alignment for screenshot consumers before mutation', async () => {
+    await expect(
+      new DefaultCaptureSurfaceService().apply(request({ measureVideoViewport: vi.fn() }))
+    ).rejects.toMatchObject({ code: 'unsupported-context' });
+    expect(mocks.applyPreparedWindowSize).not.toHaveBeenCalled();
+  });
   it('admits only the browser-window preset and journals before changing bounds', async () => {
     const service = new DefaultCaptureSurfaceService();
     await expect(service.apply(request())).resolves.toMatchObject({
@@ -216,6 +301,36 @@ describe('window-only capture-surface application', () => {
 });
 
 describe('window-only capture-surface lifecycle', () => {
+  it('preserves user-changed bounds during interrupted alignment recovery', async () => {
+    mocks.readJournal.mockResolvedValueOnce([
+      journalEntry({
+        phase: 'prepared',
+        alignmentFrom: applied,
+        applied: { ...applied, height: 719 },
+      }),
+    ]);
+    mocks.getWindowSnapshot.mockResolvedValue({ ...applied, width: 1000 });
+    await new DefaultCaptureSurfaceService().recover();
+    expect(mocks.restoreWindowSnapshot).not.toHaveBeenCalled();
+    expect(mocks.writeJournal.mock.calls.at(-1)?.[0]?.[0]).toMatchObject({ phase: 'conflict' });
+    expect(mocks.writeJournal.mock.calls.at(-1)?.[0]?.[0]).not.toHaveProperty('alignmentFrom');
+  });
+  it.each([720, 719])(
+    'recovers interruption on either side of raster alignment (%i)',
+    async (height) => {
+      mocks.readJournal.mockResolvedValueOnce([
+        journalEntry({
+          phase: 'prepared',
+          alignmentFrom: applied,
+          applied: { ...applied, height: 719 },
+        }),
+      ]);
+      mocks.getWindowSnapshot.mockResolvedValue({ ...applied, height });
+      await new DefaultCaptureSurfaceService().recover();
+      expect(mocks.restoreWindowSnapshot).toHaveBeenCalledWith(3, prior);
+      expect(mocks.writeJournal.mock.calls.at(-1)?.[0]).toEqual([]);
+    }
+  );
   it('accepts an unchanged window on reassert and marks a changed window conflicted', async () => {
     const service = new DefaultCaptureSurfaceService();
     const binding = await service.apply(request());

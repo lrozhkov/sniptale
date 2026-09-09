@@ -27,7 +27,7 @@ import {
   canUseNativeEncoderTransform,
   resolveLiveEncoderContentHint,
   resolveLiveEncodingDimensions,
-  resolveLiveVideoBitrateMode,
+  LIVE_VIDEO_BITRATE_MODE,
   type LiveEncoderContentHint,
 } from './live-video-encoder-config';
 import { LiveNativeVideoEncoderSource } from './live-native-video-encoder-source';
@@ -201,7 +201,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
       this.nativeVideoSource = null;
       this.videoSource = new VideoSampleSource({
         bitrate: input.encoding.videoBitrate,
-        bitrateMode: resolveLiveVideoBitrateMode(input),
+        bitrateMode: LIVE_VIDEO_BITRATE_MODE,
         codec: input.encoding.videoCodec,
         contentHint: this.expectedContentHint,
         hardwareAcceleration: 'no-preference',
@@ -278,7 +278,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
     const contentHint = resolveLiveEncoderContentHint(videoTrack);
     const selectedConfigSupported = await canEncodeVideo(input.encoding.videoCodec, {
       bitrate: input.encoding.videoBitrate,
-      bitrateMode: resolveLiveVideoBitrateMode(input),
+      bitrateMode: LIVE_VIDEO_BITRATE_MODE,
       contentHint,
       ...(input.encoding.videoCodecString
         ? { fullCodecString: input.encoding.videoCodecString }
@@ -400,7 +400,7 @@ export class LiveRecordingArtifactSessionOwner implements LiveRecordingArtifactS
           : 'sample-raster-or-pass-through',
         contentHint: this.expectedContentHint,
         captureTrack: this.videoDiagnostics.captureTrack,
-        bitrateMode: resolveLiveVideoBitrateMode(this.input),
+        bitrateMode: LIVE_VIDEO_BITRATE_MODE,
         keyFrameInterval: LIVE_VIDEO_KEY_FRAME_INTERVAL_SECONDS,
         videoBitrate: this.input.encoding.videoBitrate,
         videoCodec: this.input.encoding.videoCodec,

@@ -4,6 +4,7 @@ import type { AppliedCaptureSurface } from '../../../capture-surface';
 
 export type VideoSurfaceSession = {
   applied: AppliedCaptureSurface | null;
+  acquisition?: Promise<AppliedCaptureSurface>;
   generation: number;
   recordingId: string;
   sourceReady: boolean;

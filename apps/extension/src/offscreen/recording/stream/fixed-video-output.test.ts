@@ -33,7 +33,6 @@ import {
   createStream,
   createTrackedStream,
 } from '../multi-source/media-stream.test-support';
-import { createRecordingGeometryPlan } from '../geometry/plan';
 import { createFixedVideoOutputStream } from './fixed-video-output';
 
 function createSettings(resolution: VideoResolutionPreset = VideoResolutionPreset.SOURCE) {
@@ -122,14 +121,16 @@ it('preserves primary source-audio ownership only when explicitly requested', as
 });
 
 it.each(Object.values(VideoResolutionPreset))(
-  'fills every stable fixed-output canvas edge for %s',
+  'downscales without enlarging small sources and fills every canvas edge for %s',
   async (resolution) => {
-    const outputSize = createRecordingGeometryPlan({
-      frameRateCap: 30,
-      outputBasis: { height: 500, width: 1086 },
-      resolution,
-      sourceRect: { x: 0, y: 0, height: 500, width: 1086 },
-    }).outputSize;
+    const outputSize =
+      resolution === VideoResolutionPreset.P240
+        ? { width: 522, height: 240 }
+        : resolution === VideoResolutionPreset.P360
+          ? { width: 782, height: 360 }
+          : resolution === VideoResolutionPreset.P480
+            ? { width: 1042, height: 480 }
+            : { width: 1086, height: 500 };
     const canvasStream = createStream(outputSize.width, outputSize.height);
     const sourceStream = createTrackedStream({ height: 500, width: 1086 });
     const { canvas, ctx } = installCanvasFixture(canvasStream);

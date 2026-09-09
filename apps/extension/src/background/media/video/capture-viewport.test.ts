@@ -2,6 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   sendTabMessage: vi.fn(),
+  getTab: vi.fn(),
+  getZoom: vi.fn(),
+}));
+
+vi.mock('@sniptale/platform/browser/tabs', () => ({
+  browserTabs: { get: mocks.getTab, getZoom: mocks.getZoom },
 }));
 
 vi.mock('../../routing-contracts/runtime-messaging/services', async (importOriginal) => ({
@@ -9,7 +15,11 @@ vi.mock('../../routing-contracts/runtime-messaging/services', async (importOrigi
   getBackgroundRuntimeMessaging: () => ({ sendTabMessage: mocks.sendTabMessage }),
 }));
 
-import { captureViewportsEqual, readTabCaptureViewport } from './capture-viewport';
+import {
+  captureViewportsEqual,
+  readTabCaptureViewport,
+  readVideoPresetViewport,
+} from './capture-viewport';
 
 const viewport = {
   devicePixelRatio: 2,
@@ -28,6 +38,20 @@ beforeEach(() => {
 });
 
 describe('tab capture viewport validation', () => {
+  it('measures tab DIPs independently of browser chrome and page zoom', async () => {
+    mocks.getTab.mockResolvedValue({ windowId: 3, width: 2560, height: 1305 });
+    mocks.getZoom.mockResolvedValue(1.25);
+    mocks.sendTabMessage.mockResolvedValue({
+      success: true,
+      viewport: { ...viewport, devicePixelRatio: 1.5625 },
+    });
+    await expect(readVideoPresetViewport(7)).resolves.toEqual({
+      windowId: 3,
+      width: 2560,
+      height: 1305,
+      scale: 1.25,
+    });
+  });
   it('reads the atomic viewport response through canonical tab messaging', async () => {
     await expect(readTabCaptureViewport(7)).resolves.toEqual(viewport);
     expect(mocks.sendTabMessage).toHaveBeenCalledWith(

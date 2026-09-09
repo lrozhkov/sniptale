@@ -2,7 +2,6 @@ import { translate } from '../../../../../platform/i18n/popup';
 import { openSettingsPage } from '../../../../../platform/navigation/extension-pages';
 import {
   resolveVideoOutputProfile,
-  isVideoResolutionFrameRateSupported,
   VideoFrameRate,
   VideoOutputContainer,
   type VideoOutputDimensions,
@@ -51,9 +50,6 @@ export function OutputSettingsPanel(props: {
     resolution: VideoOutputProfile['resolution']
   ): VideoOutputProfile => ({
     ...outputProfile,
-    frameRate: isVideoResolutionFrameRateSupported(resolution, outputProfile.frameRate)
-      ? outputProfile.frameRate
-      : VideoFrameRate.FPS24,
     resolution,
   });
   const unsupportedReason = translate('popup.video.outputResourceUnsupported');

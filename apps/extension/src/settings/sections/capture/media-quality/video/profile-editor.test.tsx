@@ -4,6 +4,9 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
+const { codecSupport } = vi.hoisted(() => ({ codecSupport: vi.fn(() => 'available') }));
+vi.mock('./profile-support', () => ({ useProfileCodecSupport: codecSupport }));
+
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
   translate: (key: string) => key,
@@ -115,6 +118,7 @@ function change(element: Element | null | undefined, value: string) {
 }
 
 beforeEach(() => {
+  codecSupport.mockReturnValue('available');
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   container = document.createElement('div');
   document.body.append(container);
@@ -133,7 +137,7 @@ afterEach(() => {
 it('creates a named profile and submits the selected output combination', () => {
   const props = renderEditor();
   expect(container?.textContent).toContain('settings.videoQuality.createTitle');
-  expect(container?.firstElementChild?.getAttribute('data-width')).toBe('480px');
+  expect(container?.firstElementChild?.getAttribute('data-width')).toBe('560px');
   expect(container?.firstElementChild?.getAttribute('data-max-height')).toBe('84vh');
   expect(container?.querySelector('header')?.getAttribute('data-compact')).toBe('true');
   expect(container?.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(true);
@@ -145,14 +149,12 @@ it('creates a named profile and submits the selected output combination', () => 
   ).toBe(true);
 
   change(container?.querySelector('input'), 'Review');
-  change(
-    container?.querySelector('[aria-label="settings.videoQuality.qualityLabel"]'),
-    VideoQuality.LOW
+  act(() =>
+    Array.from(container?.querySelectorAll('button') ?? [])
+      .find((button) => button.textContent === 'settings.videoQuality.qualityLow')
+      ?.click()
   );
-  change(
-    container?.querySelector('[aria-label="settings.videoQuality.containerLabel"]'),
-    VideoOutputContainer.MP4
-  );
+  act(() => container?.querySelector<HTMLInputElement>('input[value="MP4"]')?.click());
   change(
     container?.querySelector('[aria-label="settings.videoQuality.codecLabel"]'),
     VideoOutputCodec.AVC
@@ -176,10 +178,29 @@ it('creates a named profile and submits the selected output combination', () => 
   );
 });
 
+it('keeps the codec status slot mounted through format checks and their result', () => {
+  renderEditor();
+  const status = container?.querySelector('[role="status"]');
+  expect(status).not.toBeNull();
+  expect(status?.textContent).toBe('');
+  codecSupport.mockReturnValue('checking');
+  renderEditor();
+  expect(container?.querySelector('[role="status"]')).toBe(status);
+  expect(status?.textContent).toBe('settings.videoQuality.codecChecking');
+  codecSupport.mockReturnValue('unavailable');
+  renderEditor();
+  expect(container?.querySelector('[role="status"]')).toBe(status);
+  expect(status?.textContent).toBe('settings.videoQuality.codecUnavailable');
+  codecSupport.mockReturnValue('available');
+  renderEditor();
+  expect(container?.querySelector('[role="status"]')).toBe(status);
+  expect(status?.textContent).toBe('');
+});
+
 it('edits a profile, normalizes an incompatible codec, and closes from either action', () => {
   const onClose = vi.fn();
   const props = renderEditor({
-    busy: true,
+    busy: false,
     onClose,
     profile: {
       id: 'custom:mp4',
@@ -194,12 +215,11 @@ it('edits a profile, normalizes an incompatible codec, and closes from either ac
     },
   });
   expect(container?.textContent).toContain('settings.videoQuality.editTitle');
-  expect(container?.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(true);
-
-  change(
-    container?.querySelector('[aria-label="settings.videoQuality.containerLabel"]'),
-    VideoOutputContainer.WEBM
+  expect(container?.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(
+    false
   );
+
+  act(() => container?.querySelector<HTMLInputElement>('input[value="WEBM"]')?.click());
   act(() => container?.querySelector('form')?.requestSubmit());
   expect(props.onSave).toHaveBeenCalledWith(
     expect.objectContaining({
@@ -226,14 +246,12 @@ it('preserves compatible codecs and maps every frame-rate option into the profil
       configuration: DEFAULT_VIDEO_OUTPUT_PROFILE,
     },
   });
-  const containerSelect = container?.querySelector(
-    '[aria-label="settings.videoQuality.containerLabel"]'
-  );
+
   const frameRateSelect = container?.querySelector(
     '[aria-label="settings.videoQuality.frameRateLabel"]'
   );
 
-  change(containerSelect, VideoOutputContainer.WEBM);
+  act(() => container?.querySelector<HTMLInputElement>('input[value="WEBM"]')?.click());
   change(frameRateSelect, String(VideoFrameRate.FPS24));
   act(() => container?.querySelector('form')?.requestSubmit());
   change(frameRateSelect, String(VideoFrameRate.FPS60));
@@ -264,7 +282,7 @@ it('preserves compatible codecs and maps every frame-rate option into the profil
   );
 });
 
-it('disables incompatible 2160p frame rates and normalizes the draft to 24 fps', () => {
+it('rejects 4K60 without changing FPS and allows 4K30', () => {
   const props = renderEditor({
     profile: {
       id: 'custom:4k',
@@ -284,12 +302,14 @@ it('disables incompatible 2160p frame rates and normalizes the draft to 24 fps',
   );
 
   change(resolutionSelect, VideoResolutionPreset.P2160);
-
-  expect(frameRateSelect?.value).toBe(String(VideoFrameRate.FPS24));
+  expect(frameRateSelect?.value).toBe(String(VideoFrameRate.FPS60));
+  change(frameRateSelect, String(VideoFrameRate.FPS30));
+  change(resolutionSelect, VideoResolutionPreset.P2160);
+  expect(frameRateSelect?.value).toBe(String(VideoFrameRate.FPS30));
   expect(
     frameRateSelect?.querySelector<HTMLOptionElement>(`option[value="${VideoFrameRate.FPS30}"]`)
       ?.disabled
-  ).toBe(true);
+  ).toBe(false);
   expect(
     frameRateSelect?.querySelector<HTMLOptionElement>(`option[value="${VideoFrameRate.FPS60}"]`)
       ?.disabled
@@ -299,9 +319,36 @@ it('disables incompatible 2160p frame rates and normalizes the draft to 24 fps',
   expect(props.onSave).toHaveBeenCalledWith(
     expect.objectContaining({
       configuration: expect.objectContaining({
-        frameRate: VideoFrameRate.FPS24,
+        frameRate: VideoFrameRate.FPS30,
         resolution: VideoResolutionPreset.P2160,
       }),
     })
   );
+});
+
+it.each(['checking', 'unavailable', 'busy'])('blocks submission while %s', (state) => {
+  codecSupport.mockReturnValue(state === 'busy' ? 'available' : state);
+  const props = renderEditor({
+    busy: state === 'busy',
+    profile: { id: 'custom:test', name: 'Test', configuration: DEFAULT_VIDEO_OUTPUT_PROFILE },
+  });
+  act(() =>
+    container
+      ?.querySelector('form')
+      ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+  );
+  expect(props.onSave).not.toHaveBeenCalled();
+});
+
+it('orders compression quality from smaller files to more detail', () => {
+  renderEditor();
+  const group = container?.querySelector('[aria-label="settings.videoQuality.qualityLabel"]');
+  expect(
+    Array.from(group?.querySelectorAll('button') ?? []).map((button) => button.textContent)
+  ).toEqual([
+    'settings.videoQuality.qualityLow',
+    'settings.videoQuality.qualityMedium',
+    'settings.videoQuality.qualityHigh',
+    'settings.videoQuality.qualityUltra',
+  ]);
 });

@@ -29,7 +29,12 @@ async function unwindRecoveredStack(
       });
       const observation = await readCurrentSurfaceSnapshot(state);
       try {
-        if (captureSurfaceSnapshotsEqual(state.entry.applied, observation.current)) {
+        if (
+          captureSurfaceSnapshotsEqual(state.entry.applied, observation.current) ||
+          (state.entry.phase === 'prepared' &&
+            state.entry.alignmentFrom &&
+            captureSurfaceSnapshotsEqual(state.entry.alignmentFrom, observation.current))
+        ) {
           await restoreCaptureSurfaceSnapshot(state);
         } else if (!captureSurfaceSnapshotsEqual(state.prior, observation.current)) {
           throw new Error('restore-conflict');
@@ -41,6 +46,7 @@ async function unwindRecoveredStack(
       }
       registry.remove(state);
     } catch {
+      delete state.entry.alignmentFrom;
       state.entry.phase = 'conflict';
     }
     await registry.persist();

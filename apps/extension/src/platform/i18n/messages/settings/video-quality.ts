@@ -1,6 +1,29 @@
 import { defineMessageSource } from '../source';
 
 export const settingsVideoQualityMessages = defineMessageSource({
+  smallerFile: { ru: 'Меньше файл', en: 'Smaller file' },
+  moreDetail: { ru: 'Больше деталей', en: 'More detail' },
+  codecChecking: { ru: 'Проверяем доступность кодека…', en: 'Checking codec availability…' },
+  codecUnavailable: {
+    ru: 'Этот кодек недоступен в текущем браузере. Выберите другой формат или кодек.',
+    en: 'This codec is unavailable in this browser. Choose another format or codec.',
+  },
+  codecUnknown: {
+    ru: 'Не удалось проверить кодек. Доступность будет проверена перед записью.',
+    en: 'Could not check this codec. Availability will be checked before recording.',
+  },
+  advanced: { ru: 'Дополнительно: кодек', en: 'Advanced: codec' },
+  mp4Purpose: { ru: 'Для обмена и видеоредакторов', en: 'For sharing and editing' },
+  webmPurpose: { ru: 'Для браузеров и веба', en: 'For browsers and the web' },
+  upTo: { ru: 'До', en: 'Up to' },
+  geometryHelp: {
+    ru: 'Маленький источник не увеличивается. 4K — до 30 кадров/с. Для исходного размера доступность зависит от выбранного источника.',
+    en: 'Smaller sources are not enlarged. 4K supports up to 30 fps. Source-size availability depends on the selected source.',
+  },
+  compressionHelp: {
+    ru: 'Выше качество — больше файл. Все варианты используют сжатие с потерями; кодек и размер проверяются перед записью.',
+    en: 'Higher quality produces larger files. All options use lossy compression; codec and dimensions are checked before recording.',
+  },
   kicker: {
     ru: 'Запись экрана',
     en: 'Screen recording',
@@ -46,12 +69,12 @@ export const settingsVideoQualityMessages = defineMessageSource({
     en: 'Delete profile',
   },
   createTitle: {
-    ru: 'Новый профиль качества',
-    en: 'New quality profile',
+    ru: 'Новый профиль записи',
+    en: 'New recording profile',
   },
   editTitle: {
-    ru: 'Настройка профиля качества',
-    en: 'Edit quality profile',
+    ru: 'Профиль записи',
+    en: 'Edit recording profile',
   },
   nameLabel: {
     ru: 'Название',
@@ -62,14 +85,14 @@ export const settingsVideoQualityMessages = defineMessageSource({
     en: 'For example, Client demo',
   },
   qualityLabel: {
-    ru: 'Качество',
-    en: 'Quality',
+    ru: 'Качество сжатия',
+    en: 'Compression quality',
   },
   qualityLow: { ru: 'Низкое', en: 'Low' },
   qualityMedium: { ru: 'Среднее', en: 'Medium' },
   qualityHigh: { ru: 'Высокое', en: 'High' },
   qualityUltra: { ru: 'Ультра', en: 'Ultra' },
-  resolutionSource: { ru: 'Исходное', en: 'Source' },
+  resolutionSource: { ru: 'Исходный размер', en: 'Source size' },
   containerLabel: {
     ru: 'Формат',
     en: 'Format',
@@ -113,5 +136,5 @@ export const settingsVideoQualityMessages = defineMessageSource({
   compactName: { ru: 'Экономное', en: 'Compact' },
   optimalName: { ru: 'Оптимальное', en: 'Optimal' },
   highName: { ru: 'Высокое', en: 'High' },
-  maximumName: { ru: 'Максимальное', en: 'Maximum' },
+  maximumName: { ru: 'Исходный размер', en: 'Source size' },
 });

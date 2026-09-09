@@ -93,7 +93,7 @@ it('offers fast advanced choices and marks manual combinations as custom', () =>
   expect(onChange).toHaveBeenCalledWith({
     outputProfile: {
       ...DEFAULT_VIDEO_OUTPUT_PROFILE,
-      frameRate: VideoFrameRate.FPS24,
+      frameRate: VideoFrameRate.FPS30,
       quality: VideoQuality.HIGH,
       resolution: VideoResolutionPreset.P2160,
     },
@@ -129,4 +129,25 @@ it('disables a known over-budget frame-rate choice instead of silently accepting
   );
   expect(sixtyFps?.disabled).toBe(true);
   expect(sixtyFps?.getAttribute('title')).toBe('popup.video.outputResourceUnsupported');
+});
+
+it('disables 4K at 60 fps instead of silently changing the selected cadence', () => {
+  const onChange = vi.fn();
+  act(() =>
+    root?.render(
+      <OutputSettingsPanel
+        onChange={onChange}
+        settings={{
+          ...DEFAULT_VIDEO_SETTINGS,
+          outputProfile: { ...DEFAULT_VIDEO_OUTPUT_PROFILE, frameRate: VideoFrameRate.FPS60 },
+        }}
+      />
+    )
+  );
+  const fourK = Array.from(container?.querySelectorAll<HTMLButtonElement>('button') ?? []).find(
+    (button) => button.textContent === '2160p (4K)'
+  );
+  expect(fourK?.disabled).toBe(true);
+  act(() => fourK?.click());
+  expect(onChange).not.toHaveBeenCalled();
 });

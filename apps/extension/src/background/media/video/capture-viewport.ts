@@ -1,4 +1,5 @@
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
+import { browserTabs } from '@sniptale/platform/browser/tabs';
 import type { ViewportInfo } from '@sniptale/runtime-contracts/video/types/types';
 import { getBackgroundRuntimeMessaging } from '../../routing-contracts/runtime-messaging/services';
 
@@ -53,4 +54,24 @@ export async function readTabCaptureViewport(tabId: number): Promise<ViewportInf
   }
   assertSupportedCaptureViewport(response.viewport);
   return response.viewport;
+}
+
+export async function readVideoPresetViewport(tabId: number) {
+  const viewport = await readTabCaptureViewport(tabId);
+  const [tab, zoom] = await Promise.all([browserTabs.get(tabId), browserTabs.getZoom(tabId)]);
+  if (
+    typeof tab.windowId !== 'number' ||
+    typeof tab.width !== 'number' ||
+    typeof tab.height !== 'number' ||
+    !Number.isFinite(zoom) ||
+    zoom <= 0
+  )
+    throw new Error('Tab raster dimensions are unavailable');
+  // tabs.get dimensions are viewport DIPs, independent of page zoom and browser chrome.
+  return {
+    width: tab.width,
+    height: tab.height,
+    scale: viewport.devicePixelRatio / zoom,
+    windowId: tab.windowId,
+  };
 }

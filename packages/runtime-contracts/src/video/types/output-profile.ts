@@ -252,7 +252,7 @@ export function isVideoResolutionFrameRateSupported(
   resolution: VideoResolutionPreset,
   frameRate: VideoFrameRate
 ): boolean {
-  return resolution !== VideoResolutionPreset.P2160 || frameRate === VideoFrameRate.FPS24;
+  return resolution !== VideoResolutionPreset.P2160 || frameRate !== VideoFrameRate.FPS60;
 }
 
 export function resolveVideoOutputDimensions(
@@ -277,24 +277,6 @@ export function resolveVideoOutputDimensions(
   };
 }
 
-export function getVideoResolutionTier(
-  width: number,
-  height: number
-): Exclude<VideoResolutionPreset, 'SOURCE'> {
-  if (!isFinitePositive(width) || !isFinitePositive(height)) {
-    throw new Error('Video dimensions must be positive finite numbers');
-  }
-
-  const source = { width, height };
-  for (const preset of RESOLUTION_PRESET_ORDER) {
-    if (source.height <= VIDEO_RESOLUTION_LINES[preset]) {
-      return preset;
-    }
-  }
-
-  return VideoResolutionPreset.P2160;
-}
-
 export function resolveVideoTargetBitrate(params: {
   fps: number;
   height: number;
@@ -302,11 +284,31 @@ export function resolveVideoTargetBitrate(params: {
   resolution?: VideoResolutionPreset;
   width: number;
 }): number {
-  const resolution =
-    params.resolution && params.resolution !== VideoResolutionPreset.SOURCE
-      ? params.resolution
-      : getVideoResolutionTier(params.width, params.height);
-  const base = VIDEO_BITRATE_LADDER[resolution][params.quality];
-  const frameRateAdjusted = params.fps > 30 ? base * HIGH_FRAME_RATE_BITRATE_MULTIPLIER : base;
-  return Math.round(frameRateAdjusted);
+  if (![params.width, params.height, params.fps].every(isFinitePositive)) {
+    throw new Error('Video bitrate requires positive finite dimensions and frame rate');
+  }
+  // Interpolate the calibrated 16:9 anchors by actual pixel area, not a preset label.
+  const pixels = params.width * params.height;
+  let previousPixels = 0;
+  let previousRate = 0;
+  let base = 0;
+  for (const preset of RESOLUTION_PRESET_ORDER) {
+    const height = VIDEO_RESOLUTION_LINES[preset];
+    const anchorPixels = (height * height * 16) / 9;
+    const anchorRate = VIDEO_BITRATE_LADDER[preset][params.quality];
+    if (pixels <= anchorPixels) {
+      base =
+        previousRate +
+        ((anchorRate - previousRate) * (pixels - previousPixels)) / (anchorPixels - previousPixels);
+      break;
+    }
+    previousPixels = anchorPixels;
+    previousRate = anchorRate;
+  }
+  if (!base) base = (previousRate * pixels) / previousPixels;
+  const fpsFactor =
+    params.fps <= 30
+      ? params.fps / 30
+      : 1 + ((params.fps - 30) / 30) * (HIGH_FRAME_RATE_BITRATE_MULTIPLIER - 1);
+  return Math.max(1, Math.round(base * fpsFactor));
 }

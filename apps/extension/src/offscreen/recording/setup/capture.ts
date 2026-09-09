@@ -99,7 +99,8 @@ type TabCaptureViewport = {
 };
 
 function resolvePhysicalTabCaptureSize(
-  viewport: TabCaptureViewport | undefined
+  viewport: TabCaptureViewport | undefined,
+  alignForFullTab: boolean
 ): { height: number; width: number } | null {
   if (!viewport) return null;
   const { devicePixelRatio, height, width } = viewport;
@@ -114,8 +115,9 @@ function resolvePhysicalTabCaptureSize(
   ) {
     throw new Error('Tab capture viewport geometry is invalid');
   }
-  const physicalHeight = Math.round(height * devicePixelRatio);
-  const physicalWidth = Math.round(width * devicePixelRatio);
+  const alignment = alignForFullTab ? 2 : 1;
+  const physicalHeight = Math.ceil(Math.round(height * devicePixelRatio) / alignment) * alignment;
+  const physicalWidth = Math.ceil(Math.round(width * devicePixelRatio) / alignment) * alignment;
   if (!Number.isSafeInteger(physicalHeight) || !Number.isSafeInteger(physicalWidth)) {
     throw new Error('Tab capture physical geometry is invalid');
   }
@@ -126,9 +128,8 @@ function resolvePhysicalTabCaptureSize(
     throw new Error('Tab capture physical geometry exceeds Chromium limits');
   }
   return {
-    // Keep max-only bounds on the measured WebContents grid. Chromium still maps an
-    // odd edge onto its even I420 output, but fixed min/max constraints would add
-    // another fixed-resolution requirement before that browser-owned conversion.
+    // Full TAB requests leave room for Chromium's even I420 grid. Rounding down
+    // an odd viewport can shrink the entire image and introduce a right gutter.
     height: Math.max(1, physicalHeight),
     width: Math.max(1, physicalWidth),
   };
@@ -176,7 +177,10 @@ async function acquireTabStream({
   const audioConstraints: MediaTrackConstraints | false = settings.systemAudioEnabled
     ? createTabSourceConstraints(streamId)
     : false;
-  const requestedPhysicalSize = resolvePhysicalTabCaptureSize(viewport);
+  const requestedPhysicalSize = resolvePhysicalTabCaptureSize(
+    viewport,
+    captureMode === CaptureMode.TAB
+  );
 
   const requestedFrameRate = resolveVideoOutputProfile(settings).frameRate;
   const stream = await navigator.mediaDevices.getUserMedia({
