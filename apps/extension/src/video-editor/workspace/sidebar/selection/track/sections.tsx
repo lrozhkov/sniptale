@@ -25,16 +25,14 @@ export function TrackGeneralFields(props: {
         onValueCommit={(name) => props.onRenameTrack?.(props.selectedTrack.id, name)}
       />
       <div className="mt-3 space-y-2">
-        <ToggleField
-          checked={props.selectedTrack.visible}
-          disabled={!props.onToggleTrackVisibility}
-          label={translate(
-            props.selectedTrack.kind === VideoTrackKind.AUDIO
-              ? 'videoEditor.sidebar.videoSoundLabel'
-              : 'videoEditor.sidebar.trackVisibilityLabel'
-          )}
-          onChange={() => props.onToggleTrackVisibility?.(props.selectedTrack.id)}
-        />
+        {props.selectedTrack.kind !== VideoTrackKind.AUDIO ? (
+          <ToggleField
+            checked={props.selectedTrack.visible}
+            disabled={!props.onToggleTrackVisibility}
+            label={translate('videoEditor.sidebar.trackVisibilityLabel')}
+            onChange={() => props.onToggleTrackVisibility?.(props.selectedTrack.id)}
+          />
+        ) : null}
         <ToggleField
           checked={props.selectedTrack.locked}
           disabled={!props.onToggleTrackLock}

@@ -182,13 +182,9 @@ async function verifyAudioControls() {
   const muteToggle = container?.querySelector<HTMLButtonElement>(
     'button[aria-pressed][aria-label]'
   );
-  expect(muteToggle).not.toBeNull();
-
-  await act(async () => {
-    muteToggle!.click();
-  });
-
-  expect(onUpdateClipMuted).toHaveBeenCalledWith('audio-1', true);
+  expect(muteToggle).toBeNull();
+  expect(onUpdateClipMuted).not.toHaveBeenCalled();
+  expect(container?.querySelector('input[type="range"]')).not.toBeNull();
 }
 
 describe('workspace sidebar timing/audio helpers', () => {

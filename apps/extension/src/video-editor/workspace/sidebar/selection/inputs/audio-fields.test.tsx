@@ -11,7 +11,7 @@ import {
   createRecordingBaseClip,
   createRecordingAudioClip,
 } from '../../../../../features/video/project/factories/recording';
-import { renderAudioFields } from './audio-fields';
+import { renderAudioFields, renderClipLinkFields } from './audio-fields';
 
 vi.mock('../../../../../platform/i18n', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../../../platform/i18n')>()),
@@ -57,28 +57,19 @@ function fixture() {
   return { project, video, audio };
 }
 
-it('controls the audio companion while inspecting its linked video', () => {
+it('does not expose sound controls on video or an extra mute toggle on audio', () => {
   const { project, video, audio } = fixture();
-  const onMute = vi.fn();
-  act(() =>
-    root.render(
-      renderAudioFields({
-        project,
-        selectedClip: video,
-        onUpdateClipMuted: onMute,
-        onUpdateClipVolume: vi.fn(),
-        onUpdateClipAudioEnvelope: vi.fn(),
-        onDetachClipGroup: vi.fn(),
-      })
-    )
-  );
-  const sound = container.querySelector<HTMLButtonElement>(
-    '[aria-label="videoEditor.sidebar.videoSoundLabel"]'
-  );
-  expect(sound).not.toBeNull();
-  act(() => sound!.click());
-  expect(onMute).toHaveBeenCalledWith(audio.id, true);
-  expect(video.muted).toBe(true);
+  const props = {
+    project,
+    onUpdateClipMuted: vi.fn(),
+    onUpdateClipVolume: vi.fn(),
+    onUpdateClipAudioEnvelope: vi.fn(),
+    onDetachClipGroup: vi.fn(),
+  };
+  expect(renderAudioFields({ ...props, selectedClip: video })).toBeNull();
+  act(() => root.render(renderAudioFields({ ...props, selectedClip: audio })));
+  expect(container.textContent).toContain('videoEditor.sidebar.volumeLabel');
+  expect(container.querySelector('[aria-pressed]')).toBeNull();
 });
 
 it.each(['video', 'audio'] as const)(
@@ -89,12 +80,9 @@ it.each(['video', 'audio'] as const)(
     const onMute = vi.fn();
     act(() =>
       root.render(
-        renderAudioFields({
+        renderClipLinkFields({
           project: f.project,
           selectedClip: f[kind],
-          onUpdateClipMuted: onMute,
-          onUpdateClipVolume: vi.fn(),
-          onUpdateClipAudioEnvelope: vi.fn(),
           onDetachClipGroup: onDetach,
         })
       )
@@ -119,26 +107,18 @@ it('respects the audio track lock even while inspecting an unlocked video', () =
   const onDetach = vi.fn();
   act(() =>
     root.render(
-      renderAudioFields({
+      renderClipLinkFields({
         project: f.project,
         selectedClip: f.video,
-        onUpdateClipMuted: onMute,
-        onUpdateClipVolume: vi.fn(),
-        onUpdateClipAudioEnvelope: vi.fn(),
         onDetachClipGroup: onDetach,
       })
     )
   );
-  const sound = container.querySelector<HTMLButtonElement>(
-    '[aria-label="videoEditor.sidebar.videoSoundLabel"]'
-  )!;
   const detach = container.querySelector<HTMLButtonElement>(
     '[title="videoEditor.sidebar.detachButton"]'
   )!;
-  expect(sound.disabled).toBe(true);
   expect(detach.disabled).toBe(true);
   act(() => {
-    sound.click();
     detach.click();
   });
   expect(onMute).not.toHaveBeenCalled();

@@ -18,7 +18,7 @@ import { createAnnotationGroups } from '../annotation/fields';
 import { ClipTimingControls, ClipFadeFields } from '../inputs/clip-timing';
 import { InspectorGroupedPanel } from '../grouped-inspector';
 import { createSelectionRuntime, SelectionEmptyState } from './helpers';
-import { renderAudioFields } from '../inputs/audio-fields';
+import { renderAudioFields, renderClipLinkFields } from '../inputs/audio-fields';
 import {
   MediaFrameControls,
   MediaShadowControls,
@@ -66,7 +66,12 @@ function createClipGroups(
     semantic: 'info' as const,
     label: translate('videoEditor.sidebar.inspectorGroupSummary'),
     defaultActive: false,
-    content: <ClipInfo asset={asset} clip={clip} locked={runtime.selectedTrackLocked} />,
+    content: (
+      <>
+        <ClipInfo asset={asset} clip={clip} locked={runtime.selectedTrackLocked} />
+        {renderClipLinkFields(props)}
+      </>
+    ),
   } as const;
 
   if (
