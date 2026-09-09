@@ -114,3 +114,42 @@ it('changes each display setting independently and restores focus when dismissed
     vi.unstubAllGlobals();
   }
 });
+
+it('keeps the cache hint and its node stable while the percentage changes', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const render = (completedFrames: number) =>
+    act(() =>
+      root.render(
+        <PreviewStageControls
+          mode="cache"
+          onModeChange={vi.fn()}
+          onPreferencesRetry={vi.fn()}
+          onRasterPresetChange={vi.fn()}
+          onZoomChange={vi.fn()}
+          preferencesSaveFailed={false}
+          rasterPreset="720p"
+          zoom="fit"
+          status={{
+            completedFrames,
+            totalFrames: 100,
+            mode: 'cache',
+            phase: 'preparing-video-cache',
+          }}
+        />
+      )
+    );
+  try {
+    render(10);
+    const status = host.querySelector('[role="status"]');
+    expect(status?.getAttribute('title')).toBe('videoEditor.stage.previewCachePreparing');
+    render(35);
+    expect(host.querySelector('[role="status"]')).toBe(status);
+    expect(status?.getAttribute('title')).toBe('videoEditor.stage.previewCachePreparing');
+    expect(status?.textContent).toBe('35%');
+  } finally {
+    act(() => root.unmount());
+    vi.unstubAllGlobals();
+  }
+});

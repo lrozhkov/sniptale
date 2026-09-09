@@ -17,6 +17,7 @@ type ProjectTimelineSurfaceProps = Pick<
   | 'onTogglePlay'
   | 'currentTime'
   | 'isPlaying'
+  | 'isPreparingPlayback'
   | 'playbackRange'
   | 'onClearPlaybackRange'
   | 'onStepToNextFrame'
@@ -68,6 +69,7 @@ export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
           onTogglePlay: props.onTogglePlay,
           currentTime: props.currentTime,
           isPlaying: props.isPlaying,
+          isPreparingPlayback: props.isPreparingPlayback,
           playbackRange: props.playbackRange,
           onClearPlaybackRange: props.onClearPlaybackRange,
           onStepToNextFrame: props.onStepToNextFrame,

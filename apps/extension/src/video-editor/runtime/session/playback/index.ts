@@ -29,6 +29,7 @@ interface PlaybackHookState {
 
 export interface VideoEditorPlaybackController {
   pausePlayback: () => number;
+  isPreparingPlayback?: boolean | undefined;
   registerPreviewRuntime: (runtime: PlaybackPreviewRuntime | null) => void;
   seekTo: (time: number) => void;
   stepByFrames: (frameDelta: number) => void;
@@ -42,9 +43,11 @@ function createPlaybackController(
   seekTo: VideoEditorPlaybackController['seekTo'],
   stepByFrames: VideoEditorPlaybackController['stepByFrames'],
   setPlaybackPlaying: VideoEditorPlaybackController['setPlaybackPlaying'],
-  togglePlayback: VideoEditorPlaybackController['togglePlayback']
+  togglePlayback: VideoEditorPlaybackController['togglePlayback'],
+  isPreparingPlayback: boolean
 ): VideoEditorPlaybackController {
   return {
+    isPreparingPlayback,
     pausePlayback,
     registerPreviewRuntime,
     seekTo,
@@ -145,7 +148,8 @@ function usePlaybackSeek(
     seekTo,
     stepByFrames,
     setPlaybackPlaying,
-    togglePlayback
+    togglePlayback,
+    phase === 'starting'
   );
 }
 

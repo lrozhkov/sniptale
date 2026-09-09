@@ -57,6 +57,7 @@ export interface ProjectTimelineProps {
   currentTime: number;
   pixelsPerSecond: number;
   isPlaying: boolean;
+  isPreparingPlayback?: boolean | undefined;
   insertion: ProjectTimelineInsertionActions;
   magnetEnabled: boolean;
   playbackRange: VideoEditorPlaybackRange | null;

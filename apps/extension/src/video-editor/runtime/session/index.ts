@@ -12,6 +12,7 @@ import type {
 
 export interface VideoEditorRuntimeController {
   assetUrls: Record<string, string>;
+  isPreparingPlayback?: boolean | undefined;
   timelinePreviews: TimelineClipPreviewMap;
   setTimelinePreviewSuspended: (suspended: boolean) => void;
   setTimelinePreviewViewport: (viewport: TimelinePreviewViewport) => void;
@@ -34,6 +35,7 @@ function createVideoEditorRuntimeController(
 ): VideoEditorRuntimeController {
   return {
     assetUrls,
+    isPreparingPlayback: playback.isPreparingPlayback,
     timelinePreviews,
     setTimelinePreviewSuspended,
     setTimelinePreviewViewport,

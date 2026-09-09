@@ -1,5 +1,14 @@
 import { formatTimelineRulerLabel } from '../../interaction-state/helpers';
-import { X, Pause, Play, SkipBack, SkipForward, StepBack, StepForward } from 'lucide-react';
+import {
+  X,
+  LoaderCircle,
+  Pause,
+  Play,
+  SkipBack,
+  SkipForward,
+  StepBack,
+  StepForward,
+} from 'lucide-react';
 
 import { translate } from '../../../../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -10,7 +19,11 @@ export function formatPlaybackCounterTime(value: number): string {
   return formatTimelineRulerLabel(value, true);
 }
 
-function PlaybackToggleButton(props: { isPlaying: boolean; onTogglePlay: () => void }) {
+function PlaybackToggleButton(props: {
+  isPlaying: boolean;
+  isPreparingPlayback?: boolean | undefined;
+  onTogglePlay: () => void;
+}) {
   return (
     <ContentToolbarButton
       type="button"
@@ -18,17 +31,24 @@ function PlaybackToggleButton(props: { isPlaying: boolean; onTogglePlay: () => v
       active={props.isPlaying}
       className={toolbarIconButtonClassName}
       aria-label={
-        props.isPlaying
+        props.isPlaying || props.isPreparingPlayback
           ? translate('videoEditor.timeline.pause')
           : translate('videoEditor.timeline.play')
       }
       title={
-        props.isPlaying
+        props.isPlaying || props.isPreparingPlayback
           ? translate('videoEditor.timeline.pause')
           : translate('videoEditor.timeline.play')
       }
     >
-      {props.isPlaying ? (
+      {props.isPreparingPlayback ? (
+        <LoaderCircle
+          size={16}
+          strokeWidth={2.2}
+          className="animate-spin motion-reduce:animate-none"
+          aria-hidden="true"
+        />
+      ) : props.isPlaying ? (
         <Pause size={16} strokeWidth={2.2} />
       ) : (
         <Play size={16} strokeWidth={2.2} />
@@ -148,6 +168,7 @@ export function ProjectTimelinePlaybackSummary({
   currentTime,
   duration,
   isPlaying,
+  isPreparingPlayback,
   playbackRange,
   onClearPlaybackRange,
   onSeekToEnd,
@@ -159,6 +180,7 @@ export function ProjectTimelinePlaybackSummary({
   currentTime: number;
   duration: number;
   isPlaying: boolean;
+  isPreparingPlayback?: boolean | undefined;
   playbackRange: VideoEditorPlaybackRange | null;
   onClearPlaybackRange: () => void;
   onSeekToEnd: () => void;
@@ -176,7 +198,11 @@ export function ProjectTimelinePlaybackSummary({
     >
       <PlaybackSeekToStartButton onSeekToStart={onSeekToStart} />
       <PlaybackFrameStepButton direction="previous" onStep={onStepToPreviousFrame} />
-      <PlaybackToggleButton isPlaying={isPlaying} onTogglePlay={onTogglePlay} />
+      <PlaybackToggleButton
+        isPlaying={isPlaying}
+        isPreparingPlayback={isPreparingPlayback}
+        onTogglePlay={onTogglePlay}
+      />
       <PlaybackFrameStepButton direction="next" onStep={onStepToNextFrame} />
       <PlaybackSeekToEndButton onSeekToEnd={onSeekToEnd} />
       <PlaybackSummaryMeta

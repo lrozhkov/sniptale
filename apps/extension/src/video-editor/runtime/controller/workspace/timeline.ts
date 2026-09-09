@@ -96,6 +96,7 @@ function createWorkspaceTimelineState(
       canSplitProjectClipAtTime(project, store.selectedClipId, store.currentTime),
     currentTime: store.currentTime,
     isPlaying: store.isPlaying,
+    isPreparingPlayback: runtime.isPreparingPlayback,
     magnetEnabled: workspace.grid.magnetEnabled,
     pixelsPerSecond: store.pixelsPerSecond,
     playbackRange: workspace.playbackRange,

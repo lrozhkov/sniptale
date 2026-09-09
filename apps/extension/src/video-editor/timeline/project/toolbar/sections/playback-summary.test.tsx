@@ -28,7 +28,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function renderPlaybackSummary(isPlaying: boolean, withRange = false) {
+function renderPlaybackSummary(isPlaying: boolean, withRange = false, isPreparingPlayback = false) {
   if (!container) {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -47,6 +47,7 @@ function renderPlaybackSummary(isPlaying: boolean, withRange = false) {
         currentTime={12.34}
         duration={45.678}
         isPlaying={isPlaying}
+        isPreparingPlayback={isPreparingPlayback}
         playbackRange={withRange ? { start: 4.5, end: 6.75 } : null}
         onSeekToEnd={onSeekToEnd}
         onSeekToStart={onSeekToStart}
@@ -187,4 +188,19 @@ it('clears a selected range without changing transport', () => {
   expect(actions.onTogglePlay).not.toHaveBeenCalled();
   expect(actions.onSeekToStart).not.toHaveBeenCalled();
   expect(actions.onSeekToEnd).not.toHaveBeenCalled();
+});
+
+it('shows a cancellable preparation spinner, then restores the play icon', () => {
+  const { onTogglePlay } = renderPlaybackSummary(false, false, true);
+  const button = container?.querySelector<HTMLButtonElement>(
+    '[aria-label="videoEditor.timeline.pause"]'
+  );
+  expect(button).toBeTruthy();
+  expect(button?.disabled).toBe(false);
+  expect(button?.querySelector('.animate-spin')).toBeTruthy();
+  act(() => button?.click());
+  expect(onTogglePlay).toHaveBeenCalledTimes(1);
+  renderPlaybackSummary(false);
+  expect(container?.querySelector('.animate-spin')).toBeNull();
+  expect(container?.querySelector('[aria-label="videoEditor.timeline.play"]')).toBeTruthy();
 });

@@ -73,7 +73,7 @@ function PreviewCacheStatus({ status }: { status: VideoEditorPreviewStatus }) {
         : status.outcome === 'unavailable'
           ? translate('videoEditor.stage.previewCacheUnavailable')
           : isPreparing
-            ? `${translate('videoEditor.stage.previewCachePreparing')} ${percent}%`
+            ? translate('videoEditor.stage.previewCachePreparing')
             : status.phase === 'cached-frame-playback' || status.phase === 'cached-video-playback'
               ? translate('videoEditor.stage.previewCacheReady')
               : status.phase === 'paused-preparation'
@@ -98,13 +98,7 @@ function PreviewCacheStatus({ status }: { status: VideoEditorPreviewStatus }) {
             className="animate-spin motion-reduce:animate-none"
             aria-hidden="true"
           />
-          <span>
-            {Math.min(
-              100,
-              Math.round((status.completedFrames / Math.max(1, status.totalFrames)) * 100)
-            )}
-            %
-          </span>
+          <span>{percent}%</span>
         </>
       ) : ready ? (
         <span className="h-1.5 w-1.5 rounded-full bg-[var(--sniptale-color-success)]" />

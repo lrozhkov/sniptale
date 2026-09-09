@@ -28,6 +28,7 @@ function getProjectTimelineStateProps(
   | 'canSplitSelectedClip'
   | 'currentTime'
   | 'isPlaying'
+  | 'isPreparingPlayback'
   | 'magnetEnabled'
   | 'pixelsPerSecond'
   | 'playbackRange'
@@ -44,6 +45,7 @@ function getProjectTimelineStateProps(
     canSplitSelectedClip: controller.state.canSplitSelectedClip,
     currentTime: controller.state.currentTime,
     isPlaying: controller.state.isPlaying,
+    isPreparingPlayback: controller.state.isPreparingPlayback,
     magnetEnabled: controller.state.magnetEnabled,
     pixelsPerSecond: controller.state.pixelsPerSecond,
     playbackRange: controller.state.playbackRange,
