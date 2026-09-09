@@ -15,6 +15,7 @@ type ProjectTimelineBodyProps = Pick<
   | 'beginRangeSelection'
   | 'beginTrackRangeSelection'
   | 'currentTime'
+  | 'isPlaying'
   | 'consumeCompletedScrubClick'
   | 'dragGhost'
   | 'handleTimelineSeek'
@@ -130,6 +131,7 @@ function createCanvasProps(props: ProjectTimelineBodyProps): ProjectTimelineBody
   return {
     hiddenClipNamesByTrackId: props.trackPanelPrefs.prefs.hiddenClipNamesByTrackId,
     currentTime: props.currentTime,
+    isPlaying: props.isPlaying,
     consumeCompletedScrubClick: props.consumeCompletedScrubClick,
     cursorLaneVisible: props.cursorLaneVisible,
     dragGhost: props.dragGhost,

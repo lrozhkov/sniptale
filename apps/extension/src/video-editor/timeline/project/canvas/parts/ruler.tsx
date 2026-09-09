@@ -55,7 +55,7 @@ export function ProjectTimelineRuler(props: {
           }}
         >
           {marker.label ? (
-            <span className="absolute left-1 top-1 text-[10px] font-medium text-[var(--sniptale-color-text-dim)]">
+            <span className="absolute left-1 bottom-1 text-[10px] font-medium text-[var(--sniptale-color-text-dim)]">
               {marker.label}
             </span>
           ) : null}

@@ -1,3 +1,4 @@
+import type { TimelineZoomContext } from '../interaction-state/zoom';
 import type { AutoProcessingHeaderProps } from './sections/auto-transform-wizard';
 import type { ComponentProps } from 'react';
 import type { ProjectTimelinePlaybackSummary } from './sections/playback-summary';
@@ -16,6 +17,7 @@ export interface ProjectTimelineToolbarProps {
   fitSelectionDuration: number | null;
   insertion: ProjectTimelineInsertionActions;
   pixelsPerSecond: number;
+  zoomContext?: TimelineZoomContext | undefined;
   selectedClip: boolean;
   onFitProject: () => void;
   onFitSelection: () => void;

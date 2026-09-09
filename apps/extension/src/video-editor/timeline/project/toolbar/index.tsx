@@ -16,6 +16,7 @@ type ToolbarTrailingControlsInput = Pick<
   ProjectTimelineToolbarProps,
   | 'fitSelectionDuration'
   | 'pixelsPerSecond'
+  | 'zoomContext'
   | 'onFitProject'
   | 'onFitSelection'
   | 'onTimelinePreviewSuspendedChange'
@@ -72,6 +73,7 @@ function createToolbarLeadingControlsProps({
 function createToolbarTrailingControlsProps({
   fitSelectionDuration,
   pixelsPerSecond,
+  zoomContext,
   onFitProject,
   onFitSelection,
   onTimelinePreviewSuspendedChange,
@@ -80,6 +82,7 @@ function createToolbarTrailingControlsProps({
   return {
     fitSelectionDuration,
     pixelsPerSecond,
+    zoomContext,
     onFitProject,
     onFitSelection,
     onTimelinePreviewSuspendedChange,
@@ -90,6 +93,8 @@ function createToolbarTrailingControlsProps({
 export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProps) {
   const history = useVideoEditorHistoryController();
   const header = useVideoEditorHeaderController();
+  const editingDisabled =
+    controlsProps.playback.isPlaying || Boolean(controlsProps.playback.isPreparingPlayback);
   return (
     <div
       data-ui="video-editor.timeline.toolbar"
@@ -107,17 +112,20 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
         '[&_svg]:size-[18px] @max-[1400px]/timeline:[&_svg]:size-4 @max-[1000px]/timeline:[&_svg]:size-[14px]',
       ].join(' ')}
     >
-      <div className="flex shrink-0 items-center justify-center gap-[var(--timeline-control-gap)]">
+      <fieldset
+        disabled={editingDisabled}
+        className="m-0 flex min-w-0 shrink-0 items-center justify-center gap-[var(--timeline-control-gap)] border-0 p-0"
+      >
         <ProjectTimelineToolbarLeadingControls
           {...createToolbarLeadingControlsProps(controlsProps)}
         />
-      </div>
+      </fieldset>
       <ProjectTimelinePlaybackSummary {...controlsProps.playback} />
       <div className="flex items-center justify-end gap-[var(--timeline-control-gap)]">
         <ContentToolbarButton
           className={toolbarIconButtonClassName}
           title={`${translate('videoEditor.app.undo')} (${translate('videoEditor.app.undoShortcut')})`}
-          disabled={!history.canUndo}
+          disabled={editingDisabled || !history.canUndo}
           onClick={history.onUndo}
           dataUi="video-editor.timeline.toolbar.undo"
         >
@@ -126,7 +134,7 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
         <ContentToolbarButton
           className={toolbarIconButtonClassName}
           title={`${translate('videoEditor.app.redo')} (${translate('videoEditor.app.redoShortcut')})`}
-          disabled={!history.canRedo}
+          disabled={editingDisabled || !history.canRedo}
           onClick={history.onRedo}
           dataUi="video-editor.timeline.toolbar.redo"
         >

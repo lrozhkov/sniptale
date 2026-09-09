@@ -51,7 +51,12 @@ export const VideoEditorBlockingOverlayContext = createContext<boolean | null>(n
 
 export const RuntimePlaybackContext = createContext<Pick<
   VideoEditorRuntimeController,
-  'pausePlayback' | 'seekTo' | 'setPlaybackPlaying' | 'stepByFrames' | 'togglePlayback'
+  | 'isPreparingPlayback'
+  | 'pausePlayback'
+  | 'seekTo'
+  | 'setPlaybackPlaying'
+  | 'stepByFrames'
+  | 'togglePlayback'
 > | null>(null);
 export const RuntimePreviewContext = createContext<Pick<
   VideoEditorRuntimeController,

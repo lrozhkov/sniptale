@@ -39,6 +39,7 @@ export function ProjectMenu(props: { projectName: string; onExport: () => void }
         disabled={pending}
         onClick={() => setOpen(!open)}
         dataUi="video-editor.timeline.toolbar.project-menu"
+        menuIndicator
       >
         <Clapperboard aria-hidden="true" />
       </ContentToolbarButton>

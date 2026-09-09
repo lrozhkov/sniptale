@@ -16,6 +16,10 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
 
 vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../runtime/controller/composition/hooks')>()),
+  useVideoEditorProjectMenuController: () => ({
+    onCreateProject: vi.fn(),
+    onDialogVisibilityChange: vi.fn(),
+  }),
   useVideoEditorHistoryController: () => ({
     canUndo: false,
     canRedo: false,
@@ -52,6 +56,7 @@ function renderSurface(
 ) {
   return renderToStaticMarkup(
     <ProjectTimelineSurface
+      zoomContext={{ duration: project.duration, viewportWidth: 1000, fps: project.fps }}
       selection={{ kind: 'scene' }}
       onSeek={vi.fn()}
       onAutoProcessingModalVisibilityChange={vi.fn()}

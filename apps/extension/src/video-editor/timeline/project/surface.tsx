@@ -36,6 +36,7 @@ type ProjectTimelineSurfaceProps = Pick<
   | 'onTimelinePreviewSuspendedChange'
   | 'onZoomChange'
   | 'pixelsPerSecond'
+  | 'zoomContext'
   | 'project'
   | 'recordingTelemetry'
   | 'selectedClip'
@@ -93,6 +94,7 @@ export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
           fitSelectionDuration={props.fitSelectionDuration}
           insertion={props.insertion}
           pixelsPerSecond={props.pixelsPerSecond}
+          zoomContext={props.zoomContext}
           selectedClip={Boolean(props.selectedClip)}
           onFitProject={props.onFitProject}
           onFitSelection={props.onFitSelection}

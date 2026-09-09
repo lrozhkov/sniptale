@@ -1,3 +1,4 @@
+import { resolveTimelineZoomBounds } from './zoom';
 import { useTimelineNavigation } from './navigation';
 import type { ProjectTimelineProps } from '../types';
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
@@ -48,6 +49,14 @@ export function useProjectTimelineViewState(
   viewportWidth: number,
   timelineRef: React.MutableRefObject<HTMLDivElement | null>
 ) {
+  const minimumZoom = resolveTimelineZoomBounds({
+    duration: project.duration,
+    viewportWidth,
+    fps: project.fps,
+  }).min;
+  useLayoutEffect(() => {
+    if (project.duration > 0 && pixelsPerSecond < minimumZoom) onZoomChange(minimumZoom);
+  }, [minimumZoom, onZoomChange, pixelsPerSecond, project.duration]);
   const navigation = useTimelineNavigation({
     extentSeconds: Math.max(project.duration + 5, 10) + 120 / pixelsPerSecond,
     pixelsPerSecond,
@@ -79,7 +88,11 @@ export function useProjectTimelineViewState(
   );
   const requestZoom = useCallback(
     (value: number) => {
-      const zoom = clampTimelineScale(value);
+      const zoom = Math.max(
+        resolveTimelineZoomBounds({ duration: project.duration, viewportWidth, fps: project.fps })
+          .min,
+        clampTimelineScale(value)
+      );
       const startTime = readStartTime();
       const playheadX = (currentTime - startTime) * pixelsPerSecond;
       const viewportX =
@@ -88,7 +101,15 @@ export function useProjectTimelineViewState(
       setFitRequest({ pixelsPerSecond: zoom, center, viewportX });
       onZoomChange(zoom);
     },
-    [currentTime, onZoomChange, pixelsPerSecond, readStartTime, viewportWidth]
+    [
+      currentTime,
+      onZoomChange,
+      pixelsPerSecond,
+      readStartTime,
+      viewportWidth,
+      project.duration,
+      project.fps,
+    ]
   );
   const onFitProject = useCallback(
     () => requestFit(project.duration, null),
@@ -99,6 +120,7 @@ export function useProjectTimelineViewState(
     requestFit(fitSelectionDuration, selectedStart + fitSelectionDuration / 2);
   }, [fitSelectionDuration, selectedStart, requestFit]);
   return {
+    zoomContext: { duration: project.duration, viewportWidth, fps: project.fps },
     navigateTo: navigation.navigateTo,
     projection: navigation.projection,
     readTimelineStartTime: readStartTime,

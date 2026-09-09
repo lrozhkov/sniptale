@@ -280,6 +280,7 @@ function useVideoEditorContextProjections(
   );
   const runtimePlayback = useMemo(
     () => ({
+      isPreparingPlayback: runtime.isPreparingPlayback,
       pausePlayback: runtime.pausePlayback,
       seekTo: runtime.seekTo,
       stepByFrames: runtime.stepByFrames,
@@ -287,6 +288,7 @@ function useVideoEditorContextProjections(
       togglePlayback: runtime.togglePlayback,
     }),
     [
+      runtime.isPreparingPlayback,
       runtime.pausePlayback,
       runtime.seekTo,
       runtime.setPlaybackPlaying,

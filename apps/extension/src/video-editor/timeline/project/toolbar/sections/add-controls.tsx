@@ -77,6 +77,7 @@ export function ProjectTimelineAddTrackControl(props: {
         title={translate('videoEditor.timeline.addTrack')}
         aria-expanded={trackChoices.visible}
         dataUi="video-editor.timeline.toolbar.add-track"
+        menuIndicator
       >
         <Plus size={14} strokeWidth={2} />
         <span className="sr-only">{translate('videoEditor.timeline.addTrack')}</span>

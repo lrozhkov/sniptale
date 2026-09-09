@@ -193,3 +193,33 @@ it('opens project actions, cancels creation, and dismisses the menu with Escape 
   act(() => document.body.dispatchEvent(new Event('pointerdown', { bubbles: true })));
   expect(trigger.getAttribute('aria-expanded')).toBe('false');
 });
+
+it('holds editing actions disabled during playback and preparation, retaining navigation', () => {
+  renderToolbar();
+  const props = createToolbarProps();
+  for (const preparing of [false, true]) {
+    act(() =>
+      root?.render(
+        <ProjectTimelineToolbar
+          {...props}
+          playback={{ ...props.playback, isPlaying: !preparing, isPreparingPlayback: preparing }}
+        />
+      )
+    );
+    const editing = container!.querySelector('fieldset')!;
+    expect(editing.disabled).toBe(true);
+    expect(
+      container!.querySelector<HTMLButtonElement>('[data-ui="video-editor.timeline.toolbar.undo"]')!
+        .disabled
+    ).toBe(true);
+    expect(
+      container!.querySelector<HTMLInputElement>('input[type="range"]')!.matches(':disabled')
+    ).toBe(false);
+  }
+  act(() => root?.render(<ProjectTimelineToolbar {...props} />));
+  expect(container!.querySelector('fieldset')!.disabled).toBe(false);
+  expect(
+    container!.querySelector<HTMLButtonElement>('[data-ui="video-editor.timeline.toolbar.undo"]')!
+      .disabled
+  ).toBe(false);
+});

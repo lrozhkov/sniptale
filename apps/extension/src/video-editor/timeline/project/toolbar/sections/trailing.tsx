@@ -8,6 +8,7 @@ export function ProjectTimelineToolbarTrailingActions({
   fitSelectionDuration,
   onTimelinePreviewSuspendedChange,
   pixelsPerSecond,
+  zoomContext,
   onFitProject,
   onFitSelection,
   onZoomChange,
@@ -18,6 +19,7 @@ export function ProjectTimelineToolbarTrailingActions({
   | 'onFitSelection'
   | 'onTimelinePreviewSuspendedChange'
   | 'pixelsPerSecond'
+  | 'zoomContext'
   | 'onZoomChange'
 >) {
   return (
@@ -28,6 +30,7 @@ export function ProjectTimelineToolbarTrailingActions({
     >
       <ProjectTimelineZoomControl
         pixelsPerSecond={pixelsPerSecond}
+        zoomContext={zoomContext}
         onPreviewSuspendedChange={onTimelinePreviewSuspendedChange}
         onZoomChange={onZoomChange}
       />
