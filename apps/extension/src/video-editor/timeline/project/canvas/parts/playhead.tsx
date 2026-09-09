@@ -44,13 +44,11 @@ export function ProjectTimelinePlayheadHandle(props: {
       aria-valuenow={props.currentTime}
       aria-valuetext={formatPreciseTime(props.currentTime)}
       className={[
-        'absolute top-0 z-10 h-[8px] w-3 cursor-ew-resize rounded-b-[3px]',
-        'before:absolute before:inset-x-0 before:top-0 before:h-[30px]',
-        'after:absolute after:left-1/2 after:top-full after:h-[22px] after:w-px',
+        'absolute top-0 z-10 h-[30px] w-3 cursor-ew-resize',
+        'before:absolute before:inset-x-0 before:top-0 before:h-[8px]',
+        'before:bg-[var(--sniptale-color-accent-emphasis)] before:[clip-path:polygon(0_0,100%_0,50%_100%)]',
+        'after:absolute after:left-1/2 after:top-[8px] after:h-[22px] after:w-px',
         'after:bg-[var(--sniptale-color-accent-emphasis)]',
-        'border border-[var(--sniptale-color-border-accent-strong)]',
-        'bg-[var(--sniptale-color-accent-emphasis)]',
-
         'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
         'focus-visible:outline-[var(--sniptale-color-focus-ring)]',
       ].join(' ')}

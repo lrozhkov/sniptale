@@ -197,7 +197,7 @@ export function requestPlaybackSeek(
   const keepPlaying = keepPlayingOverride ?? refs.latestStateRef.current.isPlaying;
   const request = beginRequest(requestRef);
   refs.handlersRef.current.setCurrentTime(time);
-  setPhase('starting');
+  setPhase(keepPlaying ? 'starting' : 'idle');
   if (!refs.previewRuntimeRef.current) {
     completeSeek({ keepPlaying, outcome: 'live-ready', refs, setPhase, time });
     return;

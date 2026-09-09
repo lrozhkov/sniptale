@@ -1,14 +1,5 @@
 import { formatTimelineRulerLabel } from '../../interaction-state/helpers';
-import {
-  X,
-  LoaderCircle,
-  Pause,
-  Play,
-  SkipBack,
-  SkipForward,
-  StepBack,
-  StepForward,
-} from 'lucide-react';
+import { X, LoaderCircle, Play, SkipBack, SkipForward, StepBack, StepForward } from 'lucide-react';
 
 import { translate } from '../../../../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -49,7 +40,10 @@ function PlaybackToggleButton(props: {
           aria-hidden="true"
         />
       ) : props.isPlaying ? (
-        <Pause size={16} strokeWidth={2.2} />
+        <svg viewBox="0 0 16 16" className="!size-4" fill="currentColor" aria-hidden="true">
+          <rect x="4" y="3" width="2" height="10" />
+          <rect x="10" y="3" width="2" height="10" />
+        </svg>
       ) : (
         <Play size={16} strokeWidth={2.2} />
       )}

@@ -62,6 +62,8 @@ it('exposes pending preparation and cancels it on a second toggle without starti
     act(() => root.render(<Harness />));
     expect(controls.current?.isPreparingPlayback).toBe(false);
     act(() => controls.current?.registerPreviewRuntime(runtime));
+    act(() => controls.current?.seekTo(2));
+    expect(controls.current?.isPreparingPlayback).toBe(false);
     act(() => controls.current?.togglePlayback());
     expect(controls.current?.isPreparingPlayback).toBe(true);
     act(() => controls.current?.togglePlayback());
