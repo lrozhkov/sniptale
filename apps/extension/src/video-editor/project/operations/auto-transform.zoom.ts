@@ -47,6 +47,7 @@ type Click = {
 };
 
 type BuildParams = {
+  scale?: number;
   project: VideoProject;
   recordingId: string;
   telemetry: RecordingTelemetryEntry;
@@ -258,12 +259,16 @@ export function buildAutoZoomRegions(params: BuildParams): MotionRegion[] {
 
     const previousClick =
       clicks.slice(0, index).findLast((item) => item.runId === click.runId) ?? null;
-    const profile = resolveAutoZoomProfile(
-      click,
-      typingSignals,
-      previousClick,
-      clicks.slice(index + 1).find((item) => item.runId === click.runId) ?? null
-    );
+    const profile = {
+      ...resolveAutoZoomProfile(
+        click,
+        typingSignals,
+        previousClick,
+        clicks.slice(index + 1).find((item) => item.runId === click.runId) ?? null
+      ),
+    };
+    profile.scale = params.scale ?? 1.4;
+    profile.motionBlurAmount = 0;
     const sameRunIds = new Set(
       clicks.filter((item) => item.runId === click.runId).map((item) => item.id)
     );

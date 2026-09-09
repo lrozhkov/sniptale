@@ -3,88 +3,114 @@ import {
   VideoAutoProcessingAction,
   type VideoAutoProcessingSettings,
 } from '@sniptale/runtime-contracts/video/types/types';
-import type { RecordingTelemetrySignal } from '../../../features/video/project/types/interaction';
-import { buildStableSignalIntersections, mergeTimeRanges, type TimeRange } from './time-ranges';
+import { mergeTimeRanges, type TimeRange } from './time-ranges';
 
-const OVERLAP_MERGE_GAP_SECONDS = 0;
-
-type AutoTransformCandidate = {
-  action: VideoAutoProcessingAction;
-  endTime: number;
-  playbackRate: number;
-  startTime: number;
-};
-
-function buildStableRanges(
-  signals: Parameters<typeof buildStableSignalIntersections>[0],
-  settings: VideoAutoProcessingSettings['stableSegments']
-): TimeRange[] {
-  const ranges = buildStableSignalIntersections(signals, (range) => ({
-    startTime: range.startTime + settings.shoulderSeconds,
-    endTime: range.endTime - settings.shoulderSeconds,
-  }));
-
-  return ranges.filter((range) => range.endTime - range.startTime >= settings.minDurationSeconds);
+export type AutoProcessingAudio =
+  | { status: 'absent' | 'unavailable' }
+  | { status: 'analyzed'; ranges: TimeRange[] };
+interface AutoDetectionOptions {
+  typingRate: number;
+  audio: AutoProcessingAudio;
 }
-
-function buildStaticCandidates(
-  signals: RecordingTelemetrySignal[],
-  settings: VideoAutoProcessingSettings['stableSegments']
-): AutoTransformCandidate[] {
-  if (settings.action === VideoAutoProcessingAction.SKIP) {
-    return [];
-  }
-
-  return mergeTimeRanges(buildStableRanges(signals, settings), settings.mergeGapSeconds).map(
-    (range) => ({
-      ...range,
-      action: settings.action,
-      playbackRate: settings.speedUpPlaybackRate,
+interface AutoTransformCandidate extends TimeRange {
+  action: VideoAutoProcessingAction;
+  playbackRate: number;
+  category: 'typing' | 'idle';
+}
+function intersect(ranges: TimeRange[], mask: TimeRange[]): TimeRange[] {
+  return ranges.flatMap((a) =>
+    mask.flatMap((b) => {
+      const startTime = Math.max(a.startTime, b.startTime);
+      const endTime = Math.min(a.endTime, b.endTime);
+      return endTime > startTime ? [{ startTime, endTime }] : [];
     })
   );
 }
-
-function mergeAutoTransformCandidates(
-  candidates: AutoTransformCandidate[]
-): AutoTransformCandidate[] {
-  const sortedCandidates = [...candidates].sort((left, right) => left.startTime - right.startTime);
-  const merged: AutoTransformCandidate[] = [];
-
-  for (const candidate of sortedCandidates) {
-    const previous = merged.at(-1);
-    if (!previous || candidate.startTime > previous.endTime + OVERLAP_MERGE_GAP_SECONDS) {
-      merged.push({ ...candidate });
+function subtract(ranges: TimeRange[], excluded: TimeRange[]): TimeRange[] {
+  return excluded.reduce(
+    (remaining, cut) =>
+      remaining.flatMap((range) => {
+        if (cut.endTime <= range.startTime || cut.startTime >= range.endTime) return [range];
+        return [
+          ...(cut.startTime > range.startTime
+            ? [{ startTime: range.startTime, endTime: cut.startTime }]
+            : []),
+          ...(cut.endTime < range.endTime
+            ? [{ startTime: cut.endTime, endTime: range.endTime }]
+            : []),
+        ];
+      }),
+    ranges
+  );
+}
+function stationaryRanges(telemetry: RecordingTelemetryEntry): TimeRange[] {
+  const signals = telemetry.signals.filter((signal) => signal.kind === 'cursor-idle');
+  if (signals.length) return mergeTimeRanges(signals, 0);
+  const samples = telemetry.cursorTrack?.samples ?? [];
+  const ranges: TimeRange[] = [];
+  let anchor = samples[0];
+  for (let i = 1; i < samples.length; i++) {
+    const previous = samples[i - 1]!;
+    const current = samples[i]!;
+    if (
+      !anchor ||
+      !previous.visible ||
+      !current.visible ||
+      current.time <= previous.time ||
+      Math.hypot(current.x - anchor.x, current.y - anchor.y) > 2
+    ) {
+      anchor = current;
       continue;
     }
-
-    previous.endTime = Math.max(previous.endTime, candidate.endTime);
-    previous.playbackRate = Math.max(previous.playbackRate, candidate.playbackRate);
-    if (candidate.action === VideoAutoProcessingAction.REMOVE) {
-      previous.action = VideoAutoProcessingAction.REMOVE;
-    }
+    ranges.push({ startTime: previous.time, endTime: current.time });
   }
-
-  return merged;
+  return mergeTimeRanges(ranges, 0);
 }
-
-function sanitizeStableSettings(
-  settings: VideoAutoProcessingSettings['stableSegments']
-): VideoAutoProcessingSettings['stableSegments'] {
-  return {
-    ...settings,
-    mergeGapSeconds: Math.max(0, settings.mergeGapSeconds),
-    minDurationSeconds: Math.max(0.1, settings.minDurationSeconds),
-    shoulderSeconds: Math.max(0, settings.shoulderSeconds),
-    speedUpPlaybackRate: Math.max(1, settings.speedUpPlaybackRate),
-  };
-}
-
+/** Source-time candidates are disjoint: input is never mistaken for an idle pause. */
 export function buildAutoTransformCandidates(
   telemetry: RecordingTelemetryEntry,
-  settings: VideoAutoProcessingSettings['stableSegments']
+  settings: VideoAutoProcessingSettings['stableSegments'],
+  options: AutoDetectionOptions = { typingRate: 2, audio: { status: 'absent' } }
 ): AutoTransformCandidate[] {
-  const signals = telemetry.signals;
-  return mergeAutoTransformCandidates(
-    buildStaticCandidates(signals, sanitizeStableSettings(settings))
+  if (options.audio.status === 'unavailable') return [];
+  const typing = mergeTimeRanges(
+    telemetry.signals.filter((signal) => signal.kind === 'typing'),
+    0
   );
+  const silent = (ranges: TimeRange[]) =>
+    options.audio.status === 'analyzed' ? intersect(ranges, options.audio.ranges) : ranges;
+  const candidates: AutoTransformCandidate[] =
+    options.typingRate > 1
+      ? silent(typing)
+          .filter((range) => range.endTime - range.startTime >= 0.5)
+          .map((range) => ({
+            ...range,
+            action: 'speed-up',
+            playbackRate: options.typingRate,
+            category: 'typing',
+          }))
+      : [];
+  if (settings.action !== VideoAutoProcessingAction.SKIP) {
+    const activity = telemetry.actionEvents
+      .filter((event) => event.kind !== 'PAUSE')
+      .map((event) => ({
+        startTime: event.time,
+        endTime: event.time + Math.max(0.1, event.duration),
+      }));
+    // Never bridge a gap across input or audible sound, regardless of merge-gap preference.
+    const idle = subtract(silent(stationaryRanges(telemetry)), [...typing, ...activity]);
+    for (const range of idle) {
+      const startTime = range.startTime + settings.shoulderSeconds;
+      const endTime = range.endTime - settings.shoulderSeconds;
+      if (endTime - startTime >= settings.minDurationSeconds)
+        candidates.push({
+          startTime,
+          endTime,
+          action: settings.action,
+          playbackRate: settings.speedUpPlaybackRate,
+          category: 'idle',
+        });
+    }
+  }
+  return candidates.sort((a, b) => a.startTime - b.startTime);
 }

@@ -65,7 +65,12 @@ it('forwards empty scope without inferring a recording or applying during prepar
     project: f.authority.project,
   });
   await f.actions.prepare(request);
-  expect(prepare).toHaveBeenCalledWith(f.authority.project, request, undefined);
+  expect(prepare).toHaveBeenCalledWith(
+    f.authority.project,
+    request,
+    undefined,
+    expect.any(Function)
+  );
   expect(request.targets).toEqual([]);
   expect(f.store.updateProject).not.toHaveBeenCalled();
 });

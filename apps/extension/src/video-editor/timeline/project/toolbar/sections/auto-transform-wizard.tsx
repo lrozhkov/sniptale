@@ -49,6 +49,10 @@ export function AutoTransformWizard(props: AutoProcessingHeaderProps & { onClose
     scope,
     settings,
     camera,
+    typingRate,
+    framingScale,
+    setTypingRate,
+    setFramingScale,
     analysis,
     preview,
     selectedIds,
@@ -111,6 +115,10 @@ export function AutoTransformWizard(props: AutoProcessingHeaderProps & { onClose
             scope={scope}
             settings={settings}
             camera={camera}
+            typingRate={typingRate}
+            framingScale={framingScale}
+            onTypingRate={setTypingRate}
+            onFramingScale={setFramingScale}
             busy={busy}
             seconds={seconds}
             onToggleScope={toggleScope}

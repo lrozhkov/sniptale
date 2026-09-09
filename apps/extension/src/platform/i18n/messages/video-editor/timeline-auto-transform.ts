@@ -1,9 +1,28 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorTimelineAutoTransformMessages = defineMessageSource({
+  autoTyping: { ru: 'Ввод текста', en: 'Typing' },
+  autoDetectionHelp: {
+    ru: 'Пауза — мышь неподвижна и нет действий. Если в записи есть звук, сокращаем только тишину, в том числе при вводе текста.',
+    en: 'Pauses have a stationary mouse and no actions. When the recording has audio, only silent time is shortened, including typing.',
+  },
+  autoFramingStrength: { ru: 'Приближение', en: 'Zoom strength' },
+  autoFramingSubtle: { ru: 'Мягкое · 1,25×', en: 'Subtle · 1.25×' },
+  autoFramingBalanced: { ru: 'Обычное · 1,4×', en: 'Balanced · 1.4×' },
+  autoFramingClose: { ru: 'Крупно · 1,7×', en: 'Close · 1.7×' },
+  autoFramingHelp: {
+    ru: 'Плавно приближает к кликам и возвращает общий план. Существующие области зума сохраняются.',
+    en: 'Smoothly zooms to clicks, then returns to the full frame. Existing zoom regions are preserved.',
+  },
+  autoAudioUnavailable: {
+    ru: 'Не удалось проверить звук. Сокращение ввода и пауз для этих записей пропущено; попробуйте повторить анализ.',
+    en: 'Audio could not be analyzed. Typing and pause edits for these recordings were skipped; try analyzing again.',
+  },
+  autoIdleDetected: { ru: 'Пауза без действий', en: 'Idle pause' },
+
   autoTransform: {
     ru: 'Автообработка',
-    en: 'Auto transform',
+    en: 'Auto edit',
   },
   autoTransformWizardTitle: {
     ru: 'Автообработка фрагментов',
@@ -14,8 +33,8 @@ export const videoEditorTimelineAutoTransformMessages = defineMessageSource({
     en: '1. What to detect',
   },
   autoTransformStableDescription: {
-    ru: 'Используем пересечение пауз курсора и статичных кадров. Аудио-тишина в этой версии не меняет монтаж.',
-    en: 'Use the overlap of cursor pauses and static frames. Audio silence does not change edits in this version.',
+    ru: 'Сократите ввод и паузы, добавьте приближение к действиям. Сначала проверьте предлагаемые изменения.',
+    en: 'Shorten typing and pauses, and zoom in on actions. Review the proposed changes before applying.',
   },
   autoTransformDecisionStep: {
     ru: '2. Что сделать',
@@ -85,7 +104,7 @@ export const videoEditorTimelineAutoTransformMessages = defineMessageSource({
   },
   autoLinked: { ru: 'Связанных дорожек:', en: 'Linked tracks:' },
   autoIdle: { ru: 'Паузы', en: 'Idle intervals' },
-  autoCamera: { ru: 'Кадрирование по кликам', en: 'Frame clicks' },
+  autoCamera: { ru: 'Приближать к кликам', en: 'Zoom in on clicks' },
   autoMore: { ru: 'Настройки поиска пауз', en: 'Idle detection settings' },
   autoShoulder: { ru: 'Отступ, с', en: 'Shoulder, s' },
   autoMergeGap: { ru: 'Объединять, с', en: 'Merge gap, s' },

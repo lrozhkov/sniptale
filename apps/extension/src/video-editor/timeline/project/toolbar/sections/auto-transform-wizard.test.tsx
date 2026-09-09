@@ -199,7 +199,7 @@ it('scope and settings changes invalidate the candidate and removing all suggest
   await review();
   expect(f.prepare.mock.calls.at(-1)?.[0].targets).toHaveLength(2);
 });
-it('has no scope for history-lane selection and disables stale previews', async () => {
+it('selects eligible recordings for history-lane processing and disables stale previews', async () => {
   const f = fixture();
   act(() =>
     root.render(
@@ -210,11 +210,11 @@ it('has no scope for history-lane selection and disables stale previews', async 
       />
     )
   );
-  expect(button('review').disabled).toBe(true);
+  expect(button('review').disabled).toBe(false);
   const first = document.querySelector<HTMLInputElement>(
     '[data-ui="video-editor.auto.scope"] input'
   )!;
-  act(() => first.click());
+  expect(first.checked).toBe(true);
   await review();
   act(() =>
     root.render(
