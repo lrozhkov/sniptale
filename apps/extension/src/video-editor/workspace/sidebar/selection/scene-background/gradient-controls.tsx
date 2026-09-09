@@ -26,18 +26,17 @@ export function GradientAnimationControls(props: GradientControlProps) {
         onChange={(mode) => updateGradientAnimation(props, { ...animation, mode })}
         options={getGradientAnimationModeOptions()}
       />
-      {animation.mode !== VideoSceneGradientAnimationMode.NONE &&
-        animation.mode !== VideoSceneGradientAnimationMode.AUDIO_REACTIVE && (
-          <SliderField
-            label={translate('videoEditor.sidebar.sceneBackgroundAnimationSpeedLabel')}
-            value={animation.speed}
-            min={0}
-            max={100}
-            step={1}
-            onChange={(speed) => updateGradientAnimation(props, { ...animation, speed })}
-            formatValue={(value) => `${Math.round(value)}%`}
-          />
-        )}
+      {animation.mode !== VideoSceneGradientAnimationMode.NONE && (
+        <SliderField
+          label={translate('videoEditor.sidebar.sceneBackgroundAnimationSpeedLabel')}
+          value={animation.speed}
+          min={0}
+          max={100}
+          step={1}
+          onChange={(speed) => updateGradientAnimation(props, { ...animation, speed })}
+          formatValue={(value) => `${Math.round(value)}%`}
+        />
+      )}
       {animation.mode !== VideoSceneGradientAnimationMode.NONE && (
         <SliderField
           label={translate('videoEditor.sidebar.sceneBackgroundAnimationIntensityLabel')}

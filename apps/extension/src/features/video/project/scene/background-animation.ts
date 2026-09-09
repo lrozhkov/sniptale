@@ -87,19 +87,14 @@ export function resolveGradientAnimationFrame(params: {
   )
     return neutral;
   const intensity = animation.intensity / 100;
-  if (animation.mode === VideoSceneGradientAnimationMode.AUDIO_REACTIVE) {
-    const pulse = resolveAudioReactiveAmount(params.audioEnvelope) * intensity;
-    return {
-      ...neutral,
-      angle: clampSceneBackgroundAngle(params.angle + pulse * 90),
-      fromStop: pulse * 35,
-      toStop: 100 - pulse * 35,
-      radiusScale: 1 - pulse * 0.6,
-    };
-  }
   if (animation.speed === 0) return neutral;
   const time = Number.isFinite(params.time) ? Math.max(0, params.time) : 0;
   const phase = ((time * Math.PI * 2 * animation.speed) / 100) * 0.16;
+  if (animation.mode === VideoSceneGradientAnimationMode.AUDIO_REACTIVE) {
+    const amount = resolveAudioReactiveAmount(params.audioEnvelope) * intensity;
+    if (amount === 0) return neutral;
+    return resolveAudioMotionFrame(params.angle, phase, amount);
+  }
   const wave = Math.sin(phase);
   switch (animation.mode) {
     case VideoSceneGradientAnimationMode.ROTATE:
@@ -129,4 +124,22 @@ export function resolveGradientAnimationFrame(params: {
         offsetY: Math.sin(phase * 0.7) * 0.3 * intensity,
       };
   }
+}
+
+/** Fixed mixed periods create evolving motion without random state or frame history. */
+function resolveAudioMotionFrame(angle: number, phase: number, amount: number) {
+  const horizontal = 0.68 * Math.sin(phase) + 0.32 * Math.sin(phase * Math.SQRT2 + 0.8);
+  const vertical =
+    0.65 * Math.sin(phase * 0.73 + 1.7) + 0.35 * Math.sin(phase * Math.sqrt(3) + 0.2);
+  const turn = 0.65 * Math.sin(phase * 0.61 + 0.6) + 0.35 * Math.sin(phase * 1.17 + 2);
+  const breath = (1 + Math.sin(phase * 0.83 + 0.4)) / 2;
+  const spread = (1 + Math.sin(phase * 1.11 + 1.3)) / 2;
+  return {
+    angle: clampSceneBackgroundAngle(angle + turn * 65 * amount),
+    offsetX: horizontal * 0.3 * amount,
+    offsetY: vertical * 0.24 * amount,
+    fromStop: amount * (8 + spread * 18),
+    toStop: 100 - amount * (8 + (1 - spread) * 18),
+    radiusScale: 1 + amount * (0.2 - 0.55 * breath),
+  };
 }
