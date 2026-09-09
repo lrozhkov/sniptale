@@ -385,3 +385,12 @@ export function useVideoEditorTimelineController() {
     selectedClipActions
   );
 }
+
+export function useVideoEditorProjectMenuController() {
+  const commands = useProjectCommandContext();
+  const dialogs = useWorkspaceDialogsContext();
+  return {
+    onCreateProject: commands.handleCreateProject,
+    onDialogVisibilityChange: dialogs.setProjectDialogOpen,
+  };
+}

@@ -67,6 +67,8 @@ const mocks = vi.hoisted(() => {
     refreshRecordings: action,
   };
   const workspace = {
+    projectDialogOpen: false,
+    setProjectDialogOpen: action,
     autoProcessingModalOpen: false,
     setAutoProcessingModalOpen: action,
     audioRecordingDialogOpen: false,

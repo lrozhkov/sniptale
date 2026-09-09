@@ -1,14 +1,12 @@
-import { Redo2, Undo2, Magnet, Clapperboard } from 'lucide-react';
+import { ProjectMenu } from './project-menu';
+import { Redo2, Undo2, Magnet } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { translate } from '../../../../platform/i18n';
 import {
   useVideoEditorHistoryController,
   useVideoEditorHeaderController,
 } from '../../../runtime/controller/composition/hooks';
-import {
-  toolbarIconButtonClassName,
-  toolbarExportButtonClassName,
-} from './sections/constants/button';
+import { toolbarIconButtonClassName } from './sections/constants/button';
 import { ProjectTimelinePlaybackSummary } from './sections/playback-summary';
 import { ProjectTimelineToolbarLeadingControls } from './sections/leading';
 import { ProjectTimelineToolbarTrailingActions } from './sections/trailing';
@@ -152,17 +150,7 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
         )}
         <ToolbarSeparator />
         {header && (
-          <ContentToolbarButton
-            className={toolbarExportButtonClassName}
-            title={translate('videoEditor.app.exportButton')}
-            onClick={header.onOpenExportDialog}
-            dataUi="video-editor.timeline.toolbar.export"
-          >
-            <Clapperboard aria-hidden="true" />
-            <span className="whitespace-nowrap text-xs font-semibold">
-              {translate('videoEditor.app.exportButton')}
-            </span>
-          </ContentToolbarButton>
+          <ProjectMenu projectName={header.projectName} onExport={header.onOpenExportDialog} />
         )}
       </div>
     </div>

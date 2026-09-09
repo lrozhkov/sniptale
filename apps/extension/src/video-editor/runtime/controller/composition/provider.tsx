@@ -64,6 +64,7 @@ function useVideoEditorRuntimeComposition(
   );
   const blockingOverlayOpen =
     commandPaletteOpen ||
+    workspace.projectDialogOpen ||
     workspace.autoProcessingModalOpen ||
     workspace.confirm.dialog !== null ||
     workspace.audioRecordingDialogOpen ||
@@ -234,6 +235,7 @@ function useVideoEditorContextProjections(
 ) {
   const workspaceDialogs = useMemo(
     () => ({
+      setProjectDialogOpen: workspace.setProjectDialogOpen,
       setAutoProcessingModalOpen: workspace.setAutoProcessingModalOpen,
       audioRecordingDialogOpen: workspace.audioRecordingDialogOpen,
       audioRecordingTarget: workspace.audioRecordingTarget,
@@ -247,6 +249,7 @@ function useVideoEditorContextProjections(
       toggleLibraryPanel: workspace.toggleLibraryPanel,
     }),
     [
+      workspace.setProjectDialogOpen,
       workspace.setAutoProcessingModalOpen,
       workspace.audioRecordingDialogOpen,
       workspace.audioRecordingTarget,

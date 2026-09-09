@@ -200,6 +200,12 @@ export const videoEditorAppMessages = defineMessageSource({
     ru: 'Экспортов',
     en: 'Exports:',
   },
+  projectMenu: { ru: 'Действия с проектом', en: 'Project actions' },
+  newProjectAction: { ru: 'Создать новый', en: 'New project' },
+  copyProjectAction: { ru: 'Создать копию', en: 'Duplicate project' },
+  projectNameLabel: { ru: 'Название проекта', en: 'Project name' },
+  projectNameRequired: { ru: 'Введите название проекта', en: 'Enter a project name' },
+  projectCopySuffix: { ru: ' — копия', en: ' — copy' },
   exportButton: {
     ru: 'Экспорт',
     en: 'Export',

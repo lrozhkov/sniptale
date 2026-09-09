@@ -17,8 +17,13 @@ const history = vi.hoisted(() => ({
 }));
 vi.mock('../../../runtime/controller/composition/hooks', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../runtime/controller/composition/hooks')>()),
+  useVideoEditorProjectMenuController: () => ({
+    onCreateProject: vi.fn(),
+    onDialogVisibilityChange: vi.fn(),
+  }),
   useVideoEditorHistoryController: () => history,
   useVideoEditorHeaderController: () => ({
+    projectName: 'Project',
     grid: { magnetEnabled: true, onToggleMagnet: vi.fn() },
     onOpenExportDialog: vi.fn(),
   }),
@@ -143,4 +148,48 @@ it('routes available history actions from the timeline and disables unavailable 
   });
   expect(history.onUndo).toHaveBeenCalledTimes(1);
   expect(history.onRedo).not.toHaveBeenCalled();
+});
+
+it('opens project actions, cancels creation, and dismisses the menu with Escape or outside click', () => {
+  const host = renderToolbar();
+  const trigger = host.querySelector<HTMLButtonElement>(
+    '[data-ui="video-editor.timeline.toolbar.project-menu"]'
+  )!;
+  const clickNamed = (label: string) =>
+    act(() =>
+      [...document.querySelectorAll<HTMLButtonElement>('button')]
+        .find((button) => button.textContent === label)!
+        .click()
+    );
+  act(() => trigger.click());
+  expect(trigger.getAttribute('aria-expanded')).toBe('true');
+  clickNamed('videoEditor.app.newProjectAction');
+  expect(document.querySelector('[role=dialog]')).not.toBeNull();
+  act(() =>
+    document
+      .querySelector('[role=dialog]')!
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  expect(document.querySelector('[role=dialog]')).toBeNull();
+  act(() => trigger.click());
+  clickNamed('videoEditor.app.copyProjectAction');
+  expect(document.querySelector('input[id]')).not.toBeNull();
+  act(() =>
+    document
+      .querySelector('[role=dialog]')!
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  act(() => trigger.click());
+  clickNamed('videoEditor.app.exportButton');
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  act(() => trigger.click());
+  act(() =>
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+  );
+  expect(document.activeElement?.textContent).toBe('videoEditor.app.newProjectAction');
+  act(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true })));
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
+  act(() => trigger.click());
+  act(() => document.body.dispatchEvent(new Event('pointerdown', { bubbles: true })));
+  expect(trigger.getAttribute('aria-expanded')).toBe('false');
 });

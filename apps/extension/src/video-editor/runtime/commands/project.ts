@@ -3,6 +3,7 @@ import { translate } from '../../../platform/i18n';
 import { createLogger } from '@sniptale/platform/observability/logger';
 import {
   createBlankProject,
+  copyProject,
   deletePersistedProject,
   openPersistedProject,
 } from '../../project/operations/ops';
@@ -37,7 +38,14 @@ export async function loadProjectWorkspace(
   }
 }
 
-async function createProjectWorkspace(port: ProjectHandlerPort): Promise<void> {
+export async function createProjectWorkspace(
+  port: ProjectHandlerPort,
+  name?: string,
+  copyCurrent = false
+): Promise<void> {
+  const projectName = name?.trim();
+  if (name !== undefined && !projectName)
+    throw new Error(translate('videoEditor.app.projectNameRequired'));
   const transition = beginProjectTransition();
   try {
     const currentProject = port.getCurrentProject();
@@ -45,13 +53,24 @@ async function createProjectWorkspace(port: ProjectHandlerPort): Promise<void> {
       await waitForVideoEditorSave(currentProject.id);
       if (!transition.isCurrent()) return;
     }
-    const project = await createBlankProject();
+    const source = port.getCurrentProject();
+    if (copyCurrent && (!source || source.id !== currentProject?.id)) {
+      throw new Error(translate('common.errors.actionFailed'));
+    }
+    const project =
+      copyCurrent && source
+        ? await copyProject(source, projectName ?? source.name)
+        : await createBlankProject(projectName);
     if (!transition.isCurrent()) return;
-    port.applyLoadedProject(project, null);
-    await Promise.all([
+    port.applyLoadedProject(project, project.baseRecordingId);
+    const refreshes = await Promise.allSettled([
       port.libraries.refreshProjects(),
       port.libraries.refreshProjectExports(project.id),
     ]);
+    for (const refresh of refreshes) {
+      if (refresh.status === 'rejected')
+        logger.warn('Project created, library refresh failed', refresh.reason);
+    }
   } finally {
     transition.complete();
   }
@@ -119,14 +138,18 @@ export function useProjectHandlers(
     [port]
   );
 
-  const handleCreateProject = useCallback(async () => {
-    try {
-      await createProjectWorkspace(port);
-    } catch (projectError) {
-      logger.error('Failed to create project', projectError);
-      port.setError(toErrorMessage(projectError, 'common.errors.actionFailed'));
-    }
-  }, [port]);
+  const handleCreateProject = useCallback(
+    async (name?: string, copyCurrent = false) => {
+      try {
+        await createProjectWorkspace(port, name, copyCurrent);
+      } catch (projectError) {
+        logger.error('Failed to create project', projectError);
+        port.setError(toErrorMessage(projectError, 'common.errors.actionFailed'));
+        if (name !== undefined) throw projectError;
+      }
+    },
+    [port]
+  );
 
   const handleDeleteProject = useCallback(
     async (projectId: string) => {

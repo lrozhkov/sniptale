@@ -1,5 +1,6 @@
 export {
   createBlankProject,
+  copyProject,
   loadInitialProjectFromLocation,
   openPersistedProject,
 } from './workspace';
