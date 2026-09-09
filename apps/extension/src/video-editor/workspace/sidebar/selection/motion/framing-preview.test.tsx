@@ -86,7 +86,7 @@ const ready = async (index = 0) =>
   act(async () => {
     pending[index]!.resolve(document.createElement('canvas'));
   });
-const button = () => host.querySelector('button')!;
+const button = () => host.querySelector<HTMLButtonElement>('[data-video-editor-local-navigation]')!;
 const pointer = (type: string, x: number, y: number, target?: Element) =>
   act(() => {
     const event = new MouseEvent(type, { bubbles: true, clientX: x, clientY: y, button: 0 });
@@ -110,7 +110,7 @@ it('renders the framed composition and commits a gesture in its displayed scene 
   pointer('pointermove', 150, 110);
   expect(commit).not.toHaveBeenCalled();
   pointer('pointerup', 200, 120);
-  expect(commit).toHaveBeenCalledExactlyOnceWith({ x: 500, y: 320 });
+  expect(commit).toHaveBeenCalledExactlyOnceWith({ x: 600, y: 340 });
 });
 
 it('cancels a draft and respects the locked fieldset for pointer and keyboard edits', async () => {
@@ -150,7 +150,7 @@ it('disposes stale rendering, ignores its result and offers retry after a curren
   expect(draw).not.toHaveBeenCalled();
   expect(button().disabled).toBe(true);
   await act(async () => pending[1]!.reject(new Error('decode failed')));
-  const retry = host.querySelectorAll('button')[1]!;
+  const retry = host.querySelectorAll('button')[3]!;
   expect(retry).toBeDefined();
   act(() => retry.click());
   expect(pending[1]!.dispose).toHaveBeenCalledOnce();
@@ -166,7 +166,7 @@ it('moves the selected area in scene coordinates with one commit and clamps it i
   pointer('pointermove', 200, 125);
   expect(commitArea).not.toHaveBeenCalled();
   pointer('pointerup', 200, 125);
-  expect(commitArea).toHaveBeenCalledExactlyOnceWith({ x: 250, y: 175, width: 400, height: 300 });
+  expect(commitArea).toHaveBeenCalledExactlyOnceWith({ x: 300, y: 200, width: 400, height: 300 });
   expect(commit).not.toHaveBeenCalled();
   commitArea.mockClear();
   pointer('pointerdown', 150, 100);
@@ -184,7 +184,7 @@ it('resizes from a corner while retaining the opposite corner and stops at minim
   pointer('pointermove', 120, 90);
   expect(commitArea).not.toHaveBeenCalled();
   pointer('pointerup', 120, 90);
-  expect(commitArea).toHaveBeenCalledExactlyOnceWith({ x: 220, y: 165, width: 380, height: 285 });
+  expect(commitArea).toHaveBeenCalledExactlyOnceWith({ x: 240, y: 180, width: 360, height: 270 });
   commitArea.mockClear();
   pointer('pointerdown', 100, 75, corner);
   pointer('pointerup', 800, 600);
@@ -270,11 +270,9 @@ it('retains a decoded frame through focus edits and autosave metadata changes', 
     editedRegion
   );
   expect(button().disabled).toBe(false);
-  expect(pending).toHaveLength(2);
+  expect(pending).toHaveLength(1);
   expect(mocks.create).toHaveBeenCalledOnce();
   expect(draw).toHaveBeenCalledOnce();
-  await ready(1);
-  expect(draw).toHaveBeenCalledTimes(2);
 });
 
 it('does not cancel a pending decode for focus-only changes', async () => {
@@ -341,3 +339,18 @@ it.each(['LOCK_OVERLAYS', 'FOLLOW_CAMERA'] as const)(
     expect(mocks.create).toHaveBeenCalledOnce();
   }
 );
+
+it('shows a full-scene navigator and switches to the composed result without another decoder', async () => {
+  render();
+  await ready();
+  setupBounds();
+  expect(pending[0]!.camera.scale).toBe(1);
+  const result = host.querySelectorAll('button')[1]!;
+  act(() => result.click());
+  expect(pending[1]!.camera.scale).toBe(2);
+  await ready(1);
+  pointer('pointerdown', 100, 100);
+  pointer('pointerup', 200, 120);
+  expect(commit).not.toHaveBeenCalled();
+  expect(mocks.create).toHaveBeenCalledOnce();
+});

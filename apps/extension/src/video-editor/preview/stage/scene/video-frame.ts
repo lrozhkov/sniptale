@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 
 import { isVideoClip } from '../../../../features/video/project/timeline';
@@ -54,6 +54,7 @@ export function canRenderActivePreviewVideos(
 function usePreviewStageVideoFrameStateSync(
   activeVideoClipIds: string[],
   currentTime: number,
+  previousCanRender: boolean,
   setVideoFrameState: Dispatch<
     SetStateAction<{
       canRender: boolean;
@@ -63,17 +64,10 @@ function usePreviewStageVideoFrameStateSync(
   videoRefs: PreviewStageVideoRefs
 ): void {
   useEffect(() => {
-    setVideoFrameState((value) => {
-      const canRender = resolveCanRenderState(activeVideoClipIds, videoRefs);
-      if (value.canRender === canRender) {
-        return value;
-      }
-      return {
-        canRender,
-        version: value.version,
-      };
-    });
-  }, [activeVideoClipIds, currentTime, setVideoFrameState, videoRefs]);
+    const canRender = resolveCanRenderState(activeVideoClipIds, videoRefs);
+    if (canRender === previousCanRender) return;
+    setVideoFrameState((value) => ({ canRender, version: value.version }));
+  }, [activeVideoClipIds, currentTime, previousCanRender, setVideoFrameState, videoRefs]);
 }
 
 function usePreviewStageVideoFrameListeners(
@@ -87,22 +81,27 @@ function usePreviewStageVideoFrameListeners(
   >,
   videoRefs: PreviewStageVideoRefs
 ): void {
+  const subscription = useRef<{
+    key: string;
+    videos: HTMLVideoElement[];
+    dispose: () => void;
+  } | null>(null);
+  // Media refs may arrive after asset URLs load, without a timeline or clip-ID change.
   useEffect(() => {
-    const videos: HTMLVideoElement[] = [];
-    for (const video of Object.values(videoRefs.current)) {
-      if (video instanceof HTMLVideoElement) {
-        videos.push(video);
-      }
-    }
-    if (videos.length === 0) {
+    const videos = Object.values(videoRefs.current).filter(
+      (video): video is HTMLVideoElement => video instanceof HTMLVideoElement
+    );
+    const previous = subscription.current;
+    if (
+      previous?.key === activeVideoClipKey &&
+      previous.videos.length === videos.length &&
+      previous.videos.every((video, index) => video === videos[index])
+    )
       return;
-    }
-
+    previous?.dispose();
     let frameHandle = 0;
     const requestFrameRefresh = () => {
-      if (frameHandle !== 0) {
-        cancelAnimationFrame(frameHandle);
-      }
+      if (frameHandle !== 0) cancelAnimationFrame(frameHandle);
       frameHandle = requestAnimationFrame(() => {
         frameHandle = 0;
         setVideoFrameState((value) => ({
@@ -111,16 +110,24 @@ function usePreviewStageVideoFrameListeners(
         }));
       });
     };
-
     addVideoFrameRefreshListeners(videos, requestFrameRefresh);
-
-    return () => {
-      if (frameHandle !== 0) {
-        cancelAnimationFrame(frameHandle);
-      }
-      removeVideoFrameRefreshListeners(videos, requestFrameRefresh);
+    subscription.current = {
+      key: activeVideoClipKey,
+      videos,
+      dispose: () => {
+        if (frameHandle !== 0) cancelAnimationFrame(frameHandle);
+        removeVideoFrameRefreshListeners(videos, requestFrameRefresh);
+      },
     };
-  }, [activeVideoClipIds, activeVideoClipKey, setVideoFrameState, videoRefs]);
+    requestFrameRefresh();
+  });
+  useEffect(
+    () => () => {
+      subscription.current?.dispose();
+      subscription.current = null;
+    },
+    []
+  );
 }
 
 const VIDEO_FRAME_TRACKED_EVENTS = ['loadeddata', 'seeked', 'timeupdate'] as const;
@@ -147,7 +154,10 @@ export function usePreviewStageVideoFrameVersion(
   videoRefs: PreviewStageVideoRefs
 ): { canRender: boolean; version: number } {
   const activeVideoClipKey = resolveActiveVideoClipKey(activeClips);
-  const activeVideoClipIds = parseActiveVideoClipIds(activeVideoClipKey);
+  const activeVideoClipIds = useMemo(
+    () => parseActiveVideoClipIds(activeVideoClipKey),
+    [activeVideoClipKey]
+  );
   const [videoFrameState, setVideoFrameState] = useState({
     canRender: resolveCanRenderState(activeVideoClipIds, videoRefs),
     version: 0,
@@ -156,6 +166,7 @@ export function usePreviewStageVideoFrameVersion(
   usePreviewStageVideoFrameStateSync(
     activeVideoClipIds,
     currentTime,
+    videoFrameState.canRender,
     setVideoFrameState,
     videoRefs
   );

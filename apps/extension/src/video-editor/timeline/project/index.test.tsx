@@ -32,6 +32,10 @@ vi.mock('../../runtime/controller/composition/hooks', async (importOriginal) => 
     grid: { magnetEnabled: false, onToggleMagnet: vi.fn() },
     onOpenExportDialog: vi.fn(),
   }),
+  useVideoEditorProjectMenuController: () => ({
+    onCreateProject: vi.fn(),
+    onDialogVisibilityChange: vi.fn(),
+  }),
 }));
 
 let container: HTMLDivElement;
@@ -237,7 +241,7 @@ it('publishes an effect draft through the root context and restores its original
   expect(segment).not.toBeNull();
   const originalLeft = segment.style.left;
   const button = segment.querySelector<HTMLButtonElement>(
-    '[aria-label^="videoEditor.timeline.motionLane ·"]'
+    '[aria-label^="videoEditor.timeline.motionSegment ·"]'
   )!;
   act(() => {
     pointer(button, 'pointerdown', 480);

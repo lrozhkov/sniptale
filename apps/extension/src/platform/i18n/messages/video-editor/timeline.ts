@@ -138,7 +138,7 @@ export const videoEditorTimelineMessages = defineMessageSource({
     en: 'Subtitle track',
   },
   addZoomRegion: {
-    ru: 'Область зума',
+    ru: 'Приблизить',
     en: 'Zoom region',
   },
   closeGap: {
@@ -300,7 +300,7 @@ export const videoEditorTimelineMessages = defineMessageSource({
     en: 'Segments will appear here when the project contains data.',
   },
   emptyZoomLaneLabel: {
-    ru: 'Нажмите + или наведите на дорожку, чтобы добавить зум.',
+    ru: 'Нажмите «Приблизить», чтобы добавить масштабирование.',
     en: 'Press + or point at the lane to add a zoom.',
   },
   fileDropUnsupported: {

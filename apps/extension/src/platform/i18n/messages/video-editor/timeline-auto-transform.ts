@@ -11,7 +11,7 @@ export const videoEditorTimelineAutoTransformMessages = defineMessageSource({
   autoFramingBalanced: { ru: 'Обычное · 1,4×', en: 'Balanced · 1.4×' },
   autoFramingClose: { ru: 'Крупно · 1,7×', en: 'Close · 1.7×' },
   autoFramingHelp: {
-    ru: 'Плавно приближает к кликам и возвращает общий план. Существующие области зума сохраняются.',
+    ru: 'Плавно приближает к кликам и возвращает общий план. Существующие области масштабирования сохраняются.',
     en: 'Smoothly zooms to clicks, then returns to the full frame. Existing zoom regions are preserved.',
   },
   autoAudioUnavailable: {

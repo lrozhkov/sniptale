@@ -57,6 +57,8 @@ export const videoEditorSidebarSelectionEffectMessages = defineMessageSource({
   framingBinding: { ru: 'Привязка', en: 'Binding' },
   framingBindingScene: { ru: 'Сцена', en: 'Scene' },
   framingExactPosition: { ru: 'Точное положение', en: 'Exact position' },
+  framingAreaView: { ru: 'Область', en: 'Area' },
+  framingResultView: { ru: 'Результат', en: 'Result' },
   framingPreviewLabel: { ru: 'Положение области кадрирования', en: 'Framing area position' },
   framingAreaPreviewHint: {
     ru: 'Перетащите область или её углы. Сплошная рамка — итоговый кадр.',
@@ -125,11 +127,11 @@ export const videoEditorSidebarSelectionEffectMessages = defineMessageSource({
     en: 'Instant',
   },
   motionScaleLabel: {
-    ru: 'Масштаб зума',
+    ru: 'Масштаб',
     en: 'Zoom scale',
   },
   motionCameraModeLabel: {
-    ru: 'Режим зума',
+    ru: 'Режим масштабирования',
     en: 'Zoom mode',
   },
   motionCameraModeStatic: {
@@ -189,7 +191,7 @@ export const videoEditorSidebarSelectionEffectMessages = defineMessageSource({
     en: 'Lock',
   },
   motionOverlayZoomFollowCamera: {
-    ru: 'Вместе с зумом',
+    ru: 'Вместе с масштабом',
     en: 'Follow zoom',
   },
   motionTargetActionLabel: {
@@ -285,7 +287,7 @@ export const videoEditorSidebarSelectionEffectMessages = defineMessageSource({
     en: 'Click on the canvas to place the focus point.',
   },
   motionAreaPickHint: {
-    ru: 'Протяните по полотну, чтобы задать область зума.',
+    ru: 'Протяните по полотну, чтобы задать область масштабирования.',
     en: 'Drag on the canvas to define the zoom area.',
   },
 });

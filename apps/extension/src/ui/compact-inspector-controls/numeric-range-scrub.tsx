@@ -1,4 +1,5 @@
 import {
+  useState,
   type ReactNode,
   type ChangeEvent,
   type CSSProperties,
@@ -38,18 +39,20 @@ interface NumericRangeScrubProps {
 }
 
 export function NumericRangeScrub(props: NumericRangeScrubProps) {
+  const [focused, setFocused] = useState(false);
   if (props.disabled) {
     return null;
   }
 
   const state = getNumericRangeScrubState(props);
-  const visible = props.visible || props.active;
+  const visible = props.visible || props.active || focused;
 
   return (
     <NumericRangeScrubShell visible={visible} rangeRatio={state.rangeRatio}>
       <NumericRangeTrack />
       <NumericRangeInput
         label={props.label}
+        onFocusChange={setFocused}
         onActiveChange={props.onActiveChange}
         onCommitValue={props.onCommitValue}
         onPreviewValue={props.onPreviewValue}
@@ -122,6 +125,7 @@ function NumericRangeTrack() {
 }
 
 function NumericRangeInput(props: {
+  onFocusChange: (focused: boolean) => void;
   label: string;
   onActiveChange: (active: boolean) => void;
   onCommitValue: (value: number) => void;
@@ -146,6 +150,7 @@ function NumericRangeInput(props: {
       max={props.rangeMax}
       step={props.rangeStep}
       value={props.rangeValue}
+      onFocus={() => props.onFocusChange(true)}
       onChange={(event) => props.onPreviewValue(props.readValue(event))}
       onPointerDown={(event) => handlePointerActiveChange(event, props.onActiveChange, true)}
       onPointerUp={(event) => {
@@ -154,6 +159,7 @@ function NumericRangeInput(props: {
       }}
       onKeyUp={handleRangeCommit}
       onBlur={(event) => {
+        props.onFocusChange(false);
         handleRangeCommit(event);
         props.onActiveChange(false);
       }}

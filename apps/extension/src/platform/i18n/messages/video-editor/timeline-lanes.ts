@@ -37,8 +37,9 @@ export const videoEditorTimelineLaneMessages = defineMessageSource({
     ru: 'Действия',
     en: 'Actions',
   },
+  motionSegment: { ru: 'Масштабирование', en: 'Zoom' },
   motionLane: {
-    ru: 'Зум',
+    ru: 'Масштаб',
     en: 'Zoom',
   },
   historyClick: { ru: 'Клик', en: 'Click' },

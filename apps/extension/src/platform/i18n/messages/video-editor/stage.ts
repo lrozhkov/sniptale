@@ -54,7 +54,7 @@ export const videoEditorStageMessages = defineMessageSource({
     en: 'Automation',
   },
   addZoomRegion: {
-    ru: 'Добавить область зума',
+    ru: 'Приблизить',
     en: 'Add zoom region',
   },
   addVideoTrack: {
@@ -270,7 +270,7 @@ export const videoEditorStageMessages = defineMessageSource({
     en: 'Click and focus emphasis',
   },
   addZoomRegionNote: {
-    ru: 'Зум и поведение камеры',
+    ru: 'Масштабирование и поведение камеры',
     en: 'Zoom and camera follow',
   },
 });

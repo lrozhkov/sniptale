@@ -191,7 +191,7 @@ function MotionSegments(
         className={MOTION_LANE_SEGMENT_CLASS_NAME}
         height={28}
         isSelected={isSelectedEffectSegment(props.selectedEffectSelection, 'motion', segment.id)}
-        label={translate('videoEditor.timeline.motionLane')}
+        label={translate('videoEditor.timeline.motionSegment')}
         hideLabel
         leadingIcon={
           segment.region.scale < 1 ? (
@@ -200,7 +200,7 @@ function MotionSegments(
             <ZoomIn size={14} aria-hidden="true" />
           )
         }
-        title={`${translate('videoEditor.timeline.motionLane')} · ${subtitle}`}
+        title={`${translate('videoEditor.timeline.motionSegment')} · ${subtitle}`}
         startTime={segment.start}
         endTime={segment.end}
         pixelsPerSecond={props.pixelsPerSecond}

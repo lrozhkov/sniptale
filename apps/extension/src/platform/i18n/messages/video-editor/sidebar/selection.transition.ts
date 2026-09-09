@@ -126,7 +126,7 @@ export const videoEditorSidebarSelectionTransitionMessages = defineMessageSource
     en: 'Slide',
   },
   transitionZoomDissolve: {
-    ru: 'Зум-растворение',
+    ru: 'Приближение с растворением',
     en: 'Zoom dissolve',
   },
   transitionBlurReveal: {
