@@ -10,7 +10,7 @@ import { resolveMotionConnectionSource } from '../../../../features/video/projec
 import { VideoTemporalEasing } from '../../../../features/video/project/types';
 import { VideoEditorSelectionKind } from '../../../contracts/selection';
 import { projectTimelineInterval } from '../interaction-state/projection';
-import { MoveRight, Plus, ZoomIn, ZoomOut } from 'lucide-react';
+import { MoveRight, ZoomIn, ZoomOut } from 'lucide-react';
 
 const MOTION_LANE_SEGMENT_CLASS_NAME = [
   'border-[var(--sniptale-color-border-soft)]',
@@ -81,6 +81,40 @@ function MotionConnections(props: UtilityLaneProps & { laneVisible: boolean }) {
     const label = translate(
       connected ? 'videoEditor.timeline.framingConnection' : 'videoEditor.timeline.connectFraming'
     );
+    if (!connected) {
+      return (
+        <div
+          key={destination.id}
+          data-ui="video-editor.timeline.framing-connection"
+          data-framing-destination={destination.id}
+          className="group absolute top-1/2 h-7 -translate-y-1/2"
+          style={{ left: geometry.left, width: geometry.width }}
+        >
+          <button
+            type="button"
+            data-ui="video-editor.timeline.add-framing-connection"
+            aria-label={label}
+            title={label}
+            disabled={locked || !props.laneVisible || !props.onConnectMotionRegions}
+            className={[
+              'absolute left-1/2 flex h-7 w-7 max-w-full -translate-x-1/2 items-center justify-center',
+              'overflow-hidden rounded-md border border-[var(--sniptale-color-border-soft)] shadow-sm',
+              'bg-[var(--sniptale-color-surface-panel)] text-[var(--sniptale-color-text-secondary)]',
+              'opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity',
+              'hover:bg-[var(--sniptale-color-surface-hover)] cursor-pointer disabled:cursor-default',
+              'disabled:opacity-0 focus-visible:outline focus-visible:outline-[var(--sniptale-color-focus-ring)]',
+            ].join(' ')}
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              props.onConnectMotionRegions?.(source.id, destination.id);
+            }}
+          >
+            <MoveRight size={16} aria-hidden="true" />
+          </button>
+        </div>
+      );
+    }
     return (
       <button
         key={destination.id}
@@ -88,33 +122,25 @@ function MotionConnections(props: UtilityLaneProps & { laneVisible: boolean }) {
         data-ui="video-editor.timeline.framing-connection"
         data-framing-destination={destination.id}
         aria-label={label}
-        aria-pressed={connected ? selected : undefined}
+        aria-pressed={selected}
         title={label}
-        disabled={!connected && (locked || !props.laneVisible || !props.onConnectMotionRegions)}
         className={[
           `absolute top-1/2 flex h-7 -translate-y-1/2 items-center justify-center
 overflow-hidden rounded border text-xs transition-opacity`,
           '!cursor-pointer disabled:pointer-events-none disabled:opacity-40',
-          connected ? 'video-editor-timeline-item' : '',
+          'video-editor-timeline-item',
           selected ? 'video-editor-timeline-item-selected' : '',
           'border-[var(--sniptale-color-border-soft)] text-[var(--sniptale-color-text-secondary)]',
-          connected
-            ? 'bg-[var(--sniptale-color-surface-panel)]'
-            : 'border-dashed opacity-0 hover:opacity-100 focus-visible:opacity-100',
+          'bg-[var(--sniptale-color-surface-panel)]',
         ].join(' ')}
         style={{ left: geometry.left, width: geometry.width }}
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => {
           event.stopPropagation();
-          if (connected) props.onSelectMotionRegion?.(destination.id, 'connection');
-          else props.onConnectMotionRegions?.(source.id, destination.id);
+          props.onSelectMotionRegion?.(destination.id, 'connection');
         }}
       >
-        {connected ? (
-          <MoveRight size={16} aria-hidden="true" />
-        ) : (
-          <Plus size={16} aria-hidden="true" />
-        )}
+        <MoveRight size={16} aria-hidden="true" />
         {geometry.width > 180 ? <span className="ml-1.5 truncate">{label}</span> : null}
       </button>
     );

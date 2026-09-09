@@ -5,9 +5,9 @@ import { videoEditorTimelineLaneMessages } from './timeline-lanes';
 export const videoEditorTimelineMessages = defineMessageSource({
   historyLaneShort: { ru: 'История', en: 'History' },
   hideClipNames: { ru: 'Скрывать названия фрагментов', en: 'Hide clip names' },
-  framingConnection: { ru: 'Переход кадрирования', en: 'Framing transition' },
-  connectFraming: { ru: 'Соединить состояния', en: 'Connect framing states' },
-  disconnectFraming: { ru: 'Убрать переход', en: 'Remove framing transition' },
+  framingConnection: { ru: 'Переход', en: 'Transition' },
+  connectFraming: { ru: 'Добавить переход', en: 'Add transition' },
+  disconnectFraming: { ru: 'Убрать переход', en: 'Remove transition' },
   trackKindPrimary: {
     ru: 'Видео',
     en: 'Video',
