@@ -54,3 +54,16 @@ describe('offscreen desktop preview helpers', () => {
     removeSpy.mockRestore();
   });
 });
+
+it('does not warn for a play request cancelled by detaching the preview', async () => {
+  const rejection = Promise.withResolvers<void>();
+  vi.spyOn(HTMLMediaElement.prototype, 'play').mockReturnValueOnce(rejection.promise);
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+  const controller = createDesktopPreviewController();
+  const video = controller.attachDesktopPreview({} as MediaStream);
+  controller.detachDesktopPreview(video);
+  rejection.reject(new DOMException('interrupted', 'AbortError'));
+  await Promise.resolve();
+  expect(loggerWarnMock).not.toHaveBeenCalled();
+  vi.restoreAllMocks();
+});

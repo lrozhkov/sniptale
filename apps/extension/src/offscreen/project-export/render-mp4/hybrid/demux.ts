@@ -170,16 +170,14 @@ function queueDecodedFrameEncode(args: {
     args.request.videoEncoder,
     CLEAN_SOURCE_ENCODER_QUEUE_CAPACITY,
     args.request.signal
-  ).then(() => {
-    try {
+  )
+    .then(() => {
       args.request.videoEncoder.encode(outputFrame, {
         keyFrame: args.outputIndexRef.current === 0,
       });
       args.outputIndexRef.current += 1;
-    } finally {
-      outputFrame.close();
-    }
-  });
+    })
+    .finally(() => outputFrame.close());
   args.encodeTasks.push(encodeTask);
 }
 

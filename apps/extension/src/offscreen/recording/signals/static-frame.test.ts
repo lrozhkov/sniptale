@@ -132,7 +132,11 @@ function createCanvasElement(createElement: Document['createElement']): HTMLCanv
   const canvas = createElement('canvas');
   Object.defineProperty(canvas, 'getContext', {
     configurable: true,
-    value: vi.fn(() => ctx),
+    value: vi.fn((kind, options) => {
+      expect(kind).toBe('2d');
+      expect(options).toEqual({ willReadFrequently: true });
+      return ctx;
+    }),
   });
   canvas.height = 0;
   canvas.width = 0;
@@ -209,7 +213,7 @@ function registerStaticFramePersistenceTest(): void {
 }
 
 function registerStaticFrameMissingTelemetryTest(): void {
-  it('logs a warning and skips persistence when telemetry sidecar never becomes available', async () => {
+  it('quietly skips persistence when optional telemetry is absent', async () => {
     vi.useFakeTimers();
     getRecordingTelemetryMock.mockResolvedValue(null);
 
@@ -218,10 +222,7 @@ function registerStaticFrameMissingTelemetryTest(): void {
     await pending;
 
     expect(saveRecordingTelemetrySafelyMock).not.toHaveBeenCalled();
-    expect(loggerWarnMock).toHaveBeenCalledWith(
-      'Skipping static-frame pass because telemetry sidecar is unavailable',
-      { recordingId: 'recording-missing' }
-    );
+    expect(loggerWarnMock).not.toHaveBeenCalled();
   });
 }
 
@@ -264,4 +265,13 @@ describe('offscreen recording static-frame signals', () => {
   registerStaticFramePersistenceTest();
   registerStaticFrameMissingTelemetryTest();
   registerStaticFrameReplacementTest();
+});
+
+it('still warns when reading telemetry fails', async () => {
+  getRecordingTelemetryMock.mockRejectedValueOnce(new Error('storage unavailable'));
+  await persistStaticFrameSignals('recording-failure');
+  expect(loggerWarnMock).toHaveBeenCalledWith('Static-frame post-pass failed', {
+    errorMessage: 'storage unavailable',
+    recordingId: 'recording-failure',
+  });
 });

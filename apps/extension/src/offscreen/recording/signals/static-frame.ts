@@ -169,7 +169,7 @@ function createStaticFrameTelemetrySignals(signals: StaticSignal[]) {
 async function detectStaticFrameSignals(blob: Blob) {
   const { cleanup, duration, video } = await loadVideo(blob);
   const canvas = createFrameSignatureCanvas();
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
   if (!ctx || !Number.isFinite(duration) || duration <= 0) {
     cleanup();
@@ -213,9 +213,7 @@ export async function persistStaticFrameSignals(recordingId: string): Promise<vo
   try {
     const entry = await getTelemetryEntryWithRetry(recordingId);
     if (!entry) {
-      logger.warn('Skipping static-frame pass because telemetry sidecar is unavailable', {
-        recordingId,
-      });
+      // Telemetry is optional; collection and persistence failures are logged by their owners.
       return;
     }
 
