@@ -1,3 +1,4 @@
+import type { PersistenceMutationPermit } from '../infrastructure/mutation-barrier';
 import { initDB, VIDEO_EFFECT_BUNDLES_STORE } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import type { ImportedEffectArtifact } from '../../../features/video/project/effect-bundle/import/artifact';
@@ -60,8 +61,10 @@ export async function saveEffectArtifact(
   });
 }
 
-export async function listEffectBundles(): Promise<EffectBundleCatalogListItem[]> {
-  const db = await initDB();
+export async function listEffectBundles(
+  permit?: PersistenceMutationPermit
+): Promise<EffectBundleCatalogListItem[]> {
+  const db = await initDB(permit);
   const valuesValue: unknown = await db.getAll(VIDEO_EFFECT_BUNDLES_STORE);
   if (!Array.isArray(valuesValue)) {
     throw new EffectBundlePersistenceError('catalogEntryInvalid');

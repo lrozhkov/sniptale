@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import type { EffectBundleCatalogEntry } from './index';
-import { queryEffectCatalog } from './query';
+import { getEffectCatalogThemes, queryEffectCatalog } from './query';
 const documents = ['card-light', 'card-dark', 'other'].map((id) => ({
   id,
   source: '{}',
@@ -40,4 +40,10 @@ it('combines group, theme and search; unknown themes stay unclassified', () => {
   expect(
     queryEffectCatalog(catalog, { query: 'карточки', kind: 'all', theme: 'all' }, 'ru')
   ).toHaveLength(3);
+});
+
+it('derives theme options only from the supplied catalog inventory', () => {
+  expect(getEffectCatalogThemes([{ ...catalog, documents: [documents[1]!] }])).toEqual(['dark']);
+  expect(getEffectCatalogThemes([])).toEqual([]);
+  expect(getEffectCatalogThemes([catalog])).toEqual(['light', 'dark', 'unspecified']);
 });

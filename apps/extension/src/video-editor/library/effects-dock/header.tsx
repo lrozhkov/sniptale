@@ -1,7 +1,9 @@
+import { EditorIconButton } from '@sniptale/ui/editor-chrome';
+import { openSettingsPage } from '../../../platform/navigation/extension-pages';
 import type { EffectFileImportResult } from '../../../composition/persistence/effect-bundles/import-files';
 import { EffectImportSummary } from '../../../ui/effect-catalog-controls';
 import { useRef, useState } from 'react';
-import { Upload } from 'lucide-react';
+import { Upload, Settings2 } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 
 import { translate } from '../../../platform/i18n';
@@ -29,15 +31,23 @@ export function EffectImportControl(props: {
             void props.run('import', async () => setResults(await props.onImport(files)));
         }}
       />
-      <ProductActionButton
-        disabled={props.disabled}
-        tone="secondary"
-        className="w-full justify-start"
-        onClick={() => inputRef.current?.click()}
-      >
-        <Upload size={16} aria-hidden="true" />
-        {translate('videoEditor.effectsLibrary.importMany')}
-      </ProductActionButton>
+      <div className="flex min-w-0 items-center gap-1">
+        <ProductActionButton
+          disabled={props.disabled}
+          tone="secondary"
+          className="min-w-0 flex-1 justify-start"
+          onClick={() => inputRef.current?.click()}
+        >
+          <Upload size={16} aria-hidden="true" />
+          {translate('videoEditor.effectsLibrary.importMany')}
+        </ProductActionButton>
+        <EditorIconButton
+          title={translate('settings.navigation.videoEffects')}
+          onClick={() => void openSettingsPage({ route: { section: 'video-effects' } })}
+        >
+          <Settings2 size={16} aria-hidden="true" />
+        </EditorIconButton>
+      </div>
       <EffectImportSummary results={results} />
     </div>
   );

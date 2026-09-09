@@ -1,3 +1,9 @@
+vi.mock('../../../composition/persistence/infrastructure/indexed-db/core', async (original) => ({
+  ...(await original<
+    typeof import('../../../composition/persistence/infrastructure/indexed-db/core')
+  >()),
+  initDB: vi.fn(async () => undefined),
+}));
 import { beforeEach, expect, it, vi } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import {
@@ -86,6 +92,7 @@ it('inspects a backup and commits the reviewed selection', async () => {
     fingerprint: inspected.inspection.fingerprint,
     destructiveConfirmed: false,
   });
+  expect(mocks.read).toHaveBeenLastCalledWith(expect.any(Object));
   expect(committed).toMatchObject({
     report: { status: 'committed', strategy: 'safe-merge' },
   });

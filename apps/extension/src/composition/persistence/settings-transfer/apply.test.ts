@@ -1,3 +1,5 @@
+import { createDefaultHighlighterSettings } from '../../../features/highlighter/style/defaults';
+import { serializeHighlighterSettings } from '../highlighter/mutation-write';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import type { NormalizedSettings } from '../../../contracts/settings';
@@ -48,6 +50,21 @@ beforeEach(() => {
 });
 
 describe('settings transfer AI owner transaction', () => {
+  it('stores restored system borders using the canonical compact sync format', async () => {
+    const settings = createDefaultHighlighterSettings();
+    await applySettingsTransferDomains({
+      domains: {
+        'styles.borders': { schemaVersion: 1, data: cloneSettingsTransferJsonValue(settings) },
+      },
+      summary: emptySummary(),
+    });
+    expect(mocks.syncSet).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sniptale_highlighter_settings: serializeHighlighterSettings(settings),
+      }),
+      undefined
+    );
+  });
   it('applies transferable settings while preserving local consent and matching AI secrets', async () => {
     const summary = emptySummary();
     mocks.localGet.mockResolvedValue({

@@ -26,6 +26,7 @@ export type SettingsCollectionItem = {
   meta?: ReactNode;
   supplement?: ReactNode;
   preview?: ReactNode;
+  previewVariant?: 'icon' | 'image';
   badges?: readonly {
     id: string;
     label: string;

@@ -78,7 +78,11 @@ function parseCoreDomain(
       if (parsed.data.popupStartup !== undefined) {
         if (!isPlainRecord(parsed.data.popupStartup)) failSettingsTransferDomain(domainId);
         const popup = asRecord(parsed.data.popupStartup);
-        if (Object.keys(popup).some((key) => key !== 'selection' && key !== 'lastPage')) {
+        if (
+          Object.keys(popup).some(
+            (key) => key !== 'selection' && key !== 'lastPage' && key !== 'lastExportDestination'
+          )
+        ) {
           failSettingsTransferDomain(domainId);
         }
         const parsedPopup = parseStoredPopupStartupState(popup);

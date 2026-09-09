@@ -13,7 +13,8 @@ export function SettingsCollectionRowIdentity({ item }: { item: SettingsCollecti
       {item.preview === undefined ? null : (
         <span
           className={[
-            'flex h-8 w-8 flex-none items-center justify-center overflow-hidden rounded-lg border',
+            'flex flex-none items-center justify-center overflow-hidden border',
+            item.previewVariant === 'image' ? 'h-14 w-24 rounded-md' : 'h-8 w-8 rounded-lg',
             'border-[var(--sniptale-color-border-soft)]',
           ].join(' ')}
         >

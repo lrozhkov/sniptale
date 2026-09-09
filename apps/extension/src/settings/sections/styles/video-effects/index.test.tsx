@@ -37,6 +37,13 @@ const entries: EffectBundleCatalogListItem[] = [];
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal(
+    'IntersectionObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
   list.mockResolvedValue(entries);
   container = document.createElement('div');
   document.body.append(container);
@@ -107,25 +114,13 @@ function catalogRows(): EffectBundleCatalogListItem[] {
     return { ...entry, status: 'ready' as const, entry, documentKinds: [entry.documents[0]!.kind] };
   });
 }
-it('manages saved packs, confirms removal, and exports through the portable exporter', async () => {
+it('manages saved packs and confirms removal without per-pack export', async () => {
   list.mockResolvedValue(catalogRows());
-  get.mockResolvedValue((catalogRows()[0] as { entry: unknown }).entry);
-  exportCatalog.mockResolvedValue({ blob: new Blob(['{}']), filename: 'pack.json' });
-  const create = vi.fn(() => 'blob:test');
-  const revoke = vi.fn();
-  vi.stubGlobal('URL', { createObjectURL: create, revokeObjectURL: revoke });
-  const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
   await act(async () => root.render(<VideoEffectsSection />));
   const row = container.querySelector('[data-settings-collection-item="pack-0"]')!;
   await act(async () => (row.querySelector('[role=switch]') as HTMLElement).click());
   expect(toggle).toHaveBeenCalledWith('pack-0', false);
-  const exportButton = Array.from(row.querySelectorAll('button')).find((b) =>
-    b.querySelector('svg.lucide-download')
-  )!;
-  await act(async () => exportButton.click());
-  await act(async () => exportButton.click());
-  expect(exportCatalog).toHaveBeenCalledTimes(2);
-  expect(revoke).toHaveBeenCalledWith('blob:test');
+  expect(row.querySelector('svg.lucide-download')).toBeNull();
   await act(async () =>
     (row.querySelector('[data-collection-inline-action="delete"]') as HTMLElement).click()
   );
@@ -136,7 +131,6 @@ it('manages saved packs, confirms removal, and exports through the portable expo
   )!;
   await act(async () => confirm.click());
   expect(remove).toHaveBeenCalledWith('pack-0');
-  click.mockRestore();
 });
 it('shows load and operation failures and recovers on focus', async () => {
   list.mockRejectedValueOnce(new Error('load'));
@@ -145,8 +139,8 @@ it('shows load and operation failures and recovers on focus', async () => {
   list.mockResolvedValue(catalogRows());
   await act(async () => window.dispatchEvent(new Event('focus')));
   expect(container.querySelector('[role=alert]')).toBeNull();
-  get.mockResolvedValue(null);
-  const button = container.querySelector('button:has(svg.lucide-download)') as HTMLElement;
+  toggle.mockRejectedValueOnce(new Error('save'));
+  const button = container.querySelector('[role=switch]') as HTMLElement;
   await act(async () => button.click());
   expect(container.querySelector('[role=alert]')).not.toBeNull();
 });

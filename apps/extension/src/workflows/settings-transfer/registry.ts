@@ -143,6 +143,9 @@ export const SETTINGS_TRANSFER_REGISTRY = [
   ...domain('styles.surfaces', [
     field('styles.surfaces', 'items', { kind: 'collection', dynamicItems: true }),
   ]),
+  ...domain('styles.video-effects', [
+    field('styles.video-effects', 'items', { kind: 'collection', dynamicItems: true }),
+  ]),
   ...domain('styles.gradients', [
     field('styles.gradients', 'items', { kind: 'collection', dynamicItems: true }),
   ]),

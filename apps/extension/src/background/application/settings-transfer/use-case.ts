@@ -1,3 +1,4 @@
+import { initDB } from '../../../composition/persistence/infrastructure/indexed-db/core';
 import { runtimeInfo } from '@sniptale/platform/browser/runtime';
 import type {
   SettingsTransferCommitReport,
@@ -94,8 +95,9 @@ async function commitSettingsTransfer(
     throw new Error('Exact restore requires a complete backup and destructive confirmation');
   }
   const imported = parseSettingsTransferDomains(transferPackage.domains);
+  await initDB();
   return runWithExclusivePersistenceMutationPermit(async (permit) => {
-    const current = await readSettingsTransferSnapshot();
+    const current = await readSettingsTransferSnapshot(permit);
     const currentDomains = parseSettingsTransferDomains(current.domains);
     if (
       message.strategy === 'exact-restore' &&

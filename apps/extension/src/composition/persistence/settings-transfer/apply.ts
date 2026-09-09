@@ -1,3 +1,7 @@
+import { parseStoredHighlighterSettings } from '../highlighter/guards';
+import { resolveLoadedHighlighterSettings } from '../highlighter/resolved';
+import { serializeHighlighterSettings } from '../highlighter/mutation-write';
+import { prepareEffectSettingsMutation } from '../effect-bundles/settings-transfer';
 import type {
   SettingsTransferChangeSummary,
   SettingsTransferDomainPayload,
@@ -71,6 +75,11 @@ export async function applySettingsTransferDomains(args: {
       })
     : null;
   assertStorageBudget(syncWrites, localWrites);
+  const effectData = args.domains['styles.video-effects'];
+  const effectPlan = effectData
+    ? await prepareEffectSettingsMutation(effectData.data, args.permit)
+    : null;
+  let effectsCommitted = false;
 
   let syncCommitted = false;
   let providerCommitted = false;
@@ -88,6 +97,10 @@ export async function applySettingsTransferDomains(args: {
       await browserStorage.local.set(localWrites, args.permit);
       localCommitted = true;
     }
+    if (effectPlan) {
+      await effectPlan.commit();
+      effectsCommitted = true;
+    }
     args.summary.clearedAiSecretBindings.push(...(providerPlan?.clearedProviderIds ?? []));
     args.summary.missingAiSecretBindings.push(...(providerPlan?.missingProviderIds ?? []));
   } catch (error) {
@@ -99,6 +112,7 @@ export async function applySettingsTransferDomains(args: {
         rollbackFailed = true;
       }
     };
+    if (effectsCommitted && effectPlan) await compensate(() => effectPlan.rollback());
     if (localCommitted)
       await compensate(() => restoreArea('local', beforeLocal, LOCAL_KEYS, args.permit));
     if (providerCommitted && providerPlan) await compensate(() => providerPlan.rollback());
@@ -266,7 +280,19 @@ function applyVideoWrites(context: WriteBuildContext): void {
 
 function applyStyleWrites(context: WriteBuildContext): void {
   const { data, localWrites, syncWrites } = context;
-  assign(syncWrites, 'sniptale_highlighter_settings', data('styles.borders'));
+  const borders = data('styles.borders');
+  if (borders) {
+    const parsed = parseStoredHighlighterSettings(borders);
+    if (parsed.hasInvalidRoot || parsed.invalidFieldCount > 0)
+      throw new TypeError('Invalid border catalog transfer state');
+    syncWrites['sniptale_highlighter_settings'] = serializeHighlighterSettings(
+      resolveLoadedHighlighterSettings(
+        parsed.value.borderPresets,
+        parsed.value.defaultBorderPresetId,
+        parsed.value
+      )
+    );
+  }
   const callouts = data('styles.callouts');
   if (callouts)
     syncWrites['sniptale_callout_presets'] = serializeCalloutPresetCatalog(

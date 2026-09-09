@@ -14,8 +14,12 @@ export function describeCatalogDocument(
   // The SDK collection explicitly names theme variants with these suffixes; other IDs are unclassified.
   const variant = /(?:[._-])(light|dark)$/.exec(document.id)?.[1];
   const theme = variant === 'light' || variant === 'dark' ? variant : 'unspecified';
+  const label = parsed?.label[locale] ?? parsed?.label.en ?? document.id;
   return {
-    label: parsed?.label[locale] ?? parsed?.label.en ?? document.id,
+    label:
+      theme === 'unspecified'
+        ? label
+        : label.replace(/\s*·\s*(?:Dark|Light|Тёмная|Темная|Светлая)$/iu, ''),
     description: parsed?.description?.[locale] ?? parsed?.description?.en ?? '',
     theme,
   };
@@ -36,4 +40,15 @@ export function queryEffectCatalog(
       )
     );
   });
+}
+
+export function getEffectCatalogThemes(
+  catalogs: readonly EffectBundleCatalogEntry[]
+): Exclude<EffectCatalogFilter['theme'], 'all'>[] {
+  const present = new Set(
+    catalogs.flatMap((catalog) =>
+      catalog.documents.map((document) => describeCatalogDocument(document, 'en').theme)
+    )
+  );
+  return (['light', 'dark', 'unspecified'] as const).filter((theme) => present.has(theme));
 }

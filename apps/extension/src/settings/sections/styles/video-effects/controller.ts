@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   deleteEffectBundle,
-  getEffectBundle,
   listEffectBundles,
   setEffectBundleEnabled,
 } from '../../../../composition/persistence/effect-bundles';
@@ -9,7 +8,6 @@ import {
   importEffectFiles,
   type EffectFileImportResult,
 } from '../../../../composition/persistence/effect-bundles/import-files';
-import { exportEffectCatalog } from '../../../../features/video/project/effect-bundle/catalog/export';
 import type { EffectBundleCatalogListItem } from '../../../../features/video/project/effect-bundle/catalog';
 import { translate } from '../../../../platform/i18n';
 
@@ -19,7 +17,7 @@ export function useVideoEffectsSettings() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<EffectFileImportResult[]>([]);
-  const lifetime = useRef({ active: true, revision: 0, url: null as string | null });
+  const lifetime = useRef({ active: true, revision: 0 });
   const pending = useRef(false);
   const reload = useCallback(async () => {
     const owner = lifetime.current;
@@ -39,7 +37,7 @@ export function useVideoEffectsSettings() {
     }
   }, []);
   useEffect(() => {
-    const owner = { active: true, revision: 0, url: null as string | null };
+    const owner = { active: true, revision: 0 };
     lifetime.current = owner;
     void reload();
     window.addEventListener('focus', reload);
@@ -47,7 +45,6 @@ export function useVideoEffectsSettings() {
       owner.active = false;
       owner.revision++;
       window.removeEventListener('focus', reload);
-      if (owner.url) URL.revokeObjectURL(owner.url);
     };
   }, [reload]);
   const run = async (operation: () => Promise<void>) => {
@@ -82,19 +79,5 @@ export function useVideoEffectsSettings() {
       }),
     toggle: (id: string, enabled: boolean) => run(() => setEffectBundleEnabled(id, enabled)),
     remove: (id: string) => run(() => deleteEffectBundle(id)),
-    exportEntry: (id: string) =>
-      run(async () => {
-        const owner = lifetime.current;
-        const catalog = await getEffectBundle(id);
-        if (!catalog) throw new Error('Missing catalog entry');
-        const artifact = await exportEffectCatalog(catalog);
-        if (!owner.active) return;
-        if (owner.url) URL.revokeObjectURL(owner.url);
-        owner.url = URL.createObjectURL(artifact.blob);
-        const link = document.createElement('a');
-        link.href = owner.url;
-        link.download = artifact.filename;
-        link.click();
-      }),
   };
 }

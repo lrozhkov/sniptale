@@ -4,7 +4,7 @@ import { parseSettingsTransferDomains, SettingsTransferDomainError } from './dom
 
 describe('settings transfer registry', () => {
   it('covers every frozen visible Settings domain once', () => {
-    expect(new Set(SETTINGS_TRANSFER_DOMAIN_IDS).size).toBe(24);
+    expect(new Set(SETTINGS_TRANSFER_DOMAIN_IDS).size).toBe(25);
     expect(SETTINGS_TRANSFER_DOMAIN_IDS).toContain('styles.surfaces');
     expect(SETTINGS_TRANSFER_DOMAIN_IDS).toContain('styles.gradients');
     expect(SETTINGS_TRANSFER_DOMAIN_IDS).not.toContain('access.capture-assets');
@@ -85,5 +85,24 @@ describe('settings transfer registry', () => {
         },
       })
     ).toThrow(SettingsTransferDomainError);
+  });
+});
+
+it('accepts the persisted popup export destination in its own settings backup', () => {
+  expect(
+    parseSettingsTransferDomains({
+      'interface.preferences': {
+        schemaVersion: 1,
+        data: {
+          popupStartup: {
+            selection: 'remember-last',
+            lastPage: 'menu',
+            lastExportDestination: 'export',
+          },
+        },
+      },
+    })
+  ).toMatchObject({
+    'interface.preferences': { data: { popupStartup: { lastExportDestination: 'export' } } },
   });
 });
