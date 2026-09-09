@@ -58,6 +58,11 @@ export function ProjectTimelineSurface(props: ProjectTimelineSurfaceProps) {
       <AutoProcessingReviewDock>
         <ProjectTimelineToolbar
           historySelected={props.selection?.kind === 'history-lane'}
+          historyVisible={props.panelPrefs.telemetryLaneVisible}
+          hasHistory={
+            props.project.actionEvents.length > 0 ||
+            props.recordingTelemetry.some((entry) => entry.signals.length > 0)
+          }
           historyActions={{
             project: props.project,
             selection: props.selection,

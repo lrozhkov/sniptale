@@ -16,7 +16,11 @@ export type AutoProcessingHeaderProps = Omit<AutoProcessingWorkflowProps, 'onClo
   onModalVisibilityChange: (visible: boolean) => void;
 };
 export function ProjectTimelineAutoProcessingControl(
-  props: AutoProcessingHeaderProps & { visible?: boolean }
+  props: AutoProcessingHeaderProps & {
+    visible?: boolean;
+    disabled?: boolean;
+    disabledReason?: string;
+  }
 ) {
   const [open, setOpen] = useState(false);
   return (
@@ -25,7 +29,10 @@ export function ProjectTimelineAutoProcessingControl(
         <ContentToolbarButton
           className={toolbarButtonClassName}
           dataUi="video-editor.auto.open"
-          title={translate('videoEditor.timeline.autoTransform')}
+          title={
+            props.disabled ? props.disabledReason : translate('videoEditor.timeline.autoTransform')
+          }
+          disabled={props.disabled}
           onClick={() => setOpen(true)}
         >
           <WandSparkles size={14} aria-hidden="true" />

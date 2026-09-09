@@ -6,6 +6,8 @@ import type { ProjectTimelineInsertionActions } from '../types';
 export interface ProjectTimelineToolbarProps {
   historyActions?: AutoProcessingHeaderProps;
   historySelected?: boolean;
+  historyVisible?: boolean;
+  hasHistory?: boolean;
   playback: ComponentProps<typeof ProjectTimelinePlaybackSummary>;
   canAddMotionRegion: boolean;
   canDeleteSelectedClip: boolean;

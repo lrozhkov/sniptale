@@ -293,11 +293,12 @@ it('shows authored history by default without a sidecar and respects explicit co
   expect(props.project.actionEvents).toHaveLength(1);
 });
 
-it('keeps an empty project compact until history data exists', () => {
+it('keeps enabled empty history selectable for adding the first click', () => {
   const props = createProps();
   props.panelPrefs.telemetryLaneVisible = true;
   mountTimeline(props);
-  expect(container.querySelector('[data-ui="video-editor.timeline.history-row"]')).toBeNull();
+  expect(container.querySelector('[data-ui="video-editor.timeline.history-row"]')).not.toBeNull();
+  expect(container.querySelector('[data-ui="video-editor.timeline.history-lane"]')).not.toBeNull();
 });
 
 it('sizes the track rail by names independently of row height', () => {

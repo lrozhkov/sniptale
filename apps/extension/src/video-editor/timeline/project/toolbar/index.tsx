@@ -27,6 +27,8 @@ type ToolbarTrailingControlsInput = Pick<
 function createToolbarLeadingControlsProps({
   historyActions,
   historySelected,
+  historyVisible,
+  hasHistory,
   canAddMotionRegion,
   canDeleteSelectedClip,
   canEditSelectedClip,
@@ -40,6 +42,8 @@ function createToolbarLeadingControlsProps({
   ProjectTimelineToolbarProps,
   | 'historyActions'
   | 'historySelected'
+  | 'historyVisible'
+  | 'hasHistory'
   | 'canAddMotionRegion'
   | 'canDeleteSelectedClip'
   | 'canEditSelectedClip'
@@ -53,6 +57,8 @@ function createToolbarLeadingControlsProps({
   return {
     ...(historyActions ? { historyActions } : {}),
     historySelected: historySelected ?? false,
+    historyVisible: historyVisible ?? false,
+    hasHistory: hasHistory ?? false,
     canAddMotionRegion,
     canDeleteSelectedClip,
     canEditSelectedClip,

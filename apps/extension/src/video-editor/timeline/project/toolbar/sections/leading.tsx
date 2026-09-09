@@ -12,6 +12,8 @@ import { ProjectTimelineClipActions } from './clip-actions';
 export function ProjectTimelineToolbarLeadingControls({
   historyActions,
   historySelected,
+  historyVisible,
+  hasHistory,
   canAddMotionRegion,
   canDeleteSelectedClip,
   canEditSelectedClip,
@@ -25,6 +27,8 @@ export function ProjectTimelineToolbarLeadingControls({
   ProjectTimelineToolbarProps,
   | 'historyActions'
   | 'historySelected'
+  | 'historyVisible'
+  | 'hasHistory'
   | 'canAddMotionRegion'
   | 'canDeleteSelectedClip'
   | 'canEditSelectedClip'
@@ -40,15 +44,23 @@ export function ProjectTimelineToolbarLeadingControls({
       {historyActions ? (
         <ProjectTimelineAutoProcessingControl
           {...historyActions}
-          visible={historySelected ?? false}
+          visible={hasHistory ?? false}
+          disabled={!historySelected}
+          disabledReason={translate('videoEditor.timeline.historySelectTrack')}
         />
       ) : null}
-      {historyActions && historySelected ? (
+      {historyActions && historyVisible ? (
         <ContentToolbarButton
           className={toolbarButtonClassName}
           dataUi="video-editor.timeline.toolbar.add-click"
-          title={translate('videoEditor.timeline.historyAddClick')}
-          disabled={getVideoProjectUtilityLanes(historyActions.project).actions.locked}
+          title={translate(
+            !historySelected
+              ? 'videoEditor.timeline.historySelectTrack'
+              : 'videoEditor.timeline.historyAddClick'
+          )}
+          disabled={
+            !historySelected || getVideoProjectUtilityLanes(historyActions.project).actions.locked
+          }
           onClick={() =>
             insertion.onAddActionEvent(
               getVideoProjectActionPresentation(historyActions.project).clickPreset
