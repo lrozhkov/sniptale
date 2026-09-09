@@ -24,8 +24,8 @@ export function ProjectTimelineRuler(props: {
     <div
       data-ui="video-editor.timeline.ruler"
       className={[
-        'sticky top-0 z-40 flex h-[30px] items-end overflow-hidden border-b',
-        'border-[var(--sniptale-color-border-soft)]',
+        'sticky top-0 z-40 flex h-[30px] items-end overflow-hidden',
+        'shadow-[inset_0_-1px_0_var(--sniptale-color-border-soft)]',
         'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-panel)_96%,transparent)]',
         'relative px-0',
       ].join(' ')}

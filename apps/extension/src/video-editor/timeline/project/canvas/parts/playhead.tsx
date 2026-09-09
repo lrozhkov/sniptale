@@ -45,9 +45,9 @@ export function ProjectTimelinePlayheadHandle(props: {
       aria-valuetext={formatPreciseTime(props.currentTime)}
       className={[
         'absolute top-0 z-10 h-[30px] w-3 cursor-ew-resize',
-        'before:absolute before:inset-x-0 before:top-0 before:h-[8px]',
+        'before:absolute before:inset-x-0 before:top-0 before:h-[8px] before:translate-x-[0.5px]',
         'before:bg-[var(--sniptale-color-accent-emphasis)] before:[clip-path:polygon(0_0,100%_0,50%_100%)]',
-        'after:absolute after:left-1/2 after:top-[8px] after:h-[22px] after:w-px',
+        'after:absolute after:left-1/2 after:top-[6px] after:h-[24px] after:w-px',
         'after:bg-[var(--sniptale-color-accent-emphasis)]',
         'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2',
         'focus-visible:outline-[var(--sniptale-color-focus-ring)]',
