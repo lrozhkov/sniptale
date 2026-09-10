@@ -66,3 +66,25 @@ it('does not pause a newer request when an old resume completes', async () => {
   await flushPreviewAudioGraphTasks();
   expect(play).toHaveBeenCalledOnce();
 });
+
+it('treats media preparation abort as cancellation and permits playback retry', async () => {
+  installPreviewAudioContextHarness();
+  const state = createPreviewAudioGraphState();
+  const audio = document.createElement('audio');
+  const play = vi
+    .spyOn(audio, 'play')
+    .mockRejectedValueOnce(new DOMException('interrupted by pause', 'AbortError'))
+    .mockResolvedValueOnce(undefined);
+  ensurePreviewAudioGraphNode(state, 'clip', audio);
+  const logger = createLogger({ namespace: 'TestAudio' });
+  const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+  requestPreviewAudioDriverPlayback(state, 'clip', audio, logger);
+  await flushPreviewAudioGraphTasks();
+  expect(warn).not.toHaveBeenCalled();
+  expect(state.warned).toBe(false);
+  expect(state.pendingPlayClipIds.has('clip')).toBe(false);
+  requestPreviewAudioDriverPlayback(state, 'clip', audio, logger);
+  await flushPreviewAudioGraphTasks();
+  expect(play).toHaveBeenCalledTimes(2);
+  expect(state.pendingPlayClipIds.has('clip')).toBe(false);
+});

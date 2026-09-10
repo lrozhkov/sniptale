@@ -103,6 +103,8 @@ export function requestPreviewAudioDriverPlayback(
       return element.play();
     })
     .catch((error) => {
+      // Media priming can pause or reload the element without a driver-version change.
+      if (error instanceof DOMException && error.name === 'AbortError') return;
       if (requestVersion === state.playRequestVersions.get(clipId)) {
         warnPreviewAudioDriver(state, logger, 'Preview audio driver play() rejected', error);
       }
