@@ -1,7 +1,5 @@
-import {
-  createEffectRuntimeFailure,
-  getEffectRuntimeIdentity,
-} from '../../contracts/effect-runtime/identity';
+import { returnEffectRuntimeRetryInputs } from '../../contracts/effect-runtime/retry-inputs';
+import { createEffectRuntimeFailure } from '../../contracts/effect-runtime/identity';
 import { closeEffectRuntimeBitmaps } from '../../contracts/effect-runtime/bitmap-lifetime';
 import type { EffectRuntimeFrameResult } from '../../contracts/effect-runtime/types';
 import { drawImageAsset } from './assets/render-assets';
@@ -103,15 +101,10 @@ function createResolutionFailure(
   value: unknown,
   resolution: Exclude<ReturnType<typeof resolveEffectRuntimeWorkerRequest>, { ok: true }>
 ): EffectRuntimeFrameResult {
+  if (resolution.code === 'cacheMiss')
+    return returnEffectRuntimeRetryInputs(value, resolution.missingRef);
   closeEffectRuntimeBitmaps(value);
-  return resolution.code === 'cacheMiss'
-    ? {
-        ...getEffectRuntimeIdentity(value),
-        code: 'cacheMiss',
-        kind: 'error',
-        missingRef: resolution.missingRef,
-      }
-    : createEffectRuntimeFailure(value, resolution.code);
+  return createEffectRuntimeFailure(value, resolution.code);
 }
 
 export function executeEffectRuntimeWorkerRequest(

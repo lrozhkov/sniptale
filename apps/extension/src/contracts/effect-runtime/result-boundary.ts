@@ -1,3 +1,4 @@
+import { parseEffectRuntimeRetryInputs } from './retry-inputs';
 // policyStateIds: [] - result codes and key lists are immutable parser allowlists, not authority state.
 import { hasExactKeys, isRecord, parseEffectRuntimeIdentity } from './identity';
 import { isImageBitmap } from './bitmap-lifetime';
@@ -53,12 +54,26 @@ function parseEffectRuntimeErrorResult(
 ): EffectRuntimeFrameResult | null {
   if (value['code'] === 'cacheMiss') {
     if (
-      !hasExactKeys(value, CACHE_MISS_KEYS) ||
+      !hasExactKeys(
+        value,
+        value['retryInputs'] === undefined ? CACHE_MISS_KEYS : [...CACHE_MISS_KEYS, 'retryInputs']
+      ) ||
       (value['missingRef'] !== 'assetSelection' && value['missingRef'] !== 'document')
     ) {
       return null;
     }
-    return { ...identity, code: 'cacheMiss', kind: 'error', missingRef: value['missingRef'] };
+    const retryInputs =
+      value['retryInputs'] === undefined
+        ? undefined
+        : parseEffectRuntimeRetryInputs(value['retryInputs']);
+    if (retryInputs === null) return null;
+    return {
+      ...identity,
+      code: 'cacheMiss',
+      kind: 'error',
+      missingRef: value['missingRef'],
+      ...(retryInputs ? { retryInputs } : {}),
+    };
   }
   if (
     !hasExactKeys(value, FAILURE_KEYS) ||

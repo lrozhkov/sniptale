@@ -1,3 +1,4 @@
+import { collectEffectRuntimeResultBitmaps } from '../../contracts/effect-runtime/retry-inputs';
 import { EFFECT_RUNTIME_WORKER_RESPONSE } from '../../contracts/effect-runtime/types';
 import { closeEffectRuntimeBitmaps } from '../../contracts/effect-runtime/bitmap-lifetime';
 import { createEffectRuntimeFailure } from '../../contracts/effect-runtime/identity';
@@ -20,11 +21,11 @@ self.onmessage = (event: MessageEvent<unknown>) => {
     return;
   }
   void executionState.execute(event.data).then((result) => {
-    const transfer = result.kind === 'frame' ? [result.bitmap] : [];
+    const transfer = collectEffectRuntimeResultBitmaps(result);
     try {
       self.postMessage({ result, type: EFFECT_RUNTIME_WORKER_RESPONSE }, { transfer });
     } catch {
-      if (result.kind === 'frame') result.bitmap.close();
+      closeEffectRuntimeBitmaps(result);
     }
   });
 };

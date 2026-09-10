@@ -55,6 +55,7 @@ function failureResponse(
       effectInstanceId: request.effectInstanceId,
       kind: 'error',
       missingRef,
+      retryInputs: request.inputFrames,
       requestId: request.requestId,
       sequenceId: request.sequenceId,
       snapshotId: request.snapshotId,
@@ -157,7 +158,7 @@ it('replays inputs and fresh immutable bytes when only the document acknowledgem
     documentRef: { source: '{}' },
     inputFrames: { source: expect.any(Object) },
   });
-  expect(requests[10]!.inputFrames.source?.bitmap).not.toBe(bitmap);
+  expect(requests[10]!.inputFrames.source?.bitmap).toBe(bitmap);
   expect(materialize).toHaveBeenCalledTimes(2);
   manager.dispose();
   ports.forEach((port) => port.close());
@@ -224,6 +225,50 @@ it('rejects and closes a late frame from a session cleared by another active req
   latePort.postMessage(frameResponse(requests[1], lateBitmap));
   await expect(second).resolves.toMatchObject({ code: 'stale' });
   expect(lateBitmap.close).toHaveBeenCalledOnce();
+  manager.dispose();
+  ports.forEach((port) => port.close());
+});
+
+it('does not clone input bitmaps on a successful warmed request', async () => {
+  const manager = new EffectRuntimeSandboxSessionManager(document, {
+    loadTimeoutMs: 100,
+    requestTimeoutMs: 100,
+  });
+  const first = manager.renderFrame(commandWithRefs(0));
+  const iframe = document.querySelector('iframe');
+  if (!iframe?.contentWindow) throw new Error('Expected iframe');
+  const requests: EffectRuntimeRenderMessage[] = [];
+  const ports: MessagePort[] = [];
+  installSandboxResponder(iframe, requests, ports, (request) => frameResponse(request));
+  iframe.dispatchEvent(new Event('load'));
+  await first;
+  await expect(
+    manager.renderFrame(commandWithRefs(0, createSandboxInputBitmap()))
+  ).resolves.toMatchObject({ kind: 'frame' });
+  expect(createImageBitmap).not.toHaveBeenCalled();
+  manager.dispose();
+  ports.forEach((port) => port.close());
+});
+
+it('closes returned inputs from a stale response instead of retrying another request', async () => {
+  const manager = new EffectRuntimeSandboxSessionManager(document, {
+    loadTimeoutMs: 100,
+    requestTimeoutMs: 100,
+  });
+  const bitmap = createSandboxInputBitmap();
+  const result = manager.renderFrame(commandWithRefs(0, bitmap));
+  const iframe = document.querySelector('iframe');
+  if (!iframe?.contentWindow) throw new Error('Expected iframe');
+  const requests: EffectRuntimeRenderMessage[] = [];
+  const ports: MessagePort[] = [];
+  installSandboxResponder(iframe, requests, ports, (request) => ({
+    ...failureResponse(request, 'cacheMiss', 'document'),
+    requestId: 'unrelated',
+  }));
+  iframe.dispatchEvent(new Event('load'));
+  await expect(result).resolves.toMatchObject({ code: 'stale' });
+  expect(bitmap.close).toHaveBeenCalledOnce();
+  expect(requests).toHaveLength(1);
   manager.dispose();
   ports.forEach((port) => port.close());
 });

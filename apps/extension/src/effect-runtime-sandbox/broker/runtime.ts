@@ -1,3 +1,4 @@
+import { collectEffectRuntimeResultBitmaps } from '../../contracts/effect-runtime/retry-inputs';
 import {
   createEffectRuntimeFailure,
   hasExactKeys,
@@ -101,8 +102,8 @@ function executeRequest(
 
 function postResult(port: MessagePort, result: EffectRuntimeFrameResult): void {
   try {
-    port.postMessage(result, result.kind === 'frame' ? [result.bitmap] : []);
+    port.postMessage(result, collectEffectRuntimeResultBitmaps(result));
   } catch {
-    if (result.kind === 'frame') result.bitmap.close();
+    closeEffectRuntimeBitmaps(result);
   }
 }
