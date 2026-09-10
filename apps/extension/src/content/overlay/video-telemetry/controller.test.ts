@@ -30,7 +30,9 @@ it('records cursor samples and click actions across enable pause resume and disa
 
   controller.enable('recording-1');
   document.dispatchEvent(createPointerLikeEvent(40, 60));
-  document.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 40, clientY: 60 }));
+  document.dispatchEvent(
+    new MouseEvent('click', { bubbles: true, detail: 1, clientX: 40, clientY: 60 })
+  );
   controller.pause();
   vi.advanceTimersByTime(24);
   document.dispatchEvent(createPointerLikeEvent(90, 120));
@@ -96,7 +98,9 @@ it('throttles high-frequency pointer samples while preserving click capture', ()
   document.dispatchEvent(createPointerLikeEvent(11, 11));
   vi.advanceTimersByTime(10);
   document.dispatchEvent(createPointerLikeEvent(12, 12));
-  document.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 12, clientY: 12 }));
+  document.dispatchEvent(
+    new MouseEvent('click', { bubbles: true, detail: 1, clientX: 12, clientY: 12 })
+  );
 
   const snapshot = controller.disable();
 
@@ -107,7 +111,9 @@ it('throttles high-frequency pointer samples while preserving click capture', ()
 it('returns stable initial viewport proof for an unchanged recording', () => {
   const controller = createVideoTelemetryController();
   controller.enable('static-recording');
-  document.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 40, clientY: 60 }));
+  document.dispatchEvent(
+    new MouseEvent('click', { bubbles: true, detail: 1, clientX: 40, clientY: 60 })
+  );
   expect(controller.disable()).toMatchObject({
     viewportObservation: {
       initial: {
