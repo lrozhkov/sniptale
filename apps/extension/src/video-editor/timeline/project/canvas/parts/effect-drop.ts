@@ -19,10 +19,21 @@ export function createTrackEffectDropHandlers(args: {
   pixelsPerSecond: number;
   onDrop: ProjectTimelineProps['onDropEffectDocument'];
   resolveTimelineLaneId?: (event: React.DragEvent<HTMLDivElement>) => string | null;
-  onHighlight(trackId: string | null): void;
+  onHighlight(trackId: string | null, clipId?: string | null): void;
 }) {
   const editable =
     args.track.kind === 'PRIMARY' && !args.track.locked && args.track.role !== 'CAMERA';
+  const resolveClip = (event: React.DragEvent<HTMLDivElement>) => {
+    if (args.header) return undefined;
+    const element =
+      event.target instanceof Element ? event.target.closest('[data-project-timeline-clip]') : null;
+    return args.project.clips.find(
+      (clip) =>
+        clip.id === element?.getAttribute('data-project-timeline-clip') &&
+        clip.trackId === args.track.id &&
+        clip.type !== 'AUDIO'
+    );
+  };
   return {
     onDragOver(event: React.DragEvent<HTMLDivElement>): boolean {
       if (!hasVideoEditorEffectDocumentDragType(event.dataTransfer)) return false;
@@ -39,7 +50,10 @@ export function createTrackEffectDropHandlers(args: {
       }
       event.preventDefault();
       event.dataTransfer.dropEffect = 'copy';
-      args.onHighlight(args.track.id);
+      args.onHighlight(
+        args.track.id,
+        args.dragKind === 'targetEffect' ? (resolveClip(event)?.id ?? null) : null
+      );
       return true;
     },
     onDrop(event: React.DragEvent<HTMLDivElement>): boolean {
@@ -64,17 +78,8 @@ export function createTrackEffectDropHandlers(args: {
           args.resolveTimelineLaneId?.(event) ?? null
         );
       } else if (payload.kind === 'targetEffect') {
-        const element =
-          event.target instanceof Element
-            ? event.target.closest('[data-project-timeline-clip]')
-            : null;
-        const clip = args.project.clips.find(
-          (clip) =>
-            clip.id === element?.getAttribute('data-project-timeline-clip') &&
-            clip.trackId === args.track.id
-        );
-        if (clip && clip.type !== 'AUDIO')
-          args.onDrop(payload, { kind: 'clip', clipId: clip.id }, clip.startTime);
+        const clip = resolveClip(event);
+        if (clip) args.onDrop(payload, { kind: 'clip', clipId: clip.id }, clip.startTime);
         else args.onDrop(payload, { kind: 'track', trackId: args.track.id }, time);
       }
       return true;

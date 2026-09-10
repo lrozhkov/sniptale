@@ -72,9 +72,10 @@ interface ProjectTimelineTrackLaneProps extends Omit<
   'trackLayoutModel' | 'tracks'
 > {
   dropActive: boolean;
+  dropClipId: string | null;
   track: VideoProject['tracks'][number];
   trackLayout: TimelineTrackLayout | undefined;
-  onSetDropTrackId: (trackId: string | null) => void;
+  onSetDropTrackId: (trackId: string | null, clipId?: string | null) => void;
 }
 
 export function ProjectTimelineTrackLanes(props: ProjectTimelineTrackLanesProps) {
@@ -82,7 +83,20 @@ export function ProjectTimelineTrackLanes(props: ProjectTimelineTrackLanesProps)
   const globalOwner = resolveEffectOwner(props.project, { kind: 'video-group' });
   const canDropGlobal =
     drag?.kind === 'targetEffect' && globalOwner && !globalOwner.locked && globalOwner.duration > 0;
-  const [dropTrackId, setDropTrackId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{
+    trackId: string;
+    clipId: string | null;
+    drag: typeof drag;
+  } | null>(null);
+  const setDropTrackId = (trackId: string | null, clipId: string | null = null) => {
+    setDropTarget((previous) =>
+      previous?.trackId === trackId && previous?.clipId === clipId && previous?.drag === drag
+        ? previous
+        : trackId
+          ? { trackId, clipId, drag }
+          : null
+    );
+  };
   return (
     <>
       {props.tracks.map((track) => (
@@ -101,7 +115,14 @@ export function ProjectTimelineTrackLanes(props: ProjectTimelineTrackLanesProps)
           timelinePreviews={props.timelinePreviews}
           track={track}
           trackLayout={props.trackLayoutModel.layoutByTrackId.get(track.id)}
-          dropActive={dropTrackId === track.id}
+          dropActive={dropTarget?.drag === drag && dropTarget?.trackId === track.id}
+          dropClipId={
+            drag?.kind === 'targetEffect' &&
+            dropTarget?.drag === drag &&
+            dropTarget?.trackId === track.id
+              ? dropTarget.clipId
+              : null
+          }
           onBeginClipInteraction={props.onBeginClipInteraction}
           onBeginEffectInteraction={props.onBeginEffectInteraction}
           onBeginTrackRangeSelection={props.onBeginTrackRangeSelection}
@@ -183,7 +204,7 @@ function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
           props.selection,
           props.selectedTrackId,
           props.track.id,
-          props.dropActive
+          props.dropActive && !props.dropClipId
         )
       }
       data-track-lane-id={props.track.id}
@@ -256,7 +277,9 @@ function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
         pixelsPerSecond={props.pixelsPerSecond}
         projection={props.projection}
         project={displayProject}
-        hoveredClipId={props.dragGhost?.activeReorder ? null : props.hoveredClipId}
+        hoveredClipId={
+          props.dragGhost?.activeReorder ? null : (props.dropClipId ?? props.hoveredClipId)
+        }
         selectedClipId={
           props.dragGhost?.activeReorder ? props.dragGhost.clipId : props.selectedClipId
         }

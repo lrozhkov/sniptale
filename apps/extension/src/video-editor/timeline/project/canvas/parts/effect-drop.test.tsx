@@ -84,18 +84,26 @@ it('applies video effects to the actual clip under the pointer', async () => {
   const project = createEmptyVideoProject('FX');
   project.clips = [createVideoClip({ id: 'video', trackId: project.tracks[0]!.id, startTime: 2 })];
   const onDrop = vi.fn();
+  const onHighlight = vi.fn();
   const h = createTrackEffectDropHandlers({
     project,
     track: project.tracks[0]!,
     pixelsPerSecond: 50,
+    dragKind: 'targetEffect',
     onDrop,
-    onHighlight: vi.fn(),
+    onHighlight,
   });
   const e = event('targetEffect');
   const clip = document.createElement('div');
   clip.setAttribute('data-project-timeline-clip', 'video');
   Object.defineProperty(e, 'target', { value: clip });
+  h.onDragOver(e);
+  expect(onHighlight).toHaveBeenLastCalledWith(project.tracks[0]!.id, 'video');
+  h.onDragOver(event('targetEffect'));
+  expect(onHighlight).toHaveBeenLastCalledWith(project.tracks[0]!.id, null);
+  h.onDragOver(e);
   h.onDrop(e);
+  expect(onHighlight).toHaveBeenLastCalledWith(null);
   expect(onDrop).toHaveBeenCalledWith(
     { packId: 'pack', documentId: 'doc', kind: 'targetEffect' },
     { kind: 'clip', clipId: 'video' },
