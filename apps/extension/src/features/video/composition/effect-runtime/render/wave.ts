@@ -23,6 +23,7 @@ export async function renderEffectRuntimeComposition(args: {
   overlayTime: number;
   ownerDocument?: Document;
   rasterScale?: number;
+  signal?: AbortSignal;
   visualPasses: readonly VideoCompositionVisualPass[];
 }): Promise<EffectRuntimeRenderedComposition> {
   const renderedByTime = new Map<number, EffectRuntimeRenderedFrameMap>();
@@ -44,6 +45,7 @@ export async function renderEffectRuntimeComposition(args: {
   }
 
   function renderFrame(frame: VideoCompositionFrame): Promise<EffectRuntimeRenderedFrameMap> {
+    args.signal?.throwIfAborted();
     if ((frame.effectRuntimePlans ?? []).length === 0) {
       return Promise.resolve(EMPTY_EFFECT_RUNTIME_FRAMES);
     }
@@ -63,6 +65,7 @@ export async function renderEffectRuntimeComposition(args: {
       }),
       plans,
       resourceScope,
+      ...(args.signal ? { signal: args.signal } : {}),
     });
   }
 }

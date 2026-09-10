@@ -192,5 +192,6 @@ async function resolvePreviewEffectRuntimeFrames(
       stage: params.stage,
     }),
     visualPasses: renderPasses.visualPasses,
+    ...(params.signal ? { signal: params.signal } : {}),
   });
 }

@@ -49,21 +49,6 @@ export function withCommandStyle(
   }
 }
 
-export async function withSavedState(
-  command: CommandStyleSource,
-  layer: RuntimeLayerState | null,
-  state: RenderState,
-  draw: () => Promise<void>
-): Promise<void> {
-  state.context.save();
-  try {
-    applyCommandStyle(command, layer, state);
-    await draw();
-  } finally {
-    state.context.restore();
-  }
-}
-
 function applyCommandStyle(
   command: CommandStyleSource,
   layer: RuntimeLayerState | null,

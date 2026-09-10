@@ -44,6 +44,7 @@ export async function renderEffectRuntimeFramePlans(args: {
   inputMaterializer: EffectRuntimeInputMaterializer;
   plans: readonly EffectRuntimeFramePlan[];
   resourceScope?: EffectRuntimeFrameResourceScope;
+  signal?: AbortSignal;
 }): Promise<EffectRuntimeRenderedFrameMap> {
   const frames: MutableEffectRuntimeRenderedFrames = new Map();
   const { directPlans, targetPlans } = partitionFramePlans(
@@ -57,7 +58,7 @@ export async function renderEffectRuntimeFramePlans(args: {
   ).targetPlans;
   const standalonePlans = directPlans.filter((plan) => plan.kind === 'standalone');
   const transitionPlans = directPlans.filter((plan) => plan.kind === 'transition');
-  const executePlan = createPlanExecutor(args.executor);
+  const executePlan = createPlanExecutor(args.executor, args.signal);
   const resourceScope =
     args.resourceScope ?? createEffectRuntimeCompositionResourceLedger().createFrameScope();
   try {
@@ -66,7 +67,8 @@ export async function renderEffectRuntimeFramePlans(args: {
       args.inputMaterializer,
       executePlan,
       frames,
-      resourceScope
+      resourceScope,
+      args.signal
     );
     const targetFailure = directFailure
       ? null
@@ -75,7 +77,8 @@ export async function renderEffectRuntimeFramePlans(args: {
           args.inputMaterializer,
           executePlan,
           frames,
-          resourceScope
+          resourceScope,
+          args.signal
         );
     const transitionFailure =
       directFailure || targetFailure
@@ -85,7 +88,8 @@ export async function renderEffectRuntimeFramePlans(args: {
             args.inputMaterializer,
             executePlan,
             frames,
-            resourceScope
+            resourceScope,
+            args.signal
           );
     const trackFailure =
       directFailure || targetFailure || transitionFailure
@@ -95,7 +99,8 @@ export async function renderEffectRuntimeFramePlans(args: {
             args.inputMaterializer,
             executePlan,
             frames,
-            resourceScope
+            resourceScope,
+            args.signal
           );
     const videoFailure =
       directFailure || targetFailure || transitionFailure || trackFailure
@@ -105,11 +110,13 @@ export async function renderEffectRuntimeFramePlans(args: {
             args.inputMaterializer,
             executePlan,
             frames,
-            resourceScope
+            resourceScope,
+            args.signal
           );
     const failure =
       directFailure ?? targetFailure ?? transitionFailure ?? trackFailure ?? videoFailure;
     if (failure) throw new EffectRuntimeFrameBatchError([failure]);
+    args.signal?.throwIfAborted();
     return frames;
   } catch (error) {
     disposeEffectRuntimeRenderedFrames(frames);
@@ -123,9 +130,13 @@ type ExecuteFramePlan = (
 ) => Promise<EffectRuntimeFrameResult>;
 type MutableEffectRuntimeRenderedFrames = Map<string, EffectRuntimeRenderedFrame>;
 
-function createPlanExecutor(executor: EffectRuntimeSandboxExecutor): ExecuteFramePlan {
+function createPlanExecutor(
+  executor: EffectRuntimeSandboxExecutor,
+  signal?: AbortSignal
+): ExecuteFramePlan {
   let sequenceId = 0;
   return async (plan: EffectRuntimeFramePlan, inputFrames: EffectRuntimeFrameInputs) => {
+    signal?.throwIfAborted();
     let message;
     try {
       message = await createEffectRuntimeRenderMessage({
@@ -137,6 +148,7 @@ function createPlanExecutor(executor: EffectRuntimeSandboxExecutor): ExecuteFram
     } catch {
       throw new Error('EFFECT_RUNTIME_REQUEST_BUILD_FAILED');
     }
+    signal?.throwIfAborted();
     return executor.renderFrame(message);
   };
 }
@@ -171,9 +183,11 @@ async function renderDirectFramePlans(
   materializer: EffectRuntimeInputMaterializer,
   executePlan: ExecuteFramePlan,
   frames: MutableEffectRuntimeRenderedFrames,
-  resourceScope: EffectRuntimeFrameResourceScope
+  resourceScope: EffectRuntimeFrameResourceScope,
+  signal?: AbortSignal
 ): Promise<EffectRuntimeFrameError | null> {
   for (const plan of plans) {
+    signal?.throwIfAborted();
     const inputFrames: EffectRuntimeFrameInputs =
       plan.kind === 'transition'
         ? await materializeTransitionFrameInputs(materializer, plan, frames)
@@ -211,9 +225,11 @@ async function renderTargetFrameChains(
   materializer: EffectRuntimeInputMaterializer,
   executePlan: ExecuteFramePlan,
   frames: MutableEffectRuntimeRenderedFrames,
-  resourceScope: EffectRuntimeFrameResourceScope
+  resourceScope: EffectRuntimeFrameResourceScope,
+  signal?: AbortSignal
 ): Promise<EffectRuntimeFrameError | null> {
   for (const chain of targetPlans.values()) {
+    signal?.throwIfAborted();
     let source = await materializer.materializeTargetSource(chain[0]!, frames);
     let finalPlan: EffectRuntimeFramePlan | null = null;
     for (const plan of chain) {

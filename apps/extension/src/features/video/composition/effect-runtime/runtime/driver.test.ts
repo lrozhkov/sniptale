@@ -325,3 +325,68 @@ it('orders clip, junction, track and global stages regardless of catalog inserti
   });
   expect(requests).toEqual(['clip', 'junction', 'track', 'global']);
 });
+
+it.each([1, 2, 3])(
+  'stops an aborted job after step %i and releases completed frames',
+  async (stopAt) => {
+    const controller = new AbortController();
+    const fixture = createOrderedExecutor();
+    const execute = fixture.executor.renderFrame;
+    fixture.executor.renderFrame = vi.fn(async (request) => {
+      const result = await execute(request);
+      if (fixture.requests.length === stopAt) controller.abort();
+      return result;
+    });
+    const materializeTargetSource = vi.fn(async () => bitmap('base', 200, 100));
+    await expect(
+      renderEffectRuntimeFramePlans({
+        executor: fixture.executor,
+        inputMaterializer: { materializeTargetSource, materializeTransitionInputs: vi.fn() },
+        plans: createTargetChainPlans(),
+        signal: controller.signal,
+      })
+    ).rejects.toThrow();
+    expect(fixture.requests).toHaveLength(stopAt);
+    expect(fixture.outputs.standalone.close).toHaveBeenCalledOnce();
+    if (stopAt >= 2) expect(fixture.outputs.target1.close).toHaveBeenCalledOnce();
+    if (stopAt === 3) expect(fixture.outputs.target2.close).toHaveBeenCalledOnce();
+    if (stopAt === 1) expect(materializeTargetSource).not.toHaveBeenCalled();
+  }
+);
+
+it('does not materialize inputs for an already aborted job', async () => {
+  const fixture = createOrderedExecutor();
+  const materializeTargetSource = vi.fn();
+  await expect(
+    renderEffectRuntimeFramePlans({
+      executor: fixture.executor,
+      inputMaterializer: { materializeTargetSource, materializeTransitionInputs: vi.fn() },
+      plans: createTargetChainPlans().slice(1),
+      signal: AbortSignal.abort(),
+    })
+  ).rejects.toThrow();
+  expect(materializeTargetSource).not.toHaveBeenCalled();
+  expect(fixture.requests).toHaveLength(0);
+});
+
+it('releases materialized inputs when cancellation arrives before dispatch', async () => {
+  const fixture = createOrderedExecutor();
+  const controller = new AbortController();
+  const base = bitmap('cancelled-input', 200, 100);
+  await expect(
+    renderEffectRuntimeFramePlans({
+      executor: fixture.executor,
+      inputMaterializer: {
+        materializeTargetSource: async () => {
+          controller.abort();
+          return base;
+        },
+        materializeTransitionInputs: vi.fn(),
+      },
+      plans: createTargetChainPlans().slice(1),
+      signal: controller.signal,
+    })
+  ).rejects.toThrow();
+  expect(fixture.requests).toHaveLength(0);
+  expect(base.close).toHaveBeenCalledOnce();
+});

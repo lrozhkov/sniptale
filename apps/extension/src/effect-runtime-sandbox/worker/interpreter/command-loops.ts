@@ -4,13 +4,13 @@ import { isRecord, n, type RenderState, withItem } from './model.js';
 
 type Command<Op extends EffectV1Command['op']> = Extract<EffectV1Command, { op: Op }>;
 type LoopCommand = Command<'forEach' | 'forGrid' | 'forRange' | 'stableOrderBy'>;
-type ExecuteCommands = (commands: EffectV1Command[], state: RenderState) => Promise<void>;
+type ExecuteCommands = (commands: EffectV1Command[], state: RenderState) => void;
 
-export async function executeCommandLoop(
+export function executeCommandLoop(
   command: LoopCommand,
   state: RenderState,
   executeCommands: ExecuteCommands
-): Promise<void> {
+): void {
   if (command.op === 'forEach') return executeItems(command, command.items, state, executeCommands);
   if (command.op === 'forRange') {
     const indexes = Array.from({ length: Number(command.count) }, (_, index) => index);
@@ -34,24 +34,24 @@ export async function executeCommandLoop(
   );
 }
 
-async function executeGrid(
+function executeGrid(
   command: Command<'forGrid'>,
   state: RenderState,
   executeCommands: ExecuteCommands
-): Promise<void> {
+): void {
   const items: Array<{ column: number; row: number }> = [];
   for (let row = 0; row < command.rows; row += 1) {
     for (let column = 0; column < command.columns; column += 1) items.push({ column, row });
   }
-  await executeItems(command, items, state, executeCommands);
+  executeItems(command, items, state, executeCommands);
 }
 
-async function executeItems(
+function executeItems(
   command: LoopCommand,
   items: unknown[],
   state: RenderState,
   executeCommands: ExecuteCommands
-): Promise<void> {
+): void {
   const previousItem = state.scope.item;
   const previousVars = state.scope.vars;
   try {
@@ -60,7 +60,7 @@ async function executeItems(
       const variable = resolveLoopVariable(command);
       state.scope.vars = { ...previousVars, [variable]: items[index], index };
       if (command.op === 'forGrid') setGridVariables(command, items[index], state);
-      await executeCommands(command.commands, state);
+      executeCommands(command.commands, state);
     }
   } finally {
     state.scope.item = previousItem;

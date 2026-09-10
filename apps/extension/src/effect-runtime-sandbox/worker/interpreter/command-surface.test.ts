@@ -111,7 +111,7 @@ it('executes bounded loops, drawing variants, clipping, passes, and SVG dispatch
   document.layers = [{ id: 'hidden', type: 'customDraw' }];
   const canvas = createCanvas(320, 180, operations);
 
-  await createEffectV1GraphRenderer(document, runtime).renderFrame({
+  const rendering = createEffectV1GraphRenderer(document, runtime).renderFrame({
     assets: { logo: createSvgAsset('logo') },
     controls: {},
     createCanvas: () => canvas,
@@ -125,6 +125,10 @@ it('executes bounded loops, drawing variants, clipping, passes, and SVG dispatch
     track: vi.fn(),
     width: 320,
   });
+
+  const immediateOperations = [...operations];
+  await rendering;
+  expect(immediateOperations).toEqual(operations);
 
   expect(operations).toEqual(
     expect.arrayContaining([
