@@ -62,7 +62,10 @@ function useCurrentTrackIds(project: VideoProject): ReadonlySet<string> {
     .map((track) => track.id)
     .sort()
     .join('\n');
-  return useMemo(() => new Set(trackIdsKey === '' ? [] : trackIdsKey.split('\n')), [trackIdsKey]);
+  return useMemo(
+    () => new Set(['video-group', ...(trackIdsKey === '' ? [] : trackIdsKey.split('\n'))]),
+    [trackIdsKey]
+  );
 }
 
 function useLoadTrackPanelPrefs(

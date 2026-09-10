@@ -1,3 +1,4 @@
+import { getCurrentLocale } from '../platform/i18n';
 import type {
   EffectBundleCatalogEntry,
   EffectBundleCatalogDocumentEntry,
@@ -62,7 +63,8 @@ export function createEffectPreviewSession({
             readDocument().entry,
             frameProgress,
             captured,
-            inputSource
+            inputSource,
+            getCurrentLocale()
           );
           if (active && coverRequest && token) {
             try {

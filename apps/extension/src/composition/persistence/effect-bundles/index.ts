@@ -37,9 +37,19 @@ export async function saveEffectArtifact(
     }
     const entry = {
       ...draft,
+      documents: draft.documents.map((document) => {
+        const presetPreferences = existing?.documents.find(
+          (item) => item.id === document.id
+        )?.presetPreferences;
+        return presetPreferences ? { ...document, presetPreferences } : document;
+      }),
       createdAt: existing?.createdAt ?? now,
       enabled: existing?.enabled ?? true,
     };
+    if (!parseEffectBundleCatalogEntry(entry)) {
+      tx.abort();
+      throw new EffectBundlePersistenceError('catalogEntryInvalid');
+    }
     const allEntriesValue: unknown = await store.getAll();
     if (!Array.isArray(allEntriesValue)) {
       tx.abort();

@@ -1,3 +1,4 @@
+import { resolveEffectOwner } from '../../../../../features/video/project/effect-instance/owner';
 import { useEffect, useRef, useState } from 'react';
 import { getEffectInstanceLabel } from '../../../../../features/video/project/effect-instance/presentation';
 import { resizeClipEffectInterval } from '../../../../../features/video/project/effect-instance/editing';
@@ -15,7 +16,7 @@ import {
 
 export function ClipFxRows(props: {
   project: VideoProject;
-  layout: TimelineTrackLayout;
+  layout: Pick<TimelineTrackLayout, 'fxInstanceIds' | 'fxCollapsed' | 'fxHeight' | 'clipRowHeight'>;
   pixelsPerSecond: number;
   projection?: TimelineProjection | undefined;
   selectedId: string | null;
@@ -44,7 +45,7 @@ function ClipFxInterval(
   const x = props.projection
     ? timelineTimeToViewportX(props.projection, instance.startTime)
     : instance.startTime * props.pixelsPerSecond;
-  const disabled = !instance.enabled || clip.effectsBypassed || !track.visible;
+  const disabled = !instance.enabled || clip.bypassed || !track.visible;
   const collapsed = props.layout.fxCollapsed;
   return (
     <div
@@ -166,10 +167,8 @@ function useClipFxInteraction(
   useEffect(() => () => cleanup.current?.(), []);
   const instance = draft ?? props.instance;
   const target = instance.target;
-  const clip = props.project.clips.find(
-    (clip) => target.kind === 'clip' && clip.id === target.clipId
-  );
-  const track = props.project.tracks.find((track) => track.id === clip?.trackId);
+  const clip = resolveEffectOwner(props.project, target);
+  const track = clip;
   const collapsed = props.layout.fxCollapsed;
   const select = () => actions.selectEffectInstance(instance.id);
   const begin = (event: React.PointerEvent, mode: 'move' | 'start' | 'end') => {

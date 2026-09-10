@@ -1,6 +1,26 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorEffectsLibraryMessages = defineMessageSource({
+  visualPreset: { en: 'Style', ru: 'Стиль' },
+  customPreset: { en: 'Custom', ru: 'Свой' },
+  defaultPreset: { en: 'New instances', ru: 'Новые экземпляры' },
+  templateDefault: { en: 'Template default', ru: 'Как в шаблоне' },
+  presetName: { en: 'Preset name', ru: 'Название пресета' },
+  savePreset: { en: 'Save preset', ru: 'Сохранить пресет' },
+  previewAnnotation: { en: 'Preview annotation', ru: 'Просмотреть аннотацию' },
+  backToCatalog: { en: 'Back to catalog', ru: 'К каталогу' },
+  previewPlay: { en: 'Play preview', ru: 'Воспроизвести' },
+  previewPause: { en: 'Pause preview', ru: 'Пауза' },
+  previewPosition: { en: 'Preview position', ru: 'Позиция предпросмотра' },
+  fallbackTransition: { en: 'Dissolve', ru: 'Растворение' },
+  chooseTransition: { en: 'Choose transition', ru: 'Выбрать переход' },
+  useFallbackTransition: { en: 'Use dissolve', ru: 'Заменить растворением' },
+  wholeTrack: { en: 'Whole track', ru: 'Вся дорожка' },
+  wholeVideo: { en: 'All video', ru: 'Все видеодорожки' },
+  bypassOwner: { en: 'Bypass this FX chain', ru: 'Выключить цепочку FX' },
+  applyTo: { en: 'Apply to', ru: 'Применить к' },
+  selectedClip: { en: 'Selected clip', ru: 'Выбранный фрагмент' },
+  selectedTrack: { en: 'Selected video track', ru: 'Выбранная видеодорожка' },
   fxCount: { en: 'FX · {count}', ru: 'FX · {count}' },
   toggleTimelineEffects: {
     en: 'Show or collapse FX intervals',

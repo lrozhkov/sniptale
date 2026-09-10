@@ -50,3 +50,10 @@ export {
   mapEffectV1ScenePoint,
 } from './object-layout/geometry.js';
 export type { EffectV1ObjectLayout, EffectV1ObjectHandle } from './model/types.js';
+
+export type { EffectControlPreset } from './model/types.js';
+export {
+  validateEffectV1ControlPresetValues,
+  applyEffectV1ControlPresetValues,
+  applyEffectV1ControlPreset,
+} from './model/control-presets.js';

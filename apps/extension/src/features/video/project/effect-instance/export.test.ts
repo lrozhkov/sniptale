@@ -1,6 +1,11 @@
+import { applyInitialEffectPreset } from '../effect-bundle/catalog/presets';
 import { readFileSync } from 'node:fs';
 import { expect, it } from 'vitest';
-import { parseEffectV1Source, sha256EffectV1Bytes } from '@sniptale/runtime-contracts/effect-v1';
+import {
+  parseEffectV1Source,
+  sha256EffectV1Bytes,
+  resolveEffectV1ControlDefault,
+} from '@sniptale/runtime-contracts/effect-v1';
 import { createEmptyVideoProject } from '../factories/creation';
 import { createEffectHostClip } from '../factories/overlay-clip';
 import { importEffectBundleZip, importRawEffectDocument } from '../effect-bundle/import/zip';
@@ -71,7 +76,7 @@ it('bakes derived negative anchor coordinates and preserves layout without mutat
   const bytes = readFileSync(
     new URL(
       '../../../../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/' +
-        'sniptale-callout-light.sniptale-effect.json',
+        'sniptale-callout.sniptale-effect.json',
       import.meta.url
     )
   );
@@ -82,7 +87,14 @@ it('bakes derived negative anchor coordinates and preserves layout without mutat
   const snapshot = project.effectSnapshots![0]!;
   const original = snapshot.source;
   instance.sceneAnchors = { tip: { x: 0, y: 0 } };
-  instance.controls['sequence'] = 2;
+  instance.controls = {
+    ...imported.artifact.document.document.controlPresets!.find(
+      (p) => p.id === 'sniptale-orange-light'
+    )!.values,
+    title: 'Edited title',
+    subtitle: '',
+    sequence: 2,
+  };
   const result = await exportEffectInstance(project, 'instance');
   const reimported = await importRawEffectDocument(new Uint8Array(await result.blob.arrayBuffer()));
   expect(reimported.ok).toBe(true);
@@ -91,6 +103,13 @@ it('bakes derived negative anchor coordinates and preserves layout without mutat
   const expected = resolveEffectObjectControls(exported, instance, project.clips[0]!.transform);
   for (const id of ['anchorX', 'anchorY', 'sequence'])
     expect(exported.controls.find((c) => c.id === id)?.defaultValue).toBe(expected[id]);
+  const initial = applyInitialEffectPreset(
+    exported,
+    Object.fromEntries(
+      exported.controls.map((control) => [control.id, resolveEffectV1ControlDefault(control, 'ru')])
+    )
+  );
+  expect(initial).toMatchObject(instance.controls);
   expect(expected['anchorX']).toBeLessThan(0);
   expect(snapshot.source).toBe(original);
 });

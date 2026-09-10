@@ -51,3 +51,27 @@ it('locks block edits and missing targets cannot be edited', () => {
   project.clips = [];
   expect(isEffectInstanceEditable(project, instance)).toBe(false);
 });
+
+it('track and global ranges follow owner length but manual ranges remain at project time', () => {
+  const { project, instance } = fixture();
+  instance.target = { kind: 'track', trackId: project.tracks[0]!.id };
+  instance.rangeMode = 'interval';
+  project.clips[0]!.startTime = 20;
+  expect(reconcileVideoProjectEffectInstances(project).effectInstances![0]).toMatchObject({
+    startTime: 12,
+    duration: 4,
+  });
+  project.effectInstances = [resizeClipEffectInterval(project, instance, { rangeMode: 'owner' })];
+  expect(project.effectInstances[0]).toMatchObject({
+    startTime: 0,
+    duration: 40,
+    playbackRate: 0.05,
+  });
+  project.clips[0]!.duration = 30;
+  expect(reconcileVideoProjectEffectInstances(project).effectInstances![0]).toMatchObject({
+    duration: 50,
+    playbackRate: 0.04,
+  });
+  project.tracks[0]!.role = 'CAMERA';
+  expect(reconcileVideoProjectEffectInstances(project).effectInstances).toEqual([]);
+});

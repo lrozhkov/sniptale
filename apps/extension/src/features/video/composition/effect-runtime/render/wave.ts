@@ -54,6 +54,7 @@ export async function renderEffectRuntimeComposition(args: {
     return renderEffectRuntimeFramePlans({
       executor: args.executor,
       inputMaterializer: createEffectRuntimeInputMaterializer({
+        camera: frame.camera,
         clipMediaElements: args.clipMediaElements,
         imageBank: args.imageBank,
         ...(args.ownerDocument ? { ownerDocument: args.ownerDocument } : {}),

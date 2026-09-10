@@ -74,6 +74,7 @@ type VideoEditorProjectActionKeys =
   | 'duplicateEffectInstance'
   | 'moveEffectInstance'
   | 'selectEffectInstance'
+  | 'setEffectTargetBypassed'
   | 'setClipEffectsBypassed'
   | 'updateEffectInstance'
   | 'upsertObjectTrack'

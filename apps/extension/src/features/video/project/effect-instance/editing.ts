@@ -1,3 +1,4 @@
+import { resolveEffectOwner } from './owner';
 import type { VideoProject } from '../types';
 import type { VideoProjectEffectInstance } from './types';
 
@@ -6,12 +7,17 @@ export function isEffectInstanceEditable(
   instance: VideoProjectEffectInstance
 ): boolean {
   const target = instance.target;
+  if (instance.kind === 'targetEffect') {
+    const owner = resolveEffectOwner(project, target);
+    return owner !== null && !owner.locked;
+  }
   const clips = project.clips.filter((clip) =>
     target.kind === 'clip'
       ? clip.id === target.clipId
       : target.kind === 'scene'
         ? clip.type === 'EFFECT' && clip.effectInstanceId === instance.id
-        : project.transitions?.some(
+        : target.kind === 'transition' &&
+          project.transitions?.some(
             (junction) =>
               junction.id === target.transitionId &&
               (junction.leadingClipId === clip.id || junction.trailingClipId === clip.id)
@@ -33,8 +39,8 @@ export function resizeClipEffectInterval(
   patch: { startTime?: number; duration?: number; rangeMode?: 'owner' | 'interval' }
 ): VideoProjectEffectInstance {
   const target = instance.target;
-  if (instance.kind !== 'targetEffect' || target.kind !== 'clip') return instance;
-  const clip = project.clips.find((clip) => clip.id === target.clipId);
+  if (instance.kind !== 'targetEffect') return instance;
+  const clip = resolveEffectOwner(project, target);
   if (!clip || !isEffectInstanceEditable(project, instance)) return instance;
   if (
     (patch.startTime !== undefined && !Number.isFinite(patch.startTime)) ||

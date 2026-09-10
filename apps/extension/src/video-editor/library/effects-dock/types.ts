@@ -21,6 +21,8 @@ export interface VideoEditorEffectsLibraryDockProps {
     catalog: EffectBundleCatalogEntry;
     documentId: string;
     startTime: number;
+    standaloneDuration?: number;
+    controlPresetId?: string;
     target: VideoProjectEffectTarget;
     trackId?: string;
     timelineLaneId?: string | null;
@@ -28,6 +30,8 @@ export interface VideoEditorEffectsLibraryDockProps {
   onDeleteEffectBundle(packId: string): Promise<void>;
   onImportEffectFiles(files: readonly File[]): Promise<EffectFileImportResult[]>;
   onSetEffectBundleEnabled(packId: string, enabled: boolean): Promise<void>;
+  effectTarget?: VideoProjectEffectTarget | null;
+  selectedTrackId?: string | null;
   selectedClipId: string | null;
   selectedTransitionId: string | null;
 }

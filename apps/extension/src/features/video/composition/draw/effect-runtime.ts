@@ -22,37 +22,37 @@ export function drawEffectRuntimeVisualLayer(args: {
   scaleY: number;
   state: EffectRuntimeDrawState;
 }): boolean {
-  const standalone = findStandaloneFrame(args.frames, args.layer.clipId);
-  if (standalone) {
-    drawCompositionVisualLayerBitmap(
-      args.context,
-      args.layer,
-      standalone.bitmap,
-      args.scaleX,
-      args.scaleY,
-      args.alpha,
-      standalone.bitmapBounds
-    );
-    return true;
-  }
-  const target = findTargetFrame(args.frames, args.layer.clipId);
-  if (target) {
-    drawCompositionVisualLayerBitmap(
-      args.context,
-      args.layer,
-      target.bitmap,
-      args.scaleX,
-      args.scaleY,
-      args.alpha
-    );
+  if (args.layer.effectActionsOnly) return false;
+  const group = findGroupFrame(args.frames, args.layer.clipId);
+  if (group) {
+    const key = `group:${group.effectInstanceId}`;
+    if (!args.state.drawnTransitionIds.has(key)) {
+      args.state.drawnTransitionIds.add(key);
+      drawFullFrame(args.context, group, args.scaleX, args.scaleY, args.alpha ?? 1);
+    }
     return true;
   }
   const transition = findTransitionFrame(args.frames, args.layer.clipId);
-  if (!transition || transition.target.kind !== 'transition') return false;
-  if (!args.state.drawnTransitionIds.has(transition.target.transitionId)) {
-    args.state.drawnTransitionIds.add(transition.target.transitionId);
-    drawFullFrame(args.context, transition, args.scaleX, args.scaleY, args.alpha ?? 1);
+  if (transition && transition.target.kind === 'transition') {
+    if (!args.state.drawnTransitionIds.has(transition.target.transitionId)) {
+      args.state.drawnTransitionIds.add(transition.target.transitionId);
+      drawFullFrame(args.context, transition, args.scaleX, args.scaleY, args.alpha ?? 1);
+    }
+    return true;
   }
+  const frame =
+    findTargetFrame(args.frames, args.layer.clipId) ??
+    findStandaloneFrame(args.frames, args.layer.clipId);
+  if (!frame) return false;
+  drawCompositionVisualLayerBitmap(
+    args.context,
+    args.layer,
+    frame.bitmap,
+    args.scaleX,
+    args.scaleY,
+    args.alpha,
+    frame.bitmapBounds
+  );
   return true;
 }
 
@@ -127,4 +127,39 @@ function drawFullFrame(
   } finally {
     context.globalAlpha = previousAlpha;
   }
+}
+
+function findGroupFrame(frames: EffectRuntimeRenderedFrameMap | undefined, clipId: string) {
+  let track: EffectRuntimeRenderedFrame | undefined;
+  for (const frame of frames?.values() ?? []) {
+    if (
+      (frame.target.kind === 'video-group' || frame.target.kind === 'track') &&
+      frame.target.clipIds.includes(clipId)
+    ) {
+      if (frame.target.kind === 'video-group') return frame;
+      track = frame;
+    }
+  }
+  return track;
+}
+
+/** Keep selection geometry in the frame model; only the final draw projection is flattened. */
+export function resolveEffectRuntimeVisualLayers(
+  layers: VideoCompositionVisualLayer[],
+  frames: EffectRuntimeRenderedFrameMap | undefined
+): VideoCompositionVisualLayer[] {
+  const seen = new Set<string>();
+  return layers.flatMap((layer) => {
+    const group = findGroupFrame(frames, layer.clipId);
+    const processed =
+      group ?? findTargetFrame(frames, layer.clipId) ?? findTransitionFrame(frames, layer.clipId);
+    const actions: VideoCompositionVisualLayer[] =
+      processed && layer.kind === 'video' && layer.actions?.length
+        ? [{ ...layer, effectActionsOnly: true }]
+        : [];
+    if (!group) return [layer, ...actions];
+    if (seen.has(group.effectInstanceId)) return actions;
+    seen.add(group.effectInstanceId);
+    return [{ ...layer, effectViewportRaster: true }, ...actions];
+  });
 }

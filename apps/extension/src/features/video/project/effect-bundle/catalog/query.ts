@@ -4,24 +4,39 @@ import type { EffectBundleCatalogDocumentEntry, EffectBundleCatalogEntry } from 
 export interface EffectCatalogFilter {
   query: string;
   kind: 'all' | EffectV1Kind;
-  theme: 'all' | 'light' | 'dark' | 'unspecified';
+  theme: string;
+}
+export interface EffectCatalogTheme {
+  value: string;
+  label: string;
+  description?: string;
 }
 export function describeCatalogDocument(
   document: EffectBundleCatalogDocumentEntry,
   locale: 'en' | 'ru'
 ) {
   const parsed = parseEffectV1Source(document.source).document;
-  // The SDK collection explicitly names theme variants with these suffixes; other IDs are unclassified.
-  const variant = /(?:[._-])(light|dark)$/.exec(document.id)?.[1];
-  const theme = variant === 'light' || variant === 'dark' ? variant : 'unspecified';
-  const label = parsed?.label[locale] ?? parsed?.label.en ?? document.id;
+  const preset = parsed?.controlPresets?.find(
+    (item) =>
+      item.id ===
+      (document.previewPresetId?.startsWith('user:')
+        ? parsed.defaultControlPresetId
+        : (document.previewPresetId ?? parsed.defaultControlPresetId))
+  );
+  const userPreset = document.presetPreferences?.presets.find(
+    (item) => `user:${item.id}` === document.previewPresetId
+  );
   return {
-    label:
-      theme === 'unspecified'
-        ? label
-        : label.replace(/\s*·\s*(?:Dark|Light|Тёмная|Темная|Светлая)$/iu, ''),
+    label: parsed?.label[locale] ?? parsed?.label.en ?? document.id,
     description: parsed?.description?.[locale] ?? parsed?.description?.en ?? '',
-    theme,
+    theme: preset ? `theme:${preset.theme.id}` : 'unspecified',
+    style: preset
+      ? `style:${preset.theme.id}:${userPreset ? `user-${userPreset.id}` : preset.style.id}`
+      : userPreset
+        ? `style:user:${userPreset.id}`
+        : 'unspecified',
+    themeLabel: preset?.theme.label[locale] ?? preset?.theme.label.en ?? '',
+    styleLabel: userPreset?.name ?? preset?.style.label[locale] ?? preset?.style.label.en ?? '',
   };
 }
 export function queryEffectCatalog(
@@ -30,25 +45,68 @@ export function queryEffectCatalog(
   locale: 'en' | 'ru'
 ) {
   const query = filter.query.trim().toLocaleLowerCase(locale);
-  return catalog.documents.filter((document) => {
-    const metadata = describeCatalogDocument(document, locale);
-    return (
-      (filter.kind === 'all' || document.kind === filter.kind) &&
-      (filter.theme === 'all' || metadata.theme === filter.theme) &&
-      [catalog.label[locale], document.id, metadata.label, metadata.description].some((value) =>
-        value.toLocaleLowerCase(locale).includes(query)
-      )
-    );
-  });
+  return catalog.documents
+    .flatMap((document) => {
+      const presets = parseEffectV1Source(document.source).document?.controlPresets;
+      const variants = presets?.length
+        ? presets.map((preset) => ({ ...document, previewPresetId: preset.id }))
+        : [document];
+      variants.push(
+        ...(document.presetPreferences?.presets ?? []).map((preset) => ({
+          ...document,
+          previewPresetId: `user:${preset.id}`,
+        }))
+      );
+      const choice = document.presetPreferences?.defaultPreset;
+      const defaultId = choice ? `${choice.kind === 'user' ? 'user:' : ''}${choice.id}` : undefined;
+      return defaultId
+        ? variants.sort(
+            (a, b) =>
+              Number(b.previewPresetId === defaultId) - Number(a.previewPresetId === defaultId)
+          )
+        : variants;
+    })
+    .filter((document) => {
+      const metadata = describeCatalogDocument(document, locale);
+      return (
+        (filter.kind === 'all' || document.kind === filter.kind) &&
+        (filter.theme === 'all' ||
+          metadata.theme === filter.theme ||
+          metadata.style === filter.theme) &&
+        [
+          catalog.label[locale],
+          document.id,
+          metadata.label,
+          metadata.description,
+          metadata.themeLabel,
+          metadata.styleLabel,
+        ].some((value) => value.toLocaleLowerCase(locale).includes(query))
+      );
+    });
 }
-
 export function getEffectCatalogThemes(
-  catalogs: readonly EffectBundleCatalogEntry[]
-): Exclude<EffectCatalogFilter['theme'], 'all'>[] {
-  const present = new Set(
-    catalogs.flatMap((catalog) =>
-      catalog.documents.map((document) => describeCatalogDocument(document, 'en').theme)
-    )
-  );
-  return (['light', 'dark', 'unspecified'] as const).filter((theme) => present.has(theme));
+  catalogs: readonly EffectBundleCatalogEntry[],
+  locale: 'en' | 'ru' = 'en'
+): EffectCatalogTheme[] {
+  const groups = new Map<string, { label: string; styles: Map<string, string> }>();
+  for (const catalog of catalogs)
+    for (const document of queryEffectCatalog(
+      catalog,
+      { query: '', kind: 'all', theme: 'all' },
+      locale
+    )) {
+      const metadata = describeCatalogDocument(document, locale);
+      if (metadata.theme === 'unspecified' && metadata.style === 'unspecified') continue;
+      const group = groups.get(metadata.theme) ?? { label: metadata.themeLabel, styles: new Map() };
+      group.styles.set(metadata.style, metadata.styleLabel);
+      groups.set(metadata.theme, group);
+    }
+  return [...groups]
+    .sort((a, b) => a[1].label.localeCompare(b[1].label, locale))
+    .flatMap(([value, group]) => [
+      ...(group.label ? [{ value, label: group.label }] : []),
+      ...[...group.styles]
+        .sort((a, b) => a[1].localeCompare(b[1], locale))
+        .map(([value, label]) => ({ value, label: `  ${label}`, description: group.label })),
+    ]);
 }

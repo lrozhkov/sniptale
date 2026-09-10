@@ -29,6 +29,13 @@ export interface TimelineTrackLayout {
 }
 
 export interface TimelineTrackLayoutModel {
+  videoFx?: {
+    fxInstanceIds: string[];
+    fxCollapsed: boolean;
+    fxHeight: number;
+    clipRowHeight: number;
+    top: number;
+  };
   layoutByTrackId: Map<string, TimelineTrackLayout>;
   layouts: TimelineTrackLayout[];
   totalTrackHeight: number;
@@ -68,8 +75,8 @@ export function buildTimelineTrackLayoutModel(params: {
       .filter(
         (instance) =>
           instance.kind === 'targetEffect' &&
-          instance.target.kind === 'clip' &&
-          clipIds.has(instance.target.clipId)
+          ((instance.target.kind === 'clip' && clipIds.has(instance.target.clipId)) ||
+            (instance.target.kind === 'track' && instance.target.trackId === track.id))
       )
       .map((instance) => instance.id);
     const fxCollapsed = params.collapsedFxByTrackId?.[track.id] ?? false;
@@ -97,7 +104,27 @@ export function buildTimelineTrackLayoutModel(params: {
     top += rowHeight;
   }
 
-  return { layoutByTrackId, layouts, totalTrackHeight: top };
+  const globalIds = (params.project.effectInstances ?? [])
+    .filter(
+      (instance) => instance.kind === 'targetEffect' && instance.target.kind === 'video-group'
+    )
+    .map((instance) => instance.id);
+  const collapsed = params.collapsedFxByTrackId?.['video-group'] ?? false;
+  const videoFx = globalIds.length
+    ? {
+        fxInstanceIds: globalIds,
+        fxCollapsed: collapsed,
+        fxHeight: collapsed ? 20 : globalIds.length * 24,
+        clipRowHeight: 0,
+        top,
+      }
+    : undefined;
+  return {
+    layoutByTrackId,
+    layouts,
+    totalTrackHeight: top + (videoFx?.fxHeight ?? 0),
+    ...(videoFx ? { videoFx } : {}),
+  };
 }
 
 export function resolveTimelineTrackLayoutModel(params: {

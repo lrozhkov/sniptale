@@ -1,3 +1,5 @@
+import { resolveEffectApplicationTarget } from './effects.junction';
+import { resolveEffectOwner } from '../../../features/video/project/effect-instance/owner';
 import {
   isEffectInstanceEditable,
   resizeClipEffectInterval,
@@ -17,6 +19,7 @@ import { duplicateStandaloneEffectHost } from './clip-timeline/effect-host';
 type EffectInstanceActions = Pick<
   VideoEditorProjectState,
   | 'selectEffectInstance'
+  | 'setEffectTargetBypassed'
   | 'setClipEffectsBypassed'
   | 'applyEffectDocument'
   | 'deleteEffectInstance'
@@ -43,9 +46,34 @@ export function createEffectInstanceActions(
           selectedTrackId:
             target.kind === 'clip'
               ? (state.project!.clips.find((clip) => clip.id === target.clipId)?.trackId ?? null)
-              : null,
+              : target.kind === 'track'
+                ? target.trackId
+                : null,
         };
       }),
+    setEffectTargetBypassed: (target, bypassed) =>
+      set((state) =>
+        applyProjectUpdate(state, (project) => {
+          const owner = resolveEffectOwner(project, target);
+          if (!owner || owner.locked) return project;
+          if (target.kind === 'video-group') return { ...project, videoEffectsBypassed: bypassed };
+          if (target.kind === 'track')
+            return {
+              ...project,
+              tracks: project.tracks.map((track) =>
+                track.id === target.trackId ? { ...track, effectsBypassed: bypassed } : track
+              ),
+            };
+          if (target.kind === 'clip')
+            return {
+              ...project,
+              clips: project.clips.map((clip) =>
+                clip.id === target.clipId ? { ...clip, effectsBypassed: bypassed } : clip
+              ),
+            };
+          return project;
+        })
+      ),
     setClipEffectsBypassed: (clipId, bypassed) =>
       set((state) =>
         applyProjectUpdate(state, (project) => {
@@ -84,11 +112,13 @@ function createApplyEffectDocument(
     );
     const trackId = args.trackId ?? (args.target.kind === 'scene' ? selectedTrack?.id : undefined);
     const instanceId = crypto.randomUUID();
+    const resolved = resolveEffectApplicationTarget(sourceProject, args.target);
     const nextProject = await applyEffectCatalogDocument({
       ...args,
       ...(trackId === undefined ? {} : { trackId }),
       instanceId,
-      project: sourceProject,
+      project: resolved.project,
+      target: resolved.target,
     });
     let committed = false;
     set((state) => {
@@ -104,13 +134,21 @@ function createApplyEffectDocument(
             selectedTrackId: host.trackId,
             selection: { clipId: host.id, kind: VideoEditorSelectionKind.CLIP },
           }
-        : {
-            ...update,
-            selection: {
-              kind: VideoEditorSelectionKind.EFFECT_INSTANCE,
-              effectInstanceId: instanceId,
-            },
-          };
+        : resolved.target.kind === 'transition'
+          ? {
+              ...update,
+              selection: {
+                kind: VideoEditorSelectionKind.TRANSITION_JUNCTION,
+                transitionId: resolved.target.transitionId,
+              },
+            }
+          : {
+              ...update,
+              selection: {
+                kind: VideoEditorSelectionKind.EFFECT_INSTANCE,
+                effectInstanceId: instanceId,
+              },
+            };
     });
     return committed ? instanceId : null;
   };
@@ -235,7 +273,9 @@ function updateMatchingEffectInstance(
 
 function sameTarget(left: VideoProjectEffectInstance, right: VideoProjectEffectInstance): boolean {
   if (left.target.kind !== right.target.kind) return false;
-  if (left.target.kind === 'scene') return true;
+  if (left.target.kind === 'scene' || left.target.kind === 'video-group') return true;
+  if (left.target.kind === 'track' && right.target.kind === 'track')
+    return left.target.trackId === right.target.trackId;
   if (left.target.kind === 'clip' && right.target.kind === 'clip') {
     return left.target.clipId === right.target.clipId;
   }

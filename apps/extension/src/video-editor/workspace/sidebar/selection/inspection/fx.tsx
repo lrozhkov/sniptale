@@ -2,7 +2,7 @@ import { useVideoEditorEffectEditingPort } from '../../../../runtime/controller/
 import { isEffectInstanceEditable } from '../../../../../features/video/project/effect-instance/editing';
 import type { VideoProject } from '../../../../../features/video/project/types';
 import { InspectorGroupedPanel } from '../grouped-inspector';
-import { createEffectInstanceGroup } from '../effect-instance/groups';
+import { createEffectInstanceGroups } from '../effect-instance/groups';
 
 export function InspectFxPanel(props: { project: VideoProject; instanceId: string }) {
   const actions = useVideoEditorEffectEditingPort((port) => port);
@@ -11,7 +11,7 @@ export function InspectFxPanel(props: { project: VideoProject; instanceId: strin
   return (
     <InspectorGroupedPanel
       groups={[
-        createEffectInstanceGroup({
+        ...createEffectInstanceGroups({
           project: props.project,
           instanceId: instance.id,
           target: instance.target,
@@ -20,6 +20,7 @@ export function InspectFxPanel(props: { project: VideoProject; instanceId: strin
           onDuplicateEffectInstance: actions.duplicateEffectInstance,
           onMoveEffectInstance: actions.moveEffectInstance,
           onUpdateEffectInstance: actions.updateEffectInstance,
+          onSetEffectTargetBypassed: actions.setEffectTargetBypassed,
           onSetClipEffectsBypassed: actions.setClipEffectsBypassed,
         }),
       ]}

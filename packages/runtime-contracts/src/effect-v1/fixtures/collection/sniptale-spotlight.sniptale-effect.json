@@ -1,11 +1,11 @@
 {
   "schemaVersion": "sniptale.effect.v1",
-  "id": "sniptale-spotlight-dark",
+  "id": "sniptale-spotlight",
   "kind": "targetEffect",
   "duration": 4,
   "label": {
-    "ru": "Фокус с затемнением · Тёмная",
-    "en": "Dimmed focus · Dark"
+    "ru": "Фокус с затемнением",
+    "en": "Dimmed focus"
   },
   "description": {
     "ru": "Выделение области с независимой толщиной контура и безопасным положением.",
@@ -814,5 +814,60 @@
         }
       }
     ]
-  }
+  },
+  "controlPresets": [
+    {
+      "id": "sniptale-orange-dark",
+      "label": {
+        "en": "Dark",
+        "ru": "Тёмный"
+      },
+      "theme": {
+        "id": "sniptale-orange",
+        "label": {
+          "en": "Sniptale Orange",
+          "ru": "Sniptale Orange"
+        }
+      },
+      "style": {
+        "id": "dark",
+        "label": {
+          "en": "Dark",
+          "ru": "Тёмный"
+        }
+      },
+      "values": {
+        "accent": "#fb923c",
+        "surface": "#16181d",
+        "line": 3
+      }
+    },
+    {
+      "id": "sniptale-orange-light",
+      "label": {
+        "en": "Light",
+        "ru": "Светлый"
+      },
+      "theme": {
+        "id": "sniptale-orange",
+        "label": {
+          "en": "Sniptale Orange",
+          "ru": "Sniptale Orange"
+        }
+      },
+      "style": {
+        "id": "light",
+        "label": {
+          "en": "Light",
+          "ru": "Светлый"
+        }
+      },
+      "values": {
+        "accent": "#c2410c",
+        "surface": "#fffaf4",
+        "line": 3
+      }
+    }
+  ],
+  "defaultControlPresetId": "sniptale-orange-dark"
 }

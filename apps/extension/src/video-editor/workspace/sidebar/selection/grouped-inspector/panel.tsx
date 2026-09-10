@@ -4,6 +4,9 @@ import { useInspectorSectionMemory } from './presentation';
 import { useEffect, useRef, useState } from 'react';
 import {
   Grid3X3,
+  CaseSensitive,
+  Shapes,
+  Settings2,
   AudioLines,
   Clock3,
   Frame,
@@ -28,6 +31,10 @@ import { resolveVisibleInspectorGroups } from './visibility';
 import type { InspectorGroupDefinition, InspectorSectionSemantic } from './types';
 
 const SECTION_ICONS: Readonly<Record<InspectorSectionSemantic, LucideIcon>> = {
+  typography: CaseSensitive,
+  geometry: Shapes,
+  processing: SlidersHorizontal,
+  advanced: Settings2,
   info: Info,
   timing: Clock3,
   placement: Move,

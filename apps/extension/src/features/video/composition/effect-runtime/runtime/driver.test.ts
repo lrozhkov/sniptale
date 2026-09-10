@@ -39,6 +39,34 @@ it('runs a target chain in stable order and retains only its final bitmap author
   expect(base.close).toHaveBeenCalledOnce();
 });
 
+it('prepares a junction only after its clip FX have completed', async () => {
+  const fixture = createOrderedExecutor();
+  const transition = createPlan(
+    'junction',
+    {
+      kind: 'transition',
+      leadingClipId: 'clip-a',
+      trailingClipId: 'clip-b',
+      transitionId: 'junction',
+    },
+    200,
+    100
+  );
+  const materializeTransitionInputs = vi.fn(async () => {
+    expect(fixture.requests.map(({ instanceId }) => instanceId)).toEqual(['target-1', 'target-2']);
+    return { from: bitmap('from', 200, 100), to: bitmap('to', 200, 100) };
+  });
+  await renderEffectRuntimeFramePlans({
+    executor: fixture.executor,
+    inputMaterializer: {
+      materializeTargetSource: vi.fn(async () => bitmap('base', 200, 100)),
+      materializeTransitionInputs,
+    },
+    plans: [transition, ...createTargetChainPlans().slice(1)],
+  });
+  expect(materializeTransitionInputs).toHaveBeenCalledOnce();
+});
+
 it('disposes earlier successes and surfaces a typed runtime failure without fallback', async () => {
   const success = bitmap('success', 1280, 720);
   let call = 0;
@@ -235,3 +263,65 @@ function bitmap(label: string, width: number, height: number): FakeImageBitmap {
 function placement() {
   return { height: 100, opacity: 1, rotation: 0, width: 200, x: 0, y: 0 };
 }
+
+it('orders clip, junction, track and global stages regardless of catalog insertion order', async () => {
+  const requests: string[] = [];
+  const plans = [
+    createPlan('global', { kind: 'video-group', clipIds: ['a', 'b'] }, 200, 100),
+    createPlan('track', { kind: 'track', trackId: 'v', clipIds: ['a', 'b'] }, 200, 100),
+    createPlan(
+      'junction',
+      { kind: 'transition', leadingClipId: 'a', trailingClipId: 'b', transitionId: 't' },
+      200,
+      100
+    ),
+    createPlan(
+      'clip',
+      { kind: 'clip', clipId: 'a', chainIndex: 0, placement: placement() },
+      200,
+      100
+    ),
+  ].map((plan) => ({
+    ...plan,
+    kind: plan.target.kind === 'transition' ? ('transition' as const) : ('targetEffect' as const),
+  }));
+  const executor: EffectRuntimeSandboxExecutor = {
+    dispose: vi.fn(),
+    renderFrame: vi.fn(
+      async (request: Parameters<EffectRuntimeSandboxExecutor['renderFrame']>[0]) => {
+        requests.push(request.effectInstanceId);
+        for (const input of Object.values(request.inputFrames)) input.bitmap.close();
+        return {
+          kind: 'frame' as const,
+          bitmap: bitmap(request.effectInstanceId, 200, 100),
+          width: 200,
+          height: 100,
+          effectInstanceId: request.effectInstanceId,
+          requestId: request.requestId,
+          sequenceId: request.sequenceId,
+          snapshotId: request.snapshotId,
+          acknowledged: {
+            documentId: request.documentRef.id,
+            assetSelectionId: request.assetSelectionRef.id,
+          },
+        };
+      }
+    ),
+  };
+  await renderEffectRuntimeFramePlans({
+    executor,
+    plans,
+    inputMaterializer: {
+      materializeTargetSource: async (plan, frames) => {
+        if (plan.target.kind === 'track') expect(frames?.has('junction')).toBe(true);
+        if (plan.target.kind === 'video-group') expect(frames?.has('track')).toBe(true);
+        return bitmap('input', 200, 100);
+      },
+      materializeTransitionInputs: async (_plan, frames) => {
+        expect(frames?.get('clip')?.bitmap).toMatchObject({ label: 'clip' });
+        return { from: bitmap('a', 200, 100), to: bitmap('b', 200, 100) };
+      },
+    },
+  });
+  expect(requests).toEqual(['clip', 'junction', 'track', 'global']);
+});

@@ -24,65 +24,74 @@ vi.mock('../workflows/video/effect-runtime-sandbox', async (original) => ({
 }));
 import { EffectCatalogPreview, EffectCatalogPreviewProvider } from './effect-catalog-preview';
 
-it('uses canonical sandbox identity, serializes renders and closes late frames after unmount', async () => {
-  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
-  vi.stubGlobal('crypto', webcrypto);
-  vi.stubGlobal('Blob', NodeBlob);
-  const observers: Array<() => void> = [];
-  vi.stubGlobal(
-    'IntersectionObserver',
-    class {
-      constructor(callback: (entries: Array<{ isIntersecting: boolean }>) => void) {
-        observers.push(() => callback([{ isIntersecting: true }]));
+it.each([false, true])(
+  'uses canonical sandbox identity and closes late frames (controlled=%s)',
+  async (controlled) => {
+    mocks.render.mockClear();
+    mocks.dispose.mockClear();
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    vi.stubGlobal('crypto', webcrypto);
+    vi.stubGlobal('Blob', NodeBlob);
+    const observers: Array<() => void> = [];
+    vi.stubGlobal(
+      'IntersectionObserver',
+      class {
+        constructor(callback: (entries: Array<{ isIntersecting: boolean }>) => void) {
+          observers.push(() => callback([{ isIntersecting: true }]));
+        }
+        observe() {}
+        disconnect() {}
       }
-      observe() {}
-      disconnect() {}
+    );
+    const catalog = await createEffectCatalogEntry(await readValidBundleArtifact(), 1);
+    const entry = catalog.documents.find((document) => document.kind === 'standalone')!;
+    let finish!: (value: EffectRuntimeFrameResult) => void;
+    mocks.render.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        })
+    );
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    try {
+      await act(async () =>
+        root.render(
+          <EffectCatalogPreviewProvider>
+            <EffectCatalogPreview
+              catalog={catalog}
+              document={entry}
+              {...(controlled ? { progress: 0.25 } : {})}
+            />
+          </EffectCatalogPreviewProvider>
+        )
+      );
+      await act(async () => observers.forEach((invoke) => invoke()));
+      await vi.waitFor(() => expect(mocks.render).toHaveBeenCalledOnce());
+      const command: EffectRuntimeRenderCommand = mocks.render.mock.calls[0]![0];
+      expect(command.snapshotId).toBe(`effect:${entry.sha256}`);
+      expect(command.documentRef.id).toBe(entry.sha256);
+      expect((await command.materializeImmutablePayloads()).documentSource).toBe(entry.source);
+      act(() => root.unmount());
+      const close = vi.fn();
+      await act(async () =>
+        finish({
+          ...command,
+          kind: 'frame',
+          acknowledged: {
+            documentId: command.documentRef.id,
+            assetSelectionId: command.assetSelectionRef.id,
+          },
+          bitmap: { close, width: 320, height: 180 } as unknown as ImageBitmap,
+        })
+      );
+      expect(close).toHaveBeenCalledOnce();
+      expect(mocks.dispose).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllGlobals();
     }
-  );
-  const catalog = await createEffectCatalogEntry(await readValidBundleArtifact(), 1);
-  const entry = catalog.documents.find((document) => document.kind === 'standalone')!;
-  let finish!: (value: EffectRuntimeFrameResult) => void;
-  mocks.render.mockImplementation(
-    () =>
-      new Promise((resolve) => {
-        finish = resolve;
-      })
-  );
-  const container = document.createElement('div');
-  const root = createRoot(container);
-  try {
-    await act(async () =>
-      root.render(
-        <EffectCatalogPreviewProvider>
-          <EffectCatalogPreview catalog={catalog} document={entry} />
-        </EffectCatalogPreviewProvider>
-      )
-    );
-    await act(async () => observers.forEach((invoke) => invoke()));
-    await vi.waitFor(() => expect(mocks.render).toHaveBeenCalledOnce());
-    const command: EffectRuntimeRenderCommand = mocks.render.mock.calls[0]![0];
-    expect(command.snapshotId).toBe(`effect:${entry.sha256}`);
-    expect(command.documentRef.id).toBe(entry.sha256);
-    expect((await command.materializeImmutablePayloads()).documentSource).toBe(entry.source);
-    act(() => root.unmount());
-    const close = vi.fn();
-    await act(async () =>
-      finish({
-        ...command,
-        kind: 'frame',
-        acknowledged: {
-          documentId: command.documentRef.id,
-          assetSelectionId: command.assetSelectionRef.id,
-        },
-        bitmap: { close, width: 320, height: 180 } as unknown as ImageBitmap,
-      })
-    );
-    expect(close).toHaveBeenCalledOnce();
-    expect(mocks.dispose).toHaveBeenCalledOnce();
-  } finally {
-    vi.unstubAllGlobals();
   }
-});
+);
 
 it('draws visible posters, scrubs and recovers after a failed frame without changing the document', async () => {
   vi.clearAllMocks();

@@ -35,7 +35,7 @@ it('exports a standalone asset-free document as JSON without catalog state', asy
   const bytes = readFileSync(
     new URL(
       '../../../../../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/' +
-        'sniptale-callout-light.sniptale-effect.json',
+        'sniptale-callout.sniptale-effect.json',
       import.meta.url
     )
   );

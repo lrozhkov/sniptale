@@ -31,7 +31,7 @@ import {
   renderTextStyleFields,
 } from '../inputs/text-shape';
 import { renderTransformFields } from '../inputs/transform-fields';
-import { createEffectInstanceGroup } from '../effect-instance/groups';
+import { createEffectInstanceGroups } from '../effect-instance/groups';
 import { ClipInfo, resolveClipAsset } from './clip-info';
 import { isVideoEditorPresentedClip } from '../../../../project/operations/presented-tracks';
 import { CameraLayoutControls, CameraFitControls } from '../inputs/camera-layout';
@@ -88,7 +88,7 @@ function createClipGroups(
         onUpdateAnnotationClipStyle: props.onUpdateAnnotationClipStyle,
         onUpdateAnnotationClipTemplate: props.onUpdateAnnotationClipTemplate,
       }),
-      createClipEffectGroup(props, clip, runtime.selectedTrackLocked),
+      ...createClipEffectGroup(props, clip, runtime.selectedTrackLocked),
     ] as const;
   }
 
@@ -201,7 +201,7 @@ function createStandardClipGroups(
         />
       ),
     },
-    createClipEffectGroup(props, clip, runtime.selectedTrackLocked),
+    ...createClipEffectGroup(props, clip, runtime.selectedTrackLocked),
   ] as const;
 }
 
@@ -336,7 +336,7 @@ function createClipEffectGroup(
 ) {
   const hostedInstanceId =
     clip.type === VideoProjectClipType.EFFECT ? clip.effectInstanceId : undefined;
-  return createEffectInstanceGroup({
+  return createEffectInstanceGroups({
     disabled: locked,
     onDeleteEffectInstance: props.onDeleteEffectInstance ?? (() => undefined),
     onDuplicateEffectInstance: props.onDuplicateEffectInstance ?? (() => null),

@@ -196,6 +196,9 @@ function collectEffectInputClipIds(plans: readonly EffectRuntimeFramePlan[]): Se
   const clipIds = new Set<string>();
   for (const plan of plans) {
     if (plan.target.kind === 'clip') clipIds.add(plan.target.clipId);
+    if (plan.target.kind === 'track' || plan.target.kind === 'video-group') {
+      for (const id of plan.target.clipIds) clipIds.add(id);
+    }
     if (plan.target.kind === 'transition') {
       clipIds.add(plan.target.leadingClipId);
       clipIds.add(plan.target.trailingClipId);

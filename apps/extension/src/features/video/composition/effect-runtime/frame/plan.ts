@@ -49,7 +49,22 @@ export function resolveEffectRuntimeFramePlans(
     });
     if (plan) plans.push(plan);
   }
-  return plans;
+  const generated = new Map(
+    plans.flatMap((plan) =>
+      plan.target.kind === 'scene' ? [[plan.target.clipId, plan] as const] : []
+    )
+  );
+  return plans.map((plan) => {
+    if (plan.target.kind !== 'clip') return plan;
+    const host = generated.get(plan.target.clipId);
+    if (!host?.bitmapBounds) return plan;
+    return {
+      ...plan,
+      bitmapBounds: host.bitmapBounds,
+      dimensions: host.dimensions,
+      renderDimensions: host.renderDimensions,
+    };
+  });
 }
 
 function resolveInstanceFramePlan(args: {

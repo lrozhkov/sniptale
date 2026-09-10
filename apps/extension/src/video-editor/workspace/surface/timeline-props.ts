@@ -1,13 +1,13 @@
 import type { ProjectTimelineProps } from '../../timeline/project/types';
 import type { VideoEditorTimelineController } from '../../runtime/controller/contracts/timeline';
 import type { VideoEditorEffectDocumentDragPayload } from '../../contracts/effect-document-drag';
-import type { VideoProjectEffectTarget } from '../../../features/video/project/effect-instance/types';
+import type { VideoEditorEffectApplicationTarget } from '../../contracts/effect-document-drag';
 
 export function getProjectTimelineProps(
   controller: VideoEditorTimelineController,
   onDropEffectDocument: (
     payload: VideoEditorEffectDocumentDragPayload,
-    target: VideoProjectEffectTarget,
+    target: VideoEditorEffectApplicationTarget,
     startTime: number,
     trackId?: string,
     timelineLaneId?: string | null

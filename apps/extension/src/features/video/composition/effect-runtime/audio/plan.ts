@@ -1,3 +1,4 @@
+import { resolveEffectOwner } from '../../../project/effect-instance/owner';
 import type { EffectV1Document } from '@sniptale/runtime-contracts/effect-v1';
 
 import { buildProjectTransitionSegments } from '../../../project/transition/project';
@@ -161,13 +162,12 @@ function resolveTargetAvailability(
       : { status: 'hidden' };
   }
   if (instance.kind === 'targetEffect') {
-    if (target.kind !== 'clip') return { status: 'invalid' };
-    const clip = project.clips.find(({ id }) => id === target.clipId);
-    if (!clip) return { status: 'invalid' };
-    return project.tracks.find(({ id }) => id === clip.trackId)?.visible === true
+    const owner = resolveEffectOwner(project, target);
+    if (!owner) return { status: 'invalid' };
+    return owner.visible && !owner.bypassed
       ? {
           status: 'available',
-          timelineInterval: { end: clip.startTime + clip.duration, start: clip.startTime },
+          timelineInterval: { end: owner.startTime + owner.duration, start: owner.startTime },
         }
       : { status: 'hidden' };
   }

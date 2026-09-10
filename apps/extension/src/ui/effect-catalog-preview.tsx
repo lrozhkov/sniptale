@@ -1,3 +1,4 @@
+import { getCurrentLocale } from '../platform/i18n';
 import { createContext, useContext, useEffect, useRef, useMemo, type ReactNode } from 'react';
 import { parseEffectV1Source } from '@sniptale/runtime-contracts/effect-v1';
 import type {
@@ -14,6 +15,7 @@ const PreviewContext = createContext<PreviewQueue | null>(null);
 /** One serialized renderer per catalog. Cached covers do not instantiate the sandbox. */
 export function EffectCatalogPreviewProvider({ children }: { children: ReactNode }) {
   const owner = useRef<PreviewQueue | null>(null);
+  const waiting = useRef<Array<Parameters<PreviewQueue['enqueue']>[0]>>([]);
   useEffect(() => {
     let active = true;
     let executor: EffectRuntimeSandboxExecutor | undefined;
@@ -34,7 +36,9 @@ export function EffectCatalogPreviewProvider({ children }: { children: ReactNode
           .catch(() => undefined);
       },
     };
+    for (const task of waiting.current.splice(0)) owner.current.enqueue(task);
     return () => {
+      waiting.current = [];
       active = false;
       owner.current = null;
       executor?.dispose();
@@ -42,7 +46,8 @@ export function EffectCatalogPreviewProvider({ children }: { children: ReactNode
   }, []);
   const bridge = useRef<PreviewQueue>({
     enqueue(task) {
-      owner.current?.enqueue(task);
+      if (owner.current) owner.current.enqueue(task);
+      else waiting.current.push(task);
     },
   });
   return <PreviewContext.Provider value={bridge.current}>{children}</PreviewContext.Provider>;
@@ -52,7 +57,11 @@ export function EffectCatalogPreview({
   catalog,
   document: entry,
   captureFrame,
+  progress,
+  expanded = false,
 }: {
+  progress?: number;
+  expanded?: boolean;
   catalog: EffectBundleCatalogEntry;
   document: EffectBundleCatalogDocumentEntry;
   captureFrame?: (() => HTMLCanvasElement | null) | undefined;
@@ -61,11 +70,12 @@ export function EffectCatalogPreview({
   const canvas = useRef<HTMLCanvasElement>(null);
   const request = useRef<(progress: number, poster?: boolean) => void>(() => undefined);
   const source = useRef<HTMLCanvasElement | null>(null);
+  const controlled = progress !== undefined;
   const enteredAt = useRef(0);
   const animation = useRef<ReturnType<typeof setInterval> | null>(null);
   const latest = useRef({ catalog, entry });
   latest.current = { catalog, entry };
-  const key = effectPosterKey(entry);
+  const key = effectPosterKey(entry, getCurrentLocale());
   const duration = useMemo(
     () => parseEffectV1Source(entry.source).document?.duration ?? 4,
     [entry.source]
@@ -92,7 +102,7 @@ export function EffectCatalogPreview({
     request.current = session.render;
     const observer = new IntersectionObserver((entries) => {
       if (entries.some((entry) => entry.isIntersecting)) {
-        session.render(0.5, true);
+        if (!controlled) session.render(0.5, true);
         observer.disconnect();
       }
     });
@@ -103,16 +113,21 @@ export function EffectCatalogPreview({
       observer.disconnect();
       stop();
     };
-  }, [key, queue]);
+  }, [key, queue, controlled]);
+  useEffect(() => {
+    if (progress !== undefined) request.current(progress);
+  }, [progress, key]);
   return (
     <canvas
       ref={canvas}
       className={[
-        'block aspect-video h-auto max-h-20 w-full rounded-[4px] object-contain',
+        'block aspect-video h-auto w-full rounded-[4px] object-contain',
+        expanded ? 'max-h-64' : 'max-h-20',
         'bg-[var(--sniptale-color-surface-panel)]',
       ].join(' ')}
       aria-hidden="true"
       onPointerEnter={(event) => {
+        if (progress !== undefined) return;
         stop();
         enteredAt.current = event.clientX;
         source.current = captureFrame?.() ?? null;
@@ -132,6 +147,7 @@ export function EffectCatalogPreview({
         );
       }}
       onPointerMove={(event) => {
+        if (progress !== undefined) return;
         if (animation.current !== null && Math.abs(event.clientX - enteredAt.current) < 3) return;
         if (animation.current !== null) clearInterval(animation.current);
         animation.current = null;
@@ -145,6 +161,7 @@ export function EffectCatalogPreview({
         );
       }}
       onPointerLeave={() => {
+        if (progress !== undefined) return;
         stop();
         request.current(0.5, true);
       }}

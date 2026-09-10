@@ -4,7 +4,7 @@ import { expect, it } from 'vitest';
 import lock from '../fixtures/collection/source-lock.json';
 import { parseEffectV1Source, normalizeEffectV1ToTemplate } from '../index';
 it('admits the supplied collection with its complete layout metadata and locked source bytes', () => {
-  expect(lock.files).toHaveLength(29);
+  expect(lock.files).toHaveLength(21);
   const schema = readFileSync(
     new URL('../fixtures/sniptale-effect-v1.schema.json', import.meta.url)
   );
@@ -22,7 +22,7 @@ it('admits the supplied collection with its complete layout metadata and locked 
     );
     if (document.objectLayout) layouts++;
   }
-  expect(layouts).toBe(12);
+  expect(layouts).toBe(6);
 });
 
 it('matches every accepted and rejected SDK workflow case', async () => {

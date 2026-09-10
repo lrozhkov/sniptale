@@ -32,7 +32,7 @@ function fixture() {
   const source = readFileSync(
     new URL(
       '../../../../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/' +
-        'sniptale-callout-light.sniptale-effect.json',
+        'sniptale-callout.sniptale-effect.json',
       import.meta.url
     ),
     'utf8'

@@ -1,3 +1,4 @@
+import { isVideoEffectTrack } from '../effect-instance/owner';
 import type {
   VideoProjectEffectInstance,
   VideoProjectEffectSnapshot,
@@ -7,6 +8,7 @@ import { VideoProjectClipType } from '../types';
 
 export interface VideoProjectEffectReferenceModel {
   clips: VideoProjectClip[];
+  tracks?: import('../types').VideoProjectTrack[];
   effectInstances?: VideoProjectEffectInstance[];
   effectSnapshots?: Array<Pick<VideoProjectEffectSnapshot, 'id' | 'kind'>>;
   transitions?: VideoProjectTransition[];
@@ -66,7 +68,7 @@ function isValidInstance(
   const snapshot = context.snapshots.get(instance.snapshotId);
   if (!snapshot || snapshot.kind !== instance.kind) return false;
   if (instance.target.kind === 'scene') return isValidStandaloneInstance(instance, context);
-  if (instance.target.kind === 'clip')
+  if (instance.kind === 'targetEffect')
     return isValidTargetEffectInstance(instance, context.project);
   return isValidTransitionInstance(instance, context);
 }
@@ -88,12 +90,17 @@ function isValidTargetEffectInstance(
   instance: VideoProjectEffectInstance,
   project: VideoProjectEffectReferenceModel
 ): boolean {
-  if (instance.kind !== 'targetEffect' || instance.target.kind !== 'clip') return false;
+  if (instance.kind !== 'targetEffect') return false;
+  if (instance.target.kind === 'video-group') return true;
+  if (instance.target.kind === 'track') {
+    const trackId = instance.target.trackId;
+    return (
+      project.tracks?.some((track) => track.id === trackId && isVideoEffectTrack(track)) === true
+    );
+  }
+  if (instance.target.kind !== 'clip') return false;
   const { clipId } = instance.target;
-  return project.clips.some(
-    ({ id, type }) =>
-      id === clipId && type !== VideoProjectClipType.AUDIO && type !== VideoProjectClipType.EFFECT
-  );
+  return project.clips.some(({ id, type }) => id === clipId && type !== VideoProjectClipType.AUDIO);
 }
 
 function isValidTransitionInstance(

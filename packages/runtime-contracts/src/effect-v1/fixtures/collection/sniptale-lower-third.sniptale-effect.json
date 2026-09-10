@@ -1,15 +1,15 @@
 {
   "schemaVersion": "sniptale.effect.v1",
-  "id": "sniptale-title-dark",
+  "id": "sniptale-lower-third",
   "kind": "standalone",
   "duration": 4,
   "label": {
-    "ru": "Главная мысль · Тёмная",
-    "en": "Main idea · Dark"
+    "ru": "Имя и роль",
+    "en": "Name and role"
   },
   "description": {
-    "ru": "Две крупные строки с отдельным акцентом и необязательной подложкой.",
-    "en": "Two bold lines with an accent and an optional backplate."
+    "ru": "Компактный титр с независимыми размерами имени и роли.",
+    "en": "A compact lower third with independent name and role sizes."
   },
   "assets": [],
   "controls": [
@@ -67,9 +67,9 @@
         "ru": "Размер заголовка",
         "en": "Heading size"
       },
-      "defaultValue": 68,
-      "min": 52,
-      "max": 76,
+      "defaultValue": 34,
+      "min": 26,
+      "max": 40,
       "step": 1,
       "group": "typography",
       "order": 4
@@ -81,86 +81,53 @@
         "ru": "Размер подписи",
         "en": "Detail size"
       },
-      "defaultValue": 22,
-      "min": 18,
-      "max": 26,
+      "defaultValue": 20,
+      "min": 17,
+      "max": 24,
       "step": 1,
       "group": "typography",
       "order": 5
     },
     {
-      "id": "eyebrow",
-      "kind": "text",
-      "label": {
-        "ru": "Надзаголовок",
-        "en": "Eyebrow"
-      },
-      "defaultValue": "ИСТОРИИ SNIPTALE",
-      "group": "content",
-      "order": 6,
-      "localizedDefaultValue": {
-        "ru": "ИСТОРИИ SNIPTALE",
-        "en": "SNIPTALE STORIES"
-      }
-    },
-    {
       "id": "title",
       "kind": "text",
       "label": {
-        "ru": "Заголовок · строка 1",
-        "en": "Heading · line 1"
+        "ru": "Имя · строка 1",
+        "en": "Name · line 1"
       },
-      "defaultValue": "Покажите главное.",
+      "defaultValue": "Анна Смирнова",
       "group": "content",
-      "order": 7,
+      "order": 6,
       "localizedDefaultValue": {
-        "ru": "Покажите главное.",
-        "en": "Show what matters."
+        "ru": "Анна Смирнова",
+        "en": "Anna Smirnova"
       }
     },
     {
-      "id": "line2",
+      "id": "name2",
       "kind": "text",
       "label": {
-        "ru": "Заголовок · строка 2",
-        "en": "Heading · line 2"
+        "ru": "Имя · дополнительная строка",
+        "en": "Name · optional second line"
       },
-      "defaultValue": "Без лишних слов.",
+      "defaultValue": "",
       "group": "content",
-      "order": 8,
-      "localizedDefaultValue": {
-        "ru": "Без лишних слов.",
-        "en": "Let the story speak."
-      }
+      "order": 7
     },
     {
       "id": "subtitle",
       "kind": "text",
       "label": {
-        "ru": "Подпись",
-        "en": "Subtitle"
+        "ru": "Роль",
+        "en": "Role"
       },
-      "defaultValue": "От первой идеи — до готовой истории.",
+      "defaultValue": "Дизайнер продукта",
       "group": "content",
-      "order": 9,
+      "order": 8,
       "localizedDefaultValue": {
-        "ru": "От первой идеи — до готовой истории.",
-        "en": "From the first idea to the finished story."
+        "ru": "Дизайнер продукта",
+        "en": "Product designer"
       }
-    },
-    {
-      "id": "backplate",
-      "kind": "number",
-      "label": {
-        "ru": "Подложка (%)",
-        "en": "Backplate (%)"
-      },
-      "defaultValue": 0,
-      "min": 0,
-      "max": 100,
-      "step": 1,
-      "group": "appearance",
-      "order": 10
     }
   ],
   "layers": [],
@@ -235,98 +202,6 @@
           "op": "mul",
           "args": [
             {
-              "op": "div",
-              "args": [
-                {
-                  "op": "read",
-                  "path": "controls.backplate"
-                },
-                100
-              ]
-            },
-            {
-              "op": "mul",
-              "args": [
-                {
-                  "op": "read",
-                  "path": "defs.exit"
-                },
-                {
-                  "op": "out",
-                  "args": [
-                    {
-                      "op": "clamp",
-                      "args": [
-                        {
-                          "op": "div",
-                          "args": [
-                            {
-                              "op": "sub",
-                              "args": [
-                                {
-                                  "op": "read",
-                                  "path": "progress"
-                                },
-                                {
-                                  "op": "mul",
-                                  "args": [
-                                    {
-                                      "op": "read",
-                                      "path": "defs.entry"
-                                    },
-                                    0
-                                  ]
-                                }
-                              ]
-                            },
-                            {
-                              "op": "mul",
-                              "args": [
-                                {
-                                  "op": "read",
-                                  "path": "defs.entry"
-                                },
-                                1
-                              ]
-                            }
-                          ]
-                        },
-                        0,
-                        1
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        },
-        "commands": [
-          {
-            "op": "fillRect",
-            "x": 0,
-            "y": 0,
-            "width": {
-              "op": "read",
-              "path": "width"
-            },
-            "height": {
-              "op": "read",
-              "path": "height"
-            },
-            "fill": {
-              "op": "read",
-              "path": "controls.surface"
-            }
-          }
-        ]
-      },
-      {
-        "op": "group",
-        "alpha": {
-          "op": "mul",
-          "args": [
-            {
               "op": "read",
               "path": "defs.exit"
             },
@@ -383,39 +258,31 @@
             "op": "fillRect",
             "x": 0,
             "y": 0,
-            "width": 4,
-            "height": 26,
+            "width": {
+              "op": "read",
+              "path": "width"
+            },
+            "height": {
+              "op": "read",
+              "path": "height"
+            },
             "fill": {
               "op": "read",
-              "path": "controls.accent"
+              "path": "controls.surface"
             }
           },
           {
-            "op": "text",
-            "text": {
+            "op": "fillRect",
+            "x": 0,
+            "y": 0,
+            "width": 4,
+            "height": {
               "op": "read",
-              "path": "controls.eyebrow"
+              "path": "height"
             },
-            "x": 18,
-            "y": 13,
-            "fontSize": 13,
-            "fontWeight": 700,
-            "fontFamily": "Arial, sans-serif",
-            "baseline": "middle",
             "fill": {
               "op": "read",
-              "path": "controls.ink"
-            },
-            "alpha": 1,
-            "maxWidth": {
-              "op": "sub",
-              "args": [
-                {
-                  "op": "read",
-                  "path": "width"
-                },
-                36
-              ]
+              "path": "controls.accent"
             }
           }
         ]
@@ -452,7 +319,7 @@
                                   "op": "read",
                                   "path": "defs.entry"
                                 },
-                                0.12
+                                0.15
                               ]
                             }
                           ]
@@ -464,7 +331,7 @@
                               "op": "read",
                               "path": "defs.entry"
                             },
-                            0.88
+                            0.85
                           ]
                         }
                       ]
@@ -484,11 +351,59 @@
               "op": "read",
               "path": "controls.title"
             },
-            "x": 0,
-            "y": 80,
+            "x": 24,
+            "y": {
+              "op": "select",
+              "value": {
+                "op": "not",
+                "args": [
+                  {
+                    "op": "eq",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.name2"
+                      },
+                      ""
+                    ]
+                  }
+                ]
+              },
+              "values": [32, 51]
+            },
             "fontSize": {
-              "op": "read",
-              "path": "controls.font"
+              "op": "select",
+              "value": {
+                "op": "not",
+                "args": [
+                  {
+                    "op": "eq",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.name2"
+                      },
+                      ""
+                    ]
+                  }
+                ]
+              },
+              "values": [
+                {
+                  "op": "min",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "controls.font"
+                    },
+                    32
+                  ]
+                },
+                {
+                  "op": "read",
+                  "path": "controls.font"
+                }
+              ]
             },
             "fontWeight": 700,
             "fontFamily": "Arial, sans-serif",
@@ -499,94 +414,156 @@
             },
             "alpha": 1,
             "maxWidth": {
-              "op": "read",
-              "path": "width"
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "width"
+                },
+                48
+              ]
             }
           }
         ]
       },
       {
-        "op": "group",
-        "alpha": {
-          "op": "mul",
+        "op": "when",
+        "condition": {
+          "op": "not",
           "args": [
             {
-              "op": "read",
-              "path": "defs.exit"
-            },
-            {
-              "op": "out",
+              "op": "eq",
               "args": [
                 {
-                  "op": "clamp",
-                  "args": [
-                    {
-                      "op": "div",
-                      "args": [
-                        {
-                          "op": "sub",
-                          "args": [
-                            {
-                              "op": "read",
-                              "path": "progress"
-                            },
-                            {
-                              "op": "mul",
-                              "args": [
-                                {
-                                  "op": "read",
-                                  "path": "defs.entry"
-                                },
-                                0.3
-                              ]
-                            }
-                          ]
-                        },
-                        {
-                          "op": "mul",
-                          "args": [
-                            {
-                              "op": "read",
-                              "path": "defs.entry"
-                            },
-                            0.7
-                          ]
-                        }
-                      ]
-                    },
-                    0,
-                    1
-                  ]
-                }
+                  "op": "read",
+                  "path": "controls.name2"
+                },
+                ""
               ]
             }
           ]
         },
         "commands": [
           {
-            "op": "text",
-            "text": {
-              "op": "read",
-              "path": "controls.line2"
+            "op": "group",
+            "alpha": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.exit"
+                },
+                {
+                  "op": "out",
+                  "args": [
+                    {
+                      "op": "clamp",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            {
+                              "op": "sub",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "progress"
+                                },
+                                {
+                                  "op": "mul",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "defs.entry"
+                                    },
+                                    0.25
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "defs.entry"
+                                },
+                                0.75
+                              ]
+                            }
+                          ]
+                        },
+                        0,
+                        1
+                      ]
+                    }
+                  ]
+                }
+              ]
             },
-            "x": 0,
-            "y": 157,
-            "fontSize": {
-              "op": "read",
-              "path": "controls.font"
-            },
-            "fontWeight": 700,
-            "fontFamily": "Arial, sans-serif",
-            "baseline": "middle",
-            "fill": {
-              "op": "read",
-              "path": "controls.accent"
-            },
-            "alpha": 1,
-            "maxWidth": {
-              "op": "read",
-              "path": "width"
-            }
+            "commands": [
+              {
+                "op": "text",
+                "text": {
+                  "op": "read",
+                  "path": "controls.name2"
+                },
+                "x": 24,
+                "y": 68,
+                "fontSize": {
+                  "op": "select",
+                  "value": {
+                    "op": "not",
+                    "args": [
+                      {
+                        "op": "eq",
+                        "args": [
+                          {
+                            "op": "read",
+                            "path": "controls.name2"
+                          },
+                          ""
+                        ]
+                      }
+                    ]
+                  },
+                  "values": [
+                    {
+                      "op": "min",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "controls.font"
+                        },
+                        32
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "controls.font"
+                    }
+                  ]
+                },
+                "fontWeight": 700,
+                "fontFamily": "Arial, sans-serif",
+                "baseline": "middle",
+                "fill": {
+                  "op": "read",
+                  "path": "controls.ink"
+                },
+                "alpha": 1,
+                "maxWidth": {
+                  "op": "sub",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "width"
+                    },
+                    48
+                  ]
+                }
+              }
+            ]
           }
         ]
       },
@@ -622,7 +599,7 @@
                                   "op": "read",
                                   "path": "defs.entry"
                                 },
-                                0.55
+                                0.38
                               ]
                             }
                           ]
@@ -634,7 +611,7 @@
                               "op": "read",
                               "path": "defs.entry"
                             },
-                            0.44999999999999996
+                            0.62
                           ]
                         }
                       ]
@@ -654,8 +631,8 @@
               "op": "read",
               "path": "controls.subtitle"
             },
-            "x": 0,
-            "y": 225,
+            "x": 24,
+            "y": 110,
             "fontSize": {
               "op": "read",
               "path": "controls.bodyFont"
@@ -667,10 +644,16 @@
               "op": "read",
               "path": "controls.ink"
             },
-            "alpha": 0.84,
+            "alpha": 0.74,
             "maxWidth": {
-              "op": "read",
-              "path": "width"
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "width"
+                },
+                48
+              ]
             }
           }
         ]
@@ -678,8 +661,63 @@
     ]
   },
   "objectLayout": {
-    "width": 820,
-    "height": 244,
+    "width": 520,
+    "height": 142,
     "resize": "scale"
-  }
+  },
+  "controlPresets": [
+    {
+      "id": "sniptale-orange-dark",
+      "label": {
+        "en": "Dark",
+        "ru": "Тёмный"
+      },
+      "theme": {
+        "id": "sniptale-orange",
+        "label": {
+          "en": "Sniptale Orange",
+          "ru": "Sniptale Orange"
+        }
+      },
+      "style": {
+        "id": "dark",
+        "label": {
+          "en": "Dark",
+          "ru": "Тёмный"
+        }
+      },
+      "values": {
+        "accent": "#fb923c",
+        "surface": "#171a20",
+        "ink": "#fafafa"
+      }
+    },
+    {
+      "id": "sniptale-orange-light",
+      "label": {
+        "en": "Light",
+        "ru": "Светлый"
+      },
+      "theme": {
+        "id": "sniptale-orange",
+        "label": {
+          "en": "Sniptale Orange",
+          "ru": "Sniptale Orange"
+        }
+      },
+      "style": {
+        "id": "light",
+        "label": {
+          "en": "Light",
+          "ru": "Светлый"
+        }
+      },
+      "values": {
+        "accent": "#c2410c",
+        "surface": "#ffffff",
+        "ink": "#202127"
+      }
+    }
+  ],
+  "defaultControlPresetId": "sniptale-orange-dark"
 }

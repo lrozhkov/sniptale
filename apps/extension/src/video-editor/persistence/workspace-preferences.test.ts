@@ -26,3 +26,18 @@ it('restores only valid layout values and discards invalid dimensions and unknow
     parseWorkspacePreferences({ inspectorWidth: 450, previewHeight: 600 }).inspectorWidth
   ).toBe(450);
 });
+
+it('keeps bounded independent effect-library filters without accepting arbitrary categories', () => {
+  const parsed = parseWorkspacePreferences({
+    effectLibraryFilters: {
+      standalone: { query: 'Title', theme: 'dark' },
+      targetEffect: { query: 'Blur', theme: 'all' },
+      transition: { query: 'x'.repeat(257), theme: 'all' },
+      unexpected: { query: 'bad', theme: 'all' },
+    },
+  });
+  expect(parsed.effectLibraryFilters).toEqual({
+    standalone: { query: 'Title', theme: 'dark' },
+    targetEffect: { query: 'Blur', theme: 'all' },
+  });
+});

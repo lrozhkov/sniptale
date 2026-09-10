@@ -85,6 +85,8 @@ function isHydratableProjectShape(value: unknown): value is VideoProject {
     value['height'] <= MAX_VIDEO_PROJECT_DIMENSION &&
     isPositiveNumber(value['fps']) &&
     value['fps'] <= MAX_VIDEO_PROJECT_FPS &&
+    (value['videoEffectsBypassed'] === undefined ||
+      typeof value['videoEffectsBypassed'] === 'boolean') &&
     isColorString(value['backgroundColor']) &&
     isEnumValue(value['timelinePlacementMode'], VideoTimelinePlacementMode) &&
     isNonNegativeNumber(value['duration']) &&

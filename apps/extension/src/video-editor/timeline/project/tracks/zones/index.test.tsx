@@ -90,7 +90,7 @@ function verifyTrackZoneRendering() {
   const transitionButton = container?.querySelector<HTMLButtonElement>(
     '[data-ui="timeline.track-transition-zone"]'
   );
-  const cutZone = container?.querySelector('div.pointer-events-none.absolute.inset-y-3.z-20');
+  const cutZone = container?.querySelector('[data-ui="timeline.transition-cut-drop"]');
   const stackedCue = container?.querySelector('[data-ui="timeline.track-overlap-zone"]');
   const buttons = container?.querySelectorAll('button');
 
@@ -139,6 +139,7 @@ function expectPrimaryTrackZones(
   expect(buildTrackGapZones(project, trackId)).toEqual([]);
   expect(buildTrackJunctionZones(project, trackId)).toEqual([
     {
+      locked: false,
       detail: CROSSFADE_DETAIL,
       end: 5,
       id: 'transition-1',
@@ -167,6 +168,8 @@ function expectCutTrackZones(
   expect(buildTrackCutZones(project, trackId)).toEqual([
     {
       id: 'cut:clip-cut-a:clip-cut-b',
+      leadingClipId: 'clip-cut-a',
+      trailingClipId: 'clip-cut-b',
       time: 3,
     },
   ]);
@@ -196,6 +199,8 @@ function verifySplitCutZone() {
   expect(buildTrackCutZones(splitProject, trackId)).toEqual([
     {
       id: expect.stringContaining('cut:'),
+      leadingClipId: 'clip-split',
+      trailingClipId: expect.any(String),
       time: 2.5,
     },
   ]);

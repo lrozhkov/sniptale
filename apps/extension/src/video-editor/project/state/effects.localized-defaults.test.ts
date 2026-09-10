@@ -17,7 +17,7 @@ vi.mock('../../../platform/i18n', async (importOriginal) => ({
 it('localizes only new instances; edits, empty strings, history and restored copies retain text', async () => {
   locale.value = 'ru';
   const source = readFileSync(
-    'packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-callout-dark.sniptale-effect.json'
+    'packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-callout.sniptale-effect.json'
   );
   const imported = await importRawEffectDocument(new Uint8Array(source));
   if (!imported.ok) throw new Error('Expected valid collection document');

@@ -1,3 +1,4 @@
+import type { EffectPresetPreferences } from './presets';
 import type { EffectV1Kind } from '@sniptale/runtime-contracts/effect-v1';
 
 export type EffectBundleCatalogSource = 'bundle-zip' | 'raw-json';
@@ -16,6 +17,9 @@ interface EffectBundleCatalogAssetReference {
 }
 
 export interface EffectBundleCatalogDocumentEntry {
+  presetPreferences?: EffectPresetPreferences;
+  /** Catalog presentation only, never part of an immutable document or stored entry. */
+  previewPresetId?: string;
   assets: EffectBundleCatalogAssetReference[];
   id: string;
   kind: EffectV1Kind;

@@ -18,13 +18,18 @@ export class FakeHTMLVideoElement extends FakeHTMLMediaElement {
 export function createVisualTestContext() {
   const maskContext = {
     fillRect: vi.fn(),
+    clearRect: vi.fn(),
+    setTransform: vi.fn(),
     restore: vi.fn(),
     save: vi.fn(),
   };
   const maskCanvas = {
     getContext: vi.fn(() => maskContext),
   };
-  return {
+  const alphas: number[] = [];
+  const context = {
+    globalAlpha: 1,
+    roundRect: vi.fn(),
     beginPath: vi.fn(),
     canvas: {
       ownerDocument: {
@@ -42,9 +47,13 @@ export function createVisualTestContext() {
     moveTo: vi.fn(),
     quadraticCurveTo: vi.fn(),
     rect: vi.fn(),
-    restore: vi.fn(),
+    restore: vi.fn(() => {
+      context.globalAlpha = alphas.pop() ?? 1;
+    }),
     rotate: vi.fn(),
-    save: vi.fn(),
+    save: vi.fn(() => {
+      alphas.push(context.globalAlpha);
+    }),
     scale: vi.fn(),
     stroke: vi.fn(),
     strokeRect: vi.fn(),
@@ -57,7 +66,10 @@ export function createVisualTestContext() {
     shadowOffsetY: 0,
     strokeStyle: '',
     __maskContext: maskContext,
-  } as unknown as CanvasRenderingContext2D & { __maskContext: CanvasRenderingContext2D };
+  };
+  return context as unknown as CanvasRenderingContext2D & {
+    __maskContext: CanvasRenderingContext2D;
+  };
 }
 
 export function createEffectVisualLayer(): Extract<

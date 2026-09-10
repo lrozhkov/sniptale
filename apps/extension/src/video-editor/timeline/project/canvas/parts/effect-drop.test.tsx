@@ -48,7 +48,7 @@ it('routes an annotation to its hovered track and scrolled time without seeking'
     null
   );
 });
-it('rejects locked/audio tracks and does not treat blank lanes as a transition or FX target', () => {
+it('rejects locked/audio tracks and transitions on blank lanes; blank video lanes target their track', () => {
   const project = createEmptyVideoProject('drop');
   const onDrop = vi.fn();
   for (const patch of [{ locked: true }, { kind: 'AUDIO' as const }]) {
@@ -69,8 +69,13 @@ it('rejects locked/audio tracks and does not treat blank lanes as a transition o
     onHighlight: vi.fn(),
   });
   h.onDrop(event('transition'));
-  h.onDrop(event('targetEffect'));
   expect(onDrop).not.toHaveBeenCalled();
+  h.onDrop(event('targetEffect'));
+  expect(onDrop).toHaveBeenCalledWith(
+    expect.objectContaining({ kind: 'targetEffect' }),
+    { kind: 'track', trackId: project.tracks[0]!.id },
+    2
+  );
 });
 
 it('applies video effects to the actual clip under the pointer', async () => {

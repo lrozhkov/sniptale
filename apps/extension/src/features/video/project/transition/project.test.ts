@@ -105,7 +105,7 @@ function registerTransitionBoundaryGuardTests() {
     expect(syncProjectTransitions(project).transitions).toEqual([]);
     expect(buildProjectTransitionSegments(project)).toEqual([]);
   });
-  it('does not create transitions between annotation and media clips on the same lane', () => {
+  it('creates transitions between annotation and media clips on the same lane', () => {
     const project = createTransitionProject();
     const annotationClip = createAnnotationClip(project.tracks[0]!.id, 1280, 720, 4);
     annotationClip.id = 'annotation-1';
@@ -123,8 +123,8 @@ function registerTransitionBoundaryGuardTests() {
       }),
     ];
 
-    expect(syncProjectTransitions(project).transitions).toEqual([]);
-    expect(buildProjectTransitionSegments(project)).toEqual([]);
+    expect(syncProjectTransitions(project).transitions).toHaveLength(1);
+    expect(buildProjectTransitionSegments(project)).toHaveLength(1);
   });
 }
 

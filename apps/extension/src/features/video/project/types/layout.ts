@@ -127,6 +127,7 @@ export interface VideoProjectShapeStyle {
 }
 
 export interface VideoProjectTrack {
+  effectsBypassed?: boolean;
   id: string;
   name: string;
   order: number;

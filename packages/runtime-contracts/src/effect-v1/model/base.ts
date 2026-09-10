@@ -1,3 +1,11 @@
+export type EffectControlPreset = {
+  id: string;
+  label: LocaleText & { en: string };
+  theme: { id: string; label: LocaleText & { en: string } };
+  style: { id: string; label: LocaleText & { en: string } };
+  values: Record<string, number | string>;
+};
+
 export type LocaleText = {
   en?: string;
   ru?: string;
@@ -160,6 +168,8 @@ export type EffectDefinition = {
   category?: string;
   clips: EffectClip[];
   controls?: ControlDefinition[];
+  controlPresets?: EffectControlPreset[];
+  defaultControlPresetId?: string | undefined;
   description?: LocaleText;
   duration: number;
   /** Canonical EffectV1 document retained by editor/runtime adapters. */

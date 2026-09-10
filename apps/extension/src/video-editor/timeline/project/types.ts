@@ -1,3 +1,4 @@
+import type { VideoEditorEffectApplicationTarget } from '../../contracts/effect-document-drag';
 import type { VideoEditorProjectActions } from '../../contracts/commands/project';
 import type { AutoProcessingActions } from '../../project/operations/auto-transform';
 import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
@@ -82,7 +83,7 @@ export interface ProjectTimelineProps {
   onSelectTransition: (transitionId: string) => void;
   onDropEffectDocument?: (
     payload: VideoEditorEffectDocumentDragPayload,
-    target: VideoProjectEffectTarget,
+    target: VideoEditorEffectApplicationTarget,
     startTime: number,
     trackId?: string,
     timelineLaneId?: string | null

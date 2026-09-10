@@ -106,11 +106,12 @@ function resolveCollectionView(
   locale: 'en' | 'ru'
 ) {
   const themes = getEffectCatalogThemes(
-    controller.entries.flatMap((entry) => (entry.status === 'ready' ? [entry.entry] : []))
+    controller.entries.flatMap((entry) => (entry.status === 'ready' ? [entry.entry] : [])),
+    locale
   );
   const effectiveFilter: EffectCatalogFilter = {
     ...filter,
-    theme: themes.some((theme) => theme === filter.theme) ? filter.theme : 'all',
+    theme: themes.some((theme) => theme.value === filter.theme) ? filter.theme : 'all',
   };
   const items = buildCollectionItems(controller, effectiveFilter, locale);
   return { themes, effectiveFilter, items };
@@ -150,15 +151,14 @@ function buildCollectionItems(
               {documents.map((document) => {
                 const metadata = describeCatalogDocument(document, locale);
                 return (
-                  <li key={document.id} className="flex min-w-0 items-center justify-between gap-2">
+                  <li
+                    key={`${document.id}:${document.previewPresetId ?? ''}`}
+                    className="flex min-w-0 items-center justify-between gap-2"
+                  >
                     <span className="min-w-0 break-words">{metadata.label}</span>
-                    {metadata.theme !== 'unspecified' && (
+                    {(metadata.themeLabel || metadata.styleLabel) && (
                       <span className="shrink-0 text-[var(--sniptale-color-text-muted)]">
-                        {translate(
-                          metadata.theme === 'dark'
-                            ? 'videoEditor.effectsLibrary.darkTheme'
-                            : 'videoEditor.effectsLibrary.lightTheme'
-                        )}
+                        {[metadata.themeLabel, metadata.styleLabel].filter(Boolean).join(' · ')}
                       </span>
                     )}
                   </li>
@@ -167,13 +167,13 @@ function buildCollectionItems(
             </ul>
           ) : undefined,
         meta:
-          documents.length === 1 &&
-          describeCatalogDocument(documents[0]!, locale).theme !== 'unspecified'
-            ? translate(
-                describeCatalogDocument(documents[0]!, locale).theme === 'dark'
-                  ? 'videoEditor.effectsLibrary.darkTheme'
-                  : 'videoEditor.effectsLibrary.lightTheme'
-              )
+          documents.length === 1
+            ? [
+                describeCatalogDocument(documents[0]!, locale).themeLabel,
+                describeCatalogDocument(documents[0]!, locale).styleLabel,
+              ]
+                .filter(Boolean)
+                .join(' · ')
             : undefined,
         capabilities: { toggle: true, delete: true },
       },

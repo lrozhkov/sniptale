@@ -16,6 +16,8 @@ export interface EffectRuntimeFramePlacement extends EffectRuntimeFrameDimension
 }
 
 type EffectRuntimeFrameTarget =
+  | { kind: 'track'; trackId: string; clipIds: string[] }
+  | { kind: 'video-group'; clipIds: string[] }
   | { clipId: string; kind: 'scene' }
   | {
       chainIndex: number;
@@ -75,7 +77,8 @@ export function isSameEffectTarget(
   right: VideoProjectEffectTarget
 ): boolean {
   if (left.kind !== right.kind) return false;
-  if (left.kind === 'scene') return true;
+  if (left.kind === 'scene' || left.kind === 'video-group') return true;
+  if (left.kind === 'track' && right.kind === 'track') return left.trackId === right.trackId;
   if (left.kind === 'clip' && right.kind === 'clip') return left.clipId === right.clipId;
   return (
     left.kind === 'transition' &&

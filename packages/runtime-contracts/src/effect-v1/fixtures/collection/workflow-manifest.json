@@ -1,166 +1,78 @@
 {
   "format": "sniptale.workflow-corpus.v1",
-  "schemaSha256": "0e9679be22393f4e4ccbd1aa9bdcc7538281b78fcd3615a67deb1c9ea8a3ef83",
+  "schemaSha256": "e68d88ab5148f42676aa48d0d32b8744a71ed47484f9aa74fa84a21707554f6a",
   "entries": [
     {
-      "artifact": "sniptale-lower-third-dark.sniptale-effect.json",
-      "sha256": "40351275a9f51f0fdba1a91782b7e5af6619f1c392c0c92f1da07a480961c02c",
+      "artifact": "sniptale-lower-third.sniptale-effect.json",
+      "sha256": "7c95edf538d422a340badd1d0a19cde11f8169b6decaf0e9558f3e77f097bc00",
       "accepted": true,
       "kind": "standalone",
       "diagnostics": [],
       "representativeTime": 2,
-      "timeMapping": "source",
-      "sourceSha256": "09392bec60a83b643dd56141b9f7b7abc729cd9f8022e7ebe986e3b25213f0dc"
+      "timeMapping": "source"
     },
     {
-      "artifact": "sniptale-title-dark.sniptale-effect.json",
-      "sha256": "fd9ebf67e647187cdb91e009da98297706bf6b1b8901cc44415fd654f8166fc8",
+      "artifact": "sniptale-title.sniptale-effect.json",
+      "sha256": "943aeddde907db5e7744dd08d4333ed5a2f522444951bb17a51810e122192fa2",
       "accepted": true,
       "kind": "standalone",
       "diagnostics": [],
       "representativeTime": 2,
-      "timeMapping": "source",
-      "sourceSha256": "fd9ebf67e647187cdb91e009da98297706bf6b1b8901cc44415fd654f8166fc8"
+      "timeMapping": "source"
     },
     {
-      "artifact": "sniptale-chapters-dark.sniptale-effect.json",
-      "sha256": "ac1a3b73e1efd786e1b5c9dfa544830fe092f0852a997f8dcf9819733b0bf965",
+      "artifact": "sniptale-chapters.sniptale-effect.json",
+      "sha256": "16e06b525123e9aed9b175cae476faedf9f6d52041a1d77c23165e58073f5fd7",
       "accepted": true,
       "kind": "standalone",
       "diagnostics": [],
       "representativeTime": 2,
-      "timeMapping": "source",
-      "sourceSha256": "28f4f02884a4f06c5dd8f1331a7067f5578dd485c0595d1f792c64a1e2b8da09"
+      "timeMapping": "source"
     },
     {
-      "artifact": "sniptale-callout-dark.sniptale-effect.json",
-      "sha256": "86b9b68f62259f83900b37dba149d74322fc97988289dd0d1590ff1ebb4052db",
+      "artifact": "sniptale-callout.sniptale-effect.json",
+      "sha256": "c046682d0917adb06e1bf6d645b97445ce4a91405644852e2dfd56b00a2b29fe",
       "accepted": true,
       "kind": "standalone",
       "diagnostics": [],
       "representativeTime": 2,
-      "timeMapping": "source",
-      "sourceSha256": "f8e56a56e2d834af22975f43fd0e998903648e24b250e3083f4176ba56ed7afe"
+      "timeMapping": "source"
     },
     {
-      "artifact": "sniptale-frame-dark.sniptale-effect.json",
-      "sha256": "d2a2d0458a1bb5aec6b3e9404fd324d7cbb39451cab1d771ec7675b860d2d3ff",
+      "artifact": "sniptale-frame.sniptale-effect.json",
+      "sha256": "fc90b0aff0d75515f1664a24b258eedce83955dc3608cbd41f2b3b5c3ae951a4",
       "accepted": true,
       "kind": "standalone",
       "diagnostics": [],
       "representativeTime": 2,
-      "timeMapping": "source",
-      "sourceSha256": "d2a2d0458a1bb5aec6b3e9404fd324d7cbb39451cab1d771ec7675b860d2d3ff"
+      "timeMapping": "source"
     },
     {
-      "artifact": "sniptale-corners-dark.sniptale-effect.json",
-      "sha256": "3b22d7e0ae0057339538a19a14f93cad78cff201e9aaa6f0b527440709303957",
+      "artifact": "sniptale-corners.sniptale-effect.json",
+      "sha256": "e9e3004f9bbb42119b81abb1f6d2ac5e7493be582e87110e77ce0a9a0e18c317",
       "accepted": true,
       "kind": "standalone",
       "diagnostics": [],
       "representativeTime": 2,
-      "timeMapping": "source",
-      "sourceSha256": "3b22d7e0ae0057339538a19a14f93cad78cff201e9aaa6f0b527440709303957"
+      "timeMapping": "source"
     },
     {
-      "artifact": "sniptale-spotlight-dark.sniptale-effect.json",
-      "sha256": "9c04007f844f807b83f8e59fb51c4116847020e5b78ab4205c1c5ef1e6ad9b51",
+      "artifact": "sniptale-spotlight.sniptale-effect.json",
+      "sha256": "a031da05be5f5c4880371ad9f34700d897bb7cc5d34151dcc94e244df0430f27",
       "accepted": true,
       "kind": "targetEffect",
       "diagnostics": [],
       "representativeTime": 2,
-      "timeMapping": "normalized-interval",
-      "sourceSha256": "9c04007f844f807b83f8e59fb51c4116847020e5b78ab4205c1c5ef1e6ad9b51"
+      "timeMapping": "normalized-interval"
     },
     {
-      "artifact": "sniptale-frosted-dark.sniptale-effect.json",
-      "sha256": "e6bad29a6bed66f0a4ff9a640c30be4cd1f6b638cca8d7288708be6fdeb82e3b",
+      "artifact": "sniptale-frosted.sniptale-effect.json",
+      "sha256": "26aa4e5c9ee4240b4322f3b7fa6e3ac20cb8dabfe76ebf60d0ef521a019d6e88",
       "accepted": true,
       "kind": "targetEffect",
       "diagnostics": [],
       "representativeTime": 2,
-      "timeMapping": "normalized-interval",
-      "sourceSha256": "e6bad29a6bed66f0a4ff9a640c30be4cd1f6b638cca8d7288708be6fdeb82e3b"
-    },
-    {
-      "artifact": "sniptale-lower-third-light.sniptale-effect.json",
-      "sha256": "3b2b14dedce7c2d53a93cd3891decef29eb071de75afaf08dafb63c3c2fa49f8",
-      "accepted": true,
-      "kind": "standalone",
-      "diagnostics": [],
-      "representativeTime": 2,
-      "timeMapping": "source",
-      "sourceSha256": "a5f885b458fe03c6ee7d0831fa1f91a421518de5de61542c60c3d29e0881e46f"
-    },
-    {
-      "artifact": "sniptale-title-light.sniptale-effect.json",
-      "sha256": "57bbbcc74a8fe7334a4db9bd8da8cb156847a0d46d69854bbb5ef469a391448e",
-      "accepted": true,
-      "kind": "standalone",
-      "diagnostics": [],
-      "representativeTime": 2,
-      "timeMapping": "source",
-      "sourceSha256": "57bbbcc74a8fe7334a4db9bd8da8cb156847a0d46d69854bbb5ef469a391448e"
-    },
-    {
-      "artifact": "sniptale-chapters-light.sniptale-effect.json",
-      "sha256": "4dc286b74742132847c05f430769058cacb4c9f5902fd7ee31eac50f6a136d44",
-      "accepted": true,
-      "kind": "standalone",
-      "diagnostics": [],
-      "representativeTime": 2,
-      "timeMapping": "source",
-      "sourceSha256": "2781b4b7e0f1fa6cc6a3198f8ecce59890006a50904b6c30cb2209826f26e0e6"
-    },
-    {
-      "artifact": "sniptale-callout-light.sniptale-effect.json",
-      "sha256": "d147112999021470219608e04c6cdf154202c0ae1771a3c72f6b009be8296867",
-      "accepted": true,
-      "kind": "standalone",
-      "diagnostics": [],
-      "representativeTime": 2,
-      "timeMapping": "source",
-      "sourceSha256": "9455484ad1e926d9a250f93bb5b0af839aacc452304732e7da9985f33bb0c079"
-    },
-    {
-      "artifact": "sniptale-frame-light.sniptale-effect.json",
-      "sha256": "e862c3b078ef0102edc4d82fcd03b9027b6a577f921215a6ac180ebd192cf082",
-      "accepted": true,
-      "kind": "standalone",
-      "diagnostics": [],
-      "representativeTime": 2,
-      "timeMapping": "source",
-      "sourceSha256": "e862c3b078ef0102edc4d82fcd03b9027b6a577f921215a6ac180ebd192cf082"
-    },
-    {
-      "artifact": "sniptale-corners-light.sniptale-effect.json",
-      "sha256": "92fa41449d273ddc4e3be09cbb649209aebb6379fc5dd4df5957619ae435a6e8",
-      "accepted": true,
-      "kind": "standalone",
-      "diagnostics": [],
-      "representativeTime": 2,
-      "timeMapping": "source",
-      "sourceSha256": "92fa41449d273ddc4e3be09cbb649209aebb6379fc5dd4df5957619ae435a6e8"
-    },
-    {
-      "artifact": "sniptale-spotlight-light.sniptale-effect.json",
-      "sha256": "3d71851bffd06eb6937e102c01698b1975d17bc5c1d6c76afabfd7ccf7d20611",
-      "accepted": true,
-      "kind": "targetEffect",
-      "diagnostics": [],
-      "representativeTime": 2,
-      "timeMapping": "normalized-interval",
-      "sourceSha256": "3d71851bffd06eb6937e102c01698b1975d17bc5c1d6c76afabfd7ccf7d20611"
-    },
-    {
-      "artifact": "sniptale-frosted-light.sniptale-effect.json",
-      "sha256": "2647040dedf87c7cda59dcb3797cf99a71289852c8c378c4278ef1ff9a867877",
-      "accepted": true,
-      "kind": "targetEffect",
-      "diagnostics": [],
-      "representativeTime": 2,
-      "timeMapping": "normalized-interval",
-      "sourceSha256": "2647040dedf87c7cda59dcb3797cf99a71289852c8c378c4278ef1ff9a867877"
+      "timeMapping": "normalized-interval"
     },
     {
       "artifact": "sniptale-transition-dissolve.sniptale-effect.json",
@@ -169,8 +81,7 @@
       "kind": "transition",
       "diagnostics": [],
       "representativeTime": 0.4,
-      "timeMapping": "normalized-interval",
-      "sourceSha256": "e9058ef9ead7b62c15976fe343d69ee20ffb90887b0cb078a33cbd4cb9310d98"
+      "timeMapping": "normalized-interval"
     },
     {
       "artifact": "sniptale-transition-blur.sniptale-effect.json",
@@ -179,8 +90,7 @@
       "kind": "transition",
       "diagnostics": [],
       "representativeTime": 0.4,
-      "timeMapping": "normalized-interval",
-      "sourceSha256": "900c0ef6b71d5ad3e00e28364112e5a0eb1b0520dc4ce8dcd3a095b0939492bc"
+      "timeMapping": "normalized-interval"
     },
     {
       "artifact": "sniptale-transition-zoom.sniptale-effect.json",
@@ -189,8 +99,7 @@
       "kind": "transition",
       "diagnostics": [],
       "representativeTime": 0.4,
-      "timeMapping": "normalized-interval",
-      "sourceSha256": "b30f13c6b083ae76c8c5906e398a6cb70e00d7d5c91e17f0b6c3ad297384cfa1"
+      "timeMapping": "normalized-interval"
     },
     {
       "artifact": "sniptale-transition-push.sniptale-effect.json",
@@ -199,8 +108,7 @@
       "kind": "transition",
       "diagnostics": [],
       "representativeTime": 0.4,
-      "timeMapping": "normalized-interval",
-      "sourceSha256": "6fa5ff2763f3765b8e0d707cde8a1ca3f1ad780969860129a06e0c3f4bf4e535"
+      "timeMapping": "normalized-interval"
     },
     {
       "artifact": "sniptale-transition-split.sniptale-effect.json",
@@ -209,8 +117,7 @@
       "kind": "transition",
       "diagnostics": [],
       "representativeTime": 0.4,
-      "timeMapping": "normalized-interval",
-      "sourceSha256": "b0ae054aa5b147b88800de4f1a5252ca291176e89fa85dfa1712b9737f8d6460"
+      "timeMapping": "normalized-interval"
     },
     {
       "artifact": "sniptale-transition-light-leak.sniptale-effect.json",
@@ -219,8 +126,7 @@
       "kind": "transition",
       "diagnostics": [],
       "representativeTime": 0.4,
-      "timeMapping": "normalized-interval",
-      "sourceSha256": "7b3f11a1d6da1244f70baf782a472c1bed9a87e1cd9e5f31d52a6ec0a4748a52"
+      "timeMapping": "normalized-interval"
     },
     {
       "artifact": "sniptale-video-push-in.sniptale-effect.json",
@@ -229,8 +135,7 @@
       "kind": "targetEffect",
       "diagnostics": [],
       "representativeTime": 2.5,
-      "timeMapping": "normalized-interval",
-      "sourceSha256": "8d013ececd42a3c5dc23801be75760043054257a8484b203c5b708af0ca292de"
+      "timeMapping": "normalized-interval"
     },
     {
       "artifact": "sniptale-video-bloom.sniptale-effect.json",
@@ -239,8 +144,7 @@
       "kind": "targetEffect",
       "diagnostics": [],
       "representativeTime": 2.5,
-      "timeMapping": "normalized-interval",
-      "sourceSha256": "af9cd20d2fd5291ecd85a0420643ec487f6d3bdc2b24703246293a922473dbe1"
+      "timeMapping": "normalized-interval"
     },
     {
       "artifact": "sniptale-video-warm.sniptale-effect.json",
@@ -249,8 +153,7 @@
       "kind": "targetEffect",
       "diagnostics": [],
       "representativeTime": 2.5,
-      "timeMapping": "normalized-interval",
-      "sourceSha256": "d493e4852207785a0b15ec1c0888560b9d6e99cecd8dabfcc38014bbd793b3b1"
+      "timeMapping": "normalized-interval"
     },
     {
       "artifact": "sniptale-video-grain.sniptale-effect.json",
@@ -259,8 +162,7 @@
       "kind": "targetEffect",
       "diagnostics": [],
       "representativeTime": 2.5,
-      "timeMapping": "normalized-interval",
-      "sourceSha256": "46e58f46d69d723455c12035e3d88afc1e5b71f98deb377d890d2f467748446a"
+      "timeMapping": "normalized-interval"
     },
     {
       "artifact": "sniptale-video-vignette.sniptale-effect.json",
@@ -269,8 +171,7 @@
       "kind": "targetEffect",
       "diagnostics": [],
       "representativeTime": 2.5,
-      "timeMapping": "normalized-interval",
-      "sourceSha256": "a9c91fc3606f9a5781752c508ce347ee26d52d7bb9e8368a91ff019ae4bba6d9"
+      "timeMapping": "normalized-interval"
     },
     {
       "artifact": "sniptale-video-light-drift.sniptale-effect.json",
@@ -279,8 +180,7 @@
       "kind": "targetEffect",
       "diagnostics": [],
       "representativeTime": 2.5,
-      "timeMapping": "normalized-interval",
-      "sourceSha256": "b3a14aa8d3229313c8f41b18fbdc3cb1191b3ecfd3a803a6cee22ba34ee1d165"
+      "timeMapping": "normalized-interval"
     },
     {
       "artifact": "sniptale-video-blur.sniptale-effect.json",
@@ -289,76 +189,67 @@
       "kind": "targetEffect",
       "diagnostics": [],
       "representativeTime": 2.5,
-      "timeMapping": "normalized-interval",
-      "sourceSha256": "5b65041f4151c1c45e09863c264dcb3d63c466e8d8919f3b18b93948d3730ef2"
+      "timeMapping": "normalized-interval"
     },
     {
       "artifact": "english-only-callout.sniptale-effect.json",
-      "sha256": "c0c64fee119b57d8f9762c8788e19775924e16b76ba4cc75bd04337e9715fbc7",
+      "sha256": "59bc570eded472df86f57a073db8129048edbebd82cb68346e790dac406c698f",
       "accepted": true,
       "kind": "standalone",
       "diagnostics": [],
       "representativeTime": 2,
-      "timeMapping": "source",
-      "sourceSha256": "cf24c31c4532626d172dae3434b65111a9bdb0049648374f3410a866c450b0cd"
+      "timeMapping": "source"
     },
     {
       "artifact": "unknown-group.sniptale-effect.json",
-      "sha256": "f6cf55663871716cd86c2d0db093998d64f76e568a7fdab84434412ef1018446",
+      "sha256": "339688d23d1fabbd57b7b0f531cabc0e11e12aa3c2141f22324558de8399e4c9",
       "accepted": true,
       "kind": "standalone",
       "diagnostics": ["CONTROL_GROUP_UNKNOWN"],
       "representativeTime": 2,
-      "timeMapping": "source",
-      "sourceSha256": "3cb3751e34cf71df7e06673558b2dee1d1cf8c5ab9ac8c4f6cc1796ebe66d314"
+      "timeMapping": "source"
     },
     {
       "artifact": "invalid-group.sniptale-effect.json",
-      "sha256": "ece41f3942a3e86bc4237be12c4964f821c289464fe22839b57bf212f6c7a5a7",
+      "sha256": "18d54caed88b0ae63d4387e8be7825826daf370ee76e4e6fb611cdfbe220a404",
       "accepted": false,
       "kind": "standalone",
-      "diagnostics": ["IDENTIFIER"],
-      "sourceSha256": "6eae7af98fc40b3b44858673361e8d5889552886847c6496c5a1372333180f00"
+      "diagnostics": ["IDENTIFIER", "CONTROL_PRESET_PROTECTED", "CONTROL_PRESET_PROTECTED"]
     },
     {
       "artifact": "invalid-option.sniptale-effect.json",
-      "sha256": "ed2e3d70b559c014a0aea89dc071f9e9d54d0a2936159a827bf3ac9ddf12df56",
+      "sha256": "e624200a3bc1c949e4ecbce36cfe9d6d4d9e84c5a7964d5fd46e5de22215be20",
       "accepted": false,
       "kind": "standalone",
-      "diagnostics": ["CONTROL_OPTION_DUPLICATE"],
-      "sourceSha256": "3f6721a1f153681e688d4c8705a46c0cef638a5aede4c4eb57a8705d5a3bc036"
+      "diagnostics": ["CONTROL_OPTION_DUPLICATE"]
     },
     {
       "artifact": "invalid-default.sniptale-effect.json",
-      "sha256": "42334527550c591ec6bf548a20b36635d54ff91fc980a9555de9c996042ffe03",
+      "sha256": "d016f9e893416219356503e6ce2e59386a8c2f47c6e4f547f9f943103cdd0d66",
       "accepted": false,
       "kind": "standalone",
-      "diagnostics": ["CONTROL_OPTION_DEFAULT"],
-      "sourceSha256": "2ce47d2f3a30a5a31c08072443b1c6cb5cf8a45f2b6ae2065086ccc16715aeba"
+      "diagnostics": ["CONTROL_OPTION_DEFAULT"]
     },
     {
       "artifact": "missing-english.sniptale-effect.json",
-      "sha256": "99f2e29c009231efd4c38b66c7cba798e112ee843c97d3382ad25787bc08cb86",
+      "sha256": "339ede53b7147fb85181306b2c3f79f78c797243330522693a6f18df66863d79",
       "accepted": false,
       "kind": "standalone",
-      "diagnostics": ["LOCALE_EN_REQUIRED"],
-      "sourceSha256": "148ed860cbaf246dec87502ddfc37c47581542ae53cb36a10d5637db0dd59061"
+      "diagnostics": ["LOCALE_EN_REQUIRED"]
     },
     {
       "artifact": "invalid-locale.sniptale-effect.json",
-      "sha256": "a3d3530bc42608bb95009bf9382989e2ecfa2cc31ec10fc9b9743655075f6c2c",
+      "sha256": "a45d63a79eb43d3f2499b511e3d891132ccd32c1d728a4bd187657244616e895",
       "accepted": false,
       "kind": "standalone",
-      "diagnostics": ["LOCALE_ENTRY"],
-      "sourceSha256": "96644fe13e16ce4fb72b21159fbf9bc9baaa90807c77afd5bad6d070fdd1a991"
+      "diagnostics": ["LOCALE_ENTRY"]
     },
     {
       "artifact": "invalid-blend.sniptale-effect.json",
-      "sha256": "2a4ce71c5cf02b41ad374c33e8ac581753be8374d1e7ba85b16ae7f82e593547",
+      "sha256": "ce0fdea05249bdfd491e9c96640290beb526f26716dd96810560d2e4f58c4722",
       "accepted": false,
       "kind": "standalone",
-      "diagnostics": ["COMMAND_ENUM"],
-      "sourceSha256": "850471de433533c6e8202ba57d153afa0702f3a1e96bb0a11767e60bbe11aff1"
+      "diagnostics": ["COMMAND_ENUM"]
     },
     {
       "artifact": "alpha-source-atop.sniptale-effect.json",
@@ -367,8 +258,7 @@
       "kind": "targetEffect",
       "diagnostics": [],
       "representativeTime": 2,
-      "timeMapping": "normalized-interval",
-      "sourceSha256": "b231088ed0ce81f319b7bd1ecabd92f0f6c5c1b2d17f6a060253cc7a1c097fe4"
+      "timeMapping": "normalized-interval"
     },
     {
       "artifact": "alpha-destination-in.sniptale-effect.json",
@@ -377,68 +267,123 @@
       "kind": "targetEffect",
       "diagnostics": [],
       "representativeTime": 2,
-      "timeMapping": "normalized-interval",
-      "sourceSha256": "5815a447065aed07e10568f6b7cce4ea336a18ae583e20b38a31637b2c1cd21f"
+      "timeMapping": "normalized-interval"
     },
     {
       "artifact": "localized-default-missing-en.sniptale-effect.json",
-      "sha256": "54020383cbb8c889522d6a85ee528d1427d4af27ebc2689bf7a8eaeb7b7f093f",
+      "sha256": "6bfbf7e2ad3c9624783fc358db8692ab128001173527f60db355f974ddc0b102",
       "accepted": false,
       "kind": "standalone",
-      "diagnostics": ["LOCALE_EN_REQUIRED"],
-      "sourceSha256": "e81c10277d24faa238969edd1b5063088cd87607e4154da0b291519a14e30997"
+      "diagnostics": ["LOCALE_EN_REQUIRED"]
     },
     {
       "artifact": "localized-default-shape.sniptale-effect.json",
-      "sha256": "45e4ecb931e5a1d488d7277eb9535f01fa9cfbcb8d1a67d867dc9078180d12d0",
+      "sha256": "6b868d8877c720190a8c3e0e0a2e942005fc9f369a4e3c52347488175593cd65",
       "accepted": false,
       "kind": "standalone",
-      "diagnostics": ["LOCALE_TEXT"],
-      "sourceSha256": "5b2bf1987ffa9bfed1fd62bd1490401755e5ed178308bd187cf7d65453ca1617"
+      "diagnostics": ["LOCALE_TEXT"]
     },
     {
       "artifact": "localized-default-type.sniptale-effect.json",
-      "sha256": "650dbeeb5194887484c1473aafebd1f471694c749e9845c71ae81b22795f4aa4",
+      "sha256": "8505bd182734f302c49534ee6959b8cd4850476b6987a604a3407753b84d28c8",
       "accepted": false,
       "kind": "standalone",
-      "diagnostics": ["LOCALE_ENTRY"],
-      "sourceSha256": "2839cf8da5168d1a9dde3f60863006decad0d723df14e3c13dbae1d4c3d102e2"
+      "diagnostics": ["LOCALE_ENTRY"]
     },
     {
       "artifact": "localized-default-kind.sniptale-effect.json",
-      "sha256": "523433444718f9a8c067e587d25cca3b5f1cbb22bc2d204843fe05fa0e8033fb",
+      "sha256": "08e96866615cc7bb515f470c3cf4826d6708d253d8fd48654ef8f9d1397d01c9",
       "accepted": false,
       "kind": "standalone",
-      "diagnostics": ["CONTROL_LOCALIZED_DEFAULT_KIND"],
-      "sourceSha256": "f77632aad802927c1bca105859df94f0bd6d109be19d57c5a5fc90fbd7923ba5"
+      "diagnostics": ["CONTROL_LOCALIZED_DEFAULT_KIND"]
     },
     {
       "artifact": "localized-default-options.sniptale-effect.json",
-      "sha256": "576db9c3352afdf4caf33794c2eade9321473df5ed8ed707102cc2da6d4ba2dd",
+      "sha256": "b9ef33f79385d0ce3aa91fbfd595d4c1afbe2a9e56ab63d6c7bda05c30041ce6",
       "accepted": false,
       "kind": "standalone",
-      "diagnostics": ["CONTROL_OPTION_LOCALIZED_DEFAULT"],
-      "sourceSha256": "ecd44663644500458a1b9128d7877a807fff1c64dafd3b5344b6f38214540733"
+      "diagnostics": ["CONTROL_OPTION_LOCALIZED_DEFAULT"]
     },
     {
       "artifact": "localized-default-regional.sniptale-effect.json",
-      "sha256": "b418cf194b7ef718aedb7fd0396541b5e54ad9da8ce9f4d13bdcab7d97eb8438",
+      "sha256": "3e584da87470cd743e3d63476ec4f9de9c45085521bf1bd9d7dea2c8558c1e2a",
       "accepted": true,
       "kind": "standalone",
       "diagnostics": [],
       "representativeTime": 2,
-      "timeMapping": "source",
-      "sourceSha256": "ffe9816731cfd66b930487d9622af98d928d6429b10fc972bd183ced0823e5a7"
+      "timeMapping": "source"
     },
     {
       "artifact": "localized-default-empty.sniptale-effect.json",
-      "sha256": "7a5cda1a8fb2426c0e18090d79e18cae9715ac45b244ce87e266bad4b942c1ea",
+      "sha256": "66f4f7e25e3c0b85239e614fce340db07f319732eb5511622e9b679e35ef28d5",
       "accepted": true,
       "kind": "standalone",
       "diagnostics": [],
       "representativeTime": 2,
-      "timeMapping": "source",
-      "sourceSha256": "132fd39f3a8344f6b70ff1389887823414295f7faf4822d7d879d10e2b7f61bb"
+      "timeMapping": "source"
+    },
+    {
+      "artifact": "preset-unknown-control.sniptale-effect.json",
+      "sha256": "68d035f5e52f4f3302c6f26058f2b13bb96194e04e7fc52a6d3590738eaaa3ee",
+      "accepted": false,
+      "kind": "standalone",
+      "diagnostics": ["CONTROL_PRESET_CONTROL"]
+    },
+    {
+      "artifact": "preset-text.sniptale-effect.json",
+      "sha256": "2f38aba6beed71587aa710235c28b248c300437d75a3bd0aa7bcda047ce4f356",
+      "accepted": false,
+      "kind": "standalone",
+      "diagnostics": ["CONTROL_PRESET_PROTECTED"]
+    },
+    {
+      "artifact": "preset-anchor.sniptale-effect.json",
+      "sha256": "d5504c2f58329722f97c4ef45ea230b42e6f03509d08fedecccffa93731cbe48",
+      "accepted": false,
+      "kind": "standalone",
+      "diagnostics": ["CONTROL_PRESET_PROTECTED"]
+    },
+    {
+      "artifact": "preset-bad-value.sniptale-effect.json",
+      "sha256": "aeb9dc7c639996240f007e7d550b2aeb7d14e6dd10798ceb3811e9c93d9eb5a1",
+      "accepted": false,
+      "kind": "standalone",
+      "diagnostics": ["CONTROL_PRESET_VALUE"]
+    },
+    {
+      "artifact": "preset-bad-default.sniptale-effect.json",
+      "sha256": "987dec1df87d7b203055bc6746c18485215561c42aba128f3aba1f10e3bdcd6f",
+      "accepted": false,
+      "kind": "standalone",
+      "diagnostics": ["CONTROL_PRESET_DEFAULT"]
+    },
+    {
+      "artifact": "preset-duplicate.sniptale-effect.json",
+      "sha256": "48cac078091259f21af5f0e532146b125dfbfd7d70624d142203c438cc1dbf47",
+      "accepted": false,
+      "kind": "standalone",
+      "diagnostics": ["CONTROL_PRESET_DUPLICATE"]
+    },
+    {
+      "artifact": "preset-label.sniptale-effect.json",
+      "sha256": "ed5026da35343a9e49cdbb0ca286df4b5ded91d16e5e27608192fe95c2e88140",
+      "accepted": false,
+      "kind": "standalone",
+      "diagnostics": ["LOCALE_EN_REQUIRED"]
+    },
+    {
+      "artifact": "preset-no-default.sniptale-effect.json",
+      "sha256": "ccc1608ea51ec791985fa0d734b00890e2fb91cce4e7f4de427b719edf8d0392",
+      "accepted": false,
+      "kind": "standalone",
+      "diagnostics": ["IDENTIFIER", "CONTROL_PRESET_DEFAULT"]
+    },
+    {
+      "artifact": "preset-extra-field.sniptale-effect.json",
+      "sha256": "4c2dbe99e7f3a5e233976029137467a6ae6dcea471aff7cd3ce6df4beabaf250",
+      "accepted": false,
+      "kind": "standalone",
+      "diagnostics": ["UNKNOWN_FIELD"]
     }
   ]
 }

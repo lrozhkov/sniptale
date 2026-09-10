@@ -1,5 +1,7 @@
+import { applyInitialEffectPreset } from '../../features/video/project/effect-bundle/catalog/presets';
 import {
   parseEffectV1Source,
+  resolveEffectV1ControlDefault,
   resolveEffectV1ObjectRenderBounds,
 } from '@sniptale/runtime-contracts/effect-v1';
 import type {
@@ -17,13 +19,19 @@ export async function renderEffectCatalogPreview(
   entry: EffectBundleCatalogDocumentEntry,
   progress: number,
   sequenceId: number,
-  sourceFrame?: HTMLCanvasElement | null
+  sourceFrame?: HTMLCanvasElement | null,
+  locale: string = 'en'
 ): Promise<ImageBitmap> {
   const parsed = parseEffectV1Source(entry.source).document;
   if (!parsed) throw new Error('Invalid preview document');
   const time = progress * parsed.duration;
-  const controls = Object.fromEntries(
-    parsed.controls.map((control) => [control.id, control.defaultValue])
+  const controls = applyInitialEffectPreset(
+    parsed,
+    Object.fromEntries(
+      parsed.controls.map((control) => [control.id, resolveEffectV1ControlDefault(control, locale)])
+    ),
+    entry.presetPreferences,
+    entry.previewPresetId
   );
   const body = parsed.objectLayout ?? { width: 640, height: 360 };
   const bounds = parsed.objectLayout?.handles?.length
@@ -39,9 +47,7 @@ export async function renderEffectCatalogPreview(
   });
   const plan: EffectRuntimeFramePlan = {
     assets,
-    controls: Object.fromEntries(
-      parsed.controls.map((control) => [control.id, control.defaultValue])
-    ),
+    controls,
     dimensions,
     renderDimensions: { width, height },
     documentSha256: entry.sha256,
@@ -114,8 +120,18 @@ export function effectPreviewProgress(position: number, duration: number, kind: 
   return edge + ((x - 0.4) / 0.2) * (1 - 2 * edge);
 }
 
-export function effectPosterKey(entry: EffectBundleCatalogDocumentEntry): string {
-  return `poster-v2-320:${entry.sha256}:${entry.assets
+export function effectPosterKey(
+  entry: EffectBundleCatalogDocumentEntry,
+  locale: string = 'en'
+): string {
+  const choice = entry.presetPreferences?.defaultPreset;
+  const presetId =
+    entry.previewPresetId ??
+    (choice ? `${choice.kind === 'user' ? 'user:' : ''}${choice.id}` : 'default');
+  const values = presetId.startsWith('user:')
+    ? entry.presetPreferences?.presets.find((preset) => `user:${preset.id}` === presetId)?.values
+    : undefined;
+  return `poster-v3-320:${entry.sha256}:${locale}:${presetId}:${JSON.stringify(values)}:${entry.assets
     .map(({ id, sha256 }) => `${id}:${sha256}`)
     .sort()
     .join('|')}`;

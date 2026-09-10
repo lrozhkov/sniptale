@@ -145,7 +145,7 @@ it('keeps catalog management out of the editor for invalid bundles', () => {
   expect(container?.textContent).toContain(translate('videoEditor.effectsLibrary.noSearchResults'));
 });
 
-it('does not expose a transition that already owns an EffectV1 instance', () => {
+it('allows replacing the imported template of an existing transition', () => {
   const project = createEmptyVideoProject('occupied transition');
   project.tracks.push(createVideoProjectTrack('Annotations', 0, VideoTrackKind.PRIMARY));
   const track = project.tracks.find(({ name }) => name === 'Annotations')!;
@@ -179,7 +179,7 @@ it('does not expose a transition that already owns an EffectV1 instance', () => 
     },
   ];
 
-  expect(resolveEffectTransitionTargetId(project, 1.5, 'transition-1')).toBeNull();
+  expect(resolveEffectTransitionTargetId(project, 1.5, 'transition-1')).toBe('transition-1');
 });
 
 it('surfaces a rejected dropped apply through the shared operation owner', async () => {
@@ -333,7 +333,12 @@ function findDocumentButton(id: string): HTMLButtonElement {
   const row = [...(container?.querySelectorAll('[data-effect-document]') ?? [])].find(
     (element) => element.getAttribute('data-effect-document') === id
   );
-  const button = row?.querySelector('button');
+  const button =
+    id === 'standalone'
+      ? [...(row?.querySelectorAll('button') ?? [])].find(
+          (item) => item.title === translate('videoEditor.effectsLibrary.applyToScene')
+        )
+      : row?.querySelector('button');
   if (!(button instanceof HTMLButtonElement)) throw new Error(`Missing button for ${id}`);
   return button;
 }

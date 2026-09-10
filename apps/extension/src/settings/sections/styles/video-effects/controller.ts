@@ -1,3 +1,4 @@
+import { EFFECT_CATALOG_CHANGED_EVENT } from '../../../../features/video/project/effect-bundle/catalog/presets';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   deleteEffectBundle,
@@ -41,10 +42,12 @@ export function useVideoEffectsSettings() {
     lifetime.current = owner;
     void reload();
     window.addEventListener('focus', reload);
+    window.addEventListener(EFFECT_CATALOG_CHANGED_EVENT, reload);
     return () => {
       owner.active = false;
       owner.revision++;
       window.removeEventListener('focus', reload);
+      window.removeEventListener(EFFECT_CATALOG_CHANGED_EVENT, reload);
     };
   }, [reload]);
   const run = async (operation: () => Promise<void>) => {

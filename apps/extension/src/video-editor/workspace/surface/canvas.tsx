@@ -17,7 +17,7 @@ import { VideoEditorWorkspaceEffectsLibrary } from './effects-library';
 import type { WorkspaceEffectBundlesState } from './effect-bundles';
 import { getProjectTimelineProps } from './timeline-props';
 import type { VideoEditorEffectDocumentDragPayload } from '../../contracts/effect-document-drag';
-import type { VideoProjectEffectTarget } from '../../../features/video/project/effect-instance/types';
+import type { VideoEditorEffectApplicationTarget } from '../../contracts/effect-document-drag';
 import type { EffectLibraryOperations } from '../../library/effects-dock/operations';
 import type { VideoEditorEffectCatalogItem } from '../../library/effects-dock/types';
 import type { EffectEditingPort } from '../../contracts/controller-store';
@@ -474,7 +474,7 @@ interface ApplyDroppedEffectDocumentArgs {
   operations: EffectLibraryOperations;
   payload: VideoEditorEffectDocumentDragPayload;
   startTime: number;
-  target: VideoProjectEffectTarget;
+  target: VideoEditorEffectApplicationTarget;
   trackId?: string;
   timelineLaneId?: string | null;
 }
@@ -497,6 +497,7 @@ export async function applyDroppedEffectDocument(
     args.onApplyEffectDocument({
       catalog,
       documentId: document.id,
+      ...(args.payload.controlPresetId ? { controlPresetId: args.payload.controlPresetId } : {}),
       startTime: args.startTime,
       target: args.target,
       ...(args.trackId === undefined ? {} : { trackId: args.trackId }),
@@ -507,12 +508,13 @@ export async function applyDroppedEffectDocument(
 
 function doesEffectKindMatchTarget(
   kind: VideoEditorEffectDocumentDragPayload['kind'],
-  target: VideoProjectEffectTarget
+  target: VideoEditorEffectApplicationTarget
 ): boolean {
   return (
     (kind === 'standalone' && target.kind === 'scene') ||
-    (kind === 'targetEffect' && target.kind === 'clip') ||
-    (kind === 'transition' && target.kind === 'transition')
+    (kind === 'targetEffect' &&
+      (target.kind === 'clip' || target.kind === 'track' || target.kind === 'video-group')) ||
+    (kind === 'transition' && (target.kind === 'transition' || target.kind === 'junction'))
   );
 }
 

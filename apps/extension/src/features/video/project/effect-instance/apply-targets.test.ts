@@ -65,7 +65,7 @@ it('fails when a declared transition has no renderable overlap segment', async (
   ).rejects.toEqual(expect.objectContaining({ code: 'effectTargetMissing' }));
 });
 
-it('rejects audio and standalone-host clips as target-effect inputs', async () => {
+it('rejects audio and accepts generated annotation clips as target-effect inputs', async () => {
   const catalog = await createRawCatalog('neutral-target-effect.sniptale-effect.json');
   const project = createProjectWithTransition();
   const audioTrack = createVideoProjectTrack('Audio', 2, VideoTrackKind.AUDIO);
@@ -83,7 +83,7 @@ it('rejects audio and standalone-host clips as target-effect inputs', async () =
   });
   project.clips.push(audio, host);
 
-  for (const clipId of [audio.id, host.id]) {
+  for (const clipId of [audio.id]) {
     await expect(
       applyEffectCatalogDocument({
         ...createApplyArgs(catalog, catalog.documents[0]!.id, project),
@@ -93,22 +93,61 @@ it('rejects audio and standalone-host clips as target-effect inputs', async () =
   }
 });
 
-it('rejects a second EffectV1 document for the same transition target', async () => {
-  const catalog = await createRawCatalog('neutral-transition.sniptale-effect.json');
+it('applies track and video-group effects with owner duration and refuses camera/audio tracks', async () => {
+  const catalog = await createRawCatalog('neutral-target-effect.sniptale-effect.json');
   const project = createProjectWithTransition();
-  const transitionId = project.transitions![0]!.id;
-  const first = await applyEffectCatalogDocument({
-    ...createApplyArgs(catalog, catalog.documents[0]!.id, project),
-    target: { kind: 'transition', transitionId },
-  });
-
+  for (const target of [
+    { kind: 'track' as const, trackId: project.tracks[0]!.id },
+    { kind: 'video-group' as const },
+  ]) {
+    const next = await applyEffectCatalogDocument({
+      ...createApplyArgs(catalog, catalog.documents[0]!.id, project),
+      target,
+    });
+    expect(next.effectInstances![0]).toMatchObject({
+      target,
+      startTime: 0,
+      duration: 9,
+      rangeMode: 'owner',
+    });
+  }
+  project.tracks[0]!.role = 'CAMERA';
   await expect(
     applyEffectCatalogDocument({
-      ...createApplyArgs(catalog, catalog.documents[0]!.id, first),
-      instanceId: 'second-transition-effect',
-      target: { kind: 'transition', transitionId },
+      ...createApplyArgs(catalog, catalog.documents[0]!.id, project),
+      target: { kind: 'track', trackId: project.tracks[0]!.id },
     })
-  ).rejects.toEqual(expect.objectContaining({ code: 'effectKindTargetMismatch' }));
+  ).rejects.toMatchObject({ code: 'effectKindTargetMismatch' });
+});
+
+it('replaces a junction template instead of stacking transition graphs', async () => {
+  const catalog = await createRawCatalog('neutral-transition.sniptale-effect.json');
+  const project = createProjectWithTransition();
+  const target = { kind: 'transition' as const, transitionId: project.transitions![0]!.id };
+  const first = await applyEffectCatalogDocument({
+    ...createApplyArgs(catalog, catalog.documents[0]!.id, project),
+    target,
+  });
+  const second = await applyEffectCatalogDocument({
+    ...createApplyArgs(catalog, catalog.documents[0]!.id, first),
+    instanceId: 'replacement',
+    target,
+  });
+  expect(second.effectInstances).toHaveLength(1);
+  expect(second.effectInstances![0]).toMatchObject({ id: 'replacement', target });
+  expect(first.effectInstances![0]!.id).toBe('effect-instance');
+});
+
+it('refuses imported transitions on a locked track', async () => {
+  const catalog = await createRawCatalog('neutral-transition.sniptale-effect.json');
+  const project = createProjectWithTransition();
+  project.tracks[0]!.locked = true;
+  await expect(
+    applyEffectCatalogDocument({
+      ...createApplyArgs(catalog, catalog.documents[0]!.id, project),
+      target: { kind: 'transition', transitionId: project.transitions![0]!.id },
+    })
+  ).rejects.toMatchObject({ code: 'effectKindTargetMismatch' });
 });
 
 function createApplyArgs(

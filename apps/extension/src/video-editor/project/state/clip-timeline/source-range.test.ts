@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { setup } from '../insertion/material.test-support';
 import { resolveVideoProjectActionOccurrences } from '../../../../features/video/project/action-occurrences';
-import { planSourceRangeCompression } from './source-range';
+import { planSourceRangeCompression, planSourceRangeRemoval } from './source-range';
 
 function fixture() {
   const { store, asset } = setup(true);
@@ -103,4 +103,94 @@ it('rejects locked linked audio and stale source identity without a partial muta
   expect(
     planSourceRangeCompression(project, { ...request, sourceInstanceId: 'other-insertion' })
   ).toMatchObject({ status: 'blocked', reason: 'missing-source' });
+});
+
+it('compresses track and global FX with the source interval while retaining clip FX', () => {
+  const { project, request, video } = fixture();
+  const base = {
+    kind: 'targetEffect' as const,
+    snapshotId: 'snapshot',
+    enabled: true,
+    controls: {},
+    startTime: 11,
+    duration: 5,
+    playbackRate: 1,
+    rangeMode: 'interval' as const,
+  };
+  project.effectInstances = [
+    { ...base, id: 'track-fx', target: { kind: 'track', trackId: video.trackId } },
+    { ...base, id: 'global-fx', target: { kind: 'video-group' } },
+    {
+      ...base,
+      id: 'clip-fx',
+      startTime: 10,
+      duration: 6,
+      target: { kind: 'clip', clipId: video.id },
+    },
+  ];
+  const result = planSourceRangeCompression(project, request);
+  expect(result.status).toBe('ready');
+  if (result.status !== 'ready') throw new Error('Expected compression');
+  for (const kind of ['track', 'video-group']) {
+    const pieces = result.project.effectInstances!.filter(
+      (instance) => instance.target.kind === kind
+    );
+    expect(
+      pieces.map(({ startTime, duration, playbackRate, sourceStart }) => ({
+        startTime,
+        duration,
+        playbackRate,
+        sourceStart,
+      }))
+    ).toEqual([
+      { startTime: 11, duration: 1, playbackRate: 1, sourceStart: 0 },
+      { startTime: 12, duration: 0.5, playbackRate: 4, sourceStart: 1 },
+      { startTime: 12.5, duration: 2, playbackRate: 1, sourceStart: 3 },
+    ]);
+  }
+  expect(
+    result.project.effectInstances!.filter((instance) => instance.target.kind === 'clip')
+  ).toHaveLength(3);
+  expect(project.effectInstances).toHaveLength(3);
+});
+
+it('rejects invalid compression requests and removes a whole interval without leaving scoped FX behind', () => {
+  const { project, request, video } = fixture();
+  for (const targetPlaybackRate of [NaN, -1, 10000])
+    expect(planSourceRangeCompression(project, { ...request, targetPlaybackRate })).toMatchObject({
+      status: 'blocked',
+      reason: 'invalid-rate',
+    });
+  expect(
+    planSourceRangeCompression(project, { ...request, sourceEnd: request.sourceStart })
+  ).toMatchObject({ status: 'blocked', reason: 'range-too-short' });
+  const mismatch = {
+    ...project,
+    clips: project.clips.map((clip) =>
+      clip.type === 'AUDIO' ? { ...clip, playbackRate: 2 } : clip
+    ),
+  };
+  expect(planSourceRangeCompression(mismatch, request)).toMatchObject({
+    status: 'blocked',
+    reason: 'linked-timing',
+  });
+  project.effectInstances = [
+    {
+      id: 'removed',
+      kind: 'targetEffect',
+      target: { kind: 'track', trackId: video.trackId },
+      snapshotId: 'snapshot',
+      controls: {},
+      enabled: true,
+      startTime: 10,
+      duration: 6,
+      playbackRate: 1,
+      rangeMode: 'interval',
+    },
+  ];
+  const removed = planSourceRangeRemoval(project, { ...request, sourceStart: 0, sourceEnd: 6 });
+  expect(removed.status).toBe('ready');
+  if (removed.status !== 'ready') throw new Error('Expected removal');
+  expect(removed.project.effectInstances).toEqual([]);
+  expect(removed.project.clips.some((clip) => clip.id === video.id)).toBe(false);
 });

@@ -3,6 +3,8 @@ export const EFFECT_V1_ROOT_KEYS = new Set([
   'assets',
   'clips',
   'controls',
+  'controlPresets',
+  'defaultControlPresetId',
   'description',
   'duration',
   'id',

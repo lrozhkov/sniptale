@@ -281,6 +281,7 @@ export type VideoProjectClip =
   | VideoProjectShapeClip;
 
 export interface VideoProject {
+  videoEffectsBypassed?: boolean;
   version: 2;
   id: string;
   name: string;

@@ -1673,5 +1673,60 @@
         "padding": 16
       }
     ]
-  }
+  },
+  "controlPresets": [
+    {
+      "id": "sniptale-orange-dark",
+      "label": {
+        "en": "Dark",
+        "ru": "Тёмный"
+      },
+      "theme": {
+        "id": "sniptale-orange",
+        "label": {
+          "en": "Sniptale Orange",
+          "ru": "Sniptale Orange"
+        }
+      },
+      "style": {
+        "id": "dark",
+        "label": {
+          "en": "Dark",
+          "ru": "Тёмный"
+        }
+      },
+      "values": {
+        "accent": "#fb923c",
+        "surface": "#171a20",
+        "ink": "#fafafa"
+      }
+    },
+    {
+      "id": "sniptale-orange-light",
+      "label": {
+        "en": "Light",
+        "ru": "Светлый"
+      },
+      "theme": {
+        "id": "sniptale-orange",
+        "label": {
+          "en": "Sniptale Orange",
+          "ru": "Sniptale Orange"
+        }
+      },
+      "style": {
+        "id": "light",
+        "label": {
+          "en": "Light",
+          "ru": "Светлый"
+        }
+      },
+      "values": {
+        "accent": "#c2410c",
+        "surface": "#ffffff",
+        "ink": "#202127"
+      }
+    }
+  ],
+  "defaultControlPresetId": "sniptale-orange-dark"
 }

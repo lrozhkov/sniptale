@@ -11,6 +11,8 @@ import {
 } from '../../interaction-state/projection';
 
 export function createTrackEffectDropHandlers(args: {
+  dragKind?: string | undefined;
+  header?: boolean;
   project: VideoProject;
   track: VideoProjectTrack;
   projection?: TimelineProjection | undefined;
@@ -25,7 +27,12 @@ export function createTrackEffectDropHandlers(args: {
     onDragOver(event: React.DragEvent<HTMLDivElement>): boolean {
       if (!hasVideoEditorEffectDocumentDragType(event.dataTransfer)) return false;
       event.stopPropagation();
-      if (!editable || !args.onDrop) {
+      if (
+        !editable ||
+        !args.onDrop ||
+        args.dragKind === 'transition' ||
+        (args.header && args.dragKind !== 'targetEffect')
+      ) {
         event.dataTransfer.dropEffect = 'none';
         args.onHighlight(null);
         return true;
@@ -41,7 +48,8 @@ export function createTrackEffectDropHandlers(args: {
       event.stopPropagation();
       args.onHighlight(null);
       const payload = readVideoEditorEffectDocumentDragPayload(event.dataTransfer);
-      if (!editable || !payload || !args.onDrop) return true;
+      if (!editable || !payload || !args.onDrop || (args.header && payload.kind !== 'targetEffect'))
+        return true;
       const x = event.clientX - event.currentTarget.getBoundingClientRect().left;
       const time = Math.max(
         0,
@@ -65,8 +73,9 @@ export function createTrackEffectDropHandlers(args: {
             clip.id === element?.getAttribute('data-project-timeline-clip') &&
             clip.trackId === args.track.id
         );
-        if (clip && clip.type !== 'AUDIO' && clip.type !== 'EFFECT')
+        if (clip && clip.type !== 'AUDIO')
           args.onDrop(payload, { kind: 'clip', clipId: clip.id }, clip.startTime);
+        else args.onDrop(payload, { kind: 'track', trackId: args.track.id }, time);
       }
       return true;
     },

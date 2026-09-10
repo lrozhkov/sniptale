@@ -141,6 +141,7 @@ function selectClipSelectionPort(state: VideoEditorState): ClipSelectionPort {
 function selectEffectEditingPort(state: VideoEditorState): EffectEditingPort {
   return {
     selectEffectInstance: state.selectEffectInstance,
+    setEffectTargetBypassed: state.setEffectTargetBypassed,
     setClipEffectsBypassed: state.setClipEffectsBypassed,
     applyEffectDocument: state.applyEffectDocument,
     deleteEffectInstance: state.deleteEffectInstance,

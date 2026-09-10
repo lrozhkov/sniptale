@@ -5,7 +5,10 @@ import { EditorIconButton } from '@sniptale/ui/editor-chrome';
 import { ProductGlassInput } from '@sniptale/ui/product-glass-controls';
 import { CompactSelect } from './compact-inspector-controls/primitives';
 import { translate } from '../platform/i18n';
-import type { EffectCatalogFilter } from '../features/video/project/effect-bundle/catalog/query';
+import type {
+  EffectCatalogFilter,
+  EffectCatalogTheme,
+} from '../features/video/project/effect-bundle/catalog/query';
 import type { EffectFileImportResult } from '../composition/persistence/effect-bundles/import-files';
 
 export function EffectCatalogControls({
@@ -17,7 +20,7 @@ export function EffectCatalogControls({
 }: {
   filter: EffectCatalogFilter;
   onChange: (filter: EffectCatalogFilter) => void;
-  themes?: readonly Exclude<EffectCatalogFilter['theme'], 'all'>[];
+  themes?: readonly EffectCatalogTheme[];
   disabled?: boolean;
   hideCategories?: boolean;
 }) {
@@ -105,24 +108,15 @@ export function EffectCatalogControls({
           {searching ? <X size={16} aria-hidden="true" /> : <Search size={16} aria-hidden="true" />}
         </EditorIconButton>
       </div>
-      {themes.length > 1 && (
+      {themes.length > 0 && (
         <CompactSelect
           aria-label={translate('videoEditor.effectsLibrary.theme')}
-          value={themes.some((theme) => theme === filter.theme) ? filter.theme : 'all'}
+          value={themes.some((theme) => theme.value === filter.theme) ? filter.theme : 'all'}
           containerClassName="min-w-0"
           disabled={disabled}
           options={[
             { value: 'all', label: translate('videoEditor.effectsLibrary.allThemes') },
-            ...themes.map((value) => ({
-              value,
-              label: translate(
-                value === 'light'
-                  ? 'videoEditor.effectsLibrary.lightTheme'
-                  : value === 'dark'
-                    ? 'videoEditor.effectsLibrary.darkTheme'
-                    : 'videoEditor.effectsLibrary.noTheme'
-              ),
-            })),
+            ...themes,
           ]}
           onChange={(theme) => onChange({ ...filter, theme })}
         />

@@ -93,3 +93,24 @@ it('gives long entrance/exit animations scrub space while keeping transitions li
     effectPosterKey({ ...entry, assets: [{ id: 'replacement', sha256: 'b'.repeat(64) }] })
   );
 });
+
+it('keys each localized style independently of unrelated user presets', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { effectPosterKey } = await import('./effect-catalog-preview');
+  const source = readFileSync(
+    'packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-callout.sniptale-effect.json',
+    'utf8'
+  );
+  const catalog = await createEffectCatalogEntry(await readValidBundleArtifact(), 1);
+  const entry = { ...catalog.documents[0]!, source, previewPresetId: 'sniptale-orange-light' };
+  expect(effectPosterKey(entry, 'en')).not.toBe(effectPosterKey(entry, 'ru'));
+  expect(effectPosterKey(entry)).not.toBe(
+    effectPosterKey({ ...entry, previewPresetId: 'sniptale-orange-dark' })
+  );
+  expect(effectPosterKey(entry)).toBe(
+    effectPosterKey({
+      ...entry,
+      presetPreferences: { presets: [{ id: 'other', name: 'Other', values: {} }] },
+    })
+  );
+});

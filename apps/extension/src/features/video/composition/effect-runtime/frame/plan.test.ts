@@ -271,13 +271,13 @@ it('separates extended negative raster bounds from rotated body placement and st
   const source = readFileSync(
     new URL(
       '../../../../../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/' +
-        'sniptale-callout-light.sniptale-effect.json',
+        'sniptale-callout.sniptale-effect.json',
       import.meta.url
     ),
     'utf8'
   );
   snapshot.source = source;
-  snapshot.documentId = 'sniptale-callout-light';
+  snapshot.documentId = 'sniptale-callout';
   const instance = project.effectInstances![0]!;
   instance.controls = {};
   instance.sceneAnchors = { tip: { x: 0, y: 0 } };
@@ -298,4 +298,27 @@ it('separates extended negative raster bounds from rotated body placement and st
   expect(
     resolveEffectRuntimeFramePlans(project, 1).find((p) => p.effectInstanceId === instance.id)
   ).toEqual(plan);
+});
+
+it('preserves an external callout pointer through its clip FX chain', () => {
+  const project = createProject();
+  const source = readFileSync(
+    'packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-callout.sniptale-effect.json',
+    'utf8'
+  );
+  Object.assign(project.effectSnapshots![0]!, { source, documentId: 'sniptale-callout' });
+  Object.assign(project.effectInstances![0]!, {
+    controls: {},
+    sceneAnchors: { tip: { x: -200, y: -100 } },
+  });
+  for (const instance of project.effectInstances!.filter((item) => item.kind === 'targetEffect'))
+    instance.target = { kind: 'clip', clipId: 'standalone-host' };
+  const plans = resolveEffectRuntimeFramePlans(project, 1);
+  const host = plans.find((plan) => plan.kind === 'standalone')!;
+  expect(host.bitmapBounds!.x).toBeLessThan(0);
+  for (const fx of plans.filter((plan) => plan.kind === 'targetEffect')) {
+    expect(fx.bitmapBounds).toEqual(host.bitmapBounds);
+    expect(fx.dimensions).toEqual(host.dimensions);
+    expect(fx.renderDimensions).toEqual(host.renderDimensions);
+  }
 });

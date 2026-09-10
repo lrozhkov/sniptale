@@ -1,3 +1,4 @@
+import { resolveEffectRuntimeVisualLayers } from '../../../../features/video/composition/draw/effect-runtime';
 import {
   createEffectRuntimeDrawState,
   drawCompositionVisualLayer,
@@ -154,7 +155,10 @@ function drawPreviewOrderedVisualLayers(params: {
   prepared: PreparedPreviewSceneCanvas;
 }) {
   const segments = segmentVisualLayersByViewportLock(
-    params.frame.visualLayers,
+    resolveEffectRuntimeVisualLayers(
+      params.frame.visualLayers,
+      params.effectRuntimeFrames?.overlayFrames
+    ),
     params.frame.camera
   );
   const overlayEffectState = createEffectRuntimeDrawState();
@@ -241,7 +245,9 @@ function resolveOrderedPreviewPassLayers(
   for (const segmentLayer of layers) {
     const layer = passLayers.find((candidate) => candidate.clipId === segmentLayer.clipId);
     if (layer) {
-      resolvedLayers.push(layer);
+      resolvedLayers.push(
+        segmentLayer.effectActionsOnly ? { ...layer, effectActionsOnly: true } : layer
+      );
     }
   }
   return resolvedLayers;

@@ -101,6 +101,7 @@ function ProjectTimelineBodyCanvas(props: ProjectTimelineBodyProps) {
 
 function createTrackListProps(props: ProjectTimelineBodyProps): ProjectTimelineBodyTrackListProps {
   return {
+    onDropEffectDocument: props.onDropEffectDocument,
     canShowTelemetryLane: true,
     recordingTelemetry: props.recordingTelemetry,
     onSelectHistoryLane: props.onSelectHistoryLane,

@@ -22,6 +22,8 @@ export interface VideoProjectEffectSnapshot {
 
 export type VideoProjectEffectTarget =
   | { kind: 'scene' }
+  | { kind: 'track'; trackId: string }
+  | { kind: 'video-group' }
   | { clipId: string; kind: 'clip' }
   | { kind: 'transition'; transitionId: string };
 

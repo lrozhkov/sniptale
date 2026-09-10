@@ -1,5 +1,6 @@
 import type {
   ControlDefinition,
+  EffectControlPreset,
   EffectClip,
   EffectLayer,
   EffectScene,
@@ -68,7 +69,11 @@ export type EffectV1ObjectHandle = {
   padding: number;
 };
 
+export type { EffectControlPreset } from './base.js';
+
 export type EffectV1Document = {
+  controlPresets?: EffectControlPreset[];
+  defaultControlPresetId?: string;
   assets: EffectV1Asset[];
   clips: EffectClip[];
   controls: ControlDefinition[];

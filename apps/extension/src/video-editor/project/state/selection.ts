@@ -107,7 +107,9 @@ export function resolveSelectedTrackIdFromSelection(
       )?.target;
       return target?.kind === 'clip'
         ? (project.clips.find((clip) => clip.id === target.clipId)?.trackId ?? null)
-        : null;
+        : target?.kind === 'track'
+          ? target.trackId
+          : null;
     }
     case VideoEditorSelectionKind.MOTION_CONNECTION:
     case VideoEditorSelectionKind.HISTORY_LANE:

@@ -22,6 +22,8 @@ export function getEffectControlSections(document: EffectV1Document) {
   const controls = document.controls.filter((control) => !axes.has(control.id));
   return groups
     .map(([id, key]) => ({
+      id,
+      semantic: id,
       label: translate(`videoEditor.effectsLibrary.${key}`),
       advanced: id === 'advanced',
       controls: controls

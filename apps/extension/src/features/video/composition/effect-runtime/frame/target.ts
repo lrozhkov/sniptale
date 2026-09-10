@@ -1,3 +1,4 @@
+import { resolveEffectOwner, isVideoEffectTrack } from '../../../project/effect-instance/owner';
 import type { VideoProjectEffectInstance } from '../../../project/effect-instance/types';
 import { isEffectInstanceTimingEqual } from '../../../project/effect-instance/timing';
 import type { VideoProject, VideoProjectTransitionSegment } from '../../../project/types/index';
@@ -5,6 +6,8 @@ import type { EffectRuntimeFramePlacement } from '../runtime/types';
 import { resolveEffectTargetTrackAvailability } from './target-availability';
 
 export type UnindexedEffectRuntimeFrameTarget =
+  | { kind: 'track'; trackId: string; clipIds: string[] }
+  | { kind: 'video-group'; clipIds: string[] }
   | { clipId: string; kind: 'scene'; placement: EffectRuntimeFramePlacement }
   | { clipId: string; kind: 'clip'; placement: EffectRuntimeFramePlacement }
   | {
@@ -39,6 +42,31 @@ export function resolveEffectRuntimeFrameTarget(
       : null;
   }
   if (kind === 'targetEffect') {
+    if (target.kind === 'track' || target.kind === 'video-group') {
+      const owner = resolveEffectOwner(project, target);
+      if (!owner) return undefined;
+      if (!owner.visible || owner.bypassed) return null;
+      const ids = new Set(
+        project.tracks
+          .filter(
+            (track) =>
+              track.visible &&
+              isVideoEffectTrack(track) &&
+              (target.kind === 'video-group' || track.id === target.trackId)
+          )
+          .map((track) => track.id)
+      );
+      const clipIds = project.clips
+        .filter(
+          (clip) =>
+            ids.has(clip.trackId) &&
+            projectTime >= clip.startTime &&
+            projectTime < clip.startTime + clip.duration
+        )
+        .map((clip) => clip.id);
+      if (!clipIds.length) return null;
+      return { ...target, clipIds };
+    }
     if (target.kind !== 'clip') return undefined;
     const clip = project.clips.find(({ id }) => id === target.clipId);
     if (!clip) return undefined;

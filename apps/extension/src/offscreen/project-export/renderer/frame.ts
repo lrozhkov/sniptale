@@ -1,3 +1,4 @@
+import { resolveEffectRuntimeVisualLayers } from '../../../features/video/composition/draw/effect-runtime';
 import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 import {
   createEffectRuntimeDrawState,
@@ -88,7 +89,10 @@ function drawVisualPasses(params: {
   settings: VideoProjectExportSettings;
 }) {
   const segments = segmentVisualLayersByViewportLock(
-    params.renderPasses.overlayFrame.visualLayers,
+    resolveEffectRuntimeVisualLayers(
+      params.renderPasses.overlayFrame.visualLayers,
+      params.effectRuntimeFrames?.overlayFrames
+    ),
     params.renderPasses.overlayFrame.camera
   );
   const overlayEffectState = createEffectRuntimeDrawState();

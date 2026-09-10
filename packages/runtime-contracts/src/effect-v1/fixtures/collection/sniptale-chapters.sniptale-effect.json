@@ -1,11 +1,11 @@
 {
   "schemaVersion": "sniptale.effect.v1",
-  "id": "sniptale-chapters-dark",
+  "id": "sniptale-chapters",
   "kind": "standalone",
   "duration": 4,
   "label": {
-    "ru": "Маршрут видео · Тёмная",
-    "en": "Video chapters · Dark"
+    "ru": "Маршрут видео",
+    "en": "Video chapters"
   },
   "description": {
     "ru": "До трёх разделов с последовательным появлением и активным пунктом.",
@@ -1387,5 +1387,60 @@
     "width": 520,
     "height": 292,
     "resize": "scale"
-  }
+  },
+  "controlPresets": [
+    {
+      "id": "sniptale-orange-dark",
+      "label": {
+        "en": "Dark",
+        "ru": "Тёмный"
+      },
+      "theme": {
+        "id": "sniptale-orange",
+        "label": {
+          "en": "Sniptale Orange",
+          "ru": "Sniptale Orange"
+        }
+      },
+      "style": {
+        "id": "dark",
+        "label": {
+          "en": "Dark",
+          "ru": "Тёмный"
+        }
+      },
+      "values": {
+        "accent": "#fb923c",
+        "surface": "#171a20",
+        "ink": "#fafafa"
+      }
+    },
+    {
+      "id": "sniptale-orange-light",
+      "label": {
+        "en": "Light",
+        "ru": "Светлый"
+      },
+      "theme": {
+        "id": "sniptale-orange",
+        "label": {
+          "en": "Sniptale Orange",
+          "ru": "Sniptale Orange"
+        }
+      },
+      "style": {
+        "id": "light",
+        "label": {
+          "en": "Light",
+          "ru": "Светлый"
+        }
+      },
+      "values": {
+        "accent": "#c2410c",
+        "surface": "#ffffff",
+        "ink": "#202127"
+      }
+    }
+  ],
+  "defaultControlPresetId": "sniptale-orange-dark"
 }

@@ -186,6 +186,8 @@ function isEffectTarget(value: unknown): boolean {
   return (
     isRecord(value) &&
     (value['kind'] === 'scene' ||
+      value['kind'] === 'video-group' ||
+      (value['kind'] === 'track' && typeof value['trackId'] === 'string') ||
       (value['kind'] === 'clip' && typeof value['clipId'] === 'string') ||
       (value['kind'] === 'transition' && typeof value['transitionId'] === 'string'))
   );

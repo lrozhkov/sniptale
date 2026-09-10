@@ -6,7 +6,7 @@ function document() {
   const source = readFileSync(
     new URL(
       '../../../../../../../../packages/runtime-contracts/src/effect-v1/fixtures/collection/' +
-        'sniptale-callout-light.sniptale-effect.json',
+        'sniptale-callout.sniptale-effect.json',
       import.meta.url
     ),
     'utf8'
@@ -35,6 +35,7 @@ it('groups explicit metadata independently of template names, preserving source 
 it('uses authored enum labels and never guesses options from numeric ranges', () => {
   const doc = document();
   const sequence = doc.controls.find((c) => c.id === 'sequence')!;
+  delete sequence.options;
   expect(getEffectSequenceOptions(doc.id, sequence)).toBeNull();
   sequence.options = [
     { value: 0, label: { en: 'One' } },

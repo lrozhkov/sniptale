@@ -48,6 +48,6 @@ it('shows enabled documents with apply actions and no pack management or phantom
   expect(html).not.toContain('lucide-trash');
   expect(html).not.toContain('role="switch"');
   expect(html).not.toContain('Светлая');
-  expect(html).toContain('Тёмная');
+  expect(html).not.toContain('Тёмная');
   expect(html).toContain('Добавить');
 });

@@ -2,7 +2,10 @@ import {
   useVideoEditorPreviewController,
   useVideoEditorSelectionsContext,
 } from '../../runtime/controller/composition/hooks';
-import { useVideoEditorEffectEditingPort } from '../../runtime/controller/store';
+import {
+  useVideoEditorClipSelectionPort,
+  useVideoEditorEffectEditingPort,
+} from '../../runtime/controller/store';
 import { VideoEditorEffectsLibraryDock } from '../../library/effects-dock';
 import type { WorkspaceEffectBundlesState } from './effect-bundles';
 import { buildProjectTransitionSegments } from '../../../features/video/project/transition/project';
@@ -17,10 +20,21 @@ export function VideoEditorWorkspaceEffectsLibrary(props: {
 }): React.JSX.Element | null {
   const preview = useVideoEditorPreviewController();
   const selections = useVideoEditorSelectionsContext();
+  const editorSelection = useVideoEditorClipSelectionPort((port) => port.selection);
   const onApplyEffect = useVideoEditorEffectEditingPort((port) => port.applyEffectDocument);
   if (!preview) return null;
+  const selectedEffectTarget =
+    editorSelection.kind === 'effect-instance'
+      ? preview.project.effectInstances?.find(
+          (instance) => instance.id === editorSelection.effectInstanceId
+        )?.target
+      : undefined;
   const selectedClip = preview.project.clips.find(
-    ({ id }) => id === preview.selection.selectedClipId
+    ({ id }) =>
+      id ===
+      (selectedEffectTarget?.kind === 'clip'
+        ? selectedEffectTarget.clipId
+        : preview.selection.selectedClipId)
   );
   const selectedTransitionId = resolveEffectTransitionTargetId(
     preview.project,
@@ -29,6 +43,7 @@ export function VideoEditorWorkspaceEffectsLibrary(props: {
   );
   return (
     <VideoEditorEffectsLibraryDock
+      effectTarget={selectedEffectTarget ?? null}
       catalogs={props.effectBundles.catalogs}
       kind={props.kind}
       capturePreviewFrame={captureCatalogFrame}
@@ -52,12 +67,13 @@ export function VideoEditorWorkspaceEffectsLibrary(props: {
       onDeleteEffectBundle={props.effectBundles.onDeleteEffectBundle}
       onImportEffectFiles={props.effectBundles.onImportEffectFiles}
       onSetEffectBundleEnabled={props.effectBundles.onSetEffectBundleEnabled}
-      selectedClipId={
-        selectedClip &&
-        selectedClip.type !== VideoProjectClipType.AUDIO &&
-        selectedClip.type !== VideoProjectClipType.EFFECT
-          ? selectedClip.id
+      selectedTrackId={
+        selections.selectedTrack?.kind === 'PRIMARY' && selections.selectedTrack.role !== 'CAMERA'
+          ? selections.selectedTrack.id
           : null
+      }
+      selectedClipId={
+        selectedClip && selectedClip.type !== VideoProjectClipType.AUDIO ? selectedClip.id : null
       }
       selectedTransitionId={selectedTransitionId}
     />
@@ -69,16 +85,7 @@ export function resolveEffectTransitionTargetId(
   currentTime: number,
   selectedTransitionId: string | null
 ): string | null {
-  const occupiedTransitionIds = new Set(
-    (project.effectInstances ?? []).flatMap((instance) =>
-      instance.kind === 'transition' && instance.target.kind === 'transition'
-        ? [instance.target.transitionId]
-        : []
-    )
-  );
-  const segments = buildProjectTransitionSegments(project).filter(
-    ({ id }) => !occupiedTransitionIds.has(id)
-  );
+  const segments = buildProjectTransitionSegments(project);
   if (selectedTransitionId && segments.some(({ id }) => id === selectedTransitionId)) {
     return selectedTransitionId;
   }
