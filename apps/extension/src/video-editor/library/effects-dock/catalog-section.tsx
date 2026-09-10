@@ -1,9 +1,11 @@
+import { useEffectDocumentDrag } from '../../chrome/effect-document-drag';
+import { parseEffectV1Source } from '@sniptale/runtime-contracts/effect-v1';
 import {
   EffectCatalogPreview,
   EffectCatalogPreviewProvider,
 } from '../../../ui/effect-catalog-preview';
 import { useState } from 'react';
-import { Plus, Check, GripVertical } from 'lucide-react';
+import { Plus, Check, ArrowRightToLine } from 'lucide-react';
 import {
   describeCatalogDocument,
   getEffectCatalogThemes,
@@ -13,16 +15,15 @@ import {
 import { EffectCatalogControls } from '../../../ui/effect-catalog-controls';
 import type { EffectBundleCatalogEntry } from '../../../features/video/project/effect-bundle/catalog';
 import type { VideoProjectEffectTarget } from '../../../features/video/project/effect-instance/types';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { EditorIconButton } from '@sniptale/ui/editor-chrome';
 import { writeVideoEditorEffectDocumentDragPayload } from '../../contracts/effect-document-drag';
 import { getCurrentLocale, translate } from '../../../platform/i18n';
 import type { EffectLibraryOperations } from './operations';
 import type { VideoEditorEffectsLibraryDockProps } from './types';
 
-const CATALOG_CARD_CLASS_NAME =
-  'space-y-2 border-b border-[var(--sniptale-color-border-soft)] pb-3';
+const CATALOG_CARD_CLASS_NAME = 'contents';
 const DOCUMENT_CARD_CLASS_NAME = [
-  'effect-catalog-card group grid min-w-0 grid-cols-[minmax(64px,36%)_minmax(0,1fr)] items-center gap-2',
+  'effect-catalog-card group/effect-card flex min-w-0 flex-col items-stretch gap-1.5',
   'rounded-[6px] border p-1.5 cursor-grab active:cursor-grabbing',
   'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]',
 ].join(' ');
@@ -41,9 +42,17 @@ export function CatalogSection(
   const catalogs = props.catalogs.flatMap((item) =>
     item.status === 'ready' && item.catalog.enabled ? [item.catalog] : []
   );
-  const themes = getEffectCatalogThemes(catalogs);
+  const themes = getEffectCatalogThemes(
+    catalogs.map((catalog) => ({
+      ...catalog,
+      documents: catalog.documents.filter(
+        (document) => !props.kind || document.kind === props.kind
+      ),
+    }))
+  );
   const effectiveFilter: EffectCatalogFilter = {
     ...filter,
+    kind: props.kind ?? filter.kind,
     theme: themes.some((theme) => theme === filter.theme) ? filter.theme : 'all',
   };
   const visibleCatalogs = catalogs.filter(
@@ -59,13 +68,19 @@ export function CatalogSection(
           <div className="shrink-0 border-b border-[var(--sniptale-color-border-soft)] p-2">
             <EffectCatalogControls
               themes={themes}
+              hideCategories
               filter={effectiveFilter}
               onChange={setFilter}
               disabled={props.disabled}
             />
           </div>
         )}
-        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
+        <div
+          className={[
+            'grid min-h-0 flex-1 grid-cols-[repeat(auto-fit,minmax(128px,1fr))] content-start',
+            'auto-rows-max gap-2 overflow-y-auto p-2',
+          ].join(' ')}
+        >
           {!props.isLoading && props.catalogs.length === 0 && (
             <p className="px-1 text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
               {translate('videoEditor.effectsLibrary.noImportedPacks')}
@@ -105,7 +120,7 @@ function CatalogEntry(
   return (
     <article className={CATALOG_CARD_CLASS_NAME}>
       {catalog.documents.length > 1 && (
-        <div className="flex min-w-0 items-center justify-between gap-2 px-1">
+        <div className="col-span-full flex min-w-0 items-center justify-between gap-2 px-1">
           <h3 className="min-w-0 break-words text-[13px] font-semibold">
             {readLocalized(catalog.label)}
           </h3>
@@ -129,6 +144,7 @@ function CatalogDocument(
     document: EffectBundleCatalogEntry['documents'][number];
   }
 ): React.JSX.Element {
+  const drag = useEffectDocumentDrag();
   const target = resolveDocumentTarget(props.document.kind, props);
   const metadata = describeCatalogDocument(props.document, getCurrentLocale());
   return (
@@ -136,20 +152,19 @@ function CatalogDocument(
       className={DOCUMENT_CARD_CLASS_NAME}
       data-effect-document={props.document.id}
       draggable={!props.disabled}
-      onDragStart={(event) =>
-        writeVideoEditorEffectDocumentDragPayload(event.dataTransfer, {
+      onDragStart={(event) => {
+        const payload = {
           documentId: props.document.id,
           kind: props.document.kind,
           packId: props.catalog.packId,
-        })
-      }
+        };
+        writeVideoEditorEffectDocumentDragPayload(event.dataTransfer, payload);
+        const duration = parseEffectV1Source(props.document.source).document?.duration;
+        if (duration) drag.start({ ...payload, duration });
+      }}
+      onDragEnd={drag.end}
     >
-      <EffectCatalogPreview
-        catalog={props.catalog}
-        document={props.document}
-        captureFrame={props.capturePreviewFrame}
-      />
-      <div className="flex min-w-0 flex-col items-stretch gap-1">
+      <div className="flex min-w-0 items-start gap-1">
         <div className="min-w-0 flex-1">
           <p className="break-words text-[13px] font-medium text-[var(--sniptale-color-text-primary)]">
             {metadata.label}
@@ -164,23 +179,15 @@ function CatalogDocument(
             </span>
           )}
         </div>
-        <div className="flex items-center justify-between gap-1">
-          {props.document.kind !== 'standalone' && (
-            <span
-              title={translate(
-                props.document.kind === 'targetEffect'
-                  ? 'videoEditor.effectsLibrary.dragToClip'
-                  : 'videoEditor.effectsLibrary.dragToTransition'
-              )}
-              className="shrink-0 text-[var(--sniptale-color-text-muted)]"
-            >
-              <GripVertical size={14} aria-hidden="true" />
-            </span>
-          )}
-          <ProductActionButton
-            compact
-            tone="secondary"
-            className="self-end !min-w-0"
+        <div
+          className={[
+            'flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-100',
+            'group-hover/effect-card:opacity-100 group-focus-within/effect-card:opacity-100',
+            '[@media(hover:none)]:opacity-100 motion-reduce:transition-none',
+          ].join(' ')}
+        >
+          <EditorIconButton
+            className="!h-6 !w-6 !min-w-6"
             title={getDocumentActionLabel(props.document.kind, target)}
             aria-label={getDocumentActionLabel(props.document.kind, target)}
             disabled={props.disabled || !target}
@@ -201,16 +208,34 @@ function CatalogDocument(
             ) : (
               <Check size={14} aria-hidden="true" />
             )}
-            <span className="effect-catalog-apply-label">
-              {translate(
-                props.document.kind === 'standalone'
-                  ? 'common.actions.add'
-                  : 'videoEditor.effectsLibrary.apply'
-              )}
-            </span>
-          </ProductActionButton>
+          </EditorIconButton>
+          {props.document.kind === 'standalone' && props.appendTime !== undefined && (
+            <EditorIconButton
+              className="!h-6 !w-6 !min-w-6"
+              title={translate('videoEditor.app.materialsAppend')}
+              disabled={props.disabled || !target}
+              onClick={() =>
+                target &&
+                void props.run('apply', () =>
+                  props.onApplyEffect({
+                    catalog: props.catalog,
+                    documentId: props.document.id,
+                    startTime: props.appendTime!,
+                    target,
+                  })
+                )
+              }
+            >
+              <ArrowRightToLine size={14} aria-hidden="true" />
+            </EditorIconButton>
+          )}
         </div>
       </div>
+      <EffectCatalogPreview
+        catalog={props.catalog}
+        document={props.document}
+        captureFrame={props.capturePreviewFrame}
+      />
     </div>
   );
 }

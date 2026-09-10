@@ -13,11 +13,13 @@ export function EffectCatalogControls({
   onChange,
   themes = [],
   disabled = false,
+  hideCategories = false,
 }: {
   filter: EffectCatalogFilter;
   onChange: (filter: EffectCatalogFilter) => void;
   themes?: readonly Exclude<EffectCatalogFilter['theme'], 'all'>[];
   disabled?: boolean;
+  hideCategories?: boolean;
 }) {
   const searchButton = useRef<HTMLButtonElement>(null);
   const [searching, setSearching] = useState(false);
@@ -60,7 +62,7 @@ export function EffectCatalogControls({
               }
             }}
           />
-        ) : (
+        ) : !hideCategories ? (
           <div
             className="effect-catalog-categories"
             role="group"
@@ -83,6 +85,8 @@ export function EffectCatalogControls({
               </button>
             ))}
           </div>
+        ) : (
+          <span className="flex-1" />
         )}
         <EditorIconButton
           ref={searchButton}

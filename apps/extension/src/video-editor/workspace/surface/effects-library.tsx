@@ -13,6 +13,7 @@ export function VideoEditorWorkspaceEffectsLibrary(props: {
   effectBundles: WorkspaceEffectBundlesState;
   effectOperations: EffectLibraryOperations;
   isOpen: boolean;
+  kind: 'standalone' | 'targetEffect' | 'transition';
 }): React.JSX.Element | null {
   const preview = useVideoEditorPreviewController();
   const selections = useVideoEditorSelectionsContext();
@@ -29,8 +30,20 @@ export function VideoEditorWorkspaceEffectsLibrary(props: {
   return (
     <VideoEditorEffectsLibraryDock
       catalogs={props.effectBundles.catalogs}
+      kind={props.kind}
       capturePreviewFrame={captureCatalogFrame}
       currentTime={preview.transport.currentTime}
+      appendTime={Math.max(
+        0,
+        ...preview.project.clips
+          .filter((clip) =>
+            selections.selectedTrack?.kind === 'PRIMARY' &&
+            selections.selectedTrack.role !== 'CAMERA'
+              ? clip.trackId === selections.selectedTrack.id
+              : true
+          )
+          .map((clip) => clip.startTime + clip.duration)
+      )}
       errorCode={props.effectBundles.errorCode}
       isLoading={props.effectBundles.isLoading}
       isOpen={props.isOpen}

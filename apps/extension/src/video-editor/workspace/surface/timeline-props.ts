@@ -8,7 +8,9 @@ export function getProjectTimelineProps(
   onDropEffectDocument: (
     payload: VideoEditorEffectDocumentDragPayload,
     target: VideoProjectEffectTarget,
-    startTime: number
+    startTime: number,
+    trackId?: string,
+    timelineLaneId?: string | null
   ) => void
 ): ProjectTimelineProps {
   return {

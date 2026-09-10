@@ -82,7 +82,9 @@ export interface ProjectTimelineProps {
   onDropEffectDocument?: (
     payload: VideoEditorEffectDocumentDragPayload,
     target: VideoProjectEffectTarget,
-    startTime: number
+    startTime: number,
+    trackId?: string,
+    timelineLaneId?: string | null
   ) => void;
   onSelectCursorSegment: (sampleId: string) => void;
   onSelectHistorySpan?: (

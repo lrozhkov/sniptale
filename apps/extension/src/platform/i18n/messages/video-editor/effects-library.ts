@@ -44,6 +44,10 @@ export const videoEditorEffectsLibraryMessages = defineMessageSource({
 
   exportInstance: { ru: 'Экспорт эффекта', en: 'Export effect' },
   exportFailed: { ru: 'Не удалось экспортировать эффект', en: 'Could not export effect' },
+  targetOccupied: {
+    ru: 'На дорожке недостаточно места. Переместите бегунок в свободный интервал или добавьте аннотацию в конец.',
+    en: 'Not enough room on this track. Move the playhead to a free interval or append the annotation.',
+  },
   objectTypography: { ru: 'Типографика', en: 'Typography' },
   objectGeometry: { ru: 'Геометрия', en: 'Geometry' },
   objectProcessing: { ru: 'Обработка', en: 'Processing' },

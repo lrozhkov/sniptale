@@ -16,6 +16,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { translate, type TranslationKey } from '../../../platform/i18n';
 import {
+  buildClipLabel,
   isAudioClip,
   isAnnotationClip,
   isShapeClip,
@@ -77,7 +78,8 @@ function createStaticSelectionMeta(Icon: LucideIcon, labelKey: TranslationKey) {
 export function getSelectionMeta(
   selection: VideoEditorSelection,
   clip: WorkspaceSidebarProps['selectedClip'],
-  selectedTrack?: WorkspaceSidebarProps['selectedTrack']
+  selectedTrack?: WorkspaceSidebarProps['selectedTrack'],
+  project?: WorkspaceSidebarProps['project']
 ): { icon: React.ReactNode; label: string; title: string } {
   switch (selection.kind) {
     case VideoEditorSelectionKind.SCENE:
@@ -88,7 +90,10 @@ export function getSelectionMeta(
       return {
         icon: getClipSelectionIcon(clip),
         label: getClipTypeLabel(clip),
-        title: clip?.name ?? translate('videoEditor.sidebar.sceneProperties'),
+        title:
+          clip && project && clip.type === 'EFFECT'
+            ? buildClipLabel(project, clip)
+            : (clip?.name ?? translate('videoEditor.sidebar.sceneProperties')),
       };
     case VideoEditorSelectionKind.TRACK:
       return selectedTrack

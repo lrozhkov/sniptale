@@ -185,3 +185,37 @@ function readFixture(filename: string): Uint8Array {
     )
   );
 }
+
+it('inserts standalone annotations only into a free requested video track', async () => {
+  const catalog = await createRawCatalog('neutral-standalone.sniptale-effect.json');
+  const project = createProjectWithTransition();
+  const trackId = project.tracks[0]!.id;
+  const args = {
+    ...createApplyArgs(catalog, catalog.documents[0]!.id, project),
+    target: { kind: 'scene' } as const,
+    trackId,
+  };
+  const applied = await applyEffectCatalogDocument({ ...args, startTime: 12 });
+  expect(applied.clips.at(-1)).toMatchObject({ trackId, startTime: 12, type: 'EFFECT' });
+  await expect(applyEffectCatalogDocument({ ...args, startTime: 2 })).rejects.toEqual(
+    expect.objectContaining({ code: 'effectTargetOccupied' })
+  );
+  await expect(
+    applyEffectCatalogDocument({
+      ...args,
+      startTime: 12,
+      project: { ...project, tracks: project.tracks.map((track) => ({ ...track, locked: true })) },
+    })
+  ).rejects.toEqual(expect.objectContaining({ code: 'effectTargetMissing' }));
+});
+
+it('rejects a logical lane without its owning track', async () => {
+  const catalog = await createRawCatalog('neutral-standalone.sniptale-effect.json');
+  await expect(
+    applyEffectCatalogDocument({
+      ...createApplyArgs(catalog, catalog.documents[0]!.id, createEmptyVideoProject('lane')),
+      target: { kind: 'scene' },
+      timelineLaneId: 'missing',
+    })
+  ).rejects.toEqual(expect.objectContaining({ code: 'effectTargetMissing' }));
+});

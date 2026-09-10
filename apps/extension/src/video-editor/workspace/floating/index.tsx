@@ -1,5 +1,5 @@
 import { WorkspacePanelButton } from './panel-header';
-import { FolderOpen, Sparkles, X } from 'lucide-react';
+import { FolderOpen, Sparkles, WandSparkles, ArrowRightLeft, X } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { translate } from '../../../platform/i18n';
 import { VideoEditorFloatingDocumentBar } from './document-bar';
@@ -7,7 +7,7 @@ import { VideoEditorFloatingDocumentBar } from './document-bar';
 export function VideoEditorWorkspaceHeader(props: {
   libraryOpen: boolean;
   onOpenLibraryPanel: () => void;
-  onOpenEffectsPanel: () => void;
+  onOpenEffectsPanel: (kind: 'standalone' | 'targetEffect' | 'transition') => void;
   children?: React.ReactNode;
 }) {
   return (
@@ -22,14 +22,27 @@ export function VideoEditorWorkspaceHeader(props: {
           >
             <FolderOpen size={18} aria-hidden="true" />
           </ContentToolbarButton>
-          <ContentToolbarButton
-            className="!h-9 !w-9 !min-w-9 !px-0"
-            dataUi="video-editor.viewer.open-effects"
-            title={translate('videoEditor.effectsLibrary.button')}
-            onClick={props.onOpenEffectsPanel}
-          >
-            <Sparkles size={18} aria-hidden="true" />
-          </ContentToolbarButton>
+          {getLibrarySections()
+            .slice(1)
+            .map(({ id, label, Icon }) => (
+              <ContentToolbarButton
+                key={id}
+                className="!h-9 !w-9 !min-w-9 !px-0"
+                dataUi={`video-editor.viewer.open-${id}`}
+                title={label}
+                onClick={() =>
+                  props.onOpenEffectsPanel(
+                    id === 'annotations'
+                      ? 'standalone'
+                      : id === 'transitions'
+                        ? 'transition'
+                        : 'targetEffect'
+                  )
+                }
+              >
+                <Icon size={18} aria-hidden="true" />
+              </ContentToolbarButton>
+            ))}
         </div>
       )}
       <VideoEditorFloatingDocumentBar>{props.children}</VideoEditorFloatingDocumentBar>
@@ -37,21 +50,47 @@ export function VideoEditorWorkspaceHeader(props: {
   );
 }
 
+type LibrarySection = 'materials' | 'annotations' | 'effects' | 'transitions';
+
+function getLibrarySections() {
+  return [
+    { id: 'materials', Icon: FolderOpen, label: translate('videoEditor.app.materialsTitle') },
+    {
+      id: 'annotations',
+      Icon: Sparkles,
+      label: translate('videoEditor.effectsLibrary.annotations'),
+    },
+    {
+      id: 'effects',
+      Icon: WandSparkles,
+      label: translate('videoEditor.effectsLibrary.videoEffects'),
+    },
+    {
+      id: 'transitions',
+      Icon: ArrowRightLeft,
+      label: translate('videoEditor.effectsLibrary.transitions'),
+    },
+  ] as const;
+}
+
 export function VideoEditorLibraryNavigation(props: {
-  active: 'materials' | 'effects';
-  onChange: (active: 'materials' | 'effects') => void;
+  active: LibrarySection;
+  onChange: (active: LibrarySection) => void;
 }) {
+  const sections = getLibrarySections();
+  const activeIndex = sections.findIndex((section) => section.id === props.active);
   return (
     <div
       role="group"
       aria-label={translate('videoEditor.app.materialsTitle')}
       className={[
-        'relative grid min-w-0 max-w-[168px] flex-1 items-center gap-1',
+        '@container/library-nav relative grid min-w-[102px] flex-1 items-center gap-0.5',
         'transition-[grid-template-columns] duration-150 ease-out motion-reduce:transition-none',
       ].join(' ')}
       style={{
-        gridTemplateColumns:
-          props.active === 'materials' ? 'minmax(0, 1fr) 36px' : '36px minmax(0, 1fr)',
+        gridTemplateColumns: sections
+          .map((section) => (section.id === props.active ? 'minmax(24px, 1fr)' : '24px'))
+          .join(' '),
       }}
     >
       <span
@@ -62,37 +101,28 @@ export function VideoEditorLibraryNavigation(props: {
           'bg-[var(--sniptale-color-surface-hover)] transition-transform duration-150 ease-out',
           'motion-reduce:transition-none',
         ].join(' ')}
-        style={{
-          width: 'calc(100% - 40px)',
-          transform: props.active === 'materials' ? 'translateX(0)' : 'translateX(40px)',
-        }}
+        style={{ width: 'calc(100% - 78px)', transform: `translateX(${activeIndex * 26}px)` }}
       />
-      {(['materials', 'effects'] as const).map((id) => {
-        const label = translate(
-          id === 'materials'
-            ? 'videoEditor.app.materialsTitle'
-            : 'videoEditor.effectsLibrary.button'
-        );
-        return (
-          <ContentToolbarButton
-            key={id}
-            title={label}
-            aria-pressed={props.active === id}
-            onClick={() => props.onChange(id)}
-            dataUi={`video-editor.library-tab.${id}`}
-            className={[
-              'relative !h-9 !w-full !min-w-9 !gap-1.5 !border-transparent !bg-transparent !px-1.5 !shadow-none',
-              'transition-[background-color,color] motion-reduce:transition-none',
-              props.active === id ? '!text-[var(--sniptale-color-text-primary)]' : '',
-            ].join(' ')}
-          >
-            {id === 'materials' ? <FolderOpen size={16} /> : <Sparkles size={16} />}
-            {props.active === id && (
-              <span className="truncate text-[13px] font-medium">{label}</span>
-            )}
-          </ContentToolbarButton>
-        );
-      })}
+      {sections.map(({ id, label, Icon }) => (
+        <ContentToolbarButton
+          key={id}
+          title={label}
+          aria-pressed={props.active === id}
+          onClick={() => props.onChange(id)}
+          dataUi={`video-editor.library-tab.${id}`}
+          className={[
+            'relative !h-9 !w-full !min-w-6 !gap-1 !border-transparent !bg-transparent !px-1 !shadow-none',
+            props.active === id ? '!text-[var(--sniptale-color-accent)]' : '',
+          ].join(' ')}
+        >
+          <Icon size={16} className="shrink-0" aria-hidden="true" />
+          {props.active === id && (
+            <span className="hidden truncate text-[12px] font-medium @[150px]/library-nav:block">
+              {label}
+            </span>
+          )}
+        </ContentToolbarButton>
+      ))}
     </div>
   );
 }

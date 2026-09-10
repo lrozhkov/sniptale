@@ -121,9 +121,13 @@ interface VideoEditorWorkspaceCanvasProps {
   effectBundles: WorkspaceEffectBundlesState;
   effectOperations: EffectLibraryOperations;
   effectsLibraryDockOpen: boolean;
+  effectKind?: 'standalone' | 'targetEffect' | 'transition';
   previewHeightStyle: React.CSSProperties;
   onClearActiveInsertKind: () => void;
-  onEffectsLibraryDockOpenChange: (open: boolean) => void;
+  onEffectsLibraryDockOpenChange: (
+    open: boolean,
+    kind?: 'standalone' | 'targetEffect' | 'transition'
+  ) => void;
 }
 
 function VideoEditorWorkspaceUpper(
@@ -156,7 +160,7 @@ function VideoEditorWorkspaceUpper(
     <VideoEditorWorkspaceHeader
       libraryOpen={Boolean(props.materialsOpen || props.effectsLibraryDockOpen)}
       onOpenLibraryPanel={() => props.onMaterialsOpenChange(true)}
-      onOpenEffectsPanel={() => props.onEffectsLibraryDockOpenChange(true)}
+      onOpenEffectsPanel={(kind) => props.onEffectsLibraryDockOpenChange(true, kind)}
     >
       {source && (
         <WorkspaceViewerHeading
@@ -206,6 +210,7 @@ function VideoEditorWorkspaceUpper(
           effectBundles={props.effectBundles}
           effectOperations={props.effectOperations}
           isOpen={props.effectsLibraryDockOpen}
+          kind={props.effectKind ?? 'targetEffect'}
         />
       </WorkspaceLibraryPanel>
       <div
@@ -278,11 +283,26 @@ function WorkspaceLibraryPanel(
 ) {
   const libraryNavigation = (
     <VideoEditorLibraryNavigation
-      active={props.effectsLibraryDockOpen ? 'effects' : 'materials'}
+      active={
+        props.effectsLibraryDockOpen
+          ? props.effectKind === 'standalone'
+            ? 'annotations'
+            : props.effectKind === 'transition'
+              ? 'transitions'
+              : 'effects'
+          : 'materials'
+      }
       onChange={(active) =>
-        active === 'effects'
-          ? props.onEffectsLibraryDockOpenChange(true)
-          : props.onMaterialsOpenChange(true)
+        active === 'materials'
+          ? props.onMaterialsOpenChange(true)
+          : props.onEffectsLibraryDockOpenChange(
+              true,
+              active === 'annotations'
+                ? 'standalone'
+                : active === 'transitions'
+                  ? 'transition'
+                  : 'targetEffect'
+            )
       }
     />
   );
@@ -431,7 +451,7 @@ function VideoEditorWorkspaceTimeline(
         panelPrefs={presentation.panelPrefs}
         {...getProjectTimelineProps(
           controller,
-          (payload, target, startTime) =>
+          (payload, target, startTime, trackId, timelineLaneId) =>
             void applyDroppedEffectDocument({
               catalogs: props.effectBundles.catalogs,
               onApplyEffectDocument,
@@ -439,6 +459,8 @@ function VideoEditorWorkspaceTimeline(
               payload,
               startTime,
               target,
+              ...(trackId === undefined ? {} : { trackId }),
+              ...(timelineLaneId === undefined ? {} : { timelineLaneId }),
             })
         )}
       />
@@ -453,6 +475,8 @@ interface ApplyDroppedEffectDocumentArgs {
   payload: VideoEditorEffectDocumentDragPayload;
   startTime: number;
   target: VideoProjectEffectTarget;
+  trackId?: string;
+  timelineLaneId?: string | null;
 }
 
 export async function applyDroppedEffectDocument(
@@ -475,6 +499,8 @@ export async function applyDroppedEffectDocument(
       documentId: document.id,
       startTime: args.startTime,
       target: args.target,
+      ...(args.trackId === undefined ? {} : { trackId: args.trackId }),
+      ...(args.timelineLaneId === undefined ? {} : { timelineLaneId: args.timelineLaneId }),
     })
   );
 }

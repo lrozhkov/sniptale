@@ -1,3 +1,4 @@
+import { getEffectClipLabel } from '../effect-instance/presentation';
 import { translate } from '../../../../platform/i18n';
 import { applyVideoProjectMutationPatch } from '../mutation';
 import { getAssetById, getSortedTracks } from './basics';
@@ -56,7 +57,7 @@ export function buildClipLabel(project: VideoProject, clip: VideoProjectClip): s
     );
   }
   if (clip.type === VideoProjectClipType.EFFECT) {
-    return clip.name;
+    return getEffectClipLabel(project, clip);
   }
   if (clip.type === VideoProjectClipType.SUBTITLE) {
     return (

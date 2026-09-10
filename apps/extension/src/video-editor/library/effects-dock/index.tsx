@@ -48,6 +48,8 @@ export function VideoEditorEffectsLibraryDock(
 }
 
 function formatOperationError(error: EffectLibraryOperationError): string {
+  if (error.code === 'effectTargetOccupied')
+    return translate('videoEditor.effectsLibrary.targetOccupied');
   const message =
     error.kind === 'import'
       ? translate('videoEditor.effectsLibrary.importFailed')

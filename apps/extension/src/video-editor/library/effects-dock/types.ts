@@ -10,6 +10,8 @@ export type VideoEditorEffectCatalogItem =
 export interface VideoEditorEffectsLibraryDockProps {
   catalogs: readonly VideoEditorEffectCatalogItem[];
   currentTime: number;
+  appendTime?: number;
+  kind?: 'standalone' | 'targetEffect' | 'transition';
   capturePreviewFrame?: () => HTMLCanvasElement | null;
   errorCode: string | null;
   isLoading: boolean;
@@ -20,6 +22,8 @@ export interface VideoEditorEffectsLibraryDockProps {
     documentId: string;
     startTime: number;
     target: VideoProjectEffectTarget;
+    trackId?: string;
+    timelineLaneId?: string | null;
   }): Promise<string | null>;
   onDeleteEffectBundle(packId: string): Promise<void>;
   onImportEffectFiles(files: readonly File[]): Promise<EffectFileImportResult[]>;

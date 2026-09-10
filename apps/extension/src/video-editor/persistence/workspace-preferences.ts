@@ -5,7 +5,7 @@ export interface WorkspacePreferences {
   inspectorCollapsed: boolean;
   inspectorFullHeight: boolean;
   materialsFullHeight: boolean;
-  activeLibrary: 'materials' | 'effects' | null;
+  activeLibrary: 'materials' | 'annotations' | 'effects' | 'transitions' | null;
   materialsWidth: number | null;
   inspectorWidth: number | null;
   previewHeight: number | null;
@@ -39,7 +39,9 @@ export function parseWorkspacePreferences(value: unknown): WorkspacePreferences 
     'activeLibrary' in value &&
     (value.activeLibrary === null ||
       value.activeLibrary === 'materials' ||
-      value.activeLibrary === 'effects')
+      value.activeLibrary === 'effects' ||
+      value.activeLibrary === 'annotations' ||
+      value.activeLibrary === 'transitions')
   )
     result.activeLibrary = value.activeLibrary;
   for (const [key, min, max] of [

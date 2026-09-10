@@ -37,11 +37,20 @@ function createApplyEffectDocument(
   get: VideoEditorProjectSliceGet
 ): EffectInstanceActions['applyEffectDocument'] {
   return async (args) => {
-    const sourceProject = get().project;
+    const sourceState = get();
+    const sourceProject = sourceState.project;
     if (!sourceProject) return null;
+    const selectedTrack = sourceProject.tracks.find(
+      (track) =>
+        track.id === sourceState.selectedTrackId &&
+        track.kind === 'PRIMARY' &&
+        track.role !== 'CAMERA'
+    );
+    const trackId = args.trackId ?? (args.target.kind === 'scene' ? selectedTrack?.id : undefined);
     const instanceId = crypto.randomUUID();
     const nextProject = await applyEffectCatalogDocument({
       ...args,
+      ...(trackId === undefined ? {} : { trackId }),
       instanceId,
       project: sourceProject,
     });

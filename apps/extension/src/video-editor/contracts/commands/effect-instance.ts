@@ -8,6 +8,8 @@ export interface VideoEditorEffectInstanceActions {
     documentId: string;
     startTime: number;
     target: VideoProjectEffectTarget;
+    trackId?: string;
+    timelineLaneId?: string | null;
   }): Promise<string | null>;
   deleteEffectInstance(instanceId: string): void;
   duplicateEffectInstance(instanceId: string): string | null;

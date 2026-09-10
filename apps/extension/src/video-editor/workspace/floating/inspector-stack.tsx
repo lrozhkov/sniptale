@@ -73,7 +73,8 @@ function VideoEditorFloatingInspectorContent({
   const sidebarState = useWorkspaceSidebarState(
     sidebarProps.selection,
     sidebarProps.selectedClip,
-    sidebarProps.selectedTrack
+    sidebarProps.selectedTrack,
+    sidebarProps.project
   );
 
   if (leftSidebarCollapsed) {

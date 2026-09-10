@@ -1,3 +1,4 @@
+import { getEffectInsertionError } from './placement';
 import { initializeEffectSceneAnchors } from './layout';
 import type { EffectV1ObjectLayout } from '@sniptale/runtime-contracts/effect-v1';
 import type { EffectBundleCatalogEntry } from '../effect-bundle/catalog';
@@ -24,6 +25,8 @@ export async function applyEffectCatalogDocument(args: {
   project: VideoProject;
   startTime: number;
   target: VideoProjectEffectTarget;
+  trackId?: string;
+  timelineLaneId?: string | null;
 }): Promise<VideoProject> {
   const { assets, catalogDocument, document } = await readVerifiedCatalogDocument(
     args.catalog,
@@ -53,7 +56,13 @@ export async function applyEffectCatalogDocument(args: {
   };
   const overlayTrack =
     document.kind === 'standalone'
-      ? resolveVideoOverlayTrack(args.project, timing.startTime, timing.duration)
+      ? resolveStandaloneTrack(
+          args.project,
+          timing.startTime,
+          timing.duration,
+          args.trackId,
+          args.timelineLaneId
+        )
       : null;
   const clips = overlayTrack
     ? [
@@ -61,12 +70,14 @@ export async function applyEffectCatalogDocument(args: {
         createStandaloneHostClip(
           args.project,
           instance,
-          catalogDocument.id,
+          '',
           overlayTrack.id,
           document.objectLayout
         ),
       ]
     : args.project.clips;
+  if (overlayTrack && args.timelineLaneId)
+    clips[clips.length - 1]!.timelineLaneId = args.timelineLaneId;
   const host = clips.find(
     (clip) => clip.type === 'EFFECT' && clip.effectInstanceId === instance.id
   );
@@ -227,4 +238,22 @@ async function snapshotsEqual(
 
 function equalBytes(left: Uint8Array, right: Uint8Array): boolean {
   return left.byteLength === right.byteLength && left.every((byte, index) => right[index] === byte);
+}
+
+function resolveStandaloneTrack(
+  project: VideoProject,
+  start: number,
+  duration: number,
+  trackId: string | undefined,
+  timelineLaneId?: string | null
+) {
+  if (!Number.isFinite(start) || start < 0)
+    throw new ApplyEffectInstanceError('effectTargetMissing');
+  if (trackId === undefined) {
+    if (timelineLaneId) throw new ApplyEffectInstanceError('effectTargetMissing');
+    return resolveVideoOverlayTrack(project, start, duration);
+  }
+  const error = getEffectInsertionError(project, trackId, start, duration, timelineLaneId);
+  if (error) throw new ApplyEffectInstanceError(error);
+  return project.tracks.find((track) => track.id === trackId)!;
 }

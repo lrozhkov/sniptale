@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react';
+import { useEffectClipPreviews } from './effect-thumbnails';
+import { useCallback, useMemo, useState } from 'react';
 import { useVideoEditorAssetUrls } from './asset-urls';
 import { useVideoEditorPlayback } from './playback';
 import type { ApplyLoadedProject, UseVideoEditorRuntimeParams } from './types';
@@ -153,5 +154,10 @@ function useTimelinePreviewRuntime(
     suspended: timelinePreviewSuspended,
     viewport: timelinePreviewViewport,
   });
-  return { setTimelinePreviewSuspended, setTimelinePreviewViewport, timelinePreviews };
+  const effects = useEffectClipPreviews(project, timelinePreviewViewport);
+  const combined = useMemo(
+    () => ({ ...timelinePreviews, ...effects }),
+    [timelinePreviews, effects]
+  );
+  return { setTimelinePreviewSuspended, setTimelinePreviewViewport, timelinePreviews: combined };
 }
