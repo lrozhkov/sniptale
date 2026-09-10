@@ -1,9 +1,10 @@
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { useEffectDocumentDrag } from '../../../chrome/effect-document-drag';
 import { useState } from 'react';
 import { createTrackEffectDropHandlers } from '../canvas/parts/effect-drop';
 import type { ProjectTimelineProps } from '../types';
 import { VideoTrackKind } from '../../../../features/video/project/types';
-import { Eye, EyeOff, Lock, Unlock, Volume2, VolumeX } from 'lucide-react';
+import { Eye, EyeOff, Lock, Unlock, Volume2, VolumeX, ChevronDown, ChevronUp } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import type { VideoProject } from '../../../../features/video/project/types';
 import { getTrackKindLabel } from '../interaction-state/helpers';
@@ -67,7 +68,10 @@ export function ProjectTimelineTrackRow({
       }
     >
       <div
-        className={TIMELINE_LANE_HEADER_CLASS_NAME}
+        className={[
+          TIMELINE_LANE_HEADER_CLASS_NAME,
+          trackLayout?.fxHeight ? '!border-b-0' : '',
+        ].join(' ')}
         data-selected={isSelected}
         style={{ height: trackLayout?.clipRowHeight }}
       >
@@ -87,21 +91,29 @@ export function ProjectTimelineTrackRow({
       {Boolean(trackLayout?.fxHeight) && (
         <div
           style={{ height: trackLayout?.fxHeight }}
-          className="border-b border-[var(--sniptale-color-border-soft)] px-3"
+          className="border-b border-[var(--sniptale-color-border-soft)]"
         >
-          <button
-            type="button"
+          <ContentToolbarButton
+            dataUi="video-editor.timeline.track-fx"
+            className={[
+              '!h-full !min-h-0 !w-full !justify-between !rounded-none !border-0 !px-3 !py-0 !shadow-none',
+              '!text-[10px] !font-normal !text-[var(--sniptale-color-text-muted)]',
+            ].join(' ')}
             onClick={onToggleFx}
             aria-expanded={!trackLayout?.fxCollapsed}
-            className="flex h-5 items-center gap-1 text-[11px] text-[var(--sniptale-color-text-muted)]"
-            title={translate('videoEditor.effectsLibrary.toggleTimelineEffects')}
-          >
-            <span aria-hidden="true">{trackLayout?.fxCollapsed ? '▸' : '▾'}</span>
-            {translate('videoEditor.effectsLibrary.fxCount').replace(
-              '{count}',
-              String(trackLayout?.fxInstanceIds.length ?? 0)
+            title={translate(
+              trackLayout?.fxCollapsed
+                ? 'videoEditor.effectsLibrary.showTimelineEffects'
+                : 'videoEditor.effectsLibrary.collapseTimelineEffects'
             )}
-          </button>
+          >
+            <span>{translate('videoEditor.effectsLibrary.title')}</span>
+            {trackLayout?.fxCollapsed ? (
+              <ChevronDown aria-hidden="true" size={10} />
+            ) : (
+              <ChevronUp aria-hidden="true" size={10} />
+            )}
+          </ContentToolbarButton>
         </div>
       )}
     </div>

@@ -22,6 +22,8 @@ export const videoEditorEffectsLibraryMessages = defineMessageSource({
   selectedClip: { en: 'Selected clip', ru: 'Выбранный фрагмент' },
   selectedTrack: { en: 'Selected video track', ru: 'Выбранная видеодорожка' },
   fxCount: { en: 'FX · {count}', ru: 'FX · {count}' },
+  showTimelineEffects: { en: 'Show effect intervals', ru: 'Показать интервалы эффектов' },
+  collapseTimelineEffects: { en: 'Collapse effect intervals', ru: 'Свернуть интервалы эффектов' },
   toggleTimelineEffects: {
     en: 'Show or collapse FX intervals',
     ru: 'Показать или свернуть интервалы FX',
