@@ -187,7 +187,7 @@ function resolveTargetAvailability(
 
 function parseSnapshot(snapshot: VideoProjectEffectSnapshot) {
   try {
-    return parseEffectRuntimeSnapshotDocument(snapshot.source);
+    return parseEffectRuntimeSnapshotDocument(snapshot);
   } catch {
     fail('effectAudioIntegrityFailure');
   }

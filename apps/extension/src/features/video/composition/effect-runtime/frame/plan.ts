@@ -79,7 +79,7 @@ function resolveInstanceFramePlan(args: {
   if (!instance.enabled) return null;
   const snapshot = args.snapshots.get(instance.snapshotId);
   if (!snapshot || snapshot.kind !== instance.kind) fail('effectPlanIntegrityFailure');
-  const document = parseSnapshotDocument(snapshot.source);
+  const document = parseSnapshotDocument(snapshot);
   assertSnapshotDocument(instance, snapshot, document);
   const timing = resolveEffectInstanceTime(instance, document.duration, args.projectTime);
   if (!timing) return null;
@@ -181,9 +181,9 @@ function assertTransitionTiming(
   }
 }
 
-function parseSnapshotDocument(source: string) {
+function parseSnapshotDocument(snapshot: { readonly source: string }) {
   try {
-    return parseEffectRuntimeSnapshotDocument(source);
+    return parseEffectRuntimeSnapshotDocument(snapshot);
   } catch {
     fail('effectPlanIntegrityFailure');
   }
