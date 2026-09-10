@@ -77,8 +77,12 @@ async function startRecordingInternal(
     frameShape: null as readonly number[] | null,
   };
   recordingContext.recordingPointObservation = pointObservation;
+  // Encoder transforms consume raw frames; trackSettings describes their encoded output.
+  const inputFrameSettings = prepared.encoderFrameTransform
+    ? prepared.rawTrackSettings
+    : prepared.trackSettings;
   const onVideoFrameGeometry = (frame: VideoFrame) =>
-    observeRecordingFrameGeometry(pointObservation, prepared.trackSettings, frame);
+    observeRecordingFrameGeometry(pointObservation, inputFrameSettings, frame);
 
   const { streamInstanceId } = params;
   const begin = waitForRecordingBegin(
