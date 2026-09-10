@@ -95,6 +95,9 @@ export interface PreviewStageCanvasProps {
     | undefined;
   onAddShapeOverlay: (shapeType: VideoProjectShapeType) => string | null;
   onAddTextOverlay: () => string | null;
+  onPreviewEffectControls?:
+    | ((instanceId: string, controls: Record<string, number> | null) => void)
+    | undefined;
   onPreviewEffectAnchors?:
     | ((instanceId: string, anchors: Record<string, { x: number; y: number }> | null) => void)
     | undefined;
@@ -116,6 +119,7 @@ export interface PreviewStageCanvasProps {
   selectedActionOccurrence: VideoProjectActionOccurrence | null;
   selectedClip: VideoProjectClip | null;
   selectedClipId: string | null;
+  selectedEffectInstanceId?: string | null | undefined;
   selectedClipLocked: boolean;
   selectedMotionRegion: VideoProjectMotionRegion | null;
   stageRef: React.RefObject<HTMLDivElement | null>;

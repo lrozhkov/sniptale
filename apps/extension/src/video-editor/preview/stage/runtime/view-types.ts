@@ -51,6 +51,7 @@ export interface PreviewStageProps {
   previewZoom: VideoEditorPreviewZoom;
   placementMode: VideoEditorPlacementMode | null;
   selectedClipId: string | null;
+  selectedEffectInstanceId?: string | null | undefined;
   selectedActionOccurrence: VideoProjectActionOccurrence | null;
   selectedMotionRegion: VideoProjectMotionRegion | null;
   onAddActionEvent: (preset: VideoProjectActionPreset) => void;

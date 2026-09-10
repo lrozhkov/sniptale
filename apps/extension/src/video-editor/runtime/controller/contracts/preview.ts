@@ -54,6 +54,7 @@ export interface VideoEditorPreviewController {
     placementMode: VideoEditorPlacementMode | null;
     selectedActionOccurrence: VideoEditorSelections['selectedActionOccurrence'];
     selectedClipId: string | null;
+    selectedEffectInstanceId?: string | null | undefined;
     selectedMotionRegion: VideoEditorSelections['selectedMotionRegion'];
     onSelectClip: VideoEditorSessionActions['selectClip'];
     onSelectScene: VideoEditorSessionActions['selectScene'];

@@ -56,6 +56,7 @@ function buildPreviewStageSurfaceProps(
     selectedActionOccurrence: props.selectedActionOccurrence,
     selectedClip: runtime.surface.selectedClip,
     selectedClipId: props.selectedClipId,
+    selectedEffectInstanceId: props.selectedEffectInstanceId,
     selectedClipLocked: runtime.surface.selectedClipLocked,
     selectedMotionRegion: props.selectedMotionRegion,
     stageRef: runtime.surface.stageRef,
@@ -96,6 +97,7 @@ function buildPreviewStageSurfaceActionProps(
     onUpdateClipTransform: props.onUpdateClipTransform,
     onUpdateEffectInstance: props.onUpdateEffectInstance,
     onPreviewEffectAnchors: runtime.render.onPreviewEffectAnchors,
+    onPreviewEffectControls: runtime.render.onPreviewEffectControls,
     onUpdateMotionRegion: props.onUpdateMotionRegion,
     onUpsertObjectTrackCorrectionAnchor: props.onUpsertObjectTrackCorrectionAnchor,
   };

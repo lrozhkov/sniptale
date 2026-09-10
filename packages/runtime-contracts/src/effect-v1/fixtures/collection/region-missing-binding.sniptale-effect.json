@@ -789,7 +789,7 @@
     "units": "percent",
     "position": "available-space",
     "inset": 0.022222222222222223,
-    "xControl": "x",
+    "xControl": "missing",
     "yControl": "y",
     "widthControl": "width",
     "heightControl": "height"

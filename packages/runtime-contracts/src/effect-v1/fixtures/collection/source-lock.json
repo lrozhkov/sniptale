@@ -1,8 +1,8 @@
 {
-  "source": "effect-sdk STYLES-HANDOFF.md 2026-09-10 canonical styles workflow corpus",
+  "source": "effect-sdk FOCUS-HANDOFF.md 2026-09-11 editorRegion workflow corpus",
   "baseCommit": "92c981c089d576b8a47954d1cfd7355e0fd113f9",
   "cleanCommit": false,
-  "schemaSha256": "e68d88ab5148f42676aa48d0d32b8744a71ed47484f9aa74fa84a21707554f6a",
+  "schemaSha256": "c26290ae9685274061548aae11f3dc9a57e8c6a695928cc0c985857518bb9aa9",
   "files": [
     {
       "file": "sniptale-lower-third.sniptale-effect.json",
@@ -11,13 +11,13 @@
     },
     {
       "file": "sniptale-title.sniptale-effect.json",
-      "sha256": "943aeddde907db5e7744dd08d4333ed5a2f522444951bb17a51810e122192fa2",
-      "sourceSha256": "943aeddde907db5e7744dd08d4333ed5a2f522444951bb17a51810e122192fa2"
+      "sha256": "c9f7e52782633cf373619e42855dcf4716fc9d6ba4ac88b0028aea0df007e379",
+      "sourceSha256": "c9f7e52782633cf373619e42855dcf4716fc9d6ba4ac88b0028aea0df007e379"
     },
     {
       "file": "sniptale-chapters.sniptale-effect.json",
-      "sha256": "16e06b525123e9aed9b175cae476faedf9f6d52041a1d77c23165e58073f5fd7",
-      "sourceSha256": "3df450e3ee1189db13d930e49c30f70d02206f986a7c2d6068db07c1adbca550"
+      "sha256": "02fd16aec02696892a462fad5671f7be116b210af4ce2c8380901390211d4895",
+      "sourceSha256": "e8219664cb49a9533261dac56c4fcc2814a5f07547fbd484d42c848231bc5dd1"
     },
     {
       "file": "sniptale-callout.sniptale-effect.json",
@@ -36,13 +36,13 @@
     },
     {
       "file": "sniptale-spotlight.sniptale-effect.json",
-      "sha256": "a031da05be5f5c4880371ad9f34700d897bb7cc5d34151dcc94e244df0430f27",
-      "sourceSha256": "a031da05be5f5c4880371ad9f34700d897bb7cc5d34151dcc94e244df0430f27"
+      "sha256": "2af353fa1f2a3addf4b54edd0c93d0a623434deed66425804d08da37233d5024",
+      "sourceSha256": "ee0ba13369122dd7907f9a8f76f90f3b33e7022616e84777be99e70e1c98863e"
     },
     {
       "file": "sniptale-frosted.sniptale-effect.json",
-      "sha256": "26aa4e5c9ee4240b4322f3b7fa6e3ac20cb8dabfe76ebf60d0ef521a019d6e88",
-      "sourceSha256": "26aa4e5c9ee4240b4322f3b7fa6e3ac20cb8dabfe76ebf60d0ef521a019d6e88"
+      "sha256": "b5b47a1012d19796f2ac784e078f915dcdb5a39128c2924a0ef52ab193aedcef",
+      "sourceSha256": "a6149229d119fca5da17dcc713c9c171a21cecaf47cabf619f83962d06b94ccc"
     },
     {
       "file": "sniptale-transition-dissolve.sniptale-effect.json",
@@ -111,6 +111,7 @@
     }
   ],
   "formatting": "Repository formatter; sourceSha256 identifies supplied SDK bytes, sha256 identifies formatted fixture bytes.",
-  "workflowManifestSha256": "b6b3c497285b204cf6dfe4be53c85cdd1fd5f8caabdb98c647ba0b72260902e2",
-  "workflowSourceManifestSha256": "23e8f699e23e83f5e135ebe5cd6115e143963de752041cafb5775dba38c7a395"
+  "workflowManifestSha256": "53ea6620458fed88b5db1a579df4acc4925411de10bf0c82a2441b053c88fc8b",
+  "workflowSourceManifestSha256": "9221c8513bf6f32c53b9ea154368ac3b5524bccd1ac1268e844170654ff8ff1c",
+  "workflowManifestSourceSha256": "0ed1ed8e65ba8d309f14798752f4dfb43968ebb3deff8b78d040aa2f89ad5959"
 }

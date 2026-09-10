@@ -3263,6 +3263,49 @@
         }
       ]
     },
+    "editorRegion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "kind",
+        "units",
+        "position",
+        "inset",
+        "xControl",
+        "yControl",
+        "widthControl",
+        "heightControl"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9._-]{0,127}$"
+        },
+        "label": { "$ref": "#/$defs/localeText" },
+        "kind": { "const": "rect" },
+        "units": { "const": "percent" },
+        "position": { "const": "available-space" },
+        "inset": { "type": "number", "minimum": 0, "maximum": 0.25 },
+        "xControl": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9._-]{0,127}$"
+        },
+        "yControl": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9._-]{0,127}$"
+        },
+        "widthControl": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9._-]{0,127}$"
+        },
+        "heightControl": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9._-]{0,127}$"
+        }
+      }
+    },
     "presets": { "type": "array" },
     "program": { "$ref": "#/$defs/program" },
     "scenes": {
@@ -3298,6 +3341,10 @@
         "controlPresets": ["defaultControlPresetId"],
         "defaultControlPresetId": ["controlPresets"]
       }
+    },
+    {
+      "if": { "required": ["editorRegion"] },
+      "then": { "properties": { "kind": { "const": "targetEffect" } } }
     }
   ],
   "type": "object",

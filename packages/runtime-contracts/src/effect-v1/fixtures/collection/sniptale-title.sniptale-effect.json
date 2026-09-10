@@ -110,12 +110,12 @@
         "ru": "Заголовок · строка 1",
         "en": "Heading · line 1"
       },
-      "defaultValue": "Покажите главное.",
+      "defaultValue": "Покажите главное",
       "group": "content",
       "order": 7,
       "localizedDefaultValue": {
-        "ru": "Покажите главное.",
-        "en": "Show what matters."
+        "ru": "Покажите главное",
+        "en": "Show what matters"
       }
     },
     {
@@ -125,12 +125,12 @@
         "ru": "Заголовок · строка 2",
         "en": "Heading · line 2"
       },
-      "defaultValue": "Без лишних слов.",
+      "defaultValue": "Без лишних слов",
       "group": "content",
       "order": 8,
       "localizedDefaultValue": {
-        "ru": "Без лишних слов.",
-        "en": "Let the story speak."
+        "ru": "Без лишних слов",
+        "en": "Let the story speak"
       }
     },
     {
@@ -140,12 +140,12 @@
         "ru": "Подпись",
         "en": "Subtitle"
       },
-      "defaultValue": "От первой идеи — до готовой истории.",
+      "defaultValue": "От первой идеи — до готовой истории",
       "group": "content",
       "order": 9,
       "localizedDefaultValue": {
-        "ru": "От первой идеи — до готовой истории.",
-        "en": "From the first idea to the finished story."
+        "ru": "От первой идеи — до готовой истории",
+        "en": "From the first idea to the finished story"
       }
     },
     {

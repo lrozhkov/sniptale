@@ -38,6 +38,9 @@ function createPreviewStageCanvasOverlays(
     selectionOverlay: createPreviewStageSelectionOverlay({
       onUpdateEffectInstance: params.onUpdateEffectInstance,
       onPreviewEffectAnchors: params.onPreviewEffectAnchors,
+      onPreviewEffectControls: params.onPreviewEffectControls,
+      selectedEffectInstanceId: params.selectedEffectInstanceId,
+      currentTime: params.currentTime,
       beginInteraction: params.beginInteraction,
       camera: params.camera,
       mode,

@@ -57,3 +57,10 @@ export {
   applyEffectV1ControlPresetValues,
   applyEffectV1ControlPreset,
 } from './model/control-presets.js';
+
+export type { EffectV1EditorRegion } from './model/types.js';
+export {
+  resolveEffectV1EditorRegion,
+  updateEffectV1EditorRegion,
+  type EffectV1RegionRect,
+} from './editor-region/geometry.js';

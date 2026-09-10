@@ -786,7 +786,7 @@
       "en": "Focus area"
     },
     "kind": "rect",
-    "units": "percent",
+    "units": "pixels",
     "position": "available-space",
     "inset": 0.022222222222222223,
     "xControl": "x",

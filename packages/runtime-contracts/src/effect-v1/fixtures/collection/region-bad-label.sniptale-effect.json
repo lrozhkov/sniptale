@@ -782,8 +782,7 @@
   "editorRegion": {
     "id": "focus",
     "label": {
-      "ru": "Область фокуса",
-      "en": "Focus area"
+      "ru": "Фокус"
     },
     "kind": "rect",
     "units": "percent",

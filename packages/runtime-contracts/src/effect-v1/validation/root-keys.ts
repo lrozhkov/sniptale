@@ -12,6 +12,7 @@ export const EFFECT_V1_ROOT_KEYS = new Set([
   'label',
   'layers',
   'objectLayout',
+  'editorRegion',
   'presets',
   'program',
   'scenes',

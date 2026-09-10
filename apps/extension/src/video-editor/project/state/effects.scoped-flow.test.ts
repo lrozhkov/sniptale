@@ -106,3 +106,67 @@ it('creates a touching junction and graph in one undoable operation and replaces
   expect(restore.project.effectInstances![0]!.id).toBe(first);
   expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(replaced.project)))).not.toBeNull();
 });
+
+it.each(['clip', 'track', 'video-group'] as const)(
+  'preserves editor region controls across %s history, duplicate and reload',
+  async (kind) => {
+    const { store, trackId, a } = fixture();
+    const imported = await importRawEffectDocument(
+      new Uint8Array(
+        readFileSync(
+          'packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-spotlight.sniptale-effect.json'
+        )
+      )
+    );
+    if (!imported.ok) throw new Error('Invalid SDK region fixture');
+    const bundle = await createEffectCatalogEntry(
+      { document: imported.artifact, kind: 'raw-json' },
+      1
+    );
+    const target =
+      kind === 'clip' ? { kind, clipId: a.id } : kind === 'track' ? { kind, trackId } : { kind };
+    const id = await store.getState().applyEffectDocument({
+      catalog: bundle,
+      documentId: bundle.documents[0]!.id,
+      startTime: 0,
+      target,
+    });
+    if (!id) throw new Error('Region not applied');
+    const before = structuredClone(
+      store.getState().project!.effectInstances!.find((item) => item.id === id)!.controls
+    );
+    const controls = { x: 12.25, y: 60.5, width: 35.5, height: 27.25 };
+    store.getState().updateEffectInstance(id, { controls });
+    const state = store.getState();
+    const undone = undoVideoEditorProjectHistory(state.projectHistory, state.project!);
+    if (undone?.status !== 'applied') throw new Error('No region undo');
+    expect(undone.project.effectInstances!.find((item) => item.id === id)!.controls).toEqual(
+      before
+    );
+    const redone = redoVideoEditorProjectHistory(undone.history, undone.project);
+    if (redone?.status !== 'applied') throw new Error('No region redo');
+    const saved = parseHydratableVideoProject(JSON.parse(JSON.stringify(redone.project)));
+    if (!saved) throw new Error('Region not saved');
+    expect(saved.effectInstances!.find((item) => item.id === id)!.controls).toMatchObject(controls);
+    expect(JSON.parse(saved.effectSnapshots![0]!.source)).toMatchObject({
+      editorRegion: {
+        kind: 'rect',
+        xControl: 'x',
+      },
+    });
+    store.getState().setProject(saved);
+    const copy = store.getState().duplicateEffectInstance(id);
+    expect(
+      store.getState().project!.effectInstances!.find((item) => item.id === copy)!.controls
+    ).toMatchObject(controls);
+    expect(saved.clips).toEqual(state.project!.clips);
+    if (kind === 'clip') {
+      store.getState().splitClipAt(a.id, 5);
+      const split = store.getState().project!;
+      expect(split.clips.length).toBeGreaterThan(saved.clips.length);
+      for (const instance of split.effectInstances ?? [])
+        expect(instance.controls).toMatchObject(controls);
+      expect(parseHydratableVideoProject(JSON.parse(JSON.stringify(split)))).not.toBeNull();
+    }
+  }
+);

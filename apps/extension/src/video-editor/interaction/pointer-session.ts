@@ -1,5 +1,15 @@
 interface WindowPointerSessionParams {
-  cursor?: 'grabbing' | 'ew-resize';
+  cursor?:
+    | 'grabbing'
+    | 'ew-resize'
+    | 'e-resize'
+    | 'se-resize'
+    | 's-resize'
+    | 'sw-resize'
+    | 'w-resize'
+    | 'nw-resize'
+    | 'n-resize'
+    | 'ne-resize';
   onMove: (event: PointerEvent) => void;
   onEnd?: () => void;
   onCancel?: () => void;

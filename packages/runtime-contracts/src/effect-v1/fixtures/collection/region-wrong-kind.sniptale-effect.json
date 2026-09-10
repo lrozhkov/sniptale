@@ -1,7 +1,7 @@
 {
   "schemaVersion": "sniptale.effect.v1",
   "id": "sniptale-spotlight",
-  "kind": "targetEffect",
+  "kind": "standalone",
   "duration": 4,
   "label": {
     "ru": "Фокус с затемнением",

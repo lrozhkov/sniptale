@@ -39,7 +39,7 @@ interface CreateWorkspaceHeaderArgs {
 
 type PreviewStore = AnnotationEditingPort &
   Pick<EffectEditingPort, 'updateEffectInstance'> &
-  Pick<ClipSelectionPort, 'selectClip' | 'selectScene' | 'selectedClipId'> &
+  Pick<ClipSelectionPort, 'selectClip' | 'selectScene' | 'selectedClipId' | 'selection'> &
   Pick<PlaybackPort, 'currentTime' | 'isPlaying'> &
   RuntimeSessionPort &
   Pick<
@@ -155,6 +155,10 @@ function createWorkspacePreviewSelection(args: CreateWorkspacePreviewArgs) {
     placementMode: args.store.placementMode,
     selectedActionOccurrence: args.selections.selectedActionOccurrence,
     selectedClipId: args.store.selectedClipId,
+    selectedEffectInstanceId:
+      args.store.selection.kind === 'effect-instance'
+        ? args.store.selection.effectInstanceId
+        : null,
     selectedMotionRegion: args.selections.selectedMotionRegion,
   };
 }

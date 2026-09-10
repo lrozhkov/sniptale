@@ -790,7 +790,7 @@
     "position": "available-space",
     "inset": 0.022222222222222223,
     "xControl": "x",
-    "yControl": "y",
+    "yControl": "x",
     "widthControl": "width",
     "heightControl": "height"
   }

@@ -156,6 +156,7 @@ export function usePreviewStageRuntime(params: PreviewStageProps) {
     previewRasterSize,
     render: {
       onPreviewEffectAnchors: transient.onPreviewEffectAnchors,
+      onPreviewEffectControls: transient.onPreviewEffectControls,
       currentTime: transient.currentTime,
       effectRuntimeFeedback,
       project: previewProject,

@@ -375,6 +375,7 @@ function createWorkspacePreviewProps(
     registerPreviewRuntime: preview.transport.registerPreviewRuntime,
     selectedActionOccurrence: preview.selection.selectedActionOccurrence,
     selectedClipId: preview.selection.selectedClipId,
+    selectedEffectInstanceId: preview.selection.selectedEffectInstanceId,
     selectedMotionRegion: preview.selection.selectedMotionRegion,
     onClearActiveInsertKind: props.onClearActiveInsertKind,
     ...preview.editing,

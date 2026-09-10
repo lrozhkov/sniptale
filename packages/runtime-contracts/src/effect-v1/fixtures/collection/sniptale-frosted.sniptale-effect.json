@@ -25,17 +25,6 @@
       "order": 0
     },
     {
-      "id": "surface",
-      "kind": "color",
-      "label": {
-        "ru": "Подложка",
-        "en": "Surface"
-      },
-      "defaultValue": "#16181d",
-      "group": "appearance",
-      "order": 1
-    },
-    {
       "id": "x",
       "kind": "number",
       "label": {
@@ -99,7 +88,7 @@
         "en": "Stroke width"
       },
       "defaultValue": 3,
-      "min": 1,
+      "min": 0,
       "max": 8,
       "step": 1,
       "group": "appearance",
@@ -411,7 +400,1258 @@
           "op": "read",
           "path": "height"
         },
-        "fit": "cover"
+        "fit": "cover",
+        "alpha": {
+          "op": "sub",
+          "args": [
+            1,
+            {
+              "op": "select",
+              "value": {
+                "op": "gt",
+                "args": [
+                  {
+                    "op": "read",
+                    "path": "controls.blur"
+                  },
+                  0
+                ]
+              },
+              "values": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.exit"
+                    },
+                    {
+                      "op": "out",
+                      "args": [
+                        {
+                          "op": "clamp",
+                          "args": [
+                            {
+                              "op": "div",
+                              "args": [
+                                {
+                                  "op": "sub",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "progress"
+                                    },
+                                    {
+                                      "op": "mul",
+                                      "args": [
+                                        {
+                                          "op": "read",
+                                          "path": "defs.entry"
+                                        },
+                                        0
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "op": "mul",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "defs.entry"
+                                    },
+                                    {
+                                      "op": "sub",
+                                      "args": [1, 0]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            0,
+                            1
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                0
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "op": "when",
+        "condition": {
+          "op": "and",
+          "args": [
+            {
+              "op": "gt",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "controls.blur"
+                },
+                0
+              ]
+            },
+            {
+              "op": "gt",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.exit"
+                    },
+                    {
+                      "op": "out",
+                      "args": [
+                        {
+                          "op": "clamp",
+                          "args": [
+                            {
+                              "op": "div",
+                              "args": [
+                                {
+                                  "op": "sub",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "progress"
+                                    },
+                                    {
+                                      "op": "mul",
+                                      "args": [
+                                        {
+                                          "op": "read",
+                                          "path": "defs.entry"
+                                        },
+                                        0
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "op": "mul",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "defs.entry"
+                                    },
+                                    {
+                                      "op": "sub",
+                                      "args": [1, 0]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            0,
+                            1
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                0
+              ]
+            }
+          ]
+        },
+        "commands": [
+          {
+            "op": "renderPass",
+            "id": "padded",
+            "width": {
+              "op": "div",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "width"
+                    },
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "controls.blur"
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        2
+                      ]
+                    }
+                  ]
+                },
+                4
+              ]
+            },
+            "height": {
+              "op": "div",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "height"
+                    },
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "controls.blur"
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        2
+                      ]
+                    }
+                  ]
+                },
+                4
+              ]
+            },
+            "commands": [
+              {
+                "op": "group",
+                "scaleX": 0.25,
+                "scaleY": 0.25,
+                "commands": [
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "controls.blur"
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "controls.blur"
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "scaleX": -1,
+                    "scaleY": -1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "source",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "controls.blur"
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "controls.blur"
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "scaleX": -1,
+                    "scaleY": 1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "source",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "controls.blur"
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "controls.blur"
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "height"
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    "scaleX": -1,
+                    "scaleY": -1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "source",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "controls.blur"
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "controls.blur"
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "scaleX": 1,
+                    "scaleY": -1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "source",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "controls.blur"
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "controls.blur"
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "scaleX": 1,
+                    "scaleY": 1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "source",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "controls.blur"
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "controls.blur"
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "height"
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    "scaleX": 1,
+                    "scaleY": -1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "source",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "controls.blur"
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "width"
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "controls.blur"
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "scaleX": -1,
+                    "scaleY": -1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "source",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "controls.blur"
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "width"
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "controls.blur"
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "scaleX": -1,
+                    "scaleY": 1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "source",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "controls.blur"
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "width"
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "controls.blur"
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "height"
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    "scaleX": -1,
+                    "scaleY": -1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "source",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "op": "renderPass",
+            "id": "blur",
+            "width": {
+              "op": "div",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "width"
+                    },
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "controls.blur"
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        2
+                      ]
+                    }
+                  ]
+                },
+                4
+              ]
+            },
+            "height": {
+              "op": "div",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "height"
+                    },
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "controls.blur"
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        2
+                      ]
+                    }
+                  ]
+                },
+                4
+              ]
+            },
+            "commands": [
+              {
+                "op": "compositePass",
+                "passId": "padded",
+                "x": 0,
+                "y": 0,
+                "width": {
+                  "op": "div",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.blur"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.s"
+                                },
+                                3
+                              ]
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    4
+                  ]
+                },
+                "height": {
+                  "op": "div",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.blur"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.s"
+                                },
+                                3
+                              ]
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    4
+                  ]
+                },
+                "filter": {
+                  "blur": {
+                    "op": "mul",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.blur"
+                      },
+                      {
+                        "op": "read",
+                        "path": "defs.s"
+                      },
+                      0.25
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "compositePass",
+            "passId": "blur",
+            "x": {
+              "op": "sub",
+              "args": [
+                0,
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "controls.blur"
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.s"
+                    },
+                    3
+                  ]
+                }
+              ]
+            },
+            "y": {
+              "op": "sub",
+              "args": [
+                0,
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "controls.blur"
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.s"
+                    },
+                    3
+                  ]
+                }
+              ]
+            },
+            "width": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "div",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.blur"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.s"
+                                },
+                                3
+                              ]
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    4
+                  ]
+                },
+                4
+              ]
+            },
+            "height": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "div",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.blur"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.s"
+                                },
+                                3
+                              ]
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    4
+                  ]
+                },
+                4
+              ]
+            },
+            "alpha": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.exit"
+                },
+                {
+                  "op": "out",
+                  "args": [
+                    {
+                      "op": "clamp",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            {
+                              "op": "sub",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "progress"
+                                },
+                                {
+                                  "op": "mul",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "defs.entry"
+                                    },
+                                    0
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "defs.entry"
+                                },
+                                {
+                                  "op": "sub",
+                                  "args": [1, 0]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        0,
+                        1
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "blend": "lighter"
+          },
+          {
+            "op": "clip",
+            "x": {
+              "op": "read",
+              "path": "defs.px"
+            },
+            "y": {
+              "op": "read",
+              "path": "defs.py"
+            },
+            "width": {
+              "op": "read",
+              "path": "defs.bw"
+            },
+            "height": {
+              "op": "read",
+              "path": "defs.bh"
+            },
+            "commands": [
+              {
+                "op": "clear"
+              },
+              {
+                "op": "image",
+                "input": "source",
+                "x": 0,
+                "y": 0,
+                "width": {
+                  "op": "read",
+                  "path": "width"
+                },
+                "height": {
+                  "op": "read",
+                  "path": "height"
+                },
+                "fit": "cover"
+              }
+            ]
+          }
+        ]
       },
       {
         "op": "when",
@@ -420,93 +1660,107 @@
           "args": [
             {
               "op": "read",
-              "path": "controls.blur"
+              "path": "controls.line"
             },
             0
           ]
         },
         "commands": [
           {
-            "op": "renderPass",
-            "id": "soft",
-            "width": {
-              "op": "div",
-              "args": [
-                {
-                  "op": "read",
-                  "path": "width"
-                },
-                4
-              ]
-            },
-            "height": {
-              "op": "div",
-              "args": [
-                {
-                  "op": "read",
-                  "path": "height"
-                },
-                4
-              ]
-            },
+            "op": "group",
             "commands": [
               {
-                "op": "group",
-                "commands": [
+                "op": "polyline",
+                "points": [
                   {
-                    "op": "image",
-                    "input": "source",
                     "x": 0,
-                    "y": 0,
-                    "width": {
+                    "y": 0
+                  },
+                  {
+                    "x": {
                       "op": "read",
-                      "path": "width"
+                      "path": "defs.bw"
                     },
-                    "height": {
+                    "y": 0
+                  },
+                  {
+                    "x": {
                       "op": "read",
-                      "path": "height"
+                      "path": "defs.bw"
                     },
-                    "fit": "cover",
-                    "filter": {
-                      "blur": {
-                        "op": "mul",
-                        "args": [
-                          {
-                            "op": "mul",
-                            "args": [
-                              {
-                                "op": "read",
-                                "path": "controls.blur"
-                              },
-                              {
-                                "op": "read",
-                                "path": "defs.s"
-                              }
-                            ]
-                          },
-                          0.25
-                        ]
-                      }
+                    "y": {
+                      "op": "read",
+                      "path": "defs.bh"
                     }
+                  },
+                  {
+                    "x": 0,
+                    "y": {
+                      "op": "read",
+                      "path": "defs.bh"
+                    }
+                  },
+                  {
+                    "x": 0,
+                    "y": 0
                   }
                 ],
-                "scaleX": 0.25,
-                "scaleY": 0.25
+                "stroke": {
+                  "op": "read",
+                  "path": "controls.accent"
+                },
+                "lineWidth": {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "controls.line"
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.s"
+                    }
+                  ]
+                },
+                "lineCap": "round",
+                "lineJoin": "round",
+                "progress": {
+                  "op": "read",
+                  "path": "defs.en"
+                },
+                "shadow": {
+                  "color": "#00000099",
+                  "blur": {
+                    "op": "mul",
+                    "args": [
+                      4,
+                      {
+                        "op": "read",
+                        "path": "defs.s"
+                      }
+                    ]
+                  },
+                  "x": 0,
+                  "y": {
+                    "op": "mul",
+                    "args": [
+                      1,
+                      {
+                        "op": "read",
+                        "path": "defs.s"
+                      }
+                    ]
+                  }
+                }
               }
-            ]
-          },
-          {
-            "op": "compositePass",
-            "passId": "soft",
-            "x": 0,
-            "y": 0,
-            "width": {
+            ],
+            "x": {
               "op": "read",
-              "path": "width"
+              "path": "defs.px"
             },
-            "height": {
+            "y": {
               "op": "read",
-              "path": "height"
+              "path": "defs.py"
             },
             "alpha": {
               "op": "mul",
@@ -565,301 +1819,22 @@
             }
           }
         ]
-      },
-      {
-        "op": "clip",
-        "x": {
-          "op": "read",
-          "path": "defs.px"
-        },
-        "y": {
-          "op": "read",
-          "path": "defs.py"
-        },
-        "width": {
-          "op": "read",
-          "path": "defs.bw"
-        },
-        "height": {
-          "op": "read",
-          "path": "defs.bh"
-        },
-        "commands": [
-          {
-            "op": "image",
-            "input": "source",
-            "x": 0,
-            "y": 0,
-            "width": {
-              "op": "read",
-              "path": "width"
-            },
-            "height": {
-              "op": "read",
-              "path": "height"
-            },
-            "fit": "cover"
-          }
-        ]
-      },
-      {
-        "op": "group",
-        "commands": [
-          {
-            "op": "polyline",
-            "points": [
-              {
-                "x": 0,
-                "y": 0
-              },
-              {
-                "x": {
-                  "op": "read",
-                  "path": "defs.bw"
-                },
-                "y": 0
-              },
-              {
-                "x": {
-                  "op": "read",
-                  "path": "defs.bw"
-                },
-                "y": {
-                  "op": "read",
-                  "path": "defs.bh"
-                }
-              },
-              {
-                "x": 0,
-                "y": {
-                  "op": "read",
-                  "path": "defs.bh"
-                }
-              },
-              {
-                "x": 0,
-                "y": 0
-              }
-            ],
-            "stroke": {
-              "op": "read",
-              "path": "controls.surface"
-            },
-            "lineWidth": {
-              "op": "add",
-              "args": [
-                {
-                  "op": "mul",
-                  "args": [
-                    {
-                      "op": "read",
-                      "path": "controls.line"
-                    },
-                    {
-                      "op": "read",
-                      "path": "defs.s"
-                    }
-                  ]
-                },
-                {
-                  "op": "mul",
-                  "args": [
-                    3,
-                    {
-                      "op": "read",
-                      "path": "defs.s"
-                    }
-                  ]
-                }
-              ]
-            },
-            "lineCap": "round",
-            "lineJoin": "round",
-            "progress": {
-              "op": "read",
-              "path": "defs.en"
-            }
-          },
-          {
-            "op": "polyline",
-            "points": [
-              {
-                "x": 0,
-                "y": 0
-              },
-              {
-                "x": {
-                  "op": "read",
-                  "path": "defs.bw"
-                },
-                "y": 0
-              },
-              {
-                "x": {
-                  "op": "read",
-                  "path": "defs.bw"
-                },
-                "y": {
-                  "op": "read",
-                  "path": "defs.bh"
-                }
-              },
-              {
-                "x": 0,
-                "y": {
-                  "op": "read",
-                  "path": "defs.bh"
-                }
-              },
-              {
-                "x": 0,
-                "y": 0
-              }
-            ],
-            "stroke": {
-              "op": "read",
-              "path": "controls.accent"
-            },
-            "lineWidth": {
-              "op": "mul",
-              "args": [
-                {
-                  "op": "read",
-                  "path": "controls.line"
-                },
-                {
-                  "op": "read",
-                  "path": "defs.s"
-                }
-              ]
-            },
-            "lineCap": "round",
-            "lineJoin": "round",
-            "progress": {
-              "op": "read",
-              "path": "defs.en"
-            }
-          }
-        ],
-        "x": {
-          "op": "read",
-          "path": "defs.px"
-        },
-        "y": {
-          "op": "read",
-          "path": "defs.py"
-        },
-        "alpha": {
-          "op": "mul",
-          "args": [
-            {
-              "op": "out",
-              "args": [
-                {
-                  "op": "clamp",
-                  "args": [
-                    {
-                      "op": "div",
-                      "args": [
-                        {
-                          "op": "sub",
-                          "args": [
-                            {
-                              "op": "read",
-                              "path": "progress"
-                            },
-                            {
-                              "op": "mul",
-                              "args": [
-                                {
-                                  "op": "read",
-                                  "path": "defs.entry"
-                                },
-                                0
-                              ]
-                            }
-                          ]
-                        },
-                        {
-                          "op": "mul",
-                          "args": [
-                            {
-                              "op": "read",
-                              "path": "defs.entry"
-                            },
-                            1
-                          ]
-                        }
-                      ]
-                    },
-                    0,
-                    1
-                  ]
-                }
-              ]
-            },
-            {
-              "op": "read",
-              "path": "defs.exit"
-            }
-          ]
-        }
       }
     ]
   },
-  "controlPresets": [
-    {
-      "id": "sniptale-orange-dark",
-      "label": {
-        "en": "Dark",
-        "ru": "Тёмный"
-      },
-      "theme": {
-        "id": "sniptale-orange",
-        "label": {
-          "en": "Sniptale Orange",
-          "ru": "Sniptale Orange"
-        }
-      },
-      "style": {
-        "id": "dark",
-        "label": {
-          "en": "Dark",
-          "ru": "Тёмный"
-        }
-      },
-      "values": {
-        "accent": "#fb923c",
-        "surface": "#16181d",
-        "line": 3
-      }
+  "editorRegion": {
+    "id": "focus",
+    "label": {
+      "ru": "Область фокуса",
+      "en": "Focus area"
     },
-    {
-      "id": "sniptale-orange-light",
-      "label": {
-        "en": "Light",
-        "ru": "Светлый"
-      },
-      "theme": {
-        "id": "sniptale-orange",
-        "label": {
-          "en": "Sniptale Orange",
-          "ru": "Sniptale Orange"
-        }
-      },
-      "style": {
-        "id": "light",
-        "label": {
-          "en": "Light",
-          "ru": "Светлый"
-        }
-      },
-      "values": {
-        "accent": "#c2410c",
-        "surface": "#fffaf4",
-        "line": 3
-      }
-    }
-  ],
-  "defaultControlPresetId": "sniptale-orange-dark"
+    "kind": "rect",
+    "units": "percent",
+    "position": "available-space",
+    "inset": 0.022222222222222223,
+    "xControl": "x",
+    "yControl": "y",
+    "widthControl": "width",
+    "heightControl": "height"
+  }
 }
