@@ -44,6 +44,20 @@ export function EffectCatalogControls({
       label: translate('videoEditor.effectsLibrary.transitions'),
     },
   ] as const;
+  const themeSelect =
+    themes.length > 0 ? (
+      <CompactSelect
+        aria-label={translate('videoEditor.effectsLibrary.theme')}
+        value={themes.some((theme) => theme.value === filter.theme) ? filter.theme : 'all'}
+        containerClassName="min-w-0 flex-1"
+        disabled={disabled}
+        options={[
+          { value: 'all', label: translate('videoEditor.effectsLibrary.allThemes') },
+          ...themes,
+        ]}
+        onChange={(theme) => onChange({ ...filter, theme })}
+      />
+    ) : null;
   return (
     <div className="flex w-full min-w-0 flex-col gap-2" data-ui="effect-catalog.filters">
       <div className="flex min-w-0 items-center gap-1">
@@ -89,7 +103,7 @@ export function EffectCatalogControls({
             ))}
           </div>
         ) : (
-          <span className="flex-1" />
+          (themeSelect ?? <span className="flex-1" />)
         )}
         <EditorIconButton
           ref={searchButton}
@@ -108,19 +122,7 @@ export function EffectCatalogControls({
           {searching ? <X size={16} aria-hidden="true" /> : <Search size={16} aria-hidden="true" />}
         </EditorIconButton>
       </div>
-      {themes.length > 0 && (
-        <CompactSelect
-          aria-label={translate('videoEditor.effectsLibrary.theme')}
-          value={themes.some((theme) => theme.value === filter.theme) ? filter.theme : 'all'}
-          containerClassName="min-w-0"
-          disabled={disabled}
-          options={[
-            { value: 'all', label: translate('videoEditor.effectsLibrary.allThemes') },
-            ...themes,
-          ]}
-          onChange={(theme) => onChange({ ...filter, theme })}
-        />
-      )}
+      {!hideCategories && !searching && themeSelect}
     </div>
   );
 }

@@ -78,24 +78,12 @@ export function VideoEditorLibraryNavigation(props: {
   onChange: (active: LibrarySection) => void;
 }) {
   const sections = getLibrarySections();
-  const activeIndex = sections.findIndex((section) => section.id === props.active);
   return (
     <div
       role="group"
       aria-label={translate('videoEditor.app.materialsTitle')}
       className="@container/library-nav relative flex min-w-[140px] flex-1 items-center gap-1"
     >
-      <span
-        aria-hidden="true"
-        data-ui="video-editor.library-tab.indicator"
-        className={[
-          'pointer-events-none absolute inset-y-0 left-0 w-8 rounded-[8px]',
-          '@[220px]/library-nav:w-[calc(100%-108px)]',
-          'bg-[var(--sniptale-color-surface-hover)] transition-transform duration-150 ease-out',
-          'motion-reduce:transition-none',
-        ].join(' ')}
-        style={{ transform: `translateX(${activeIndex * 36}px)` }}
-      />
       {sections.map(({ id, label, Icon }) => (
         <ContentToolbarButton
           key={id}
@@ -105,12 +93,17 @@ export function VideoEditorLibraryNavigation(props: {
           dataUi={`video-editor.library-tab.${id}`}
           className={[
             'relative !h-8 !w-8 !min-w-8 shrink-0 !gap-1 !border-transparent !bg-transparent !px-1 !shadow-none',
-            props.active === id
-              ? '!text-[var(--sniptale-color-accent)] @[220px]/library-nav:flex-1'
-              : '',
+            'hover:!bg-[var(--sniptale-color-surface-hover)]',
+            props.active === id ? '@[220px]/library-nav:flex-1' : '',
           ].join(' ')}
         >
-          <Icon size={16} className="shrink-0" aria-hidden="true" />
+          <Icon
+            size={16}
+            className={
+              props.active === id ? 'shrink-0 text-[var(--sniptale-color-accent)]' : 'shrink-0'
+            }
+            aria-hidden="true"
+          />
           {props.active === id && (
             <span className="hidden truncate text-[12px] font-medium @[220px]/library-nav:block">
               {label}

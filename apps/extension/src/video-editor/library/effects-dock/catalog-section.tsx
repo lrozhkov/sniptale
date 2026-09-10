@@ -246,22 +246,21 @@ function CatalogDocument(
       }}
       onDragEnd={drag.end}
     >
-      <div className="flex min-w-0 items-start gap-1">
+      <div className="flex h-6 min-w-0 items-center">
         <div className="min-w-0 flex-1">
-          <p className="break-words text-[11px] leading-4 font-medium text-[var(--sniptale-color-text-primary)]">
+          <p
+            title={metadata.label}
+            className="truncate text-[11px] leading-4 font-medium text-[var(--sniptale-color-text-primary)]"
+          >
             {metadata.label}
           </p>
-          {(metadata.themeLabel || metadata.styleLabel) && (
-            <span className="text-[10px] text-[var(--sniptale-color-text-muted)]">
-              {[metadata.themeLabel, metadata.styleLabel].filter(Boolean).join(' · ')}
-            </span>
-          )}
         </div>
         <div
           className={[
-            'flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-100',
+            'flex max-w-0 shrink-0 items-center gap-0.5 overflow-hidden opacity-0',
+            'group-hover/effect-card:max-w-24 group-focus-within/effect-card:max-w-24',
             'group-hover/effect-card:opacity-100 group-focus-within/effect-card:opacity-100',
-            '[@media(hover:none)]:opacity-100 motion-reduce:transition-none',
+            '[@media(hover:none)]:max-w-24 [@media(hover:none)]:opacity-100',
           ].join(' ')}
         >
           {props.document.kind === 'standalone' && (
@@ -328,6 +327,14 @@ function CatalogDocument(
           )}
         </div>
       </div>
+      {(metadata.themeLabel || metadata.styleLabel) && (
+        <span
+          title={[metadata.themeLabel, metadata.styleLabel].filter(Boolean).join(' · ')}
+          className="block truncate text-[10px] text-[var(--sniptale-color-text-muted)]"
+        >
+          {[metadata.themeLabel, metadata.styleLabel].filter(Boolean).join(' · ')}
+        </span>
+      )}
       <EffectCatalogPreview
         catalog={props.catalog}
         document={props.document}
