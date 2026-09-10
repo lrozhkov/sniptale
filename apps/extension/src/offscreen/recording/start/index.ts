@@ -77,33 +77,8 @@ async function startRecordingInternal(
     frameShape: null as readonly number[] | null,
   };
   recordingContext.recordingPointObservation = pointObservation;
-  const onVideoFrameGeometry = (frame: VideoFrame) => {
-    const visible = frame.visibleRect;
-    const shape = [
-      frame.codedWidth,
-      frame.codedHeight,
-      frame.displayWidth,
-      frame.displayHeight,
-      visible?.x ?? -1,
-      visible?.y ?? -1,
-      visible?.width ?? -1,
-      visible?.height ?? -1,
-    ];
-    pointObservation.stable =
-      pointObservation.stable &&
-      frame.displayWidth === prepared.rawVideoWidth &&
-      frame.displayHeight === prepared.rawVideoHeight &&
-      frame.codedWidth === frame.displayWidth &&
-      frame.codedHeight === frame.displayHeight &&
-      visible?.x === 0 &&
-      visible.y === 0 &&
-      visible.width === frame.displayWidth &&
-      visible.height === frame.displayHeight &&
-      (pointObservation.frameShape === null ||
-        shape.every((value, index) => value === pointObservation.frameShape?.[index]));
-    pointObservation.frameShape ??= shape;
-    pointObservation.sawFrame = true;
-  };
+  const onVideoFrameGeometry = (frame: VideoFrame) =>
+    observeRecordingFrameGeometry(pointObservation, prepared.trackSettings, frame);
 
   const { streamInstanceId } = params;
   const begin = waitForRecordingBegin(
@@ -184,4 +159,37 @@ async function startRecordingInternal(
     },
     transformFailure: prepared.transformFailure,
   });
+}
+
+function observeRecordingFrameGeometry(
+  pointObservation: NonNullable<typeof recordingContext.recordingPointObservation>,
+  input: MediaTrackSettings,
+  frame: VideoFrame
+): void {
+  const visible = frame.visibleRect;
+  const shape = [
+    frame.codedWidth,
+    frame.codedHeight,
+    frame.displayWidth,
+    frame.displayHeight,
+    visible?.x ?? -1,
+    visible?.y ?? -1,
+    visible?.width ?? -1,
+    visible?.height ?? -1,
+  ];
+  // Frames come from the prepared encoder input, which may already be resized or cropped.
+  pointObservation.stable =
+    pointObservation.stable &&
+    frame.displayWidth === input.width &&
+    frame.displayHeight === input.height &&
+    frame.codedWidth === frame.displayWidth &&
+    frame.codedHeight === frame.displayHeight &&
+    visible?.x === 0 &&
+    visible.y === 0 &&
+    visible.width === frame.displayWidth &&
+    visible.height === frame.displayHeight &&
+    (pointObservation.frameShape === null ||
+      shape.every((value, index) => value === pointObservation.frameShape?.[index]));
+  pointObservation.frameShape ??= shape;
+  pointObservation.sawFrame = true;
 }

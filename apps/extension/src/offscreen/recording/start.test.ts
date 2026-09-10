@@ -327,3 +327,34 @@ it.each([
     });
   }
 );
+
+it('validates click geometry against the prepared input rather than the larger raw capture', async () => {
+  prepareRecordingStreamMock.mockResolvedValueOnce({
+    ...prepared,
+    rawVideoWidth: 2560,
+    rawVideoHeight: 1440,
+  });
+  await startRecording(
+    {
+      captureMode: CaptureMode.TAB,
+      generation: 3,
+      recordingId: 'recording-1',
+      streamInstanceId: 'stream-instance-1',
+      settings: createSettings(),
+      streamId: 'stream-1',
+    },
+    messaging
+  );
+  const observe = finalizeRecordingBootstrapMock.mock.calls[0]![0].onVideoFrameGeometry!;
+  observe({
+    codedWidth: 1280,
+    codedHeight: 720,
+    displayWidth: 1280,
+    displayHeight: 720,
+    visibleRect: { x: 0, y: 0, width: 1280, height: 720 },
+  } as VideoFrame);
+  expect(recordingContextMock.recordingPointObservation).toMatchObject({
+    stable: true,
+    sawFrame: true,
+  });
+});
