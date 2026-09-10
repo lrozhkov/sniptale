@@ -1,3 +1,4 @@
+import { PreviewFrameRateReadout } from '../frame-rate';
 import { LoaderCircle, CircleAlert, Pause } from 'lucide-react';
 import { PreviewDisplaySettings } from './display-settings';
 import { translate } from '../../../../platform/i18n';
@@ -42,7 +43,11 @@ export function PreviewStageControls(props: PreviewStageControlsProps) {
         className="flex h-9 shrink-0 items-center gap-2 empty:hidden"
         data-ui="video.preview.feedback"
       >
-        {props.mode === 'cache' ? <PreviewCacheStatus status={props.status} /> : null}
+        {props.mode === 'cache' ? (
+          <PreviewCacheStatus status={props.status} />
+        ) : (
+          <PreviewFrameRateReadout />
+        )}
         <PreviewPreferencesRetry {...props} />
       </div>
       <PreviewDisplaySettings {...props} />

@@ -44,6 +44,8 @@ export interface PreviewStageProps {
   playbackRange: VideoEditorPlaybackRange | null;
   previewMode: VideoEditorPreviewMode;
   previewPreferencesSaveFailed: boolean;
+  previewShowFrameRate?: boolean | undefined;
+  onPreviewShowFrameRateChange?: ((value: boolean) => void) | undefined;
   previewFrameRate?: VideoEditorPreviewFrameRate | undefined;
   previewRasterPreset: VideoEditorPreviewRasterPreset;
   previewZoom: VideoEditorPreviewZoom;

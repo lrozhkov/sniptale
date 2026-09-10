@@ -41,6 +41,8 @@ export interface VideoEditorPreviewController {
     onRasterPresetChange: (rasterPreset: VideoEditorPreviewRasterPreset) => void;
     onRetrySave: () => void;
     onZoomChange: (zoom: VideoEditorPreviewZoom) => void;
+    showFrameRate?: boolean;
+    onShowFrameRateChange?: (value: boolean) => void;
     frameRate: VideoEditorPreviewFrameRate;
     onFrameRateChange: (frameRate: VideoEditorPreviewFrameRate) => void;
     rasterPreset: VideoEditorPreviewRasterPreset;

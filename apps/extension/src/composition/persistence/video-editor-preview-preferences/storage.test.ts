@@ -6,12 +6,14 @@ import {
 } from './storage';
 
 const firstPreferences = {
+  showFrameRate: true,
   frameRate: '15',
   mode: 'cache',
   rasterPreset: '1440p',
   zoom: '75%',
 } as const;
 const secondPreferences = {
+  showFrameRate: false,
   frameRate: 'project',
   mode: 'live',
   rasterPreset: '720p',
@@ -33,7 +35,13 @@ it('loads validated fields without write-on-read repair', async () => {
 
   await expect(storage.load()).resolves.toEqual({
     invalidFieldCount: 1,
-    preferences: { frameRate: 'project', mode: 'cache', rasterPreset: '720p', zoom: '75%' },
+    preferences: {
+      showFrameRate: false,
+      frameRate: 'project',
+      mode: 'cache',
+      rasterPreset: '720p',
+      zoom: '75%',
+    },
   });
   expect(area.set).not.toHaveBeenCalled();
 });
@@ -71,7 +79,13 @@ it('rejects invalid values before a durable write', async () => {
 
   await expect(
     Reflect.apply(storage.save, storage, [
-      { frameRate: 'project', mode: 'cache', rasterPreset: '4k', zoom: 'fit' },
+      {
+        showFrameRate: false,
+        frameRate: 'project',
+        mode: 'cache',
+        rasterPreset: '4k',
+        zoom: 'fit',
+      },
     ])
   ).rejects.toThrow('Invalid video editor preview preferences');
   expect(area.set).not.toHaveBeenCalled();

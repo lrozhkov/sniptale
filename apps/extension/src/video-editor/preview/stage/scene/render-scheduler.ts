@@ -21,7 +21,7 @@ interface PreviewSceneRenderSchedulerState {
 
 interface PreviewSceneRenderSchedulerOptions {
   onError: (error: unknown) => void;
-  onSuccess?: () => void;
+  onSuccess?: (job: PreviewSceneRenderJob) => void;
   render: (job: Parameters<typeof renderPreviewScene>[0]) => ReturnType<typeof renderPreviewScene>;
 }
 
@@ -102,7 +102,7 @@ function startNextPreviewSceneRender(
     .then(
       (presented) => {
         if (presented !== false && !controller.signal.aborted) {
-          args.onSuccess?.();
+          args.onSuccess?.(job);
         }
       },
       (error: unknown) => {

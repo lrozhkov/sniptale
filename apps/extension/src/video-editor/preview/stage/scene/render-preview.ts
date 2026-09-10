@@ -123,12 +123,13 @@ export async function renderPreviewScene(params: {
       )
     )
       return false;
-    drawResolvedPreviewScene({
+    const drawn = drawResolvedPreviewScene({
       clipMediaElements,
       effectRuntimeFrames,
       params,
       renderPasses,
     });
+    if (!drawn) return false;
   } finally {
     disposeEffectRuntimeComposition(effectRuntimeFrames);
   }
@@ -139,7 +140,7 @@ function drawResolvedPreviewScene(args: {
   effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined;
   params: Parameters<typeof renderPreviewScene>[0];
   renderPasses: ReturnType<typeof resolveVideoCompositionRenderPasses>;
-}): void {
+}): boolean {
   const visualPassArgs = {
     canvas: args.params.canvas,
     clipMediaElements: args.clipMediaElements,
@@ -154,7 +155,7 @@ function drawResolvedPreviewScene(args: {
   };
   const overlayPrepared = drawPreviewVisualPasses(visualPassArgs);
 
-  if (!overlayPrepared || args.params.signal?.aborted) return;
+  if (!overlayPrepared || args.params.signal?.aborted) return false;
 
   drawPreviewSceneOverlays({
     camera: args.renderPasses.overlayFrame.camera,
@@ -162,6 +163,7 @@ function drawResolvedPreviewScene(args: {
     frame: args.renderPasses.overlayFrame,
     viewport: overlayPrepared.viewport,
   });
+  return true;
 }
 
 async function resolvePreviewEffectRuntimeFrames(

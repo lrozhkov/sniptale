@@ -220,3 +220,22 @@ function createJob(
     videoRefs: { current: {} },
   };
 }
+
+it.each(['rejected', 'not-presented'])('does not count a %s playback render', async (outcome) => {
+  const onSuccess = vi.fn();
+  const onError = vi.fn();
+  const scheduler = createPreviewSceneRenderScheduler({
+    onSuccess,
+    onError,
+    render: async () => {
+      if (outcome === 'rejected') throw new Error('failed');
+      return false;
+    },
+  });
+  scheduler.enqueue(createJob(1, true));
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(onSuccess).not.toHaveBeenCalled();
+  expect(onError).toHaveBeenCalledTimes(outcome === 'rejected' ? 1 : 0);
+  scheduler.dispose();
+});

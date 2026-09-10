@@ -1,6 +1,8 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorStageMessages = defineMessageSource({
+  showFrameRate: { ru: 'Показывать частоту кадров', en: 'Show frame rate' },
+  actualFrameRate: { ru: 'Частота отрисовки превью', en: 'Preview render frame rate' },
   title: {
     ru: 'Превью сцены',
     en: 'Stage preview',

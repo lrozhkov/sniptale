@@ -44,6 +44,8 @@ function buildPreviewStageSurfaceProps(
     previewPreferencesSaveFailed: props.previewPreferencesSaveFailed,
     previewCacheBypass: runtime.cache.bypass,
     previewExactFrameCache: runtime.cache.exactFrameCache,
+    previewShowFrameRate: props.previewShowFrameRate,
+    onPreviewShowFrameRateChange: props.onPreviewShowFrameRateChange,
     previewFrameRate: props.previewFrameRate,
     previewRasterPreset: props.previewRasterPreset,
     previewRasterSize: runtime.previewRasterSize,

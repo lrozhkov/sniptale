@@ -1,3 +1,4 @@
+import { usePreviewFrameRate } from '../frame-rate';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
@@ -163,6 +164,7 @@ function DisplayChoiceSection<T extends string>(props: {
 }
 
 function PreviewDisplayChoices(props: PreviewDisplaySettingsProps) {
+  const frameRate = usePreviewFrameRate();
   return (
     <ProductDropdownMenu
       className={[
@@ -209,6 +211,22 @@ function PreviewDisplayChoices(props: PreviewDisplaySettingsProps) {
           },
         ]}
       />
+      <label
+        className={[
+          'flex min-h-8 cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-xs',
+          'text-[var(--sniptale-color-text-primary)] has-[:disabled]:opacity-50',
+          'has-[:disabled]:cursor-default',
+        ].join(' ')}
+      >
+        <input
+          type="checkbox"
+          checked={frameRate?.enabled ?? false}
+          disabled={props.mode !== 'live'}
+          onChange={(event) => frameRate?.onChange(event.target.checked)}
+          className="m-0 accent-[var(--sniptale-color-accent)]"
+        />
+        {translate('videoEditor.stage.showFrameRate')}
+      </label>
       <DisplayChoiceSection
         label={translate('videoEditor.stage.previewZoom')}
         value={props.zoom}

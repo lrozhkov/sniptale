@@ -230,9 +230,11 @@ it('keeps the recording destination independent of viewer selection, transport a
     preview.preferences.onModeChange(preview.preferences.mode);
     preview.preferences.onRasterPresetChange(preview.preferences.rasterPreset);
     preview.preferences.onFrameRateChange('15');
+    preview.preferences.onShowFrameRateChange(true);
   });
   expect(store.selectClip).toHaveBeenCalledWith('another-clip');
   expect(runtime.seekTo).toHaveBeenCalledWith(20);
+  expect(workspaceState!.preview.preferences.preferences.showFrameRate).toBe(true);
   expect(createWorkspaceLayoutController(workspaceState!).audioRecordingTarget).toEqual(target);
   act(() => header.onOpenAudioRecordingDialog());
   expect(createWorkspaceLayoutController(workspaceState!).audioRecordingTarget).toBeNull();

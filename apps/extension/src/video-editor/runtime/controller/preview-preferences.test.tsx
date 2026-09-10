@@ -52,7 +52,13 @@ beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   mocks.load.mockReset().mockResolvedValue({
     invalidFieldCount: 0,
-    preferences: { frameRate: 'project', mode: 'live', rasterPreset: '720p', zoom: 'fit' },
+    preferences: {
+      showFrameRate: false,
+      frameRate: 'project',
+      mode: 'live',
+      rasterPreset: '720p',
+      zoom: 'fit',
+    },
   });
   mocks.save.mockReset();
   mocks.toastError.mockReset();
@@ -82,6 +88,7 @@ it('keeps the selected behavior and exposes a retry after a durable save failure
   expect(container.querySelector('[data-state]')?.textContent).toBe('cache:false');
   expect(mocks.save).toHaveBeenCalledTimes(2);
   expect(mocks.save).toHaveBeenLastCalledWith({
+    showFrameRate: false,
     frameRate: 'project',
     mode: 'cache',
     rasterPreset: '720p',

@@ -18,6 +18,7 @@ export type { VideoEditorPreviewMode, VideoEditorPreviewRasterPreset, VideoEdito
 
 export interface VideoEditorPreviewPreferences {
   frameRate: VideoEditorPreviewFrameRate;
+  showFrameRate: boolean;
   mode: VideoEditorPreviewMode;
   rasterPreset: VideoEditorPreviewRasterPreset;
   zoom: VideoEditorPreviewZoom;
@@ -25,6 +26,7 @@ export interface VideoEditorPreviewPreferences {
 
 export const DEFAULT_VIDEO_EDITOR_PREVIEW_PREFERENCES: VideoEditorPreviewPreferences = {
   frameRate: 'project',
+  showFrameRate: false,
   mode: 'live',
   rasterPreset: '720p',
   zoom: 'fit',
@@ -70,6 +72,9 @@ export function parseVideoEditorPreviewPreferences(
   if (includesValue(VIDEO_EDITOR_PREVIEW_FRAME_RATES, value['frameRate'])) {
     preferences.frameRate = value['frameRate'];
   } else if (value['frameRate'] !== undefined) invalidFieldCount += 1;
+  if (typeof value['showFrameRate'] === 'boolean')
+    preferences.showFrameRate = value['showFrameRate'];
+  else if (value['showFrameRate'] !== undefined) invalidFieldCount += 1;
   return { invalidFieldCount, preferences };
 }
 
@@ -81,7 +86,9 @@ export function parseCompleteVideoEditorPreviewPreferences(
   if (!includesValue(VIDEO_EDITOR_PREVIEW_RASTER_PRESETS, value['rasterPreset'])) return null;
   if (!includesValue(VIDEO_EDITOR_PREVIEW_ZOOM_LEVELS, value['zoom'])) return null;
   if (!includesValue(VIDEO_EDITOR_PREVIEW_FRAME_RATES, value['frameRate'])) return null;
+  if (typeof value['showFrameRate'] !== 'boolean') return null;
   return {
+    showFrameRate: value['showFrameRate'],
     frameRate: value['frameRate'],
     mode: value['mode'],
     rasterPreset: value['rasterPreset'],
@@ -90,4 +97,4 @@ export function parseCompleteVideoEditorPreviewPreferences(
 }
 
 // policyStateIds: [] - preference keys are a static parser allowlist, not mutable authority.
-const PREFERENCE_KEYS = new Set(['frameRate', 'mode', 'rasterPreset', 'zoom']);
+const PREFERENCE_KEYS = new Set(['showFrameRate', 'frameRate', 'mode', 'rasterPreset', 'zoom']);

@@ -367,6 +367,8 @@ function createWorkspacePreviewProps(
     project: preview.project,
     previewMode: preview.preferences.mode,
     previewPreferencesSaveFailed: preview.preferences.saveFailed,
+    previewShowFrameRate: preview.preferences.showFrameRate,
+    onPreviewShowFrameRateChange: preview.preferences.onShowFrameRateChange,
     previewFrameRate: preview.preferences.frameRate,
     previewRasterPreset: preview.preferences.rasterPreset,
     previewZoom: preview.preferences.zoom,

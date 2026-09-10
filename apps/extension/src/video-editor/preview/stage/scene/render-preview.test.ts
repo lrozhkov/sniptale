@@ -50,7 +50,7 @@ it('retains the presented canvas when a seek loses video readiness between enque
   expect(await pending).toBe(false);
   expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
   Object.defineProperty(video, 'readyState', { value: 4, configurable: true });
-  await renderPreviewScene(job);
+  expect(await renderPreviewScene(job)).toBe(false);
   expect(drawPreviewVisualPasses).toHaveBeenCalledOnce();
 });
 it('still paints scene backgrounds in timeline gaps', async () => {

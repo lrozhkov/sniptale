@@ -154,6 +154,8 @@ export interface PreviewStageSurfaceProps extends PreviewStageCanvasProps {
   onTogglePlay: () => void;
   previewMode: VideoEditorPreviewMode;
   previewPreferencesSaveFailed: boolean;
+  previewShowFrameRate?: boolean | undefined;
+  onPreviewShowFrameRateChange?: ((value: boolean) => void) | undefined;
   previewFrameRate?: VideoEditorPreviewFrameRate | undefined;
   previewRasterPreset: VideoEditorPreviewRasterPreset;
   previewZoom: VideoEditorPreviewZoom;
