@@ -108,13 +108,11 @@ export function TrackLayoutFields({
         </div>
       </div>
       <InspectorDetails label={translate('videoEditor.sidebar.inspectorDisplay')}>
-        {track.kind === VideoTrackKind.PRIMARY ? (
-          <ToggleField
-            label={translate('videoEditor.timeline.hideClipNames')}
-            checked={panelPrefs.prefs.hiddenClipNamesByTrackId?.[track.id] ?? false}
-            onChange={(hidden) => panelPrefs.setClipNamesHidden(track.id, hidden)}
-          />
-        ) : null}
+        <ToggleField
+          label={translate('videoEditor.timeline.hideClipNames')}
+          checked={panelPrefs.prefs.hiddenClipNamesByTrackId?.[track.id] ?? true}
+          onChange={(hidden) => panelPrefs.setClipNamesHidden(track.id, hidden)}
+        />
         <NumericRow
           appearance="plain"
           scrub={{ min: 0.5, max: 3 }}

@@ -252,7 +252,7 @@ function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
         />
       )}
       <ProjectTimelineTrackClipStack
-        hideClipNames={props.hiddenClipNamesByTrackId?.[props.track.id] ?? false}
+        hideClipNames={props.hiddenClipNamesByTrackId?.[props.track.id] ?? true}
         pixelsPerSecond={props.pixelsPerSecond}
         projection={props.projection}
         project={displayProject}
