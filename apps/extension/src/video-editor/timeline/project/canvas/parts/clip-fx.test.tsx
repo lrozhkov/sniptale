@@ -123,9 +123,8 @@ it.each(['clip', 'track', 'video-group'] as const)(
         '0.45'
       );
       act(() => root.render(<Harness collapsed />));
-      pointer(button(), 'pointerdown', 100);
-      pointer(window, 'pointermove', 140);
-      pointer(window, 'pointerup', 140);
+      expect(container.querySelectorAll('[data-clip-fx]')).toHaveLength(0);
+      expect(container.querySelector('[data-clip-fx-overview]')).not.toBeNull();
       expect(value()).toEqual(beforeLocked);
       act(() => root.render(<Harness />));
       key(button(), 'd', { ctrlKey: true });

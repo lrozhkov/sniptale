@@ -1,3 +1,4 @@
+import { resolveTimelineFxCoverage } from '../../tracks/fx-layout';
 import { resolveEffectOwner } from '../../../../../features/video/project/effect-instance/owner';
 import { useEffect, useRef, useState } from 'react';
 import { getEffectInstanceLabel } from '../../../../../features/video/project/effect-instance/presentation';
@@ -16,7 +17,10 @@ import {
 
 export function ClipFxRows(props: {
   project: VideoProject;
-  layout: Pick<TimelineTrackLayout, 'fxInstanceIds' | 'fxCollapsed' | 'fxHeight' | 'clipRowHeight'>;
+  layout: Pick<
+    TimelineTrackLayout,
+    'fxInstanceIds' | 'fxRows' | 'fxCollapsed' | 'fxHeight' | 'clipRowHeight'
+  >;
   pixelsPerSecond: number;
   projection?: TimelineProjection | undefined;
   selectedId: string | null;
@@ -26,12 +30,41 @@ export function ClipFxRows(props: {
       className="pointer-events-none absolute inset-x-0"
       style={{ top: props.layout.clipRowHeight, height: props.layout.fxHeight }}
     >
-      {props.layout.fxInstanceIds.map((id, index) => {
-        const instance = props.project.effectInstances?.find((item) => item.id === id);
-        return instance ? (
-          <ClipFxInterval key={id} {...props} instance={instance} index={index} />
-        ) : null;
-      })}
+      {props.layout.fxCollapsed ? (
+        <ClipFxOverview {...props} />
+      ) : (
+        props.layout.fxRows.flatMap((row, index) =>
+          row.map((id) => {
+            const instance = props.project.effectInstances?.find((item) => item.id === id);
+            return instance ? (
+              <ClipFxInterval key={id} {...props} instance={instance} index={index} />
+            ) : null;
+          })
+        )
+      )}
+    </div>
+  );
+}
+
+function ClipFxOverview(props: Parameters<typeof ClipFxRows>[0]) {
+  const ids = new Set(props.layout.fxInstanceIds);
+  const ranges = resolveTimelineFxCoverage(
+    (props.project.effectInstances ?? []).filter((item) => ids.has(item.id))
+  );
+  return (
+    <div aria-hidden="true" data-clip-fx-overview>
+      {ranges.map((range) => (
+        <span
+          key={range.startTime}
+          className="absolute top-1.5 h-2 rounded-sm bg-[var(--sniptale-color-text-muted)] opacity-40"
+          style={{
+            left: props.projection
+              ? timelineTimeToViewportX(props.projection, range.startTime)
+              : range.startTime * props.pixelsPerSecond,
+            width: Math.max(2, range.duration * props.pixelsPerSecond),
+          }}
+        />
+      ))}
     </div>
   );
 }
@@ -108,11 +141,7 @@ function ClipFxInterval(
           'focus-visible:outline focus-visible:outline-1',
         ].join(' ')}
       >
-        {!collapsed && (
-          <>
-            FX {props.index + 1} · {label}
-          </>
-        )}
+        {!collapsed && <>{label}</>}
       </button>
       {!collapsed &&
         !track.locked &&

@@ -1,3 +1,4 @@
+import { packTimelineFxRows } from './fx-layout';
 import { buildVideoCompositionTransitionSegments } from '../../../../features/video/composition/timeline/lanes';
 import { createVideoProjectClipLogicalLaneId } from '../../../../features/video/project/timeline/logical-lanes';
 import type { VideoProject } from '../../../../features/video/project/types';
@@ -13,6 +14,7 @@ import {
 
 export interface TimelineTrackLayout {
   fxInstanceIds: string[];
+  fxRows: string[][];
   fxCollapsed: boolean;
   fxHeight: number;
   center: number;
@@ -31,6 +33,7 @@ export interface TimelineTrackLayout {
 export interface TimelineTrackLayoutModel {
   videoFx?: {
     fxInstanceIds: string[];
+    fxRows: string[][];
     fxCollapsed: boolean;
     fxHeight: number;
     clipRowHeight: number;
@@ -71,19 +74,20 @@ export function buildTimelineTrackLayoutModel(params: {
     const clipIds = new Set(
       params.project.clips.filter((clip) => clip.trackId === track.id).map((clip) => clip.id)
     );
-    const fxInstanceIds = (params.project.effectInstances ?? [])
-      .filter(
-        (instance) =>
-          instance.kind === 'targetEffect' &&
-          ((instance.target.kind === 'clip' && clipIds.has(instance.target.clipId)) ||
-            (instance.target.kind === 'track' && instance.target.trackId === track.id))
-      )
-      .map((instance) => instance.id);
+    const fxInstances = (params.project.effectInstances ?? []).filter(
+      (instance) =>
+        instance.kind === 'targetEffect' &&
+        ((instance.target.kind === 'clip' && clipIds.has(instance.target.clipId)) ||
+          (instance.target.kind === 'track' && instance.target.trackId === track.id))
+    );
+    const fxInstanceIds = fxInstances.map((instance) => instance.id);
+    const fxRows = packTimelineFxRows(fxInstances);
     const fxCollapsed = params.collapsedFxByTrackId?.[track.id] ?? false;
-    const fxHeight = fxInstanceIds.length ? (fxCollapsed ? 20 : fxInstanceIds.length * 24) : 0;
+    const fxHeight = fxInstanceIds.length ? (fxCollapsed ? 20 : fxRows.length * 24) : 0;
     const rowHeight = clipRowHeight + fxHeight;
     const layout = {
       fxInstanceIds,
+      fxRows,
       fxCollapsed,
       fxHeight,
       center: top + clipRowHeight / 2,
@@ -104,17 +108,18 @@ export function buildTimelineTrackLayoutModel(params: {
     top += rowHeight;
   }
 
-  const globalIds = (params.project.effectInstances ?? [])
-    .filter(
-      (instance) => instance.kind === 'targetEffect' && instance.target.kind === 'video-group'
-    )
-    .map((instance) => instance.id);
+  const globalInstances = (params.project.effectInstances ?? []).filter(
+    (instance) => instance.kind === 'targetEffect' && instance.target.kind === 'video-group'
+  );
+  const globalIds = globalInstances.map((instance) => instance.id);
+  const globalRows = packTimelineFxRows(globalInstances);
   const collapsed = params.collapsedFxByTrackId?.['video-group'] ?? false;
   const videoFx = globalIds.length
     ? {
         fxInstanceIds: globalIds,
+        fxRows: globalRows,
         fxCollapsed: collapsed,
-        fxHeight: collapsed ? 20 : globalIds.length * 24,
+        fxHeight: collapsed ? 20 : globalRows.length * 24,
         clipRowHeight: 0,
         top,
       }
