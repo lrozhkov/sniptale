@@ -78,3 +78,35 @@ it('renders inspector framing through the shared camera transform instead of sca
   expect(args.overlayFrame.camera).toEqual(cameraOverride);
   expect(args.passes.every((pass) => pass.frame.camera === cameraOverride)).toBe(true);
 });
+
+it('does not start a frame from unavailable media even when it becomes ready during async work', async () => {
+  const { video, job } = setup();
+  Object.defineProperty(video, 'readyState', { value: 1, configurable: true });
+  const pending = renderPreviewScene(job);
+  Object.defineProperty(video, 'readyState', { value: 4, configurable: true });
+  expect(await pending).toBe(false);
+  expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
+  await renderPreviewScene(job);
+  expect(drawPreviewVisualPasses).toHaveBeenCalledOnce();
+});
+
+it('retains the complete frame while a video is seeking despite current-data readiness', async () => {
+  const { video, job } = setup();
+  Object.defineProperty(video, 'seeking', { value: true, configurable: true });
+  expect(await renderPreviewScene(job)).toBe(false);
+  expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
+  Object.defineProperty(video, 'seeking', { value: false });
+  await renderPreviewScene(job);
+  expect(drawPreviewVisualPasses).toHaveBeenCalledOnce();
+});
+
+it('discards async results if seeking starts and finishes during their calculation', async () => {
+  const { video, job } = setup();
+  const pending = renderPreviewScene(job);
+  video.dispatchEvent(new Event('seeking'));
+  video.dispatchEvent(new Event('seeked'));
+  expect(await pending).toBe(false);
+  expect(drawPreviewVisualPasses).not.toHaveBeenCalled();
+  await renderPreviewScene(job);
+  expect(drawPreviewVisualPasses).toHaveBeenCalledOnce();
+});
