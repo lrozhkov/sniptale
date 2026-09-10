@@ -314,9 +314,7 @@ function TrackGapZoneLayer(props: {
 
     return (
       <div
-        {...TIMELINE_OBJECT_MARKER_PROPS}
         key={zone.id}
-        onPointerDown={stopPointerPropagation}
         className={[
           'group absolute inset-y-2 z-0 hover:z-30 focus-within:z-30 rounded-sm',
           'outline outline-1 -outline-offset-1 outline-dashed',
@@ -337,6 +335,8 @@ function TrackGapZoneLayer(props: {
         }}
       >
         <div
+          {...TIMELINE_OBJECT_MARKER_PROPS}
+          onPointerDown={stopPointerPropagation}
           data-ui="video-editor.timeline.gap-actions"
           className={[
             'absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1',

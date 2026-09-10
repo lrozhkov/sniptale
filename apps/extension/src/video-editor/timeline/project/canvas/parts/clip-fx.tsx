@@ -23,7 +23,7 @@ export function ClipFxRows(props: {
 }) {
   return (
     <div
-      className="absolute inset-x-0"
+      className="pointer-events-none absolute inset-x-0"
       style={{ top: props.layout.clipRowHeight, height: props.layout.fxHeight }}
     >
       {props.layout.fxInstanceIds.map((id, index) => {
@@ -52,9 +52,10 @@ function ClipFxInterval(
       {...TIMELINE_OBJECT_MARKER_PROPS}
       data-clip-fx={instance.id}
       className={[
-        'absolute flex items-center rounded-[4px] border border-[var(--sniptale-color-border-soft)]',
-        'bg-[var(--sniptale-color-surface-hover)] hover:outline hover:outline-1',
-        'hover:outline-[var(--sniptale-color-accent)]',
+        'video-editor-timeline-item pointer-events-auto absolute flex items-center rounded-[4px] border',
+        'border-[var(--sniptale-color-border-soft)]',
+        'bg-[var(--sniptale-color-surface-hover)]',
+        props.selectedId === instance.id ? 'video-editor-timeline-item-selected' : '',
       ].join(' ')}
       style={{
         left: x,
@@ -62,8 +63,6 @@ function ClipFxInterval(
         top: collapsed ? 4 : props.index * 24 + 2,
         height: collapsed ? 12 : 20,
         opacity: disabled ? 0.45 : 1,
-        outline:
-          props.selectedId === instance.id ? '1px solid var(--sniptale-color-accent)' : undefined,
       }}
       onPointerDown={(event) => event.stopPropagation()}
     >
@@ -105,8 +104,8 @@ function ClipFxInterval(
             });
         }}
         className={[
-          'h-full min-w-0 flex-1 cursor-grab truncate px-2 text-left text-[10px]',
-          'hover:text-[var(--sniptale-color-accent)] focus-visible:outline focus-visible:outline-1',
+          'h-full min-w-0 flex-1 !cursor-grab truncate px-2 text-left text-[10px]',
+          'focus-visible:outline focus-visible:outline-1',
         ].join(' ')}
       >
         {!collapsed && (
@@ -131,7 +130,7 @@ function ClipFxInterval(
                 ? 'videoEditor.effectsLibrary.resizeFxStart'
                 : 'videoEditor.effectsLibrary.resizeFxEnd'
             )}
-            className="absolute inset-y-0 w-1 cursor-ew-resize"
+            className="absolute inset-y-0 z-10 w-2 !cursor-ew-resize"
             style={mode === 'start' ? { left: 0 } : { right: 0 }}
             onPointerDown={(event) => begin(event, mode)}
             onKeyDown={(event) => {

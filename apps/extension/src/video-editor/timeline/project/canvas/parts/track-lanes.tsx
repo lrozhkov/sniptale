@@ -407,7 +407,10 @@ function createTrackLaneRangeSelectionHandler(
   onBeginTrackRangeSelection: (trackId: string) => React.PointerEventHandler<HTMLDivElement>
 ) {
   return (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.target !== event.currentTarget) {
+    if (
+      event.target instanceof Element &&
+      event.target.closest('[data-timeline-object="true"], button, input, select, textarea')
+    ) {
       return;
     }
 

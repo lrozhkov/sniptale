@@ -248,7 +248,7 @@ function CatalogDocument(
     >
       <div className="flex min-w-0 items-start gap-1">
         <div className="min-w-0 flex-1">
-          <p className="break-words text-[13px] font-medium text-[var(--sniptale-color-text-primary)]">
+          <p className="break-words text-[11px] leading-4 font-medium text-[var(--sniptale-color-text-primary)]">
             {metadata.label}
           </p>
           {(metadata.themeLabel || metadata.styleLabel) && (

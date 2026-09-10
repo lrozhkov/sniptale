@@ -4,7 +4,6 @@ import type { EffectFileImportResult } from '../../../composition/persistence/ef
 import { EffectImportSummary } from '../../../ui/effect-catalog-controls';
 import { useRef, useState } from 'react';
 import { Upload, Settings2 } from 'lucide-react';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 
 import { translate } from '../../../platform/i18n';
 
@@ -32,15 +31,15 @@ export function EffectImportControl(props: {
         }}
       />
       <div className="flex min-w-0 items-center gap-1">
-        <ProductActionButton
+        <EditorIconButton
           disabled={props.disabled}
-          tone="secondary"
-          className="min-w-0 flex-1 justify-start"
+          title={translate('videoEditor.effectsLibrary.importMany')}
+          className="!w-auto min-w-0 flex-1 !justify-start gap-2 px-2 text-xs"
           onClick={() => inputRef.current?.click()}
         >
           <Upload size={16} aria-hidden="true" />
           {translate('videoEditor.effectsLibrary.importMany')}
-        </ProductActionButton>
+        </EditorIconButton>
         <EditorIconButton
           title={translate('settings.navigation.videoEffects')}
           onClick={() => void openSettingsPage({ route: { section: 'video-effects' } })}

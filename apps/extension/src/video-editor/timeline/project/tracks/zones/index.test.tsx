@@ -96,10 +96,21 @@ function verifyTrackZoneRendering() {
 
   expect(cutZone?.getAttribute('style')).toContain('left: 60px');
   expect(buttons).toHaveLength(4);
-  expect(gapButton?.closest<HTMLElement>('[data-timeline-object]')?.style.left).toBe('40px');
-  expect(gapButton?.closest<HTMLElement>('[data-timeline-object]')?.style.width).toBe('20px');
+  expect(gapButton?.parentElement?.parentElement?.style.left).toBe('40px');
+  expect(gapButton?.parentElement?.parentElement?.style.width).toBe('20px');
   expect(transitionButton?.style.left).toBe('80px');
   expect(transitionButton?.style.width).toBe('20px');
+  const lanePointer = vi.fn();
+  document.body.addEventListener('pointerdown', lanePointer);
+  act(() =>
+    gapButton?.parentElement?.parentElement?.dispatchEvent(
+      new MouseEvent('pointerdown', { bubbles: true })
+    )
+  );
+  expect(lanePointer).toHaveBeenCalledOnce();
+  act(() => gapButton?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  expect(lanePointer).toHaveBeenCalledOnce();
+  document.body.removeEventListener('pointerdown', lanePointer);
   expect(stackedCue).toBeNull();
   expect(transitionButton?.querySelector('svg path')).not.toBeNull();
 

@@ -15,7 +15,7 @@ export function VideoEditorWorkspaceHeader(props: {
       {!props.libraryOpen && (
         <div className="flex shrink-0 items-center gap-1">
           <ContentToolbarButton
-            className="!h-9 !w-9 !min-w-9 !px-0"
+            className="!h-8 !w-8 !min-w-8 !px-0"
             dataUi="video-editor.viewer.open-materials"
             title={translate('videoEditor.app.materialsTitle')}
             onClick={props.onOpenLibraryPanel}
@@ -27,7 +27,7 @@ export function VideoEditorWorkspaceHeader(props: {
             .map(({ id, label, Icon }) => (
               <ContentToolbarButton
                 key={id}
-                className="!h-9 !w-9 !min-w-9 !px-0"
+                className="!h-8 !w-8 !min-w-8 !px-0"
                 dataUi={`video-editor.viewer.open-${id}`}
                 title={label}
                 onClick={() =>
@@ -83,25 +83,18 @@ export function VideoEditorLibraryNavigation(props: {
     <div
       role="group"
       aria-label={translate('videoEditor.app.materialsTitle')}
-      className={[
-        '@container/library-nav relative grid min-w-[102px] flex-1 items-center gap-0.5',
-        'transition-[grid-template-columns] duration-150 ease-out motion-reduce:transition-none',
-      ].join(' ')}
-      style={{
-        gridTemplateColumns: sections
-          .map((section) => (section.id === props.active ? 'minmax(24px, 1fr)' : '24px'))
-          .join(' '),
-      }}
+      className="@container/library-nav relative flex min-w-[140px] flex-1 items-center gap-1"
     >
       <span
         aria-hidden="true"
         data-ui="video-editor.library-tab.indicator"
         className={[
-          'pointer-events-none absolute inset-y-0 left-0 rounded-[8px]',
+          'pointer-events-none absolute inset-y-0 left-0 w-8 rounded-[8px]',
+          '@[220px]/library-nav:w-[calc(100%-108px)]',
           'bg-[var(--sniptale-color-surface-hover)] transition-transform duration-150 ease-out',
           'motion-reduce:transition-none',
         ].join(' ')}
-        style={{ width: 'calc(100% - 78px)', transform: `translateX(${activeIndex * 26}px)` }}
+        style={{ transform: `translateX(${activeIndex * 36}px)` }}
       />
       {sections.map(({ id, label, Icon }) => (
         <ContentToolbarButton
@@ -111,13 +104,15 @@ export function VideoEditorLibraryNavigation(props: {
           onClick={() => props.onChange(id)}
           dataUi={`video-editor.library-tab.${id}`}
           className={[
-            'relative !h-9 !w-full !min-w-6 !gap-1 !border-transparent !bg-transparent !px-1 !shadow-none',
-            props.active === id ? '!text-[var(--sniptale-color-accent)]' : '',
+            'relative !h-8 !w-8 !min-w-8 shrink-0 !gap-1 !border-transparent !bg-transparent !px-1 !shadow-none',
+            props.active === id
+              ? '!text-[var(--sniptale-color-accent)] @[220px]/library-nav:flex-1'
+              : '',
           ].join(' ')}
         >
           <Icon size={16} className="shrink-0" aria-hidden="true" />
           {props.active === id && (
-            <span className="hidden truncate text-[12px] font-medium @[150px]/library-nav:block">
+            <span className="hidden truncate text-[12px] font-medium @[220px]/library-nav:block">
               {label}
             </span>
           )}
