@@ -20,7 +20,9 @@
         "ru": "Акцент",
         "en": "Accent"
       },
-      "defaultValue": "#c2410c"
+      "defaultValue": "#c2410c",
+      "group": "appearance",
+      "order": 0
     },
     {
       "id": "surface",
@@ -29,7 +31,9 @@
         "ru": "Подложка",
         "en": "Surface"
       },
-      "defaultValue": "#ffffff"
+      "defaultValue": "#ffffff",
+      "group": "appearance",
+      "order": 1
     },
     {
       "id": "ink",
@@ -38,7 +42,9 @@
         "ru": "Основной текст",
         "en": "Primary text"
       },
-      "defaultValue": "#202127"
+      "defaultValue": "#202127",
+      "group": "appearance",
+      "order": 2
     },
     {
       "id": "entry",
@@ -50,7 +56,9 @@
       "defaultValue": 18,
       "min": 5,
       "max": 40,
-      "step": 1
+      "step": 1,
+      "group": "animation",
+      "order": 3
     },
     {
       "id": "font",
@@ -62,7 +70,9 @@
       "defaultValue": 34,
       "min": 26,
       "max": 40,
-      "step": 1
+      "step": 1,
+      "group": "typography",
+      "order": 4
     },
     {
       "id": "bodyFont",
@@ -74,7 +84,9 @@
       "defaultValue": 20,
       "min": 17,
       "max": 24,
-      "step": 1
+      "step": 1,
+      "group": "typography",
+      "order": 5
     },
     {
       "id": "title",
@@ -83,7 +95,13 @@
         "ru": "Имя · строка 1",
         "en": "Name · line 1"
       },
-      "defaultValue": "Анна Смирнова"
+      "defaultValue": "Анна Смирнова",
+      "group": "content",
+      "order": 6,
+      "localizedDefaultValue": {
+        "ru": "Анна Смирнова",
+        "en": "Anna Smirnova"
+      }
     },
     {
       "id": "name2",
@@ -92,7 +110,9 @@
         "ru": "Имя · дополнительная строка",
         "en": "Name · optional second line"
       },
-      "defaultValue": ""
+      "defaultValue": "",
+      "group": "content",
+      "order": 7
     },
     {
       "id": "subtitle",
@@ -101,7 +121,13 @@
         "ru": "Роль",
         "en": "Role"
       },
-      "defaultValue": "Дизайнер продукта"
+      "defaultValue": "Дизайнер продукта",
+      "group": "content",
+      "order": 8,
+      "localizedDefaultValue": {
+        "ru": "Дизайнер продукта",
+        "en": "Product designer"
+      }
     }
   ],
   "layers": [],

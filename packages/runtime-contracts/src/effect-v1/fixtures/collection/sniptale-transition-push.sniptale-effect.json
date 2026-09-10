@@ -23,19 +23,53 @@
       "defaultValue": 85,
       "min": 0,
       "max": 100,
-      "step": 1
+      "step": 1,
+      "group": "animation",
+      "order": 0
     },
     {
       "id": "direction",
       "kind": "number",
       "label": {
-        "ru": "Направление (0: ←, 1: →, 2: ↑, 3: ↓)",
-        "en": "Direction (0: ←, 1: →, 2: ↑, 3: ↓)"
+        "ru": "Направление",
+        "en": "Direction"
       },
       "defaultValue": 0,
       "min": 0,
       "max": 3,
-      "step": 1
+      "step": 1,
+      "group": "animation",
+      "order": 1,
+      "options": [
+        {
+          "value": 0,
+          "label": {
+            "ru": "Влево",
+            "en": "Left"
+          }
+        },
+        {
+          "value": 1,
+          "label": {
+            "ru": "Вправо",
+            "en": "Right"
+          }
+        },
+        {
+          "value": 2,
+          "label": {
+            "ru": "Вверх",
+            "en": "Up"
+          }
+        },
+        {
+          "value": 3,
+          "label": {
+            "ru": "Вниз",
+            "en": "Down"
+          }
+        }
+      ]
     }
   ],
   "layers": [],

@@ -41,6 +41,8 @@ const expectedKeys = {
     'deleteEffectInstance',
     'duplicateEffectInstance',
     'moveEffectInstance',
+    'selectEffectInstance',
+    'setClipEffectsBypassed',
     'updateEffectInstance',
   ],
   export: [

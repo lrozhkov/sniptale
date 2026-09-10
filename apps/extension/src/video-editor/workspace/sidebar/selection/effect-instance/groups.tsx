@@ -23,6 +23,7 @@ const EFFECT_ACTION_CLASS_NAME = [
 ].join(' ');
 
 interface EffectInstanceGroupActions {
+  onSetClipEffectsBypassed?: (clipId: string, bypassed: boolean) => void;
   onDeleteEffectInstance(instanceId: string): void;
   onDuplicateEffectInstance(instanceId: string): string | null;
   onMoveEffectInstance(instanceId: string, direction: 'down' | 'up'): void;
@@ -40,17 +41,20 @@ export function createEffectInstanceGroup(
   const instances = (args.project.effectInstances ?? []).filter((instance) =>
     args.instanceId ? instance.id === args.instanceId : sameTarget(instance.target, args.target)
   );
+  const siblings = (args.project.effectInstances ?? []).filter((instance) =>
+    sameTarget(instance.target, args.target)
+  );
   return {
     content: (
       <div className="space-y-3">
-        {instances.map((instance, index) => (
+        {instances.map((instance) => (
           <EffectInstanceCard
             {...args}
             instance={instance}
             hideTitle={Boolean(args.instanceId)}
             key={instance.id}
-            canMoveUp={index > 0}
-            canMoveDown={index < instances.length - 1}
+            canMoveUp={siblings.indexOf(instance) > 0}
+            canMoveDown={siblings.indexOf(instance) < siblings.length - 1}
           />
         ))}
       </div>
@@ -107,17 +111,60 @@ function EffectInstanceStartTime(props: EffectInstanceCardProps): React.JSX.Elem
   if (props.instance.target.kind === 'transition' || props.instance.target.kind === 'scene') {
     return null;
   }
+  const target = props.instance.target;
+  const clip = props.project.clips.find(
+    (clip) => target.kind === 'clip' && clip.id === target.clipId
+  );
+  if (!clip) return null;
+  const owner = props.instance.rangeMode === 'owner';
   return (
-    <NumberInput
-      disabled={props.disabled ?? false}
-      label={translate('videoEditor.effectsLibrary.controlStartTime')}
-      min={0}
-      max={props.project.duration}
-      step={0.05}
-      unit="s"
-      value={props.instance.startTime}
-      onChange={(startTime) => props.onUpdateEffectInstance(props.instance.id, { startTime })}
-    />
+    <div className="space-y-3">
+      <SelectInput
+        label={translate('videoEditor.effectsLibrary.fxScope')}
+        disabled={props.disabled ?? false}
+        value={owner ? 'owner' : 'interval'}
+        options={[
+          { value: 'owner', label: translate('videoEditor.effectsLibrary.wholeClip') },
+          { value: 'interval', label: translate('videoEditor.effectsLibrary.customInterval') },
+        ]}
+        onChange={(value) => {
+          if (value === 'owner' || value === 'interval')
+            props.onUpdateEffectInstance(props.instance.id, { rangeMode: value });
+        }}
+      />
+      {!owner && (
+        <>
+          <NumberInput
+            disabled={props.disabled ?? false}
+            label={translate('videoEditor.effectsLibrary.controlStartTime')}
+            min={clip.startTime}
+            max={clip.startTime + clip.duration - props.instance.duration}
+            step={1 / props.project.fps}
+            unit="s"
+            value={props.instance.startTime}
+            onChange={(startTime) => props.onUpdateEffectInstance(props.instance.id, { startTime })}
+          />
+          <NumberInput
+            disabled={props.disabled ?? false}
+            label={translate('videoEditor.effectsLibrary.fxDuration')}
+            min={1 / props.project.fps}
+            max={clip.duration}
+            step={1 / props.project.fps}
+            unit="s"
+            value={props.instance.duration}
+            onChange={(duration) => props.onUpdateEffectInstance(props.instance.id, { duration })}
+          />
+        </>
+      )}
+      {props.onSetClipEffectsBypassed && (
+        <ToggleField
+          checked={clip.effectsBypassed ?? false}
+          disabled={props.disabled ?? false}
+          label={translate('videoEditor.effectsLibrary.bypassClip')}
+          onChange={(value) => props.onSetClipEffectsBypassed?.(clip.id, value)}
+        />
+      )}
+    </div>
   );
 }
 

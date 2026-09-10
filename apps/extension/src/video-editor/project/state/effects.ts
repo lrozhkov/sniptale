@@ -41,6 +41,8 @@ type VideoEditorStoreSet = VideoEditorProjectSliceSet;
 type VideoEditorStoreGet = VideoEditorProjectSliceGet;
 type VideoEditorProjectEffectActionSurface = Pick<
   VideoEditorProjectState,
+  | 'selectEffectInstance'
+  | 'setClipEffectsBypassed'
   | 'applyEffectDocument'
   | 'clearCursorSampleSkinOverride'
   | 'deleteActionEvent'

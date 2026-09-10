@@ -150,6 +150,7 @@ export interface VideoProjectAsset {
 }
 
 interface VideoProjectBaseClip {
+  effectsBypassed?: boolean;
   id: string;
   trackId: string;
   timelineLaneId?: string | null;

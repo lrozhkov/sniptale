@@ -23,7 +23,9 @@
       "defaultValue": 85,
       "min": 0,
       "max": 100,
-      "step": 1
+      "step": 1,
+      "group": "animation",
+      "order": 0
     },
     {
       "id": "bias",
@@ -35,7 +37,9 @@
       "defaultValue": 50,
       "min": 0,
       "max": 100,
-      "step": 1
+      "step": 1,
+      "group": "geometry",
+      "order": 1
     }
   ],
   "layers": [],
@@ -55,25 +59,6 @@
     "kind": "graph",
     "version": 1,
     "definitions": {
-      "s": {
-        "op": "div",
-        "args": [
-          {
-            "op": "min",
-            "args": [
-              {
-                "op": "read",
-                "path": "width"
-              },
-              {
-                "op": "read",
-                "path": "height"
-              }
-            ]
-          },
-          720
-        ]
-      },
       "q": {
         "op": "mix",
         "args": [
@@ -101,26 +86,6 @@
             ]
           }
         ]
-      },
-      "pulse": {
-        "op": "mul",
-        "args": [
-          4,
-          {
-            "op": "read",
-            "path": "defs.q"
-          },
-          {
-            "op": "sub",
-            "args": [
-              1,
-              {
-                "op": "read",
-                "path": "defs.q"
-              }
-            ]
-          }
-        ]
       }
     },
     "commands": [
@@ -128,19 +93,187 @@
         "op": "clear"
       },
       {
-        "op": "image",
-        "input": "from",
+        "op": "clip",
         "x": 0,
         "y": 0,
         "width": {
-          "op": "read",
-          "path": "width"
+          "op": "mul",
+          "args": [
+            {
+              "op": "read",
+              "path": "width"
+            },
+            {
+              "op": "div",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "controls.bias"
+                },
+                100
+              ]
+            },
+            {
+              "op": "sub",
+              "args": [
+                1,
+                {
+                  "op": "read",
+                  "path": "defs.q"
+                }
+              ]
+            }
+          ]
         },
         "height": {
           "op": "read",
           "path": "height"
         },
-        "fit": "cover"
+        "commands": [
+          {
+            "op": "image",
+            "input": "from",
+            "x": 0,
+            "y": 0,
+            "width": {
+              "op": "read",
+              "path": "width"
+            },
+            "height": {
+              "op": "read",
+              "path": "height"
+            },
+            "fit": "cover"
+          }
+        ]
+      },
+      {
+        "op": "clip",
+        "x": {
+          "op": "add",
+          "args": [
+            {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "width"
+                },
+                {
+                  "op": "div",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "controls.bias"
+                    },
+                    100
+                  ]
+                },
+                {
+                  "op": "sub",
+                  "args": [
+                    1,
+                    {
+                      "op": "read",
+                      "path": "defs.q"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "width"
+                },
+                {
+                  "op": "read",
+                  "path": "defs.q"
+                }
+              ]
+            }
+          ]
+        },
+        "y": 0,
+        "width": {
+          "op": "sub",
+          "args": [
+            {
+              "op": "read",
+              "path": "width"
+            },
+            {
+              "op": "add",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "width"
+                    },
+                    {
+                      "op": "div",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "controls.bias"
+                        },
+                        100
+                      ]
+                    },
+                    {
+                      "op": "sub",
+                      "args": [
+                        1,
+                        {
+                          "op": "read",
+                          "path": "defs.q"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "width"
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.q"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "height": {
+          "op": "read",
+          "path": "height"
+        },
+        "commands": [
+          {
+            "op": "image",
+            "input": "from",
+            "x": 0,
+            "y": 0,
+            "width": {
+              "op": "read",
+              "path": "width"
+            },
+            "height": {
+              "op": "read",
+              "path": "height"
+            },
+            "fit": "cover"
+          }
+        ]
       },
       {
         "op": "clip",

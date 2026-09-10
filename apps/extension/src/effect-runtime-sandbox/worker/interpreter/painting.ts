@@ -13,7 +13,7 @@ type GradientPaint = Extract<EffectV1Paint, { kind: 'linearGradient' | 'radialGr
 
 interface CommandStyleSource {
   alpha?: unknown;
-  blend?: 'lighter' | 'screen' | 'source-over';
+  blend?: 'lighter' | 'screen' | 'source-over' | 'source-atop' | 'destination-in';
   filter?: unknown;
   shadow?: EffectV1Shadow;
 }

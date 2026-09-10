@@ -32,7 +32,7 @@ it('applies target effects only to an existing clip', async () => {
   });
 
   expect(applied.effectInstances![0]).toEqual(
-    expect.objectContaining({ duration: 3, playbackRate: 1, startTime: 2 })
+    expect.objectContaining({ duration: 5, playbackRate: 0.6, startTime: 0, rangeMode: 'owner' })
   );
 });
 

@@ -246,3 +246,52 @@ it('keeps scene anchors independent across duplicate, split and history snapshot
     tip: { x: 50, y: 40 },
   });
 });
+
+it('selects FX without seeking and bypasses a clip without rewriting individual switches', async () => {
+  const { resolveSelectedTrackIdFromSelection } = await import('./selection');
+  const { getEffectInstanceLabel } =
+    await import('../../../features/video/project/effect-instance/presentation');
+  const { isVideoProjectClip } = await import('../../../features/video/project/validation/clips');
+  const store = createStoreWithEffects();
+  store.getState().setCurrentTime(3.5);
+  store.getState().selectEffectInstance('missing');
+  store.getState().selectEffectInstance('clip');
+  expect(store.getState().selection).toEqual({ kind: 'effect-instance', effectInstanceId: 'clip' });
+  expect(store.getState().currentTime).toBe(3.5);
+  expect(
+    resolveSelectedTrackIdFromSelection(store.getState().project!, store.getState().selection)
+  ).toBe(store.getState().project!.clips.find((clip) => clip.id === 'clip-a')!.trackId);
+  const controls = store
+    .getState()
+    .project!.effectInstances!.map(({ id, controls, enabled }) => ({ id, controls, enabled }));
+  store.getState().setClipEffectsBypassed('clip-a', true);
+  const project = store.getState().project!;
+  expect(
+    project.effectInstances!.map(({ id, controls, enabled }) => ({ id, controls, enabled }))
+  ).toEqual(controls);
+  const clip = project.clips.find((clip) => clip.id === 'clip-a')!;
+  expect(clip.effectsBypassed).toBe(true);
+  expect(isVideoProjectClip(clip)).toBe(true);
+  expect(isVideoProjectClip({ ...clip, effectsBypassed: 'yes' })).toBe(false);
+  store.getState().setClipEffectsBypassed('missing', true);
+  store.getState().toggleTrackLock(clip.trackId);
+  store.getState().setClipEffectsBypassed(clip.id, false);
+  expect(store.getState().project!.clips.find((item) => item.id === clip.id)!.effectsBypassed).toBe(
+    true
+  );
+  store.getState().toggleTrackLock(clip.trackId);
+  store.getState().setClipEffectsBypassed(clip.id, false);
+  store.getState().deleteEffectInstance('clip');
+  expect(store.getState().selection.kind).toBe('scene');
+  expect(
+    resolveSelectedTrackIdFromSelection(project, {
+      kind: 'effect-instance',
+      effectInstanceId: 'missing',
+    })
+  ).toBeNull();
+  store.getState().selectEffectInstance('scene-a');
+  expect(resolveSelectedTrackIdFromSelection(project, store.getState().selection)).toBeNull();
+  expect(getEffectInstanceLabel(project, 'missing')).toBeTruthy();
+  expect(getEffectInstanceLabel({ ...project, effectSnapshots: [] }, 'clip')).toBeTruthy();
+  expect(getEffectInstanceLabel(project, 'clip')).toBeTruthy();
+});

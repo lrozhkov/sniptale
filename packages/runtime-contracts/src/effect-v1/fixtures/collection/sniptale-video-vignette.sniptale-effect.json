@@ -23,7 +23,9 @@
       "defaultValue": 30,
       "min": 0,
       "max": 100,
-      "step": 1
+      "step": 1,
+      "group": "processing",
+      "order": 0
     },
     {
       "id": "edge",
@@ -35,7 +37,9 @@
       "defaultValue": 8,
       "min": 0,
       "max": 40,
-      "step": 1
+      "step": 1,
+      "group": "animation",
+      "order": 1
     },
     {
       "id": "spread",
@@ -47,7 +51,9 @@
       "defaultValue": 45,
       "min": 15,
       "max": 80,
-      "step": 1
+      "step": 1,
+      "group": "processing",
+      "order": 2
     },
     {
       "id": "focusX",
@@ -59,7 +65,9 @@
       "defaultValue": 50,
       "min": 20,
       "max": 80,
-      "step": 1
+      "step": 1,
+      "group": "geometry",
+      "order": 3
     },
     {
       "id": "focusY",
@@ -71,7 +79,9 @@
       "defaultValue": 50,
       "min": 20,
       "max": 80,
-      "step": 1
+      "step": 1,
+      "group": "geometry",
+      "order": 4
     }
   ],
   "layers": [],
@@ -91,25 +101,6 @@
     "kind": "graph",
     "version": 1,
     "definitions": {
-      "s": {
-        "op": "div",
-        "args": [
-          {
-            "op": "min",
-            "args": [
-              {
-                "op": "read",
-                "path": "width"
-              },
-              {
-                "op": "read",
-                "path": "height"
-              }
-            ]
-          },
-          720
-        ]
-      },
       "edge": {
         "op": "max",
         "args": [
@@ -330,7 +321,8 @@
                 },
                 0.85
               ]
-            }
+            },
+            "blend": "source-atop"
           }
         ],
         "scaleX": {

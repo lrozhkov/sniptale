@@ -70,3 +70,47 @@ it('accepts English-only documents and regional language tags with deterministic
   validateLocaleText({ en: 'OK', xx_bad: 'bad' }, '$.label', false, report);
   expect(report.diagnostics.map((d) => d.code)).toContain('LOCALE_ENTRY');
 });
+
+it('admits localized text defaults only for text and validates their option values', () => {
+  const text = {
+    id: 'heading',
+    kind: 'text',
+    defaultValue: 'Hello',
+    localizedDefaultValue: { en: 'Hello', ru: 'Привет' },
+  };
+  expect(diagnostics(text)).toEqual([]);
+  expect(diagnostics({ ...text, kind: 'color' }).map((item) => item.code)).toContain(
+    'CONTROL_LOCALIZED_DEFAULT_KIND'
+  );
+  expect(
+    diagnostics({ ...text, localizedDefaultValue: { ru: 'Привет' } }).map((item) => item.code)
+  ).toContain('LOCALE_EN_REQUIRED');
+  expect(
+    diagnostics({
+      ...text,
+      options: [
+        { value: 'Hello', label: { en: 'Hello' } },
+        { value: 'Other', label: { en: 'Other' } },
+      ],
+    }).map((item) => item.code)
+  ).toContain('CONTROL_OPTION_LOCALIZED_DEFAULT');
+});
+
+it('resolves initial text once with English fallback without rewriting literal defaults', async () => {
+  const { resolveEffectV1ControlDefault } = await import('../model/locale');
+  const text = {
+    id: 'heading',
+    kind: 'text' as const,
+    defaultValue: 'Literal',
+    localizedDefaultValue: { en: 'Hello', ru: 'Привет', 'ru-RU': '' },
+  };
+  expect(resolveEffectV1ControlDefault(text, 'ru-RU')).toBe('Привет');
+  expect(resolveEffectV1ControlDefault(text, 'fr')).toBe('Hello');
+  expect(text.defaultValue).toBe('Literal');
+  expect(resolveEffectV1ControlDefault({ id: 'blank', kind: 'text', defaultValue: '' }, 'ru')).toBe(
+    ''
+  );
+  expect(resolveEffectV1ControlDefault({ id: 'n', kind: 'number', defaultValue: 12 }, 'ru')).toBe(
+    12
+  );
+});

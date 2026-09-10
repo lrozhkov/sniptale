@@ -20,7 +20,9 @@
         "ru": "Акцент",
         "en": "Accent"
       },
-      "defaultValue": "#c2410c"
+      "defaultValue": "#c2410c",
+      "group": "appearance",
+      "order": 0
     },
     {
       "id": "surface",
@@ -29,7 +31,9 @@
         "ru": "Подложка",
         "en": "Surface"
       },
-      "defaultValue": "#fffaf4"
+      "defaultValue": "#fffaf4",
+      "group": "appearance",
+      "order": 1
     },
     {
       "id": "x",
@@ -41,7 +45,9 @@
       "defaultValue": 50,
       "min": 0,
       "max": 100,
-      "step": 1
+      "step": 1,
+      "group": "geometry",
+      "order": 2
     },
     {
       "id": "y",
@@ -53,7 +59,9 @@
       "defaultValue": 50,
       "min": 0,
       "max": 100,
-      "step": 1
+      "step": 1,
+      "group": "geometry",
+      "order": 3
     },
     {
       "id": "width",
@@ -65,7 +73,9 @@
       "defaultValue": 52,
       "min": 12,
       "max": 88,
-      "step": 1
+      "step": 1,
+      "group": "geometry",
+      "order": 4
     },
     {
       "id": "height",
@@ -77,7 +87,9 @@
       "defaultValue": 38,
       "min": 12,
       "max": 80,
-      "step": 1
+      "step": 1,
+      "group": "geometry",
+      "order": 5
     },
     {
       "id": "line",
@@ -89,7 +101,9 @@
       "defaultValue": 3,
       "min": 1,
       "max": 8,
-      "step": 1
+      "step": 1,
+      "group": "appearance",
+      "order": 6
     },
     {
       "id": "entry",
@@ -101,7 +115,9 @@
       "defaultValue": 18,
       "min": 5,
       "max": 40,
-      "step": 1
+      "step": 1,
+      "group": "animation",
+      "order": 7
     },
     {
       "id": "blur",
@@ -113,7 +129,9 @@
       "defaultValue": 10,
       "min": 0,
       "max": 24,
-      "step": 1
+      "step": 1,
+      "group": "processing",
+      "order": 8
     }
   ],
   "layers": [],

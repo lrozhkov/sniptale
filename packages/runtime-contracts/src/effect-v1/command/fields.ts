@@ -43,7 +43,7 @@ const NUMERIC_FIELDS = new Set([
 const ENUM_FIELDS: Record<string, ReadonlySet<string>> = {
   align: new Set(['center', 'end', 'left', 'right', 'start']),
   baseline: new Set(['alphabetic', 'bottom', 'hanging', 'ideographic', 'middle', 'top']),
-  blend: new Set(['lighter', 'screen', 'source-over']),
+  blend: new Set(['lighter', 'screen', 'source-over', 'source-atop', 'destination-in']),
   direction: new Set(['asc', 'desc']),
   fit: new Set(['contain', 'cover', 'fill']),
   fontStyle: new Set(['italic', 'normal', 'oblique']),

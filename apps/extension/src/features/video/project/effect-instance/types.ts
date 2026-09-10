@@ -28,6 +28,8 @@ export type VideoProjectEffectTarget =
 export interface VideoProjectEffectInstance {
   /** Authoritative logical scene positions; local handle controls are derived at render time. */
   sceneAnchors?: Record<string, { x: number; y: number }>;
+  /** Full-owner timing follows the clip; manual interval edits retain their source phase. */
+  rangeMode?: 'owner' | 'interval';
   controls: Record<string, number | string>;
   duration: number;
   enabled: boolean;

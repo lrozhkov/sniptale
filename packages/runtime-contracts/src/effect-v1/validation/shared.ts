@@ -1,3 +1,4 @@
+import { isEffectV1LocaleTag } from '../model/locale-tags';
 export const IDENTIFIER_PATTERN = /^[a-z][a-z0-9._-]{0,127}$/i;
 
 export type EffectV1Record = Record<string, unknown>;
@@ -111,25 +112,9 @@ export function validateLocaleText(
     report.error('LOCALE_EN_REQUIRED', `${path}.en`, 'English fallback text is required.');
   }
   for (const [locale, text] of Object.entries(value)) {
-    if (!isLocaleCode(locale) || typeof text !== 'string') {
+    if (!isEffectV1LocaleTag(locale) || typeof text !== 'string') {
       report.error('LOCALE_ENTRY', `${path}.${locale}`, 'Expected a locale string.');
     }
-  }
-}
-
-function isLocaleCode(value: string): boolean {
-  if (value.length > 64) return false;
-  const [language, ...subtags] = value.split('-');
-  if (
-    !language ||
-    !/^[a-zA-Z]{2,8}$/.test(language) ||
-    subtags.some((part) => !/^[a-zA-Z0-9]{1,8}$/.test(part))
-  )
-    return false;
-  try {
-    return Intl.getCanonicalLocales(value).length === 1;
-  } catch {
-    return false;
   }
 }
 

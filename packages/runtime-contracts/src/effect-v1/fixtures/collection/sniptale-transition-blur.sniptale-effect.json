@@ -23,7 +23,9 @@
       "defaultValue": 85,
       "min": 0,
       "max": 100,
-      "step": 1
+      "step": 1,
+      "group": "animation",
+      "order": 0
     },
     {
       "id": "strength",
@@ -35,7 +37,9 @@
       "defaultValue": 12,
       "min": 0,
       "max": 24,
-      "step": 1
+      "step": 1,
+      "group": "processing",
+      "order": 1
     }
   ],
   "layers": [],
@@ -128,60 +132,2565 @@
         "op": "clear"
       },
       {
-        "op": "image",
-        "input": "from",
-        "x": 0,
-        "y": 0,
-        "width": {
-          "op": "read",
-          "path": "width"
+        "op": "when",
+        "condition": {
+          "op": "gt",
+          "args": [
+            {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "controls.strength"
+                },
+                {
+                  "op": "read",
+                  "path": "defs.pulse"
+                }
+              ]
+            },
+            0
+          ]
         },
-        "height": {
-          "op": "read",
-          "path": "height"
-        },
-        "fit": "cover"
-      },
-      {
-        "op": "image",
-        "input": "to",
-        "x": 0,
-        "y": 0,
-        "width": {
-          "op": "read",
-          "path": "width"
-        },
-        "height": {
-          "op": "read",
-          "path": "height"
-        },
-        "fit": "cover",
-        "alpha": {
-          "op": "read",
-          "path": "defs.q"
-        }
+        "commands": [
+          {
+            "op": "renderPass",
+            "id": "from-padded",
+            "width": {
+              "op": "div",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "width"
+                    },
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        2
+                      ]
+                    }
+                  ]
+                },
+                4
+              ]
+            },
+            "height": {
+              "op": "div",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "height"
+                    },
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        2
+                      ]
+                    }
+                  ]
+                },
+                4
+              ]
+            },
+            "commands": [
+              {
+                "op": "group",
+                "scaleX": 0.25,
+                "scaleY": 0.25,
+                "commands": [
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "scaleX": -1,
+                    "scaleY": -1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "from",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "scaleX": -1,
+                    "scaleY": 1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "from",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "height"
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    "scaleX": -1,
+                    "scaleY": -1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "from",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "scaleX": 1,
+                    "scaleY": -1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "from",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "scaleX": 1,
+                    "scaleY": 1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "from",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "height"
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    "scaleX": 1,
+                    "scaleY": -1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "from",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "width"
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "scaleX": -1,
+                    "scaleY": -1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "from",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "width"
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "scaleX": -1,
+                    "scaleY": 1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "from",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "width"
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "height"
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    "scaleX": -1,
+                    "scaleY": -1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "from",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "op": "renderPass",
+            "id": "from-blur",
+            "width": {
+              "op": "div",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "width"
+                    },
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        2
+                      ]
+                    }
+                  ]
+                },
+                4
+              ]
+            },
+            "height": {
+              "op": "div",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "height"
+                    },
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        2
+                      ]
+                    }
+                  ]
+                },
+                4
+              ]
+            },
+            "commands": [
+              {
+                "op": "compositePass",
+                "passId": "from-padded",
+                "x": 0,
+                "y": 0,
+                "width": {
+                  "op": "div",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "mul",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "controls.strength"
+                                    },
+                                    {
+                                      "op": "read",
+                                      "path": "defs.pulse"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.s"
+                                },
+                                3
+                              ]
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    4
+                  ]
+                },
+                "height": {
+                  "op": "div",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "mul",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "controls.strength"
+                                    },
+                                    {
+                                      "op": "read",
+                                      "path": "defs.pulse"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.s"
+                                },
+                                3
+                              ]
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    4
+                  ]
+                },
+                "filter": {
+                  "blur": {
+                    "op": "mul",
+                    "args": [
+                      {
+                        "op": "mul",
+                        "args": [
+                          {
+                            "op": "read",
+                            "path": "controls.strength"
+                          },
+                          {
+                            "op": "read",
+                            "path": "defs.pulse"
+                          }
+                        ]
+                      },
+                      {
+                        "op": "read",
+                        "path": "defs.s"
+                      },
+                      0.25
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "compositePass",
+            "passId": "from-blur",
+            "x": {
+              "op": "sub",
+              "args": [
+                0,
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "controls.strength"
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.pulse"
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.s"
+                    },
+                    3
+                  ]
+                }
+              ]
+            },
+            "y": {
+              "op": "sub",
+              "args": [
+                0,
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "controls.strength"
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.pulse"
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.s"
+                    },
+                    3
+                  ]
+                }
+              ]
+            },
+            "width": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "div",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "mul",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "controls.strength"
+                                    },
+                                    {
+                                      "op": "read",
+                                      "path": "defs.pulse"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.s"
+                                },
+                                3
+                              ]
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    4
+                  ]
+                },
+                4
+              ]
+            },
+            "height": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "div",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "mul",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "controls.strength"
+                                    },
+                                    {
+                                      "op": "read",
+                                      "path": "defs.pulse"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.s"
+                                },
+                                3
+                              ]
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    4
+                  ]
+                },
+                4
+              ]
+            },
+            "alpha": {
+              "op": "sub",
+              "args": [
+                1,
+                {
+                  "op": "read",
+                  "path": "defs.q"
+                }
+              ]
+            },
+            "blend": "source-over"
+          },
+          {
+            "op": "renderPass",
+            "id": "to-padded",
+            "width": {
+              "op": "div",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "width"
+                    },
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        2
+                      ]
+                    }
+                  ]
+                },
+                4
+              ]
+            },
+            "height": {
+              "op": "div",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "height"
+                    },
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        2
+                      ]
+                    }
+                  ]
+                },
+                4
+              ]
+            },
+            "commands": [
+              {
+                "op": "group",
+                "scaleX": 0.25,
+                "scaleY": 0.25,
+                "commands": [
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "scaleX": -1,
+                    "scaleY": -1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "to",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "scaleX": -1,
+                    "scaleY": 1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "to",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "height"
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    "scaleX": -1,
+                    "scaleY": -1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "to",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "scaleX": 1,
+                    "scaleY": -1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "to",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "scaleX": 1,
+                    "scaleY": 1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "to",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "height"
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    "scaleX": 1,
+                    "scaleY": -1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "to",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "width"
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "scaleX": -1,
+                    "scaleY": -1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "to",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "width"
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        0
+                      ]
+                    },
+                    "scaleX": -1,
+                    "scaleY": 1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "to",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "group",
+                    "x": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "width"
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    "y": {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "height"
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    "scaleX": -1,
+                    "scaleY": -1,
+                    "commands": [
+                      {
+                        "op": "image",
+                        "input": "to",
+                        "x": 0,
+                        "y": 0,
+                        "width": {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        "height": {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        "fit": "cover"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "op": "renderPass",
+            "id": "to-blur",
+            "width": {
+              "op": "div",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "width"
+                    },
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        2
+                      ]
+                    }
+                  ]
+                },
+                4
+              ]
+            },
+            "height": {
+              "op": "div",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "height"
+                    },
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "controls.strength"
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.pulse"
+                                }
+                              ]
+                            },
+                            {
+                              "op": "read",
+                              "path": "defs.s"
+                            },
+                            3
+                          ]
+                        },
+                        2
+                      ]
+                    }
+                  ]
+                },
+                4
+              ]
+            },
+            "commands": [
+              {
+                "op": "compositePass",
+                "passId": "to-padded",
+                "x": 0,
+                "y": 0,
+                "width": {
+                  "op": "div",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "mul",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "controls.strength"
+                                    },
+                                    {
+                                      "op": "read",
+                                      "path": "defs.pulse"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.s"
+                                },
+                                3
+                              ]
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    4
+                  ]
+                },
+                "height": {
+                  "op": "div",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "mul",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "controls.strength"
+                                    },
+                                    {
+                                      "op": "read",
+                                      "path": "defs.pulse"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.s"
+                                },
+                                3
+                              ]
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    4
+                  ]
+                },
+                "filter": {
+                  "blur": {
+                    "op": "mul",
+                    "args": [
+                      {
+                        "op": "mul",
+                        "args": [
+                          {
+                            "op": "read",
+                            "path": "controls.strength"
+                          },
+                          {
+                            "op": "read",
+                            "path": "defs.pulse"
+                          }
+                        ]
+                      },
+                      {
+                        "op": "read",
+                        "path": "defs.s"
+                      },
+                      0.25
+                    ]
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "op": "compositePass",
+            "passId": "to-blur",
+            "x": {
+              "op": "sub",
+              "args": [
+                0,
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "controls.strength"
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.pulse"
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.s"
+                    },
+                    3
+                  ]
+                }
+              ]
+            },
+            "y": {
+              "op": "sub",
+              "args": [
+                0,
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "controls.strength"
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.pulse"
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.s"
+                    },
+                    3
+                  ]
+                }
+              ]
+            },
+            "width": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "div",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "width"
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "mul",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "controls.strength"
+                                    },
+                                    {
+                                      "op": "read",
+                                      "path": "defs.pulse"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.s"
+                                },
+                                3
+                              ]
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    4
+                  ]
+                },
+                4
+              ]
+            },
+            "height": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "div",
+                  "args": [
+                    {
+                      "op": "add",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "height"
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "mul",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "controls.strength"
+                                    },
+                                    {
+                                      "op": "read",
+                                      "path": "defs.pulse"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "op": "read",
+                                  "path": "defs.s"
+                                },
+                                3
+                              ]
+                            },
+                            2
+                          ]
+                        }
+                      ]
+                    },
+                    4
+                  ]
+                },
+                4
+              ]
+            },
+            "alpha": {
+              "op": "read",
+              "path": "defs.q"
+            },
+            "blend": "lighter"
+          }
+        ]
       },
       {
         "op": "when",
         "condition": {
-          "op": "and",
+          "op": "not",
           "args": [
             {
               "op": "gt",
               "args": [
                 {
-                  "op": "read",
-                  "path": "defs.pulse"
-                },
-                0
-              ]
-            },
-            {
-              "op": "gt",
-              "args": [
-                {
-                  "op": "read",
-                  "path": "controls.strength"
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "controls.strength"
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.pulse"
+                    }
+                  ]
                 },
                 0
               ]
@@ -190,146 +2699,8 @@
         },
         "commands": [
           {
-            "op": "renderPass",
-            "id": "soft-from",
-            "width": {
-              "op": "div",
-              "args": [
-                {
-                  "op": "read",
-                  "path": "width"
-                },
-                4
-              ]
-            },
-            "height": {
-              "op": "div",
-              "args": [
-                {
-                  "op": "read",
-                  "path": "height"
-                },
-                4
-              ]
-            },
-            "commands": [
-              {
-                "op": "group",
-                "commands": [
-                  {
-                    "op": "image",
-                    "input": "from",
-                    "x": 0,
-                    "y": 0,
-                    "width": {
-                      "op": "read",
-                      "path": "width"
-                    },
-                    "height": {
-                      "op": "read",
-                      "path": "height"
-                    },
-                    "fit": "cover",
-                    "filter": {
-                      "blur": {
-                        "op": "mul",
-                        "args": [
-                          {
-                            "op": "mul",
-                            "args": [
-                              {
-                                "op": "read",
-                                "path": "controls.strength"
-                              },
-                              {
-                                "op": "read",
-                                "path": "defs.s"
-                              }
-                            ]
-                          },
-                          0.25
-                        ]
-                      }
-                    }
-                  }
-                ],
-                "scaleX": 0.25,
-                "scaleY": 0.25
-              }
-            ]
-          },
-          {
-            "op": "renderPass",
-            "id": "soft-to",
-            "width": {
-              "op": "div",
-              "args": [
-                {
-                  "op": "read",
-                  "path": "width"
-                },
-                4
-              ]
-            },
-            "height": {
-              "op": "div",
-              "args": [
-                {
-                  "op": "read",
-                  "path": "height"
-                },
-                4
-              ]
-            },
-            "commands": [
-              {
-                "op": "group",
-                "commands": [
-                  {
-                    "op": "image",
-                    "input": "to",
-                    "x": 0,
-                    "y": 0,
-                    "width": {
-                      "op": "read",
-                      "path": "width"
-                    },
-                    "height": {
-                      "op": "read",
-                      "path": "height"
-                    },
-                    "fit": "cover",
-                    "filter": {
-                      "blur": {
-                        "op": "mul",
-                        "args": [
-                          {
-                            "op": "mul",
-                            "args": [
-                              {
-                                "op": "read",
-                                "path": "controls.strength"
-                              },
-                              {
-                                "op": "read",
-                                "path": "defs.s"
-                              }
-                            ]
-                          },
-                          0.25
-                        ]
-                      }
-                    }
-                  }
-                ],
-                "scaleX": 0.25,
-                "scaleY": 0.25
-              }
-            ]
-          },
-          {
-            "op": "compositePass",
-            "passId": "soft-from",
+            "op": "image",
+            "input": "from",
             "x": 0,
             "y": 0,
             "width": {
@@ -340,52 +2711,37 @@
               "op": "read",
               "path": "height"
             },
+            "fit": "cover",
             "alpha": {
-              "op": "mul",
+              "op": "sub",
               "args": [
-                {
-                  "op": "read",
-                  "path": "defs.pulse"
-                },
-                {
-                  "op": "sub",
-                  "args": [
-                    1,
-                    {
-                      "op": "read",
-                      "path": "defs.q"
-                    }
-                  ]
-                }
-              ]
-            }
-          },
-          {
-            "op": "compositePass",
-            "passId": "soft-to",
-            "x": 0,
-            "y": 0,
-            "width": {
-              "op": "read",
-              "path": "width"
-            },
-            "height": {
-              "op": "read",
-              "path": "height"
-            },
-            "alpha": {
-              "op": "mul",
-              "args": [
-                {
-                  "op": "read",
-                  "path": "defs.pulse"
-                },
+                1,
                 {
                   "op": "read",
                   "path": "defs.q"
                 }
               ]
             }
+          },
+          {
+            "op": "image",
+            "input": "to",
+            "x": 0,
+            "y": 0,
+            "width": {
+              "op": "read",
+              "path": "width"
+            },
+            "height": {
+              "op": "read",
+              "path": "height"
+            },
+            "fit": "cover",
+            "alpha": {
+              "op": "read",
+              "path": "defs.q"
+            },
+            "blend": "lighter"
           }
         ]
       }

@@ -3,6 +3,8 @@ import type { VideoProjectEffectTarget } from '../../../features/video/project/e
 import type { VideoProjectEffectInstancePatch } from './patches';
 
 export interface VideoEditorEffectInstanceActions {
+  selectEffectInstance(instanceId: string): void;
+  setClipEffectsBypassed(clipId: string, bypassed: boolean): void;
   applyEffectDocument(args: {
     catalog: EffectBundleCatalogEntry;
     documentId: string;

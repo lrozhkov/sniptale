@@ -1,0 +1,1681 @@
+{
+  "schemaVersion": "sniptale.effect.v1",
+  "id": "english-only-callout",
+  "kind": "standalone",
+  "duration": 4,
+  "label": {
+    "en": "Pointer annotation",
+    "pt-BR": "Anotação",
+    "x-private": "Private annotation",
+    "i-klingon": "Annotation"
+  },
+  "description": {
+    "en": "English fallback metadata"
+  },
+  "assets": [],
+  "controls": [
+    {
+      "id": "accent",
+      "kind": "color",
+      "label": {
+        "en": "Accent"
+      },
+      "defaultValue": "#fb923c",
+      "group": "appearance",
+      "order": 0
+    },
+    {
+      "id": "surface",
+      "kind": "color",
+      "label": {
+        "en": "Surface"
+      },
+      "defaultValue": "#171a20",
+      "group": "appearance",
+      "order": 1
+    },
+    {
+      "id": "ink",
+      "kind": "color",
+      "label": {
+        "en": "Primary text"
+      },
+      "defaultValue": "#fafafa",
+      "group": "appearance",
+      "order": 2
+    },
+    {
+      "id": "entry",
+      "kind": "number",
+      "label": {
+        "en": "Entrance (% duration)"
+      },
+      "defaultValue": 24,
+      "min": 5,
+      "max": 40,
+      "step": 1,
+      "group": "animation",
+      "order": 3
+    },
+    {
+      "id": "font",
+      "kind": "number",
+      "label": {
+        "en": "Heading size"
+      },
+      "defaultValue": 28,
+      "min": 22,
+      "max": 32,
+      "step": 1,
+      "group": "typography",
+      "order": 4
+    },
+    {
+      "id": "bodyFont",
+      "kind": "number",
+      "label": {
+        "en": "Detail size"
+      },
+      "defaultValue": 20,
+      "min": 17,
+      "max": 24,
+      "step": 1,
+      "group": "typography",
+      "order": 5
+    },
+    {
+      "id": "title",
+      "kind": "text",
+      "label": {
+        "en": "Heading"
+      },
+      "defaultValue": "Важная деталь",
+      "group": "content",
+      "order": 6,
+      "localizedDefaultValue": {
+        "en": "Title",
+        "pt": "Título",
+        "pt-BR": "Título regional"
+      }
+    },
+    {
+      "id": "subtitle",
+      "kind": "text",
+      "label": {
+        "en": "Detail"
+      },
+      "defaultValue": "Начните с этой области",
+      "group": "content",
+      "order": 7,
+      "localizedDefaultValue": {
+        "ru": "Начните с этой области",
+        "en": "Start with this area"
+      }
+    },
+    {
+      "id": "anchorX",
+      "kind": "number",
+      "label": {
+        "en": "Pointer target X"
+      },
+      "defaultValue": 514,
+      "min": -1000000,
+      "max": 1000000,
+      "step": 1,
+      "group": "geometry",
+      "order": 8
+    },
+    {
+      "id": "anchorY",
+      "kind": "number",
+      "label": {
+        "en": "Pointer target Y"
+      },
+      "defaultValue": 102,
+      "min": -1000000,
+      "max": 1000000,
+      "step": 1,
+      "group": "geometry",
+      "order": 9
+    },
+    {
+      "id": "sequence",
+      "kind": "number",
+      "label": {
+        "en": "Entrance order"
+      },
+      "defaultValue": 0,
+      "min": 0,
+      "max": 2,
+      "step": 1,
+      "group": "animation",
+      "order": 10,
+      "options": [
+        {
+          "value": 0,
+          "label": {
+            "en": "Line, then text"
+          }
+        },
+        {
+          "value": 1,
+          "label": {
+            "en": "Text, then line"
+          }
+        },
+        {
+          "value": 2,
+          "label": {
+            "en": "Together"
+          }
+        }
+      ]
+    },
+    {
+      "id": "traceShare",
+      "kind": "number",
+      "label": {
+        "en": "Trace share of entrance (%)"
+      },
+      "defaultValue": 60,
+      "min": 30,
+      "max": 85,
+      "step": 1,
+      "group": "animation",
+      "order": 11
+    },
+    {
+      "id": "spark",
+      "kind": "number",
+      "label": {
+        "en": "Tracing head glow (%)"
+      },
+      "defaultValue": 60,
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "group": "animation",
+      "order": 12
+    }
+  ],
+  "layers": [],
+  "clips": [],
+  "scenes": [
+    {
+      "id": "main",
+      "start": 0,
+      "duration": 4
+    }
+  ],
+  "timeline": {
+    "phases": [],
+    "tracks": []
+  },
+  "program": {
+    "kind": "graph",
+    "version": 1,
+    "definitions": {
+      "entry": {
+        "op": "min",
+        "args": [
+          0.55,
+          {
+            "op": "mul",
+            "args": [
+              {
+                "op": "div",
+                "args": [
+                  {
+                    "op": "read",
+                    "path": "controls.entry"
+                  },
+                  {
+                    "op": "max",
+                    "args": [0.000001, 100]
+                  }
+                ]
+              },
+              {
+                "op": "select",
+                "value": {
+                  "op": "read",
+                  "path": "defs.outside"
+                },
+                "values": [
+                  {
+                    "op": "clamp",
+                    "args": [
+                      {
+                        "op": "sqrt",
+                        "args": [
+                          {
+                            "op": "div",
+                            "args": [
+                              {
+                                "op": "read",
+                                "path": "defs.length"
+                              },
+                              {
+                                "op": "max",
+                                "args": [0.000001, 240]
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      0.8,
+                      1.5
+                    ]
+                  },
+                  1
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "exit": {
+        "op": "out",
+        "args": [
+          {
+            "op": "clamp",
+            "args": [
+              {
+                "op": "div",
+                "args": [
+                  {
+                    "op": "sub",
+                    "args": [
+                      1,
+                      {
+                        "op": "read",
+                        "path": "progress"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "max",
+                    "args": [0.000001, 0.1]
+                  }
+                ]
+              },
+              0,
+              1
+            ]
+          }
+        ]
+      },
+      "ax": {
+        "op": "read",
+        "path": "controls.anchorX"
+      },
+      "ay": {
+        "op": "read",
+        "path": "controls.anchorY"
+      },
+      "cx": {
+        "op": "div",
+        "args": [
+          {
+            "op": "read",
+            "path": "width"
+          },
+          2
+        ]
+      },
+      "cy": {
+        "op": "div",
+        "args": [
+          {
+            "op": "read",
+            "path": "height"
+          },
+          2
+        ]
+      },
+      "horizontal": {
+        "op": "gte",
+        "args": [
+          {
+            "op": "div",
+            "args": [
+              {
+                "op": "abs",
+                "args": [
+                  {
+                    "op": "sub",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "defs.ax"
+                      },
+                      {
+                        "op": "read",
+                        "path": "defs.cx"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "read",
+                "path": "width"
+              }
+            ]
+          },
+          {
+            "op": "div",
+            "args": [
+              {
+                "op": "abs",
+                "args": [
+                  {
+                    "op": "sub",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "defs.ay"
+                      },
+                      {
+                        "op": "read",
+                        "path": "defs.cy"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "read",
+                "path": "height"
+              }
+            ]
+          }
+        ]
+      },
+      "sx": {
+        "op": "select",
+        "value": {
+          "op": "read",
+          "path": "defs.horizontal"
+        },
+        "values": [
+          {
+            "op": "select",
+            "value": {
+              "op": "gte",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.ax"
+                },
+                {
+                  "op": "read",
+                  "path": "defs.cx"
+                }
+              ]
+            },
+            "values": [
+              {
+                "op": "read",
+                "path": "width"
+              },
+              0
+            ]
+          },
+          {
+            "op": "read",
+            "path": "defs.cx"
+          }
+        ]
+      },
+      "sy": {
+        "op": "select",
+        "value": {
+          "op": "read",
+          "path": "defs.horizontal"
+        },
+        "values": [
+          {
+            "op": "read",
+            "path": "defs.cy"
+          },
+          {
+            "op": "select",
+            "value": {
+              "op": "gte",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.ay"
+                },
+                {
+                  "op": "read",
+                  "path": "defs.cy"
+                }
+              ]
+            },
+            "values": [
+              {
+                "op": "read",
+                "path": "height"
+              },
+              0
+            ]
+          }
+        ]
+      },
+      "elbowX": {
+        "op": "select",
+        "value": {
+          "op": "read",
+          "path": "defs.horizontal"
+        },
+        "values": [
+          {
+            "op": "mix",
+            "args": [
+              {
+                "op": "read",
+                "path": "defs.sx"
+              },
+              {
+                "op": "read",
+                "path": "defs.ax"
+              },
+              0.45
+            ]
+          },
+          {
+            "op": "read",
+            "path": "defs.sx"
+          }
+        ]
+      },
+      "elbowY": {
+        "op": "select",
+        "value": {
+          "op": "read",
+          "path": "defs.horizontal"
+        },
+        "values": [
+          {
+            "op": "read",
+            "path": "defs.sy"
+          },
+          {
+            "op": "mix",
+            "args": [
+              {
+                "op": "read",
+                "path": "defs.sy"
+              },
+              {
+                "op": "read",
+                "path": "defs.ay"
+              },
+              0.45
+            ]
+          }
+        ]
+      },
+      "outside": {
+        "op": "or",
+        "args": [
+          {
+            "op": "lt",
+            "args": [
+              {
+                "op": "read",
+                "path": "defs.ax"
+              },
+              0
+            ]
+          },
+          {
+            "op": "gt",
+            "args": [
+              {
+                "op": "read",
+                "path": "defs.ax"
+              },
+              {
+                "op": "read",
+                "path": "width"
+              }
+            ]
+          },
+          {
+            "op": "lt",
+            "args": [
+              {
+                "op": "read",
+                "path": "defs.ay"
+              },
+              0
+            ]
+          },
+          {
+            "op": "gt",
+            "args": [
+              {
+                "op": "read",
+                "path": "defs.ay"
+              },
+              {
+                "op": "read",
+                "path": "height"
+              }
+            ]
+          }
+        ]
+      },
+      "reverse": {
+        "op": "not",
+        "args": [
+          {
+            "op": "eq",
+            "args": [
+              {
+                "op": "read",
+                "path": "controls.sequence"
+              },
+              1
+            ]
+          }
+        ]
+      },
+      "p0X": {
+        "op": "select",
+        "value": {
+          "op": "read",
+          "path": "defs.reverse"
+        },
+        "values": [
+          {
+            "op": "read",
+            "path": "defs.ax"
+          },
+          {
+            "op": "read",
+            "path": "defs.sx"
+          }
+        ]
+      },
+      "p2X": {
+        "op": "select",
+        "value": {
+          "op": "read",
+          "path": "defs.reverse"
+        },
+        "values": [
+          {
+            "op": "read",
+            "path": "defs.sx"
+          },
+          {
+            "op": "read",
+            "path": "defs.ax"
+          }
+        ]
+      },
+      "p1X": {
+        "op": "read",
+        "path": "defs.elbowX"
+      },
+      "p0Y": {
+        "op": "select",
+        "value": {
+          "op": "read",
+          "path": "defs.reverse"
+        },
+        "values": [
+          {
+            "op": "read",
+            "path": "defs.ay"
+          },
+          {
+            "op": "read",
+            "path": "defs.sy"
+          }
+        ]
+      },
+      "p2Y": {
+        "op": "select",
+        "value": {
+          "op": "read",
+          "path": "defs.reverse"
+        },
+        "values": [
+          {
+            "op": "read",
+            "path": "defs.sy"
+          },
+          {
+            "op": "read",
+            "path": "defs.ay"
+          }
+        ]
+      },
+      "p1Y": {
+        "op": "read",
+        "path": "defs.elbowY"
+      },
+      "length1": {
+        "op": "sqrt",
+        "args": [
+          {
+            "op": "add",
+            "args": [
+              {
+                "op": "pow",
+                "args": [
+                  {
+                    "op": "sub",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "defs.p1X"
+                      },
+                      {
+                        "op": "read",
+                        "path": "defs.p0X"
+                      }
+                    ]
+                  },
+                  2
+                ]
+              },
+              {
+                "op": "pow",
+                "args": [
+                  {
+                    "op": "sub",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "defs.p1Y"
+                      },
+                      {
+                        "op": "read",
+                        "path": "defs.p0Y"
+                      }
+                    ]
+                  },
+                  2
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "length2": {
+        "op": "sqrt",
+        "args": [
+          {
+            "op": "add",
+            "args": [
+              {
+                "op": "pow",
+                "args": [
+                  {
+                    "op": "sub",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "defs.p2X"
+                      },
+                      {
+                        "op": "read",
+                        "path": "defs.p1X"
+                      }
+                    ]
+                  },
+                  2
+                ]
+              },
+              {
+                "op": "pow",
+                "args": [
+                  {
+                    "op": "sub",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "defs.p2Y"
+                      },
+                      {
+                        "op": "read",
+                        "path": "defs.p1Y"
+                      }
+                    ]
+                  },
+                  2
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "length": {
+        "op": "add",
+        "args": [
+          {
+            "op": "read",
+            "path": "defs.length1"
+          },
+          {
+            "op": "read",
+            "path": "defs.length2"
+          }
+        ]
+      },
+      "share": {
+        "op": "select",
+        "value": {
+          "op": "read",
+          "path": "defs.outside"
+        },
+        "values": [
+          {
+            "op": "div",
+            "args": [
+              {
+                "op": "read",
+                "path": "controls.traceShare"
+              },
+              {
+                "op": "max",
+                "args": [0.000001, 100]
+              }
+            ]
+          },
+          0
+        ]
+      },
+      "traceStart": {
+        "op": "select",
+        "value": {
+          "op": "eq",
+          "args": [
+            {
+              "op": "read",
+              "path": "controls.sequence"
+            },
+            1
+          ]
+        },
+        "values": [
+          {
+            "op": "mul",
+            "args": [
+              {
+                "op": "read",
+                "path": "defs.entry"
+              },
+              {
+                "op": "sub",
+                "args": [
+                  1,
+                  {
+                    "op": "read",
+                    "path": "defs.share"
+                  }
+                ]
+              }
+            ]
+          },
+          0
+        ]
+      },
+      "traceRaw": {
+        "op": "clamp",
+        "args": [
+          {
+            "op": "div",
+            "args": [
+              {
+                "op": "sub",
+                "args": [
+                  {
+                    "op": "read",
+                    "path": "progress"
+                  },
+                  {
+                    "op": "read",
+                    "path": "defs.traceStart"
+                  }
+                ]
+              },
+              {
+                "op": "max",
+                "args": [
+                  0.000001,
+                  {
+                    "op": "mul",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "defs.entry"
+                      },
+                      {
+                        "op": "read",
+                        "path": "defs.share"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          0,
+          1
+        ]
+      },
+      "trace": {
+        "op": "inOut",
+        "args": [
+          {
+            "op": "read",
+            "path": "defs.traceRaw"
+          }
+        ]
+      },
+      "bodyStart": {
+        "op": "select",
+        "value": {
+          "op": "eq",
+          "args": [
+            {
+              "op": "read",
+              "path": "controls.sequence"
+            },
+            0
+          ]
+        },
+        "values": [
+          {
+            "op": "mul",
+            "args": [
+              {
+                "op": "read",
+                "path": "defs.entry"
+              },
+              {
+                "op": "read",
+                "path": "defs.share"
+              }
+            ]
+          },
+          0
+        ]
+      },
+      "bodySpan": {
+        "op": "select",
+        "value": {
+          "op": "eq",
+          "args": [
+            {
+              "op": "read",
+              "path": "controls.sequence"
+            },
+            2
+          ]
+        },
+        "values": [
+          {
+            "op": "read",
+            "path": "defs.entry"
+          },
+          {
+            "op": "mul",
+            "args": [
+              {
+                "op": "read",
+                "path": "defs.entry"
+              },
+              {
+                "op": "sub",
+                "args": [
+                  1,
+                  {
+                    "op": "read",
+                    "path": "defs.share"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "bodyRaw": {
+        "op": "clamp",
+        "args": [
+          {
+            "op": "div",
+            "args": [
+              {
+                "op": "sub",
+                "args": [
+                  {
+                    "op": "read",
+                    "path": "progress"
+                  },
+                  {
+                    "op": "read",
+                    "path": "defs.bodyStart"
+                  }
+                ]
+              },
+              {
+                "op": "max",
+                "args": [
+                  0.000001,
+                  {
+                    "op": "read",
+                    "path": "defs.bodySpan"
+                  }
+                ]
+              }
+            ]
+          },
+          0,
+          1
+        ]
+      },
+      "distance": {
+        "op": "mul",
+        "args": [
+          {
+            "op": "read",
+            "path": "defs.length"
+          },
+          {
+            "op": "read",
+            "path": "defs.trace"
+          }
+        ]
+      },
+      "headX": {
+        "op": "select",
+        "value": {
+          "op": "lte",
+          "args": [
+            {
+              "op": "read",
+              "path": "defs.distance"
+            },
+            {
+              "op": "read",
+              "path": "defs.length1"
+            }
+          ]
+        },
+        "values": [
+          {
+            "op": "mix",
+            "args": [
+              {
+                "op": "read",
+                "path": "defs.p0X"
+              },
+              {
+                "op": "read",
+                "path": "defs.p1X"
+              },
+              {
+                "op": "clamp",
+                "args": [
+                  {
+                    "op": "div",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "defs.distance"
+                      },
+                      {
+                        "op": "max",
+                        "args": [
+                          0.000001,
+                          {
+                            "op": "read",
+                            "path": "defs.length1"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  0,
+                  1
+                ]
+              }
+            ]
+          },
+          {
+            "op": "mix",
+            "args": [
+              {
+                "op": "read",
+                "path": "defs.p1X"
+              },
+              {
+                "op": "read",
+                "path": "defs.p2X"
+              },
+              {
+                "op": "clamp",
+                "args": [
+                  {
+                    "op": "div",
+                    "args": [
+                      {
+                        "op": "sub",
+                        "args": [
+                          {
+                            "op": "read",
+                            "path": "defs.distance"
+                          },
+                          {
+                            "op": "read",
+                            "path": "defs.length1"
+                          }
+                        ]
+                      },
+                      {
+                        "op": "max",
+                        "args": [
+                          0.000001,
+                          {
+                            "op": "read",
+                            "path": "defs.length2"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  0,
+                  1
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "headY": {
+        "op": "select",
+        "value": {
+          "op": "lte",
+          "args": [
+            {
+              "op": "read",
+              "path": "defs.distance"
+            },
+            {
+              "op": "read",
+              "path": "defs.length1"
+            }
+          ]
+        },
+        "values": [
+          {
+            "op": "mix",
+            "args": [
+              {
+                "op": "read",
+                "path": "defs.p0Y"
+              },
+              {
+                "op": "read",
+                "path": "defs.p1Y"
+              },
+              {
+                "op": "clamp",
+                "args": [
+                  {
+                    "op": "div",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "defs.distance"
+                      },
+                      {
+                        "op": "max",
+                        "args": [
+                          0.000001,
+                          {
+                            "op": "read",
+                            "path": "defs.length1"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  0,
+                  1
+                ]
+              }
+            ]
+          },
+          {
+            "op": "mix",
+            "args": [
+              {
+                "op": "read",
+                "path": "defs.p1Y"
+              },
+              {
+                "op": "read",
+                "path": "defs.p2Y"
+              },
+              {
+                "op": "clamp",
+                "args": [
+                  {
+                    "op": "div",
+                    "args": [
+                      {
+                        "op": "sub",
+                        "args": [
+                          {
+                            "op": "read",
+                            "path": "defs.distance"
+                          },
+                          {
+                            "op": "read",
+                            "path": "defs.length1"
+                          }
+                        ]
+                      },
+                      {
+                        "op": "max",
+                        "args": [
+                          0.000001,
+                          {
+                            "op": "read",
+                            "path": "defs.length2"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  0,
+                  1
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "commands": [
+      {
+        "op": "clear"
+      },
+      {
+        "op": "when",
+        "condition": {
+          "op": "read",
+          "path": "defs.outside"
+        },
+        "commands": [
+          {
+            "op": "group",
+            "alpha": {
+              "op": "read",
+              "path": "defs.exit"
+            },
+            "commands": [
+              {
+                "op": "when",
+                "condition": {
+                  "op": "gt",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.trace"
+                    },
+                    0
+                  ]
+                },
+                "commands": [
+                  {
+                    "op": "polyline",
+                    "points": [
+                      {
+                        "x": {
+                          "op": "read",
+                          "path": "defs.p0X"
+                        },
+                        "y": {
+                          "op": "read",
+                          "path": "defs.p0Y"
+                        }
+                      },
+                      {
+                        "x": {
+                          "op": "read",
+                          "path": "defs.p1X"
+                        },
+                        "y": {
+                          "op": "read",
+                          "path": "defs.p1Y"
+                        }
+                      },
+                      {
+                        "x": {
+                          "op": "read",
+                          "path": "defs.p2X"
+                        },
+                        "y": {
+                          "op": "read",
+                          "path": "defs.p2Y"
+                        }
+                      }
+                    ],
+                    "stroke": {
+                      "op": "read",
+                      "path": "controls.accent"
+                    },
+                    "lineWidth": 2,
+                    "lineCap": "round",
+                    "lineJoin": "round",
+                    "progress": {
+                      "op": "read",
+                      "path": "defs.trace"
+                    },
+                    "shadow": {
+                      "color": "#00000070",
+                      "blur": 5,
+                      "x": 0,
+                      "y": 1
+                    }
+                  }
+                ]
+              },
+              {
+                "op": "shape",
+                "shape": "circle",
+                "x": {
+                  "op": "sub",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.ax"
+                    },
+                    5
+                  ]
+                },
+                "y": {
+                  "op": "sub",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.ay"
+                    },
+                    5
+                  ]
+                },
+                "width": 10,
+                "height": 10,
+                "fill": {
+                  "op": "read",
+                  "path": "controls.accent"
+                },
+                "alpha": {
+                  "op": "select",
+                  "value": {
+                    "op": "read",
+                    "path": "defs.reverse"
+                  },
+                  "values": [
+                    {
+                      "op": "out",
+                      "args": [
+                        {
+                          "op": "clamp",
+                          "args": [
+                            {
+                              "op": "div",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "progress"
+                                },
+                                {
+                                  "op": "max",
+                                  "args": [
+                                    0.000001,
+                                    {
+                                      "op": "mul",
+                                      "args": [
+                                        {
+                                          "op": "read",
+                                          "path": "defs.entry"
+                                        },
+                                        0.1
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            0,
+                            1
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "clamp",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            {
+                              "op": "sub",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "defs.trace"
+                                },
+                                0.9
+                              ]
+                            },
+                            {
+                              "op": "max",
+                              "args": [0.000001, 0.1]
+                            }
+                          ]
+                        },
+                        0,
+                        1
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "op": "group",
+                "alpha": {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "div",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "controls.spark"
+                        },
+                        {
+                          "op": "max",
+                          "args": [0.000001, 100]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "min",
+                      "args": [
+                        1,
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "defs.trace"
+                            },
+                            12
+                          ]
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "sub",
+                              "args": [
+                                1,
+                                {
+                                  "op": "read",
+                                  "path": "defs.trace"
+                                }
+                              ]
+                            },
+                            12
+                          ]
+                        }
+                      ]
+                    }
+                  ]
+                },
+                "commands": [
+                  {
+                    "op": "shape",
+                    "shape": "circle",
+                    "x": {
+                      "op": "sub",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "defs.headX"
+                        },
+                        6
+                      ]
+                    },
+                    "y": {
+                      "op": "sub",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "defs.headY"
+                        },
+                        6
+                      ]
+                    },
+                    "width": 12,
+                    "height": 12,
+                    "fill": {
+                      "op": "read",
+                      "path": "controls.accent"
+                    },
+                    "alpha": 0.28
+                  },
+                  {
+                    "op": "shape",
+                    "shape": "circle",
+                    "x": {
+                      "op": "sub",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "defs.headX"
+                        },
+                        2.5
+                      ]
+                    },
+                    "y": {
+                      "op": "sub",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "defs.headY"
+                        },
+                        2.5
+                      ]
+                    },
+                    "width": 5,
+                    "height": 5,
+                    "fill": "#ffffff",
+                    "alpha": 1
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "op": "group",
+        "alpha": {
+          "op": "mul",
+          "args": [
+            {
+              "op": "read",
+              "path": "defs.exit"
+            },
+            {
+              "op": "out",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.bodyRaw"
+                }
+              ]
+            }
+          ]
+        },
+        "commands": [
+          {
+            "op": "fillRect",
+            "x": 0,
+            "y": 0,
+            "width": {
+              "op": "read",
+              "path": "width"
+            },
+            "height": {
+              "op": "read",
+              "path": "height"
+            },
+            "fill": {
+              "op": "read",
+              "path": "controls.surface"
+            }
+          },
+          {
+            "op": "fillRect",
+            "x": 0,
+            "y": 0,
+            "width": 3,
+            "height": {
+              "op": "read",
+              "path": "height"
+            },
+            "fill": {
+              "op": "read",
+              "path": "controls.accent"
+            }
+          },
+          {
+            "op": "group",
+            "alpha": {
+              "op": "out",
+              "args": [
+                {
+                  "op": "clamp",
+                  "args": [
+                    {
+                      "op": "div",
+                      "args": [
+                        {
+                          "op": "sub",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "defs.bodyRaw"
+                            },
+                            0.2
+                          ]
+                        },
+                        0.8
+                      ]
+                    },
+                    0,
+                    1
+                  ]
+                }
+              ]
+            },
+            "commands": [
+              {
+                "op": "text",
+                "text": {
+                  "op": "read",
+                  "path": "controls.title"
+                },
+                "x": 22,
+                "y": 39,
+                "fontSize": {
+                  "op": "read",
+                  "path": "controls.font"
+                },
+                "fontWeight": 700,
+                "fontFamily": "Arial, sans-serif",
+                "baseline": "middle",
+                "fill": {
+                  "op": "read",
+                  "path": "controls.ink"
+                },
+                "alpha": 1,
+                "maxWidth": {
+                  "op": "sub",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "width"
+                    },
+                    44
+                  ]
+                }
+              },
+              {
+                "op": "text",
+                "text": {
+                  "op": "read",
+                  "path": "controls.subtitle"
+                },
+                "x": 22,
+                "y": 83,
+                "fontSize": {
+                  "op": "read",
+                  "path": "controls.bodyFont"
+                },
+                "fontWeight": 400,
+                "fontFamily": "Arial, sans-serif",
+                "baseline": "middle",
+                "fill": {
+                  "op": "read",
+                  "path": "controls.ink"
+                },
+                "alpha": 0.8,
+                "maxWidth": {
+                  "op": "sub",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "width"
+                    },
+                    44
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "objectLayout": {
+    "width": 380,
+    "height": 120,
+    "resize": "scale",
+    "handles": [
+      {
+        "id": "tip",
+        "label": {
+          "en": "Target"
+        },
+        "xControl": "anchorX",
+        "yControl": "anchorY",
+        "padding": 16
+      }
+    ]
+  }
+}

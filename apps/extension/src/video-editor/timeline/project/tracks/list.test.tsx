@@ -272,6 +272,7 @@ function createTrackPanelPrefs(options: { compactRows: boolean; hideTrackNames: 
     setCollapsedTelemetryLaneVisible: vi.fn(),
     setCompactRows: vi.fn(),
     setHideTrackNames: vi.fn(),
+    setFxCollapsed: () => undefined,
     setClipNamesHidden: vi.fn(),
     setTrackHeight: vi.fn(),
   };

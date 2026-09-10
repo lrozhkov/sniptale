@@ -1,3 +1,7 @@
+import {
+  isEffectInstanceEditable,
+  resizeClipEffectInterval,
+} from '../../../features/video/project/effect-instance/editing';
 import { applyEffectCatalogDocument } from '../../../features/video/project/effect-instance/apply';
 import type { VideoProjectEffectInstance } from '../../../features/video/project/effect-instance/types';
 import { applyVideoProjectMutationPatch } from '../../../features/video/project/mutation';
@@ -12,6 +16,8 @@ import { duplicateStandaloneEffectHost } from './clip-timeline/effect-host';
 
 type EffectInstanceActions = Pick<
   VideoEditorProjectState,
+  | 'selectEffectInstance'
+  | 'setClipEffectsBypassed'
   | 'applyEffectDocument'
   | 'deleteEffectInstance'
   | 'duplicateEffectInstance'
@@ -24,6 +30,36 @@ export function createEffectInstanceActions(
   get: VideoEditorProjectSliceGet
 ): EffectInstanceActions {
   return {
+    selectEffectInstance: (instanceId) =>
+      set((state) => {
+        const instance = state.project?.effectInstances?.find((item) => item.id === instanceId);
+        if (!instance) return {};
+        const target = instance.target;
+        return {
+          selection: {
+            kind: VideoEditorSelectionKind.EFFECT_INSTANCE,
+            effectInstanceId: instanceId,
+          },
+          selectedTrackId:
+            target.kind === 'clip'
+              ? (state.project!.clips.find((clip) => clip.id === target.clipId)?.trackId ?? null)
+              : null,
+        };
+      }),
+    setClipEffectsBypassed: (clipId, bypassed) =>
+      set((state) =>
+        applyProjectUpdate(state, (project) => {
+          const clip = project.clips.find((clip) => clip.id === clipId);
+          if (!clip || project.tracks.find((track) => track.id === clip.trackId)?.locked)
+            return project;
+          return {
+            ...project,
+            clips: project.clips.map((item) =>
+              item.id === clipId ? { ...item, effectsBypassed: bypassed } : item
+            ),
+          };
+        })
+      ),
     applyEffectDocument: createApplyEffectDocument(set, get),
     deleteEffectInstance: createDeleteEffectInstance(set),
     duplicateEffectInstance: createDuplicateEffectInstance(set),
@@ -68,7 +104,13 @@ function createApplyEffectDocument(
             selectedTrackId: host.trackId,
             selection: { clipId: host.id, kind: VideoEditorSelectionKind.CLIP },
           }
-        : update;
+        : {
+            ...update,
+            selection: {
+              kind: VideoEditorSelectionKind.EFFECT_INSTANCE,
+              effectInstanceId: instanceId,
+            },
+          };
     });
     return committed ? instanceId : null;
   };
@@ -80,6 +122,8 @@ function createDeleteEffectInstance(
   return (instanceId) =>
     set((state) =>
       applyProjectUpdate(state, (project) => {
+        const found = project.effectInstances?.find((item) => item.id === instanceId);
+        if (!found || !isEffectInstanceEditable(project, found)) return project;
         const instances = (project.effectInstances ?? []).filter(({ id }) => id !== instanceId);
         if (instances.length === (project.effectInstances ?? []).length) return project;
         const usedSnapshots = new Set(instances.map(({ snapshotId }) => snapshotId));
@@ -103,7 +147,8 @@ function createDuplicateEffectInstance(
         const instances = project.effectInstances ?? [];
         const index = instances.findIndex(({ id }) => id === instanceId);
         const source = instances[index];
-        if (!source || source.kind === 'transition') return project;
+        if (!source || source.kind === 'transition' || !isEffectInstanceEditable(project, source))
+          return project;
         if (source.kind === 'standalone') {
           const host = project.clips.find(
             (clip) => 'effectInstanceId' in clip && clip.effectInstanceId === source.id
@@ -117,7 +162,7 @@ function createDuplicateEffectInstance(
           ...source,
           controls: { ...source.controls },
           id: crypto.randomUUID(),
-          startTime: source.startTime + source.duration,
+          startTime: source.startTime,
         };
         duplicateId = duplicate.id;
         return applyVideoProjectMutationPatch(project, {
@@ -142,7 +187,7 @@ function createMoveEffectInstance(
         const instances = [...(project.effectInstances ?? [])];
         const index = instances.findIndex(({ id }) => id === instanceId);
         const instance = instances[index];
-        if (!instance) return project;
+        if (!instance || !isEffectInstanceEditable(project, instance)) return project;
         const step = direction === 'up' ? -1 : 1;
         let swapIndex = index + step;
         while (instances[swapIndex] && !sameTarget(instance, instances[swapIndex]!))
@@ -162,7 +207,7 @@ function createUpdateEffectInstance(
       applyProjectUpdate(state, (project) =>
         applyVideoProjectMutationPatch(project, {
           effectInstances: (project.effectInstances ?? []).map((instance) =>
-            updateMatchingEffectInstance(instance, instanceId, patch)
+            updateMatchingEffectInstance(project, instance, instanceId, patch)
           ),
         })
       )
@@ -170,19 +215,21 @@ function createUpdateEffectInstance(
 }
 
 function updateMatchingEffectInstance(
+  project: import('../../../features/video/project/types').VideoProject,
   instance: VideoProjectEffectInstance,
   instanceId: string,
   patch: Parameters<EffectInstanceActions['updateEffectInstance']>[1]
 ): VideoProjectEffectInstance {
-  if (instance.id !== instanceId) return instance;
+  if (instance.id !== instanceId || !isEffectInstanceEditable(project, instance)) return instance;
+  const timed =
+    patch.startTime !== undefined || patch.duration !== undefined || patch.rangeMode !== undefined
+      ? resizeClipEffectInterval(project, instance, patch)
+      : instance;
   return {
-    ...instance,
+    ...timed,
     ...(patch.sceneAnchors ? { sceneAnchors: structuredClone(patch.sceneAnchors) } : {}),
     ...(patch.controls ? { controls: mergeControls(instance.controls, patch.controls) } : {}),
     ...(patch.enabled === undefined ? {} : { enabled: patch.enabled }),
-    ...(patch.startTime === undefined || instance.kind === 'transition'
-      ? {}
-      : { startTime: Math.max(0, patch.startTime) }),
   };
 }
 

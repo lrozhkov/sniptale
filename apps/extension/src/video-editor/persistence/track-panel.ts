@@ -16,6 +16,7 @@ export interface VideoEditorTrackPanelPrefs {
   collapsedTelemetryLaneVisible: boolean;
   compactRows: boolean;
   hideTrackNames: boolean;
+  collapsedFxByTrackId?: Record<string, boolean>;
   hiddenClipNamesByTrackId?: Record<string, boolean>;
   trackHeightByTrackId: Record<string, VideoEditorTrackHeightMultiplier>;
 }
@@ -57,6 +58,8 @@ function parseStoredTrackPanelPrefs(
     if (isBoolean(value[field])) parsed[field] = value[field];
     else if (value[field] !== undefined) invalidFieldCount += 1;
   }
+  const collapsedFx = parseHiddenClipNames(value['collapsedFxByTrackId'], currentTrackIds);
+  if (collapsedFx !== undefined) parsed.collapsedFxByTrackId = collapsedFx;
   const hiddenNames = parseHiddenClipNames(value['hiddenClipNamesByTrackId'], currentTrackIds);
   if (hiddenNames !== undefined) parsed.hiddenClipNamesByTrackId = hiddenNames;
   else if (value['hiddenClipNamesByTrackId'] !== undefined) invalidFieldCount += 1;

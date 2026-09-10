@@ -23,7 +23,9 @@
       "defaultValue": 85,
       "min": 0,
       "max": 100,
-      "step": 1
+      "step": 1,
+      "group": "animation",
+      "order": 0
     },
     {
       "id": "strength",
@@ -35,7 +37,9 @@
       "defaultValue": 65,
       "min": 0,
       "max": 100,
-      "step": 1
+      "step": 1,
+      "group": "processing",
+      "order": 1
     },
     {
       "id": "tint",
@@ -44,7 +48,9 @@
         "ru": "Цвет света",
         "en": "Light color"
       },
-      "defaultValue": "#ffb36a"
+      "defaultValue": "#ffb36a",
+      "group": "appearance",
+      "order": 2
     }
   ],
   "layers": [],
@@ -64,25 +70,6 @@
     "kind": "graph",
     "version": 1,
     "definitions": {
-      "s": {
-        "op": "div",
-        "args": [
-          {
-            "op": "min",
-            "args": [
-              {
-                "op": "read",
-                "path": "width"
-              },
-              {
-                "op": "read",
-                "path": "height"
-              }
-            ]
-          },
-          720
-        ]
-      },
       "q": {
         "op": "mix",
         "args": [
@@ -149,7 +136,17 @@
           "op": "read",
           "path": "height"
         },
-        "fit": "cover"
+        "fit": "cover",
+        "alpha": {
+          "op": "sub",
+          "args": [
+            1,
+            {
+              "op": "read",
+              "path": "defs.q"
+            }
+          ]
+        }
       },
       {
         "op": "image",
@@ -168,7 +165,8 @@
         "alpha": {
           "op": "read",
           "path": "defs.q"
-        }
+        },
+        "blend": "lighter"
       },
       {
         "op": "fillRect",
@@ -298,7 +296,7 @@
             0.8
           ]
         },
-        "blend": "screen"
+        "blend": "source-atop"
       }
     ]
   }

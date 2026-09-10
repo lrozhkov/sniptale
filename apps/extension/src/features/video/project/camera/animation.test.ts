@@ -133,3 +133,11 @@ it('uses an instant destination on the last visible frame', () => {
   if (camera?.type !== 'VIDEO') throw new Error('video expected');
   expect(camera.cameraPositions?.at(-1)?.transition.kind).toBe('instant');
 });
+
+it('admits FX bypass on a camera clip without weakening its position validation', () => {
+  const { clip } = fixture();
+  expect(isVideoProjectClip({ ...clip, effectsBypassed: true })).toBe(true);
+  expect(isVideoProjectClip({ ...clip, effectsBypassed: false })).toBe(true);
+  expect(isVideoProjectClip({ ...clip, effectsBypassed: 'true' })).toBe(false);
+  expect(isVideoProjectClip({ ...clip, effectsBypassed: true, cameraPositions: null })).toBe(false);
+});

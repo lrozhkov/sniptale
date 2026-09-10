@@ -73,6 +73,8 @@ type VideoEditorProjectActionKeys =
   | 'deleteEffectInstance'
   | 'duplicateEffectInstance'
   | 'moveEffectInstance'
+  | 'selectEffectInstance'
+  | 'setClipEffectsBypassed'
   | 'updateEffectInstance'
   | 'upsertObjectTrack'
   | 'deleteObjectTrack'

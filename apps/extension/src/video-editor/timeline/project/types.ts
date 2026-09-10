@@ -48,6 +48,7 @@ export interface TimelineClipRevealRequest {
 }
 
 export interface ProjectTimelineProps {
+  collapsedFxByTrackId?: Readonly<Record<string, boolean>> | undefined;
   revealClipRequest?: TimelineClipRevealRequest | undefined;
   canDeleteSelectedClip: boolean;
   canEditSelectedClip: boolean;

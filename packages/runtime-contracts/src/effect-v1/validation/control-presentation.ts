@@ -42,6 +42,16 @@ export function validateControlPresentation(
   ) {
     report.error('CONTROL_ORDER', `${path}.order`, 'Expected a non-negative safe integer.');
   }
+  const localizedDefault = control['localizedDefaultValue'];
+  if (localizedDefault !== undefined) {
+    if (control['kind'] !== 'text')
+      report.error(
+        'CONTROL_LOCALIZED_DEFAULT_KIND',
+        `${path}.localizedDefaultValue`,
+        'Localized defaults require a text control.'
+      );
+    validateLocaleText(localizedDefault, `${path}.localizedDefaultValue`, false, report);
+  }
   const options = control['options'];
   if (options === undefined) return;
   if (
@@ -90,6 +100,16 @@ export function validateControlPresentation(
       );
     values.add(value);
   });
+  if (control['kind'] === 'text' && isRecord(localizedDefault)) {
+    for (const [locale, text] of Object.entries(localizedDefault)) {
+      if (typeof text === 'string' && text.trim() && !values.has(text))
+        report.error(
+          'CONTROL_OPTION_LOCALIZED_DEFAULT',
+          `${path}.localizedDefaultValue.${locale}`,
+          'Localized default must be one of the options.'
+        );
+    }
+  }
   if (!values.has(control['defaultValue'] as number | string))
     report.error(
       'CONTROL_OPTION_DEFAULT',

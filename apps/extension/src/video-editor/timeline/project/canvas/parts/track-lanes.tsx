@@ -1,3 +1,4 @@
+import { ClipFxRows } from './clip-fx';
 import { useEffectDocumentDrag } from '../../../../chrome/effect-document-drag';
 import { getEffectInsertionError } from '../../../../../features/video/project/effect-instance/placement';
 import { createTrackEffectDropHandlers } from './effect-drop';
@@ -192,6 +193,17 @@ function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
         trackId={props.track.id}
         trackLayout={props.trackLayout}
       />
+      {props.trackLayout && props.trackLayout.fxHeight > 0 && (
+        <ClipFxRows
+          project={props.project}
+          layout={props.trackLayout}
+          pixelsPerSecond={props.pixelsPerSecond}
+          projection={props.projection}
+          selectedId={
+            props.selection.kind === 'effect-instance' ? props.selection.effectInstanceId : null
+          }
+        />
+      )}
       <ProjectTimelineTrackClipStack
         hideClipNames={props.hiddenClipNamesByTrackId?.[props.track.id] ?? false}
         pixelsPerSecond={props.pixelsPerSecond}

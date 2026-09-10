@@ -20,7 +20,9 @@
         "ru": "Акцент",
         "en": "Accent"
       },
-      "defaultValue": "#fb923c"
+      "defaultValue": "#fb923c",
+      "group": "appearance",
+      "order": 0
     },
     {
       "id": "surface",
@@ -29,7 +31,9 @@
         "ru": "Подложка",
         "en": "Surface"
       },
-      "defaultValue": "#171a20"
+      "defaultValue": "#171a20",
+      "group": "appearance",
+      "order": 1
     },
     {
       "id": "ink",
@@ -38,7 +42,9 @@
         "ru": "Основной текст",
         "en": "Primary text"
       },
-      "defaultValue": "#fafafa"
+      "defaultValue": "#fafafa",
+      "group": "appearance",
+      "order": 2
     },
     {
       "id": "entry",
@@ -50,7 +56,9 @@
       "defaultValue": 24,
       "min": 5,
       "max": 40,
-      "step": 1
+      "step": 1,
+      "group": "animation",
+      "order": 3
     },
     {
       "id": "font",
@@ -62,7 +70,9 @@
       "defaultValue": 28,
       "min": 22,
       "max": 32,
-      "step": 1
+      "step": 1,
+      "group": "typography",
+      "order": 4
     },
     {
       "id": "bodyFont",
@@ -74,7 +84,9 @@
       "defaultValue": 20,
       "min": 17,
       "max": 24,
-      "step": 1
+      "step": 1,
+      "group": "typography",
+      "order": 5
     },
     {
       "id": "title",
@@ -83,7 +95,13 @@
         "ru": "Заголовок",
         "en": "Heading"
       },
-      "defaultValue": "Важная деталь"
+      "defaultValue": "Важная деталь",
+      "group": "content",
+      "order": 6,
+      "localizedDefaultValue": {
+        "ru": "Важная деталь",
+        "en": "An important detail"
+      }
     },
     {
       "id": "subtitle",
@@ -92,43 +110,78 @@
         "ru": "Пояснение",
         "en": "Detail"
       },
-      "defaultValue": "Начните с этой области"
+      "defaultValue": "Начните с этой области",
+      "group": "content",
+      "order": 7,
+      "localizedDefaultValue": {
+        "ru": "Начните с этой области",
+        "en": "Start with this area"
+      }
     },
     {
       "id": "anchorX",
       "kind": "number",
       "label": {
-        "ru": "Конец указателя · X",
-        "en": "Pointer tip · X"
+        "ru": "Точка указателя X",
+        "en": "Pointer target X"
       },
       "defaultValue": 514,
       "min": -1000000,
       "max": 1000000,
-      "step": 1
+      "step": 1,
+      "group": "geometry",
+      "order": 8
     },
     {
       "id": "anchorY",
       "kind": "number",
       "label": {
-        "ru": "Конец указателя · Y",
-        "en": "Pointer tip · Y"
+        "ru": "Точка указателя Y",
+        "en": "Pointer target Y"
       },
       "defaultValue": 102,
       "min": -1000000,
       "max": 1000000,
-      "step": 1
+      "step": 1,
+      "group": "geometry",
+      "order": 9
     },
     {
       "id": "sequence",
       "kind": "number",
       "label": {
-        "ru": "Появление (0: линия → текст, 1: текст → линия, 2: вместе)",
-        "en": "Entrance (0: trace → text, 1: text → trace, 2: together)"
+        "ru": "Порядок появления",
+        "en": "Entrance order"
       },
       "defaultValue": 0,
       "min": 0,
       "max": 2,
-      "step": 1
+      "step": 1,
+      "group": "animation",
+      "order": 10,
+      "options": [
+        {
+          "value": 0,
+          "label": {
+            "ru": "Линия, затем текст",
+            "en": "Line, then text"
+          }
+        },
+        {
+          "value": 1,
+          "label": {
+            "ru": "Текст, затем линия",
+            "en": "Text, then line"
+          }
+        },
+        {
+          "value": 2,
+          "label": {
+            "ru": "Одновременно",
+            "en": "Together"
+          }
+        }
+      ]
     },
     {
       "id": "traceShare",
@@ -140,7 +193,9 @@
       "defaultValue": 60,
       "min": 30,
       "max": 85,
-      "step": 1
+      "step": 1,
+      "group": "animation",
+      "order": 11
     },
     {
       "id": "spark",
@@ -152,7 +207,9 @@
       "defaultValue": 60,
       "min": 0,
       "max": 100,
-      "step": 1
+      "step": 1,
+      "group": "animation",
+      "order": 12
     }
   ],
   "layers": [],
@@ -188,7 +245,7 @@
                   },
                   {
                     "op": "max",
-                    "args": [1e-6, 100]
+                    "args": [0.000001, 100]
                   }
                 ]
               },
@@ -214,7 +271,7 @@
                               },
                               {
                                 "op": "max",
-                                "args": [1e-6, 240]
+                                "args": [0.000001, 240]
                               }
                             ]
                           }
@@ -252,7 +309,7 @@
                   },
                   {
                     "op": "max",
-                    "args": [1e-6, 0.1]
+                    "args": [0.000001, 0.1]
                   }
                 ]
               },
@@ -742,7 +799,7 @@
               },
               {
                 "op": "max",
-                "args": [1e-6, 100]
+                "args": [0.000001, 100]
               }
             ]
           },
@@ -806,7 +863,7 @@
               {
                 "op": "max",
                 "args": [
-                  1e-6,
+                  0.000001,
                   {
                     "op": "mul",
                     "args": [
@@ -926,7 +983,7 @@
               {
                 "op": "max",
                 "args": [
-                  1e-6,
+                  0.000001,
                   {
                     "op": "read",
                     "path": "defs.bodySpan"
@@ -992,7 +1049,7 @@
                       {
                         "op": "max",
                         "args": [
-                          1e-6,
+                          0.000001,
                           {
                             "op": "read",
                             "path": "defs.length1"
@@ -1040,7 +1097,7 @@
                       {
                         "op": "max",
                         "args": [
-                          1e-6,
+                          0.000001,
                           {
                             "op": "read",
                             "path": "defs.length2"
@@ -1097,7 +1154,7 @@
                       {
                         "op": "max",
                         "args": [
-                          1e-6,
+                          0.000001,
                           {
                             "op": "read",
                             "path": "defs.length1"
@@ -1145,7 +1202,7 @@
                       {
                         "op": "max",
                         "args": [
-                          1e-6,
+                          0.000001,
                           {
                             "op": "read",
                             "path": "defs.length2"
@@ -1300,7 +1357,7 @@
                                 {
                                   "op": "max",
                                   "args": [
-                                    1e-6,
+                                    0.000001,
                                     {
                                       "op": "mul",
                                       "args": [
@@ -1339,7 +1396,7 @@
                             },
                             {
                               "op": "max",
-                              "args": [1e-6, 0.1]
+                              "args": [0.000001, 0.1]
                             }
                           ]
                         },
@@ -1364,7 +1421,7 @@
                         },
                         {
                           "op": "max",
-                          "args": [1e-6, 100]
+                          "args": [0.000001, 100]
                         }
                       ]
                     },
@@ -1457,8 +1514,8 @@
                         2.5
                       ]
                     },
-                    "width": 5.0,
-                    "height": 5.0,
+                    "width": 5,
+                    "height": 5,
                     "fill": "#ffffff",
                     "alpha": 1
                   }

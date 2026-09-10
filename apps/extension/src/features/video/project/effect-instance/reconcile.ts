@@ -54,7 +54,23 @@ function reconcileEffectInstances(
   );
   return (project.effectInstances ?? []).flatMap((instance) => {
     if (instance.target.kind === 'clip') {
-      return targetClipIds.has(instance.target.clipId) ? [instance] : [];
+      if (!targetClipIds.has(instance.target.clipId)) return [];
+      const clipId = instance.target.clipId;
+      const clip = project.clips.find((clip) => clip.id === clipId)!;
+      if (instance.rangeMode === 'owner')
+        return [reconcileStandaloneInstanceTiming(instance, clip.startTime, clip.duration)];
+      const startTime = Math.max(instance.startTime, clip.startTime);
+      const end = Math.min(instance.startTime + instance.duration, clip.startTime + clip.duration);
+      if (end <= startTime) return [];
+      return [
+        {
+          ...instance,
+          startTime,
+          duration: end - startTime,
+          sourceStart:
+            (instance.sourceStart ?? 0) + (startTime - instance.startTime) * instance.playbackRate,
+        },
+      ];
     }
     if (instance.target.kind === 'scene') {
       const host = hostsByInstanceId.get(instance.id);

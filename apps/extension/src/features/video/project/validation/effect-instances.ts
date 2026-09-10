@@ -169,6 +169,9 @@ function isEffectInstance(value: unknown): value is VideoProjectEffectInstance {
     typeof value['snapshotId'] === 'string' &&
     isKind(value['kind']) &&
     typeof value['enabled'] === 'boolean' &&
+    (value['rangeMode'] === undefined ||
+      (value['kind'] === 'targetEffect' &&
+        (value['rangeMode'] === 'owner' || value['rangeMode'] === 'interval'))) &&
     isNonNegativeFinite(value['startTime']) &&
     isPositiveFinite(value['duration']) &&
     isPositiveFinite(value['playbackRate']) &&

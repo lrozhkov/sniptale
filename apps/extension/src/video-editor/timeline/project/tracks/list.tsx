@@ -173,6 +173,12 @@ function ProjectTimelineRailRows(props: {
       ) : null}
       {props.tracks.map((track, index) => (
         <ProjectTimelineTrackRow
+          onToggleFx={() =>
+            props.trackPanelPrefs.setFxCollapsed(
+              track.id,
+              !(props.trackLayoutModel.layoutByTrackId.get(track.id)?.fxCollapsed ?? false)
+            )
+          }
           key={track.id}
           compactRows={props.trackPanelPrefs.prefs.compactRows}
           isSelected={props.selectedTrackId === track.id}

@@ -190,7 +190,15 @@
                 }
               ]
             },
-            "blend": { "enum": ["lighter", "screen", "source-over"] },
+            "blend": {
+              "enum": [
+                "lighter",
+                "screen",
+                "source-over",
+                "source-atop",
+                "destination-in"
+              ]
+            },
             "filter": { "$ref": "#/$defs/filter" },
             "shadow": { "$ref": "#/$defs/shadow" },
             "height": {
@@ -275,7 +283,15 @@
                 }
               ]
             },
-            "blend": { "enum": ["lighter", "screen", "source-over"] },
+            "blend": {
+              "enum": [
+                "lighter",
+                "screen",
+                "source-over",
+                "source-atop",
+                "destination-in"
+              ]
+            },
             "filter": { "$ref": "#/$defs/filter" },
             "shadow": { "$ref": "#/$defs/shadow" },
             "fill": { "$ref": "#/$defs/paint" },
@@ -417,7 +433,15 @@
                 }
               ]
             },
-            "blend": { "enum": ["lighter", "screen", "source-over"] },
+            "blend": {
+              "enum": [
+                "lighter",
+                "screen",
+                "source-over",
+                "source-atop",
+                "destination-in"
+              ]
+            },
             "filter": { "$ref": "#/$defs/filter" },
             "shadow": { "$ref": "#/$defs/shadow" },
             "commands": {
@@ -503,7 +527,15 @@
                 }
               ]
             },
-            "blend": { "enum": ["lighter", "screen", "source-over"] },
+            "blend": {
+              "enum": [
+                "lighter",
+                "screen",
+                "source-over",
+                "source-atop",
+                "destination-in"
+              ]
+            },
             "filter": { "$ref": "#/$defs/filter" },
             "shadow": { "$ref": "#/$defs/shadow" },
             "assetId": {
@@ -616,7 +648,15 @@
                 }
               ]
             },
-            "blend": { "enum": ["lighter", "screen", "source-over"] },
+            "blend": {
+              "enum": [
+                "lighter",
+                "screen",
+                "source-over",
+                "source-atop",
+                "destination-in"
+              ]
+            },
             "filter": { "$ref": "#/$defs/filter" },
             "shadow": { "$ref": "#/$defs/shadow" },
             "closed": { "type": "boolean" },
@@ -672,7 +712,15 @@
                 }
               ]
             },
-            "blend": { "enum": ["lighter", "screen", "source-over"] },
+            "blend": {
+              "enum": [
+                "lighter",
+                "screen",
+                "source-over",
+                "source-atop",
+                "destination-in"
+              ]
+            },
             "filter": { "$ref": "#/$defs/filter" },
             "shadow": { "$ref": "#/$defs/shadow" },
             "lineCap": { "enum": ["butt", "round", "square"] },
@@ -771,7 +819,15 @@
                 }
               ]
             },
-            "blend": { "enum": ["lighter", "screen", "source-over"] },
+            "blend": {
+              "enum": [
+                "lighter",
+                "screen",
+                "source-over",
+                "source-atop",
+                "destination-in"
+              ]
+            },
             "filter": { "$ref": "#/$defs/filter" },
             "shadow": { "$ref": "#/$defs/shadow" },
             "from": {
@@ -860,7 +916,15 @@
                 }
               ]
             },
-            "blend": { "enum": ["lighter", "screen", "source-over"] },
+            "blend": {
+              "enum": [
+                "lighter",
+                "screen",
+                "source-over",
+                "source-atop",
+                "destination-in"
+              ]
+            },
             "filter": { "$ref": "#/$defs/filter" },
             "shadow": { "$ref": "#/$defs/shadow" },
             "fill": { "$ref": "#/$defs/paint" },
@@ -992,7 +1056,15 @@
                 }
               ]
             },
-            "blend": { "enum": ["lighter", "screen", "source-over"] },
+            "blend": {
+              "enum": [
+                "lighter",
+                "screen",
+                "source-over",
+                "source-atop",
+                "destination-in"
+              ]
+            },
             "filter": { "$ref": "#/$defs/filter" },
             "shadow": { "$ref": "#/$defs/shadow" },
             "assetId": {
@@ -1067,7 +1139,15 @@
                 }
               ]
             },
-            "blend": { "enum": ["lighter", "screen", "source-over"] },
+            "blend": {
+              "enum": [
+                "lighter",
+                "screen",
+                "source-over",
+                "source-atop",
+                "destination-in"
+              ]
+            },
             "filter": { "$ref": "#/$defs/filter" },
             "shadow": { "$ref": "#/$defs/shadow" },
             "align": { "enum": ["center", "end", "left", "right", "start"] },
@@ -1167,11 +1247,55 @@
       ]
     },
     "control": {
+      "allOf": [
+        {
+          "if": {
+            "properties": { "kind": { "enum": ["number", "color"] } },
+            "required": ["kind"]
+          },
+          "then": { "not": { "required": ["localizedDefaultValue"] } }
+        },
+        {
+          "if": {
+            "properties": { "kind": { "const": "color" } },
+            "required": ["kind"]
+          },
+          "then": { "not": { "required": ["options"] } }
+        },
+        {
+          "if": {
+            "properties": { "kind": { "const": "number" } },
+            "required": ["kind"]
+          },
+          "then": {
+            "properties": {
+              "defaultValue": { "type": "number" },
+              "options": {
+                "items": { "properties": { "value": { "type": "number" } } }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "kind": { "enum": ["text", "color"] } },
+            "required": ["kind"]
+          },
+          "then": {
+            "properties": {
+              "defaultValue": { "type": "string" },
+              "options": {
+                "items": { "properties": { "value": { "type": "string" } } }
+              }
+            }
+          }
+        }
+      ],
       "additionalProperties": false,
       "properties": {
         "group": {
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
-          "type": "string"
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9._-]{0,127}$"
         },
         "order": {
           "type": "integer",
@@ -1188,33 +1312,18 @@
             "required": ["value", "label"],
             "properties": {
               "value": { "type": ["string", "number"] },
-              "label": {
-                "additionalProperties": false,
-                "required": ["en"],
-                "properties": { "en": { "type": "string", "minLength": 1 } },
-                "patternProperties": {
-                  "^[a-zA-Z]{2,8}(?:-[a-zA-Z0-9]{1,8})*$": { "type": "string" }
-                },
-                "type": "object"
-              }
+              "label": { "$ref": "#/$defs/localeText" }
             }
           }
         },
         "defaultValue": {},
+        "localizedDefaultValue": { "$ref": "#/$defs/localeText" },
         "id": {
-          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
-          "type": "string"
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9._-]{0,127}$"
         },
         "kind": { "enum": ["color", "number", "text"] },
-        "label": {
-          "additionalProperties": false,
-          "required": ["en"],
-          "properties": { "en": { "type": "string", "minLength": 1 } },
-          "patternProperties": {
-            "^[a-zA-Z]{2,8}(?:-[a-zA-Z0-9]{1,8})*$": { "type": "string" }
-          },
-          "type": "object"
-        },
+        "label": { "$ref": "#/$defs/localeText" },
         "max": { "type": "number" },
         "min": { "type": "number" },
         "step": { "exclusiveMinimum": 0, "type": "number" }
@@ -1995,9 +2104,11 @@
     "localeText": {
       "additionalProperties": false,
       "required": ["en"],
-      "properties": { "en": { "type": "string", "minLength": 1 } },
+      "properties": {
+        "en": { "type": "string", "minLength": 1, "pattern": "\\S" }
+      },
       "patternProperties": {
-        "^[a-zA-Z]{2,8}(?:-[a-zA-Z0-9]{1,8})*$": { "type": "string" }
+        "^(?:[a-zA-Z]{2,8}|[iIxX])(?:-[a-zA-Z0-9]{1,8})*$": { "type": "string" }
       },
       "type": "object"
     },
@@ -2722,9 +2833,13 @@
             {
               "additionalProperties": false,
               "required": ["en"],
-              "properties": { "en": { "type": "string", "minLength": 1 } },
+              "properties": {
+                "en": { "type": "string", "minLength": 1, "pattern": "\\S" }
+              },
               "patternProperties": {
-                "^[a-zA-Z]{2,8}(?:-[a-zA-Z0-9]{1,8})*$": { "type": "string" }
+                "^(?:[a-zA-Z]{2,8}|[iIxX])(?:-[a-zA-Z0-9]{1,8})*$": {
+                  "type": "string"
+                }
               },
               "type": "object"
             }
@@ -3028,9 +3143,11 @@
     "description": {
       "additionalProperties": false,
       "required": ["en"],
-      "properties": { "en": { "type": "string", "minLength": 1 } },
+      "properties": {
+        "en": { "type": "string", "minLength": 1, "pattern": "\\S" }
+      },
       "patternProperties": {
-        "^[a-zA-Z]{2,8}(?:-[a-zA-Z0-9]{1,8})*$": { "type": "string" }
+        "^(?:[a-zA-Z]{2,8}|[iIxX])(?:-[a-zA-Z0-9]{1,8})*$": { "type": "string" }
       },
       "type": "object"
     },
@@ -3040,9 +3157,11 @@
     "label": {
       "additionalProperties": false,
       "required": ["en"],
-      "properties": { "en": { "type": "string", "minLength": 1 } },
+      "properties": {
+        "en": { "type": "string", "minLength": 1, "pattern": "\\S" }
+      },
       "patternProperties": {
-        "^[a-zA-Z]{2,8}(?:-[a-zA-Z0-9]{1,8})*$": { "type": "string" }
+        "^(?:[a-zA-Z]{2,8}|[iIxX])(?:-[a-zA-Z0-9]{1,8})*$": { "type": "string" }
       },
       "type": "object"
     },
@@ -3065,15 +3184,7 @@
                 "type": "string",
                 "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$"
               },
-              "label": {
-                "type": "object",
-                "additionalProperties": false,
-                "properties": {
-                  "ru": { "type": "string" },
-                  "en": { "type": "string" }
-                },
-                "required": ["ru", "en"]
-              },
+              "label": { "$ref": "#/$defs/localeText" },
               "xControl": {
                 "type": "string",
                 "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$"

@@ -1,154 +1,156 @@
 {
-  "source": "effect-sdk working tree supplied for integration",
+  "source": "effect-sdk SDK-HANDOFF.md 2026-09-10 localized defaults workflow corpus",
   "baseCommit": "92c981c089d576b8a47954d1cfd7355e0fd113f9",
   "cleanCommit": false,
-  "schemaSha256": "0cdc5cd31c3b38c32d4c81b8021d76e415e776e7a7a12406fb95fd90b7b8e460",
+  "schemaSha256": "0e9679be22393f4e4ccbd1aa9bdcc7538281b78fcd3615a67deb1c9ea8a3ef83",
   "files": [
     {
       "file": "sniptale-callout-dark.sniptale-effect.json",
-      "sha256": "47fb74a0c5f9a8eddbe2970155d5f25b1054ec2c88017eb4836411c6b8a7777e",
-      "sourceSha256": "b6104b8a8af666d0acc87a2d78b981819a74bb70a3086c44baacbe34013e8abb"
+      "sha256": "86b9b68f62259f83900b37dba149d74322fc97988289dd0d1590ff1ebb4052db",
+      "sourceSha256": "f8e56a56e2d834af22975f43fd0e998903648e24b250e3083f4176ba56ed7afe"
     },
     {
       "file": "sniptale-callout-light.sniptale-effect.json",
-      "sha256": "8df51be3d67b227c0df5e0a24c95c35c01b60606ff3936e464e4f2a15bd2d47d",
-      "sourceSha256": "6c6d1b82536a6c8a8cdb63365632d7109fd943d08d4bf9f10143d16437505291"
+      "sha256": "d147112999021470219608e04c6cdf154202c0ae1771a3c72f6b009be8296867",
+      "sourceSha256": "9455484ad1e926d9a250f93bb5b0af839aacc452304732e7da9985f33bb0c079"
     },
     {
       "file": "sniptale-chapters-dark.sniptale-effect.json",
-      "sha256": "ef87a1dce52ed8dc7a00eb849724397735ece014e5ae2ca82bb2e7da105a21b8",
-      "sourceSha256": "8694c4dadedca04bd892ce03c4c6a8907890ace9bac12fa0d7669cb31d3380bb"
+      "sha256": "ac1a3b73e1efd786e1b5c9dfa544830fe092f0852a997f8dcf9819733b0bf965",
+      "sourceSha256": "28f4f02884a4f06c5dd8f1331a7067f5578dd485c0595d1f792c64a1e2b8da09"
     },
     {
       "file": "sniptale-chapters-light.sniptale-effect.json",
-      "sha256": "1fa756eb039ca6336c61f5e22327697fea6ac1e8376f817fbfa4f601398a5bb9",
-      "sourceSha256": "7269fd9092df291e21424713572c436dc46a9bf4535b9984eee9aa66569e263e"
+      "sha256": "4dc286b74742132847c05f430769058cacb4c9f5902fd7ee31eac50f6a136d44",
+      "sourceSha256": "2781b4b7e0f1fa6cc6a3198f8ecce59890006a50904b6c30cb2209826f26e0e6"
     },
     {
       "file": "sniptale-corners-dark.sniptale-effect.json",
-      "sha256": "278f02026a01bab679d3e88fd49db32883b6595eadb15fd3c8cef49e977e838f",
-      "sourceSha256": "278f02026a01bab679d3e88fd49db32883b6595eadb15fd3c8cef49e977e838f"
+      "sha256": "3b22d7e0ae0057339538a19a14f93cad78cff201e9aaa6f0b527440709303957",
+      "sourceSha256": "3b22d7e0ae0057339538a19a14f93cad78cff201e9aaa6f0b527440709303957"
     },
     {
       "file": "sniptale-corners-light.sniptale-effect.json",
-      "sha256": "02796f847349e7f8dfcdde569f8e0756e2a167bf7395865571d9a398039ce3df",
-      "sourceSha256": "02796f847349e7f8dfcdde569f8e0756e2a167bf7395865571d9a398039ce3df"
+      "sha256": "92fa41449d273ddc4e3be09cbb649209aebb6379fc5dd4df5957619ae435a6e8",
+      "sourceSha256": "92fa41449d273ddc4e3be09cbb649209aebb6379fc5dd4df5957619ae435a6e8"
     },
     {
       "file": "sniptale-frame-dark.sniptale-effect.json",
-      "sha256": "3b478930c4153788b9bd5f0508f11113bbb603f3467a1011f7761c3a57010b23",
-      "sourceSha256": "3b478930c4153788b9bd5f0508f11113bbb603f3467a1011f7761c3a57010b23"
+      "sha256": "d2a2d0458a1bb5aec6b3e9404fd324d7cbb39451cab1d771ec7675b860d2d3ff",
+      "sourceSha256": "d2a2d0458a1bb5aec6b3e9404fd324d7cbb39451cab1d771ec7675b860d2d3ff"
     },
     {
       "file": "sniptale-frame-light.sniptale-effect.json",
-      "sha256": "4ab6c2575847e4ce21fdd7ea8f92e9499b08b646edc565ad7ccb53f0b7a2be03",
-      "sourceSha256": "4ab6c2575847e4ce21fdd7ea8f92e9499b08b646edc565ad7ccb53f0b7a2be03"
+      "sha256": "e862c3b078ef0102edc4d82fcd03b9027b6a577f921215a6ac180ebd192cf082",
+      "sourceSha256": "e862c3b078ef0102edc4d82fcd03b9027b6a577f921215a6ac180ebd192cf082"
     },
     {
       "file": "sniptale-frosted-dark.sniptale-effect.json",
-      "sha256": "3167e4718fe41fd2ae3ba7f26ba3408af81620cf3b10375935d87968608dbf9f",
-      "sourceSha256": "3167e4718fe41fd2ae3ba7f26ba3408af81620cf3b10375935d87968608dbf9f"
+      "sha256": "e6bad29a6bed66f0a4ff9a640c30be4cd1f6b638cca8d7288708be6fdeb82e3b",
+      "sourceSha256": "e6bad29a6bed66f0a4ff9a640c30be4cd1f6b638cca8d7288708be6fdeb82e3b"
     },
     {
       "file": "sniptale-frosted-light.sniptale-effect.json",
-      "sha256": "7c631cf6079c0c033e2def0111099d858196f2b0e285034bb3cf53cb8ed09ae8",
-      "sourceSha256": "7c631cf6079c0c033e2def0111099d858196f2b0e285034bb3cf53cb8ed09ae8"
+      "sha256": "2647040dedf87c7cda59dcb3797cf99a71289852c8c378c4278ef1ff9a867877",
+      "sourceSha256": "2647040dedf87c7cda59dcb3797cf99a71289852c8c378c4278ef1ff9a867877"
     },
     {
       "file": "sniptale-lower-third-dark.sniptale-effect.json",
-      "sha256": "bf16eebc1216505671d494176fc17b12d2fc74afb4d0b85ebe45461f63f2565f",
-      "sourceSha256": "0e6715598258a4a3d75a2d8d890fec55c4992b325a11c3b8e613effa93be0918"
+      "sha256": "40351275a9f51f0fdba1a91782b7e5af6619f1c392c0c92f1da07a480961c02c",
+      "sourceSha256": "09392bec60a83b643dd56141b9f7b7abc729cd9f8022e7ebe986e3b25213f0dc"
     },
     {
       "file": "sniptale-lower-third-light.sniptale-effect.json",
-      "sha256": "be832eb65a5a8cbdf523678830cb5279a83d1a020dd8d634c7fe90b5d8da8c63",
-      "sourceSha256": "9c3d4504a3306355b14334bad702ac554e341b105825486db8f77bdf4e44e534"
+      "sha256": "3b2b14dedce7c2d53a93cd3891decef29eb071de75afaf08dafb63c3c2fa49f8",
+      "sourceSha256": "a5f885b458fe03c6ee7d0831fa1f91a421518de5de61542c60c3d29e0881e46f"
     },
     {
       "file": "sniptale-spotlight-dark.sniptale-effect.json",
-      "sha256": "dac22ab4da5d8e27ce28a6bba74cce173ff7f47e8ff4ca041b52b48e7305cfea",
-      "sourceSha256": "dac22ab4da5d8e27ce28a6bba74cce173ff7f47e8ff4ca041b52b48e7305cfea"
+      "sha256": "9c04007f844f807b83f8e59fb51c4116847020e5b78ab4205c1c5ef1e6ad9b51",
+      "sourceSha256": "9c04007f844f807b83f8e59fb51c4116847020e5b78ab4205c1c5ef1e6ad9b51"
     },
     {
       "file": "sniptale-spotlight-light.sniptale-effect.json",
-      "sha256": "8c018c8a5d6fa8b76ba90209d97a6f4e50915649f345f7876a2aaf308d6dea53",
-      "sourceSha256": "8c018c8a5d6fa8b76ba90209d97a6f4e50915649f345f7876a2aaf308d6dea53"
+      "sha256": "3d71851bffd06eb6937e102c01698b1975d17bc5c1d6c76afabfd7ccf7d20611",
+      "sourceSha256": "3d71851bffd06eb6937e102c01698b1975d17bc5c1d6c76afabfd7ccf7d20611"
     },
     {
       "file": "sniptale-title-dark.sniptale-effect.json",
-      "sha256": "799ccae5fa48ce2f50d7c3f0c36724e7b626da869d2805f023a7ff3b5687fcce",
-      "sourceSha256": "799ccae5fa48ce2f50d7c3f0c36724e7b626da869d2805f023a7ff3b5687fcce"
+      "sha256": "fd9ebf67e647187cdb91e009da98297706bf6b1b8901cc44415fd654f8166fc8",
+      "sourceSha256": "fd9ebf67e647187cdb91e009da98297706bf6b1b8901cc44415fd654f8166fc8"
     },
     {
       "file": "sniptale-title-light.sniptale-effect.json",
-      "sha256": "200641adb0d4716c27fd3562a5d20a180aae0a346d029ebda831ad7e8734ce64",
-      "sourceSha256": "200641adb0d4716c27fd3562a5d20a180aae0a346d029ebda831ad7e8734ce64"
+      "sha256": "57bbbcc74a8fe7334a4db9bd8da8cb156847a0d46d69854bbb5ef469a391448e",
+      "sourceSha256": "57bbbcc74a8fe7334a4db9bd8da8cb156847a0d46d69854bbb5ef469a391448e"
     },
     {
       "file": "sniptale-transition-blur.sniptale-effect.json",
-      "sha256": "416161be5c15905e626580d406d3292c7cc09e742106d415e77fd8f52a8f3846",
-      "sourceSha256": "416161be5c15905e626580d406d3292c7cc09e742106d415e77fd8f52a8f3846"
+      "sha256": "900c0ef6b71d5ad3e00e28364112e5a0eb1b0520dc4ce8dcd3a095b0939492bc",
+      "sourceSha256": "900c0ef6b71d5ad3e00e28364112e5a0eb1b0520dc4ce8dcd3a095b0939492bc"
     },
     {
       "file": "sniptale-transition-dissolve.sniptale-effect.json",
-      "sha256": "e36aa3919f26773f87b522eb71a832d9441e020e1a3740f28276a9afa44f750f",
-      "sourceSha256": "e36aa3919f26773f87b522eb71a832d9441e020e1a3740f28276a9afa44f750f"
+      "sha256": "e9058ef9ead7b62c15976fe343d69ee20ffb90887b0cb078a33cbd4cb9310d98",
+      "sourceSha256": "e9058ef9ead7b62c15976fe343d69ee20ffb90887b0cb078a33cbd4cb9310d98"
     },
     {
       "file": "sniptale-transition-light-leak.sniptale-effect.json",
-      "sha256": "69183adbd4fbe6007fd4dd86ea3481af472e64532a4851a639178e4d189abe18",
-      "sourceSha256": "69183adbd4fbe6007fd4dd86ea3481af472e64532a4851a639178e4d189abe18"
+      "sha256": "7b3f11a1d6da1244f70baf782a472c1bed9a87e1cd9e5f31d52a6ec0a4748a52",
+      "sourceSha256": "7b3f11a1d6da1244f70baf782a472c1bed9a87e1cd9e5f31d52a6ec0a4748a52"
     },
     {
       "file": "sniptale-transition-push.sniptale-effect.json",
-      "sha256": "b7fd9d30b0acbb51110e6c06d399af63a8c546fa0e85ce1854f162b630ac667f",
-      "sourceSha256": "ddd5d25ac2292d2925b8fa6949c61db0e64701a32aa2d472ec548b81fd7734aa"
+      "sha256": "66f08a8ba2e4182057cb0536c9b739255860aa8ed962168cd13ff709402455e4",
+      "sourceSha256": "6fa5ff2763f3765b8e0d707cde8a1ca3f1ad780969860129a06e0c3f4bf4e535"
     },
     {
       "file": "sniptale-transition-split.sniptale-effect.json",
-      "sha256": "1622ade0d9a051c1322282a0993f0388db0ecfbff4e9f8c5d2a889cbdd55635d",
-      "sourceSha256": "1622ade0d9a051c1322282a0993f0388db0ecfbff4e9f8c5d2a889cbdd55635d"
+      "sha256": "b0ae054aa5b147b88800de4f1a5252ca291176e89fa85dfa1712b9737f8d6460",
+      "sourceSha256": "b0ae054aa5b147b88800de4f1a5252ca291176e89fa85dfa1712b9737f8d6460"
     },
     {
       "file": "sniptale-transition-zoom.sniptale-effect.json",
-      "sha256": "6000ebb9fc4998517c71c7b0e7ae48843e73a6408254e39be413274c5e577c2d",
-      "sourceSha256": "6000ebb9fc4998517c71c7b0e7ae48843e73a6408254e39be413274c5e577c2d"
+      "sha256": "b30f13c6b083ae76c8c5906e398a6cb70e00d7d5c91e17f0b6c3ad297384cfa1",
+      "sourceSha256": "b30f13c6b083ae76c8c5906e398a6cb70e00d7d5c91e17f0b6c3ad297384cfa1"
     },
     {
       "file": "sniptale-video-bloom.sniptale-effect.json",
-      "sha256": "3da047e76fcaf6b52777b5e93646d9898fecb902613e696c5d65b0876c01b569",
-      "sourceSha256": "3da047e76fcaf6b52777b5e93646d9898fecb902613e696c5d65b0876c01b569"
+      "sha256": "af9cd20d2fd5291ecd85a0420643ec487f6d3bdc2b24703246293a922473dbe1",
+      "sourceSha256": "af9cd20d2fd5291ecd85a0420643ec487f6d3bdc2b24703246293a922473dbe1"
     },
     {
       "file": "sniptale-video-blur.sniptale-effect.json",
-      "sha256": "b107f3c73313b242b1bd6fb7607ec4f6e9b46449171e67b2be9f728f9ce849d8",
-      "sourceSha256": "b107f3c73313b242b1bd6fb7607ec4f6e9b46449171e67b2be9f728f9ce849d8"
+      "sha256": "5b65041f4151c1c45e09863c264dcb3d63c466e8d8919f3b18b93948d3730ef2",
+      "sourceSha256": "5b65041f4151c1c45e09863c264dcb3d63c466e8d8919f3b18b93948d3730ef2"
     },
     {
       "file": "sniptale-video-grain.sniptale-effect.json",
-      "sha256": "0aef0b7e562a4843122ed454ccadc7c24b95bbfa75cc34e2ca35c9ede7fe1d3a",
-      "sourceSha256": "1207fbfb77ef026bc526ec25d31b07692e00ade2e725357b7954e28e11390da9"
+      "sha256": "0aab09afdb38f874ee71eb7cbf02efae7a99540d5613c5f2795f6dccf9adbae9",
+      "sourceSha256": "46e58f46d69d723455c12035e3d88afc1e5b71f98deb377d890d2f467748446a"
     },
     {
       "file": "sniptale-video-light-drift.sniptale-effect.json",
-      "sha256": "2c01aee51b0f354d9164761e0fea6ebde5fa86f1da22bb344c5ad849e8648225",
-      "sourceSha256": "2c01aee51b0f354d9164761e0fea6ebde5fa86f1da22bb344c5ad849e8648225"
+      "sha256": "b3a14aa8d3229313c8f41b18fbdc3cb1191b3ecfd3a803a6cee22ba34ee1d165",
+      "sourceSha256": "b3a14aa8d3229313c8f41b18fbdc3cb1191b3ecfd3a803a6cee22ba34ee1d165"
     },
     {
       "file": "sniptale-video-push-in.sniptale-effect.json",
-      "sha256": "62d34df5403a729fd98f030fba6c3251f4eaf6e2d4de225824ce32f9f13711f6",
-      "sourceSha256": "62d34df5403a729fd98f030fba6c3251f4eaf6e2d4de225824ce32f9f13711f6"
+      "sha256": "8d013ececd42a3c5dc23801be75760043054257a8484b203c5b708af0ca292de",
+      "sourceSha256": "8d013ececd42a3c5dc23801be75760043054257a8484b203c5b708af0ca292de"
     },
     {
       "file": "sniptale-video-vignette.sniptale-effect.json",
-      "sha256": "435c76ec3493c2eb7d8a231131ba364c895c0647783b8401f561d4685bc82c1c",
-      "sourceSha256": "435c76ec3493c2eb7d8a231131ba364c895c0647783b8401f561d4685bc82c1c"
+      "sha256": "a9c91fc3606f9a5781752c508ce347ee26d52d7bb9e8368a91ff019ae4bba6d9",
+      "sourceSha256": "a9c91fc3606f9a5781752c508ce347ee26d52d7bb9e8368a91ff019ae4bba6d9"
     },
     {
       "file": "sniptale-video-warm.sniptale-effect.json",
-      "sha256": "dc1dd95261ea6a8346aa01f77871c9ad9515e9064abb48f6a8784a0f0dbf5c2b",
-      "sourceSha256": "dc1dd95261ea6a8346aa01f77871c9ad9515e9064abb48f6a8784a0f0dbf5c2b"
+      "sha256": "d493e4852207785a0b15ec1c0888560b9d6e99cecd8dabfcc38014bbd793b3b1",
+      "sourceSha256": "d493e4852207785a0b15ec1c0888560b9d6e99cecd8dabfcc38014bbd793b3b1"
     }
   ],
-  "formatting": "Repository formatter; sourceSha256 identifies supplied SDK bytes, sha256 identifies formatted fixture bytes."
+  "formatting": "Repository formatter; sourceSha256 identifies supplied SDK bytes, sha256 identifies formatted fixture bytes.",
+  "workflowManifestSha256": "43b8c8dd5ebb613352ddea35996674d38fd667affb9d4fd2fa03fa8da4165611",
+  "workflowSourceManifestSha256": "f46b75121f18115431fda53379a557f8af2bface14677bc4506d245c899a475c"
 }

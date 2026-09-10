@@ -20,7 +20,9 @@
         "ru": "Акцент",
         "en": "Accent"
       },
-      "defaultValue": "#fb923c"
+      "defaultValue": "#fb923c",
+      "group": "appearance",
+      "order": 0
     },
     {
       "id": "surface",
@@ -29,7 +31,9 @@
         "ru": "Подложка",
         "en": "Surface"
       },
-      "defaultValue": "#171a20"
+      "defaultValue": "#171a20",
+      "group": "appearance",
+      "order": 1
     },
     {
       "id": "ink",
@@ -38,7 +42,9 @@
         "ru": "Основной текст",
         "en": "Primary text"
       },
-      "defaultValue": "#fafafa"
+      "defaultValue": "#fafafa",
+      "group": "appearance",
+      "order": 2
     },
     {
       "id": "entry",
@@ -50,7 +56,9 @@
       "defaultValue": 18,
       "min": 5,
       "max": 40,
-      "step": 1
+      "step": 1,
+      "group": "animation",
+      "order": 3
     },
     {
       "id": "font",
@@ -62,7 +70,9 @@
       "defaultValue": 24,
       "min": 20,
       "max": 28,
-      "step": 1
+      "step": 1,
+      "group": "typography",
+      "order": 4
     },
     {
       "id": "bodyFont",
@@ -74,7 +84,9 @@
       "defaultValue": 26,
       "min": 20,
       "max": 30,
-      "step": 1
+      "step": 1,
+      "group": "typography",
+      "order": 5
     },
     {
       "id": "count",
@@ -86,19 +98,53 @@
       "defaultValue": 3,
       "min": 1,
       "max": 3,
-      "step": 1
+      "step": 1,
+      "group": "geometry",
+      "order": 6
     },
     {
       "id": "active",
       "kind": "number",
       "label": {
-        "ru": "Активный раздел (0 — без выделения)",
-        "en": "Active chapter (0 — none)"
+        "ru": "Активный раздел",
+        "en": "Active chapter"
       },
       "defaultValue": 1,
       "min": 0,
       "max": 3,
-      "step": 1
+      "step": 1,
+      "group": "animation",
+      "order": 7,
+      "options": [
+        {
+          "value": 0,
+          "label": {
+            "ru": "Без выделения",
+            "en": "None"
+          }
+        },
+        {
+          "value": 1,
+          "label": {
+            "ru": "Первый",
+            "en": "First"
+          }
+        },
+        {
+          "value": 2,
+          "label": {
+            "ru": "Второй",
+            "en": "Second"
+          }
+        },
+        {
+          "value": 3,
+          "label": {
+            "ru": "Третий",
+            "en": "Third"
+          }
+        }
+      ]
     },
     {
       "id": "title",
@@ -107,7 +153,13 @@
         "ru": "Заголовок",
         "en": "Heading"
       },
-      "defaultValue": "В ЭТОМ ВИДЕО"
+      "defaultValue": "В ЭТОМ ВИДЕО",
+      "group": "content",
+      "order": 8,
+      "localizedDefaultValue": {
+        "ru": "В ЭТОМ ВИДЕО",
+        "en": "IN THIS VIDEO"
+      }
     },
     {
       "id": "subtitle",
@@ -116,7 +168,13 @@
         "ru": "Раздел 1",
         "en": "Chapter 1"
       },
-      "defaultValue": "С чего начать"
+      "defaultValue": "С чего начать",
+      "group": "content",
+      "order": 9,
+      "localizedDefaultValue": {
+        "ru": "С чего начать",
+        "en": "Getting started"
+      }
     },
     {
       "id": "item2",
@@ -125,7 +183,13 @@
         "ru": "Раздел 2",
         "en": "Chapter 2"
       },
-      "defaultValue": "Как это работает"
+      "defaultValue": "Как это работает",
+      "group": "content",
+      "order": 10,
+      "localizedDefaultValue": {
+        "ru": "Как это работает",
+        "en": "How it works"
+      }
     },
     {
       "id": "item3",
@@ -134,7 +198,13 @@
         "ru": "Раздел 3",
         "en": "Chapter 3"
       },
-      "defaultValue": "Что получилось"
+      "defaultValue": "Что получилось",
+      "group": "content",
+      "order": 11,
+      "localizedDefaultValue": {
+        "ru": "Что получилось",
+        "en": "The result"
+      }
     }
   ],
   "layers": [],

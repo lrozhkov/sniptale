@@ -13,6 +13,7 @@ const TRACK_SELECT_FOCUS_CLASS_NAME = [
 ].join(' ');
 
 interface ProjectTimelineTrackRowProps {
+  onToggleFx?: () => void;
   compactRows: boolean;
   isSelected: boolean;
   track: VideoProject['tracks'][number];
@@ -24,6 +25,7 @@ interface ProjectTimelineTrackRowProps {
 }
 
 export function ProjectTimelineTrackRow({
+  onToggleFx,
   compactRows,
   isSelected,
   track,
@@ -34,23 +36,45 @@ export function ProjectTimelineTrackRow({
   onToggleTrackVisibility,
 }: ProjectTimelineTrackRowProps) {
   return (
-    <div
-      className={TIMELINE_LANE_HEADER_CLASS_NAME}
-      data-selected={isSelected}
-      style={{ height: trackLayout?.rowHeight }}
-    >
-      <ProjectTimelineTrackMeta
-        compactRows={compactRows}
-        isSelected={isSelected}
-        track={track}
-        trackLabel={trackLabel}
-        onSelectTrack={onSelectTrack}
-      />
-      <ProjectTimelineTrackStateControls
-        track={track}
-        onToggleTrackLock={onToggleTrackLock}
-        onToggleTrackVisibility={onToggleTrackVisibility}
-      />
+    <div style={{ height: trackLayout?.rowHeight }}>
+      <div
+        className={TIMELINE_LANE_HEADER_CLASS_NAME}
+        data-selected={isSelected}
+        style={{ height: trackLayout?.clipRowHeight }}
+      >
+        <ProjectTimelineTrackMeta
+          compactRows={compactRows}
+          isSelected={isSelected}
+          track={track}
+          trackLabel={trackLabel}
+          onSelectTrack={onSelectTrack}
+        />
+        <ProjectTimelineTrackStateControls
+          track={track}
+          onToggleTrackLock={onToggleTrackLock}
+          onToggleTrackVisibility={onToggleTrackVisibility}
+        />
+      </div>
+      {Boolean(trackLayout?.fxHeight) && (
+        <div
+          style={{ height: trackLayout?.fxHeight }}
+          className="border-b border-[var(--sniptale-color-border-soft)] px-3"
+        >
+          <button
+            type="button"
+            onClick={onToggleFx}
+            aria-expanded={!trackLayout?.fxCollapsed}
+            className="flex h-5 items-center gap-1 text-[11px] text-[var(--sniptale-color-text-muted)]"
+            title={translate('videoEditor.effectsLibrary.toggleTimelineEffects')}
+          >
+            <span aria-hidden="true">{trackLayout?.fxCollapsed ? '▸' : '▾'}</span>
+            {translate('videoEditor.effectsLibrary.fxCount').replace(
+              '{count}',
+              String(trackLayout?.fxInstanceIds.length ?? 0)
+            )}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

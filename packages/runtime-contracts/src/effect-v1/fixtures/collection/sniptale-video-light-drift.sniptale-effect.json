@@ -23,7 +23,9 @@
       "defaultValue": 30,
       "min": 0,
       "max": 100,
-      "step": 1
+      "step": 1,
+      "group": "processing",
+      "order": 0
     },
     {
       "id": "edge",
@@ -35,7 +37,9 @@
       "defaultValue": 8,
       "min": 0,
       "max": 40,
-      "step": 1
+      "step": 1,
+      "group": "animation",
+      "order": 1
     },
     {
       "id": "tint",
@@ -44,7 +48,9 @@
         "ru": "Цвет света",
         "en": "Light color"
       },
-      "defaultValue": "#ffb36a"
+      "defaultValue": "#ffb36a",
+      "group": "appearance",
+      "order": 2
     },
     {
       "id": "travel",
@@ -56,7 +62,9 @@
       "defaultValue": 65,
       "min": 0,
       "max": 100,
-      "step": 1
+      "step": 1,
+      "group": "animation",
+      "order": 3
     },
     {
       "id": "height",
@@ -68,7 +76,9 @@
       "defaultValue": 20,
       "min": 0,
       "max": 100,
-      "step": 1
+      "step": 1,
+      "group": "geometry",
+      "order": 4
     }
   ],
   "layers": [],
@@ -88,25 +98,6 @@
     "kind": "graph",
     "version": 1,
     "definitions": {
-      "s": {
-        "op": "div",
-        "args": [
-          {
-            "op": "min",
-            "args": [
-              {
-                "op": "read",
-                "path": "width"
-              },
-              {
-                "op": "read",
-                "path": "height"
-              }
-            ]
-          },
-          720
-        ]
-      },
       "edge": {
         "op": "max",
         "args": [
@@ -405,7 +396,7 @@
             0.65
           ]
         },
-        "blend": "screen"
+        "blend": "source-atop"
       }
     ]
   }

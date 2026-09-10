@@ -23,7 +23,9 @@
       "defaultValue": 12,
       "min": 0,
       "max": 32,
-      "step": 1
+      "step": 1,
+      "group": "processing",
+      "order": 0
     },
     {
       "id": "strength",
@@ -35,7 +37,9 @@
       "defaultValue": 100,
       "min": 0,
       "max": 100,
-      "step": 1
+      "step": 1,
+      "group": "processing",
+      "order": 1
     },
     {
       "id": "edge",
@@ -47,7 +51,9 @@
       "defaultValue": 8,
       "min": 0,
       "max": 40,
-      "step": 1
+      "step": 1,
+      "group": "animation",
+      "order": 2
     }
   ],
   "layers": [],

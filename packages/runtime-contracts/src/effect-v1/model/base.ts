@@ -7,6 +7,7 @@ export type LocaleText = {
 export type EffectArtifactType = 'animation' | 'transition';
 
 export type EffectControlPresentation = {
+  localizedDefaultValue?: LocaleText;
   group?: string;
   order?: number;
   options?: { value: number | string; label: LocaleText }[];

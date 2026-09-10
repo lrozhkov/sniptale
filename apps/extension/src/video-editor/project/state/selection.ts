@@ -12,6 +12,10 @@ export function resolveSelectionAfterProjectUpdate(
   splitLineage?: ReadonlyMap<string, string>
 ): VideoEditorProjectState['selection'] {
   switch (selection.kind) {
+    case VideoEditorSelectionKind.EFFECT_INSTANCE:
+      return project.effectInstances?.some((item) => item.id === selection.effectInstanceId)
+        ? selection
+        : createSceneSelection();
     case VideoEditorSelectionKind.HISTORY_SPAN: {
       const clip = project.clips.find((item) => item.id === selection.clipId);
       return clip?.type === 'VIDEO' &&
@@ -97,6 +101,14 @@ export function resolveSelectedTrackIdFromSelection(
   selection: VideoEditorProjectState['selection']
 ): string | null {
   switch (selection.kind) {
+    case VideoEditorSelectionKind.EFFECT_INSTANCE: {
+      const target = project.effectInstances?.find(
+        (item) => item.id === selection.effectInstanceId
+      )?.target;
+      return target?.kind === 'clip'
+        ? (project.clips.find((clip) => clip.id === target.clipId)?.trackId ?? null)
+        : null;
+    }
     case VideoEditorSelectionKind.MOTION_CONNECTION:
     case VideoEditorSelectionKind.HISTORY_LANE:
     case VideoEditorSelectionKind.HISTORY_SPAN:

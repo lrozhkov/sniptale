@@ -11,7 +11,11 @@ const labels = new WeakMap<VideoProjectEffectSnapshot, Record<string, string | u
 
 export function getEffectClipLabel(project: VideoProject, clip: VideoProjectEffectClip): string {
   if (clip.name.trim()) return clip.name;
-  const instance = project.effectInstances?.find(({ id }) => id === clip.effectInstanceId);
+  return getEffectInstanceLabel(project, clip.effectInstanceId);
+}
+
+export function getEffectInstanceLabel(project: VideoProject, instanceId: string): string {
+  const instance = project.effectInstances?.find(({ id }) => id === instanceId);
   const snapshot = project.effectSnapshots?.find(({ id }) => id === instance?.snapshotId);
   if (!snapshot) return translate('videoEditor.effectsLibrary.unavailableEffect');
   let label = labels.get(snapshot);

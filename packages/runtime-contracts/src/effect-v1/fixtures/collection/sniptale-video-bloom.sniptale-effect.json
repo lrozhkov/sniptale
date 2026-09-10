@@ -23,7 +23,9 @@
       "defaultValue": 30,
       "min": 0,
       "max": 100,
-      "step": 1
+      "step": 1,
+      "group": "processing",
+      "order": 0
     },
     {
       "id": "edge",
@@ -35,7 +37,9 @@
       "defaultValue": 8,
       "min": 0,
       "max": 40,
-      "step": 1
+      "step": 1,
+      "group": "animation",
+      "order": 1
     },
     {
       "id": "radius",
@@ -47,7 +51,9 @@
       "defaultValue": 10,
       "min": 2,
       "max": 20,
-      "step": 1
+      "step": 1,
+      "group": "processing",
+      "order": 2
     }
   ],
   "layers": [],
@@ -310,7 +316,10 @@
             0.4
           ]
         },
-        "blend": "screen"
+        "blend": "source-atop",
+        "filter": {
+          "brightness": 1.35
+        }
       }
     ]
   }

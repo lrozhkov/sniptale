@@ -20,7 +20,9 @@
         "ru": "Акцент",
         "en": "Accent"
       },
-      "defaultValue": "#fb923c"
+      "defaultValue": "#fb923c",
+      "group": "appearance",
+      "order": 0
     },
     {
       "id": "surface",
@@ -29,7 +31,9 @@
         "ru": "Подложка",
         "en": "Surface"
       },
-      "defaultValue": "#16181d"
+      "defaultValue": "#16181d",
+      "group": "appearance",
+      "order": 1
     },
     {
       "id": "line",
@@ -41,7 +45,9 @@
       "defaultValue": 3,
       "min": 1,
       "max": 8,
-      "step": 1
+      "step": 1,
+      "group": "appearance",
+      "order": 2
     },
     {
       "id": "entry",
@@ -53,7 +59,9 @@
       "defaultValue": 18,
       "min": 5,
       "max": 40,
-      "step": 1
+      "step": 1,
+      "group": "animation",
+      "order": 3
     },
     {
       "id": "corner",
@@ -65,7 +73,9 @@
       "defaultValue": 64,
       "min": 12,
       "max": 64,
-      "step": 1
+      "step": 1,
+      "group": "geometry",
+      "order": 4
     }
   ],
   "layers": [],

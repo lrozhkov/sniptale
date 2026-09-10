@@ -1,3 +1,4 @@
+import { InspectFxPanel } from './inspection/fx';
 import './inspector.css';
 import { InspectorSelectionFamilyContext } from './grouped-inspector/presentation';
 import { InspectorDetails } from './shared/details';
@@ -46,6 +47,8 @@ export function WorkspaceSidebarInspectPanel(props: WorkspaceSidebarSelectionPan
 
 function SelectionBody(props: WorkspaceSidebarSelectionPanelProps) {
   switch (props.selection.kind) {
+    case VideoEditorSelectionKind.EFFECT_INSTANCE:
+      return <InspectFxPanel {...props} instanceId={props.selection.effectInstanceId} />;
     case VideoEditorSelectionKind.HISTORY_SPAN:
       return (
         <InspectHistorySpanPanel

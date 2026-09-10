@@ -103,8 +103,12 @@ it('exposes only targets that are available for each EffectV1 kind', async () =>
   expect(standalone.disabled).toBe(false);
   expect(target.disabled).toBe(true);
   expect(transition.disabled).toBe(true);
-  expect(standalone.textContent).toBe(translate('common.actions.add'));
-  expect(target.textContent).toBe(translate('videoEditor.effectsLibrary.apply'));
+  expect(standalone.getAttribute('aria-label')).toBe(
+    translate('videoEditor.effectsLibrary.applyToScene')
+  );
+  expect(target.getAttribute('aria-label')).toBe(
+    translate('videoEditor.effectsLibrary.selectClipTarget')
+  );
   expect(target.title).toBe(translate('videoEditor.effectsLibrary.selectClipTarget'));
 
   await click(standalone);

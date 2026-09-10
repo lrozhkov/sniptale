@@ -12,6 +12,9 @@ import {
 } from './stacking';
 
 export interface TimelineTrackLayout {
+  fxInstanceIds: string[];
+  fxCollapsed: boolean;
+  fxHeight: number;
   center: number;
   clipRowHeight: number;
   junctionZones: TimelineJunctionZone[];
@@ -32,6 +35,7 @@ export interface TimelineTrackLayoutModel {
 }
 
 export function buildTimelineTrackLayoutModel(params: {
+  collapsedFxByTrackId?: Readonly<Record<string, boolean>> | undefined;
   project: VideoProject;
   trackHeightByTrackId: Record<string, VideoEditorTrackHeightMultiplier>;
   tracks: VideoProject['tracks'];
@@ -57,9 +61,25 @@ export function buildTimelineTrackLayoutModel(params: {
     );
     const logicalRowHeight = clipRowHeight / logicalRows;
     const transitionRowCount = 0;
-    const rowHeight = clipRowHeight;
+    const clipIds = new Set(
+      params.project.clips.filter((clip) => clip.trackId === track.id).map((clip) => clip.id)
+    );
+    const fxInstanceIds = (params.project.effectInstances ?? [])
+      .filter(
+        (instance) =>
+          instance.kind === 'targetEffect' &&
+          instance.target.kind === 'clip' &&
+          clipIds.has(instance.target.clipId)
+      )
+      .map((instance) => instance.id);
+    const fxCollapsed = params.collapsedFxByTrackId?.[track.id] ?? false;
+    const fxHeight = fxInstanceIds.length ? (fxCollapsed ? 20 : fxInstanceIds.length * 24) : 0;
+    const rowHeight = clipRowHeight + fxHeight;
     const layout = {
-      center: top + rowHeight / 2,
+      fxInstanceIds,
+      fxCollapsed,
+      fxHeight,
+      center: top + clipRowHeight / 2,
       clipRowHeight,
       junctionZones: [],
       logicalLaneMetrics,

@@ -23,7 +23,9 @@
       "defaultValue": 30,
       "min": 0,
       "max": 100,
-      "step": 1
+      "step": 1,
+      "group": "processing",
+      "order": 0
     },
     {
       "id": "edge",
@@ -35,7 +37,9 @@
       "defaultValue": 8,
       "min": 0,
       "max": 40,
-      "step": 1
+      "step": 1,
+      "group": "animation",
+      "order": 1
     },
     {
       "id": "size",
@@ -47,7 +51,9 @@
       "defaultValue": 1.5,
       "min": 1,
       "max": 3,
-      "step": 0.25
+      "step": 0.25,
+      "group": "processing",
+      "order": 2
     },
     {
       "id": "speed",
@@ -59,7 +65,9 @@
       "defaultValue": 12,
       "min": 0,
       "max": 24,
-      "step": 1
+      "step": 1,
+      "group": "animation",
+      "order": 3
     }
   ],
   "layers": [],
@@ -2907,7 +2915,8 @@
                 },
                 0.5
               ]
-            }
+            },
+            "blend": "source-atop"
           }
         ]
       }

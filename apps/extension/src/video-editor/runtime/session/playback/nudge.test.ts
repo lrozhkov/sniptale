@@ -279,3 +279,20 @@ describe('video-editor playback selection nudge', () => {
   registerManualAreaNudgeTest();
   registerInertSelectionNudgeTest();
 });
+
+it('does not move canvas content when an FX interval is selected', () => {
+  const project = createEmptyVideoProject('FX');
+  expect(
+    applyPlaybackSelectionNudge(
+      {
+        ...createLatestState(project),
+        selection: { kind: VideoEditorSelectionKind.EFFECT_INSTANCE, effectInstanceId: 'fx' },
+        selectedActionOccurrence: null,
+        selectedClipId: null,
+        selectedMotionRegion: null,
+      },
+      createHandlers() as never,
+      { deltaX: 1, deltaY: 0 }
+    )
+  ).toBe(false);
+});

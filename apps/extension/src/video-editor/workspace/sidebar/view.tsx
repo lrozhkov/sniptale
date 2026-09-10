@@ -1,3 +1,4 @@
+import { getEffectInstanceLabel } from '../../../features/video/project/effect-instance/presentation';
 import React from 'react';
 import {
   Camera,
@@ -82,6 +83,10 @@ export function getSelectionMeta(
   project?: WorkspaceSidebarProps['project']
 ): { icon: React.ReactNode; label: string; title: string } {
   switch (selection.kind) {
+    case VideoEditorSelectionKind.EFFECT_INSTANCE: {
+      const label = project ? getEffectInstanceLabel(project, selection.effectInstanceId) : 'FX';
+      return { icon: renderSidebarIcon(SlidersHorizontal), label, title: label };
+    }
     case VideoEditorSelectionKind.SCENE:
       return createStaticSelectionMeta(SlidersHorizontal, 'videoEditor.sidebar.sceneProperties');
     case VideoEditorSelectionKind.CLIP_GROUP:

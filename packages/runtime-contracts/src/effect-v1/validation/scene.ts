@@ -22,6 +22,7 @@ const CLIP_KEYS = new Set([
 ]);
 const CONTROL_KEYS = new Set([
   'defaultValue',
+  'localizedDefaultValue',
   'id',
   'kind',
   'label',

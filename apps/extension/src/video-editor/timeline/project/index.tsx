@@ -22,7 +22,10 @@ export const ProjectTimeline = (
         : panelPrefs.prefs.trackHeightByTrackId,
     [panelPrefs.prefs, props.project.tracks]
   );
-  const timelineState = useProjectTimelineState(props, heights);
+  const timelineState = useProjectTimelineState(
+    { ...props, collapsedFxByTrackId: panelPrefs.prefs.collapsedFxByTrackId },
+    heights
+  );
 
   return (
     <TimelineEffectDraftContext.Provider value={timelineState.effectDragDraft}>

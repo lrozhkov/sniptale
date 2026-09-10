@@ -42,6 +42,7 @@ export function resolveEffectRuntimeFrameTarget(
     if (target.kind !== 'clip') return undefined;
     const clip = project.clips.find(({ id }) => id === target.clipId);
     if (!clip) return undefined;
+    if (clip.effectsBypassed) return null;
     if (projectTime < clip.startTime || projectTime >= clip.startTime + clip.duration) return null;
     const track = project.tracks.find(({ id }) => id === clip.trackId);
     return track?.visible === true

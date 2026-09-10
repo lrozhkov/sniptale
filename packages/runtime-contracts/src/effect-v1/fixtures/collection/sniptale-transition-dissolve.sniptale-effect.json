@@ -23,7 +23,9 @@
       "defaultValue": 85,
       "min": 0,
       "max": 100,
-      "step": 1
+      "step": 1,
+      "group": "animation",
+      "order": 0
     }
   ],
   "layers": [],
@@ -43,25 +45,6 @@
     "kind": "graph",
     "version": 1,
     "definitions": {
-      "s": {
-        "op": "div",
-        "args": [
-          {
-            "op": "min",
-            "args": [
-              {
-                "op": "read",
-                "path": "width"
-              },
-              {
-                "op": "read",
-                "path": "height"
-              }
-            ]
-          },
-          720
-        ]
-      },
       "q": {
         "op": "mix",
         "args": [
@@ -89,26 +72,6 @@
             ]
           }
         ]
-      },
-      "pulse": {
-        "op": "mul",
-        "args": [
-          4,
-          {
-            "op": "read",
-            "path": "defs.q"
-          },
-          {
-            "op": "sub",
-            "args": [
-              1,
-              {
-                "op": "read",
-                "path": "defs.q"
-              }
-            ]
-          }
-        ]
       }
     },
     "commands": [
@@ -128,7 +91,17 @@
           "op": "read",
           "path": "height"
         },
-        "fit": "cover"
+        "fit": "cover",
+        "alpha": {
+          "op": "sub",
+          "args": [
+            1,
+            {
+              "op": "read",
+              "path": "defs.q"
+            }
+          ]
+        }
       },
       {
         "op": "image",
@@ -147,7 +120,8 @@
         "alpha": {
           "op": "read",
           "path": "defs.q"
-        }
+        },
+        "blend": "lighter"
       }
     ]
   }

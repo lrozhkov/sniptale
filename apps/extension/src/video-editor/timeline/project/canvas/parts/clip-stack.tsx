@@ -38,7 +38,7 @@ export function ProjectTimelineTrackClipStack(props: {
 
   return (
     <div
-      className="pointer-events-none absolute bottom-0 left-0 right-0"
+      className="pointer-events-none absolute top-0 left-0 right-0"
       style={{ height: props.trackLayout?.clipRowHeight }}
     >
       <ProjectTimelineTrackClipItems {...props} {...stackLayout} />

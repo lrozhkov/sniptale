@@ -23,6 +23,9 @@ it('renders logical lane separators plus template and transition gutter guides',
 
 function createTrackLayout(): TimelineTrackLayout {
   return {
+    fxInstanceIds: [],
+    fxCollapsed: false,
+    fxHeight: 0,
     center: 89,
     clipRowHeight: 62,
     junctionZones: [],

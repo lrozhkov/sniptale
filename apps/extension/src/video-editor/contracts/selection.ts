@@ -1,5 +1,6 @@
 export const VideoEditorSelectionKind = {
   SCENE: 'scene',
+  EFFECT_INSTANCE: 'effect-instance',
   CLIP: 'clip',
   CLIP_GROUP: 'clip-group',
   TRACK: 'track',
@@ -18,6 +19,7 @@ export type VideoEditorSelectionKind =
   (typeof VideoEditorSelectionKind)[keyof typeof VideoEditorSelectionKind];
 
 export type VideoEditorSelection =
+  | { kind: typeof VideoEditorSelectionKind.EFFECT_INSTANCE; effectInstanceId: string }
   | { kind: typeof VideoEditorSelectionKind.SCENE }
   | { kind: typeof VideoEditorSelectionKind.MOTION_LANE }
   | { kind: typeof VideoEditorSelectionKind.HISTORY_LANE }

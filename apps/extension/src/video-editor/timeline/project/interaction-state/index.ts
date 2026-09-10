@@ -30,6 +30,7 @@ function useProjectTimelineInteractions(
   const pointerSessionCleanupRef = useRef<(() => void) | null>(null);
   const { beginClipInteraction, dragGhost, snapGuideTime, trackLayoutModel, tracks } =
     useProjectTimelineDrag({
+      collapsedFxByTrackId: props.collapsedFxByTrackId,
       currentTime: props.currentTime,
       historyTransaction: props.historyTransaction,
       magnetEnabled: props.magnetEnabled,

@@ -1,3 +1,5 @@
+import { getCurrentLocale } from '../../../../platform/i18n';
+import { resolveEffectV1ControlDefault } from '@sniptale/runtime-contracts/effect-v1';
 import { getEffectInsertionError } from './placement';
 import { initializeEffectSceneAnchors } from './layout';
 import type { EffectV1ObjectLayout } from '@sniptale/runtime-contracts/effect-v1';
@@ -28,6 +30,7 @@ export async function applyEffectCatalogDocument(args: {
   trackId?: string;
   timelineLaneId?: string | null;
 }): Promise<VideoProject> {
+  const locale = getCurrentLocale();
   const { assets, catalogDocument, document } = await readVerifiedCatalogDocument(
     args.catalog,
     args.documentId
@@ -42,8 +45,12 @@ export async function applyEffectCatalogDocument(args: {
     args.project
   );
   const instance: VideoProjectEffectInstance = {
+    ...(document.kind === 'targetEffect' ? { rangeMode: 'owner' as const } : {}),
     controls: Object.fromEntries(
-      document.controls.map(({ defaultValue, id }) => [id, defaultValue])
+      document.controls.map((control) => [
+        control.id,
+        resolveEffectV1ControlDefault(control, locale),
+      ])
     ),
     duration: timing.duration,
     enabled: true,
@@ -197,8 +204,11 @@ function resolveInstanceTiming(
   target: VideoProjectEffectTarget,
   project: VideoProject
 ): { duration: number; startTime: number } {
-  if (target.kind !== 'transition') {
-    return { duration: documentDuration, startTime: requestedStartTime };
+  if (target.kind === 'scene') return { duration: documentDuration, startTime: requestedStartTime };
+  if (target.kind === 'clip') {
+    const clip = project.clips.find((clip) => clip.id === target.clipId);
+    if (!clip || clip.duration <= 0) throw new ApplyEffectInstanceError('effectTargetMissing');
+    return { duration: clip.duration, startTime: clip.startTime };
   }
   const segment = buildProjectTransitionSegments(project).find(
     ({ id }) => id === target.transitionId

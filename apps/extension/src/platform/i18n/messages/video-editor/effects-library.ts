@@ -1,6 +1,18 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorEffectsLibraryMessages = defineMessageSource({
+  fxCount: { en: 'FX · {count}', ru: 'FX · {count}' },
+  toggleTimelineEffects: {
+    en: 'Show or collapse FX intervals',
+    ru: 'Показать или свернуть интервалы FX',
+  },
+  wholeClip: { en: 'Whole clip', ru: 'Весь фрагмент' },
+  customInterval: { en: 'Interval', ru: 'Интервал' },
+  fxScope: { en: 'Range', ru: 'Диапазон' },
+  fxDuration: { en: 'Duration', ru: 'Длительность' },
+  bypassClip: { en: 'Bypass clip effects', ru: 'Отключить эффекты фрагмента' },
+  resizeFxStart: { en: 'Change effect start', ru: 'Изменить начало эффекта' },
+  resizeFxEnd: { en: 'Change effect end', ru: 'Изменить конец эффекта' },
   all: { ru: 'Все', en: 'All' },
   apply: { ru: 'Применить', en: 'Apply' },
   dragToClip: {
