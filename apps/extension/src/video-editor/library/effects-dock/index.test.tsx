@@ -46,7 +46,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-it('keeps import failure guidance in the padded scrollable content without internal-error copy', () => {
+it('keeps failure guidance above the footer outside layout flow and allows dismissal', () => {
   renderDock({
     operations: {
       ...createOperations(),
@@ -55,7 +55,10 @@ it('keeps import failure guidance in the padded scrollable content without inter
   });
   const alert = container?.querySelector('[role="alert"]');
   expect(alert?.textContent).toBe(translate('videoEditor.effectsLibrary.importFailed'));
-  expect(alert?.closest('[aria-busy]')?.className).toContain('flex-col');
+  expect(alert?.className).toContain('absolute');
+  expect(alert?.className).toContain('bottom-2');
+  act(() => alert?.querySelector<HTMLButtonElement>('button')?.click());
+  expect(container?.querySelector('[role="alert"]')).toBeNull();
 });
 
 it('shows catalog loading and a safe recovery message instead of diagnostic codes', () => {

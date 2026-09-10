@@ -321,7 +321,7 @@ function MaterialRow(props: {
             className={[
               'absolute inset-0 !size-8 !min-h-8 !p-0 opacity-0',
               'group-hover/material:opacity-100 group-focus-within/material:opacity-100',
-              '!bg-[var(--sniptale-color-surface-base)]',
+              '!bg-[color:rgb(from_var(--sniptale-color-surface-panel)_r_g_b_/_1)]',
             ].join(' ')}
             aria-label={`${translate('videoEditor.app.materialsRemove')}: ${props.asset.name}`}
             title={translate('videoEditor.app.materialsRemove')}

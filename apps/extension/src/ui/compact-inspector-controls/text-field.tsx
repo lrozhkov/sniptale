@@ -5,7 +5,7 @@ import { focusNextCompactInput } from '@sniptale/ui/compact-inspector-controls/f
 import { cx } from './shared';
 
 const TEXT_FIELD_LABEL_CLASS_NAME = [
-  'flex-1 overflow-hidden text-ellipsis whitespace-nowrap',
+  'select-none break-words',
   'text-[length:var(--sniptale-compact-font-size,12px)] font-semibold',
   'text-[color:var(--sniptale-color-text-secondary)]',
 ].join(' ');
@@ -40,14 +40,7 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
     <div
       data-ui="shared.ui.compact-inspector.text-field"
       data-editing={editing ? 'true' : 'false'}
-      className={cx(
-        'flex min-h-10 items-center justify-between gap-3 rounded-[10px] border px-3 py-1.5',
-        'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-input)_62%,transparent)]',
-        invalid || editing
-          ? 'border-[color:var(--sniptale-color-border-accent-strong)]'
-          : 'border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_72%,transparent)]',
-        className
-      )}
+      className={cx('flex w-full min-w-0 flex-col items-stretch gap-1.5', className)}
     >
       <span className={cx('min-w-0', TEXT_FIELD_LABEL_CLASS_NAME)} title={label}>
         {label}
@@ -99,7 +92,12 @@ function TextFieldInput({
       }
       className={cx(
         'h-[var(--sniptale-compact-control-height,32px)]',
-        'min-w-0 flex-1 border-0 bg-transparent p-0 text-right outline-none',
+        'w-full min-w-0 rounded-[6px] border px-2.5 py-1 text-left outline-none',
+        'bg-[color:var(--sniptale-color-surface-input)]',
+        'border-[color:var(--sniptale-color-border-soft)]',
+        'focus:border-[color:var(--sniptale-color-border-accent-strong)]',
+        'disabled:cursor-not-allowed disabled:opacity-50',
+        invalid && 'border-[color:var(--sniptale-color-border-accent-strong)]',
         'text-[length:var(--sniptale-compact-font-size,12px)] font-semibold',
         'text-[color:var(--sniptale-color-text-primary)]',
         'placeholder:text-[color:var(--sniptale-color-text-muted)]',
