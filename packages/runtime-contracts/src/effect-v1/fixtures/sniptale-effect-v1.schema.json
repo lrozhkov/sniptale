@@ -1169,6 +1169,37 @@
     "control": {
       "additionalProperties": false,
       "properties": {
+        "group": {
+          "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
+          "type": "string"
+        },
+        "order": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["value", "label"],
+            "properties": {
+              "value": { "type": ["string", "number"] },
+              "label": {
+                "additionalProperties": false,
+                "required": ["en"],
+                "properties": { "en": { "type": "string", "minLength": 1 } },
+                "patternProperties": {
+                  "^[a-zA-Z]{2,8}(?:-[a-zA-Z0-9]{1,8})*$": { "type": "string" }
+                },
+                "type": "object"
+              }
+            }
+          }
+        },
         "defaultValue": {},
         "id": {
           "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$",
@@ -1177,10 +1208,10 @@
         "kind": { "enum": ["color", "number", "text"] },
         "label": {
           "additionalProperties": false,
-          "minProperties": 1,
-          "properties": {
-            "en": { "type": "string" },
-            "ru": { "type": "string" }
+          "required": ["en"],
+          "properties": { "en": { "type": "string", "minLength": 1 } },
+          "patternProperties": {
+            "^[a-zA-Z]{2,8}(?:-[a-zA-Z0-9]{1,8})*$": { "type": "string" }
           },
           "type": "object"
         },
@@ -1963,8 +1994,11 @@
     },
     "localeText": {
       "additionalProperties": false,
-      "minProperties": 1,
-      "properties": { "en": { "type": "string" }, "ru": { "type": "string" } },
+      "required": ["en"],
+      "properties": { "en": { "type": "string", "minLength": 1 } },
+      "patternProperties": {
+        "^[a-zA-Z]{2,8}(?:-[a-zA-Z0-9]{1,8})*$": { "type": "string" }
+      },
       "type": "object"
     },
     "motionPath": {
@@ -2687,10 +2721,10 @@
             { "type": "string" },
             {
               "additionalProperties": false,
-              "minProperties": 1,
-              "properties": {
-                "en": { "type": "string" },
-                "ru": { "type": "string" }
+              "required": ["en"],
+              "properties": { "en": { "type": "string", "minLength": 1 } },
+              "patternProperties": {
+                "^[a-zA-Z]{2,8}(?:-[a-zA-Z0-9]{1,8})*$": { "type": "string" }
               },
               "type": "object"
             }
@@ -2993,8 +3027,11 @@
     "controls": { "items": { "$ref": "#/$defs/control" }, "type": "array" },
     "description": {
       "additionalProperties": false,
-      "minProperties": 1,
-      "properties": { "en": { "type": "string" }, "ru": { "type": "string" } },
+      "required": ["en"],
+      "properties": { "en": { "type": "string", "minLength": 1 } },
+      "patternProperties": {
+        "^[a-zA-Z]{2,8}(?:-[a-zA-Z0-9]{1,8})*$": { "type": "string" }
+      },
       "type": "object"
     },
     "duration": { "exclusiveMinimum": 0, "type": "number" },
@@ -3002,8 +3039,11 @@
     "kind": { "enum": ["standalone", "targetEffect", "transition"] },
     "label": {
       "additionalProperties": false,
-      "minProperties": 1,
-      "properties": { "en": { "type": "string" }, "ru": { "type": "string" } },
+      "required": ["en"],
+      "properties": { "en": { "type": "string", "minLength": 1 } },
+      "patternProperties": {
+        "^[a-zA-Z]{2,8}(?:-[a-zA-Z0-9]{1,8})*$": { "type": "string" }
+      },
       "type": "object"
     },
     "layers": { "items": { "$ref": "#/$defs/layer" }, "type": "array" },

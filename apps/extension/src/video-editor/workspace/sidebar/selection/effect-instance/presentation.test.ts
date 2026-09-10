@@ -15,40 +15,33 @@ function document() {
   if (!parsed) throw new Error('Invalid fixture');
   return parsed;
 }
-it('groups callout settings and hides local axes and rare spark controls', () => {
+it('groups explicit metadata independently of template names, preserving source order for ties', () => {
   const doc = document();
-  const sections = getEffectControlSections(doc);
-  expect(sections.flatMap((s) => s.controls.map((c) => c.id))).not.toContain('anchorX');
-  expect(sections.flatMap((s) => s.controls.map((c) => c.id))).not.toContain('anchorY');
-  expect(sections.filter((s) => s.advanced).flatMap((s) => s.controls.map((c) => c.id))).toEqual([
-    'spark',
-  ]);
-  expect(
-    sections.find((s) => s.controls.some((c) => c.id === 'sequence'))!.controls.map((c) => c.id)
-  ).toEqual(['sequence', 'entry', 'traceShare']);
-  const sequence = doc.controls.find((c) => c.id === 'sequence')!;
-  expect(getEffectSequenceOptions(doc.id, sequence)?.map((o) => o.value)).toEqual(['0', '1', '2']);
-  expect(getEffectSequenceOptions('external-effect', sequence)).toBeNull();
-  expect(getEffectSequenceOptions(doc.id, doc.controls[0]!)).toBeNull();
-});
-it('preserves generic and additional authored parameters instead of interpreting arbitrary numbers as enums', () => {
-  const doc = document();
-  doc.controls.push({
-    id: 'extra',
-    kind: 'number',
-    label: { en: 'Extra', ru: 'Дополнительно' },
-    defaultValue: 1,
-    min: 0,
-    max: 2,
-    step: 1,
-  });
-  expect(
-    getEffectControlSections(doc)
-      .at(-1)!
-      .controls.map((c) => c.id)
-  ).toEqual(['extra']);
-  expect(getEffectSequenceOptions(doc.id, doc.controls.at(-1)!)).toBeNull();
   doc.id = 'external-effect';
-  expect(getEffectControlSections(doc)).toHaveLength(1);
-  expect(getEffectControlSections(doc)[0]!.controls.map((c) => c.id)).toContain('extra');
+  doc.controls = [
+    { id: 'late', kind: 'text', defaultValue: '', group: 'content', order: 2 },
+    { id: 'early', kind: 'text', defaultValue: '', group: 'content', order: 1 },
+    { id: 'custom', kind: 'number', defaultValue: 0, group: 'future-group' },
+    { id: 'ungrouped', kind: 'number', defaultValue: 0 },
+    { id: 'anchorX', kind: 'number', defaultValue: 0, group: 'geometry' },
+  ];
+  const sections = getEffectControlSections(doc);
+  expect(sections.map((s) => s.controls.map((c) => c.id))).toEqual([
+    ['early', 'late'],
+    ['custom', 'ungrouped'],
+  ]);
+  expect(sections.at(-1)?.advanced).toBe(true);
+});
+it('uses authored enum labels and never guesses options from numeric ranges', () => {
+  const doc = document();
+  const sequence = doc.controls.find((c) => c.id === 'sequence')!;
+  expect(getEffectSequenceOptions(doc.id, sequence)).toBeNull();
+  sequence.options = [
+    { value: 0, label: { en: 'One' } },
+    { value: 1, label: { en: 'Two' } },
+  ];
+  expect(getEffectSequenceOptions('external', sequence)).toEqual([
+    { value: '0', label: 'One' },
+    { value: '1', label: 'Two' },
+  ]);
 });

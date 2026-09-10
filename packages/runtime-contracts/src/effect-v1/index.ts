@@ -1,3 +1,4 @@
+export { resolveEffectLocaleText } from './model/locale.js';
 export { createEffectV1Diagnostics } from './model/diagnostics.js';
 export {
   assertEffectV1AssetSignature,

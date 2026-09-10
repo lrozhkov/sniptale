@@ -1,7 +1,11 @@
 import { InspectorDetails } from '../shared/details';
 import { useEffectInstanceExport } from '../../../../runtime/effect-export';
 import { getEffectControlSections, getEffectSequenceOptions } from './presentation';
-import { parseEffectV1Source, type ControlDefinition } from '@sniptale/runtime-contracts/effect-v1';
+import {
+  parseEffectV1Source,
+  resolveEffectLocaleText,
+  type ControlDefinition,
+} from '@sniptale/runtime-contracts/effect-v1';
 import { ArrowUp, ArrowDown, Copy, Trash2, Download } from 'lucide-react';
 import { EditorIconButton } from '@sniptale/ui/editor-chrome';
 
@@ -267,11 +271,11 @@ function EffectControl(props: {
   if (sequenceOptions)
     return (
       <SelectInput
-        label={translate('videoEditor.effectsLibrary.appearanceOrder')}
+        label={label}
         value={String(props.value)}
         options={sequenceOptions}
         disabled={props.disabled}
-        onChange={(value) => update(Number(value))}
+        onChange={(value) => update(props.control.kind === 'number' ? Number(value) : value)}
       />
     );
   if (props.control.kind === 'number') {
@@ -314,9 +318,7 @@ function EffectControl(props: {
 }
 
 function readLocaleText(value: Record<string, string | undefined> | undefined): string {
-  if (!value) return '';
-  const locale = getCurrentLocale();
-  return value[locale] ?? value['en'] ?? value['ru'] ?? '';
+  return resolveEffectLocaleText(value, getCurrentLocale());
 }
 
 function sameTarget(left: VideoProjectEffectTarget, right: VideoProjectEffectTarget): boolean {

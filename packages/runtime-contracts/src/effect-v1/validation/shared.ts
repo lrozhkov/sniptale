@@ -100,15 +100,12 @@ export function validateRange(
 export function validateLocaleText(
   value: unknown,
   path: string,
-  requireRu: boolean,
+  _requireRu: boolean,
   report: EffectV1DiagnosticReporter
 ): void {
   if (!isRecord(value)) {
     report.error('LOCALE_TEXT', path, 'Expected a locale text object.');
     return;
-  }
-  if (requireRu && (typeof value['ru'] !== 'string' || value['ru'].trim() === '')) {
-    report.error('LOCALE_RU_REQUIRED', `${path}.ru`, 'Russian source text is required.');
   }
   if (typeof value['en'] !== 'string' || value['en'].trim() === '') {
     report.error('LOCALE_EN_REQUIRED', `${path}.en`, 'English fallback text is required.');
@@ -121,20 +118,19 @@ export function validateLocaleText(
 }
 
 function isLocaleCode(value: string): boolean {
-  const language = value.slice(0, 2);
+  if (value.length > 64) return false;
+  const [language, ...subtags] = value.split('-');
   if (
-    language.length !== 2 ||
-    [...language].some((character) => character < 'a' || character > 'z')
-  ) {
+    !language ||
+    !/^[a-zA-Z]{2,8}$/.test(language) ||
+    subtags.some((part) => !/^[a-zA-Z0-9]{1,8}$/.test(part))
+  )
+    return false;
+  try {
+    return Intl.getCanonicalLocales(value).length === 1;
+  } catch {
     return false;
   }
-  if (value.length === 2) return true;
-  const region = value.slice(3);
-  return (
-    value.length === 5 &&
-    value[2] === '-' &&
-    [...region].every((character) => character >= 'A' && character <= 'Z')
-  );
 }
 
 export function isSafeRelativePath(value: unknown): boolean {

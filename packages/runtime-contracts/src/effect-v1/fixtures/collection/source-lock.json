@@ -2,7 +2,7 @@
   "source": "effect-sdk working tree supplied for integration",
   "baseCommit": "92c981c089d576b8a47954d1cfd7355e0fd113f9",
   "cleanCommit": false,
-  "schemaSha256": "0908052e382750585f2b1d78f39e709cb61504a10338741e9dca7baad86a8d60",
+  "schemaSha256": "0cdc5cd31c3b38c32d4c81b8021d76e415e776e7a7a12406fb95fd90b7b8e460",
   "files": [
     {
       "file": "sniptale-callout-dark.sniptale-effect.json",

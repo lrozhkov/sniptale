@@ -44,6 +44,9 @@ export const videoEditorEffectsLibraryMessages = defineMessageSource({
 
   exportInstance: { ru: 'Экспорт эффекта', en: 'Export effect' },
   exportFailed: { ru: 'Не удалось экспортировать эффект', en: 'Could not export effect' },
+  objectTypography: { ru: 'Типографика', en: 'Typography' },
+  objectGeometry: { ru: 'Геометрия', en: 'Geometry' },
+  objectProcessing: { ru: 'Обработка', en: 'Processing' },
   objectText: { ru: 'Текст', en: 'Text' },
   objectAppearance: { ru: 'Вид', en: 'Appearance' },
   objectAnimation: { ru: 'Анимация', en: 'Animation' },

@@ -6,22 +6,30 @@ export type LocaleText = {
 
 export type EffectArtifactType = 'animation' | 'transition';
 
-export type ControlDefinition =
-  | {
-      defaultValue: string;
-      id: string;
-      kind: 'color' | 'text';
-      label?: LocaleText;
-    }
-  | {
-      defaultValue: number;
-      id: string;
-      kind: 'number';
-      label?: LocaleText;
-      max?: number;
-      min?: number;
-      step?: number;
-    };
+export type EffectControlPresentation = {
+  group?: string;
+  order?: number;
+  options?: { value: number | string; label: LocaleText }[];
+};
+
+export type ControlDefinition = EffectControlPresentation &
+  (
+    | {
+        defaultValue: string;
+        id: string;
+        kind: 'color' | 'text';
+        label?: LocaleText;
+      }
+    | {
+        defaultValue: number;
+        id: string;
+        kind: 'number';
+        label?: LocaleText;
+        max?: number;
+        min?: number;
+        step?: number;
+      }
+  );
 
 export type TimelinePhase = {
   duration: number;
