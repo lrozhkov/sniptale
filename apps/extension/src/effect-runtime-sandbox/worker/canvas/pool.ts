@@ -87,8 +87,16 @@ function resolveCanvasEntry(
   key: CanvasPoolKey
 ): CanvasPoolEntry {
   const cacheKey = serializeKey(key);
-  const cached = entries.find((candidate) => !candidate.leased && candidate.key === cacheKey);
+  const cached =
+    entries.find((candidate) => !candidate.leased && candidate.key === cacheKey) ??
+    entries.find(
+      (candidate) =>
+        !candidate.leased &&
+        candidate.canvas.width === key.width &&
+        candidate.canvas.height === key.height
+    );
   if (cached) {
+    cached.key = cacheKey;
     entries.splice(entries.indexOf(cached), 1);
     entries.push(cached);
     return cached;

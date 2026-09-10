@@ -92,11 +92,55 @@ it('releases evicted pixels and limits retained idle bytes', () => {
     createCanvas: (width, height) => ({ width, height, getContext: () => createContext() }),
   });
   const a = pool.lease({ effectInstanceId: 'a', slot: 0, width: 3000, height: 3000 });
-  a.release();
   const b = pool.lease({ effectInstanceId: 'b', slot: 0, width: 3000, height: 3000 });
+  a.release();
   b.release();
   expect(a.canvas.width).toBe(0);
   expect(pool.snapshot().entries).toBe(1);
   pool.clear();
   expect(b.canvas.width).toBe(0);
+});
+
+it('reuses compatible idle surfaces across sequential multi-pass effects without allocation churn', () => {
+  const createCanvas = vi.fn((width: number, height: number) => ({
+    width,
+    height,
+    getContext: () => ({ ...createContext(), reset: vi.fn() }),
+  }));
+  const pool = createEffectRuntimeCanvasPool({ createCanvas });
+  try {
+    for (let frame = 0; frame < 10; frame++) {
+      for (let effect = 0; effect < 3; effect++) {
+        const leases = Array.from({ length: 3 }, (_, slot) =>
+          pool.lease({
+            effectInstanceId: `effect-${effect}`,
+            slot,
+            width: 1280,
+            height: 720,
+          })
+        );
+        expect(new Set(leases.map(({ canvas }) => canvas)).size).toBe(3);
+        leases.forEach((lease) => lease.release());
+      }
+    }
+    expect(createCanvas).toHaveBeenCalledTimes(3);
+    expect(pool.snapshot()).toEqual({ entries: 3, leases: 0 });
+  } finally {
+    pool.clear();
+  }
+});
+
+it('keeps dimensions and exclusive leases when recycling slots', () => {
+  const pool = createEffectRuntimeCanvasPool({
+    maxEntries: 1,
+    createCanvas: (width, height) => ({ width, height, getContext: () => createContext() }),
+  });
+  const first = pool.lease({ effectInstanceId: 'a', slot: 0, width: 100, height: 100 });
+  expect(() => pool.lease({ effectInstanceId: 'b', slot: 0, width: 100, height: 100 })).toThrow();
+  first.release();
+  const second = pool.lease({ effectInstanceId: 'b', slot: 0, width: 200, height: 100 });
+  expect(first.canvas.width).toBe(0);
+  expect(second.canvas.width).toBe(200);
+  second.release();
+  pool.clear();
 });
