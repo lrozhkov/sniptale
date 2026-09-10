@@ -1,4 +1,5 @@
-import { parseEffectV1Source, type EffectV1Kind } from '@sniptale/runtime-contracts/effect-v1';
+import { readEffectPresentationDocument } from '../presentation-document';
+import { type EffectV1Kind } from '@sniptale/runtime-contracts/effect-v1';
 import type { EffectBundleCatalogDocumentEntry, EffectBundleCatalogEntry } from './index';
 
 export interface EffectCatalogFilter {
@@ -15,7 +16,7 @@ export function describeCatalogDocument(
   document: EffectBundleCatalogDocumentEntry,
   locale: 'en' | 'ru'
 ) {
-  const parsed = parseEffectV1Source(document.source).document;
+  const parsed = readEffectPresentationDocument(document.source).document;
   const preset = parsed?.controlPresets?.find(
     (item) =>
       item.id ===
@@ -47,7 +48,7 @@ export function queryEffectCatalog(
   const query = filter.query.trim().toLocaleLowerCase(locale);
   return catalog.documents
     .flatMap((document) => {
-      const presets = parseEffectV1Source(document.source).document?.controlPresets;
+      const presets = readEffectPresentationDocument(document.source).document?.controlPresets;
       const variants = presets?.length
         ? presets.map((preset) => ({ ...document, previewPresetId: preset.id }))
         : [document];

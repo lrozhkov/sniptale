@@ -1,3 +1,4 @@
+import { readEffectPresentationDocument } from '../../../../../features/video/project/effect-bundle/presentation-document';
 import type { InspectorGroupDefinition } from '../grouped-inspector/types';
 import { EffectVisualPresets } from './presets';
 import { resolveEffectOwner } from '../../../../../features/video/project/effect-instance/owner';
@@ -5,7 +6,6 @@ import { InspectorDetails } from '../shared/details';
 import { useEffectInstanceExport } from '../../../../runtime/effect-export';
 import { getEffectControlSections, getEffectSequenceOptions } from './presentation';
 import {
-  parseEffectV1Source,
   resolveEffectLocaleText,
   type ControlDefinition,
 } from '@sniptale/runtime-contracts/effect-v1';
@@ -84,7 +84,7 @@ export function createEffectInstanceGroups(
   );
   for (const instance of instances) {
     const snapshot = args.project.effectSnapshots?.find((item) => item.id === instance.snapshotId);
-    const validation = snapshot ? parseEffectV1Source(snapshot.source) : null;
+    const validation = snapshot ? readEffectPresentationDocument(snapshot.source) : null;
     if (!validation?.document) continue;
     for (const section of getEffectControlSections(validation.document)) {
       const id = `effect-controls-${section.id}`;
@@ -141,7 +141,7 @@ type EffectInstanceCardProps = EffectInstanceGroupActions & {
 function EffectInstanceCard(props: EffectInstanceCardProps): React.JSX.Element {
   const { instance } = props;
   const snapshot = props.project.effectSnapshots?.find(({ id }) => id === instance.snapshotId);
-  const validation = snapshot ? parseEffectV1Source(snapshot.source) : null;
+  const validation = snapshot ? readEffectPresentationDocument(snapshot.source) : null;
   return (
     <section
       className="space-y-3 border-b border-[var(--sniptale-color-border-soft)] pb-3 last:border-b-0"
@@ -252,7 +252,9 @@ function EffectInstanceStartTime(props: EffectInstanceCardProps): React.JSX.Elem
 }
 
 function EffectInstanceControls(
-  props: EffectInstanceCardProps & { validation: ReturnType<typeof parseEffectV1Source> | null }
+  props: EffectInstanceCardProps & {
+    validation: ReturnType<typeof readEffectPresentationDocument> | null;
+  }
 ): React.JSX.Element {
   if (!props.validation?.document) {
     return (

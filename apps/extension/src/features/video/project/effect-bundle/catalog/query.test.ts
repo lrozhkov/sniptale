@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
 import type { EffectBundleCatalogEntry } from './index';
 import { getEffectCatalogThemes, queryEffectCatalog } from './query';
 const source = readFileSync(
@@ -100,4 +100,23 @@ it('names and filters user styles even when a graph does not declare a theme', (
   expect(
     queryEffectCatalog(next, { query: 'My settings', kind: 'all', theme: 'style:user:mine' }, 'en')
   ).toHaveLength(1);
+});
+
+it('does not parse the same graph again when playback rerenders catalog variants and themes', () => {
+  const fresh = {
+    ...catalog,
+    documents: catalog.documents.map((d) => ({ ...d, source: d.source + '\n ' })),
+  };
+  const parse = vi.spyOn(JSON, 'parse');
+  try {
+    for (let frame = 0; frame < 3; frame++) {
+      getEffectCatalogThemes([fresh], 'ru');
+      queryEffectCatalog(fresh, { query: '', kind: 'all', theme: 'all' }, 'en');
+    }
+    expect(parse.mock.calls.filter(([value]) => value === fresh.documents[0]!.source)).toHaveLength(
+      1
+    );
+  } finally {
+    parse.mockRestore();
+  }
 });
