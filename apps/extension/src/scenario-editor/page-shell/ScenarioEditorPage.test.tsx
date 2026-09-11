@@ -11,6 +11,7 @@ import {
 
 const io = vi.hoisted(() => ({
   load: vi.fn(),
+  previous: vi.fn(),
   library: vi.fn(),
   asset: vi.fn(),
   create: vi.fn(),
@@ -24,8 +25,19 @@ const io = vi.hoisted(() => ({
 vi.mock('../../platform/navigation/extension-pages', () => ({ openGalleryPage: io.library }));
 vi.mock('./runtime/resource-session', () => ({ useGuideResourceSession: () => enterSession }));
 const enterSession = async () => true;
-vi.mock('../../composition/persistence/scenario/projects', () => ({
-  getScenarioProject: io.load,
+vi.mock('../../composition/persistence/scenario/history', () => ({
+  getScenarioSavedVersions: async (id: string) => {
+    const project = await io.load(id);
+    return project
+      ? {
+          currentRevision: 1,
+          versions: [
+            { project, revision: 1, savedAt: project.updatedAt },
+            ...(io.previous() ?? []),
+          ],
+        }
+      : null;
+  },
 }));
 vi.mock('../../composition/persistence/scenario/store/project-records/assets', () => ({
   getScenarioAssetBlob: io.asset,
@@ -49,6 +61,7 @@ let root: Root;
 let container: HTMLDivElement;
 beforeEach(() => {
   vi.clearAllMocks();
+  io.previous.mockReturnValue([]);
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
   window.history.replaceState({}, '', '/?projectId=guide');
   container = document.createElement('div');
@@ -79,6 +92,16 @@ async function render() {
   });
 }
 async function click(label: string, scope: ParentNode = container) {
+  if (
+    ['Duplicate project', 'Delete project', 'Reload project'].includes(label) &&
+    scope === container
+  ) {
+    const trigger = container.querySelector<HTMLButtonElement>('.guide-action-menu-anchor button');
+    await act(async () => {
+      trigger?.click();
+    });
+    scope = document.body;
+  }
   const button = [...scope.querySelectorAll('button')].find(
     (node) => (node.getAttribute('aria-label') ?? node.textContent) === label
   );
@@ -355,16 +378,18 @@ it('confirms project deletion and clears the project route only after success', 
   expect(container.textContent).toContain('Create a guide and add its first step');
 });
 
-it('confirms replacing unsaved edits with the persisted version', async () => {
+it('confirms replacing failed edits with the persisted version', async () => {
+  io.save.mockRejectedValue(new Error('Storage failure'));
   await render();
   await click('Add step');
-  await click('Reopen saved version');
+  await settleAutosave();
+  await click('Reload project');
   expect(io.load).toHaveBeenCalledTimes(1);
   await click('Cancel');
   expect(container.querySelectorAll('article')).toHaveLength(2);
-  await click('Reopen saved version');
+  await click('Reload project');
   const confirm = [...container.querySelectorAll('[role="alertdialog"] button')].find(
-    (button) => button.textContent === 'Reopen saved version'
+    (button) => button.textContent === 'Reload project'
   );
   if (!(confirm instanceof HTMLButtonElement)) throw new Error('Missing reload confirmation');
   await act(async () => confirm.click());
@@ -382,7 +407,9 @@ it('prevents duplicate copy submissions and ignores page state updates after unm
   );
   await render();
   await click('Duplicate project');
-  await click('Duplicate project');
+  const trigger = container.querySelector<HTMLButtonElement>('.guide-action-menu-anchor button');
+  expect(trigger?.disabled).toBe(true);
+  await act(async () => trigger?.click());
   expect(io.duplicate).toHaveBeenCalledTimes(1);
   expect(container.querySelector('input')?.disabled).toBe(true);
   await act(async () => root.render(null));
@@ -465,7 +492,7 @@ async function editField(selector: string, value: string) {
   });
 }
 
-it('composes multiple blocks and retains undo after save, then resets it on reload', async () => {
+it('composes multiple blocks and retains undo and redo after autosave', async () => {
   await render();
   const article = container.querySelector('article#first');
   if (!article) throw new Error('Missing step');
@@ -479,15 +506,9 @@ it('composes multiple blocks and retains undo after save, then resets it on relo
   expect(article.querySelectorAll('.guide-block')).toHaveLength(3);
   await click('Redo');
   expect(article.querySelectorAll('.guide-block')).toHaveLength(4);
-  await click('Reopen saved version');
-  const dialog = container.querySelector('[role="alertdialog"]');
-  if (!dialog) throw new Error('Missing reload dialog');
-  await click('Reopen saved version', dialog);
-  expect(container.querySelectorAll('.guide-block')).toHaveLength(0);
-  const undo = [...container.querySelectorAll('button')].find(
-    (button) => button.getAttribute('aria-label') === 'Undo'
-  );
-  expect(undo?.disabled).toBe(true);
+
+  await settleAutosave();
+  expect(article.querySelectorAll('.guide-block')).toHaveLength(4);
 });
 
 it('groups text edits and routes keyboard undo and redo to the same history', async () => {
@@ -716,4 +737,16 @@ it('settles autosave without writing when undo then redo returns to the durable 
   expect(container.querySelector('.guide-page-feedback')?.getAttribute('data-status')).toBe(
     'saved'
   );
+});
+
+it('opens stored revisions in ordinary undo and autosaves against the current revision', async () => {
+  const previous = createGuideProject('Previous guide', 'guide', 90);
+  io.previous.mockReturnValue([{ project: previous, revision: 0, savedAt: 90 }]);
+  await render();
+  await click('Undo');
+  expect(container.querySelector('input')?.value).toBe('Previous guide');
+  await settleAutosave();
+  expect(io.save).toHaveBeenCalledWith(previous, { baseUpdatedAt: 100 });
+  await click('Redo');
+  expect(container.querySelector('input')?.value).toBe('Local guide');
 });

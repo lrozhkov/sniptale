@@ -125,7 +125,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
   });
 }
 
-test('saved versions survive reload and restore as an undoable new publication', async ({
+test('ordinary undo reopens previous saved states and publishes reversibly', async ({
   page,
   hostOrigin,
 }, testInfo) => {
@@ -170,6 +170,34 @@ test('compact header owns panel toggles and dividers resize the workspace', asyn
   await header.getByRole('button', { name: 'Outline', exact: true }).click();
   await expect(divider).toHaveAttribute('aria-valuenow', '240');
 });
+
+for (const theme of SCENARIO_VISUAL_THEMES) {
+  test(`project menu stays compact and keyboard accessible in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }, testInfo) => {
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1024, height: 768 });
+    const trigger = page.locator('.guide-action-menu-anchor button');
+    await trigger.focus();
+    await page.keyboard.press('ArrowDown');
+    const menu = page.locator('.guide-action-menu');
+    await expect(menu).toBeVisible();
+    await expect(menu).toHaveAttribute('data-theme', theme);
+    await expect(
+      menu.getByRole('button', { name: 'Duplicate project', exact: true })
+    ).toBeFocused();
+    const box = await menu.boundingBox();
+    expect(box?.width).toBeLessThanOrEqual(240);
+    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(1024);
+    await testInfo.attach(`project-menu-${theme}`, {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+  });
+}
 
 test('history cleanup preserves two-tab undo resources until sessions close', async ({
   page,

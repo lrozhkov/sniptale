@@ -14,7 +14,7 @@ export interface GuideHistory {
   group: string | null;
 }
 type HistoryAction =
-  | { kind: 'reset'; project: GuideProject | null }
+  | { kind: 'reset'; project: GuideProject | null; past?: GuideProject[] }
   | { kind: 'commit'; project: GuideProject }
   | { kind: 'publish'; project: GuideProject; source: GuideProject }
   | { kind: 'edit'; project: GuideProject; group: string | null }
@@ -25,7 +25,14 @@ type HistoryAction =
 /** One reducer owns the current buffer and both directions of reversible edits. */
 export function reduceGuideHistory(state: GuideHistory, action: HistoryAction): GuideHistory {
   if (action.kind === 'reset')
-    return { present: action.project, past: [], future: [], group: null };
+    return {
+      present: action.project,
+      past: (action.past ?? [])
+        .filter((project) => project.id === action.project?.id)
+        .slice(-HISTORY_LIMIT),
+      future: [],
+      group: null,
+    };
   if (action.kind === 'seal') return { ...state, group: null };
   if (!state.present) return state;
   if (action.kind === 'undo') {
@@ -91,7 +98,8 @@ export function useGuideHistory({
     group: null,
   });
   const reset = useCallback(
-    (project: GuideProject | null) => dispatch({ kind: 'reset', project }),
+    (project: GuideProject | null, past: GuideProject[] = []) =>
+      dispatch({ kind: 'reset', project, past }),
     []
   );
   const edit = (project: GuideProject, group: string | null = null) => {

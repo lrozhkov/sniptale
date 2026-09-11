@@ -1,3 +1,4 @@
+import { clearScenarioSavedHistory } from '../../../apps/extension/src/composition/persistence/scenario/retention';
 import { createRoot } from 'react-dom/client';
 import { harnessReady } from './browser-mocks/browser-mocks';
 import { ScenarioEditorPage } from '../../../apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage';
@@ -91,6 +92,12 @@ async function mountGuideHarness(): Promise<void> {
   await setLocalePreference(params.get('locale') === 'ru' ? 'ru' : 'en');
   const projectId = params.get('projectId') ?? 'guide-visual';
   await seedGuide(projectId);
+  if (params.get('clearHistory') === '1') {
+    const project = await getScenarioProject(projectId);
+    if (!project) throw new Error('Missing retention fixture');
+    await clearScenarioSavedHistory(projectId, project.updatedAt);
+    params.delete('clearHistory');
+  }
   params.set('projectId', projectId);
   window.history.replaceState({}, '', `${window.location.pathname}?${params}`);
   const root = document.getElementById('root');

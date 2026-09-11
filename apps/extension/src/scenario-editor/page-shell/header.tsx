@@ -8,6 +8,7 @@ import { openGalleryPage } from '../../platform/navigation/extension-pages';
 export function GuidePageHeader({
   project,
   panelControls,
+  projectActions,
   disabled,
   feedback,
   canUndo,
@@ -19,6 +20,7 @@ export function GuidePageHeader({
 }: {
   project: GuideProject | null;
   panelControls?: ReactNode;
+  projectActions?: ReactNode;
   disabled: boolean;
   feedback?: ReactNode;
   canUndo: boolean;
@@ -70,6 +72,7 @@ export function GuidePageHeader({
             />
           </label>
         )}
+        {projectActions}
         {feedback}
         {project && (
           <div

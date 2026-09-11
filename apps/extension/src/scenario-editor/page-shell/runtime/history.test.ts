@@ -110,3 +110,20 @@ it('acknowledges an older autosave without replacing later text or splitting its
   state = reduceGuideHistory(state, { kind: 'undo' });
   expect(state.present?.name).toBe('Original');
 });
+
+it('hydrates bounded project history in chronological order and resets redo', () => {
+  const project = createGuideProject('Current', 'guide', 100);
+  const past = Array.from({ length: 55 }, (_, index) => ({ ...project, name: String(index) }));
+  let state = reduceGuideHistory(initial(), {
+    kind: 'reset',
+    project,
+    past: [...past, createGuideProject('Other', 'other', 1)],
+  });
+  expect(state.past).toHaveLength(50);
+  expect(state.past[0]?.name).toBe('5');
+  state = reduceGuideHistory(state, { kind: 'undo' });
+  expect(state.present?.name).toBe('54');
+  state = reduceGuideHistory(state, { kind: 'redo' });
+  expect(state.present).toBe(project);
+  expect(reduceGuideHistory(state, { kind: 'reset', project: null }).past).toEqual([]);
+});

@@ -1,40 +1,5 @@
 import { defineMessageSource } from '../../source';
 export const scenarioEditorCoreMessages = defineMessageSource({
-  guideClearHistory: { ru: 'Очистить историю сохранений', en: 'Clear saved history' },
-  guideClearHistoryMessage: {
-    ru: 'Предыдущие сохранённые версии будут удалены без возможности восстановления. Текущее содержимое останется. Файлы, нужные для отмены правок в открытых вкладках, освободятся после закрытия этих вкладок.',
-    en: 'Previous saved versions will be permanently removed. Current content stays. Files needed for undo in open tabs will be released after those tabs close.',
-  },
-  guideHistorySaveFirst: {
-    ru: 'Сохраните правки перед очисткой истории.',
-    en: 'Save your changes before clearing history.',
-  },
-  guideHistoryClearFailed: {
-    ru: 'Не удалось очистить историю. Содержимое редактора сохранено.',
-    en: 'Could not clear history. Your editor content remains.',
-  },
-  guideSavedHistory: { ru: 'История сохранений', en: 'Saved versions' },
-  guideHistoryLimit: {
-    ru: 'До {count} предыдущих сохранений. История хранится локально вместе с проектом.',
-    en: 'Up to {count} previous saves. History stays locally with this project.',
-  },
-  guideSavedVersion: { ru: 'Сохранённая версия', en: 'Saved version' },
-  guideVersionLabel: { ru: 'Версия {revision}', en: 'Version {revision}' },
-  guideCurrentVersion: { ru: 'текущая', en: 'current' },
-  guideVersionPreview: { ru: 'Просмотр сохранённой версии', en: 'Saved version preview' },
-  guideRestoreVersion: { ru: 'Восстановить как новую версию', en: 'Restore as a new version' },
-  guideRestoreVersionMessage: {
-    ru: 'Выбранная версия заменит содержимое редактора, включая несохранённые правки. Текущая сохранённая версия останется в истории. Действие можно отменить.',
-    en: 'The selected version will replace the editor content, including unsaved changes. The current saved version will remain in history. You can undo this action.',
-  },
-  guideHistoryLoadFailed: {
-    ru: 'Не удалось загрузить историю сохранений.',
-    en: 'Could not load saved versions.',
-  },
-  guideHistoryRestoreFailed: {
-    ru: 'Не удалось восстановить версию. Текущие правки сохранены в редакторе. При конфликте сохраните копию проекта.',
-    en: 'Could not restore this version. Your current edits remain in the editor. For a conflict, save a project copy.',
-  },
   guideEditImage: { ru: 'Редактировать изображение', en: 'Edit image' },
   guideImageBack: { ru: 'Назад без применения', en: 'Back without applying' },
   guideImageApplyHint: {
@@ -179,13 +144,12 @@ export const scenarioEditorCoreMessages = defineMessageSource({
     ru: 'Не удалось удалить проект. Повторите попытку.',
     en: 'Could not delete the project. Try again.',
   },
-  guideReload: { ru: 'Открыть сохранённую версию', en: 'Reopen saved version' },
+  guideReload: { ru: 'Перезагрузить проект', en: 'Reload project' },
   guideReloadMessage: {
     ru: 'Заменить текущие правки сохранённой версией? Несохранённые изменения будут потеряны. Чтобы оставить их, сначала создайте копию.',
     en: 'Replace your current edits with the saved version? Unsaved changes will be lost. Duplicate the project first to keep them.',
   },
   guideStepTitle: { ru: 'Заголовок шага', en: 'Step title' },
-  guideSave: { ru: 'Сохранить', en: 'Save' },
   guideAddStep: { ru: 'Добавить шаг', en: 'Add step' },
   guideSaving: { ru: 'Сохранение…', en: 'Saving…' },
   guideSaved: { ru: 'Сохранено', en: 'Saved' },

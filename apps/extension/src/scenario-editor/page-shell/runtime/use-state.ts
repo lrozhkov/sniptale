@@ -10,15 +10,13 @@ import {
   duplicateScenarioProjectRecord,
   deleteScenarioProjectRecord,
 } from '../../../composition/persistence/scenario/store/public';
-import { getScenarioProject } from '../../../composition/persistence/scenario/projects';
+import { getScenarioSavedVersions } from '../../../composition/persistence/scenario/history';
 import { getScenarioAssetBlob } from '../../../composition/persistence/scenario/store/project-records/assets';
 import { replaceScenarioEditorSelectionInUrl } from '../../platform/browser-driver';
 import { useGuideHistory } from './history';
 import { useGuideAutosave } from './autosave';
 import { useGuideResourceSession } from './resource-session';
-import { clearScenarioSavedHistory } from '../../../composition/persistence/scenario/retention';
 
-import { restoreScenarioSavedVersion } from '../../../composition/persistence/scenario/history';
 import { applyScenarioImageEdit } from '../../../workflows/scenario-capture-edit/edits';
 
 type GuidePageStatus =
@@ -33,18 +31,9 @@ type GuidePageStatus =
   | 'conflict'
   | 'dirty';
 
-type GuideActionError =
-  | 'copy'
-  | 'delete'
-  | 'structure'
-  | 'import'
-  | 'edit'
-  | 'restore'
-  | 'clearHistory';
+type GuideActionError = 'copy' | 'delete' | 'structure' | 'import' | 'edit';
 
 type GuideCommitCommand =
-  | { kind: 'clearHistory' }
-  | { kind: 'restore'; revision: number }
   | {
       kind: 'import';
       input: Omit<Parameters<typeof importScenarioImages>[0], 'project' | 'baseUpdatedAt'>;
@@ -82,11 +71,13 @@ export function useGuidePageState() {
     setStatus('loading');
     try {
       if (!(await enterResourceSession(requestedId.current))) return;
-      const loaded = await getScenarioProject(requestedId.current);
+      const history = await getScenarioSavedVersions(requestedId.current);
+      const [current, ...previous] = history?.versions ?? [];
+      const loaded = current?.project ?? null;
       if (turn !== generation.current) return;
       setActionError(null);
       saved.current = loaded ?? null;
-      reset(loaded ?? null);
+      reset(loaded, previous.map((version) => version.project).reverse());
       setStatus(loaded ? 'ready' : 'missing');
     } catch {
       if (turn === generation.current) setStatus('unavailable');
@@ -154,10 +145,9 @@ export function useGuidePageState() {
   const commitChange = async (command: GuideCommitCommand) => {
     const base = saved.current;
     if (!project || !base || status === 'conflict') return false;
-    if (command.kind === 'clearHistory' && status !== 'ready' && status !== 'saved') return false;
     return mutate(
       () => runGuideCommitCommand(command, project, base.updatedAt),
-      (result) => acceptProject(result, command.kind !== 'clearHistory'),
+      (result) => acceptProject(result, true),
       (error) => {
         if (isRevisionConflict(error)) setStatus('conflict');
         else if (error instanceof Error && error.name === 'AbortError') setStatus(status);
@@ -184,7 +174,7 @@ export function useGuidePageState() {
 }
 
 /** Owns display URL acquisition and release independently from the editable project lifecycle. */
-export function useGuideImages(project: GuideProject | null) {
+function useGuideImages(project: GuideProject | null) {
   const [images, setImages] = useState<Record<string, string | null>>({});
   const assetKey = JSON.stringify([
     ...new Set(
@@ -258,13 +248,6 @@ function runGuideCommitCommand(
   project: GuideProject,
   baseUpdatedAt: number
 ) {
-  if (command.kind === 'clearHistory') return clearScenarioSavedHistory(project.id, baseUpdatedAt);
-  if (command.kind === 'restore')
-    return restoreScenarioSavedVersion({
-      projectId: project.id,
-      revision: command.revision,
-      baseUpdatedAt,
-    });
   return command.kind === 'import'
     ? importScenarioImages({ ...command.input, project, baseUpdatedAt })
     : applyScenarioImageEdit({ ...command.input, project, baseUpdatedAt });

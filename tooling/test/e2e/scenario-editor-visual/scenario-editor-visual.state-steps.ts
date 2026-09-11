@@ -30,6 +30,7 @@ export async function verifyIndependentProjectCopy(page: Page): Promise<void> {
   const originalId = original.searchParams.get('projectId');
   const originalTitle = await page.locator('article#text-only input').inputValue();
   await page.locator('article#text-only input').fill('Unsaved content copied');
+  await page.locator('.guide-action-menu-anchor button').click();
   await page.getByRole('button', { name: 'Duplicate project', exact: true }).click();
   await expect.poll(() => new URL(page.url()).searchParams.get('projectId')).not.toBe(originalId);
   await expect(page.getByRole('status').first()).toHaveText('Saved');
@@ -43,10 +44,12 @@ export async function verifyIndependentProjectCopy(page: Page): Promise<void> {
   copied.searchParams.set('locale', 'en');
   await page.goto(original.toString(), { waitUntil: 'domcontentloaded' });
   await expect(page.locator('article#text-only input')).toHaveValue(originalTitle);
+  await page.locator('.guide-action-menu-anchor button').click();
   await page.getByRole('button', { name: 'Delete project', exact: true }).click();
   await expect(page.getByRole('alertdialog')).toBeVisible();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(page.locator('article')).toHaveCount(2);
+  await page.locator('.guide-action-menu-anchor button').click();
   await page.getByRole('button', { name: 'Delete project', exact: true }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(page.locator('article')).toHaveCount(0);
@@ -160,7 +163,7 @@ export async function verifyGuideComposition(page: Page): Promise<void> {
   await expect(page.locator('article#text-only input.guide-block-heading')).toHaveValue('Detail');
   await expect(page.locator('article#text-only header span')).toHaveCount(0);
   await expect(page.locator('.guide-document img')).toHaveCount(2);
-  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeEnabled();
 }
 
 export async function verifyImageImport(page: Page, testInfo: TestInfo): Promise<void> {
@@ -215,6 +218,7 @@ export async function verifyImageImport(page: Page, testInfo: TestInfo): Promise
       )
     )
     .toBe(true);
+  await page.locator('.guide-action-menu-anchor button').click();
   await page.getByRole('button', { name: 'Delete project', exact: true }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(page.locator('article')).toHaveCount(0);
@@ -401,36 +405,20 @@ export async function verifySavedVersionHistory(page: Page, testInfo: TestInfo):
   url.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
   url.searchParams.set('locale', 'en');
   await page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
-  await page.getByRole('button', { name: 'Saved versions', exact: true }).click();
-  const versions = page.getByLabel('Saved version', { exact: true });
-  await versions.click();
-  await page.getByRole('option').nth(1).click();
-  const preview = page.getByLabel('Saved version preview', { exact: true });
-  await expect(preview).toContainText('Historical version A');
-  await expect(preview.locator('img')).toHaveCount(2);
-  await testInfo.attach('saved-version-preview', {
+  await expect(title).toHaveValue('Historical version B');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(title).toHaveValue('Historical version A');
+  await expect(page.locator('.guide-image-frame img')).toHaveCount(2);
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  await testInfo.attach('persisted-undo', {
     body: await page.screenshot({ fullPage: true }),
     contentType: 'image/png',
   });
-  await title.fill('Unsaved work before restore');
-  const restore = page.getByRole('button', { name: 'Restore as a new version', exact: true });
-  await restore.click();
-  await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(title).toHaveValue('Unsaved work before restore');
-  await restore.click();
-  await page
-    .getByRole('alertdialog')
-    .getByRole('button', { name: 'Restore as a new version', exact: true })
-    .click();
-  await expect(title).toHaveValue('Historical version A');
-  await expect(page.getByRole('status').first()).toHaveText('Saved');
-  await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await expect(title).toHaveValue('Unsaved work before restore');
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  await expect(title).toHaveValue('Historical version A');
+  await expect(title).toHaveValue('Historical version B');
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   await page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
-  await expect(title).toHaveValue('Historical version A');
+  await expect(title).toHaveValue('Historical version B');
 }
 
 export async function verifyResourceRetention(page: Page): Promise<void> {
@@ -447,22 +435,20 @@ export async function verifyResourceRetention(page: Page): Promise<void> {
     await expect(page.locator('article#compare')).toHaveCount(0);
     await expect(page.getByRole('status').first()).toHaveText('Saved');
     await expect(page.getByRole('status').first()).toHaveText('Saved');
-    await page.getByRole('button', { name: 'Saved versions', exact: true }).click();
-    await page.getByRole('button', { name: 'Clear saved history', exact: true }).click();
-    await page
-      .getByRole('alertdialog')
-      .getByRole('button', { name: 'Clear saved history', exact: true })
-      .click();
-    await expect(page.getByRole('status').first()).toHaveText('Saved');
-    await page.getByLabel('Saved version', { exact: true }).click();
-    await expect(page.getByRole('option')).toHaveCount(1);
-    await page.getByRole('option').click();
-    expect(await readProjectAssetCount(page)).toBe(originalAssetCount);
     await page.getByRole('button', { name: 'Undo', exact: true }).click();
     await expect(page.locator('.guide-image-frame img')).toHaveCount(2);
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    await page.getByRole('button', { name: 'Redo', exact: true }).click();
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    const retentionUrl = new URL(reopen);
+    retentionUrl.searchParams.set('clearHistory', '1');
+    await page.goto(retentionUrl.toString());
+    await expect(page.locator('article#text-only')).toBeVisible();
+    expect(await readProjectAssetCount(page)).toBe(originalAssetCount);
+    await expect(second.locator('.guide-image-frame img')).toHaveCount(2);
     await expect
       .poll(() =>
-        page
+        second
           .locator('.guide-image-frame img')
           .evaluateAll((images) =>
             images.every(
@@ -472,7 +458,6 @@ export async function verifyResourceRetention(page: Page): Promise<void> {
           )
       )
       .toBe(true);
-    await page.getByRole('button', { name: 'Redo', exact: true }).click();
     await page.goto(reopen.toString());
     await expect(page.locator('article#text-only')).toBeVisible();
     expect(await readProjectAssetCount(page)).toBe(originalAssetCount);

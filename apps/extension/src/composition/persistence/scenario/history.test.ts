@@ -6,7 +6,7 @@ vi.mock('./aggregate-mutations', () => ({ commitScenarioAggregateMutation: io.co
 vi.mock('../../../features/media-hub/events', () => ({
   publishMediaHubLibraryChanged: io.publish,
 }));
-import { getScenarioSavedVersions, restoreScenarioSavedVersion } from './history';
+import { getScenarioSavedVersions } from './history';
 const previous = createGuideProject('Previous', 'guide', 1);
 const current = { ...previous, name: 'Current', updatedAt: 2 };
 beforeEach(() => {
@@ -27,29 +27,11 @@ it('lists the current committed version followed by previous versions after reop
     ],
   });
 });
-it('restores only an existing stored version via the page base revision and a new publication', async () => {
-  const result = await restoreScenarioSavedVersion({
-    projectId: 'guide',
-    revision: 1,
-    baseUpdatedAt: 2,
-  });
-  expect(io.commit).toHaveBeenCalledWith(previous, { expectedUpdatedAt: 2 });
-  expect(result.updatedAt).toBe(3);
-  expect(result.name).toBe('Previous');
-  expect(io.publish).toHaveBeenCalledOnce();
-});
-it('rejects unavailable versions before publication and propagates CAS or quota failure', async () => {
-  await expect(
-    restoreScenarioSavedVersion({ projectId: 'guide', revision: 9, baseUpdatedAt: 2 })
-  ).rejects.toThrow('unavailable');
-  expect(io.commit).not.toHaveBeenCalled();
-  const conflict = new Error('Changed in another tab');
-  conflict.name = 'StaleScenarioAggregateRevisionError';
-  io.commit.mockRejectedValueOnce(conflict);
-  await expect(
-    restoreScenarioSavedVersion({ projectId: 'guide', revision: 1, baseUpdatedAt: 1 })
-  ).rejects.toBe(conflict);
-  expect(io.publish).not.toHaveBeenCalled();
+it('returns null for a missing project and propagates read failures', async () => {
   io.get.mockResolvedValueOnce(undefined);
-  await expect(getScenarioSavedVersions('guide')).rejects.toThrow('unavailable');
+  expect(await getScenarioSavedVersions('guide')).toBeNull();
+  const failure = new Error('Storage unavailable');
+  io.get.mockRejectedValueOnce(failure);
+  await expect(getScenarioSavedVersions('guide')).rejects.toBe(failure);
+  expect(io.commit).not.toHaveBeenCalled();
 });

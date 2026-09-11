@@ -20,7 +20,6 @@ type WorkspaceProps = {
   onAddSection: () => void;
   importResources: ReactNode;
   itemActions: ReactNode;
-  projectActions: ReactNode;
   children: ReactNode;
   t: Translate;
 };
@@ -205,13 +204,7 @@ function GuideInspector(props: WorkspaceProps & { open: boolean }) {
         <Settings2 size={16} aria-hidden="true" />
         <h2>{t('scenario.editor.guideInspector')}</h2>
       </div>
-      <div className="guide-panel-scroll">
-        {props.itemActions}
-        <div className="guide-project-actions">
-          <h2>{t('scenario.editor.projectLabel')}</h2>
-          {props.projectActions}
-        </div>
-      </div>
+      <div className="guide-panel-scroll">{props.itemActions}</div>
     </FloatingChromePanel>
   );
 }
