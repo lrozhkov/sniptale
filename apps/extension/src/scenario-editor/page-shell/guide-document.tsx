@@ -66,10 +66,51 @@ export function GuideDocument({
                 if (selectedId !== item.id) onSelect(item.id);
               }}
             >
-              <h2>{item.title}</h2>
-              {item.paragraphs.map((paragraph, index) => (
-                <p key={index}>{paragraph.runs.map((run) => run.text).join('')}</p>
-              ))}
+              <h2 aria-label={item.title || t('scenario.editor.guideSectionTitle')}>
+                <textarea
+                  className="guide-section-title"
+                  rows={1}
+                  aria-label={t('scenario.editor.guideSectionTitle')}
+                  placeholder={t('scenario.editor.guideSectionTitle')}
+                  maxLength={GUIDE_LIMITS.maxLabelLength}
+                  value={item.title}
+                  disabled={disabled}
+                  onChange={(event) =>
+                    onChange(
+                      {
+                        ...project,
+                        items: project.items.map((entry) =>
+                          entry.id === item.id ? { ...item, title: event.target.value } : entry
+                        ),
+                      },
+                      `section-title:${item.id}`
+                    )
+                  }
+                />
+              </h2>
+              <textarea
+                className="guide-description"
+                rows={1}
+                aria-label={t('scenario.editor.body')}
+                placeholder={t('scenario.editor.body')}
+                value={item.paragraphs
+                  .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
+                  .join('\n')}
+                disabled={disabled}
+                onChange={(event) =>
+                  onChange(
+                    {
+                      ...project,
+                      items: project.items.map((entry) =>
+                        entry.id === item.id
+                          ? { ...item, paragraphs: createGuideParagraphs(event.target.value) }
+                          : entry
+                      ),
+                    },
+                    `section-body:${item.id}`
+                  )
+                }
+              />
             </section>
           );
         number += 1;
@@ -89,7 +130,9 @@ export function GuideDocument({
           >
             <header>
               {item.showNumber && <span>{number}</span>}
-              <input
+              <textarea
+                className="guide-step-title"
+                rows={1}
                 aria-label={t('scenario.editor.guideStepTitle')}
                 placeholder={t('scenario.editor.guideStepTitle')}
                 maxLength={GUIDE_LIMITS.maxLabelLength}
@@ -243,7 +286,8 @@ function GuideTextBlock({
 }) {
   if (block.kind === 'heading')
     return (
-      <input
+      <textarea
+        rows={1}
         className="guide-block-heading"
         aria-label={t('scenario.editor.guideHeading')}
         placeholder={t('scenario.editor.guideHeading')}
@@ -261,7 +305,7 @@ function GuideTextBlock({
       disabled={disabled}
       className={block.kind === 'note' ? 'guide-note' : 'guide-description'}
       placeholder={t('scenario.editor.body')}
-      rows={Math.max(3, block.paragraphs.length + 1)}
+      rows={1}
       value={block.paragraphs
         .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
         .join('\n')}

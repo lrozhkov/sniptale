@@ -220,7 +220,7 @@
   background: var(--sniptale-color-surface-input);
   font-weight: 650;
 }
-.guide-document article > header input {
+.guide-document article > header .guide-step-title {
   min-width: 0;
   width: 100%;
   padding: 0.25rem;
@@ -235,15 +235,42 @@
 .guide-document textarea {
   display: block;
   width: 100%;
-  resize: vertical;
-  padding: 0.5rem;
-  margin: 0.75rem 0;
-  border: 1px solid transparent;
-  border-radius: var(--sniptale-radius-md);
+  min-width: 0;
+  field-sizing: content;
+  resize: none;
+  overflow: hidden;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: var(--sniptale-radius-sm);
   background: transparent;
   color: inherit;
+  font: inherit;
   line-height: 1.65;
 }
+.guide-document :is(.guide-step-title, .guide-section-title) {
+  font-size: 1.65rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.guide-document .guide-section-title {
+  margin: 0;
+}
+.guide-document .guide-block-heading {
+  padding: 0;
+  border: 0;
+  font-size: 1.125rem;
+  font-weight: 650;
+  line-height: 1.4;
+}
+.guide-page .guide-document textarea:focus-visible {
+  outline: 1px solid var(--guide-muted);
+  outline-offset: 4px;
+}
+.guide-document textarea::placeholder {
+  color: var(--guide-muted);
+}
+
 .guide-document :is(input, textarea):not(.sniptale-input):not(.sniptale-textarea):hover,
 .guide-document :is(input, textarea):not(.sniptale-input):not(.sniptale-textarea):focus {
   border-color: var(--sniptale-color-border-soft);
@@ -355,7 +382,7 @@
 .guide-block {
   position: relative;
   margin-block: 0.75rem;
-  padding-top: 0.5rem;
+  padding-top: 0;
 }
 .guide-block-actions {
   position: absolute;

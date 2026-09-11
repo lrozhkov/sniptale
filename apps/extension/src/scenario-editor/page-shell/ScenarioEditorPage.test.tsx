@@ -253,7 +253,7 @@ it('renders optional blocks and keeps text edits isolated from images and other 
   expect(container.querySelector('article#first header span')).toBeNull();
   expect(container.querySelector('article img')?.getAttribute('alt')).toBe('Example image');
   expect(container.querySelector('figcaption')?.textContent).toBe('Image caption');
-  const textarea = container.querySelector('textarea');
+  const textarea = container.querySelector<HTMLTextAreaElement>('article .guide-description');
   if (!textarea) throw new Error('Missing description');
   await act(async () => {
     const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
@@ -422,8 +422,8 @@ it('selects an edited step without taking focus or the caret from its field', as
   project.items = [createGuideStep('First', 'first'), createGuideStep('Second', 'second')];
   io.load.mockResolvedValue(project);
   await render();
-  const input = container.querySelector('article#second input');
-  if (!(input instanceof HTMLInputElement)) throw new Error('Missing step field');
+  const input = container.querySelector('article#second .guide-step-title');
+  if (!(input instanceof HTMLTextAreaElement)) throw new Error('Missing step field');
   await act(async () => {
     input.focus();
     input.setSelectionRange(2, 2);
@@ -513,10 +513,10 @@ it('composes multiple blocks and retains undo and redo after autosave', async ()
 
 it('groups text edits and routes keyboard undo and redo to the same history', async () => {
   await render();
-  await editField('article#first input', 'First change');
-  await editField('article#first input', 'Second change');
-  const field = container.querySelector('article#first input');
-  if (!(field instanceof HTMLInputElement)) throw new Error('Missing field');
+  await editField('article#first .guide-step-title', 'First change');
+  await editField('article#first .guide-step-title', 'Second change');
+  const field = container.querySelector('article#first .guide-step-title');
+  if (!(field instanceof HTMLTextAreaElement)) throw new Error('Missing field');
   await act(async () =>
     field.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })
@@ -539,8 +539,8 @@ it('groups text edits and routes keyboard undo and redo to the same history', as
 
 it('supports optional numbering and editable sections with structural undo', async () => {
   await render();
-  const stepField = container.querySelector('article#first input');
-  if (!(stepField instanceof HTMLInputElement)) throw new Error('Missing field');
+  const stepField = container.querySelector('article#first .guide-step-title');
+  if (!(stepField instanceof HTMLTextAreaElement)) throw new Error('Missing field');
   await act(async () => stepField.focus());
   const number = container.querySelector('input[type="checkbox"]');
   if (!(number instanceof HTMLInputElement)) throw new Error('Missing number control');
@@ -549,16 +549,21 @@ it('supports optional numbering and editable sections with structural undo', asy
   await click('Undo');
   expect(container.querySelector('article#first header span')?.textContent).toBe('1');
   await click('Add section');
-  await editField('.guide-step-actions input:not([type="checkbox"])', 'A section');
-  expect(container.querySelector('.guide-document section h2')?.textContent).toBe('A section');
-  await editField('.guide-step-actions textarea', 'Section description');
-  expect(container.querySelector('.guide-document section p')?.textContent).toBe(
+  await editField('.guide-section-title', 'A section');
+  expect(container.querySelector('section h2')?.getAttribute('aria-label')).toBe('A section');
+  expect(container.querySelector<HTMLTextAreaElement>('.guide-section-title')?.value).toBe(
+    'A section'
+  );
+  await editField('section .guide-description', 'Section description');
+  expect(container.querySelector<HTMLTextAreaElement>('section .guide-description')?.value).toBe(
     'Section description'
   );
   await click('Remove item');
   expect(container.querySelector('.guide-document section')).toBeNull();
   await click('Undo');
-  expect(container.querySelector('.guide-document section h2')?.textContent).toBe('A section');
+  expect(container.querySelector<HTMLTextAreaElement>('.guide-section-title')?.value).toBe(
+    'A section'
+  );
 });
 
 it('preserves undo performed during autosave and uses the acknowledged revision for the next write', async () => {
@@ -613,7 +618,7 @@ it('routes block and item tools through reversible order-preserving mutations', 
     await act(async () => button.click());
   };
   const values = () =>
-    [...container.querySelectorAll<HTMLTextAreaElement>('article#first textarea')].map(
+    [...container.querySelectorAll<HTMLTextAreaElement>('article#first .guide-block textarea')].map(
       (field) => field.value
     );
   await tool('Move up', block);
@@ -629,8 +634,8 @@ it('routes block and item tools through reversible order-preserving mutations', 
   await tool('Split step here', tail);
   expect(container.querySelectorAll('article')).toHaveLength(3);
   expect(values()).toEqual(['One']);
-  const title = container.querySelector('article#first input');
-  if (!(title instanceof HTMLInputElement)) throw new Error('Missing title');
+  const title = container.querySelector('article#first .guide-step-title');
+  if (!(title instanceof HTMLTextAreaElement)) throw new Error('Missing title');
   await act(async () => title.focus());
   await click('Merge with next step');
   expect(values()).toEqual(['One', 'Two', 'Three']);
@@ -660,7 +665,7 @@ it('accepts image import as one undoable publication and saves undo against its 
     items: [...project.items, createGuideStep('Imported', 'imported')],
   }));
   await render();
-  await editField('article#first input', 'Unsaved title');
+  await editField('article#first .guide-step-title', 'Unsaved title');
   const fileInput = container.querySelector('input[type="file"]');
   Object.defineProperty(fileInput, 'files', {
     value: [new File(['png'], 'one.png', { type: 'image/png' })],
@@ -674,7 +679,10 @@ it('accepts image import as one undoable publication and saves undo against its 
   expect(container.querySelectorAll('article')).toHaveLength(2);
   await click('Undo');
   expect(container.querySelectorAll('article')).toHaveLength(1);
-  expect(container.querySelector('article input')).toHaveProperty('value', 'Unsaved title');
+  expect(container.querySelector('article .guide-step-title')).toHaveProperty(
+    'value',
+    'Unsaved title'
+  );
   await settleAutosave();
   expect(io.save).toHaveBeenLastCalledWith(expect.anything(), { baseUpdatedAt: 105 });
 });
@@ -688,13 +696,16 @@ it('keeps typing available during autosave and uses the acknowledged revision fo
       })
   );
   await render();
-  await editField('article#first input', 'First draft');
+  await editField('article#first .guide-step-title', 'First draft');
   await settleAutosave();
   expect(io.save).toHaveBeenCalledTimes(1);
-  expect(container.querySelector('article input')).toHaveProperty('disabled', false);
-  await editField('article#first input', 'More recent draft');
+  expect(container.querySelector('article .guide-step-title')).toHaveProperty('disabled', false);
+  await editField('article#first .guide-step-title', 'More recent draft');
   await act(async () => finish?.());
-  expect(container.querySelector('article input')).toHaveProperty('value', 'More recent draft');
+  expect(container.querySelector('article .guide-step-title')).toHaveProperty(
+    'value',
+    'More recent draft'
+  );
   io.save.mockImplementation(async (project) => ({ ...project, updatedAt: 102 }));
   await settleAutosave();
   expect(io.save).toHaveBeenCalledTimes(2);
@@ -703,7 +714,10 @@ it('keeps typing available during autosave and uses the acknowledged revision fo
     { baseUpdatedAt: 101 }
   );
   await click('Undo');
-  expect(container.querySelector('article input')).toHaveProperty('value', 'First step');
+  expect(container.querySelector('article .guide-step-title')).toHaveProperty(
+    'value',
+    'First step'
+  );
 });
 
 it('protects a closing page until its latest edit is durable and does not autosave acknowledgments', async () => {
@@ -711,7 +725,7 @@ it('protects a closing page until its latest edit is durable and does not autosa
   expect(
     [...container.querySelectorAll('button')].some((button) => button.textContent === 'Save')
   ).toBe(false);
-  await editField('article#first input', 'Last edit');
+  await editField('article#first .guide-step-title', 'Last edit');
   const pendingClose = new Event('beforeunload', { cancelable: true });
   await act(async () => window.dispatchEvent(pendingClose));
   expect(pendingClose.defaultPrevented).toBe(true);

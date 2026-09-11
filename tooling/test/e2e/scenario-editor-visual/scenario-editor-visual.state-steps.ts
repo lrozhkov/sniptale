@@ -12,14 +12,14 @@ export async function verifyStepNavigation(page: Page): Promise<void> {
 }
 
 export async function verifySaveAndReopen(page: Page): Promise<void> {
-  const title = page.locator('article#text-only input');
+  const title = page.locator('article#text-only .guide-step-title');
   await title.fill('Saved local step');
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   const reopen = new URL(page.url());
   reopen.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
   reopen.searchParams.set('locale', 'en');
   await page.goto(reopen.toString(), { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('article#text-only input')).toHaveValue('Saved local step');
+  await expect(page.locator('article#text-only .guide-step-title')).toHaveValue('Saved local step');
   await expect(page.locator('article#text-only')).toBeFocused();
 }
 
@@ -28,13 +28,15 @@ export async function verifyIndependentProjectCopy(page: Page): Promise<void> {
   original.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
   original.searchParams.set('locale', 'en');
   const originalId = original.searchParams.get('projectId');
-  const originalTitle = await page.locator('article#text-only input').inputValue();
-  await page.locator('article#text-only input').fill('Unsaved content copied');
+  const originalTitle = await page.locator('article#text-only .guide-step-title').inputValue();
+  await page.locator('article#text-only .guide-step-title').fill('Unsaved content copied');
   await page.locator('.guide-action-menu-anchor button').click();
   await page.getByRole('button', { name: 'Duplicate project', exact: true }).click();
   await expect.poll(() => new URL(page.url()).searchParams.get('projectId')).not.toBe(originalId);
   await expect(page.getByRole('status').first()).toHaveText('Saved');
-  await expect(page.locator('article input').nth(1)).toHaveValue('Unsaved content copied');
+  await expect(page.locator('article .guide-step-title').nth(1)).toHaveValue(
+    'Unsaved content copied'
+  );
   await page
     .getByRole('textbox', { name: 'Scenario', exact: true })
     .fill('Renamed independent guide');
@@ -43,7 +45,7 @@ export async function verifyIndependentProjectCopy(page: Page): Promise<void> {
   copied.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
   copied.searchParams.set('locale', 'en');
   await page.goto(original.toString(), { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('article#text-only input')).toHaveValue(originalTitle);
+  await expect(page.locator('article#text-only .guide-step-title')).toHaveValue(originalTitle);
   await page.locator('.guide-action-menu-anchor button').click();
   await page.getByRole('button', { name: 'Delete project', exact: true }).click();
   await expect(page.getByRole('alertdialog')).toBeVisible();
@@ -58,7 +60,9 @@ export async function verifyIndependentProjectCopy(page: Page): Promise<void> {
   await expect(page.getByRole('textbox', { name: 'Scenario', exact: true })).toHaveValue(
     'Renamed independent guide'
   );
-  await expect(page.locator('article input').nth(1)).toHaveValue('Unsaved content copied');
+  await expect(page.locator('article .guide-step-title').nth(1)).toHaveValue(
+    'Unsaved content copied'
+  );
   await expect(page.locator('main img')).toHaveCount(2);
   await expect
     .poll(() =>
@@ -79,9 +83,9 @@ export async function verifyWorkspacePanelsAndFocus(page: Page): Promise<void> {
   await resource.click();
   await expect(page.locator('article#compare')).toBeFocused();
   await page.keyboard.press('Tab');
-  await expect(page.locator('article#compare input')).toBeFocused();
-  await page.locator('article#text-only input').focus();
-  await expect(page.locator('article#text-only input')).toBeFocused();
+  await expect(page.locator('article#compare .guide-step-title')).toBeFocused();
+  await page.locator('article#text-only .guide-step-title').focus();
+  await expect(page.locator('article#text-only .guide-step-title')).toBeFocused();
   await expect(page.locator('article#text-only')).toHaveAttribute('data-selected', 'true');
   await page.locator('button[aria-controls="guide-library-panel"]').click();
   const inspectorToggle = page.locator('button[aria-controls="guide-inspector-panel"]');
@@ -111,8 +115,8 @@ export async function verifyGuideComposition(page: Page): Promise<void> {
   await step.getByRole('button', { name: '+ Text', exact: true }).click();
   await step.getByRole('button', { name: '+ Heading', exact: true }).click();
   await step.getByRole('button', { name: '+ Note', exact: true }).click();
-  await step.locator('textarea').nth(0).fill('First explanation');
-  await step.locator('textarea').nth(1).fill('Second explanation');
+  await step.locator('.guide-description').nth(0).fill('First explanation');
+  await step.locator('.guide-description').nth(1).fill('Second explanation');
   await step.getByRole('textbox', { name: 'Heading', exact: true }).fill('Detail');
   await step.getByRole('textbox', { name: 'Note text', exact: true }).fill('Remember this');
   await page.getByRole('checkbox', { name: 'Show step number', exact: true }).uncheck();
@@ -146,7 +150,7 @@ export async function verifyGuideComposition(page: Page): Promise<void> {
   await expect(page.locator('article')).toHaveCount(2);
   await expect(step.locator('.guide-block')).toHaveCount(4);
   await page.getByRole('button', { name: 'Add section', exact: true }).click();
-  await page.getByRole('textbox', { name: 'Section title', exact: true }).fill('Finish');
+  await page.getByRole('textbox', { name: 'Section title', exact: true }).last().fill('Finish');
   await page
     .locator('.guide-step-actions')
     .getByRole('button', { name: 'Move up', exact: true })
@@ -157,10 +161,12 @@ export async function verifyGuideComposition(page: Page): Promise<void> {
   reopen.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
   reopen.searchParams.set('locale', 'en');
   await page.goto(reopen.toString(), { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('.guide-document section h2').last()).toHaveText('Finish');
+  await expect(page.locator('.guide-section-title').last()).toHaveValue('Finish');
   await expect(page.locator('article#text-only .guide-block')).toHaveCount(4);
-  await expect(page.locator('article#text-only textarea').first()).toHaveValue('First explanation');
-  await expect(page.locator('article#text-only input.guide-block-heading')).toHaveValue('Detail');
+  await expect(page.locator('article#text-only .guide-description').first()).toHaveValue(
+    'First explanation'
+  );
+  await expect(page.locator('article#text-only .guide-block-heading')).toHaveValue('Detail');
   await expect(page.locator('article#text-only header span')).toHaveCount(0);
   await expect(page.locator('.guide-document img')).toHaveCount(2);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeEnabled();
@@ -197,7 +203,7 @@ export async function verifyImageImport(page: Page, testInfo: TestInfo): Promise
   await page.getByRole('button', { name: 'Import selected', exact: true }).click();
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   await expect(page.locator('article')).toHaveCount(before + 2);
-  await expect(page.locator('article').nth(before).locator('header input')).toHaveValue(
+  await expect(page.locator('article').nth(before).locator('header .guide-step-title')).toHaveValue(
     'second-import.png'
   );
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
@@ -294,7 +300,7 @@ export async function verifyImageFraming(page: Page, testInfo: TestInfo): Promis
 
 export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo): Promise<void> {
   const launch = page.locator('[data-edit-image]').first();
-  const title = page.locator('article#compare > header input');
+  const title = page.locator('article#compare > header .guide-step-title');
   await title.fill('Unsaved title retained through annotations');
   const originalImage = await page.locator('.guide-image-frame img').first().getAttribute('src');
   await launch.click();
@@ -396,7 +402,7 @@ async function readImageEditProof(page: Page) {
 }
 
 export async function verifySavedVersionHistory(page: Page, testInfo: TestInfo): Promise<void> {
-  const title = page.locator('article#compare > header input');
+  const title = page.locator('article#compare > header .guide-step-title');
   await title.fill('Historical version A');
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   await title.fill('Historical version B');

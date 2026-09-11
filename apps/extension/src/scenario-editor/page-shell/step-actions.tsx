@@ -1,12 +1,7 @@
 import { ArrowUp, ArrowDown, Copy, Merge, Trash2 } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { ProductInput, ProductTextarea } from '@sniptale/ui/product-form-controls';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
-import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
-import {
-  createGuideParagraphs,
-  type GuideStructureOperation,
-} from '../../features/scenario/project/public';
+import type { GuideStructureOperation } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
 
 /** Controls only the selected document item; project lifecycle actions remain separate. */
@@ -45,37 +40,7 @@ export function GuideStepActions({
           />
           {t('scenario.editor.guideShowNumber')}
         </label>
-      ) : (
-        <>
-          <label>
-            {t('scenario.editor.guideSectionTitle')}
-            <ProductInput
-              disabled={disabled}
-              maxLength={GUIDE_LIMITS.maxLabelLength}
-              value={item.title}
-              onChange={(event) =>
-                changeItem({ ...item, title: event.target.value }, `section-title:${item.id}`)
-              }
-            />
-          </label>
-          <label>
-            {t('scenario.editor.body')}
-            <ProductTextarea
-              disabled={disabled}
-              rows={3}
-              value={item.paragraphs
-                .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
-                .join('\n')}
-              onChange={(event) =>
-                changeItem(
-                  { ...item, paragraphs: createGuideParagraphs(event.target.value) },
-                  `section-body:${item.id}`
-                )
-              }
-            />
-          </label>
-        </>
-      )}
+      ) : null}
       <div role="group" aria-label={t('scenario.editor.guideStepActions')}>
         <ProductActionButton
           tone="secondary"

@@ -199,6 +199,36 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
   });
 }
 
+test('document text fits its content while wrapping and resizing', async ({
+  page,
+  hostOrigin,
+}, testInfo) => {
+  await openVisualHarness(page, hostOrigin, 'dark', 'en', { width: 1024, height: 768 });
+  const title = page.locator('article#compare > header :is(input, textarea)');
+  await title.fill(
+    'A long step title that should wrap naturally across the document without hiding its ending'
+  );
+  await expect
+    .poll(() => title.evaluate((field) => field.scrollWidth <= field.clientWidth + 1))
+    .toBe(true);
+  const body = page.locator('article#compare .guide-description');
+  await body.fill('A detailed explanation stays visible in the document. '.repeat(35));
+  await expect(body).toHaveCSS('outline-width', '1px');
+  await expect
+    .poll(() => body.evaluate((field) => field.scrollHeight <= field.clientHeight + 1))
+    .toBe(true);
+  await testInfo.attach('inline-text-narrow', {
+    body: await page.screenshot(),
+    contentType: 'image/png',
+  });
+  const narrowHeight = await body.evaluate((field) => field.clientHeight);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await expect.poll(() => body.evaluate((field) => field.clientHeight)).toBeLessThan(narrowHeight);
+  await body.fill('Short explanation.');
+  await expect.poll(() => body.evaluate((field) => field.clientHeight)).toBeLessThan(50);
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+});
+
 test('history cleanup preserves two-tab undo resources until sessions close', async ({
   page,
   hostOrigin,
