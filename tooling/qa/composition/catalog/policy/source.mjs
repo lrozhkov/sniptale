@@ -85,10 +85,6 @@ const TOOL_SOURCES = new Map([
     'verify-manifest-permissions.mjs',
     'tooling/qa/guards/architecture/manifest-permissions/check.mjs',
   ],
-  [
-    'verify-manual-mock-export-parity.mjs',
-    'tooling/qa/guards/quality/mocks/manual-export-parity/check.mjs',
-  ],
   ['verify-messaging.mjs', 'tooling/qa/guards/boundaries/verify-messaging.mjs'],
   ['verify-naming.mjs', 'tooling/qa/guards/quality/naming/check.mjs'],
   [

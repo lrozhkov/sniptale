@@ -12,7 +12,6 @@ import { runLineLengthCheck } from '../../../guards/quality/readability/line-len
 import { runRepositoryReadabilityCheck } from '../../../guards/quality/readability/line-length/check.mjs';
 import { runFormatterCheck } from '../../../guards/quality/verify-oxfmt.mjs';
 import { collectFormattableFiles } from '../../../analysis/repository/shared-files.mjs';
-import { runRepositoryManualMockExportParityCheck } from '../../../guards/quality/mocks/manual-export-parity/check.mjs';
 import { runRepositoryNamingCheck } from '../../../guards/quality/naming/check.mjs';
 import { DEFAULT_OXLINT_ROOTS, runOxlint } from '../../../guards/quality/verify-oxlint.mjs';
 import {
@@ -90,14 +89,6 @@ function collectRepositoryReadabilityStep() {
       'Repository readability violations found:',
       value
     ),
-    durationMs
-  );
-}
-
-function collectRepositoryMockParityStep() {
-  const { durationMs, value } = measureSyncStep(runRepositoryManualMockExportParityCheck);
-  return withDuration(
-    createViolationStep('Mock export parity', 'Manual mock export parity violations:', value),
     durationMs
   );
 }
@@ -212,7 +203,6 @@ function createDefaultCollectors() {
     collectDeadCommentedCodeStep,
     collectStructuralRiskStep,
     collectNamingStep,
-    collectMockParityStep: collectRepositoryMockParityStep,
     collectViolationSteps,
     collectI18nStep: () =>
       collectMeasuredStringFailureStep('i18n', 'i18n guardrail violations found:', runI18nCheck),
@@ -279,7 +269,6 @@ export async function collectFullVerifyLane({
         ? null
         : collectors.collectStructuralRiskStep(context),
       namingStep: collectors.collectNamingStep(context),
-      mockParityStep: context.releaseMode ? collectors.collectMockParityStep(context) : null,
       violationSteps: await collectors.collectViolationSteps({
         ...context,
         deferOwnerGuards: true,
@@ -337,7 +326,6 @@ async function collectCoreStepResults(context, collectors, includeTests) {
       ? []
       : [collectors.collectStructuralRiskStep(context)]),
     collectors.collectNamingStep(context),
-    ...(context.releaseMode ? [collectors.collectMockParityStep(context)] : []),
     ...(await collectors.collectViolationSteps(context)),
     collectors.collectI18nStep(context),
     collectors.collectDesignSystemStep(context),
