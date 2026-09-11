@@ -52,7 +52,9 @@ async function render(disabled = false) {
   );
 }
 async function click(name: string) {
-  const button = [...host.querySelectorAll('button')].find((node) => node.textContent === name);
+  const button = [...host.querySelectorAll('button')].find(
+    (node) => (node.getAttribute('aria-label') ?? node.textContent) === name
+  );
   if (!button) throw new Error(`Missing ${name}`);
   await act(async () => button.click());
 }
@@ -95,7 +97,7 @@ it('cancels a draft on Escape and restores trigger focus without undo work', asy
   );
   expect(change).not.toHaveBeenCalled();
   expect(host.querySelector('img')?.style.translate).toBe('0% 0%');
-  expect(document.activeElement?.textContent).toBe('Frame and image');
+  expect(document.activeElement?.getAttribute('aria-label')).toBe('Frame and image');
 });
 it('cancels on pointercancel and when saving disables an active gesture', async () => {
   await render();

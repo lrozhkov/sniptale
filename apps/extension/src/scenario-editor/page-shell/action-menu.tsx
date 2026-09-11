@@ -53,7 +53,20 @@ export function GuideActionMenu({
     if (disabled) setOpen(false);
   }, [disabled]);
   return (
-    <div ref={containerRef} className="guide-action-menu-anchor">
+    <div
+      ref={containerRef}
+      className="guide-action-menu-anchor"
+      onBlurCapture={(event) => {
+        if (!open) return;
+        const next = event.relatedTarget;
+        if (
+          next instanceof Node &&
+          (containerRef.current?.contains(next) || menuRef.current?.contains(next))
+        )
+          return;
+        setOpen(false);
+      }}
+    >
       <ContentToolbarButton
         ref={trigger}
         type="button"

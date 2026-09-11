@@ -398,16 +398,6 @@
   padding: 0.375rem;
   background: transparent;
 }
-.guide-add-blocks {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--sniptale-color-border-soft);
-}
-.guide-add-blocks button {
-  font-size: 0.8125rem;
-}
 .guide-block-heading {
   width: 100%;
   min-width: 0;
@@ -418,27 +408,6 @@
   color: inherit;
   font-size: 1.125rem;
   font-weight: 650;
-}
-.guide-step-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin-top: 1rem;
-  font-size: 0.8125rem;
-}
-.guide-step-actions [role='group'] {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.375rem;
-}
-.guide-step-actions label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.375rem;
-}
-.guide-step-actions .guide-number-toggle {
-  flex-direction: row;
-  align-items: center;
 }
 
 @media (max-width: 1100px) {
@@ -633,9 +602,6 @@
   }
 }
 
-.guide-step-actions [role='group'] > button:nth-child(n + 3) {
-  grid-column: 1 / -1;
-}
 .guide-inspector-panel .guide-inspector-title {
   margin-block: 0.25rem;
 }
@@ -693,8 +659,7 @@
   border-color: var(--guide-border);
   background: color-mix(in srgb, var(--guide-border) 15%, var(--guide-paper));
 }
-.guide-document
-  :is(.guide-add-blocks, .guide-block-actions, .guide-image-controls, [data-edit-image]) {
+.guide-document :is(.guide-block-actions, .guide-image-controls, [data-edit-image]) {
   font-family: var(--sniptale-font-sans);
 }
 .guide-image-controls {
@@ -770,19 +735,6 @@
   }
 }
 
-.guide-document .guide-image-tools,
-.guide-document .guide-add-blocks {
-  width: fit-content;
-  max-width: 100%;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.25rem;
-  padding: 0.25rem;
-  margin-block: 0.5rem;
-  color: var(--sniptale-color-text-primary);
-  font-family: var(--sniptale-font-sans);
-}
-
 .guide-page-header .guide-page-feedback {
   display: flex;
   align-items: center;
@@ -821,13 +773,116 @@
   margin-top: 0.25rem;
 }
 
-.guide-step-actions [role='group'] > button {
-  justify-content: flex-start;
-}
-.guide-library-panel > button,
-.guide-step-actions button {
+.guide-library-panel > button {
   min-height: 2rem;
   height: auto;
   padding: 0.375rem 0.5rem;
   font-size: 0.8125rem;
+}
+
+.guide-document > article,
+.guide-document > section {
+  position: relative;
+}
+.guide-item-actions {
+  position: absolute;
+  top: -0.75rem;
+  right: 0.5rem;
+  z-index: 4;
+  opacity: 0;
+  pointer-events: none;
+}
+.guide-document > :is(article, section):hover > .guide-item-actions,
+.guide-item-actions:focus-within {
+  opacity: 1;
+  pointer-events: auto;
+}
+.guide-document
+  :is(.guide-item-actions, .guide-block-actions, .guide-insertion-chrome, .guide-image-tools) {
+  display: flex;
+  width: fit-content;
+  max-width: 100%;
+  gap: 0.125rem;
+  margin: 0;
+  color: var(--sniptale-color-text-primary);
+  padding: 0.125rem;
+  border-radius: var(--sniptale-radius-sm);
+  font-family: var(--sniptale-font-sans);
+}
+.guide-document :is(.guide-action-menu-anchor, .guide-image-tools) > button {
+  width: 1.75rem;
+  height: 1.75rem;
+  min-width: 1.75rem;
+  min-height: 1.75rem;
+  padding: 0.25rem;
+}
+.guide-insertion {
+  position: relative;
+  height: 0;
+  z-index: 3;
+}
+.guide-insertion::before {
+  content: '';
+  position: absolute;
+  inset: -0.5rem 0 auto;
+  height: 1rem;
+}
+.guide-insertion-chrome {
+  position: absolute;
+  top: -1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  pointer-events: none;
+}
+.guide-insertion:hover > .guide-insertion-chrome,
+.guide-insertion:focus-within > .guide-insertion-chrome {
+  opacity: 1;
+  pointer-events: auto;
+}
+.guide-insertion-block {
+  position: absolute;
+  top: calc(var(--guide-gap) * -0.5);
+  left: 0;
+  right: 0;
+}
+.guide-insertion-block[data-end='true'] {
+  top: auto;
+  bottom: calc(var(--guide-gap) * -0.5);
+}
+.guide-empty-step {
+  position: relative;
+  min-height: 1rem;
+}
+.guide-document .guide-image-surface {
+  position: relative;
+  margin: 0;
+}
+.guide-image-tools {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+}
+.guide-image-surface:hover > .guide-image-tools,
+.guide-image-surface:focus-within > .guide-image-tools,
+.guide-image-surface[data-editing='true'] > .guide-image-tools {
+  opacity: 1;
+  pointer-events: auto;
+}
+.guide-number-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+}
+@media (hover: none) {
+  .guide-item-actions,
+  .guide-image-tools,
+  .guide-insertion-chrome {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }

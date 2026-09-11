@@ -10,7 +10,12 @@ type ItemOperation =
   | { kind: 'move-item'; itemId: string; direction: -1 | 1 }
   | { kind: 'duplicate-item' | 'remove-item'; itemId: string };
 type BlockOperation =
-  | { kind: 'add-block'; itemId: string; blockKind: 'text' | 'heading' | 'note' }
+  | {
+      kind: 'add-block';
+      itemId: string;
+      blockKind: 'text' | 'heading' | 'note';
+      beforeBlockId?: string;
+    }
   | { kind: 'move-block'; itemId: string; blockId: string; direction: -1 | 1 }
   | { kind: 'duplicate-block' | 'remove-block'; itemId: string; blockId: string };
 
@@ -18,8 +23,8 @@ type BlockOperation =
 export type GuideStructureOperation =
   | ItemOperation
   | BlockOperation
-  | { kind: 'add-step' }
-  | { kind: 'add-section' }
+  | { kind: 'add-step'; beforeItemId?: string }
+  | { kind: 'add-section'; beforeItemId?: string }
   | { kind: 'merge-next'; itemId: string }
   | { kind: 'split-step'; itemId: string; blockId: string };
 
@@ -31,10 +36,10 @@ export function applyGuideStructureOperation(
   const next = structuredClone(project);
   switch (operation.kind) {
     case 'add-step':
-      next.items.push(createGuideStep());
+      next.items.splice(insertionIndex(next.items, operation.beforeItemId), 0, createGuideStep());
       break;
     case 'add-section':
-      next.items.push({
+      next.items.splice(insertionIndex(next.items, operation.beforeItemId), 0, {
         kind: 'section',
         id: crypto.randomUUID(),
         title: '',
@@ -61,6 +66,13 @@ export function applyGuideStructureOperation(
   const parsed = parseGuideProject(next);
   if (parsed.status !== 'ok') throw new Error('Guide content limits exceeded.');
   return parsed.project;
+}
+
+function insertionIndex(entries: { id: string }[], beforeId: string | undefined): number {
+  if (beforeId === undefined) return entries.length;
+  const index = entries.findIndex((entry) => entry.id === beforeId);
+  if (index < 0) throw new Error('Guide insertion target is unavailable.');
+  return index;
 }
 
 function requireItemIndex(project: GuideProject, id: string): number {
@@ -116,7 +128,11 @@ function createBlock(kind: 'text' | 'heading' | 'note'): GuideBlock {
 function changeBlocks(project: GuideProject, operation: BlockOperation): void {
   const step = requireStep(project, operation.itemId);
   if (operation.kind === 'add-block') {
-    step.blocks.push(createBlock(operation.blockKind));
+    step.blocks.splice(
+      insertionIndex(step.blocks, operation.beforeBlockId),
+      0,
+      createBlock(operation.blockKind)
+    );
     return;
   }
   const index = step.blocks.findIndex((block) => block.id === operation.blockId);

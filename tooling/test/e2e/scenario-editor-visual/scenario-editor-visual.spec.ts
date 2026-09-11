@@ -177,7 +177,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     hostOrigin,
   }, testInfo) => {
     await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1024, height: 768 });
-    const trigger = page.locator('.guide-action-menu-anchor button');
+    const trigger = page.locator('.guide-page-header .guide-action-menu-anchor button');
     await trigger.focus();
     await page.keyboard.press('ArrowDown');
     const menu = page.locator('.guide-action-menu');
@@ -226,6 +226,62 @@ test('document text fits its content while wrapping and resizing', async ({
   await expect.poll(() => body.evaluate((field) => field.clientHeight)).toBeLessThan(narrowHeight);
   await body.fill('Short explanation.');
   await expect.poll(() => body.evaluate((field) => field.clientHeight)).toBeLessThan(50);
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+});
+
+test('document tools are contextual and leave image geometry unchanged', async ({
+  page,
+  hostOrigin,
+}, testInfo) => {
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 900 });
+  await expect(page.locator('.guide-add-blocks')).toHaveCount(0);
+  const image = page.locator('article#compare .guide-image-frame').first();
+  const tools = page.locator('article#compare .guide-image-tools').first();
+  await page.mouse.move(10, 10);
+  await expect(tools).toHaveCSS('opacity', '0');
+  const before = await image.boundingBox();
+  await image.hover();
+  await expect(tools).toHaveCSS('opacity', '1');
+  expect(await image.boundingBox()).toEqual(before);
+  const insertion = page.locator('article#compare [data-insert-before="before"] button');
+  await insertion.focus();
+  await page.keyboard.press('Enter');
+  await page
+    .locator('.guide-action-menu')
+    .getByRole('button', { name: 'Heading', exact: true })
+    .click();
+  const heading = page.locator('article#compare .guide-block-heading');
+  await expect(heading).toBeFocused();
+  await expect(page.locator('article#compare .guide-block').nth(1)).toHaveAttribute(
+    'data-kind',
+    'heading'
+  );
+  await heading.fill('Inserted between text and image');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(heading).toHaveValue('');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(heading).toHaveCount(0);
+  await page.locator('.guide-insertion-item[data-insert-before="compare"] button').focus();
+  await page.keyboard.press('Enter');
+  await page
+    .locator('.guide-action-menu')
+    .getByRole('button', { name: 'Add step', exact: true })
+    .click();
+  const insertedTitle = page.locator('.guide-step-title:focus');
+  await expect(insertedTitle).toHaveCount(1);
+  await insertedTitle.fill('Inserted before the illustrated step');
+  await expect(page.locator('article').first().locator('.guide-step-title')).toHaveValue(
+    'Inserted before the illustrated step'
+  );
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  await page.mouse.move(10, 10);
+  await testInfo.attach('contextual-document-tools', {
+    body: await page.screenshot(),
+    contentType: 'image/png',
+  });
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.locator('main article')).toHaveCount(2);
   await expect(page.getByRole('status').first()).toHaveText('Saved');
 });
 

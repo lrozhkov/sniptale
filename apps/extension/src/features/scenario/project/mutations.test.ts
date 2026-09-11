@@ -156,3 +156,41 @@ it('rejects a block limit overflow without changing the source project', () => {
   ).toThrow('limits');
   expect(step.blocks).toHaveLength(GUIDE_LIMITS.maxBlocksPerStep);
 });
+
+it('inserts at stable item and block boundaries without changing neighboring content', () => {
+  const source = fixture();
+  const inserted = applyGuideStructureOperation(source, {
+    kind: 'add-step',
+    beforeItemId: 'first',
+  });
+  expect(inserted.items.map((item) => item.id)).toEqual([
+    'intro',
+    expect.any(String),
+    'first',
+    'second',
+  ]);
+  expect(source.items.map((item) => item.id)).toEqual(['intro', 'first', 'second']);
+  const withBlock = applyGuideStructureOperation(source, {
+    kind: 'add-block',
+    itemId: 'first',
+    blockKind: 'heading',
+    beforeBlockId: 'image',
+  });
+  const step = withBlock.items[1];
+  expect(step?.kind === 'step' && step.blocks.map((block) => block.kind)).toEqual([
+    'text',
+    'heading',
+    'image',
+  ]);
+  expect(() =>
+    applyGuideStructureOperation(source, { kind: 'add-section', beforeItemId: 'missing' })
+  ).toThrow();
+  expect(() =>
+    applyGuideStructureOperation(source, {
+      kind: 'add-block',
+      itemId: 'first',
+      blockKind: 'text',
+      beforeBlockId: 'missing',
+    })
+  ).toThrow();
+});

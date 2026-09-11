@@ -1,3 +1,4 @@
+import { Check, Crop, Pencil } from 'lucide-react';
 import { FloatingChromeToolbar } from '@sniptale/ui/floating-chrome';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -154,6 +155,7 @@ export function GuideImageSurface(props: ImageProps) {
   return (
     <figure
       className="guide-image-surface"
+      data-editing={editing}
       onKeyDownCapture={(event) => {
         if (event.key === 'Escape' && editing) {
           event.preventDefault();
@@ -164,26 +166,31 @@ export function GuideImageSurface(props: ImageProps) {
     >
       <FloatingChromeToolbar className="guide-image-tools">
         {props.onEdit && (
-          <ProductActionButton
-            tone="secondary"
-            compact
+          <ContentToolbarButton
             type="button"
+            title={t('scenario.editor.guideEditImage')}
+            aria-label={t('scenario.editor.guideEditImage')}
             data-edit-image
             disabled={disabled || !url}
             onClick={props.onEdit}
           >
-            {t('scenario.editor.guideEditImage')}
-          </ProductActionButton>
+            <Pencil size={16} aria-hidden="true" />
+          </ContentToolbarButton>
         )}
         <ContentToolbarButton
-          className="!w-auto !min-w-0 px-3"
           ref={trigger}
           type="button"
           disabled={disabled || !url}
+          title={t(
+            editing ? 'scenario.editor.guideImageDone' : 'scenario.editor.guideEditImageFrame'
+          )}
+          aria-label={t(
+            editing ? 'scenario.editor.guideImageDone' : 'scenario.editor.guideEditImageFrame'
+          )}
           aria-expanded={editing}
           onClick={() => (editing ? close() : setEditing(true))}
         >
-          {t(editing ? 'scenario.editor.guideImageDone' : 'scenario.editor.guideEditImageFrame')}
+          {editing ? <Check size={16} aria-hidden="true" /> : <Crop size={16} aria-hidden="true" />}
         </ContentToolbarButton>
       </FloatingChromeToolbar>
       <GuideImageViewport {...props} editing={editing} gesture={gesture} />

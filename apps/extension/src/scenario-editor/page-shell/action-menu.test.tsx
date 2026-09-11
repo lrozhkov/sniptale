@@ -55,3 +55,25 @@ it('supports keyboard navigation, escape restoration and outside dismissal witho
   expect(document.querySelector('.guide-action-menu')).toBeNull();
   expect(select).not.toHaveBeenCalled();
 });
+
+it('dismisses when keyboard focus moves to another context without stealing that focus', async () => {
+  await act(async () =>
+    root.render(
+      <>
+        <GuideActionMenu
+          label="Project"
+          icon="…"
+          items={[{ label: 'Copy', icon: null, onSelect: vi.fn() }]}
+        />
+        <button data-outside>Outside</button>
+      </>
+    )
+  );
+  const trigger = container.querySelector('button')!;
+  await act(async () => trigger.click());
+  expect(document.querySelector('.guide-action-menu')).not.toBeNull();
+  const outside = container.querySelector<HTMLButtonElement>('[data-outside]')!;
+  await act(async () => outside.focus());
+  expect(document.querySelector('.guide-action-menu')).toBeNull();
+  expect(document.activeElement).toBe(outside);
+});

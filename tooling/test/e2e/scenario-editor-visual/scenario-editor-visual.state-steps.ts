@@ -1,8 +1,29 @@
-import { expect, type Page, type TestInfo } from '@playwright/test';
+import { expect, type Page, type TestInfo, type Locator } from '@playwright/test';
 import {
   applyHarnessBootstrap,
   SCENARIO_EDITOR_VISUAL_HARNESS_PATH,
 } from '../extension-critical.helpers';
+
+async function documentCommand(
+  page: Page,
+  scope: Locator,
+  command: string,
+  kind: 'item' | 'block' | 'insert'
+) {
+  const selector =
+    kind === 'insert'
+      ? '.guide-insertion-block[data-end="true"] button'
+      : kind === 'item'
+        ? '.guide-item-actions button'
+        : '.guide-block-actions button';
+  const trigger = scope.locator(selector).first();
+  await trigger.focus();
+  await trigger.click();
+  await page
+    .locator('.guide-action-menu')
+    .getByRole('button', { name: command, exact: true })
+    .click();
+}
 
 export async function verifyStepNavigation(page: Page): Promise<void> {
   await expect(page.locator('article#compare')).toBeFocused();
@@ -30,7 +51,7 @@ export async function verifyIndependentProjectCopy(page: Page): Promise<void> {
   const originalId = original.searchParams.get('projectId');
   const originalTitle = await page.locator('article#text-only .guide-step-title').inputValue();
   await page.locator('article#text-only .guide-step-title').fill('Unsaved content copied');
-  await page.locator('.guide-action-menu-anchor button').click();
+  await page.locator('.guide-page-header .guide-action-menu-anchor button').click();
   await page.getByRole('button', { name: 'Duplicate project', exact: true }).click();
   await expect.poll(() => new URL(page.url()).searchParams.get('projectId')).not.toBe(originalId);
   await expect(page.getByRole('status').first()).toHaveText('Saved');
@@ -46,12 +67,12 @@ export async function verifyIndependentProjectCopy(page: Page): Promise<void> {
   copied.searchParams.set('locale', 'en');
   await page.goto(original.toString(), { waitUntil: 'domcontentloaded' });
   await expect(page.locator('article#text-only .guide-step-title')).toHaveValue(originalTitle);
-  await page.locator('.guide-action-menu-anchor button').click();
+  await page.locator('.guide-page-header .guide-action-menu-anchor button').click();
   await page.getByRole('button', { name: 'Delete project', exact: true }).click();
   await expect(page.getByRole('alertdialog')).toBeVisible();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel', exact: true }).click();
   await expect(page.locator('article')).toHaveCount(2);
-  await page.locator('.guide-action-menu-anchor button').click();
+  await page.locator('.guide-page-header .guide-action-menu-anchor button').click();
   await page.getByRole('button', { name: 'Delete project', exact: true }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(page.locator('article')).toHaveCount(0);
@@ -111,10 +132,10 @@ export async function verifyWorkspacePanelsAndFocus(page: Page): Promise<void> {
 export async function verifyGuideComposition(page: Page): Promise<void> {
   const step = page.locator('article#text-only');
   await step.getByRole('textbox', { name: 'Step title', exact: true }).fill('Flexible step');
-  await step.getByRole('button', { name: '+ Text', exact: true }).click();
-  await step.getByRole('button', { name: '+ Text', exact: true }).click();
-  await step.getByRole('button', { name: '+ Heading', exact: true }).click();
-  await step.getByRole('button', { name: '+ Note', exact: true }).click();
+  await documentCommand(page, step, 'Text', 'insert');
+  await documentCommand(page, step, 'Text', 'insert');
+  await documentCommand(page, step, 'Heading', 'insert');
+  await documentCommand(page, step, 'Note', 'insert');
   await step.locator('.guide-description').nth(0).fill('First explanation');
   await step.locator('.guide-description').nth(1).fill('Second explanation');
   await step.getByRole('textbox', { name: 'Heading', exact: true }).fill('Detail');
@@ -122,11 +143,7 @@ export async function verifyGuideComposition(page: Page): Promise<void> {
   await page.getByRole('checkbox', { name: 'Show step number', exact: true }).uncheck();
   await expect(step.locator('header span')).toHaveCount(0);
   await step.locator('.guide-block').first().hover();
-  await step
-    .locator('.guide-block')
-    .first()
-    .getByRole('button', { name: 'Duplicate block', exact: true })
-    .click();
+  await documentCommand(page, step.locator('.guide-block').first(), 'Duplicate block', 'block');
   await expect(step.locator('.guide-block')).toHaveCount(5);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(step.locator('.guide-block')).toHaveCount(4);
@@ -137,24 +154,28 @@ export async function verifyGuideComposition(page: Page): Promise<void> {
     .locator('.guide-block')
     .filter({ has: page.getByRole('textbox', { name: 'Heading', exact: true }) });
   await heading.hover();
-  await heading.getByRole('button', { name: 'Move up', exact: true }).click();
+  await documentCommand(page, heading, 'Move up', 'block');
   await heading.hover();
-  await heading.getByRole('button', { name: 'Split step here', exact: true }).click();
+  await documentCommand(page, heading, 'Split step here', 'block');
   await expect(page.locator('article')).toHaveCount(3);
   await expect(step.locator('.guide-block')).toHaveCount(1);
   await page.getByRole('link', { name: 'Flexible step', exact: true }).click();
-  await page
-    .locator('.guide-step-actions')
-    .getByRole('button', { name: 'Merge with next step', exact: true })
-    .click();
+  await documentCommand(
+    page,
+    page.locator('.guide-document > [data-selected="true"]'),
+    'Merge with next step',
+    'item'
+  );
   await expect(page.locator('article')).toHaveCount(2);
   await expect(step.locator('.guide-block')).toHaveCount(4);
   await page.getByRole('button', { name: 'Add section', exact: true }).click();
   await page.getByRole('textbox', { name: 'Section title', exact: true }).last().fill('Finish');
-  await page
-    .locator('.guide-step-actions')
-    .getByRole('button', { name: 'Move up', exact: true })
-    .click();
+  await documentCommand(
+    page,
+    page.locator('.guide-document > [data-selected="true"]'),
+    'Move up',
+    'item'
+  );
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   const reopen = new URL(page.url());
@@ -224,7 +245,7 @@ export async function verifyImageImport(page: Page, testInfo: TestInfo): Promise
       )
     )
     .toBe(true);
-  await page.locator('.guide-action-menu-anchor button').click();
+  await page.locator('.guide-page-header .guide-action-menu-anchor button').click();
   await page.getByRole('button', { name: 'Delete project', exact: true }).click();
   await page.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(page.locator('article')).toHaveCount(0);
@@ -232,6 +253,7 @@ export async function verifyImageImport(page: Page, testInfo: TestInfo): Promise
 
 export async function verifyImageFraming(page: Page, testInfo: TestInfo): Promise<void> {
   const figure = page.locator('article#compare figure').first();
+  await figure.hover();
   await figure.getByRole('button', { name: 'Frame and image', exact: true }).click();
   await figure.getByRole('button', { name: 'Center image', exact: true }).click();
   await figure.getByRole('button', { name: 'Fill', exact: true }).click();
@@ -303,6 +325,7 @@ export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo)
   const title = page.locator('article#compare > header .guide-step-title');
   await title.fill('Unsaved title retained through annotations');
   const originalImage = await page.locator('.guide-image-frame img').first().getAttribute('src');
+  await page.locator('article#compare figure').first().hover();
   await launch.click();
   const child = page.frameLocator('.guide-image-editor iframe');
   const apply = child.locator('[data-ui="editor.floating.document-bar.save-for-slide-button"]');
@@ -321,6 +344,7 @@ export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo)
     'src',
     originalImage ?? ''
   );
+  await page.locator('article#compare figure').first().hover();
   await launch.click();
   await expect(apply).toBeVisible();
   await child.locator('[data-ui="editor.floating.tool-rail.pencil"]').click();
@@ -347,6 +371,7 @@ export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo)
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   await page.reload();
   await expect(title).toHaveValue('Unsaved title retained through annotations');
+  await page.locator('article#compare figure').first().hover();
   await launch.click();
   await expect(apply).toBeVisible();
   await apply.click();
@@ -354,6 +379,7 @@ export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo)
   const reopened = await readImageEditProof(page);
   expect(reopened.annotations).toBe(firstPublication.annotations);
   expect(reopened.standaloneWorkspaces).toBe(0);
+  await page.locator('article#compare figure').first().hover();
   await launch.click();
   await expect(apply).toBeVisible();
   await child.locator('[data-ui="editor.floating.document-bar.close-scenario-button"]').click();
@@ -437,7 +463,7 @@ export async function verifyResourceRetention(page: Page): Promise<void> {
     await applyHarnessBootstrap(second, { preserveMediaLibrary: true });
     await second.goto(reopen.toString());
     await expect(second.locator('.guide-image-frame img')).toHaveCount(2);
-    await page.getByRole('button', { name: 'Remove item', exact: true }).click();
+    await documentCommand(page, page.locator('article#compare'), 'Remove item', 'item');
     await expect(page.locator('article#compare')).toHaveCount(0);
     await expect(page.getByRole('status').first()).toHaveText('Saved');
     await expect(page.getByRole('status').first()).toHaveText('Saved');

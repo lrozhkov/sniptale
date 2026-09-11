@@ -38,6 +38,24 @@ export function GuideAppearance({ project, selectedId, disabled, onChange, t }: 
   };
   return (
     <div className="guide-appearance">
+      {step && (
+        <label className="guide-number-toggle">
+          <input
+            type="checkbox"
+            disabled={disabled}
+            checked={step.showNumber}
+            onChange={(event) =>
+              onChange({
+                ...project,
+                items: project.items.map((entry) =>
+                  entry.id === step.id ? { ...step, showNumber: event.target.checked } : entry
+                ),
+              })
+            }
+          />
+          {t('scenario.editor.guideShowNumber')}
+        </label>
+      )}
       <CollapsibleSection label={t('scenario.editor.appearance')} defaultOpen={false}>
         <div className="guide-appearance-fields">
           {step && (

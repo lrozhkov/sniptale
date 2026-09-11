@@ -87,28 +87,34 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 async function render() {
-  await act(async () => {
-    root.render(<ScenarioEditorPage />);
-  });
+  await act(async () => root.render(<ScenarioEditorPage />));
 }
 async function click(label: string, scope: ParentNode = container) {
-  if (
-    ['Duplicate project', 'Delete project', 'Reload project'].includes(label) &&
-    scope === container
-  ) {
-    const trigger = container.querySelector<HTMLButtonElement>('.guide-action-menu-anchor button');
-    await act(async () => {
-      trigger?.click();
-    });
+  const menus = [
+    [
+      ['Duplicate project', 'Delete project', 'Reload project'],
+      '.guide-page-header .guide-action-menu-anchor',
+    ],
+    [['Text', 'Heading', 'Note'], '.guide-insertion-block[data-end="true"]'],
+    [
+      ['Move up', 'Move down', 'Duplicate item', 'Remove item', 'Merge with next step'],
+      '.guide-document [data-selected="true"] > .guide-item-actions',
+    ],
+  ] as const;
+  const selector =
+    scope instanceof Element && scope.matches('.guide-block')
+      ? '.guide-block-actions'
+      : menus.find(([labels]) => labels.some((name) => name === label))?.[1];
+  if (selector) {
+    const trigger = scope.querySelector<HTMLButtonElement>(`${selector} button`);
+    await act(async () => trigger?.click());
     scope = document.body;
   }
   const button = [...scope.querySelectorAll('button')].find(
     (node) => (node.getAttribute('aria-label') ?? node.textContent) === label
   );
   if (!button) throw new Error(`Missing test control ${label}`);
-  await act(async () => {
-    button.click();
-  });
+  await act(async () => button.click());
 }
 
 async function settleAutosave() {
@@ -172,9 +178,7 @@ it('opens a linked step and keeps outline navigation tied to stable item IDs', a
   expect(document.activeElement?.id).toBe('second');
   const first = container.querySelector('nav a');
   if (!(first instanceof HTMLAnchorElement)) throw new Error('Expected outline link');
-  await act(async () => {
-    first.click();
-  });
+  await act(async () => first.click());
   expect(document.activeElement?.id).toBe('first');
   expect(io.select).toHaveBeenCalledWith({ projectId: 'guide', stepId: 'first' });
   expect(io.save).not.toHaveBeenCalled();
@@ -407,7 +411,9 @@ it('prevents duplicate copy submissions and ignores page state updates after unm
   );
   await render();
   await click('Duplicate project');
-  const trigger = container.querySelector<HTMLButtonElement>('.guide-action-menu-anchor button');
+  const trigger = container.querySelector<HTMLButtonElement>(
+    '.guide-page-header .guide-action-menu-anchor button'
+  );
   expect(trigger?.disabled).toBe(true);
   await act(async () => trigger?.click());
   expect(io.duplicate).toHaveBeenCalledTimes(1);
@@ -496,10 +502,10 @@ it('composes multiple blocks and retains undo and redo after autosave', async ()
   await render();
   const article = container.querySelector('article#first');
   if (!article) throw new Error('Missing step');
-  await click('+ Text', article);
-  await click('+ Text', article);
-  await click('+ Heading', article);
-  await click('+ Note', article);
+  await click('Text', article);
+  await click('Text', article);
+  await click('Heading', article);
+  await click('Note', article);
   expect(article.querySelectorAll('.guide-block')).toHaveLength(4);
   await settleAutosave();
   await click('Undo');
@@ -610,28 +616,21 @@ it('routes block and item tools through reversible order-preserving mutations', 
   await render();
   const block = container.querySelector('[data-block-id="text-1"]');
   if (!block) throw new Error('Missing block');
-  const tool = async (name: string, scope: ParentNode) => {
-    const button = [...scope.querySelectorAll('button')].find(
-      (entry) => entry.getAttribute('aria-label') === name
-    );
-    if (!button) throw new Error('Missing block tool');
-    await act(async () => button.click());
-  };
   const values = () =>
     [...container.querySelectorAll<HTMLTextAreaElement>('article#first .guide-block textarea')].map(
       (field) => field.value
     );
-  await tool('Move up', block);
+  await click('Move up', block);
   expect(values()).toEqual(['Two', 'One', 'Three']);
-  await tool('Move down', block);
+  await click('Move down', block);
   expect(values()).toEqual(['One', 'Two', 'Three']);
-  await tool('Duplicate block', block);
+  await click('Duplicate block', block);
   expect(values()).toEqual(['One', 'Two', 'Two', 'Three']);
-  await tool('Remove block', block);
+  await click('Remove block', block);
   expect(values()).toEqual(['One', 'Two', 'Three']);
   const tail = container.querySelectorAll('article#first .guide-block')[1];
   if (!tail) throw new Error('Missing tail');
-  await tool('Split step here', tail);
+  await click('Split step here', tail);
   expect(container.querySelectorAll('article')).toHaveLength(3);
   expect(values()).toEqual(['One']);
   const title = container.querySelector('article#first .guide-step-title');
@@ -639,12 +638,12 @@ it('routes block and item tools through reversible order-preserving mutations', 
   await act(async () => title.focus());
   await click('Merge with next step');
   expect(values()).toEqual(['One', 'Two', 'Three']);
-  await click('Move down', container.querySelector('.guide-step-actions')!);
+  await click('Move down');
   expect([...container.querySelectorAll('article')].map((entry) => entry.id)).toEqual([
     'next',
     'first',
   ]);
-  await click('Move up', container.querySelector('.guide-step-actions')!);
+  await click('Move up');
   expect([...container.querySelectorAll('article')].map((entry) => entry.id)).toEqual([
     'first',
     'next',
@@ -763,4 +762,37 @@ it('opens stored revisions in ordinary undo and autosaves against the current re
   expect(io.save).toHaveBeenCalledWith(previous, { baseUpdatedAt: 100 });
   await click('Redo');
   expect(container.querySelector('input')?.value).toBe('Local guide');
+});
+
+it('inserts at a block boundary and focuses the new field before typing', async () => {
+  const project = createGuideProject('Guide', 'guide', 100);
+  const step = createGuideStep('First', 'first');
+  step.blocks = ['a', 'b'].map((id) => ({
+    kind: 'text',
+    id,
+    paragraphs: createGuideParagraphs(id),
+  }));
+  project.items = [step];
+  io.load.mockResolvedValue(project);
+  await render();
+  const trigger = container.querySelector<HTMLButtonElement>('[data-insert-before="b"] button');
+  await act(async () => trigger?.click());
+  const menu = document.querySelector('.guide-action-menu');
+  if (!menu) throw new Error('Missing insertion menu');
+  const command = [...menu.querySelectorAll('button')].find(
+    (button) => button.textContent === 'Heading'
+  );
+  await act(async () => command?.click());
+  const heading = container.querySelector<HTMLTextAreaElement>('.guide-block-heading');
+  expect(document.activeElement).toBe(heading);
+  expect(
+    [...container.querySelectorAll('.guide-block')].map((block) => block.getAttribute('data-kind'))
+  ).toEqual(['text', 'heading', 'text']);
+  await editField('.guide-block-heading', 'Inserted heading');
+  await click('Undo');
+  expect(heading?.value).toBe('');
+  await click('Undo');
+  expect(container.querySelectorAll('.guide-block')).toHaveLength(2);
+  await click('Redo');
+  expect(container.querySelectorAll('.guide-block')).toHaveLength(3);
 });

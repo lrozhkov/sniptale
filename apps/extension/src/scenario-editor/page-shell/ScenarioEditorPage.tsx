@@ -1,3 +1,4 @@
+import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { GuideAppearance } from './appearance';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { GuidePageHeader } from './header';
@@ -7,11 +8,10 @@ import type { Translate } from '../../platform/i18n';
 import { createTranslator, useAppLocale } from '../../platform/i18n';
 import type { GuideStructureOperation } from '../../features/scenario/project/public';
 import { GuideImageEditor, useGuideImageEditorMode } from './image-editor';
-import { GuideDocument } from './guide-document';
+import { GuideDocument, type GuideFocusRequest } from './guide-document';
 import { GuideWorkspace, GuidePanelControls } from './workspace';
 import { useGuidePanels } from './panel-layout';
 import { GuideImageResources } from './resources';
-import { GuideStepActions } from './step-actions';
 import { useGuidePageState } from './runtime/use-state';
 
 /** Composes the local guide workspace around its single edit/save state owner. */
@@ -20,23 +20,30 @@ export function ScenarioEditorPage() {
   const state = useGuidePageState();
   const panels = useGuidePanels();
   const imageEditor = useGuideImageEditorMode(state.images);
-  const [focusRequest, setFocusRequest] = useState(0);
-  const selectItem = (id: string) => {
+  const [focusRequest, setFocusRequest] = useState<GuideFocusRequest>({ sequence: 0 });
+  const selectItem = (id: string, requestFocus = true) => {
     state.selectItem(id);
-    setFocusRequest((current) => current + 1);
+    setFocusRequest((current) => ({
+      sequence: current.sequence + 1,
+      preserveFocus: !requestFocus,
+    }));
   };
   const { project, status } = state;
   const disabled = state.editingLocked;
   const operate = (operation: GuideStructureOperation) => {
     const next = state.operate(operation);
     if (!next) return;
-    const target =
-      next.items.find((item) => !project?.items.some((current) => current.id === item.id)) ??
-      next.items.find((item) => item.id === state.selectedId) ??
-      next.items[0];
+    const { target, addedItem, addedBlock } = resolveOperationFocus(
+      project,
+      next,
+      state.selectedId
+    );
     if (target) {
       state.selectItem(target.id, next);
-      setFocusRequest((current) => current + 1);
+      setFocusRequest((current) => ({
+        sequence: current.sequence + 1,
+        ...(addedItem ? { field: true } : addedBlock ? { blockId: addedBlock.id } : {}),
+      }));
     } else state.selectItem(null, next);
   };
   if (imageEditor.selection && project)
@@ -130,14 +137,6 @@ export function ScenarioEditorPage() {
                 onChange={state.update}
                 t={t}
               />
-              <GuideStepActions
-                project={project}
-                selectedId={state.selectedId}
-                disabled={disabled}
-                onChange={state.update}
-                onOperate={operate}
-                t={t}
-              />
             </>
           }
 
@@ -154,7 +153,7 @@ export function ScenarioEditorPage() {
             images={state.images}
             disabled={disabled}
             onChange={state.update}
-            onSelect={selectItem}
+            onSelect={(id) => selectItem(id, false)}
             onOperate={operate}
             t={t}
           />
@@ -162,6 +161,35 @@ export function ScenarioEditorPage() {
       )}
     </main>
   );
+}
+
+/** Maps canonical structural changes to a document focus destination without owning edit state. */
+function resolveOperationFocus(
+  project: GuideProject | null,
+  next: GuideProject,
+  selectedId: string | null
+) {
+  const addedItem = next.items.find(
+    (item) => !project?.items.some((current) => current.id === item.id)
+  );
+  const previousBlockIds = new Set(
+    project?.items.flatMap((item) =>
+      item.kind === 'step' ? item.blocks.map((block) => block.id) : []
+    )
+  );
+  const addedBlockItem = next.items.find(
+    (item) => item.kind === 'step' && item.blocks.some((block) => !previousBlockIds.has(block.id))
+  );
+  const addedBlock =
+    addedBlockItem?.kind === 'step'
+      ? addedBlockItem.blocks.find((block) => !previousBlockIds.has(block.id))
+      : undefined;
+  const target =
+    addedItem ??
+    addedBlockItem ??
+    next.items.find((item) => item.id === selectedId) ??
+    next.items[0];
+  return { target, addedItem, addedBlock };
 }
 
 function GuidePageFeedback({
