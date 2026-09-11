@@ -1,8 +1,8 @@
 import { resolveVideoCompositionFrame } from '../../../../features/video/composition/timeline/frame';
 import {
-  mapActionOccurrencePointToScene,
-  mapScenePointToActionOccurrence,
-} from '../../../preview/stage/canvas/geometry';
+  mapScenePointToVideoActionOccurrence,
+  mapVideoActionOccurrencePointToScene,
+} from '../../../../features/video/composition/action-occurrence-geometry';
 import {
   buildDraggedArea,
   clampStagePoint,
@@ -105,14 +105,14 @@ function nudgeSelectedActionPoint(
   }
 
   const camera = resolveVideoCompositionFrame(project, latestState.currentTime).camera;
-  const point = mapActionOccurrencePointToScene(
+  const point = mapVideoActionOccurrencePointToScene(
     project,
     selectedActionOccurrence,
     latestState.currentTime,
     camera
   );
   if (!point) return false;
-  const mapped = mapScenePointToActionOccurrence(
+  const mapped = mapScenePointToVideoActionOccurrence(
     project,
     selectedActionOccurrence,
     latestState.currentTime,

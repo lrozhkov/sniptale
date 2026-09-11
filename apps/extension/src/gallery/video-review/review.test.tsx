@@ -40,9 +40,9 @@ vi.mock('../../composition/persistence/review-workspaces/store', async (importOr
   moveVideoWorkspaceHistory: integration.history,
   readVideoWorkspace: integration.read,
 }));
-vi.mock('../library/actions/shared', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../library/actions/shared')>()),
-  downloadBlob: integration.download,
+vi.mock('../shared/download', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../shared/download')>()),
+  downloadGalleryBlob: integration.download,
 }));
 import {
   parseReviewAnnotation,

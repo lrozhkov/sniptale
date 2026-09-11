@@ -41,6 +41,18 @@ const sidebarContractMappings = SIDEBAR_CONTRACT_FILES.map((productionFile) => (
 
 export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
   ...controllerContractMappings,
+  {
+    allowCrossOwner: true,
+    owner: 'video-action-occurrence-geometry',
+    productionFile: 'apps/extension/src/features/video/composition/action-occurrence-geometry.ts',
+    reason:
+      'Preview interaction and playback nudge suites exercise viewport locking and both directions of action-point mapping through the shared composition owner.',
+    testFiles: [
+      'apps/extension/src/video-editor/preview/stage/canvas/geometry.camera.test.ts',
+      'apps/extension/src/video-editor/preview/stage/point-overlay/index.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/playback/nudge.test.ts',
+    ],
+  },
   ...[
     'body.tsx',
     'index.tsx',

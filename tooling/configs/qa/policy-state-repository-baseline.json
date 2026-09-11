@@ -1,8 +1,17 @@
 {
   "schemaVersion": 2,
   "controlId": "qa.rule.policy-state-descriptor",
-  "findingCount": 296,
-  "findingDigest": "sha256:28210d51d7d07d43be230f8496d3d075ed5eb8dd4515aed625eecb7eba6cc354",
+  "findingCount": 301,
+  "findingDigest": "sha256:cb3f7f83865e42eccf256cffafe72cbb4b0f3f21ed26a350b7dcaf62a8a1a006",
+  "rationales": [
+    {
+      "id": "noise.policy-state-descriptor.non-authority-signals",
+      "owner": "architecture-boundaries",
+      "reason": "The exact files match broad state-like syntax signals but were reviewed as non-authoritative local state or test-reset seams; the heuristic cannot establish policy-state authority from syntax alone.",
+      "removalCondition": "Remove an exact entry when the state-like signal disappears or the file becomes a registered policy-state authority.",
+      "classification": "tool-noise"
+    }
+  ],
   "findings": [
     {
       "file": "apps/extension/src/background/ai/llm/service-history.ts",
@@ -1223,6 +1232,12 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
+      "file": "apps/extension/src/features/video/composition/canvas/buffer-pool.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
       "file": "apps/extension/src/features/video/composition/effect-runtime/media/audio-container/wav.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
@@ -1254,6 +1269,12 @@
     },
     {
       "file": "apps/extension/src/features/video/project/effect-bundle/manifest/index.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
+      "file": "apps/extension/src/features/video/project/effect-bundle/presentation-document.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
@@ -1679,6 +1700,12 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
+      "file": "packages/runtime-contracts/src/effect-v1/editor-region/validation.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
       "file": "packages/runtime-contracts/src/effect-v1/expression/validation.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
@@ -1697,6 +1724,12 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
+      "file": "packages/runtime-contracts/src/effect-v1/model/locale-tags.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
       "file": "packages/runtime-contracts/src/effect-v1/timeline/motion-path.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
@@ -1704,6 +1737,18 @@
     },
     {
       "file": "packages/runtime-contracts/src/effect-v1/timeline/validation.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
+      "file": "packages/runtime-contracts/src/effect-v1/validation/control-presentation.ts",
+      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
+      "rule": "policy-state-descriptor-required",
+      "noiseId": "noise.policy-state-descriptor.non-authority-signals"
+    },
+    {
+      "file": "packages/runtime-contracts/src/effect-v1/validation/control-presets.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
@@ -1773,15 +1818,6 @@
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
-    }
-  ],
-  "rationales": [
-    {
-      "id": "noise.policy-state-descriptor.non-authority-signals",
-      "owner": "architecture-boundaries",
-      "reason": "The exact files match broad state-like syntax signals but were reviewed as non-authoritative local state or test-reset seams; the heuristic cannot establish policy-state authority from syntax alone.",
-      "removalCondition": "Remove an exact entry when the state-like signal disappears or the file becomes a registered policy-state authority.",
-      "classification": "tool-noise"
     }
   ]
 }

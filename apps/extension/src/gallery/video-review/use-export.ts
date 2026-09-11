@@ -4,7 +4,7 @@ import {
   type ReviewMediaIndex,
 } from '../../workflows/video-review/media-index';
 import { exportReviewedVideo } from '../../workflows/video-review/export-lifecycle';
-import { downloadBlob } from '../library/actions/shared';
+import { downloadGalleryBlob } from '../shared/download';
 import type { LoadedReview } from './use-session';
 import type { ReviewAnchor } from '../../features/video/review/types';
 
@@ -69,7 +69,7 @@ export function useReviewExport(resource: LoadedReview) {
       if (!mounted.current || controller.signal.aborted) await value.release?.();
       else {
         if (destination === 'download')
-          downloadBlob(value.file, value.receipt.filename, value.release, () => {
+          downloadGalleryBlob(value.file, value.receipt.filename, value.release, () => {
             if (mounted.current) setFailed(true);
           });
         if (!selection) setResult(value);
@@ -97,7 +97,7 @@ export function useReviewExport(resource: LoadedReview) {
     },
     download: () => {
       if (!resource.session.getSnapshot().document.edits.length)
-        downloadBlob(resource.file, resource.filename);
+        downloadGalleryBlob(resource.file, resource.filename);
       else void start('download');
     },
   };

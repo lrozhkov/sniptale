@@ -12,7 +12,7 @@ This file projects changeable values and inventories from their existing machine
 | Immutable GitHub Releases | `true` | `tooling/configs/ci/github-policy.json#/security/immutableReleases` |
 | Required GitHub checks | `pr-gate` | `tooling/configs/ci/github-policy.json#/ruleset` |
 | Protected release tags | `refs/tags/v*` | `tooling/configs/ci/github-policy.json#/releaseTagRuleset` |
-| QA controls | `91` controls in `14` ordered categories | `tooling/qa/composition/catalog/catalog.mjs#QA_CONTROL_CATALOG` |
+| QA controls | `90` controls in `14` ordered categories | `tooling/qa/composition/catalog/catalog.mjs#QA_CONTROL_CATALOG` |
 
 ## QA control categories
 
@@ -23,7 +23,7 @@ This file projects changeable values and inventories from their existing machine
 - `single-file-semantics`: 5
 - `owner-state-and-diff-structure`: 27
 - `dependency-graph`: 3
-- `cross-artifact-closure`: 6
+- `cross-artifact-closure`: 5
 - `behavioral-proof`: 8
 - `supply-chain-network`: 5
 - `release-sast-and-legal`: 5

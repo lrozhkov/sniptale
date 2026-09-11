@@ -14,9 +14,9 @@ vi.mock('../../workflows/video-review/export-lifecycle', async (importOriginal) 
   ...(await importOriginal<typeof import('../../workflows/video-review/export-lifecycle')>()),
   exportReviewedVideo: mocks.export,
 }));
-vi.mock('../library/actions/shared', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../library/actions/shared')>()),
-  downloadBlob: mocks.download,
+vi.mock('../shared/download', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../shared/download')>()),
+  downloadGalleryBlob: mocks.download,
 }));
 function setup() {
   vi.clearAllMocks();

@@ -1,9 +1,3 @@
-import { resolveVideoCompositionActionSourceMapping } from '../../../../features/video/composition/timeline/frame/actions';
-import type { VideoProjectActionOccurrence } from '../../../../features/video/project/action-occurrences';
-import {
-  mapSourceNormalizedPointToVisualLayer,
-  mapVisualLayerPointToSourceNormalized,
-} from '../../../../features/video/composition/draw/fitted-media';
 import type { CSSProperties } from 'react';
 
 import {
@@ -11,14 +5,15 @@ import {
   mapCompositionRectThroughCamera,
   mapViewportPointToComposition,
 } from '../../../../features/video/composition/motion';
-import {
-  type VideoProject,
-  type VideoProjectClip,
-  VideoMotionOverlayZoomMode,
-  VideoProjectClipType,
-  VideoProjectTrackRole,
-} from '../../../../features/video/project/types/index';
+import { type VideoProject } from '../../../../features/video/project/types/index';
 import type { PreviewStageCanvasProps } from '../types';
+
+export {
+  canEditVideoActionOccurrence as canEditActionOccurrenceOnCanvas,
+  mapScenePointToVideoActionOccurrence as mapScenePointToActionOccurrence,
+  mapVideoActionOccurrencePointToScene as mapActionOccurrencePointToScene,
+  shouldLockVideoClipToViewport as shouldLockPreviewClipToViewport,
+} from '../../../../features/video/composition/action-occurrence-geometry';
 
 interface PreviewStageBounds {
   height: number;
@@ -159,98 +154,4 @@ export function getPreviewStageInteractionScale(
     scaleX: scaledValue,
     scaleY: scaledValue,
   };
-}
-
-export function shouldLockPreviewClipToViewport(
-  clip: Pick<VideoProjectClip, 'type' | 'trackId'>,
-  camera: PreviewStageCanvasProps['camera'],
-  project: Pick<VideoProject, 'tracks'>
-) {
-  if (
-    clip.type === VideoProjectClipType.VIDEO &&
-    project.tracks.find((track) => track.id === clip.trackId)?.role === VideoProjectTrackRole.CAMERA
-  ) {
-    return true;
-  }
-  if (
-    (camera.overlayZoomMode ?? VideoMotionOverlayZoomMode.LOCK_OVERLAYS) !==
-    VideoMotionOverlayZoomMode.LOCK_OVERLAYS
-  ) {
-    return false;
-  }
-
-  switch (clip.type) {
-    case VideoProjectClipType.TEXT:
-    case VideoProjectClipType.SUBTITLE:
-    case VideoProjectClipType.ANNOTATION:
-    case VideoProjectClipType.EFFECT:
-    case VideoProjectClipType.SHAPE:
-      return true;
-    case VideoProjectClipType.VIDEO:
-    case VideoProjectClipType.IMAGE:
-    case VideoProjectClipType.AUDIO:
-      return false;
-  }
-}
-
-/** Direct editing is unavailable for arbitrary effect warps without an inverse mapping. */
-export function canEditActionOccurrenceOnCanvas(
-  project: VideoProject,
-  occurrence: VideoProjectActionOccurrence,
-  currentTime: number
-): boolean {
-  if (!Number.isFinite(currentTime)) return false;
-  if (occurrence.clipId === null) return true;
-  const clip = project.clips.find((item) => item.id === occurrence.clipId);
-  if (!clip || currentTime < clip.startTime || currentTime >= clip.startTime + clip.duration)
-    return false;
-  return !(project.effectInstances ?? []).some(
-    (effect) =>
-      effect.enabled &&
-      currentTime >= effect.startTime &&
-      currentTime < effect.startTime + effect.duration &&
-      ((effect.target.kind === 'clip' && effect.target.clipId === clip.id) ||
-        (effect.target.kind === 'transition' &&
-          project.transitions?.some(
-            (transition) =>
-              'transitionId' in effect.target &&
-              transition.id === effect.target.transitionId &&
-              (transition.leadingClipId === clip.id || transition.trailingClipId === clip.id)
-          )))
-  );
-}
-
-export function mapActionOccurrencePointToScene(
-  project: VideoProject,
-  occurrence: VideoProjectActionOccurrence,
-  currentTime: number,
-  camera: PreviewStageCanvasProps['camera']
-) {
-  if (!canEditActionOccurrenceOnCanvas(project, occurrence, currentTime)) return null;
-  const point = occurrence.event.presentation?.point ?? occurrence.event.point;
-  if (!point || occurrence.clipId === null) return point;
-  const mapping = resolveVideoCompositionActionSourceMapping(project, occurrence, currentTime);
-  const mapped = mapping && mapSourceNormalizedPointToVisualLayer({ ...mapping, point });
-  const clip = project.clips.find((item) => item.id === occurrence.clipId);
-  return mapped && clip && shouldLockPreviewClipToViewport(clip, camera, project)
-    ? mapViewportPointToComposition(mapped, camera)
-    : mapped;
-}
-
-export function mapScenePointToActionOccurrence(
-  project: VideoProject,
-  occurrence: VideoProjectActionOccurrence,
-  currentTime: number,
-  camera: PreviewStageCanvasProps['camera'],
-  point: { x: number; y: number }
-) {
-  if (!canEditActionOccurrenceOnCanvas(project, occurrence, currentTime)) return null;
-  if (occurrence.clipId === null) return point;
-  const clip = project.clips.find((item) => item.id === occurrence.clipId);
-  const mapped =
-    clip && shouldLockPreviewClipToViewport(clip, camera, project)
-      ? mapCompositionPointThroughCamera(point, camera)
-      : point;
-  const mapping = resolveVideoCompositionActionSourceMapping(project, occurrence, currentTime);
-  return mapping ? mapVisualLayerPointToSourceNormalized({ ...mapping, point: mapped }) : null;
 }

@@ -1,7 +1,7 @@
 import type { ReviewExportReceipt } from '../../workflows/video-review/export-lifecycle';
 import { translate } from '../../platform/i18n';
 import { createVideoReviewReport } from '../../workflows/video-review/report';
-import { downloadBlob } from '../library/actions/shared';
+import { downloadGalleryBlob } from '../shared/download';
 import type { LoadedReview } from './use-session';
 
 /** Copy and download share the exact committed revision and complete telemetry payload. */
@@ -31,7 +31,7 @@ export async function exportReviewReport(
   });
   if (action === 'copy') await navigator.clipboard.writeText(report);
   else
-    downloadBlob(
+    downloadGalleryBlob(
       new Blob([report], { type: 'text/markdown;charset=utf-8' }),
       `${resource.filename}.sniptale-video-review.md`
     );

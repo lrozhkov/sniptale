@@ -413,6 +413,17 @@ export const LOCAL_OWNER_MAPPINGS = [
     ],
   },
   {
+    owner: 'gallery-shared-download',
+    productionFile: 'apps/extension/src/gallery/shared/download.ts',
+    reason:
+      'Download lifecycle, release failure, bounded cleanup, and video-review publication are exercised by the existing gallery consumer suites.',
+    testFiles: [
+      'apps/extension/src/gallery/library/actions/shared.download.test.ts',
+      'apps/extension/src/gallery/video-review/review.test.tsx',
+      'apps/extension/src/gallery/video-review/use-export.test.tsx',
+    ],
+  },
+  {
     owner: 'content-frame-runtime-test-support',
     productionFile: 'apps/extension/src/content/selection/frame-runtime/test-support.ts',
     reason:
