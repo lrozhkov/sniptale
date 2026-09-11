@@ -108,20 +108,28 @@ export async function verifyWorkspacePanelsAndFocus(page: Page): Promise<void> {
   await page.locator('article#text-only .guide-step-title').focus();
   await expect(page.locator('article#text-only .guide-step-title')).toBeFocused();
   await expect(page.locator('article#text-only')).toHaveAttribute('data-selected', 'true');
-  await page.locator('button[aria-controls="guide-library-panel"]').click();
-  const inspectorToggle = page.locator('button[aria-controls="guide-inspector-panel"]');
-  if ((await inspectorToggle.getAttribute('aria-expanded')) === 'true')
-    await inspectorToggle.click();
+  await page
+    .locator('#guide-library-panel')
+    .getByRole('button', { name: 'Close', exact: true })
+    .click();
+  const inspector = page.locator('#guide-inspector-panel');
+  if (await inspector.isVisible())
+    await inspector.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.locator('#guide-library-panel')).toBeHidden();
   await expect(page.locator('#guide-inspector-panel')).toBeHidden();
   await page.evaluate(() => {
     document.documentElement.style.fontSize = '200%';
   });
-  const save = page.locator('button[aria-controls="guide-inspector-panel"]');
+  const save = page
+    .locator('.guide-page-header')
+    .getByRole('button', { name: 'Inspector', exact: true });
   await expect(save).toBeInViewport();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
-  await page.locator('button[aria-controls="guide-library-panel"]').click();
+  await page
+    .locator('.guide-page-header')
+    .getByRole('button', { name: 'Outline', exact: true })
+    .click();
   await expect(page.locator('#guide-library-panel')).toBeVisible();
   await expect(save).toBeInViewport();
   await page.evaluate(() => {
@@ -196,6 +204,7 @@ export async function verifyGuideComposition(page: Page): Promise<void> {
 export async function verifyImageImport(page: Page, testInfo: TestInfo): Promise<void> {
   const before = await page.locator('article').count();
   await page.getByRole('button', { name: 'Resources', exact: true }).click();
+  await page.getByRole('button', { name: 'Image library', exact: true }).click();
   const encoded = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
     canvas.width = 300;
@@ -224,6 +233,10 @@ export async function verifyImageImport(page: Page, testInfo: TestInfo): Promise
   await page.getByRole('button', { name: 'Import selected', exact: true }).click();
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   await expect(page.locator('article')).toHaveCount(before + 2);
+  await page
+    .getByRole('dialog', { name: 'Resources', exact: true })
+    .getByRole('button', { name: 'Close', exact: true })
+    .click();
   await expect(page.locator('article').nth(before).locator('header .guide-step-title')).toHaveValue(
     'second-import.png'
   );

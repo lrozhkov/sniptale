@@ -35,21 +35,21 @@ function pointer(target: EventTarget, type: string, clientX: number) {
 it('resizes with keyboard within limits and restores the default', () => {
   for (let n = 0; n < 20; n++)
     act(() =>
-      divider().dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+      divider().dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }))
     );
-  expect(divider().getAttribute('aria-valuenow')).toBe('320');
+  expect(divider().getAttribute('aria-valuenow')).toBe('180');
   act(() => divider().dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true })));
-  expect(divider().getAttribute('aria-valuenow')).toBe('224');
+  expect(divider().getAttribute('aria-valuenow')).toBe('320');
 });
 it('cancels a resize with Escape and releases listeners after pointerup', () => {
-  pointer(divider(), 'pointerdown', 224);
+  pointer(divider(), 'pointerdown', 320);
   pointer(window, 'pointermove', 280);
   expect(divider().getAttribute('aria-valuenow')).toBe('280');
   act(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
-  expect(divider().getAttribute('aria-valuenow')).toBe('224');
+  expect(divider().getAttribute('aria-valuenow')).toBe('320');
   pointer(window, 'pointermove', 300);
-  expect(divider().getAttribute('aria-valuenow')).toBe('224');
-  pointer(divider(), 'pointerdown', 224);
+  expect(divider().getAttribute('aria-valuenow')).toBe('320');
+  pointer(divider(), 'pointerdown', 320);
   pointer(window, 'pointermove', 260);
   pointer(window, 'pointerup', 260);
   pointer(window, 'pointermove', 310);

@@ -1,3 +1,4 @@
+import { GuideResourceDrawer } from './resource-drawer';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { GuideAppearance } from './appearance';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -20,32 +21,9 @@ export function ScenarioEditorPage() {
   const state = useGuidePageState();
   const panels = useGuidePanels();
   const imageEditor = useGuideImageEditorMode(state.images);
-  const [focusRequest, setFocusRequest] = useState<GuideFocusRequest>({ sequence: 0 });
-  const selectItem = (id: string, requestFocus = true) => {
-    state.selectItem(id);
-    setFocusRequest((current) => ({
-      sequence: current.sequence + 1,
-      preserveFocus: !requestFocus,
-    }));
-  };
   const { project, status } = state;
   const disabled = state.editingLocked;
-  const operate = (operation: GuideStructureOperation) => {
-    const next = state.operate(operation);
-    if (!next) return;
-    const { target, addedItem, addedBlock } = resolveOperationFocus(
-      project,
-      next,
-      state.selectedId
-    );
-    if (target) {
-      state.selectItem(target.id, next);
-      setFocusRequest((current) => ({
-        sequence: current.sequence + 1,
-        ...(addedItem ? { field: true } : addedBlock ? { blockId: addedBlock.id } : {}),
-      }));
-    } else state.selectItem(null, next);
-  };
+  const { focusRequest, selectItem, operate } = useGuideNavigation(state);
   if (imageEditor.selection && project)
     return (
       <GuideImageEditor
@@ -56,6 +34,42 @@ export function ScenarioEditorPage() {
         onClose={imageEditor.close}
       />
     );
+  const header = (
+    <GuidePageHeader
+      projectActions={
+        project && (
+          <GuideProjectActions
+            project={project}
+            disabled={disabled || state.mutationPending}
+            status={status}
+            onDuplicate={state.duplicate}
+            onDelete={state.remove}
+            onReload={state.reload}
+            t={t}
+          />
+        )
+      }
+      leftControls={project && <GuidePanelControls panels={panels} t={t} side="left" />}
+      panelControls={project && <GuidePanelControls panels={panels} t={t} side="right" />}
+
+      project={project}
+      disabled={disabled}
+      feedback={
+        <GuidePageFeedback
+          status={status}
+          actionError={state.actionError}
+          onRetry={project ? state.save : undefined}
+          t={t}
+        />
+      }
+      canUndo={state.canUndo}
+      canRedo={state.canRedo}
+      onUndo={state.undo}
+      onRedo={state.redo}
+      onChange={state.update}
+      t={t}
+    />
+  );
   return (
     <main
       className="guide-page"
@@ -73,73 +87,42 @@ export function ScenarioEditorPage() {
         else state.undo();
       }}
     >
-      <GuidePageHeader
-        projectActions={
-          project && (
-            <GuideProjectActions
-              project={project}
-              disabled={disabled || state.mutationPending}
-              status={status}
-              onDuplicate={state.duplicate}
-              onDelete={state.remove}
-              onReload={state.reload}
-              t={t}
-            />
-          )
-        }
-        panelControls={project && <GuidePanelControls panels={panels} t={t} />}
-        project={project}
-        disabled={disabled}
-        feedback={
-          <GuidePageFeedback
-            status={status}
-            actionError={state.actionError}
-            onRetry={project ? state.save : undefined}
-            t={t}
-          />
-        }
-        canUndo={state.canUndo}
-        canRedo={state.canRedo}
-        onUndo={state.undo}
-        onRedo={state.redo}
-        onChange={state.update}
-        t={t}
-      />
+      {!project && header}
       <GuideProjectRecovery state={state} t={t} />
       {project && (
         <GuideWorkspace
-          panels={panels}
+          header={header}
           importResources={
-            <GuideImageResources
-              disabled={disabled || state.mutationPending || state.status === 'conflict'}
-              selectedStepId={
-                project.items.find((item) => item.id === state.selectedId)?.kind === 'step'
-                  ? state.selectedId
-                  : null
-              }
-              t={t}
-              onImport={(input) => state.commitChange({ kind: 'import', input })}
-            />
+            <GuideResourceDrawer t={t}>
+              <GuideImageResources
+                disabled={disabled || state.mutationPending || state.status === 'conflict'}
+                selectedStepId={
+                  project.items.find((item) => item.id === state.selectedId)?.kind === 'step'
+                    ? state.selectedId
+                    : null
+                }
+                t={t}
+                onImport={(input) => state.commitChange({ kind: 'import', input })}
+              />
+            </GuideResourceDrawer>
           }
+          images={state.images}
+          panels={panels}
           project={project}
           selectedId={state.selectedId}
-          images={state.images}
           disabled={disabled}
           onSelect={selectItem}
           onAddStep={() => operate({ kind: 'add-step' })}
           onAddSection={() => operate({ kind: 'add-section' })}
           itemActions={
-            <>
-              <GuideAppearance
-                project={project}
-                selectedId={state.selectedId}
-                disabled={disabled}
-                onChange={state.update}
-                t={t}
-              />
-            </>
+            <GuideAppearance
+              project={project}
+              selectedId={state.selectedId}
+              disabled={disabled}
+              onChange={state.update}
+              t={t}
+            />
           }
-
           t={t}
         >
           <GuideDocument
@@ -161,6 +144,41 @@ export function ScenarioEditorPage() {
       )}
     </main>
   );
+}
+
+/** Selection and structural commands share one disposable document focus intent. */
+function useGuideNavigation(
+  state: Pick<
+    ReturnType<typeof useGuidePageState>,
+    'project' | 'selectedId' | 'selectItem' | 'operate'
+  >
+) {
+  const [focusRequest, setFocusRequest] = useState<GuideFocusRequest>({ sequence: 0 });
+  const selectItem = (id: string, requestFocus = true) => {
+    state.selectItem(id);
+    setFocusRequest((current) => ({
+      sequence: current.sequence + 1,
+      preserveFocus: !requestFocus,
+    }));
+  };
+  const { project } = state;
+  const operate = (operation: GuideStructureOperation) => {
+    const next = state.operate(operation);
+    if (!next) return;
+    const { target, addedItem, addedBlock } = resolveOperationFocus(
+      project,
+      next,
+      state.selectedId
+    );
+    if (target) {
+      state.selectItem(target.id, next);
+      setFocusRequest((current) => ({
+        sequence: current.sequence + 1,
+        ...(addedItem ? { field: true } : addedBlock ? { blockId: addedBlock.id } : {}),
+      }));
+    } else state.selectItem(null, next);
+  };
+  return { focusRequest, selectItem, operate };
 }
 
 /** Maps canonical structural changes to a document focus destination without owning edit state. */
@@ -221,7 +239,11 @@ function GuidePageFeedback({
       data-status={status}
       data-quiet={
         !actionError &&
-        (status === 'saved' || status === 'ready' || status === 'dirty' || status === 'empty')
+        (status === 'saving' ||
+          status === 'saved' ||
+          status === 'ready' ||
+          status === 'dirty' ||
+          status === 'empty')
       }
     >
       <p role="status" aria-live="polite">

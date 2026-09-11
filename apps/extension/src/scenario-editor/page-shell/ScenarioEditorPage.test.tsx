@@ -12,7 +12,6 @@ import {
 const io = vi.hoisted(() => ({
   load: vi.fn(),
   previous: vi.fn(),
-  library: vi.fn(),
   asset: vi.fn(),
   create: vi.fn(),
   duplicate: vi.fn(),
@@ -22,7 +21,6 @@ const io = vi.hoisted(() => ({
   select: vi.fn(),
   mount: vi.fn(),
 }));
-vi.mock('../../platform/navigation/extension-pages', () => ({ openGalleryPage: io.library }));
 vi.mock('./runtime/resource-session', () => ({ useGuideResourceSession: () => enterSession }));
 const enterSession = async () => true;
 vi.mock('../../composition/persistence/scenario/history', () => ({
@@ -79,7 +77,6 @@ beforeEach(() => {
     updatedAt: 102,
   }));
   io.remove.mockResolvedValue(undefined);
-  io.library.mockResolvedValue(undefined);
 });
 afterEach(() => {
   act(() => root.unmount());
@@ -123,15 +120,17 @@ async function settleAutosave() {
   });
 }
 
-it('loads the canonical document and saves added steps against the loaded revision', async () => {
+it('saves the edited project title and added steps against the loaded revision', async () => {
   await render();
   expect(container.querySelectorAll('article')).toHaveLength(1);
+  await editField('input[aria-label="Scenario"]', 'Renamed guide');
   await click('Add step');
   expect(container.querySelectorAll('article')).toHaveLength(2);
   await settleAutosave();
   expect(io.save).toHaveBeenCalledWith(
     expect.objectContaining({
       version: 4,
+      name: 'Renamed guide',
       items: expect.arrayContaining([expect.objectContaining({ id: 'first' })]),
     }),
     { baseUpdatedAt: 100 }
@@ -457,28 +456,15 @@ it('navigates from current resources and collapses panels without changing the d
   io.load.mockResolvedValue(project);
   await render();
   await click('Resources');
-  await click('Image step');
+  await click('Image step', document.body);
   expect(document.activeElement?.id).toBe('image-step');
-  await click('Outline');
+  await click('Close', container.querySelector('#guide-library-panel')!);
   expect(container.querySelector('#guide-library-panel')?.hasAttribute('hidden')).toBe(true);
   await click('Outline');
   expect(container.querySelector('#guide-library-panel')?.hasAttribute('hidden')).toBe(false);
   await click('Inspector');
   expect(container.querySelector('#guide-inspector-panel')?.hasAttribute('hidden')).toBe(false);
   expect(container.querySelectorAll('article')).toHaveLength(1);
-  expect(io.save).not.toHaveBeenCalled();
-});
-
-it('preserves edits when library navigation fails and offers retry', async () => {
-  io.library.mockRejectedValueOnce(new Error('tab unavailable'));
-  await render();
-  await click('Add step');
-  await click('Library');
-  expect(container.textContent).toContain('Could not open the library');
-  expect(container.querySelectorAll('article')).toHaveLength(2);
-  await click('Library');
-  expect(io.library).toHaveBeenCalledTimes(2);
-  expect(container.textContent).not.toContain('Could not open the library');
   expect(io.save).not.toHaveBeenCalled();
 });
 
@@ -665,12 +651,15 @@ it('accepts image import as one undoable publication and saves undo against its 
   }));
   await render();
   await editField('article#first .guide-step-title', 'Unsaved title');
-  const fileInput = container.querySelector('input[type="file"]');
+  await click('Resources');
+  await click('Image library');
+  const fileInput = document.querySelector('input[type="file"]');
   Object.defineProperty(fileInput, 'files', {
     value: [new File(['png'], 'one.png', { type: 'image/png' })],
   });
   await act(async () => fileInput?.dispatchEvent(new Event('change', { bubbles: true })));
-  await click('Import selected');
+  await click('Import selected', document.body);
+  await click('Close', document.body);
   expect(io.importImages.mock.calls[0]?.[0]).toMatchObject({
     baseUpdatedAt: 100,
     project: { items: [{ title: 'Unsaved title' }] },
@@ -697,6 +686,7 @@ it('keeps typing available during autosave and uses the acknowledged revision fo
   await render();
   await editField('article#first .guide-step-title', 'First draft');
   await settleAutosave();
+  expect(container.querySelector('.guide-page-feedback')?.getAttribute('data-quiet')).toBe('true');
   expect(io.save).toHaveBeenCalledTimes(1);
   expect(container.querySelector('article .guide-step-title')).toHaveProperty('disabled', false);
   await editField('article#first .guide-step-title', 'More recent draft');

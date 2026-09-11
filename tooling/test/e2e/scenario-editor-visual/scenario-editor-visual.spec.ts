@@ -147,28 +147,33 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
   });
 }
 
-test('compact header owns panel toggles and dividers resize the workspace', async ({
+test('panel headers close panels and transparent dividers resize the workspace', async ({
   page,
   hostOrigin,
 }) => {
   await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1920, height: 1080 });
   const header = page.locator('.guide-page-header');
   expect((await header.boundingBox())?.height).toBeLessThanOrEqual(52);
-  expect((await page.locator('.guide-project-name').boundingBox())?.width).toBeLessThanOrEqual(280);
-  await expect(header.getByRole('button', { name: 'Outline', exact: true })).toBeVisible();
-  await expect(header.getByRole('button', { name: 'Inspector', exact: true })).toBeVisible();
+  expect((await page.locator('.guide-project-name').boundingBox())?.width).toBeLessThan(
+    (await header.boundingBox())!.width
+  );
+  await expect(header.getByRole('button', { name: 'Outline', exact: true })).toHaveCount(0);
+  await expect(header.getByRole('button', { name: 'Inspector', exact: true })).toHaveCount(0);
   await expect(page.locator('.guide-workspace-bar')).toHaveCount(0);
   await page.locator('article#compare').focus();
   await expect(page.locator('article#compare')).toHaveCSS('outline-width', '1px');
   const divider = page.getByRole('separator', { name: 'Outline', exact: true });
   await divider.focus();
-  await page.keyboard.press('ArrowRight');
-  await expect(divider).toHaveAttribute('aria-valuenow', '240');
-  expect((await page.locator('#guide-library-panel').boundingBox())?.width).toBeCloseTo(240, 0);
-  await header.getByRole('button', { name: 'Outline', exact: true }).click();
+  await page.keyboard.press('ArrowLeft');
+  await expect(divider).toHaveAttribute('aria-valuenow', '304');
+  expect((await page.locator('#guide-library-panel').boundingBox())?.width).toBeCloseTo(304, 0);
+  await page
+    .locator('#guide-library-panel')
+    .getByRole('button', { name: 'Close', exact: true })
+    .click();
   await expect(page.locator('#guide-library-panel')).toBeHidden();
   await header.getByRole('button', { name: 'Outline', exact: true }).click();
-  await expect(divider).toHaveAttribute('aria-valuenow', '240');
+  await expect(divider).toHaveAttribute('aria-valuenow', '304');
 });
 
 for (const theme of SCENARIO_VISUAL_THEMES) {
@@ -213,7 +218,7 @@ test('document text fits its content while wrapping and resizing', async ({
     .toBe(true);
   const body = page.locator('article#compare .guide-description');
   await body.fill('A detailed explanation stays visible in the document. '.repeat(35));
-  await expect(body).toHaveCSS('outline-width', '1px');
+  await expect(body).toHaveCSS('outline-style', 'none');
   await expect
     .poll(() => body.evaluate((field) => field.scrollHeight <= field.clientHeight + 1))
     .toBe(true);
@@ -283,6 +288,139 @@ test('document tools are contextual and leave image geometry unchanged', async (
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(page.locator('main article')).toHaveCount(2);
   await expect(page.getByRole('status').first()).toHaveText('Saved');
+});
+
+test('resources open in a wide drawer and return focus to their inspector', async ({
+  page,
+  hostOrigin,
+}, testInfo) => {
+  await openVisualHarness(page, hostOrigin, 'dark', 'en', { width: 1280, height: 900 });
+  await page.getByRole('button', { name: 'Resources', exact: true }).click();
+  const trigger = page.getByRole('button', { name: 'Image library', exact: true });
+  await expect(trigger).toBeVisible();
+  await trigger.click();
+  const drawer = page.getByRole('dialog', { name: 'Resources', exact: true });
+  await expect(drawer).toBeVisible();
+  expect((await drawer.boundingBox())?.width).toBeGreaterThan(900);
+  await expect(
+    page.locator('.guide-library-panel').getByRole('button', { name: 'Resources', exact: true })
+  ).toBeVisible();
+  await drawer.locator('button[aria-haspopup="listbox"]').click();
+  await expect(page.getByRole('listbox')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('listbox')).toHaveCount(0);
+  await expect(drawer).toBeVisible();
+  await page.setViewportSize({ width: 640, height: 720 });
+  const box = await drawer.boundingBox();
+  expect(box?.x).toBeGreaterThanOrEqual(0);
+  expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(640);
+  await testInfo.attach('resources-drawer-narrow', {
+    body: await page.screenshot(),
+    contentType: 'image/png',
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await testInfo.attach('resources-drawer-dark', {
+    body: await page.screenshot(),
+    contentType: 'image/png',
+  });
+  await page.keyboard.press('Escape');
+  await expect(drawer).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+});
+
+test('workspace has three aligned surface headers and restores panels by section', async ({
+  page,
+  hostOrigin,
+}) => {
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1440, height: 900 });
+  await expect(page.locator('.guide-library-link')).toHaveCount(0);
+  await expect(page.locator('.guide-center-panel > .guide-page-header')).toBeVisible();
+  const headers = page.locator(
+    '.guide-workspace > .guide-library-panel > .guide-panel-heading, .guide-center-panel > .guide-page-header, .guide-workspace > .guide-inspector-panel > .guide-panel-heading'
+  );
+  await expect(headers).toHaveCount(3);
+  const boxes = await headers.evaluateAll((elements) =>
+    elements.map((element) => ({
+      top: element.getBoundingClientRect().top,
+      height: element.getBoundingClientRect().height,
+    }))
+  );
+  expect(new Set(boxes.map((box) => box.top)).size).toBe(1);
+  expect(new Set(boxes.map((box) => box.height)).size).toBe(1);
+  const center = page.locator('.guide-center-panel > .guide-page-header');
+  await page
+    .locator('#guide-library-panel')
+    .getByRole('button', { name: 'Close', exact: true })
+    .click();
+  await expect(center.getByRole('button', { name: 'Outline', exact: true })).toBeVisible();
+  await center.getByRole('button', { name: 'Resources', exact: true }).click();
+  await expect(
+    page.locator('#guide-library-panel').getByRole('button', { name: 'Image library', exact: true })
+  ).toBeVisible();
+  await expect(center.getByRole('button', { name: 'Resources', exact: true })).toHaveCount(0);
+  await page
+    .locator('#guide-inspector-panel')
+    .getByRole('button', { name: 'Close', exact: true })
+    .click();
+  await center.getByRole('button', { name: 'Inspector', exact: true }).click();
+  await expect(center.getByRole('button', { name: 'Inspector', exact: true })).toHaveCount(0);
+  const divider = page.getByRole('separator', { name: 'Outline', exact: true });
+  await divider.hover();
+  await expect(divider).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+});
+
+test('inline text highlights its own rounded edge and hides empty placeholders on focus', async ({
+  page,
+  hostOrigin,
+}) => {
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1440, height: 900 });
+  const title = page.locator('article#compare .guide-step-title');
+  await title.focus();
+  await expect(title).toHaveCSS('outline-style', 'none');
+  await expect(title).toHaveCSS('border-top-width', '1px');
+  const colors = await title.evaluate((element) => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--sniptale-color-accent)';
+    element.parentElement!.append(probe);
+    const expected = getComputedStyle(probe).color;
+    probe.remove();
+    return {
+      actual: getComputedStyle(element).borderTopColor,
+      expected,
+      radius: parseFloat(getComputedStyle(element).borderTopLeftRadius),
+      placeholder: getComputedStyle(element, '::placeholder').opacity,
+    };
+  });
+  expect(colors.actual).toBe(colors.expected);
+  expect(colors.radius).toBeGreaterThan(0);
+  expect(colors.placeholder).toBe('0');
+  await title.blur();
+  expect(
+    await title.evaluate((element) => getComputedStyle(element, '::placeholder').opacity)
+  ).toBe('1');
+});
+
+test('project title expands within the center and history sits beside the outer menu', async ({
+  page,
+  hostOrigin,
+}) => {
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1920, height: 1080 });
+  const header = page.locator('.guide-page-header');
+  const title = header.locator('input');
+  const before = (await title.boundingBox())!.width;
+  await title.focus();
+  expect(await title.evaluate((element) => getComputedStyle(element).outlineStyle)).toBe('none');
+  expect((await title.boundingBox())!.width).toBeGreaterThan(before);
+  const menu = header.locator('.guide-action-menu-anchor');
+  const redo = header.getByRole('button', { name: 'Redo', exact: true });
+  expect((await menu.boundingBox())!.x).toBeGreaterThan((await redo.boundingBox())!.x);
+  expect((await title.boundingBox())!.x + (await title.boundingBox())!.width).toBeLessThan(
+    (await redo.boundingBox())!.x
+  );
+  const divider = page.getByRole('separator', { name: 'Outline', exact: true });
+  expect(await divider.getAttribute('aria-valuenow')).toBe(
+    await divider.getAttribute('aria-valuemax')
+  );
 });
 
 test('history cleanup preserves two-tab undo resources until sessions close', async ({

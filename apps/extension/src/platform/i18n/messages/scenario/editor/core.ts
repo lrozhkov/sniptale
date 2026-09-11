@@ -93,15 +93,10 @@ export const scenarioEditorCoreMessages = defineMessageSource({
     ru: 'Не удалось изменить структуру. Проверьте выбранный элемент и допустимый размер инструкции. Предыдущая версия осталась в редакторе.',
     en: 'Could not change the structure. Check the selected item and guide size limits. The previous version remains in the editor.',
   },
-  guideLibraryFailed: {
-    ru: 'Не удалось открыть библиотеку. Нажмите «Библиотека», чтобы повторить.',
-    en: 'Could not open the library. Select Library to retry.',
-  },
-  guideLibrary: { ru: 'Библиотека', en: 'Library' },
-  guideLibraryHint: { ru: 'Открыть библиотеку в новой вкладке', en: 'Open library in a new tab' },
   guideDocument: { ru: 'Инструкция', en: 'Guide document' },
   guideInspector: { ru: 'Настройки', en: 'Inspector' },
   guideNavigation: { ru: 'Навигация по инструкции', en: 'Guide navigation' },
+  guideOpenImageLibrary: { ru: 'Библиотека изображений', en: 'Image library' },
   guideResources: { ru: 'Ресурсы', en: 'Resources' },
   guideResourcesHint: {
     ru: 'Изображения в этой инструкции. Выберите изображение, чтобы перейти к его шагу.',

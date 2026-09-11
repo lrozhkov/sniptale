@@ -1,20 +1,46 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 
 type PanelSide = 'left' | 'right';
+type GuideLeftSection = 'structure' | 'resources';
 const limits = {
-  left: { min: 180, max: 320, initial: 224 },
-  right: { min: 260, max: 420, initial: 300 },
+  left: { min: 180, max: 320, initial: 320 },
+  right: { min: 260, max: 420, initial: 420 },
 };
 
 /** Owns disposable panel visibility and dimensions; resizing never edits the guide. */
 export function useGuidePanels() {
-  const [leftOpen, setLeftOpen] = useState(true);
+  const [viewport, setViewport] = useState(() => window.innerWidth);
+  const [leftOpen, setLeftOpen] = useState(() => window.innerWidth >= 720);
+  const [leftSection, setLeftSection] = useState<GuideLeftSection>('structure');
   const [rightOpen, setRightOpen] = useState(() => window.innerWidth >= 1200);
-  const [widths, setWidths] = useState({ left: 224, right: 300 });
+  const [requested, setWidths] = useState(() => ({
+    left: 320,
+    right:
+      window.innerWidth >= 1200
+        ? Math.max(260, Math.min(420, window.innerWidth - 32 - 640 - 320))
+        : 420,
+  }));
+  const budget = viewport - 32 - 640;
+  const inline = viewport >= 1200 && leftOpen && rightOpen;
+  const left = Math.min(requested.left, inline ? Math.max(180, budget - 260) : 320);
+  const right = Math.min(requested.right, inline ? Math.max(260, budget - left) : 420);
+  const widths = { left, right };
+  const bounds = {
+    left: { ...limits.left, max: inline ? Math.min(320, budget - right) : 320 },
+    right: { ...limits.right, max: inline ? Math.min(420, budget - left) : 420 },
+  };
   const cancel = useRef<(() => void) | null>(null);
-  useEffect(() => () => cancel.current?.(), []);
+  useEffect(() => {
+    const measure = () => setViewport(window.innerWidth);
+    const releaseGesture = () => cancel.current?.();
+    window.addEventListener('resize', measure);
+    return () => {
+      window.removeEventListener('resize', measure);
+      releaseGesture();
+    };
+  }, []);
   const resize = (side: PanelSide, value: number) => {
-    const bound = limits[side];
+    const bound = bounds[side];
     setWidths((current) => ({
       ...current,
       [side]: Math.max(bound.min, Math.min(bound.max, value)),
@@ -23,12 +49,20 @@ export function useGuidePanels() {
   return {
     leftOpen,
     rightOpen,
+    leftSection,
+    openLeft: (section: GuideLeftSection) => {
+      setLeftSection(section);
+      setLeftOpen(true);
+    },
     toggleLeft: () => setLeftOpen((open) => !open),
     toggleRight: () => setRightOpen((open) => !open),
     widths,
+    bounds,
     resize,
     cancel,
     style: {
+      '--guide-left-gap': leftOpen ? '8px' : '0px',
+      '--guide-right-gap': rightOpen ? '8px' : '0px',
       '--guide-left-width': `${leftOpen ? widths.left : 0}px`,
       '--guide-right-width': `${rightOpen ? widths.right : 0}px`,
     } as CSSProperties,
@@ -45,7 +79,7 @@ export function GuidePanelDivider({
   panels: ReturnType<typeof useGuidePanels>;
   label: string;
 }) {
-  const bound = limits[side];
+  const bound = panels.bounds[side];
   const direction = side === 'left' ? 1 : -1;
   return (
     <div
@@ -57,9 +91,9 @@ export function GuidePanelDivider({
       aria-valuemax={bound.max}
       aria-valuenow={panels.widths[side]}
       tabIndex={0}
-      onDoubleClick={() => panels.resize(side, bound.initial)}
+      onDoubleClick={() => panels.resize(side, bound.max)}
       onKeyDown={(event) => {
-        if (event.key === 'Home') panels.resize(side, bound.initial);
+        if (event.key === 'Home') panels.resize(side, bound.max);
         else if (event.key === 'ArrowLeft' || event.key === 'ArrowRight')
           panels.resize(
             side,

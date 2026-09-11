@@ -1,10 +1,9 @@
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { useState, type ReactNode } from 'react';
-import { FileText, Image, PanelLeft, PanelRight, Plus, Settings2 } from 'lucide-react';
+import { type ReactNode } from 'react';
+import { FileText, Image, PanelRight, Plus, Settings2, X } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { GuidePanelDivider, type useGuidePanels } from './panel-layout';
-import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
 import './workspace.css';
@@ -14,11 +13,12 @@ type WorkspaceProps = {
   project: GuideProject;
   selectedId: string | null;
   images: Record<string, string | null>;
+  header: ReactNode;
+  importResources: ReactNode;
   disabled: boolean;
   onSelect: (id: string) => void;
   onAddStep: () => void;
   onAddSection: () => void;
-  importResources: ReactNode;
   itemActions: ReactNode;
   children: ReactNode;
   t: Translate;
@@ -28,7 +28,6 @@ type WorkspaceProps = {
 export function GuideWorkspace(props: WorkspaceProps) {
   const { project, selectedId, onSelect, t } = props;
   const { leftOpen, rightOpen } = props.panels;
-  const [mode, setMode] = useState<'structure' | 'resources'>('structure');
   return (
     <div
       className="guide-workspace"
@@ -44,25 +43,47 @@ export function GuideWorkspace(props: WorkspaceProps) {
         aria-label={t('scenario.editor.guideNavigation')}
       >
         <div className="guide-panel-heading">
-          <SegmentedSwitch
-            wrap
-            activeId={mode}
-            onChange={setMode}
-            ariaLabel={t('scenario.editor.guideNavigation')}
-            options={[
-              { id: 'structure', label: t('scenario.editor.outline') },
-              { id: 'resources', label: t('scenario.editor.guideResources') },
-            ]}
-          />
+          <div
+            className="guide-left-navigation"
+            role="group"
+            aria-label={t('scenario.editor.guideNavigation')}
+          >
+            {(
+              [
+                { id: 'structure', Icon: FileText, label: t('scenario.editor.outline') },
+                { id: 'resources', Icon: Image, label: t('scenario.editor.guideResources') },
+              ] as const
+            ).map(({ id, Icon, label }) => (
+              <ContentToolbarButton
+                key={id}
+                title={label}
+                aria-pressed={props.panels.leftSection === id}
+                className="guide-section-tab"
+                onClick={() => props.panels.openLeft(id)}
+              >
+                <Icon size={16} aria-hidden="true" />
+                {props.panels.leftSection === id && <span>{label}</span>}
+              </ContentToolbarButton>
+            ))}
+          </div>
+          <ContentToolbarButton
+            title={t('scenario.editor.close')}
+            aria-controls="guide-library-panel"
+            aria-expanded={true}
+            onClick={props.panels.toggleLeft}
+          >
+            <X size={16} aria-hidden="true" />
+          </ContentToolbarButton>
         </div>
         <div className="guide-panel-scroll">
-          <div hidden={mode !== 'structure'}>
+          {props.panels.leftSection === 'structure' ? (
             <GuideOutline project={project} selectedId={selectedId} onSelect={onSelect} t={t} />
-          </div>
-          <div hidden={mode !== 'resources'}>
-            {props.importResources}
-            {mode === 'resources' && <GuideResources {...props} />}
-          </div>
+          ) : (
+            <>
+              {props.importResources}
+              <GuideResources {...props} />
+            </>
+          )}
         </div>
         <ProductActionButton
           tone="secondary"
@@ -88,28 +109,31 @@ export function GuideWorkspace(props: WorkspaceProps) {
       {leftOpen && (
         <GuidePanelDivider side="left" panels={props.panels} label={t('scenario.editor.outline')} />
       )}
-      <div
-        className="guide-document-scroll"
-        tabIndex={0}
-        aria-label={t('scenario.editor.guideDocument')}
-      >
-        {project.items.length === 0 && (
-          <div className="guide-document-empty">
-            <FileText size={32} aria-hidden="true" />
-            <h2>{t('scenario.editor.guideFirstStep')}</h2>
-            <p>{t('scenario.editor.guideFirstStepHint')}</p>
-            <ProductActionButton
-              tone="secondary"
-              compact
-              type="button"
-              disabled={props.disabled}
-              onClick={props.onAddStep}
-            >
-              {t('scenario.editor.guideAddStep')}
-            </ProductActionButton>
-          </div>
-        )}
-        {props.children}
+      <div className="guide-center-panel">
+        {props.header}
+        <div
+          className="guide-document-scroll"
+          tabIndex={0}
+          aria-label={t('scenario.editor.guideDocument')}
+        >
+          {project.items.length === 0 && (
+            <div className="guide-document-empty">
+              <FileText size={32} aria-hidden="true" />
+              <h2>{t('scenario.editor.guideFirstStep')}</h2>
+              <p>{t('scenario.editor.guideFirstStepHint')}</p>
+              <ProductActionButton
+                tone="secondary"
+                compact
+                type="button"
+                disabled={props.disabled}
+                onClick={props.onAddStep}
+              >
+                {t('scenario.editor.guideAddStep')}
+              </ProductActionButton>
+            </div>
+          )}
+          {props.children}
+        </div>
       </div>
       {rightOpen && (
         <GuidePanelDivider
@@ -156,6 +180,75 @@ function GuideOutline({
   );
 }
 
+/** Selected-item details and project tools use one scrollable app panel. */
+function GuideInspector(props: WorkspaceProps & { open: boolean }) {
+  const { t } = props;
+  return (
+    <FloatingChromePanel
+      role="complementary"
+      id="guide-inspector-panel"
+      className="guide-inspector-panel"
+      hidden={!props.open}
+      aria-label={t('scenario.editor.guideInspector')}
+    >
+      <div className="guide-panel-heading">
+        <Settings2 size={16} aria-hidden="true" />
+        <h2>{t('scenario.editor.guideInspector')}</h2>
+        <ContentToolbarButton
+          title={t('scenario.editor.close')}
+          aria-controls="guide-inspector-panel"
+          aria-expanded={true}
+          onClick={props.panels.toggleRight}
+        >
+          <X size={16} aria-hidden="true" />
+        </ContentToolbarButton>
+      </div>
+      <div className="guide-panel-scroll">{props.itemActions}</div>
+    </FloatingChromePanel>
+  );
+}
+
+/** Collapsed sections reopen directly into the requested inspector content. */
+export function GuidePanelControls({
+  panels,
+  t,
+  side,
+}: {
+  panels: ReturnType<typeof useGuidePanels>;
+  t: Translate;
+  side: 'left' | 'right';
+}) {
+  if (side === 'right')
+    return panels.rightOpen ? null : (
+      <ContentToolbarButton
+        title={t('scenario.editor.guideInspector')}
+        aria-controls="guide-inspector-panel"
+        onClick={panels.toggleRight}
+      >
+        <PanelRight size={16} aria-hidden="true" />
+      </ContentToolbarButton>
+    );
+  if (panels.leftOpen) return null;
+  return (
+    <div className="guide-collapsed-sections">
+      <ContentToolbarButton
+        title={t('scenario.editor.outline')}
+        aria-controls="guide-library-panel"
+        onClick={() => panels.openLeft('structure')}
+      >
+        <FileText size={16} aria-hidden="true" />
+      </ContentToolbarButton>
+      <ContentToolbarButton
+        title={t('scenario.editor.guideResources')}
+        aria-controls="guide-library-panel"
+        onClick={() => panels.openLeft('resources')}
+      >
+        <Image size={16} aria-hidden="true" />
+      </ContentToolbarButton>
+    </div>
+  );
+}
+
 function GuideResources({ project, images, onSelect, t }: WorkspaceProps) {
   const resources = project.items.flatMap((item) =>
     item.kind === 'step'
@@ -186,57 +279,5 @@ function GuideResources({ project, images, onSelect, t }: WorkspaceProps) {
         </ProductActionButton>
       ))}
     </div>
-  );
-}
-
-/** Selected-item details and project tools use one scrollable app panel. */
-function GuideInspector(props: WorkspaceProps & { open: boolean }) {
-  const { t } = props;
-  return (
-    <FloatingChromePanel
-      role="complementary"
-      id="guide-inspector-panel"
-      className="guide-inspector-panel"
-      hidden={!props.open}
-      aria-label={t('scenario.editor.guideInspector')}
-    >
-      <div className="guide-panel-heading">
-        <Settings2 size={16} aria-hidden="true" />
-        <h2>{t('scenario.editor.guideInspector')}</h2>
-      </div>
-      <div className="guide-panel-scroll">{props.itemActions}</div>
-    </FloatingChromePanel>
-  );
-}
-
-/** Header owns panel commands; panels contain only their working content. */
-export function GuidePanelControls({
-  panels,
-  t,
-}: {
-  panels: ReturnType<typeof useGuidePanels>;
-  t: Translate;
-}) {
-  return (
-    <>
-      <ContentToolbarButton
-        type="button"
-        title={t('scenario.editor.outline')}
-        aria-expanded={panels.leftOpen}
-        aria-controls="guide-library-panel"
-        onClick={panels.toggleLeft}
-      >
-        <PanelLeft size={16} aria-hidden="true" />
-      </ContentToolbarButton>
-      <ContentToolbarButton
-        type="button"
-        title={t('scenario.editor.guideInspector')}
-        aria-expanded={panels.rightOpen}
-        aria-controls="guide-inspector-panel"
-        onClick={panels.toggleRight}
-      >
-        <PanelRight size={16} aria-hidden="true" />
-      </ContentToolbarButton>
-    </>
   );
 }
