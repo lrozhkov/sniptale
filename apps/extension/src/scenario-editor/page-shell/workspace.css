@@ -1096,3 +1096,11 @@
   margin: 0;
   text-align: center;
 }
+
+.guide-drop-zone {
+  display: contents;
+}
+.guide-document [data-image-drop] {
+  outline: 1px solid var(--sniptale-color-accent);
+  outline-offset: -1px;
+}

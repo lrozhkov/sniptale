@@ -1,3 +1,4 @@
+import { GUIDE_IMAGE_DRAG_TYPE } from './image-drop';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { type ReactNode } from 'react';
@@ -228,7 +229,7 @@ export function GuidePanelControls({
   );
 }
 
-function GuideResources({ project, images, onSelect, t }: WorkspaceProps) {
+function GuideResources({ project, images, onSelect, disabled, t }: WorkspaceProps) {
   const resources = project.items.flatMap((item) =>
     item.kind === 'step'
       ? item.blocks.flatMap((block) => (block.kind === 'image' ? [{ item, block }] : []))
@@ -245,10 +246,22 @@ function GuideResources({ project, images, onSelect, t }: WorkspaceProps) {
           key={block.id}
           type="button"
           className="guide-resource"
+          draggable={!disabled}
+          onDragStart={(event) => {
+            if (disabled) {
+              event.preventDefault();
+              return;
+            }
+            event.dataTransfer.effectAllowed = 'copy';
+            event.dataTransfer.setData(
+              GUIDE_IMAGE_DRAG_TYPE,
+              JSON.stringify({ projectId: project.id, blockId: block.id })
+            );
+          }}
           onClick={() => onSelect(item.id)}
         >
           {images[block.assetId] ? (
-            <img src={images[block.assetId] ?? undefined} alt="" loading="lazy" />
+            <img src={images[block.assetId] ?? undefined} alt="" loading="lazy" draggable={false} />
           ) : (
             <Image size={24} aria-hidden="true" />
           )}

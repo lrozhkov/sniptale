@@ -1,3 +1,5 @@
+import type { GuideImageImportPlacement } from '../../composition/persistence/scenario/store/public';
+import { GuideImageDropZone } from './image-drop';
 import { GuideResourceDrawer } from './resource-drawer';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { GuideAppearance } from './appearance';
@@ -23,6 +25,11 @@ export function ScenarioEditorPage() {
   const imageEditor = useGuideImageEditorMode(state.images);
   const { project, status } = state;
   const disabled = state.editingLocked;
+  const importFiles = (files: File[], placement: GuideImageImportPlacement, signal: AbortSignal) =>
+    state.commitChange({
+      kind: 'import',
+      input: { sources: files.map((file) => ({ kind: 'file', file })), placement, signal },
+    });
   const { focusRequest, selectItem, operate } = useGuideNavigation(state);
   if (imageEditor.selection && project)
     return (
@@ -124,31 +131,31 @@ export function ScenarioEditorPage() {
           }
           t={t}
         >
-          <GuideDocument
-            onUploadImage={(stepId, blockId, file, signal) =>
-              state.commitChange({
-                kind: 'import',
-                input: {
-                  sources: [{ kind: 'file', file }],
-                  placement: { kind: 'replace-image', stepId, blockId },
-                  signal,
-                },
-              })
-            }
-            onEditImage={(itemId, blockId) => {
-              state.sealEdit();
-              imageEditor.open(itemId, blockId);
-            }}
-            focusRequest={focusRequest}
+          <GuideImageDropZone
             project={project}
-            selectedId={state.selectedId}
-            images={state.images}
-            disabled={disabled}
-            onChange={state.update}
-            onSelect={(id) => selectItem(id, false)}
-            onOperate={operate}
-            t={t}
-          />
+            disabled={disabled || state.mutationPending || status === 'conflict'}
+            onPlace={operate}
+            onFiles={importFiles}
+          >
+            <GuideDocument
+              onUploadImage={(stepId, blockId, file, signal) =>
+                importFiles([file], { kind: 'replace-image', stepId, blockId }, signal)
+              }
+              onEditImage={(itemId, blockId) => {
+                state.sealEdit();
+                imageEditor.open(itemId, blockId);
+              }}
+              focusRequest={focusRequest}
+              project={project}
+              selectedId={state.selectedId}
+              images={state.images}
+              disabled={disabled}
+              onChange={state.update}
+              onSelect={(id) => selectItem(id, false)}
+              onOperate={operate}
+              t={t}
+            />
+          </GuideImageDropZone>
         </GuideWorkspace>
       )}
     </main>

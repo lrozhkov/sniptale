@@ -210,3 +210,111 @@ it('inserts an empty image slot at a stable boundary without creating media refe
   expect(first.blocks[1]).not.toHaveProperty('assetId');
   expect(source).toEqual(fixture());
 });
+
+it('places a canonical project image in another step without acquiring resources', () => {
+  const source = fixture();
+  const next = applyGuideStructureOperation(source, {
+    kind: 'place-image',
+    sourceBlockId: 'image',
+    itemId: 'second',
+  });
+  const target = next.items[2];
+  if (target?.kind !== 'step') throw new Error('Missing target');
+  expect(target.blocks).toHaveLength(2);
+  expect(target.blocks[1]).toMatchObject({
+    kind: 'image',
+    assetId: 'asset',
+    editDocumentId: 'annotations',
+  });
+  expect(target.blocks[1]?.id).not.toBe('image');
+  expect(source).toEqual(fixture());
+});
+
+it('fills a selected slot preserving its frame, identity and caption', () => {
+  const source = applyGuideStructureOperation(fixture(), {
+    kind: 'add-block',
+    itemId: 'second',
+    blockKind: 'image-slot',
+  });
+  const step = source.items[2];
+  if (step?.kind !== 'step') throw new Error('Missing step');
+  const slot = step.blocks[1];
+  if (slot?.kind !== 'image-slot') throw new Error('Missing slot');
+  slot.caption = 'Target caption';
+  const next = applyGuideStructureOperation(source, {
+    kind: 'place-image',
+    sourceBlockId: 'image',
+    itemId: 'second',
+    blockId: slot.id,
+  });
+  const target = next.items[2];
+  expect(target?.kind === 'step' && target.blocks[1]).toMatchObject({
+    kind: 'image',
+    id: slot.id,
+    frame: slot.frame,
+    caption: 'Target caption',
+    assetId: 'asset',
+  });
+  expect(step.blocks[1]?.kind).toBe('image-slot');
+});
+
+it('rejects stale image source and non-image replacement targets without changing the project', () => {
+  const source = fixture();
+  for (const [sourceBlockId, blockId] of [
+    ['gone', undefined],
+    ['text', undefined],
+    ['image', 'note'],
+    ['image', 'gone'],
+  ]) {
+    expect(() =>
+      applyGuideStructureOperation(source, {
+        kind: 'place-image',
+        sourceBlockId: sourceBlockId!,
+        itemId: 'second',
+        ...(blockId ? { blockId } : {}),
+      })
+    ).toThrow();
+  }
+  expect(source).toEqual(fixture());
+});
+
+it('replaces only the chosen image at capacity and rejects appending beyond capacity', () => {
+  const source = fixture();
+  const step = source.items[2];
+  if (step?.kind !== 'step') throw new Error('Missing step');
+  step.blocks = Array.from({ length: GUIDE_LIMITS.maxBlocksPerStep }, (_, index) =>
+    createGuideImageBlock({
+      id: `target-${index}`,
+      assetId: `old-${index}`,
+      width: 320,
+      height: 240,
+      source: { kind: 'import', filename: 'old.png' },
+    })
+  );
+  const before = structuredClone(source);
+  const next = applyGuideStructureOperation(source, {
+    kind: 'place-image',
+    sourceBlockId: 'image',
+    itemId: 'second',
+    blockId: 'target-1',
+  });
+  const target = next.items[2];
+  if (target?.kind !== 'step') throw new Error('Missing target');
+  expect(target.blocks).toHaveLength(GUIDE_LIMITS.maxBlocksPerStep);
+  expect(target.blocks[0]).toEqual(step.blocks[0]);
+  expect(target.blocks[1]).toMatchObject({
+    id: 'target-1',
+    assetId: 'asset',
+    frame: { width: 320, height: 240 },
+    contentTransform: { x: 0, y: 0, scale: 1 },
+  });
+  expect(target.blocks[2]).toEqual(step.blocks[2]);
+  expect(() =>
+    applyGuideStructureOperation(source, {
+      kind: 'place-image',
+      sourceBlockId: 'image',
+      itemId: 'second',
+    })
+  ).toThrow('limits');
+  expect(source).toEqual(before);
+});

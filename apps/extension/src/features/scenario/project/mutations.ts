@@ -23,6 +23,7 @@ type BlockOperation =
 export type GuideStructureOperation =
   | ItemOperation
   | BlockOperation
+  | { kind: 'place-image'; sourceBlockId: string; itemId: string; blockId?: string }
   | { kind: 'add-step'; beforeItemId?: string }
   | { kind: 'add-section'; beforeItemId?: string }
   | { kind: 'merge-next'; itemId: string }
@@ -35,6 +36,9 @@ export function applyGuideStructureOperation(
 ): GuideProject {
   const next = structuredClone(project);
   switch (operation.kind) {
+    case 'place-image':
+      placeImage(next, operation);
+      break;
     case 'add-step':
       next.items.splice(insertionIndex(next.items, operation.beforeItemId), 0, createGuideStep());
       break;
@@ -172,4 +176,33 @@ function splitStep(project: GuideProject, itemId: string, blockId: string): void
   following.templateId = step.templateId;
   following.styleOverrides = { ...step.styleOverrides };
   project.items.splice(index + 1, 0, following);
+}
+
+function placeImage(
+  project: GuideProject,
+  operation: Extract<GuideStructureOperation, { kind: 'place-image' }>
+): void {
+  const source = project.items
+    .flatMap((item) => (item.kind === 'step' ? item.blocks : []))
+    .find((block) => block.id === operation.sourceBlockId);
+  if (source?.kind !== 'image') throw new Error('Guide image source is unavailable.');
+  const step = requireStep(project, operation.itemId);
+  const copy = structuredClone(source);
+  if (operation.blockId === undefined) {
+    step.blocks.push({ ...copy, id: crypto.randomUUID() });
+    return;
+  }
+  const index = step.blocks.findIndex((block) => block.id === operation.blockId);
+  const target = step.blocks[index];
+  if (target?.kind !== 'image' && target?.kind !== 'image-slot')
+    throw new Error('Guide image target is unavailable.');
+  step.blocks[index] = {
+    ...copy,
+    id: target.id,
+    frame: { ...target.frame },
+    fit: target.fit,
+    alt: target.alt,
+    caption: target.caption,
+    contentTransform: { x: 0, y: 0, scale: 1 },
+  };
 }

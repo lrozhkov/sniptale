@@ -524,6 +524,73 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
   });
 }
 
+test('image drops append, replace and fill slots with one Undo per gesture', async ({
+  page,
+  hostOrigin,
+}) => {
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1440, height: 1000 });
+  await page.getByRole('button', { name: 'Resources', exact: true }).click();
+  const resource = page.locator('.guide-resource').first();
+  const step = page.locator('article#compare');
+  const count = await step.locator('.guide-block').count();
+  const undo = page.getByRole('button', { name: 'Undo', exact: true });
+  await resource.dragTo(step.locator('.guide-step-title'));
+  await expect(step.locator('.guide-block')).toHaveCount(count + 1);
+  await undo.click();
+  await expect(step.locator('.guide-block')).toHaveCount(count);
+  const image = step.locator('[data-kind="image"]').last();
+  const id = await image.getAttribute('data-block-id');
+  const original = await image.locator('img').getAttribute('src');
+  await resource.dragTo(image.locator('img'));
+  await expect(step.locator('.guide-block')).toHaveCount(count);
+  await expect(image).toHaveAttribute('data-block-id', id!);
+  await expect(image.locator('img')).toHaveAttribute(
+    'src',
+    (await resource.locator('img').getAttribute('src')) ?? ''
+  );
+  await undo.click();
+  await expect(image.locator('img')).toHaveAttribute('src', original!);
+  const add = step
+    .locator('.guide-insertion-block[data-end="true"]')
+    .getByRole('button', { name: 'Image', exact: true });
+  await add.focus();
+  await add.click();
+  const slot = step.locator('[data-kind="image-slot"]');
+  const slotId = await slot.getAttribute('data-block-id');
+  await resource.dragTo(slot.getByRole('button', { name: 'Upload image', exact: true }));
+  await expect(slot).toHaveCount(0);
+  await expect(step.locator(`[data-block-id="${slotId}"]`)).toHaveAttribute('data-kind', 'image');
+  await undo.click();
+  await expect(slot).toHaveCount(1);
+  const transfer = await page.evaluateHandle(async () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 32;
+    canvas.height = 32;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Canvas unavailable');
+    context.fillStyle = '#2767a5';
+    context.fillRect(0, 0, 32, 32);
+    const blob = await new Promise<Blob>((resolve, reject) =>
+      canvas.toBlob(
+        (result) => (result ? resolve(result) : reject(new Error('No image'))),
+        'image/png'
+      )
+    );
+    const data = new DataTransfer();
+    data.items.add(new File([blob], 'dropped.png', { type: 'image/png' }));
+    return data;
+  });
+  await slot.dispatchEvent('drop', { dataTransfer: transfer });
+  await expect(slot).toHaveCount(0);
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  await undo.click();
+  await expect(slot).toHaveCount(1);
+  await undo.click();
+  await expect(step.locator('.guide-block')).toHaveCount(count);
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  await transfer.dispose();
+});
+
 test('history cleanup preserves two-tab undo resources until sessions close', async ({
   page,
   hostOrigin,
