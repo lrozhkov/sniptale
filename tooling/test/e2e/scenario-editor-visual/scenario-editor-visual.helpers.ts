@@ -10,6 +10,7 @@ export const SCENARIO_VISUAL_VIEWPORTS: Array<{ name: string; size: ViewportSize
   { name: 'qhd', size: { height: 1440, width: 2560 } },
   { name: 'desktop', size: { height: 1080, width: 1920 } },
   { name: 'hd', size: { height: 720, width: 1280 } },
+  { name: 'minimum', size: { height: 640, width: 1024 } },
 ];
 
 export function createPageIssueCollector(page: Page) {

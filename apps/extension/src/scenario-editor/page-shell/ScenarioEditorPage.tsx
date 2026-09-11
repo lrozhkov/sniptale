@@ -5,12 +5,30 @@ import type { Translate } from '../../platform/i18n';
 import { createTranslator, useAppLocale } from '../../platform/i18n';
 import { createGuideParagraphs, createGuideStep } from '../../features/scenario/project/public';
 import { GuideDocument } from './guide-document';
+import { GuideWorkspace } from './workspace';
+import { openGalleryPage } from '../../platform/navigation/extension-pages';
 import { useGuidePageState } from './runtime/use-state';
 
 /** Composes the local guide workspace around its single edit/save state owner. */
 export function ScenarioEditorPage() {
   const t = createTranslator(useAppLocale());
   const state = useGuidePageState();
+  const [focusRequest, setFocusRequest] = useState(0);
+  const selectItem = (id: string) => {
+    state.selectItem(id);
+    setFocusRequest((current) => current + 1);
+  };
+  const [libraryStatus, setLibraryStatus] = useState<'idle' | 'opening' | 'failed'>('idle');
+  const openLibrary = async () => {
+    if (libraryStatus === 'opening') return;
+    setLibraryStatus('opening');
+    try {
+      await openGalleryPage();
+      setLibraryStatus('idle');
+    } catch {
+      setLibraryStatus('failed');
+    }
+  };
   const { project, status } = state;
   const disabled = status === 'saving' || status === 'loading';
   const statusMessages = {
@@ -23,18 +41,38 @@ export function ScenarioEditorPage() {
     missing: t('scenario.editor.guideMissing'),
     loading: t('scenario.editor.loading'),
     empty: '',
-    ready: '',
+    ready: t('scenario.editor.guideSaved'),
   };
   const statusText = statusMessages[status];
   return (
-    <main>
-      <header>
-        <h1>{t('scenario.editor.title')}</h1>
-        <p role="status" aria-live="polite">
-          {statusText}
-        </p>
+    <main className="guide-page">
+      <header className="guide-page-header">
+        <div className="guide-page-identity">
+          <button
+            type="button"
+            className="guide-library-link"
+            disabled={libraryStatus === 'opening'}
+            onClick={() => void openLibrary()}
+            title={t('scenario.editor.guideLibraryHint')}
+          >
+            {t('scenario.editor.guideLibrary')}
+          </button>
+          <h1>{t('scenario.editor.title')}</h1>
+        </div>
+        {project && (
+          <label className="guide-project-name">
+            <span>{t('scenario.editor.projectLabel')}</span>
+            <input
+              disabled={disabled}
+              value={project.name}
+              maxLength={GUIDE_LIMITS.maxLabelLength}
+              onChange={(event) => state.update({ ...project, name: event.target.value })}
+            />
+          </label>
+        )}
         {project && (
           <button
+            className="guide-save"
             type="button"
             disabled={disabled || status === 'saved' || status === 'conflict'}
             onClick={() => void state.save()}
@@ -42,17 +80,14 @@ export function ScenarioEditorPage() {
             {t('scenario.editor.guideSave')}
           </button>
         )}
-        {project && (
-          <GuideProjectActions
-            name={project.name}
-            disabled={disabled}
-            hasUnsavedChanges={status === 'dirty' || status === 'failed' || status === 'conflict'}
-            onDuplicate={state.duplicate}
-            onDelete={state.remove}
-            onReload={state.reload}
-            t={t}
-          />
+      </header>
+      <div className="guide-page-feedback" data-status={status}>
+        {libraryStatus === 'failed' && (
+          <p role="alert">{t('scenario.editor.guideLibraryFailed')}</p>
         )}
+        <p role="status" aria-live="polite">
+          {statusText}
+        </p>
         {state.actionError && (
           <p role="alert">
             {t(
@@ -62,14 +97,14 @@ export function ScenarioEditorPage() {
             )}
           </p>
         )}
-      </header>
+      </div>
       {(status === 'missing' || status === 'unavailable') && (
         <button type="button" onClick={() => void state.reload()}>
           {t('scenario.editor.guideRetry')}
         </button>
       )}
       {!project && (status === 'empty' || status === 'failed') && (
-        <section>
+        <section className="guide-empty">
           <p>{t('scenario.editor.guideEmpty')}</p>
           <button
             type="button"
@@ -81,54 +116,45 @@ export function ScenarioEditorPage() {
         </section>
       )}
       {project && (
-        <>
-          <label>
-            {t('scenario.editor.projectLabel')}
-            <input
+        <GuideWorkspace
+          project={project}
+          selectedId={state.selectedId}
+          images={state.images}
+          disabled={disabled}
+          onSelect={selectItem}
+          onAddStep={() => {
+            const step = createGuideStep();
+            step.blocks.push({
+              kind: 'text',
+              id: crypto.randomUUID(),
+              paragraphs: createGuideParagraphs(''),
+            });
+            state.update({ ...project, items: [...project.items, step] });
+          }}
+          projectActions={
+            <GuideProjectActions
+              name={project.name}
               disabled={disabled}
-              value={project.name}
-              onChange={(event) => state.update({ ...project, name: event.target.value })}
+              hasUnsavedChanges={status === 'dirty' || status === 'failed' || status === 'conflict'}
+              onDuplicate={state.duplicate}
+              onDelete={state.remove}
+              onReload={state.reload}
+              t={t}
             />
-          </label>
-          <nav aria-label={t('scenario.editor.outline')}>
-            {project.items.map((item) => (
-              <a
-                key={item.id}
-                href={`#${encodeURIComponent(item.id)}`}
-                aria-current={state.selectedId === item.id ? 'step' : undefined}
-                onClick={(event) => {
-                  event.preventDefault();
-                  state.selectItem(item.id);
-                }}
-              >
-                {item.title || t('scenario.editor.untitledStep')}
-              </a>
-            ))}
-          </nav>
-          <button
-            type="button"
-            disabled={disabled}
-            onClick={() => {
-              const step = createGuideStep();
-              step.blocks.push({
-                kind: 'text',
-                id: crypto.randomUUID(),
-                paragraphs: createGuideParagraphs(''),
-              });
-              state.update({ ...project, items: [...project.items, step] });
-            }}
-          >
-            {t('scenario.editor.guideAddStep')}
-          </button>
+          }
+          t={t}
+        >
           <GuideDocument
+            focusRequest={focusRequest}
             project={project}
             selectedId={state.selectedId}
             images={state.images}
             disabled={disabled}
             onChange={state.update}
+            onSelect={selectItem}
             t={t}
           />
-        </>
+        </GuideWorkspace>
       )}
     </main>
   );

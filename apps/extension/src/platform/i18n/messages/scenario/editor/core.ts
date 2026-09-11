@@ -1,5 +1,41 @@
 import { defineMessageSource } from '../../source';
 export const scenarioEditorCoreMessages = defineMessageSource({
+  guideLibraryFailed: {
+    ru: 'Не удалось открыть библиотеку. Нажмите «Библиотека», чтобы повторить.',
+    en: 'Could not open the library. Select Library to retry.',
+  },
+  guideLibrary: { ru: 'Библиотека', en: 'Library' },
+  guideLibraryHint: { ru: 'Открыть библиотеку в новой вкладке', en: 'Open library in a new tab' },
+  guideDocument: { ru: 'Инструкция', en: 'Guide document' },
+  guideInspector: { ru: 'Настройки', en: 'Inspector' },
+  guideNavigation: { ru: 'Навигация по инструкции', en: 'Guide navigation' },
+  guideResources: { ru: 'Ресурсы', en: 'Resources' },
+  guideResourcesHint: {
+    ru: 'Изображения в этой инструкции. Выберите изображение, чтобы перейти к его шагу.',
+    en: 'Images in this guide. Select an image to go to its step.',
+  },
+  guideNoResources: {
+    ru: 'В инструкции пока нет изображений.',
+    en: 'This guide has no images yet.',
+  },
+  guideFirstStep: { ru: 'Начните с первого шага', en: 'Start with the first step' },
+  guideFirstStepHint: {
+    ru: 'Опишите действие, добавьте пояснение и продолжайте инструкцию шаг за шагом.',
+    en: 'Describe an action, add an explanation, and build your guide step by step.',
+  },
+  guideSectionHint: {
+    ru: 'Раздел объединяет следующие за ним шаги и не получает номер.',
+    en: 'A section introduces the steps that follow and has no step number.',
+  },
+  guideBlockCount: { ru: 'Блоков в шаге: {count}', en: 'Blocks in this step: {count}' },
+  guideEditHint: {
+    ru: 'Заголовок и описание редактируются прямо в документе.',
+    en: 'Edit the title and description directly in the document.',
+  },
+  guideSelectHint: {
+    ru: 'Выберите шаг в структуре или поле в документе.',
+    en: 'Select a step in the outline or a field in the document.',
+  },
   guideDuplicate: { ru: 'Создать копию', en: 'Duplicate project' },
   guideCopyName: { ru: '{name} — копия', en: '{name} — copy' },
   guideCopyFailed: {

@@ -11,6 +11,7 @@ import {
 
 const io = vi.hoisted(() => ({
   load: vi.fn(),
+  library: vi.fn(),
   asset: vi.fn(),
   create: vi.fn(),
   duplicate: vi.fn(),
@@ -19,6 +20,7 @@ const io = vi.hoisted(() => ({
   select: vi.fn(),
   mount: vi.fn(),
 }));
+vi.mock('../../platform/navigation/extension-pages', () => ({ openGalleryPage: io.library }));
 vi.mock('../../composition/persistence/scenario/projects', () => ({
   getScenarioProject: io.load,
 }));
@@ -60,6 +62,7 @@ beforeEach(() => {
     updatedAt: 102,
   }));
   io.remove.mockResolvedValue(undefined);
+  io.library.mockResolvedValue(undefined);
 });
 afterEach(() => {
   act(() => root.unmount());
@@ -373,4 +376,63 @@ it('prevents duplicate copy submissions and ignores page state updates after unm
   await act(async () => root.render(null));
   await act(async () => finish?.(createGuideProject('Copied', 'copy', 102)));
   expect(io.select).not.toHaveBeenCalled();
+});
+
+it('selects an edited step without taking focus or the caret from its field', async () => {
+  const project = createGuideProject('Guide', 'guide', 100);
+  project.items = [createGuideStep('First', 'first'), createGuideStep('Second', 'second')];
+  io.load.mockResolvedValue(project);
+  await render();
+  const input = container.querySelector('article#second input');
+  if (!(input instanceof HTMLInputElement)) throw new Error('Missing step field');
+  await act(async () => {
+    input.focus();
+    input.setSelectionRange(2, 2);
+  });
+  expect(document.activeElement).toBe(input);
+  expect(input.selectionStart).toBe(2);
+  expect(container.querySelector('nav a[aria-current]')?.textContent).toContain('Second');
+  expect(io.select).toHaveBeenLastCalledWith({ projectId: 'guide', stepId: 'second' });
+  expect(io.save).not.toHaveBeenCalled();
+});
+
+it('navigates from current resources and collapses panels without changing the document', async () => {
+  const project = createGuideProject('Guide', 'guide', 100);
+  const step = createGuideStep('Image step', 'image-step');
+  step.blocks = [
+    createGuideImageBlock({
+      id: 'image',
+      assetId: 'asset',
+      width: 800,
+      height: 600,
+      source: { kind: 'import', filename: 'image.png' },
+    }),
+  ];
+  project.items = [step];
+  io.load.mockResolvedValue(project);
+  await render();
+  await click('Resources');
+  await click('Image step');
+  expect(document.activeElement?.id).toBe('image-step');
+  await click('Outline');
+  expect(container.querySelector('#guide-library-panel')?.hasAttribute('hidden')).toBe(true);
+  await click('Outline');
+  expect(container.querySelector('#guide-library-panel')?.hasAttribute('hidden')).toBe(false);
+  await click('Inspector');
+  expect(container.querySelector('#guide-inspector-panel')?.hasAttribute('hidden')).toBe(true);
+  expect(container.querySelectorAll('article')).toHaveLength(1);
+  expect(io.save).not.toHaveBeenCalled();
+});
+
+it('preserves edits when library navigation fails and offers retry', async () => {
+  io.library.mockRejectedValueOnce(new Error('tab unavailable'));
+  await render();
+  await click('Add step');
+  await click('Library');
+  expect(container.textContent).toContain('Could not open the library');
+  expect(container.querySelectorAll('article')).toHaveLength(2);
+  await click('Library');
+  expect(io.library).toHaveBeenCalledTimes(2);
+  expect(container.textContent).not.toContain('Could not open the library');
+  expect(io.save).not.toHaveBeenCalled();
 });

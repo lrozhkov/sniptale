@@ -11,6 +11,7 @@ import {
   verifyIndependentProjectCopy,
   verifySaveAndReopen,
   verifyStepNavigation,
+  verifyWorkspacePanelsAndFocus,
 } from './scenario-editor-visual.state-steps';
 
 test.setTimeout(180_000);
@@ -43,6 +44,16 @@ test('guide navigation and edits survive a real local save and reopen', async ({
   await verifyStepNavigation(page);
   await verifySaveAndReopen(page);
   await assertVisualAcceptance(page);
+  issues.assertClean();
+});
+
+test('workspace navigation preserves field focus and primary actions at enlarged text', async ({
+  page,
+  hostOrigin,
+}) => {
+  const issues = createPageIssueCollector(page);
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1024, height: 640 });
+  await verifyWorkspacePanelsAndFocus(page);
   issues.assertClean();
 });
 

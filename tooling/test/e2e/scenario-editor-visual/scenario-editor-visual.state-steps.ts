@@ -32,7 +32,9 @@ export async function verifyIndependentProjectCopy(page: Page): Promise<void> {
   await expect.poll(() => new URL(page.url()).searchParams.get('projectId')).not.toBe(originalId);
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   await expect(page.locator('article input').nth(1)).toHaveValue('Unsaved content copied');
-  await page.locator('main > label input').fill('Renamed independent guide');
+  await page
+    .getByRole('textbox', { name: 'Scenario', exact: true })
+    .fill('Renamed independent guide');
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   const copied = new URL(page.url());
@@ -49,7 +51,9 @@ export async function verifyIndependentProjectCopy(page: Page): Promise<void> {
   await expect(page.locator('article')).toHaveCount(0);
   await expect.poll(() => new URL(page.url()).searchParams.get('projectId')).toBeNull();
   await page.goto(copied.toString(), { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('main > label input')).toHaveValue('Renamed independent guide');
+  await expect(page.getByRole('textbox', { name: 'Scenario', exact: true })).toHaveValue(
+    'Renamed independent guide'
+  );
   await expect(page.locator('article input').nth(1)).toHaveValue('Unsaved content copied');
   await expect(page.locator('main img')).toHaveCount(2);
   await expect
@@ -63,4 +67,33 @@ export async function verifyIndependentProjectCopy(page: Page): Promise<void> {
         )
     )
     .toBe(true);
+}
+
+export async function verifyWorkspacePanelsAndFocus(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Resources', exact: true }).click();
+  const resource = page.locator('.guide-resource').first();
+  await resource.click();
+  await expect(page.locator('article#compare')).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.locator('article#compare input')).toBeFocused();
+  await page.locator('article#text-only input').focus();
+  await expect(page.locator('article#text-only input')).toBeFocused();
+  await expect(page.locator('.guide-selection-label')).toContainText('step');
+  await page.locator('button[aria-controls="guide-library-panel"]').click();
+  await page.locator('button[aria-controls="guide-inspector-panel"]').click();
+  await expect(page.locator('#guide-library-panel')).toBeHidden();
+  await expect(page.locator('#guide-inspector-panel')).toBeHidden();
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = '200%';
+  });
+  const save = page.getByRole('button', { name: 'Save', exact: true });
+  await expect(save).toBeInViewport();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+  await page.locator('button[aria-controls="guide-library-panel"]').click();
+  await expect(page.locator('#guide-library-panel')).toBeVisible();
+  await expect(save).toBeInViewport();
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = '';
+  });
 }
