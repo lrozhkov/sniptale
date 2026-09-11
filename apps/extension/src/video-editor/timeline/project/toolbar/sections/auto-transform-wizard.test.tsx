@@ -1,8 +1,9 @@
+// @vitest-environment jsdom
+
 import { AutoProcessingReviewDockContext } from './auto-transform-modal';
 import { usePlaybackShortcuts } from '../../../../runtime/session/playback/shortcuts';
 import { useVideoEditorProjectHistoryShortcuts } from '../../../../runtime/session/history-shortcuts';
 import type { PlaybackLatestState, PlaybackHandlers } from '../../../../interaction/playback/types';
-// @vitest-environment jsdom
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';

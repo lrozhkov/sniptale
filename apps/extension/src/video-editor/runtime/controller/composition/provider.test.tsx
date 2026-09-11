@@ -1,6 +1,7 @@
+// @vitest-environment jsdom
+
 import { RuntimePlaybackContext } from './contexts';
 import { useVideoEditorOverlayPlayback } from '../overlay-playback';
-// @vitest-environment jsdom
 
 import { act, useContext, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

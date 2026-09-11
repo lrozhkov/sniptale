@@ -1,5 +1,6 @@
-import { createVideoClipFromAsset } from '../../../features/video/project/factories/clip';
 // @vitest-environment jsdom
+
+import { createVideoClipFromAsset } from '../../../features/video/project/factories/clip';
 import { act } from 'react';
 import { useActiveCanvasInsertEscape } from '@sniptale/ui/canvas-tools';
 import { createRoot } from 'react-dom/client';

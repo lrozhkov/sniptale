@@ -1,5 +1,6 @@
-import { createEmptyVideoProject } from '../../../../../features/video/project/factories/creation';
 // @vitest-environment jsdom
+
+import { createEmptyVideoProject } from '../../../../../features/video/project/factories/creation';
 import { ProjectTimelineAddTrackControl } from './add-controls';
 
 import { act } from 'react';

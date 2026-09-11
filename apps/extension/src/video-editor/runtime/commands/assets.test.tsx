@@ -1,6 +1,6 @@
-import { createAudioClip } from '../../../features/video/project/timeline/project-meta.test.helpers';
 // @vitest-environment jsdom
 
+import { createAudioClip } from '../../../features/video/project/timeline/project-meta.test.helpers';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
