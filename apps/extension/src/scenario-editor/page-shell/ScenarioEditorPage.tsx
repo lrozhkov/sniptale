@@ -1,3 +1,4 @@
+import { GuideAppearance } from './appearance';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { GuidePageHeader } from './header';
 import { GuideProjectActions } from './project-actions';
@@ -7,7 +8,8 @@ import { createTranslator, useAppLocale } from '../../platform/i18n';
 import type { GuideStructureOperation } from '../../features/scenario/project/public';
 import { GuideImageEditor, useGuideImageEditorMode } from './image-editor';
 import { GuideDocument } from './guide-document';
-import { GuideWorkspace } from './workspace';
+import { GuideWorkspace, GuidePanelControls } from './workspace';
+import { useGuidePanels } from './panel-layout';
 import { GuideImageResources } from './resources';
 import { GuideStepActions } from './step-actions';
 import { useGuidePageState } from './runtime/use-state';
@@ -16,6 +18,7 @@ import { useGuidePageState } from './runtime/use-state';
 export function ScenarioEditorPage() {
   const t = createTranslator(useAppLocale());
   const state = useGuidePageState();
+  const panels = useGuidePanels();
   const imageEditor = useGuideImageEditorMode(state.images);
   const [focusRequest, setFocusRequest] = useState(0);
   const selectItem = (id: string) => {
@@ -64,6 +67,7 @@ export function ScenarioEditorPage() {
       }}
     >
       <GuidePageHeader
+        panelControls={project && <GuidePanelControls panels={panels} t={t} />}
         project={project}
         disabled={disabled}
         saveDisabled={disabled || status === 'saved' || status === 'conflict'}
@@ -79,6 +83,7 @@ export function ScenarioEditorPage() {
       <GuideProjectRecovery state={state} t={t} />
       {project && (
         <GuideWorkspace
+          panels={panels}
           importResources={
             <GuideImageResources
               disabled={disabled || state.status === 'conflict'}
@@ -99,14 +104,23 @@ export function ScenarioEditorPage() {
           onAddStep={() => operate({ kind: 'add-step' })}
           onAddSection={() => operate({ kind: 'add-section' })}
           itemActions={
-            <GuideStepActions
-              project={project}
-              selectedId={state.selectedId}
-              disabled={disabled}
-              onChange={state.update}
-              onOperate={operate}
-              t={t}
-            />
+            <>
+              <GuideAppearance
+                project={project}
+                selectedId={state.selectedId}
+                disabled={disabled}
+                onChange={state.update}
+                t={t}
+              />
+              <GuideStepActions
+                project={project}
+                selectedId={state.selectedId}
+                disabled={disabled}
+                onChange={state.update}
+                onOperate={operate}
+                t={t}
+              />
+            </>
           }
           projectActions={
             <GuideProjectActions

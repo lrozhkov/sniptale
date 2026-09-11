@@ -1,3 +1,4 @@
+import { FloatingChromeToolbar } from '@sniptale/ui/floating-chrome';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
@@ -161,30 +162,32 @@ export function GuideImageSurface(props: ImageProps) {
         }
       }}
     >
-      {props.onEdit && (
-        <ProductActionButton
-          tone="secondary"
-          compact
+      <FloatingChromeToolbar className="guide-image-tools">
+        {props.onEdit && (
+          <ProductActionButton
+            tone="secondary"
+            compact
+            type="button"
+            data-edit-image
+            disabled={disabled || !url}
+            onClick={props.onEdit}
+          >
+            {t('scenario.editor.guideEditImage')}
+          </ProductActionButton>
+        )}
+        <ContentToolbarButton
+          className="!w-auto !min-w-0 px-3"
+          ref={trigger}
           type="button"
-          data-edit-image
           disabled={disabled || !url}
-          onClick={props.onEdit}
+          aria-expanded={editing}
+          onClick={() => (editing ? close() : setEditing(true))}
         >
-          {t('scenario.editor.guideEditImage')}
-        </ProductActionButton>
-      )}
+          {t(editing ? 'scenario.editor.guideImageDone' : 'scenario.editor.guideEditImageFrame')}
+        </ContentToolbarButton>
+      </FloatingChromeToolbar>
       <GuideImageViewport {...props} editing={editing} gesture={gesture} />
       {block.caption && <figcaption>{block.caption}</figcaption>}
-      <ContentToolbarButton
-        className="!w-auto !min-w-0 px-3"
-        ref={trigger}
-        type="button"
-        disabled={disabled || !url}
-        aria-expanded={editing}
-        onClick={() => (editing ? close() : setEditing(true))}
-      >
-        {t(editing ? 'scenario.editor.guideImageDone' : 'scenario.editor.guideEditImageFrame')}
-      </ContentToolbarButton>
       {editing && (
         <GuideImageControls
           {...props}

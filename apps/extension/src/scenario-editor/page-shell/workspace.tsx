@@ -1,13 +1,16 @@
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useState, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, FileText, Image, List, Plus, Settings2 } from 'lucide-react';
+import { FileText, Image, PanelLeft, PanelRight, Plus, Settings2 } from 'lucide-react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { GuidePanelDivider, type useGuidePanels } from './panel-layout';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
 import './workspace.css';
 
 type WorkspaceProps = {
+  panels: ReturnType<typeof useGuidePanels>;
   project: GuideProject;
   selectedId: string | null;
   images: Record<string, string | null>;
@@ -25,44 +28,15 @@ type WorkspaceProps = {
 /** Owns disposable panel visibility; document selection and edits remain in page state. */
 export function GuideWorkspace(props: WorkspaceProps) {
   const { project, selectedId, onSelect, t } = props;
-  const [leftOpen, setLeftOpen] = useState(true);
-  const [rightOpen, setRightOpen] = useState(true);
+  const { leftOpen, rightOpen } = props.panels;
   const [mode, setMode] = useState<'structure' | 'resources'>('structure');
-  const selected = project.items.find((item) => item.id === selectedId);
   return (
-    <div className="guide-workspace" data-left-open={leftOpen} data-right-open={rightOpen}>
-      <div className="guide-workspace-bar">
-        <ProductActionButton
-          tone="secondary"
-          compact
-          type="button"
-          aria-expanded={leftOpen}
-          aria-controls="guide-library-panel"
-          onClick={() => setLeftOpen(!leftOpen)}
-        >
-          <List size={16} aria-hidden="true" />
-          {t('scenario.editor.outline')}
-          {leftOpen ? (
-            <ChevronLeft size={14} aria-hidden="true" />
-          ) : (
-            <ChevronRight size={14} aria-hidden="true" />
-          )}
-        </ProductActionButton>
-        <span className="guide-selection-label">
-          {selected?.title || t('scenario.editor.guideDocument')}
-        </span>
-        <ProductActionButton
-          tone="secondary"
-          compact
-          type="button"
-          aria-expanded={rightOpen}
-          aria-controls="guide-inspector-panel"
-          onClick={() => setRightOpen(!rightOpen)}
-        >
-          <Settings2 size={16} aria-hidden="true" />
-          {t('scenario.editor.guideInspector')}
-        </ProductActionButton>
-      </div>
+    <div
+      className="guide-workspace"
+      style={props.panels.style}
+      data-left-open={leftOpen}
+      data-right-open={rightOpen}
+    >
       <FloatingChromePanel
         role="complementary"
         id="guide-library-panel"
@@ -112,6 +86,9 @@ export function GuideWorkspace(props: WorkspaceProps) {
           {t('scenario.editor.guideAddSection')}
         </ProductActionButton>
       </FloatingChromePanel>
+      {leftOpen && (
+        <GuidePanelDivider side="left" panels={props.panels} label={t('scenario.editor.outline')} />
+      )}
       <div
         className="guide-document-scroll"
         tabIndex={0}
@@ -135,6 +112,13 @@ export function GuideWorkspace(props: WorkspaceProps) {
         )}
         {props.children}
       </div>
+      {rightOpen && (
+        <GuidePanelDivider
+          side="right"
+          panels={props.panels}
+          label={t('scenario.editor.guideInspector')}
+        />
+      )}
       <GuideInspector {...props} open={rightOpen} />
     </div>
   );
@@ -208,8 +192,7 @@ function GuideResources({ project, images, onSelect, t }: WorkspaceProps) {
 
 /** Selected-item details and project tools use one scrollable app panel. */
 function GuideInspector(props: WorkspaceProps & { open: boolean }) {
-  const { project, selectedId, t } = props;
-  const selected = project.items.find((item) => item.id === selectedId);
+  const { t } = props;
   return (
     <FloatingChromePanel
       role="complementary"
@@ -223,24 +206,6 @@ function GuideInspector(props: WorkspaceProps & { open: boolean }) {
         <h2>{t('scenario.editor.guideInspector')}</h2>
       </div>
       <div className="guide-panel-scroll">
-        {selected ? (
-          <>
-            <p className="guide-inspector-title">
-              {selected.title || t('scenario.editor.untitledStep')}
-            </p>
-            <p>
-              {selected.kind === 'section'
-                ? t('scenario.editor.guideSectionHint')
-                : t('scenario.editor.guideBlockCount').replace(
-                    '{count}',
-                    String(selected.blocks.length)
-                  )}
-            </p>
-            <p>{t('scenario.editor.guideEditHint')}</p>
-          </>
-        ) : (
-          <p>{t('scenario.editor.guideSelectHint')}</p>
-        )}
         {props.itemActions}
         <div className="guide-project-actions">
           <h2>{t('scenario.editor.projectLabel')}</h2>
@@ -248,5 +213,37 @@ function GuideInspector(props: WorkspaceProps & { open: boolean }) {
         </div>
       </div>
     </FloatingChromePanel>
+  );
+}
+
+/** Header owns panel commands; panels contain only their working content. */
+export function GuidePanelControls({
+  panels,
+  t,
+}: {
+  panels: ReturnType<typeof useGuidePanels>;
+  t: Translate;
+}) {
+  return (
+    <>
+      <ContentToolbarButton
+        type="button"
+        title={t('scenario.editor.outline')}
+        aria-expanded={panels.leftOpen}
+        aria-controls="guide-library-panel"
+        onClick={panels.toggleLeft}
+      >
+        <PanelLeft size={16} aria-hidden="true" />
+      </ContentToolbarButton>
+      <ContentToolbarButton
+        type="button"
+        title={t('scenario.editor.guideInspector')}
+        aria-expanded={panels.rightOpen}
+        aria-controls="guide-inspector-panel"
+        onClick={panels.toggleRight}
+      >
+        <PanelRight size={16} aria-hidden="true" />
+      </ContentToolbarButton>
+    </>
   );
 }

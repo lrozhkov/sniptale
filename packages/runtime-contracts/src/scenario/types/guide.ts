@@ -131,3 +131,15 @@ export interface GuideProject {
   };
   items: Array<GuideSection | GuideStep>;
 }
+
+/** Portable appearance only; templates never contain guide content or resource identities. */
+export interface GuideAppearanceTemplate {
+  format: 'sniptale-guide-template';
+  version: 1;
+  name: string;
+  layout: GuideStep['layout'];
+  showNumber: boolean;
+  style: GuideStyle;
+}
+
+export const MAX_GUIDE_TEMPLATE_BYTES = 16 * 1024;

@@ -1,3 +1,4 @@
+import { scenarioEditorAppearanceMessages } from './appearance';
 import { defineMessageSource } from '../../source';
 import { scenarioEditorAiMessages } from './ai';
 import { scenarioEditorCoreMessages } from './core';
@@ -11,6 +12,7 @@ import { scenarioEditorV3PresentationMessages } from './v3-presentation';
 import { scenarioEditorV3TemplateMessages } from './v3-templates';
 
 export const scenarioEditorMessages = defineMessageSource({
+  ...scenarioEditorAppearanceMessages,
   ...scenarioEditorAiMessages,
   ...scenarioEditorCoreMessages,
   ...scenarioEditorExportMessages,

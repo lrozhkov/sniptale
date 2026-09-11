@@ -1,3 +1,5 @@
+import { FloatingChromeToolbar } from '@sniptale/ui/floating-chrome';
+import { guideDocumentStyle } from './document-appearance';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useEffect, useRef } from 'react';
 import type {
@@ -9,6 +11,7 @@ import type {
 import type { Translate } from '../../platform/i18n';
 import {
   createGuideParagraphs,
+  resolveGuideStyle,
   type GuideStructureOperation,
 } from '../../features/scenario/project/public';
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -50,7 +53,7 @@ export function GuideDocument({
   }, [selectedId, focusRequest]);
   let number = 0;
   return (
-    <div ref={content} className="guide-document">
+    <div ref={content} className="guide-document" style={guideDocumentStyle(project.style)}>
       {project.items.map((item) => {
         if (item.kind === 'section')
           return (
@@ -70,9 +73,13 @@ export function GuideDocument({
             </section>
           );
         number += 1;
+        const appearance = resolveGuideStyle(project.style, item.styleOverrides);
         return (
           <article
             key={item.id}
+            data-layout={item.layout}
+            data-number-style={appearance.numberStyle}
+            style={guideDocumentStyle(appearance)}
             id={item.id}
             tabIndex={-1}
             data-selected={selectedId === item.id}
@@ -154,32 +161,39 @@ function GuideStepBody({
     );
   return (
     <>
-      {item.blocks.map((block, index) => (
-        <div className="guide-block" key={block.id} data-block-id={block.id}>
-          <GuideBlockActions
-            itemId={item.id}
-            blockId={block.id}
-            index={index}
-            count={item.blocks.length}
-            disabled={disabled}
-            onOperate={onOperate}
-            t={t}
-          />
-          {block.kind === 'image' ? (
-            <GuideImageSurface
-              onEdit={() => onEditImage(item.id, block.id)}
-              block={block}
-              url={images[block.assetId]}
+      <div className="guide-step-blocks">
+        {item.blocks.map((block, index) => (
+          <div
+            className="guide-block"
+            key={block.id}
+            data-block-id={block.id}
+            data-kind={block.kind}
+          >
+            <GuideBlockActions
+              itemId={item.id}
+              blockId={block.id}
+              index={index}
+              count={item.blocks.length}
               disabled={disabled}
-              onChange={changeBlock}
+              onOperate={onOperate}
               t={t}
             />
-          ) : (
-            <GuideTextBlock block={block} disabled={disabled} onChange={changeBlock} t={t} />
-          )}
-        </div>
-      ))}
-      <div
+            {block.kind === 'image' ? (
+              <GuideImageSurface
+                onEdit={() => onEditImage(item.id, block.id)}
+                block={block}
+                url={images[block.assetId]}
+                disabled={disabled}
+                onChange={changeBlock}
+                t={t}
+              />
+            ) : (
+              <GuideTextBlock block={block} disabled={disabled} onChange={changeBlock} t={t} />
+            )}
+          </div>
+        ))}
+      </div>
+      <FloatingChromeToolbar
         className="guide-add-blocks"
         role="group"
         aria-label={t('scenario.editor.guideAddBlock')}
@@ -211,7 +225,7 @@ function GuideStepBody({
         >
           {t('scenario.editor.guideAddNote')}
         </ProductActionButton>
-      </div>
+      </FloatingChromeToolbar>
     </>
   );
 }

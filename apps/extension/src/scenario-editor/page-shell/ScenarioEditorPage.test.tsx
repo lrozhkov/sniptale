@@ -425,7 +425,7 @@ it('navigates from current resources and collapses panels without changing the d
   await click('Outline');
   expect(container.querySelector('#guide-library-panel')?.hasAttribute('hidden')).toBe(false);
   await click('Inspector');
-  expect(container.querySelector('#guide-inspector-panel')?.hasAttribute('hidden')).toBe(true);
+  expect(container.querySelector('#guide-inspector-panel')?.hasAttribute('hidden')).toBe(false);
   expect(container.querySelectorAll('article')).toHaveLength(1);
   expect(io.save).not.toHaveBeenCalled();
 });

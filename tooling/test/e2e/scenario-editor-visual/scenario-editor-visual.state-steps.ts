@@ -81,9 +81,11 @@ export async function verifyWorkspacePanelsAndFocus(page: Page): Promise<void> {
   await expect(page.locator('article#compare input')).toBeFocused();
   await page.locator('article#text-only input').focus();
   await expect(page.locator('article#text-only input')).toBeFocused();
-  await expect(page.locator('.guide-selection-label')).toContainText('step');
+  await expect(page.locator('article#text-only')).toHaveAttribute('data-selected', 'true');
   await page.locator('button[aria-controls="guide-library-panel"]').click();
-  await page.locator('button[aria-controls="guide-inspector-panel"]').click();
+  const inspectorToggle = page.locator('button[aria-controls="guide-inspector-panel"]');
+  if ((await inspectorToggle.getAttribute('aria-expanded')) === 'true')
+    await inspectorToggle.click();
   await expect(page.locator('#guide-library-panel')).toBeHidden();
   await expect(page.locator('#guide-inspector-panel')).toBeHidden();
   await page.evaluate(() => {

@@ -1,3 +1,5 @@
+import { expect } from '@playwright/test';
+import { verifyGuideAppearance } from './scenario-editor-visual.appearance-steps';
 import { test } from '../support/extension-fixture';
 import { assertVisualAcceptance } from './scenario-editor-visual.assertions';
 import {
@@ -131,6 +133,42 @@ test('saved versions survive reload and restore as an undoable new publication',
   await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 900 });
   await verifySavedVersionHistory(page, testInfo);
   issues.assertClean();
+});
+
+for (const theme of SCENARIO_VISUAL_THEMES) {
+  test(`guide layouts and portable appearance templates preserve images in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }, testInfo) => {
+    const issues = createPageIssueCollector(page);
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 1080 });
+    await verifyGuideAppearance(page, testInfo);
+    issues.assertClean();
+  });
+}
+
+test('compact header owns panel toggles and dividers resize the workspace', async ({
+  page,
+  hostOrigin,
+}) => {
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1920, height: 1080 });
+  const header = page.locator('.guide-page-header');
+  expect((await header.boundingBox())?.height).toBeLessThanOrEqual(52);
+  expect((await page.locator('.guide-project-name').boundingBox())?.width).toBeLessThanOrEqual(280);
+  await expect(header.getByRole('button', { name: 'Outline', exact: true })).toBeVisible();
+  await expect(header.getByRole('button', { name: 'Inspector', exact: true })).toBeVisible();
+  await expect(page.locator('.guide-workspace-bar')).toHaveCount(0);
+  await page.locator('article#compare').focus();
+  await expect(page.locator('article#compare')).toHaveCSS('outline-width', '1px');
+  const divider = page.getByRole('separator', { name: 'Outline', exact: true });
+  await divider.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(divider).toHaveAttribute('aria-valuenow', '240');
+  expect((await page.locator('#guide-library-panel').boundingBox())?.width).toBeCloseTo(240, 0);
+  await header.getByRole('button', { name: 'Outline', exact: true }).click();
+  await expect(page.locator('#guide-library-panel')).toBeHidden();
+  await header.getByRole('button', { name: 'Outline', exact: true }).click();
+  await expect(divider).toHaveAttribute('aria-valuenow', '240');
 });
 
 test('history cleanup preserves two-tab undo resources until sessions close', async ({

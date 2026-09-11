@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { GUIDE_LIMITS, type GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -8,6 +8,7 @@ import { openGalleryPage } from '../../platform/navigation/extension-pages';
 
 export function GuidePageHeader({
   project,
+  panelControls,
   disabled,
   saveDisabled,
   canUndo,
@@ -19,6 +20,7 @@ export function GuidePageHeader({
   t,
 }: {
   project: GuideProject | null;
+  panelControls?: ReactNode;
   disabled: boolean;
   saveDisabled: boolean;
   canUndo: boolean;
@@ -54,12 +56,14 @@ export function GuidePageHeader({
           >
             <Library size={16} aria-hidden="true" />
           </ContentToolbarButton>
-          <h1>{t('scenario.editor.title')}</h1>
         </div>
         {project && (
           <label className="guide-project-name">
-            <span>{t('scenario.editor.projectLabel')}</span>
+            <span aria-hidden="true" className="guide-project-name-measure">
+              {project.name || ' '}
+            </span>
             <input
+              aria-label={t('scenario.editor.projectLabel')}
               disabled={disabled}
               value={project.name}
               maxLength={GUIDE_LIMITS.maxLabelLength}
@@ -95,6 +99,7 @@ export function GuidePageHeader({
             </ContentToolbarButton>
           </div>
         )}
+        <div className="guide-header-panel-controls">{panelControls}</div>
         {project && (
           <ProductActionButton
             className="guide-save"
