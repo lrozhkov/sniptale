@@ -97,3 +97,63 @@ export async function verifyWorkspacePanelsAndFocus(page: Page): Promise<void> {
     document.documentElement.style.fontSize = '';
   });
 }
+
+export async function verifyGuideComposition(page: Page): Promise<void> {
+  const step = page.locator('article#text-only');
+  await step.getByRole('textbox', { name: 'Step title', exact: true }).fill('Flexible step');
+  await step.getByRole('button', { name: '+ Text', exact: true }).click();
+  await step.getByRole('button', { name: '+ Text', exact: true }).click();
+  await step.getByRole('button', { name: '+ Heading', exact: true }).click();
+  await step.getByRole('button', { name: '+ Note', exact: true }).click();
+  await step.locator('textarea').nth(0).fill('First explanation');
+  await step.locator('textarea').nth(1).fill('Second explanation');
+  await step.getByRole('textbox', { name: 'Heading', exact: true }).fill('Detail');
+  await step.getByRole('textbox', { name: 'Note text', exact: true }).fill('Remember this');
+  await page.getByRole('checkbox', { name: 'Show step number', exact: true }).uncheck();
+  await expect(step.locator('header span')).toHaveCount(0);
+  await step
+    .locator('.guide-block')
+    .first()
+    .getByRole('button', { name: 'Duplicate block', exact: true })
+    .click();
+  await expect(step.locator('.guide-block')).toHaveCount(5);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(step.locator('.guide-block')).toHaveCount(4);
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(step.locator('.guide-block')).toHaveCount(5);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  const heading = step
+    .locator('.guide-block')
+    .filter({ has: page.getByRole('textbox', { name: 'Heading', exact: true }) });
+  await heading.getByRole('button', { name: 'Move up', exact: true }).click();
+  await heading.getByRole('button', { name: 'Split step here', exact: true }).click();
+  await expect(page.locator('article')).toHaveCount(3);
+  await expect(step.locator('.guide-block')).toHaveCount(1);
+  await page.getByRole('link', { name: 'Flexible step', exact: true }).click();
+  await page
+    .locator('.guide-step-actions')
+    .getByRole('button', { name: 'Merge with next step', exact: true })
+    .click();
+  await expect(page.locator('article')).toHaveCount(2);
+  await expect(step.locator('.guide-block')).toHaveCount(4);
+  await page.getByRole('button', { name: 'Add section', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Section title', exact: true }).fill('Finish');
+  await page
+    .locator('.guide-step-actions')
+    .getByRole('button', { name: 'Move up', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  const reopen = new URL(page.url());
+  reopen.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
+  reopen.searchParams.set('locale', 'en');
+  await page.goto(reopen.toString(), { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('.guide-document section h2').last()).toHaveText('Finish');
+  await expect(page.locator('article#text-only .guide-block')).toHaveCount(4);
+  await expect(page.locator('article#text-only textarea').first()).toHaveValue('First explanation');
+  await expect(page.locator('article#text-only input.guide-block-heading')).toHaveValue('Detail');
+  await expect(page.locator('article#text-only header span')).toHaveCount(0);
+  await expect(page.locator('.guide-document img')).toHaveCount(2);
+  await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeDisabled();
+}

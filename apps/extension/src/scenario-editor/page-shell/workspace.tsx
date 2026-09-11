@@ -12,6 +12,8 @@ type WorkspaceProps = {
   disabled: boolean;
   onSelect: (id: string) => void;
   onAddStep: () => void;
+  onAddSection: () => void;
+  itemActions: ReactNode;
   projectActions: ReactNode;
   children: ReactNode;
   t: Translate;
@@ -86,6 +88,9 @@ export function GuideWorkspace(props: WorkspaceProps) {
           <Plus size={16} aria-hidden="true" />
           {t('scenario.editor.guideAddStep')}
         </button>
+        <button type="button" disabled={props.disabled} onClick={props.onAddSection}>
+          {t('scenario.editor.guideAddSection')}
+        </button>
       </aside>
       <div
         className="guide-document-scroll"
@@ -130,6 +135,7 @@ export function GuideWorkspace(props: WorkspaceProps) {
           ) : (
             <p>{t('scenario.editor.guideSelectHint')}</p>
           )}
+          {props.itemActions}
           <div className="guide-project-actions">
             <h2>{t('scenario.editor.projectLabel')}</h2>
             {props.projectActions}

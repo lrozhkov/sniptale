@@ -9,6 +9,7 @@ import {
 } from './scenario-editor-visual.helpers';
 import {
   verifyIndependentProjectCopy,
+  verifyGuideComposition,
   verifySaveAndReopen,
   verifyStepNavigation,
   verifyWorkspacePanelsAndFocus,
@@ -64,5 +65,15 @@ test('project copies preserve unsaved content and images after deleting the orig
   const issues = createPageIssueCollector(page);
   await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 720 });
   await verifyIndependentProjectCopy(page);
+  issues.assertClean();
+});
+
+test('guide blocks, sections and reversible structural edits survive saving and reopening', async ({
+  page,
+  hostOrigin,
+}) => {
+  const issues = createPageIssueCollector(page);
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 900 });
+  await verifyGuideComposition(page);
   issues.assertClean();
 });

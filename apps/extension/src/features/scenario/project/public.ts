@@ -4,3 +4,4 @@ export {
   createGuideProject,
   createGuideStep,
 } from './factories';
+export { applyGuideStructureOperation, type GuideStructureOperation } from './mutations';

@@ -13,6 +13,7 @@ import {
 import { getScenarioProject } from '../../../composition/persistence/scenario/projects';
 import { getScenarioAssetBlob } from '../../../composition/persistence/scenario/store/project-records/assets';
 import { replaceScenarioEditorSelectionInUrl } from '../../platform/browser-driver';
+import { useGuideHistory } from './history';
 
 type GuidePageStatus =
   | 'loading'
@@ -28,15 +29,20 @@ type GuidePageStatus =
 
 /** Owns this page's disposable edit buffer; persistence owns committed project ordering. */
 export function useGuidePageState() {
-  const [project, setProject] = useState<GuideProject | null>(null);
   const [status, setStatus] = useState<GuidePageStatus>('loading');
-  const [actionError, setActionError] = useState<'copy' | 'delete' | null>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(() =>
-    readScenarioEditorStepId(window.location.search)
-  );
-  const images = useGuideImages(project);
+  const [actionError, setActionError] = useState<'copy' | 'delete' | 'structure' | null>(null);
   const saved = useRef<GuideProject | null>(null);
   const busy = useRef(false);
+  const { project, reset, commit, ...editing } = useGuideHistory({
+    canEdit: () => !busy.current && status !== 'loading',
+    onEdit: () => {
+      setActionError(null);
+      setStatus((current) => (current === 'conflict' ? 'conflict' : 'dirty'));
+    },
+    onFailure: () => setActionError('structure'),
+  });
+  const images = useGuideImages(project);
+  const { selectedId, selectItem, clearSelection } = useGuideSelection(project);
   const generation = useRef(0);
   const requestedId = useRef(readScenarioEditorProjectId(window.location.search));
   const load = useCallback(async () => {
@@ -51,12 +57,12 @@ export function useGuidePageState() {
       if (turn !== generation.current) return;
       setActionError(null);
       saved.current = loaded ?? null;
-      setProject(loaded ?? null);
+      reset(loaded ?? null);
       setStatus(loaded ? 'ready' : 'missing');
     } catch {
       if (turn === generation.current) setStatus('unavailable');
     }
-  }, []);
+  }, [reset]);
   useEffect(() => {
     void load();
     return () => {
@@ -84,13 +90,14 @@ export function useGuidePageState() {
   };
   const acceptProject = (committed: GuideProject) => {
     saved.current = committed;
-    setProject(committed);
+    commit(committed);
     setStatus('saved');
   };
   const openProject = (committed: GuideProject) => {
     requestedId.current = committed.id;
     acceptProject(committed);
-    setSelectedId(null);
+    reset(committed);
+    clearSelection();
     replaceScenarioEditorSelectionInUrl({ projectId: committed.id });
   };
   const create = (name: string) =>
@@ -99,11 +106,6 @@ export function useGuidePageState() {
       openProject,
       () => setStatus('failed')
     );
-  const update = (next: GuideProject) => {
-    if (busy.current || !project || next.id !== project.id) return;
-    setProject(next);
-    setStatus((current) => (current === 'conflict' ? 'conflict' : 'dirty'));
-  };
   const save = async () => {
     const base = saved.current;
     if (!project || !base || status === 'conflict') return;
@@ -137,18 +139,13 @@ export function useGuidePageState() {
       () => {
         requestedId.current = null;
         saved.current = null;
-        setProject(null);
-        setSelectedId(null);
+        reset(null);
+        clearSelection();
         replaceScenarioEditorSelectionInUrl({ projectId: null });
         setStatus('empty');
       },
       () => rejectAction('delete')
     );
-  };
-  const selectItem = (id: string) => {
-    if (!project?.items.some((item) => item.id === id)) return;
-    setSelectedId(id);
-    replaceScenarioEditorSelectionInUrl({ projectId: project.id, stepId: id });
   };
   return {
     project,
@@ -158,7 +155,7 @@ export function useGuidePageState() {
     selectedId,
     selectItem,
     create,
-    update,
+    ...editing,
     save,
     duplicate,
     remove,
@@ -205,4 +202,28 @@ function useGuideImages(project: GuideProject | null) {
     };
   }, [assetKey]);
   return images;
+}
+
+/** Keeps item selection addressable when structural edits or undo remove the focused item. */
+function useGuideSelection(project: GuideProject | null) {
+  const [selectedId, setSelectedId] = useState<string | null>(() =>
+    readScenarioEditorStepId(window.location.search)
+  );
+  useEffect(() => {
+    if (!project || !selectedId || project.items.some((item) => item.id === selectedId)) return;
+    const fallback = project.items[0]?.id ?? null;
+    setSelectedId(fallback);
+    replaceScenarioEditorSelectionInUrl({ projectId: project.id, stepId: fallback });
+  }, [project, selectedId]);
+  const selectItem = (id: string | null, next = project) => {
+    if (
+      !project ||
+      next?.id !== project.id ||
+      (id !== null && !next.items.some((item) => item.id === id))
+    )
+      return;
+    setSelectedId(id);
+    replaceScenarioEditorSelectionInUrl({ projectId: project.id, stepId: id });
+  };
+  return { selectedId, selectItem, clearSelection: () => setSelectedId(null) };
 }

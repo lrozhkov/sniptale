@@ -3,9 +3,11 @@ import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dial
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
 import { createTranslator, useAppLocale } from '../../platform/i18n';
-import { createGuideParagraphs, createGuideStep } from '../../features/scenario/project/public';
+import type { GuideStructureOperation } from '../../features/scenario/project/public';
 import { GuideDocument } from './guide-document';
 import { GuideWorkspace } from './workspace';
+import { GuideStepActions } from './step-actions';
+import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { openGalleryPage } from '../../platform/navigation/extension-pages';
 import { useGuidePageState } from './runtime/use-state';
 
@@ -17,17 +19,6 @@ export function ScenarioEditorPage() {
   const selectItem = (id: string) => {
     state.selectItem(id);
     setFocusRequest((current) => current + 1);
-  };
-  const [libraryStatus, setLibraryStatus] = useState<'idle' | 'opening' | 'failed'>('idle');
-  const openLibrary = async () => {
-    if (libraryStatus === 'opening') return;
-    setLibraryStatus('opening');
-    try {
-      await openGalleryPage();
-      setLibraryStatus('idle');
-    } catch {
-      setLibraryStatus('failed');
-    }
   };
   const { project, status } = state;
   const disabled = status === 'saving' || status === 'loading';
@@ -44,47 +35,48 @@ export function ScenarioEditorPage() {
     ready: t('scenario.editor.guideSaved'),
   };
   const statusText = statusMessages[status];
+  const operate = (operation: GuideStructureOperation) => {
+    const next = state.operate(operation);
+    if (!next) return;
+    const target =
+      next.items.find((item) => !project?.items.some((current) => current.id === item.id)) ??
+      next.items.find((item) => item.id === state.selectedId) ??
+      next.items[0];
+    if (target) {
+      state.selectItem(target.id, next);
+      setFocusRequest((current) => current + 1);
+    } else state.selectItem(null, next);
+  };
   return (
-    <main className="guide-page">
-      <header className="guide-page-header">
-        <div className="guide-page-identity">
-          <button
-            type="button"
-            className="guide-library-link"
-            disabled={libraryStatus === 'opening'}
-            onClick={() => void openLibrary()}
-            title={t('scenario.editor.guideLibraryHint')}
-          >
-            {t('scenario.editor.guideLibrary')}
-          </button>
-          <h1>{t('scenario.editor.title')}</h1>
-        </div>
-        {project && (
-          <label className="guide-project-name">
-            <span>{t('scenario.editor.projectLabel')}</span>
-            <input
-              disabled={disabled}
-              value={project.name}
-              maxLength={GUIDE_LIMITS.maxLabelLength}
-              onChange={(event) => state.update({ ...project, name: event.target.value })}
-            />
-          </label>
-        )}
-        {project && (
-          <button
-            className="guide-save"
-            type="button"
-            disabled={disabled || status === 'saved' || status === 'conflict'}
-            onClick={() => void state.save()}
-          >
-            {t('scenario.editor.guideSave')}
-          </button>
-        )}
-      </header>
+    <main
+      className="guide-page"
+      onBlurCapture={state.sealEdit}
+      onKeyDownCapture={(event) => {
+        if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== 'z')
+          return;
+        if (
+          event.target instanceof Element &&
+          event.target.closest('[role="dialog"], [role="alertdialog"]')
+        )
+          return;
+        event.preventDefault();
+        if (event.shiftKey) state.redo();
+        else state.undo();
+      }}
+    >
+      <GuidePageHeader
+        project={project}
+        disabled={disabled}
+        saveDisabled={disabled || status === 'saved' || status === 'conflict'}
+        canUndo={state.canUndo}
+        canRedo={state.canRedo}
+        onUndo={state.undo}
+        onRedo={state.redo}
+        onSave={state.save}
+        onChange={state.update}
+        t={t}
+      />
       <div className="guide-page-feedback" data-status={status}>
-        {libraryStatus === 'failed' && (
-          <p role="alert">{t('scenario.editor.guideLibraryFailed')}</p>
-        )}
         <p role="status" aria-live="polite">
           {statusText}
         </p>
@@ -93,7 +85,9 @@ export function ScenarioEditorPage() {
             {t(
               state.actionError === 'copy'
                 ? 'scenario.editor.guideCopyFailed'
-                : 'scenario.editor.guideDeleteFailed'
+                : state.actionError === 'structure'
+                  ? 'scenario.editor.guideOperationFailed'
+                  : 'scenario.editor.guideDeleteFailed'
             )}
           </p>
         )}
@@ -122,15 +116,18 @@ export function ScenarioEditorPage() {
           images={state.images}
           disabled={disabled}
           onSelect={selectItem}
-          onAddStep={() => {
-            const step = createGuideStep();
-            step.blocks.push({
-              kind: 'text',
-              id: crypto.randomUUID(),
-              paragraphs: createGuideParagraphs(''),
-            });
-            state.update({ ...project, items: [...project.items, step] });
-          }}
+          onAddStep={() => operate({ kind: 'add-step' })}
+          onAddSection={() => operate({ kind: 'add-section' })}
+          itemActions={
+            <GuideStepActions
+              project={project}
+              selectedId={state.selectedId}
+              disabled={disabled}
+              onChange={state.update}
+              onOperate={operate}
+              t={t}
+            />
+          }
           projectActions={
             <GuideProjectActions
               name={project.name}
@@ -152,6 +149,7 @@ export function ScenarioEditorPage() {
             disabled={disabled}
             onChange={state.update}
             onSelect={selectItem}
+            onOperate={operate}
             t={t}
           />
         </GuideWorkspace>
@@ -230,5 +228,111 @@ function GuideProjectActions({
         onConfirm={confirm}
       />
     </div>
+  );
+}
+
+function GuidePageHeader({
+  project,
+  disabled,
+  saveDisabled,
+  canUndo,
+  canRedo,
+  onUndo,
+  onRedo,
+  onSave,
+  onChange,
+  t,
+}: {
+  project: GuideProject | null;
+  disabled: boolean;
+  saveDisabled: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+  onUndo: () => void;
+  onRedo: () => void;
+  onSave: () => Promise<void>;
+  onChange: (project: GuideProject, group?: string | null) => void;
+  t: Translate;
+}) {
+  const [libraryStatus, setLibraryStatus] = useState<'idle' | 'opening' | 'failed'>('idle');
+  const openLibrary = async () => {
+    if (libraryStatus === 'opening') return;
+    setLibraryStatus('opening');
+    try {
+      await openGalleryPage();
+      setLibraryStatus('idle');
+    } catch {
+      setLibraryStatus('failed');
+    }
+  };
+  return (
+    <>
+      <header className="guide-page-header">
+        <div className="guide-page-identity">
+          <button
+            type="button"
+            className="guide-library-link"
+            disabled={libraryStatus === 'opening'}
+            onClick={() => void openLibrary()}
+            title={t('scenario.editor.guideLibraryHint')}
+          >
+            {t('scenario.editor.guideLibrary')}
+          </button>
+          <h1>{t('scenario.editor.title')}</h1>
+        </div>
+        {project && (
+          <label className="guide-project-name">
+            <span>{t('scenario.editor.projectLabel')}</span>
+            <input
+              disabled={disabled}
+              value={project.name}
+              maxLength={GUIDE_LIMITS.maxLabelLength}
+              onChange={(event) =>
+                onChange({ ...project, name: event.target.value }, 'project-name')
+              }
+            />
+          </label>
+        )}
+        {project && (
+          <div
+            className="guide-history-controls"
+            role="group"
+            aria-label={t('scenario.editor.guideHistoryActions')}
+          >
+            <button
+              type="button"
+              disabled={disabled || !canUndo}
+              onClick={onUndo}
+              title={t('scenario.editor.guideUndoHint')}
+            >
+              {t('scenario.editor.guideUndo')}
+            </button>
+            <button
+              type="button"
+              disabled={disabled || !canRedo}
+              onClick={onRedo}
+              title={t('scenario.editor.guideRedoHint')}
+            >
+              {t('scenario.editor.guideRedo')}
+            </button>
+          </div>
+        )}
+        {project && (
+          <button
+            className="guide-save"
+            type="button"
+            disabled={saveDisabled}
+            onClick={() => void onSave()}
+          >
+            {t('scenario.editor.guideSave')}
+          </button>
+        )}
+      </header>
+      {libraryStatus === 'failed' && (
+        <div className="guide-page-feedback">
+          <p role="alert">{t('scenario.editor.guideLibraryFailed')}</p>
+        </div>
+      )}
+    </>
   );
 }

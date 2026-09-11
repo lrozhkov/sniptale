@@ -74,10 +74,8 @@ async function render() {
     root.render(<ScenarioEditorPage />);
   });
 }
-async function click(label: string) {
-  const button = [...container.querySelectorAll('button')].find(
-    (node) => node.textContent === label
-  );
+async function click(label: string, scope: ParentNode = container) {
+  const button = [...scope.querySelectorAll('button')].find((node) => node.textContent === label);
   if (!button) throw new Error(`Missing test control ${label}`);
   await act(async () => {
     button.click();
@@ -214,7 +212,9 @@ it('renders optional blocks and keeps text edits isolated from images and other 
   );
   await render();
   expect(container.querySelector('section')?.textContent).toContain('Section description');
-  expect(container.querySelector('h3')?.textContent).toBe('Details');
+  expect(container.querySelector<HTMLInputElement>('[aria-label="Heading"]')?.value).toBe(
+    'Details'
+  );
   expect(container.querySelector('article#first header span')).toBeNull();
   expect(container.querySelector('img')?.alt).toBe('Example image');
   expect(container.querySelector('figcaption')?.textContent).toBe('Image caption');
@@ -435,4 +435,184 @@ it('preserves edits when library navigation fails and offers retry', async () =>
   expect(io.library).toHaveBeenCalledTimes(2);
   expect(container.textContent).not.toContain('Could not open the library');
   expect(io.save).not.toHaveBeenCalled();
+});
+
+async function editField(selector: string, value: string) {
+  const field = container.querySelector(selector);
+  if (!(field instanceof HTMLInputElement) && !(field instanceof HTMLTextAreaElement))
+    throw new Error('Missing field');
+  await act(async () => {
+    field.focus();
+    const prototype =
+      field instanceof HTMLInputElement
+        ? HTMLInputElement.prototype
+        : HTMLTextAreaElement.prototype;
+    Object.getOwnPropertyDescriptor(prototype, 'value')?.set?.call(field, value);
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+    field.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+
+it('composes multiple blocks and retains undo after save, then resets it on reload', async () => {
+  await render();
+  const article = container.querySelector('article#first');
+  if (!article) throw new Error('Missing step');
+  await click('+ Text', article);
+  await click('+ Text', article);
+  await click('+ Heading', article);
+  await click('+ Note', article);
+  expect(article.querySelectorAll('.guide-block')).toHaveLength(4);
+  await click('Save');
+  await click('Undo');
+  expect(article.querySelectorAll('.guide-block')).toHaveLength(3);
+  await click('Redo');
+  expect(article.querySelectorAll('.guide-block')).toHaveLength(4);
+  await click('Reopen saved version');
+  const dialog = container.querySelector('[role="alertdialog"]');
+  if (!dialog) throw new Error('Missing reload dialog');
+  await click('Reopen saved version', dialog);
+  expect(container.querySelectorAll('.guide-block')).toHaveLength(0);
+  const undo = [...container.querySelectorAll('button')].find(
+    (button) => button.textContent === 'Undo'
+  );
+  expect(undo?.disabled).toBe(true);
+});
+
+it('groups text edits and routes keyboard undo and redo to the same history', async () => {
+  await render();
+  await editField('article#first input', 'First change');
+  await editField('article#first input', 'Second change');
+  const field = container.querySelector('article#first input');
+  if (!(field instanceof HTMLInputElement)) throw new Error('Missing field');
+  await act(async () =>
+    field.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })
+    )
+  );
+  expect(field.value).toBe('First step');
+  await act(async () =>
+    field.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'z',
+        ctrlKey: true,
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+  );
+  expect(field.value).toBe('Second change');
+});
+
+it('supports optional numbering and editable sections with structural undo', async () => {
+  await render();
+  const stepField = container.querySelector('article#first input');
+  if (!(stepField instanceof HTMLInputElement)) throw new Error('Missing field');
+  await act(async () => stepField.focus());
+  const number = container.querySelector('input[type="checkbox"]');
+  if (!(number instanceof HTMLInputElement)) throw new Error('Missing number control');
+  await act(async () => number.click());
+  expect(container.querySelector('article#first header span')).toBeNull();
+  await click('Undo');
+  expect(container.querySelector('article#first header span')?.textContent).toBe('1');
+  await click('Add section');
+  await editField('.guide-step-actions input:not([type="checkbox"])', 'A section');
+  expect(container.querySelector('.guide-document section h2')?.textContent).toBe('A section');
+  await editField('.guide-step-actions textarea', 'Section description');
+  expect(container.querySelector('.guide-document section p')?.textContent).toBe(
+    'Section description'
+  );
+  await click('Remove item');
+  expect(container.querySelector('.guide-document section')).toBeNull();
+  await click('Undo');
+  expect(container.querySelector('.guide-document section h2')?.textContent).toBe('A section');
+});
+
+it('blocks keyboard history while saving and restores it without changing the saved revision base', async () => {
+  let complete: (() => void) | undefined;
+  io.save.mockImplementation(
+    (project) =>
+      new Promise((resolve) => {
+        complete = () => resolve({ ...project, updatedAt: 101 });
+      })
+  );
+  await render();
+  await click('Add step');
+  await click('Save');
+  const main = container.querySelector('main');
+  if (!main) throw new Error('Missing page');
+  await act(async () =>
+    main.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })
+    )
+  );
+  expect(container.querySelectorAll('article')).toHaveLength(2);
+  await act(async () => complete?.());
+  await click('Undo');
+  expect(container.querySelectorAll('article')).toHaveLength(1);
+  io.save.mockImplementation(async (project) => ({ ...project, updatedAt: 102 }));
+  await click('Save');
+  expect(io.save).toHaveBeenLastCalledWith(expect.objectContaining({ items: expect.any(Array) }), {
+    baseUpdatedAt: 101,
+  });
+});
+
+it('routes block and item tools through reversible order-preserving mutations', async () => {
+  const project = createGuideProject('Guide', 'guide', 100);
+  const first = createGuideStep('First', 'first');
+  first.blocks = ['One', 'Two', 'Three'].map((text, index) => ({
+    kind: 'text',
+    id: `text-${index}`,
+    paragraphs: createGuideParagraphs(text),
+  }));
+  project.items = [first, createGuideStep('Next', 'next')];
+  io.load.mockResolvedValue(project);
+  await render();
+  const block = container.querySelector('[data-block-id="text-1"]');
+  if (!block) throw new Error('Missing block');
+  const tool = async (name: string, scope: ParentNode) => {
+    const button = [...scope.querySelectorAll('button')].find(
+      (entry) => entry.getAttribute('aria-label') === name
+    );
+    if (!button) throw new Error('Missing block tool');
+    await act(async () => button.click());
+  };
+  const values = () =>
+    [...container.querySelectorAll<HTMLTextAreaElement>('article#first textarea')].map(
+      (field) => field.value
+    );
+  await tool('Move up', block);
+  expect(values()).toEqual(['Two', 'One', 'Three']);
+  await tool('Move down', block);
+  expect(values()).toEqual(['One', 'Two', 'Three']);
+  await tool('Duplicate block', block);
+  expect(values()).toEqual(['One', 'Two', 'Two', 'Three']);
+  await tool('Remove block', block);
+  expect(values()).toEqual(['One', 'Two', 'Three']);
+  const tail = container.querySelectorAll('article#first .guide-block')[1];
+  if (!tail) throw new Error('Missing tail');
+  await tool('Split step here', tail);
+  expect(container.querySelectorAll('article')).toHaveLength(3);
+  expect(values()).toEqual(['One']);
+  const title = container.querySelector('article#first input');
+  if (!(title instanceof HTMLInputElement)) throw new Error('Missing title');
+  await act(async () => title.focus());
+  await click('Merge with next step');
+  expect(values()).toEqual(['One', 'Two', 'Three']);
+  await click('Move down');
+  expect([...container.querySelectorAll('article')].map((entry) => entry.id)).toEqual([
+    'next',
+    'first',
+  ]);
+  await click('Move up');
+  expect([...container.querySelectorAll('article')].map((entry) => entry.id)).toEqual([
+    'first',
+    'next',
+  ]);
+  await click('Duplicate item');
+  expect(container.querySelectorAll('article')).toHaveLength(3);
+  await click('Remove item');
+  expect(container.querySelectorAll('article')).toHaveLength(2);
+  await click('Undo');
+  expect(container.querySelectorAll('article')).toHaveLength(3);
 });
