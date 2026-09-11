@@ -167,6 +167,9 @@ function isEffectInstance(value: unknown): value is VideoProjectEffectInstance {
     value['id'].length > 0 &&
     value['id'].length <= 128 &&
     typeof value['snapshotId'] === 'string' &&
+    (value['catalogPackId'] === undefined ||
+      (typeof value['catalogPackId'] === 'string' &&
+        /^(builtin:)?[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value['catalogPackId']))) &&
     isKind(value['kind']) &&
     typeof value['enabled'] === 'boolean' &&
     (value['rangeMode'] === undefined ||

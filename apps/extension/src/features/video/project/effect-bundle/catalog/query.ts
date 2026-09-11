@@ -1,4 +1,4 @@
-import { readEffectPresentationDocument } from '../presentation-document';
+import { readCatalogPresentation } from './presentation';
 import { type EffectV1Kind } from '@sniptale/runtime-contracts/effect-v1';
 import type { EffectBundleCatalogDocumentEntry, EffectBundleCatalogEntry } from './index';
 
@@ -16,7 +16,7 @@ export function describeCatalogDocument(
   document: EffectBundleCatalogDocumentEntry,
   locale: 'en' | 'ru'
 ) {
-  const parsed = readEffectPresentationDocument(document.source).document;
+  const parsed = readCatalogPresentation(document);
   const preset = parsed?.controlPresets?.find(
     (item) =>
       item.id ===
@@ -48,7 +48,7 @@ export function queryEffectCatalog(
   const query = filter.query.trim().toLocaleLowerCase(locale);
   return catalog.documents
     .flatMap((document) => {
-      const presets = readEffectPresentationDocument(document.source).document?.controlPresets;
+      const presets = readCatalogPresentation(document)?.controlPresets;
       const variants = presets?.length
         ? presets.map((preset) => ({ ...document, previewPresetId: preset.id }))
         : [document];

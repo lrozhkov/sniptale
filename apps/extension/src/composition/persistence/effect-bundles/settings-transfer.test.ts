@@ -1,3 +1,8 @@
+vi.mock('./preferences', async (original) => ({
+  ...(await original<typeof import('./preferences')>()),
+  readEffectCatalogPreferences: async () => [],
+  writeEffectCatalogPreferences: async () => {},
+}));
 import { runWithExclusivePersistenceMutationPermit } from '../infrastructure/mutation-barrier';
 import { expect, it, vi } from 'vitest';
 import { createEffectCatalogEntry } from './catalog-builder';
@@ -121,4 +126,56 @@ it('requires a live mutation permit, restores atomically and propagates failed w
     expect(storeMocks.abort).toHaveBeenCalled();
     await plan.rollback();
   });
+});
+
+it('keeps presets attached to imported copies and preserves unrelated builtin preferences', async () => {
+  const portable = await encodeEffectSettingsEntry(
+    await createEffectCatalogEntry(await readValidBundleArtifact(), 1)
+  );
+  const local = { packId: 'builtin:base', enabled: false, documents: {} };
+  const importedPreference = { packId: portable.id, documents: { missing: { presets: [] } } };
+  const domain = (item: unknown, preferences: unknown[]) => ({
+    'styles.video-effects': {
+      schemaVersion: 1,
+      data: cloneSettingsTransferJsonValue({ items: [item], preferences }),
+    },
+  });
+  const plan = planSettingsTransfer({
+    current: domain(portable, [local]),
+    imported: domain({ ...portable, enabled: false }, [importedPreference]),
+    strategy: 'safe-merge',
+  });
+  const data = plan.domains['styles.video-effects']!.data as {
+    items: { id: string }[];
+    preferences: { packId: string }[];
+  };
+  expect(data.preferences).toContainEqual(local);
+  expect(data.preferences).toContainEqual({ ...importedPreference, packId: data.items[1]!.id });
+});
+
+it('merges preference inventories by source identity with one explicit conflict decision', () => {
+  const row = (packId: string, enabled: boolean) => ({ packId, enabled, documents: {} });
+  const a = row('builtin:base', false),
+    b = row('another', false),
+    same = row('unchanged', true);
+  const domain = (preferences: unknown[]) => ({
+    'styles.video-effects': {
+      schemaVersion: 1,
+      data: cloneSettingsTransferJsonValue({ items: [], preferences }),
+    },
+  });
+  for (const decision of ['keep-local', 'use-imported'] as const) {
+    const plan = planSettingsTransfer({
+      current: domain([a, b, same]),
+      imported: domain([row(a.packId, true), row(b.packId, true), same]),
+      strategy: 'safe-merge',
+      decisions: { 'styles.video-effects.preferences': decision },
+    });
+    expect(plan.conflicts).toHaveLength(1);
+    expect(plan.domains['styles.video-effects']!.data).toEqual({
+      items: [],
+      preferences:
+        decision === 'keep-local' ? [a, b, same] : [row(a.packId, true), row(b.packId, true), same],
+    });
+  }
 });

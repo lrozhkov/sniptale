@@ -109,6 +109,7 @@ function classifyReference(path, policy) {
     path === 'apps/extension/build/layout.data.json' ||
     path === 'apps/extension/package.json' ||
     path === 'apps/extension/build/injected-build-shim-guard.ts' ||
+    path === 'apps/extension/build/video-effects.ts' ||
     path === 'tooling/test/harness/content-runtime-shim-guard.test.ts'
   ) {
     return { classification: 'app-root-build-input', disposition: 'retain' };

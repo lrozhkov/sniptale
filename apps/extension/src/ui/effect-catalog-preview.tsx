@@ -1,6 +1,6 @@
+import { readCatalogPresentation } from '../features/video/project/effect-bundle/catalog/presentation';
 import { getCurrentLocale } from '../platform/i18n';
 import { createContext, useContext, useEffect, useRef, useMemo, type ReactNode } from 'react';
-import { parseEffectV1Source } from '@sniptale/runtime-contracts/effect-v1';
 import type {
   EffectBundleCatalogEntry,
   EffectBundleCatalogDocumentEntry,
@@ -76,10 +76,7 @@ export function EffectCatalogPreview({
   const latest = useRef({ catalog, entry });
   latest.current = { catalog, entry };
   const key = effectPosterKey(entry, getCurrentLocale());
-  const duration = useMemo(
-    () => parseEffectV1Source(entry.source).document?.duration ?? 4,
-    [entry.source]
-  );
+  const duration = useMemo(() => readCatalogPresentation(entry)?.duration ?? 4, [entry]);
   const stop = () => {
     if (animation.current !== null) clearInterval(animation.current);
     animation.current = null;

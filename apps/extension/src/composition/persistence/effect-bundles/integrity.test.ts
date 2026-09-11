@@ -43,7 +43,7 @@ it('rejects document digest, JSON, identity, and asset-closure mismatches', asyn
 
   const malformedSource = '{';
   await expectIntegrityFailure(await replaceDocumentSource(entry, malformedSource));
-  const parsed = JSON.parse(entry.documents[0]!.source);
+  const parsed = JSON.parse(entry.documents[0]!.source!);
   const changedSource = JSON.stringify({ ...parsed, id: 'changed-id' });
   await expectIntegrityFailure(await replaceDocumentSource(entry, changedSource));
   await expectIntegrityFailure({ ...entry, assets: [] });

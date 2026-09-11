@@ -1,3 +1,4 @@
+import { resolveCatalogDocument } from '../effect-bundle/catalog/resolution';
 import {
   assertEffectV1AssetSignature,
   sha256EffectV1Bytes,
@@ -25,6 +26,7 @@ export async function readVerifiedCatalogDocument(
   catalogDocument: EffectBundleCatalogEntry['documents'][number];
   document: EffectV1Document;
 }> {
+  catalog = await resolveCatalogDocument(catalog, documentId);
   const catalogDocument = catalog.documents.find(({ id }) => id === documentId);
   if (!catalogDocument) failCatalogIntegrity();
   const documentResult = await readCatalogDocuments(catalog);
@@ -58,6 +60,7 @@ async function readCatalogDocuments(catalog: EffectBundleCatalogEntry): Promise<
   const documents = new Map<string, EffectV1Document>();
   let retainedByteLength = 0;
   for (const entry of catalog.documents) {
+    if (entry.source === undefined) failCatalogIntegrity();
     const sourceBytes = new TextEncoder().encode(entry.source);
     retainedByteLength += sourceBytes.byteLength;
     if ((await sha256EffectV1Bytes(sourceBytes)) !== entry.sha256) failCatalogIntegrity();

@@ -71,7 +71,13 @@ it('provides target and transition inputs and releases them when rendering fails
         throw new Error('sandbox unavailable');
       });
       await expect(
-        renderEffectCatalogPreview({ renderFrame, dispose: vi.fn() }, catalog, entry, 0.25, 1)
+        renderEffectCatalogPreview(
+          { renderFrame, dispose: vi.fn() },
+          { ...catalog, documents: [entry] },
+          entry,
+          0.25,
+          1
+        )
       ).rejects.toThrow('sandbox unavailable');
       expect(renderFrame).toHaveBeenCalledOnce();
     }

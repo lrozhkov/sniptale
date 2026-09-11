@@ -122,7 +122,7 @@ function buildCollectionItems(
   filter: EffectCatalogFilter,
   locale: 'ru' | 'en'
 ): SettingsCollectionItem[] {
-  return controller.entries.flatMap((entry) => {
+  return controller.entries.flatMap<SettingsCollectionItem>((entry) => {
     if (entry.status === 'invalid')
       return [
         {
@@ -145,37 +145,18 @@ function buildCollectionItems(
         previewVariant: 'image',
         preview: <EffectCatalogPreview catalog={entry.entry} document={documents[0]!} />,
         busy: controller.busy,
-        supplement:
-          documents.length > 1 ? (
-            <ul className="space-y-1 text-xs text-[var(--sniptale-color-text-secondary)]">
-              {documents.map((document) => {
-                const metadata = describeCatalogDocument(document, locale);
-                return (
-                  <li
-                    key={`${document.id}:${document.previewPresetId ?? ''}`}
-                    className="flex min-w-0 items-center justify-between gap-2"
-                  >
-                    <span className="min-w-0 break-words">{metadata.label}</span>
-                    {(metadata.themeLabel || metadata.styleLabel) && (
-                      <span className="shrink-0 text-[var(--sniptale-color-text-muted)]">
-                        {[metadata.themeLabel, metadata.styleLabel].filter(Boolean).join(' · ')}
-                      </span>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          ) : undefined,
         meta:
-          documents.length === 1
-            ? [
-                describeCatalogDocument(documents[0]!, locale).themeLabel,
-                describeCatalogDocument(documents[0]!, locale).styleLabel,
-              ]
-                .filter(Boolean)
-                .join(' · ')
-            : undefined,
-        capabilities: { toggle: true, delete: true },
+          entry.source === 'builtin'
+            ? translate('videoEditor.effectsLibrary.builtinPack')
+            : documents.length === 1
+              ? [
+                  describeCatalogDocument(documents[0]!, locale).themeLabel,
+                  describeCatalogDocument(documents[0]!, locale).styleLabel,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')
+              : undefined,
+        capabilities: { toggle: true, delete: entry.source !== 'builtin' },
       },
     ];
   });

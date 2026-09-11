@@ -1,6 +1,9 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorEffectsLibraryMessages = defineMessageSource({
+  presetUnavailable: { en: 'Unavailable for this version', ru: 'Недоступен для этой версии' },
+  builtinPack: { en: 'Built-in', ru: 'Встроенный' },
+
   resizeRegionTopLeft: { en: 'Resize top left', ru: 'Изменить размер слева сверху' },
   resizeRegionTopRight: { en: 'Resize top right', ru: 'Изменить размер справа сверху' },
   resizeRegionBottomLeft: { en: 'Resize bottom left', ru: 'Изменить размер слева снизу' },

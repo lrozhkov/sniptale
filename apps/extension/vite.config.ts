@@ -1,3 +1,4 @@
+import { videoEffectResources } from './build/video-effect-resources.ts';
 import { copyFile, mkdir } from 'node:fs/promises';
 import { dirname, join, resolve as resolvePath } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -151,6 +152,7 @@ export default defineConfig(({ mode }) => ({
   publicDir: resolvePath(BUILD_LAYOUT.appRoot, 'public'),
   base: './',
   plugins: [
+    videoEffectResources(join(APP_ROOT, 'public/video-effects')),
     extensionHtmlInputs(BUILD_LAYOUT),
     copyDevExtensionFonts(),
     tailwindcss(),

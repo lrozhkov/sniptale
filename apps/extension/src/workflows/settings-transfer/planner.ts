@@ -102,6 +102,8 @@ function mergeValue(args: {
 function mergeArray(args: Parameters<typeof mergeValue>[0]): SettingsTransferJsonValue[] {
   const current = args.current as SettingsTransferJsonValue[];
   const imported = args.imported as SettingsTransferJsonValue[];
+  if (args.path === 'styles.video-effects.preferences')
+    return mergeEffectPreferences(args, current, imported);
   if (!current.every(hasStringId) || !imported.every(hasStringId)) {
     const decision = registerConflict(args, 'scalar');
     if (decision === 'keep-local') {
@@ -143,6 +145,37 @@ function mergeArray(args: Parameters<typeof mergeValue>[0]): SettingsTransferJso
       continue;
     }
     result[index] = importedRecord;
+    args.summary.updated += 1;
+  }
+  return result;
+}
+
+function mergeEffectPreferences(
+  args: Parameters<typeof mergeValue>[0],
+  current: SettingsTransferJsonValue[],
+  imported: SettingsTransferJsonValue[]
+): SettingsTransferJsonValue[] {
+  const result = [...current];
+  let decision: SettingsTransferConflictDecision | undefined;
+  for (const row of imported) {
+    if (!isRecord(row) || typeof row['packId'] !== 'string')
+      throw new Error('Invalid effect preferences');
+    const index = result.findIndex((item) => isRecord(item) && item['packId'] === row['packId']);
+    if (index < 0) {
+      result.push(row);
+      args.summary.added += 1;
+      continue;
+    }
+    if (deepEqual(result[index]!, row)) {
+      args.summary.unchanged += 1;
+      continue;
+    }
+    decision ??= registerConflict(args, 'scalar');
+    if (decision === 'keep-local') {
+      args.summary.skipped += 1;
+      continue;
+    }
+    result[index] = row;
     args.summary.updated += 1;
   }
   return result;
@@ -320,6 +353,7 @@ function remapImportedValue(
 }
 
 function referenceTargetCollection(path: string): string | null {
+  if (path === 'styles.video-effects.preferences.packId') return 'styles.video-effects.items';
   if (path.startsWith('capture.quick-actions.items.') && path.endsWith('.viewportPresetId'))
     return 'capture.viewport-presets.items';
   if (path === 'capture.viewport-presets.defaultId') return 'capture.viewport-presets.items';

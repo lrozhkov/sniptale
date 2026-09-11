@@ -1,3 +1,4 @@
+import { resolveCatalogDocument } from '../../features/video/project/effect-bundle/catalog/resolution';
 import { applyInitialEffectPreset } from '../../features/video/project/effect-bundle/catalog/presets';
 import {
   parseEffectV1Source,
@@ -22,6 +23,12 @@ export async function renderEffectCatalogPreview(
   sourceFrame?: HTMLCanvasElement | null,
   locale: string = 'en'
 ): Promise<ImageBitmap> {
+  catalog = await resolveCatalogDocument(catalog, entry.id);
+  entry = {
+    ...catalog.documents.find((document) => document.id === entry.id)!,
+    ...(entry.previewPresetId ? { previewPresetId: entry.previewPresetId } : {}),
+  };
+  if (!entry.source) throw new Error('Missing effect source');
   const parsed = parseEffectV1Source(entry.source).document;
   if (!parsed) throw new Error('Invalid preview document');
   const time = progress * parsed.duration;

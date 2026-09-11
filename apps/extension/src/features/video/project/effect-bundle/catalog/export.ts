@@ -14,6 +14,7 @@ export async function exportEffectCatalog(
   const files = catalog.assets.map((asset) => ({ asset, path: `assets/${asset.sha256}` }));
   const documents = await Promise.all(
     catalog.documents.map(async (entry, index) => {
+      if (!entry.source) throw new Error('Catalog document is not loaded');
       const document = parseEffectV1Source(entry.source).document;
       if (!document) throw new Error('Invalid catalog document');
       for (const declaration of document.assets) {

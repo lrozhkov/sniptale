@@ -22,12 +22,29 @@ export function parseEffectPresetPreferences(
   input: unknown
 ): EffectPresetPreferences | null {
   const document = parseEffectV1Source(source).document;
+  const stored = parseStoredEffectPresetPreferences(input);
   if (
     !document ||
-    !record(input) ||
-    !Array.isArray(input['presets']) ||
-    input['presets'].length > 16
+    !stored ||
+    stored.presets.some(
+      (preset) => !validateEffectV1ControlPresetValues(document, preset.values).ok
+    )
   )
+    return null;
+  const choice = stored.defaultPreset;
+  if (
+    choice &&
+    !(choice.kind === 'builtin' ? document.controlPresets : stored.presets)?.some(
+      (item) => item.id === choice.id
+    )
+  )
+    return null;
+  return stored;
+}
+
+/** Structural persistence boundary retains presets whose definitions are temporarily unavailable. */
+export function parseStoredEffectPresetPreferences(input: unknown): EffectPresetPreferences | null {
+  if (!record(input) || !Array.isArray(input['presets']) || input['presets'].length > 16)
     return null;
   const presets: EffectUserPreset[] = [];
   for (const preset of input['presets']) {
@@ -38,16 +55,21 @@ export function parseEffectPresetPreferences(
       !preset['name'].trim() ||
       preset['name'].length > 120 ||
       !record(preset['values']) ||
+      Object.keys(preset['values']).length > 256 ||
       Object.values(preset['values']).some(
         (value) => typeof value === 'string' && value.length > 128
-      ) ||
-      !validateEffectV1ControlPresetValues(document, preset['values']).ok
+      )
     )
       return null;
     if (presets.some((item) => item.id === preset['id'])) return null;
     const values: Record<string, number | string> = {};
     for (const [key, value] of Object.entries(preset['values'])) {
-      if (typeof value !== 'number' && typeof value !== 'string') return null;
+      if (
+        (typeof value !== 'number' && typeof value !== 'string') ||
+        (typeof value === 'number' && !Number.isFinite(value)) ||
+        key.length > 128
+      )
+        return null;
       values[key] = value;
     }
     presets.push({
@@ -62,12 +84,6 @@ export function parseEffectPresetPreferences(
     !record(choice) ||
     !id(choice['id']) ||
     (choice['kind'] !== 'builtin' && choice['kind'] !== 'user')
-  )
-    return null;
-  if (
-    !(choice['kind'] === 'builtin' ? document.controlPresets : presets)?.some(
-      (item) => item.id === choice['id']
-    )
   )
     return null;
   return { presets, defaultPreset: { kind: choice['kind'], id: choice['id'] } };

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useEffectPresetCatalog } from './preset-catalog';
 import {
   applyEffectV1ControlPresetValues,
+  validateEffectV1ControlPresetValues,
   resolveEffectLocaleText,
   type EffectV1Document,
 } from '@sniptale/runtime-contracts/effect-v1';
@@ -16,6 +17,7 @@ import { InspectorActionButton } from '../shared/actions';
 export function EffectVisualPresets(props: {
   document: EffectV1Document;
   sourceSha256: string;
+  catalogPackId?: string | undefined;
   controls: Readonly<Record<string, number | string>>;
   disabled: boolean;
   onChange(controls: Record<string, number | string>): void;
@@ -26,10 +28,16 @@ export function EffectVisualPresets(props: {
     busy,
     error,
     save: persist,
-  } = useEffectPresetCatalog(props.document.id, props.sourceSha256);
+  } = useEffectPresetCatalog(props.document.id, props.sourceSha256, props.catalogPackId);
   const [preferred, setPreferred] = useState<string | null>(null);
   const options = resolveVisualPresetOptions(props.document, preferences);
   const selected = resolveSelectedPreset(options, props.controls, preferred);
+  const defaultValue = preferences.defaultPreset
+    ? `${preferences.defaultPreset.kind}:${preferences.defaultPreset.id}`
+    : 'template';
+  const defaultUnavailable =
+    defaultValue !== 'template' &&
+    !options.some((option) => option.value === defaultValue && !option.disabled);
   const save = async (next: EffectPresetPreferences) => {
     if (!(await persist(next))) return false;
     const added = next.presets.find(
@@ -57,7 +65,7 @@ export function EffectVisualPresets(props: {
         onChange={(id) => {
           const preset = options.find((option) => option.value === id);
           setPreferred(id);
-          if (preset)
+          if (preset && !preset.disabled)
             props.onChange(
               applyEffectV1ControlPresetValues(props.document, props.controls, preset.values)
             );
@@ -74,6 +82,15 @@ export function EffectVisualPresets(props: {
           disabled={busy}
           options={[
             { value: 'template', label: translate('videoEditor.effectsLibrary.templateDefault') },
+            ...(defaultUnavailable && !options.some((option) => option.value === defaultValue)
+              ? [
+                  {
+                    value: defaultValue,
+                    label: translate('videoEditor.effectsLibrary.presetUnavailable'),
+                    disabled: true,
+                  },
+                ]
+              : []),
             ...options,
           ]}
           onChange={(value) => {
@@ -83,6 +100,11 @@ export function EffectVisualPresets(props: {
             else void save({ presets: preferences.presets });
           }}
         />
+      )}
+      {defaultUnavailable && (
+        <p role="status" className="text-xs text-[var(--sniptale-color-text-muted)]">
+          {translate('videoEditor.effectsLibrary.presetUnavailable')}
+        </p>
       )}
       {error && (
         <p role="alert" className="text-xs text-[var(--sniptale-color-danger)]">
@@ -202,11 +224,15 @@ function resolveVisualPresetOptions(
       value: `builtin:${preset.id}`,
       label: resolveEffectLocaleText(preset.label, getCurrentLocale()),
       values: preset.values,
+      disabled: false,
     })),
     ...preferences.presets.map((preset) => ({
       value: `user:${preset.id}`,
-      label: preset.name,
+      label: validateEffectV1ControlPresetValues(document, preset.values).ok
+        ? preset.name
+        : `${preset.name} — ${translate('videoEditor.effectsLibrary.presetUnavailable')}`,
       values: preset.values,
+      disabled: !validateEffectV1ControlPresetValues(document, preset.values).ok,
     })),
   ];
   return options;
@@ -217,6 +243,7 @@ function resolveSelectedPreset(
   preferred: string | null
 ) {
   const matches = (option: (typeof options)[number]) =>
+    !option.disabled &&
     Object.entries(option.values).every(([id, value]) => controls[id] === value);
   return (
     options.find((option) => option.value === preferred && matches(option))?.value ??

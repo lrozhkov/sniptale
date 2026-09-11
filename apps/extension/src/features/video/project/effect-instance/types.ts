@@ -28,6 +28,8 @@ export type VideoProjectEffectTarget =
   | { kind: 'transition'; transitionId: string };
 
 export interface VideoProjectEffectInstance {
+  /** Catalog identity for preferences only; rendering uses immutable snapshots. */
+  catalogPackId?: string;
   /** Authoritative logical scene positions; local handle controls are derived at render time. */
   sceneAnchors?: Record<string, { x: number; y: number }>;
   /** Full-owner timing follows the clip; manual interval edits retain their source phase. */

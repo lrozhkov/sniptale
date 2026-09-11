@@ -1,0 +1,230 @@
+{
+  "schemaVersion": "sniptale.effect.v1",
+  "id": "sniptale-video-push-in",
+  "kind": "targetEffect",
+  "duration": 5,
+  "label": {
+    "ru": "Медленное приближение",
+    "en": "Slow push-in"
+  },
+  "description": {
+    "ru": "Настраиваемая обработка; интенсивность 0 сохраняет исходник.",
+    "en": "Adjustable processing; zero intensity preserves the source."
+  },
+  "assets": [],
+  "controls": [
+    {
+      "id": "strength",
+      "kind": "number",
+      "label": {
+        "ru": "Интенсивность (%)",
+        "en": "Intensity (%)"
+      },
+      "defaultValue": 30,
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "group": "processing",
+      "order": 0
+    },
+    {
+      "id": "travel",
+      "kind": "number",
+      "label": {
+        "ru": "Движение (%)",
+        "en": "Travel (%)"
+      },
+      "defaultValue": 100,
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "group": "animation",
+      "order": 1
+    },
+    {
+      "id": "focusX",
+      "kind": "number",
+      "label": {
+        "ru": "Центр X (%)",
+        "en": "Focus X (%)"
+      },
+      "defaultValue": 50,
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "group": "geometry",
+      "order": 2
+    },
+    {
+      "id": "focusY",
+      "kind": "number",
+      "label": {
+        "ru": "Центр Y (%)",
+        "en": "Focus Y (%)"
+      },
+      "defaultValue": 50,
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "group": "geometry",
+      "order": 3
+    }
+  ],
+  "layers": [],
+  "clips": [],
+  "scenes": [
+    {
+      "id": "main",
+      "start": 0,
+      "duration": 5
+    }
+  ],
+  "timeline": {
+    "phases": [],
+    "tracks": []
+  },
+  "program": {
+    "kind": "graph",
+    "version": 1,
+    "definitions": {
+      "z": {
+        "op": "add",
+        "args": [
+          1,
+          {
+            "op": "mul",
+            "args": [
+              {
+                "op": "div",
+                "args": [
+                  {
+                    "op": "read",
+                    "path": "controls.strength"
+                  },
+                  100
+                ]
+              },
+              0.3,
+              {
+                "op": "mix",
+                "args": [
+                  1,
+                  {
+                    "op": "inOut",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "progress"
+                      }
+                    ]
+                  },
+                  {
+                    "op": "div",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.travel"
+                      },
+                      100
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "commands": [
+      {
+        "op": "clear"
+      },
+      {
+        "op": "group",
+        "commands": [
+          {
+            "op": "image",
+            "input": "source",
+            "x": 0,
+            "y": 0,
+            "width": {
+              "op": "read",
+              "path": "width"
+            },
+            "height": {
+              "op": "read",
+              "path": "height"
+            },
+            "fit": "cover"
+          }
+        ],
+        "x": {
+          "op": "mul",
+          "args": [
+            {
+              "op": "read",
+              "path": "width"
+            },
+            {
+              "op": "sub",
+              "args": [
+                1,
+                {
+                  "op": "read",
+                  "path": "defs.z"
+                }
+              ]
+            },
+            {
+              "op": "div",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "controls.focusX"
+                },
+                100
+              ]
+            }
+          ]
+        },
+        "y": {
+          "op": "mul",
+          "args": [
+            {
+              "op": "read",
+              "path": "height"
+            },
+            {
+              "op": "sub",
+              "args": [
+                1,
+                {
+                  "op": "read",
+                  "path": "defs.z"
+                }
+              ]
+            },
+            {
+              "op": "div",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "controls.focusY"
+                },
+                100
+              ]
+            }
+          ]
+        },
+        "scaleX": {
+          "op": "read",
+          "path": "defs.z"
+        },
+        "scaleY": {
+          "op": "read",
+          "path": "defs.z"
+        }
+      }
+    ]
+  }
+}

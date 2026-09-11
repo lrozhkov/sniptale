@@ -168,6 +168,7 @@ function EffectInstanceCard(props: EffectInstanceCardProps): React.JSX.Element {
           key={`${instance.id}:${snapshot.sha256}`}
           document={validation.document}
           sourceSha256={snapshot.sha256}
+          catalogPackId={instance.catalogPackId}
           controls={instance.controls}
           disabled={props.disabled ?? false}
           onChange={(controls) => props.onUpdateEffectInstance(instance.id, { controls })}

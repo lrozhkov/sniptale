@@ -1,0 +1,5710 @@
+{
+  "schemaVersion": "sniptale.effect.v1",
+  "id": "sniptale-chapters",
+  "kind": "standalone",
+  "duration": 4,
+  "label": {
+    "ru": "Маршрут видео",
+    "en": "Video chapters"
+  },
+  "description": {
+    "ru": "До десяти разделов: одна колонка до пяти пунктов, две — от шести. Последовательное появление и активный пункт.",
+    "en": "Up to ten chapters: one column for up to five, two from six onward. Staggered entrance and active step."
+  },
+  "assets": [],
+  "controls": [
+    {
+      "id": "accent",
+      "kind": "color",
+      "label": {
+        "ru": "Акцент",
+        "en": "Accent"
+      },
+      "defaultValue": "#fb923c",
+      "group": "appearance",
+      "order": 0
+    },
+    {
+      "id": "surface",
+      "kind": "color",
+      "label": {
+        "ru": "Подложка",
+        "en": "Surface"
+      },
+      "defaultValue": "#171a20",
+      "group": "appearance",
+      "order": 1
+    },
+    {
+      "id": "ink",
+      "kind": "color",
+      "label": {
+        "ru": "Основной текст",
+        "en": "Primary text"
+      },
+      "defaultValue": "#fafafa",
+      "group": "appearance",
+      "order": 2
+    },
+    {
+      "id": "entry",
+      "kind": "number",
+      "label": {
+        "ru": "Вход (% длительности)",
+        "en": "Entrance (% duration)"
+      },
+      "defaultValue": 18,
+      "min": 5,
+      "max": 40,
+      "step": 1,
+      "group": "animation",
+      "order": 3
+    },
+    {
+      "id": "font",
+      "kind": "number",
+      "label": {
+        "ru": "Размер заголовка",
+        "en": "Heading size"
+      },
+      "defaultValue": 24,
+      "min": 20,
+      "max": 28,
+      "step": 1,
+      "group": "typography",
+      "order": 4
+    },
+    {
+      "id": "bodyFont",
+      "kind": "number",
+      "label": {
+        "ru": "Размер подписи",
+        "en": "Detail size"
+      },
+      "defaultValue": 26,
+      "min": 20,
+      "max": 30,
+      "step": 1,
+      "group": "typography",
+      "order": 5
+    },
+    {
+      "id": "count",
+      "kind": "number",
+      "label": {
+        "ru": "Количество разделов",
+        "en": "Chapter count"
+      },
+      "defaultValue": 3,
+      "min": 1,
+      "max": 10,
+      "step": 1,
+      "group": "geometry",
+      "order": 6,
+      "options": [
+        {
+          "value": 1,
+          "label": {
+            "ru": "1",
+            "en": "1"
+          }
+        },
+        {
+          "value": 2,
+          "label": {
+            "ru": "2",
+            "en": "2"
+          }
+        },
+        {
+          "value": 3,
+          "label": {
+            "ru": "3",
+            "en": "3"
+          }
+        },
+        {
+          "value": 4,
+          "label": {
+            "ru": "4",
+            "en": "4"
+          }
+        },
+        {
+          "value": 5,
+          "label": {
+            "ru": "5",
+            "en": "5"
+          }
+        },
+        {
+          "value": 6,
+          "label": {
+            "ru": "6",
+            "en": "6"
+          }
+        },
+        {
+          "value": 7,
+          "label": {
+            "ru": "7",
+            "en": "7"
+          }
+        },
+        {
+          "value": 8,
+          "label": {
+            "ru": "8",
+            "en": "8"
+          }
+        },
+        {
+          "value": 9,
+          "label": {
+            "ru": "9",
+            "en": "9"
+          }
+        },
+        {
+          "value": 10,
+          "label": {
+            "ru": "10",
+            "en": "10"
+          }
+        }
+      ]
+    },
+    {
+      "id": "active",
+      "kind": "number",
+      "label": {
+        "ru": "Активный раздел",
+        "en": "Active chapter"
+      },
+      "defaultValue": 1,
+      "min": 0,
+      "max": 10,
+      "step": 1,
+      "group": "animation",
+      "order": 7,
+      "options": [
+        {
+          "value": 0,
+          "label": {
+            "ru": "Без выделения",
+            "en": "None"
+          }
+        },
+        {
+          "value": 1,
+          "label": {
+            "ru": "Раздел 1",
+            "en": "Chapter 1"
+          }
+        },
+        {
+          "value": 2,
+          "label": {
+            "ru": "Раздел 2",
+            "en": "Chapter 2"
+          }
+        },
+        {
+          "value": 3,
+          "label": {
+            "ru": "Раздел 3",
+            "en": "Chapter 3"
+          }
+        },
+        {
+          "value": 4,
+          "label": {
+            "ru": "Раздел 4",
+            "en": "Chapter 4"
+          }
+        },
+        {
+          "value": 5,
+          "label": {
+            "ru": "Раздел 5",
+            "en": "Chapter 5"
+          }
+        },
+        {
+          "value": 6,
+          "label": {
+            "ru": "Раздел 6",
+            "en": "Chapter 6"
+          }
+        },
+        {
+          "value": 7,
+          "label": {
+            "ru": "Раздел 7",
+            "en": "Chapter 7"
+          }
+        },
+        {
+          "value": 8,
+          "label": {
+            "ru": "Раздел 8",
+            "en": "Chapter 8"
+          }
+        },
+        {
+          "value": 9,
+          "label": {
+            "ru": "Раздел 9",
+            "en": "Chapter 9"
+          }
+        },
+        {
+          "value": 10,
+          "label": {
+            "ru": "Раздел 10",
+            "en": "Chapter 10"
+          }
+        }
+      ]
+    },
+    {
+      "id": "title",
+      "kind": "text",
+      "label": {
+        "ru": "Заголовок",
+        "en": "Heading"
+      },
+      "defaultValue": "В ЭТОМ ВИДЕО",
+      "group": "content",
+      "order": 8,
+      "localizedDefaultValue": {
+        "ru": "В ЭТОМ ВИДЕО",
+        "en": "IN THIS VIDEO"
+      }
+    },
+    {
+      "id": "subtitle",
+      "kind": "text",
+      "label": {
+        "ru": "Раздел 1",
+        "en": "Chapter 1"
+      },
+      "defaultValue": "С чего начать",
+      "group": "content",
+      "order": 9,
+      "localizedDefaultValue": {
+        "ru": "С чего начать",
+        "en": "Getting started"
+      }
+    },
+    {
+      "id": "item2",
+      "kind": "text",
+      "label": {
+        "ru": "Раздел 2",
+        "en": "Chapter 2"
+      },
+      "defaultValue": "Как это работает",
+      "group": "content",
+      "order": 10,
+      "localizedDefaultValue": {
+        "ru": "Как это работает",
+        "en": "How it works"
+      }
+    },
+    {
+      "id": "item3",
+      "kind": "text",
+      "label": {
+        "ru": "Раздел 3",
+        "en": "Chapter 3"
+      },
+      "defaultValue": "Что получилось",
+      "group": "content",
+      "order": 11,
+      "localizedDefaultValue": {
+        "ru": "Что получилось",
+        "en": "The result"
+      }
+    },
+    {
+      "id": "item4",
+      "kind": "text",
+      "label": {
+        "ru": "Раздел 4",
+        "en": "Chapter 4"
+      },
+      "defaultValue": "Детали",
+      "localizedDefaultValue": {
+        "ru": "Детали",
+        "en": "Details"
+      },
+      "group": "content",
+      "order": 12
+    },
+    {
+      "id": "item5",
+      "kind": "text",
+      "label": {
+        "ru": "Раздел 5",
+        "en": "Chapter 5"
+      },
+      "defaultValue": "Практика",
+      "localizedDefaultValue": {
+        "ru": "Практика",
+        "en": "Practice"
+      },
+      "group": "content",
+      "order": 13
+    },
+    {
+      "id": "item6",
+      "kind": "text",
+      "label": {
+        "ru": "Раздел 6",
+        "en": "Chapter 6"
+      },
+      "defaultValue": "Пример",
+      "localizedDefaultValue": {
+        "ru": "Пример",
+        "en": "Example"
+      },
+      "group": "content",
+      "order": 14
+    },
+    {
+      "id": "item7",
+      "kind": "text",
+      "label": {
+        "ru": "Раздел 7",
+        "en": "Chapter 7"
+      },
+      "defaultValue": "Настройка",
+      "localizedDefaultValue": {
+        "ru": "Настройка",
+        "en": "Setup"
+      },
+      "group": "content",
+      "order": 15
+    },
+    {
+      "id": "item8",
+      "kind": "text",
+      "label": {
+        "ru": "Раздел 8",
+        "en": "Chapter 8"
+      },
+      "defaultValue": "Проверка",
+      "localizedDefaultValue": {
+        "ru": "Проверка",
+        "en": "Review"
+      },
+      "group": "content",
+      "order": 16
+    },
+    {
+      "id": "item9",
+      "kind": "text",
+      "label": {
+        "ru": "Раздел 9",
+        "en": "Chapter 9"
+      },
+      "defaultValue": "Итоги",
+      "localizedDefaultValue": {
+        "ru": "Итоги",
+        "en": "Summary"
+      },
+      "group": "content",
+      "order": 17
+    },
+    {
+      "id": "item10",
+      "kind": "text",
+      "label": {
+        "ru": "Раздел 10",
+        "en": "Chapter 10"
+      },
+      "defaultValue": "Дальше",
+      "localizedDefaultValue": {
+        "ru": "Дальше",
+        "en": "Next steps"
+      },
+      "group": "content",
+      "order": 18
+    }
+  ],
+  "layers": [],
+  "clips": [],
+  "scenes": [
+    {
+      "id": "main",
+      "start": 0,
+      "duration": 4
+    }
+  ],
+  "timeline": {
+    "phases": [],
+    "tracks": []
+  },
+  "program": {
+    "kind": "graph",
+    "version": 1,
+    "definitions": {
+      "entry": {
+        "op": "max",
+        "args": [
+          0.0001,
+          {
+            "op": "div",
+            "args": [
+              {
+                "op": "read",
+                "path": "controls.entry"
+              },
+              100
+            ]
+          }
+        ]
+      },
+      "exit": {
+        "op": "out",
+        "args": [
+          {
+            "op": "clamp",
+            "args": [
+              {
+                "op": "div",
+                "args": [
+                  {
+                    "op": "sub",
+                    "args": [
+                      1,
+                      {
+                        "op": "read",
+                        "path": "progress"
+                      }
+                    ]
+                  },
+                  0.1
+                ]
+              },
+              0,
+              1
+            ]
+          }
+        ]
+      },
+      "count": {
+        "op": "clamp",
+        "args": [
+          {
+            "op": "floor",
+            "args": [
+              {
+                "op": "read",
+                "path": "controls.count"
+              }
+            ]
+          },
+          1,
+          10
+        ]
+      },
+      "row": {
+        "op": "div",
+        "args": [
+          {
+            "op": "sub",
+            "args": [
+              {
+                "op": "read",
+                "path": "height"
+              },
+              70
+            ]
+          },
+          {
+            "op": "read",
+            "path": "defs.rows"
+          }
+        ]
+      },
+      "columns": {
+        "op": "select",
+        "value": {
+          "op": "gt",
+          "args": [
+            {
+              "op": "read",
+              "path": "defs.count"
+            },
+            5
+          ]
+        },
+        "values": [2, 1]
+      },
+      "rows": {
+        "op": "floor",
+        "args": [
+          {
+            "op": "div",
+            "args": [
+              {
+                "op": "add",
+                "args": [
+                  {
+                    "op": "read",
+                    "path": "defs.count"
+                  },
+                  {
+                    "op": "sub",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "defs.columns"
+                      },
+                      1
+                    ]
+                  }
+                ]
+              },
+              {
+                "op": "read",
+                "path": "defs.columns"
+              }
+            ]
+          }
+        ]
+      },
+      "column": {
+        "op": "div",
+        "args": [
+          {
+            "op": "read",
+            "path": "width"
+          },
+          {
+            "op": "read",
+            "path": "defs.columns"
+          }
+        ]
+      }
+    },
+    "commands": [
+      {
+        "op": "clear"
+      },
+      {
+        "op": "group",
+        "alpha": {
+          "op": "mul",
+          "args": [
+            {
+              "op": "read",
+              "path": "defs.exit"
+            },
+            {
+              "op": "out",
+              "args": [
+                {
+                  "op": "clamp",
+                  "args": [
+                    {
+                      "op": "div",
+                      "args": [
+                        {
+                          "op": "sub",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "progress"
+                            },
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "defs.entry"
+                                },
+                                0
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "defs.entry"
+                            },
+                            {
+                              "op": "sub",
+                              "args": [1, 0]
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    0,
+                    1
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "commands": [
+          {
+            "op": "fillRect",
+            "x": 0,
+            "y": 0,
+            "width": {
+              "op": "read",
+              "path": "width"
+            },
+            "height": {
+              "op": "read",
+              "path": "height"
+            },
+            "fill": {
+              "op": "read",
+              "path": "controls.surface"
+            }
+          },
+          {
+            "op": "text",
+            "text": {
+              "op": "read",
+              "path": "controls.title"
+            },
+            "x": 24,
+            "y": 32,
+            "fontSize": {
+              "op": "read",
+              "path": "controls.font"
+            },
+            "fontFamily": "Arial, sans-serif",
+            "baseline": "middle",
+            "fill": {
+              "op": "read",
+              "path": "controls.ink"
+            },
+            "fontWeight": 700
+          },
+          {
+            "op": "fillRect",
+            "x": 24,
+            "y": 59,
+            "width": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "width"
+                },
+                48
+              ]
+            },
+            "height": 1,
+            "fill": {
+              "op": "read",
+              "path": "controls.ink"
+            },
+            "alpha": 0.2
+          }
+        ]
+      },
+      {
+        "op": "group",
+        "alpha": {
+          "op": "mul",
+          "args": [
+            {
+              "op": "select",
+              "value": {
+                "op": "gt",
+                "args": [
+                  {
+                    "op": "read",
+                    "path": "defs.count"
+                  },
+                  0
+                ]
+              },
+              "values": [1, 0]
+            },
+            {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.exit"
+                },
+                {
+                  "op": "out",
+                  "args": [
+                    {
+                      "op": "clamp",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            {
+                              "op": "sub",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "progress"
+                                },
+                                {
+                                  "op": "mul",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "defs.entry"
+                                    },
+                                    {
+                                      "op": "mul",
+                                      "args": [
+                                        0.55,
+                                        {
+                                          "op": "div",
+                                          "args": [
+                                            0,
+                                            {
+                                              "op": "max",
+                                              "args": [
+                                                1,
+                                                {
+                                                  "op": "sub",
+                                                  "args": [
+                                                    {
+                                                      "op": "read",
+                                                      "path": "defs.count"
+                                                    },
+                                                    1
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "defs.entry"
+                                },
+                                {
+                                  "op": "sub",
+                                  "args": [
+                                    1,
+                                    {
+                                      "op": "mul",
+                                      "args": [
+                                        0.55,
+                                        {
+                                          "op": "div",
+                                          "args": [
+                                            0,
+                                            {
+                                              "op": "max",
+                                              "args": [
+                                                1,
+                                                {
+                                                  "op": "sub",
+                                                  "args": [
+                                                    {
+                                                      "op": "read",
+                                                      "path": "defs.count"
+                                                    },
+                                                    1
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        0,
+                        1
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "commands": [
+          {
+            "op": "fillRect",
+            "x": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "floor",
+                  "args": [
+                    {
+                      "op": "div",
+                      "args": [
+                        0,
+                        {
+                          "op": "read",
+                          "path": "defs.rows"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "read",
+                  "path": "defs.column"
+                }
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            0,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                8
+              ]
+            },
+            "width": 3,
+            "height": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.row"
+                },
+                16
+              ]
+            },
+            "fill": {
+              "op": "read",
+              "path": "controls.accent"
+            },
+            "alpha": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  1
+                ]
+              },
+              "values": [1, 0]
+            }
+          },
+          {
+            "op": "text",
+            "text": "01",
+            "x": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "floor",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            0,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.column"
+                    }
+                  ]
+                },
+                20
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            0,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.45
+                  ]
+                }
+              ]
+            },
+            "fontSize": {
+              "op": "min",
+              "args": [
+                20,
+                {
+                  "op": "min",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "controls.bodyFont"
+                    },
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        },
+                        0.46
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "fontFamily": "Arial, sans-serif",
+            "baseline": "middle",
+            "fill": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  1
+                ]
+              },
+              "values": [
+                {
+                  "op": "read",
+                  "path": "controls.accent"
+                },
+                {
+                  "op": "read",
+                  "path": "controls.ink"
+                }
+              ]
+            },
+            "fontWeight": 700,
+            "maxWidth": 30
+          },
+          {
+            "op": "text",
+            "text": {
+              "op": "read",
+              "path": "controls.subtitle"
+            },
+            "x": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "floor",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            0,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.column"
+                    }
+                  ]
+                },
+                62
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            0,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.45
+                  ]
+                }
+              ]
+            },
+            "fontSize": {
+              "op": "min",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "controls.bodyFont"
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.46
+                  ]
+                }
+              ]
+            },
+            "fontFamily": "Arial, sans-serif",
+            "baseline": "middle",
+            "fill": {
+              "op": "read",
+              "path": "controls.ink"
+            },
+            "fontWeight": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  1
+                ]
+              },
+              "values": [700, 400]
+            },
+            "maxWidth": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.column"
+                },
+                82
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "op": "group",
+        "alpha": {
+          "op": "mul",
+          "args": [
+            {
+              "op": "select",
+              "value": {
+                "op": "gt",
+                "args": [
+                  {
+                    "op": "read",
+                    "path": "defs.count"
+                  },
+                  1
+                ]
+              },
+              "values": [1, 0]
+            },
+            {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.exit"
+                },
+                {
+                  "op": "out",
+                  "args": [
+                    {
+                      "op": "clamp",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            {
+                              "op": "sub",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "progress"
+                                },
+                                {
+                                  "op": "mul",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "defs.entry"
+                                    },
+                                    {
+                                      "op": "mul",
+                                      "args": [
+                                        0.55,
+                                        {
+                                          "op": "div",
+                                          "args": [
+                                            1,
+                                            {
+                                              "op": "max",
+                                              "args": [
+                                                1,
+                                                {
+                                                  "op": "sub",
+                                                  "args": [
+                                                    {
+                                                      "op": "read",
+                                                      "path": "defs.count"
+                                                    },
+                                                    1
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "defs.entry"
+                                },
+                                {
+                                  "op": "sub",
+                                  "args": [
+                                    1,
+                                    {
+                                      "op": "mul",
+                                      "args": [
+                                        0.55,
+                                        {
+                                          "op": "div",
+                                          "args": [
+                                            1,
+                                            {
+                                              "op": "max",
+                                              "args": [
+                                                1,
+                                                {
+                                                  "op": "sub",
+                                                  "args": [
+                                                    {
+                                                      "op": "read",
+                                                      "path": "defs.count"
+                                                    },
+                                                    1
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        0,
+                        1
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "commands": [
+          {
+            "op": "fillRect",
+            "x": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "floor",
+                  "args": [
+                    {
+                      "op": "div",
+                      "args": [
+                        1,
+                        {
+                          "op": "read",
+                          "path": "defs.rows"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "read",
+                  "path": "defs.column"
+                }
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            1,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                8
+              ]
+            },
+            "width": 3,
+            "height": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.row"
+                },
+                16
+              ]
+            },
+            "fill": {
+              "op": "read",
+              "path": "controls.accent"
+            },
+            "alpha": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  2
+                ]
+              },
+              "values": [1, 0]
+            }
+          },
+          {
+            "op": "text",
+            "text": "02",
+            "x": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "floor",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            1,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.column"
+                    }
+                  ]
+                },
+                20
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            1,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.45
+                  ]
+                }
+              ]
+            },
+            "fontSize": {
+              "op": "min",
+              "args": [
+                20,
+                {
+                  "op": "min",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "controls.bodyFont"
+                    },
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        },
+                        0.46
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "fontFamily": "Arial, sans-serif",
+            "baseline": "middle",
+            "fill": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  2
+                ]
+              },
+              "values": [
+                {
+                  "op": "read",
+                  "path": "controls.accent"
+                },
+                {
+                  "op": "read",
+                  "path": "controls.ink"
+                }
+              ]
+            },
+            "fontWeight": 700,
+            "maxWidth": 30
+          },
+          {
+            "op": "text",
+            "text": {
+              "op": "read",
+              "path": "controls.item2"
+            },
+            "x": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "floor",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            1,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.column"
+                    }
+                  ]
+                },
+                62
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            1,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.45
+                  ]
+                }
+              ]
+            },
+            "fontSize": {
+              "op": "min",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "controls.bodyFont"
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.46
+                  ]
+                }
+              ]
+            },
+            "fontFamily": "Arial, sans-serif",
+            "baseline": "middle",
+            "fill": {
+              "op": "read",
+              "path": "controls.ink"
+            },
+            "fontWeight": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  2
+                ]
+              },
+              "values": [700, 400]
+            },
+            "maxWidth": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.column"
+                },
+                82
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "op": "group",
+        "alpha": {
+          "op": "mul",
+          "args": [
+            {
+              "op": "select",
+              "value": {
+                "op": "gt",
+                "args": [
+                  {
+                    "op": "read",
+                    "path": "defs.count"
+                  },
+                  2
+                ]
+              },
+              "values": [1, 0]
+            },
+            {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.exit"
+                },
+                {
+                  "op": "out",
+                  "args": [
+                    {
+                      "op": "clamp",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            {
+                              "op": "sub",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "progress"
+                                },
+                                {
+                                  "op": "mul",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "defs.entry"
+                                    },
+                                    {
+                                      "op": "mul",
+                                      "args": [
+                                        0.55,
+                                        {
+                                          "op": "div",
+                                          "args": [
+                                            2,
+                                            {
+                                              "op": "max",
+                                              "args": [
+                                                1,
+                                                {
+                                                  "op": "sub",
+                                                  "args": [
+                                                    {
+                                                      "op": "read",
+                                                      "path": "defs.count"
+                                                    },
+                                                    1
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "defs.entry"
+                                },
+                                {
+                                  "op": "sub",
+                                  "args": [
+                                    1,
+                                    {
+                                      "op": "mul",
+                                      "args": [
+                                        0.55,
+                                        {
+                                          "op": "div",
+                                          "args": [
+                                            2,
+                                            {
+                                              "op": "max",
+                                              "args": [
+                                                1,
+                                                {
+                                                  "op": "sub",
+                                                  "args": [
+                                                    {
+                                                      "op": "read",
+                                                      "path": "defs.count"
+                                                    },
+                                                    1
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        0,
+                        1
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "commands": [
+          {
+            "op": "fillRect",
+            "x": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "floor",
+                  "args": [
+                    {
+                      "op": "div",
+                      "args": [
+                        2,
+                        {
+                          "op": "read",
+                          "path": "defs.rows"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "read",
+                  "path": "defs.column"
+                }
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            2,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                8
+              ]
+            },
+            "width": 3,
+            "height": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.row"
+                },
+                16
+              ]
+            },
+            "fill": {
+              "op": "read",
+              "path": "controls.accent"
+            },
+            "alpha": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  3
+                ]
+              },
+              "values": [1, 0]
+            }
+          },
+          {
+            "op": "text",
+            "text": "03",
+            "x": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "floor",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            2,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.column"
+                    }
+                  ]
+                },
+                20
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            2,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.45
+                  ]
+                }
+              ]
+            },
+            "fontSize": {
+              "op": "min",
+              "args": [
+                20,
+                {
+                  "op": "min",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "controls.bodyFont"
+                    },
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        },
+                        0.46
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "fontFamily": "Arial, sans-serif",
+            "baseline": "middle",
+            "fill": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  3
+                ]
+              },
+              "values": [
+                {
+                  "op": "read",
+                  "path": "controls.accent"
+                },
+                {
+                  "op": "read",
+                  "path": "controls.ink"
+                }
+              ]
+            },
+            "fontWeight": 700,
+            "maxWidth": 30
+          },
+          {
+            "op": "text",
+            "text": {
+              "op": "read",
+              "path": "controls.item3"
+            },
+            "x": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "floor",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            2,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.column"
+                    }
+                  ]
+                },
+                62
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            2,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.45
+                  ]
+                }
+              ]
+            },
+            "fontSize": {
+              "op": "min",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "controls.bodyFont"
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.46
+                  ]
+                }
+              ]
+            },
+            "fontFamily": "Arial, sans-serif",
+            "baseline": "middle",
+            "fill": {
+              "op": "read",
+              "path": "controls.ink"
+            },
+            "fontWeight": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  3
+                ]
+              },
+              "values": [700, 400]
+            },
+            "maxWidth": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.column"
+                },
+                82
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "op": "group",
+        "alpha": {
+          "op": "mul",
+          "args": [
+            {
+              "op": "select",
+              "value": {
+                "op": "gt",
+                "args": [
+                  {
+                    "op": "read",
+                    "path": "defs.count"
+                  },
+                  3
+                ]
+              },
+              "values": [1, 0]
+            },
+            {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.exit"
+                },
+                {
+                  "op": "out",
+                  "args": [
+                    {
+                      "op": "clamp",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            {
+                              "op": "sub",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "progress"
+                                },
+                                {
+                                  "op": "mul",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "defs.entry"
+                                    },
+                                    {
+                                      "op": "mul",
+                                      "args": [
+                                        0.55,
+                                        {
+                                          "op": "div",
+                                          "args": [
+                                            3,
+                                            {
+                                              "op": "max",
+                                              "args": [
+                                                1,
+                                                {
+                                                  "op": "sub",
+                                                  "args": [
+                                                    {
+                                                      "op": "read",
+                                                      "path": "defs.count"
+                                                    },
+                                                    1
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "defs.entry"
+                                },
+                                {
+                                  "op": "sub",
+                                  "args": [
+                                    1,
+                                    {
+                                      "op": "mul",
+                                      "args": [
+                                        0.55,
+                                        {
+                                          "op": "div",
+                                          "args": [
+                                            3,
+                                            {
+                                              "op": "max",
+                                              "args": [
+                                                1,
+                                                {
+                                                  "op": "sub",
+                                                  "args": [
+                                                    {
+                                                      "op": "read",
+                                                      "path": "defs.count"
+                                                    },
+                                                    1
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        0,
+                        1
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "commands": [
+          {
+            "op": "fillRect",
+            "x": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "floor",
+                  "args": [
+                    {
+                      "op": "div",
+                      "args": [
+                        3,
+                        {
+                          "op": "read",
+                          "path": "defs.rows"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "read",
+                  "path": "defs.column"
+                }
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            3,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                8
+              ]
+            },
+            "width": 3,
+            "height": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.row"
+                },
+                16
+              ]
+            },
+            "fill": {
+              "op": "read",
+              "path": "controls.accent"
+            },
+            "alpha": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  4
+                ]
+              },
+              "values": [1, 0]
+            }
+          },
+          {
+            "op": "text",
+            "text": "04",
+            "x": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "floor",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            3,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.column"
+                    }
+                  ]
+                },
+                20
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            3,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.45
+                  ]
+                }
+              ]
+            },
+            "fontSize": {
+              "op": "min",
+              "args": [
+                20,
+                {
+                  "op": "min",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "controls.bodyFont"
+                    },
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        },
+                        0.46
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "fontFamily": "Arial, sans-serif",
+            "baseline": "middle",
+            "fill": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  4
+                ]
+              },
+              "values": [
+                {
+                  "op": "read",
+                  "path": "controls.accent"
+                },
+                {
+                  "op": "read",
+                  "path": "controls.ink"
+                }
+              ]
+            },
+            "fontWeight": 700,
+            "maxWidth": 30
+          },
+          {
+            "op": "text",
+            "text": {
+              "op": "read",
+              "path": "controls.item4"
+            },
+            "x": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "floor",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            3,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.column"
+                    }
+                  ]
+                },
+                62
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            3,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.45
+                  ]
+                }
+              ]
+            },
+            "fontSize": {
+              "op": "min",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "controls.bodyFont"
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.46
+                  ]
+                }
+              ]
+            },
+            "fontFamily": "Arial, sans-serif",
+            "baseline": "middle",
+            "fill": {
+              "op": "read",
+              "path": "controls.ink"
+            },
+            "fontWeight": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  4
+                ]
+              },
+              "values": [700, 400]
+            },
+            "maxWidth": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.column"
+                },
+                82
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "op": "group",
+        "alpha": {
+          "op": "mul",
+          "args": [
+            {
+              "op": "select",
+              "value": {
+                "op": "gt",
+                "args": [
+                  {
+                    "op": "read",
+                    "path": "defs.count"
+                  },
+                  4
+                ]
+              },
+              "values": [1, 0]
+            },
+            {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.exit"
+                },
+                {
+                  "op": "out",
+                  "args": [
+                    {
+                      "op": "clamp",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            {
+                              "op": "sub",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "progress"
+                                },
+                                {
+                                  "op": "mul",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "defs.entry"
+                                    },
+                                    {
+                                      "op": "mul",
+                                      "args": [
+                                        0.55,
+                                        {
+                                          "op": "div",
+                                          "args": [
+                                            4,
+                                            {
+                                              "op": "max",
+                                              "args": [
+                                                1,
+                                                {
+                                                  "op": "sub",
+                                                  "args": [
+                                                    {
+                                                      "op": "read",
+                                                      "path": "defs.count"
+                                                    },
+                                                    1
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "defs.entry"
+                                },
+                                {
+                                  "op": "sub",
+                                  "args": [
+                                    1,
+                                    {
+                                      "op": "mul",
+                                      "args": [
+                                        0.55,
+                                        {
+                                          "op": "div",
+                                          "args": [
+                                            4,
+                                            {
+                                              "op": "max",
+                                              "args": [
+                                                1,
+                                                {
+                                                  "op": "sub",
+                                                  "args": [
+                                                    {
+                                                      "op": "read",
+                                                      "path": "defs.count"
+                                                    },
+                                                    1
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        0,
+                        1
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "commands": [
+          {
+            "op": "fillRect",
+            "x": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "floor",
+                  "args": [
+                    {
+                      "op": "div",
+                      "args": [
+                        4,
+                        {
+                          "op": "read",
+                          "path": "defs.rows"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "read",
+                  "path": "defs.column"
+                }
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            4,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                8
+              ]
+            },
+            "width": 3,
+            "height": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.row"
+                },
+                16
+              ]
+            },
+            "fill": {
+              "op": "read",
+              "path": "controls.accent"
+            },
+            "alpha": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  5
+                ]
+              },
+              "values": [1, 0]
+            }
+          },
+          {
+            "op": "text",
+            "text": "05",
+            "x": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "floor",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            4,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.column"
+                    }
+                  ]
+                },
+                20
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            4,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.45
+                  ]
+                }
+              ]
+            },
+            "fontSize": {
+              "op": "min",
+              "args": [
+                20,
+                {
+                  "op": "min",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "controls.bodyFont"
+                    },
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        },
+                        0.46
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "fontFamily": "Arial, sans-serif",
+            "baseline": "middle",
+            "fill": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  5
+                ]
+              },
+              "values": [
+                {
+                  "op": "read",
+                  "path": "controls.accent"
+                },
+                {
+                  "op": "read",
+                  "path": "controls.ink"
+                }
+              ]
+            },
+            "fontWeight": 700,
+            "maxWidth": 30
+          },
+          {
+            "op": "text",
+            "text": {
+              "op": "read",
+              "path": "controls.item5"
+            },
+            "x": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "floor",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            4,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.column"
+                    }
+                  ]
+                },
+                62
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            4,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.45
+                  ]
+                }
+              ]
+            },
+            "fontSize": {
+              "op": "min",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "controls.bodyFont"
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.46
+                  ]
+                }
+              ]
+            },
+            "fontFamily": "Arial, sans-serif",
+            "baseline": "middle",
+            "fill": {
+              "op": "read",
+              "path": "controls.ink"
+            },
+            "fontWeight": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  5
+                ]
+              },
+              "values": [700, 400]
+            },
+            "maxWidth": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.column"
+                },
+                82
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "op": "group",
+        "alpha": {
+          "op": "mul",
+          "args": [
+            {
+              "op": "select",
+              "value": {
+                "op": "gt",
+                "args": [
+                  {
+                    "op": "read",
+                    "path": "defs.count"
+                  },
+                  5
+                ]
+              },
+              "values": [1, 0]
+            },
+            {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.exit"
+                },
+                {
+                  "op": "out",
+                  "args": [
+                    {
+                      "op": "clamp",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            {
+                              "op": "sub",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "progress"
+                                },
+                                {
+                                  "op": "mul",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "defs.entry"
+                                    },
+                                    {
+                                      "op": "mul",
+                                      "args": [
+                                        0.55,
+                                        {
+                                          "op": "div",
+                                          "args": [
+                                            5,
+                                            {
+                                              "op": "max",
+                                              "args": [
+                                                1,
+                                                {
+                                                  "op": "sub",
+                                                  "args": [
+                                                    {
+                                                      "op": "read",
+                                                      "path": "defs.count"
+                                                    },
+                                                    1
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "defs.entry"
+                                },
+                                {
+                                  "op": "sub",
+                                  "args": [
+                                    1,
+                                    {
+                                      "op": "mul",
+                                      "args": [
+                                        0.55,
+                                        {
+                                          "op": "div",
+                                          "args": [
+                                            5,
+                                            {
+                                              "op": "max",
+                                              "args": [
+                                                1,
+                                                {
+                                                  "op": "sub",
+                                                  "args": [
+                                                    {
+                                                      "op": "read",
+                                                      "path": "defs.count"
+                                                    },
+                                                    1
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        0,
+                        1
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "commands": [
+          {
+            "op": "fillRect",
+            "x": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "floor",
+                  "args": [
+                    {
+                      "op": "div",
+                      "args": [
+                        5,
+                        {
+                          "op": "read",
+                          "path": "defs.rows"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "read",
+                  "path": "defs.column"
+                }
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            5,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                8
+              ]
+            },
+            "width": 3,
+            "height": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.row"
+                },
+                16
+              ]
+            },
+            "fill": {
+              "op": "read",
+              "path": "controls.accent"
+            },
+            "alpha": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  6
+                ]
+              },
+              "values": [1, 0]
+            }
+          },
+          {
+            "op": "text",
+            "text": "06",
+            "x": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "floor",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            5,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.column"
+                    }
+                  ]
+                },
+                20
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            5,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.45
+                  ]
+                }
+              ]
+            },
+            "fontSize": {
+              "op": "min",
+              "args": [
+                20,
+                {
+                  "op": "min",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "controls.bodyFont"
+                    },
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        },
+                        0.46
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "fontFamily": "Arial, sans-serif",
+            "baseline": "middle",
+            "fill": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  6
+                ]
+              },
+              "values": [
+                {
+                  "op": "read",
+                  "path": "controls.accent"
+                },
+                {
+                  "op": "read",
+                  "path": "controls.ink"
+                }
+              ]
+            },
+            "fontWeight": 700,
+            "maxWidth": 30
+          },
+          {
+            "op": "text",
+            "text": {
+              "op": "read",
+              "path": "controls.item6"
+            },
+            "x": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "floor",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            5,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.column"
+                    }
+                  ]
+                },
+                62
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            5,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.45
+                  ]
+                }
+              ]
+            },
+            "fontSize": {
+              "op": "min",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "controls.bodyFont"
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.46
+                  ]
+                }
+              ]
+            },
+            "fontFamily": "Arial, sans-serif",
+            "baseline": "middle",
+            "fill": {
+              "op": "read",
+              "path": "controls.ink"
+            },
+            "fontWeight": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  6
+                ]
+              },
+              "values": [700, 400]
+            },
+            "maxWidth": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.column"
+                },
+                82
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "op": "group",
+        "alpha": {
+          "op": "mul",
+          "args": [
+            {
+              "op": "select",
+              "value": {
+                "op": "gt",
+                "args": [
+                  {
+                    "op": "read",
+                    "path": "defs.count"
+                  },
+                  6
+                ]
+              },
+              "values": [1, 0]
+            },
+            {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.exit"
+                },
+                {
+                  "op": "out",
+                  "args": [
+                    {
+                      "op": "clamp",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            {
+                              "op": "sub",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "progress"
+                                },
+                                {
+                                  "op": "mul",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "defs.entry"
+                                    },
+                                    {
+                                      "op": "mul",
+                                      "args": [
+                                        0.55,
+                                        {
+                                          "op": "div",
+                                          "args": [
+                                            6,
+                                            {
+                                              "op": "max",
+                                              "args": [
+                                                1,
+                                                {
+                                                  "op": "sub",
+                                                  "args": [
+                                                    {
+                                                      "op": "read",
+                                                      "path": "defs.count"
+                                                    },
+                                                    1
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "defs.entry"
+                                },
+                                {
+                                  "op": "sub",
+                                  "args": [
+                                    1,
+                                    {
+                                      "op": "mul",
+                                      "args": [
+                                        0.55,
+                                        {
+                                          "op": "div",
+                                          "args": [
+                                            6,
+                                            {
+                                              "op": "max",
+                                              "args": [
+                                                1,
+                                                {
+                                                  "op": "sub",
+                                                  "args": [
+                                                    {
+                                                      "op": "read",
+                                                      "path": "defs.count"
+                                                    },
+                                                    1
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        0,
+                        1
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "commands": [
+          {
+            "op": "fillRect",
+            "x": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "floor",
+                  "args": [
+                    {
+                      "op": "div",
+                      "args": [
+                        6,
+                        {
+                          "op": "read",
+                          "path": "defs.rows"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "read",
+                  "path": "defs.column"
+                }
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            6,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                8
+              ]
+            },
+            "width": 3,
+            "height": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.row"
+                },
+                16
+              ]
+            },
+            "fill": {
+              "op": "read",
+              "path": "controls.accent"
+            },
+            "alpha": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  7
+                ]
+              },
+              "values": [1, 0]
+            }
+          },
+          {
+            "op": "text",
+            "text": "07",
+            "x": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "floor",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            6,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.column"
+                    }
+                  ]
+                },
+                20
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            6,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.45
+                  ]
+                }
+              ]
+            },
+            "fontSize": {
+              "op": "min",
+              "args": [
+                20,
+                {
+                  "op": "min",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "controls.bodyFont"
+                    },
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        },
+                        0.46
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "fontFamily": "Arial, sans-serif",
+            "baseline": "middle",
+            "fill": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  7
+                ]
+              },
+              "values": [
+                {
+                  "op": "read",
+                  "path": "controls.accent"
+                },
+                {
+                  "op": "read",
+                  "path": "controls.ink"
+                }
+              ]
+            },
+            "fontWeight": 700,
+            "maxWidth": 30
+          },
+          {
+            "op": "text",
+            "text": {
+              "op": "read",
+              "path": "controls.item7"
+            },
+            "x": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "floor",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            6,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.column"
+                    }
+                  ]
+                },
+                62
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            6,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.45
+                  ]
+                }
+              ]
+            },
+            "fontSize": {
+              "op": "min",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "controls.bodyFont"
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.46
+                  ]
+                }
+              ]
+            },
+            "fontFamily": "Arial, sans-serif",
+            "baseline": "middle",
+            "fill": {
+              "op": "read",
+              "path": "controls.ink"
+            },
+            "fontWeight": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  7
+                ]
+              },
+              "values": [700, 400]
+            },
+            "maxWidth": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.column"
+                },
+                82
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "op": "group",
+        "alpha": {
+          "op": "mul",
+          "args": [
+            {
+              "op": "select",
+              "value": {
+                "op": "gt",
+                "args": [
+                  {
+                    "op": "read",
+                    "path": "defs.count"
+                  },
+                  7
+                ]
+              },
+              "values": [1, 0]
+            },
+            {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.exit"
+                },
+                {
+                  "op": "out",
+                  "args": [
+                    {
+                      "op": "clamp",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            {
+                              "op": "sub",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "progress"
+                                },
+                                {
+                                  "op": "mul",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "defs.entry"
+                                    },
+                                    {
+                                      "op": "mul",
+                                      "args": [
+                                        0.55,
+                                        {
+                                          "op": "div",
+                                          "args": [
+                                            7,
+                                            {
+                                              "op": "max",
+                                              "args": [
+                                                1,
+                                                {
+                                                  "op": "sub",
+                                                  "args": [
+                                                    {
+                                                      "op": "read",
+                                                      "path": "defs.count"
+                                                    },
+                                                    1
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "defs.entry"
+                                },
+                                {
+                                  "op": "sub",
+                                  "args": [
+                                    1,
+                                    {
+                                      "op": "mul",
+                                      "args": [
+                                        0.55,
+                                        {
+                                          "op": "div",
+                                          "args": [
+                                            7,
+                                            {
+                                              "op": "max",
+                                              "args": [
+                                                1,
+                                                {
+                                                  "op": "sub",
+                                                  "args": [
+                                                    {
+                                                      "op": "read",
+                                                      "path": "defs.count"
+                                                    },
+                                                    1
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        0,
+                        1
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "commands": [
+          {
+            "op": "fillRect",
+            "x": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "floor",
+                  "args": [
+                    {
+                      "op": "div",
+                      "args": [
+                        7,
+                        {
+                          "op": "read",
+                          "path": "defs.rows"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "read",
+                  "path": "defs.column"
+                }
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            7,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                8
+              ]
+            },
+            "width": 3,
+            "height": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.row"
+                },
+                16
+              ]
+            },
+            "fill": {
+              "op": "read",
+              "path": "controls.accent"
+            },
+            "alpha": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  8
+                ]
+              },
+              "values": [1, 0]
+            }
+          },
+          {
+            "op": "text",
+            "text": "08",
+            "x": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "floor",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            7,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.column"
+                    }
+                  ]
+                },
+                20
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            7,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.45
+                  ]
+                }
+              ]
+            },
+            "fontSize": {
+              "op": "min",
+              "args": [
+                20,
+                {
+                  "op": "min",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "controls.bodyFont"
+                    },
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        },
+                        0.46
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "fontFamily": "Arial, sans-serif",
+            "baseline": "middle",
+            "fill": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  8
+                ]
+              },
+              "values": [
+                {
+                  "op": "read",
+                  "path": "controls.accent"
+                },
+                {
+                  "op": "read",
+                  "path": "controls.ink"
+                }
+              ]
+            },
+            "fontWeight": 700,
+            "maxWidth": 30
+          },
+          {
+            "op": "text",
+            "text": {
+              "op": "read",
+              "path": "controls.item8"
+            },
+            "x": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "floor",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            7,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.column"
+                    }
+                  ]
+                },
+                62
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            7,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.45
+                  ]
+                }
+              ]
+            },
+            "fontSize": {
+              "op": "min",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "controls.bodyFont"
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.46
+                  ]
+                }
+              ]
+            },
+            "fontFamily": "Arial, sans-serif",
+            "baseline": "middle",
+            "fill": {
+              "op": "read",
+              "path": "controls.ink"
+            },
+            "fontWeight": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  8
+                ]
+              },
+              "values": [700, 400]
+            },
+            "maxWidth": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.column"
+                },
+                82
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "op": "group",
+        "alpha": {
+          "op": "mul",
+          "args": [
+            {
+              "op": "select",
+              "value": {
+                "op": "gt",
+                "args": [
+                  {
+                    "op": "read",
+                    "path": "defs.count"
+                  },
+                  8
+                ]
+              },
+              "values": [1, 0]
+            },
+            {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.exit"
+                },
+                {
+                  "op": "out",
+                  "args": [
+                    {
+                      "op": "clamp",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            {
+                              "op": "sub",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "progress"
+                                },
+                                {
+                                  "op": "mul",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "defs.entry"
+                                    },
+                                    {
+                                      "op": "mul",
+                                      "args": [
+                                        0.55,
+                                        {
+                                          "op": "div",
+                                          "args": [
+                                            8,
+                                            {
+                                              "op": "max",
+                                              "args": [
+                                                1,
+                                                {
+                                                  "op": "sub",
+                                                  "args": [
+                                                    {
+                                                      "op": "read",
+                                                      "path": "defs.count"
+                                                    },
+                                                    1
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "defs.entry"
+                                },
+                                {
+                                  "op": "sub",
+                                  "args": [
+                                    1,
+                                    {
+                                      "op": "mul",
+                                      "args": [
+                                        0.55,
+                                        {
+                                          "op": "div",
+                                          "args": [
+                                            8,
+                                            {
+                                              "op": "max",
+                                              "args": [
+                                                1,
+                                                {
+                                                  "op": "sub",
+                                                  "args": [
+                                                    {
+                                                      "op": "read",
+                                                      "path": "defs.count"
+                                                    },
+                                                    1
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        0,
+                        1
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "commands": [
+          {
+            "op": "fillRect",
+            "x": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "floor",
+                  "args": [
+                    {
+                      "op": "div",
+                      "args": [
+                        8,
+                        {
+                          "op": "read",
+                          "path": "defs.rows"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "read",
+                  "path": "defs.column"
+                }
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            8,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                8
+              ]
+            },
+            "width": 3,
+            "height": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.row"
+                },
+                16
+              ]
+            },
+            "fill": {
+              "op": "read",
+              "path": "controls.accent"
+            },
+            "alpha": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  9
+                ]
+              },
+              "values": [1, 0]
+            }
+          },
+          {
+            "op": "text",
+            "text": "09",
+            "x": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "floor",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            8,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.column"
+                    }
+                  ]
+                },
+                20
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            8,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.45
+                  ]
+                }
+              ]
+            },
+            "fontSize": {
+              "op": "min",
+              "args": [
+                20,
+                {
+                  "op": "min",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "controls.bodyFont"
+                    },
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        },
+                        0.46
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "fontFamily": "Arial, sans-serif",
+            "baseline": "middle",
+            "fill": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  9
+                ]
+              },
+              "values": [
+                {
+                  "op": "read",
+                  "path": "controls.accent"
+                },
+                {
+                  "op": "read",
+                  "path": "controls.ink"
+                }
+              ]
+            },
+            "fontWeight": 700,
+            "maxWidth": 30
+          },
+          {
+            "op": "text",
+            "text": {
+              "op": "read",
+              "path": "controls.item9"
+            },
+            "x": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "floor",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            8,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.column"
+                    }
+                  ]
+                },
+                62
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            8,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.45
+                  ]
+                }
+              ]
+            },
+            "fontSize": {
+              "op": "min",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "controls.bodyFont"
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.46
+                  ]
+                }
+              ]
+            },
+            "fontFamily": "Arial, sans-serif",
+            "baseline": "middle",
+            "fill": {
+              "op": "read",
+              "path": "controls.ink"
+            },
+            "fontWeight": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  9
+                ]
+              },
+              "values": [700, 400]
+            },
+            "maxWidth": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.column"
+                },
+                82
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "op": "group",
+        "alpha": {
+          "op": "mul",
+          "args": [
+            {
+              "op": "select",
+              "value": {
+                "op": "gt",
+                "args": [
+                  {
+                    "op": "read",
+                    "path": "defs.count"
+                  },
+                  9
+                ]
+              },
+              "values": [1, 0]
+            },
+            {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.exit"
+                },
+                {
+                  "op": "out",
+                  "args": [
+                    {
+                      "op": "clamp",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            {
+                              "op": "sub",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "progress"
+                                },
+                                {
+                                  "op": "mul",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "defs.entry"
+                                    },
+                                    {
+                                      "op": "mul",
+                                      "args": [
+                                        0.55,
+                                        {
+                                          "op": "div",
+                                          "args": [
+                                            9,
+                                            {
+                                              "op": "max",
+                                              "args": [
+                                                1,
+                                                {
+                                                  "op": "sub",
+                                                  "args": [
+                                                    {
+                                                      "op": "read",
+                                                      "path": "defs.count"
+                                                    },
+                                                    1
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "defs.entry"
+                                },
+                                {
+                                  "op": "sub",
+                                  "args": [
+                                    1,
+                                    {
+                                      "op": "mul",
+                                      "args": [
+                                        0.55,
+                                        {
+                                          "op": "div",
+                                          "args": [
+                                            9,
+                                            {
+                                              "op": "max",
+                                              "args": [
+                                                1,
+                                                {
+                                                  "op": "sub",
+                                                  "args": [
+                                                    {
+                                                      "op": "read",
+                                                      "path": "defs.count"
+                                                    },
+                                                    1
+                                                  ]
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        0,
+                        1
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "commands": [
+          {
+            "op": "fillRect",
+            "x": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "floor",
+                  "args": [
+                    {
+                      "op": "div",
+                      "args": [
+                        9,
+                        {
+                          "op": "read",
+                          "path": "defs.rows"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "read",
+                  "path": "defs.column"
+                }
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            9,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                8
+              ]
+            },
+            "width": 3,
+            "height": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.row"
+                },
+                16
+              ]
+            },
+            "fill": {
+              "op": "read",
+              "path": "controls.accent"
+            },
+            "alpha": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  10
+                ]
+              },
+              "values": [1, 0]
+            }
+          },
+          {
+            "op": "text",
+            "text": "10",
+            "x": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "floor",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            9,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.column"
+                    }
+                  ]
+                },
+                20
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            9,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.45
+                  ]
+                }
+              ]
+            },
+            "fontSize": {
+              "op": "min",
+              "args": [
+                20,
+                {
+                  "op": "min",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "controls.bodyFont"
+                    },
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        },
+                        0.46
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "fontFamily": "Arial, sans-serif",
+            "baseline": "middle",
+            "fill": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  10
+                ]
+              },
+              "values": [
+                {
+                  "op": "read",
+                  "path": "controls.accent"
+                },
+                {
+                  "op": "read",
+                  "path": "controls.ink"
+                }
+              ]
+            },
+            "fontWeight": 700,
+            "maxWidth": 30
+          },
+          {
+            "op": "text",
+            "text": {
+              "op": "read",
+              "path": "controls.item10"
+            },
+            "x": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "floor",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            9,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        }
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "defs.column"
+                    }
+                  ]
+                },
+                62
+              ]
+            },
+            "y": {
+              "op": "add",
+              "args": [
+                {
+                  "op": "add",
+                  "args": [
+                    70,
+                    {
+                      "op": "mul",
+                      "args": [
+                        {
+                          "op": "mod",
+                          "args": [
+                            9,
+                            {
+                              "op": "read",
+                              "path": "defs.rows"
+                            }
+                          ]
+                        },
+                        {
+                          "op": "read",
+                          "path": "defs.row"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.45
+                  ]
+                }
+              ]
+            },
+            "fontSize": {
+              "op": "min",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "controls.bodyFont"
+                },
+                {
+                  "op": "mul",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "defs.row"
+                    },
+                    0.46
+                  ]
+                }
+              ]
+            },
+            "fontFamily": "Arial, sans-serif",
+            "baseline": "middle",
+            "fill": {
+              "op": "read",
+              "path": "controls.ink"
+            },
+            "fontWeight": {
+              "op": "select",
+              "value": {
+                "op": "eq",
+                "args": [
+                  {
+                    "op": "floor",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.active"
+                      }
+                    ]
+                  },
+                  10
+                ]
+              },
+              "values": [700, 400]
+            },
+            "maxWidth": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.column"
+                },
+                82
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "objectLayout": {
+    "width": 520,
+    "height": 292,
+    "resize": "scale"
+  },
+  "controlPresets": [
+    {
+      "id": "sniptale-orange-dark",
+      "label": {
+        "en": "Dark",
+        "ru": "Тёмный"
+      },
+      "theme": {
+        "id": "sniptale-orange",
+        "label": {
+          "en": "Sniptale Orange",
+          "ru": "Sniptale Orange"
+        }
+      },
+      "style": {
+        "id": "dark",
+        "label": {
+          "en": "Dark",
+          "ru": "Тёмный"
+        }
+      },
+      "values": {
+        "accent": "#fb923c",
+        "surface": "#171a20",
+        "ink": "#fafafa"
+      }
+    },
+    {
+      "id": "sniptale-orange-light",
+      "label": {
+        "en": "Light",
+        "ru": "Светлый"
+      },
+      "theme": {
+        "id": "sniptale-orange",
+        "label": {
+          "en": "Sniptale Orange",
+          "ru": "Sniptale Orange"
+        }
+      },
+      "style": {
+        "id": "light",
+        "label": {
+          "en": "Light",
+          "ru": "Светлый"
+        }
+      },
+      "values": {
+        "accent": "#c2410c",
+        "surface": "#ffffff",
+        "ink": "#202127"
+      }
+    }
+  ],
+  "defaultControlPresetId": "sniptale-orange-dark"
+}

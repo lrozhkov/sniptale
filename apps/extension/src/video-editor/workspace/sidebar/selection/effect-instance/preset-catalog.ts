@@ -7,7 +7,11 @@ import {
   type EffectPresetPreferences,
 } from '../../../../../features/video/project/effect-bundle/catalog/presets';
 
-export function useEffectPresetCatalog(documentId: string, sourceSha256: string) {
+export function useEffectPresetCatalog(
+  documentId: string,
+  sourceSha256: string,
+  catalogPackId?: string
+) {
   const [catalog, setCatalog] = useState<EffectBundleCatalogEntry | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(false);
@@ -19,6 +23,7 @@ export function useEffectPresetCatalog(documentId: string, sourceSha256: string)
         const found = entries.find(
           (entry) =>
             entry.status === 'ready' &&
+            (catalogPackId ? entry.packId === catalogPackId : entry.source !== 'builtin') &&
             entry.entry.documents.some(
               (doc) => doc.id === documentId && doc.sha256 === sourceSha256
             )
@@ -31,7 +36,7 @@ export function useEffectPresetCatalog(documentId: string, sourceSha256: string)
     return () => {
       active = false;
     };
-  }, [documentId, sourceSha256]);
+  }, [documentId, sourceSha256, catalogPackId]);
   const entry = catalog?.documents.find((doc) => doc.id === documentId);
   const preferences = entry?.presetPreferences ?? { presets: [] };
   const save = async (next: EffectPresetPreferences) => {

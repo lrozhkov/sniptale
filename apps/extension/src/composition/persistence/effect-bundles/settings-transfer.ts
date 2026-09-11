@@ -1,3 +1,8 @@
+import {
+  parseEffectCatalogPreferences,
+  readEffectCatalogPreferences,
+  writeEffectCatalogPreferences,
+} from './preferences';
 import { EFFECT_BUNDLE_LIMITS } from '../../../features/video/project/effect-bundle';
 import type { EffectBundleCatalogEntry } from '../../../features/video/project/effect-bundle/catalog';
 import { parseEffectBundleCatalogEntry } from './entry';
@@ -17,6 +22,8 @@ type PortableEntry = Omit<EffectBundleCatalogEntry, 'assets'> & {
 export async function encodeEffectSettingsEntry(
   entry: EffectBundleCatalogEntry
 ): Promise<PortableEntry> {
+  if (entry.source === 'builtin' || entry.materializeDocument)
+    throw new Error('Builtin resources are not transferable');
   const assets = await Promise.all(
     entry.assets.map(async ({ blob, ...asset }) => {
       const bytes = new Uint8Array(await blob.arrayBuffer());
@@ -26,7 +33,13 @@ export async function encodeEffectSettingsEntry(
       return { ...asset, base64: btoa(binary) };
     })
   );
-  return { ...entry, id: entry.packId, name: entry.label.en, assets };
+  return {
+    ...entry,
+    documents: entry.documents.map(({ presetPreferences: _preferences, ...document }) => document),
+    id: entry.packId,
+    name: entry.label.en,
+    assets,
+  };
 }
 
 export function decodeEffectSettingsEntry(value: unknown): EffectBundleCatalogEntry {
@@ -70,6 +83,8 @@ export async function prepareEffectSettingsMutation(
   if (!isRecord(value) || !Array.isArray(value['items']))
     throw new Error('Invalid effect settings collection');
   const entries = value['items'].map(decodeEffectSettingsEntry);
+  const preferences = parseEffectCatalogPreferences(value['preferences']);
+  const beforePreferences = await readEffectCatalogPreferences();
   if (
     new Set(entries.map((entry) => entry.packId)).size !== entries.length ||
     entries.reduce((sum, entry) => sum + entry.retainedByteLength, 0) > 512 * 1024 * 1024
@@ -95,7 +110,16 @@ export async function prepareEffectSettingsMutation(
       throw error;
     }
   };
-  return { commit: () => write(entries), rollback: () => write(before) };
+  return {
+    commit: async () => {
+      await write(entries);
+      await writeEffectCatalogPreferences(preferences, permit);
+    },
+    rollback: async () => {
+      await write(before);
+      await writeEffectCatalogPreferences(beforePreferences, permit);
+    },
+  };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

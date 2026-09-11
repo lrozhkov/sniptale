@@ -57,6 +57,7 @@ export async function applyEffectCatalogDocument(args: {
     args.project
   );
   const instance: VideoProjectEffectInstance = {
+    catalogPackId: args.catalog.packId,
     ...(document.kind === 'targetEffect' ? { rangeMode: 'owner' as const } : {}),
     controls: applyInitialEffectPreset(
       document,
@@ -203,7 +204,7 @@ function createSnapshot(
       assets.reduce((total, asset) => total + asset.byteLength, 0),
     schemaVersion: 'sniptale.effect.v1',
     sha256: document.sha256,
-    source: document.source,
+    source: document.source!,
   };
 }
 

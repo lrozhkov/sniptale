@@ -1,0 +1,164 @@
+{
+  "manifestVersion": "sniptale.bundle.v1",
+  "engineVersion": "2.0",
+  "packId": "sniptale-base",
+  "version": "1.0.0",
+  "label": {
+    "en": "Sniptale",
+    "ru": "Sniptale"
+  },
+  "description": {
+    "en": "Annotations, video effects and transitions",
+    "ru": "Аннотации, видеоэффекты и переходы"
+  },
+  "effectDocuments": [
+    {
+      "id": "sniptale-lower-third",
+      "path": "effects/annotations/sniptale-lower-third/effect.sniptale-effect.json",
+      "schemaVersion": "sniptale.effect.v1",
+      "sha256": "7c95edf538d422a340badd1d0a19cde11f8169b6decaf0e9558f3e77f097bc00",
+      "byteLength": 18064
+    },
+    {
+      "id": "sniptale-title",
+      "path": "effects/annotations/sniptale-title/effect.sniptale-effect.json",
+      "schemaVersion": "sniptale.effect.v1",
+      "sha256": "c9f7e52782633cf373619e42855dcf4716fc9d6ba4ac88b0028aea0df007e379",
+      "byteLength": 18558
+    },
+    {
+      "id": "sniptale-chapters",
+      "path": "effects/annotations/sniptale-chapters/effect.sniptale-effect.json",
+      "schemaVersion": "sniptale.effect.v1",
+      "sha256": "02fd16aec02696892a462fad5671f7be116b210af4ce2c8380901390211d4895",
+      "byteLength": 165068
+    },
+    {
+      "id": "sniptale-callout",
+      "path": "effects/annotations/sniptale-callout/effect.sniptale-effect.json",
+      "schemaVersion": "sniptale.effect.v1",
+      "sha256": "638c3b30852c5018f841f9ed0c22aeb94d10ce7bfc02adb15a1574a580f11ca7",
+      "byteLength": 42165
+    },
+    {
+      "id": "sniptale-frame",
+      "path": "effects/annotations/sniptale-frame/effect.sniptale-effect.json",
+      "schemaVersion": "sniptale.effect.v1",
+      "sha256": "fc90b0aff0d75515f1664a24b258eedce83955dc3608cbd41f2b3b5c3ae951a4",
+      "byteLength": 11642
+    },
+    {
+      "id": "sniptale-corners",
+      "path": "effects/annotations/sniptale-corners/effect.sniptale-effect.json",
+      "schemaVersion": "sniptale.effect.v1",
+      "sha256": "e9e3004f9bbb42119b81abb1f6d2ac5e7493be582e87110e77ce0a9a0e18c317",
+      "byteLength": 49327
+    },
+    {
+      "id": "sniptale-spotlight",
+      "path": "effects/effects/sniptale-spotlight/effect.sniptale-effect.json",
+      "schemaVersion": "sniptale.effect.v1",
+      "sha256": "2af353fa1f2a3addf4b54edd0c93d0a623434deed66425804d08da37233d5024",
+      "byteLength": 18825
+    },
+    {
+      "id": "sniptale-frosted",
+      "path": "effects/effects/sniptale-frosted/effect.sniptale-effect.json",
+      "schemaVersion": "sniptale.effect.v1",
+      "sha256": "b5b47a1012d19796f2ac784e078f915dcdb5a39128c2924a0ef52ab193aedcef",
+      "byteLength": 53220
+    },
+    {
+      "id": "sniptale-transition-dissolve",
+      "path": "effects/transitions/sniptale-transition-dissolve/effect.sniptale-effect.json",
+      "schemaVersion": "sniptale.effect.v1",
+      "sha256": "e9058ef9ead7b62c15976fe343d69ee20ffb90887b0cb078a33cbd4cb9310d98",
+      "byteLength": 2439
+    },
+    {
+      "id": "sniptale-transition-blur",
+      "path": "effects/transitions/sniptale-transition-blur/effect.sniptale-effect.json",
+      "schemaVersion": "sniptale.effect.v1",
+      "sha256": "900c0ef6b71d5ad3e00e28364112e5a0eb1b0520dc4ce8dcd3a095b0939492bc",
+      "byteLength": 89050
+    },
+    {
+      "id": "sniptale-transition-zoom",
+      "path": "effects/transitions/sniptale-transition-zoom/effect.sniptale-effect.json",
+      "schemaVersion": "sniptale.effect.v1",
+      "sha256": "b30f13c6b083ae76c8c5906e398a6cb70e00d7d5c91e17f0b6c3ad297384cfa1",
+      "byteLength": 5763
+    },
+    {
+      "id": "sniptale-transition-push",
+      "path": "effects/transitions/sniptale-transition-push/effect.sniptale-effect.json",
+      "schemaVersion": "sniptale.effect.v1",
+      "sha256": "66f08a8ba2e4182057cb0536c9b739255860aa8ed962168cd13ff709402455e4",
+      "byteLength": 7066
+    },
+    {
+      "id": "sniptale-transition-split",
+      "path": "effects/transitions/sniptale-transition-split/effect.sniptale-effect.json",
+      "schemaVersion": "sniptale.effect.v1",
+      "sha256": "b0ae054aa5b147b88800de4f1a5252ca291176e89fa85dfa1712b9737f8d6460",
+      "byteLength": 7440
+    },
+    {
+      "id": "sniptale-transition-light-leak",
+      "path": "effects/transitions/sniptale-transition-light-leak/effect.sniptale-effect.json",
+      "schemaVersion": "sniptale.effect.v1",
+      "sha256": "7b3f11a1d6da1244f70baf782a472c1bed9a87e1cd9e5f31d52a6ec0a4748a52",
+      "byteLength": 6131
+    },
+    {
+      "id": "sniptale-video-push-in",
+      "path": "effects/effects/sniptale-video-push-in/effect.sniptale-effect.json",
+      "schemaVersion": "sniptale.effect.v1",
+      "sha256": "8d013ececd42a3c5dc23801be75760043054257a8484b203c5b708af0ca292de",
+      "byteLength": 4816
+    },
+    {
+      "id": "sniptale-video-bloom",
+      "path": "effects/effects/sniptale-video-bloom/effect.sniptale-effect.json",
+      "schemaVersion": "sniptale.effect.v1",
+      "sha256": "af9cd20d2fd5291ecd85a0420643ec487f6d3bdc2b24703246293a922473dbe1",
+      "byteLength": 7221
+    },
+    {
+      "id": "sniptale-video-warm",
+      "path": "effects/effects/sniptale-video-warm/effect.sniptale-effect.json",
+      "schemaVersion": "sniptale.effect.v1",
+      "sha256": "d493e4852207785a0b15ec1c0888560b9d6e99cecd8dabfcc38014bbd793b3b1",
+      "byteLength": 5917
+    },
+    {
+      "id": "sniptale-video-grain",
+      "path": "effects/effects/sniptale-video-grain/effect.sniptale-effect.json",
+      "schemaVersion": "sniptale.effect.v1",
+      "sha256": "0aab09afdb38f874ee71eb7cbf02efae7a99540d5613c5f2795f6dccf9adbae9",
+      "byteLength": 71815
+    },
+    {
+      "id": "sniptale-video-vignette",
+      "path": "effects/effects/sniptale-video-vignette/effect.sniptale-effect.json",
+      "schemaVersion": "sniptale.effect.v1",
+      "sha256": "a9c91fc3606f9a5781752c508ce347ee26d52d7bb9e8368a91ff019ae4bba6d9",
+      "byteLength": 7618
+    },
+    {
+      "id": "sniptale-video-light-drift",
+      "path": "effects/effects/sniptale-video-light-drift/effect.sniptale-effect.json",
+      "schemaVersion": "sniptale.effect.v1",
+      "sha256": "b3a14aa8d3229313c8f41b18fbdc3cb1191b3ecfd3a803a6cee22ba34ee1d165",
+      "byteLength": 9138
+    },
+    {
+      "id": "sniptale-video-blur",
+      "path": "effects/effects/sniptale-video-blur/effect.sniptale-effect.json",
+      "schemaVersion": "sniptale.effect.v1",
+      "sha256": "5b65041f4151c1c45e09863c264dcb3d63c466e8d8919f3b18b93948d3730ef2",
+      "byteLength": 37170
+    }
+  ],
+  "assets": []
+}

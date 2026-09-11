@@ -1,5 +1,9 @@
+import {
+  collectEffectCatalogPreferences,
+  readEffectCatalogPreferences,
+} from '../effect-bundles/preferences';
 import type { PersistenceMutationPermit } from '../infrastructure/mutation-barrier';
-import { listEffectBundles } from '../effect-bundles';
+import { listImportedEffectBundles } from '../effect-bundles';
 import { encodeEffectSettingsEntry } from '../effect-bundles/settings-transfer';
 import type {
   SettingsTransferDomainPayload,
@@ -86,7 +90,7 @@ export async function readSettingsTransferSnapshot(
     browserStorage.local.get([THEME_STORAGE_KEY, LOCALE_STORAGE_KEY]),
   ]);
 
-  const effectCatalogs = await listEffectBundles(permit);
+  const effectCatalogs = await listImportedEffectBundles(permit);
   if (effectCatalogs.some((entry) => entry.status !== 'ready'))
     throw new Error('Invalid effect catalog cannot be backed up');
   const effects = await Promise.all(
@@ -139,7 +143,13 @@ export async function readSettingsTransferSnapshot(
     }),
     'styles.surfaces': payload(serializeSurfaceStylePresetCatalog(surfaces)),
     'styles.gradients': payload(gradients),
-    'styles.video-effects': payload({ items: effects }),
+    'styles.video-effects': payload({
+      items: effects,
+      preferences: collectEffectCatalogPreferences(
+        effectCatalogs.flatMap((item) => (item.status === 'ready' ? [item.entry] : [])),
+        await readEffectCatalogPreferences()
+      ),
+    }),
     'ai.providers': payload({ items: providers }),
     'ai.models': payload({
       items: ai.models.map(selectSettingsTransferModelMetadata),

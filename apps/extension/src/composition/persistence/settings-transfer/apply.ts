@@ -98,8 +98,8 @@ export async function applySettingsTransferDomains(args: {
       localCommitted = true;
     }
     if (effectPlan) {
-      await effectPlan.commit();
       effectsCommitted = true;
+      await effectPlan.commit();
     }
     args.summary.clearedAiSecretBindings.push(...(providerPlan?.clearedProviderIds ?? []));
     args.summary.missingAiSecretBindings.push(...(providerPlan?.missingProviderIds ?? []));

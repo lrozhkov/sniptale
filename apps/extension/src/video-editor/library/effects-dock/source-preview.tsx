@@ -1,7 +1,7 @@
+import { readCatalogPresentation } from '../../../features/video/project/effect-bundle/catalog/presentation';
 import { useEffect, useState, useRef } from 'react';
 import { ArrowLeft, Play, Pause } from 'lucide-react';
 import { EditorIconButton } from '@sniptale/ui/editor-chrome';
-import { parseEffectV1Source } from '@sniptale/runtime-contracts/effect-v1';
 import { describeCatalogDocument } from '../../../features/video/project/effect-bundle/catalog/query';
 import type {
   EffectBundleCatalogEntry,
@@ -22,7 +22,7 @@ export function AnnotationSourcePreview(
     }
 ) {
   const [duration, setDuration] = useState(
-    () => parseEffectV1Source(props.document.source).document?.duration ?? 4
+    () => readCatalogPresentation(props.document)?.duration ?? 4
   );
   const [time, setTime] = useState(0);
   const currentTime = useRef(time);

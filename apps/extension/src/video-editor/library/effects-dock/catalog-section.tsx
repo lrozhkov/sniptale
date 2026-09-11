@@ -1,8 +1,8 @@
+import { readCatalogPresentation } from '../../../features/video/project/effect-bundle/catalog/presentation';
 import { AnnotationSourcePreview } from './source-preview';
 import { CompactSelect } from '../../../ui/compact-inspector-controls';
 import { useWorkspacePreference } from '../../runtime/controller/workspace-preferences';
 import { useEffectDocumentDrag } from '../../chrome/effect-document-drag';
-import { parseEffectV1Source } from '@sniptale/runtime-contracts/effect-v1';
 import {
   EffectCatalogPreview,
   EffectCatalogPreviewProvider,
@@ -241,7 +241,7 @@ function CatalogDocument(
           packId: props.catalog.packId,
         };
         writeVideoEditorEffectDocumentDragPayload(event.dataTransfer, payload);
-        const duration = parseEffectV1Source(props.document.source).document?.duration;
+        const duration = readCatalogPresentation(props.document)?.duration;
         if (duration) drag.start({ ...payload, duration });
       }}
       onDragEnd={drag.end}

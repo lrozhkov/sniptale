@@ -1,6 +1,6 @@
 vi.mock('../effect-bundles', async (original) => ({
   ...(await original<typeof import('../effect-bundles')>()),
-  listEffectBundles: vi.fn(async () => []),
+  listImportedEffectBundles: vi.fn(async () => []),
 }));
 import { beforeEach, expect, it, vi } from 'vitest';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';

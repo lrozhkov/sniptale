@@ -1,0 +1,303 @@
+{
+  "schemaVersion": "sniptale.effect.v1",
+  "id": "sniptale-transition-light-leak",
+  "kind": "transition",
+  "duration": 0.8,
+  "label": {
+    "ru": "Световой переход",
+    "en": "Light leak"
+  },
+  "description": {
+    "ru": "Переход с точными начальным и конечным кадрами.",
+    "en": "A transition with exact start and end frames."
+  },
+  "assets": [],
+  "controls": [
+    {
+      "id": "curve",
+      "kind": "number",
+      "label": {
+        "ru": "Плавность (%)",
+        "en": "Easing (%)"
+      },
+      "defaultValue": 85,
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "group": "animation",
+      "order": 0
+    },
+    {
+      "id": "strength",
+      "kind": "number",
+      "label": {
+        "ru": "Интенсивность (%)",
+        "en": "Intensity (%)"
+      },
+      "defaultValue": 65,
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "group": "processing",
+      "order": 1
+    },
+    {
+      "id": "tint",
+      "kind": "color",
+      "label": {
+        "ru": "Цвет света",
+        "en": "Light color"
+      },
+      "defaultValue": "#ffb36a",
+      "group": "appearance",
+      "order": 2
+    }
+  ],
+  "layers": [],
+  "clips": [],
+  "scenes": [
+    {
+      "id": "main",
+      "start": 0,
+      "duration": 0.8
+    }
+  ],
+  "timeline": {
+    "phases": [],
+    "tracks": []
+  },
+  "program": {
+    "kind": "graph",
+    "version": 1,
+    "definitions": {
+      "q": {
+        "op": "mix",
+        "args": [
+          {
+            "op": "read",
+            "path": "progress"
+          },
+          {
+            "op": "inOut",
+            "args": [
+              {
+                "op": "read",
+                "path": "progress"
+              }
+            ]
+          },
+          {
+            "op": "div",
+            "args": [
+              {
+                "op": "read",
+                "path": "controls.curve"
+              },
+              100
+            ]
+          }
+        ]
+      },
+      "pulse": {
+        "op": "mul",
+        "args": [
+          4,
+          {
+            "op": "read",
+            "path": "defs.q"
+          },
+          {
+            "op": "sub",
+            "args": [
+              1,
+              {
+                "op": "read",
+                "path": "defs.q"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "commands": [
+      {
+        "op": "clear"
+      },
+      {
+        "op": "image",
+        "input": "from",
+        "x": 0,
+        "y": 0,
+        "width": {
+          "op": "read",
+          "path": "width"
+        },
+        "height": {
+          "op": "read",
+          "path": "height"
+        },
+        "fit": "cover",
+        "alpha": {
+          "op": "sub",
+          "args": [
+            1,
+            {
+              "op": "read",
+              "path": "defs.q"
+            }
+          ]
+        }
+      },
+      {
+        "op": "image",
+        "input": "to",
+        "x": 0,
+        "y": 0,
+        "width": {
+          "op": "read",
+          "path": "width"
+        },
+        "height": {
+          "op": "read",
+          "path": "height"
+        },
+        "fit": "cover",
+        "alpha": {
+          "op": "read",
+          "path": "defs.q"
+        },
+        "blend": "lighter"
+      },
+      {
+        "op": "fillRect",
+        "x": 0,
+        "y": 0,
+        "width": {
+          "op": "read",
+          "path": "width"
+        },
+        "height": {
+          "op": "read",
+          "path": "height"
+        },
+        "fill": {
+          "kind": "radialGradient",
+          "x0": {
+            "op": "mul",
+            "args": [
+              {
+                "op": "read",
+                "path": "width"
+              },
+              {
+                "op": "mix",
+                "args": [
+                  -0.1,
+                  1.1,
+                  {
+                    "op": "read",
+                    "path": "defs.q"
+                  }
+                ]
+              }
+            ]
+          },
+          "y0": {
+            "op": "mul",
+            "args": [
+              {
+                "op": "read",
+                "path": "height"
+              },
+              0.3
+            ]
+          },
+          "r0": 0,
+          "x1": {
+            "op": "mul",
+            "args": [
+              {
+                "op": "read",
+                "path": "width"
+              },
+              {
+                "op": "mix",
+                "args": [
+                  -0.1,
+                  1.1,
+                  {
+                    "op": "read",
+                    "path": "defs.q"
+                  }
+                ]
+              }
+            ]
+          },
+          "y1": {
+            "op": "mul",
+            "args": [
+              {
+                "op": "read",
+                "path": "height"
+              },
+              0.3
+            ]
+          },
+          "r1": {
+            "op": "mul",
+            "args": [
+              {
+                "op": "max",
+                "args": [
+                  {
+                    "op": "read",
+                    "path": "width"
+                  },
+                  {
+                    "op": "read",
+                    "path": "height"
+                  }
+                ]
+              },
+              0.9
+            ]
+          },
+          "stops": [
+            {
+              "offset": 0,
+              "color": {
+                "op": "read",
+                "path": "controls.tint"
+              }
+            },
+            {
+              "offset": 1,
+              "color": "#00000000"
+            }
+          ]
+        },
+        "alpha": {
+          "op": "mul",
+          "args": [
+            {
+              "op": "div",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "controls.strength"
+                },
+                100
+              ]
+            },
+            {
+              "op": "read",
+              "path": "defs.pulse"
+            },
+            0.8
+          ]
+        },
+        "blend": "source-atop"
+      }
+    ]
+  }
+}
