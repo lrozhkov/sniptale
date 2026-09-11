@@ -183,6 +183,7 @@ async function verifyArtifactPersistenceWithDocument() {
     },
     updatedAt: 11,
     workspaceRevision: 1,
+    history: [{ revision: 0, savedAt: project.updatedAt, project }],
   });
   expect(txPutMock).toHaveBeenCalledWith({
     stepId: 'step-1',

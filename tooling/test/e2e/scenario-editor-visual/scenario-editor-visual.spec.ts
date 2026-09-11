@@ -10,6 +10,7 @@ import {
 import {
   verifyImageImport,
   verifySavedVersionHistory,
+  verifyResourceRetention,
   verifyImageEditorRoundtrip,
   verifyImageFraming,
   verifyIndependentProjectCopy,
@@ -129,5 +130,15 @@ test('saved versions survive reload and restore as an undoable new publication',
   const issues = createPageIssueCollector(page);
   await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 900 });
   await verifySavedVersionHistory(page, testInfo);
+  issues.assertClean();
+});
+
+test('history cleanup preserves two-tab undo resources until sessions close', async ({
+  page,
+  hostOrigin,
+}) => {
+  const issues = createPageIssueCollector(page);
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 900 });
+  await verifyResourceRetention(page);
   issues.assertClean();
 });

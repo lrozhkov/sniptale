@@ -22,6 +22,8 @@ const io = vi.hoisted(() => ({
   mount: vi.fn(),
 }));
 vi.mock('../../platform/navigation/extension-pages', () => ({ openGalleryPage: io.library }));
+vi.mock('./runtime/resource-session', () => ({ useGuideResourceSession: () => enterSession }));
+const enterSession = async () => true;
 vi.mock('../../composition/persistence/scenario/projects', () => ({
   getScenarioProject: io.load,
 }));

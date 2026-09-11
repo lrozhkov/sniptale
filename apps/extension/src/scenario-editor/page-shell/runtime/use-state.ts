@@ -15,6 +15,8 @@ import { getScenarioProject } from '../../../composition/persistence/scenario/pr
 import { getScenarioAssetBlob } from '../../../composition/persistence/scenario/store/project-records/assets';
 import { replaceScenarioEditorSelectionInUrl } from '../../platform/browser-driver';
 import { useGuideHistory } from './history';
+import { useGuideResourceSession } from './resource-session';
+import { clearScenarioSavedHistory } from '../../../composition/persistence/scenario/retention';
 
 import { restoreScenarioSavedVersion } from '../../../composition/persistence/scenario/history';
 import { applyScenarioImageEdit } from '../../../workflows/scenario-capture-edit/edits';
@@ -31,9 +33,17 @@ type GuidePageStatus =
   | 'conflict'
   | 'dirty';
 
-type GuideActionError = 'copy' | 'delete' | 'structure' | 'import' | 'edit' | 'restore';
+type GuideActionError =
+  | 'copy'
+  | 'delete'
+  | 'structure'
+  | 'import'
+  | 'edit'
+  | 'restore'
+  | 'clearHistory';
 
 type GuideCommitCommand =
+  | { kind: 'clearHistory' }
   | { kind: 'restore'; revision: number }
   | {
       kind: 'import';
@@ -46,6 +56,7 @@ type GuideCommitCommand =
 
 /** Owns this page's disposable edit buffer; persistence owns committed project ordering. */
 export function useGuidePageState() {
+  const enterResourceSession = useGuideResourceSession();
   const [status, setStatus] = useState<GuidePageStatus>('loading');
   const [actionError, setActionError] = useState<GuideActionError | null>(null);
   const saved = useRef<GuideProject | null>(null);
@@ -69,6 +80,7 @@ export function useGuidePageState() {
     }
     setStatus('loading');
     try {
+      if (!(await enterResourceSession(requestedId.current))) return;
       const loaded = await getScenarioProject(requestedId.current);
       if (turn !== generation.current) return;
       setActionError(null);
@@ -78,41 +90,21 @@ export function useGuidePageState() {
     } catch {
       if (turn === generation.current) setStatus('unavailable');
     }
-  }, [reset]);
+  }, [reset, enterResourceSession]);
   useEffect(() => {
     void load();
     return () => {
       generation.current += 1;
     };
   }, [load]);
-  const mutate = async <T>(
-    operation: () => Promise<T>,
-    accept: (result: T) => void,
-    reject: (error: unknown) => void
-  ) => {
-    if (busy.current) return false;
-    busy.current = true;
-    const turn = generation.current;
-    setActionError(null);
-    setStatus('saving');
-    try {
-      const result = await operation();
-      if (turn !== generation.current) return false;
-      accept(result);
-      return true;
-    } catch (error) {
-      if (turn === generation.current) reject(error);
-      return false;
-    } finally {
-      busy.current = false;
-    }
-  };
+  const mutate = createGuideMutationRunner({ busy, generation, setStatus, setActionError });
   const acceptProject = (committed: GuideProject, reversible = false) => {
     saved.current = committed;
     commit(committed, reversible);
     setStatus('saved');
   };
-  const openProject = (committed: GuideProject | null) => {
+  const openProject = async (committed: GuideProject | null) => {
+    if (!(await enterResourceSession(committed?.id ?? null))) return;
     requestedId.current = committed?.id ?? null;
     saved.current = committed;
     reset(committed);
@@ -135,7 +127,7 @@ export function useGuidePageState() {
       (error) => setStatus(isRevisionConflict(error) ? 'conflict' : 'failed')
     );
   };
-  const rejectAction = (action: 'copy' | 'delete' | 'import' | 'edit' | 'restore') => {
+  const rejectAction = (action: Exclude<GuideActionError, 'structure'>) => {
     setStatus(status);
     setActionError(action);
   };
@@ -158,9 +150,10 @@ export function useGuidePageState() {
   const commitChange = async (command: GuideCommitCommand) => {
     const base = saved.current;
     if (!project || !base || status === 'conflict') return false;
+    if (command.kind === 'clearHistory' && status !== 'ready' && status !== 'saved') return false;
     return mutate(
       () => runGuideCommitCommand(command, project, base.updatedAt),
-      (result) => acceptProject(result, true),
+      (result) => acceptProject(result, command.kind !== 'clearHistory'),
       (error) => {
         if (isRevisionConflict(error)) setStatus('conflict');
         else if (error instanceof Error && error.name === 'AbortError') setStatus(status);
@@ -259,6 +252,7 @@ function runGuideCommitCommand(
   project: GuideProject,
   baseUpdatedAt: number
 ) {
+  if (command.kind === 'clearHistory') return clearScenarioSavedHistory(project.id, baseUpdatedAt);
   if (command.kind === 'restore')
     return restoreScenarioSavedVersion({
       projectId: project.id,
@@ -268,4 +262,40 @@ function runGuideCommitCommand(
   return command.kind === 'import'
     ? importScenarioImages({ ...command.input, project, baseUpdatedAt })
     : applyScenarioImageEdit({ ...command.input, project, baseUpdatedAt });
+}
+
+/** One command admission owner rejects duplicate and stale asynchronous page mutations. */
+function createGuideMutationRunner({
+  busy,
+  generation,
+  setStatus,
+  setActionError,
+}: {
+  busy: { current: boolean };
+  generation: { current: number };
+  setStatus: (status: GuidePageStatus) => void;
+  setActionError: (error: GuideActionError | null) => void;
+}) {
+  return async <T>(
+    operation: () => Promise<T>,
+    accept: (result: T) => void | Promise<void>,
+    reject: (error: unknown) => void
+  ) => {
+    if (busy.current) return false;
+    busy.current = true;
+    const turn = generation.current;
+    setActionError(null);
+    setStatus('saving');
+    try {
+      const result = await operation();
+      if (turn !== generation.current) return false;
+      await accept(result);
+      return true;
+    } catch (error) {
+      if (turn === generation.current) reject(error);
+      return false;
+    } finally {
+      busy.current = false;
+    }
+  };
 }

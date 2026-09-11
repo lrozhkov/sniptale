@@ -17,9 +17,15 @@ export function createScenarioProjectEntry(args: {
   project: GuideProject;
   storageClass?: LibraryStorageClass;
   updatedAt?: number;
+  historyPolicy?: 'append' | 'preserve' | 'discard';
 }): ScenarioProjectEntry {
   const updatedAt = createScenarioProjectRevision(args.existing, args.updatedAt);
-  const history = appendScenarioSavedVersion(args.existing);
+  const history =
+    args.historyPolicy === 'discard'
+      ? []
+      : args.historyPolicy === 'preserve'
+        ? (args.existing?.history ?? [])
+        : appendScenarioSavedVersion(args.existing);
   return {
     ...(history.length ? { history } : {}),
     id: args.project.id,

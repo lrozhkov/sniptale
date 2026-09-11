@@ -11,6 +11,8 @@ type HistoryProps = {
   project: GuideProject;
   disabled: boolean;
   onRestore: (revision: number) => Promise<boolean>;
+  onClearHistory: () => Promise<boolean>;
+  canClearHistory: boolean;
   t: Translate;
 };
 
@@ -32,13 +34,20 @@ export function GuideSavedHistory(props: HistoryProps) {
   );
 }
 
-function GuideSavedHistoryPanel({ project, disabled, onRestore, t }: HistoryProps) {
+function GuideSavedHistoryPanel({
+  project,
+  disabled,
+  onRestore,
+  onClearHistory,
+  canClearHistory,
+  t,
+}: HistoryProps) {
   const [data, setData] = useState<SavedVersions | null>(null);
   const [failed, setFailed] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [selectedRevision, setSelectedRevision] = useState<number | null>(null);
-  const [confirmation, setConfirmation] = useState(false);
-  const [restoreFailed, setRestoreFailed] = useState(false);
+  const [confirmation, setConfirmation] = useState<'restore' | 'clear' | null>(null);
+  const [restoreFailed, setRestoreFailed] = useState<'restore' | 'clear' | null>(null);
   const locale = useAppLocale();
   useEffect(() => {
     let active = true;
@@ -60,9 +69,10 @@ function GuideSavedHistoryPanel({ project, disabled, onRestore, t }: HistoryProp
     new Intl.DateTimeFormat(locale, { dateStyle: 'short', timeStyle: 'medium' }).format(time);
   const restore = async () => {
     if (!selected || disabled) return;
-    const accepted = await onRestore(selected.revision);
-    setRestoreFailed(!accepted);
-    setConfirmation(false);
+    const accepted =
+      confirmation === 'clear' ? await onClearHistory() : await onRestore(selected.revision);
+    setRestoreFailed(accepted ? null : confirmation);
+    setConfirmation(null);
   };
   return (
     <div>
@@ -92,7 +102,7 @@ function GuideSavedHistoryPanel({ project, disabled, onRestore, t }: HistoryProp
               value={selected.revision}
               onChange={(event) => {
                 setSelectedRevision(Number(event.target.value));
-                setRestoreFailed(false);
+                setRestoreFailed(null);
               }}
             >
               {data.versions.map((version) => (
@@ -113,21 +123,49 @@ function GuideSavedHistoryPanel({ project, disabled, onRestore, t }: HistoryProp
           <button
             type="button"
             disabled={disabled || failed || selected.revision === data.currentRevision}
-            onClick={() => setConfirmation(true)}
+            onClick={() => setConfirmation('restore')}
           >
             {t('scenario.editor.guideRestoreVersion')}
           </button>
+          <button
+            type="button"
+            disabled={disabled || failed || !canClearHistory || data.versions.length < 2}
+            onClick={() => setConfirmation('clear')}
+          >
+            {t('scenario.editor.guideClearHistory')}
+          </button>
+          {!canClearHistory && <p>{t('scenario.editor.guideHistorySaveFirst')}</p>}
         </>
       )}
-      {restoreFailed && <p role="alert">{t('scenario.editor.guideHistoryRestoreFailed')}</p>}
+      {restoreFailed && (
+        <p role="alert">
+          {t(
+            restoreFailed === 'clear'
+              ? 'scenario.editor.guideHistoryClearFailed'
+              : 'scenario.editor.guideHistoryRestoreFailed'
+          )}
+        </p>
+      )}
       <ProductConfirmDialog
-        isOpen={confirmation}
+        isOpen={confirmation !== null}
         isLoading={disabled}
-        title={t('scenario.editor.guideRestoreVersion')}
-        message={t('scenario.editor.guideRestoreVersionMessage')}
-        confirmText={t('scenario.editor.guideRestoreVersion')}
+        title={t(
+          confirmation === 'clear'
+            ? 'scenario.editor.guideClearHistory'
+            : 'scenario.editor.guideRestoreVersion'
+        )}
+        message={t(
+          confirmation === 'clear'
+            ? 'scenario.editor.guideClearHistoryMessage'
+            : 'scenario.editor.guideRestoreVersionMessage'
+        )}
+        confirmText={t(
+          confirmation === 'clear'
+            ? 'scenario.editor.guideClearHistory'
+            : 'scenario.editor.guideRestoreVersion'
+        )}
         cancelText={t('common.actions.cancel')}
-        onCancel={() => setConfirmation(false)}
+        onCancel={() => setConfirmation(null)}
         onConfirm={restore}
       />
     </div>

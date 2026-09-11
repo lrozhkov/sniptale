@@ -132,6 +132,7 @@ export function ScenarioEditorPage() {
               disabled={disabled}
               status={status}
               onRestore={(revision) => state.commitChange({ kind: 'restore', revision })}
+              onClearHistory={() => state.commitChange({ kind: 'clearHistory' })}
               onDuplicate={state.duplicate}
               onDelete={state.remove}
               onReload={state.reload}
@@ -166,6 +167,7 @@ function GuideProjectActions({
   disabled,
   status,
   onRestore,
+  onClearHistory,
   onDuplicate,
   onDelete,
   onReload,
@@ -175,6 +177,7 @@ function GuideProjectActions({
   disabled: boolean;
   status: ReturnType<typeof useGuidePageState>['status'];
   onRestore: (revision: number) => Promise<boolean>;
+  onClearHistory: () => Promise<boolean>;
   onDuplicate: (name: string) => Promise<void>;
   onDelete: () => Promise<void>;
   onReload: () => Promise<void>;
@@ -199,6 +202,8 @@ function GuideProjectActions({
         project={project}
         disabled={disabled || status === 'conflict'}
         onRestore={onRestore}
+        onClearHistory={onClearHistory}
+        canClearHistory={status === 'ready' || status === 'saved'}
         t={t}
       />
       <button type="button" disabled={disabled} onClick={copy}>
@@ -381,15 +386,17 @@ function GuidePageFeedback({
           {t(
             actionError === 'copy'
               ? 'scenario.editor.guideCopyFailed'
-              : actionError === 'restore'
-                ? 'scenario.editor.guideHistoryRestoreFailed'
-                : actionError === 'edit'
-                  ? 'scenario.editor.guideImageApplyFailed'
-                  : actionError === 'import'
-                    ? 'scenario.editor.guideImportFailed'
-                    : actionError === 'structure'
-                      ? 'scenario.editor.guideOperationFailed'
-                      : 'scenario.editor.guideDeleteFailed'
+              : actionError === 'clearHistory'
+                ? 'scenario.editor.guideHistoryClearFailed'
+                : actionError === 'restore'
+                  ? 'scenario.editor.guideHistoryRestoreFailed'
+                  : actionError === 'edit'
+                    ? 'scenario.editor.guideImageApplyFailed'
+                    : actionError === 'import'
+                      ? 'scenario.editor.guideImportFailed'
+                      : actionError === 'structure'
+                        ? 'scenario.editor.guideOperationFailed'
+                        : 'scenario.editor.guideDeleteFailed'
           )}
         </p>
       )}

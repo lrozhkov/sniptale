@@ -342,7 +342,8 @@ function createScenarioAggregateEntry(args: {
   });
 }
 
-async function applyScenarioAssetMutations(
+/** Applies validated scenario child mutations inside the caller's aggregate transaction. */
+export async function applyScenarioAssetMutations(
   tx: ScenarioAggregateTransaction,
   projectId: string,
   children: PreparedScenarioAggregateChildMutation | undefined,

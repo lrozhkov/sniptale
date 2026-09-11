@@ -1,5 +1,18 @@
 import { defineMessageSource } from '../../source';
 export const scenarioEditorCoreMessages = defineMessageSource({
+  guideClearHistory: { ru: 'Очистить историю сохранений', en: 'Clear saved history' },
+  guideClearHistoryMessage: {
+    ru: 'Предыдущие сохранённые версии будут удалены без возможности восстановления. Текущее содержимое останется. Файлы, нужные для отмены правок в открытых вкладках, освободятся после закрытия этих вкладок.',
+    en: 'Previous saved versions will be permanently removed. Current content stays. Files needed for undo in open tabs will be released after those tabs close.',
+  },
+  guideHistorySaveFirst: {
+    ru: 'Сохраните правки перед очисткой истории.',
+    en: 'Save your changes before clearing history.',
+  },
+  guideHistoryClearFailed: {
+    ru: 'Не удалось очистить историю. Содержимое редактора сохранено.',
+    en: 'Could not clear history. Your editor content remains.',
+  },
   guideSavedHistory: { ru: 'История сохранений', en: 'Saved versions' },
   guideHistoryLimit: {
     ru: 'До {count} предыдущих сохранений. История хранится локально вместе с проектом.',

@@ -1,5 +1,8 @@
 import { expect, type Page, type TestInfo } from '@playwright/test';
-import { SCENARIO_EDITOR_VISUAL_HARNESS_PATH } from '../extension-critical.helpers';
+import {
+  applyHarnessBootstrap,
+  SCENARIO_EDITOR_VISUAL_HARNESS_PATH,
+} from '../extension-critical.helpers';
 
 export async function verifyStepNavigation(page: Page): Promise<void> {
   await expect(page.locator('article#compare')).toBeFocused();
@@ -414,4 +417,82 @@ export async function verifySavedVersionHistory(page: Page, testInfo: TestInfo):
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   await page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
   await expect(title).toHaveValue('Historical version A');
+}
+
+export async function verifyResourceRetention(page: Page): Promise<void> {
+  const reopen = new URL(page.url());
+  reopen.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
+  reopen.searchParams.set('locale', 'en');
+  const originalAssetCount = await readProjectAssetCount(page);
+  const second = await page.context().newPage();
+  try {
+    await applyHarnessBootstrap(second, { preserveMediaLibrary: true });
+    await second.goto(reopen.toString());
+    await expect(second.locator('.guide-image-frame img')).toHaveCount(2);
+    await page.getByRole('button', { name: 'Remove item', exact: true }).click();
+    await expect(page.locator('article#compare')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    await page.getByRole('button', { name: 'Saved versions', exact: true }).click();
+    await page.getByRole('button', { name: 'Clear saved history', exact: true }).click();
+    await page
+      .getByRole('alertdialog')
+      .getByRole('button', { name: 'Clear saved history', exact: true })
+      .click();
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    await expect(page.getByLabel('Saved version', { exact: true }).locator('option')).toHaveCount(
+      1
+    );
+    expect(await readProjectAssetCount(page)).toBe(originalAssetCount);
+    await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    await expect(page.locator('.guide-image-frame img')).toHaveCount(2);
+    await expect
+      .poll(() =>
+        page
+          .locator('.guide-image-frame img')
+          .evaluateAll((images) =>
+            images.every(
+              (image) =>
+                image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0
+            )
+          )
+      )
+      .toBe(true);
+    await page.getByRole('button', { name: 'Redo', exact: true }).click();
+    await page.goto(reopen.toString());
+    await expect(page.locator('article#text-only')).toBeVisible();
+    expect(await readProjectAssetCount(page)).toBe(originalAssetCount);
+    await second.close();
+    await page.goto('about:blank');
+    await page.goto(reopen.toString());
+    await expect(page.locator('article#text-only')).toBeVisible();
+    await expect.poll(() => readProjectAssetCount(page)).toBe(0);
+    await expect(page.locator('article#compare')).toHaveCount(0);
+  } finally {
+    if (!second.isClosed()) await second.close();
+  }
+}
+
+async function readProjectAssetCount(page: Page): Promise<number> {
+  return page.evaluate(async () => {
+    const id = new URL(location.href).searchParams.get('projectId');
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('sniptale-db');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      return await new Promise<number>((resolve, reject) => {
+        const request = db
+          .transaction('scenario_assets', 'readonly')
+          .objectStore('scenario_assets')
+          .index('projectId')
+          .count(id ?? '');
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    } finally {
+      db.close();
+    }
+  });
 }

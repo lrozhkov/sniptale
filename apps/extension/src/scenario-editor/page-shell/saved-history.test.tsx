@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createGuideProject, createGuideStep } from '../../features/scenario/project/public';
 import { createTranslator } from '../../platform/i18n';
-const io = vi.hoisted(() => ({ load: vi.fn(), restore: vi.fn() }));
+const io = vi.hoisted(() => ({ load: vi.fn(), restore: vi.fn(), clear: vi.fn() }));
 vi.mock('../../composition/persistence/scenario/history', () => ({
   getScenarioSavedVersions: io.load,
 }));
@@ -30,6 +30,7 @@ beforeEach(() => {
     ],
   });
   io.restore.mockResolvedValue(true);
+  io.clear.mockResolvedValue(true);
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -39,13 +40,15 @@ afterEach(() => {
   host.remove();
   vi.unstubAllGlobals();
 });
-async function render() {
+async function render(canClearHistory = true) {
   await act(async () =>
     root.render(
       <GuideSavedHistory
         project={current}
         disabled={false}
         onRestore={io.restore}
+        onClearHistory={io.clear}
+        canClearHistory={canClearHistory}
         t={createTranslator('en')}
       />
     )
@@ -102,5 +105,31 @@ it('shows a load error and reloads committed history on explicit retry', async (
   await click('Saved versions');
   expect(host.querySelector('[role="alert"]')?.textContent).toContain('Could not load');
   await click('Retry loading');
+  expect(host.querySelector('select')?.options).toHaveLength(2);
+});
+
+it('requires saved content and confirmation before clearing durable versions', async () => {
+  await render(false);
+  await click('Saved versions');
+  const button = [...host.querySelectorAll('button')].find(
+    (item) => item.textContent === 'Clear saved history'
+  );
+  expect(button?.disabled).toBe(true);
+  expect(host.textContent).toContain('Save your changes before clearing history.');
+  await render();
+  await click('Clear saved history');
+  expect(io.clear).not.toHaveBeenCalled();
+  const dialog = document.querySelector('[role="alertdialog"]');
+  if (!dialog) throw new Error('Missing confirmation');
+  expect(dialog.textContent).toContain('open tabs');
+  await click('Cancel', dialog);
+  expect(io.clear).not.toHaveBeenCalled();
+  await click('Clear saved history');
+  io.clear.mockResolvedValueOnce(false);
+  const next = document.querySelector('[role="alertdialog"]');
+  if (!next) throw new Error('Missing confirmation');
+  await click('Clear saved history', next);
+  expect(io.clear).toHaveBeenCalledOnce();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain('Could not clear history');
   expect(host.querySelector('select')?.options).toHaveLength(2);
 });
