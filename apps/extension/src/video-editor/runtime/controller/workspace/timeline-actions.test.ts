@@ -156,6 +156,23 @@ it('deletes the selected object track from timeline delete actions', () => {
   expect(store.deleteObjectTrack).toHaveBeenCalledWith('visual-cursor');
 });
 
+it('deletes the selected effect instance from timeline delete actions', () => {
+  const store = createStore();
+  store.selection = {
+    kind: VideoEditorSelectionKind.EFFECT_INSTANCE,
+    effectInstanceId: 'effect-instance',
+  };
+  store.deleteEffectInstance = vi.fn();
+
+  createWorkspaceTimelineEditingActions(
+    store,
+    createWorkspace(),
+    createSelectedClipActions()
+  ).onDeleteSelectedTimelineObject();
+
+  expect(store.deleteEffectInstance).toHaveBeenCalledWith('effect-instance');
+});
+
 it('preserves captured facts while cursor moves remain explicit', () => {
   const project = createProject([createVideoClip({ sourceInstanceId: 'instance-video' })]);
   project.baseRecordingId = 'rec-asset-video';

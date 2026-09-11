@@ -1,5 +1,6 @@
-import { REVIEW_SPEED_RATES } from '../../features/video/review/speed';
 // @vitest-environment jsdom
+
+import { REVIEW_SPEED_RATES } from '../../features/video/review/speed';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';

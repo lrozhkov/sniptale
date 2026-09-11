@@ -48,6 +48,7 @@ it('exposes pending preparation and cancels it on a second toggle without starti
         duplicateClip: vi.fn(),
         deleteActionEvent: vi.fn(),
         deleteCursorSample: vi.fn(),
+        deleteEffectInstance: vi.fn(),
         deleteMotionRegion: vi.fn(),
         deleteObjectTrack: vi.fn(),
         clearPlacementMode: vi.fn(),

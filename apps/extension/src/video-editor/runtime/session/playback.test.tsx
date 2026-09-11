@@ -57,6 +57,7 @@ interface PlaybackHarnessProps {
   deleteActionEvent: (actionEventId: string) => void;
   deleteClip: (clipId: string | readonly string[]) => void;
   deleteCursorSample: (sampleId: string) => void;
+  deleteEffectInstance?: (effectInstanceId: string) => void;
   deleteMotionRegion: (motionRegionId: string) => void;
   deleteObjectTrack: (objectTrackId: string) => void;
   duplicateClip?: (clipId: string) => void;
@@ -109,6 +110,7 @@ function PlaybackHarness(props: PlaybackHarnessProps) {
       duplicateClip: props.duplicateClip ?? vi.fn(),
       deleteActionEvent: props.deleteActionEvent,
       deleteCursorSample: props.deleteCursorSample,
+      deleteEffectInstance: props.deleteEffectInstance ?? vi.fn(),
       deleteMotionRegion: props.deleteMotionRegion,
       deleteObjectTrack: props.deleteObjectTrack,
       clearPlacementMode: props.clearPlacementMode,

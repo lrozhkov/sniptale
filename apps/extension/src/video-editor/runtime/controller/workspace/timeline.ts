@@ -54,6 +54,7 @@ function createWorkspaceTimelineActions(
   store: TimelineEditingPort &
     AnnotationEditingPort &
     ClipSelectionPort &
+    Pick<EffectEditingPort, 'deleteEffectInstance'> &
     HistoryPort &
     Pick<ProjectLifecyclePort, 'project' | 'setError'>,
   runtime: VideoEditorRuntimeController,

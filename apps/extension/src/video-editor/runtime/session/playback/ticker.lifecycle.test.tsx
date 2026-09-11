@@ -57,6 +57,7 @@ it('keeps the transport anchor through inspector edits while reading current pro
       duplicateClip: vi.fn(),
       deleteActionEvent: vi.fn(),
       deleteCursorSample: vi.fn(),
+      deleteEffectInstance: vi.fn(),
       deleteMotionRegion: vi.fn(),
       deleteObjectTrack: vi.fn(),
       clearPlacementMode: vi.fn(),

@@ -32,6 +32,7 @@ export interface UseVideoEditorRuntimeParams {
       actionEvent: VideoEditorProjectActions['deleteActionEvent'];
       clip: VideoEditorProjectActions['deleteClip'];
       cursorSample: VideoEditorProjectActions['deleteCursorSample'];
+      effectInstance: VideoEditorProjectActions['deleteEffectInstance'];
       motionRegion: VideoEditorProjectActions['deleteMotionRegion'];
       objectTrack: VideoEditorProjectActions['deleteObjectTrack'];
     };

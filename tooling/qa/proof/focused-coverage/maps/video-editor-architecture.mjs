@@ -46,7 +46,7 @@ export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
     owner: 'video-action-occurrence-geometry',
     productionFile: 'apps/extension/src/features/video/composition/action-occurrence-geometry.ts',
     reason:
-      'Preview interaction and playback nudge suites exercise viewport locking and both directions of action-point mapping through the shared composition owner.',
+      'Preview and nudge suites cover viewport locking and bidirectional action-point mapping.',
     testFiles: [
       'apps/extension/src/video-editor/preview/stage/canvas/geometry.camera.test.ts',
       'apps/extension/src/video-editor/preview/stage/point-overlay/index.test.tsx',
@@ -64,7 +64,7 @@ export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
     owner: 'video-editor-composed-timeline',
     productionFile: `apps/extension/src/video-editor/timeline/project/${path}`,
     reason:
-      'Real timeline root, body and canvas exercise precise fit, clip and effect drafts, cancellation, commit and projected range geometry.',
+      'Timeline suites cover fit, clip and effect drafts, cancellation, commit, and range geometry.',
     testFiles: [
       'apps/extension/src/video-editor/timeline/project/index.test.tsx',
       'apps/extension/src/video-editor/timeline/project/canvas/index.test.tsx',
@@ -74,7 +74,7 @@ export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
     owner: 'video-editor-integrated-ui-proof',
     productionFile: 'apps/extension/src/ui/compact-inspector-controls/numeric.tsx',
     reason:
-      'Compact numeric editing, keyboard commit, range clamping and invalid-value recovery execute the numeric control.',
+      'Numeric control suites cover editing, keyboard commit, clamping, and invalid-value recovery.',
     testFiles: [
       'apps/extension/src/ui/compact-inspector-controls/numeric-interactions.test.tsx',
       'apps/extension/src/ui/compact-inspector-controls/numeric-range.test.tsx',
@@ -245,7 +245,7 @@ export const VIDEO_EDITOR_ARCHITECTURE_OWNER_MAPPINGS = [
     productionFile:
       'apps/extension/src/video-editor/workspace/sidebar/selection/shared/sliders.tsx',
     reason:
-      'Shared controls prove display mapping and commit deduplication; timing and media-frame tests exercise consumers.',
+      'Shared controls cover display mapping and commit deduplication; consumer tests cover usage.',
     testFiles: [
       'apps/extension/src/video-editor/workspace/sidebar/selection/shared/controls.test.tsx',
       'apps/extension/src/video-editor/workspace/sidebar/selection/inputs/clip-timing.test.tsx',

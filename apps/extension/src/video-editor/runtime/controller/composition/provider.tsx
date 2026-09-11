@@ -15,6 +15,7 @@ import {
   getCurrentVideoEditorProjectSnapshot,
   getCurrentVideoEditorSelectedClipId,
   useVideoEditorClipSelectionPort,
+  useVideoEditorEffectEditingPort,
   useVideoEditorRecordingTelemetryPort,
   useVideoEditorExportPort,
   useVideoEditorHistoryPort,
@@ -51,6 +52,7 @@ function useVideoEditorRuntimeComposition(
   const lifecycle = useVideoEditorProjectLifecyclePort((port) => port);
   const playback = useVideoEditorPlaybackPort((port) => port);
   const selection = useVideoEditorClipSelectionPort((port) => port);
+  const effects = useVideoEditorEffectEditingPort((port) => port);
   const timeline = useVideoEditorTimelineEditingPort((port) => port);
   const history = useVideoEditorHistoryPort((port) => port);
   const exportPort = useVideoEditorExportPort((port) => port);
@@ -105,6 +107,7 @@ function useVideoEditorRuntimeComposition(
         actionEvent: timeline.deleteActionEvent,
         clip: timeline.deleteClip,
         cursorSample: timeline.deleteCursorSample,
+        effectInstance: effects.deleteEffectInstance,
         motionRegion: timeline.deleteMotionRegion,
         objectTrack: timeline.deleteObjectTrack,
       },

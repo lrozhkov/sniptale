@@ -1,5 +1,14 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'video-editor-playback-shortcuts',
+    productionFile: 'apps/extension/src/video-editor/runtime/session/playback/shortcuts.ts',
+    reason: 'Shortcut suites cover effect deletion and the complete keyboard routing surface.',
+    testFiles: [
+      'apps/extension/src/video-editor/runtime/session/playback.effect-instance-delete.test.tsx',
+      'apps/extension/src/video-editor/runtime/session/playback.space-intercept.test.tsx',
+    ],
+  },
+  {
     owner: 'settings-transfer-workflow',
     productionPrefix: 'apps/extension/src/workflows/settings-transfer/',
     exclusive: true,
@@ -416,7 +425,7 @@ export const LOCAL_OWNER_MAPPINGS = [
     owner: 'gallery-shared-download',
     productionFile: 'apps/extension/src/gallery/shared/download.ts',
     reason:
-      'Download lifecycle, release failure, bounded cleanup, and video-review publication are exercised by the existing gallery consumer suites.',
+      'Gallery suites cover download lifecycle, failure, cleanup, and video-review publication.',
     testFiles: [
       'apps/extension/src/gallery/library/actions/shared.download.test.ts',
       'apps/extension/src/gallery/video-review/review.test.tsx',

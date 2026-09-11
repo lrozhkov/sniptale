@@ -43,6 +43,7 @@ function PlaybackHarness(props: PlaybackHarnessProps) {
       duplicateClip: vi.fn(),
       deleteActionEvent: vi.fn(),
       deleteCursorSample: vi.fn(),
+      deleteEffectInstance: vi.fn(),
       deleteMotionRegion: vi.fn(),
       deleteObjectTrack: vi.fn(),
       clearPlacementMode: vi.fn(),

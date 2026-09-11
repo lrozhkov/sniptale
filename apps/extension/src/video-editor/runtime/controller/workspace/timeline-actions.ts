@@ -8,6 +8,7 @@ import { VideoProjectInteractionTimeBasis } from '../../../../features/video/pro
 import type { VideoEditorRuntimeController } from '../../session';
 import type {
   ClipSelectionPort,
+  EffectEditingPort,
   HistoryPort,
   ProjectLifecyclePort,
   TimelineEditingPort,
@@ -26,8 +27,13 @@ type SelectedClipActions = {
   duplicateSelectedClip: () => void;
   splitSelectedClip: () => void;
 };
+type NonEffectTimelineSelection = Exclude<
+  ClipSelectionPort['selection'],
+  { kind: typeof VideoEditorSelectionKind.EFFECT_INSTANCE }
+>;
 
 type TimelineActionStore = TimelineEditingPort &
+  Pick<EffectEditingPort, 'deleteEffectInstance'> &
   ClipSelectionPort &
   Pick<
     HistoryPort,
@@ -114,7 +120,7 @@ function createMotionRegionResizer(store: TimelineActionStore) {
 }
 
 function deleteSelectedTimelineObject(
-  selection: ClipSelectionPort['selection'],
+  selection: NonEffectTimelineSelection,
   store: TimelineActionStore,
   selectedClipActions: Pick<SelectedClipActions, 'deleteSelectedClip'>
 ) {
@@ -164,8 +170,13 @@ export function createWorkspaceTimelineEditingActions(
       isProjectHistoryTransactionCurrent: store.isProjectHistoryTransactionCurrent,
     },
     onDeleteSelectedClip: selectedClipActions.deleteSelectedClip,
-    onDeleteSelectedTimelineObject: () =>
-      deleteSelectedTimelineObject(store.selection, store, selectedClipActions),
+    onDeleteSelectedTimelineObject: () => {
+      if (store.selection.kind === VideoEditorSelectionKind.EFFECT_INSTANCE) {
+        store.deleteEffectInstance(store.selection.effectInstanceId);
+        return;
+      }
+      deleteSelectedTimelineObject(store.selection, store, selectedClipActions);
+    },
     onDuplicateSelectedClip: selectedClipActions.duplicateSelectedClip,
     onUpdateSelectedClipPlaybackRate: createSelectedClipPlaybackRateAction(store),
     autoProcessing: createAutoProcessingActions(store, getCurrentVideoEditorProjectSnapshot),

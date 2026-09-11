@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { CaptureMode } from '@sniptale/runtime-contracts/video/types/types';
+import { CaptureMode, WebcamPresentationMode } from '@sniptale/runtime-contracts/video/types/types';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { prepareContentSurfaceIfNeeded } from './preflight.content-surface';
@@ -105,6 +105,10 @@ it('binds an embedded camera without switching the toolbar mode when auto-open i
     {
       ...DEFAULT_VIDEO_SETTINGS,
       webcamEnabled: true,
+      webcamPresentation: {
+        ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!,
+        mode: WebcamPresentationMode.EMBEDDED,
+      },
       recordingSurface: { cursorSpotlightEnabled: false, toolbarEnabled: false },
     },
     'recording-embedded',

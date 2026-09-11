@@ -98,7 +98,7 @@ function registerLegacyAnnotationFieldTests() {
     const markup = renderToStaticMarkup(<AnnotationFields {...createProps()} />);
 
     expect(markup).toContain('videoEditor.sidebar.inspectorGroupGeneral');
-    expect(markup).toContain('videoEditor.sidebar.annotationLegacyComparisonLabel');
+    expect(markup).toContain('videoEditor.sidebar.annotationSwapStyleLabel');
     expect(markup).toContain('videoEditor.sidebar.inspectorGroupContent');
     expect(markup).toContain('videoEditor.sidebar.inspectorGroupTarget');
     expect(markup).toContain('videoEditor.sidebar.inspectorGroupMotion');

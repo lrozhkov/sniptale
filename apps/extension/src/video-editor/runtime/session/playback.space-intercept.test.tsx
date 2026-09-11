@@ -52,6 +52,7 @@ function createHandlers(): PlaybackHandlers {
     deleteActionEvent: vi.fn(),
     deleteClip: vi.fn(),
     deleteCursorSample: vi.fn(),
+    deleteEffectInstance: vi.fn(),
     deleteMotionRegion: vi.fn(),
     deleteObjectTrack: vi.fn(),
     duplicateClip: vi.fn(),

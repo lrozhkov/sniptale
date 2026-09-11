@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
+import { SETTINGS_TRANSFER_MAX_BYTES } from '../../settings-transfer';
 import { parseBackgroundRuntimeMessage, parseRuntimeResponseForMessage } from './boundary';
 
 it('accepts each settings transfer operation at the background boundary', () => {
@@ -86,7 +87,7 @@ it.each([
   {
     type: MessageType.SETTINGS_TRANSFER,
     operation: 'inspect-import',
-    fileText: 'x'.repeat(2 * 1024 * 1024 + 1),
+    fileText: 'x'.repeat(SETTINGS_TRANSFER_MAX_BYTES + 1),
   },
   {
     type: MessageType.SETTINGS_TRANSFER,

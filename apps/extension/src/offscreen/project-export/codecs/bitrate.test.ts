@@ -14,9 +14,19 @@ function createSettings(overrides: Record<string, unknown> = {}) {
   } as never;
 }
 
-it('uses an exact standard-profile ladder instead of a pixel-ratio heuristic', () => {
+it('uses materialized dimensions rather than the requested resolution label', () => {
   expect(resolveExportTargetBitrate(createSettings())).toBe(8_000_000);
   expect(
     resolveExportTargetBitrate(createSettings({ fps: 60, resolution: VideoResolutionPreset.P1440 }))
+  ).toBe(12_000_000);
+  expect(
+    resolveExportTargetBitrate(
+      createSettings({
+        fps: 60,
+        height: 1440,
+        resolution: VideoResolutionPreset.P1440,
+        width: 2560,
+      })
+    )
   ).toBe(24_000_000);
 });

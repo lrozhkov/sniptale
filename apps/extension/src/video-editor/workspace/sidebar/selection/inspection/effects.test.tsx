@@ -136,19 +136,14 @@ describe('workspace-sidebar/selection/inspect-effects', () => {
     );
     expect(sectionNames).toEqual([
       'videoEditor.sidebar.inspectorGroupTransition',
-      'videoEditor.sidebar.inspectorGroupAnimation',
       'videoEditor.sidebar.inspectorGroupInfo',
     ]);
-    expect(container?.textContent).toContain('videoEditor.sidebar.transitionLightSweep');
-    expect(container?.textContent).toContain('videoEditor.sidebar.transitionHighlightColorLabel');
+    expect(container?.textContent).toContain('videoEditor.effectsLibrary.fallbackTransition');
+    expect(container?.textContent).toContain('videoEditor.effectsLibrary.chooseTransition');
+    expect(container?.textContent).toContain('videoEditor.sidebar.transitionEasingLabel');
     clickGroup('videoEditor.sidebar.inspectorGroupInfo');
     expect(container?.textContent).toContain('videoEditor.sidebar.transitionLeadingClipLabel');
     expect(container?.textContent).not.toContain('videoEditor.templates.previewToneHero');
-    clickGroup('videoEditor.sidebar.inspectorGroupAnimation');
-    expect(container?.textContent).toContain('videoEditor.sidebar.transitionDirectionLabel');
-    expect(container?.textContent).not.toContain(
-      'videoEditor.sidebar.transitionHighlightColorLabel'
-    );
   });
 });
 

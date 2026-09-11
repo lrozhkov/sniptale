@@ -35,6 +35,7 @@ export interface PlaybackHandlers {
   deleteActionEvent: (actionEventId: string) => void;
   deleteClip: (clipId: string | readonly string[]) => void;
   deleteCursorSample: (sampleId: string) => void;
+  deleteEffectInstance: (effectInstanceId: string) => void;
   deleteMotionRegion: (motionRegionId: string) => void;
   deleteObjectTrack: (objectTrackId: string) => void;
   duplicateClip: (clipId: string) => void;

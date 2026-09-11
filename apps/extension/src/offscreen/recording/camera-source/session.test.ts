@@ -4,6 +4,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import {
   WebcamFrameRatePreset,
+  WebcamPresentationMode,
   WebcamResolutionPreset,
 } from '@sniptale/runtime-contracts/video/types/types';
 import { TestMediaStream, createTrackedStream } from '../multi-source/media-stream.test-support';
@@ -49,8 +50,16 @@ it('shares one stable normalized output while leases own independent clones', as
     waitForMetadata: vi.fn().mockResolvedValue(undefined),
   });
 
-  const first = await owner.acquire({ ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: true });
-  const second = await owner.acquire({ ...DEFAULT_VIDEO_SETTINGS, webcamEnabled: true });
+  const settings = {
+    ...DEFAULT_VIDEO_SETTINGS,
+    webcamEnabled: true,
+    webcamPresentation: {
+      ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!,
+      mode: WebcamPresentationMode.EMBEDDED,
+    },
+  };
+  const first = await owner.acquire(settings);
+  const second = await owner.acquire(settings);
 
   expect(acquireRawStream).toHaveBeenCalledOnce();
   expect(acquireRawStream).toHaveBeenCalledWith({
@@ -311,6 +320,10 @@ it('atomically swaps the raw input without replacing an acquired output track', 
   const lease = await owner.acquire({
     ...DEFAULT_VIDEO_SETTINGS,
     webcamEnabled: true,
+    webcamPresentation: {
+      ...DEFAULT_VIDEO_SETTINGS.webcamPresentation!,
+      mode: WebcamPresentationMode.EMBEDDED,
+    },
     webcamQuality: {
       frameRate: WebcamFrameRatePreset.FPS30,
       resolution: WebcamResolutionPreset.P720,

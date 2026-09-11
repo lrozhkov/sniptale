@@ -115,6 +115,7 @@ export function useVideoEditorRuntime(
       deleteClip: params.playback.deleteSelection.clip,
       deleteActionEvent: params.playback.deleteSelection.actionEvent,
       deleteCursorSample: params.playback.deleteSelection.cursorSample,
+      deleteEffectInstance: params.playback.deleteSelection.effectInstance,
       deleteMotionRegion: params.playback.deleteSelection.motionRegion,
       deleteObjectTrack: params.playback.deleteSelection.objectTrack,
       clearPlacementMode: params.playback.clearPlacementMode,
