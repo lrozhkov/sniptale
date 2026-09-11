@@ -196,9 +196,9 @@ export async function commitScenarioAggregateMutation(
   }
   project = parsed.project;
   assertChildOwnership(project.id, options.children);
-  await recoverScenarioAssetPublications();
   let preparedChildren: PreparedScenarioAggregateChildMutation | undefined;
   try {
+    await recoverScenarioAssetPublications();
     preparedChildren = await prepareScenarioEditorDocumentMutations(options.children);
   } catch (error) {
     return rejectScenarioMutationBeforeHandoff(options.children, error);

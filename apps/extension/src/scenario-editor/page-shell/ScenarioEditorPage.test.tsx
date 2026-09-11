@@ -13,6 +13,8 @@ const io = vi.hoisted(() => ({
   load: vi.fn(),
   asset: vi.fn(),
   create: vi.fn(),
+  duplicate: vi.fn(),
+  remove: vi.fn(),
   save: vi.fn(),
   select: vi.fn(),
   mount: vi.fn(),
@@ -25,6 +27,8 @@ vi.mock('../../composition/persistence/scenario/store/project-records/assets', (
 }));
 vi.mock('../../composition/persistence/scenario/store/public', () => ({
   createScenarioProjectRecord: io.create,
+  duplicateScenarioProjectRecord: io.duplicate,
+  deleteScenarioProjectRecord: io.remove,
   saveScenarioProjectRecord: io.save,
 }));
 vi.mock('../platform/browser-driver', () => ({ replaceScenarioEditorSelectionInUrl: io.select }));
@@ -49,6 +53,13 @@ beforeEach(() => {
   io.load.mockResolvedValue(project);
   io.asset.mockResolvedValue(undefined);
   io.save.mockImplementation(async (value) => ({ ...value, updatedAt: 101 }));
+  io.duplicate.mockImplementation(async (value, name) => ({
+    ...value,
+    id: 'copy',
+    name,
+    updatedAt: 102,
+  }));
+  io.remove.mockResolvedValue(undefined);
 });
 afterEach(() => {
   act(() => root.unmount());
@@ -279,4 +290,87 @@ it('distinguishes missing image data and ignores an image load completed after u
   await act(async () => root.render(null));
   await act(async () => finish(new Blob(['late'])));
   expect(createUrl).not.toHaveBeenCalled();
+});
+
+it('recovers a conflicted edit buffer by copying it and retains it if copying fails', async () => {
+  const error = new Error('Changed elsewhere');
+  error.name = 'StaleScenarioAggregateRevisionError';
+  io.save.mockRejectedValueOnce(error);
+  await render();
+  await click('Add step');
+  await click('Save');
+  io.duplicate.mockRejectedValueOnce(new Error('quota'));
+  await click('Duplicate project');
+  expect(container.querySelectorAll('article')).toHaveLength(2);
+  expect(container.textContent).toContain('Could not create a copy');
+  expect(container.textContent).toContain('This project changed in another tab');
+  await click('Save');
+  expect(io.save).toHaveBeenCalledTimes(1);
+  await click('Duplicate project');
+  expect(io.duplicate).toHaveBeenLastCalledWith(
+    expect.objectContaining({ id: 'guide', items: expect.any(Array) }),
+    'Local guide — copy'
+  );
+  expect(io.select).toHaveBeenLastCalledWith({ projectId: 'copy' });
+  expect(container.querySelectorAll('article')).toHaveLength(2);
+  expect(container.textContent).not.toContain('Could not create a copy');
+  await click('Add step');
+  await click('Save');
+  expect(io.save).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'copy' }), {
+    baseUpdatedAt: 102,
+  });
+});
+
+it('confirms project deletion and clears the project route only after success', async () => {
+  await render();
+  await click('Delete project');
+  expect(io.remove).not.toHaveBeenCalled();
+  await click('Cancel');
+  expect(container.querySelectorAll('article')).toHaveLength(1);
+  await click('Delete project');
+  io.remove.mockRejectedValueOnce(new Error('storage'));
+  await click('Delete');
+  expect(container.textContent).toContain('Could not delete the project');
+  expect(container.querySelectorAll('article')).toHaveLength(1);
+  await click('Delete project');
+  await click('Delete');
+  expect(io.remove).toHaveBeenLastCalledWith('guide');
+  expect(io.select).toHaveBeenLastCalledWith({ projectId: null });
+  expect(container.querySelectorAll('article')).toHaveLength(0);
+  expect(container.textContent).toContain('Create a guide and add its first step');
+});
+
+it('confirms replacing unsaved edits with the persisted version', async () => {
+  await render();
+  await click('Add step');
+  await click('Reopen saved version');
+  expect(io.load).toHaveBeenCalledTimes(1);
+  await click('Cancel');
+  expect(container.querySelectorAll('article')).toHaveLength(2);
+  await click('Reopen saved version');
+  const confirm = [...container.querySelectorAll('[role="alertdialog"] button')].find(
+    (button) => button.textContent === 'Reopen saved version'
+  );
+  if (!(confirm instanceof HTMLButtonElement)) throw new Error('Missing reload confirmation');
+  await act(async () => confirm.click());
+  expect(io.load).toHaveBeenCalledTimes(2);
+  expect(container.querySelectorAll('article')).toHaveLength(1);
+});
+
+it('prevents duplicate copy submissions and ignores page state updates after unmount', async () => {
+  let finish: ((project: ReturnType<typeof createGuideProject>) => void) | undefined;
+  io.duplicate.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  await render();
+  await click('Duplicate project');
+  await click('Duplicate project');
+  expect(io.duplicate).toHaveBeenCalledTimes(1);
+  expect(container.querySelector('input')?.disabled).toBe(true);
+  await act(async () => root.render(null));
+  await act(async () => finish?.(createGuideProject('Copied', 'copy', 102)));
+  expect(io.select).not.toHaveBeenCalled();
 });

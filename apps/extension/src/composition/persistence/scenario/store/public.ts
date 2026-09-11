@@ -13,3 +13,5 @@ export {
   getScenarioStepEditorDocumentRecord,
   getScenarioStepEditorDocumentTransferRecord,
 } from './step-editor-documents/index';
+
+export { duplicateScenarioProjectRecord } from './project-records/duplicate';

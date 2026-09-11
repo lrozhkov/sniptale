@@ -7,7 +7,11 @@ import {
   SCENARIO_VISUAL_LOCALES,
   SCENARIO_VISUAL_VIEWPORTS,
 } from './scenario-editor-visual.helpers';
-import { verifySaveAndReopen, verifyStepNavigation } from './scenario-editor-visual.state-steps';
+import {
+  verifyIndependentProjectCopy,
+  verifySaveAndReopen,
+  verifyStepNavigation,
+} from './scenario-editor-visual.state-steps';
 
 test.setTimeout(180_000);
 
@@ -39,5 +43,15 @@ test('guide navigation and edits survive a real local save and reopen', async ({
   await verifyStepNavigation(page);
   await verifySaveAndReopen(page);
   await assertVisualAcceptance(page);
+  issues.assertClean();
+});
+
+test('project copies preserve unsaved content and images after deleting the original', async ({
+  page,
+  hostOrigin,
+}) => {
+  const issues = createPageIssueCollector(page);
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 720 });
+  await verifyIndependentProjectCopy(page);
   issues.assertClean();
 });

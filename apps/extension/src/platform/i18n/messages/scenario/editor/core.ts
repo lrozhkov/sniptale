@@ -1,5 +1,25 @@
 import { defineMessageSource } from '../../source';
 export const scenarioEditorCoreMessages = defineMessageSource({
+  guideDuplicate: { ru: 'Создать копию', en: 'Duplicate project' },
+  guideCopyName: { ru: '{name} — копия', en: '{name} — copy' },
+  guideCopyFailed: {
+    ru: 'Не удалось создать копию. Проверьте доступное место и повторите. Исходные правки остались в редакторе.',
+    en: 'Could not create a copy. Check available space and retry. Your original edits remain in the editor.',
+  },
+  guideDelete: { ru: 'Удалить проект', en: 'Delete project' },
+  guideDeleteMessage: {
+    ru: 'Удалить этот проект и его изображения? Это действие нельзя отменить.',
+    en: 'Delete this project and its images? This action cannot be undone.',
+  },
+  guideDeleteFailed: {
+    ru: 'Не удалось удалить проект. Повторите попытку.',
+    en: 'Could not delete the project. Try again.',
+  },
+  guideReload: { ru: 'Открыть сохранённую версию', en: 'Reopen saved version' },
+  guideReloadMessage: {
+    ru: 'Заменить текущие правки сохранённой версией? Несохранённые изменения будут потеряны. Чтобы оставить их, сначала создайте копию.',
+    en: 'Replace your current edits with the saved version? Unsaved changes will be lost. Duplicate the project first to keep them.',
+  },
   guideStepTitle: { ru: 'Заголовок шага', en: 'Step title' },
   guideSave: { ru: 'Сохранить', en: 'Save' },
   guideAddStep: { ru: 'Добавить шаг', en: 'Add step' },

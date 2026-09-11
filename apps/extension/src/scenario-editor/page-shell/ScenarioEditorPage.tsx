@@ -1,3 +1,7 @@
+import { useState } from 'react';
+import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
+import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
+import type { Translate } from '../../platform/i18n';
 import { createTranslator, useAppLocale } from '../../platform/i18n';
 import { createGuideParagraphs, createGuideStep } from '../../features/scenario/project/public';
 import { GuideDocument } from './guide-document';
@@ -37,6 +41,26 @@ export function ScenarioEditorPage() {
           >
             {t('scenario.editor.guideSave')}
           </button>
+        )}
+        {project && (
+          <GuideProjectActions
+            name={project.name}
+            disabled={disabled}
+            hasUnsavedChanges={status === 'dirty' || status === 'failed' || status === 'conflict'}
+            onDuplicate={state.duplicate}
+            onDelete={state.remove}
+            onReload={state.reload}
+            t={t}
+          />
+        )}
+        {state.actionError && (
+          <p role="alert">
+            {t(
+              state.actionError === 'copy'
+                ? 'scenario.editor.guideCopyFailed'
+                : 'scenario.editor.guideDeleteFailed'
+            )}
+          </p>
         )}
       </header>
       {(status === 'missing' || status === 'unavailable') && (
@@ -107,5 +131,78 @@ export function ScenarioEditorPage() {
         </>
       )}
     </main>
+  );
+}
+
+function GuideProjectActions({
+  name,
+  disabled,
+  hasUnsavedChanges,
+  onDuplicate,
+  onDelete,
+  onReload,
+  t,
+}: {
+  name: string;
+  disabled: boolean;
+  hasUnsavedChanges: boolean;
+  onDuplicate: (name: string) => Promise<void>;
+  onDelete: () => Promise<void>;
+  onReload: () => Promise<void>;
+  t: Translate;
+}) {
+  const [confirmation, setConfirmation] = useState<'delete' | 'reload' | null>(null);
+  const copy = () => {
+    const pattern = t('scenario.editor.guideCopyName');
+    const available = GUIDE_LIMITS.maxLabelLength - pattern.replace('{name}', '').length;
+    void onDuplicate(pattern.replace('{name}', name.slice(0, available)));
+  };
+  const confirm = async () => {
+    if (confirmation === 'delete') await onDelete();
+    else if (confirmation === 'reload') await onReload();
+    setConfirmation(null);
+  };
+  return (
+    <div role="group" aria-label={t('scenario.editor.projectLabel')}>
+      <button type="button" disabled={disabled} onClick={copy}>
+        {t('scenario.editor.guideDuplicate')}
+      </button>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => {
+          if (hasUnsavedChanges) setConfirmation('reload');
+          else void onReload();
+        }}
+      >
+        {t('scenario.editor.guideReload')}
+      </button>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setConfirmation('delete')}
+        className="text-[var(--sniptale-color-danger)]"
+      >
+        {t('scenario.editor.guideDelete')}
+      </button>
+      <ProductConfirmDialog
+        isOpen={confirmation !== null}
+        isLoading={disabled}
+        title={t(
+          confirmation === 'delete' ? 'scenario.editor.guideDelete' : 'scenario.editor.guideReload'
+        )}
+        message={t(
+          confirmation === 'delete'
+            ? 'scenario.editor.guideDeleteMessage'
+            : 'scenario.editor.guideReloadMessage'
+        )}
+        confirmText={t(
+          confirmation === 'delete' ? 'common.actions.delete' : 'scenario.editor.guideReload'
+        )}
+        cancelText={t('common.actions.cancel')}
+        onCancel={() => setConfirmation(null)}
+        onConfirm={confirm}
+      />
+    </div>
   );
 }

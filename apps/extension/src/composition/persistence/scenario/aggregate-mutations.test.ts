@@ -286,6 +286,22 @@ it('surfaces editor cleanup failure together with a pre-journal revision rejecti
   });
 });
 
+it('discards supplied staging when recovery rejects before a new publication journal', async () => {
+  const project = createGuideProject('Recovery failure');
+  const assetMocks = await import('../assets');
+  const error = new Error('recovery publication quota exhausted');
+  vi.mocked(assetMocks.recoverStandaloneAssetPublications).mockRejectedValueOnce(error);
+  await expect(
+    commitScenarioAggregateMutation(project, {
+      expectedRevision: null,
+      children: { assetPuts: [createAsset(project.id, 'recovery-failure')] },
+    })
+  ).rejects.toBe(error);
+  expect(assetMocks.discardPreparedAsset).toHaveBeenCalledWith('opfs-recovery-failure');
+  expect(assetMocks.createAssetPublicationJournal).not.toHaveBeenCalled();
+  expect(getStore('scenario_projects').has(project.id)).toBe(false);
+});
+
 it('rejects a document preparation failure before publication handoff', async () => {
   const project = createGuideProject('Aggregate');
   const assetMocks = await import('../assets');
