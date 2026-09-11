@@ -31,3 +31,26 @@ describe('project asset storage admission', () => {
     );
   });
 });
+
+import { assertImportableProjectImage } from './project-assets';
+it.each([
+  ['image/png', [137, 80, 78, 71, 13, 10, 26, 10]],
+  ['image/jpeg', [255, 216, 255]],
+  ['image/gif', [...'GIF89a'].map((char) => char.charCodeAt(0))],
+  ['image/webp', [...'RIFF0000WEBP'].map((char) => char.charCodeAt(0))],
+  ['image/avif', [...'0000ftypavif'].map((char) => char.charCodeAt(0))],
+])('admits %s signature and rejects mismatching bytes', async (mime, bytes) => {
+  await expect(
+    assertImportableProjectImage(new Blob([new Uint8Array(bytes)], { type: mime }))
+  ).resolves.toBeUndefined();
+  await expect(assertImportableProjectImage(new Blob(['wrong'], { type: mime }))).rejects.toThrow();
+});
+it('rejects empty, unsupported and oversized raster imports', async () => {
+  for (const blob of [
+    new Blob([], { type: 'image/png' }),
+    new Blob(['svg'], { type: 'image/svg+xml' }),
+    new Blob([new Uint8Array(64 * 1024 * 1024 + 1)], { type: 'image/png' }),
+  ]) {
+    await expect(assertImportableProjectImage(blob)).rejects.toThrow();
+  }
+});

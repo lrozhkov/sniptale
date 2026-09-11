@@ -6,6 +6,7 @@ import { createTranslator, useAppLocale } from '../../platform/i18n';
 import type { GuideStructureOperation } from '../../features/scenario/project/public';
 import { GuideDocument } from './guide-document';
 import { GuideWorkspace } from './workspace';
+import { GuideImageResources } from './resources';
 import { GuideStepActions } from './step-actions';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { openGalleryPage } from '../../platform/navigation/extension-pages';
@@ -22,19 +23,6 @@ export function ScenarioEditorPage() {
   };
   const { project, status } = state;
   const disabled = status === 'saving' || status === 'loading';
-  const statusMessages = {
-    saving: t('scenario.editor.guideSaving'),
-    saved: t('scenario.editor.guideSaved'),
-    dirty: t('scenario.editor.guideDirty'),
-    failed: t('scenario.editor.guideFailed'),
-    conflict: t('scenario.editor.guideConflict'),
-    unavailable: t('scenario.editor.guideUnavailable'),
-    missing: t('scenario.editor.guideMissing'),
-    loading: t('scenario.editor.loading'),
-    empty: '',
-    ready: t('scenario.editor.guideSaved'),
-  };
-  const statusText = statusMessages[status];
   const operate = (operation: GuideStructureOperation) => {
     const next = state.operate(operation);
     if (!next) return;
@@ -76,22 +64,7 @@ export function ScenarioEditorPage() {
         onChange={state.update}
         t={t}
       />
-      <div className="guide-page-feedback" data-status={status}>
-        <p role="status" aria-live="polite">
-          {statusText}
-        </p>
-        {state.actionError && (
-          <p role="alert">
-            {t(
-              state.actionError === 'copy'
-                ? 'scenario.editor.guideCopyFailed'
-                : state.actionError === 'structure'
-                  ? 'scenario.editor.guideOperationFailed'
-                  : 'scenario.editor.guideDeleteFailed'
-            )}
-          </p>
-        )}
-      </div>
+      <GuidePageFeedback status={status} actionError={state.actionError} t={t} />
       {(status === 'missing' || status === 'unavailable') && (
         <button type="button" onClick={() => void state.reload()}>
           {t('scenario.editor.guideRetry')}
@@ -111,6 +84,18 @@ export function ScenarioEditorPage() {
       )}
       {project && (
         <GuideWorkspace
+          importResources={
+            <GuideImageResources
+              disabled={disabled || state.status === 'conflict'}
+              selectedStepId={
+                project.items.find((item) => item.id === state.selectedId)?.kind === 'step'
+                  ? state.selectedId
+                  : null
+              }
+              t={t}
+              onImport={state.importImages}
+            />
+          }
           project={project}
           selectedId={state.selectedId}
           images={state.images}
@@ -334,5 +319,48 @@ function GuidePageHeader({
         </div>
       )}
     </>
+  );
+}
+
+function GuidePageFeedback({
+  status,
+  actionError,
+  t,
+}: {
+  status: ReturnType<typeof useGuidePageState>['status'];
+  actionError: ReturnType<typeof useGuidePageState>['actionError'];
+  t: Translate;
+}) {
+  const statusMessages = {
+    saving: t('scenario.editor.guideSaving'),
+    saved: t('scenario.editor.guideSaved'),
+    dirty: t('scenario.editor.guideDirty'),
+    failed: t('scenario.editor.guideFailed'),
+    conflict: t('scenario.editor.guideConflict'),
+    unavailable: t('scenario.editor.guideUnavailable'),
+    missing: t('scenario.editor.guideMissing'),
+    loading: t('scenario.editor.loading'),
+    empty: '',
+    ready: t('scenario.editor.guideSaved'),
+  };
+  return (
+    <div className="guide-page-feedback" data-status={status}>
+      <p role="status" aria-live="polite">
+        {statusMessages[status]}
+      </p>
+      {actionError && (
+        <p role="alert">
+          {t(
+            actionError === 'copy'
+              ? 'scenario.editor.guideCopyFailed'
+              : actionError === 'import'
+                ? 'scenario.editor.guideImportFailed'
+                : actionError === 'structure'
+                  ? 'scenario.editor.guideOperationFailed'
+                  : 'scenario.editor.guideDeleteFailed'
+          )}
+        </p>
+      )}
+    </div>
   );
 }

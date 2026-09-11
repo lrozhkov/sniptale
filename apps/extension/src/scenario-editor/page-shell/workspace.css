@@ -522,3 +522,74 @@
     border-top: 1px solid var(--sniptale-color-border-soft);
   }
 }
+
+.guide-import {
+  display: grid;
+  gap: 0.5rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--sniptale-color-border-soft);
+}
+.guide-import label {
+  display: grid;
+  gap: 0.25rem;
+}
+.guide-import input,
+.guide-import select {
+  width: 100%;
+  min-width: 0;
+}
+.guide-import ol {
+  margin: 0;
+  padding-left: 1rem;
+}
+.guide-import li {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  align-items: center;
+  gap: 0.25rem;
+  margin-block: 0.5rem;
+}
+.guide-import li span {
+  grid-column: 2;
+}
+.guide-import-selection-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+.guide-import li span {
+  flex: 1;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.guide-import li img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+.guide-import-library {
+  max-height: 180px;
+  overflow: auto;
+  display: grid;
+  gap: 0.25rem;
+}
+.guide-import :is(input, select) {
+  font: inherit;
+  color: var(--sniptale-color-text-primary);
+  background: var(--sniptale-color-surface-input);
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: var(--sniptale-radius-md);
+  padding: 0.5rem;
+}
+.guide-import select:focus-visible {
+  outline: 2px solid var(--sniptale-color-accent);
+  outline-offset: 3px;
+}
+.guide-import :is(input, select):disabled {
+  opacity: 0.55;
+}
+.guide-import li button {
+  padding: 0.25rem;
+  min-width: 1.75rem;
+}

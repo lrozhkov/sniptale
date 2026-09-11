@@ -1,5 +1,36 @@
 import { defineMessageSource } from '../../source';
 export const scenarioEditorCoreMessages = defineMessageSource({
+  guideImportLimit: {
+    ru: 'До 50 изображений за один импорт, до 64 МБ каждое.',
+    en: 'Up to 50 images per import, up to 64 MB each.',
+  },
+  guideImportFiles: { ru: 'Изображения с компьютера', en: 'Images from computer' },
+  guideChooseLibrary: {
+    ru: 'Выбрать из библиотеки / обновить',
+    en: 'Choose from library / refresh',
+  },
+  guideLibraryLoadFailed: {
+    ru: 'Не удалось загрузить библиотеку. Повторите выбор.',
+    en: 'Could not load the library. Try choosing again.',
+  },
+  guideLibrarySearch: { ru: 'Поиск изображений', en: 'Search images' },
+  guideLibraryEmpty: {
+    ru: 'В библиотеке пока нет изображений.',
+    en: 'No images in the library yet.',
+  },
+  guideImportOrder: { ru: 'Порядок импорта', en: 'Import order' },
+  guideRemoveResource: { ru: 'Убрать из выбора', en: 'Remove from selection' },
+  guideImportPlacement: { ru: 'Добавить изображения', en: 'Add images' },
+  guideImportAsSteps: { ru: 'Каждое в отдельный шаг', en: 'Each as a separate step' },
+  guideImportAsBlocks: { ru: 'Блоками в выбранный шаг', en: 'As blocks in selected step' },
+  guideImportSelected: { ru: 'Импортировать выбранное', en: 'Import selected' },
+  guideImportProgress: { ru: 'Подготовка изображений', en: 'Preparing images' },
+  guideImportCancel: { ru: 'Отменить подготовку', en: 'Cancel preparation' },
+  guideImportFailed: {
+    ru: 'Импорт не завершён. Проверьте изображения и повторите; правки сохранены в редакторе.',
+    en: 'Import did not complete. Check the images and retry; your edits remain in the editor.',
+  },
+
   guideUndoHint: { ru: 'Отменить (Ctrl / ⌘ + Z)', en: 'Undo (Ctrl / ⌘ + Z)' },
   guideRedoHint: { ru: 'Повторить (Ctrl / ⌘ + Shift + Z)', en: 'Redo (Ctrl / ⌘ + Shift + Z)' },
   guideUndo: { ru: 'Отменить', en: 'Undo' },

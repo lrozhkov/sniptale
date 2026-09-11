@@ -13,6 +13,7 @@ type WorkspaceProps = {
   onSelect: (id: string) => void;
   onAddStep: () => void;
   onAddSection: () => void;
+  importResources: ReactNode;
   itemActions: ReactNode;
   projectActions: ReactNode;
   children: ReactNode;
@@ -73,11 +74,13 @@ export function GuideWorkspace(props: WorkspaceProps) {
           ]}
         />
         <div className="guide-panel-scroll">
-          {mode === 'structure' ? (
+          <div hidden={mode !== 'structure'}>
             <GuideOutline project={project} selectedId={selectedId} onSelect={onSelect} t={t} />
-          ) : (
-            <GuideResources {...props} />
-          )}
+          </div>
+          <div hidden={mode !== 'resources'}>
+            {props.importResources}
+            {mode === 'resources' && <GuideResources {...props} />}
+          </div>
         </div>
         <button
           type="button"

@@ -15,3 +15,8 @@ export {
 } from './step-editor-documents/index';
 
 export { duplicateScenarioProjectRecord } from './project-records/duplicate';
+export {
+  importScenarioImages,
+  type GuideImageImportSource,
+  type GuideImageImportPlacement,
+} from './image-import';

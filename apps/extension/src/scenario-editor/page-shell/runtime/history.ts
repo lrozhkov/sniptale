@@ -110,7 +110,8 @@ export function useGuideHistory({
     canUndo: state.past.length > 0,
     canRedo: state.future.length > 0,
     reset,
-    commit: (project: GuideProject) => dispatch({ kind: 'commit', project }),
+    commit: (project: GuideProject, reversible = false) =>
+      dispatch(reversible ? { kind: 'edit', project, group: null } : { kind: 'commit', project }),
     update: edit,
     operate,
     undo: () => changeHistory('undo'),

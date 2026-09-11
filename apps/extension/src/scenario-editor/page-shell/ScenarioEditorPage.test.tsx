@@ -17,6 +17,7 @@ const io = vi.hoisted(() => ({
   duplicate: vi.fn(),
   remove: vi.fn(),
   save: vi.fn(),
+  importImages: vi.fn(),
   select: vi.fn(),
   mount: vi.fn(),
 }));
@@ -32,6 +33,7 @@ vi.mock('../../composition/persistence/scenario/store/public', () => ({
   duplicateScenarioProjectRecord: io.duplicate,
   deleteScenarioProjectRecord: io.remove,
   saveScenarioProjectRecord: io.save,
+  importScenarioImages: io.importImages,
 }));
 vi.mock('../platform/browser-driver', () => ({ replaceScenarioEditorSelectionInUrl: io.select }));
 vi.mock('../../platform/i18n', async (importOriginal) => ({
@@ -216,7 +218,7 @@ it('renders optional blocks and keeps text edits isolated from images and other 
     'Details'
   );
   expect(container.querySelector('article#first header span')).toBeNull();
-  expect(container.querySelector('img')?.alt).toBe('Example image');
+  expect(container.querySelector('article img')?.getAttribute('alt')).toBe('Example image');
   expect(container.querySelector('figcaption')?.textContent).toBe('Image caption');
   const textarea = container.querySelector('textarea');
   if (!textarea) throw new Error('Missing description');
@@ -615,4 +617,31 @@ it('routes block and item tools through reversible order-preserving mutations', 
   expect(container.querySelectorAll('article')).toHaveLength(2);
   await click('Undo');
   expect(container.querySelectorAll('article')).toHaveLength(3);
+});
+
+it('accepts image import as one undoable publication and saves undo against its new revision', async () => {
+  vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:preview'), revokeObjectURL: vi.fn() });
+  io.importImages.mockImplementation(async ({ project }) => ({
+    ...project,
+    updatedAt: 105,
+    items: [...project.items, createGuideStep('Imported', 'imported')],
+  }));
+  await render();
+  await editField('article#first input', 'Unsaved title');
+  const fileInput = container.querySelector('input[type="file"]');
+  Object.defineProperty(fileInput, 'files', {
+    value: [new File(['png'], 'one.png', { type: 'image/png' })],
+  });
+  await act(async () => fileInput?.dispatchEvent(new Event('change', { bubbles: true })));
+  await click('Import selected');
+  expect(io.importImages.mock.calls[0]?.[0]).toMatchObject({
+    baseUpdatedAt: 100,
+    project: { items: [{ title: 'Unsaved title' }] },
+  });
+  expect(container.querySelectorAll('article')).toHaveLength(2);
+  await click('Undo');
+  expect(container.querySelectorAll('article')).toHaveLength(1);
+  expect(container.querySelector('article input')).toHaveProperty('value', 'Unsaved title');
+  await click('Save');
+  expect(io.save).toHaveBeenLastCalledWith(expect.anything(), { baseUpdatedAt: 105 });
 });

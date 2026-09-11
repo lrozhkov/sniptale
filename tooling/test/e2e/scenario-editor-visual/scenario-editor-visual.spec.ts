@@ -8,6 +8,7 @@ import {
   SCENARIO_VISUAL_VIEWPORTS,
 } from './scenario-editor-visual.helpers';
 import {
+  verifyImageImport,
   verifyIndependentProjectCopy,
   verifyGuideComposition,
   verifySaveAndReopen,
@@ -77,3 +78,15 @@ test('guide blocks, sections and reversible structural edits survive saving and 
   await verifyGuideComposition(page);
   issues.assertClean();
 });
+
+for (const theme of SCENARIO_VISUAL_THEMES) {
+  test(`ordered local image import remains undoable in ${theme} theme`, async ({
+    page,
+    hostOrigin,
+  }, testInfo) => {
+    const issues = createPageIssueCollector(page);
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 900 });
+    await verifyImageImport(page, testInfo);
+    issues.assertClean();
+  });
+}

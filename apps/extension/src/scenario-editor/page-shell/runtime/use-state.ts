@@ -5,6 +5,7 @@ import {
   readScenarioEditorStepId,
 } from '@sniptale/runtime-contracts/scenario-editor/session';
 import {
+  importScenarioImages,
   createScenarioProjectRecord,
   duplicateScenarioProjectRecord,
   deleteScenarioProjectRecord,
@@ -27,10 +28,12 @@ type GuidePageStatus =
   | 'conflict'
   | 'dirty';
 
+type GuideActionError = 'copy' | 'delete' | 'structure' | 'import';
+
 /** Owns this page's disposable edit buffer; persistence owns committed project ordering. */
 export function useGuidePageState() {
   const [status, setStatus] = useState<GuidePageStatus>('loading');
-  const [actionError, setActionError] = useState<'copy' | 'delete' | 'structure' | null>(null);
+  const [actionError, setActionError] = useState<GuideActionError | null>(null);
   const saved = useRef<GuideProject | null>(null);
   const busy = useRef(false);
   const { project, reset, commit, ...editing } = useGuideHistory({
@@ -41,8 +44,7 @@ export function useGuidePageState() {
     },
     onFailure: () => setActionError('structure'),
   });
-  const images = useGuideImages(project);
-  const { selectedId, selectItem, clearSelection } = useGuideSelection(project);
+  const { clearSelection, ...selection } = useGuideSelection(project);
   const generation = useRef(0);
   const requestedId = useRef(readScenarioEditorProjectId(window.location.search));
   const load = useCallback(async () => {
@@ -74,31 +76,35 @@ export function useGuidePageState() {
     accept: (result: T) => void,
     reject: (error: unknown) => void
   ) => {
-    if (busy.current) return;
+    if (busy.current) return false;
     busy.current = true;
     const turn = generation.current;
     setActionError(null);
     setStatus('saving');
     try {
       const result = await operation();
-      if (turn === generation.current) accept(result);
+      if (turn !== generation.current) return false;
+      accept(result);
+      return true;
     } catch (error) {
       if (turn === generation.current) reject(error);
+      return false;
     } finally {
       busy.current = false;
     }
   };
-  const acceptProject = (committed: GuideProject) => {
+  const acceptProject = (committed: GuideProject, reversible = false) => {
     saved.current = committed;
-    commit(committed);
+    commit(committed, reversible);
     setStatus('saved');
   };
-  const openProject = (committed: GuideProject) => {
-    requestedId.current = committed.id;
-    acceptProject(committed);
+  const openProject = (committed: GuideProject | null) => {
+    requestedId.current = committed?.id ?? null;
+    saved.current = committed;
     reset(committed);
+    setStatus(committed ? 'saved' : 'empty');
     clearSelection();
-    replaceScenarioEditorSelectionInUrl({ projectId: committed.id });
+    replaceScenarioEditorSelectionInUrl({ projectId: committed?.id ?? null });
   };
   const create = (name: string) =>
     mutate(
@@ -112,15 +118,10 @@ export function useGuidePageState() {
     await mutate(
       () => saveScenarioProjectRecord(project, { baseUpdatedAt: base.updatedAt }),
       acceptProject,
-      (error) =>
-        setStatus(
-          error instanceof Error && error.name === 'StaleScenarioAggregateRevisionError'
-            ? 'conflict'
-            : 'failed'
-        )
+      (error) => setStatus(isRevisionConflict(error) ? 'conflict' : 'failed')
     );
   };
-  const rejectAction = (action: 'copy' | 'delete') => {
+  const rejectAction = (action: 'copy' | 'delete' | 'import') => {
     setStatus(status);
     setActionError(action);
   };
@@ -136,24 +137,32 @@ export function useGuidePageState() {
     if (!project) return;
     await mutate(
       () => deleteScenarioProjectRecord(project.id),
-      () => {
-        requestedId.current = null;
-        saved.current = null;
-        reset(null);
-        clearSelection();
-        replaceScenarioEditorSelectionInUrl({ projectId: null });
-        setStatus('empty');
-      },
+      () => openProject(null),
       () => rejectAction('delete')
     );
   };
+  const importImages = async (
+    input: Omit<Parameters<typeof importScenarioImages>[0], 'project' | 'baseUpdatedAt'>
+  ) => {
+    const base = saved.current;
+    if (!project || !base || status === 'conflict') return false;
+    return mutate(
+      () => importScenarioImages({ ...input, project, baseUpdatedAt: base.updatedAt }),
+      (result) => acceptProject(result, true),
+      (error) => {
+        if (isRevisionConflict(error)) setStatus('conflict');
+        else if (error instanceof Error && error.name === 'AbortError') setStatus(status);
+        else rejectAction('import');
+      }
+    );
+  };
   return {
+    importImages,
     project,
     status,
     actionError,
-    images,
-    selectedId,
-    selectItem,
+    images: useGuideImages(project),
+    ...selection,
     create,
     ...editing,
     save,
@@ -226,4 +235,8 @@ function useGuideSelection(project: GuideProject | null) {
     replaceScenarioEditorSelectionInUrl({ projectId: project.id, stepId: id });
   };
   return { selectedId, selectItem, clearSelection: () => setSelectedId(null) };
+}
+
+function isRevisionConflict(error: unknown): boolean {
+  return error instanceof Error && error.name === 'StaleScenarioAggregateRevisionError';
 }
