@@ -1,5 +1,6 @@
-import type { VideoEditorEffectsLibraryDockProps } from './types';
 // @vitest-environment jsdom
+
+import type { VideoEditorEffectsLibraryDockProps } from './types';
 import { readFileSync } from 'node:fs';
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';

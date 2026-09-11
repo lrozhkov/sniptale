@@ -113,8 +113,7 @@ export const LOCAL_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/content/overlay/ai/pick/controller/submit/feedback.ts',
     exclusive: true,
     allowMissingProductionTarget: true,
-    reason:
-      'The removed feedback-only leaf is covered through the apply transaction that now owns its user-visible outcomes.',
+    reason: 'The apply transaction covers the removed feedback leaf and its visible outcomes.',
     testFiles: ['apps/extension/src/content/overlay/ai/pick/controller/submit/apply.test.ts'],
   },
   {
@@ -134,8 +133,7 @@ export const LOCAL_OWNER_MAPPINGS = [
     owner: 'content-design-review-popover',
     productionPrefix: 'apps/extension/src/content/overlay/design-review/popover/',
     exclusive: true,
-    reason:
-      'Direct proof covers the mock-aligned comment, action, element controls, settings disclosure, autosave, and the absent closed popover.',
+    reason: 'Direct proof covers review controls, settings, autosave, and the closed popover.',
     testFiles: [
       'apps/extension/src/content/overlay/design-review/popover/comment.test.tsx',
       'apps/extension/src/content/overlay/design-review/popover/view.test.tsx',
@@ -172,24 +170,21 @@ export const LOCAL_OWNER_MAPPINGS = [
     owner: 'content-design-review-layout-settings',
     productionFile: 'apps/extension/src/content/overlay/design-review/settings/sections/frame.tsx',
     exclusive: true,
-    reason:
-      'The compact settings navigation suite selects the localized size-and-spacing owner and proves its width and height controls.',
+    reason: 'The settings suite covers localized size, spacing, width, and height controls.',
     testFiles: ['apps/extension/src/content/overlay/design-review/settings/view.test.tsx'],
   },
   {
     owner: 'content-design-review-text-settings',
     productionFile: 'apps/extension/src/content/overlay/design-review/settings/sections/text.tsx',
     exclusive: true,
-    reason:
-      'The compact settings navigation suite proves localized text controls are the default active owner and are replaced by the selected section.',
+    reason: 'The settings suite covers default text controls and selected-section replacement.',
     testFiles: ['apps/extension/src/content/overlay/design-review/settings/view.test.tsx'],
   },
   {
     owner: 'content-design-review-view-contract',
     productionFile: 'apps/extension/src/content/overlay/design-review/types.ts',
     exclusive: true,
-    reason:
-      'Popover and compact settings suites exercise the shared review action and view-state contract through both UI consumers.',
+    reason: 'Popover and settings suites cover the shared review action and view-state contract.',
     testFiles: [
       'apps/extension/src/content/overlay/design-review/popover/view.test.tsx',
       'apps/extension/src/content/overlay/design-review/settings/view.test.tsx',
@@ -208,7 +203,7 @@ export const LOCAL_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/content/overlay/design-review/runtime/record.ts',
     exclusive: true,
     reason:
-      'The record suite proves action metadata, current-element serialization, atomic deletion, CSS rollback, and history restoration.',
+      'The record suite covers metadata, serialization, deletion, rollback, and history restore.',
     testFiles: ['apps/extension/src/content/overlay/design-review/runtime/comment.test.ts'],
   },
   {
@@ -216,15 +211,14 @@ export const LOCAL_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/content/selection/design-review/picker.ts',
     exclusive: true,
     reason:
-      'The picker suite proves exact open-shadow and same-origin iframe selection, inaccessible boundary fallback, and extension-UI exclusion.',
+      'The picker suite covers shadow and iframe selection, fallback, and extension-UI exclusion.',
     testFiles: ['apps/extension/src/content/selection/design-review/picker.test.ts'],
   },
   {
     owner: 'content-design-review-mode',
     productionFile: 'apps/extension/src/content/selection/design-review/mode.ts',
     exclusive: true,
-    reason:
-      'The mode suite proves standalone activation, sibling-mode exclusion, selection publication, and deterministic deactivation.',
+    reason: 'The mode suite covers activation, sibling exclusion, selection, and deactivation.',
     testFiles: ['apps/extension/src/content/selection/design-review/mode.test.ts'],
   },
   {
@@ -250,16 +244,14 @@ export const LOCAL_OWNER_MAPPINGS = [
     owner: 'content-overlay-app-layout-projection',
     productionFile: 'apps/extension/src/content/overlay/app-layout/props.ts',
     exclusive: true,
-    reason:
-      'The app layout projection is exercised through the app composition that builds and renders its scenario, toolbar, and dialog sections.',
+    reason: 'The app composition covers scenario, toolbar, and dialog layout projection.',
     testFiles: ['apps/extension/src/content/overlay/app/view/index.test.tsx'],
   },
   {
     owner: 'content-app-mode-flags',
     productionFile: 'apps/extension/src/content/overlay/app/content-mode/state/flags.ts',
     exclusive: true,
-    reason:
-      'The content mode hook suite proves grouped mode flags and controls still project the standalone Design Review state.',
+    reason: 'The content-mode hook covers grouped flags and standalone Design Review state.',
     testFiles: ['apps/extension/src/content/overlay/app/content-mode/index.test.tsx'],
   },
   {
@@ -274,8 +266,7 @@ export const LOCAL_OWNER_MAPPINGS = [
     owner: 'content-overlay-scenario-controller',
     productionFile: 'apps/extension/src/content/overlay/scenario/controller.ts',
     exclusive: true,
-    reason:
-      'Scenario controller state, runtime, view-state, and effect composition execute through its direct orchestration suite.',
+    reason: 'The orchestration suite covers scenario state, runtime, view state, and effects.',
     testFiles: ['apps/extension/src/content/overlay/scenario/controller.test.tsx'],
   },
   {
@@ -301,8 +292,7 @@ export const LOCAL_OWNER_MAPPINGS = [
     owner: 'content-page-preparation-local-save-hook',
     productionFile: 'apps/extension/src/content/parser/page-preparation/local-save/hook/index.ts',
     exclusive: true,
-    reason:
-      'The page-preparation local-save hook executes through the toolbar visibility, history, result, and retry behavior suites.',
+    reason: 'Toolbar suites cover local-save visibility, history, results, and retries.',
     testFiles: [
       'apps/extension/src/content/overlay/toolbar/capture/local-save.file.test.tsx',
       'apps/extension/src/content/overlay/toolbar/capture/local-save.test.tsx',
