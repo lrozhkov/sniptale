@@ -1,3 +1,5 @@
+import { FloatingChromeToolbar } from '@sniptale/ui/floating-chrome';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ArrowDown, ArrowUp, Copy, Split, Trash2 } from 'lucide-react';
 import type { GuideStructureOperation } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
@@ -21,12 +23,12 @@ export function GuideBlockActions({
   t: Translate;
 }) {
   return (
-    <div
+    <FloatingChromeToolbar
       className="guide-block-actions"
       role="group"
       aria-label={t('scenario.editor.guideBlockActions')}
     >
-      <button
+      <ContentToolbarButton
         type="button"
         disabled={disabled || index === 0}
         title={t('scenario.editor.guideMoveUp')}
@@ -34,8 +36,8 @@ export function GuideBlockActions({
         onClick={() => onOperate({ kind: 'move-block', itemId, blockId, direction: -1 })}
       >
         <ArrowUp size={15} aria-hidden="true" />
-      </button>
-      <button
+      </ContentToolbarButton>
+      <ContentToolbarButton
         type="button"
         disabled={disabled || index === count - 1}
         title={t('scenario.editor.guideMoveDown')}
@@ -43,8 +45,8 @@ export function GuideBlockActions({
         onClick={() => onOperate({ kind: 'move-block', itemId, blockId, direction: 1 })}
       >
         <ArrowDown size={15} aria-hidden="true" />
-      </button>
-      <button
+      </ContentToolbarButton>
+      <ContentToolbarButton
         type="button"
         disabled={disabled}
         title={t('scenario.editor.guideDuplicateBlock')}
@@ -52,8 +54,8 @@ export function GuideBlockActions({
         onClick={() => onOperate({ kind: 'duplicate-block', itemId, blockId })}
       >
         <Copy size={15} aria-hidden="true" />
-      </button>
-      <button
+      </ContentToolbarButton>
+      <ContentToolbarButton
         type="button"
         disabled={disabled || index === 0}
         title={t('scenario.editor.guideSplitHere')}
@@ -61,8 +63,8 @@ export function GuideBlockActions({
         onClick={() => onOperate({ kind: 'split-step', itemId, blockId })}
       >
         <Split size={15} aria-hidden="true" />
-      </button>
-      <button
+      </ContentToolbarButton>
+      <ContentToolbarButton
         type="button"
         disabled={disabled}
         title={t('scenario.editor.guideRemoveBlock')}
@@ -70,7 +72,7 @@ export function GuideBlockActions({
         onClick={() => onOperate({ kind: 'remove-block', itemId, blockId })}
       >
         <Trash2 size={15} aria-hidden="true" />
-      </button>
-    </div>
+      </ContentToolbarButton>
+    </FloatingChromeToolbar>
   );
 }

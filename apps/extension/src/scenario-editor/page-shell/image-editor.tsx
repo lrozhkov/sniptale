@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import {
@@ -10,6 +11,7 @@ import type { applyScenarioImageEdit } from '../../workflows/scenario-capture-ed
 import type { Translate } from '../../platform/i18n';
 
 type EditInput = Omit<Parameters<typeof applyScenarioImageEdit>[0], 'project' | 'baseUpdatedAt'>;
+type ImageEditorPhase = 'loading' | 'ready' | 'load-failed' | 'applying' | 'apply-failed';
 type Prepared = Awaited<ReturnType<typeof prepareScenarioImageEditorPayload>>;
 
 /** Owns entering/leaving image mode and returning focus after the new image URL becomes available. */
@@ -55,9 +57,7 @@ export function GuideImageEditor({
   const iframe = useRef<HTMLIFrameElement>(null);
   const [attempt, setAttempt] = useState(0);
   const [session, setSession] = useState<{ id: string; prepared: Prepared } | null>(null);
-  const [phase, setPhase] = useState<
-    'loading' | 'ready' | 'load-failed' | 'applying' | 'apply-failed'
-  >('loading');
+  const [phase, setPhase] = useState<ImageEditorPhase>('loading');
   const callbacks = useRef({ onApply, onClose });
   callbacks.current = { onApply, onClose };
   const source = useRef({ project, itemId, blockId });
@@ -147,30 +147,12 @@ export function GuideImageEditor({
   }, [session]);
   return (
     <main className="guide-page guide-image-editor">
-      <header>
-        <button type="button" autoFocus disabled={phase === 'applying'} onClick={onClose}>
-          {t('scenario.editor.guideImageBack')}
-        </button>
-        <h1>{t('scenario.editor.guideEditImage')}</h1>
-        <p role={phase.endsWith('failed') ? 'alert' : 'status'}>
-          {t(
-            phase === 'loading'
-              ? 'scenario.editor.loading'
-              : phase === 'applying'
-                ? 'scenario.editor.guideSaving'
-                : phase === 'load-failed'
-                  ? 'scenario.editor.guideImageLoadFailed'
-                  : phase === 'apply-failed'
-                    ? 'scenario.editor.guideImageApplyFailed'
-                    : 'scenario.editor.guideImageApplyHint'
-          )}
-        </p>
-        {phase === 'load-failed' && (
-          <button type="button" onClick={() => setAttempt((current) => current + 1)}>
-            {t('scenario.editor.guideRetry')}
-          </button>
-        )}
-      </header>
+      <GuideImageEditorHeader
+        phase={phase}
+        t={t}
+        onClose={onClose}
+        onRetry={() => setAttempt((current) => current + 1)}
+      />
       {session && (
         <iframe
           ref={iframe}
@@ -181,5 +163,52 @@ export function GuideImageEditor({
         />
       )}
     </main>
+  );
+}
+
+/** Session feedback and navigation remain visible above the embedded editor. */
+function GuideImageEditorHeader({
+  phase,
+  t,
+  onClose,
+  onRetry,
+}: {
+  phase: ImageEditorPhase;
+  t: Translate;
+  onClose: () => void;
+  onRetry: () => void;
+}) {
+  return (
+    <header>
+      <ProductActionButton
+        tone="secondary"
+        compact
+        type="button"
+        autoFocus
+        disabled={phase === 'applying'}
+        onClick={onClose}
+      >
+        {t('scenario.editor.guideImageBack')}
+      </ProductActionButton>
+      <h1>{t('scenario.editor.guideEditImage')}</h1>
+      <p role={phase.endsWith('failed') ? 'alert' : 'status'}>
+        {t(
+          phase === 'loading'
+            ? 'scenario.editor.loading'
+            : phase === 'applying'
+              ? 'scenario.editor.guideSaving'
+              : phase === 'load-failed'
+                ? 'scenario.editor.guideImageLoadFailed'
+                : phase === 'apply-failed'
+                  ? 'scenario.editor.guideImageApplyFailed'
+                  : 'scenario.editor.guideImageApplyHint'
+        )}
+      </p>
+      {phase === 'load-failed' && (
+        <ProductActionButton tone="secondary" compact type="button" onClick={onRetry}>
+          {t('scenario.editor.guideRetry')}
+        </ProductActionButton>
+      )}
+    </header>
   );
 }

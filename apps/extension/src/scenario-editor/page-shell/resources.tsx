@@ -1,3 +1,5 @@
+import { ProductInput, ProductSelect } from '@sniptale/ui/product-form-controls';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, X } from 'lucide-react';
 import { listMediaLibrary } from '../../composition/persistence/media-library';
@@ -197,16 +199,22 @@ export function GuideImageResources(props: ResourceProps) {
           }}
         />
       </label>
-      <button type="button" disabled={locked} onClick={() => void loadLibrary()}>
+      <ProductActionButton
+        tone="secondary"
+        compact
+        type="button"
+        disabled={locked}
+        onClick={() => void loadLibrary()}
+      >
         {t('scenario.editor.guideChooseLibrary')}
-      </button>
+      </ProductActionButton>
       {libraryLoading && <p role="status">{t('scenario.editor.loading')}</p>}
       {libraryError && <p role="alert">{t('scenario.editor.guideLibraryLoadFailed')}</p>}
       {library && (
         <div>
           <label>
             {t('scenario.editor.guideLibrarySearch')}
-            <input value={query} onChange={(event) => setQuery(event.target.value)} />
+            <ProductInput value={query} onChange={(event) => setQuery(event.target.value)} />
           </label>
           <div className="guide-import-library">
             {library
@@ -214,7 +222,9 @@ export function GuideImageResources(props: ResourceProps) {
                 item.filename.toLocaleLowerCase().includes(query.toLocaleLowerCase())
               )
               .map((item) => (
-                <button
+                <ProductActionButton
+                  tone="secondary"
+                  compact
                   key={item.id}
                   type="button"
                   disabled={
@@ -237,7 +247,7 @@ export function GuideImageResources(props: ResourceProps) {
                   }
                 >
                   {item.filename}
-                </button>
+                </ProductActionButton>
               ))}
             {library.length === 0 && <p>{t('scenario.editor.guideLibraryEmpty')}</p>}
           </div>
@@ -252,31 +262,37 @@ export function GuideImageResources(props: ResourceProps) {
       />
       <label>
         {t('scenario.editor.guideImportPlacement')}
-        <select
+        <ProductSelect
+          aria-label={t('scenario.editor.guideImportPlacement')}
           value={placement}
           disabled={locked}
-          onChange={(event) => setPlacement(event.target.value === 'blocks' ? 'blocks' : 'steps')}
-        >
-          <option value="steps">{t('scenario.editor.guideImportAsSteps')}</option>
-          <option value="blocks" disabled={!selectedStepId}>
-            {t('scenario.editor.guideImportAsBlocks')}
-          </option>
-        </select>
+          onChange={setPlacement}
+          options={[
+            { value: 'steps', label: t('scenario.editor.guideImportAsSteps') },
+            {
+              value: 'blocks',
+              label: t('scenario.editor.guideImportAsBlocks'),
+              disabled: !selectedStepId,
+            },
+          ]}
+        />
       </label>
-      <button
+      <ProductActionButton
+        tone="secondary"
+        compact
         type="button"
         className="guide-primary"
         disabled={locked || selection.length === 0 || (placement === 'blocks' && !selectedStepId)}
         onClick={() => void submit()}
       >
         {t('scenario.editor.guideImportSelected')}
-      </button>
+      </ProductActionButton>
       {pending && (
         <div role="status">
           {t('scenario.editor.guideImportProgress')} {progress} / {selection.length}
-          <button type="button" onClick={cancel}>
+          <ProductActionButton tone="secondary" compact type="button" onClick={cancel}>
             {t('scenario.editor.guideImportCancel')}
-          </button>
+          </ProductActionButton>
         </div>
       )}
       {failed && <p role="alert">{t('scenario.editor.guideImportFailed')}</p>}
@@ -304,30 +320,36 @@ function GuideImportSelection({
           {item.preview && <img src={item.preview} alt="" />}
           <span>{item.name}</span>
           <div className="guide-import-selection-actions">
-            <button
+            <ProductActionButton
+              tone="secondary"
+              compact
               type="button"
               disabled={locked || index === 0}
               aria-label={t('scenario.editor.guideMoveUp')}
               onClick={() => move(index, -1)}
             >
               <ArrowUp size={14} aria-hidden="true" />
-            </button>
-            <button
+            </ProductActionButton>
+            <ProductActionButton
+              tone="secondary"
+              compact
               type="button"
               disabled={locked || index === selection.length - 1}
               aria-label={t('scenario.editor.guideMoveDown')}
               onClick={() => move(index, 1)}
             >
               <ArrowDown size={14} aria-hidden="true" />
-            </button>
-            <button
+            </ProductActionButton>
+            <ProductActionButton
+              tone="secondary"
+              compact
               type="button"
               disabled={locked}
               aria-label={t('scenario.editor.guideRemoveResource')}
               onClick={() => remove(item.id)}
             >
               <X size={14} aria-hidden="true" />
-            </button>
+            </ProductActionButton>
           </div>
         </li>
       ))}

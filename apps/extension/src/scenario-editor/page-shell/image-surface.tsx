@@ -1,3 +1,6 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from 'react';
 import type { GuideImageBlock } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -142,7 +145,6 @@ export function GuideImageSurface(props: ImageProps) {
   const [editing, setEditing] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const gesture = useImageGesture({ ...props, disabled: disabled || !url }, editing);
-  const shown = gesture.shown;
   const close = () => {
     gesture.finish(false);
     setEditing(false);
@@ -160,101 +162,21 @@ export function GuideImageSurface(props: ImageProps) {
       }}
     >
       {props.onEdit && (
-        <button type="button" data-edit-image disabled={disabled || !url} onClick={props.onEdit}>
+        <ProductActionButton
+          tone="secondary"
+          compact
+          type="button"
+          data-edit-image
+          disabled={disabled || !url}
+          onClick={props.onEdit}
+        >
           {t('scenario.editor.guideEditImage')}
-        </button>
+        </ProductActionButton>
       )}
-      <div
-        ref={gesture.frame}
-        className="guide-image-frame"
-        role="group"
-        data-editing={editing}
-        style={{
-          width: `min(100%, ${shown.frame.width}px)`,
-          aspectRatio: `${shown.frame.width} / ${shown.frame.height}`,
-        }}
-        tabIndex={editing && !disabled ? 0 : -1}
-        aria-label={t('scenario.editor.guideImagePosition')}
-        onPointerDown={(event) => gesture.begin(event, 'pan')}
-        onPointerMove={gesture.move}
-        onPointerUp={(event) => gesture.finish(true, event.pointerId)}
-        onPointerCancel={(event) => gesture.finish(false, event.pointerId)}
-        onLostPointerCapture={(event) => gesture.finish(false, event.pointerId)}
-        onKeyDown={(event) => {
-          if (!editing || disabled || event.target !== event.currentTarget) return;
-          const direction = {
-            ArrowLeft: [-1, 0],
-            ArrowRight: [1, 0],
-            ArrowUp: [0, -1],
-            ArrowDown: [0, 1],
-          }[event.key];
-          if (!direction) return;
-          event.preventDefault();
-          event.stopPropagation();
-          onChange(
-            changeGuideImageGeometry(block, {
-              kind: 'pan',
-              x: block.contentTransform.x + direction[0]! * 0.02,
-              y: block.contentTransform.y + direction[1]! * 0.02,
-            }),
-            `image-pan:${block.id}`
-          );
-        }}
-      >
-        {url ? (
-          <img
-            src={url}
-            alt={block.alt}
-            draggable={false}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: shown.fit,
-              translate: `${shown.contentTransform.x * 100}% ${shown.contentTransform.y * 100}%`,
-              scale: shown.contentTransform.scale,
-            }}
-          />
-        ) : (
-          <p role="status">
-            {t(
-              url === null ? 'scenario.editor.workspacePreviewLoadError' : 'scenario.editor.loading'
-            )}
-          </p>
-        )}
-        {editing && url && (
-          <button
-            type="button"
-            className="guide-image-resize"
-            disabled={disabled}
-            aria-label={t('scenario.editor.guideResizeImageFrame')}
-            onPointerDown={(event) => gesture.begin(event, 'resize')}
-            onKeyDown={(event) => {
-              if (disabled) return;
-              const delta = {
-                ArrowLeft: [-10, 0],
-                ArrowRight: [10, 0],
-                ArrowUp: [0, -10],
-                ArrowDown: [0, 10],
-              }[event.key];
-              if (!delta) return;
-              event.preventDefault();
-              event.stopPropagation();
-              onChange(
-                changeGuideImageGeometry(block, {
-                  kind: 'frame',
-                  width: block.frame.width + delta[0]!,
-                  height: block.frame.height + delta[1]!,
-                }),
-                `image-frame:${block.id}`
-              );
-            }}
-          >
-            ↘
-          </button>
-        )}
-      </div>
+      <GuideImageViewport {...props} editing={editing} gesture={gesture} />
       {block.caption && <figcaption>{block.caption}</figcaption>}
-      <button
+      <ContentToolbarButton
+        className="!w-auto !min-w-0 px-3"
         ref={trigger}
         type="button"
         disabled={disabled || !url}
@@ -262,7 +184,7 @@ export function GuideImageSurface(props: ImageProps) {
         onClick={() => (editing ? close() : setEditing(true))}
       >
         {t(editing ? 'scenario.editor.guideImageDone' : 'scenario.editor.guideEditImageFrame')}
-      </button>
+      </ContentToolbarButton>
       {editing && (
         <GuideImageControls
           {...props}
@@ -310,7 +232,7 @@ function GuideImageControls({
       />
       <label>
         {t('scenario.editor.guideImageZoom')}
-        <input
+        <ProductInput
           type="number"
           min="10"
           max="10000"
@@ -333,7 +255,7 @@ function GuideImageControls({
               ? 'scenario.editor.guideImageWidth'
               : 'scenario.editor.guideImageHeight'
           )}
-          <input
+          <ProductInput
             type="number"
             min="1"
             max={GUIDE_LIMITS.maxDimension}
@@ -351,7 +273,7 @@ function GuideImageControls({
       ))}
       <label>
         {t('scenario.editor.guideImageCaption')}
-        <input
+        <ProductInput
           value={block.caption}
           maxLength={GUIDE_LIMITS.maxTextLength}
           disabled={disabled}
@@ -362,7 +284,7 @@ function GuideImageControls({
       </label>
       <label>
         {t('scenario.editor.guideImageAlt')}
-        <input
+        <ProductInput
           value={block.alt}
           maxLength={GUIDE_LIMITS.maxTextLength}
           disabled={disabled}
@@ -371,23 +293,136 @@ function GuideImageControls({
           }
         />
       </label>
-      <button
+      <ProductActionButton
+        tone="secondary"
+        compact
         type="button"
         disabled={disabled}
         onClick={() => geometry({ kind: 'zoom', scale: 1 })}
       >
         {t('scenario.editor.guideImageResetZoom')}
-      </button>
-      <button
+      </ProductActionButton>
+      <ProductActionButton
+        tone="secondary"
+        compact
         type="button"
         disabled={disabled}
         onClick={() => geometry({ kind: 'pan', x: 0, y: 0 })}
       >
         {t('scenario.editor.guideImageCenter')}
-      </button>
-      <button type="button" onClick={onReset}>
+      </ProductActionButton>
+      <ProductActionButton tone="secondary" compact type="button" onClick={onReset}>
         {t('scenario.editor.guideImageReset')}
-      </button>
+      </ProductActionButton>
     </fieldset>
+  );
+}
+
+/** The viewport binds pointer/keyboard framing to the existing gesture owner. */
+function GuideImageViewport({
+  block,
+  url,
+  disabled,
+  onChange,
+  t,
+  editing,
+  gesture,
+}: ImageProps & {
+  editing: boolean;
+  gesture: ReturnType<typeof useImageGesture>;
+}) {
+  const shown = gesture.shown;
+  return (
+    <div
+      ref={gesture.frame}
+      className="guide-image-frame"
+      role="group"
+      data-editing={editing}
+      style={{
+        width: `min(100%, ${shown.frame.width}px)`,
+        aspectRatio: `${shown.frame.width} / ${shown.frame.height}`,
+      }}
+      tabIndex={editing && !disabled ? 0 : -1}
+      aria-label={t('scenario.editor.guideImagePosition')}
+      onPointerDown={(event) => gesture.begin(event, 'pan')}
+      onPointerMove={gesture.move}
+      onPointerUp={(event) => gesture.finish(true, event.pointerId)}
+      onPointerCancel={(event) => gesture.finish(false, event.pointerId)}
+      onLostPointerCapture={(event) => gesture.finish(false, event.pointerId)}
+      onKeyDown={(event) => {
+        if (!editing || disabled || event.target !== event.currentTarget) return;
+        const direction = {
+          ArrowLeft: [-1, 0],
+          ArrowRight: [1, 0],
+          ArrowUp: [0, -1],
+          ArrowDown: [0, 1],
+        }[event.key];
+        if (!direction) return;
+        event.preventDefault();
+        event.stopPropagation();
+        onChange(
+          changeGuideImageGeometry(block, {
+            kind: 'pan',
+            x: block.contentTransform.x + direction[0]! * 0.02,
+            y: block.contentTransform.y + direction[1]! * 0.02,
+          }),
+          `image-pan:${block.id}`
+        );
+      }}
+    >
+      {url ? (
+        <img
+          src={url}
+          alt={block.alt}
+          draggable={false}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: shown.fit,
+            translate: `${shown.contentTransform.x * 100}% ${shown.contentTransform.y * 100}%`,
+            scale: shown.contentTransform.scale,
+          }}
+        />
+      ) : (
+        <p role="status">
+          {t(
+            url === null ? 'scenario.editor.workspacePreviewLoadError' : 'scenario.editor.loading'
+          )}
+        </p>
+      )}
+      {editing && url && (
+        <ProductActionButton
+          tone="secondary"
+          compact
+          type="button"
+          className="guide-image-resize"
+          disabled={disabled}
+          aria-label={t('scenario.editor.guideResizeImageFrame')}
+          onPointerDown={(event) => gesture.begin(event, 'resize')}
+          onKeyDown={(event) => {
+            if (disabled) return;
+            const delta = {
+              ArrowLeft: [-10, 0],
+              ArrowRight: [10, 0],
+              ArrowUp: [0, -10],
+              ArrowDown: [0, 10],
+            }[event.key];
+            if (!delta) return;
+            event.preventDefault();
+            event.stopPropagation();
+            onChange(
+              changeGuideImageGeometry(block, {
+                kind: 'frame',
+                width: block.frame.width + delta[0]!,
+                height: block.frame.height + delta[1]!,
+              }),
+              `image-frame:${block.id}`
+            );
+          }}
+        >
+          ↘
+        </ProductActionButton>
+      )}
+    </div>
   );
 }

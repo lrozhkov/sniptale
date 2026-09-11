@@ -1,3 +1,6 @@
+import { ArrowUp, ArrowDown, Copy, Merge, Trash2 } from 'lucide-react';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { ProductInput, ProductTextarea } from '@sniptale/ui/product-form-controls';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import {
@@ -46,7 +49,7 @@ export function GuideStepActions({
         <>
           <label>
             {t('scenario.editor.guideSectionTitle')}
-            <input
+            <ProductInput
               disabled={disabled}
               maxLength={GUIDE_LIMITS.maxLabelLength}
               value={item.title}
@@ -57,7 +60,7 @@ export function GuideStepActions({
           </label>
           <label>
             {t('scenario.editor.body')}
-            <textarea
+            <ProductTextarea
               disabled={disabled}
               rows={3}
               value={item.paragraphs
@@ -74,43 +77,58 @@ export function GuideStepActions({
         </>
       )}
       <div role="group" aria-label={t('scenario.editor.guideStepActions')}>
-        <button
+        <ProductActionButton
+          tone="secondary"
+          compact
           type="button"
           disabled={disabled || index === 0}
           onClick={() => onOperate({ kind: 'move-item', itemId: item.id, direction: -1 })}
         >
+          <ArrowUp size={15} aria-hidden="true" />
           {t('scenario.editor.guideMoveUp')}
-        </button>
-        <button
+        </ProductActionButton>
+        <ProductActionButton
+          tone="secondary"
+          compact
           type="button"
           disabled={disabled || index === project.items.length - 1}
           onClick={() => onOperate({ kind: 'move-item', itemId: item.id, direction: 1 })}
         >
+          <ArrowDown size={15} aria-hidden="true" />
           {t('scenario.editor.guideMoveDown')}
-        </button>
-        <button
+        </ProductActionButton>
+        <ProductActionButton
+          tone="secondary"
+          compact
           type="button"
           disabled={disabled}
           onClick={() => onOperate({ kind: 'duplicate-item', itemId: item.id })}
         >
+          <Copy size={15} aria-hidden="true" />
           {t('scenario.editor.guideDuplicateItem')}
-        </button>
+        </ProductActionButton>
         {item.kind === 'step' && (
-          <button
+          <ProductActionButton
+            tone="secondary"
+            compact
             type="button"
             disabled={disabled || project.items[index + 1]?.kind !== 'step'}
             onClick={() => onOperate({ kind: 'merge-next', itemId: item.id })}
           >
+            <Merge size={15} aria-hidden="true" />
             {t('scenario.editor.guideMergeNext')}
-          </button>
+          </ProductActionButton>
         )}
-        <button
+        <ProductActionButton
+          tone="danger"
+          compact
           type="button"
           disabled={disabled}
           onClick={() => onOperate({ kind: 'remove-item', itemId: item.id })}
         >
+          <Trash2 size={15} aria-hidden="true" />
           {t('scenario.editor.guideRemoveItem')}
-        </button>
+        </ProductActionButton>
       </div>
     </div>
   );

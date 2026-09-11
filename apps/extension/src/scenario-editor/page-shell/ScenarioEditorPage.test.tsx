@@ -79,7 +79,9 @@ async function render() {
   });
 }
 async function click(label: string, scope: ParentNode = container) {
-  const button = [...scope.querySelectorAll('button')].find((node) => node.textContent === label);
+  const button = [...scope.querySelectorAll('button')].find(
+    (node) => (node.getAttribute('aria-label') ?? node.textContent) === label
+  );
   if (!button) throw new Error(`Missing test control ${label}`);
   await act(async () => {
     button.click();
@@ -477,7 +479,7 @@ it('composes multiple blocks and retains undo after save, then resets it on relo
   await click('Reopen saved version', dialog);
   expect(container.querySelectorAll('.guide-block')).toHaveLength(0);
   const undo = [...container.querySelectorAll('button')].find(
-    (button) => button.textContent === 'Undo'
+    (button) => button.getAttribute('aria-label') === 'Undo'
   );
   expect(undo?.disabled).toBe(true);
 });
@@ -603,12 +605,12 @@ it('routes block and item tools through reversible order-preserving mutations', 
   await act(async () => title.focus());
   await click('Merge with next step');
   expect(values()).toEqual(['One', 'Two', 'Three']);
-  await click('Move down');
+  await click('Move down', container.querySelector('.guide-step-actions')!);
   expect([...container.querySelectorAll('article')].map((entry) => entry.id)).toEqual([
     'next',
     'first',
   ]);
-  await click('Move up');
+  await click('Move up', container.querySelector('.guide-step-actions')!);
   expect([...container.querySelectorAll('article')].map((entry) => entry.id)).toEqual([
     'first',
     'next',

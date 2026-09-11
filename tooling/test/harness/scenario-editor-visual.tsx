@@ -13,6 +13,10 @@ import { createScenarioAssetEntryFromBlob } from '../../../apps/extension/src/co
 import { initializeAppTheme } from '../../../apps/extension/src/ui/theme/index';
 import { setLocalePreference } from '../../../apps/extension/src/platform/i18n';
 import '@sniptale/ui/styles';
+import '@sniptale/ui/styles/ai-modal';
+import '@sniptale/ui/styles/glass';
+import '@sniptale/ui/styles/toolbar';
+import '@sniptale/ui/styles/overlays';
 
 async function createFixtureImage(): Promise<Blob> {
   const canvas = document.createElement('canvas');

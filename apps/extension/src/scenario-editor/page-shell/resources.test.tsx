@@ -60,13 +60,12 @@ it('previews ordered files, reorders/removes and imports blocks, then releases p
   expect(host.querySelectorAll('img')).toHaveLength(3);
   await click('Move up', host.querySelectorAll('li')[1]);
   await click('Remove from selection', host.querySelectorAll('li')[2]);
-  const select = host.querySelector('select');
-  await act(async () => {
-    if (select) {
-      select.value = 'blocks';
-      select.dispatchEvent(new Event('change', { bubbles: true }));
-    }
-  });
+  const placement = host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]');
+  if (!placement) throw new Error('Missing import placement');
+  await act(async () => placement.click());
+  const blocks = document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1];
+  if (!blocks) throw new Error('Missing block placement');
+  await act(async () => blocks.click());
   await click('Import selected');
   expect(
     io.import.mock.calls[0]?.[0].sources.map((source: { file: File }) => source.file.name)

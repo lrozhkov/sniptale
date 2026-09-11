@@ -114,6 +114,7 @@ export async function verifyGuideComposition(page: Page): Promise<void> {
   await step.getByRole('textbox', { name: 'Note text', exact: true }).fill('Remember this');
   await page.getByRole('checkbox', { name: 'Show step number', exact: true }).uncheck();
   await expect(step.locator('header span')).toHaveCount(0);
+  await step.locator('.guide-block').first().hover();
   await step
     .locator('.guide-block')
     .first()
@@ -128,7 +129,9 @@ export async function verifyGuideComposition(page: Page): Promise<void> {
   const heading = step
     .locator('.guide-block')
     .filter({ has: page.getByRole('textbox', { name: 'Heading', exact: true }) });
+  await heading.hover();
   await heading.getByRole('button', { name: 'Move up', exact: true }).click();
+  await heading.hover();
   await heading.getByRole('button', { name: 'Split step here', exact: true }).click();
   await expect(page.locator('article')).toHaveCount(3);
   await expect(step.locator('.guide-block')).toHaveCount(1);
@@ -239,11 +242,23 @@ export async function verifyImageFraming(page: Page, testInfo: TestInfo): Promis
   await page.mouse.down();
   await page.mouse.move(rect.x + 120, rect.y + 100);
   await page.mouse.up();
-  await expect(figure.locator('img')).toHaveCSS('translate', '8% 6.25%');
+  await expect
+    .poll(() =>
+      figure
+        .locator('img')
+        .evaluate((image) => getComputedStyle(image).translate.split(' ').map(Number.parseFloat))
+    )
+    .toEqual([expect.closeTo(4000 / rect.width, 3), expect.closeTo(2000 / rect.height, 3)]);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(figure.locator('img')).toHaveCSS('translate', /^(0%|0px)( (0%|0px))?$/);
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  await expect(figure.locator('img')).toHaveCSS('translate', '8% 6.25%');
+  await expect
+    .poll(() =>
+      figure
+        .locator('img')
+        .evaluate((image) => getComputedStyle(image).translate.split(' ').map(Number.parseFloat))
+    )
+    .toEqual([expect.closeTo(4000 / rect.width, 3), expect.closeTo(2000 / rect.height, 3)]);
   await testInfo.attach('image-framing', {
     body: await page.screenshot({ fullPage: true }),
     contentType: 'image/png',
@@ -263,10 +278,17 @@ export async function verifyImageFraming(page: Page, testInfo: TestInfo): Promis
   await page.goto(reopen.toString(), { waitUntil: 'domcontentloaded' });
   await expect(figure.locator('figcaption')).toHaveText('Framed screenshot');
   await expect(figure.locator('img')).toHaveAttribute('alt', 'A framed interface');
-  await expect(figure.locator('img')).toHaveCSS('translate', '8% 6.25%');
+  await expect
+    .poll(() =>
+      figure
+        .locator('img')
+        .evaluate((image) => getComputedStyle(image).translate.split(' ').map(Number.parseFloat))
+    )
+    .toEqual([expect.closeTo(4000 / rect.width, 3), expect.closeTo(2000 / rect.height, 3)]);
   await expect(figure.locator('img')).toHaveCSS('scale', '1.5');
   await expect(figure.locator('img')).toHaveCSS('object-fit', 'cover');
-  await expect(frame).toHaveCSS('width', '500px');
+  await expect(frame).toHaveAttribute('style', /width: min\(100%, 500px\)/);
+  expect((await frame.boundingBox())?.width).toBeLessThanOrEqual(500);
 }
 
 export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo): Promise<void> {
@@ -387,9 +409,8 @@ export async function verifySavedVersionHistory(page: Page, testInfo: TestInfo):
   await page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Saved versions', exact: true }).click();
   const versions = page.getByLabel('Saved version', { exact: true });
-  const earlier = await versions.locator('option').nth(1).getAttribute('value');
-  if (!earlier) throw new Error('Missing previous save');
-  await versions.selectOption(earlier);
+  await versions.click();
+  await page.getByRole('option').nth(1).click();
   const preview = page.getByLabel('Saved version preview', { exact: true });
   await expect(preview).toContainText('Historical version A');
   await expect(preview.locator('img')).toHaveCount(2);
@@ -440,9 +461,9 @@ export async function verifyResourceRetention(page: Page): Promise<void> {
       .getByRole('button', { name: 'Clear saved history', exact: true })
       .click();
     await expect(page.getByRole('status').first()).toHaveText('Saved');
-    await expect(page.getByLabel('Saved version', { exact: true }).locator('option')).toHaveCount(
-      1
-    );
+    await page.getByLabel('Saved version', { exact: true }).click();
+    await expect(page.getByRole('option')).toHaveCount(1);
+    await page.getByRole('option').click();
     expect(await readProjectAssetCount(page)).toBe(originalAssetCount);
     await page.getByRole('button', { name: 'Undo', exact: true }).click();
     await expect(page.locator('.guide-image-frame img')).toHaveCount(2);

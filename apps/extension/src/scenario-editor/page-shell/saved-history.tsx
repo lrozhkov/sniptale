@@ -1,3 +1,5 @@
+import { ProductSelect } from '@sniptale/ui/product-form-controls';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useEffect, useState } from 'react';
 import { ProductConfirmDialog } from '@sniptale/ui/product-feedback/confirm-dialog';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -21,14 +23,16 @@ export function GuideSavedHistory(props: HistoryProps) {
   const [open, setOpen] = useState(false);
   return (
     <section className="guide-saved-history">
-      <button
+      <ProductActionButton
+        tone="secondary"
+        compact
         type="button"
         aria-expanded={open}
         disabled={props.disabled}
         onClick={() => setOpen((value) => !value)}
       >
         {props.t('scenario.editor.guideSavedHistory')}
-      </button>
+      </ProductActionButton>
       {open && <GuideSavedHistoryPanel {...props} />}
     </section>
   );
@@ -83,57 +87,65 @@ function GuideSavedHistoryPanel({
       {failed && (
         <p role="alert">
           {t('scenario.editor.guideHistoryLoadFailed')}{' '}
-          <button
+          <ProductActionButton
+            tone="secondary"
+            compact
             type="button"
             disabled={disabled}
             onClick={() => setAttempt((value) => value + 1)}
           >
             {t('scenario.editor.guideRetry')}
-          </button>
+          </ProductActionButton>
         </p>
       )}
       {data && selected && (
         <>
           <label>
             {t('scenario.editor.guideSavedVersion')}
-            <select
+            <ProductSelect
               aria-label={t('scenario.editor.guideSavedVersion')}
               disabled={disabled}
-              value={selected.revision}
-              onChange={(event) => {
-                setSelectedRevision(Number(event.target.value));
+              value={String(selected.revision)}
+              onChange={(value) => {
+                setSelectedRevision(Number(value));
                 setRestoreFailed(null);
               }}
-            >
-              {data.versions.map((version) => (
-                <option key={version.revision} value={version.revision}>
-                  {t('scenario.editor.guideVersionLabel').replace(
+              options={data.versions.map((version) => ({
+                value: String(version.revision),
+                label: [
+                  t('scenario.editor.guideVersionLabel').replace(
                     '{revision}',
                     String(version.revision)
-                  )}{' '}
-                  · {formatTime(version.savedAt)}
-                  {version.revision === data.currentRevision
-                    ? ` · ${t('scenario.editor.guideCurrentVersion')}`
-                    : ''}
-                </option>
-              ))}
-            </select>
+                  ),
+                  formatTime(version.savedAt),
+                  version.revision === data.currentRevision
+                    ? t('scenario.editor.guideCurrentVersion')
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · '),
+              }))}
+            />
           </label>
           <GuideSavedHistoryPreview project={selected.project} t={t} />
-          <button
+          <ProductActionButton
+            tone="secondary"
+            compact
             type="button"
             disabled={disabled || failed || selected.revision === data.currentRevision}
             onClick={() => setConfirmation('restore')}
           >
             {t('scenario.editor.guideRestoreVersion')}
-          </button>
-          <button
+          </ProductActionButton>
+          <ProductActionButton
+            tone="secondary"
+            compact
             type="button"
             disabled={disabled || failed || !canClearHistory || data.versions.length < 2}
             onClick={() => setConfirmation('clear')}
           >
             {t('scenario.editor.guideClearHistory')}
-          </button>
+          </ProductActionButton>
           {!canClearHistory && <p>{t('scenario.editor.guideHistorySaveFirst')}</p>}
         </>
       )}

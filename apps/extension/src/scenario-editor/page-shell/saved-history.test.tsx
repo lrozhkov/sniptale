@@ -59,19 +59,31 @@ async function click(label: string, scope: ParentNode = host) {
   if (!button) throw new Error(`Missing ${label}`);
   await act(async () => button.click());
 }
+async function openVersions() {
+  const trigger = host.querySelector<HTMLButtonElement>('[aria-label="Saved version"]');
+  if (!trigger) throw new Error('Missing versions');
+  await act(async () => trigger.click());
+}
 async function choosePrevious() {
-  const select = host.querySelector('select');
-  if (!select) throw new Error('Missing versions');
-  await act(async () => {
-    select.value = '1';
-    select.dispatchEvent(new Event('change', { bubbles: true }));
-  });
+  await openVersions();
+  const option = document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1];
+  if (!option) throw new Error('Missing previous version');
+  await act(async () => option.click());
+}
+async function expectVersionCount(count: number) {
+  await openVersions();
+  expect(document.querySelectorAll('[role="option"]')).toHaveLength(count);
+  const selected = document.querySelector<HTMLButtonElement>(
+    '[role="option"][aria-selected="true"]'
+  );
+  if (!selected) throw new Error('Missing selected version');
+  await act(async () => selected.click());
 }
 it('loads only when opened and previews stored content before a confirmed restore', async () => {
   await render();
   expect(io.load).not.toHaveBeenCalled();
   await click('Saved versions');
-  expect(host.querySelector('select')?.options).toHaveLength(2);
+  await expectVersionCount(2);
   await choosePrevious();
   expect(host.querySelector('.guide-history-preview')?.textContent).toContain('Previous guide');
   expect(host.querySelector('.guide-history-preview')?.textContent).toContain('Earlier step');
@@ -105,7 +117,7 @@ it('shows a load error and reloads committed history on explicit retry', async (
   await click('Saved versions');
   expect(host.querySelector('[role="alert"]')?.textContent).toContain('Could not load');
   await click('Retry loading');
-  expect(host.querySelector('select')?.options).toHaveLength(2);
+  await expectVersionCount(2);
 });
 
 it('requires saved content and confirmation before clearing durable versions', async () => {
@@ -131,5 +143,5 @@ it('requires saved content and confirmation before clearing durable versions', a
   await click('Clear saved history', next);
   expect(io.clear).toHaveBeenCalledOnce();
   expect(host.querySelector('[role="alert"]')?.textContent).toContain('Could not clear history');
-  expect(host.querySelector('select')?.options).toHaveLength(2);
+  await expectVersionCount(2);
 });

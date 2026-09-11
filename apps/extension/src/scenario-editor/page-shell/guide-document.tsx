@@ -1,3 +1,4 @@
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useEffect, useRef } from 'react';
 import type {
   GuideBlock,
@@ -183,27 +184,33 @@ function GuideStepBody({
         role="group"
         aria-label={t('scenario.editor.guideAddBlock')}
       >
-        <button
+        <ProductActionButton
+          tone="secondary"
+          compact
           type="button"
           disabled={disabled}
           onClick={() => onOperate({ kind: 'add-block', itemId: item.id, blockKind: 'text' })}
         >
           {t('scenario.editor.guideAddText')}
-        </button>
-        <button
+        </ProductActionButton>
+        <ProductActionButton
+          tone="secondary"
+          compact
           type="button"
           disabled={disabled}
           onClick={() => onOperate({ kind: 'add-block', itemId: item.id, blockKind: 'heading' })}
         >
           {t('scenario.editor.guideAddHeading')}
-        </button>
-        <button
+        </ProductActionButton>
+        <ProductActionButton
+          tone="secondary"
+          compact
           type="button"
           disabled={disabled}
           onClick={() => onOperate({ kind: 'add-block', itemId: item.id, blockKind: 'note' })}
         >
           {t('scenario.editor.guideAddNote')}
-        </button>
+        </ProductActionButton>
       </div>
     </>
   );
