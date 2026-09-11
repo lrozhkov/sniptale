@@ -707,3 +707,21 @@ it.each([4, 99])(
     expect(assetMocks.deleteAssetObject).not.toHaveBeenCalled();
   }
 );
+it('records previous committed content once and leaves history unchanged on exact replay', async () => {
+  const first = await commitScenarioAggregateMutation(
+    createGuideProject('First', 'history-guide', 1)
+  );
+  const second = await commitScenarioAggregateMutation(
+    { ...first.project, name: 'Second' },
+    { expectedUpdatedAt: first.project.updatedAt }
+  );
+  const saved = getStore('scenario_projects').get(first.project.id);
+  expect(saved).toMatchObject({
+    workspaceRevision: 2,
+    history: [{ revision: 1, savedAt: first.project.updatedAt, project: first.project }],
+  });
+  await commitScenarioAggregateMutation(second.project, {
+    expectedUpdatedAt: second.project.updatedAt,
+  });
+  expect(getStore('scenario_projects').get(first.project.id)).toEqual(saved);
+});

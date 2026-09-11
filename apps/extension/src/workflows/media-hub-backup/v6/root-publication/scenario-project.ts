@@ -27,7 +27,11 @@ import { parseScenarioStepEditorDocumentEntry } from '../../../../composition/pe
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { decodePortableEditorDocument } from '../root-codecs/editor-document';
-import { parsePortableScenarioProjectMetadata } from '../root-codecs/projects';
+import {
+  decodePortableScenarioHistory,
+  MAX_PORTABLE_SCENARIO_HISTORY_BYTES,
+  parsePortableScenarioProjectMetadata,
+} from '../root-codecs/projects';
 import type { ArchiveRootPublisher } from '../restore';
 import type { StagedArchiveObject } from '../staging';
 import { rebaseTemporaryLifecycle } from '../restore-lifecycle';
@@ -105,6 +109,16 @@ function decodeAndRemapGuideProject(args: {
   return parsed.project;
 }
 
+async function readSavedHistoryObject(object: StagedArchiveObject, projectId: string) {
+  if (object.ref.size > MAX_PORTABLE_SCENARIO_HISTORY_BYTES)
+    throw new Error('Portable guide history exceeds the metadata limit.');
+  const file = await readAssetFile(object.ref, 'saved-versions.json');
+  if (file.size > MAX_PORTABLE_SCENARIO_HISTORY_BYTES)
+    throw new Error('Portable guide history exceeds the metadata limit.');
+  const value: unknown = JSON.parse(await file.text());
+  return decodePortableScenarioHistory(value, projectId);
+}
+
 export const scenarioProjectRootPublisher: ArchiveRootPublisher = {
   profile: 'scenario-project',
   async checkpointSkipIfExisting({ envelope, session }) {
@@ -136,6 +150,9 @@ export const scenarioProjectRootPublisher: ArchiveRootPublisher = {
       session.strategy === 'duplicate' && sourceExists ? newId() : metadata.entry.id;
     const rootKey = `scenario-project:${envelope.descriptor.rootId}`;
     const objects = new Map(staged.map((object) => [object.objectId, object]));
+    const portableHistory = metadata.historyObjectId
+      ? await readSavedHistoryObject(required(objects, metadata.historyObjectId), metadata.entry.id)
+      : [];
     const assetIds = new Map(
       metadata.assets.map((asset) => [
         asset.entry.id,
@@ -165,6 +182,20 @@ export const scenarioProjectRootPublisher: ArchiveRootPublisher = {
       ...rebaseTemporaryLifecycle(metadata.entry),
       id: targetProjectId,
       project,
+      ...(portableHistory.length
+        ? {
+            history: portableHistory.map((version) => ({
+              ...version,
+              project: decodeAndRemapGuideProject({
+                assetIds,
+                project: version.project,
+                projectId: targetProjectId,
+                stepIds,
+                rootIdMap: session.rootIdMap,
+              }),
+            })),
+          }
+        : {}),
     });
     if (!entry) throw new Error('Restored scenario project metadata is invalid.');
     const assets = metadata.assets.map((item) => {

@@ -1,3 +1,4 @@
+import { appendScenarioSavedVersion } from '../history-model';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { ScenarioProjectEntry } from '../contracts';
 import { createLibraryLifecycle, updateLibraryLifecycle } from '../../library-lifecycle/contracts';
@@ -18,7 +19,9 @@ export function createScenarioProjectEntry(args: {
   updatedAt?: number;
 }): ScenarioProjectEntry {
   const updatedAt = createScenarioProjectRevision(args.existing, args.updatedAt);
+  const history = appendScenarioSavedVersion(args.existing);
   return {
+    ...(history.length ? { history } : {}),
     id: args.project.id,
     project: {
       ...args.project,

@@ -202,9 +202,20 @@ async function buildScenarioProjectRoot(args: {
     aggregateKind: 'scenario',
     db: args.db,
   });
+  const { history, ...portableEntry } = encodePortableScenarioProjectEntry(
+    projectScenarioPrivacy(args.entry, args.options)
+  );
+  const historyObjectId = history?.length
+    ? collector.addObject(
+        new Blob([JSON.stringify(history)], { type: 'application/json' }),
+        'saved-versions.json',
+        'application/json'
+      )
+    : undefined;
   const metadata: PortableScenarioProjectMetadata = {
     assets,
-    entry: encodePortableScenarioProjectEntry(projectScenarioPrivacy(args.entry, args.options)),
+    entry: portableEntry,
+    ...(historyObjectId ? { historyObjectId } : {}),
     exportThumbnails,
     exports,
     stepDocuments,

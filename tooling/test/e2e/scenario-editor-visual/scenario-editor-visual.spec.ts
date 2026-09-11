@@ -9,6 +9,7 @@ import {
 } from './scenario-editor-visual.helpers';
 import {
   verifyImageImport,
+  verifySavedVersionHistory,
   verifyImageEditorRoundtrip,
   verifyImageFraming,
   verifyIndependentProjectCopy,
@@ -120,3 +121,13 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     issues.assertClean();
   });
 }
+
+test('saved versions survive reload and restore as an undoable new publication', async ({
+  page,
+  hostOrigin,
+}, testInfo) => {
+  const issues = createPageIssueCollector(page);
+  await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1280, height: 900 });
+  await verifySavedVersionHistory(page, testInfo);
+  issues.assertClean();
+});

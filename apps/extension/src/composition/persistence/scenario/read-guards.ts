@@ -1,3 +1,4 @@
+import { parseScenarioSavedVersions } from './history-model';
 import type { ScenarioProjectSummary } from '../../../features/scenario/contracts/types/project';
 import type {
   PendingScenarioAssetEntry,
@@ -152,7 +153,15 @@ export function parseScenarioProjectEntry(value: unknown): ScenarioProjectEntry 
   ) {
     return null;
   }
+  const history = parseScenarioSavedVersions(
+    value['history'],
+    project.id,
+    workspaceRevision,
+    project.updatedAt
+  );
+  if (!history) return null;
   return {
+    ...(history.length ? { history } : {}),
     createdAt: value['createdAt'],
     id: value['id'],
     ...(lifecycle === undefined ? {} : { lifecycle }),

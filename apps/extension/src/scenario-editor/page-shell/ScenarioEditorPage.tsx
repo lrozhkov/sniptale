@@ -8,6 +8,7 @@ import { GuideImageEditor, useGuideImageEditorMode } from './image-editor';
 import { GuideDocument } from './guide-document';
 import { GuideWorkspace } from './workspace';
 import { GuideImageResources } from './resources';
+import { GuideSavedHistory } from './saved-history';
 import { GuideStepActions } from './step-actions';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { openGalleryPage } from '../../platform/navigation/extension-pages';
@@ -43,7 +44,7 @@ export function ScenarioEditorPage() {
         project={project}
         {...imageEditor.selection}
         t={t}
-        onApply={(input) => state.mutateImages({ kind: 'edit', input })}
+        onApply={(input) => state.commitChange({ kind: 'edit', input })}
         onClose={imageEditor.close}
       />
     );
@@ -105,7 +106,7 @@ export function ScenarioEditorPage() {
                   : null
               }
               t={t}
-              onImport={(input) => state.mutateImages({ kind: 'import', input })}
+              onImport={(input) => state.commitChange({ kind: 'import', input })}
             />
           }
           project={project}
@@ -127,9 +128,10 @@ export function ScenarioEditorPage() {
           }
           projectActions={
             <GuideProjectActions
-              name={project.name}
+              project={project}
               disabled={disabled}
-              hasUnsavedChanges={status === 'dirty' || status === 'failed' || status === 'conflict'}
+              status={status}
+              onRestore={(revision) => state.commitChange({ kind: 'restore', revision })}
               onDuplicate={state.duplicate}
               onDelete={state.remove}
               onReload={state.reload}
@@ -160,27 +162,30 @@ export function ScenarioEditorPage() {
 }
 
 function GuideProjectActions({
-  name,
+  project,
   disabled,
-  hasUnsavedChanges,
+  status,
+  onRestore,
   onDuplicate,
   onDelete,
   onReload,
   t,
 }: {
-  name: string;
+  project: GuideProject;
   disabled: boolean;
-  hasUnsavedChanges: boolean;
+  status: ReturnType<typeof useGuidePageState>['status'];
+  onRestore: (revision: number) => Promise<boolean>;
   onDuplicate: (name: string) => Promise<void>;
   onDelete: () => Promise<void>;
   onReload: () => Promise<void>;
   t: Translate;
 }) {
   const [confirmation, setConfirmation] = useState<'delete' | 'reload' | null>(null);
+  const hasUnsavedChanges = status === 'dirty' || status === 'failed' || status === 'conflict';
   const copy = () => {
     const pattern = t('scenario.editor.guideCopyName');
     const available = GUIDE_LIMITS.maxLabelLength - pattern.replace('{name}', '').length;
-    void onDuplicate(pattern.replace('{name}', name.slice(0, available)));
+    void onDuplicate(pattern.replace('{name}', project.name.slice(0, available)));
   };
   const confirm = async () => {
     if (confirmation === 'delete') await onDelete();
@@ -189,6 +194,13 @@ function GuideProjectActions({
   };
   return (
     <div role="group" aria-label={t('scenario.editor.projectLabel')}>
+      <GuideSavedHistory
+        key={project.id}
+        project={project}
+        disabled={disabled || status === 'conflict'}
+        onRestore={onRestore}
+        t={t}
+      />
       <button type="button" disabled={disabled} onClick={copy}>
         {t('scenario.editor.guideDuplicate')}
       </button>
@@ -369,13 +381,15 @@ function GuidePageFeedback({
           {t(
             actionError === 'copy'
               ? 'scenario.editor.guideCopyFailed'
-              : actionError === 'edit'
-                ? 'scenario.editor.guideImageApplyFailed'
-                : actionError === 'import'
-                  ? 'scenario.editor.guideImportFailed'
-                  : actionError === 'structure'
-                    ? 'scenario.editor.guideOperationFailed'
-                    : 'scenario.editor.guideDeleteFailed'
+              : actionError === 'restore'
+                ? 'scenario.editor.guideHistoryRestoreFailed'
+                : actionError === 'edit'
+                  ? 'scenario.editor.guideImageApplyFailed'
+                  : actionError === 'import'
+                    ? 'scenario.editor.guideImportFailed'
+                    : actionError === 'structure'
+                      ? 'scenario.editor.guideOperationFailed'
+                      : 'scenario.editor.guideDeleteFailed'
           )}
         </p>
       )}

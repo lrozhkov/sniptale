@@ -369,3 +369,49 @@ async function readImageEditProof(page: Page) {
     }
   });
 }
+
+export async function verifySavedVersionHistory(page: Page, testInfo: TestInfo): Promise<void> {
+  const title = page.locator('article#compare > header input');
+  await title.fill('Historical version A');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  await title.fill('Historical version B');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  const url = new URL(page.url());
+  url.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
+  url.searchParams.set('locale', 'en');
+  await page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: 'Saved versions', exact: true }).click();
+  const versions = page.getByLabel('Saved version', { exact: true });
+  const earlier = await versions.locator('option').nth(1).getAttribute('value');
+  if (!earlier) throw new Error('Missing previous save');
+  await versions.selectOption(earlier);
+  const preview = page.getByLabel('Saved version preview', { exact: true });
+  await expect(preview).toContainText('Historical version A');
+  await expect(preview.locator('img')).toHaveCount(2);
+  await testInfo.attach('saved-version-preview', {
+    body: await page.screenshot({ fullPage: true }),
+    contentType: 'image/png',
+  });
+  await title.fill('Unsaved work before restore');
+  const restore = page.getByRole('button', { name: 'Restore as a new version', exact: true });
+  await restore.click();
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(title).toHaveValue('Unsaved work before restore');
+  await restore.click();
+  await page
+    .getByRole('alertdialog')
+    .getByRole('button', { name: 'Restore as a new version', exact: true })
+    .click();
+  await expect(title).toHaveValue('Historical version A');
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(title).toHaveValue('Unsaved work before restore');
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(title).toHaveValue('Historical version A');
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  await page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
+  await expect(title).toHaveValue('Historical version A');
+}

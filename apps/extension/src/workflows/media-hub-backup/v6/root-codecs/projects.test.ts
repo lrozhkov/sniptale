@@ -38,3 +38,37 @@ describe('portable guide project codec', () => {
     expect(project).toEqual(original);
   });
 });
+it('encodes historical image references and rejects malformed or cross-project history', async () => {
+  const { decodePortableScenarioHistory } = await import('./projects');
+  const project = createGuideProject('Old', 'guide', 1);
+  const step = createGuideStep('Old image', 'step');
+  step.blocks.push(
+    createGuideImageBlock({
+      id: 'image',
+      assetId: 'old-asset',
+      editDocumentId: 'old-document',
+      width: 100,
+      height: 50,
+      source: { kind: 'import', filename: 'old.png' },
+    })
+  );
+  project.items.push(step);
+  const entry = {
+    id: project.id,
+    createdAt: 1,
+    updatedAt: 2,
+    workspaceRevision: 2,
+    project: { ...project, updatedAt: 2, items: [] },
+    history: [{ revision: 1, savedAt: 1, project }],
+  };
+  const encoded = encodePortableScenarioProjectEntry(entry);
+  expect(JSON.stringify(encoded.history)).toContain('"scenarioAssetId":"old-asset"');
+  expect(JSON.stringify(encoded.history)).toContain('"editDocumentId":"old-document"');
+  expect(JSON.stringify(encoded.history)).not.toContain('"assetId"');
+  expect(decodePortableScenarioHistory(encoded.history, 'guide')).toHaveLength(1);
+  expect(() => decodePortableScenarioHistory(encoded.history, 'foreign')).toThrow();
+  expect(() => decodePortableScenarioHistory([null], 'guide')).toThrow();
+  expect(() =>
+    decodePortableScenarioHistory(Array(51).fill(encoded.history?.[0]), 'guide')
+  ).toThrow();
+});

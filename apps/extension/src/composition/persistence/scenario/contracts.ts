@@ -5,6 +5,12 @@ import type { LibraryLifecycle } from '../library-lifecycle/contracts';
 import type { AssetRef } from '../assets';
 import type { PersistedEditorDocumentV3 } from '../document-assets';
 
+export interface ScenarioSavedVersion {
+  revision: number;
+  savedAt: number;
+  project: GuideProject;
+}
+
 export interface ScenarioProjectEntry {
   id: string;
   project: GuideProject;
@@ -13,6 +19,7 @@ export interface ScenarioProjectEntry {
   lifecycle?: LibraryLifecycle;
   /** Owner-issued revision of the committed aggregate. */
   workspaceRevision: number;
+  history?: ScenarioSavedVersion[];
 }
 
 export interface ScenarioAssetEntry {
