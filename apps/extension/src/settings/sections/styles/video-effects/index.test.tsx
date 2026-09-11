@@ -15,7 +15,7 @@ vi.mock('../../../../composition/persistence/effect-bundles', async (original) =
   ...(await original<typeof import('../../../../composition/persistence/effect-bundles')>()),
   getEffectBundle: get,
   listEffectBundles: list,
-  setEffectBundleEnabled: toggle,
+  setEffectDocumentEnabled: toggle,
   deleteEffectBundle: remove,
 }));
 vi.mock('../../../../composition/persistence/effect-bundles/import-files', async (original) => ({
@@ -117,9 +117,9 @@ function catalogRows(): EffectBundleCatalogListItem[] {
 it('manages saved packs and confirms removal without per-pack export', async () => {
   list.mockResolvedValue(catalogRows());
   await act(async () => root.render(<VideoEffectsSection />));
-  const row = container.querySelector('[data-settings-collection-item="pack-0"]')!;
+  const row = container.querySelector('[data-settings-collection-item="pack-0/effect-0"]')!;
   await act(async () => (row.querySelector('[role=switch]') as HTMLElement).click());
-  expect(toggle).toHaveBeenCalledWith('pack-0', false);
+  expect(toggle).toHaveBeenCalledWith('pack-0', 'effect-0', false);
   expect(row.querySelector('svg.lucide-download')).toBeNull();
   await act(async () =>
     (row.querySelector('[data-collection-inline-action="delete"]') as HTMLElement).click()

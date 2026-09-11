@@ -13,6 +13,7 @@ export const EFFECT_PREFERENCES_KEY = 'videoEffectPreferences';
 export interface EffectCatalogPreference {
   packId: string;
   enabled?: boolean;
+  documentEnabled?: Record<string, boolean>;
   documents: Record<string, EffectPresetPreferences>;
 }
 export function parseEffectCatalogPreferences(value: unknown): EffectCatalogPreference[] {
@@ -32,6 +33,17 @@ export function parseEffectCatalogPreferences(value: unknown): EffectCatalogPref
       (row['enabled'] !== undefined && typeof row['enabled'] !== 'boolean')
     )
       throw new Error('Invalid effect preference');
+    const availability = row['documentEnabled'];
+    if (
+      availability !== undefined &&
+      (!record(availability) ||
+        Object.keys(availability).length > 128 ||
+        Object.entries(availability).some(
+          ([id, enabled]) =>
+            !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(id) || typeof enabled !== 'boolean'
+        ))
+    )
+      throw new Error('Invalid effect availability');
     seen.add(row['packId']);
     const documents: Record<string, EffectPresetPreferences> = {};
     for (const [id, value] of Object.entries(row['documents'])) {
@@ -48,6 +60,13 @@ export function parseEffectCatalogPreferences(value: unknown): EffectCatalogPref
     return {
       packId: row['packId'],
       documents,
+      ...(record(availability)
+        ? {
+            documentEnabled: Object.fromEntries(
+              Object.entries(availability).map(([id, enabled]) => [id, enabled === true])
+            ),
+          }
+        : {}),
       ...(typeof row['enabled'] === 'boolean' ? { enabled: row['enabled'] } : {}),
     };
   });
@@ -88,16 +107,17 @@ export function overlayEffectPreferences(
   preferences: EffectCatalogPreference[]
 ): EffectBundleCatalogEntry {
   const preference = preferences.find((row) => row.packId === entry.packId);
-  return {
-    ...entry,
-    enabled: preference?.enabled ?? entry.enabled,
-    documents: entry.documents.map((document) => ({
-      ...document,
-      ...(preference && Object.hasOwn(preference.documents, document.id)
-        ? { presetPreferences: preference.documents[document.id] }
-        : {}),
-    })),
-  };
+  const documents = entry.documents.map((document) => ({
+    ...document,
+    enabled:
+      preference?.documentEnabled && Object.hasOwn(preference.documentEnabled, document.id)
+        ? preference.documentEnabled[document.id]!
+        : (preference?.enabled ?? entry.enabled),
+    ...(preference && Object.hasOwn(preference.documents, document.id)
+      ? { presetPreferences: preference.documents[document.id] }
+      : {}),
+  }));
+  return { ...entry, documents, enabled: documents.some((document) => document.enabled) };
 }
 function record(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -120,6 +140,7 @@ export function collectEffectCatalogPreferences(
       packId: entry.packId,
       enabled: current?.enabled ?? entry.enabled,
       documents: { ...retained, ...current?.documents },
+      ...(current?.documentEnabled ? { documentEnabled: current.documentEnabled } : {}),
     });
   }
   return parseEffectCatalogPreferences([...result.values()]);

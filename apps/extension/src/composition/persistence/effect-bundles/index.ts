@@ -147,15 +147,11 @@ export async function listEffectBundles(
     },
     ...imported,
   ];
-  return entries.map((item) =>
-    item.status === 'ready'
-      ? {
-          ...item,
-          entry: overlayEffectPreferences(item.entry, preferences),
-          enabled: preferences.find((p) => p.packId === item.packId)?.enabled ?? item.enabled,
-        }
-      : item
-  );
+  return entries.map((item) => {
+    if (item.status !== 'ready') return item;
+    const entry = overlayEffectPreferences(item.entry, preferences);
+    return { ...item, entry, enabled: entry.enabled };
+  });
 }
 
 export async function getEffectBundle(packId: string): Promise<EffectBundleCatalogEntry | null> {
@@ -181,8 +177,31 @@ export async function deleteEffectBundle(packId: string): Promise<void> {
 }
 
 export async function setEffectBundleEnabled(packId: string, enabled: boolean): Promise<void> {
-  if (!(await getEffectBundle(packId))) return;
-  await mutateEffectCatalogPreference(packId, (current) => ({ ...current, enabled }));
+  const catalog = await getEffectBundle(packId);
+  if (!catalog) return;
+  await mutateEffectCatalogPreference(packId, (current) => ({
+    ...current,
+    enabled,
+    documentEnabled: {
+      ...current.documentEnabled,
+      ...Object.fromEntries(catalog.documents.map((document) => [document.id, enabled])),
+    },
+  }));
+}
+
+/** Change availability of one catalog document, preserving sibling styles and user presets. */
+export async function setEffectDocumentEnabled(
+  packId: string,
+  documentId: string,
+  enabled: boolean
+): Promise<void> {
+  const catalog = await getEffectBundle(packId);
+  if (!catalog?.documents.some((document) => document.id === documentId))
+    throw new EffectBundlePersistenceError('catalogEntryInvalid');
+  await mutateEffectCatalogPreference(packId, (current) => ({
+    ...current,
+    documentEnabled: { ...current.documentEnabled, [documentId]: enabled },
+  }));
 }
 
 function assertStorageHeadroom(

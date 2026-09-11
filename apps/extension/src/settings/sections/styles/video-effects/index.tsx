@@ -19,6 +19,12 @@ import {
 import { translate, useAppLocale } from '../../../../platform/i18n';
 import { useVideoEffectsSettings } from './controller';
 
+interface EffectSettingsItem extends SettingsCollectionItem {
+  packId: string;
+  packName: string;
+  documentId?: string;
+}
+
 export function VideoEffectsSection() {
   const locale = useAppLocale();
   const controller = useVideoEffectsSettings();
@@ -70,14 +76,11 @@ export function VideoEffectsSection() {
               : 'videoEditor.effectsLibrary.noImportedPacks'
           )}
           onAction={(action) => {
-            if (action.type === 'toggle') void controller.toggle(action.itemId, action.nextChecked);
-            if (action.type === 'delete') {
-              const entry = controller.entries.find((item) => item.packId === action.itemId);
-              setDeleting({
-                id: action.itemId,
-                name: entry?.status === 'ready' ? entry.label[locale] : action.itemId,
-              });
-            }
+            const item = items.find((item) => item.id === action.itemId);
+            if (!item) return;
+            if (action.type === 'toggle' && item.documentId)
+              void controller.toggle(item.packId, item.documentId, action.nextChecked);
+            if (action.type === 'delete') setDeleting({ id: item.packId, name: item.packName });
           }}
         />
         <ProductConfirmDialog
@@ -87,7 +90,7 @@ export function VideoEffectsSection() {
             '{name}',
             deleting?.name ?? ''
           )}
-          message={translate('videoEditor.effectsLibrary.removeHelp')}
+          message={translate('videoEditor.effectsLibrary.removePackHelp')}
           confirmText={translate('common.actions.delete')}
           cancelText={translate('common.actions.cancel')}
           onCancel={() => setDeleting(null)}
@@ -107,7 +110,8 @@ function resolveCollectionView(
 ) {
   const themes = getEffectCatalogThemes(
     controller.entries.flatMap((entry) => (entry.status === 'ready' ? [entry.entry] : [])),
-    locale
+    locale,
+    { includeDisabled: true }
   );
   const effectiveFilter: EffectCatalogFilter = {
     ...filter,
@@ -121,44 +125,42 @@ function buildCollectionItems(
   controller: Pick<ReturnType<typeof useVideoEffectsSettings>, 'entries' | 'busy'>,
   filter: EffectCatalogFilter,
   locale: 'ru' | 'en'
-): SettingsCollectionItem[] {
-  return controller.entries.flatMap<SettingsCollectionItem>((entry) => {
+): EffectSettingsItem[] {
+  return controller.entries.flatMap<EffectSettingsItem>((entry) => {
     if (entry.status === 'invalid')
       return [
         {
           id: entry.packId,
+          packId: entry.packId,
+          packName: entry.packId,
           title: translate('videoEditor.effectsLibrary.invalidPack'),
           capabilities: { delete: true },
           busy: controller.busy,
         },
       ];
-    const documents = queryEffectCatalog(entry.entry, filter, locale);
-    if (!documents.length) return [];
-    return [
-      {
-        id: entry.packId,
-        title:
-          documents.length === 1
-            ? describeCatalogDocument(documents[0]!, locale).label
-            : entry.label[locale],
-        enabled: entry.enabled,
-        previewVariant: 'image',
-        preview: <EffectCatalogPreview catalog={entry.entry} document={documents[0]!} />,
+    const matches = queryEffectCatalog(entry.entry, filter, locale, { includeDisabled: true });
+    const seen = new Set<string>();
+    const documents = matches.filter((document) => {
+      if (seen.has(document.id)) return false;
+      seen.add(document.id);
+      return true;
+    });
+    return documents.map((document) => {
+      const metadata = describeCatalogDocument(document, locale);
+      return {
+        id: `${entry.packId}/${document.id}`,
+        packId: entry.packId,
+        packName: entry.label[locale],
+        documentId: document.id,
+        title: metadata.label,
+        enabled: document.enabled ?? entry.enabled,
+        previewVariant: 'image' as const,
+        preview: <EffectCatalogPreview catalog={entry.entry} document={document} />,
         busy: controller.busy,
-        meta:
-          entry.source === 'builtin'
-            ? translate('videoEditor.effectsLibrary.builtinPack')
-            : documents.length === 1
-              ? [
-                  describeCatalogDocument(documents[0]!, locale).themeLabel,
-                  describeCatalogDocument(documents[0]!, locale).styleLabel,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')
-              : undefined,
+        meta: metadata.themeLabel || entry.label[locale],
         capabilities: { toggle: true, delete: entry.source !== 'builtin' },
-      },
-    ];
+      };
+    });
   });
 }
 

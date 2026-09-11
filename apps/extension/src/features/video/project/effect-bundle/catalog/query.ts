@@ -43,10 +43,12 @@ export function describeCatalogDocument(
 export function queryEffectCatalog(
   catalog: EffectBundleCatalogEntry,
   filter: EffectCatalogFilter,
-  locale: 'en' | 'ru'
+  locale: 'en' | 'ru',
+  options: { includeDisabled?: boolean } = {}
 ) {
   const query = filter.query.trim().toLocaleLowerCase(locale);
   return catalog.documents
+    .filter((document) => options.includeDisabled || document.enabled !== false)
     .flatMap((document) => {
       const presets = readCatalogPresentation(document)?.controlPresets;
       const variants = presets?.length
@@ -87,14 +89,16 @@ export function queryEffectCatalog(
 }
 export function getEffectCatalogThemes(
   catalogs: readonly EffectBundleCatalogEntry[],
-  locale: 'en' | 'ru' = 'en'
+  locale: 'en' | 'ru' = 'en',
+  options: { includeDisabled?: boolean } = {}
 ): EffectCatalogTheme[] {
   const groups = new Map<string, { label: string; styles: Map<string, string> }>();
   for (const catalog of catalogs)
     for (const document of queryEffectCatalog(
       catalog,
       { query: '', kind: 'all', theme: 'all' },
-      locale
+      locale,
+      options
     )) {
       const metadata = describeCatalogDocument(document, locale);
       if (metadata.theme === 'unspecified' && metadata.style === 'unspecified') continue;

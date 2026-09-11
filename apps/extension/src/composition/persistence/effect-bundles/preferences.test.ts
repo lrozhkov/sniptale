@@ -113,3 +113,48 @@ it('exports retained presets while preserving current preferences', async () => 
   expect(collectEffectCatalogPreferences([entry], [cleared])).toEqual([cleared]);
   expect(JSON.stringify(merged)).not.toContain('sourceSha256');
 });
+
+it('preserves independent availability through writes, update projections and settings export', async () => {
+  const { overlayEffectPreferences, collectEffectCatalogPreferences } =
+    await import('./preferences');
+  const { createEffectCatalogEntry } = await import('./catalog-builder');
+  const { readValidBundleArtifact } = await import('./fixture.test-support');
+  const entry = await createEffectCatalogEntry(await readValidBundleArtifact(), 1);
+  entry.packId = 'builtin:base';
+  const first = entry.documents[0]!;
+  entry.documents.push({ ...first, id: 'sibling' });
+  await mutateEffectCatalogPreference(entry.packId, (row) => ({ ...row, enabled: false }));
+  await Promise.all([
+    mutateEffectCatalogPreference(entry.packId, (row) => ({
+      ...row,
+      documentEnabled: { ...row.documentEnabled, [first.id]: true },
+    })),
+    mutateEffectCatalogPreference(entry.packId, (row) => ({
+      ...row,
+      documents: { [first.id]: { presets: [] } },
+    })),
+  ]);
+  const stored = await readEffectCatalogPreferences();
+  const projected = overlayEffectPreferences({ ...entry, version: '2' }, stored);
+  expect(projected.enabled).toBe(true);
+  expect(projected.documents.map((document) => document.enabled)).toEqual([true, false]);
+  expect(projected.documents[0]!.presetPreferences).toEqual({ presets: [] });
+  const exported = collectEffectCatalogPreferences([entry], stored);
+  expect(parseEffectCatalogPreferences(JSON.parse(JSON.stringify(exported)))).toEqual(stored);
+  expect(
+    overlayEffectPreferences({ ...entry, packId: 'base' }, stored).documents.every(
+      (document) => document.enabled
+    )
+  ).toBe(true);
+});
+it.each([
+  null,
+  [],
+  { valid: 'false' },
+  { '../bad': false },
+  Object.fromEntries(Array.from({ length: 129 }, (_, i) => ['d' + i, true])),
+])('rejects malformed availability maps', (documentEnabled) => {
+  expect(() =>
+    parseEffectCatalogPreferences([{ packId: 'base', documents: {}, documentEnabled }])
+  ).toThrow();
+});

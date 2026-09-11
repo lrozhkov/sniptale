@@ -8,6 +8,7 @@ import {
   listImportedEffectBundles as listEffectBundles,
   saveEffectArtifact,
   setEffectBundleEnabled,
+  setEffectDocumentEnabled,
 } from './index';
 
 const preferences = vi.hoisted(() => ({
@@ -302,4 +303,17 @@ it('resolves the asynchronous storage estimate before opening the mutation trans
   await save;
   expect(mocks.transaction).toHaveBeenCalledOnce();
   expect(mocks.put).toHaveBeenCalledOnce();
+});
+
+it('writes availability only for the requested document and rejects missing documents', async () => {
+  const entry = await saveEffectArtifact(await readValidBundleArtifact(), 100);
+  mocks.db.get.mockResolvedValue(entry);
+  const document = entry.documents[0]!;
+  await setEffectDocumentEnabled(entry.packId, document.id, false);
+  expect(await preferences.mutate.mock.results[0]!.value).toMatchObject({
+    documentEnabled: { [document.id]: false },
+    documents: {},
+  });
+  await expect(setEffectDocumentEnabled(entry.packId, 'missing', true)).rejects.toThrow();
+  expect(preferences.mutate).toHaveBeenCalledOnce();
 });

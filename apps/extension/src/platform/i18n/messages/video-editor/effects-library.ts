@@ -76,6 +76,10 @@ export const videoEditorEffectsLibraryMessages = defineMessageSource({
     en: 'Effects are available across projects. Disabling or removing catalog entries does not change effects already used in a project.',
   },
   removeConfirm: { ru: 'Удалить «{name}» из каталога?', en: 'Remove “{name}” from the catalog?' },
+  removePackHelp: {
+    en: 'The entire imported collection will be removed. Effects already used in projects will remain.',
+    ru: 'Будет удалён весь импортированный набор. Эффекты, уже добавленные в проекты, сохранятся.',
+  },
   removeHelp: {
     ru: 'Для повторного добавления понадобится исходный файл эффекта.',
     en: 'You will need the original effect file to add it again.',
