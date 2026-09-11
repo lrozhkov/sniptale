@@ -167,7 +167,8 @@ function admitImageImport(args: Parameters<typeof importScenarioImages>[0]) {
       : undefined;
   if (
     placement.kind === 'replace-image' &&
-    (args.sources.length !== 1 || replacement?.kind !== 'image')
+    (args.sources.length !== 1 ||
+      (replacement?.kind !== 'image' && replacement?.kind !== 'image-slot'))
   )
     throw new Error('The selected image is unavailable.');
   if (
@@ -178,5 +179,10 @@ function admitImageImport(args: Parameters<typeof importScenarioImages>[0]) {
   ) {
     throw new Error('The guide has reached its content limit.');
   }
-  return { project, target, replacement: replacement?.kind === 'image' ? replacement : undefined };
+  return {
+    project,
+    target,
+    replacement:
+      replacement?.kind === 'image' || replacement?.kind === 'image-slot' ? replacement : undefined,
+  };
 }

@@ -1,5 +1,5 @@
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { FileText, Heading, ListPlus, MessageSquare } from 'lucide-react';
+import { FileText, Heading, Image, ListPlus, MessageSquare } from 'lucide-react';
 import type { GuideStructureOperation } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
 
@@ -45,6 +45,11 @@ export function GuideDocumentInsert({
           },
         ]
       : [
+          {
+            kind: 'image-slot' as const,
+            label: t('scenario.editor.guideAddImage'),
+            icon: <Image size={15} aria-hidden="true" />,
+          },
           {
             kind: 'text' as const,
             label: t('scenario.editor.guideAddText'),

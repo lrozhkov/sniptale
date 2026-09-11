@@ -125,6 +125,16 @@ export function ScenarioEditorPage() {
           t={t}
         >
           <GuideDocument
+            onUploadImage={(stepId, blockId, file, signal) =>
+              state.commitChange({
+                kind: 'import',
+                input: {
+                  sources: [{ kind: 'file', file }],
+                  placement: { kind: 'replace-image', stepId, blockId },
+                  signal,
+                },
+              })
+            }
             onEditImage={(itemId, blockId) => {
               state.sealEdit();
               imageEditor.open(itemId, blockId);

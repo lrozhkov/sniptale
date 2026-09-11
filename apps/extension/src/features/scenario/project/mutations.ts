@@ -13,7 +13,7 @@ type BlockOperation =
   | {
       kind: 'add-block';
       itemId: string;
-      blockKind: 'text' | 'heading' | 'note';
+      blockKind: 'text' | 'heading' | 'note' | 'image-slot';
       beforeBlockId?: string;
     }
   | { kind: 'move-block'; itemId: string; blockId: string; direction: -1 | 1 }
@@ -118,8 +118,10 @@ function changeItems(project: GuideProject, operation: ItemOperation): void {
   project.items.splice(index + 1, 0, copy);
 }
 
-function createBlock(kind: 'text' | 'heading' | 'note'): GuideBlock {
+function createBlock(kind: 'text' | 'heading' | 'note' | 'image-slot'): GuideBlock {
   const id = crypto.randomUUID();
+  if (kind === 'image-slot')
+    return { kind, id, frame: { width: 960, height: 540 }, fit: 'contain', alt: '', caption: '' };
   if (kind === 'heading') return { kind, id, text: '' };
   if (kind === 'note') return { kind, id, tone: 'info', paragraphs: createGuideParagraphs('') };
   return { kind, id, paragraphs: createGuideParagraphs('') };

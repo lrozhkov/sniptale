@@ -194,3 +194,19 @@ it('inserts at stable item and block boundaries without changing neighboring con
     })
   ).toThrow();
 });
+
+it('inserts an empty image slot at a stable boundary without creating media references', () => {
+  const source = fixture();
+  const next = applyGuideStructureOperation(source, {
+    kind: 'add-block',
+    itemId: 'first',
+    blockKind: 'image-slot',
+    beforeBlockId: 'image',
+  });
+  const first = next.items.find((item) => item.id === 'first');
+  if (first?.kind !== 'step') throw new Error('Missing step');
+  expect(first.blocks.map((block) => block.kind)).toEqual(['text', 'image-slot', 'image']);
+  expect(first.blocks[1]).toMatchObject({ frame: { width: 960, height: 540 }, fit: 'contain' });
+  expect(first.blocks[1]).not.toHaveProperty('assetId');
+  expect(source).toEqual(fixture());
+});

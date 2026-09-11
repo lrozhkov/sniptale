@@ -1,4 +1,5 @@
 import { expect } from '@playwright/test';
+import { SCENARIO_EDITOR_VISUAL_HARNESS_PATH } from '../extension-critical.helpers';
 import { verifyGuideAppearance } from './scenario-editor-visual.appearance-steps';
 import { test } from '../support/extension-fixture';
 import { assertVisualAcceptance } from './scenario-editor-visual.assertions';
@@ -248,6 +249,17 @@ test('document tools are contextual and leave image geometry unchanged', async (
   await image.hover();
   await expect(tools).toHaveCSS('opacity', '1');
   expect(await image.boundingBox()).toEqual(before);
+  const miniButton = tools.getByRole('button').first();
+  await miniButton.hover();
+  const buttonSurface = await miniButton.evaluate((button) => {
+    const probe = document.createElement('span');
+    probe.style.backgroundColor = 'var(--sniptale-color-surface-canvas)';
+    button.append(probe);
+    const color = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return color;
+  });
+  await expect(miniButton).toHaveCSS('background-color', buttonSurface);
   const insertion = page
     .locator('article#compare [data-insert-before="before"]')
     .getByRole('button', { name: 'Heading', exact: true });
@@ -427,6 +439,90 @@ test('project title expands within the center and history sits beside the outer 
     await divider.getAttribute('aria-valuemax')
   );
 });
+
+for (const theme of SCENARIO_VISUAL_THEMES) {
+  test(`empty image slots fill from a file and undo after reopening in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }, testInfo) => {
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 900 });
+    const reopen = async () => {
+      const url = new URL(page.url());
+      url.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
+      url.searchParams.set('theme', theme);
+      url.searchParams.set('locale', 'en');
+      await page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
+    };
+    const step = page.locator('article#compare');
+    const count = await step.locator('.guide-block').count();
+    const add = step
+      .locator('.guide-insertion-block[data-end="true"]')
+      .getByRole('button', { name: 'Image', exact: true });
+    await add.focus();
+    await add.click();
+    const slot = step.locator('[data-kind="image-slot"]');
+    await expect(slot.getByRole('button', { name: 'Upload image', exact: true })).toBeFocused();
+    const id = await slot.getAttribute('data-block-id');
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    await reopen();
+    await expect(slot).toHaveCount(1);
+    await slot.locator('input[type="file"]').setInputFiles({
+      name: 'invalid.svg',
+      mimeType: 'image/svg+xml',
+      buffer: Buffer.from('<svg/>'),
+    });
+    await expect(slot.getByRole('alert')).toBeVisible();
+    const encoded = await page.evaluate(() => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 160;
+      canvas.height = 90;
+      const context = canvas.getContext('2d');
+      if (!context) throw new Error('Canvas unavailable');
+      context.fillStyle = '#2767a5';
+      context.fillRect(0, 0, 160, 90);
+      return canvas.toDataURL('image/png').split(',')[1]!;
+    });
+    await slot.locator('input[type="file"]').setInputFiles({
+      name: 'slot.png',
+      mimeType: 'image/png',
+      buffer: Buffer.from(encoded, 'base64'),
+    });
+    await expect(slot).toHaveCount(0);
+    const filled = step.locator(`[data-block-id="${id}"]`);
+    await expect(filled).toHaveAttribute('data-kind', 'image');
+    await expect(filled.locator('img')).toBeVisible();
+    await expect(step.locator('.guide-block')).toHaveCount(count + 1);
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    await reopen();
+    await expect(filled.locator('img')).toBeVisible();
+    await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    await expect(slot).toHaveCount(1);
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    await page.evaluate(() => document.fonts.ready);
+    await expect
+      .poll(() =>
+        step
+          .locator('img')
+          .evaluateAll(
+            (images) =>
+              images.length === 2 &&
+              images.every(
+                (image) =>
+                  image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0
+              )
+          )
+      )
+      .toBe(true);
+    await slot.scrollIntoViewIfNeeded();
+    await testInfo.attach(`empty-image-slot-${theme}`, {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+    await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    await expect(step.locator('.guide-block')).toHaveCount(count);
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+  });
+}
 
 test('history cleanup preserves two-tab undo resources until sessions close', async ({
   page,

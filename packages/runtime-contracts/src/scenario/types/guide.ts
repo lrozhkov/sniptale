@@ -83,6 +83,14 @@ export interface GuideImageBlock {
   contentTransform: { x: number; y: number; scale: number };
 }
 
+/** Empty image space has layout and identity but owns no media until filled. */
+export interface GuideImageSlotBlock extends Pick<
+  GuideImageBlock,
+  'id' | 'frame' | 'fit' | 'alt' | 'caption'
+> {
+  kind: 'image-slot';
+}
+
 /** Blocks are ordered content, not freely positioned slide elements. */
 export type GuideBlock =
   | { kind: 'heading'; id: string; text: string }
@@ -93,7 +101,8 @@ export type GuideBlock =
       tone: 'neutral' | 'info' | 'warning' | 'error';
       paragraphs: GuideParagraph[];
     }
-  | GuideImageBlock;
+  | GuideImageBlock
+  | GuideImageSlotBlock;
 
 /** Numbering derives from document order, even when a step hides its number. */
 export interface GuideStep {

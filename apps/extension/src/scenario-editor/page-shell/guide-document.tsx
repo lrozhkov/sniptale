@@ -6,7 +6,6 @@ import type {
   GuideBlock,
   GuideSection,
   GuideStep,
-  GuideImageBlock,
   GuideProject,
 } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
@@ -18,6 +17,7 @@ import {
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { GuideBlockActions } from './block-actions';
 import { GuideImageSurface } from './image-surface';
+import { GuideImageUpload } from './image-upload';
 
 export type GuideFocusRequest = {
   sequence: number;
@@ -25,6 +25,13 @@ export type GuideFocusRequest = {
   field?: boolean;
   preserveFocus?: boolean;
 };
+
+type GuideImageUploadHandler = (
+  itemId: string,
+  blockId: string,
+  file: File,
+  signal: AbortSignal
+) => Promise<boolean>;
 
 /** Semantic guide content; effects and persistence stay in the page state owner. */
 export function GuideDocument({
@@ -37,6 +44,7 @@ export function GuideDocument({
   onSelect,
   onOperate,
   onEditImage,
+  onUploadImage,
   t,
 }: {
   project: GuideProject;
@@ -47,6 +55,7 @@ export function GuideDocument({
   onChange: (project: GuideProject, group?: string | null) => void;
   onOperate: (operation: GuideStructureOperation) => void;
   onEditImage: (itemId: string, blockId: string) => void;
+  onUploadImage: GuideImageUploadHandler;
   onSelect: (id: string) => void;
   t: Translate;
 }) {
@@ -147,6 +156,7 @@ export function GuideDocument({
                 onChange={onChange}
                 onOperate={onOperate}
                 onEditImage={onEditImage}
+                onUploadImage={onUploadImage}
                 t={t}
               />
               <GuideStepActions
@@ -187,8 +197,8 @@ function focusGuideTarget(
         (entry) => entry.dataset['blockId'] === focusRequest.blockId
       )
     : null;
-  const field = (block ?? (focusRequest.field ? target : null))?.querySelector<HTMLTextAreaElement>(
-    'textarea'
+  const field = (block ?? (focusRequest.field ? target : null))?.querySelector<HTMLElement>(
+    'textarea, [data-image-upload]'
   );
   if (!field && target.contains(document.activeElement)) return;
   (field ?? target).focus({ preventScroll: true });
@@ -268,6 +278,7 @@ function GuideStepBody({
   onChange,
   onOperate,
   onEditImage,
+  onUploadImage,
   t,
 }: {
   project: GuideProject;
@@ -277,6 +288,7 @@ function GuideStepBody({
   onChange: (project: GuideProject, group?: string | null) => void;
   onOperate: (operation: GuideStructureOperation) => void;
   onEditImage: (itemId: string, blockId: string) => void;
+  onUploadImage: GuideImageUploadHandler;
   t: Translate;
 }) {
   const changeBlock = (block: GuideBlock, group: string | null = `block:${block.id}`) =>
@@ -328,6 +340,13 @@ function GuideStepBody({
                 onChange={changeBlock}
                 t={t}
               />
+            ) : block.kind === 'image-slot' ? (
+              <GuideImageUpload
+                frame={block.frame}
+                disabled={disabled}
+                onUpload={(file, signal) => onUploadImage(item.id, block.id, file, signal)}
+                t={t}
+              />
             ) : (
               <GuideTextBlock block={block} disabled={disabled} onChange={changeBlock} t={t} />
             )}
@@ -364,7 +383,7 @@ function GuideTextBlock({
   onChange,
   t,
 }: {
-  block: Exclude<GuideBlock, GuideImageBlock>;
+  block: Extract<GuideBlock, { kind: 'heading' | 'text' | 'note' }>;
   disabled: boolean;
   onChange: (block: GuideBlock) => void;
   t: Translate;

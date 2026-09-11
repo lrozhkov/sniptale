@@ -148,6 +148,10 @@ const projectSchema: z.ZodType<GuideProject> = z
                       })
                       .strict(),
                     image,
+                    image
+                      .pick({ id: true, frame: true, fit: true, alt: true, caption: true })
+                      .extend({ kind: z.literal('image-slot') })
+                      .strict(),
                   ])
                 )
                 .max(GUIDE_LIMITS.maxBlocksPerStep),

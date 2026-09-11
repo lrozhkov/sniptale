@@ -5,7 +5,9 @@ import type { GuideProject, GuideBlock } from '@sniptale/runtime-contracts/scena
 
 it('keeps guide project and overlay discriminants exact', () => {
   expectTypeOf<GuideProject['version']>().toEqualTypeOf<4>();
-  expectTypeOf<GuideBlock['kind']>().toEqualTypeOf<'heading' | 'text' | 'note' | 'image'>();
+  expectTypeOf<GuideBlock['kind']>().toEqualTypeOf<
+    'heading' | 'text' | 'note' | 'image' | 'image-slot'
+  >();
   expectTypeOf<ScenarioOverlay['kind']>().toEqualTypeOf<
     | 'focus-rect'
     | 'click-ring'

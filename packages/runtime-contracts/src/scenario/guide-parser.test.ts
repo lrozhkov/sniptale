@@ -430,3 +430,26 @@ describe('portable appearance templates', () => {
     ).toBeNull();
   });
 });
+
+it('roundtrips an empty image slot without accepting phantom resource references', () => {
+  const slot = {
+    kind: 'image-slot',
+    id: 'slot',
+    frame: { width: 960, height: 540 },
+    fit: 'contain',
+    alt: '',
+    caption: '',
+  };
+  const value = { ...project(), items: [{ ...step(), blocks: [slot] }] };
+  expect(parseGuideProject(JSON.parse(JSON.stringify(value)))).toEqual({
+    status: 'ok',
+    project: value,
+  });
+  for (const invalid of [
+    { ...slot, assetId: 'fake' },
+    { ...slot, frame: { width: 0, height: 540 } },
+  ])
+    expect(parseGuideProject({ ...value, items: [{ ...step(), blocks: [invalid] }] }).status).toBe(
+      'invalid'
+    );
+});

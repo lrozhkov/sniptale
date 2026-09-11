@@ -1,6 +1,8 @@
 import { defineMessageSource } from '../../source';
 export const scenarioEditorCoreMessages = defineMessageSource({
   guideEditImage: { ru: 'Редактировать изображение', en: 'Edit image' },
+  guideAddImage: { ru: 'Изображение', en: 'Image' },
+  guideUploadImage: { ru: 'Загрузить изображение', en: 'Upload image' },
   guideImageBack: { ru: 'Назад без применения', en: 'Back without applying' },
   guideImageApplyHint: {
     ru: 'Измените изображение и нажмите «Применить», чтобы вернуться к сценарию.',

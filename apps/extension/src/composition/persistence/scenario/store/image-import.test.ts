@@ -324,3 +324,24 @@ it('replaces at block capacity and preserves the original on cancellation or con
   expect(io.event).not.toHaveBeenCalled();
   expect(args.project).toEqual(original);
 });
+it('fills a resource-free slot without adding a second block', async () => {
+  const args = replacementInput();
+  const step = args.project.items[0];
+  if (step?.kind !== 'step') throw new Error('Missing step');
+  step.blocks = [
+    {
+      kind: 'image-slot',
+      id: 'target',
+      frame: { width: 960, height: 540 },
+      fit: 'contain',
+      alt: '',
+      caption: '',
+    },
+  ];
+  const result = await importScenarioImages(args);
+  expect(result.items[0]).toMatchObject({
+    blocks: [{ kind: 'image', id: 'target', frame: { width: 960, height: 540 } }],
+  });
+  expect(step.blocks[0]?.kind).toBe('image-slot');
+  expect(io.commit).toHaveBeenCalledTimes(1);
+});
