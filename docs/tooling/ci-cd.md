@@ -50,7 +50,7 @@ Artifacts and logs exclude credentials, raw project identifiers, JIT configurati
 
 ## Release admission
 
-The provenance finalizer accepts only paths classified as `post-proof-only` after the source proof. Unknown paths and changes to product, build, QA, container, or proof composition require a new provenance run.
+The provenance finalizer requires a later control commit with at least one path classified as `post-proof-only`; it does not accept the source proof commit itself. Unknown paths and changes to product, build, QA, container, or proof composition require a new provenance run.
 
 Publication is restricted to `main`. It requires a GitHub-verifiable annotated version tag, the matching finalizer result, verified release assets, and attestations for every published subject. Diagnostic mode is read-only and cannot enter the publisher environment.
 
