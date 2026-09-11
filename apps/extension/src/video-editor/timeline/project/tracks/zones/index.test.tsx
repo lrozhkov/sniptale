@@ -90,16 +90,27 @@ function verifyTrackZoneRendering() {
   const transitionButton = container?.querySelector<HTMLButtonElement>(
     '[data-ui="timeline.track-transition-zone"]'
   );
-  const cutZone = container?.querySelector('div.pointer-events-none.absolute.inset-y-3.z-20');
+  const cutZone = container?.querySelector('[data-ui="timeline.transition-cut-drop"]');
   const stackedCue = container?.querySelector('[data-ui="timeline.track-overlap-zone"]');
   const buttons = container?.querySelectorAll('button');
 
   expect(cutZone?.getAttribute('style')).toContain('left: 60px');
   expect(buttons).toHaveLength(4);
-  expect(gapButton?.closest<HTMLElement>('[data-timeline-object]')?.style.left).toBe('40px');
-  expect(gapButton?.closest<HTMLElement>('[data-timeline-object]')?.style.width).toBe('20px');
+  expect(gapButton?.parentElement?.parentElement?.style.left).toBe('40px');
+  expect(gapButton?.parentElement?.parentElement?.style.width).toBe('20px');
   expect(transitionButton?.style.left).toBe('80px');
   expect(transitionButton?.style.width).toBe('20px');
+  const lanePointer = vi.fn();
+  document.body.addEventListener('pointerdown', lanePointer);
+  act(() =>
+    gapButton?.parentElement?.parentElement?.dispatchEvent(
+      new MouseEvent('pointerdown', { bubbles: true })
+    )
+  );
+  expect(lanePointer).toHaveBeenCalledOnce();
+  act(() => gapButton?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true })));
+  expect(lanePointer).toHaveBeenCalledOnce();
+  document.body.removeEventListener('pointerdown', lanePointer);
   expect(stackedCue).toBeNull();
   expect(transitionButton?.querySelector('svg path')).not.toBeNull();
 
@@ -139,6 +150,7 @@ function expectPrimaryTrackZones(
   expect(buildTrackGapZones(project, trackId)).toEqual([]);
   expect(buildTrackJunctionZones(project, trackId)).toEqual([
     {
+      locked: false,
       detail: CROSSFADE_DETAIL,
       end: 5,
       id: 'transition-1',
@@ -167,6 +179,8 @@ function expectCutTrackZones(
   expect(buildTrackCutZones(project, trackId)).toEqual([
     {
       id: 'cut:clip-cut-a:clip-cut-b',
+      leadingClipId: 'clip-cut-a',
+      trailingClipId: 'clip-cut-b',
       time: 3,
     },
   ]);
@@ -196,6 +210,8 @@ function verifySplitCutZone() {
   expect(buildTrackCutZones(splitProject, trackId)).toEqual([
     {
       id: expect.stringContaining('cut:'),
+      leadingClipId: 'clip-split',
+      trailingClipId: expect.any(String),
       time: 2.5,
     },
   ]);

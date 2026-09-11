@@ -69,7 +69,7 @@ export function getClipWaveformPeaks(
     return [];
   }
 
-  const resolvedSampleCount = Math.max(8, Math.min(sampleCount, 160));
+  const resolvedSampleCount = Math.max(8, Math.min(Math.round(sampleCount), 4096));
   const clipStartRatio = clampValue(clip.sourceStart / assetDuration, 0, 1);
   const clipEndRatio = clampValue(
     (clip.sourceStart + clip.sourceDuration) / assetDuration,

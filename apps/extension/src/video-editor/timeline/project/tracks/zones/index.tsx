@@ -1,3 +1,4 @@
+import { useEffectDocumentDrag } from '../../../../chrome/effect-document-drag';
 import {
   projectTimelineInterval,
   projectTimelinePoint,
@@ -23,6 +24,7 @@ type TransitionTrimHandler = (
 ) => void;
 
 export function ProjectTimelineTrackZones(props: {
+  mediaHeight?: number | undefined;
   onBeginTransitionTrim?: TransitionTrimHandler | undefined;
   cutZones: TimelineCutZone[];
   gapZones: TimelineGapZone[];
@@ -36,8 +38,13 @@ export function ProjectTimelineTrackZones(props: {
   onSelectTransition?: (transitionId: string) => void;
 }) {
   return (
-    <>
+    <div
+      data-ui="timeline.media-zones"
+      className="absolute inset-x-0 top-0"
+      style={{ height: props.mediaHeight ?? '100%' }}
+    >
       <TrackCutZoneLayer
+        onDropEffectDocument={props.onDropEffectDocument}
         cutZones={props.cutZones}
         pixelsPerSecond={props.pixelsPerSecond}
         projection={props.projection}
@@ -58,7 +65,7 @@ export function ProjectTimelineTrackZones(props: {
         onSelectTransition={props.onSelectTransition}
         onBeginTransitionTrim={props.onBeginTransitionTrim}
       />
-    </>
+    </div>
   );
 }
 
@@ -94,6 +101,7 @@ function TrackJunctionZoneButton(props: {
   selected: boolean;
   zone: TimelineJunctionZone;
 }) {
+  const { drag } = useEffectDocumentDrag();
   const geometry = props.projection
     ? projectTimelineInterval(props.projection, props.zone.start, props.zone.end)
     : {
@@ -128,13 +136,25 @@ function TrackJunctionZoneButton(props: {
       }}
       onPointerDown={stopPointerPropagation}
       onDragOver={(event) => {
-        if (props.zone.audio || !hasVideoEditorEffectDocumentDragType(event.dataTransfer)) return;
+        if (!hasVideoEditorEffectDocumentDragType(event.dataTransfer)) return;
+        event.stopPropagation();
+        if (
+          props.zone.audio ||
+          props.zone.locked ||
+          (drag?.kind ?? readVideoEditorEffectDocumentDragPayload(event.dataTransfer)?.kind) !==
+            'transition'
+        ) {
+          event.dataTransfer.dropEffect = 'none';
+          return;
+        }
         event.preventDefault();
         event.stopPropagation();
         event.dataTransfer.dropEffect = 'copy';
       }}
       onDrop={(event) => {
-        if (props.zone.audio) return;
+        if (props.zone.audio || props.zone.locked) return;
+        if (!hasVideoEditorEffectDocumentDragType(event.dataTransfer)) return;
+        event.stopPropagation();
         const payload = readVideoEditorEffectDocumentDragPayload(event.dataTransfer);
         if (!payload || payload.kind !== 'transition') return;
         event.preventDefault();
@@ -218,21 +238,55 @@ function getJunctionZoneStyle(zone: TimelineJunctionZone, pixelsPerSecond: numbe
 }
 
 function TrackCutZoneLayer(props: {
+  onDropEffectDocument: ProjectTimelineProps['onDropEffectDocument'];
   cutZones: TimelineCutZone[];
   pixelsPerSecond: number;
   projection?: TimelineProjection | undefined;
 }) {
+  const { drag } = useEffectDocumentDrag();
   return props.cutZones.map((zone) => {
     const left = props.projection
       ? projectTimelinePoint(props.projection, zone.time)
       : zone.time * props.pixelsPerSecond;
     if (left === null) return null;
+    const active = drag?.kind === 'transition' && zone.leadingClipId && zone.trailingClipId;
     return (
       <div
         key={zone.id}
+        data-ui="timeline.transition-cut-drop"
+        onDragOver={(event) => {
+          if (!active) return;
+          event.preventDefault();
+          event.stopPropagation();
+          event.dataTransfer.dropEffect = 'copy';
+        }}
+        onDrop={(event) => {
+          const payload = readVideoEditorEffectDocumentDragPayload(event.dataTransfer);
+          if (
+            !active ||
+            payload?.kind !== 'transition' ||
+            !zone.leadingClipId ||
+            !zone.trailingClipId
+          )
+            return;
+          event.preventDefault();
+          event.stopPropagation();
+          props.onDropEffectDocument?.(
+            payload,
+            {
+              kind: 'junction',
+              leadingClipId: zone.leadingClipId,
+              trailingClipId: zone.trailingClipId,
+            },
+            zone.time
+          );
+        }}
         aria-hidden="true"
         className={[
-          'pointer-events-none absolute inset-y-3 z-20 w-[6px] -translate-x-1/2 rounded-full',
+          active
+            ? 'pointer-events-auto w-8 outline outline-1 outline-[var(--sniptale-color-accent)]'
+            : 'pointer-events-none w-[6px]',
+          'absolute inset-y-3 z-30 -translate-x-1/2 rounded-sm',
           'bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-canvas)_80%,transparent)]',
           'shadow-[0_0_0_1px_color-mix(in_srgb,var(--sniptale-color-border-strong)_40%,transparent)]',
         ].join(' ')}
@@ -260,9 +314,7 @@ function TrackGapZoneLayer(props: {
 
     return (
       <div
-        {...TIMELINE_OBJECT_MARKER_PROPS}
         key={zone.id}
-        onPointerDown={stopPointerPropagation}
         className={[
           'group absolute inset-y-2 z-0 hover:z-30 focus-within:z-30 rounded-sm',
           'outline outline-1 -outline-offset-1 outline-dashed',
@@ -283,6 +335,8 @@ function TrackGapZoneLayer(props: {
         }}
       >
         <div
+          {...TIMELINE_OBJECT_MARKER_PROPS}
+          onPointerDown={stopPointerPropagation}
           data-ui="video-editor.timeline.gap-actions"
           className={[
             'absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-1',

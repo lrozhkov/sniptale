@@ -18,6 +18,7 @@ export function isVideoProjectTrack(value: unknown): boolean {
     isString(value['id']) &&
     isString(value['name']) &&
     isFiniteNumber(value['order']) &&
+    (value['effectsBypassed'] === undefined || isBoolean(value['effectsBypassed'])) &&
     isBoolean(value['visible']) &&
     isBoolean(value['locked']) &&
     isEnumValue(value['kind'], VideoTrackKind) &&

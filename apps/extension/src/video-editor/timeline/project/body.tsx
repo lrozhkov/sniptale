@@ -15,6 +15,7 @@ type ProjectTimelineBodyProps = Pick<
   | 'beginRangeSelection'
   | 'beginTrackRangeSelection'
   | 'currentTime'
+  | 'isPlaying'
   | 'consumeCompletedScrubClick'
   | 'dragGhost'
   | 'handleTimelineSeek'
@@ -100,6 +101,7 @@ function ProjectTimelineBodyCanvas(props: ProjectTimelineBodyProps) {
 
 function createTrackListProps(props: ProjectTimelineBodyProps): ProjectTimelineBodyTrackListProps {
   return {
+    onDropEffectDocument: props.onDropEffectDocument,
     canShowTelemetryLane: true,
     recordingTelemetry: props.recordingTelemetry,
     onSelectHistoryLane: props.onSelectHistoryLane,
@@ -130,6 +132,7 @@ function createCanvasProps(props: ProjectTimelineBodyProps): ProjectTimelineBody
   return {
     hiddenClipNamesByTrackId: props.trackPanelPrefs.prefs.hiddenClipNamesByTrackId,
     currentTime: props.currentTime,
+    isPlaying: props.isPlaying,
     consumeCompletedScrubClick: props.consumeCompletedScrubClick,
     cursorLaneVisible: props.cursorLaneVisible,
     dragGhost: props.dragGhost,

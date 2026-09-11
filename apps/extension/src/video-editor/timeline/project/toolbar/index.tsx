@@ -1,14 +1,12 @@
-import { Redo2, Undo2, Magnet, Clapperboard } from 'lucide-react';
+import { ProjectMenu } from './project-menu';
+import { Redo2, Undo2, Magnet } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { translate } from '../../../../platform/i18n';
 import {
   useVideoEditorHistoryController,
   useVideoEditorHeaderController,
 } from '../../../runtime/controller/composition/hooks';
-import {
-  toolbarIconButtonClassName,
-  toolbarExportButtonClassName,
-} from './sections/constants/button';
+import { toolbarIconButtonClassName } from './sections/constants/button';
 import { ProjectTimelinePlaybackSummary } from './sections/playback-summary';
 import { ProjectTimelineToolbarLeadingControls } from './sections/leading';
 import { ProjectTimelineToolbarTrailingActions } from './sections/trailing';
@@ -18,6 +16,7 @@ type ToolbarTrailingControlsInput = Pick<
   ProjectTimelineToolbarProps,
   | 'fitSelectionDuration'
   | 'pixelsPerSecond'
+  | 'zoomContext'
   | 'onFitProject'
   | 'onFitSelection'
   | 'onTimelinePreviewSuspendedChange'
@@ -27,6 +26,8 @@ type ToolbarTrailingControlsInput = Pick<
 function createToolbarLeadingControlsProps({
   historyActions,
   historySelected,
+  historyVisible,
+  hasHistory,
   canAddMotionRegion,
   canDeleteSelectedClip,
   canEditSelectedClip,
@@ -40,6 +41,8 @@ function createToolbarLeadingControlsProps({
   ProjectTimelineToolbarProps,
   | 'historyActions'
   | 'historySelected'
+  | 'historyVisible'
+  | 'hasHistory'
   | 'canAddMotionRegion'
   | 'canDeleteSelectedClip'
   | 'canEditSelectedClip'
@@ -53,6 +56,8 @@ function createToolbarLeadingControlsProps({
   return {
     ...(historyActions ? { historyActions } : {}),
     historySelected: historySelected ?? false,
+    historyVisible: historyVisible ?? false,
+    hasHistory: hasHistory ?? false,
     canAddMotionRegion,
     canDeleteSelectedClip,
     canEditSelectedClip,
@@ -68,6 +73,7 @@ function createToolbarLeadingControlsProps({
 function createToolbarTrailingControlsProps({
   fitSelectionDuration,
   pixelsPerSecond,
+  zoomContext,
   onFitProject,
   onFitSelection,
   onTimelinePreviewSuspendedChange,
@@ -76,6 +82,7 @@ function createToolbarTrailingControlsProps({
   return {
     fitSelectionDuration,
     pixelsPerSecond,
+    zoomContext,
     onFitProject,
     onFitSelection,
     onTimelinePreviewSuspendedChange,
@@ -86,6 +93,8 @@ function createToolbarTrailingControlsProps({
 export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProps) {
   const history = useVideoEditorHistoryController();
   const header = useVideoEditorHeaderController();
+  const editingDisabled =
+    controlsProps.playback.isPlaying || Boolean(controlsProps.playback.isPreparingPlayback);
   return (
     <div
       data-ui="video-editor.timeline.toolbar"
@@ -103,17 +112,20 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
         '[&_svg]:size-[18px] @max-[1400px]/timeline:[&_svg]:size-4 @max-[1000px]/timeline:[&_svg]:size-[14px]',
       ].join(' ')}
     >
-      <div className="flex shrink-0 items-center justify-center gap-[var(--timeline-control-gap)]">
+      <fieldset
+        disabled={editingDisabled}
+        className="m-0 flex min-w-0 shrink-0 items-center justify-center gap-[var(--timeline-control-gap)] border-0 p-0"
+      >
         <ProjectTimelineToolbarLeadingControls
           {...createToolbarLeadingControlsProps(controlsProps)}
         />
-      </div>
+      </fieldset>
       <ProjectTimelinePlaybackSummary {...controlsProps.playback} />
       <div className="flex items-center justify-end gap-[var(--timeline-control-gap)]">
         <ContentToolbarButton
           className={toolbarIconButtonClassName}
           title={`${translate('videoEditor.app.undo')} (${translate('videoEditor.app.undoShortcut')})`}
-          disabled={!history.canUndo}
+          disabled={editingDisabled || !history.canUndo}
           onClick={history.onUndo}
           dataUi="video-editor.timeline.toolbar.undo"
         >
@@ -122,7 +134,7 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
         <ContentToolbarButton
           className={toolbarIconButtonClassName}
           title={`${translate('videoEditor.app.redo')} (${translate('videoEditor.app.redoShortcut')})`}
-          disabled={!history.canRedo}
+          disabled={editingDisabled || !history.canRedo}
           onClick={history.onRedo}
           dataUi="video-editor.timeline.toolbar.redo"
         >
@@ -146,17 +158,7 @@ export function ProjectTimelineToolbar(controlsProps: ProjectTimelineToolbarProp
         )}
         <ToolbarSeparator />
         {header && (
-          <ContentToolbarButton
-            className={toolbarExportButtonClassName}
-            title={translate('videoEditor.app.exportButton')}
-            onClick={header.onOpenExportDialog}
-            dataUi="video-editor.timeline.toolbar.export"
-          >
-            <Clapperboard aria-hidden="true" />
-            <span className="whitespace-nowrap text-xs font-semibold">
-              {translate('videoEditor.app.exportButton')}
-            </span>
-          </ContentToolbarButton>
+          <ProjectMenu projectName={header.projectName} onExport={header.onOpenExportDialog} />
         )}
       </div>
     </div>

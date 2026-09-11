@@ -18,6 +18,7 @@ import type {
 } from '../../../contracts/commands/history';
 
 interface UseProjectTimelineDragOptions {
+  collapsedFxByTrackId?: Readonly<Record<string, boolean>> | undefined;
   currentTime: number;
   historyTransaction: VideoEditorProjectHistoryTransactionActions;
   magnetEnabled: boolean;
@@ -163,6 +164,7 @@ export function useProjectTimelineDrag({
   onTimelinePreviewSuspendedChange,
   onTrimClipEnd,
   onTrimClipStart,
+  collapsedFxByTrackId,
   trackHeightByTrackId = EMPTY_TRACK_HEIGHTS,
 }: UseProjectTimelineDragOptions) {
   const interactionRef = useRef<TimelineInteraction | null>(null);
@@ -175,7 +177,11 @@ export function useProjectTimelineDrag({
   currentTimeRef.current = currentTime;
   const [dragGhost, setDragGhost] = useState<TimelineClipDragGhost | null>(null);
   const [snapGuideTime, setSnapGuideTime] = useState<number | null>(null);
-  const { trackLayoutModel, tracks } = useTimelineDragModel(project, trackHeightByTrackId);
+  const { trackLayoutModel, tracks } = useTimelineDragModel(
+    project,
+    trackHeightByTrackId,
+    collapsedFxByTrackId
+  );
   const trackLayoutModelRef = useRef(trackLayoutModel);
   trackLayoutModelRef.current = trackLayoutModel;
 
@@ -230,15 +236,22 @@ export function useProjectTimelineDrag({
 
 function useTimelineDragModel(
   project: VideoProject,
-  trackHeightByTrackId: Record<string, VideoEditorTrackHeightMultiplier>
+  trackHeightByTrackId: Record<string, VideoEditorTrackHeightMultiplier>,
+  collapsedFxByTrackId?: Readonly<Record<string, boolean>>
 ) {
   const tracks = useMemo(
     () => getSortedTracks(project).filter(isVideoEditorPresentedTrack),
     [project]
   );
   const trackLayoutModel = useMemo(
-    () => buildTimelineTrackLayoutModel({ project, trackHeightByTrackId, tracks }),
-    [project, trackHeightByTrackId, tracks]
+    () =>
+      buildTimelineTrackLayoutModel({
+        project,
+        trackHeightByTrackId,
+        tracks,
+        collapsedFxByTrackId,
+      }),
+    [project, trackHeightByTrackId, tracks, collapsedFxByTrackId]
   );
   return { trackLayoutModel, tracks };
 }

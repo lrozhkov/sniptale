@@ -10,11 +10,21 @@ let container: HTMLDivElement;
 let controls: ReturnType<typeof useProjectTimelineViewState>;
 const onZoomChange = vi.fn();
 const project = { ...createEmptyVideoProject('Fit', 1920, 1080), duration: 100 };
-function Harness(props: { zoom: number; selected: boolean; duration?: number; fps?: number }) {
+function Harness(props: {
+  zoom: number;
+  selected: boolean;
+  duration?: number;
+  fps?: number;
+  projectDuration?: number;
+}) {
   const ref = useRef<HTMLDivElement | null>(null);
   controls = useProjectTimelineViewState(
     {
-      project: { ...project, fps: props.fps ?? project.fps },
+      project: {
+        ...project,
+        duration: props.projectDuration ?? project.duration,
+        fps: props.fps ?? project.fps,
+      },
       pixelsPerSecond: props.zoom,
       onZoomChange,
       currentTime: 12,
@@ -115,3 +125,16 @@ it.each([30, 60, 240])(
     expect(projection.scrollWidth).toBeLessThanOrEqual(30000000);
   }
 );
+
+it('recovers an old over-wide scale to project fit but preserves useful zoom', () => {
+  render(0.005);
+  expect(onZoomChange).toHaveBeenCalledWith(9.04);
+  onZoomChange.mockClear();
+  render(120);
+  expect(onZoomChange).not.toHaveBeenCalled();
+});
+
+it('does not magnify an empty project before its first insertion', () => {
+  act(() => root.render(<Harness zoom={90} selected={false} projectDuration={0} />));
+  expect(onZoomChange).not.toHaveBeenCalled();
+});

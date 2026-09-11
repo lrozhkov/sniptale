@@ -1,3 +1,4 @@
+import { usePreviewFrameRate } from '../frame-rate';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown } from 'lucide-react';
@@ -10,12 +11,15 @@ import {
 } from '@sniptale/ui/theme/safe-portal';
 import { translate } from '../../../../platform/i18n';
 import type {
+  VideoEditorPreviewFrameRate,
   VideoEditorPreviewMode,
   VideoEditorPreviewRasterPreset,
   VideoEditorPreviewZoom,
 } from '../../../contracts/preview-runtime';
 
 interface PreviewDisplaySettingsProps {
+  frameRate?: VideoEditorPreviewFrameRate;
+  onFrameRateChange?: (frameRate: VideoEditorPreviewFrameRate) => void;
   mode: VideoEditorPreviewMode;
   onModeChange: (mode: VideoEditorPreviewMode) => void;
   rasterPreset: VideoEditorPreviewRasterPreset;
@@ -75,6 +79,7 @@ export function PreviewDisplaySettings(props: PreviewDisplaySettingsProps) {
       >
         <span>
           {modeLabel} · {props.rasterPreset} · {zoomLabel}
+          {props.frameRate && props.frameRate !== 'project' ? ` · ${props.frameRate} fps` : ''}
         </span>
         <ChevronDown size={14} aria-hidden="true" className={open ? 'rotate-180' : ''} />
       </ContentToolbarButton>
@@ -159,6 +164,7 @@ function DisplayChoiceSection<T extends string>(props: {
 }
 
 function PreviewDisplayChoices(props: PreviewDisplaySettingsProps) {
+  const frameRate = usePreviewFrameRate();
   return (
     <ProductDropdownMenu
       className={[
@@ -185,6 +191,42 @@ function PreviewDisplayChoices(props: PreviewDisplaySettingsProps) {
         onChange={props.onRasterPresetChange}
         options={RASTER_OPTIONS}
       />
+      <DisplayChoiceSection
+        label={translate('videoEditor.stage.previewFrameRate')}
+        value={props.frameRate ?? 'project'}
+        onChange={props.onFrameRateChange ?? (() => undefined)}
+        options={[
+          { value: 'project', label: translate('videoEditor.stage.previewFrameRateProject') },
+          {
+            value: '30',
+            label: translate('videoEditor.stage.previewFrameRateLimit').replace('{fps}', '30'),
+          },
+          {
+            value: '24',
+            label: translate('videoEditor.stage.previewFrameRateLimit').replace('{fps}', '24'),
+          },
+          {
+            value: '15',
+            label: translate('videoEditor.stage.previewFrameRateLimit').replace('{fps}', '15'),
+          },
+        ]}
+      />
+      <label
+        className={[
+          'flex min-h-8 cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-xs',
+          'text-[var(--sniptale-color-text-primary)] has-[:disabled]:opacity-50',
+          'has-[:disabled]:cursor-default',
+        ].join(' ')}
+      >
+        <input
+          type="checkbox"
+          checked={frameRate?.enabled ?? false}
+          disabled={props.mode !== 'live'}
+          onChange={(event) => frameRate?.onChange(event.target.checked)}
+          className="m-0 accent-[var(--sniptale-color-accent)]"
+        />
+        {translate('videoEditor.stage.showFrameRate')}
+      </label>
       <DisplayChoiceSection
         label={translate('videoEditor.stage.previewZoom')}
         value={props.zoom}

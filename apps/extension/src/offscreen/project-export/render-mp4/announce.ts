@@ -15,7 +15,7 @@ function formatMuxerInitMessage(fallbackNotes: string[]): string {
 export function announceMp4PipelineStart(jobId: string, fallbackNotes: string[]) {
   return sendProgress(
     jobId,
-    VideoProjectExportPhase.TRANSCODING,
+    VideoProjectExportPhase.PREPARING,
     0,
     formatMuxerInitMessage(fallbackNotes)
   );

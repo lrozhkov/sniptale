@@ -1,3 +1,14 @@
+import {
+  createBuiltinEffectResources,
+  readBuiltinEffectResource,
+  BUILTIN_EFFECT_PREFIX,
+} from './builtin';
+import {
+  readEffectCatalogPreferences,
+  overlayEffectPreferences,
+  mutateEffectCatalogPreference,
+} from './preferences';
+import type { PersistenceMutationPermit } from '../infrastructure/mutation-barrier';
 import { initDB, VIDEO_EFFECT_BUNDLES_STORE } from '../infrastructure/indexed-db/core';
 import { runWithIndexedDbMutation } from '../infrastructure/indexed-db/mutation';
 import type { ImportedEffectArtifact } from '../../../features/video/project/effect-bundle/import/artifact';
@@ -36,9 +47,19 @@ export async function saveEffectArtifact(
     }
     const entry = {
       ...draft,
+      documents: draft.documents.map((document) => {
+        const presetPreferences = existing?.documents.find(
+          (item) => item.id === document.id
+        )?.presetPreferences;
+        return presetPreferences ? { ...document, presetPreferences } : document;
+      }),
       createdAt: existing?.createdAt ?? now,
       enabled: existing?.enabled ?? true,
     };
+    if (!parseEffectBundleCatalogEntry(entry)) {
+      tx.abort();
+      throw new EffectBundlePersistenceError('catalogEntryInvalid');
+    }
     const allEntriesValue: unknown = await store.getAll();
     if (!Array.isArray(allEntriesValue)) {
       tx.abort();
@@ -60,8 +81,10 @@ export async function saveEffectArtifact(
   });
 }
 
-export async function listEffectBundles(): Promise<EffectBundleCatalogListItem[]> {
-  const db = await initDB();
+export async function listImportedEffectBundles(
+  permit?: PersistenceMutationPermit
+): Promise<EffectBundleCatalogListItem[]> {
+  const db = await initDB(permit);
   const valuesValue: unknown = await db.getAll(VIDEO_EFFECT_BUNDLES_STORE);
   if (!Array.isArray(valuesValue)) {
     throw new EffectBundlePersistenceError('catalogEntryInvalid');
@@ -98,70 +121,68 @@ export async function listEffectBundles(): Promise<EffectBundleCatalogListItem[]
   );
 }
 
+const builtinResources = createBuiltinEffectResources(readBuiltinEffectResource);
+
+export async function listEffectBundles(
+  permit?: PersistenceMutationPermit
+): Promise<EffectBundleCatalogListItem[]> {
+  const [imported, builtin, preferences] = await Promise.all([
+    listImportedEffectBundles(permit),
+    builtinResources.load(),
+    readEffectCatalogPreferences(),
+  ]);
+  const entries: EffectBundleCatalogListItem[] = [
+    {
+      createdAt: builtin.createdAt,
+      documentKinds: builtin.documents.map((d) => d.kind),
+      enabled: builtin.enabled,
+      entry: builtin,
+      label: builtin.label,
+      packId: builtin.packId,
+      retainedByteLength: 0,
+      source: builtin.source,
+      status: 'ready',
+      updatedAt: builtin.updatedAt,
+      version: builtin.version,
+    },
+    ...imported,
+  ];
+  return entries.map((item) =>
+    item.status === 'ready'
+      ? {
+          ...item,
+          entry: overlayEffectPreferences(item.entry, preferences),
+          enabled: preferences.find((p) => p.packId === item.packId)?.enabled ?? item.enabled,
+        }
+      : item
+  );
+}
+
 export async function getEffectBundle(packId: string): Promise<EffectBundleCatalogEntry | null> {
+  if (packId.startsWith(BUILTIN_EFFECT_PREFIX)) {
+    const entry = await builtinResources.load();
+    return entry.packId === packId
+      ? overlayEffectPreferences(entry, await readEffectCatalogPreferences())
+      : null;
+  }
   const db = await initDB();
   const value: unknown = await db.get(VIDEO_EFFECT_BUNDLES_STORE, packId);
   if (value === undefined) return null;
   const entry = parseEffectBundleCatalogEntry(value);
   if (!entry) throw new EffectBundlePersistenceError('catalogEntryInvalid');
   await assertEffectBundleCatalogIntegrity(entry);
-  return entry;
+  return overlayEffectPreferences(entry, await readEffectCatalogPreferences());
 }
 
 export async function deleteEffectBundle(packId: string): Promise<void> {
+  if (packId.startsWith(BUILTIN_EFFECT_PREFIX))
+    throw new EffectBundlePersistenceError('catalogEntryInvalid');
   await runWithIndexedDbMutation((db) => db.delete(VIDEO_EFFECT_BUNDLES_STORE, packId));
 }
 
 export async function setEffectBundleEnabled(packId: string, enabled: boolean): Promise<void> {
-  await runWithIndexedDbMutation(async (db) => {
-    const verifiedValue: unknown = await db.get(VIDEO_EFFECT_BUNDLES_STORE, packId);
-    if (verifiedValue === undefined) return;
-    const verifiedEntry = parseEffectBundleCatalogEntry(verifiedValue);
-    if (!verifiedEntry) throw new EffectBundlePersistenceError('catalogEntryInvalid');
-    await assertEffectBundleCatalogIntegrity(verifiedEntry);
-
-    const tx = db.transaction(VIDEO_EFFECT_BUNDLES_STORE, 'readwrite');
-    const store = tx.objectStore(VIDEO_EFFECT_BUNDLES_STORE);
-    const currentValue: unknown = await store.get(packId);
-    const currentEntry = parseEffectBundleCatalogEntry(currentValue);
-    if (!currentEntry || !hasSameCatalogMutationIdentity(verifiedEntry, currentEntry)) {
-      tx.abort();
-      throw new EffectBundlePersistenceError('catalogIntegrityFailure');
-    }
-    await store.put({ ...currentEntry, enabled, updatedAt: Date.now() });
-    await tx.done;
-  });
-}
-
-function hasSameCatalogMutationIdentity(
-  verified: EffectBundleCatalogEntry,
-  current: EffectBundleCatalogEntry
-): boolean {
-  return (
-    JSON.stringify(catalogMutationIdentity(verified)) ===
-    JSON.stringify(catalogMutationIdentity(current))
-  );
-}
-
-function catalogMutationIdentity(entry: EffectBundleCatalogEntry) {
-  return {
-    assets: entry.assets.map(({ blob, ...asset }) => ({
-      ...asset,
-      blobSize: blob.size,
-      blobType: blob.type,
-    })),
-    createdAt: entry.createdAt,
-    description: entry.description,
-    documents: entry.documents,
-    enabled: entry.enabled,
-    label: entry.label,
-    packId: entry.packId,
-    retainedByteLength: entry.retainedByteLength,
-    source: entry.source,
-    sourceSha256: entry.sourceSha256,
-    updatedAt: entry.updatedAt,
-    version: entry.version,
-  };
+  if (!(await getEffectBundle(packId))) return;
+  await mutateEffectCatalogPreference(packId, (current) => ({ ...current, enabled }));
 }
 
 function assertStorageHeadroom(

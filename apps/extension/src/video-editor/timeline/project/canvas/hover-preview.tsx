@@ -20,7 +20,7 @@ export function useTimelineHoverPreview({
   const clearHoverPreview = () => setHoverTime(null);
 
   const updateHoverPreview = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!timelineRef.current || isTimelineObjectTarget(event.target)) {
+    if (!timelineRef.current || event.buttons > 0 || isTimelineObjectTarget(event.target)) {
       clearHoverPreview();
       return;
     }

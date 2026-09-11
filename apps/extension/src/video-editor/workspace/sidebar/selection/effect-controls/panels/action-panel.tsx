@@ -1,7 +1,8 @@
+import { ActionClickStyleFields, ActionKeyStyleFields } from '../action-style-fields';
 import { InspectorDetails } from '../../shared/details';
 import { getActionEventLabel } from '../../../../../chrome/display';
 import { canEditActionOccurrenceOnCanvas } from '../../../../../preview/stage/canvas/geometry';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorActionButton } from '../../shared/actions';
 import { translate } from '../../../../../../platform/i18n';
 import { resolveVideoProjectActionPresentations } from '../../../../../../features/video/project/action-presentation';
 import { getVideoProjectUtilityLanes } from '../../../../../../features/video/project/utility-lanes';
@@ -23,7 +24,8 @@ type ActionProps = Pick<
   | 'placementMode'
   | 'onClearPlacementMode'
   | 'onStartActionPointPlacement'
->;
+> &
+  Partial<Pick<WorkspaceSidebarSelectionPanelProps, 'recentColors' | 'onRememberRecentColor'>>;
 
 export function InspectActionPanel(props: ActionProps) {
   const occurrence = props.selectedActionOccurrence;
@@ -60,8 +62,12 @@ export function InspectActionPanel(props: ActionProps) {
           },
           {
             id: 'appearance',
-            semantic: 'appearance' as const,
-            label: translate('videoEditor.sidebar.inspectorGroupAppearance'),
+            semantic: event.kind === 'KEY' ? ('content' as const) : ('effects' as const),
+            label: translate(
+              event.kind === 'KEY'
+                ? 'videoEditor.sidebar.historyKeyboard'
+                : 'videoEditor.sidebar.historyClickEffects'
+            ),
             defaultActive: true,
             content: (
               <>
@@ -100,14 +106,20 @@ export function InspectActionPanel(props: ActionProps) {
                   duration={resolved.duration}
                   offset={resolved.offset}
                   preset={resolved.preset}
-                  showPreset={event.kind !== 'KEY'}
+                  showPreset={event.kind !== 'KEY' && event.kind !== 'SCROLL'}
                   disabled={disabled}
                   onChange={update}
                 />
-                <ProductActionButton
+                <EventStyleFields
+                  props={props}
+                  resolved={resolved}
+                  disabled={disabled}
+                  update={update}
+                />
+                <InspectorActionButton
                   compact
                   tone="secondary"
-                  className="mt-3"
+                  separated
                   disabled={disabled || !resolved.overridden}
                   onClick={() =>
                     props.onUpdateActionEventDetails(event.id, {
@@ -117,17 +129,19 @@ export function InspectActionPanel(props: ActionProps) {
                   }
                 >
                   {translate('videoEditor.sidebar.historyReset')}
-                </ProductActionButton>
+                </InspectorActionButton>
               </>
             ),
           },
           {
             id: 'animation',
             semantic: 'animation',
-            label: translate('videoEditor.sidebar.inspectorGroupAnimation'),
+            label: translate('videoEditor.sidebar.historyTransitions'),
             content: (
               <ActionPrimaryFields
                 part="animation"
+                easing={resolved.easing}
+                showEasing={event.kind !== 'KEY'}
                 duration={resolved.duration}
                 offset={resolved.offset}
                 preset={resolved.preset}
@@ -276,4 +290,38 @@ function resolveStatusLabel(reason: ActionPresentation['reason']) {
     case null:
       return translate('videoEditor.sidebar.historyVisible');
   }
+}
+
+function EventStyleFields({
+  props,
+  resolved,
+  disabled,
+  update,
+}: {
+  props: ActionProps;
+  resolved: ActionPresentation;
+  disabled: boolean;
+  update: (patch: VideoProjectActionPresentationOverride) => void;
+}) {
+  const common = {
+    disabled,
+    recentColors: props.recentColors,
+    onRememberRecentColor: props.onRememberRecentColor,
+  };
+  if (resolved.event.kind === 'KEY')
+    return (
+      <ActionKeyStyleFields
+        {...common}
+        value={resolved.keyStyle}
+        onChange={(keyStyle) => update({ keyStyle })}
+      />
+    );
+  if (resolved.event.kind === 'SCROLL' || resolved.preset === 'NONE') return null;
+  return (
+    <ActionClickStyleFields
+      {...common}
+      value={resolved.clickStyle}
+      onChange={(clickStyle) => update({ clickStyle })}
+    />
+  );
 }

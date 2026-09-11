@@ -77,3 +77,47 @@ it('registers hidden preview videos with muted defaults for runtime-owned playba
   expect(video?.muted).toBe(true);
   expect(video?.defaultMuted).toBe(true);
 });
+
+it('releases removed video sources without resetting players on ordinary frame updates', () => {
+  const pause = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
+  const load = vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
+  const videoRefs: PreviewStageVideoRefs = { current: {} };
+  const clip = createVideoClip();
+  const render = (clips: VideoProjectVideoClip[], src = 'blob:first') =>
+    act(() =>
+      root!.render(
+        <PreviewStageVideoBank
+          assetUrls={{ [clip.assetId]: src }}
+          bankClips={clips}
+          videoRefs={videoRefs}
+        />
+      )
+    );
+  try {
+    for (let i = 0; i < 3; i++) {
+      render([clip]);
+      const video = videoRefs.current[clip.id]!;
+      const loads = load.mock.calls.length;
+      const pauses = pause.mock.calls.length;
+      render([{ ...clip }]);
+      expect(videoRefs.current[clip.id]).toBe(video);
+      expect(load).toHaveBeenCalledTimes(loads);
+      expect(pause).toHaveBeenCalledTimes(pauses);
+      render([]);
+      expect(video.hasAttribute('src')).toBe(false);
+      expect(pause).toHaveBeenCalledTimes(pauses + 1);
+      expect(load).toHaveBeenCalledTimes(loads + 1);
+      expect(videoRefs.current[clip.id]).toBeUndefined();
+    }
+    render([clip]);
+    const video = videoRefs.current[clip.id]!;
+    const loads = load.mock.calls.length;
+    render([clip], 'blob:second');
+    expect(video.src).toBe('blob:second');
+    expect(load).toHaveBeenCalledTimes(loads + 1);
+    render([]);
+  } finally {
+    pause.mockRestore();
+    load.mockRestore();
+  }
+});

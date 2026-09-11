@@ -25,6 +25,7 @@ interface ProjectTimelinePanelPrefsState {
   setCollapsedTelemetryLaneVisible: (visible: boolean) => void;
   setCompactRows: (compactRows: boolean) => void;
   setHideTrackNames: (hidden: boolean) => void;
+  setFxCollapsed: (trackId: string, collapsed: boolean) => void;
   setClipNamesHidden: (trackId: string, hidden: boolean) => void;
   setTrackHeight: (trackId: string, multiplier: VideoEditorTrackHeightMultiplier) => void;
 }
@@ -61,7 +62,10 @@ function useCurrentTrackIds(project: VideoProject): ReadonlySet<string> {
     .map((track) => track.id)
     .sort()
     .join('\n');
-  return useMemo(() => new Set(trackIdsKey === '' ? [] : trackIdsKey.split('\n')), [trackIdsKey]);
+  return useMemo(
+    () => new Set(['video-group', ...(trackIdsKey === '' ? [] : trackIdsKey.split('\n'))]),
+    [trackIdsKey]
+  );
 }
 
 function useLoadTrackPanelPrefs(
@@ -111,6 +115,14 @@ function useTrackPanelPrefsActions(
     setCompactRows: useTrackPanelBooleanSetter(updatePrefs, 'compactRows'),
     setHideTrackNames: useTrackPanelBooleanSetter(updatePrefs, 'hideTrackNames'),
     setTrackHeight: useTrackHeightSetter(updatePrefs),
+    setFxCollapsed: useCallback(
+      (trackId: string, collapsed: boolean) =>
+        updatePrefs((current) => ({
+          ...current,
+          collapsedFxByTrackId: { ...current.collapsedFxByTrackId, [trackId]: collapsed },
+        })),
+      [updatePrefs]
+    ),
     setClipNamesHidden: useCallback(
       (trackId: string, hidden: boolean) =>
         updatePrefs((current) => ({

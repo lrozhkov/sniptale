@@ -23,6 +23,10 @@ export function AutoProcessingSetup({
   scope,
   settings,
   camera,
+  typingRate,
+  framingScale,
+  onTypingRate,
+  onFramingScale,
   busy,
   seconds,
   onToggleScope,
@@ -33,6 +37,10 @@ export function AutoProcessingSetup({
   scope: readonly string[];
   settings: VideoAutoProcessingSettings;
   camera: boolean;
+  typingRate: number;
+  framingScale: number;
+  onTypingRate: (rate: number) => void;
+  onFramingScale: (scale: number) => void;
   busy: boolean;
   seconds: (value: number) => string;
   onToggleScope: (clipId: string) => void;
@@ -40,7 +48,7 @@ export function AutoProcessingSetup({
   onToggleCamera: () => void;
 }) {
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_310px]">
+    <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_350px]">
       <section
         className="flex min-h-0 flex-col p-5"
         aria-label={translate('videoEditor.timeline.autoScope')}
@@ -104,6 +112,10 @@ has-[:disabled]:opacity-60`}
       <AutoProcessingSettings
         settings={settings}
         camera={camera}
+        typingRate={typingRate}
+        framingScale={framingScale}
+        onTypingRate={onTypingRate}
+        onFramingScale={onFramingScale}
         busy={busy}
         onChangeSettings={onChangeSettings}
         onToggleCamera={onToggleCamera}
@@ -115,12 +127,20 @@ has-[:disabled]:opacity-60`}
 function AutoProcessingSettings({
   settings,
   camera,
+  typingRate,
+  framingScale,
+  onTypingRate,
+  onFramingScale,
   busy,
   onChangeSettings,
   onToggleCamera,
 }: {
   settings: VideoAutoProcessingSettings;
   camera: boolean;
+  typingRate: number;
+  framingScale: number;
+  onTypingRate: (rate: number) => void;
+  onFramingScale: (scale: number) => void;
   busy: boolean;
   onChangeSettings: (patch: Partial<VideoAutoProcessingSettings['stableSegments']>) => void;
   onToggleCamera: () => void;
@@ -134,6 +154,20 @@ function AutoProcessingSettings({
         <SlidersHorizontal size={15} aria-hidden="true" />
         {translate('videoEditor.timeline.autoSettings')}
       </h3>
+      <div className="mb-4 border-b border-[var(--sniptale-color-border-soft)] pb-4">
+        <SelectField
+          label={translate('videoEditor.timeline.autoTyping')}
+          className="!border-transparent !bg-transparent !px-0 !py-0"
+          value={String(typingRate)}
+          disabled={busy}
+          options={[1, 2, 4, 8].map((rate) => ({
+            value: String(rate),
+            label:
+              rate === 1 ? translate('videoEditor.timeline.autoTransformActionSkip') : `${rate}×`,
+          }))}
+          onChange={(value) => onTypingRate(Number(value))}
+        />
+      </div>
       <div className="space-y-2">
         <SelectField
           label={translate('videoEditor.timeline.autoIdle')}
@@ -157,6 +191,9 @@ function AutoProcessingSettings({
           />
         ) : null}
       </div>
+      <p className="mt-2 text-xs leading-relaxed text-[var(--sniptale-color-text-secondary)]">
+        {translate('videoEditor.timeline.autoDetectionHelp')}
+      </p>
       <div
         className={`my-4 flex items-center justify-between gap-4 border-t
 border-[var(--sniptale-color-border-soft)] pt-4`}
@@ -172,12 +209,31 @@ border-[var(--sniptale-color-border-soft)] pt-4`}
           onClick={onToggleCamera}
         />
       </div>
+      {camera ? (
+        <div className="mb-4">
+          <SelectField
+            label={translate('videoEditor.timeline.autoFramingStrength')}
+            className="!border-transparent !bg-transparent !px-0 !py-0"
+            value={String(framingScale)}
+            disabled={busy}
+            options={[
+              { value: '1.25', label: translate('videoEditor.timeline.autoFramingSubtle') },
+              { value: '1.4', label: translate('videoEditor.timeline.autoFramingBalanced') },
+              { value: '1.7', label: translate('videoEditor.timeline.autoFramingClose') },
+            ]}
+            onChange={(value) => onFramingScale(Number(value))}
+          />
+          <p className="mt-2 text-xs leading-relaxed text-[var(--sniptale-color-text-secondary)]">
+            {translate('videoEditor.timeline.autoFramingHelp')}
+          </p>
+        </div>
+      ) : null}
       <details className="group border-t border-[var(--sniptale-color-border-soft)] pt-4">
         <summary className="cursor-pointer text-xs text-[var(--sniptale-color-text-secondary)]">
           {translate('videoEditor.timeline.autoMore')}
         </summary>
         <div className="mt-3 space-y-1">
-          {(['minDurationSeconds', 'shoulderSeconds', 'mergeGapSeconds'] as const).map((key) => {
+          {(['minDurationSeconds', 'shoulderSeconds'] as const).map((key) => {
             const label = translate(
               key === 'minDurationSeconds'
                 ? 'videoEditor.timeline.autoTransformMinDurationLabel'

@@ -110,6 +110,7 @@ function selectTimelineEditingPort(state: VideoEditorState): TimelineEditingPort
     updateTransitionDuration: state.updateTransitionDuration,
     updateTransitionEasing: state.updateTransitionEasing,
     updateTransitionTemplate: state.updateTransitionTemplate,
+    renameAsset: state.renameAsset,
     upsertAsset: state.upsertAsset,
     upsertAssets: state.upsertAssets,
     removeUnusedAssets: state.removeUnusedAssets,
@@ -139,6 +140,9 @@ function selectClipSelectionPort(state: VideoEditorState): ClipSelectionPort {
 
 function selectEffectEditingPort(state: VideoEditorState): EffectEditingPort {
   return {
+    selectEffectInstance: state.selectEffectInstance,
+    setEffectTargetBypassed: state.setEffectTargetBypassed,
+    setClipEffectsBypassed: state.setClipEffectsBypassed,
     applyEffectDocument: state.applyEffectDocument,
     deleteEffectInstance: state.deleteEffectInstance,
     duplicateEffectInstance: state.duplicateEffectInstance,

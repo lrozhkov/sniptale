@@ -73,3 +73,21 @@ it('collects capability profiles per codec and isolates a rejected family', asyn
 
   expect(profiles.map((profile) => profile.codec)).toEqual([VideoMp4Codec.HEVC]);
 });
+
+it.each([VideoMp4Codec.AVC, VideoMp4Codec.HEVC])(
+  'probes a sufficient level for 4K60 %s instead of hiding a supported codec',
+  async (codec) => {
+    vi.stubGlobal('VideoEncoder', {
+      isConfigSupported: vi.fn(async (config: VideoEncoderConfig) => ({
+        config,
+        supported:
+          codec === VideoMp4Codec.AVC
+            ? config.codec.endsWith('34')
+            : config.codec.includes('.L153.'),
+      })),
+    });
+    const settings = { ...createSettings(codec), width: 3840, height: 2160, fps: 60 };
+    const profiles = await getSupportedMp4VideoCodecProfiles(settings, [codec]);
+    expect(profiles.map((profile) => profile.codec)).toEqual([codec]);
+  }
+);

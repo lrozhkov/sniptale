@@ -1,3 +1,4 @@
+import { resolveEffectRuntimeVisualLayers } from '../../../../features/video/composition/draw/effect-runtime';
 import {
   createEffectRuntimeDrawState,
   drawCompositionVisualLayer,
@@ -154,7 +155,10 @@ function drawPreviewOrderedVisualLayers(params: {
   prepared: PreparedPreviewSceneCanvas;
 }) {
   const segments = segmentVisualLayersByViewportLock(
-    params.frame.visualLayers,
+    resolveEffectRuntimeVisualLayers(
+      params.frame.visualLayers,
+      params.effectRuntimeFrames?.overlayFrames
+    ),
     params.frame.camera
   );
   const overlayEffectState = createEffectRuntimeDrawState();
@@ -211,19 +215,26 @@ function drawPreviewUnlockedLayerGroup(params: {
       ? params.prepared
       : { ...params.prepared, context: passTarget.context };
 
-  for (const pass of params.passes) {
-    drawPreparedPreviewVisualPass({
-      clipMediaElements: params.clipMediaElements,
-      effectRuntimeFrames: getEffectRuntimeVisualPassFrames(params.effectRuntimeFrames, pass.time),
-      effectRuntimeState: resolvePreviewEffectDrawState(params.effectRuntimeStates, pass.time),
-      imageBank: params.imageBank,
-      layers: resolveOrderedPreviewPassLayers(params.layers, pass.frame.visualLayers),
-      pass,
-      prepared: groupedPrepared,
-    });
-  }
+  try {
+    for (const pass of params.passes) {
+      drawPreparedPreviewVisualPass({
+        clipMediaElements: params.clipMediaElements,
+        effectRuntimeFrames: getEffectRuntimeVisualPassFrames(
+          params.effectRuntimeFrames,
+          pass.time
+        ),
+        effectRuntimeState: resolvePreviewEffectDrawState(params.effectRuntimeStates, pass.time),
+        imageBank: params.imageBank,
+        layers: resolveOrderedPreviewPassLayers(params.layers, pass.frame.visualLayers),
+        pass,
+        prepared: groupedPrepared,
+      });
+    }
 
-  passTarget.flush();
+    passTarget.flush();
+  } finally {
+    passTarget.dispose();
+  }
 }
 
 function resolveOrderedPreviewPassLayers(
@@ -234,7 +245,9 @@ function resolveOrderedPreviewPassLayers(
   for (const segmentLayer of layers) {
     const layer = passLayers.find((candidate) => candidate.clipId === segmentLayer.clipId);
     if (layer) {
-      resolvedLayers.push(layer);
+      resolvedLayers.push(
+        segmentLayer.effectActionsOnly ? { ...layer, effectActionsOnly: true } : layer
+      );
     }
   }
   return resolvedLayers;

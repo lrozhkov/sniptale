@@ -9,6 +9,8 @@ import { createEmptyVideoProject } from '../factories/creation';
 import { importRawEffectDocument } from '../effect-bundle/import/zip';
 import { applyEffectCatalogDocument } from './apply';
 import { resolveEffectInstanceTime } from './timing';
+import { buildClipLabel } from '../timeline/meta';
+import { getCurrentLocale } from '../../../../platform/i18n';
 
 it('applies immutable content-addressed snapshots and reuses only byte-identical content', async () => {
   const catalog = await createRawCatalog(readFixture());
@@ -185,4 +187,25 @@ it('places overlapping standalone effects on separate video layers and reuses a 
   const third = await apply(second, 5, 'later');
   expect(third.tracks).toBe(second.tracks);
   expect(third.clips.at(-1)?.startTime).toBe(5);
+});
+
+it('presents authored names instead of effect IDs and preserves a user rename', async () => {
+  const catalog = await createRawCatalog(readFixture());
+  const project = await applyEffectCatalogDocument({
+    catalog,
+    documentId: catalog.documents[0]!.id,
+    instanceId: 'named',
+    project: createEmptyVideoProject('names'),
+    startTime: 0,
+    target: { kind: 'scene' },
+  });
+  const clip = project.clips[0]!;
+  const labels = JSON.parse(readFixture()).label;
+  expect(clip.name).toBe('');
+  expect(buildClipLabel(project, clip)).toBe(labels[getCurrentLocale()] ?? labels.en);
+  expect(buildClipLabel(project, { ...clip, name: catalog.documents[0]!.id })).toBe(
+    catalog.documents[0]!.id
+  );
+  expect(buildClipLabel(project, { ...clip, name: labels.ru })).toBe(labels.ru);
+  expect(buildClipLabel(project, { ...clip, name: 'My explanation' })).toBe('My explanation');
 });

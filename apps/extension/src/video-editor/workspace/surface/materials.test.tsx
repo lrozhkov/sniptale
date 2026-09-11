@@ -1,5 +1,6 @@
-import { createVideoClipFromAsset } from '../../../features/video/project/factories/clip';
 // @vitest-environment jsdom
+
+import { createVideoClipFromAsset } from '../../../features/video/project/factories/clip';
 import { act } from 'react';
 import { useActiveCanvasInsertEscape } from '@sniptale/ui/canvas-tools';
 import { createRoot } from 'react-dom/client';
@@ -47,6 +48,7 @@ function renderMaterials() {
   act(() =>
     root.render(
       <VideoEditorMaterials
+        onRename={vi.fn()}
         onShowUse={vi.fn()}
         onRemoveUnused={onRemoveUnused}
         onOpenLibrary={onOpenLibrary}
@@ -85,6 +87,7 @@ it('includes library recordings alongside local video in the Video category', as
   act(() =>
     root.render(
       <VideoEditorMaterials
+        onRename={vi.fn()}
         project={project}
         onImport={onImport}
         onSelect={onSelect}
@@ -156,6 +159,7 @@ it('dismisses Import before the armed canvas insertion and restores its trigger'
       <>
         <ArmedInsertion onCancel={onCancel} />
         <VideoEditorMaterials
+          onRename={vi.fn()}
           onShowUse={vi.fn()}
           onRemoveUnused={vi.fn()}
           onOpenLibrary={onOpenLibrary}
@@ -207,6 +211,7 @@ it('yields focus to an inspector select without retaining a competing menu layer
           ]}
         />
         <VideoEditorMaterials
+          onRename={vi.fn()}
           onShowUse={vi.fn()}
           onRemoveUnused={vi.fn()}
           onOpenLibrary={onOpenLibrary}
@@ -279,6 +284,7 @@ it('anchors import in the footer and only exposes removal for unused materials',
   act(() =>
     root.render(
       <VideoEditorMaterials
+        onRename={vi.fn()}
         onShowUse={vi.fn()}
         project={project}
         selectedAssetId={asset.id}
@@ -304,6 +310,7 @@ it('filters used materials and searches names without changing the bulk-removal 
   act(() =>
     root.render(
       <VideoEditorMaterials
+        onRename={vi.fn()}
         onShowUse={vi.fn()}
         project={project}
         onImport={onImport}

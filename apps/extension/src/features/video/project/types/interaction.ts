@@ -30,6 +30,7 @@ export const VideoCursorAnimationPreset = {
   PULSE: 'PULSE',
   FLOAT: 'FLOAT',
   BREATHE: 'BREATHE',
+  PRESS: 'PRESS',
 } as const;
 
 export type VideoCursorAnimationPreset =
@@ -76,6 +77,7 @@ export const VideoProjectActionPreset = {
   NONE: 'NONE',
   CLICK_RIPPLE: 'CLICK_RIPPLE',
   SPOTLIGHT: 'SPOTLIGHT',
+  CLICK_PRESS: 'CLICK_PRESS',
   DWELL_ZOOM: 'DWELL_ZOOM',
   SCROLL_EMPHASIS: 'SCROLL_EMPHASIS',
 } as const;
@@ -149,6 +151,31 @@ export interface VideoProjectActionPoint {
   y: number;
 }
 
+export interface VideoActionClickStyle {
+  color: string;
+  size: number;
+  opacity: number;
+  strokeWidth: number;
+}
+
+export interface VideoActionKeyStyle {
+  position:
+    | 'bottom-left'
+    | 'bottom-center'
+    | 'bottom-right'
+    | 'top-left'
+    | 'top-center'
+    | 'top-right';
+  fontFamily: 'sans-serif' | 'serif' | 'monospace';
+  fontSize: number;
+  color: string;
+  background: string;
+  opacity: number;
+  cornerRadius: number;
+  margin: number;
+  entrance: 'fade' | 'slide' | 'none';
+}
+
 /** Project-wide presentation defaults; captured event facts remain independent. */
 export interface VideoProjectActionPresentation {
   enabled: boolean;
@@ -157,10 +184,16 @@ export interface VideoProjectActionPresentation {
   offset: number;
   clickSuppressionInterval: number;
   showKeystrokes: boolean;
+  clickStyle?: VideoActionClickStyle;
+  keyStyle?: VideoActionKeyStyle;
+  easing?: VideoTemporalEasing;
 }
 
 /** Missing properties inherit the current project presentation defaults. */
 export interface VideoProjectActionPresentationOverride {
+  clickStyle?: VideoActionClickStyle;
+  keyStyle?: VideoActionKeyStyle;
+  easing?: VideoTemporalEasing;
   enabled?: boolean;
   preset?: VideoProjectActionPreset;
   duration?: number;

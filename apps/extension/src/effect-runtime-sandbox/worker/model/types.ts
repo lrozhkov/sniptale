@@ -159,6 +159,7 @@ type RuntimeContextMethods = Pick<
 
 export type RuntimeCanvasContext = RuntimeContextProperties &
   RuntimeContextMethods & {
+    reset?(): void;
     __sniptaleLogicalScaleX?: number;
     __sniptaleLogicalScaleY?: number;
     drawImage(

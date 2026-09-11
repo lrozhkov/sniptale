@@ -17,7 +17,9 @@ export function createDesktopPreviewController(): DesktopPreviewController {
       video.srcObject = stream;
 
       video.play().catch((error) => {
-        logger.warn('Desktop preview play() rejected', error);
+        if (video.srcObject === stream) {
+          logger.warn('Desktop preview play() rejected', error);
+        }
       });
 
       return video;

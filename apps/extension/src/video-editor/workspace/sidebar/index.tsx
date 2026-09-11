@@ -9,7 +9,8 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = (props) => {
   const state = useWorkspaceSidebarState(
     props.selection ?? createSceneSelection(),
     props.selectedClip,
-    props.selectedTrack
+    props.selectedTrack,
+    props.project
   );
 
   if (props.collapsed) {

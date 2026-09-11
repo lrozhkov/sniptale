@@ -77,25 +77,6 @@ async function createRenderMessage(
   };
 }
 
-async function cloneFrameInputs(
-  inputFrames: EffectRuntimeFrameInputs
-): Promise<EffectRuntimeFrameInputs> {
-  const clones: EffectRuntimeFrameInputs = {};
-  try {
-    for (const [name, frame] of Object.entries(inputFrames)) {
-      clones[name as keyof EffectRuntimeFrameInputs] = {
-        bitmap: await createImageBitmap(frame.bitmap),
-        height: frame.height,
-        width: frame.width,
-      };
-    }
-    return clones;
-  } catch (error) {
-    closeEffectRuntimeBitmaps(clones);
-    throw error;
-  }
-}
-
 function sendRenderRequest(
   authority: EffectRuntimeSandboxRenderAuthority,
   current: EffectRuntimeSandboxSession,
@@ -117,7 +98,7 @@ function rejectStaleSessionResult(
   result: EffectRuntimeFrameResult
 ): EffectRuntimeFrameResult | null {
   if (authority.isCurrentSession(current)) return null;
-  if (result.kind === 'frame') result.bitmap.close();
+  closeEffectRuntimeBitmaps(result);
   return createEffectRuntimeFailure(command, 'stale');
 }
 
@@ -142,10 +123,7 @@ async function requestFrameWithCacheRetry(
 ): Promise<EffectRuntimeFrameResult> {
   const sendFullDocument = !authority.acknowledgedDocuments.has(command.documentRef.id);
   const sendFullAssets = !authority.acknowledgedAssetSelections.has(command.assetSelectionRef.id);
-  let retryInputs =
-    (!sendFullDocument || !sendFullAssets) && Object.keys(command.inputFrames).length > 0
-      ? await cloneFrameInputs(command.inputFrames)
-      : null;
+  let retryInputs: EffectRuntimeFrameInputs | null = null;
   try {
     const request = await createRenderMessage(command, {
       inputFrames: command.inputFrames,
@@ -156,6 +134,7 @@ async function requestFrameWithCacheRetry(
     const staleInitial = rejectStaleSessionResult(authority, current, command, result);
     if (staleInitial) return staleInitial;
     if (result.kind === 'error' && result.code === 'cacheMiss') {
+      retryInputs = result.retryInputs ?? {};
       forgetMissingRef(authority, command, result.missingRef);
       const retry = await createRenderMessage(command, {
         inputFrames: retryInputs ?? {},
@@ -166,7 +145,11 @@ async function requestFrameWithCacheRetry(
       result = await sendRenderRequest(authority, current, retry);
       const staleRetry = rejectStaleSessionResult(authority, current, command, result);
       if (staleRetry) return staleRetry;
-      if (result.kind === 'error' && result.code === 'cacheMiss') authority.clearSession(current);
+      if (result.kind === 'error' && result.code === 'cacheMiss') {
+        closeEffectRuntimeBitmaps(result);
+        authority.clearSession(current);
+        return createEffectRuntimeFailure(command, 'inputRejected');
+      }
     }
     return result;
   } finally {

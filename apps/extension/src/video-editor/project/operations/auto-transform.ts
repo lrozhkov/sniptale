@@ -7,6 +7,8 @@ import type {
 } from '../../../features/video/project/types';
 import type { VideoAutoProcessingSettings } from '@sniptale/runtime-contracts/video/types/types';
 import { getVideoProjectUtilityLanes } from '../../../features/video/project/utility-lanes';
+import { analyzeAutoProcessingAudio } from './auto-transform.audio';
+import type { AutoProcessingAudio } from './auto-transform.candidates';
 import { buildAutoTransformCandidates } from './auto-transform.candidates';
 import { buildAutoZoomRegions } from './auto-transform.zoom';
 import {
@@ -30,11 +32,14 @@ export interface AutoProcessingRequest {
   targets: AutoProcessingTarget[];
   settings: VideoAutoProcessingSettings;
   camera: boolean;
+  typingRate?: number;
+  framingScale?: number;
 }
 interface AutoProcessingSuggestion {
   id: string;
   target: AutoProcessingTarget;
   kind: 'timing' | 'camera';
+  category?: 'typing' | 'idle';
   label: string;
   startTime: number;
   endTime: number;
@@ -53,6 +58,7 @@ export interface AutoProcessingPreview {
   suggestions: AutoProcessingSuggestion[];
   selectedIds: string[];
   telemetry: (RecordingTelemetryEntry | undefined)[];
+  audio?: Record<string, AutoProcessingAudio>;
   summary: {
     beforeDuration: number;
     afterDuration: number;
@@ -148,6 +154,7 @@ function buildTimingSuggestions(
         id: timing.id,
         target,
         kind: 'timing',
+        category: candidate.category,
         label: clip.name,
         startTime,
         endTime: startTime + beforeDuration,
@@ -165,7 +172,8 @@ function buildCameraSuggestions(
   project: VideoProject,
   target: AutoProcessingTarget,
   clip: VideoProjectVideoClip,
-  telemetry: RecordingTelemetryEntry
+  telemetry: RecordingTelemetryEntry,
+  scale?: number
 ): AutoProcessingSuggestion[] {
   if (getVideoProjectUtilityLanes(project).camera.locked)
     return [
@@ -180,6 +188,7 @@ function buildCameraSuggestions(
     recordingId: target.recordingId,
     telemetry,
     clipIds: new Set([target.clipId]),
+    ...(scale === undefined ? {} : { scale }),
   });
   return regions.flatMap((region) => {
     if (
@@ -211,7 +220,8 @@ function buildCameraSuggestions(
 function buildSuggestions(
   project: VideoProject,
   request: AutoProcessingRequest,
-  telemetry: (RecordingTelemetryEntry | undefined)[]
+  telemetry: (RecordingTelemetryEntry | undefined)[],
+  audio: Record<string, AutoProcessingAudio>
 ) {
   const suggestions: AutoProcessingSuggestion[] = [];
   const linkedKeys = new Set<string>();
@@ -242,7 +252,10 @@ function buildSuggestions(
         project,
         target,
         clip,
-        buildAutoTransformCandidates(entry, request.settings.stableSegments)
+        buildAutoTransformCandidates(entry, request.settings.stableSegments, {
+          typingRate: request.typingRate ?? 2,
+          audio: audio[clip.assetId] ?? { status: 'unavailable' },
+        })
       )
     );
     if (request.camera) {
@@ -253,7 +266,9 @@ function buildSuggestions(
           ...suggestions.flatMap((row) => (row.region ? [row.region] : [])),
         ],
       };
-      suggestions.push(...buildCameraSuggestions(cameraProject, target, clip, entry));
+      suggestions.push(
+        ...buildCameraSuggestions(cameraProject, target, clip, entry, request.framingScale)
+      );
     }
   }
   return suggestions;
@@ -287,7 +302,8 @@ function bindSelectedCameraRegions(
 export async function prepareAutoProcessing(
   project: VideoProject,
   request: AutoProcessingRequest,
-  selectedIds?: readonly string[]
+  selectedIds?: readonly string[],
+  analyzeAudio = analyzeAutoProcessingAudio
 ): Promise<AutoProcessingPreview> {
   if (!request.settings.enabled || !request.targets.length)
     return {
@@ -310,7 +326,14 @@ export async function prepareAutoProcessing(
     ...new Set(request.targets.map((target) => target.recordingId).filter(Boolean)),
   ];
   const telemetry = await Promise.all(recordingIds.map((id) => getRecordingTelemetry(id)));
-  const suggestions = buildSuggestions(project, request, telemetry);
+  const audio: Record<string, AutoProcessingAudio> = {};
+  for (const target of request.targets) {
+    const clip = project.clips.find((item) => item.id === target.clipId);
+    if (clip?.type !== 'VIDEO' || audio[clip.assetId]) continue;
+    const asset = project.assets.find((item) => item.id === clip.assetId);
+    audio[clip.assetId] = asset ? await analyzeAudio(asset) : { status: 'unavailable' };
+  }
+  const suggestions = buildSuggestions(project, request, telemetry, audio);
   const chosen = new Set(
     selectedIds ?? suggestions.filter((row) => row.status === 'available').map((row) => row.id)
   );
@@ -335,6 +358,7 @@ export async function prepareAutoProcessing(
     suggestions,
     selectedIds: selected.map((row) => row.id),
     telemetry,
+    audio,
     summary: {
       beforeDuration: project.duration,
       afterDuration: next?.duration ?? project.duration,

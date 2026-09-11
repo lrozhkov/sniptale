@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_VIDEO_OUTPUT_PROFILE,
   getDefaultVideoOutputCodec,
-  getVideoResolutionTier,
   getVideoRecordingMimeTypeCandidates,
   isVideoOutputProfile,
   isVideoPixelRateSupported,
@@ -46,22 +45,16 @@ describe('canonical video output geometry', () => {
       height: 478,
     });
   });
-
-  it('assigns arbitrary source dimensions to their enclosing standard tier', () => {
-    expect(getVideoResolutionTier(1482, 916)).toBe(VideoResolutionPreset.P1080);
-    expect(getVideoResolutionTier(2560, 1080)).toBe(VideoResolutionPreset.P1080);
-    expect(getVideoResolutionTier(1080, 1920)).toBe(VideoResolutionPreset.P2160);
-  });
 });
 
 describe('canonical video output profile', () => {
-  it('keeps the 2160p preset inside its canonical 24 fps live-recording tier', () => {
+  it('keeps the 2160p preset inside its 30 fps live-recording limit', () => {
     expect(
       isVideoResolutionFrameRateSupported(VideoResolutionPreset.P2160, VideoFrameRate.FPS24)
     ).toBe(true);
     expect(
       isVideoResolutionFrameRateSupported(VideoResolutionPreset.P2160, VideoFrameRate.FPS30)
-    ).toBe(false);
+    ).toBe(true);
     expect(
       isVideoResolutionFrameRateSupported(VideoResolutionPreset.P2160, VideoFrameRate.FPS60)
     ).toBe(false);
@@ -193,4 +186,15 @@ describe('canonical video output profile', () => {
     expect(isVideoPixelRateSupported(3840 * 2160 * 60)).toBe(false);
     expect(isVideoPixelRateSupported(Number.NaN)).toBe(false);
   });
+});
+
+it('keeps bitrate continuous across resolution labels and accounts for width', () => {
+  const rate = (width: number, height: number) =>
+    resolveVideoTargetBitrate({ width, height, fps: 30, quality: 'HIGH' });
+  expect(rate(1920, 1081) - rate(1920, 1080)).toBeLessThan(10000);
+  expect(rate(2560, 1080)).toBeGreaterThan(rate(1920, 1080));
+  expect(rate(1080, 1920)).toBe(rate(1920, 1080));
+  expect(
+    isVideoResolutionFrameRateSupported(VideoResolutionPreset.P2160, VideoFrameRate.FPS30)
+  ).toBe(true);
 });

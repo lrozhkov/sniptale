@@ -223,3 +223,58 @@ it('keeps Zoom lane selection across updates and clears it when the last region 
   project.motionRegions = [];
   expect(resolveSelectionAfterProjectUpdate(project, selection)).toEqual({ kind: 'scene' });
 });
+
+it('clears orphaned FX targets and reconciles groups after removing their clips', () => {
+  const project = createSelectionProject();
+  project.effectInstances = [
+    {
+      id: 'fx',
+      kind: 'targetEffect',
+      target: { kind: 'clip', clipId: 'missing' },
+      controls: {},
+      enabled: true,
+      duration: 1,
+      startTime: 0,
+      playbackRate: 1,
+      snapshotId: 'snapshot',
+    },
+  ];
+  const selected = { kind: 'effect-instance', effectInstanceId: 'fx' } as const;
+  expect(resolveSelectedTrackIdFromSelection(project, selected)).toBeNull();
+  expect(resolveSelectionAfterProjectUpdate(project, selected)).toEqual(selected);
+  project.effectInstances = [];
+  expect(resolveSelectionAfterProjectUpdate(project, selected)).toEqual({ kind: 'scene' });
+  const group = {
+    kind: 'clip-group',
+    clipIds: ['clip-1', 'clip-2', 'missing'],
+    anchorClipId: 'missing',
+  } as const;
+  project.clips.push({ ...project.clips[0]!, id: 'clip-2' });
+  const mutableGroup = { ...group, clipIds: [...group.clipIds] };
+  const retained = resolveSelectionAfterProjectUpdate(project, mutableGroup);
+  expect(retained).toEqual({
+    kind: 'clip-group',
+    clipIds: ['clip-1', 'clip-2'],
+    anchorClipId: 'clip-1',
+  });
+  expect(resolveSelectionAfterProjectUpdate(project, retained)).toEqual(retained);
+  project.clips.pop();
+  expect(resolveSelectionAfterProjectUpdate(project, mutableGroup)).toEqual({
+    kind: 'clip',
+    clipId: 'clip-1',
+  });
+  project.clips = [];
+  expect(resolveSelectionAfterProjectUpdate(project, mutableGroup)).toEqual({ kind: 'scene' });
+  expect(
+    resolveSelectedTrackIdFromSelection(project, {
+      kind: 'transition-junction',
+      transitionId: 'missing',
+    })
+  ).toBeNull();
+  expect(
+    resolveSelectedTrackIdFromSelection(project, {
+      kind: 'transition-junction',
+      transitionId: 'transition-1',
+    })
+  ).toBeNull();
+});

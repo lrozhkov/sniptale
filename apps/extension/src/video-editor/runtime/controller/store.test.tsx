@@ -41,6 +41,9 @@ const expectedKeys = {
     'deleteEffectInstance',
     'duplicateEffectInstance',
     'moveEffectInstance',
+    'selectEffectInstance',
+    'setClipEffectsBypassed',
+    'setEffectTargetBypassed',
     'updateEffectInstance',
   ],
   export: [
@@ -159,6 +162,7 @@ const expectedKeys = {
     'updateTransitionDuration',
     'updateTransitionEasing',
     'updateTransitionTemplate',
+    'renameAsset',
     'upsertAsset',
     'upsertAssets',
     'removeUnusedAssets',

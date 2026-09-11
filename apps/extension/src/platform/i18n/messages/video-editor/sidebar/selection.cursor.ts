@@ -182,7 +182,7 @@ export const videoEditorSidebarSelectionCursorMessages = defineMessageSource({
     en: 'The video is not ready for analysis yet.',
   },
   cursorDetectionReadyForZoom: {
-    ru: 'Траектория курсора готова для зума',
+    ru: 'Траектория курсора готова для масштабирования',
     en: 'Cursor path is ready for zoom',
   },
   cursorDetectionNeedsCorrection: {

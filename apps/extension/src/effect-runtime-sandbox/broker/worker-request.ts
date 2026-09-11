@@ -1,3 +1,4 @@
+import { matchesEffectRuntimeRetryInputs } from '../../contracts/effect-runtime/retry-inputs';
 import { closeEffectRuntimeBitmaps } from '../../contracts/effect-runtime/bitmap-lifetime';
 import {
   createEffectRuntimeFailure,
@@ -150,7 +151,7 @@ function handleWorkerMessage(
     closeEffectRuntimeBitmaps(event.data);
     failWorker(request, worker, state, resolve, options.lease, 'malformed');
   } else if (!sameEffectRuntimeIdentity(request, result)) {
-    if (result.kind === 'frame') result.bitmap.close();
+    closeEffectRuntimeBitmaps(result);
     finishWorker(
       worker,
       state,
@@ -160,10 +161,11 @@ function handleWorkerMessage(
       true
     );
   } else if (
+    !matchesEffectRuntimeRetryInputs(request.inputFrames, result) ||
     isFrameSizeInvalid(request, result) ||
     !hasExpectedEffectRuntimeAcknowledgement(request, result)
   ) {
-    if (result.kind === 'frame') result.bitmap.close();
+    closeEffectRuntimeBitmaps(result);
     finishWorker(
       worker,
       state,
@@ -186,7 +188,7 @@ function finishWorker(
   terminate: boolean
 ): void {
   if (state.settled) {
-    if (result.kind === 'frame') result.bitmap.close();
+    closeEffectRuntimeBitmaps(result);
     return;
   }
   state.settled = true;

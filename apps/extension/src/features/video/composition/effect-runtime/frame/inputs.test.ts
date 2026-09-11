@@ -27,7 +27,13 @@ class FakeBitmap implements ImageBitmap {
 }
 
 const clearRect = vi.fn();
-const context: Partial<CanvasRenderingContext2D> = { clearRect };
+const context: Partial<CanvasRenderingContext2D> = {
+  clearRect,
+  save: vi.fn(),
+  restore: vi.fn(),
+  scale: vi.fn(),
+  translate: vi.fn(),
+};
 
 beforeEach(() => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
@@ -226,7 +232,7 @@ function createLayer(clipId: string): VideoCompositionVisualLayer {
   };
 }
 
-it('bakes captured actions into isolated effect input once without appending to the bitmap', async () => {
+it('keeps captured actions outside FX input and draws them once in the final overlay', async () => {
   const { drawCompositionVisualLayer, drawCompositionVisualLayerBitmap } =
     await import('../../draw/visual');
   const { createVisualTestContext } = await import('../../draw/visual.test-support');
@@ -295,9 +301,17 @@ it('bakes captured actions into isolated effect input once without appending to 
     })
   );
   expect(source.draw).toHaveBeenCalledOnce();
-  expect(context.arc).toHaveBeenCalledTimes(1);
-  expect(context.arc).toHaveBeenCalledWith(5, 5, 32, 0, Math.PI * 2);
+  expect(context.arc).not.toHaveBeenCalled();
   drawCompositionVisualLayerBitmap(context as CanvasRenderingContext2D, layer, bitmap, 1, 1);
+  drawCompositionVisualLayer(
+    context as CanvasRenderingContext2D,
+    { ...layer, effectActionsOnly: true },
+    1,
+    1,
+    {},
+    new Map([[layer.clipId, source]])
+  );
+  expect(source.draw).toHaveBeenCalledOnce();
   expect(context.arc).toHaveBeenCalledTimes(1);
   bitmap.close();
 });

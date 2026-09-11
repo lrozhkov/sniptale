@@ -8,6 +8,8 @@ function createContext() {
     globalCompositeOperation: 'source-over',
     restore: vi.fn(),
     save: vi.fn(),
+    setTransform: vi.fn(),
+    clearRect: vi.fn(),
     shadowBlur: 0,
     shadowColor: '',
     shadowOffsetX: 0,
@@ -31,6 +33,8 @@ function createContext() {
     rect: vi.fn(),
     restore: vi.fn(),
     save: vi.fn(),
+    setTransform: vi.fn(),
+    clearRect: vi.fn(),
     shadowBlur: 0,
     shadowColor: '',
     shadowOffsetY: 0,
@@ -96,6 +100,8 @@ it('draws glow masks with OffscreenCanvas when no owner document exists', () => 
     globalCompositeOperation: 'source-over',
     restore: vi.fn(),
     save: vi.fn(),
+    setTransform: vi.fn(),
+    clearRect: vi.fn(),
   };
   class FakeOffscreenCanvas {
     height: number;
@@ -161,9 +167,45 @@ function createContextWithoutMaskCanvas(
     fillRect: vi.fn(),
     restore: vi.fn(),
     save: vi.fn(),
+    setTransform: vi.fn(),
+    clearRect: vi.fn(),
     ...overrides,
   } as unknown as CanvasRenderingContext2D & {
     drawImage: ReturnType<typeof vi.fn>;
     fillRect: ReturnType<typeof vi.fn>;
   };
 }
+
+it.each(['rounded', 'soft', 'ellipse'] as const)(
+  'reuses and clears the camera %s mask between frames',
+  (shape) => {
+    const context = createContext();
+    const mask = context.__maskContext;
+    const fill = vi.fn();
+    const beginPath = vi.fn();
+    Object.assign(mask, {
+      fill,
+      beginPath,
+      roundRect: vi.fn(),
+      moveTo: vi.fn(),
+      lineTo: vi.fn(),
+      closePath: vi.fn(),
+    });
+    const frame = { height: 80, width: 120, x: 6, y: 8 };
+    for (let i = 0; i < 3; i++)
+      drawMediaFrameShadow(
+        context,
+        50,
+        VideoMediaShadowMode.GLOW,
+        frame,
+        2,
+        { shape, roundness: 50, zoom: 1, panX: 0, panY: 0 },
+        true
+      );
+    expect(context.canvas.ownerDocument.createElement).toHaveBeenCalledTimes(1);
+    expect(mask.clearRect).toHaveBeenCalledTimes(3);
+    expect(beginPath).toHaveBeenCalledTimes(6);
+    expect(fill).toHaveBeenCalledTimes(6);
+    expect(mask.restore).toHaveBeenCalledTimes(3);
+  }
+);

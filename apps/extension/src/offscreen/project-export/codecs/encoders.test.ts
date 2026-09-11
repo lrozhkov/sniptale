@@ -18,6 +18,7 @@ import {
   type VideoProjectExportSettings,
 } from '../../../features/video/project/types';
 import { MP4_VIDEO_ENCODER_CANDIDATES_BY_CODEC } from './constants';
+import { resolveExportTargetBitrate } from './bitrate';
 import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 
 function createVideoExportSettings(
@@ -89,7 +90,7 @@ it('selects supported MP4 video and audio encoder candidates', async () => {
     expect.objectContaining({
       bitrate: 5_000_000,
       bitrateMode: 'variable',
-      codec: 'avc1.4D401F',
+      codec: 'avc1.4D4028',
       framerate: 30,
       height: 1080,
       width: 1920,
@@ -107,20 +108,19 @@ it('passes the exact low-tier bitrate through the effective MP4 encoder config',
   }));
   vi.stubGlobal('VideoEncoder', { isConfigSupported: videoSupportMock });
 
-  const videoEncoder = await getSupportedMp4VideoEncoder(
-    createVideoExportSettings({
-      width: 426,
-      height: 240,
-      quality: VideoExportQualityPreset.LOW,
-      resolution: VideoResolutionPreset.P240,
-    }),
-    VideoMp4Codec.AVC
-  );
+  const settings = createVideoExportSettings({
+    width: 426,
+    height: 240,
+    quality: VideoExportQualityPreset.LOW,
+    resolution: VideoResolutionPreset.P240,
+  });
+  const expectedBitrate = resolveExportTargetBitrate(settings);
+  const videoEncoder = await getSupportedMp4VideoEncoder(settings, VideoMp4Codec.AVC);
 
   expect(videoSupportMock).toHaveBeenCalledWith(
-    expect.objectContaining({ bitrate: 250_000, bitrateMode: 'variable' })
+    expect.objectContaining({ bitrate: expectedBitrate, bitrateMode: 'variable' })
   );
-  expect(videoEncoder.config.bitrate).toBe(250_000);
+  expect(videoEncoder.config.bitrate).toBe(expectedBitrate);
 });
 
 it('rejects a supported result whose normalized config drops variable bitrate', async () => {

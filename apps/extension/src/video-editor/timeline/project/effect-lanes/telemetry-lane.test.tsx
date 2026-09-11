@@ -1,5 +1,6 @@
-import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
 // @vitest-environment jsdom
+
+import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
 import {
   createProject,
   createTrack,

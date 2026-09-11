@@ -1,5 +1,5 @@
 import { translate } from '../../../../../platform/i18n';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorActionButton } from '../shared/actions';
 import {
   VideoCursorCaptureMode,
   VideoTemporalEasing,
@@ -230,7 +230,7 @@ function CursorAppearanceModeButton(props: {
 }) {
   return (
     <div className="mt-3 flex flex-wrap gap-2">
-      <ProductActionButton
+      <InspectorActionButton
         compact
         tone="primary"
         onClick={() => {
@@ -247,7 +247,7 @@ function CursorAppearanceModeButton(props: {
             ? 'videoEditor.sidebar.cursorAppearanceUnlink'
             : 'videoEditor.sidebar.cursorAppearanceRestoreTrack'
         )}
-      </ProductActionButton>
+      </InspectorActionButton>
     </div>
   );
 }

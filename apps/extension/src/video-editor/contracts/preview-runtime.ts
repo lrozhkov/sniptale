@@ -56,3 +56,5 @@ export interface VideoEditorPreviewRuntimePort {
   settle(time: number): void;
   subscribe(listener: (status: VideoEditorPreviewStatus) => void): () => void;
 }
+
+export type { VideoEditorPreviewFrameRate } from '../../features/video/preview/preferences';

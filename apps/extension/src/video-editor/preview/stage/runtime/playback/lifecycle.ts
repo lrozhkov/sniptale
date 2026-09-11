@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import {
   VideoEditorPreviewMode,
@@ -66,7 +66,13 @@ function createPlaybackPreviewRuntime(authority: PreviewRuntimeAuthority): Playb
       authority.publishStatus({
         completedFrames: authority.previewStatusRef.current.completedFrames,
         mode: authority.latestStateRef.current.previewMode,
-        phase: phase.startsWith('preparing-') ? 'paused-preparation' : 'idle',
+        phase: phase.startsWith('preparing-')
+          ? 'paused-preparation'
+          : authority.completedCacheRef.current === 'video-cache-ready'
+            ? 'cached-video-playback'
+            : authority.completedCacheRef.current === 'frame-cache-ready'
+              ? 'cached-frame-playback'
+              : 'idle',
         totalFrames: authority.previewStatusRef.current.totalFrames,
       });
     },
@@ -82,6 +88,7 @@ function createPlaybackPreviewRuntime(authority: PreviewRuntimeAuthority): Playb
 }
 
 function usePreviewRuntimeAuthority(params: UsePreviewStagePlaybackPreviewRuntimeParams) {
+  const completedCacheRef = useRef<'video-cache-ready' | 'frame-cache-ready' | null>(null);
   const [cachedVideo, setCachedVideo] = useState<PreparedCachedVideoPreview | null>(null);
   const [previewStatus, setPreviewStatus] = useState<VideoEditorPreviewStatus>({
     completedFrames: 0,
@@ -104,6 +111,7 @@ function usePreviewRuntimeAuthority(params: UsePreviewStagePlaybackPreviewRuntim
   }, []);
   const authority = useMemo<PreviewRuntimeAuthority>(
     () => ({
+      completedCacheRef,
       activePreparationRef,
       configurationRevisionRef,
       generationRef,
@@ -126,11 +134,18 @@ function usePreviewRuntimeConfigurationReset(
     () => createVideoPreviewRenderIdentity(params.project),
     [params.project]
   );
-  useEffect(() => {
+  useLayoutEffect(() => {
+    authority.completedCacheRef.current = null;
     authority.configurationRevisionRef.current += 1;
     authority.activePreparationRef.current?.abort();
     authority.activePreparationRef.current = null;
     authority.setCachedVideo(null);
+    authority.publishStatus({
+      mode: params.previewMode,
+      phase: 'idle',
+      completedFrames: 0,
+      totalFrames: 0,
+    });
   }, [
     authority,
     params.playbackRange?.end,

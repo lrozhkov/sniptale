@@ -15,6 +15,7 @@ import {
   getCurrentVideoEditorProjectSnapshot,
   getCurrentVideoEditorSelectedClipId,
   useVideoEditorClipSelectionPort,
+  useVideoEditorEffectEditingPort,
   useVideoEditorRecordingTelemetryPort,
   useVideoEditorExportPort,
   useVideoEditorHistoryPort,
@@ -51,6 +52,7 @@ function useVideoEditorRuntimeComposition(
   const lifecycle = useVideoEditorProjectLifecyclePort((port) => port);
   const playback = useVideoEditorPlaybackPort((port) => port);
   const selection = useVideoEditorClipSelectionPort((port) => port);
+  const effects = useVideoEditorEffectEditingPort((port) => port);
   const timeline = useVideoEditorTimelineEditingPort((port) => port);
   const history = useVideoEditorHistoryPort((port) => port);
   const exportPort = useVideoEditorExportPort((port) => port);
@@ -64,6 +66,7 @@ function useVideoEditorRuntimeComposition(
   );
   const blockingOverlayOpen =
     commandPaletteOpen ||
+    workspace.projectDialogOpen ||
     workspace.autoProcessingModalOpen ||
     workspace.confirm.dialog !== null ||
     workspace.audioRecordingDialogOpen ||
@@ -104,6 +107,7 @@ function useVideoEditorRuntimeComposition(
         actionEvent: timeline.deleteActionEvent,
         clip: timeline.deleteClip,
         cursorSample: timeline.deleteCursorSample,
+        effectInstance: effects.deleteEffectInstance,
         motionRegion: timeline.deleteMotionRegion,
         objectTrack: timeline.deleteObjectTrack,
       },
@@ -162,6 +166,7 @@ function useVideoEditorCommandComposition(
       getCurrentProjectId: getCurrentVideoEditorProjectId,
       getCurrentTime: getCurrentVideoEditorCurrentTime,
       setError: lifecycle.setError,
+      updateProject: timeline.updateProject,
       upsertAsset: timeline.upsertAsset,
       upsertAssets: timeline.upsertAssets,
       addAssetClip: timeline.addAssetClip,
@@ -177,6 +182,7 @@ function useVideoEditorCommandComposition(
       timeline.moveClip,
       timeline.trimClipEnd,
       timeline.trimClipStart,
+      timeline.updateProject,
       timeline.upsertAsset,
       timeline.upsertAssets,
     ]
@@ -185,6 +191,7 @@ function useVideoEditorCommandComposition(
     () => ({
       getCurrentProject: getCurrentVideoEditorProjectSnapshot,
       getCurrentSelectedClipId: getCurrentVideoEditorSelectedClipId,
+      getCurrentPlaybackRange: () => workspace.playbackRange,
       getCurrentExportState: getCurrentVideoEditorExportStateSnapshot,
       startExport: exportPort.startExport,
       failExport: exportPort.failExport,
@@ -192,6 +199,7 @@ function useVideoEditorCommandComposition(
       cancelExport: exportPort.cancelExport,
     }),
     [
+      workspace.playbackRange,
       exportPort.cancelExport,
       exportPort.failExport,
       exportPort.failExportCancellation,
@@ -232,6 +240,7 @@ function useVideoEditorContextProjections(
 ) {
   const workspaceDialogs = useMemo(
     () => ({
+      setProjectDialogOpen: workspace.setProjectDialogOpen,
       setAutoProcessingModalOpen: workspace.setAutoProcessingModalOpen,
       audioRecordingDialogOpen: workspace.audioRecordingDialogOpen,
       audioRecordingTarget: workspace.audioRecordingTarget,
@@ -245,6 +254,7 @@ function useVideoEditorContextProjections(
       toggleLibraryPanel: workspace.toggleLibraryPanel,
     }),
     [
+      workspace.setProjectDialogOpen,
       workspace.setAutoProcessingModalOpen,
       workspace.audioRecordingDialogOpen,
       workspace.audioRecordingTarget,
@@ -275,6 +285,7 @@ function useVideoEditorContextProjections(
   );
   const runtimePlayback = useMemo(
     () => ({
+      isPreparingPlayback: runtime.isPreparingPlayback,
       pausePlayback: runtime.pausePlayback,
       seekTo: runtime.seekTo,
       stepByFrames: runtime.stepByFrames,
@@ -282,6 +293,7 @@ function useVideoEditorContextProjections(
       togglePlayback: runtime.togglePlayback,
     }),
     [
+      runtime.isPreparingPlayback,
       runtime.pausePlayback,
       runtime.seekTo,
       runtime.setPlaybackPlaying,

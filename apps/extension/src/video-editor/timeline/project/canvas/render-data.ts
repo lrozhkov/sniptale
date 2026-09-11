@@ -11,8 +11,6 @@ interface ProjectTimelineRulerMarker {
 
 const WAVEFORM_CENTER_Y = 50;
 const WAVEFORM_VERTICAL_PADDING = 8;
-const WAVEFORM_MIN_AMPLITUDE = 4;
-const WAVEFORM_BAR_GAP_PERCENT = 0.8;
 
 export function buildProjectTimelineRulerMarkers(
   timelineWidth: number,
@@ -48,34 +46,27 @@ export function buildAudioClipWaveformPath(peaks: number[]): string {
     return '';
   }
 
-  return peaks
+  const top = peaks.map((peak, index) => {
+    const x = roundWaveformPoint(peaks.length === 1 ? 0 : (index * 100) / (peaks.length - 1));
+    return `${index === 0 ? 'M' : 'L'} ${x} ${roundWaveformPoint(WAVEFORM_CENTER_Y - getWaveformAmplitude(peak))}`;
+  });
+  const bottom = peaks
     .map((peak, index) => {
-      const { left, right } = getWaveformBarXRange(index, peaks.length);
-      const amplitude = getWaveformAmplitude(peak);
-      const top = roundWaveformPoint(WAVEFORM_CENTER_Y - amplitude);
-      const bottom = roundWaveformPoint(WAVEFORM_CENTER_Y + amplitude);
-      return `M ${left} ${top} L ${right} ${top} L ${right} ${bottom} L ${left} ${bottom} Z`;
+      const x = roundWaveformPoint(peaks.length === 1 ? 100 : (index * 100) / (peaks.length - 1));
+      return `L ${x} ${roundWaveformPoint(WAVEFORM_CENTER_Y + getWaveformAmplitude(peak))}`;
     })
-    .join(' ');
-}
-
-function getWaveformBarXRange(index: number, peaksLength: number): { left: number; right: number } {
-  const bucketWidth = 100 / peaksLength;
-  const gap = Math.min(WAVEFORM_BAR_GAP_PERCENT, bucketWidth * 0.3);
-  return {
-    left: roundWaveformPoint(index * bucketWidth + gap / 2),
-    right: roundWaveformPoint((index + 1) * bucketWidth - gap / 2),
-  };
+    .reverse();
+  return [...top, ...bottom, 'Z'].join(' ');
 }
 
 function getWaveformAmplitude(peak: number): number {
   const clampedPeak = Math.max(0, Math.min(1, Number.isFinite(peak) ? peak : 0));
   const maxAmplitude = WAVEFORM_CENTER_Y - WAVEFORM_VERTICAL_PADDING;
   if (clampedPeak === 0) {
-    return WAVEFORM_MIN_AMPLITUDE;
+    return 0;
   }
 
-  return Math.max(WAVEFORM_MIN_AMPLITUDE, roundWaveformPoint(clampedPeak * maxAmplitude));
+  return roundWaveformPoint(clampedPeak * maxAmplitude);
 }
 
 function roundWaveformPoint(value: number): number {

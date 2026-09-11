@@ -1,3 +1,4 @@
+import { getEffectClipLabel } from '../../../../features/video/project/effect-instance/presentation';
 import { applyVideoProjectMutationPatch } from '../../../../features/video/project/mutation';
 import { applyTimelinePlacementPolicy } from '../../../../features/video/project/timeline';
 import {
@@ -37,7 +38,7 @@ export function duplicateStandaloneEffectHost(
     effectInstanceId: instanceId,
     groupId: null,
     id: crypto.randomUUID(),
-    name: `${sourceHost.name} ${translate('shared.projectActions.copySuffix')}`,
+    name: `${getEffectClipLabel(project, sourceHost)} ${translate('shared.projectActions.copySuffix')}`,
     startTime: sourceHost.startTime + 0.25,
     transform: { ...sourceHost.transform },
   };

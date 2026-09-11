@@ -22,7 +22,16 @@ export interface CaptureSurfaceLeaseRequest {
   tabId: number;
   presetId: string;
   context: CaptureSurfaceContext;
+  /** Background-only measurement adapter, used only for video window presets. */
+  measureVideoViewport?: (tabId: number) => Promise<VideoCaptureViewport>;
 }
+
+export type VideoCaptureViewport = {
+  width: number;
+  height: number;
+  scale: number;
+  windowId: number;
+};
 
 export interface AppliedCaptureSurface {
   sessionId: string;

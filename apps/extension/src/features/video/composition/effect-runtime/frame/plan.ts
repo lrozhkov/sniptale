@@ -49,7 +49,22 @@ export function resolveEffectRuntimeFramePlans(
     });
     if (plan) plans.push(plan);
   }
-  return plans;
+  const generated = new Map(
+    plans.flatMap((plan) =>
+      plan.target.kind === 'scene' ? [[plan.target.clipId, plan] as const] : []
+    )
+  );
+  return plans.map((plan) => {
+    if (plan.target.kind !== 'clip') return plan;
+    const host = generated.get(plan.target.clipId);
+    if (!host?.bitmapBounds) return plan;
+    return {
+      ...plan,
+      bitmapBounds: host.bitmapBounds,
+      dimensions: host.dimensions,
+      renderDimensions: host.renderDimensions,
+    };
+  });
 }
 
 function resolveInstanceFramePlan(args: {
@@ -64,7 +79,7 @@ function resolveInstanceFramePlan(args: {
   if (!instance.enabled) return null;
   const snapshot = args.snapshots.get(instance.snapshotId);
   if (!snapshot || snapshot.kind !== instance.kind) fail('effectPlanIntegrityFailure');
-  const document = parseSnapshotDocument(snapshot.source);
+  const document = parseSnapshotDocument(snapshot);
   assertSnapshotDocument(instance, snapshot, document);
   const timing = resolveEffectInstanceTime(instance, document.duration, args.projectTime);
   if (!timing) return null;
@@ -166,9 +181,9 @@ function assertTransitionTiming(
   }
 }
 
-function parseSnapshotDocument(source: string) {
+function parseSnapshotDocument(snapshot: { readonly source: string }) {
   try {
-    return parseEffectRuntimeSnapshotDocument(source);
+    return parseEffectRuntimeSnapshotDocument(snapshot);
   } catch {
     fail('effectPlanIntegrityFailure');
   }

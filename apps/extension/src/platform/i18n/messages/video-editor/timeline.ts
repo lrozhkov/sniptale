@@ -5,9 +5,9 @@ import { videoEditorTimelineLaneMessages } from './timeline-lanes';
 export const videoEditorTimelineMessages = defineMessageSource({
   historyLaneShort: { ru: 'История', en: 'History' },
   hideClipNames: { ru: 'Скрывать названия фрагментов', en: 'Hide clip names' },
-  framingConnection: { ru: 'Переход кадрирования', en: 'Framing transition' },
-  connectFraming: { ru: 'Соединить состояния', en: 'Connect framing states' },
-  disconnectFraming: { ru: 'Убрать переход', en: 'Remove framing transition' },
+  framingConnection: { ru: 'Переход', en: 'Transition' },
+  connectFraming: { ru: 'Добавить переход', en: 'Add transition' },
+  disconnectFraming: { ru: 'Убрать переход', en: 'Remove transition' },
   trackKindPrimary: {
     ru: 'Видео',
     en: 'Video',
@@ -138,7 +138,7 @@ export const videoEditorTimelineMessages = defineMessageSource({
     en: 'Subtitle track',
   },
   addZoomRegion: {
-    ru: 'Область зума',
+    ru: 'Приблизить',
     en: 'Zoom region',
   },
   closeGap: {
@@ -300,7 +300,7 @@ export const videoEditorTimelineMessages = defineMessageSource({
     en: 'Segments will appear here when the project contains data.',
   },
   emptyZoomLaneLabel: {
-    ru: 'Нажмите + или наведите на дорожку, чтобы добавить зум.',
+    ru: 'Нажмите «Приблизить», чтобы добавить масштабирование.',
     en: 'Press + or point at the lane to add a zoom.',
   },
   fileDropUnsupported: {

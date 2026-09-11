@@ -1,4 +1,5 @@
 import { normalizeVideoProjectCursorSkin } from '../../../project/cursor';
+import { resolveVideoProjectActionOccurrences } from '../../../project/action-occurrences';
 import type { VideoProject, VideoProjectCursorSample } from '../../../project/types/index';
 import { VideoCursorCaptureMode, VideoTemporalEasing } from '../../../project/types/index';
 import { applyTemporalEasing } from '../../motion/index';
@@ -74,10 +75,6 @@ export function resolveCursorSample(
     : previousSample;
 }
 
-function getCursorScaleBoost(actions: VideoCompositionActionState[]): number {
-  return actions.some((action) => action.preset === 'DWELL_ZOOM') ? 1.28 : 1;
-}
-
 function resolveCursorSkin(project: VideoProject, sample: VideoProjectCursorSample) {
   return normalizeVideoProjectCursorSkin(sample.skinOverride ?? project.cursorTrack?.skin);
 }
@@ -85,7 +82,7 @@ function resolveCursorSkin(project: VideoProject, sample: VideoProjectCursorSamp
 export function resolveVideoCompositionCursor(
   project: VideoProject,
   currentTime: number,
-  actions: VideoCompositionActionState[]
+  _actions: VideoCompositionActionState[]
 ): VideoCompositionCursorState | null {
   const cursorTrack = project.cursorTrack;
   if (!cursorTrack) {
@@ -107,11 +104,22 @@ export function resolveVideoCompositionCursor(
     captureMode: cursorTrack.captureMode,
     color: skin.color,
     preset: skin.preset,
-    scale: skin.scale * getCursorScaleBoost(actions),
+    scale:
+      skin.scale *
+      (skin.animationPreset === 'PRESS' ? resolveClickPressScale(project, currentTime) : 1),
     shadow: skin.shadow,
     time: currentTime,
     visible: true,
     x: sample.x,
     y: sample.y,
   };
+}
+
+/** Feedback is tied to an actual click, never an idle oscillation or zoom region. */
+function resolveClickPressScale(project: VideoProject, currentTime: number): number {
+  const click = resolveVideoProjectActionOccurrences(project).find(
+    (item) =>
+      item.event.kind === 'CLICK' && currentTime >= item.time && currentTime < item.time + 0.25
+  );
+  return click ? 1 - 0.18 * Math.sin(((currentTime - click.time) / 0.25) * Math.PI) : 1;
 }

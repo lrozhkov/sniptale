@@ -45,7 +45,7 @@ function hasValidRangeShape(settings: Record<string, unknown>): boolean {
     return false;
   }
   if (start === undefined || end === undefined) {
-    return true;
+    return settings['scope'] !== VideoExportScope.SELECTED_RANGE;
   }
   return end > start;
 }

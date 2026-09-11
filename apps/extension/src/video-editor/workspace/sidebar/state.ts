@@ -20,7 +20,8 @@ interface WorkspaceSidebarViewState {
 export function useWorkspaceSidebarState(
   selection: VideoEditorSelection | null | undefined = createSceneSelection(),
   selectedClip: WorkspaceSidebarProps['selectedClip'],
-  selectedTrack?: WorkspaceSidebarProps['selectedTrack']
+  selectedTrack?: WorkspaceSidebarProps['selectedTrack'],
+  project?: WorkspaceSidebarProps['project']
 ): WorkspaceSidebarViewState {
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const videoInputRef = useRef<HTMLInputElement | null>(null);
@@ -31,7 +32,8 @@ export function useWorkspaceSidebarState(
   const selectionMeta = getSelectionMeta(
     selection ?? createSceneSelection(),
     selectedClip,
-    selectedTrack
+    selectedTrack,
+    project
   );
 
   return {

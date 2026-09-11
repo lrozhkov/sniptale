@@ -1,0 +1,94 @@
+[data-ui='video-editor.inspector.content'] {
+  container: inspector-body / inline-size;
+}
+
+[data-ui='video-editor.inspector.content'] [data-ui='shared.ui.compact-inspector.select-field'] {
+  display: grid;
+  grid-template-columns: fit-content(42%) minmax(0, 1fr);
+  align-items: center;
+  column-gap: 12px;
+}
+
+[data-ui='video-editor.inspector.content']
+  [data-ui='shared.ui.compact-inspector.select-field']
+  > :last-child {
+  min-width: 100%;
+  max-width: none;
+  margin-left: 0;
+}
+
+[data-ui='video-editor.inspector.content']
+  [data-ui='shared.ui.compact-inspector.select-field']
+  > span,
+[data-ui='video-editor.inspector.content']
+  [data-ui='shared.ui.compact-inspector.numeric-row']
+  > span,
+[data-ui='video-editor.inspector.content']
+  [data-ui='shared.ui.compact-inspector.color-field']
+  > span {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  overflow: visible;
+  font-weight: 400;
+}
+
+[data-ui='video-editor.inspector.content'] button[aria-haspopup='listbox'] {
+  height: auto;
+  min-height: 32px;
+  padding-block: 5px;
+}
+
+[data-ui='video-editor.inspector.content'] button[aria-haspopup='listbox'] .truncate,
+.video-editor-inspector-select-menu .truncate {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  overflow: visible;
+  text-overflow: clip;
+  line-height: 1.4;
+}
+
+[data-ui='video-editor.inspector.content'] [data-ui='shared.ui.compact-inspector.color-field'] {
+  min-height: 36px;
+  border-color: transparent;
+  background: transparent;
+  padding: 0;
+}
+
+[data-ui='video-editor.inspector.actions'] {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--sniptale-color-border-subtle);
+}
+
+[data-inspector-action] {
+  border-radius: var(--sniptale-radius-md) !important;
+  min-width: 0;
+  max-width: 100%;
+  height: auto;
+  min-height: 32px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+  padding: 6px 10px;
+}
+
+[data-inspector-action] > svg {
+  flex-shrink: 0;
+}
+
+[data-ui='video-editor.inspector.actions'] > [data-inspector-action] {
+  margin-top: 0;
+}
+
+@container inspector-body (max-width: 360px) {
+  [data-ui='shared.ui.compact-inspector.select-field'] {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 2px;
+  }
+}

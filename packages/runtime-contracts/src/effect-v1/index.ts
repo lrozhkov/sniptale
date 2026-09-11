@@ -1,3 +1,4 @@
+export { resolveEffectLocaleText, resolveEffectV1ControlDefault } from './model/locale.js';
 export { createEffectV1Diagnostics } from './model/diagnostics.js';
 export {
   assertEffectV1AssetSignature,
@@ -49,3 +50,17 @@ export {
   mapEffectV1ScenePoint,
 } from './object-layout/geometry.js';
 export type { EffectV1ObjectLayout, EffectV1ObjectHandle } from './model/types.js';
+
+export type { EffectControlPreset } from './model/types.js';
+export {
+  validateEffectV1ControlPresetValues,
+  applyEffectV1ControlPresetValues,
+  applyEffectV1ControlPreset,
+} from './model/control-presets.js';
+
+export type { EffectV1EditorRegion } from './model/types.js';
+export {
+  resolveEffectV1EditorRegion,
+  updateEffectV1EditorRegion,
+  type EffectV1RegionRect,
+} from './editor-region/geometry.js';

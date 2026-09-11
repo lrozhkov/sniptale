@@ -1,3 +1,9 @@
+import { resolveEffectOwner } from '../../../../../features/video/project/effect-instance/owner';
+import { readVideoEditorEffectDocumentDragPayload } from '../../../../contracts/effect-document-drag';
+import { ClipFxRows } from './clip-fx';
+import { useEffectDocumentDrag } from '../../../../chrome/effect-document-drag';
+import { getEffectInsertionError } from '../../../../../features/video/project/effect-instance/placement';
+import { createTrackEffectDropHandlers } from './effect-drop';
 import { AudioGapRecordingAction, AudioRecordingZones } from '../../tracks/zones/audio-recording';
 import type { TimelineProjection } from '../../interaction-state/projection';
 import { useState } from 'react';
@@ -66,46 +72,129 @@ interface ProjectTimelineTrackLaneProps extends Omit<
   'trackLayoutModel' | 'tracks'
 > {
   dropActive: boolean;
+  dropClipId: string | null;
   track: VideoProject['tracks'][number];
   trackLayout: TimelineTrackLayout | undefined;
-  onSetDropTrackId: (trackId: string | null) => void;
+  onSetDropTrackId: (trackId: string | null, clipId?: string | null) => void;
 }
 
 export function ProjectTimelineTrackLanes(props: ProjectTimelineTrackLanesProps) {
-  const [dropTrackId, setDropTrackId] = useState<string | null>(null);
-  return props.tracks.map((track) => (
-    <ProjectTimelineTrackLane
-      key={track.id}
-      hiddenClipNamesByTrackId={props.hiddenClipNamesByTrackId}
-      dragGhost={props.dragGhost}
-      pixelsPerSecond={props.pixelsPerSecond}
-      projection={props.projection}
-      project={props.project}
-      selection={props.selection}
-      hoveredClipId={props.hoveredClipId}
-      selectedClipId={props.selectedClipId}
-      selectedEffectSelection={props.selectedEffectSelection}
-      selectedTrackId={props.selectedTrackId}
-      timelinePreviews={props.timelinePreviews}
-      track={track}
-      trackLayout={props.trackLayoutModel.layoutByTrackId.get(track.id)}
-      dropActive={dropTrackId === track.id}
-      onBeginClipInteraction={props.onBeginClipInteraction}
-      onBeginEffectInteraction={props.onBeginEffectInteraction}
-      onBeginTrackRangeSelection={props.onBeginTrackRangeSelection}
-      onCloseTrackGap={props.onCloseTrackGap}
-      onDropTimelineFile={props.onDropTimelineFile}
-      onDropEffectDocument={props.onDropEffectDocument}
-      onSelectClip={props.onSelectClip}
-      onSelectTransition={props.onSelectTransition}
-      onSetHoveredClipId={props.onSetHoveredClipId}
-      onSetDropTrackId={setDropTrackId}
-      onUnsupportedTimelineFileDrop={props.onUnsupportedTimelineFileDrop}
-    />
-  ));
+  const { drag } = useEffectDocumentDrag();
+  const globalOwner = resolveEffectOwner(props.project, { kind: 'video-group' });
+  const canDropGlobal =
+    drag?.kind === 'targetEffect' && globalOwner && !globalOwner.locked && globalOwner.duration > 0;
+  const [dropTarget, setDropTarget] = useState<{
+    trackId: string;
+    clipId: string | null;
+    drag: typeof drag;
+  } | null>(null);
+  const setDropTrackId = (trackId: string | null, clipId: string | null = null) => {
+    setDropTarget((previous) =>
+      previous?.trackId === trackId && previous?.clipId === clipId && previous?.drag === drag
+        ? previous
+        : trackId
+          ? { trackId, clipId, drag }
+          : null
+    );
+  };
+  return (
+    <>
+      {props.tracks.map((track) => (
+        <ProjectTimelineTrackLane
+          key={track.id}
+          hiddenClipNamesByTrackId={props.hiddenClipNamesByTrackId}
+          dragGhost={props.dragGhost}
+          pixelsPerSecond={props.pixelsPerSecond}
+          projection={props.projection}
+          project={props.project}
+          selection={props.selection}
+          hoveredClipId={props.hoveredClipId}
+          selectedClipId={props.selectedClipId}
+          selectedEffectSelection={props.selectedEffectSelection}
+          selectedTrackId={props.selectedTrackId}
+          timelinePreviews={props.timelinePreviews}
+          track={track}
+          trackLayout={props.trackLayoutModel.layoutByTrackId.get(track.id)}
+          dropActive={dropTarget?.drag === drag && dropTarget?.trackId === track.id}
+          dropClipId={
+            drag?.kind === 'targetEffect' &&
+            dropTarget?.drag === drag &&
+            dropTarget?.trackId === track.id
+              ? dropTarget.clipId
+              : null
+          }
+          onBeginClipInteraction={props.onBeginClipInteraction}
+          onBeginEffectInteraction={props.onBeginEffectInteraction}
+          onBeginTrackRangeSelection={props.onBeginTrackRangeSelection}
+          onCloseTrackGap={props.onCloseTrackGap}
+          onDropTimelineFile={props.onDropTimelineFile}
+          onDropEffectDocument={props.onDropEffectDocument}
+          onSelectClip={props.onSelectClip}
+          onSelectTransition={props.onSelectTransition}
+          onSetHoveredClipId={props.onSetHoveredClipId}
+          onSetDropTrackId={setDropTrackId}
+          onUnsupportedTimelineFileDrop={props.onUnsupportedTimelineFileDrop}
+        />
+      ))}
+      {props.trackLayoutModel.videoFx && (
+        <div
+          className={
+            canDropGlobal
+              ? 'relative outline outline-1 outline-[var(--sniptale-color-accent)]'
+              : 'relative'
+          }
+          onDragOver={(event) => {
+            event.stopPropagation();
+            event.dataTransfer.dropEffect = canDropGlobal ? 'copy' : 'none';
+            if (canDropGlobal) event.preventDefault();
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            const payload = readVideoEditorEffectDocumentDragPayload(event.dataTransfer);
+            if (canDropGlobal && payload?.kind === 'targetEffect')
+              props.onDropEffectDocument?.(payload, { kind: 'video-group' }, 0);
+          }}
+          style={{
+            height: props.trackLayoutModel.videoFx.fxHeight,
+          }}
+        >
+          <ClipFxRows
+            project={props.project}
+            layout={props.trackLayoutModel.videoFx}
+            pixelsPerSecond={props.pixelsPerSecond}
+            projection={props.projection}
+            selectedId={
+              props.selection.kind === VideoEditorSelectionKind.EFFECT_INSTANCE
+                ? props.selection.effectInstanceId
+                : null
+            }
+          />
+        </div>
+      )}
+    </>
+  );
 }
 
 function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
+  const { drag } = useEffectDocumentDrag();
+  const [hover, setHover] = useState<{ time: number; laneId: string | null } | null>(null);
+  const preview =
+    props.dropActive && drag?.kind === 'standalone' && hover
+      ? {
+          left: (hover.time - (props.projection?.startTime ?? 0)) * props.pixelsPerSecond,
+          width: drag.duration * props.pixelsPerSecond,
+          valid:
+            getEffectInsertionError(
+              props.project,
+              props.track.id,
+              hover.time,
+              drag.duration,
+              hover.laneId
+            ) === null,
+        }
+      : null;
+  const hoverMetrics = props.trackLayout?.logicalLaneMetrics.get(hover?.laneId ?? 'line-1');
   const displayProject = getReorderDisplayProject(props.project, props.dragGhost);
   return (
     <div
@@ -115,14 +204,42 @@ function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
           props.selection,
           props.selectedTrackId,
           props.track.id,
-          props.dropActive
+          props.dropActive && !props.dropClipId
         )
       }
       data-track-lane-id={props.track.id}
       data-timeline-lane-muted={!props.track.visible}
       style={{ height: props.trackLayout?.rowHeight }}
-      {...createTrackLaneEventProps(props)}
+      {...createTrackLaneEventProps(props, drag?.kind, (event) => {
+        const x = event.clientX - event.currentTarget.getBoundingClientRect().left;
+        setHover({
+          time: Math.max(0, (props.projection?.startTime ?? 0) + x / props.pixelsPerSecond),
+          laneId: resolveTimelineLaneIdFromDropEvent(event, props.trackLayout),
+        });
+      })}
     >
+      {preview && (
+        <div
+          aria-hidden="true"
+          data-ui="timeline.annotation-drop-preview"
+          className={[
+            'pointer-events-none absolute z-40 rounded-sm border border-dashed',
+            'bg-[color:color-mix(in_srgb,var(--sniptale-color-accent)_8%,transparent)]',
+          ].join(' ')}
+          style={{
+            left: preview.left,
+            width: preview.width,
+            top: (hoverMetrics?.rowTop ?? 0) + 4,
+            height: Math.max(
+              8,
+              (hoverMetrics?.rowHeight ?? props.trackLayout?.rowHeight ?? 48) - 8
+            ),
+            borderColor: preview.valid
+              ? 'var(--sniptale-color-accent)'
+              : 'var(--sniptale-color-danger)',
+          }}
+        />
+      )}
       <AudioRecordingZones
         project={props.project}
         trackId={props.track.id}
@@ -131,6 +248,7 @@ function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
       />
       <ProjectTimelineLogicalLaneGuides trackLayout={props.trackLayout} />
       <ProjectTimelineTrackZones
+        mediaHeight={props.trackLayout?.clipRowHeight}
         {...createTrackZoneProps({
           ...props,
           project: getDragDisplayProject(props.project, props.dragGhost),
@@ -143,12 +261,25 @@ function ProjectTimelineTrackLane(props: ProjectTimelineTrackLaneProps) {
         trackId={props.track.id}
         trackLayout={props.trackLayout}
       />
+      {props.trackLayout && props.trackLayout.fxHeight > 0 && (
+        <ClipFxRows
+          project={props.project}
+          layout={props.trackLayout}
+          pixelsPerSecond={props.pixelsPerSecond}
+          projection={props.projection}
+          selectedId={
+            props.selection.kind === 'effect-instance' ? props.selection.effectInstanceId : null
+          }
+        />
+      )}
       <ProjectTimelineTrackClipStack
-        hideClipNames={props.hiddenClipNamesByTrackId?.[props.track.id] ?? false}
+        hideClipNames={props.hiddenClipNamesByTrackId?.[props.track.id] ?? true}
         pixelsPerSecond={props.pixelsPerSecond}
         projection={props.projection}
         project={displayProject}
-        hoveredClipId={props.dragGhost?.activeReorder ? null : props.hoveredClipId}
+        hoveredClipId={
+          props.dragGhost?.activeReorder ? null : (props.dropClipId ?? props.hoveredClipId)
+        }
         selectedClipId={
           props.dragGhost?.activeReorder ? props.dragGhost.clipId : props.selectedClipId
         }
@@ -195,19 +326,39 @@ function getDragDisplayProject(project: VideoProject, ghost: TimelineClipDragGho
   };
 }
 
-function createTrackLaneEventProps(props: ProjectTimelineTrackLaneProps) {
+function createTrackLaneEventProps(
+  props: ProjectTimelineTrackLaneProps,
+  dragKind: string | undefined,
+  onEffectHover: (event: React.DragEvent<HTMLDivElement>) => void
+) {
+  const effects = createTrackEffectDropHandlers({
+    dragKind,
+    project: props.project,
+    track: props.track,
+    projection: props.projection,
+    pixelsPerSecond: props.pixelsPerSecond,
+    onDrop: props.onDropEffectDocument,
+    resolveTimelineLaneId: (event) => resolveTimelineLaneIdFromDropEvent(event, props.trackLayout),
+    onHighlight: props.onSetDropTrackId,
+  });
+  const fileDrag = createTrackFileDragOverHandler(props.track.id, props.onSetDropTrackId);
+  const fileDrop = createTrackFileDropHandler({
+    onDropTimelineFile: props.onDropTimelineFile,
+    onSetDropTrackId: props.onSetDropTrackId,
+    onUnsupportedTimelineFileDrop: props.onUnsupportedTimelineFileDrop,
+    resolveTimelineLaneId: (event) => resolveTimelineLaneIdFromDropEvent(event, props.trackLayout),
+    trackId: props.track.id,
+  });
   return {
     onClick: (event: React.MouseEvent) => event.stopPropagation(),
     onDragLeave: createTrackFileDragLeaveHandler(props.onSetDropTrackId),
-    onDragOver: createTrackFileDragOverHandler(props.track.id, props.onSetDropTrackId),
-    onDrop: createTrackFileDropHandler({
-      onDropTimelineFile: props.onDropTimelineFile,
-      onSetDropTrackId: props.onSetDropTrackId,
-      onUnsupportedTimelineFileDrop: props.onUnsupportedTimelineFileDrop,
-      resolveTimelineLaneId: (event) =>
-        resolveTimelineLaneIdFromDropEvent(event, props.trackLayout),
-      trackId: props.track.id,
-    }),
+    onDragOver: (event: React.DragEvent<HTMLDivElement>) => {
+      if (!effects.onDragOver(event)) fileDrag(event);
+      else onEffectHover(event);
+    },
+    onDrop: (event: React.DragEvent<HTMLDivElement>) => {
+      if (!effects.onDrop(event)) fileDrop(event);
+    },
     onPointerDown: createTrackLaneRangeSelectionHandler(
       props.track.id,
       props.onBeginTrackRangeSelection
@@ -279,7 +430,10 @@ function createTrackLaneRangeSelectionHandler(
   onBeginTrackRangeSelection: (trackId: string) => React.PointerEventHandler<HTMLDivElement>
 ) {
   return (event: React.PointerEvent<HTMLDivElement>) => {
-    if (event.target !== event.currentTarget) {
+    if (
+      event.target instanceof Element &&
+      event.target.closest('[data-timeline-object="true"], button, input, select, textarea')
+    ) {
       return;
     }
 

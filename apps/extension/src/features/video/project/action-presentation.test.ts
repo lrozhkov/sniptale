@@ -1,3 +1,4 @@
+import { getActionClickStyle, getActionKeyStyle } from './action-style';
 import { expect, it } from 'vitest';
 import { createEmptyVideoProject } from './factories/creation';
 import type { VideoProjectActionEvent } from './types';
@@ -140,4 +141,27 @@ it('shows KEY events without points only when admitted and respects explicit NON
   });
   project.actionEvents[0]!.presentation = { preset: 'NONE' };
   expect(resolveVideoProjectActionPresentations(project)[0]?.reason).toBe('preset-none');
+});
+
+it('inherits visual style, admits a per-event style and restores track style without changing captured facts', () => {
+  const project = createEmptyVideoProject('Style');
+  project.duration = 10;
+  project.actionEvents = [event()];
+  const clickStyle = { ...getActionClickStyle(), color: '#00aaff', size: 60 };
+  const keyStyle = { ...getActionKeyStyle(), fontSize: 40 };
+  project.actionPresentation = {
+    ...getVideoProjectActionPresentation(project),
+    clickStyle,
+    keyStyle,
+    easing: 'LINEAR',
+  };
+  expect(resolveVideoProjectActionPresentations(project)[0]).toMatchObject({
+    clickStyle,
+    keyStyle,
+    easing: 'LINEAR',
+  });
+  project.actionEvents[0]!.presentation = { clickStyle: { ...clickStyle, size: 24 } };
+  expect(resolveVideoProjectActionPresentations(project)[0]?.clickStyle.size).toBe(24);
+  delete project.actionEvents[0]!.presentation;
+  expect(resolveVideoProjectActionPresentations(project)[0]?.clickStyle.size).toBe(60);
 });

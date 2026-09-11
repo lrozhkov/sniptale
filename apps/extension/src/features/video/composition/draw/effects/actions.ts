@@ -1,4 +1,8 @@
+import { getActionClickStyle } from '../../../project/action-style';
+import { applyTemporalEasing } from '../../motion';
 import type { VideoCompositionActionState, VideoCompositionCameraState } from '../../types';
+import { drawKeystroke } from './keystrokes';
+
 export function drawActionCompositionState(
   context: CanvasRenderingContext2D,
   action: VideoCompositionActionState,
@@ -6,113 +10,56 @@ export function drawActionCompositionState(
   sizeScale = 1,
   bounds?: { x: number; y: number; width: number; height: number }
 ): void {
-  if (action.renderKind === null || (action.renderKind === 'accent' && action.preset === 'NONE'))
-    return;
+  if (action.renderKind === null) return;
   if (action.renderKind === 'keystroke') {
     drawKeystroke(context, action, sizeScale, bounds);
     return;
   }
   const point = action.point ?? fallbackPoint;
-  if (!point) {
-    return;
-  }
-
+  if (!point || action.preset === 'NONE' || action.preset === 'SCROLL_EMPHASIS') return;
+  const style = getActionClickStyle(action.clickStyle);
+  const p = Math.min(1, Math.max(0, action.progress));
+  const eased = applyTemporalEasing(p, action.easing ?? 'EASE_OUT');
+  const size = style.size * Math.max(0.2, sizeScale);
+  const envelope = Math.min(1, p / 0.08) * (1 - p);
   context.save();
-
+  context.globalAlpha *= style.opacity * envelope;
+  context.strokeStyle = style.color;
+  context.fillStyle = style.color;
+  context.lineWidth = style.strokeWidth * Math.max(0.2, sizeScale);
+  context.beginPath();
   switch (action.preset) {
     case 'CLICK_RIPPLE':
-      drawRipple(context, point.x, point.y, action.progress, sizeScale);
+      context.arc(point.x, point.y, size * (0.3 + 0.7 * eased), 0, Math.PI * 2);
+      context.stroke();
       break;
-    case 'SCROLL_EMPHASIS':
-    case 'NONE':
+    case 'SPOTLIGHT': {
+      const radius = size * (0.85 + 0.15 * eased);
+      const gradient = context.createRadialGradient(point.x, point.y, 0, point.x, point.y, radius);
+      gradient.addColorStop(0, style.color);
+      gradient.addColorStop(1, 'transparent');
+      context.globalAlpha *= 0.55;
+      context.fillStyle = gradient;
+      context.arc(point.x, point.y, radius, 0, Math.PI * 2);
+      context.fill();
       break;
-    case 'SPOTLIGHT':
-      drawSpotlight(context, point.x, point.y, action.progress, sizeScale);
-      break;
+    }
+    case 'CLICK_PRESS':
     case 'DWELL_ZOOM':
-      drawDwellZoom(context, point.x, point.y, action.progress, sizeScale);
+      context.arc(
+        point.x,
+        point.y,
+        size * (0.3 + 0.18 * Math.sin(eased * Math.PI)),
+        0,
+        Math.PI * 2
+      );
+      context.globalAlpha *= 0.5;
+      context.fill();
+      context.globalAlpha *= 2;
+      context.stroke();
       break;
   }
-
   context.restore();
-}
-
-function drawKeystroke(
-  context: CanvasRenderingContext2D,
-  action: VideoCompositionActionState,
-  sizeScale: number,
-  bounds?: { x: number; y: number; width: number; height: number }
-): void {
-  const label = action.event.label;
-  if (!label) return;
-  const scale = Math.max(0.2, sizeScale);
-  const point = action.point ?? { x: 24 * scale, y: 48 * scale };
-  context.save();
-  context.font = `${18 * scale}px sans-serif`;
-  context.textBaseline = 'middle';
-  const width = Math.min(
-    context.measureText(label).width + 24 * scale,
-    bounds ? Math.max(0, bounds.x + bounds.width - point.x) : Infinity
-  );
-  context.fillStyle = 'rgba(15, 23, 42, 0.9)';
-  context.fillRect(point.x, point.y - 18 * scale, width, 36 * scale);
-  context.fillStyle = '#ffffff';
-  context.fillText(label, point.x + 12 * scale, point.y, Math.max(1, width - 24 * scale));
-  context.restore();
-}
-
-function drawRipple(
-  context: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  progress: number,
-  sizeScale: number
-): void {
-  const alpha = 0.75 * (1 - progress);
-  const radius = scaleActionSize(18 + progress * 28, sizeScale);
-
-  context.beginPath();
-  context.arc(x, y, radius, 0, Math.PI * 2);
-  context.lineWidth = scaleActionSize(4, sizeScale);
-  context.strokeStyle = `rgba(249, 115, 22, ${alpha.toFixed(3)})`;
-  context.stroke();
-}
-
-function drawSpotlight(
-  context: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  progress: number,
-  sizeScale: number
-): void {
-  const radius = scaleActionSize(40 + progress * 8, sizeScale);
-  const gradient = context.createRadialGradient(x, y, 0, x, y, radius);
-  gradient.addColorStop(0, 'rgba(249, 115, 22, 0.28)');
-  gradient.addColorStop(1, 'rgba(249, 115, 22, 0)');
-  context.fillStyle = gradient;
-  context.beginPath();
-  context.arc(x, y, radius, 0, Math.PI * 2);
-  context.fill();
-}
-
-function drawDwellZoom(
-  context: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  progress: number,
-  sizeScale: number
-): void {
-  const radius = scaleActionSize(22 + progress * 12, sizeScale);
-  context.beginPath();
-  context.arc(x, y, radius, 0, Math.PI * 2);
-  context.lineWidth = scaleActionSize(5, sizeScale);
-  context.strokeStyle = 'rgba(59, 130, 246, 0.42)';
-  context.stroke();
-}
-
-function scaleActionSize(value: number, sizeScale: number): number {
-  const clampedScale = Math.max(0.2, sizeScale);
-  return value * clampedScale;
 }
 
 /** Shared manual-action overlay mapping for preview and exported output. */
@@ -124,7 +71,8 @@ export function drawSceneActionCompositionStates(
 ): void {
   const viewportScale = (viewport.scaleX + viewport.scaleY) / 2;
   for (const action of actions) {
-    const sizeScale = viewportScale * (action.point ? camera.scale : 1);
+    const sizeScale =
+      viewportScale * (action.renderKind !== 'keystroke' && action.point ? camera.scale : 1);
     const point = action.point
       ? {
           x:
@@ -138,6 +86,11 @@ export function drawSceneActionCompositionStates(
             y: viewport.offsetY + 48 * viewport.scaleY,
           }
         : null;
-    drawActionCompositionState(context, { ...action, point }, null, sizeScale);
+    drawActionCompositionState(context, { ...action, point }, null, sizeScale, {
+      x: viewport.offsetX,
+      y: viewport.offsetY,
+      width: camera.viewportWidth * camera.scale * viewport.scaleX,
+      height: camera.viewportHeight * camera.scale * viewport.scaleY,
+    });
   }
 }

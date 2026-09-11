@@ -5,6 +5,7 @@ export function shouldLockVisualLayerToViewport(
   layer: VideoCompositionVisualLayer,
   camera: VideoCompositionCameraState
 ): boolean {
+  if (layer.effectViewportRaster) return true;
   if (layer.kind === 'video' && layer.trackRole === VideoProjectTrackRole.CAMERA) return true;
   if (
     (camera.overlayZoomMode ?? VideoMotionOverlayZoomMode.LOCK_OVERLAYS) !==

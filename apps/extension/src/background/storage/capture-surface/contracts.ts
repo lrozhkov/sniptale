@@ -27,6 +27,8 @@ export interface CaptureSurfaceJournalEntry {
   target: 'window';
   prior: CaptureSurfaceSnapshot;
   applied: CaptureSurfaceSnapshot;
+  /** Owned intermediate window while the video raster correction is prepared. */
+  alignmentFrom?: CaptureSurfaceSnapshot;
   phase: CaptureSurfaceJournalPhase;
   parentLeaseId: string | null;
   updatedAt: number;

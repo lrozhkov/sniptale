@@ -151,7 +151,7 @@ it('keeps image kind selected after clicking image when image assets exist', asy
   );
 });
 
-it('disables image kind when no image assets are available', () => {
+it('offers image upload without persisting an invalid background when no assets exist', async () => {
   renderBackgroundHarness({
     ...createProps(),
     imageAssets: [],
@@ -163,7 +163,9 @@ it('disables image kind when no image assets are available', () => {
 
   openSelect('videoEditor.sidebar.sceneBackgroundTypeLabel');
 
-  expect(getOption('videoEditor.sidebar.sceneBackgroundImage')?.disabled).toBe(true);
+  expect(getOption('videoEditor.sidebar.sceneBackgroundImage')?.disabled).toBe(false);
+  await act(async () => getOption('videoEditor.sidebar.sceneBackgroundImage')?.click());
+  expect(container?.textContent).toContain('videoEditor.sidebar.sceneBackgroundImageEmpty');
 });
 
 function getSelectTrigger(label: string) {

@@ -1,6 +1,8 @@
+import type { EffectCatalogPresentation } from './presentation';
+import type { EffectPresetPreferences } from './presets';
 import type { EffectV1Kind } from '@sniptale/runtime-contracts/effect-v1';
 
-export type EffectBundleCatalogSource = 'bundle-zip' | 'raw-json';
+export type EffectBundleCatalogSource = 'bundle-zip' | 'raw-json' | 'builtin';
 
 export interface EffectBundleCatalogAssetEntry {
   blob: Blob;
@@ -16,15 +18,21 @@ interface EffectBundleCatalogAssetReference {
 }
 
 export interface EffectBundleCatalogDocumentEntry {
+  presetPreferences?: EffectPresetPreferences;
+  /** Catalog presentation only, never part of an immutable document or stored entry. */
+  previewPresetId?: string;
   assets: EffectBundleCatalogAssetReference[];
   id: string;
   kind: EffectV1Kind;
   schemaVersion: 'sniptale.effect.v1';
   sha256: string;
-  source: string;
+  source?: string;
+  presentation?: EffectCatalogPresentation;
 }
 
 export interface EffectBundleCatalogEntry {
+  /** Disposable loader for immutable extension resources; never persisted. */
+  materializeDocument?: (documentId: string) => Promise<EffectBundleCatalogEntry>;
   assets: EffectBundleCatalogAssetEntry[];
   createdAt: number;
   description: { en: string; ru: string };

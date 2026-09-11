@@ -97,6 +97,7 @@ function createSelectionBodyActionProps(props: WorkspaceSidebarSelectionPanelPro
     onPreviewSceneBackground: props.onPreviewSceneBackground,
     onRememberRecentColor: props.onRememberRecentColor,
     onResetSceneBackgroundPreview: props.onResetSceneBackgroundPreview,
+    ...(props.onImportImage ? { onImportImage: props.onImportImage } : {}),
     onSetSceneBackground: props.onSetSceneBackground,
     onResizeProject: props.onResizeProject,
     onEnableCursorTrack: props.onEnableCursorTrack,
@@ -224,6 +225,7 @@ function createSelectionPanelUpdateProps(
   | 'onRememberRecentColor'
   | 'onResetSceneBackgroundPreview'
   | 'onSetCursorCaptureMode'
+  | 'onImportImage'
   | 'onSetSceneBackground'
   | 'onUpdateClipAudioEnvelope'
   | 'onUpdateClipFades'
@@ -257,6 +259,7 @@ function createSelectionPanelUpdateProps(
 
 function createSelectionPanelBaseUpdateProps(props: WorkspaceSidebarSelectionPanelSourceProps) {
   return {
+    ...(props.onImportImage ? { onImportImage: props.onImportImage } : {}),
     ...createSelectionSceneClipUpdateDefaults(props),
     onSetCursorCaptureMode: props.onSetCursorCaptureMode,
     onUpdateCursorSkin: props.onUpdateCursorSkin,

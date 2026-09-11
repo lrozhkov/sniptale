@@ -254,7 +254,7 @@ function runAvcLevelSelectionSuite() {
       expect.objectContaining({
         encoding: expect.objectContaining({
           frameRate: VideoFrameRate.FPS60,
-          videoBitrate: 24_000_000,
+          videoBitrate: 21_409_524,
           videoCodec: 'avc',
         }),
       })
@@ -287,7 +287,7 @@ function runAvcLevelSelectionSuite() {
       expect.objectContaining({
         encoding: expect.objectContaining({
           frameRate: 60,
-          videoBitrate: 36_000_000,
+          videoBitrate: 32_114_286,
           videoCodec: 'avc',
           videoCodecString: 'avc1.640033',
         }),

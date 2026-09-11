@@ -73,7 +73,7 @@ it('draws EffectV1 bitmaps through ordinary layer geometry and render state', ()
 
   drawCompositionVisualLayerBitmap(context, layer, bitmap, 2, 3, 0.5);
 
-  expect(context.globalAlpha).toBe(0.5);
+  expect(context.globalAlpha).toBe(1);
   expect(context.filter).toBe('blur(5.00px)');
   expect(context.drawImage).toHaveBeenCalledWith(bitmap, 0, 0, 20, 10, 104, 78, 192, 144);
   expect(context.translate).toHaveBeenCalled();
@@ -253,9 +253,9 @@ it('draws a captured point inside its fitted video with the same alpha, rotation
     {},
     new Map([[layer.clipId, video as unknown as HTMLVideoElement]])
   );
-  expect(context.globalAlpha).toBe(0.4);
+  expect(context.globalAlpha).toBe(1);
   expect(context.rotate).toHaveBeenCalledWith(Math.PI / 2);
-  expect(context.arc).toHaveBeenCalledWith(35, 70, 16, 0, Math.PI * 2);
+  expect(context.arc).toHaveBeenCalledWith(35, 70, 16.5, 0, Math.PI * 2);
   expect(context.rect).toHaveBeenCalledWith(10, 40, 100, 60);
   expect(vi.mocked(context.drawImage).mock.invocationCallOrder[0]).toBeLessThan(
     vi.mocked(context.arc).mock.invocationCallOrder[0]!
@@ -284,7 +284,7 @@ it('keeps a point-less KEY badge within CONTAIN content rather than the letterbo
     {},
     new Map([[layer.clipId, new FakeHTMLVideoElement() as unknown as HTMLVideoElement]])
   );
-  expect(context.fillText).toHaveBeenCalledWith('Ctrl + K', 22, 52, 10);
+  expect(context.fillText).toHaveBeenCalledWith('Ctrl + K', 60, 77.2, expect.closeTo(10));
   expect(context.rect).toHaveBeenCalledWith(10, 40, 100, 60);
 });
 

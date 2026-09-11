@@ -1,3 +1,4 @@
+import { isVideoProjectExportSettings } from '../../../contracts/messaging/video/validators';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import {
@@ -11,6 +12,7 @@ import {
 } from '../../../features/video/project/types/model';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import {
+  getProjectExportCapabilities,
   resetProjectExportOwnerRuntimeStateForTests,
   startProjectExport,
   type VideoProjectExportClient,
@@ -99,4 +101,25 @@ it('requests start capability before starting project export', async () => {
     jobId: 'job-1',
     settings,
   });
+});
+
+it('probes codecs independently of unresolved timeline selection on reopen or quality changes', async () => {
+  const client = createClient();
+  for (const fps of [30, 60, 30]) {
+    await getProjectExportCapabilities(
+      { ...createSettings(), fps, scope: 'selected-range' },
+      client
+    );
+    const message = sendRuntimeMessage.mock.lastCall?.[0];
+    expect(message).toMatchObject({
+      type: VideoMessageType.GET_PROJECT_EXPORT_CAPABILITIES,
+      settings: { fps },
+    });
+    if (!message || typeof message !== 'object' || !('settings' in message))
+      throw new Error('Missing settings');
+    expect(isVideoProjectExportSettings(message.settings)).toBe(true);
+    expect(message.settings).not.toHaveProperty('scope');
+    expect(message.settings).not.toHaveProperty('rangeStartSeconds');
+    expect(message.settings).not.toHaveProperty('selectedClipIds');
+  }
 });

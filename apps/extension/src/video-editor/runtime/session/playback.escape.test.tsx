@@ -29,6 +29,7 @@ function PlaybackEscapeHarness(props: { clearPlacementMode: () => void }) {
       duplicateClip: vi.fn(),
       deleteActionEvent: vi.fn(),
       deleteCursorSample: vi.fn(),
+      deleteEffectInstance: vi.fn(),
       deleteMotionRegion: vi.fn(),
       deleteObjectTrack: vi.fn(),
       clearPlacementMode: props.clearPlacementMode,

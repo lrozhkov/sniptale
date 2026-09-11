@@ -50,6 +50,7 @@ function createPlaybackParams(): UseVideoEditorRuntimeParams['playback'] {
       actionEvent: fn(),
       clip: fn(),
       cursorSample: fn(),
+      effectInstance: fn(),
       motionRegion: fn(),
       objectTrack: fn(),
     },

@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { createMotionFocusAreaFromPointScale } from '../../../../../features/video/project/motion';
+import {
+  createMotionFocusAreaFromPointScale,
+  resolveMotionOverlayZoomMode,
+} from '../../../../../features/video/project/motion';
 import {
   clampFocusAreaSize,
   normalizeMotionFocusArea,
@@ -24,7 +27,7 @@ export interface FramingPreviewProps {
   onCommitArea?: (area: VideoProjectMotionArea) => void;
 }
 
-export function useFramingInteraction(props: FramingPreviewProps, retry: number) {
+export function useFramingInteraction(props: FramingPreviewProps, overview = true) {
   const { project, region, assetUrls } = props;
   const gesture = useRef<{
     pointer: number | null;
@@ -38,7 +41,8 @@ export function useFramingInteraction(props: FramingPreviewProps, retry: number)
     project,
     region,
     draft,
-    areaDraft
+    areaDraft,
+    overview
   );
 
   useEffect(() => {
@@ -48,7 +52,7 @@ export function useFramingInteraction(props: FramingPreviewProps, retry: number)
     setDraft(null);
     gesture.current.area = null;
     setAreaDraft(null);
-  }, [assetUrls, project, region.startTime, region.duration, retry]);
+  }, [assetUrls, project, region.startTime, region.duration]);
 
   const clamp = (point: Point): Point => ({
     x: Math.min(project.width, Math.max(0, point.x)),
@@ -85,6 +89,17 @@ export function useFramingInteraction(props: FramingPreviewProps, retry: number)
   return {
     areaMode,
     area,
+    camera: {
+      viewportX: left,
+      viewportY: top,
+      viewportWidth: width,
+      viewportHeight: height,
+      focusPoint: { x: left + width / 2, y: top + height / 2 },
+      scale: project.width / width,
+      regionId: region.id,
+      motionBlurAmount: 0,
+      overlayZoomMode: resolveMotionOverlayZoomMode(region.overlayZoomMode),
+    },
     viewport,
     left,
     top,
@@ -92,7 +107,7 @@ export function useFramingInteraction(props: FramingPreviewProps, retry: number)
     height,
     handlers: {
       onPointerDown: (event: React.PointerEvent<HTMLButtonElement>) => {
-        if (event.button !== 0 || event.currentTarget.matches(':disabled')) return;
+        if (!overview || event.button !== 0 || event.currentTarget.matches(':disabled')) return;
         event.preventDefault();
         event.currentTarget.focus();
         gesture.current.world = { left, top, width, height };
@@ -258,7 +273,8 @@ function resolveFramingView(
   project: VideoProject,
   region: VideoProjectMotionRegion,
   draft: Point | null,
-  areaDraft: VideoProjectMotionArea | null
+  areaDraft: VideoProjectMotionArea | null,
+  overview: boolean
 ) {
   const areaMode = region.focusMode === VideoMotionFocusMode.MANUAL_AREA;
   const area = areaMode
@@ -277,10 +293,11 @@ function resolveFramingView(
     ? Math.min(4, Math.max(1, Math.min(project.width / area.width, project.height / area.height)))
     : region.scale;
   const viewport = resolveCameraViewportFrame(project, focus, scale);
-  const left = Math.min(0, viewport.viewportX);
-  const top = Math.min(0, viewport.viewportY);
-  const width = Math.max(project.width, viewport.viewportX + viewport.viewportWidth) - left;
-  const height = Math.max(project.height, viewport.viewportY + viewport.viewportHeight) - top;
+  const overviewScale = Math.min(1, region.scale);
+  const width = overview ? project.width / overviewScale : viewport.viewportWidth;
+  const height = overview ? project.height / overviewScale : viewport.viewportHeight;
+  const left = overview ? (project.width - width) / 2 : viewport.viewportX;
+  const top = overview ? (project.height - height) / 2 : viewport.viewportY;
 
   return { areaMode, area, focus, viewport, left, top, width, height };
 }

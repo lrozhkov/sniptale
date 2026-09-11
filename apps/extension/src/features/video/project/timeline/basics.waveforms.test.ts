@@ -147,7 +147,7 @@ it('derives waveform peaks and linked clip ids for linked media clips', () => {
   expect(getClipWaveformPeaks(project, linkedVideo, 4)).toEqual([
     0.1, 0.1, 0.1, 0.1, 0.3, 0.3, 0.3, 0.3,
   ]);
-  expect(getClipWaveformPeaks(project, linkedAudio, 999)).toHaveLength(160);
+  expect(getClipWaveformPeaks(project, linkedAudio, 999)).toHaveLength(999);
   expect(getLinkedClipIds(project, 'linked-video')).toEqual(['linked-video', 'linked-audio']);
 });
 

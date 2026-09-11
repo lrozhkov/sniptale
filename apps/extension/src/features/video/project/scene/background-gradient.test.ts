@@ -86,3 +86,30 @@ it('applies time and audio animation to radial and conic paints and rejects malf
   });
   expect(context.fillRect).toHaveBeenCalledWith(0, 0, 100, 50);
 });
+
+it('animates every gradient geometry with reproducible frames and a neutral zero intensity', () => {
+  for (const id of ['system-ocean', 'system-radial-glow', 'system-conic-spectrum'] as const) {
+    for (const mode of ['rotate', 'breathe', 'drift', 'audioReactive'] as const) {
+      const background: VideoProjectGradientBackground = {
+        kind: 'gradient',
+        gradient: getShowcaseGradient(id),
+        animation: { mode, speed: 100, intensity: 100 },
+      };
+      const original = structuredClone(background);
+      const frame = resolveSceneBackgroundFrame({
+        sceneBackground: background,
+        time: 2,
+        audioEnvelope: 1,
+      });
+      expect(frame).not.toEqual(background);
+      expect(
+        resolveSceneBackgroundFrame({ sceneBackground: background, time: 2, audioEnvelope: 1 })
+      ).toEqual(frame);
+      expect(background).toEqual(original);
+      background.animation!.intensity = 0;
+      expect(
+        resolveSceneBackgroundFrame({ sceneBackground: background, time: 2, audioEnvelope: 1 })
+      ).toEqual(background);
+    }
+  }
+});

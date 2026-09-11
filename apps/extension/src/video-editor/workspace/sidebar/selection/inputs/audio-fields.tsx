@@ -1,6 +1,6 @@
 import { InspectorDetails } from '../shared/details';
 import { Link2, Unlink } from 'lucide-react';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorActionButton } from '../shared/actions';
 import { translate } from '../../../../../platform/i18n';
 import {
   areProjectClipsEditable,
@@ -11,14 +11,12 @@ import {
 import { getClipGainRange } from '../../../../../features/video/project/timeline/basics';
 import type { VideoProjectClip } from '../../../../../features/video/project/types';
 import type { WorkspaceSidebarProps } from '../../contracts/props';
-import { AudioEnvelopeFields, AudioMuteToggle, AudioVolumeField } from './audio-controls';
+import { AudioEnvelopeFields, AudioVolumeField } from './audio-controls';
 
 function renderSharedAudioFields(params: {
   clip: VideoProjectClip;
   disabled: boolean;
-  label: string;
   onUpdateClipAudioEnvelope: WorkspaceSidebarProps['onUpdateClipAudioEnvelope'];
-  onUpdateClipMuted: WorkspaceSidebarProps['onUpdateClipMuted'];
   onUpdateClipVolume: WorkspaceSidebarProps['onUpdateClipVolume'];
 }) {
   const gainRange = getClipGainRange(params.clip);
@@ -29,12 +27,6 @@ function renderSharedAudioFields(params: {
 
   return (
     <>
-      <AudioMuteToggle
-        checked={!params.clip.muted}
-        disabled={params.disabled}
-        label={params.label}
-        onChange={(checked) => params.onUpdateClipMuted(params.clip.id, !checked)}
-      />
       <AudioVolumeField
         disabled={params.disabled}
         value={sharedVolumeValue}
@@ -64,15 +56,24 @@ export function renderAudioFields(
   >
 ) {
   const clip = props.selectedClip;
+  if (!clip || !isAudioClip(clip)) return null;
+  return renderSharedAudioFields({
+    clip,
+    disabled: !areProjectClipsEditable(props.project, [clip.id]),
+    onUpdateClipAudioEnvelope: props.onUpdateClipAudioEnvelope,
+    onUpdateClipVolume: props.onUpdateClipVolume,
+  });
+}
+
+export function renderClipLinkFields(
+  props: Pick<WorkspaceSidebarProps, 'project' | 'selectedClip' | 'onDetachClipGroup'>
+) {
+  const clip = props.selectedClip;
   if (!clip || (!isVideoClip(clip) && !isAudioClip(clip))) return null;
   const linkedIds = getLinkedClipIds(props.project, clip.id);
   const companions = props.project.clips.filter(
     (item) => item.id !== clip.id && linkedIds.includes(item.id)
   );
-  const audio = isVideoClip(clip) ? (companions.find(isAudioClip) ?? clip) : clip;
-  const asset = props.project.assets.find((item) => item.id === audio.assetId);
-  if (isVideoClip(audio) && asset?.metadata.hasAudio !== true && companions.length === 0)
-    return null;
   return (
     <>
       {companions.length > 0 ? (
@@ -85,7 +86,7 @@ export function renderAudioFields(
             >
               {companions.map((item) => item.name).join(', ')}
             </span>
-            <ProductActionButton
+            <InspectorActionButton
               tone="secondary"
               compact
               title={translate('videoEditor.sidebar.detachButton')}
@@ -94,18 +95,10 @@ export function renderAudioFields(
             >
               <Unlink size={14} aria-hidden="true" />
               {translate('videoEditor.sidebar.detachButton')}
-            </ProductActionButton>
+            </InspectorActionButton>
           </div>
         </div>
       ) : null}
-      {renderSharedAudioFields({
-        clip: audio,
-        disabled: !areProjectClipsEditable(props.project, [audio.id]),
-        label: translate('videoEditor.sidebar.videoSoundLabel'),
-        onUpdateClipAudioEnvelope: props.onUpdateClipAudioEnvelope,
-        onUpdateClipMuted: props.onUpdateClipMuted,
-        onUpdateClipVolume: props.onUpdateClipVolume,
-      })}
     </>
   );
 }

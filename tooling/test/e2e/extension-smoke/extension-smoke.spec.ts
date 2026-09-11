@@ -1,4 +1,4 @@
-import { expectVideoEditorPanelLayout } from './video-editor-layout';
+import { expectVideoEditorPanelLayout } from './video-editor-layout.test-support';
 import { mkdir } from 'node:fs/promises';
 import { CONTENT_APP_CONTAINER_ID, CONTENT_ROOT_ID } from '@sniptale/ui/branding';
 import { translate } from '../../../../apps/extension/src/platform/i18n';

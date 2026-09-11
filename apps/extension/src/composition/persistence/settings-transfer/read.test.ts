@@ -1,3 +1,7 @@
+vi.mock('../effect-bundles', async (original) => ({
+  ...(await original<typeof import('../effect-bundles')>()),
+  listImportedEffectBundles: vi.fn(async () => []),
+}));
 import { beforeEach, expect, it, vi } from 'vitest';
 import { DEFAULT_VIDEO_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import { resolveStoredCalloutPresetCatalog } from '../callout-presets/migration';
@@ -154,7 +158,7 @@ beforeEach(() => {
 
 it('reads every visible domain while removing secret and device-bound state', async () => {
   const snapshot = await readSettingsTransferSnapshot();
-  expect(Object.keys(snapshot.domains)).toHaveLength(24);
+  expect(Object.keys(snapshot.domains)).toHaveLength(25);
   expect(snapshot.domains['ai.providers']?.data).toEqual({
     items: [
       {

@@ -5,6 +5,8 @@ import {
   type AppliedCaptureSurface,
 } from '../../../capture-surface';
 import { cancelVideoSourceReadyWait } from './source-handshake';
+import { readVideoPresetViewport } from '../capture-viewport';
+import { ensureActivePageAccessRuntime } from '../../../page-access/service';
 import {
   clearClosedVideoSurfaceTab,
   clearVideoSurfaceRelease,
@@ -18,6 +20,7 @@ import {
 import { releaseAppliedVideoCaptureSurface } from './release-applied';
 
 function getContext(mode: CaptureMode) {
+  if (mode === CaptureMode.SCREEN) return 'video-screen' as const;
   return mode === CaptureMode.TAB_CROP ? ('video-tab-crop' as const) : ('video-tab' as const);
 }
 
@@ -35,27 +38,42 @@ export async function acquireVideoCaptureSurface(args: {
   });
 
   if (!args.presetId) return null;
-  if (args.captureMode === CaptureMode.SCREEN) {
-    throw new Error('Viewport presets are unavailable for screen recording');
-  }
   if (args.captureMode === CaptureMode.CAMERA || args.tabId === null) {
     throw new Error('Viewport presets are unavailable for camera recording');
   }
 
-  session.applied = await getCaptureSurfaceService().apply({
-    sessionId: args.recordingId,
-    generation,
-    owner: 'video',
-    tabId: args.tabId,
-    presetId: args.presetId,
-    context: getContext(args.captureMode),
-  });
-  return session.applied;
+  const tabId = args.tabId;
+  const presetId = args.presetId;
+  session.acquisition = (async () => {
+    const tabCapture = args.captureMode !== CaptureMode.SCREEN;
+    if (tabCapture)
+      await ensureActivePageAccessRuntime(tabId, 'Page access is required for tab recording.');
+    session.applied = await getCaptureSurfaceService().apply({
+      sessionId: args.recordingId,
+      generation,
+      owner: 'video',
+      tabId,
+      presetId,
+      context: getContext(args.captureMode),
+      ...(tabCapture ? { measureVideoViewport: readVideoPresetViewport } : {}),
+    });
+    return session.applied;
+  })();
+  try {
+    const applied = await session.acquisition;
+    if (getVideoSurfaceRelease(args.recordingId))
+      throw new Error('Recording preparation was cancelled');
+    return applied;
+  } finally {
+    delete session.acquisition;
+  }
 }
 
 async function releaseVideoCaptureSurfaceInternal(recordingId: string): Promise<void> {
   cancelVideoSourceReadyWait(recordingId, new Error('Recording source validation was cancelled'));
   const session = getVideoSurfaceSession(recordingId);
+  // Acquisition owns rollback on failure; cancellation must not detach a still-pending lease.
+  await session?.acquisition?.catch(() => undefined);
   const closedTabId = getClosedVideoSurfaceTab(recordingId);
   if (closedTabId !== null) {
     if (session?.applied) {

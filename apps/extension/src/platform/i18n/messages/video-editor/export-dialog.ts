@@ -1,6 +1,12 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorExportDialogMessages = defineMessageSource({
+  fileSection: { ru: 'Файл', en: 'File' },
+  pictureSection: { ru: 'Изображение', en: 'Picture' },
+  codecUnavailable: {
+    ru: 'браузер не поддерживает с этими параметрами экспорта',
+    en: 'unavailable in this browser for these export settings',
+  },
   title: {
     ru: 'Экспорт видео',
     en: 'Export video',
@@ -12,6 +18,11 @@ export const videoEditorExportDialogMessages = defineMessageSource({
   scopeProjectLabel: {
     ru: 'Весь проект',
     en: 'Whole project',
+  },
+  scopeSelectedRangeLabel: { ru: 'Выбранный диапазон', en: 'Selected range' },
+  selectedRangeMissing: {
+    ru: 'Выделите диапазон на таймлайне перед экспортом.',
+    en: 'Select a timeline range before exporting.',
   },
   scopeSelectedClipLabel: {
     ru: 'Только выделенный фрагмент',
@@ -118,8 +129,8 @@ export const videoEditorExportDialogMessages = defineMessageSource({
     en: 'Export subtitles as separate SRT and VTT files',
   },
   downloadAfterExport: {
-    ru: 'Скачивать итоговый файл после успешного рендера',
-    en: 'Download the final file after a successful render',
+    ru: 'Скачать готовый файл',
+    en: 'Download when ready',
   },
   selectedClipMissing: {
     ru: 'Для экспорта выделенного фрагмента сначала выберите клип на таймлайне.',

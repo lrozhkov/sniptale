@@ -76,6 +76,7 @@ export function useProjectTimelineSeek({
           pixelsPerSecond;
       const pointerOffset = event.clientX - playheadClientX;
       cleanupRef.current = startWindowPointerSession({
+        cursor: 'ew-resize',
         onMove: (moveEvent) => seekToClientX(moveEvent.clientX - pointerOffset),
         onEnd: () => {
           cleanupRef.current = null;

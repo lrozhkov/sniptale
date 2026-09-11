@@ -1,5 +1,7 @@
-import { useVideoEditorOverlayPlayback } from '../overlay-playback';
 // @vitest-environment jsdom
+
+import { RuntimePlaybackContext } from './contexts';
+import { useVideoEditorOverlayPlayback } from '../overlay-playback';
 
 import { act, useContext, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -67,6 +69,8 @@ const mocks = vi.hoisted(() => {
     refreshRecordings: action,
   };
   const workspace = {
+    projectDialogOpen: false,
+    setProjectDialogOpen: action,
     autoProcessingModalOpen: false,
     setAutoProcessingModalOpen: action,
     audioRecordingDialogOpen: false,
@@ -100,6 +104,7 @@ const mocks = vi.hoisted(() => {
     toggleSidebarCollapsed: action,
   };
   const runtime = {
+    isPreparingPlayback: false,
     applyLoadedProject: action,
     assetUrls: {},
     pausePlayback: action,
@@ -355,4 +360,26 @@ it('connects canvas scene-anchor edits to the authoritative effect mutation port
   const patch = { sceneAnchors: { tip: { x: 30, y: 40 } } };
   act(() => controller?.editing.onUpdateEffectInstance('effect', patch));
   expect(mocks.effects.updateEffectInstance).toHaveBeenCalledWith('effect', patch);
+});
+
+it('publishes cache preparation changes through the playback context', () => {
+  let preparing: boolean | undefined;
+  function Consumer() {
+    preparing = useContext(RuntimePlaybackContext)?.isPreparingPlayback;
+    return null;
+  }
+  const render = () =>
+    root.render(
+      <VideoEditorCompositionProvider>
+        <Consumer />
+      </VideoEditorCompositionProvider>
+    );
+  act(render);
+  expect(preparing).toBe(false);
+  mocks.runtime.isPreparingPlayback = true;
+  act(render);
+  expect(preparing).toBe(true);
+  mocks.runtime.isPreparingPlayback = false;
+  act(render);
+  expect(preparing).toBe(false);
 });

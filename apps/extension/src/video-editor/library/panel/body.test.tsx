@@ -182,3 +182,43 @@ it('applies supported saved filters, switches category and clears the preset thr
   );
   expect(buttons()[1]!.getAttribute('aria-pressed')).toBe('true');
 });
+
+it('keeps all-media filters only in all media and includes both supported kinds', () => {
+  render({
+    savedViews: [
+      {
+        id: 'all-view',
+        name: 'All saved',
+        folderFilter: 'all',
+        filters: {
+          activeTags: [],
+          scope: 'all',
+          facetFilters: {
+            created: [],
+            updated: [],
+            format: [],
+            size: [],
+            resolution: [],
+            duration: [],
+            source: [],
+          },
+        },
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ],
+  });
+  expect(container.querySelector('[data-ui="library-filters-video"]')!.textContent).not.toContain(
+    'All saved'
+  );
+  expect(container.querySelector('[data-ui="library-filters-image"]')!.textContent).not.toContain(
+    'All saved'
+  );
+  const all = container.querySelector('[data-ui="library-filters-all"]')!;
+  expect(all.textContent).toContain('All saved');
+  act(() => all.querySelector<HTMLButtonElement>('button')!.click());
+  const list = container.querySelector('[data-ui="recordings-scroll"]')!.textContent;
+  expect(list).toContain('recording');
+  expect(list).toContain('screenshot');
+  expect(list).not.toContain('audio');
+});

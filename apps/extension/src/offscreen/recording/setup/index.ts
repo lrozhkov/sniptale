@@ -240,7 +240,9 @@ function assertTabSourceGeometry(
   const requestedWidth = expected.width - (expected.width % 2);
   const requestedHeight = expected.height - (expected.height % 2);
   const matchesNativeGrid = raw.width === expected.width && raw.height === expected.height;
-  const matchesChromiumEvenGrid = raw.width === requestedWidth && raw.height === requestedHeight;
+  const matchesChromiumEvenGrid =
+    matchesEvenRasterAxis(raw.width, expected.width, params.captureMode === CaptureMode.TAB) &&
+    matchesEvenRasterAxis(raw.height, expected.height, params.captureMode === CaptureMode.TAB);
   if (params.captureMode === CaptureMode.TAB && !matchesNativeGrid && !matchesChromiumEvenGrid) {
     return { expectedPhysicalSize: expected, fidelity: 'source-measured' };
   }
@@ -255,6 +257,11 @@ function assertTabSourceGeometry(
     expectedPhysicalSize: expected,
     fidelity: matchesNativeGrid ? 'native-grid' : 'chromium-even-grid',
   };
+}
+
+function matchesEvenRasterAxis(actual: number, expected: number, allowRoundUp: boolean): boolean {
+  const remainder = expected % 2;
+  return actual === expected - remainder || (allowRoundUp && actual === expected + remainder);
 }
 
 function assertPositiveTabSourceSize(raw: { width: number; height: number }): void {

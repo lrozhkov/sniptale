@@ -1,3 +1,10 @@
+import {
+  collectEffectCatalogPreferences,
+  readEffectCatalogPreferences,
+} from '../effect-bundles/preferences';
+import type { PersistenceMutationPermit } from '../infrastructure/mutation-barrier';
+import { listImportedEffectBundles } from '../effect-bundles';
+import { encodeEffectSettingsEntry } from '../effect-bundles/settings-transfer';
 import type {
   SettingsTransferDomainPayload,
   SettingsTransferDynamicItem,
@@ -44,7 +51,9 @@ export interface SettingsTransferSnapshot {
   locale: AppLocale;
 }
 
-export async function readSettingsTransferSnapshot(): Promise<SettingsTransferSnapshot> {
+export async function readSettingsTransferSnapshot(
+  permit?: PersistenceMutationPermit
+): Promise<SettingsTransferSnapshot> {
   const [
     settings,
     quickActions,
@@ -81,6 +90,14 @@ export async function readSettingsTransferSnapshot(): Promise<SettingsTransferSn
     browserStorage.local.get([THEME_STORAGE_KEY, LOCALE_STORAGE_KEY]),
   ]);
 
+  const effectCatalogs = await listImportedEffectBundles(permit);
+  if (effectCatalogs.some((entry) => entry.status !== 'ready'))
+    throw new Error('Invalid effect catalog cannot be backed up');
+  const effects = await Promise.all(
+    effectCatalogs.flatMap((entry) =>
+      entry.status === 'ready' ? [encodeEffectSettingsEntry(entry.entry)] : []
+    )
+  );
   const providers = ai.providers.map(selectSettingsTransferProviderMetadata);
   const domains: Record<string, SettingsTransferDomainPayload> = {
     'interface.preferences': payload({
@@ -126,6 +143,13 @@ export async function readSettingsTransferSnapshot(): Promise<SettingsTransferSn
     }),
     'styles.surfaces': payload(serializeSurfaceStylePresetCatalog(surfaces)),
     'styles.gradients': payload(gradients),
+    'styles.video-effects': payload({
+      items: effects,
+      preferences: collectEffectCatalogPreferences(
+        effectCatalogs.flatMap((item) => (item.status === 'ready' ? [item.entry] : [])),
+        await readEffectCatalogPreferences()
+      ),
+    }),
     'ai.providers': payload({ items: providers }),
     'ai.models': payload({
       items: ai.models.map(selectSettingsTransferModelMetadata),
@@ -216,6 +240,7 @@ export function collectSettingsTransferDynamicItems(
   addEditorPresetItems(result, domains, locale);
   addPaletteItems(result, domains);
   addItems(result, domains, 'styles.surfaces', 'presets', locale);
+  addItems(result, domains, 'styles.video-effects', 'items', locale);
   addItems(result, domains, 'styles.gradients', 'presets', locale);
   addItems(result, domains, 'ai.providers', 'items', locale);
   addItems(result, domains, 'ai.models', 'items', locale, (item) =>
@@ -291,6 +316,10 @@ function getItemDisplayName(
   domainId?: string,
   locale?: AppLocale
 ): string {
+  const label = asRecord(item['label']);
+  const localizedLabel = label?.[locale ?? 'en'];
+  if (domainId === 'styles.video-effects' && typeof localizedLabel === 'string')
+    return localizedLabel;
   const namedPreset = getNamedPresetIdentity(item);
   if (
     domainId === 'capture.viewport-presets' &&

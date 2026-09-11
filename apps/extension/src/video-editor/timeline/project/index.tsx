@@ -22,7 +22,10 @@ export const ProjectTimeline = (
         : panelPrefs.prefs.trackHeightByTrackId,
     [panelPrefs.prefs, props.project.tracks]
   );
-  const timelineState = useProjectTimelineState(props, heights);
+  const timelineState = useProjectTimelineState(
+    { ...props, collapsedFxByTrackId: panelPrefs.prefs.collapsedFxByTrackId },
+    heights
+  );
 
   return (
     <TimelineEffectDraftContext.Provider value={timelineState.effectDragDraft}>
@@ -42,10 +45,7 @@ function ProjectTimelineLayout(
       <ProjectTimelineBody
         {...props}
         cursorLaneVisible={props.panelPrefs.cursorLaneVisible}
-        telemetryLaneVisible={
-          props.panelPrefs.telemetryLaneVisible &&
-          (props.project.actionEvents.length > 0 || props.recordingTelemetry.length > 0)
-        }
+        telemetryLaneVisible={props.panelPrefs.telemetryLaneVisible}
         trackPanelPrefs={props.panelPrefs}
       />
     </ProjectTimelineSurface>

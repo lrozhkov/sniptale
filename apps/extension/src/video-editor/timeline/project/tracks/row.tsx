@@ -1,5 +1,10 @@
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { useEffectDocumentDrag } from '../../../chrome/effect-document-drag';
+import { useState } from 'react';
+import { createTrackEffectDropHandlers } from '../canvas/parts/effect-drop';
+import type { ProjectTimelineProps } from '../types';
 import { VideoTrackKind } from '../../../../features/video/project/types';
-import { Eye, EyeOff, Lock, Unlock, Volume2, VolumeX } from 'lucide-react';
+import { Eye, EyeOff, Lock, Unlock, Volume2, VolumeX, ChevronDown, ChevronUp } from 'lucide-react';
 import { translate } from '../../../../platform/i18n';
 import type { VideoProject } from '../../../../features/video/project/types';
 import { getTrackKindLabel } from '../interaction-state/helpers';
@@ -13,6 +18,9 @@ const TRACK_SELECT_FOCUS_CLASS_NAME = [
 ].join(' ');
 
 interface ProjectTimelineTrackRowProps {
+  onToggleFx?: () => void;
+  project?: VideoProject;
+  onDropEffectDocument?: ProjectTimelineProps['onDropEffectDocument'];
   compactRows: boolean;
   isSelected: boolean;
   track: VideoProject['tracks'][number];
@@ -24,6 +32,9 @@ interface ProjectTimelineTrackRowProps {
 }
 
 export function ProjectTimelineTrackRow({
+  onToggleFx,
+  project,
+  onDropEffectDocument,
   compactRows,
   isSelected,
   track,
@@ -33,24 +44,78 @@ export function ProjectTimelineTrackRow({
   onToggleTrackLock,
   onToggleTrackVisibility,
 }: ProjectTimelineTrackRowProps) {
+  const { drag } = useEffectDocumentDrag();
+  const [dropActive, setDropActive] = useState(false);
+  const drop = project
+    ? createTrackEffectDropHandlers({
+        project,
+        track,
+        header: true,
+        dragKind: drag?.kind,
+        pixelsPerSecond: 1,
+        onDrop: onDropEffectDocument,
+        onHighlight: (id) => setDropActive(id !== null),
+      })
+    : null;
   return (
     <div
-      className={TIMELINE_LANE_HEADER_CLASS_NAME}
-      data-selected={isSelected}
       style={{ height: trackLayout?.rowHeight }}
+      onDragOver={(event) => drop?.onDragOver(event)}
+      onDrop={(event) => drop?.onDrop(event)}
+      onDragLeave={() => setDropActive(false)}
+      className={
+        dropActive ? 'outline outline-1 outline-[var(--sniptale-color-accent)]' : undefined
+      }
     >
-      <ProjectTimelineTrackMeta
-        compactRows={compactRows}
-        isSelected={isSelected}
-        track={track}
-        trackLabel={trackLabel}
-        onSelectTrack={onSelectTrack}
-      />
-      <ProjectTimelineTrackStateControls
-        track={track}
-        onToggleTrackLock={onToggleTrackLock}
-        onToggleTrackVisibility={onToggleTrackVisibility}
-      />
+      <div
+        className={[
+          TIMELINE_LANE_HEADER_CLASS_NAME,
+          trackLayout?.fxHeight ? '!border-b-0' : '',
+        ].join(' ')}
+        data-selected={isSelected}
+        style={{ height: trackLayout?.clipRowHeight }}
+      >
+        <ProjectTimelineTrackMeta
+          compactRows={compactRows}
+          isSelected={isSelected}
+          track={track}
+          trackLabel={trackLabel}
+          onSelectTrack={onSelectTrack}
+        />
+        <ProjectTimelineTrackStateControls
+          track={track}
+          onToggleTrackLock={onToggleTrackLock}
+          onToggleTrackVisibility={onToggleTrackVisibility}
+        />
+      </div>
+      {Boolean(trackLayout?.fxHeight) && (
+        <div
+          style={{ height: trackLayout?.fxHeight }}
+          className="border-b border-[var(--sniptale-color-border-soft)]"
+        >
+          <ContentToolbarButton
+            dataUi="video-editor.timeline.track-fx"
+            className={[
+              '!h-full !min-h-0 !w-full !justify-between !rounded-none !border-0 !px-3 !py-0 !shadow-none',
+              '!text-[10px] !font-normal !text-[var(--sniptale-color-text-muted)]',
+            ].join(' ')}
+            onClick={onToggleFx}
+            aria-expanded={!trackLayout?.fxCollapsed}
+            title={translate(
+              trackLayout?.fxCollapsed
+                ? 'videoEditor.effectsLibrary.showTimelineEffects'
+                : 'videoEditor.effectsLibrary.collapseTimelineEffects'
+            )}
+          >
+            <span>{translate('videoEditor.effectsLibrary.title')}</span>
+            {trackLayout?.fxCollapsed ? (
+              <ChevronDown aria-hidden="true" size={10} />
+            ) : (
+              <ChevronUp aria-hidden="true" size={10} />
+            )}
+          </ContentToolbarButton>
+        </div>
+      )}
     </div>
   );
 }

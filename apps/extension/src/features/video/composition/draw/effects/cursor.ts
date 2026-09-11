@@ -48,6 +48,7 @@ function resolveCursorAnimationScale(cursor: VideoCompositionCursorState): numbe
       return 1 + Math.sin(phase * 3) * 0.06;
     case 'BREATHE':
       return 1 + Math.sin(phase * 1.2) * 0.04;
+    case 'PRESS':
     case 'FLOAT':
     case 'NONE':
       return 1;

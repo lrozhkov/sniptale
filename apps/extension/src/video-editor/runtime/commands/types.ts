@@ -9,11 +9,12 @@ import type { VideoEditorExportActions } from '../../contracts/commands/export';
 import type { VideoEditorProjectActions } from '../../contracts/commands/project';
 import type { VideoEditorSessionActions } from '../../contracts/commands/session';
 import type { VideoEditorLibrariesState, ProjectListItem } from '../app-model/types';
+import type { VideoEditorPlaybackRange } from '../../interaction/playback/range';
 import type { ApplyLoadedProject } from '../session/types';
 
 export interface VideoEditorActionHandlers {
   handleOpenProject: (projectId: string) => Promise<void>;
-  handleCreateProject: () => Promise<void>;
+  handleCreateProject: (name?: string, copyCurrent?: boolean) => Promise<void>;
   handleDeleteProject: (projectId: string) => Promise<void>;
   handleAddRecording: (recordingId: string) => Promise<void>;
   handleAddLibraryMedia: (mediaId: string) => Promise<void>;
@@ -43,6 +44,7 @@ export interface AssetHandlerPort
   getCurrentProject: () => VideoProject | null;
   getCurrentProjectId: () => string | null;
   getCurrentTime: () => number;
+  updateProject: VideoEditorSessionActions['updateProject'];
   upsertAsset: VideoEditorProjectActions['upsertAsset'];
   upsertAssets: VideoEditorProjectActions['upsertAssets'];
   addAssetClip: VideoEditorProjectActions['addAssetClip'];
@@ -54,6 +56,7 @@ export interface AssetHandlerPort
 export interface ExportHandlerPort {
   getCurrentProject: () => VideoProject | null;
   getCurrentSelectedClipId: () => string | null;
+  getCurrentPlaybackRange: () => VideoEditorPlaybackRange | null;
   getCurrentExportState: () => VideoEditorExportRuntimeState;
   startExport: VideoEditorExportActions['startExport'];
   failExport: VideoEditorExportActions['failExport'];

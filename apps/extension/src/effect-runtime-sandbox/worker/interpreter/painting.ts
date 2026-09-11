@@ -13,7 +13,7 @@ type GradientPaint = Extract<EffectV1Paint, { kind: 'linearGradient' | 'radialGr
 
 interface CommandStyleSource {
   alpha?: unknown;
-  blend?: 'lighter' | 'screen' | 'source-over';
+  blend?: 'lighter' | 'screen' | 'source-over' | 'source-atop' | 'destination-in';
   filter?: unknown;
   shadow?: EffectV1Shadow;
 }
@@ -44,21 +44,6 @@ export function withCommandStyle(
   try {
     applyCommandStyle(command, layer, state);
     draw();
-  } finally {
-    state.context.restore();
-  }
-}
-
-export async function withSavedState(
-  command: CommandStyleSource,
-  layer: RuntimeLayerState | null,
-  state: RenderState,
-  draw: () => Promise<void>
-): Promise<void> {
-  state.context.save();
-  try {
-    applyCommandStyle(command, layer, state);
-    await draw();
   } finally {
     state.context.restore();
   }

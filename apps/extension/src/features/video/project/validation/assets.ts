@@ -12,7 +12,7 @@ import {
   MAX_VIDEO_PROJECT_DURATION_SECONDS,
   MAX_VIDEO_PROJECT_MEDIA_BYTES,
 } from './primitives';
-import { VideoProjectAssetType } from '../types/index';
+import { MAX_VIDEO_PROJECT_AUDIO_PEAKS, VideoProjectAssetType } from '../types/index';
 
 function isAssetSource(value: unknown): boolean {
   if (!isRecord(value) || !isString(value['kind'])) {
@@ -46,7 +46,8 @@ function isAssetMetadata(value: unknown): boolean {
     isString(value['mimeType']) &&
     isBoundedNumber(value['size'], 0, MAX_VIDEO_PROJECT_MEDIA_BYTES) &&
     isBoolean(value['hasAudio']) &&
-    (value['audioPeaks'] === null || isBoundedArray(value['audioPeaks'], isUnitInterval))
+    (value['audioPeaks'] === null ||
+      isBoundedArray(value['audioPeaks'], isUnitInterval, MAX_VIDEO_PROJECT_AUDIO_PEAKS))
   );
 }
 

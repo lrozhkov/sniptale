@@ -5,6 +5,11 @@ import { useCallback, useMemo, useState } from 'react';
 import type { VideoProject, VideoProjectTransform } from '../../../../features/video/project/types';
 import type { PreviewTransformGestureHooks } from '../canvas/transform/gesture';
 
+interface TransientControls {
+  instanceId: string;
+  controls: Record<string, number>;
+}
+
 interface TransientAnchors {
   instanceId: string;
   anchors: Record<string, { x: number; y: number }>;
@@ -20,7 +25,9 @@ export function usePreviewStageTransientTransform(
   playback: { currentTime: number; pause(): number }
 ) {
   const { currentTime, pause } = playback;
-  const [transient, setTransient] = useState<TransientTransform | TransientAnchors | null>(null);
+  const [transient, setTransient] = useState<
+    TransientTransform | TransientAnchors | TransientControls | null
+  >(null);
   const [cacheBypass, setCacheBypass] = useState(false);
   const [frozenTime, setFrozenTime] = useState<number | null>(null);
   const previewProject = useMemo(() => {
@@ -30,7 +37,12 @@ export function usePreviewStageTransientTransform(
         ...project,
         effectInstances: (project.effectInstances ?? []).map((instance) =>
           instance.id === transient.instanceId
-            ? { ...instance, sceneAnchors: transient.anchors }
+            ? {
+                ...instance,
+                ...('controls' in transient
+                  ? { controls: { ...instance.controls, ...transient.controls } }
+                  : { sceneAnchors: transient.anchors }),
+              }
             : instance
         ),
       };
@@ -86,8 +98,23 @@ export function usePreviewStageTransientTransform(
     },
     [pause]
   );
+  const onPreviewEffectControls = useCallback(
+    (instanceId: string, controls: Record<string, number> | null) => {
+      if (controls) {
+        setFrozenTime(pause());
+        setCacheBypass(true);
+        setTransient({ instanceId, controls });
+      } else {
+        setTransient(null);
+        setFrozenTime(null);
+        setCacheBypass(false);
+      }
+    },
+    [pause]
+  );
   return {
     onPreviewEffectAnchors,
+    onPreviewEffectControls,
     cacheBypass,
     currentTime: frozenTime ?? currentTime,
     gestureHooks,

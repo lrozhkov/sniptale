@@ -327,3 +327,77 @@ it.each([
     });
   }
 );
+
+it('validates click geometry against the prepared input rather than the larger raw capture', async () => {
+  prepareRecordingStreamMock.mockResolvedValueOnce({
+    ...prepared,
+    rawVideoWidth: 2560,
+    rawVideoHeight: 1440,
+  });
+  await startRecording(
+    {
+      captureMode: CaptureMode.TAB,
+      generation: 3,
+      recordingId: 'recording-1',
+      streamInstanceId: 'stream-instance-1',
+      settings: createSettings(),
+      streamId: 'stream-1',
+    },
+    messaging
+  );
+  const observe = finalizeRecordingBootstrapMock.mock.calls[0]![0].onVideoFrameGeometry!;
+  observe({
+    codedWidth: 1280,
+    codedHeight: 720,
+    displayWidth: 1280,
+    displayHeight: 720,
+    visibleRect: { x: 0, y: 0, width: 1280, height: 720 },
+  } as VideoFrame);
+  expect(recordingContextMock.recordingPointObservation).toMatchObject({
+    stable: true,
+    sawFrame: true,
+  });
+});
+
+it('keeps click mapping when the encoder crops raw input to a smaller output raster', async () => {
+  prepareRecordingStreamMock.mockResolvedValueOnce({
+    ...prepared,
+    rawTrackSettings: { width: 2560, height: 1306, frameRate: 30 },
+    rawVideoWidth: 2560,
+    rawVideoHeight: 1306,
+    trackSettings: { width: 2560, height: 1304, frameRate: 30 },
+    encoderFrameTransform: {
+      fit: 'fill',
+      outputSize: { width: 2560, height: 1304 },
+      sourceRect: { x: 0, y: 0, width: 2560, height: 1304 },
+    },
+  });
+  await startRecording(
+    {
+      captureMode: CaptureMode.TAB,
+      generation: 3,
+      recordingId: 'recording-1',
+      streamInstanceId: 'stream-instance-1',
+      settings: createSettings(),
+      streamId: 'stream-1',
+    },
+    messaging
+  );
+  const observe = finalizeRecordingBootstrapMock.mock.calls[0]![0].onVideoFrameGeometry!;
+  const frame = {
+    codedWidth: 2560,
+    codedHeight: 1306,
+    displayWidth: 2560,
+    displayHeight: 1306,
+    visibleRect: { x: 0, y: 0, width: 2560, height: 1306 },
+  };
+  observe(frame as VideoFrame);
+  observe(frame as VideoFrame);
+  expect(recordingContextMock.recordingPointObservation).toMatchObject({
+    stable: true,
+    sawFrame: true,
+  });
+  observe({ ...frame, displayHeight: 1304 } as VideoFrame);
+  observe(frame as VideoFrame);
+  expect(recordingContextMock.recordingPointObservation).toMatchObject({ stable: false });
+});

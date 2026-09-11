@@ -2,18 +2,10 @@
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const {
-  loadActiveLedgerMock,
-  loggerDebugMock,
-  loggerWarnMock,
-  sendRuntimeMessageMock,
-  upsertLedgerMock,
-} = vi.hoisted(() => ({
-  loadActiveLedgerMock: vi.fn(),
+const { loggerDebugMock, loggerWarnMock, sendRuntimeMessageMock } = vi.hoisted(() => ({
   loggerDebugMock: vi.fn(),
   loggerWarnMock: vi.fn(),
   sendRuntimeMessageMock: vi.fn(),
-  upsertLedgerMock: vi.fn(),
 }));
 
 vi.mock('@sniptale/platform/observability/logger', () => ({
@@ -28,12 +20,6 @@ vi.mock('../../platform/runtime-messaging/index', async (importOriginal) => ({
   sendRuntimeMessage: sendRuntimeMessageMock,
 }));
 
-vi.mock('../../composition/persistence/export-ledger', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../composition/persistence/export-ledger')>()),
-  loadActiveProjectExportJobLedgerEntry: loadActiveLedgerMock,
-  upsertProjectExportJobLedgerEntry: upsertLedgerMock,
-}));
-
 import { cleanupJob, getSupportedWebmExportMimeType, sendProgress, waitForDelay } from './runtime';
 import { VideoMessageType } from '@sniptale/runtime-contracts/video/messages';
 import { VideoProjectExportPhase } from '../../features/video/project/types';
@@ -46,8 +32,6 @@ async function flushPromises(): Promise<void> {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
-  loadActiveLedgerMock.mockResolvedValue(null);
-  upsertLedgerMock.mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -158,7 +142,6 @@ it('chooses the requested WebM codec and rejects unsupported codec selection', (
 
 it('sends clamped progress updates and logs best-effort transport failures', async () => {
   sendRuntimeMessageMock.mockResolvedValueOnce(undefined);
-  loadActiveLedgerMock.mockResolvedValueOnce({ jobId: 'job-1', projectId: 'project-1' });
 
   await sendProgress('job-1', VideoProjectExportPhase.TRANSCODING, 140, 'working');
 
@@ -167,15 +150,9 @@ it('sends clamped progress updates and logs best-effort transport failures', asy
     jobId: 'job-1',
     status: {
       phase: VideoProjectExportPhase.TRANSCODING,
-      progress: 100,
+      progress: 97,
       message: 'working',
     },
-  });
-  expect(upsertLedgerMock).toHaveBeenCalledWith({
-    jobId: 'job-1',
-    projectId: 'project-1',
-    phase: VideoProjectExportPhase.TRANSCODING,
-    progress: 100,
   });
   expect(loggerDebugMock).not.toHaveBeenCalled();
 
@@ -248,4 +225,23 @@ it('waits for the requested delay and rejects aborted waits', async () => {
 
   await expect(waitForDelay(0)).resolves.toBeUndefined();
   await expect(waitForDelay(0, alreadyAborted.signal)).rejects.toThrow('The export was aborted.');
+});
+
+it('reserves completion until DONE and maps rendering into the overall budget', async () => {
+  sendRuntimeMessageMock.mockResolvedValue(undefined);
+  for (const [phase, local, overall] of [
+    ['PREPARING', 0, 0],
+    ['RENDERING', 50, 47.5],
+    ['RENDERING', 100, 90],
+    ['TRANSCODING', 100, 97],
+    ['SAVING', 100, 99],
+    ['DONE', 100, 100],
+  ] as const) {
+    await sendProgress('job', phase, local, 'progress');
+    expect(sendRuntimeMessageMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        status: { phase, progress: overall, message: 'progress' },
+      })
+    );
+  }
 });

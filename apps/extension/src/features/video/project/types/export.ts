@@ -52,6 +52,7 @@ export type VideoProjectExportPhase =
 export const VideoExportScope = {
   PROJECT: 'project',
   SELECTED_CLIP: 'selected-clip',
+  SELECTED_RANGE: 'selected-range',
 } as const;
 
 export type VideoExportScope = (typeof VideoExportScope)[keyof typeof VideoExportScope];

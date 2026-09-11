@@ -87,76 +87,27 @@ export function AutoProcessingReview({
             </div>
           </dl>
         ) : selectionChanged ? (
-          <p className="mt-3 text-sm">
-            {translate(
-              selectionChanged
-                ? 'videoEditor.timeline.autoSelectionChanged'
-                : 'videoEditor.timeline.autoNoChanges'
-            )}
-          </p>
+          <p className="mt-3 text-sm">{translate('videoEditor.timeline.autoSelectionChanged')}</p>
         ) : null}
       </div>
+      {Object.values(analysis?.audio ?? {}).some((item) => item.status === 'unavailable') ? (
+        <p role="status" className="px-5 py-3 text-xs leading-relaxed">
+          {translate('videoEditor.timeline.autoAudioUnavailable')}
+        </p>
+      ) : null}
       <div className="min-h-0 flex-1 overflow-y-auto px-5 py-2">
         {analysis?.suggestions.map((row) => (
-          <div
+          <AutoProcessingSuggestionRow
             key={row.id}
-            data-ui="video-editor.auto.suggestion"
-            data-status={row.status}
-            data-clip-id={row.target.clipId}
-            className="flex items-center gap-4 border-b border-[var(--sniptale-color-border-soft)] py-3 last:border-0"
-          >
-            <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3 has-[:disabled]:cursor-default">
-              <input
-                type="checkbox"
-                className="sniptale-checkbox sniptale-checkbox-sm mt-0.5 shrink-0"
-                checked={selectedIds.includes(row.id)}
-                disabled={busy || row.status !== 'available'}
-                onChange={() => onToggleSuggestion(row.id)}
-              />
-              <span className="min-w-0">
-                <span className="block truncate text-sm font-medium" title={row.label}>
-                  {row.label}
-                </span>
-                <span className="mt-1 block text-xs tabular-nums text-[var(--sniptale-color-text-secondary)]">
-                  {seconds(row.startTime)}–{seconds(row.endTime)}
-                </span>
-                {row.status !== 'available' ? (
-                  <span className="mt-1 block text-xs text-[var(--sniptale-color-text-secondary)]">
-                    {row.status === 'unchanged'
-                      ? translate('videoEditor.timeline.autoNoChanges')
-                      : reasonLabel(row.reason)}
-                  </span>
-                ) : null}
-                {preview?.blockedId === row.id ? (
-                  <span role="alert" className="mt-1 block text-xs">
-                    {translate('videoEditor.timeline.autoBatchBlocked')}
-                  </span>
-                ) : null}
-              </span>
-            </label>
-            <div className="shrink-0 text-right text-xs">
-              <p>
-                {row.kind === 'camera'
-                  ? translate('videoEditor.timeline.autoFraming')
-                  : autoProcessingActionLabel(action)}
-              </p>
-              {row.kind === 'timing' ? (
-                <p className="mt-1 tabular-nums text-[var(--sniptale-color-text-secondary)]">
-                  {seconds(row.beforeDuration)} → {seconds(row.afterDuration)}
-                </p>
-              ) : null}
-            </div>
-            <ProductActionButton
-              compact
-              tone="secondary"
-              disabled={busy}
-              title={translate('videoEditor.timeline.autoViewOriginal')}
-              aria-label={`${translate('videoEditor.timeline.autoViewOriginal')}: ${row.label}`}
-              onClick={() => onViewOriginal(row.startTime, row.endTime)}
-            >
-              <Eye size={14} aria-hidden="true" />
-            </ProductActionButton>
-          </div>
+            row={row}
+            selectedIds={selectedIds}
+            busy={busy}
+            preview={preview}
+            action={action}
+            seconds={seconds}
+            onToggleSuggestion={onToggleSuggestion}
+            onViewOriginal={onViewOriginal}
+          />
         ))}
         {!analysis?.suggestions.length ? (
           <p className="py-8 text-center text-sm text-[var(--sniptale-color-text-secondary)]">
@@ -290,5 +241,97 @@ function AutoProcessingSubmitActions({
         </ProductActionButton>
       ) : null}
     </>
+  );
+}
+
+function AutoProcessingSuggestionRow({
+  row,
+  selectedIds,
+  busy,
+  preview,
+  action,
+  seconds,
+  onToggleSuggestion,
+  onViewOriginal,
+}: {
+  row: AutoProcessingPreview['suggestions'][number];
+  selectedIds: readonly string[];
+  busy: boolean;
+  preview: AutoProcessingPreview | null;
+  action: VideoAutoProcessingAction;
+  seconds: (value: number) => string;
+  onToggleSuggestion: (id: string) => void;
+  onViewOriginal: (start: number, end: number) => void;
+}) {
+  return (
+    <div
+      data-ui="video-editor.auto.suggestion"
+      data-status={row.status}
+      data-clip-id={row.target.clipId}
+      className={`flex items-center gap-4 border-b
+border-[var(--sniptale-color-border-soft)] py-3 last:border-0`}
+    >
+      <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3 has-[:disabled]:cursor-default">
+        <input
+          type="checkbox"
+          className="sniptale-checkbox sniptale-checkbox-sm mt-0.5 shrink-0"
+          checked={selectedIds.includes(row.id)}
+          disabled={busy || row.status !== 'available'}
+          onChange={() => onToggleSuggestion(row.id)}
+        />
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-medium" title={row.label}>
+            {row.category ? (
+              <>
+                {translate(
+                  row.category === 'typing'
+                    ? 'videoEditor.timeline.autoTyping'
+                    : 'videoEditor.timeline.autoIdleDetected'
+                )}{' '}
+                ·{' '}
+              </>
+            ) : null}
+            {row.label}
+          </span>
+          <span className="mt-1 block text-xs tabular-nums text-[var(--sniptale-color-text-secondary)]">
+            {seconds(row.startTime)}–{seconds(row.endTime)}
+          </span>
+          {row.status !== 'available' ? (
+            <span className="mt-1 block text-xs text-[var(--sniptale-color-text-secondary)]">
+              {row.status === 'unchanged'
+                ? translate('videoEditor.timeline.autoNoChanges')
+                : reasonLabel(row.reason)}
+            </span>
+          ) : null}
+          {preview?.blockedId === row.id ? (
+            <span role="alert" className="mt-1 block text-xs">
+              {translate('videoEditor.timeline.autoBatchBlocked')}
+            </span>
+          ) : null}
+        </span>
+      </label>
+      <div className="shrink-0 text-right text-xs">
+        <p>
+          {row.kind === 'camera'
+            ? translate('videoEditor.timeline.autoFraming')
+            : autoProcessingActionLabel(row.timing?.action ?? action)}
+        </p>
+        {row.kind === 'timing' ? (
+          <p className="mt-1 tabular-nums text-[var(--sniptale-color-text-secondary)]">
+            {seconds(row.beforeDuration)} → {seconds(row.afterDuration)}
+          </p>
+        ) : null}
+      </div>
+      <ProductActionButton
+        compact
+        tone="secondary"
+        disabled={busy}
+        title={translate('videoEditor.timeline.autoViewOriginal')}
+        aria-label={`${translate('videoEditor.timeline.autoViewOriginal')}: ${row.label}`}
+        onClick={() => onViewOriginal(row.startTime, row.endTime)}
+      >
+        <Eye size={14} aria-hidden="true" />
+      </ProductActionButton>
+    </div>
   );
 }

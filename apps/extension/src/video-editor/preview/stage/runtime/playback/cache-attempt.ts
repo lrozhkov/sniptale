@@ -49,6 +49,10 @@ export async function buildPreviewCacheAttempt(params: {
   revision: number;
 }): Promise<PreviewAttemptOutcome> {
   const { authority, request, revision } = params;
+  if (authority.completedCacheRef.current) {
+    publishCacheOutcome(authority, authority.completedCacheRef.current);
+    return authority.completedCacheRef.current;
+  }
   const latest = authority.latestStateRef.current;
   const linked = createLinkedAbortController(request.signal);
   authority.activePreparationRef.current = linked.controller;
@@ -77,6 +81,10 @@ export async function buildPreviewCacheAttempt(params: {
     });
     const stale = resolvePreviewAttemptFreshness(authority, request, revision);
     if (stale) return stale;
+    authority.completedCacheRef.current =
+      result.outcome === 'video-cache-ready' || result.outcome === 'frame-cache-ready'
+        ? result.outcome
+        : null;
     authority.setCachedVideo(result.cachedVideo);
     publishCacheOutcome(authority, result.outcome);
     return result.outcome;

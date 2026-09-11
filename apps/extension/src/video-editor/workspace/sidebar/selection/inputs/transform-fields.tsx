@@ -11,7 +11,8 @@ const VIDEO_TRANSFORM_SIZE_MAX = 7680;
 export function renderTransformFields(
   selectedClip: WorkspaceSidebarProps['selectedClip'],
   selectedTrackLocked: boolean,
-  onUpdateClipTransform: WorkspaceSidebarProps['onUpdateClipTransform']
+  onUpdateClipTransform: WorkspaceSidebarProps['onUpdateClipTransform'],
+  hideSize = false
 ) {
   if (!selectedClip || isAudioClip(selectedClip)) return null;
   return (
@@ -40,6 +41,7 @@ export function renderTransformFields(
       <InspectorDetails label={translate('videoEditor.sidebar.inspectorExactPlacement')}>
         <TransformGeometryFields
           clip={selectedClip}
+          hideSize={hideSize}
           disabled={selectedTrackLocked}
           onUpdateClipTransform={onUpdateClipTransform}
         />
@@ -49,6 +51,7 @@ export function renderTransformFields(
 }
 
 function TransformGeometryFields(props: {
+  hideSize: boolean;
   clip: Exclude<NonNullable<WorkspaceSidebarProps['selectedClip']>, { type: 'AUDIO' }>;
   disabled: boolean;
   onUpdateClipTransform: WorkspaceSidebarProps['onUpdateClipTransform'];
@@ -69,20 +72,24 @@ function TransformGeometryFields(props: {
         max={VIDEO_TRANSFORM_COORDINATE_LIMIT}
         min={-VIDEO_TRANSFORM_COORDINATE_LIMIT}
       />
-      <TransformNumberField
-        {...props}
-        field="width"
-        label={translate('videoEditor.sidebar.widthLabel')}
-        max={VIDEO_TRANSFORM_SIZE_MAX}
-        min={40}
-      />
-      <TransformNumberField
-        {...props}
-        field="height"
-        label={translate('videoEditor.sidebar.heightLabel')}
-        max={VIDEO_TRANSFORM_SIZE_MAX}
-        min={40}
-      />
+      {!props.hideSize ? (
+        <>
+          <TransformNumberField
+            {...props}
+            field="width"
+            label={translate('videoEditor.sidebar.widthLabel')}
+            max={VIDEO_TRANSFORM_SIZE_MAX}
+            min={40}
+          />
+          <TransformNumberField
+            {...props}
+            field="height"
+            label={translate('videoEditor.sidebar.heightLabel')}
+            max={VIDEO_TRANSFORM_SIZE_MAX}
+            min={40}
+          />
+        </>
+      ) : null}
     </>
   );
 }

@@ -244,10 +244,10 @@ describe('effect-panels', () => {
     const props = createProps();
 
     renderPanel(<InspectTransitionPanel {...props} />);
-    expect(container?.textContent).toContain('videoEditor.sidebar.transitionLightSweep');
+    expect(container?.textContent).toContain('videoEditor.effectsLibrary.fallbackTransition');
+    expect(container?.textContent).toContain('videoEditor.effectsLibrary.chooseTransition');
     expect(container?.textContent).not.toContain('videoEditor.templates.catalogStatusOptional');
-    expect(container?.textContent).toContain('videoEditor.sidebar.transitionSwapStyleLabel');
-    expect(container?.textContent).toContain('videoEditor.sidebar.transitionHighlightColorLabel');
+    expect(container?.textContent).toContain('videoEditor.sidebar.transitionEasingLabel');
     clickGroup('videoEditor.sidebar.inspectorGroupInfo');
     expect(container?.textContent).toContain('videoEditor.sidebar.transitionLeadingClipLabel');
 

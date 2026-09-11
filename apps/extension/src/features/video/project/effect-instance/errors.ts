@@ -2,7 +2,8 @@ type ApplyEffectInstanceErrorCode =
   | 'effectCatalogIntegrityFailure'
   | 'effectKindTargetMismatch'
   | 'effectProjectQuotaExceeded'
-  | 'effectTargetMissing';
+  | 'effectTargetMissing'
+  | 'effectTargetOccupied';
 
 export class ApplyEffectInstanceError extends Error {
   readonly code: ApplyEffectInstanceErrorCode;

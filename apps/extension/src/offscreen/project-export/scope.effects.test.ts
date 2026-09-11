@@ -139,3 +139,38 @@ function createInstance(
     target,
   };
 }
+
+it('validates selected IDs, keeps complete scopes intact and includes subtitles only when requested', () => {
+  const project = createScopeProject([
+    createScopeClip('video', VideoProjectClipType.VIDEO),
+    createScopeClip('subtitle', VideoProjectClipType.SUBTITLE),
+  ]);
+  expect(resolveProjectRenderScope(project, createScopeSettings({}))).toBe(project);
+  for (const selectedClipIds of [[], ['missing']])
+    expect(() =>
+      resolveProjectRenderScope(
+        project,
+        createScopeSettings({ scope: 'selected-clip', selectedClipIds })
+      )
+    ).toThrow();
+  expect(
+    resolveProjectRenderScope(
+      project,
+      createScopeSettings({
+        scope: 'selected-clip',
+        selectedClipIds: ['video'],
+        burnInSubtitles: true,
+      })
+    )
+  ).toBe(project);
+  expect(
+    resolveProjectRenderScope(
+      project,
+      createScopeSettings({
+        scope: 'selected-clip',
+        selectedClipIds: ['video'],
+        burnInSubtitles: false,
+      })
+    ).clips.map((c) => c.id)
+  ).toEqual(['video']);
+});

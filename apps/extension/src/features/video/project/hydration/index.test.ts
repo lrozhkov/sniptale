@@ -292,3 +292,13 @@ it('hydrates missing utility lane state without reordering legacy tracks', () =>
     camera: { visible: true, locked: false },
   });
 });
+
+it('preserves the complete audio envelope and late silence through hydration', () => {
+  const project = createLegacyHydrationProject();
+  const peaks = Array.from({ length: 1200 }, (_, index) =>
+    index >= 800 && index < 1000 ? 0.8 : 0
+  );
+  project.assets[0]!.metadata.audioPeaks = peaks;
+  const hydrated = hydrateVideoProject(project);
+  expect(hydrated.assets[0]!.metadata.audioPeaks).toEqual(peaks);
+});

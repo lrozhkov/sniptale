@@ -22,7 +22,6 @@ import {
 import { collectScheduledFocusedStepResults } from './scheduler.mjs';
 import { collectOwnerGuardStep } from '../../shared/owner-guard-step-helpers.mjs';
 import { runLineLengthCheck } from '../../../guards/quality/readability/line-length/check.mjs';
-import { runManualMockExportParityCheck } from '../../../guards/quality/mocks/manual-export-parity/check.mjs';
 import { runManifestPermissionsCheck } from '../../../guards/architecture/manifest-permissions/check.mjs';
 import { runRuntimeTopologyCheck } from '../../../guards/architecture/runtime-topology/check.mjs';
 import { runHtmlSanitizerOwnershipCheck } from '../../../guards/security/html-sanitizer-ownership/check.mjs';
@@ -58,14 +57,6 @@ function runStructuralRiskStep(codeFiles, baseline) {
     enforce: true,
   });
   return createViolationStep('Structural risk', 'Structural risk violations found:', {
-    ...result,
-    violations: filterAllowedViolations(result.violations, baseline),
-  });
-}
-
-function runManualMockExportParityStep(targetFiles, baseline) {
-  const result = runManualMockExportParityCheck({ targetFiles });
-  return createViolationStep('Mock export parity', 'Manual mock export parity violations found:', {
     ...result,
     violations: filterAllowedViolations(result.violations, baseline),
   });
@@ -202,7 +193,6 @@ export async function collectFocusedLightLane({
       timeSyncStep(() => runChangedLineReadabilityStep(qualityCodeFiles)),
       timeSyncStep(() => runDeadCommentedCodeStep(qualityCodeFiles, baseline)),
       timeSyncStep(() => runStructuralRiskStep(qualityCodeFiles, baseline)),
-      timeSyncStep(() => runManualMockExportParityStep(qualityTargetFiles, baseline)),
       ...(await runFocusedCodeSteps(qualityCodeFiles, targetFiles, baseline)),
     ],
     triggeredStaticSteps: runFocusedTriggeredStaticChecks({

@@ -63,11 +63,11 @@ it('fails when retained asset metadata and readable blob bytes diverge', async (
 it('parses only validated bounded snapshot documents', () => {
   const source = JSON.stringify(createDocument([{ op: 'clear' }]));
 
-  expect(parseEffectRuntimeSnapshotDocument(source)).toMatchObject({ id: 'safe-graph' });
-  expect(() => parseEffectRuntimeSnapshotDocument('{')).toThrow(
+  expect(parseEffectRuntimeSnapshotDocument({ source })).toMatchObject({ id: 'safe-graph' });
+  expect(() => parseEffectRuntimeSnapshotDocument({ source: '{' })).toThrow(
     'Effect runtime snapshot document is invalid'
   );
-  expect(() => parseEffectRuntimeSnapshotDocument('{}')).toThrow(
+  expect(() => parseEffectRuntimeSnapshotDocument({ source: '{}' })).toThrow(
     'Effect runtime snapshot document is invalid'
   );
 });

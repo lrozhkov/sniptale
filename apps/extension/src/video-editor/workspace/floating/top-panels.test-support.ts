@@ -202,6 +202,8 @@ function createPreviewController(
 
 function createFloatingPreviewPreferences() {
   return {
+    frameRate: 'project' as const,
+    onFrameRateChange: noop(),
     mode: 'live' as const,
     onModeChange: noop(),
     onRasterPresetChange: noop(),

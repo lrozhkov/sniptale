@@ -34,6 +34,7 @@ it('keeps each command family stable across unrelated parent renders', () => {
     setError: initial.setError,
     trimClipEnd: initial.trimClipEnd,
     trimClipStart: initial.trimClipStart,
+    updateProject: vi.fn(),
     upsertAsset: initial.upsertAsset,
     upsertAssets: initial.upsertAssets,
   };
@@ -44,6 +45,7 @@ it('keeps each command family stable across unrelated parent renders', () => {
     getCurrentExportState: () => initial.exportState,
     getCurrentProject: () => null,
     getCurrentSelectedClipId: () => null,
+    getCurrentPlaybackRange: () => null,
     startExport: initial.startExport,
   };
   const project: ProjectHandlerPort = {

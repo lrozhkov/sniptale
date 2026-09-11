@@ -1,4 +1,10 @@
-import type { VideoProject, VideoProjectExportSettings } from '../../features/video/project/types';
+import { sendProgress } from './runtime';
+import { translate } from '../../platform/i18n';
+import {
+  VideoProjectExportPhase,
+  type VideoProject,
+  type VideoProjectExportSettings,
+} from '../../features/video/project/types';
 import { renderOfflineAudioMix } from './offline-audio';
 import { runFrameDrivenCompositeRenderLoop } from './render-loop/frame-driven';
 import type { LoadedImagesMap } from './renderer';
@@ -34,6 +40,12 @@ export async function renderCompositeToWebm(
       signal
     );
     check();
+    await sendProgress(
+      job.jobId,
+      VideoProjectExportPhase.TRANSCODING,
+      0,
+      translate('videoEditor.progress.transcoding')
+    );
     const blob = await pipeline.finish(mixedAudio?.buffer);
     check();
     return blob;

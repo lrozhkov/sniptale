@@ -94,7 +94,8 @@ export function requestPreviewAudioDriverPlayback(
   state.pendingPlayClipIds.add(clipId);
   void resumePreviewAudioGraph(state, logger)
     .then((isRunning) => {
-      if (requestVersion !== state.playRequestVersions.get(clipId) || !isRunning) {
+      if (requestVersion !== state.playRequestVersions.get(clipId)) return;
+      if (!isRunning) {
         pausePreviewAudioDriver(state, clipId, element);
         return;
       }
@@ -102,9 +103,15 @@ export function requestPreviewAudioDriverPlayback(
       return element.play();
     })
     .catch((error) => {
-      warnPreviewAudioDriver(state, logger, 'Preview audio driver play() rejected', error);
+      // Media priming can pause or reload the element without a driver-version change.
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      if (requestVersion === state.playRequestVersions.get(clipId)) {
+        warnPreviewAudioDriver(state, logger, 'Preview audio driver play() rejected', error);
+      }
     })
     .finally(() => {
-      state.pendingPlayClipIds.delete(clipId);
+      if (requestVersion === state.playRequestVersions.get(clipId)) {
+        state.pendingPlayClipIds.delete(clipId);
+      }
     });
 }

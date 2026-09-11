@@ -96,6 +96,7 @@ async function encodeRenderedWebmFrame(args: {
 async function sendAcceleratedCompositeProgress(args: {
   frameIndex: number;
   jobId: string;
+  range?: { start: number; end: number };
   totalFrames: number;
 }) {
   if (
@@ -108,7 +109,9 @@ async function sendAcceleratedCompositeProgress(args: {
   await sendProgress(
     args.jobId,
     VideoProjectExportPhase.RENDERING,
-    ((args.frameIndex + 1) / Math.max(1, args.totalFrames)) * 100,
+    (args.range?.start ?? 0) +
+      ((args.frameIndex + 1) / Math.max(1, args.totalFrames)) *
+        ((args.range?.end ?? 100) - (args.range?.start ?? 0)),
     [
       translate('offscreenExport.hybridAcceleratedCompositeRender'),
       `${args.frameIndex + 1}`,
@@ -158,6 +161,9 @@ async function renderDecodedCompositeFrame(args: DecodedCompositeFrameArgs): Pro
       timestampUs: Math.round(args.projectTime * 1_000_000),
     });
     await sendAcceleratedCompositeProgress({
+      ...(args.request.job.renderProgressRange
+        ? { range: args.request.job.renderProgressRange }
+        : {}),
       frameIndex: args.frameIndex,
       jobId: args.request.job.jobId,
       totalFrames: args.frameTimes.timing.totalFrames,

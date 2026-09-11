@@ -60,6 +60,7 @@ function createPanelActionProps() {
     onCreateProject: vi.fn(),
     onDeleteProject: vi.fn(),
     onAddRecording: vi.fn(),
+    onImportImage: vi.fn(),
     onSetSceneBackground: vi.fn(),
     onResizeProject: vi.fn(),
     onEnableCursorTrack: vi.fn(),

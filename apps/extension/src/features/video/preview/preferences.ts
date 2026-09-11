@@ -24,3 +24,13 @@ export type VideoEditorPreviewRasterPreset = (typeof VIDEO_EDITOR_PREVIEW_RASTER
 
 export const VideoEditorPreviewZoom = { FIT: 'fit', P75: '75%', P100: '100%' } as const;
 export type VideoEditorPreviewZoom = (typeof VIDEO_EDITOR_PREVIEW_ZOOM_LEVELS)[number];
+
+export const VIDEO_EDITOR_PREVIEW_FRAME_RATES = ['project', '30', '24', '15'] as const;
+export type VideoEditorPreviewFrameRate = (typeof VIDEO_EDITOR_PREVIEW_FRAME_RATES)[number];
+
+export function resolveVideoEditorPreviewFrameRate(
+  projectFps: number,
+  preference: VideoEditorPreviewFrameRate = 'project'
+): number {
+  return preference === 'project' ? projectFps : Math.min(projectFps, Number(preference));
+}

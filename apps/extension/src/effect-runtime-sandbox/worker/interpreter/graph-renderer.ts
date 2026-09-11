@@ -39,7 +39,7 @@ export function createEffectV1GraphRenderer(
           vars: {},
         },
       };
-      await executeEffectV1Commands(program.commands, state);
+      executeEffectV1Commands(program.commands, state);
       return canvas;
     },
   };

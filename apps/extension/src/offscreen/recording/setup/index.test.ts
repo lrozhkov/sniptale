@@ -405,33 +405,38 @@ it.each([CaptureMode.TAB, CaptureMode.TAB_CROP])(
   }
 );
 
-it('records a full TAB source from the measured Chromium raster even when it differs from viewport', async () => {
+it.each([
+  { height: 1303, mapped: false },
+  { height: 1306, mapped: true },
+])('maps only recognized TAB rasters: $height', async ({ height, mapped }) => {
   mocks.acquire.mockResolvedValueOnce({
     cursorCaptureMode: null,
-    stream: createRecordingStream(2560, 1303),
+    stream: createRecordingStream(2560, height),
   });
-  mocks.createSourceVideo.mockReturnValueOnce({ videoHeight: 1303, videoWidth: 2560 });
-
-  await expect(
-    prepareRecordingStream({
-      captureMode: CaptureMode.TAB,
-      settings: {
-        ...settings,
-        outputProfile: { ...settings.outputProfile, resolution: VideoResolutionPreset.SOURCE },
-      },
-      streamId: 'stream-mismatched-viewport',
-      viewport: { width: 2560, height: 1305, devicePixelRatio: 1 },
-    })
-  ).resolves.toMatchObject({
-    rawVideoHeight: 1303,
+  mocks.createSourceVideo.mockReturnValueOnce({ videoHeight: height, videoWidth: 2560 });
+  const result = await prepareRecordingStream({
+    captureMode: CaptureMode.TAB,
+    settings: {
+      ...settings,
+      outputProfile: { ...settings.outputProfile, resolution: VideoResolutionPreset.SOURCE },
+    },
+    streamId: 'stream-mismatched-viewport',
+    viewport: { width: 2560, height: 1305, devicePixelRatio: 1 },
+  });
+  const outputHeight = Math.floor(Math.min(height, 1305) / 2) * 2;
+  expect(result).toMatchObject({
+    rawVideoHeight: height,
     rawVideoWidth: 2560,
     tabOutputGeometry: expect.objectContaining({
-      outputSize: { height: 1302, width: 2560 },
-      sourceRect: { height: 1302, width: 2560, x: 0, y: 0 },
-      sourceSize: { height: 1303, width: 2560 },
+      outputSize: { height: outputHeight, width: 2560 },
+      sourceRect: { height: outputHeight, width: 2560, x: 0, y: 0 },
+      sourceSize: { height, width: 2560 },
       tracksFullViewport: true,
     }),
   });
+  if (mapped) {
+    expect(result.recordingPointTransform?.viewport).toMatchObject({ width: 2560, height: 1305 });
+  } else expect(result.recordingPointTransform).toBeNull();
 });
 
 it('rejects TAB_CROP when the measured source cannot be mapped from viewport coordinates', async () => {

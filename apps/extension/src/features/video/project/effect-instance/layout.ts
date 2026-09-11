@@ -1,5 +1,5 @@
+import { readEffectPresentationDocument } from '../effect-bundle/presentation-document';
 import {
-  parseEffectV1Source,
   mapEffectV1ObjectPoint,
   mapEffectV1ScenePoint,
   type EffectV1Document,
@@ -11,7 +11,9 @@ export function getEffectClipObjectLayout(project: VideoProject, clip: VideoProj
   if (clip.type !== 'EFFECT') return undefined;
   const instance = project.effectInstances?.find(({ id }) => id === clip.effectInstanceId);
   const snapshot = project.effectSnapshots?.find(({ id }) => id === instance?.snapshotId);
-  return snapshot ? parseEffectV1Source(snapshot.source).document?.objectLayout : undefined;
+  return snapshot
+    ? readEffectPresentationDocument(snapshot.source).document?.objectLayout
+    : undefined;
 }
 
 /** Numeric edits and canvas commits obey the same authored aspect policy. */

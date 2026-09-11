@@ -5,10 +5,24 @@ import {
   deleteEffectBundle,
   EffectBundlePersistenceError,
   getEffectBundle,
-  listEffectBundles,
+  listImportedEffectBundles as listEffectBundles,
   saveEffectArtifact,
   setEffectBundleEnabled,
 } from './index';
+
+const preferences = vi.hoisted(() => ({
+  mutate: vi.fn(
+    async (
+      _id: string,
+      update: (value: { packId: string; documents: Record<string, never> }) => unknown
+    ) => update({ packId: _id, documents: {} })
+  ),
+}));
+vi.mock('./preferences', async (original) => ({
+  ...(await original<typeof import('./preferences')>()),
+  readEffectCatalogPreferences: async () => [],
+  mutateEffectCatalogPreference: preferences.mutate,
+}));
 
 const mocks = vi.hoisted(() => {
   const abort = vi.fn();
@@ -37,6 +51,7 @@ vi.mock('../infrastructure/indexed-db/mutation', () => ({
 }));
 
 beforeEach(() => {
+  preferences.mutate.mockClear();
   mocks.abort.mockReset();
   mocks.db.get.mockReset();
   mocks.db.get.mockResolvedValue(undefined);
@@ -200,7 +215,8 @@ it('supports null reads, deletion, missing toggles, and persisted enable state',
   mocks.db.get.mockResolvedValue(entry);
   mocks.get.mockResolvedValue(entry);
   await setEffectBundleEnabled(entry.packId, false);
-  expect(mocks.put).toHaveBeenLastCalledWith(expect.objectContaining({ enabled: false }));
+  expect(preferences.mutate).toHaveBeenCalledWith(entry.packId, expect.any(Function));
+  expect(mocks.put).toHaveBeenCalledTimes(1);
 });
 
 it('rejects a malformed enable target before opening a write transaction', async () => {
@@ -234,19 +250,18 @@ it('completes enable integrity verification before opening a write transaction',
 
   releaseIntegrity();
   await mutation;
-  expect(mocks.transaction).toHaveBeenCalledOnce();
+  expect(preferences.mutate).toHaveBeenCalledOnce();
+  expect(mocks.transaction).not.toHaveBeenCalled();
 });
 
-it('aborts an enable mutation when the stored revision changes after verification', async () => {
+it('keeps enabled preferences independent of a concurrent definition update', async () => {
   const entry = await saveEffectArtifact(await readValidBundleArtifact(), 100);
   mocks.db.get.mockResolvedValue(entry);
   mocks.get.mockResolvedValue({ ...entry, updatedAt: 200 });
   mocks.put.mockClear();
 
-  await expect(setEffectBundleEnabled(entry.packId, false)).rejects.toMatchObject({
-    code: 'catalogIntegrityFailure',
-  });
-  expect(mocks.abort).toHaveBeenCalledOnce();
+  await setEffectBundleEnabled(entry.packId, false);
+  expect(preferences.mutate).toHaveBeenCalledOnce();
   expect(mocks.put).not.toHaveBeenCalled();
 });
 

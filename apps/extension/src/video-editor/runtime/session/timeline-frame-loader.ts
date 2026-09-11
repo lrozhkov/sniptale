@@ -3,6 +3,8 @@ const TIMELINE_PREVIEW_FRAME_HEIGHT = 180;
 const TIMELINE_PREVIEW_FRAME_QUALITY = 0.72;
 
 export interface TimelineVideoFrameLoadPlan {
+  projectId?: string;
+  sourceKey?: string;
   assetUrl: string;
   samples: readonly TimelineVideoFrameSample[];
   signal?: AbortSignal;
@@ -14,6 +16,7 @@ export interface TimelineVideoFrameSample {
 }
 
 export interface TimelineVideoFrameLoadResult {
+  blob?: Blob;
   cacheKey: string;
   sourceTime: number;
   url: string;
@@ -33,7 +36,7 @@ export async function loadTimelineVideoPreviewFrames(
       await seekTimelinePreviewVideo(video, sample.sourceTime, plan.signal);
       const blob = await canvasToTimelinePreviewBlob(drawTimelinePreviewFrame(video));
       const url = URL.createObjectURL(blob);
-      createdResults.push({ cacheKey: sample.cacheKey, sourceTime: sample.sourceTime, url });
+      createdResults.push({ cacheKey: sample.cacheKey, sourceTime: sample.sourceTime, url, blob });
       await yieldTimelinePreviewFrame();
     }
   } catch (error) {

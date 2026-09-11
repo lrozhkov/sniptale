@@ -1,6 +1,6 @@
-import { createAudioClip } from '../../../features/video/project/timeline/project-meta.test.helpers';
 // @vitest-environment jsdom
 
+import { createAudioClip } from '../../../features/video/project/timeline/project-meta.test.helpers';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -74,6 +74,7 @@ function createParams(): TestAssetHandlerPort {
     setError: vi.fn(),
     trimClipEnd: vi.fn(),
     trimClipStart: vi.fn(),
+    updateProject: vi.fn(),
     upsertAsset: vi.fn(),
     upsertAssets: vi.fn(),
   };
@@ -450,4 +451,25 @@ describe('recording into an explicit audio track', () => {
       expect(params.endProjectHistoryTransaction).not.toHaveBeenCalled();
     }
   );
+});
+
+it('imports a background image in one project update without adding a timeline clip', async () => {
+  const params = createParams();
+  const project = params.getCurrentProject()!;
+  const asset = { ...(await importProjectAssetMock()), type: VideoProjectAssetType.IMAGE };
+  importProjectAssetMock.mockResolvedValue(asset);
+  renderHook(params);
+  await act(async () =>
+    latestHandlers!.handleImportImage(new File(['image'], 'background.png'), {
+      destination: 'background',
+    })
+  );
+  expect(params.updateProject).toHaveBeenCalledOnce();
+  const update = vi.mocked(params.updateProject).mock.calls[0]![0];
+  const next = update(project);
+  expect(next.assets).toContainEqual(asset);
+  expect(next.sceneBackground).toEqual({ kind: 'image', assetId: asset.id });
+  expect(next.clips).toEqual(project.clips);
+  expect(params.addAssetClip).not.toHaveBeenCalled();
+  expect(params.upsertAsset).not.toHaveBeenCalled();
 });

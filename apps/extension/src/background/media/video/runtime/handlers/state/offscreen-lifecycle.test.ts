@@ -708,3 +708,43 @@ it('opens the post-record popup when persistence is already synchronized', async
   expect(openPopupMock).toHaveBeenCalledWith();
   expectAcceptedLifecycleResponse(sendResponse);
 });
+
+it.each(['ready', 'acknowledged'] as const)(
+  'waits for window restoration before opening the popup for a %s result',
+  async (status) => {
+    const release = createDeferred();
+    releaseVideoCaptureSurfaceMock.mockReturnValueOnce(release.promise);
+    readStoredVideoPostRecordResultMock.mockResolvedValue({
+      acknowledgedBy: null,
+      createdAt: 1,
+      expiresAt: null,
+      result: { primaryRecordingId: 'rec-1', projectId: null, recordingId: 'rec-1' },
+      status,
+    });
+    const response = createSendResponse();
+    handleVideoSavedToIdb({ primaryRecordingId: 'rec-1', recordingId: 'rec-1' }, response);
+    await flushAsyncRoute();
+    expect(openPopupMock).not.toHaveBeenCalled();
+    release.resolve();
+    await flushAsyncRoute();
+    expect(openPopupMock).toHaveBeenCalledOnce();
+  }
+);
+
+it.each(['ready', 'acknowledged'] as const)(
+  'waits for restoration when synchronization returns %s',
+  async (status) => {
+    const release = createDeferred();
+    releaseVideoCaptureSurfaceMock.mockReturnValueOnce(release.promise);
+    persistPendingVideoPostRecordResultMock.mockResolvedValueOnce(status);
+    handleVideoSavedToIdb(
+      { primaryRecordingId: 'rec-1', recordingId: 'rec-1' },
+      createSendResponse()
+    );
+    await flushAsyncRoute();
+    expect(openPopupMock).not.toHaveBeenCalled();
+    release.resolve();
+    await flushAsyncRoute();
+    expect(openPopupMock).toHaveBeenCalledOnce();
+  }
+);

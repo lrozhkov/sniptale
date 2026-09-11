@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { translate } from '../../../platform/i18n';
 import { createEmptyVideoProject } from '../../../features/video/project/factories/creation';
 import { VideoProjectAssetType } from '../../../features/video/project/types';
-import { loadInitialProjectFromLocation, openPersistedProject } from './workspace';
+import { copyProject, loadInitialProjectFromLocation, openPersistedProject } from './workspace';
 import { createPersistedLegacyRecordingProject } from './workspace.test-support';
 
 const {
@@ -320,4 +320,23 @@ it('does not open a temporary project as saved when library retention fails', as
   });
   saveVideoProject.mockRejectedValue(new Error('Storage unavailable'));
   await expect(openPersistedProject(project.id)).rejects.toThrow('Storage unavailable');
+});
+
+it('duplicates the whole editable document without sharing mutable state', async () => {
+  const original = createEmptyVideoProject('Original');
+  saveVideoProject.mockImplementation(async (project) => project);
+  const copy = await copyProject(original, 'Copy');
+  expect(copy).toEqual({
+    ...original,
+    id: copy.id,
+    name: 'Copy',
+    createdAt: copy.createdAt,
+    updatedAt: copy.updatedAt,
+  });
+  expect(copy.id).not.toBe(original.id);
+  expect(copy.tracks).not.toBe(original.tracks);
+  expect(copy.tracks[0]).not.toBe(original.tracks[0]);
+  copy.tracks[0]!.name = 'Changed';
+  expect(original.tracks[0]!.name).not.toBe('Changed');
+  expect(saveVideoProject).toHaveBeenLastCalledWith(copy, { baseRevision: null });
 });

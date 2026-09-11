@@ -6,7 +6,7 @@ import type { VideoEditorLibraryPanelBodyProps } from '../contracts/panel';
 
 export function VideoEditorLibraryPanelBody(props: VideoEditorLibraryPanelBodyProps) {
   const [query, setQuery] = useState('');
-  const [category, setCategory] = useState<'video' | 'image'>('video');
+  const [category, setCategory] = useState<'all' | 'video' | 'image'>('video');
   const [presetId, setPresetId] = useState<string | null>(null);
   const savedViews = props.savedViews.filter((view) =>
     ['all', 'recording', 'screenshot'].includes(view.folderFilter)
@@ -17,11 +17,12 @@ export function VideoEditorLibraryPanelBody(props: VideoEditorLibraryPanelBodyPr
     () =>
       props.items.filter((item) => {
         if (item.source.kind === 'project-asset') return false;
+        const isImage = item.kind === 'image' || item.kind === 'screenshot';
+        const isVideo =
+          ['recording', 'video', 'export'].includes(item.kind) &&
+          item.mimeType.startsWith('video/');
         const eligible =
-          category === 'image'
-            ? item.kind === 'image' || item.kind === 'screenshot'
-            : ['recording', 'video', 'export'].includes(item.kind) &&
-              item.mimeType.startsWith('video/');
+          category === 'all' ? isImage || isVideo : category === 'image' ? isImage : isVideo;
         return (
           eligible &&
           item.filename.toLocaleLowerCase().includes(normalizedQuery) &&

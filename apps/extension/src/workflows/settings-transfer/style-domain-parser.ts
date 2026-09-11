@@ -1,3 +1,5 @@
+import { parseEffectCatalogPreferences } from '../../composition/persistence/effect-bundles/preferences';
+import { decodeEffectSettingsEntry } from '../../composition/persistence/effect-bundles/settings-transfer';
 import { parsePaint } from '@sniptale/foundation/paint';
 import type { SettingsTransferJsonValue } from '../../contracts/settings-transfer';
 import { parseAnnotationTemplateTagState } from '../../composition/persistence/annotation-template-tags';
@@ -28,6 +30,19 @@ export function parseSettingsTransferStyleDomain(
   value: Record<string, unknown>
 ): SettingsTransferJsonValue {
   switch (domainId) {
+    case 'styles.video-effects': {
+      if (!Array.isArray(value['items'])) return failSettingsTransferDomain(domainId);
+      const ids = new Set<string>();
+      for (const item of value['items']) {
+        const entry = decodeEffectSettingsEntry(item);
+        if (ids.has(entry.packId)) return failSettingsTransferDomain(domainId);
+        ids.add(entry.packId);
+      }
+      return json({
+        items: value['items'],
+        preferences: parseEffectCatalogPreferences(value['preferences']),
+      });
+    }
     case 'styles.borders': {
       const parsed = parseStoredHighlighterSettings(value);
       if (parsed.hasInvalidRoot || parsed.invalidFieldCount > 0)

@@ -28,8 +28,8 @@ it('draws an admitted keystroke label without a captured point', () => {
     },
     null
   );
-  expect(context.fillText).toHaveBeenCalledWith('Ctrl + K', 36, 48, 80);
-  expect(context.restore).toHaveBeenCalledTimes(1);
+  expect(context.fillText).toHaveBeenCalledWith('Ctrl + K', 960, expect.closeTo(1034.4, 8), 80);
+  expect(context.restore).toHaveBeenCalledTimes(2);
 });
 
 it('does not draw a NONE presentation for a click fact', () => {
@@ -61,6 +61,8 @@ it('does not draw a NONE presentation for a click fact', () => {
 
 function createContext() {
   return {
+    globalAlpha: 1,
+    roundRect: vi.fn(),
     arc: vi.fn(),
     beginPath: vi.fn(),
     closePath: vi.fn(),
@@ -142,8 +144,8 @@ it('scales action overlays with the preview size contract', () => {
     0.5
   );
 
-  expect(context.arc).toHaveBeenCalledWith(40, 50, 16, 0, Math.PI * 2);
-  expect(context.lineWidth).toBe(2);
+  expect(context.arc).toHaveBeenCalledWith(40, 50, 16.5, 0, Math.PI * 2);
+  expect(context.lineWidth).toBe(1.5);
 });
 
 it('does not cap large overlay scales in the preview size contract', () => {
@@ -165,8 +167,8 @@ it('does not cap large overlay scales in the preview size contract', () => {
     2.5
   );
 
-  expect(context.arc).toHaveBeenCalledWith(40, 50, 80, 0, Math.PI * 2);
-  expect(context.lineWidth).toBe(10);
+  expect(context.arc).toHaveBeenCalledWith(40, 50, 82.5, 0, Math.PI * 2);
+  expect(context.lineWidth).toBe(7.5);
 });
 
 function createActionState(): VideoCompositionActionState {
@@ -227,5 +229,20 @@ it('keeps the manual KEY default in the output viewport including padding, indep
     },
     { offsetX: 80, offsetY: 40, scaleX: 0.5, scaleY: 0.5 }
   );
-  expect(context.fillText).toHaveBeenCalledWith('Ctrl + K', 98, 64, 80);
+  expect(context.fillText).toHaveBeenCalledWith('Ctrl + K', 180, 117.2, 80);
+});
+
+it('uses the authored click color, opacity and thickness with a deterministic envelope', () => {
+  const context = createContext();
+  const state = {
+    ...createActionState(),
+    progress: 0.5,
+    clickStyle: { color: '#12abef', size: 60, opacity: 0.5, strokeWidth: 6 },
+    easing: 'LINEAR' as const,
+  };
+  drawActionCompositionState(context, state, { x: 40, y: 50 }, 2);
+  expect(context.strokeStyle).toBe('#12abef');
+  expect(context.lineWidth).toBe(12);
+  expect(context.globalAlpha).toBe(0.25);
+  expect(context.arc).toHaveBeenCalledWith(40, 50, expect.closeTo(78, 8), 0, Math.PI * 2);
 });

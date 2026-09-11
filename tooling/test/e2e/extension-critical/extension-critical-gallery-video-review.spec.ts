@@ -186,9 +186,8 @@ for (const variant of [
   { locale: 'ru', theme: 'light' },
   { locale: 'en', theme: 'dark' },
 ] as const) {
-  test(`gallery direct manipulation, comment editing, regions and keyboard (${variant.locale}, ${variant.theme})`, async ({
-    page,
-  }, testInfo) => {
+  const testName = `gallery editing and keyboard (${variant.locale}, ${variant.theme})`;
+  test(testName, async ({ page }, testInfo) => {
     const host = await startHostServer();
     const label = (key: Parameters<typeof translate>[0]) => translate(key, variant.locale);
     try {
@@ -217,9 +216,9 @@ for (const variant of [
         dialog.getByRole('button', { name: label(key), exact: true });
       await expect(button('gallery.videoReview.cutMode')).toBeEnabled();
       await expect(button('gallery.videoReview.telemetry')).toBeVisible();
-      const historyMarker = dialog.getByRole('button', {
-        name: new RegExp(`^${label('gallery.videoReview.telemetry')} ·`),
-      });
+      const historyMarker = dialog
+        .getByRole('button', { name: label('gallery.videoReview.telemetry'), exact: false })
+        .and(dialog.locator('button:not([aria-pressed])'));
       await expect(historyMarker).toHaveCount(1);
       await button('gallery.videoReview.telemetry').click();
       await expect(historyMarker).toHaveCount(0);
@@ -498,9 +497,9 @@ for (const { container, gaps } of [
   for (const rate of [0.0625, 0.125, 0.5, 1.25, 1.5, 2, 4, 8, 16]) {
     for (const audio of ['speed', 'mute']) {
       if (gaps && (rate !== 2 || audio !== 'speed')) continue;
-      test(`gallery exports ${rate}x with ${audio} audio and durable provenance (${container}${gaps ? ' gaps' : ''})`, async ({
-        page,
-      }, testInfo) => {
+      const gapLabel = gaps ? ' gaps' : '';
+      const testName = `gallery exports ${rate}x with ${audio} audio (${container}${gapLabel})`;
+      test(testName, async ({ page }, testInfo) => {
         const host = await startHostServer();
         const label = (key: Parameters<typeof translate>[0]) => translate(key, 'en');
         try {

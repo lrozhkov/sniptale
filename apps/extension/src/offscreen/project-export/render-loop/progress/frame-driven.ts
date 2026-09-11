@@ -6,7 +6,8 @@ export function sendFrameDrivenProgress(
   jobId: string,
   frameIndex: number,
   totalFrames: number,
-  messageDetail?: string
+  messageDetail?: string,
+  range = { start: 0, end: 100 }
 ): Promise<void> {
   const messageParts: Array<string | number> = [
     translate('offscreenExport.frameDrivenRenderPrefix'),
@@ -21,7 +22,7 @@ export function sendFrameDrivenProgress(
   return sendProgress(
     jobId,
     VideoProjectExportPhase.RENDERING,
-    ((frameIndex + 1) / totalFrames) * 100,
+    range.start + ((frameIndex + 1) / totalFrames) * (range.end - range.start),
     messageParts.join(' ')
   );
 }

@@ -55,7 +55,7 @@ it('preserves fractional In without rounding a sample outside a short source ran
 
 it('loads visible source frames before buffered frames at the current playback rate', () => {
   expect(samplesFor(2, 200, { startTime: 50, endTime: 51, pixelsPerSecond: 64 })).toEqual([
-    82, 81, 84,
+    82, 80, 84,
   ]);
 });
 
@@ -145,4 +145,34 @@ it('samples distinct source positions within a high-fps detail viewport', () => 
   const visible = samples.filter((time) => time >= 20 && time < 20 + 8 / 240).sort((a, b) => a - b);
   expect(visible.length).toBeGreaterThanOrEqual(4);
   expect(visible[1]! - visible[0]!).toBeLessThanOrEqual(2 / 240);
+});
+
+it('keeps source sample identities stable while the viewport moves inside the same grid cells', () => {
+  const first = samplesFor(2, 200, { startTime: 50.1, endTime: 51.1, pixelsPerSecond: 64 });
+  const next = samplesFor(2, 200, { startTime: 50.2, endTime: 51.2, pixelsPerSecond: 64 });
+  expect(next).toEqual(first);
+});
+
+it('keys durable frames by source identity, not material names or object URLs', () => {
+  const project = createProjectWithVisualClip(VideoProjectAssetType.VIDEO);
+  const first = buildTimelinePreviewPlans(project, { 'asset-video': 'blob:first' }, null)[0]!;
+  const reopened = buildTimelinePreviewPlans(
+    { ...project, assets: project.assets.map((asset) => ({ ...asset, name: 'Renamed' })) },
+    { 'asset-video': 'blob:reopened' },
+    null
+  )[0]!;
+  expect(reopened.sourceKey).toBe(first.sourceKey);
+  const replaced = buildTimelinePreviewPlans(
+    {
+      ...project,
+      assets: project.assets.map((asset) => ({
+        ...asset,
+        source: { kind: 'project-asset' as const, projectAssetId: 'replacement' },
+      })),
+    },
+    { 'asset-video': 'blob:first' },
+    null
+  )[0]!;
+  expect(replaced.sourceKey).not.toBe(first.sourceKey);
+  expect(replaced.slots[0]?.cacheKey).not.toBe(first.slots[0]?.cacheKey);
 });

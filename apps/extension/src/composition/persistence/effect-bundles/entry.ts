@@ -1,3 +1,4 @@
+import { parseStoredEffectPresetPreferences } from '../../../features/video/project/effect-bundle/catalog/presets';
 import { EFFECT_BUNDLE_LIMITS } from '../../../features/video/project/effect-bundle';
 import type {
   EffectBundleCatalogAssetEntry,
@@ -73,6 +74,11 @@ function parseDocumentEntry(value: unknown): EffectBundleCatalogDocumentEntry | 
   ) {
     return null;
   }
+  const preferences =
+    value['presetPreferences'] === undefined
+      ? undefined
+      : parseStoredEffectPresetPreferences(value['presetPreferences']);
+  if (preferences === null) return null;
   const references = value['assets'].map((asset) => {
     return isRecord(asset) && isIdentifier(asset['id']) && isSha256(asset['sha256'])
       ? { id: asset['id'], sha256: asset['sha256'] }
@@ -81,6 +87,7 @@ function parseDocumentEntry(value: unknown): EffectBundleCatalogDocumentEntry | 
   return references.some((entry) => !entry)
     ? null
     : {
+        ...(preferences ? { presetPreferences: preferences } : {}),
         assets: references as Array<{ id: string; sha256: string }>,
         id: value['id'],
         kind: value['kind'],

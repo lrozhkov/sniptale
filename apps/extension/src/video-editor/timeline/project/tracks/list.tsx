@@ -1,3 +1,7 @@
+import type { ProjectTimelineProps } from '../types';
+import { useEffectDocumentDrag } from '../../../chrome/effect-document-drag';
+import { readVideoEditorEffectDocumentDragPayload } from '../../../contracts/effect-document-drag';
+import { resolveEffectOwner } from '../../../../features/video/project/effect-instance/owner';
 import type { RecordingTelemetryEntry } from '../../../../composition/persistence/recordings/contracts';
 import { getTimelineHistoryLayout } from '../effect-lanes/history-layout';
 import { Activity, Rows3, Text } from 'lucide-react';
@@ -19,6 +23,7 @@ import { ProjectTimelineTrackRow } from './row';
 import type { useProjectTimelinePanelPrefs } from '../panel/prefs';
 
 interface ProjectTimelineTrackListProps {
+  onDropEffectDocument?: ProjectTimelineProps['onDropEffectDocument'];
   recordingTelemetry?: readonly RecordingTelemetryEntry[];
   canShowTelemetryLane: boolean;
   cursorLaneVisible: boolean;
@@ -60,10 +65,28 @@ export function ProjectTimelineTrackList(props: ProjectTimelineTrackListProps) {
 }
 
 function ProjectTimelineTrackListHeader(props: ProjectTimelineTrackListProps) {
+  const { drag } = useEffectDocumentDrag();
+  const owner = resolveEffectOwner(props.project, { kind: 'video-group' });
+  const canDrop = drag?.kind === 'targetEffect' && owner && !owner.locked && owner.duration > 0;
   const collapsed = props.trackPanelPrefs.prefs.hideTrackNames;
   return (
     <div
+      onDragOver={(event) => {
+        if (canDrop && props.onDropEffectDocument) {
+          event.preventDefault();
+          event.stopPropagation();
+          event.dataTransfer.dropEffect = 'copy';
+        }
+      }}
+      onDrop={(event) => {
+        const payload = readVideoEditorEffectDocumentDragPayload(event.dataTransfer);
+        if (!canDrop || payload?.kind !== 'targetEffect') return;
+        event.preventDefault();
+        event.stopPropagation();
+        props.onDropEffectDocument?.(payload, { kind: 'video-group' }, 0);
+      }}
       className={[
+        canDrop ? 'outline outline-1 outline-[var(--sniptale-color-accent)]' : '',
         'flex h-[30px] items-center border-b text-[11px]',
         'justify-between gap-1 px-2',
         'font-semibold',
@@ -72,7 +95,9 @@ function ProjectTimelineTrackListHeader(props: ProjectTimelineTrackListProps) {
       ].join(' ')}
     >
       <span className={collapsed ? 'sr-only' : undefined}>
-        {translate('videoEditor.timeline.tracksTitle')}
+        {translate(
+          canDrop ? 'videoEditor.effectsLibrary.wholeVideo' : 'videoEditor.timeline.tracksTitle'
+        )}
       </span>
       <div
         className="flex items-center gap-0.5"
@@ -133,6 +158,7 @@ function ProjectTimelineTrackListScrollArea(props: ProjectTimelineTrackListProps
 }
 
 function ProjectTimelineRailRows(props: {
+  onDropEffectDocument?: ProjectTimelineProps['onDropEffectDocument'];
   recordingTelemetry?: readonly RecordingTelemetryEntry[];
   cursorLaneVisible: boolean;
   project: VideoProject;
@@ -173,6 +199,14 @@ function ProjectTimelineRailRows(props: {
       ) : null}
       {props.tracks.map((track, index) => (
         <ProjectTimelineTrackRow
+          project={props.project}
+          onDropEffectDocument={props.onDropEffectDocument}
+          onToggleFx={() =>
+            props.trackPanelPrefs.setFxCollapsed(
+              track.id,
+              !(props.trackLayoutModel.layoutByTrackId.get(track.id)?.fxCollapsed ?? false)
+            )
+          }
           key={track.id}
           compactRows={props.trackPanelPrefs.prefs.compactRows}
           isSelected={props.selectedTrackId === track.id}
@@ -184,6 +218,27 @@ function ProjectTimelineRailRows(props: {
           onToggleTrackVisibility={props.onToggleTrackVisibility}
         />
       ))}
+      {props.trackLayoutModel.videoFx && (
+        <div
+          style={{ height: props.trackLayoutModel.videoFx.fxHeight }}
+          className="border-b border-[var(--sniptale-color-border-soft)] px-3"
+        >
+          <button
+            type="button"
+            className="flex h-5 items-center gap-1 text-[11px] text-[var(--sniptale-color-text-muted)]"
+            aria-expanded={!props.trackLayoutModel.videoFx.fxCollapsed}
+            onClick={() =>
+              props.trackPanelPrefs.setFxCollapsed(
+                'video-group',
+                !props.trackLayoutModel.videoFx?.fxCollapsed
+              )
+            }
+          >
+            <span aria-hidden="true">{props.trackLayoutModel.videoFx.fxCollapsed ? '▸' : '▾'}</span>
+            {`FX · ${translate('videoEditor.effectsLibrary.wholeVideo')}`}
+          </button>
+        </div>
+      )}
       <ProjectTimelineEffectLaneLabelRows
         onSelectMotionLane={props.onSelectMotionLane}
         motionLaneSelected={props.motionLaneSelected}

@@ -15,7 +15,7 @@ export const videoEditorProgressMessages = defineMessageSource({
   },
   preparing: { ru: 'Подготовка видео', en: 'Preparing video' },
   rendering: { ru: 'Создание видео', en: 'Rendering video' },
-  transcoding: { ru: 'Обработка видео', en: 'Processing video' },
+  transcoding: { ru: 'Сборка файла', en: 'Finalizing file' },
   saving: { ru: 'Сохранение файла', en: 'Saving file' },
   done: { ru: 'Видео готово', en: 'Video ready' },
   failed: { ru: 'Экспорт не удался', en: 'Export failed' },

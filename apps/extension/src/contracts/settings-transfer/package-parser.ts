@@ -78,7 +78,10 @@ const FORBIDDEN_NORMALIZED_KEYS = new Set([
 
 export function parseSettingsTransferPackageText(fileText: string): SettingsTransferPackageV1 {
   if (new TextEncoder().encode(fileText).byteLength > SETTINGS_TRANSFER_MAX_BYTES) {
-    throw new SettingsTransferPackageError('file-too-large', 'Settings package exceeds 2 MiB');
+    throw new SettingsTransferPackageError(
+      'file-too-large',
+      'Settings package exceeds the transfer size limit'
+    );
   }
 
   let value: unknown;

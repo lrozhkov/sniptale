@@ -56,7 +56,7 @@ async function sendHybridSpanProgress(
   await sendProgress(
     args.job.jobId,
     VideoProjectExportPhase.RENDERING,
-    (spanIndex / Math.max(1, totalSpans)) * 100,
+    args.job.renderProgressRange?.start ?? (spanIndex / Math.max(1, totalSpans)) * 100,
     getSpanProgressDetail(span)
   );
 }
@@ -111,7 +111,7 @@ async function sendHybridFallbackProgress(
   await sendProgress(
     args.job.jobId,
     VideoProjectExportPhase.RENDERING,
-    (spanIndex / Math.max(1, totalSpans)) * 100,
+    args.job.renderProgressRange?.start ?? (spanIndex / Math.max(1, totalSpans)) * 100,
     message
   );
 }
@@ -196,32 +196,54 @@ async function tryRenderAcceleratedCompositeSpan(
 export async function runMp4HybridVideoPipeline(args: Mp4HybridVideoPipelineArgs): Promise<void> {
   const spans = planMp4VideoRenderSpans(args.project, args.settings);
   await sendHybridPlanProgress(args, spans);
-  for (const [index, span] of spans.entries()) {
-    if (args.job.cancelled || args.signal?.aborted) {
-      throw new Error('PROJECT_EXPORT_CANCELLED');
-    }
-
-    await sendHybridSpanProgress(args, span, index, spans.length);
-    if (span.kind === 'clean-source') {
-      const renderedCleanSource = await tryRenderCleanSourceSpan(args, span);
-      if (!renderedCleanSource) {
-        const fallbackMessage = translate('offscreenExport.hybridCleanSpanFallback');
-        await sendHybridFallbackProgress(args, index, spans.length, fallbackMessage);
-        await renderCompositeSpan(args, span, translate('offscreenExport.hybridCleanSpanFallback'));
+  const duration = spans.reduce((sum, span) => sum + span.end - span.start, 0);
+  let completed = 0;
+  try {
+    for (const [index, span] of spans.entries()) {
+      args.job.renderProgressRange = {
+        start: duration > 0 ? (completed / duration) * 100 : 0,
+        end: duration > 0 ? ((completed + span.end - span.start) / duration) * 100 : 100,
+      };
+      completed += span.end - span.start;
+      if (args.job.cancelled || args.signal?.aborted) {
+        throw new Error('PROJECT_EXPORT_CANCELLED');
       }
-      continue;
-    }
 
-    if (span.kind === 'accelerated-composite') {
-      const renderedAcceleratedComposite = await tryRenderAcceleratedCompositeSpan(args, span);
-      if (!renderedAcceleratedComposite) {
-        const fallbackMessage = translate('offscreenExport.hybridAcceleratedCompositeFallback');
-        await sendHybridFallbackProgress(args, index, spans.length, fallbackMessage);
-        await renderCompositeSpan(args, span, fallbackMessage);
+      await sendHybridSpanProgress(args, span, index, spans.length);
+      if (span.kind === 'clean-source') {
+        const renderedCleanSource = await tryRenderCleanSourceSpan(args, span);
+        if (!renderedCleanSource) {
+          const fallbackMessage = translate('offscreenExport.hybridCleanSpanFallback');
+          await sendHybridFallbackProgress(args, index, spans.length, fallbackMessage);
+          await renderCompositeSpan(
+            args,
+            span,
+            translate('offscreenExport.hybridCleanSpanFallback')
+          );
+        }
+        continue;
       }
-      continue;
-    }
 
-    await renderCompositeSpan(args, span, getCompositeProgressDetail(span.reason));
+      if (span.kind === 'accelerated-composite') {
+        const renderedAcceleratedComposite = await tryRenderAcceleratedCompositeSpan(args, span);
+        if (!renderedAcceleratedComposite) {
+          const fallbackMessage = translate('offscreenExport.hybridAcceleratedCompositeFallback');
+          await sendHybridFallbackProgress(args, index, spans.length, fallbackMessage);
+          await renderCompositeSpan(args, span, fallbackMessage);
+        }
+        continue;
+      }
+
+      await renderCompositeSpan(args, span, getCompositeProgressDetail(span.reason));
+    }
+    if (spans.length)
+      await sendProgress(
+        args.job.jobId,
+        VideoProjectExportPhase.RENDERING,
+        100,
+        translate('offscreenExport.hybridCompositeSpanRender')
+      );
+  } finally {
+    delete args.job.renderProgressRange;
   }
 }

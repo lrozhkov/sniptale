@@ -1,3 +1,4 @@
+import { syncProjectSceneBackground } from '../../../features/video/project/scene/background';
 import { isAudioRecordingRangeAvailable } from '../../project/operations/timeline-gaps';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { toast } from '@sniptale/ui/product-feedback/toast-service';
@@ -68,12 +69,21 @@ async function importProjectAssetFile(
     return;
   }
 
+  if (placement?.destination === 'background' && assetType !== VideoProjectAssetType.IMAGE) return;
   const targetProjectId = project.id;
   const asset = await importProjectAsset(file, assetType);
   if (await isStaleImportedAsset({ asset, port, targetProjectId })) {
     return;
   }
 
+  if (placement?.destination === 'background') {
+    port.updateProject((current) => ({
+      ...current,
+      assets: [...current.assets.filter((item) => item.id !== asset.id), asset],
+      ...syncProjectSceneBackground(current, { kind: 'image', assetId: asset.id }),
+    }));
+    return;
+  }
   port.upsertAsset(asset);
   if (placement?.destination === 'materials') return;
   port.addAssetClip(

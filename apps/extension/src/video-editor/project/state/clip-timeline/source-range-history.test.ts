@@ -282,3 +282,35 @@ it('preserves clip effect document time across both compression splits and the a
     expect(resolveEffectInstanceTime(effect, 12, time!)).toMatchObject({ effectTime: expected });
   }
 });
+
+it('restores scoped FX interval edits together with typing compression in one Undo/Redo step', () => {
+  const { store, request, video } = fixture();
+  const project = store.getState().project!;
+  store.setState({
+    project: {
+      ...project,
+      effectInstances: [
+        {
+          id: 'track-fx',
+          kind: 'targetEffect',
+          target: { kind: 'track', trackId: video.trackId },
+          snapshotId: 'snapshot',
+          controls: {},
+          enabled: true,
+          startTime: 0,
+          duration: 6,
+          playbackRate: 1,
+          rangeMode: 'interval',
+        },
+      ],
+    },
+  });
+  const before = store.getState().project!;
+  expect(store.getState().applyTypingCompression(request, before).status).toBe('applied');
+  const after = store.getState().project!;
+  expect(after.effectInstances).toHaveLength(3);
+  store.getState().undoProject();
+  expect(store.getState().project!.effectInstances).toEqual(before.effectInstances);
+  store.getState().redoProject();
+  expect(store.getState().project!.effectInstances).toEqual(after.effectInstances);
+});

@@ -17,7 +17,7 @@ import { VideoEditorWorkspaceEffectsLibrary } from './effects-library';
 import type { WorkspaceEffectBundlesState } from './effect-bundles';
 import { getProjectTimelineProps } from './timeline-props';
 import type { VideoEditorEffectDocumentDragPayload } from '../../contracts/effect-document-drag';
-import type { VideoProjectEffectTarget } from '../../../features/video/project/effect-instance/types';
+import type { VideoEditorEffectApplicationTarget } from '../../contracts/effect-document-drag';
 import type { EffectLibraryOperations } from '../../library/effects-dock/operations';
 import type { VideoEditorEffectCatalogItem } from '../../library/effects-dock/types';
 import type { EffectEditingPort } from '../../contracts/controller-store';
@@ -121,9 +121,13 @@ interface VideoEditorWorkspaceCanvasProps {
   effectBundles: WorkspaceEffectBundlesState;
   effectOperations: EffectLibraryOperations;
   effectsLibraryDockOpen: boolean;
+  effectKind?: 'standalone' | 'targetEffect' | 'transition';
   previewHeightStyle: React.CSSProperties;
   onClearActiveInsertKind: () => void;
-  onEffectsLibraryDockOpenChange: (open: boolean) => void;
+  onEffectsLibraryDockOpenChange: (
+    open: boolean,
+    kind?: 'standalone' | 'targetEffect' | 'transition'
+  ) => void;
 }
 
 function VideoEditorWorkspaceUpper(
@@ -135,6 +139,7 @@ function VideoEditorWorkspaceUpper(
   const viewer = useWorkspacePreviewContext();
   const blocking = useVideoEditorBlockingOverlayContext();
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const renameAsset = useVideoEditorTimelineEditingPort((port) => port.renameAsset);
   const removeUnusedAssets = useVideoEditorTimelineEditingPort((port) => port.removeUnusedAssets);
   const appendMaterial = useVideoEditorTimelineEditingPort((port) => port.appendMaterial);
   const insertMaterial = useVideoEditorTimelineEditingPort((port) => port.insertMaterial);
@@ -155,7 +160,7 @@ function VideoEditorWorkspaceUpper(
     <VideoEditorWorkspaceHeader
       libraryOpen={Boolean(props.materialsOpen || props.effectsLibraryDockOpen)}
       onOpenLibraryPanel={() => props.onMaterialsOpenChange(true)}
-      onOpenEffectsPanel={() => props.onEffectsLibraryDockOpenChange(true)}
+      onOpenEffectsPanel={(kind) => props.onEffectsLibraryDockOpenChange(true, kind)}
     >
       {source && (
         <WorkspaceViewerHeading
@@ -189,6 +194,7 @@ function VideoEditorWorkspaceUpper(
               if (use.kind === 'scene' && !props.inspectorPanel.isOpen)
                 props.inspectorPanel.onToggle();
             }}
+            onRename={renameAsset}
             onRemoveUnused={removeUnusedAssets}
             onOpenLibrary={() => header?.onOpenLibraryPanel()}
             project={preview.project}
@@ -204,6 +210,7 @@ function VideoEditorWorkspaceUpper(
           effectBundles={props.effectBundles}
           effectOperations={props.effectOperations}
           isOpen={props.effectsLibraryDockOpen}
+          kind={props.effectKind ?? 'targetEffect'}
         />
       </WorkspaceLibraryPanel>
       <div
@@ -276,11 +283,26 @@ function WorkspaceLibraryPanel(
 ) {
   const libraryNavigation = (
     <VideoEditorLibraryNavigation
-      active={props.effectsLibraryDockOpen ? 'effects' : 'materials'}
+      active={
+        props.effectsLibraryDockOpen
+          ? props.effectKind === 'standalone'
+            ? 'annotations'
+            : props.effectKind === 'transition'
+              ? 'transitions'
+              : 'effects'
+          : 'materials'
+      }
       onChange={(active) =>
-        active === 'effects'
-          ? props.onEffectsLibraryDockOpenChange(true)
-          : props.onMaterialsOpenChange(true)
+        active === 'materials'
+          ? props.onMaterialsOpenChange(true)
+          : props.onEffectsLibraryDockOpenChange(
+              true,
+              active === 'annotations'
+                ? 'standalone'
+                : active === 'transitions'
+                  ? 'transition'
+                  : 'targetEffect'
+            )
       }
     />
   );
@@ -345,11 +367,15 @@ function createWorkspacePreviewProps(
     project: preview.project,
     previewMode: preview.preferences.mode,
     previewPreferencesSaveFailed: preview.preferences.saveFailed,
+    previewShowFrameRate: preview.preferences.showFrameRate,
+    onPreviewShowFrameRateChange: preview.preferences.onShowFrameRateChange,
+    previewFrameRate: preview.preferences.frameRate,
     previewRasterPreset: preview.preferences.rasterPreset,
     previewZoom: preview.preferences.zoom,
     registerPreviewRuntime: preview.transport.registerPreviewRuntime,
     selectedActionOccurrence: preview.selection.selectedActionOccurrence,
     selectedClipId: preview.selection.selectedClipId,
+    selectedEffectInstanceId: preview.selection.selectedEffectInstanceId,
     selectedMotionRegion: preview.selection.selectedMotionRegion,
     onClearActiveInsertKind: props.onClearActiveInsertKind,
     ...preview.editing,
@@ -383,6 +409,7 @@ function createWorkspacePreviewActions(
   | 'onPausePlayback'
   | 'onPreviewModeChange'
   | 'onPreviewPreferencesRetry'
+  | 'onPreviewFrameRateChange'
   | 'onPreviewRasterPresetChange'
   | 'onPreviewZoomChange'
   | 'onSeek'
@@ -398,6 +425,7 @@ function createWorkspacePreviewActions(
     onPausePlayback: preview.transport.onPausePlayback,
     onPreviewModeChange: preview.preferences.onModeChange,
     onPreviewPreferencesRetry: preview.preferences.onRetrySave,
+    onPreviewFrameRateChange: preview.preferences.onFrameRateChange,
     onPreviewRasterPresetChange: preview.preferences.onRasterPresetChange,
     onPreviewZoomChange: preview.preferences.onZoomChange,
     onSeek: preview.transport.onSeek,
@@ -426,7 +454,7 @@ function VideoEditorWorkspaceTimeline(
         panelPrefs={presentation.panelPrefs}
         {...getProjectTimelineProps(
           controller,
-          (payload, target, startTime) =>
+          (payload, target, startTime, trackId, timelineLaneId) =>
             void applyDroppedEffectDocument({
               catalogs: props.effectBundles.catalogs,
               onApplyEffectDocument,
@@ -434,6 +462,8 @@ function VideoEditorWorkspaceTimeline(
               payload,
               startTime,
               target,
+              ...(trackId === undefined ? {} : { trackId }),
+              ...(timelineLaneId === undefined ? {} : { timelineLaneId }),
             })
         )}
       />
@@ -447,7 +477,9 @@ interface ApplyDroppedEffectDocumentArgs {
   operations: EffectLibraryOperations;
   payload: VideoEditorEffectDocumentDragPayload;
   startTime: number;
-  target: VideoProjectEffectTarget;
+  target: VideoEditorEffectApplicationTarget;
+  trackId?: string;
+  timelineLaneId?: string | null;
 }
 
 export async function applyDroppedEffectDocument(
@@ -468,20 +500,24 @@ export async function applyDroppedEffectDocument(
     args.onApplyEffectDocument({
       catalog,
       documentId: document.id,
+      ...(args.payload.controlPresetId ? { controlPresetId: args.payload.controlPresetId } : {}),
       startTime: args.startTime,
       target: args.target,
+      ...(args.trackId === undefined ? {} : { trackId: args.trackId }),
+      ...(args.timelineLaneId === undefined ? {} : { timelineLaneId: args.timelineLaneId }),
     })
   );
 }
 
 function doesEffectKindMatchTarget(
   kind: VideoEditorEffectDocumentDragPayload['kind'],
-  target: VideoProjectEffectTarget
+  target: VideoEditorEffectApplicationTarget
 ): boolean {
   return (
     (kind === 'standalone' && target.kind === 'scene') ||
-    (kind === 'targetEffect' && target.kind === 'clip') ||
-    (kind === 'transition' && target.kind === 'transition')
+    (kind === 'targetEffect' &&
+      (target.kind === 'clip' || target.kind === 'track' || target.kind === 'video-group')) ||
+    (kind === 'transition' && (target.kind === 'transition' || target.kind === 'junction'))
   );
 }
 

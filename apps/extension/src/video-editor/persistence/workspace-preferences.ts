@@ -1,11 +1,14 @@
 import { browserStorage } from '../../composition/persistence/infrastructure/browser-storage';
 
 export interface WorkspacePreferences {
+  effectLibraryFilters?: Partial<
+    Record<'standalone' | 'targetEffect' | 'transition' | 'all', { query: string; theme: string }>
+  >;
   inspectorPresentation: 'sections' | 'all';
   inspectorCollapsed: boolean;
   inspectorFullHeight: boolean;
   materialsFullHeight: boolean;
-  activeLibrary: 'materials' | 'effects' | null;
+  activeLibrary: 'materials' | 'annotations' | 'effects' | 'transitions' | null;
   materialsWidth: number | null;
   inspectorWidth: number | null;
   previewHeight: number | null;
@@ -39,7 +42,9 @@ export function parseWorkspacePreferences(value: unknown): WorkspacePreferences 
     'activeLibrary' in value &&
     (value.activeLibrary === null ||
       value.activeLibrary === 'materials' ||
-      value.activeLibrary === 'effects')
+      value.activeLibrary === 'effects' ||
+      value.activeLibrary === 'annotations' ||
+      value.activeLibrary === 'transitions')
   )
     result.activeLibrary = value.activeLibrary;
   for (const [key, min, max] of [
@@ -55,6 +60,26 @@ export function parseWorkspacePreferences(value: unknown): WorkspacePreferences 
       dimension <= max
     )
       result[key] = dimension;
+  }
+  if (
+    'effectLibraryFilters' in value &&
+    value.effectLibraryFilters &&
+    typeof value.effectLibraryFilters === 'object'
+  ) {
+    const filters: NonNullable<WorkspacePreferences['effectLibraryFilters']> = {};
+    for (const key of ['standalone', 'targetEffect', 'transition', 'all'] as const) {
+      const filter: unknown = Reflect.get(value.effectLibraryFilters, key);
+      if (!filter || typeof filter !== 'object' || !('query' in filter) || !('theme' in filter))
+        continue;
+      if (
+        typeof filter.query === 'string' &&
+        filter.query.length <= 256 &&
+        typeof filter.theme === 'string' &&
+        filter.theme.length <= 300
+      )
+        filters[key] = { query: filter.query, theme: filter.theme };
+    }
+    result.effectLibraryFilters = filters;
   }
   return result;
 }

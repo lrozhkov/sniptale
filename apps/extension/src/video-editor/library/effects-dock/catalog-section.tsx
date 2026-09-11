@@ -1,20 +1,33 @@
+import { readCatalogPresentation } from '../../../features/video/project/effect-bundle/catalog/presentation';
+import { AnnotationSourcePreview } from './source-preview';
+import { CompactSelect } from '../../../ui/compact-inspector-controls';
+import { useWorkspacePreference } from '../../runtime/controller/workspace-preferences';
+import { useEffectDocumentDrag } from '../../chrome/effect-document-drag';
+import {
+  EffectCatalogPreview,
+  EffectCatalogPreviewProvider,
+} from '../../../ui/effect-catalog-preview';
 import { useState } from 'react';
-import { Search, Trash2 } from 'lucide-react';
-import { parseEffectV1Source } from '@sniptale/runtime-contracts/effect-v1';
-import { ProductGlassInput, ProductGlassSwitch } from '@sniptale/ui/product-glass-controls';
-import { EditorIconButton } from '@sniptale/ui/editor-chrome';
+import { Plus, Check, ArrowRightToLine, ScanEye } from 'lucide-react';
+import {
+  describeCatalogDocument,
+  getEffectCatalogThemes,
+  queryEffectCatalog,
+  type EffectCatalogFilter,
+} from '../../../features/video/project/effect-bundle/catalog/query';
+import { EffectCatalogControls } from '../../../ui/effect-catalog-controls';
 import type { EffectBundleCatalogEntry } from '../../../features/video/project/effect-bundle/catalog';
 import type { VideoProjectEffectTarget } from '../../../features/video/project/effect-instance/types';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { EditorIconButton } from '@sniptale/ui/editor-chrome';
 import { writeVideoEditorEffectDocumentDragPayload } from '../../contracts/effect-document-drag';
 import { getCurrentLocale, translate } from '../../../platform/i18n';
 import type { EffectLibraryOperations } from './operations';
 import type { VideoEditorEffectsLibraryDockProps } from './types';
 
-const CATALOG_CARD_CLASS_NAME =
-  'space-y-2 border-b border-[var(--sniptale-color-border-soft)] pb-3';
+const CATALOG_CARD_CLASS_NAME = 'contents';
 const DOCUMENT_CARD_CLASS_NAME = [
-  'flex min-w-0 flex-col gap-2 rounded-[8px] border p-2',
+  'effect-catalog-card group/effect-card flex min-w-0 flex-col items-stretch gap-1.5',
+  'rounded-[6px] border p-1.5 cursor-grab active:cursor-grabbing',
   'border-[var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-panel)]',
 ].join(' ');
 
@@ -24,117 +37,177 @@ export function CatalogSection(
       'run'
     >
 ): React.JSX.Element {
-  const [query, setQuery] = useState('');
-  const search = query.trim().toLocaleLowerCase(getCurrentLocale());
-  const matches = (value: string) => value.toLocaleLowerCase(getCurrentLocale()).includes(search);
-  const visibleCatalogs = props.catalogs.filter((item) =>
-    item.status === 'invalid'
-      ? matches(translate('videoEditor.effectsLibrary.invalidPack'))
-      : matches(readLocalized(item.catalog.label)) ||
-        item.catalog.documents.some((document) => matches(readDocumentLabel(document)))
+  const [sourcePreview, setSourcePreview] = useState<{
+    catalog: EffectBundleCatalogEntry;
+    document: EffectBundleCatalogEntry['documents'][number];
+  } | null>(null);
+  const [filters, setFilters] = useWorkspacePreference('effectLibraryFilters');
+  const key = props.kind ?? 'all';
+  const filter: EffectCatalogFilter = { query: '', kind: 'all', theme: 'all', ...filters?.[key] };
+  const setFilter = (next: EffectCatalogFilter) =>
+    setFilters((current) => ({
+      ...current,
+      [key]: { query: next.query.slice(0, 256), theme: next.theme },
+    }));
+  const [scope, setScope] = useState<'selection' | 'clip' | 'track' | 'video-group'>('selection');
+  const targetScope =
+    scope === 'selection'
+      ? props.selectedClipId
+        ? 'clip'
+        : props.selectedTrackId
+          ? 'track'
+          : props.effectTarget?.kind === 'video-group'
+            ? 'video-group'
+            : 'clip'
+      : scope;
+  const effectTarget: VideoProjectEffectTarget | null =
+    targetScope === 'clip'
+      ? props.selectedClipId
+        ? { kind: 'clip', clipId: props.selectedClipId }
+        : null
+      : targetScope === 'track'
+        ? props.selectedTrackId
+          ? { kind: 'track', trackId: props.selectedTrackId }
+          : null
+        : { kind: 'video-group' };
+  const catalogs = props.catalogs.flatMap((item) =>
+    item.status === 'ready' && item.catalog.enabled ? [item.catalog] : []
+  );
+  const themes = getEffectCatalogThemes(
+    catalogs.map((catalog) => ({
+      ...catalog,
+      documents: catalog.documents.filter(
+        (document) => !props.kind || document.kind === props.kind
+      ),
+    })),
+    getCurrentLocale()
+  );
+  const effectiveFilter: EffectCatalogFilter = {
+    ...filter,
+    kind: props.kind ?? filter.kind,
+    theme: themes.some((theme) => theme.value === filter.theme) ? filter.theme : 'all',
+  };
+  const visibleCatalogs = catalogs.filter(
+    (catalog) => queryEffectCatalog(catalog, effectiveFilter, getCurrentLocale()).length > 0
   );
   return (
-    <section
-      aria-label={translate('videoEditor.effectsLibrary.effectV1Label')}
-      className="space-y-3"
-    >
-      {props.catalogs.length > 0 && (
-        <div className="relative">
-          <Search
-            size={15}
-            aria-hidden="true"
+    <EffectCatalogPreviewProvider>
+      {sourcePreview ? (
+        <AnnotationSourcePreview
+          {...props}
+          {...sourcePreview}
+          onClose={() => setSourcePreview(null)}
+        />
+      ) : (
+        <section
+          aria-label={translate('videoEditor.effectsLibrary.effectV1Label')}
+          className="flex min-h-0 flex-1 flex-col"
+        >
+          {props.catalogs.length > 0 && (
+            <div className="shrink-0 border-b border-[var(--sniptale-color-border-soft)] p-2">
+              <EffectCatalogControls
+                themes={themes}
+                hideCategories
+                filter={effectiveFilter}
+                onChange={setFilter}
+                disabled={props.disabled}
+              />
+            </div>
+          )}
+          {props.kind === 'targetEffect' && (
+            <label
+              className={[
+                'flex items-center gap-2 border-b px-2 py-1 text-xs',
+                'border-[var(--sniptale-color-border-soft)]',
+              ].join(' ')}
+            >
+              <span>{translate('videoEditor.effectsLibrary.applyTo')}</span>
+              <CompactSelect
+                value={targetScope}
+                containerClassName="min-w-0 flex-1"
+                aria-label={translate('videoEditor.effectsLibrary.applyTo')}
+                onChange={setScope}
+                options={[
+                  {
+                    value: 'clip',
+                    label: translate('videoEditor.effectsLibrary.selectedClip'),
+                    disabled: !props.selectedClipId,
+                  },
+                  {
+                    value: 'track',
+                    label: translate('videoEditor.effectsLibrary.selectedTrack'),
+                    disabled: !props.selectedTrackId,
+                  },
+                  {
+                    value: 'video-group',
+                    label: translate('videoEditor.effectsLibrary.wholeVideo'),
+                  },
+                ]}
+              />
+            </label>
+          )}
+          <div
             className={[
-              'pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2',
-              'text-[var(--sniptale-color-text-muted)]',
+              'grid min-h-0 flex-1 grid-cols-[repeat(auto-fit,minmax(128px,1fr))] content-start',
+              'auto-rows-max gap-2 overflow-y-auto p-2',
             ].join(' ')}
-          />
-          <ProductGlassInput
-            className="!h-9 w-full !pl-8"
-            aria-label={translate('videoEditor.effectsLibrary.searchPlaceholder')}
-            placeholder={translate('videoEditor.effectsLibrary.searchPlaceholder')}
-            value={query}
-            onChange={(event) => setQuery(event.currentTarget.value)}
-          />
-        </div>
+          >
+            {!props.isLoading && props.catalogs.length === 0 && (
+              <p className="px-1 text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
+                {translate('videoEditor.effectsLibrary.noImportedPacks')}
+              </p>
+            )}
+            {props.catalogs.length > 0 && visibleCatalogs.length === 0 && (
+              <p
+                role="status"
+                className="px-1 text-xs leading-5 text-[var(--sniptale-color-text-muted)]"
+              >
+                {translate('videoEditor.effectsLibrary.noSearchResults')}
+              </p>
+            )}
+            {visibleCatalogs.map((catalog) => (
+              <CatalogEntry
+                key={catalog.packId}
+                catalog={catalog}
+                {...props}
+                onPreview={(document) => setSourcePreview({ catalog, document })}
+                filter={effectiveFilter}
+                effectTarget={effectTarget}
+              />
+            ))}
+          </div>
+        </section>
       )}
-      {!props.isLoading && props.catalogs.length === 0 && (
-        <p className="px-1 text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
-          {translate('videoEditor.effectsLibrary.noImportedPacks')}
-        </p>
-      )}
-      {props.catalogs.length > 0 && visibleCatalogs.length === 0 && (
-        <p role="status" className="px-1 text-xs leading-5 text-[var(--sniptale-color-text-muted)]">
-          {translate('videoEditor.effectsLibrary.noSearchResults')}
-        </p>
-      )}
-      {visibleCatalogs.map((item) =>
-        item.status === 'ready' ? (
-          <CatalogEntry
-            key={item.catalog.packId}
-            catalog={item.catalog}
-            {...props}
-            search={search}
-          />
-        ) : (
-          <InvalidCatalogEntry key={item.packId} packId={item.packId} {...props} />
-        )
-      )}
-    </section>
-  );
-}
-
-function InvalidCatalogEntry(
-  props: Pick<VideoEditorEffectsLibraryDockProps, 'onDeleteEffectBundle'> & {
-    disabled: boolean;
-    packId: string;
-  } & Pick<EffectLibraryOperations, 'run'>
-): React.JSX.Element {
-  return (
-    <article className={CATALOG_CARD_CLASS_NAME} data-state="invalid">
-      <h4 className="text-sm font-medium">{translate('videoEditor.effectsLibrary.invalidPack')}</h4>
-      <p className="break-all text-xs text-[var(--sniptale-color-text-muted)]">{props.packId}</p>
-      <p className="text-xs text-[var(--sniptale-color-danger)]">
-        {translate('videoEditor.effectsLibrary.invalidPackDescription')}
-      </p>
-      <ProductActionButton
-        compact
-        tone="danger"
-        disabled={props.disabled}
-        onClick={() => void props.run('delete', () => props.onDeleteEffectBundle(props.packId))}
-      >
-        {translate('videoEditor.effectsLibrary.deletePack')}
-      </ProductActionButton>
-    </article>
+    </EffectCatalogPreviewProvider>
   );
 }
 
 function CatalogEntry(
   props: VideoEditorEffectsLibraryDockProps & {
     catalog: EffectBundleCatalogEntry;
+    onPreview(document: EffectBundleCatalogEntry['documents'][number]): void;
     disabled: boolean;
-    search: string;
+    filter: EffectCatalogFilter;
   } & Pick<EffectLibraryOperations, 'run'>
 ): React.JSX.Element {
   const { catalog } = props;
-  const packMatches = readLocalized(catalog.label)
-    .toLocaleLowerCase(getCurrentLocale())
-    .includes(props.search);
-  const documents = catalog.documents.filter(
-    (document) =>
-      packMatches ||
-      readDocumentLabel(document).toLocaleLowerCase(getCurrentLocale()).includes(props.search)
-  );
+  const documents = queryEffectCatalog(catalog, props.filter, getCurrentLocale());
   return (
     <article className={CATALOG_CARD_CLASS_NAME}>
-      <div className="flex min-w-0 items-center justify-between gap-2 px-1">
-        <h3 className="min-w-0 break-words text-[13px] font-semibold">
-          {readLocalized(catalog.label)}
-        </h3>
-        <CatalogActions {...props} />
-      </div>
+      {catalog.documents.length > 1 && (
+        <div className="col-span-full flex min-w-0 items-center justify-between gap-2 px-1">
+          <h3 className="min-w-0 break-words text-[13px] font-semibold">
+            {readLocalized(catalog.label)}
+          </h3>
+        </div>
+      )}
       {catalog.enabled ? (
         documents.map((document) => (
-          <CatalogDocument key={document.id} document={document} {...props} />
+          <CatalogDocument
+            key={`${document.id}:${document.previewPresetId ?? ''}`}
+            document={document}
+            {...props}
+          />
         ))
       ) : (
         <p className="px-1 text-xs text-[var(--sniptale-color-text-muted)]">
@@ -145,100 +218,130 @@ function CatalogEntry(
   );
 }
 
-function CatalogActions(props: Parameters<typeof CatalogEntry>[0]): React.JSX.Element {
-  const toggleLabel = translate(
-    props.catalog.enabled
-      ? 'videoEditor.effectsLibrary.disablePack'
-      : 'videoEditor.effectsLibrary.enablePack'
-  );
-  return (
-    <div className="flex shrink-0 items-center gap-2">
-      <ProductGlassSwitch
-        on={props.catalog.enabled}
-        aria-pressed={props.catalog.enabled}
-        aria-label={toggleLabel}
-        title={toggleLabel}
-        disabled={props.disabled}
-        onClick={() =>
-          void props.run('update', () =>
-            props.onSetEffectBundleEnabled(props.catalog.packId, !props.catalog.enabled)
-          )
-        }
-      />
-      <EditorIconButton
-        className="!h-8 !w-8 text-[var(--sniptale-color-danger)]"
-        title={translate('videoEditor.effectsLibrary.deletePack')}
-        disabled={props.disabled}
-        onClick={() =>
-          void props.run('delete', () => props.onDeleteEffectBundle(props.catalog.packId))
-        }
-      >
-        <Trash2 size={15} aria-hidden="true" />
-      </EditorIconButton>
-    </div>
-  );
-}
-
 function CatalogDocument(
   props: Parameters<typeof CatalogEntry>[0] & {
     document: EffectBundleCatalogEntry['documents'][number];
   }
 ): React.JSX.Element {
+  const drag = useEffectDocumentDrag();
   const target = resolveDocumentTarget(props.document.kind, props);
+  const metadata = describeCatalogDocument(props.document, getCurrentLocale());
   return (
     <div
       className={DOCUMENT_CARD_CLASS_NAME}
       data-effect-document={props.document.id}
       draggable={!props.disabled}
-      onDragStart={(event) =>
-        writeVideoEditorEffectDocumentDragPayload(event.dataTransfer, {
+      onDragStart={(event) => {
+        const payload = {
           documentId: props.document.id,
+          ...(props.document.previewPresetId
+            ? { controlPresetId: props.document.previewPresetId }
+            : {}),
           kind: props.document.kind,
           packId: props.catalog.packId,
-        })
-      }
+        };
+        writeVideoEditorEffectDocumentDragPayload(event.dataTransfer, payload);
+        const duration = readCatalogPresentation(props.document)?.duration;
+        if (duration) drag.start({ ...payload, duration });
+      }}
+      onDragEnd={drag.end}
     >
-      <div>
-        <p
-          className={
-            props.catalog.documents.length === 1 &&
-            readDocumentLabel(props.document) === readLocalized(props.catalog.label)
-              ? 'sr-only'
-              : 'break-words text-[13px] font-medium text-[var(--sniptale-color-text-primary)]'
-          }
+      <div className="flex h-6 min-w-0 items-center">
+        <div className="min-w-0 flex-1">
+          <p
+            title={metadata.label}
+            className="truncate text-[11px] leading-4 font-medium text-[var(--sniptale-color-text-primary)]"
+          >
+            {metadata.label}
+          </p>
+        </div>
+        <div
+          className={[
+            'flex max-w-0 shrink-0 items-center gap-0.5 overflow-hidden opacity-0',
+            'group-hover/effect-card:max-w-24 group-focus-within/effect-card:max-w-24',
+            'group-hover/effect-card:opacity-100 group-focus-within/effect-card:opacity-100',
+            '[@media(hover:none)]:max-w-24 [@media(hover:none)]:opacity-100',
+          ].join(' ')}
         >
-          {readDocumentLabel(props.document)}
-        </p>
-        <p className="text-xs text-[var(--sniptale-color-text-muted)]">
-          {getDocumentKindLabel(props.document.kind)}
-        </p>
+          {props.document.kind === 'standalone' && (
+            <EditorIconButton
+              className="!h-6 !w-6 !min-w-6"
+              title={translate('videoEditor.effectsLibrary.previewAnnotation')}
+              onClick={() => props.onPreview(props.document)}
+            >
+              <ScanEye size={14} />
+            </EditorIconButton>
+          )}
+          <EditorIconButton
+            className="!h-6 !w-6 !min-w-6"
+            title={getDocumentActionLabel(props.document.kind, target)}
+            aria-label={getDocumentActionLabel(props.document.kind, target)}
+            disabled={props.disabled || !target}
+            onClick={() =>
+              target &&
+              void props.run('apply', () =>
+                props.onApplyEffect({
+                  catalog: props.catalog,
+                  documentId: props.document.id,
+                  ...(props.document.previewPresetId
+                    ? { controlPresetId: props.document.previewPresetId }
+                    : {}),
+                  startTime: props.currentTime,
+                  ...(props.document.kind === 'standalone' && props.selectedTrackId
+                    ? { trackId: props.selectedTrackId }
+                    : {}),
+                  target,
+                })
+              )
+            }
+          >
+            {props.document.kind === 'standalone' ? (
+              <Plus size={14} aria-hidden="true" />
+            ) : (
+              <Check size={14} aria-hidden="true" />
+            )}
+          </EditorIconButton>
+          {props.document.kind === 'standalone' && props.appendTime !== undefined && (
+            <EditorIconButton
+              className="!h-6 !w-6 !min-w-6"
+              title={translate('videoEditor.app.materialsAppend')}
+              disabled={props.disabled || !target}
+              onClick={() =>
+                target &&
+                void props.run('apply', () =>
+                  props.onApplyEffect({
+                    catalog: props.catalog,
+                    documentId: props.document.id,
+                    ...(props.document.previewPresetId
+                      ? { controlPresetId: props.document.previewPresetId }
+                      : {}),
+                    startTime: props.appendTime!,
+                    ...(props.selectedTrackId ? { trackId: props.selectedTrackId } : {}),
+                    target,
+                  })
+                )
+              }
+            >
+              <ArrowRightToLine size={14} aria-hidden="true" />
+            </EditorIconButton>
+          )}
+        </div>
       </div>
-      <ProductActionButton
-        compact
-        tone={target ? 'primary' : 'secondary'}
-        disabled={props.disabled || !target}
-        onClick={() =>
-          target &&
-          void props.run('apply', () =>
-            props.onApplyEffect({
-              catalog: props.catalog,
-              documentId: props.document.id,
-              startTime: props.currentTime,
-              target,
-            })
-          )
-        }
-      >
-        {getDocumentActionLabel(props.document.kind, target)}
-      </ProductActionButton>
+      {(metadata.themeLabel || metadata.styleLabel) && (
+        <span
+          title={[metadata.themeLabel, metadata.styleLabel].filter(Boolean).join(' · ')}
+          className="block truncate text-[10px] text-[var(--sniptale-color-text-muted)]"
+        >
+          {[metadata.themeLabel, metadata.styleLabel].filter(Boolean).join(' · ')}
+        </span>
+      )}
+      <EffectCatalogPreview
+        catalog={props.catalog}
+        document={props.document}
+        captureFrame={props.capturePreviewFrame}
+      />
     </div>
   );
-}
-
-function getDocumentKindLabel(kind: EffectBundleCatalogEntry['documents'][number]['kind']): string {
-  if (kind === 'standalone') return translate('videoEditor.effectsLibrary.documentKindScene');
-  if (kind === 'targetEffect') return translate('videoEditor.effectsLibrary.documentKindClip');
-  return translate('videoEditor.effectsLibrary.documentKindTransition');
 }
 
 function getDocumentActionLabel(
@@ -251,17 +354,31 @@ function getDocumentActionLabel(
       : translate('videoEditor.effectsLibrary.selectTransitionTarget');
   }
   if (kind === 'standalone') return translate('videoEditor.effectsLibrary.applyToScene');
-  if (kind === 'targetEffect') return translate('videoEditor.effectsLibrary.applyToClip');
+  if (kind === 'targetEffect')
+    return translate(
+      target?.kind === 'track'
+        ? 'videoEditor.effectsLibrary.selectedTrack'
+        : target?.kind === 'video-group'
+          ? 'videoEditor.effectsLibrary.wholeVideo'
+          : 'videoEditor.effectsLibrary.applyToClip'
+    );
   return translate('videoEditor.effectsLibrary.applyToTransition');
 }
 
 function resolveDocumentTarget(
   kind: EffectBundleCatalogEntry['documents'][number]['kind'],
-  props: Pick<VideoEditorEffectsLibraryDockProps, 'selectedClipId' | 'selectedTransitionId'>
+  props: Pick<
+    VideoEditorEffectsLibraryDockProps,
+    'selectedClipId' | 'selectedTransitionId' | 'effectTarget'
+  >
 ): VideoProjectEffectTarget | null {
   if (kind === 'standalone') return { kind: 'scene' };
   if (kind === 'targetEffect') {
-    return props.selectedClipId ? { clipId: props.selectedClipId, kind: 'clip' } : null;
+    return props.effectTarget === undefined
+      ? props.selectedClipId
+        ? { clipId: props.selectedClipId, kind: 'clip' }
+        : null
+      : props.effectTarget;
   }
   return props.selectedTransitionId
     ? { kind: 'transition', transitionId: props.selectedTransitionId }
@@ -270,11 +387,4 @@ function resolveDocumentTarget(
 
 function readLocalized(value: { en: string; ru: string }): string {
   return getCurrentLocale() === 'ru' ? value.ru : value.en;
-}
-
-function readDocumentLabel(document: EffectBundleCatalogEntry['documents'][number]): string {
-  const parsed = parseEffectV1Source(document.source).document;
-  return parsed
-    ? (parsed.label[getCurrentLocale()] ?? parsed.label.en ?? getDocumentKindLabel(document.kind))
-    : getDocumentKindLabel(document.kind);
 }

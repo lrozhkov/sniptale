@@ -40,3 +40,13 @@ it('keeps hybrid fallback details in frame-driven progress', async () => {
     'offscreenExport.frameDrivenRenderPrefix 6 offscreenExport.progressFrameOf 6 (Hybrid MP4: reason)'
   );
 });
+
+it('maps a span frame into its duration-weighted portion of the render', async () => {
+  await sendFrameDrivenProgress('job', 4, 10, undefined, { start: 25, end: 75 });
+  expect(sendProgressMock).toHaveBeenLastCalledWith(
+    'job',
+    expect.anything(),
+    50,
+    expect.any(String)
+  );
+});

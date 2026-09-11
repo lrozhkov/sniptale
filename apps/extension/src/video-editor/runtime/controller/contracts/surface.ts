@@ -13,6 +13,7 @@ export interface VideoEditorOverlaysController {
     onClose: VideoEditorExportActions['closeExportDialog'];
     onExport: VideoEditorActionHandlers['handleStartExport'];
     selectedClipId?: string | null;
+    selectedRangeAvailable?: boolean;
     settings: VideoEditorExportRuntimeState['settings'];
     sourceDimensions: { height: number; width: number } | null;
   };

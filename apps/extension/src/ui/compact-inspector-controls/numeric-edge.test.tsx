@@ -297,3 +297,22 @@ it('covers compact numeric keyboard, stepper, and blur commit edges', () => {
   });
   expect(input().value).toBe('20');
 });
+
+it('keeps a focused range exposed when the pointer leaves its row', () => {
+  renderScrubbedNumericRow(vi.fn());
+  const row = container!.querySelector<HTMLElement>(
+    '[data-ui="shared.ui.compact-inspector.numeric-row"]'
+  )!;
+  const scrub = container!.querySelector<HTMLElement>(
+    '[data-ui="shared.ui.compact-inspector.numeric-range-scrub"]'
+  )!;
+  const range = container!.querySelector<HTMLInputElement>('input[type="range"]')!;
+  row.getBoundingClientRect = createNumericRowRect;
+  act(() => row.dispatchEvent(createPointerEvent('pointermove', { bubbles: true, clientY: 38 })));
+  act(() => range.focus());
+  act(() => row.dispatchEvent(createPointerEvent('pointerout', { bubbles: true })));
+  expect(document.activeElement).toBe(range);
+  expect(scrub.getAttribute('aria-hidden')).not.toBe('true');
+  act(() => range.blur());
+  expect(scrub.getAttribute('aria-hidden')).toBe('true');
+});

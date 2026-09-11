@@ -8,5 +8,6 @@ export type RenderLoopJobState = Pick<
   'clipMediaElements' | 'clipAudioNodes'
 > & {
   cancelled: boolean;
+  renderProgressRange?: { start: number; end: number };
   jobId: string;
 };

@@ -6,7 +6,10 @@ import {
 } from '../../../features/video/project/effect-bundle';
 
 type EffectLibraryOperationKind = 'apply' | 'delete' | 'import' | 'update';
-type EffectLibraryOperationErrorCode = EffectBundleDiagnosticCode | 'EFFECT_OPERATION_FAILED';
+type EffectLibraryOperationErrorCode =
+  | EffectBundleDiagnosticCode
+  | 'EFFECT_OPERATION_FAILED'
+  | 'effectTargetOccupied';
 
 export interface EffectLibraryOperationError {
   code: EffectLibraryOperationErrorCode;
@@ -43,6 +46,7 @@ export function useEffectLibraryOperations(): EffectLibraryOperations {
 
 function toSafeUiErrorCode(error: unknown): EffectLibraryOperationErrorCode {
   const candidate = readErrorCode(error);
+  if (candidate === 'effectTargetOccupied') return candidate;
   return (
     EFFECT_BUNDLE_DIAGNOSTIC_CODES.find((code) => code === candidate) ?? 'EFFECT_OPERATION_FAILED'
   );

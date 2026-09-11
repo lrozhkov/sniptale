@@ -2,7 +2,7 @@ import type { VideoCodec } from 'mediabunny';
 import type { LiveVideoFrameTransform } from './live-video-frame-transform';
 
 export type LiveEncoderContentHint = 'detail' | 'motion' | 'text';
-type LiveVideoBitrateMode = 'constant' | 'variable';
+export const LIVE_VIDEO_BITRATE_MODE = 'variable' as const;
 
 interface LiveVideoEncodingSelection {
   container: 'mp4' | 'webm';
@@ -19,20 +19,104 @@ interface LiveVideoEncodingInput {
 }
 
 const VP9_LEVELS = [
-  { level: 10, maxBitrate: 200_000, maxPictureSize: 36_864 },
-  { level: 11, maxBitrate: 800_000, maxPictureSize: 73_728 },
-  { level: 20, maxBitrate: 1_800_000, maxPictureSize: 122_880 },
-  { level: 21, maxBitrate: 3_600_000, maxPictureSize: 245_760 },
-  { level: 30, maxBitrate: 7_200_000, maxPictureSize: 552_960 },
-  { level: 31, maxBitrate: 12_000_000, maxPictureSize: 983_040 },
-  { level: 40, maxBitrate: 18_000_000, maxPictureSize: 2_228_224 },
-  { level: 41, maxBitrate: 30_000_000, maxPictureSize: 2_228_224 },
-  { level: 50, maxBitrate: 60_000_000, maxPictureSize: 8_912_896 },
-  { level: 51, maxBitrate: 120_000_000, maxPictureSize: 8_912_896 },
-  { level: 52, maxBitrate: 180_000_000, maxPictureSize: 8_912_896 },
-  { level: 60, maxBitrate: 180_000_000, maxPictureSize: 35_651_584 },
-  { level: 61, maxBitrate: 240_000_000, maxPictureSize: 35_651_584 },
-  { level: 62, maxBitrate: 480_000_000, maxPictureSize: 35_651_584 },
+  {
+    level: 10,
+    maxBitrate: 200_000,
+    maxPictureSize: 36_864,
+    maxSampleRate: 829440,
+    maxDimension: 512,
+  },
+  {
+    level: 11,
+    maxBitrate: 800_000,
+    maxPictureSize: 73_728,
+    maxSampleRate: 2764800,
+    maxDimension: 768,
+  },
+  {
+    level: 20,
+    maxBitrate: 1_800_000,
+    maxPictureSize: 122_880,
+    maxSampleRate: 4608000,
+    maxDimension: 960,
+  },
+  {
+    level: 21,
+    maxBitrate: 3_600_000,
+    maxPictureSize: 245_760,
+    maxSampleRate: 9216000,
+    maxDimension: 1344,
+  },
+  {
+    level: 30,
+    maxBitrate: 7_200_000,
+    maxPictureSize: 552_960,
+    maxSampleRate: 20736000,
+    maxDimension: 2048,
+  },
+  {
+    level: 31,
+    maxBitrate: 12_000_000,
+    maxPictureSize: 983_040,
+    maxSampleRate: 36864000,
+    maxDimension: 2752,
+  },
+  {
+    level: 40,
+    maxBitrate: 18_000_000,
+    maxPictureSize: 2_228_224,
+    maxSampleRate: 83558400,
+    maxDimension: 4160,
+  },
+  {
+    level: 41,
+    maxBitrate: 30_000_000,
+    maxPictureSize: 2_228_224,
+    maxSampleRate: 160432128,
+    maxDimension: 4160,
+  },
+  {
+    level: 50,
+    maxBitrate: 60_000_000,
+    maxPictureSize: 8_912_896,
+    maxSampleRate: 311951360,
+    maxDimension: 8384,
+  },
+  {
+    level: 51,
+    maxBitrate: 120_000_000,
+    maxPictureSize: 8_912_896,
+    maxSampleRate: 588251136,
+    maxDimension: 8384,
+  },
+  {
+    level: 52,
+    maxBitrate: 180_000_000,
+    maxPictureSize: 8_912_896,
+    maxSampleRate: 1176502272,
+    maxDimension: 8384,
+  },
+  {
+    level: 60,
+    maxBitrate: 180_000_000,
+    maxPictureSize: 35_651_584,
+    maxSampleRate: 1176502272,
+    maxDimension: 16832,
+  },
+  {
+    level: 61,
+    maxBitrate: 240_000_000,
+    maxPictureSize: 35_651_584,
+    maxSampleRate: 2353004544,
+    maxDimension: 16832,
+  },
+  {
+    level: 62,
+    maxBitrate: 480_000_000,
+    maxPictureSize: 35_651_584,
+    maxSampleRate: 4706009088,
+    maxDimension: 16832,
+  },
 ] as const;
 
 export function resolveLiveEncoderContentHint(
@@ -40,16 +124,6 @@ export function resolveLiveEncoderContentHint(
 ): LiveEncoderContentHint {
   const hint = track.contentHint;
   return hint === 'motion' || hint === 'text' || hint === 'detail' ? hint : 'detail';
-}
-
-export function resolveLiveVideoBitrateMode(
-  input: Pick<LiveVideoEncodingInput, 'encoding' | 'frameTransform'>
-): LiveVideoBitrateMode {
-  return input.frameTransform &&
-    input.encoding.container === 'webm' &&
-    input.encoding.videoCodec === 'vp9'
-    ? 'constant'
-    : 'variable';
 }
 
 export function buildExactVideoEncoderConfig(
@@ -70,7 +144,7 @@ export function buildNativeVideoEncoderConfig(
   const codec =
     input.encoding.videoCodecString ??
     (input.encoding.videoCodec === 'vp9'
-      ? buildVp9CodecString(dimensions, input.encoding.videoBitrate)
+      ? buildVp9CodecString(dimensions, input.encoding.videoBitrate, input.encoding.frameRate)
       : null);
   if (!codec) return null;
   return buildVideoEncoderConfig(input, dimensions, contentHint, codec);
@@ -85,7 +159,7 @@ function buildVideoEncoderConfig(
   return {
     alpha: 'discard',
     bitrate: input.encoding.videoBitrate,
-    bitrateMode: resolveLiveVideoBitrateMode(input),
+    bitrateMode: LIVE_VIDEO_BITRATE_MODE,
     codec,
     contentHint,
     displayHeight: dimensions.height,
@@ -101,13 +175,18 @@ function buildVideoEncoderConfig(
 
 function buildVp9CodecString(
   dimensions: { height: number; width: number },
-  bitrate: number
+  bitrate: number,
+  frameRate: number
 ): string {
   const pictureSize = dimensions.width * dimensions.height;
-  const level =
-    VP9_LEVELS.find(
-      (candidate) => pictureSize <= candidate.maxPictureSize && bitrate <= candidate.maxBitrate
-    ) ?? VP9_LEVELS.at(-1)!;
+  const level = VP9_LEVELS.find(
+    (candidate) =>
+      pictureSize <= candidate.maxPictureSize &&
+      bitrate <= candidate.maxBitrate &&
+      pictureSize * frameRate <= candidate.maxSampleRate &&
+      Math.max(dimensions.width, dimensions.height) <= candidate.maxDimension
+  );
+  if (!level) throw new Error('Video exceeds the supported VP9 level limits.');
   return `vp09.00.${String(level.level).padStart(2, '0')}.08`;
 }
 
@@ -183,7 +262,7 @@ export function assertLiveVideoEncoderConfig(input: {
       'Live encoder did not preserve the requested frame rate as its rate-control expectation.'
     );
   }
-  if (actual.bitrateMode !== resolveLiveVideoBitrateMode(input)) {
+  if (actual.bitrateMode !== LIVE_VIDEO_BITRATE_MODE) {
     throw new Error(
       'Live encoder did not preserve screen-efficient variable or selected bitrate mode.'
     );

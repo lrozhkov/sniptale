@@ -130,14 +130,36 @@ function mapLogicalCropToSource(
   };
 }
 
-function mapFullViewportToSource(sourceSize: RecordingPixelSize): {
+function mapFullViewportToSource(
+  sourceSize: RecordingPixelSize,
+  coordinateSpace: TabOutputCoordinateSpace
+): {
   logicalContentRect: RecordingSampleRect;
   sourceRect: RecordingSampleRect;
 } {
-  // A TAB source is already the captured tab raster. Re-projecting the CSS viewport
-  // onto it guesses at browser chrome/letterboxing and creates a second resample.
+  const width = Math.round(coordinateSpace.width * coordinateSpace.devicePixelRatio);
+  const height = Math.round(coordinateSpace.height * coordinateSpace.devicePixelRatio);
   const fullSource = Object.freeze({ x: 0, y: 0, ...sourceSize });
-  return { logicalContentRect: fullSource, sourceRect: fullSource };
+  if (
+    width < 2 ||
+    height < 2 ||
+    sourceSize.width !== Math.ceil(width / 2) * 2 ||
+    sourceSize.height !== Math.ceil(height / 2) * 2
+  ) {
+    return { logicalContentRect: fullSource, sourceRect: fullSource };
+  }
+  // Match Chromium ComputeLetterboxRegionForI420 for our requested capture grid.
+  // Metadata includes this padding; inspecting black pixels would crop real page content.
+  const scale = Math.min(sourceSize.width / width, sourceSize.height / height);
+  const contentWidth = Math.round(width * scale);
+  const contentHeight = Math.round(height * scale);
+  const sourceRect = Object.freeze({
+    x: 0,
+    y: 0,
+    width: contentWidth - (contentWidth % 2),
+    height: contentHeight - (contentHeight % 2),
+  });
+  return { logicalContentRect: sourceRect, sourceRect };
 }
 
 function sourceRectFillsOutput(plan: RecordingGeometryPlan, fillsOutput: boolean): boolean {
@@ -197,7 +219,7 @@ export function resolveTabOutputGeometry(
   const requested = requireRequestedCrop(requestedCrop, cssViewport);
   const tracksFullViewport = options.tracksFullViewport === true;
   const mapping = tracksFullViewport
-    ? mapFullViewportToSource(source)
+    ? mapFullViewportToSource(source, cssViewport)
     : mapLogicalCropToSource(requested, source, cssViewport);
   const plan = createRecordingGeometryPlan({
     frameRateCap: options.frameRateCap,
@@ -256,7 +278,7 @@ export function remapTabOutputGeometry(
       )
     : requireRequestedCrop(geometry.requestedCrop, cssViewport);
   const mapping = geometry.tracksFullViewport
-    ? mapFullViewportToSource(source)
+    ? mapFullViewportToSource(source, cssViewport)
     : mapLogicalCropToSource(requestedCrop, source, cssViewport);
   const canFillOutput =
     !geometry.tracksFullViewport ||
@@ -369,11 +391,11 @@ export function resolveRecordingPointTransform(
   geometry: TabOutputGeometry,
   destination: Readonly<{ x: number; y: number; width: number; height: number }>
 ): RecordingPointTransform {
-  const { coordinateSpace, sourceSize, sourceRect, outputSize } = geometry;
-  const rawScaleX = sourceSize.width / coordinateSpace.width;
-  const rawScaleY = sourceSize.height / coordinateSpace.height;
-  const clientX = sourceRect.x / rawScaleX;
-  const clientY = sourceRect.y / rawScaleY;
+  const { coordinateSpace, logicalContentRect, sourceRect, outputSize } = geometry;
+  const rawScaleX = logicalContentRect.width / coordinateSpace.width;
+  const rawScaleY = logicalContentRect.height / coordinateSpace.height;
+  const clientX = (sourceRect.x - logicalContentRect.x) / rawScaleX;
+  const clientY = (sourceRect.y - logicalContentRect.y) / rawScaleY;
   return {
     viewport: {
       ...coordinateSpace,
@@ -391,8 +413,12 @@ export function resolveRecordingPointTransform(
     scaleX: (rawScaleX * destination.width) / sourceRect.width / outputSize.width,
     scaleY: (rawScaleY * destination.height) / sourceRect.height / outputSize.height,
     offsetX:
-      (destination.x - (sourceRect.x * destination.width) / sourceRect.width) / outputSize.width,
+      (destination.x -
+        ((sourceRect.x - logicalContentRect.x) * destination.width) / sourceRect.width) /
+      outputSize.width,
     offsetY:
-      (destination.y - (sourceRect.y * destination.height) / sourceRect.height) / outputSize.height,
+      (destination.y -
+        ((sourceRect.y - logicalContentRect.y) * destination.height) / sourceRect.height) /
+      outputSize.height,
   };
 }

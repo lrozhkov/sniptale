@@ -93,11 +93,13 @@ function installSuccessfulWebCodecs(
   }
 
   class VideoFrameMock {
+    static instances: VideoFrameMock[] = [];
     close = vi.fn();
     duration: number | null;
     timestamp: number;
 
     constructor(source: VideoFrame, init: VideoFrameInit) {
+      VideoFrameMock.instances.push(this);
       this.duration = init.duration ?? null;
       this.timestamp = init.timestamp ?? source.timestamp;
     }
@@ -278,4 +280,22 @@ it('accepts source decoder descriptions and frames without explicit duration', a
   ).resolves.toBe(true);
 
   expect(closeFrameMock).toHaveBeenCalledOnce();
+});
+
+it('closes frames when waiting for encoder capacity rejects', async () => {
+  createFileMock.mockReturnValue(createMp4FileMock([createSample()]));
+  const sourceClose = vi.fn();
+  const { VideoFrameMock } = installSuccessfulWebCodecs(sourceClose);
+  waitForEncoderQueueCapacityMock.mockRejectedValue(new DOMException('aborted', 'AbortError'));
+  const encode = vi.fn();
+  await expect(
+    encodeCleanSourceMp4Span({
+      span: createSpan() as never,
+      throwIfPipelineFailed: vi.fn(),
+      videoEncoder: { encode } as never,
+    })
+  ).rejects.toThrow('aborted');
+  expect(sourceClose).toHaveBeenCalledOnce();
+  expect(VideoFrameMock.instances[0]?.close).toHaveBeenCalledOnce();
+  expect(encode).not.toHaveBeenCalled();
 });

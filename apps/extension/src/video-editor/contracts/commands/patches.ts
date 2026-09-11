@@ -62,6 +62,8 @@ export type VideoEditorTransitionTemplatePatch = Partial<
 >;
 
 export type VideoProjectEffectInstancePatch = {
+  duration?: number;
+  rangeMode?: 'owner' | 'interval';
   sceneAnchors?: VideoProjectEffectInstance['sceneAnchors'];
   controls?: Partial<VideoProjectEffectInstance['controls']>;
   enabled?: boolean;

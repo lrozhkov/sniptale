@@ -301,3 +301,39 @@ it('resolves every selection from immutable source dimensions without sequential
     width: 852,
   });
 });
+
+it('offers a selected timeline range independently of clip selection', async () => {
+  const onChange = vi.fn();
+  act(() =>
+    root!.render(
+      <ExportDialogSelectFields
+        capabilities={null}
+        onChange={onChange}
+        selectedClipAvailable={false}
+        selectedRangeAvailable
+        sourceDimensions={{ width: 1920, height: 1080 }}
+        settings={{
+          downloadAfterExport: true,
+          format: VideoExportFormat.MP4,
+          mp4VideoCodec: VideoMp4Codec.AVC,
+          resolution: VideoResolutionPreset.SOURCE,
+          fps: 30,
+          width: 1920,
+          height: 1080,
+          quality: VideoExportQualityPreset.MEDIUM,
+        }}
+      />
+    )
+  );
+  act(() =>
+    container!
+      .querySelector<HTMLButtonElement>('[aria-label="videoEditor.exportDialog.scopeLabel"]')!
+      .click()
+  );
+  const option = Array.from(
+    document.body.querySelectorAll<HTMLButtonElement>('[role="option"]')
+  ).find((button) => button.textContent === 'videoEditor.exportDialog.scopeSelectedRangeLabel');
+  expect(option).toBeDefined();
+  await act(async () => option!.click());
+  expect(onChange).toHaveBeenCalledWith({ scope: 'selected-range' });
+});

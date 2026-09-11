@@ -1,3 +1,4 @@
+import { usePreviewFrameRate } from '../frame-rate';
 import { useEffect, useLayoutEffect, useMemo, useRef, type MutableRefObject } from 'react';
 
 import {
@@ -145,13 +146,19 @@ function usePreviewRenderSchedulerRef(
   onRecovery: PreviewStageCanvasSceneParams['effectRuntimeFeedback']['onRecovery'],
   exactFrameCache: PreviewStageCanvasSceneParams['previewExactFrameCache']
 ): MutableRefObject<ReturnType<typeof createPreviewSceneRenderScheduler>> {
+  const frameRate = usePreviewFrameRate();
+  const frameRateRef = useRef(frameRate);
+  frameRateRef.current = frameRate;
   const feedbackRef = useRef({ onFailure, onRecovery });
   feedbackRef.current = { onFailure, onRecovery };
   const schedulerRef = useRef<ReturnType<typeof createPreviewSceneRenderScheduler> | null>(null);
   if (!schedulerRef.current) {
     schedulerRef.current = createPreviewSceneRenderScheduler({
       onError: (error) => feedbackRef.current.onFailure('visual', error),
-      onSuccess: () => feedbackRef.current.onRecovery('visual'),
+      onSuccess: (job) => {
+        feedbackRef.current.onRecovery('visual');
+        if (job.isPlaybackFrame && job.previewMode !== 'cache') frameRateRef.current?.record();
+      },
       render: (job) => {
         if (!exactFrameCache) return renderPreviewScene(job);
         return renderPreviewSceneWithExactCache({

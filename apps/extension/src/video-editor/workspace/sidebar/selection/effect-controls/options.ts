@@ -43,12 +43,8 @@ export function getActionPresetOptions() {
       label: translate('videoEditor.sidebar.actionPresetSpotlight'),
     },
     {
-      value: VideoProjectActionPreset.DWELL_ZOOM,
-      label: translate('videoEditor.sidebar.actionPresetDwellZoom'),
-    },
-    {
-      value: VideoProjectActionPreset.SCROLL_EMPHASIS,
-      label: translate('videoEditor.sidebar.actionPresetScrollEmphasis'),
+      value: VideoProjectActionPreset.CLICK_PRESS,
+      label: translate('videoEditor.sidebar.actionPresetPress'),
     },
   ];
   return options;

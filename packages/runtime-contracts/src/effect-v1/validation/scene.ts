@@ -1,3 +1,4 @@
+import { validateControlPresentation } from './control-presentation.js';
 // policyStateIds: [] - scene, clip, and control fields are immutable validation policy.
 import {
   type EffectV1DiagnosticReporter,
@@ -19,7 +20,19 @@ const CLIP_KEYS = new Set([
   'sceneId',
   'start',
 ]);
-const CONTROL_KEYS = new Set(['defaultValue', 'id', 'kind', 'label', 'max', 'min', 'step']);
+const CONTROL_KEYS = new Set([
+  'defaultValue',
+  'localizedDefaultValue',
+  'id',
+  'kind',
+  'label',
+  'max',
+  'min',
+  'step',
+  'group',
+  'order',
+  'options',
+]);
 
 export function validateEffectV1Scenes(
   value: unknown,
@@ -153,6 +166,7 @@ export function validateEffectV1Controls(
       validateLocaleText(control['label'], `${path}.label`, false, report);
     }
     validateControlValue(control, path, report);
+    validateControlPresentation(control, path, report);
   });
   return ids;
 }

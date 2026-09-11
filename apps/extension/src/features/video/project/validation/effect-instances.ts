@@ -167,8 +167,14 @@ function isEffectInstance(value: unknown): value is VideoProjectEffectInstance {
     value['id'].length > 0 &&
     value['id'].length <= 128 &&
     typeof value['snapshotId'] === 'string' &&
+    (value['catalogPackId'] === undefined ||
+      (typeof value['catalogPackId'] === 'string' &&
+        /^(builtin:)?[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(value['catalogPackId']))) &&
     isKind(value['kind']) &&
     typeof value['enabled'] === 'boolean' &&
+    (value['rangeMode'] === undefined ||
+      (value['kind'] === 'targetEffect' &&
+        (value['rangeMode'] === 'owner' || value['rangeMode'] === 'interval'))) &&
     isNonNegativeFinite(value['startTime']) &&
     isPositiveFinite(value['duration']) &&
     isPositiveFinite(value['playbackRate']) &&
@@ -183,6 +189,8 @@ function isEffectTarget(value: unknown): boolean {
   return (
     isRecord(value) &&
     (value['kind'] === 'scene' ||
+      value['kind'] === 'video-group' ||
+      (value['kind'] === 'track' && typeof value['trackId'] === 'string') ||
       (value['kind'] === 'clip' && typeof value['clipId'] === 'string') ||
       (value['kind'] === 'transition' && typeof value['transitionId'] === 'string'))
   );

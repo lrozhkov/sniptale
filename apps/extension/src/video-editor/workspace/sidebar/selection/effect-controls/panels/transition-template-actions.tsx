@@ -1,5 +1,5 @@
 import { translate } from '../../../../../../platform/i18n';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorActionButton } from '../../shared/actions';
 import {
   getCompatibleVideoTransitionTemplateKinds,
   getVideoTransitionTemplateDefinition,
@@ -102,9 +102,9 @@ function QuickActionGroup(props: { actions: TransitionQuickAction[]; label: stri
       <p className={PANEL_META_CLASS_NAME}>{props.label}</p>
       <div className="flex flex-wrap gap-2">
         {props.actions.map((action) => (
-          <ProductActionButton key={action.key} compact tone="secondary" onClick={action.onClick}>
+          <InspectorActionButton key={action.key} compact tone="secondary" onClick={action.onClick}>
             {action.label}
-          </ProductActionButton>
+          </InspectorActionButton>
         ))}
       </div>
     </div>

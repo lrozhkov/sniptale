@@ -126,6 +126,8 @@ export function createTelemetryListeners(state: TelemetryState): TelemetryListen
       recordTypingActivity(state, event);
     },
     click: (event) => {
+      // Keyboard/accessibility activation has no pointer click count or pointer coordinates.
+      if (event.detail === 0) return;
       finalizeTelemetrySignals(state);
       recordCursorSample(state, event as PointerEvent, { force: true });
       recordActionEvent(state, event);

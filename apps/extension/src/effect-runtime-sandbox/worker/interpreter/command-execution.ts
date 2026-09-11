@@ -3,21 +3,18 @@ import type { EffectV1Command } from '@sniptale/runtime-contracts/effect-v1';
 import { getLogicalCanvasSize } from '../canvas/logical-canvas.js';
 import { drawImage, drawPath, drawShape, drawText } from './drawing.js';
 import { n, resolveCommandLayer, type RenderState, v, valueOr } from './model.js';
-import { resolveFilter, resolvePaint, withCommandStyle, withSavedState } from './painting.js';
+import { resolveFilter, resolvePaint, withCommandStyle } from './painting.js';
 import { drawSampledPath } from './sampled-path.js';
 import { createSvgPartTransform } from './svg-part-transform.js';
 import { executeCommandLoop } from './command-loops.js';
 
 type Command<Op extends EffectV1Command['op']> = Extract<EffectV1Command, { op: Op }>;
 
-export async function executeEffectV1Commands(
-  commands: EffectV1Command[],
-  state: RenderState
-): Promise<void> {
-  for (const command of commands) await executeCommand(command, state);
+export function executeEffectV1Commands(commands: EffectV1Command[], state: RenderState): void {
+  for (const command of commands) executeCommand(command, state);
 }
 
-async function executeCommand(command: EffectV1Command, state: RenderState): Promise<void> {
+function executeCommand(command: EffectV1Command, state: RenderState): void {
   const layer = resolveCommandLayer(command, state);
   if (layer?.active === false) return;
   switch (command.op) {
@@ -87,25 +84,25 @@ function executeFillRect(
   });
 }
 
-async function executeGroup(
+function executeGroup(
   command: Command<'group'>,
   layer: ReturnType<typeof resolveCommandLayer>,
   state: RenderState
-): Promise<void> {
-  await withSavedState(command, layer, state, async () => {
+): void {
+  withCommandStyle(command, layer, state, () => {
     state.context.translate(n(command.x, state), n(command.y, state));
     state.context.rotate(n(command.rotation, state));
     state.context.scale(valueOr(command.scaleX, 1, state), valueOr(command.scaleY, 1, state));
-    await executeEffectV1Commands(command.commands, state);
+    executeEffectV1Commands(command.commands, state);
   });
 }
 
-async function executeClip(
+function executeClip(
   command: Command<'clip'>,
   layer: ReturnType<typeof resolveCommandLayer>,
   state: RenderState
-): Promise<void> {
-  await withSavedState({}, layer, state, async () => {
+): void {
+  withCommandStyle({}, layer, state, () => {
     state.context.beginPath();
     state.context.rect(
       n(command.x, state),
@@ -114,15 +111,15 @@ async function executeClip(
       n(command.height, state)
     );
     state.context.clip();
-    await executeEffectV1Commands(command.commands, state);
+    executeEffectV1Commands(command.commands, state);
   });
 }
 
-async function executeWhen(command: Command<'when'>, state: RenderState): Promise<void> {
-  if (v(command.condition, state)) await executeEffectV1Commands(command.commands, state);
+function executeWhen(command: Command<'when'>, state: RenderState): void {
+  if (v(command.condition, state)) executeEffectV1Commands(command.commands, state);
 }
 
-async function executeLet(command: Command<'let'>, state: RenderState): Promise<void> {
+function executeLet(command: Command<'let'>, state: RenderState): void {
   const previous = state.scope.vars;
   const next = { ...previous };
   state.scope.vars = next;
@@ -130,16 +127,13 @@ async function executeLet(command: Command<'let'>, state: RenderState): Promise<
     for (const [name, expression] of Object.entries(command.bindings)) {
       next[name] = v(expression, state);
     }
-    await executeEffectV1Commands(command.commands, state);
+    executeEffectV1Commands(command.commands, state);
   } finally {
     state.scope.vars = previous;
   }
 }
 
-async function executeRenderPass(
-  command: Command<'renderPass'>,
-  state: RenderState
-): Promise<void> {
+function executeRenderPass(command: Command<'renderPass'>, state: RenderState): void {
   const width = valueOr(command.width, state.scope.context.width, state);
   const height = valueOr(command.height, state.scope.context.height, state);
   const canvas = state.scope.context.createCanvas(width, height);
@@ -147,7 +141,7 @@ async function executeRenderPass(
   if (!context) throw new Error('CANVAS_CONTEXT_UNAVAILABLE');
   const passState = { ...state, canvas, context };
   context.clearRect(0, 0, width, height);
-  await executeEffectV1Commands(command.commands, passState);
+  executeEffectV1Commands(command.commands, passState);
   state.passes.set(command.id, canvas);
 }
 

@@ -95,6 +95,7 @@ export const settingsTransferMessages = defineMessageSource({
     stylesToolPresets: message('Пресеты инструментов', 'Tool presets'),
     stylesPalettes: message('Палитры', 'Palettes'),
     stylesSurfaces: message('Стили поверхности', 'Surface styles'),
+    stylesVideoEffects: message('Эффекты видеоредактора', 'Video editor effects'),
     stylesGradients: message('Градиенты', 'Gradients'),
     aiProviders: message('AI-провайдеры', 'AI providers'),
     aiModels: message('AI-модели', 'AI models'),
@@ -106,6 +107,7 @@ export const settingsTransferMessages = defineMessageSource({
     accessCaptureAssets: message('Ресурсы снимков', 'Capture assets'),
   },
   fields: {
+    preferences: message('Пользовательские пресеты и предпочтения', 'User presets and preferences'),
     theme: message('Тема', 'Theme'),
     locale: message('Язык', 'Language'),
     popupStartup: message('Стартовая страница popup', 'Popup start page'),

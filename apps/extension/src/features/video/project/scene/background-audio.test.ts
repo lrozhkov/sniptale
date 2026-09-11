@@ -101,13 +101,13 @@ function createProject(
 }
 
 it('resolves a deterministic background audio envelope from explicit transient peaks', () => {
-  expect(resolveSceneBackgroundAudioEnvelope(createProject(), 2)).toBeCloseTo(0.49, 1);
+  expect(resolveSceneBackgroundAudioEnvelope(createProject(), 2)).toBeCloseTo(0.375, 3);
 });
 
-it('ignores monotone music beds without pronounced transient peaks', () => {
+it('reacts to sustained music beds without requiring isolated transient peaks', () => {
   const asset = createAudioAsset({ audioPeaks: [0.62, 0.62, 0.62, 0.62, 0.62] });
 
-  expect(resolveSceneBackgroundAudioEnvelope(createProject({ asset }), 2)).toBe(0);
+  expect(resolveSceneBackgroundAudioEnvelope(createProject({ asset }), 2)).toBeGreaterThan(0.25);
 });
 
 it('returns zero for inactive clips and assets without usable peak data', () => {
@@ -134,4 +134,19 @@ it('returns zero when no audible peak data is active', () => {
 
 it('returns zero for partial harness projects without clips', () => {
   expect(resolveSceneBackgroundAudioEnvelope({ assets: [] } as never, 2)).toBe(0);
+});
+
+it('includes a third music track regardless of order and respects its mute', () => {
+  const project = createProject();
+  const music = createAudioClip({ id: 'music', trackId: 'music-track', volume: 1 });
+  project.clips = [createAudioClip({ muted: true }), music];
+  project.tracks.push({ ...project.tracks[0]!, id: 'music-track', order: 3 });
+  project.assets[0]!.metadata.audioPeaks = [0.4, 0.4, 0.4, 0.4];
+  const value = resolveSceneBackgroundAudioEnvelope(project, 2);
+  expect(value).toBeGreaterThan(0);
+  project.tracks.reverse();
+  project.clips.reverse();
+  expect(resolveSceneBackgroundAudioEnvelope(project, 2)).toBe(value);
+  project.tracks.find((track) => track.id === 'music-track')!.visible = false;
+  expect(resolveSceneBackgroundAudioEnvelope(project, 2)).toBe(0);
 });

@@ -1,14 +1,16 @@
 import type { ProjectTimelineProps } from '../../timeline/project/types';
 import type { VideoEditorTimelineController } from '../../runtime/controller/contracts/timeline';
 import type { VideoEditorEffectDocumentDragPayload } from '../../contracts/effect-document-drag';
-import type { VideoProjectEffectTarget } from '../../../features/video/project/effect-instance/types';
+import type { VideoEditorEffectApplicationTarget } from '../../contracts/effect-document-drag';
 
 export function getProjectTimelineProps(
   controller: VideoEditorTimelineController,
   onDropEffectDocument: (
     payload: VideoEditorEffectDocumentDragPayload,
-    target: VideoProjectEffectTarget,
-    startTime: number
+    target: VideoEditorEffectApplicationTarget,
+    startTime: number,
+    trackId?: string,
+    timelineLaneId?: string | null
   ) => void
 ): ProjectTimelineProps {
   return {
@@ -28,6 +30,7 @@ function getProjectTimelineStateProps(
   | 'canSplitSelectedClip'
   | 'currentTime'
   | 'isPlaying'
+  | 'isPreparingPlayback'
   | 'magnetEnabled'
   | 'pixelsPerSecond'
   | 'playbackRange'
@@ -44,6 +47,7 @@ function getProjectTimelineStateProps(
     canSplitSelectedClip: controller.state.canSplitSelectedClip,
     currentTime: controller.state.currentTime,
     isPlaying: controller.state.isPlaying,
+    isPreparingPlayback: controller.state.isPreparingPlayback,
     magnetEnabled: controller.state.magnetEnabled,
     pixelsPerSecond: controller.state.pixelsPerSecond,
     playbackRange: controller.state.playbackRange,

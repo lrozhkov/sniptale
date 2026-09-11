@@ -37,6 +37,7 @@ export const VideoSceneGradientAnimationMode = {
   NONE: 'none',
   ROTATE: 'rotate',
   BREATHE: 'breathe',
+  DRIFT: 'drift',
   AUDIO_REACTIVE: 'audioReactive',
 } as const;
 
@@ -126,6 +127,7 @@ export interface VideoProjectShapeStyle {
 }
 
 export interface VideoProjectTrack {
+  effectsBypassed?: boolean;
   id: string;
   name: string;
   order: number;

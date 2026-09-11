@@ -1,3 +1,4 @@
+import { returnEffectRuntimeRetryInputs } from '../../contracts/effect-runtime/retry-inputs';
 import { closeEffectRuntimeBitmaps } from '../../contracts/effect-runtime/bitmap-lifetime';
 import {
   createEffectRuntimeFailure,
@@ -77,8 +78,10 @@ async function executeSessionRequest(
   try {
     const parsed = await parseEffectRuntimeRenderRequest(value, documentCache, assetSelectionCache);
     if (!parsed.ok) {
+      if (parsed.failure.code === 'cacheMiss')
+        return returnEffectRuntimeRetryInputs(value, parsed.failure.missingRef);
       closeEffectRuntimeBitmaps(value);
-      if (parsed.failure.code !== 'cacheMiss') recordFailure(state);
+      recordFailure(state);
       return parsed.failure;
     }
     request = parsed.request;

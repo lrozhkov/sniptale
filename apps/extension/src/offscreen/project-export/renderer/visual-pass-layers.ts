@@ -10,7 +10,9 @@ export function resolveOrderedVisualPassLayers(
   for (const segmentLayer of layers) {
     const layer = passLayers.find((candidate) => candidate.clipId === segmentLayer.clipId);
     if (layer) {
-      resolvedLayers.push(layer);
+      resolvedLayers.push(
+        segmentLayer.effectActionsOnly ? { ...layer, effectActionsOnly: true } : layer
+      );
     }
   }
   return resolvedLayers;

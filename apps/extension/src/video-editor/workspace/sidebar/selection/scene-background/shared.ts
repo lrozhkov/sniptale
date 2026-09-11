@@ -8,6 +8,7 @@ type RememberRecentColor = WorkspaceSidebarSelectionPanelProps['onRememberRecent
 type SetSceneBackground = WorkspaceSidebarSelectionPanelProps['onSetSceneBackground'];
 
 export interface SceneBackgroundFieldProps {
+  onImportImage?: WorkspaceSidebarSelectionPanelProps['onImportImage'];
   imageAssets: WorkspaceSidebarSelectionPanelProps['project']['assets'];
   onPreviewSceneBackground: PreviewSceneBackground;
   onRememberRecentColor: RememberRecentColor;

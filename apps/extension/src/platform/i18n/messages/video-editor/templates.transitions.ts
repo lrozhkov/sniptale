@@ -58,7 +58,7 @@ export const videoEditorTemplateTransitionMessages = defineMessageSource({
     en: 'Best for panel and screen-to-screen transitions.',
   },
   transitionDescriptionZoomDissolve: {
-    ru: 'Зум-растворение для мягкого сближения между сценами.',
+    ru: 'Приближение с растворением для мягкого сближения между сценами.',
     en: 'Zoom dissolve for a softer move between scenes.',
   },
   transitionUseCaseZoomDissolve: {

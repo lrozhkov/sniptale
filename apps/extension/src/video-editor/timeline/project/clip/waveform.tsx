@@ -17,7 +17,6 @@ function EmptyAudioClipWaveform({
     'bg-[color:color-mix(in_srgb,var(--sniptale-color-text-primary)_20%,transparent)]';
   const activeLineClassName = [
     'bg-[color:color-mix(in_srgb,var(--sniptale-color-text-primary)_42%,transparent)]',
-    'shadow-[0_0_14px_color-mix(in_srgb,var(--sniptale-color-text-primary)_18%,transparent)]',
   ].join(' ');
 
   return (
@@ -38,7 +37,8 @@ function EmptyAudioClipWaveform({
           d={buildEnvelopePath(envelopeStart, envelopeEnd)}
           fill="none"
           stroke="color-mix(in_srgb,var(--sniptale-color-accent)_72%,white)"
-          strokeWidth="2"
+          vectorEffect="non-scaling-stroke"
+          strokeWidth="1"
           strokeLinecap="round"
           opacity={muted ? 0.28 : 0.64}
         />
@@ -59,6 +59,14 @@ function WaveformShape({ muted, path }: { muted: boolean; path: string }) {
       className={waveformClassName}
       aria-hidden="true"
     >
+      <path
+        d="M 0 50 H 100"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="0.5"
+        vectorEffect="non-scaling-stroke"
+        opacity="0.35"
+      />
       <path d={path} fill="currentColor" />
     </svg>
   );
@@ -75,7 +83,8 @@ function EnvelopeOverlay({ envelopePath, muted }: { envelopePath: string; muted:
         d={envelopePath}
         fill="none"
         stroke="color-mix(in_srgb,var(--sniptale-color-accent)_78%,white)"
-        strokeWidth="2.4"
+        vectorEffect="non-scaling-stroke"
+        strokeWidth="1"
         strokeLinecap="round"
         opacity={muted ? 0.3 : 0.82}
       />

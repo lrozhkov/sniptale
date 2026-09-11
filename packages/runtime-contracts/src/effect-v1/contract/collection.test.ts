@@ -4,7 +4,7 @@ import { expect, it } from 'vitest';
 import lock from '../fixtures/collection/source-lock.json';
 import { parseEffectV1Source, normalizeEffectV1ToTemplate } from '../index';
 it('admits the supplied collection with its complete layout metadata and locked source bytes', () => {
-  expect(lock.files).toHaveLength(29);
+  expect(lock.files).toHaveLength(21);
   const schema = readFileSync(
     new URL('../fixtures/sniptale-effect-v1.schema.json', import.meta.url)
   );
@@ -22,5 +22,27 @@ it('admits the supplied collection with its complete layout metadata and locked 
     );
     if (document.objectLayout) layouts++;
   }
-  expect(layouts).toBe(12);
+  expect(layouts).toBe(6);
+});
+
+it('matches every accepted and rejected SDK workflow case', async () => {
+  const { default: manifest } = await import('../fixtures/collection/workflow-manifest.json');
+  const bytes = readFileSync(
+    new URL('../fixtures/collection/workflow-manifest.json', import.meta.url)
+  );
+  expect(createHash('sha256').update(bytes).digest('hex')).toBe(lock.workflowManifestSha256);
+  for (const entry of manifest.entries) {
+    const source = readFileSync(
+      new URL(`../fixtures/collection/${entry.artifact}`, import.meta.url)
+    );
+    expect(createHash('sha256').update(source).digest('hex')).toBe(entry.sha256);
+    const result = parseEffectV1Source(source.toString('utf8'));
+    expect(Boolean(result.document), entry.artifact).toBe(entry.accepted);
+    for (const code of entry.diagnostics) {
+      expect(
+        result.diagnostics.map((item) => item.code),
+        entry.artifact
+      ).toContain(code);
+    }
+  }
 });

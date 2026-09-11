@@ -317,3 +317,31 @@ it.each([VideoResolutionPreset.SOURCE, VideoResolutionPreset.P720])(
     }
   }
 );
+
+it('excludes the Chromium even-grid bottom padding before TAB encoding', () => {
+  const geometry = resolveTabOutputGeometry(
+    { x: 0, y: 0, width: 2560, height: 1305 },
+    { width: 2560, height: 1306 },
+    { width: 2560, height: 1305, devicePixelRatio: 1 },
+    { frameRateCap: 30, resolution: VideoResolutionPreset.SOURCE, tracksFullViewport: true }
+  );
+  expect(geometry.sourceRect).toEqual({ x: 0, y: 0, width: 2560, height: 1304 });
+  expect(geometry.outputSize).toEqual({ width: 2560, height: 1304 });
+  const points = resolveRecordingPointTransform(geometry, { x: 0, y: 0, ...geometry.outputSize });
+  expect(points.scaleY * 1305 + points.offsetY).toBeCloseTo(1);
+});
+
+it.each([
+  { width: 2560, height: 1304, dpr: 1, rawWidth: 2560, rawHeight: 1304, expectedHeight: 1304 },
+  { width: 2048, height: 1044, dpr: 1.25, rawWidth: 2560, rawHeight: 1306, expectedHeight: 1304 },
+  { width: 2559, height: 1305, dpr: 1, rawWidth: 2560, rawHeight: 1306, expectedHeight: 1306 },
+])('preserves the negotiated TAB content grid: $width x $height at $dpr', (c) => {
+  const geometry = resolveTabOutputGeometry(
+    { x: 0, y: 0, width: c.width, height: c.height },
+    { width: c.rawWidth, height: c.rawHeight },
+    { width: c.width, height: c.height, devicePixelRatio: c.dpr },
+    { frameRateCap: 30, resolution: VideoResolutionPreset.SOURCE, tracksFullViewport: true }
+  );
+  expect(geometry.sourceRect).toEqual({ x: 0, y: 0, width: c.rawWidth, height: c.expectedHeight });
+  expect(revalidateTabOutputGeometry(geometry, geometry.sourceSize)).toBe(true);
+});

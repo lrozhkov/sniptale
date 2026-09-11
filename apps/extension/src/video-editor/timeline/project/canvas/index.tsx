@@ -36,6 +36,7 @@ import { getTimelineUtilityRowPresence } from '../effect-lanes/segments';
 interface ProjectTimelineCanvasProps {
   hiddenClipNamesByTrackId?: Readonly<Record<string, boolean>> | undefined;
   currentTime: number;
+  isPlaying?: boolean | undefined;
   consumeCompletedScrubClick: () => boolean;
   dragGhost: TimelineClipDragGhost | null;
   playbackRange: VideoEditorPlaybackRange | null;
@@ -262,6 +263,7 @@ function ProjectTimelineCanvasContent(
           playheadHandle={
             props.playheadX === null ? null : (
               <ProjectTimelinePlayheadHandle
+                isPlaying={props.isPlaying}
                 currentTime={props.currentTime}
                 duration={props.project.duration}
                 left={props.playheadX}
@@ -292,7 +294,11 @@ function ProjectTimelineCanvasContent(
           }
         />
         {props.playheadX === null ? null : (
-          <ProjectTimelinePlayheadLine height={props.playheadHeight} left={props.playheadX} />
+          <ProjectTimelinePlayheadLine
+            isPlaying={props.isPlaying}
+            height={props.playheadHeight}
+            left={props.playheadX}
+          />
         )}
         {props.telemetryLaneVisible ? (
           <ProjectTimelineTelemetryLane

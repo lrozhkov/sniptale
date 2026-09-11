@@ -141,3 +141,30 @@ it.each([30, 60, 240])(
     }
   }
 );
+
+it('keeps a cached video hidden until the requested seek finishes', async () => {
+  const source = {
+    codec: 'avc1.640033',
+    endTime: 6,
+    mimeType: 'video/mp4',
+    segments: [new BufferBackedBlob(new Uint8Array([1]))],
+    startTime: 0,
+  };
+  await act(async () =>
+    root.render(<PreviewStageCachedVideo currentTime={3} isPlaying={false} source={source} />)
+  );
+  const video = container.querySelector('video')!;
+  expect(video.style.visibility).toBe('hidden');
+  Object.defineProperty(video, 'readyState', { configurable: true, value: 2 });
+  await act(async () => video.dispatchEvent(new Event('loadedmetadata')));
+  expect(video.currentTime).toBe(3);
+  await act(async () => video.dispatchEvent(new Event('seeked')));
+  expect(video.style.visibility).toBe('visible');
+  await act(async () =>
+    root.render(<PreviewStageCachedVideo currentTime={1} isPlaying={false} source={source} />)
+  );
+  expect(video.style.visibility).toBe('hidden');
+  await act(async () => video.dispatchEvent(new Event('seeked')));
+  expect(video.style.visibility).toBe('visible');
+  expect(URL.createObjectURL).toHaveBeenCalledOnce();
+});

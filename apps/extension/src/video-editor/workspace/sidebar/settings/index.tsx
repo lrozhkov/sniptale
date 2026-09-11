@@ -10,10 +10,7 @@ export function GridSettingsPanel(props: {
   onRememberRecentColor: SceneBackgroundFieldProps['onRememberRecentColor'];
 }) {
   return (
-    <div
-      className="mt-4 border-t border-[color:var(--sniptale-color-border-soft)] pt-3"
-      data-ui="video-editor.scene.grid-settings"
-    >
+    <div className="space-y-3" data-ui="video-editor.scene.grid-settings">
       <div className="grid gap-3">
         <ToggleField
           checked={props.grid.enabled}

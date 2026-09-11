@@ -1,3 +1,4 @@
+import type { VideoCompositionCameraState } from '../../../features/video/composition/types';
 import {
   getVideoClipSourceTime,
   isClipActiveAtTime,
@@ -14,7 +15,11 @@ const MEDIA_READY_FOR_CURRENT_FRAME = 2;
 export interface VideoPreviewFrameMaterializer {
   readonly canvas: HTMLCanvasElement;
   dispose(): void;
-  renderFrame(time: number, signal: AbortSignal): Promise<HTMLCanvasElement>;
+  renderFrame(
+    time: number,
+    signal: AbortSignal,
+    cameraOverride?: VideoCompositionCameraState
+  ): Promise<HTMLCanvasElement>;
 }
 
 interface VideoPreviewMaterializerState {
@@ -178,8 +183,8 @@ export function createVideoPreviewFrameMaterializer(params: {
   return {
     canvas,
     dispose: () => disposeMaterializer(state, stage),
-    renderFrame: (time, signal) =>
-      renderMaterializedFrame(params, state, canvas, stage, time, signal),
+    renderFrame: (time, signal, cameraOverride) =>
+      renderMaterializedFrame(params, state, canvas, stage, time, signal, cameraOverride),
   };
 }
 
@@ -235,12 +240,14 @@ async function renderMaterializedFrame(
   canvas: HTMLCanvasElement,
   stage: HTMLDivElement,
   time: number,
-  signal: AbortSignal
+  signal: AbortSignal,
+  cameraOverride?: VideoCompositionCameraState
 ): Promise<HTMLCanvasElement> {
   throwIfAborted(signal);
   await Promise.all(Object.values(state.imageBank).map((image) => waitForImage(image, signal)));
   await prepareMaterializedVideos(params.project, state.videoRefs, time, signal);
   await renderPreviewScene({
+    ...(cameraOverride ? { cameraOverride } : {}),
     canvas,
     currentTime: time,
     effectRuntimeExecutor: () => {

@@ -1,3 +1,11 @@
+export type EffectControlPreset = {
+  id: string;
+  label: LocaleText & { en: string };
+  theme: { id: string; label: LocaleText & { en: string } };
+  style: { id: string; label: LocaleText & { en: string } };
+  values: Record<string, number | string>;
+};
+
 export type LocaleText = {
   en?: string;
   ru?: string;
@@ -6,22 +14,31 @@ export type LocaleText = {
 
 export type EffectArtifactType = 'animation' | 'transition';
 
-export type ControlDefinition =
-  | {
-      defaultValue: string;
-      id: string;
-      kind: 'color' | 'text';
-      label?: LocaleText;
-    }
-  | {
-      defaultValue: number;
-      id: string;
-      kind: 'number';
-      label?: LocaleText;
-      max?: number;
-      min?: number;
-      step?: number;
-    };
+export type EffectControlPresentation = {
+  localizedDefaultValue?: LocaleText;
+  group?: string;
+  order?: number;
+  options?: { value: number | string; label: LocaleText }[];
+};
+
+export type ControlDefinition = EffectControlPresentation &
+  (
+    | {
+        defaultValue: string;
+        id: string;
+        kind: 'color' | 'text';
+        label?: LocaleText;
+      }
+    | {
+        defaultValue: number;
+        id: string;
+        kind: 'number';
+        label?: LocaleText;
+        max?: number;
+        min?: number;
+        step?: number;
+      }
+  );
 
 export type TimelinePhase = {
   duration: number;
@@ -151,6 +168,8 @@ export type EffectDefinition = {
   category?: string;
   clips: EffectClip[];
   controls?: ControlDefinition[];
+  controlPresets?: EffectControlPreset[];
+  defaultControlPresetId?: string | undefined;
   description?: LocaleText;
   duration: number;
   /** Canonical EffectV1 document retained by editor/runtime adapters. */

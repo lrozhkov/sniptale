@@ -1,0 +1,723 @@
+{
+  "schemaVersion": "sniptale.effect.v1",
+  "id": "sniptale-lower-third",
+  "kind": "standalone",
+  "duration": 4,
+  "label": {
+    "ru": "Имя и роль",
+    "en": "Name and role"
+  },
+  "description": {
+    "ru": "Компактный титр с независимыми размерами имени и роли.",
+    "en": "A compact lower third with independent name and role sizes."
+  },
+  "assets": [],
+  "controls": [
+    {
+      "id": "accent",
+      "kind": "color",
+      "label": {
+        "ru": "Акцент",
+        "en": "Accent"
+      },
+      "defaultValue": "#fb923c",
+      "group": "appearance",
+      "order": 0
+    },
+    {
+      "id": "surface",
+      "kind": "color",
+      "label": {
+        "ru": "Подложка",
+        "en": "Surface"
+      },
+      "defaultValue": "#171a20",
+      "group": "appearance",
+      "order": 1
+    },
+    {
+      "id": "ink",
+      "kind": "color",
+      "label": {
+        "ru": "Основной текст",
+        "en": "Primary text"
+      },
+      "defaultValue": "#fafafa",
+      "group": "appearance",
+      "order": 2
+    },
+    {
+      "id": "entry",
+      "kind": "number",
+      "label": {
+        "ru": "Вход (% длительности)",
+        "en": "Entrance (% duration)"
+      },
+      "defaultValue": 18,
+      "min": 5,
+      "max": 40,
+      "step": 1,
+      "group": "animation",
+      "order": 3
+    },
+    {
+      "id": "font",
+      "kind": "number",
+      "label": {
+        "ru": "Размер заголовка",
+        "en": "Heading size"
+      },
+      "defaultValue": 34,
+      "min": 26,
+      "max": 40,
+      "step": 1,
+      "group": "typography",
+      "order": 4
+    },
+    {
+      "id": "bodyFont",
+      "kind": "number",
+      "label": {
+        "ru": "Размер подписи",
+        "en": "Detail size"
+      },
+      "defaultValue": 20,
+      "min": 17,
+      "max": 24,
+      "step": 1,
+      "group": "typography",
+      "order": 5
+    },
+    {
+      "id": "title",
+      "kind": "text",
+      "label": {
+        "ru": "Имя · строка 1",
+        "en": "Name · line 1"
+      },
+      "defaultValue": "Анна Смирнова",
+      "group": "content",
+      "order": 6,
+      "localizedDefaultValue": {
+        "ru": "Анна Смирнова",
+        "en": "Anna Smirnova"
+      }
+    },
+    {
+      "id": "name2",
+      "kind": "text",
+      "label": {
+        "ru": "Имя · дополнительная строка",
+        "en": "Name · optional second line"
+      },
+      "defaultValue": "",
+      "group": "content",
+      "order": 7
+    },
+    {
+      "id": "subtitle",
+      "kind": "text",
+      "label": {
+        "ru": "Роль",
+        "en": "Role"
+      },
+      "defaultValue": "Дизайнер продукта",
+      "group": "content",
+      "order": 8,
+      "localizedDefaultValue": {
+        "ru": "Дизайнер продукта",
+        "en": "Product designer"
+      }
+    }
+  ],
+  "layers": [],
+  "clips": [],
+  "scenes": [
+    {
+      "id": "main",
+      "start": 0,
+      "duration": 4
+    }
+  ],
+  "timeline": {
+    "phases": [],
+    "tracks": []
+  },
+  "program": {
+    "kind": "graph",
+    "version": 1,
+    "definitions": {
+      "entry": {
+        "op": "max",
+        "args": [
+          0.0001,
+          {
+            "op": "div",
+            "args": [
+              {
+                "op": "read",
+                "path": "controls.entry"
+              },
+              100
+            ]
+          }
+        ]
+      },
+      "exit": {
+        "op": "out",
+        "args": [
+          {
+            "op": "clamp",
+            "args": [
+              {
+                "op": "div",
+                "args": [
+                  {
+                    "op": "sub",
+                    "args": [
+                      1,
+                      {
+                        "op": "read",
+                        "path": "progress"
+                      }
+                    ]
+                  },
+                  0.1
+                ]
+              },
+              0,
+              1
+            ]
+          }
+        ]
+      }
+    },
+    "commands": [
+      {
+        "op": "clear"
+      },
+      {
+        "op": "group",
+        "alpha": {
+          "op": "mul",
+          "args": [
+            {
+              "op": "read",
+              "path": "defs.exit"
+            },
+            {
+              "op": "out",
+              "args": [
+                {
+                  "op": "clamp",
+                  "args": [
+                    {
+                      "op": "div",
+                      "args": [
+                        {
+                          "op": "sub",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "progress"
+                            },
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "defs.entry"
+                                },
+                                0
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "defs.entry"
+                            },
+                            1
+                          ]
+                        }
+                      ]
+                    },
+                    0,
+                    1
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "commands": [
+          {
+            "op": "fillRect",
+            "x": 0,
+            "y": 0,
+            "width": {
+              "op": "read",
+              "path": "width"
+            },
+            "height": {
+              "op": "read",
+              "path": "height"
+            },
+            "fill": {
+              "op": "read",
+              "path": "controls.surface"
+            }
+          },
+          {
+            "op": "fillRect",
+            "x": 0,
+            "y": 0,
+            "width": 4,
+            "height": {
+              "op": "read",
+              "path": "height"
+            },
+            "fill": {
+              "op": "read",
+              "path": "controls.accent"
+            }
+          }
+        ]
+      },
+      {
+        "op": "group",
+        "alpha": {
+          "op": "mul",
+          "args": [
+            {
+              "op": "read",
+              "path": "defs.exit"
+            },
+            {
+              "op": "out",
+              "args": [
+                {
+                  "op": "clamp",
+                  "args": [
+                    {
+                      "op": "div",
+                      "args": [
+                        {
+                          "op": "sub",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "progress"
+                            },
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "defs.entry"
+                                },
+                                0.15
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "defs.entry"
+                            },
+                            0.85
+                          ]
+                        }
+                      ]
+                    },
+                    0,
+                    1
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "commands": [
+          {
+            "op": "text",
+            "text": {
+              "op": "read",
+              "path": "controls.title"
+            },
+            "x": 24,
+            "y": {
+              "op": "select",
+              "value": {
+                "op": "not",
+                "args": [
+                  {
+                    "op": "eq",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.name2"
+                      },
+                      ""
+                    ]
+                  }
+                ]
+              },
+              "values": [32, 51]
+            },
+            "fontSize": {
+              "op": "select",
+              "value": {
+                "op": "not",
+                "args": [
+                  {
+                    "op": "eq",
+                    "args": [
+                      {
+                        "op": "read",
+                        "path": "controls.name2"
+                      },
+                      ""
+                    ]
+                  }
+                ]
+              },
+              "values": [
+                {
+                  "op": "min",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "controls.font"
+                    },
+                    32
+                  ]
+                },
+                {
+                  "op": "read",
+                  "path": "controls.font"
+                }
+              ]
+            },
+            "fontWeight": 700,
+            "fontFamily": "Arial, sans-serif",
+            "baseline": "middle",
+            "fill": {
+              "op": "read",
+              "path": "controls.ink"
+            },
+            "alpha": 1,
+            "maxWidth": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "width"
+                },
+                48
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "op": "when",
+        "condition": {
+          "op": "not",
+          "args": [
+            {
+              "op": "eq",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "controls.name2"
+                },
+                ""
+              ]
+            }
+          ]
+        },
+        "commands": [
+          {
+            "op": "group",
+            "alpha": {
+              "op": "mul",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "defs.exit"
+                },
+                {
+                  "op": "out",
+                  "args": [
+                    {
+                      "op": "clamp",
+                      "args": [
+                        {
+                          "op": "div",
+                          "args": [
+                            {
+                              "op": "sub",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "progress"
+                                },
+                                {
+                                  "op": "mul",
+                                  "args": [
+                                    {
+                                      "op": "read",
+                                      "path": "defs.entry"
+                                    },
+                                    0.25
+                                  ]
+                                }
+                              ]
+                            },
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "defs.entry"
+                                },
+                                0.75
+                              ]
+                            }
+                          ]
+                        },
+                        0,
+                        1
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            "commands": [
+              {
+                "op": "text",
+                "text": {
+                  "op": "read",
+                  "path": "controls.name2"
+                },
+                "x": 24,
+                "y": 68,
+                "fontSize": {
+                  "op": "select",
+                  "value": {
+                    "op": "not",
+                    "args": [
+                      {
+                        "op": "eq",
+                        "args": [
+                          {
+                            "op": "read",
+                            "path": "controls.name2"
+                          },
+                          ""
+                        ]
+                      }
+                    ]
+                  },
+                  "values": [
+                    {
+                      "op": "min",
+                      "args": [
+                        {
+                          "op": "read",
+                          "path": "controls.font"
+                        },
+                        32
+                      ]
+                    },
+                    {
+                      "op": "read",
+                      "path": "controls.font"
+                    }
+                  ]
+                },
+                "fontWeight": 700,
+                "fontFamily": "Arial, sans-serif",
+                "baseline": "middle",
+                "fill": {
+                  "op": "read",
+                  "path": "controls.ink"
+                },
+                "alpha": 1,
+                "maxWidth": {
+                  "op": "sub",
+                  "args": [
+                    {
+                      "op": "read",
+                      "path": "width"
+                    },
+                    48
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "op": "group",
+        "alpha": {
+          "op": "mul",
+          "args": [
+            {
+              "op": "read",
+              "path": "defs.exit"
+            },
+            {
+              "op": "out",
+              "args": [
+                {
+                  "op": "clamp",
+                  "args": [
+                    {
+                      "op": "div",
+                      "args": [
+                        {
+                          "op": "sub",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "progress"
+                            },
+                            {
+                              "op": "mul",
+                              "args": [
+                                {
+                                  "op": "read",
+                                  "path": "defs.entry"
+                                },
+                                0.38
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "op": "mul",
+                          "args": [
+                            {
+                              "op": "read",
+                              "path": "defs.entry"
+                            },
+                            0.62
+                          ]
+                        }
+                      ]
+                    },
+                    0,
+                    1
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "commands": [
+          {
+            "op": "text",
+            "text": {
+              "op": "read",
+              "path": "controls.subtitle"
+            },
+            "x": 24,
+            "y": 110,
+            "fontSize": {
+              "op": "read",
+              "path": "controls.bodyFont"
+            },
+            "fontWeight": 400,
+            "fontFamily": "Arial, sans-serif",
+            "baseline": "middle",
+            "fill": {
+              "op": "read",
+              "path": "controls.ink"
+            },
+            "alpha": 0.74,
+            "maxWidth": {
+              "op": "sub",
+              "args": [
+                {
+                  "op": "read",
+                  "path": "width"
+                },
+                48
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "objectLayout": {
+    "width": 520,
+    "height": 142,
+    "resize": "scale"
+  },
+  "controlPresets": [
+    {
+      "id": "sniptale-orange-dark",
+      "label": {
+        "en": "Dark",
+        "ru": "Тёмный"
+      },
+      "theme": {
+        "id": "sniptale-orange",
+        "label": {
+          "en": "Sniptale Orange",
+          "ru": "Sniptale Orange"
+        }
+      },
+      "style": {
+        "id": "dark",
+        "label": {
+          "en": "Dark",
+          "ru": "Тёмный"
+        }
+      },
+      "values": {
+        "accent": "#fb923c",
+        "surface": "#171a20",
+        "ink": "#fafafa"
+      }
+    },
+    {
+      "id": "sniptale-orange-light",
+      "label": {
+        "en": "Light",
+        "ru": "Светлый"
+      },
+      "theme": {
+        "id": "sniptale-orange",
+        "label": {
+          "en": "Sniptale Orange",
+          "ru": "Sniptale Orange"
+        }
+      },
+      "style": {
+        "id": "light",
+        "label": {
+          "en": "Light",
+          "ru": "Светлый"
+        }
+      },
+      "values": {
+        "accent": "#c2410c",
+        "surface": "#ffffff",
+        "ink": "#202127"
+      }
+    }
+  ],
+  "defaultControlPresetId": "sniptale-orange-dark"
+}

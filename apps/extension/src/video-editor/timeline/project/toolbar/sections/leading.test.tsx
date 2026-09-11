@@ -1,5 +1,6 @@
-import { createEmptyVideoProject } from '../../../../../features/video/project/factories/creation';
 // @vitest-environment jsdom
+
+import { createEmptyVideoProject } from '../../../../../features/video/project/factories/creation';
 import { ProjectTimelineAddTrackControl } from './add-controls';
 
 import { act } from 'react';
@@ -39,6 +40,8 @@ afterEach(() => {
 
 function renderLeadingControls(options?: {
   historySelected?: boolean;
+  historyVisible?: boolean;
+  hasHistory?: boolean;
   historyLocked?: boolean;
   canAddMotionRegion?: boolean;
   canDeleteSelectedClip?: boolean;
@@ -71,6 +74,8 @@ function renderLeadingControls(options?: {
         <ProjectTimelineAddTrackControl onAddTrack={handlers.onAddTrack} />
         <ProjectTimelineToolbarLeadingControls
           historySelected={options?.historySelected ?? false}
+          historyVisible={options?.historyVisible ?? true}
+          hasHistory={options?.hasHistory ?? false}
           historyActions={{
             project,
             selection: { kind: 'history-lane' },
@@ -277,25 +282,51 @@ it('keeps track choices open while the timeline layout settles after opening', (
   expect(document.querySelector('.sniptale-toolbar-menu')).not.toBeNull();
 });
 
-it('offers history actions only for the selected history lane and honors its lock', () => {
-  renderLeadingControls({ historySelected: false });
-  expect(container?.querySelector('[data-ui="video-editor.auto.open"]')).toBeNull();
-  expect(
-    container?.querySelector('[data-ui="video-editor.timeline.toolbar.add-click"]')
-  ).toBeNull();
+it.each([false, true])(
+  'keeps visible history actions disabled until selected (entries: %s)',
+  (hasHistory) => {
+    const handlers = renderLeadingControls({ hasHistory, historySelected: false });
+    const auto = container!.querySelector<HTMLButtonElement>('[data-ui="video-editor.auto.open"]');
+    expect(Boolean(auto)).toBe(hasHistory);
+    if (auto) {
+      expect(auto.disabled).toBe(true);
+      expect(auto.title).toBe('videoEditor.timeline.historySelectTrack');
+    }
+    const click = container!.querySelector<HTMLButtonElement>(
+      '[data-ui="video-editor.timeline.toolbar.add-click"]'
+    )!;
+    expect(click.disabled).toBe(true);
+    expect(click.title).toBe('videoEditor.timeline.historySelectTrack');
+    act(() => click.click());
+    expect(handlers.onAddActionEvent).not.toHaveBeenCalled();
+  }
+);
+it.each([false, true])(
+  'shows auto-processing for nonempty hidden history (selected: %s)',
+  (historySelected) => {
+    renderLeadingControls({ historySelected, historyVisible: false, hasHistory: true });
+    expect(
+      container!.querySelector<HTMLButtonElement>('[data-ui="video-editor.auto.open"]')!.disabled
+    ).toBe(!historySelected);
+    expect(
+      container!.querySelector('[data-ui="video-editor.timeline.toolbar.add-click"]')
+    ).toBeNull();
+  }
+);
+it('allows the first click on selected empty history and honors its lock', () => {
   const handlers = renderLeadingControls({ historySelected: true });
-  expect(container?.querySelector('[data-ui="video-editor.auto.open"]')).not.toBeNull();
+  expect(container!.querySelector('[data-ui="video-editor.auto.open"]')).toBeNull();
   act(() =>
-    container
-      ?.querySelector<HTMLButtonElement>('[data-ui="video-editor.timeline.toolbar.add-click"]')
-      ?.click()
+    container!
+      .querySelector<HTMLButtonElement>('[data-ui="video-editor.timeline.toolbar.add-click"]')!
+      .click()
   );
   expect(handlers.onAddActionEvent).toHaveBeenCalledWith('CLICK_RIPPLE');
   renderLeadingControls({ historySelected: true, historyLocked: true });
   expect(
-    container?.querySelector<HTMLButtonElement>(
+    container!.querySelector<HTMLButtonElement>(
       '[data-ui="video-editor.timeline.toolbar.add-click"]'
-    )?.disabled
+    )!.disabled
   ).toBe(true);
 });
 

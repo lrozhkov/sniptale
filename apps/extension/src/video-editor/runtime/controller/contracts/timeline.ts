@@ -17,6 +17,7 @@ interface VideoEditorTimelineState {
   canSplitSelectedClip: boolean;
   currentTime: number;
   isPlaying: boolean;
+  isPreparingPlayback?: boolean | undefined;
   magnetEnabled: boolean;
   pixelsPerSecond: number;
   playbackRange: VideoEditorPlaybackRange | null;

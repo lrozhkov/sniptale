@@ -18,6 +18,7 @@ class MemoryPreviewCacheDatabase implements VideoPreviewCacheDatabasePort {
   metadata = new Map<string, unknown>();
   mutationCount = 0;
   records = new Map<string, unknown>();
+  thumbnails = new Map<string, unknown>();
   private mutationQueue: Promise<void> = Promise.resolve();
 
   async close(): Promise<void> {}
@@ -26,6 +27,7 @@ class MemoryPreviewCacheDatabase implements VideoPreviewCacheDatabasePort {
     this.instanceExists = false;
     this.metadata.clear();
     this.records.clear();
+    this.thumbnails.clear();
   }
 
   async mutateExisting<T>(
@@ -67,6 +69,15 @@ class MemoryPreviewCacheDatabase implements VideoPreviewCacheDatabasePort {
 
   private createTransaction(): VideoPreviewCacheTransaction {
     return {
+      getPoster: async () => null,
+      listPosterEntries: async () => [],
+      putPoster: async () => {},
+      deletePoster: async () => {},
+      getThumbnail: async (key) => this.thumbnails.get(key),
+      listThumbnailEntries: async () =>
+        [...this.thumbnails].map(([key, value]) => ({ key, value })),
+      putThumbnail: async (key, value) => void this.thumbnails.set(key, value),
+      deleteThumbnail: async (key) => void this.thumbnails.delete(key),
       deleteRecord: async (key) => void this.records.delete(key),
       getMetadata: async (key) => this.metadata.get(key),
       getRecord: async (key) => this.records.get(key),
@@ -218,4 +229,30 @@ describe('video preview cache cleanup and project deletion', () => {
     await expect(service.deleteProjectRecords('project-1')).resolves.toEqual({ removedCount: 2 });
     expect(database.records.has(DIGEST_C)).toBe(true);
   });
+});
+
+it('removes timeline thumbnails with their project and invalidates their pending jobs', async () => {
+  const { createTimelineThumbnailStore } = await import('./thumbnails');
+  const database = new MemoryPreviewCacheDatabase();
+  let sequence = 0;
+  const deps = {
+    database,
+    now: () => 100,
+    randomUUID: () => `aaaaaaaa-aaaa-4aaa-8aaa-${String(++sequence).padStart(12, '0')}`,
+  };
+  const thumbnails = createTimelineThumbnailStore(deps);
+  const previews = createVideoPreviewCacheService(deps);
+  const token = await thumbnails.begin();
+  const frame = {
+    projectId: 'p',
+    sourceKey: 's',
+    sourceTime: 0,
+    createdAt: 100,
+    blob: new Blob(['x'], { type: 'image/webp' }),
+  };
+  await thumbnails.commit(token, [frame]);
+  expect(database.thumbnails.size).toBe(1);
+  await previews.deleteProjectRecords('p');
+  await thumbnails.commit(token, [frame]);
+  expect(database.thumbnails.size).toBe(0);
 });

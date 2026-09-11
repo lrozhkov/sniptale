@@ -3,7 +3,10 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createEmptyVideoProject } from '../../../../../features/video/project/factories/creation';
+import {
+  createEmptyVideoProject,
+  createVideoProjectAsset,
+} from '../../../../../features/video/project/factories/creation';
 import {
   VideoClipLinkMode,
   VideoClipTransitionKind,
@@ -65,9 +68,30 @@ async function renderHarness(
   }
 
   const clip = createClip();
+  const project = createEmptyVideoProject();
+  project.assets = [
+    {
+      ...createVideoProjectAsset(
+        'Source',
+        'VIDEO',
+        { kind: 'project-asset', projectAssetId: 'source' },
+        {
+          width: 1920,
+          height: 1080,
+          duration: 10,
+          size: 100,
+          mimeType: 'video/mp4',
+          hasAudio: false,
+          audioPeaks: null,
+        }
+      ),
+      id: clip.assetId,
+    },
+  ];
   await act(async () => {
     root?.render(
       <MediaFrameControls
+        project={project}
         clip={clip}
         locked={locked}
         onApplyMediaClipVisualsToTrack={handlers.onApplyMediaClipVisualsToTrack ?? vi.fn()}
@@ -99,15 +123,16 @@ describe('workspace-sidebar/selection/media-frame', () => {
   it('renders media apply-to-track as a shared compact secondary action', async () => {
     await renderHarness();
 
-    const applyButton = Array.from(container?.querySelectorAll('button') ?? []).find((button) =>
-      button.className.includes('self-end whitespace-nowrap')
+    const applyButton = Array.from(container?.querySelectorAll('button') ?? []).find(
+      (button) =>
+        button.hasAttribute('data-inspector-action') && button.className.includes('self-end')
     );
 
     expect(container?.textContent).toContain('Вписывание');
     expect(container?.textContent).toContain('Масштаб');
     expect(applyButton).toBeDefined();
     expect(applyButton?.className).toContain('hover:bg-[color:color-mix');
-    expect(applyButton?.className).toContain('rounded-[12px]');
+    expect(applyButton?.closest('[data-ui="video-editor.inspector.actions"]')).not.toBeNull();
   });
 
   it('commits media shadow intensity through the media frame controls', async () => {
@@ -159,4 +184,20 @@ describe('workspace-sidebar/selection/media-frame disabled state', () => {
       container?.querySelector<HTMLButtonElement>('button[aria-label="Режим тени"]')?.disabled
     ).toBe(true);
   });
+});
+
+it('applies a framing preset with one command and keeps exact controls folded', async () => {
+  const onUpdateMediaClipFitMode = vi.fn();
+  await renderHarness({ onUpdateMediaClipFitMode });
+  const preset = container?.querySelector<HTMLButtonElement>(
+    '[data-ui="video-editor.framing-presets"] button[aria-label="На фоне"]'
+  );
+  expect(preset).not.toBeNull();
+  await act(async () => preset?.click());
+  expect(onUpdateMediaClipFitMode).toHaveBeenCalledExactlyOnceWith(
+    'clip-1',
+    VideoMediaFitMode.CONTAIN,
+    88
+  );
+  expect(container?.querySelector('details')?.open).toBe(false);
 });

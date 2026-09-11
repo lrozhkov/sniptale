@@ -4,7 +4,7 @@ import type {
   VideoProjectActionPresentationOverride,
   VideoTemporalEasing,
 } from '../../../../../features/video/project/types';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorActionButton } from '../shared/actions';
 import {
   VideoEditorPlacementModeKind,
   type VideoEditorPlacementMode,
@@ -30,6 +30,8 @@ export function TemporalEasingSelect(props: {
 }
 
 export function ActionPrimaryFields(props: {
+  easing?: VideoTemporalEasing;
+  showEasing?: boolean;
   part?: 'appearance' | 'animation';
   duration: number;
   offset: number;
@@ -51,6 +53,15 @@ export function ActionPrimaryFields(props: {
       )}
       {props.part !== 'appearance' ? (
         <>
+          {props.showEasing !== false ? (
+            <SelectInput
+              label={translate('videoEditor.sidebar.actionEasing')}
+              value={props.easing ?? 'EASE_OUT'}
+              disabled={props.disabled}
+              options={getTemporalEasingOptions()}
+              onChange={(easing) => props.onChange({ easing })}
+            />
+          ) : null}
           <SliderField
             label={translate('videoEditor.sidebar.historyDuration')}
             value={props.duration}
@@ -121,8 +132,8 @@ export function ActionPointButtons(props: {
 }) {
   const active = props.placementModeKind === VideoEditorPlacementModeKind.ACTION_POINT;
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-1">
-      <ProductActionButton
+    <div data-ui="video-editor.inspector.actions">
+      <InspectorActionButton
         compact
         tone="toggle"
         active={active}
@@ -131,8 +142,8 @@ export function ActionPointButtons(props: {
         onClick={() => props.onStartActionPointPlacement(props.actionEventId)}
       >
         {translate('videoEditor.sidebar.selectPointOnStage')}
-      </ProductActionButton>
-      <ProductActionButton
+      </InspectorActionButton>
+      <InspectorActionButton
         compact
         tone="secondary"
         disabled={props.disabled}
@@ -142,15 +153,21 @@ export function ActionPointButtons(props: {
         }}
       >
         {translate('videoEditor.sidebar.resetPointToCenter')}
-      </ProductActionButton>
+      </InspectorActionButton>
     </div>
   );
 }
 
 export function DangerButton(props: { label: string; onClick: () => void; className?: string }) {
   return (
-    <ProductActionButton compact tone="danger" onClick={props.onClick} className={props.className}>
+    <InspectorActionButton
+      compact
+      tone="danger"
+      separated
+      onClick={props.onClick}
+      className={props.className}
+    >
       {props.label}
-    </ProductActionButton>
+    </InspectorActionButton>
   );
 }

@@ -1,3 +1,4 @@
+import { getEffectInstanceLabel } from '../../../../../features/video/project/effect-instance/presentation';
 import { getTrackClips } from '../../../../../features/video/project/timeline';
 import { VideoTrackKind } from '../../../../../features/video/project/types';
 import type { VideoProject } from '../../../../../features/video/project/types';
@@ -11,6 +12,7 @@ interface TimelineZone {
 }
 
 export interface TimelineJunctionZone extends TimelineZone {
+  locked?: boolean;
   audio?: boolean;
   detail: string;
   label: string;
@@ -21,6 +23,8 @@ export interface TimelineJunctionZone extends TimelineZone {
 }
 
 export interface TimelineCutZone {
+  leadingClipId?: string;
+  trailingClipId?: string;
   id: string;
   time: number;
 }
@@ -48,6 +52,11 @@ export function buildTrackCutZones(project: VideoProject, trackId: string): Time
     cutZones.push({
       id: `cut:${leadingClip.id}:${trailingClip.id}`,
       time: cutTime,
+      ...(leadingClip.type !== 'AUDIO' &&
+      trailingClip.type !== 'AUDIO' &&
+      !project.tracks.find((track) => track.id === trackId)?.locked
+        ? { leadingClipId: leadingClip.id, trailingClipId: trailingClip.id }
+        : {}),
     });
   }
 
@@ -99,17 +108,22 @@ export function buildTrackJunctionZones(
     }
 
     const summary = getTimelineTransitionSummary(transition);
+    const instance = project.effectInstances?.find(
+      (item) => item.target.kind === 'transition' && item.target.transitionId === transition.id
+    );
+    const title = instance ? getEffectInstanceLabel(project, instance.id) : summary.title;
 
     return [
       {
         ...(leadingClip.type === 'AUDIO' ? { audio: true } : {}),
+        locked: project.tracks.find((track) => track.id === trackId)?.locked ?? true,
         detail: summary.detail,
         end,
         id: transition.id,
         label: summary.formatDurationLabel(end - start),
         stackIndex: 0,
         start,
-        title: summary.title,
+        title,
         zoneClassName: summary.zoneClassName,
         zoneSelectedClassName: summary.zoneSelectedClassName,
       },

@@ -293,3 +293,34 @@ it('preserves an explicitly edited draft when a related parameter updates', () =
   act(() => input().blur());
   expect(onCommitValue).toHaveBeenCalledWith(55);
 });
+
+it.each([false, true])('keeps only current numeric focus (shadow root: %s)', (shadow) => {
+  const frames: FrameRequestCallback[] = [];
+  const frame = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    frames.push(callback);
+    return frames.length;
+  });
+  renderNumeric();
+  const host = document.createElement('div');
+  document.body.append(host);
+  const focusRoot = shadow ? host.attachShadow({ mode: 'closed' }) : document;
+  if (focusRoot instanceof ShadowRoot) focusRoot.append(container!);
+  const field = input();
+  const select = vi.spyOn(field, 'select');
+  const next = document.createElement('button');
+  container!.append(next);
+  try {
+    act(() => field.focus());
+    act(() => next.focus());
+    act(() => frames.splice(0).forEach((callback) => callback(0)));
+    expect(select).not.toHaveBeenCalled();
+    expect(focusRoot.activeElement).toBe(next);
+    act(() => field.focus());
+    act(() => frames.splice(0).forEach((callback) => callback(0)));
+    expect(select).toHaveBeenCalledOnce();
+  } finally {
+    frame.mockRestore();
+    select.mockRestore();
+    host.remove();
+  }
+});

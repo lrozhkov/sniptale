@@ -20,6 +20,7 @@ const pending: {
   resolve: (canvas: HTMLCanvasElement) => void;
   reject: (error: Error) => void;
   signal: AbortSignal;
+  camera: { scale: number; overlayZoomMode?: string };
   dispose: ReturnType<typeof vi.fn>;
 }[] = [];
 const project = createEmptyVideoProject('Frame', 800, 600);
@@ -36,6 +37,7 @@ const areaRegion = {
 beforeEach(() => {
   pending.length = 0;
   draw.mockClear();
+  mocks.create.mockClear();
   commit.mockClear();
   commitArea.mockClear();
   host = document.createElement('div');
@@ -50,9 +52,13 @@ beforeEach(() => {
     const dispose = vi.fn();
     return {
       dispose,
-      renderFrame: (_time: number, signal: AbortSignal) =>
+      renderFrame: (
+        _time: number,
+        signal: AbortSignal,
+        camera: { scale: number; overlayZoomMode?: string }
+      ) =>
         new Promise<HTMLCanvasElement>((resolve, reject) =>
-          pending.push({ resolve, reject, signal, dispose })
+          pending.push({ resolve, reject, signal, dispose, camera })
         ),
     };
   });
@@ -80,7 +86,7 @@ const ready = async (index = 0) =>
   act(async () => {
     pending[index]!.resolve(document.createElement('canvas'));
   });
-const button = () => host.querySelector('button')!;
+const button = () => host.querySelector<HTMLButtonElement>('[data-video-editor-local-navigation]')!;
 const pointer = (type: string, x: number, y: number, target?: Element) =>
   act(() => {
     const event = new MouseEvent(type, { bubbles: true, clientX: x, clientY: y, button: 0 });
@@ -93,7 +99,7 @@ function setupBounds() {
   button().releasePointerCapture = vi.fn();
 }
 
-it('renders the actual composition without zoom and commits one completed pointer gesture', async () => {
+it('renders the framed composition and commits a gesture in its displayed scene coordinates', async () => {
   render();
   expect(button().disabled).toBe(true);
   await ready();
@@ -144,7 +150,7 @@ it('disposes stale rendering, ignores its result and offers retry after a curren
   expect(draw).not.toHaveBeenCalled();
   expect(button().disabled).toBe(true);
   await act(async () => pending[1]!.reject(new Error('decode failed')));
-  const retry = host.querySelectorAll('button')[1]!;
+  const retry = host.querySelectorAll('button')[3]!;
   expect(retry).toBeDefined();
   act(() => retry.click());
   expect(pending[1]!.dispose).toHaveBeenCalledOnce();
@@ -181,7 +187,7 @@ it('resizes from a corner while retaining the opposite corner and stops at minim
   expect(commitArea).toHaveBeenCalledExactlyOnceWith({ x: 240, y: 180, width: 360, height: 270 });
   commitArea.mockClear();
   pointer('pointerdown', 100, 75, corner);
-  pointer('pointerup', 400, 300);
+  pointer('pointerup', 800, 600);
   expect(commitArea).toHaveBeenCalledExactlyOnceWith({ x: 552, y: 402, width: 48, height: 48 });
 });
 
@@ -265,6 +271,7 @@ it('retains a decoded frame through focus edits and autosave metadata changes', 
   );
   expect(button().disabled).toBe(false);
   expect(pending).toHaveLength(1);
+  expect(mocks.create).toHaveBeenCalledOnce();
   expect(draw).toHaveBeenCalledOnce();
 });
 
@@ -303,4 +310,47 @@ it('reuses equivalent project snapshots but refreshes changed media URLs', async
   expect(button().disabled).toBe(true);
   await ready(1);
   expect(button().disabled).toBe(false);
+});
+
+it('coalesces camera edits during decoding and never presents a superseded composition', async () => {
+  render(false, project, { ...region, scale: 0.5 });
+  render(false, project, { ...region, scale: 0.75 });
+  render(false, project, { ...region, scale: 1 });
+  expect(pending).toHaveLength(1);
+  expect(mocks.create).toHaveBeenCalledOnce();
+  await ready(0);
+  expect(draw).not.toHaveBeenCalled();
+  expect(pending).toHaveLength(2);
+  expect(pending[1]!.camera.scale).toBe(1);
+  await ready(1);
+  expect(draw).toHaveBeenCalledOnce();
+  expect(button().disabled).toBe(false);
+});
+
+it.each(['LOCK_OVERLAYS', 'FOLLOW_CAMERA'] as const)(
+  'passes %s at 50 percent without shrinking the canvas',
+  async (overlayZoomMode) => {
+    render(false, project, { ...region, scale: 0.5, overlayZoomMode });
+    await ready();
+    expect(pending[0]!.camera).toMatchObject({ scale: 0.5, overlayZoomMode });
+    const canvas = host.querySelector('canvas')!;
+    expect(canvas.style.width).toBe('100%');
+    expect(canvas.style.height).toBe('100%');
+    expect(mocks.create).toHaveBeenCalledOnce();
+  }
+);
+
+it('shows a full-scene navigator and switches to the composed result without another decoder', async () => {
+  render();
+  await ready();
+  setupBounds();
+  expect(pending[0]!.camera.scale).toBe(1);
+  const result = host.querySelectorAll('button')[1]!;
+  act(() => result.click());
+  expect(pending[1]!.camera.scale).toBe(2);
+  await ready(1);
+  pointer('pointerdown', 100, 100);
+  pointer('pointerup', 200, 120);
+  expect(commit).not.toHaveBeenCalled();
+  expect(mocks.create).toHaveBeenCalledOnce();
 });

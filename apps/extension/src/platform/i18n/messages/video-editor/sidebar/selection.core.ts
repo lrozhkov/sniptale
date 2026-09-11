@@ -14,6 +14,7 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
     en: 'Camera framing: drag the image or use arrow keys',
   },
   cameraCropZoom: { ru: 'Приближение', en: 'Zoom in' },
+  cameraCropSection: { ru: 'Изображение внутри', en: 'Image inside frame' },
   cameraCropCenter: { ru: 'Центрировать изображение', en: 'Center image' },
 
   typingSelection: { ru: 'Набор текста', en: 'Typing interval' },
@@ -224,6 +225,19 @@ export const videoEditorSidebarSelectionCoreMessages = defineMessageSource({
   cameraPlacementBottomRight: {
     ru: 'Справа снизу',
     en: 'Bottom right',
+  },
+  framingWhole: { ru: 'Целиком', en: 'Whole' },
+  framingBackground: { ru: 'На фоне', en: 'Inset' },
+  framingFill: { ru: 'Заполнить', en: 'Fill' },
+  framingFineTune: { ru: 'Точная настройка', en: 'Fine-tune' },
+  framingWholeHint: { ru: 'По центру, без обрезки', en: 'Centered, without cropping' },
+  framingBackgroundHint: {
+    ru: 'По центру с полями под пропорции видео',
+    en: 'Centered with margins adapted to the video',
+  },
+  framingFillHint: {
+    ru: 'Заполнить холст — края видео могут быть обрезаны',
+    en: 'Fill the canvas — video edges may be cropped',
   },
   fitModeLabel: {
     ru: 'Вписывание',

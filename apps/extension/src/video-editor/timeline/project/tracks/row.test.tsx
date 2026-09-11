@@ -152,3 +152,58 @@ it('uses speaker state for audio while retaining visibility eyes for video', () 
     container!.querySelector('.lucide-volume-x')!.closest('button')!.getAttribute('aria-pressed')
   ).toBe('true');
 });
+
+it('keeps FX disclosure below the unchanged track header and omits it without effects', () => {
+  const project = createEmptyVideoProject('FX header');
+  const track = project.tracks[0]!;
+  const layout = buildTimelineTrackLayoutModel({
+    project,
+    tracks: project.tracks,
+    trackHeightByTrackId: {},
+  }).layoutByTrackId.get(track.id)!;
+  const toggle = vi.fn();
+  const select = vi.fn();
+  const render = (count: number, collapsed: boolean) =>
+    act(() =>
+      root?.render(
+        <ProjectTimelineTrackRow
+          compactRows
+          isSelected={false}
+          track={track}
+          trackLabel="V1"
+          trackLayout={{
+            ...layout,
+            fxInstanceIds: count ? ['effect'] : [],
+            fxHeight: count ? 24 : 0,
+            fxCollapsed: collapsed,
+          }}
+          onToggleFx={toggle}
+          onSelectTrack={select}
+          onToggleTrackLock={vi.fn()}
+          onToggleTrackVisibility={vi.fn()}
+        />
+      )
+    );
+  const button = () =>
+    container!.querySelector<HTMLButtonElement>('[data-ui="video-editor.timeline.track-fx"]');
+  render(0, false);
+  expect(button()).toBeNull();
+  render(1, false);
+  expect(button()?.closest('[data-selected]')).toBeNull();
+  expect(button()?.className).toContain('!h-full');
+  expect(container!.querySelector('[data-selected]')?.className).not.toContain('!gap-1');
+  expect(button()?.getAttribute('aria-expanded')).toBe('true');
+  expect(button()?.textContent).not.toContain('FX ·');
+  expect(button()?.hasAttribute('aria-pressed')).toBe(false);
+  expect(button()?.getAttribute('data-active')).not.toBe('true');
+  button()?.focus();
+  act(() => button()?.click());
+  expect(toggle).toHaveBeenCalledOnce();
+  expect(select).not.toHaveBeenCalled();
+  expect(document.activeElement).toBe(button());
+  render(1, true);
+  expect(button()?.getAttribute('aria-expanded')).toBe('false');
+  expect(document.activeElement).toBe(button());
+  render(0, true);
+  expect(button()).toBeNull();
+});

@@ -29,6 +29,13 @@ export class CaptureSurfaceLeaseApplication {
     request: CaptureSurfaceLeaseRequest,
     options: { replaceCurrent?: boolean } = {}
   ): Promise<AppliedCaptureSurface> {
+    if (
+      request.measureVideoViewport &&
+      (request.owner !== 'video' ||
+        (request.context !== 'video-tab' && request.context !== 'video-tab-crop'))
+    ) {
+      throw new CaptureSurfaceError('unsupported-context');
+    }
     const context = await this.preparation.resolveContext(request);
     const { parent, preset, stack, windowId } = context;
     const applied = this.preparation.createAppliedSurface(request, preset);
@@ -37,7 +44,7 @@ export class CaptureSurfaceLeaseApplication {
     try {
       state = await this.preparation.prepareLease(request, applied, windowId, parent);
       await this.mutation.stage(state, parent, stack);
-      await this.mutation.mutate(state);
+      await this.mutation.mutate(state, request.measureVideoViewport);
       await this.mutation.commit({ parent, replaceCurrent, request, state });
       return applied;
     } catch (error) {

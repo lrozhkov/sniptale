@@ -39,14 +39,35 @@ export function buildTimelinePreviewPlans(
     }
 
     const asset = project.assets.find((item) => item.id === clip.assetId);
-    return [createVideoPreviewPlan(clip, assetUrl, viewport, asset?.metadata.duration ?? null)];
+    const plan = createVideoPreviewPlan(clip, assetUrl, viewport, asset?.metadata.duration ?? null);
+    if (asset) {
+      plan.projectId = project.id;
+      plan.sourceKey = JSON.stringify([
+        'timeline-webp-320x180-v1',
+        asset.source,
+        asset.metadata.size,
+        asset.metadata.width,
+        asset.metadata.height,
+        asset.metadata.mimeType,
+      ]);
+      plan.slots = plan.slots.map((slot) => ({
+        ...slot,
+        cacheKey: JSON.stringify([slot.cacheKey, plan.sourceKey]),
+      }));
+    }
+    return [plan];
   });
 }
 
 export function getNextTimelinePreviewFrameBatch(
   plans: readonly TimelinePreviewPlan[],
   generatedUrlCache: Map<string, TimelinePreviewFrame>
-): { assetUrl: string; samples: readonly TimelineVideoFrameSample[] } | null {
+): {
+  projectId?: string;
+  sourceKey?: string;
+  assetUrl: string;
+  samples: readonly TimelineVideoFrameSample[];
+} | null {
   const firstMissingPlan = plans.find(
     (plan) =>
       plan.kind === 'video' && plan.slots.some((slot) => !generatedUrlCache.has(slot.cacheKey))
@@ -63,7 +84,12 @@ export function getNextTimelinePreviewFrameBatch(
       sourceTime: slot.sourceStart,
     }));
 
-  return { assetUrl: firstMissingPlan.assetUrl, samples };
+  return {
+    assetUrl: firstMissingPlan.assetUrl,
+    samples,
+    ...(firstMissingPlan.projectId ? { projectId: firstMissingPlan.projectId } : {}),
+    ...(firstMissingPlan.sourceKey ? { sourceKey: firstMissingPlan.sourceKey } : {}),
+  };
 }
 
 export function getTimelinePreviewPlanKey(plans: readonly TimelinePreviewPlan[]): string {
@@ -74,6 +100,8 @@ export function getTimelinePreviewPlanKey(plans: readonly TimelinePreviewPlan[])
         plan.kind,
         plan.assetId,
         plan.assetUrl,
+        plan.projectId ?? '',
+        plan.sourceKey ?? '',
         ...plan.slots.flatMap((slot) => [slot.cacheKey, slot.sourceEnd]),
       ].join(',')
     )
@@ -170,7 +198,7 @@ function buildVideoPreviewSourceSlots(
     slot <= lastSlot && slots.length < MAX_ASSET_STORYBOARD_FRAMES;
     slot += stride
   ) {
-    slots.push(Math.max(start, slot * step));
+    slots.push(Math.max(clip.sourceStart, slot * step));
   }
 
   slots.sort((left, right) => left - right);

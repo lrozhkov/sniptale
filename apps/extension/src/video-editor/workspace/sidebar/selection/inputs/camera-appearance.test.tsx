@@ -67,7 +67,13 @@ it('changes shape, roundness, crop zoom and centering through the camera edit po
   const clip = { ...base.clip, cameraAppearance: { ...DEFAULT_CAMERA_APPEARANCE, panX: 0.5 } };
   act(() =>
     root.render(
-      <CameraAppearanceControls clip={clip} currentTime={0} disabled={false} onEdit={onEdit} />
+      <CameraAppearanceControls
+        project={base.project}
+        clip={clip}
+        currentTime={0}
+        disabled={false}
+        onEdit={onEdit}
+      />
     )
   );
   const shape = container.querySelector<HTMLButtonElement>(
@@ -122,6 +128,7 @@ it('changes shape, roundness, crop zoom and centering through the camera edit po
   act(() =>
     root.render(
       <CameraAppearanceControls
+        project={base.project}
         clip={{ ...clip, cameraAppearance: { ...clip.cameraAppearance, shape: 'ellipse' } }}
         currentTime={0}
         disabled

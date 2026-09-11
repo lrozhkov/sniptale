@@ -46,3 +46,29 @@ describe('video project export settings validation', () => {
     ).toThrow('Invalid video project export settings');
   });
 });
+
+it('requires both selected-range bounds inside the project duration', () => {
+  expect(() =>
+    assertVideoProjectExportSettingsCompatibleWithProject(project, {
+      ...createSettings(),
+      scope: 'selected-range',
+      rangeStartSeconds: 2,
+      rangeEndSeconds: 5,
+    })
+  ).not.toThrow();
+  for (const bounds of [
+    {},
+    { rangeStartSeconds: 2 },
+    { rangeEndSeconds: 5 },
+    { rangeStartSeconds: 5, rangeEndSeconds: 2 },
+    { rangeStartSeconds: 0, rangeEndSeconds: 11 },
+  ]) {
+    expect(() =>
+      assertVideoProjectExportSettingsCompatibleWithProject(project, {
+        ...createSettings(),
+        scope: 'selected-range',
+        ...bounds,
+      })
+    ).toThrow('Invalid video project export settings');
+  }
+});

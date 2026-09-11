@@ -9,7 +9,6 @@ const REPOSITORY_FILE_TOOL_IDS = new Set([
   'qa.rule.i18n',
   'qa.rule.jscpd',
   'qa.rule.knip',
-  'qa.rule.mock-export-parity',
   'qa.rule.naming',
   'qa.rule.oxlint',
   'qa.rule.repository-readability',

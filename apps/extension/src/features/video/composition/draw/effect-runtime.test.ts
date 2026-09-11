@@ -66,7 +66,7 @@ it('draws a clip-target frame through the canonical visual layer bitmap seam', (
       state: createEffectRuntimeDrawState(),
     })
   ).toBe(true);
-  expect(drawLayerBitmap).toHaveBeenCalledWith(context, layer, frame.bitmap, 2, 3, 0.5);
+  expect(drawLayerBitmap).toHaveBeenCalledWith(context, layer, frame.bitmap, 2, 3, 0.5, undefined);
 });
 
 it('draws one full transition frame for both participating layers', () => {

@@ -1,0 +1,17 @@
+[data-ui='video-editor.inspector.sections'] [data-ui='video-editor.inspector.section-heading'],
+[data-ui='video-editor.inspector.sections']
+  [data-ui='shared.categorized-inspector.section-heading'] {
+  font-family: var(--sniptale-font-sans);
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.5;
+  letter-spacing: 0.065em;
+  text-transform: uppercase;
+  color: var(--sniptale-color-text-primary);
+  margin-bottom: 14px;
+  overflow-wrap: anywhere;
+}
+
+[data-ui='video-editor.inspector.section-heading'] > svg {
+  flex-shrink: 0;
+}

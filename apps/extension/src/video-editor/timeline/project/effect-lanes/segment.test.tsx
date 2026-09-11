@@ -24,14 +24,16 @@ it('adds a framing connection from the gap and selects the connection independen
   };
   const container = document.createElement('div');
   const root = createRoot(container);
+  const gap = () =>
+    container.querySelector<HTMLElement>('[data-ui="video-editor.timeline.framing-connection"]')!;
   const button = () =>
     container.querySelector<HTMLButtonElement>(
-      '[data-ui="video-editor.timeline.framing-connection"]'
+      '[data-ui="video-editor.timeline.add-framing-connection"]'
     )!;
   try {
     act(() => root.render(<ProjectTimelineEffectCanvasRows {...props} />));
-    expect(button().style.left).toBe('200px');
-    expect(button().style.width).toBe('200px');
+    expect(gap().style.left).toBe('200px');
+    expect(gap().style.width).toBe('200px');
     act(() => button().click());
     expect(props.onConnectMotionRegions).toHaveBeenCalledWith('first', 'second');
     expect(props.onBeginRangeSelection).not.toHaveBeenCalled();
@@ -47,8 +49,8 @@ it('adds a framing connection from the gap and selects the connection independen
         />
       )
     );
-    expect(button().getAttribute('aria-pressed')).toBe('true');
-    act(() => button().click());
+    expect(gap().getAttribute('aria-pressed')).toBe('true');
+    act(() => gap().click());
     expect(props.onSelectMotionRegion).toHaveBeenCalledWith('second', 'connection');
     project.utilityLanes = {
       actions: { visible: true, locked: false },

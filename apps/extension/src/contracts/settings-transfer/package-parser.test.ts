@@ -1,3 +1,4 @@
+import { SETTINGS_TRANSFER_MAX_BYTES } from './limits';
 import { describe, expect, it } from 'vitest';
 import { cloneSettingsTransferJsonValue } from './json-value';
 import {
@@ -73,9 +74,9 @@ describe('settings transfer package parser', () => {
   });
 
   it('enforces file, node, and domain count ceilings', () => {
-    expect(() => parseSettingsTransferPackageText(' '.repeat(2 * 1024 * 1024 + 1))).toThrowError(
-      expect.objectContaining({ code: 'file-too-large' })
-    );
+    expect(() =>
+      parseSettingsTransferPackageText(' '.repeat(SETTINGS_TRANSFER_MAX_BYTES + 1))
+    ).toThrowError(expect.objectContaining({ code: 'file-too-large' }));
     expect(() =>
       parseSettingsTransferPackageText(
         packageText({

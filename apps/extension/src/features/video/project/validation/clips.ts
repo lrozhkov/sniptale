@@ -50,6 +50,7 @@ function hasBaseClipFields(value: Record<string, unknown>): boolean {
     isEnumValue(value['linkMode'], VideoClipLinkMode) &&
     isBoundedNumber(value['startTime'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
     isBoundedNumber(value['duration'], 0, MAX_VIDEO_PROJECT_DURATION_SECONDS) &&
+    (value['effectsBypassed'] === undefined || isBoolean(value['effectsBypassed'])) &&
     isBoolean(value['muted']) &&
     isVolume(value['volume']) &&
     (value['audioGainStart'] === undefined || isVolume(value['audioGainStart'])) &&

@@ -2,14 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { translate } from '../../../platform/i18n';
 import { VideoTimelinePlacementMode } from '../../../features/video/project/types';
 import type { ProjectHandlerPort } from './types';
-import { deleteProjectWorkspace, loadProjectWorkspace } from './project';
+import { createProjectWorkspace, deleteProjectWorkspace, loadProjectWorkspace } from './project';
 
 const {
+  mockCopyProject,
   mockCreateBlankProject,
   mockDeletePersistedProject,
   mockOpenPersistedProject,
   mockWaitForVideoEditorSave,
 } = vi.hoisted(() => ({
+  mockCopyProject: vi.fn(),
   mockCreateBlankProject: vi.fn(),
   mockDeletePersistedProject: vi.fn(),
   mockOpenPersistedProject: vi.fn(),
@@ -18,6 +20,7 @@ const {
 
 vi.mock('../../project/operations/ops', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../project/operations/ops')>()),
+  copyProject: mockCopyProject,
   createBlankProject: mockCreateBlankProject,
   deletePersistedProject: mockDeletePersistedProject,
   openPersistedProject: mockOpenPersistedProject,
@@ -192,4 +195,68 @@ describe('deleteProjectWorkspace', () => {
     );
     expect(params.libraries.refreshProjects).toHaveBeenCalledTimes(1);
   });
+});
+
+describe('createProjectWorkspace', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockWaitForVideoEditorSave.mockResolvedValue(undefined);
+  });
+  it('waits for save and durable creation before switching', async () => {
+    const port = createProjectHandlerParams();
+    let saved!: () => void;
+    mockWaitForVideoEditorSave.mockReturnValue(
+      new Promise<void>((resolve) => {
+        saved = resolve;
+      })
+    );
+    const next = { ...createCurrentProject(), id: 'new' };
+    let created!: (value: typeof next) => void;
+    mockCreateBlankProject.mockReturnValue(
+      new Promise((resolve) => {
+        created = resolve;
+      })
+    );
+    const task = createProjectWorkspace(port, '  New  ');
+    expect(mockCreateBlankProject).not.toHaveBeenCalled();
+    expect(port.applyLoadedProject).not.toHaveBeenCalled();
+    saved();
+    await Promise.resolve();
+    expect(mockCreateBlankProject).toHaveBeenCalledWith('New');
+    expect(port.applyLoadedProject).not.toHaveBeenCalled();
+    created(next);
+    await task;
+    expect(port.applyLoadedProject).toHaveBeenCalledWith(next, null);
+  });
+  it('copies the current document with the requested name', async () => {
+    const port = createProjectHandlerParams();
+    const copy = { ...createCurrentProject(), id: 'copy' };
+    mockCopyProject.mockResolvedValue(copy);
+    await createProjectWorkspace(port, 'Copy', true);
+    expect(mockCopyProject).toHaveBeenCalledWith(port.getCurrentProject(), 'Copy');
+    expect(port.applyLoadedProject).toHaveBeenCalledWith(copy, null);
+  });
+  it.each(['save', 'create'])('keeps current project when %s fails', async (stage) => {
+    const port = createProjectHandlerParams();
+    if (stage === 'save') mockWaitForVideoEditorSave.mockRejectedValueOnce(new Error('save'));
+    else mockCreateBlankProject.mockRejectedValueOnce(new Error('create'));
+    await expect(createProjectWorkspace(port, 'New')).rejects.toThrow(stage);
+    expect(port.applyLoadedProject).not.toHaveBeenCalled();
+  });
+  it('rejects an empty name before doing work', async () => {
+    const port = createProjectHandlerParams();
+    await expect(createProjectWorkspace(port, '  ')).rejects.toThrow();
+    expect(mockWaitForVideoEditorSave).not.toHaveBeenCalled();
+    expect(port.applyLoadedProject).not.toHaveBeenCalled();
+  });
+});
+
+it('does not report creation failure after the project has been committed and opened', async () => {
+  const port = createProjectHandlerParams();
+  const next = { ...createCurrentProject(), id: 'new' };
+  mockWaitForVideoEditorSave.mockResolvedValue(undefined);
+  mockCreateBlankProject.mockResolvedValue(next);
+  vi.mocked(port.libraries.refreshProjects).mockRejectedValue(new Error('list unavailable'));
+  await expect(createProjectWorkspace(port, 'New')).resolves.toBeUndefined();
+  expect(port.applyLoadedProject).toHaveBeenCalledWith(next, null);
 });

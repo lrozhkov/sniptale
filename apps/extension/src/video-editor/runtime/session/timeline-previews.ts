@@ -25,6 +25,10 @@ import {
   type TimelinePreviewPlan,
 } from './timeline-preview-cache';
 
+import { createPersistentTimelineFrameLoader } from './persistent-timeline-frames';
+import { createTimelineThumbnailStore } from '../../../composition/persistence/video-preview-cache/thumbnails';
+import { defaultVideoPreviewCacheDatabase } from '../../../composition/persistence/video-preview-cache/database';
+
 export type TimelineVideoFrameLoader = (
   plan: TimelineVideoFrameLoadPlan
 ) => Promise<readonly TimelineVideoFrameLoadResult[]>;
@@ -56,15 +60,37 @@ export function useTimelineClipPreviews(
   assetUrls: Record<string, string>,
   options: UseTimelineClipPreviewsOptions = {}
 ): TimelineClipPreviewMap {
-  const loadVideoFrames = options.loadVideoFrames ?? loadTimelineVideoPreviewFrames;
+  const persistentLoader = useMemo(
+    () =>
+      project?.id
+        ? createPersistentTimelineFrameLoader(
+            createTimelineThumbnailStore({
+              database: defaultVideoPreviewCacheDatabase,
+              now: Date.now,
+              randomUUID: () => crypto.randomUUID(),
+            })
+          )
+        : null,
+    [project?.id]
+  );
+  const loadVideoFrames =
+    options.loadVideoFrames ?? persistentLoader ?? loadTimelineVideoPreviewFrames;
   const [previews, setPreviews] = useState<TimelineClipPreviewMap>({});
   const [loadRevision, setLoadRevision] = useState(0);
   const generatedUrlCacheRef = useRef(new Map<string, TimelinePreviewFrame>());
-  const plans = useMemo(
+  const nextPlans = useMemo(
     () => buildTimelinePreviewPlans(project, assetUrls, options.viewport ?? null),
     [assetUrls, options.viewport, project]
   );
-  const planKey = useMemo(() => getTimelinePreviewPlanKey(plans), [plans]);
+  const planKey = getTimelinePreviewPlanKey(nextPlans);
+  const urlKey = JSON.stringify(
+    Object.entries(assetUrls).sort(([left], [right]) => left.localeCompare(right))
+  );
+  const stable = useRef({ planKey, urlKey, plans: nextPlans, assetUrls });
+  if (stable.current.planKey !== planKey || stable.current.urlKey !== urlKey) {
+    stable.current = { planKey, urlKey, plans: nextPlans, assetUrls };
+  }
+  const plans = stable.current.plans;
 
   useEffect(() => () => revokeCachedPreviewUrls(generatedUrlCacheRef.current), []);
   useTimelinePreviewLoadingEffect({
@@ -76,7 +102,7 @@ export function useTimelineClipPreviews(
     setLoadRevision,
     setPreviews,
     suspended: options.suspended ?? false,
-    assetUrls,
+    assetUrls: stable.current.assetUrls,
   });
 
   return previews;
@@ -201,8 +227,7 @@ async function loadMissingPreviewEntries(
 
   try {
     return await loadVideoFrames({
-      assetUrl: batchPlan.assetUrl,
-      samples: batchPlan.samples,
+      ...batchPlan,
       signal: abortController.signal,
     });
   } catch {

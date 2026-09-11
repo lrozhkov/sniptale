@@ -39,7 +39,7 @@ interface CreateWorkspaceHeaderArgs {
 
 type PreviewStore = AnnotationEditingPort &
   Pick<EffectEditingPort, 'updateEffectInstance'> &
-  Pick<ClipSelectionPort, 'selectClip' | 'selectScene' | 'selectedClipId'> &
+  Pick<ClipSelectionPort, 'selectClip' | 'selectScene' | 'selectedClipId' | 'selection'> &
   Pick<PlaybackPort, 'currentTime' | 'isPlaying'> &
   RuntimeSessionPort &
   Pick<
@@ -155,6 +155,10 @@ function createWorkspacePreviewSelection(args: CreateWorkspacePreviewArgs) {
     placementMode: args.store.placementMode,
     selectedActionOccurrence: args.selections.selectedActionOccurrence,
     selectedClipId: args.store.selectedClipId,
+    selectedEffectInstanceId:
+      args.store.selection.kind === 'effect-instance'
+        ? args.store.selection.effectInstanceId
+        : null,
     selectedMotionRegion: args.selections.selectedMotionRegion,
   };
 }
@@ -170,6 +174,12 @@ function createWorkspacePreviewPreferences(workspace: Pick<VideoEditorWorkspaceS
     onRetrySave: previewPreferences.retrySave,
     onZoomChange: (zoom: typeof previewPreferences.preferences.zoom) =>
       previewPreferences.updatePreferences({ zoom }),
+    showFrameRate: previewPreferences.preferences.showFrameRate,
+    onShowFrameRateChange: (showFrameRate: boolean) =>
+      previewPreferences.updatePreferences({ showFrameRate }),
+    frameRate: previewPreferences.preferences.frameRate,
+    onFrameRateChange: (frameRate: typeof previewPreferences.preferences.frameRate) =>
+      previewPreferences.updatePreferences({ frameRate }),
     rasterPreset: previewPreferences.preferences.rasterPreset,
     saveFailed: previewPreferences.saveFailed,
     zoom: previewPreferences.preferences.zoom,

@@ -500,11 +500,11 @@ it('projects clip, motion, range and playhead together in a distant viewport wit
   );
   expect(parseFloat(playhead?.style.left ?? '')).toBeCloseTo(500, 5);
   const motion = container?.querySelector<HTMLElement>(
-    '[aria-label^="videoEditor.timeline.motionLane ·"]'
+    '[aria-label^="videoEditor.timeline.motionSegment ·"]'
   )?.parentElement;
   expect(parseFloat(motion?.style.width ?? '')).toBeCloseTo(1240, 5);
   expect(
-    container?.querySelector('[aria-label="videoEditor.timeline.motionLane:resize-start"]')
+    container?.querySelector('[aria-label="videoEditor.timeline.motionSegment:resize-start"]')
   ).toBeNull();
   expect(project).toEqual(original);
 });

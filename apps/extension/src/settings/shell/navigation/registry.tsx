@@ -85,6 +85,12 @@ export const SETTINGS_NAV_GROUPS: readonly SettingsNavGroup[] = [
         icon: Sparkles,
       },
       {
+        id: 'video-effects',
+        description: 'settings.navigation.descriptions.videoEffects',
+        label: 'settings.navigation.videoEffects',
+        icon: Sparkles,
+      },
+      {
         id: 'editor-resources',
         description: 'settings.navigation.descriptions.editorResources',
         label: 'settings.navigation.editorResources',
@@ -179,6 +185,10 @@ export const DEFERRED_SETTINGS_SECTION_LOADERS: Record<
   annotations: {
     load: () => import('../../sections/styles/annotations'),
     exportName: 'AnnotationsSection',
+  },
+  'video-effects': {
+    load: () => import('../../sections/styles/video-effects'),
+    exportName: 'VideoEffectsSection',
   },
   'editor-resources': {
     load: () => import('../../sections/styles/editor-resources'),

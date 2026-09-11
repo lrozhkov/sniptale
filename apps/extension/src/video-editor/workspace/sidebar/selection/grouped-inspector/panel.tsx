@@ -1,7 +1,12 @@
+import './panel.css';
 import { useWorkspacePreference } from '../../../../runtime/controller/workspace-preferences';
 import { useInspectorSectionMemory } from './presentation';
 import { useEffect, useRef, useState } from 'react';
 import {
+  Grid3X3,
+  CaseSensitive,
+  Shapes,
+  Settings2,
   AudioLines,
   Clock3,
   Frame,
@@ -26,12 +31,17 @@ import { resolveVisibleInspectorGroups } from './visibility';
 import type { InspectorGroupDefinition, InspectorSectionSemantic } from './types';
 
 const SECTION_ICONS: Readonly<Record<InspectorSectionSemantic, LucideIcon>> = {
+  typography: CaseSensitive,
+  geometry: Shapes,
+  processing: SlidersHorizontal,
+  advanced: Settings2,
   info: Info,
   timing: Clock3,
   placement: Move,
   framing: Frame,
   audio: AudioLines,
   canvas: Scan,
+  grid: Grid3X3,
   background: Paintbrush,
   appearance: Paintbrush,
   camera: Video,
@@ -105,6 +115,7 @@ export function InspectorGroupedPanel<TId extends string>(props: {
               className="py-4 first:pt-0 last:pb-0 focus:outline-none"
             >
               <h3
+                data-ui="video-editor.inspector.section-heading"
                 className={[
                   'mb-3 flex items-center gap-2 text-[13px] font-semibold',
                   'text-[var(--sniptale-color-text-primary)]',

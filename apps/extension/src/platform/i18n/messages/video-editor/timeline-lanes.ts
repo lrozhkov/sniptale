@@ -37,8 +37,9 @@ export const videoEditorTimelineLaneMessages = defineMessageSource({
     ru: 'Действия',
     en: 'Actions',
   },
+  motionSegment: { ru: 'Масштабирование', en: 'Zoom' },
   motionLane: {
-    ru: 'Зум',
+    ru: 'Масштаб',
     en: 'Zoom',
   },
   historyClick: { ru: 'Клик', en: 'Click' },
@@ -46,6 +47,10 @@ export const videoEditorTimelineLaneMessages = defineMessageSource({
   historyScroll: { ru: 'Прокрутка', en: 'Scroll' },
   historyPause: { ru: 'Пауза', en: 'Pause' },
   historyCallout: { ru: 'Акцент', en: 'Accent' },
+  historySelectTrack: {
+    ru: 'Выберите дорожку истории действий',
+    en: 'Select the action history track',
+  },
   historyAddClick: { ru: 'Добавить клик', en: 'Add click' },
   historyOriginalTime: { ru: 'Исходное время', en: 'Original time' },
   historyTyping: { ru: 'Ввод текста', en: 'Typing' },

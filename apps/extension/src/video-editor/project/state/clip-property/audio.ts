@@ -1,3 +1,4 @@
+import { DEFAULT_CAMERA_APPEARANCE } from '../../../../features/video/project/camera/appearance';
 import { updateCameraPositionVisual } from '../../../../features/video/project/camera/animation';
 import { resolveEffectClipTransformPatch } from '../../../../features/video/project/effect-instance/layout';
 import { clampNumber } from '../../../../features/video/project/timeline/basics';
@@ -92,7 +93,15 @@ function updateClipTransform(
       updateClipWithProjectGuard(project, clipId, (item) =>
         item.type === 'VIDEO' &&
         project.tracks.some((track) => track.id === item.trackId && track.role === 'CAMERA')
-          ? updateCameraPositionVisual(item, state.currentTime, { transform: normalizedPatch })
+          ? {
+              ...updateCameraPositionVisual(item, state.currentTime, {
+                transform: normalizedPatch,
+              }),
+              ...((normalizedPatch.width !== undefined || normalizedPatch.height !== undefined) &&
+              !item.cameraAppearance
+                ? { cameraAppearance: { ...DEFAULT_CAMERA_APPEARANCE } }
+                : {}),
+            }
           : {
               ...item,
               transform: {

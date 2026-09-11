@@ -252,11 +252,7 @@ function getTimelineClipWaveformPeaks({
     sourceStart: clip.sourceStart + offsetSeconds * sourceRate,
     sourceDuration: visibleDuration * sourceRate,
   };
-  return getClipWaveformPeaks(
-    project,
-    samplingClip,
-    Math.max(40, Math.min(160, Math.round(width / 4)))
-  );
+  return getClipWaveformPeaks(project, samplingClip, Math.max(8, Math.min(4096, Math.ceil(width))));
 }
 
 function getPreviewTileWidth(trackClipRowHeight: number, hideClipNames: boolean): number {

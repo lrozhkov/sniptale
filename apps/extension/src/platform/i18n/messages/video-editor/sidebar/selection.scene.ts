@@ -1,6 +1,15 @@
 import { defineMessageSource } from '../../source';
 
 export const videoEditorSidebarSelectionSceneMessages = defineMessageSource({
+  canvasFormatLabel: { ru: 'Пропорции', en: 'Aspect ratio' },
+  canvasResolutionLabel: { ru: 'Разрешение', en: 'Resolution' },
+  canvasFormatWide: { ru: 'Горизонтальный', en: 'Landscape' },
+  canvasFormatVertical: { ru: 'Вертикальный', en: 'Vertical' },
+  canvasFormatSquare: { ru: 'Квадратный', en: 'Square' },
+  canvasFormatPortrait: { ru: 'Портретный', en: 'Portrait' },
+  canvasFormatClassic: { ru: 'Классический', en: 'Classic' },
+  canvasCustom: { ru: 'Произвольные', en: 'Custom' },
+  canvasExactSize: { ru: 'Точные размеры', en: 'Custom dimensions' },
   sceneBackgroundTypeLabel: {
     ru: 'Тип фона',
     en: 'Background type',
@@ -54,12 +63,12 @@ export const videoEditorSidebarSelectionSceneMessages = defineMessageSource({
     en: 'None',
   },
   sceneBackgroundAnimationRotate: {
-    ru: 'Кинематографичный дрейф',
-    en: 'Cinematic drift',
+    ru: 'Вращение',
+    en: 'Rotation',
   },
   sceneBackgroundAnimationBreathe: {
-    ru: 'Смещение света',
-    en: 'Light sweep',
+    ru: 'Дыхание',
+    en: 'Breathing',
   },
   sceneBackgroundAnimationAudioReactive: {
     ru: 'Аудио',
@@ -69,9 +78,11 @@ export const videoEditorSidebarSelectionSceneMessages = defineMessageSource({
     ru: 'Фоновое изображение',
     en: 'Background image',
   },
+  sceneBackgroundImageUpload: { ru: 'Загрузить изображение', en: 'Upload image' },
+  sceneBackgroundAnimationDrift: { ru: 'Перетекание', en: 'Flow' },
   sceneBackgroundImageEmpty: {
-    ru: 'Сначала импортируйте изображение в проект.',
-    en: 'Import an image into the project first.',
+    ru: 'Изображение заполнит фон; оригинал останется в материалах.',
+    en: 'The image fills the background and stays in materials.',
   },
   gridSettingsTitle: {
     ru: 'Сетка',

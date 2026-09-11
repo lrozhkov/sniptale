@@ -64,6 +64,8 @@ function resolveSelectedClipClosure(
   const effectInstances = (project.effectInstances ?? []).filter(({ id, target }) => {
     if (target.kind === 'scene') return standaloneInstanceIds.has(id);
     if (target.kind === 'clip') return clipIds.has(target.clipId);
+    if (target.kind === 'video-group') return true;
+    if (target.kind === 'track') return clips.some((clip) => clip.trackId === target.trackId);
     return transitionIds.has(target.transitionId);
   });
   const snapshotIds = new Set(effectInstances.map(({ snapshotId }) => snapshotId));

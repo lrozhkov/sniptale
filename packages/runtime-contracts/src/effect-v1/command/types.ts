@@ -12,7 +12,7 @@ type ExpressionValue = EffectV1Expression;
 type CommandBase = { layerId?: string };
 type StyledCommand = CommandBase & {
   alpha?: ExpressionValue;
-  blend?: 'lighter' | 'screen' | 'source-over';
+  blend?: 'lighter' | 'screen' | 'source-over' | 'source-atop' | 'destination-in';
   filter?: EffectV1Filter;
   shadow?: EffectV1Shadow;
 };

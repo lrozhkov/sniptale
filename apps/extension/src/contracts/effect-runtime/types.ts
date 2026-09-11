@@ -5,7 +5,7 @@ import type {
 
 import type { SerializedSvgVector } from './svg-vector';
 
-export const EFFECT_RUNTIME_PROTOCOL_VERSION = 3 as const;
+export const EFFECT_RUNTIME_PROTOCOL_VERSION = 4 as const;
 export const EFFECT_RUNTIME_SANDBOX_CONNECTION_FRAGMENT_KEY = 'connectionNonce' as const;
 export const EFFECT_RUNTIME_SANDBOX_CONNECT_MESSAGE = 'sniptale:effect-runtime:connect' as const;
 export const EFFECT_RUNTIME_SANDBOX_READY_MESSAGE = 'sniptale:effect-runtime:ready' as const;
@@ -93,7 +93,7 @@ export interface EffectRuntimeRenderCommand extends EffectRuntimeFrameRequestFie
   materializeImmutablePayloads(): Promise<EffectRuntimeImmutablePayloads>;
 }
 
-/** Exact protocol-v3 message crossing from the parent into the sandbox. */
+/** Exact protocol-v4 message crossing from the parent into the sandbox. */
 export interface EffectRuntimeRenderMessage extends EffectRuntimeFrameRequestFields {
   assetSelectionRef: EffectRuntimeAssetSelectionReference;
   documentRef: EffectRuntimeDocumentReference;
@@ -145,7 +145,7 @@ export interface EffectRuntimeWorkerDocumentReference {
   id: string;
 }
 
-/** Exact protocol-v3 broker-to-worker message. */
+/** Exact protocol-v4 broker-to-worker message. */
 export interface EffectRuntimeWorkerMessage extends EffectRuntimeFrameRequestFields {
   assetSelectionRef: EffectRuntimeWorkerAssetSelectionReference;
   documentRef: EffectRuntimeWorkerDocumentReference;
@@ -180,6 +180,7 @@ export interface EffectRuntimeCacheMissFailure extends EffectRuntimeFrameIdentit
   code: 'cacheMiss';
   kind: 'error';
   missingRef: 'assetSelection' | 'document';
+  retryInputs?: EffectRuntimeFrameInputs;
 }
 
 export type EffectRuntimeFrameResult =

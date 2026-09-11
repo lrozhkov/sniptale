@@ -51,6 +51,7 @@ export interface WorkspaceSidebarSelectionPanelProps {
     WorkspaceSidebarProps['onResetSceneBackgroundPreview']
   >;
   onSetCursorCaptureMode: WorkspaceSidebarProps['onSetCursorCaptureMode'];
+  onImportImage?: WorkspaceSidebarProps['onImportImage'];
   onSetSceneBackground: WorkspaceSidebarProps['onSetSceneBackground'];
   onStartActionPointPlacement: NonNullable<WorkspaceSidebarProps['onStartActionPointPlacement']>;
   onStartMotionAreaPlacement: NonNullable<WorkspaceSidebarProps['onStartMotionAreaPlacement']>;

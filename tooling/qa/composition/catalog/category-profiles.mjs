@@ -36,7 +36,6 @@ const CATEGORY_BY_LABEL = new Map([
   ['Architecture guardrails', 'dependency-graph'],
   ['Audit', 'cross-artifact-closure'],
   ['HTML sanitizer ownership', 'single-file-semantics'],
-  ['Mock export parity', 'cross-artifact-closure'],
   ['Dead exports', 'cross-artifact-closure'],
   ['Dependency admission', 'supply-chain-network'],
   ['Runtime parity', 'scope-and-admission'],

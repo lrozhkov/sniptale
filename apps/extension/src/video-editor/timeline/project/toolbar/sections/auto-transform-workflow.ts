@@ -43,6 +43,8 @@ interface AutoProcessingWorkflowState {
   scope: string[];
   settings: VideoAutoProcessingSettings;
   camera: boolean;
+  typingRate: number;
+  framingScale: number;
   analysis: AutoProcessingPreview | null;
   preview: AutoProcessingPreview | null;
   selectedIds: string[];
@@ -77,23 +79,13 @@ export function useAutoProcessingWorkflow(props: AutoProcessingWorkflowProps) {
       ...change(current),
     }));
   };
-  const { preview, analysis, selectedIds, scope, camera, settings } = state;
+  const { preview, analysis, selectedIds } = state;
   const stale = preview !== null && !props.actions.isCurrent(preview);
   const busy = state.phase !== 'idle';
   const prepare = async () => {
     const revision = ++epoch.current;
     patch({ phase: 'preparing', preview: null, message: '' });
-    const request: AutoProcessingRequest = {
-      targets: choices
-        .filter((choice) => scope.includes(choice.clipId))
-        .map(({ clipId, recordingId, sourceInstanceId }) => ({
-          clipId,
-          recordingId,
-          sourceInstanceId,
-        })),
-      settings,
-      camera,
-    };
+    const request = buildWorkflowRequest(state, choices);
     try {
       const result = await props.actions.prepare(request, analysis ? selectedIds : undefined);
       if (revision !== epoch.current) return;
@@ -175,6 +167,8 @@ export function useAutoProcessingWorkflow(props: AutoProcessingWorkflowProps) {
           ? current.scope.filter((id) => id !== clipId)
           : [...current.scope, clipId],
       })),
+    setTypingRate: (typingRate: number) => invalidate(() => ({ typingRate })),
+    setFramingScale: (framingScale: number) => invalidate(() => ({ framingScale })),
     toggleCamera: () => invalidate((current) => ({ camera: !current.camera })),
     toggleSuggestion: (id: string) =>
       setState((current) => ({
@@ -201,17 +195,40 @@ function initialWorkflowState(
     id &&
     choices.some((choice) => choice.clipId === id && choice.recordingId && choice.sourceInstanceId)
       ? [id]
-      : [];
+      : choices
+          .filter((choice) => choice.recordingId && choice.sourceInstanceId && !choice.locked)
+          .map((choice) => choice.clipId);
   return {
     step: 'setup',
     scope,
     settings: defaults(),
     camera: false,
+    typingRate: 2,
+    framingScale: 1.4,
     analysis: null,
     preview: null,
     selectedIds: [],
     phase: 'idle',
     originalInterval: null,
     message: '',
+  };
+}
+
+function buildWorkflowRequest(
+  state: AutoProcessingWorkflowState,
+  choices: ReturnType<typeof getAutoProcessingClipChoices>
+): AutoProcessingRequest {
+  return {
+    targets: choices
+      .filter((choice) => state.scope.includes(choice.clipId))
+      .map(({ clipId, recordingId, sourceInstanceId }) => ({
+        clipId,
+        recordingId,
+        sourceInstanceId,
+      })),
+    settings: state.settings,
+    camera: state.camera,
+    typingRate: state.typingRate,
+    framingScale: state.framingScale,
   };
 }

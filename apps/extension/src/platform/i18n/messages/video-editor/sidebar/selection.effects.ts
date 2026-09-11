@@ -1,6 +1,39 @@
 import { defineMessageSource } from '../../source';
 
 export const videoEditorSidebarSelectionEffectMessages = defineMessageSource({
+  actionPresetPress: { ru: 'Нажатие', en: 'Press' },
+  historyClickEffects: { ru: 'Эффекты клика', en: 'Click effects' },
+  historyTransitions: { ru: 'Переходы и время', en: 'Transitions & timing' },
+  historyKeyboard: { ru: 'Клавиши', en: 'Keystrokes' },
+  historyCursor: { ru: 'Курсор', en: 'Cursor' },
+  historyRules: { ru: 'Правила истории', en: 'History rules' },
+  actionColor: { ru: 'Цвет', en: 'Color' },
+  actionSize: { ru: 'Размер', en: 'Size' },
+  actionOpacity: { ru: 'Непрозрачность', en: 'Opacity' },
+  actionStroke: { ru: 'Толщина контура', en: 'Stroke width' },
+  actionEasing: { ru: 'Движение эффекта', en: 'Effect motion' },
+  keyPosition: { ru: 'Расположение', en: 'Position' },
+  keyFont: { ru: 'Шрифт', en: 'Font' },
+  keyFontSize: { ru: 'Размер текста', en: 'Text size' },
+  keyTextColor: { ru: 'Цвет текста', en: 'Text color' },
+  keyBackground: { ru: 'Подложка', en: 'Background' },
+  keyRadius: { ru: 'Скругление', en: 'Corners' },
+  keyMargin: { ru: 'Отступ от края', en: 'Edge margin' },
+  keyEntrance: { ru: 'Появление', en: 'Entrance' },
+  keyFade: { ru: 'Растворение', en: 'Fade' },
+  keySlide: { ru: 'Мягкий сдвиг', en: 'Soft slide' },
+  keyInstant: { ru: 'Без перехода', en: 'Instant' },
+  keyBottomLeft: { ru: 'Снизу слева', en: 'Bottom left' },
+  keyBottomCenter: { ru: 'Снизу по центру', en: 'Bottom center' },
+  keyBottomRight: { ru: 'Снизу справа', en: 'Bottom right' },
+  keyTopLeft: { ru: 'Сверху слева', en: 'Top left' },
+  keyTopCenter: { ru: 'Сверху по центру', en: 'Top center' },
+  keyTopRight: { ru: 'Сверху справа', en: 'Top right' },
+  keySans: { ru: 'Без засечек', en: 'Sans serif' },
+  keySerif: { ru: 'С засечками', en: 'Serif' },
+  keyMono: { ru: 'Моноширинный', en: 'Monospace' },
+  cursorAnimationPress: { ru: 'Нажатие при клике', en: 'Press on click' },
+
   historyDuration: { ru: 'Длительность', en: 'Duration' },
   historyOffset: { ru: 'Смещение', en: 'Offset' },
   historyEventMode: { ru: 'Визуализация', en: 'Visualization' },
@@ -24,6 +57,8 @@ export const videoEditorSidebarSelectionEffectMessages = defineMessageSource({
   framingBinding: { ru: 'Привязка', en: 'Binding' },
   framingBindingScene: { ru: 'Сцена', en: 'Scene' },
   framingExactPosition: { ru: 'Точное положение', en: 'Exact position' },
+  framingAreaView: { ru: 'Область', en: 'Area' },
+  framingResultView: { ru: 'Результат', en: 'Result' },
   framingPreviewLabel: { ru: 'Положение области кадрирования', en: 'Framing area position' },
   framingAreaPreviewHint: {
     ru: 'Перетащите область или её углы. Сплошная рамка — итоговый кадр.',
@@ -61,7 +96,7 @@ export const videoEditorSidebarSelectionEffectMessages = defineMessageSource({
   },
   addClickRipple: {
     ru: 'Клик-акцент',
-    en: 'Click ripple',
+    en: 'Ripple',
   },
   actionTimePrefix: {
     ru: 'Время:',
@@ -92,11 +127,11 @@ export const videoEditorSidebarSelectionEffectMessages = defineMessageSource({
     en: 'Instant',
   },
   motionScaleLabel: {
-    ru: 'Масштаб зума',
+    ru: 'Масштаб',
     en: 'Zoom scale',
   },
   motionCameraModeLabel: {
-    ru: 'Режим зума',
+    ru: 'Режим масштабирования',
     en: 'Zoom mode',
   },
   motionCameraModeStatic: {
@@ -156,7 +191,7 @@ export const videoEditorSidebarSelectionEffectMessages = defineMessageSource({
     en: 'Lock',
   },
   motionOverlayZoomFollowCamera: {
-    ru: 'Вместе с зумом',
+    ru: 'Вместе с масштабом',
     en: 'Follow zoom',
   },
   motionTargetActionLabel: {
@@ -196,12 +231,12 @@ export const videoEditorSidebarSelectionEffectMessages = defineMessageSource({
     en: 'No animation',
   },
   actionPresetClickRipple: {
-    ru: 'Пульс клика',
-    en: 'Click ripple',
+    ru: 'Кольцо',
+    en: 'Ripple',
   },
   actionPresetSpotlight: {
-    ru: 'Подсветка',
-    en: 'Spotlight',
+    ru: 'Мягкая подсветка',
+    en: 'Soft halo',
   },
   actionPresetDwellZoom: {
     ru: 'Задержка с приближением',
@@ -252,7 +287,7 @@ export const videoEditorSidebarSelectionEffectMessages = defineMessageSource({
     en: 'Click on the canvas to place the focus point.',
   },
   motionAreaPickHint: {
-    ru: 'Протяните по полотну, чтобы задать область зума.',
+    ru: 'Протяните по полотну, чтобы задать область масштабирования.',
     en: 'Drag on the canvas to define the zoom area.',
   },
 });

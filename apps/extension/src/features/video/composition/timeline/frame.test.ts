@@ -102,7 +102,7 @@ function expectCrossfadeFrame(frame: ReturnType<typeof resolveVideoCompositionFr
       animationPreset: 'NONE',
       captureMode: VideoCursorCaptureMode.SEPARATE,
       preset: 'ARROW',
-      scale: 1.28,
+      scale: 1,
       x: 150,
       y: 200,
     })
@@ -223,7 +223,7 @@ it('prefers a sample cursor override over the shared track appearance', () => {
       animationPreset: 'FLOAT',
       color: '#22cc88',
       preset: 'RING',
-      scale: 1.6 * 1.28,
+      scale: 1.6,
       shadow: true,
     })
   );

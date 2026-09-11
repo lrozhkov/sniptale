@@ -8,10 +8,22 @@ import {
 describe('video editor preview preference parsing', () => {
   it('accepts the complete validated preference contract', () => {
     expect(
-      parseVideoEditorPreviewPreferences({ mode: 'cache', rasterPreset: '2160p', zoom: '100%' })
+      parseVideoEditorPreviewPreferences({
+        showFrameRate: false,
+        frameRate: 'project',
+        mode: 'cache',
+        rasterPreset: '2160p',
+        zoom: '100%',
+      })
     ).toEqual({
       invalidFieldCount: 0,
-      preferences: { mode: 'cache', rasterPreset: '2160p', zoom: '100%' },
+      preferences: {
+        showFrameRate: false,
+        frameRate: 'project',
+        mode: 'cache',
+        rasterPreset: '2160p',
+        zoom: '100%',
+      },
     });
   });
 
@@ -33,4 +45,20 @@ describe('video editor preview preference parsing', () => {
       preferences: DEFAULT_VIDEO_EDITOR_PREVIEW_PREFERENCES,
     });
   });
+});
+
+it('accepts FPS limits and rejects unsupported values without changing project settings', () => {
+  expect(parseVideoEditorPreviewPreferences({ frameRate: '15' }).preferences.frameRate).toBe('15');
+  const invalid = parseVideoEditorPreviewPreferences({ frameRate: 999 });
+  expect(invalid.invalidFieldCount).toBe(1);
+  expect(invalid.preferences.frameRate).toBe('project');
+});
+
+it('validates the FPS visibility preference without coercion', () => {
+  expect(
+    parseVideoEditorPreviewPreferences({ showFrameRate: true }).preferences.showFrameRate
+  ).toBe(true);
+  const invalid = parseVideoEditorPreviewPreferences({ showFrameRate: 'true' });
+  expect(invalid.invalidFieldCount).toBe(1);
+  expect(invalid.preferences.showFrameRate).toBe(false);
 });

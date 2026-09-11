@@ -3,14 +3,7 @@ import type { VideoProjectClip, VideoProjectVideoClip, VideoProject } from '../t
 import type { VideoProjectTransform } from '../types/layout';
 import type { VideoMediaFitMode } from '../types/media';
 
-export interface CameraPosition {
-  id: string;
-  /** Source seconds keep the trajectory continuous across trims, splits and rate changes. */
-  sourceTime: number;
-  transform: VideoProjectTransform;
-  fitMode: VideoMediaFitMode;
-  transition: { kind: 'instant' | 'smooth' | 'shrink'; duration: number };
-}
+type CameraPosition = NonNullable<VideoProjectVideoClip['cameraPositions']>[number];
 
 export type CameraPositionEdit =
   | { kind: 'appearance'; appearance: CameraAppearance }

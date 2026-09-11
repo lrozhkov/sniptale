@@ -25,7 +25,7 @@ An unlock request may persist session metadata under `AI_SECRET_UNLOCK_REQUESTS_
 - Retain page content or user media only for an explicit product feature and an owner registered in the storage inventory.
 - Keep durable media bytes in immutable OPFS objects. Keep identity, ownership, lifecycle, and publication state in IndexedDB.
 - Publish an OPFS object and its IndexedDB graph atomically through the persistence-transition owner.
-- Treat previews, thumbnails, caches, staging objects, and temporary jobs as non-authoritative.
+- Treat previews, thumbnails, caches, staging objects, and temporary jobs as non-authoritative. Timeline WebP thumbnails use the existing local preview-cache IndexedDB database, bounded to 32 MiB, 2048 frames, and 14 days. Reads do not renew retention; project deletion and local-data erasure remove them and invalidate pending writes.
 - Exclude local media, temporary payloads, and caches from sync, automatic export, diagnostics, and traces.
 - Include data in backup only when the backup contract explicitly names it.
 - Abort active writers before local-data erasure. Remove registered browser storage, IndexedDB, OPFS, caches, staging objects, and legacy stores covered by the erasure contract. Verify absence before reporting success.
@@ -51,7 +51,7 @@ LLM request history may retain only timestamp, model ID, request kind, result co
 
 Treat every imported file and archive as hostile input. Parse it as `unknown`. Enforce the format version, schema, exact inventory, path and MIME policy, size and resource limits, identity uniqueness, and storage quota before mutation. Revalidate after user confirmation when the flow has a preview step. A failed import must not publish a partial durable aggregate.
 
-Settings transfer includes only transferable persisted controls. Exclude credentials, credential-presence flags, cryptographic material, protection state, device identifiers, projects, media, caches, permission grants, and runtime state. Include prompts or private base URLs only after point-of-action disclosure. Enforce the limits from [Settings transfer limits](../../apps/extension/src/contracts/settings-transfer/limits.ts). Surface an unverified rollback as a blocking failure.
+Settings transfer includes transferable persisted controls and explicitly selected video-editor effect catalogs (validated imported documents and bundled assets). The effect-bundles persistence owner stores source-qualified preset/default/enabled preferences in local browser storage under `videoEffectPreferences`, bounded to 1 MiB; settings transfer includes these preferences and retains unavailable effect/style references. Built-in effect definitions remain immutable extension resources and are excluded from settings backup. Exclude credentials, credential-presence flags, cryptographic material, protection state, device identifiers, projects, media, caches, permission grants, and runtime state. Include prompts or private base URLs only after point-of-action disclosure. Enforce the limits from [Settings transfer limits](../../apps/extension/src/contracts/settings-transfer/limits.ts). Surface an unverified rollback as a blocking failure.
 
 Page Package transfer uses bounded sequential chunks and temporary OPFS staging. Do not assemble the archive in service-worker memory. Before download or Library publication, verify the manifest, intent, exact inventory, paths, MIME profile, sizes, and entry SHA-256 values through an abortable stream. Discard staging after success, failure, cancellation, erasure, or owner release.
 

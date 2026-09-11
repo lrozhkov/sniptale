@@ -12,7 +12,7 @@ This file projects changeable values and inventories from their existing machine
 | Immutable GitHub Releases | `true` | `tooling/configs/ci/github-policy.json#/security/immutableReleases` |
 | Required GitHub checks | `pr-gate` | `tooling/configs/ci/github-policy.json#/ruleset` |
 | Protected release tags | `refs/tags/v*` | `tooling/configs/ci/github-policy.json#/releaseTagRuleset` |
-| QA controls | `91` controls in `14` ordered categories | `tooling/qa/composition/catalog/catalog.mjs#QA_CONTROL_CATALOG` |
+| QA controls | `90` controls in `14` ordered categories | `tooling/qa/composition/catalog/catalog.mjs#QA_CONTROL_CATALOG` |
 
 ## QA control categories
 
@@ -23,7 +23,7 @@ This file projects changeable values and inventories from their existing machine
 - `single-file-semantics`: 5
 - `owner-state-and-diff-structure`: 27
 - `dependency-graph`: 3
-- `cross-artifact-closure`: 6
+- `cross-artifact-closure`: 5
 - `behavioral-proof`: 8
 - `supply-chain-network`: 5
 - `release-sast-and-legal`: 5
@@ -120,6 +120,12 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/ui/command-palette`
 - `apps/extension/src/ui/compact-inspector-controls`
 - `apps/extension/src/ui/drawing-tools`
+- `apps/extension/src/ui/effect-catalog-controls.test.tsx`
+- `apps/extension/src/ui/effect-catalog-controls.tsx`
+- `apps/extension/src/ui/effect-catalog-preview-session.ts`
+- `apps/extension/src/ui/effect-catalog-preview.test.tsx`
+- `apps/extension/src/ui/effect-catalog-preview.tsx`
+- `apps/extension/src/ui/effect-catalog.css`
 - `apps/extension/src/ui/glass-select`
 - `apps/extension/src/ui/gradient-preset-grid`
 - `apps/extension/src/ui/highlighter-preset-editor`

@@ -46,7 +46,7 @@ it('sends progress when cadence allows it', async () => {
       totalFrames: 10,
     })
   ).resolves.toBe(3);
-  expect(sendFrameDrivenProgressMock).toHaveBeenCalledWith('job-1', 3, 10, undefined);
+  expect(sendFrameDrivenProgressMock).toHaveBeenCalledWith('job-1', 3, 10, undefined, undefined);
 });
 
 it('passes persistent message detail to frame-driven progress', async () => {
@@ -63,5 +63,11 @@ it('passes persistent message detail to frame-driven progress', async () => {
       totalFrames: 10,
     })
   ).resolves.toBe(3);
-  expect(sendFrameDrivenProgressMock).toHaveBeenCalledWith('job-1', 3, 10, 'Hybrid MP4: reason');
+  expect(sendFrameDrivenProgressMock).toHaveBeenCalledWith(
+    'job-1',
+    3,
+    10,
+    'Hybrid MP4: reason',
+    undefined
+  );
 });

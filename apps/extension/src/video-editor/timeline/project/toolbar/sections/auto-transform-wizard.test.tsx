@@ -1,7 +1,9 @@
+// @vitest-environment jsdom
+
+import { AutoProcessingReviewDockContext } from './auto-transform-modal';
 import { usePlaybackShortcuts } from '../../../../runtime/session/playback/shortcuts';
 import { useVideoEditorProjectHistoryShortcuts } from '../../../../runtime/session/history-shortcuts';
 import type { PlaybackLatestState, PlaybackHandlers } from '../../../../interaction/playback/types';
-// @vitest-environment jsdom
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -156,7 +158,15 @@ it('keeps review open during analysis and closes only after explicit application
 });
 it('defaults only the selected exact placement and makes original playback read-only', async () => {
   const f = fixture();
-  act(() => root.render(<AutoTransformWizard {...f.props} onClose={f.close} />));
+  const dock = document.createElement('div');
+  document.body.append(dock);
+  act(() =>
+    root.render(
+      <AutoProcessingReviewDockContext.Provider value={dock}>
+        <AutoTransformWizard {...f.props} onClose={f.close} />
+      </AutoProcessingReviewDockContext.Provider>
+    )
+  );
   await review();
   expect(f.prepare.mock.calls[0]?.[0]).toMatchObject({
     targets: [{ clipId: 'one', recordingId: 'rec-asset-video', sourceInstanceId: 'instance' }],
@@ -173,8 +183,13 @@ it('defaults only the selected exact placement and makes original playback read-
   expect(f.seek).toHaveBeenCalledWith(2);
   expect(f.apply).not.toHaveBeenCalled();
   expect(document.querySelector('[role="dialog"]')).toBeNull();
-  expect(button('return')).not.toBeNull();
+  expect(dock.contains(button('return'))).toBe(true);
+  expect(dock.querySelector('[data-ui="video-editor.auto.original"]')?.className).not.toContain(
+    'fixed'
+  );
   act(() => button('return').click());
+  expect(dock.children).toHaveLength(0);
+  dock.remove();
   expect(button('apply').disabled).toBe(false);
   expect(document.querySelector<HTMLInputElement>('[data-status="available"] input')?.checked).toBe(
     true
@@ -199,7 +214,7 @@ it('scope and settings changes invalidate the candidate and removing all suggest
   await review();
   expect(f.prepare.mock.calls.at(-1)?.[0].targets).toHaveLength(2);
 });
-it('has no scope for history-lane selection and disables stale previews', async () => {
+it('selects eligible recordings for history-lane processing and disables stale previews', async () => {
   const f = fixture();
   act(() =>
     root.render(
@@ -210,11 +225,11 @@ it('has no scope for history-lane selection and disables stale previews', async 
       />
     )
   );
-  expect(button('review').disabled).toBe(true);
+  expect(button('review').disabled).toBe(false);
   const first = document.querySelector<HTMLInputElement>(
     '[data-ui="video-editor.auto.scope"] input'
   )!;
-  act(() => first.click());
+  expect(first.checked).toBe(true);
   await review();
   act(() =>
     root.render(
@@ -413,6 +428,7 @@ it('isolates Delete, Space and Undo during setup/review and restores shortcuts a
       deleteActionEvent: noop,
       deleteClip: remove,
       deleteCursorSample: noop,
+      deleteEffectInstance: noop,
       deleteMotionRegion: noop,
       deleteObjectTrack: noop,
       duplicateClip: noop,

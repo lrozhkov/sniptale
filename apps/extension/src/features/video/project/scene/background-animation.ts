@@ -60,24 +60,9 @@ export function normalizeGradientAnimation(
   };
 }
 
-function resolveAnimationCycle(time: number, speed: number, multiplier = 0.24): number {
-  const resolvedSpeed = Math.max(0, speed) / 100;
-  return Math.sin(time * Math.PI * 2 * resolvedSpeed * multiplier);
-}
-
-function resolveAnimationPulse(time: number, speed: number, multiplier = 0.24): number {
-  return (resolveAnimationCycle(time, speed, multiplier) + 1) / 2;
-}
-
-function resolveTransientEnvelope(audioEnvelope: number): number {
+function resolveAudioReactiveAmount(audioEnvelope: number): number {
   const envelope = clampSceneBackgroundNumber(audioEnvelope, 0, 1);
-  const threshold = 0.22;
-  if (envelope <= threshold) {
-    return 0;
-  }
-
-  const normalizedEnvelope = (envelope - threshold) / (1 - threshold);
-  return Math.min(1, Math.pow(normalizedEnvelope, 0.72));
+  return Math.pow(envelope, 0.72);
 }
 
 export function resolveGradientAnimationFrame(params: {
@@ -86,44 +71,75 @@ export function resolveGradientAnimationFrame(params: {
   audioEnvelope: number;
   time: number;
 }) {
-  const animation = params.animation;
-  if (!animation || animation.mode === VideoSceneGradientAnimationMode.NONE) {
-    return { angle: params.angle, fromStop: 0, toStop: 100 };
+  const animation = normalizeGradientAnimation(params.animation);
+  const neutral = {
+    angle: params.angle,
+    fromStop: 0,
+    toStop: 100,
+    offsetX: 0,
+    offsetY: 0,
+    radiusScale: 1,
+  };
+  if (
+    !animation ||
+    animation.mode === VideoSceneGradientAnimationMode.NONE ||
+    animation.intensity === 0
+  )
+    return neutral;
+  const intensity = animation.intensity / 100;
+  if (animation.speed === 0) return neutral;
+  const time = Number.isFinite(params.time) ? Math.max(0, params.time) : 0;
+  const phase = ((time * Math.PI * 2 * animation.speed) / 100) * 0.16;
+  if (animation.mode === VideoSceneGradientAnimationMode.AUDIO_REACTIVE) {
+    const amount = resolveAudioReactiveAmount(params.audioEnvelope) * intensity;
+    if (amount === 0) return neutral;
+    return resolveAudioMotionFrame(params.angle, phase, amount);
   }
-
-  const intensityRatio = animation.intensity / 100;
+  const wave = Math.sin(phase);
   switch (animation.mode) {
-    case VideoSceneGradientAnimationMode.ROTATE: {
-      const drift = resolveAnimationCycle(params.time, animation.speed);
-      const stopPulse = resolveAnimationPulse(params.time + 0.35, animation.speed, 0.18);
-      const angleOffset = drift * intensityRatio * 28;
-      const stopOffset = (4 + stopPulse * 10) * intensityRatio;
+    case VideoSceneGradientAnimationMode.ROTATE:
       return {
-        angle: clampSceneBackgroundAngle(params.angle + angleOffset),
-        fromStop: stopOffset,
-        toStop: 100 - stopOffset * 0.65,
+        ...neutral,
+        angle: clampSceneBackgroundAngle(params.angle + ((phase * 180) / Math.PI) * intensity),
+        offsetX: wave * 0.3 * intensity,
+        offsetY: (Math.cos(phase) - 1) * 0.15 * intensity,
       };
-    }
     case VideoSceneGradientAnimationMode.BREATHE: {
-      const spotlight = resolveAnimationPulse(params.time, animation.speed, 0.16);
-      const angleDrift = resolveAnimationCycle(params.time + 0.5, animation.speed, 0.12);
-      const fromStop = (6 + spotlight * 18) * intensityRatio;
-      const toStop = 100 - (10 + (1 - spotlight) * 14) * intensityRatio;
+      const pulse = ((1 - Math.cos(phase)) / 2) * intensity;
       return {
-        angle: clampSceneBackgroundAngle(params.angle + angleDrift * intensityRatio * 12),
-        fromStop,
-        toStop,
+        ...neutral,
+        fromStop: pulse * 35,
+        toStop: 100 - pulse * 35,
+        radiusScale: 1 - pulse * 0.65,
+        angle: clampSceneBackgroundAngle(params.angle + wave * 25 * intensity),
       };
     }
-    case VideoSceneGradientAnimationMode.AUDIO_REACTIVE: {
-      const envelope = resolveTransientEnvelope(params.audioEnvelope);
-      const angleOffset = envelope * intensityRatio * 78;
-      const stopOffset = envelope * intensityRatio * 30;
+    case VideoSceneGradientAnimationMode.DRIFT:
       return {
-        angle: clampSceneBackgroundAngle(params.angle + angleOffset),
-        fromStop: stopOffset,
-        toStop: 100 - stopOffset,
+        ...neutral,
+        angle: clampSceneBackgroundAngle(params.angle + wave * 65 * intensity),
+        fromStop: Math.max(0, wave) * 45 * intensity,
+        toStop: 100 + Math.min(0, wave) * 45 * intensity,
+        offsetX: wave * 0.4 * intensity,
+        offsetY: Math.sin(phase * 0.7) * 0.3 * intensity,
       };
-    }
   }
+}
+
+/** Fixed mixed periods create evolving motion without random state or frame history. */
+function resolveAudioMotionFrame(angle: number, phase: number, amount: number) {
+  const horizontal = 0.68 * Math.sin(phase) + 0.32 * Math.sin(phase * Math.SQRT2 + 0.8);
+  const vertical =
+    0.65 * Math.sin(phase * 0.73 + 1.7) + 0.35 * Math.sin(phase * Math.sqrt(3) + 0.2);
+  const turn = 0.65 * Math.sin(phase * 0.61 + 0.6) + 0.35 * Math.sin(phase * 1.17 + 2);
+  const breath = (1 + Math.sin(phase * 0.83 + 0.4)) / 2;
+  const spread = (1 + Math.sin(phase * 1.11 + 1.3)) / 2;
+  return {
+    angle: clampSceneBackgroundAngle(angle + turn * 65 * amount),
+    offsetX: horizontal * 0.3 * amount,
+    offsetY: vertical * 0.24 * amount,
+    fromStop: amount * (8 + spread * 18),
+    toStop: 100 - amount * (8 + (1 - spread) * 18),
+    radiusScale: 1 + amount * (0.2 - 0.55 * breath),
+  };
 }

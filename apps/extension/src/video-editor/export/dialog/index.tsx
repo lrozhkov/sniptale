@@ -1,7 +1,6 @@
 import React, { useId, useRef } from 'react';
 import { Download, FileOutput } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
-import { getAvailableMp4VideoCodecs } from '../../../features/video/project/export/capabilities';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import {
   ProductModal,
@@ -22,6 +21,7 @@ import { useExportDialogFocus } from './focus';
 
 interface ExportDialogProps {
   selectedClipAvailable?: boolean;
+  selectedRangeAvailable?: boolean;
   settings: VideoProjectExportSettings;
   sourceDimensions: { height: number; width: number };
   onClose: () => void;
@@ -36,14 +36,18 @@ function ExportDialogHintCard(props: {
   settings: VideoProjectExportSettings;
 }) {
   const { capabilities, capabilityError, capabilitiesPending, settings } = props;
-  const availableMp4Codecs = capabilities ? getAvailableMp4VideoCodecs(capabilities) : [];
+  const unavailable =
+    capabilities?.mp4Codecs
+      .filter((entry) => !entry.available)
+      .map((entry) =>
+        entry.codec === 'AVC' ? 'H.264' : entry.codec === 'HEVC' ? 'H.265' : 'VP9'
+      ) ?? [];
   const hintMessage = capabilitiesPending
     ? translate('videoEditor.exportDialog.capabilityLoading')
-    : settings.format === VideoExportFormat.MP4
-      ? availableMp4Codecs.length > 1
-        ? translate('videoEditor.exportDialog.mp4HintSelectable')
-        : translate('videoEditor.exportDialog.mp4HintSingleCodec')
-      : translate('videoEditor.exportDialog.webmHint');
+    : settings.format === VideoExportFormat.MP4 && unavailable.length
+      ? `${unavailable.join(', ')} — ${translate('videoEditor.exportDialog.codecUnavailable')}`
+      : null;
+  if (!hintMessage && !capabilityError) return null;
 
   return (
     <div className="text-xs leading-relaxed text-[var(--sniptale-color-text-muted)]">
@@ -125,6 +129,7 @@ function ExportDialogActions(props: {
 
 export const ExportDialog: React.FC<ExportDialogProps> = ({
   selectedClipAvailable = false,
+  selectedRangeAvailable = false,
   settings,
   sourceDimensions,
   onClose,
@@ -147,7 +152,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
         labelledBy={titleId}
         onClose={onClose}
         closeOnBackdrop
-        width="min(560px, calc(100vw - 32px))"
+        width="min(480px, calc(100vw - 32px))"
       >
         <ProductModalHeader
           compact
@@ -162,6 +167,7 @@ export const ExportDialog: React.FC<ExportDialogProps> = ({
             sourceDimensions={sourceDimensions}
             onChange={onChange}
             selectedClipAvailable={selectedClipAvailable}
+            selectedRangeAvailable={selectedRangeAvailable}
           />
           <ExportDialogHintCard
             capabilities={capabilities}

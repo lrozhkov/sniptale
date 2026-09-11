@@ -79,7 +79,10 @@ function attachCachedVideoSegments(params: {
 }
 
 function useCachedVideoSource(source: PreparedCachedVideoPreview | null): string | null {
-  const [src, setSrc] = useState<string | null>(null);
+  const [attached, setAttached] = useState<{
+    source: PreparedCachedVideoPreview;
+    src: string;
+  } | null>(null);
   useEffect(() => {
     const mediaType = source ? createVideoPreviewCacheMediaType(source.codec) : null;
     if (
@@ -89,14 +92,14 @@ function useCachedVideoSource(source: PreparedCachedVideoPreview | null): string
       !MediaSource.isTypeSupported(mediaType) ||
       typeof URL.createObjectURL !== 'function'
     ) {
-      setSrc(null);
+      setAttached(null);
       return;
     }
     const mediaSource = new MediaSource();
     const nextSrc = URL.createObjectURL(mediaSource);
     let cancelled = false;
     const onFailure = () => {
-      if (!cancelled) setSrc(null);
+      if (!cancelled) setAttached(null);
     };
     const handleSourceOpen = () =>
       attachCachedVideoSegments({
@@ -107,14 +110,14 @@ function useCachedVideoSource(source: PreparedCachedVideoPreview | null): string
         segments: source.segments,
       });
     mediaSource.addEventListener('sourceopen', handleSourceOpen, { once: true });
-    setSrc(nextSrc);
+    setAttached({ source, src: nextSrc });
     return () => {
       cancelled = true;
       mediaSource.removeEventListener('sourceopen', handleSourceOpen);
       URL.revokeObjectURL(nextSrc);
     };
   }, [source]);
-  return src;
+  return attached?.source === source ? attached.src : null;
 }
 
 function useCachedVideoPlayback(params: {
@@ -130,15 +133,34 @@ function useCachedVideoPlayback(params: {
     const relativeTime = params.currentTime - params.source.startTime;
     const duration = params.source.endTime - params.source.startTime;
     const nextTime = Math.max(0, Math.min(duration, relativeTime));
-    const shouldSeek = params.isPlaying
-      ? Math.abs(video.currentTime - nextTime) > 0.04
-      : shouldRefreshPausedPreviewMediaTime(video.currentTime, nextTime);
-    if (shouldSeek) video.currentTime = nextTime;
-    if (!params.isPlaying) {
-      video.pause();
-      return;
-    }
-    void video.play().catch(() => undefined);
+    const synchronize = () => {
+      const shouldSeek = params.isPlaying
+        ? Math.abs(video.currentTime - nextTime) > 0.25
+        : shouldRefreshPausedPreviewMediaTime(video.currentTime, nextTime);
+      if (shouldSeek) {
+        video.style.visibility = 'hidden';
+        video.currentTime = nextTime;
+      }
+      if (!params.isPlaying) video.pause();
+      else void video.play().catch(() => undefined);
+    };
+    const reveal = () => {
+      if (video.seeking || video.readyState < 2) return;
+      const mismatched = params.isPlaying
+        ? Math.abs(video.currentTime - nextTime) > 0.25
+        : shouldRefreshPausedPreviewMediaTime(video.currentTime, nextTime);
+      if (mismatched) return;
+      video.style.visibility = 'visible';
+    };
+    video.addEventListener('loadedmetadata', synchronize);
+    video.addEventListener('seeked', reveal);
+    video.addEventListener('loadeddata', reveal);
+    synchronize();
+    return () => {
+      video.removeEventListener('loadedmetadata', synchronize);
+      video.removeEventListener('seeked', reveal);
+      video.removeEventListener('loadeddata', reveal);
+    };
   }, [params.currentTime, params.isPlaying, params.source, params.src, params.videoRef]);
 }
 
@@ -157,6 +179,7 @@ export function PreviewStageCachedVideo(props: {
       ref={videoRef}
       data-preview-stage-cached-video
       className="pointer-events-none absolute inset-0 z-[1] h-full w-full object-fill"
+      style={{ visibility: 'hidden' }}
       muted
       playsInline
       preload="auto"

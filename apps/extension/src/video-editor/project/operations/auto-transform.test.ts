@@ -7,6 +7,9 @@ import {
 import { DEFAULT_VIDEO_AUTO_PROCESSING_SETTINGS } from '@sniptale/runtime-contracts/video/types/defaults';
 import type { RecordingTelemetryEntry } from '../../../composition/persistence/recordings/contracts';
 import { RecordingTelemetrySignalKind } from '../../../features/video/project/types';
+vi.mock('./auto-transform.audio', () => ({
+  analyzeAutoProcessingAudio: vi.fn(async () => ({ status: 'absent' })),
+}));
 const { getTelemetry } = vi.hoisted(() => ({ getTelemetry: vi.fn() }));
 vi.mock('../../../composition/persistence/recordings/telemetry', async (importOriginal) => ({
   ...(await importOriginal<
@@ -286,4 +289,25 @@ it('keeps sourceless video visible as an unavailable choice instead of hiding th
   expect(getAutoProcessingClipChoices(project)).toEqual(
     expect.arrayContaining([expect.objectContaining({ clipId: 'screen', recordingId: '' })])
   );
+});
+
+it('one pass shortens both typing and pauses while preserving the immutable source project', async () => {
+  getTelemetry.mockResolvedValue({
+    ...telemetry(),
+    signals: [
+      { id: 'input', kind: 'typing', startTime: 1, endTime: 3, point: null, data: {} },
+      { id: 'idle', kind: 'cursor-idle', startTime: 0, endTime: 8, point: null, data: {} },
+    ],
+  });
+  const project = fixture();
+  const result = await prepareAutoProcessing(project, { ...request, typingRate: 2 });
+  expect(result.status).toBe('ready');
+  expect(result.suggestions.map((row) => row.category)).toEqual(['idle', 'typing', 'idle']);
+  expect(result.summary.afterDuration).toBe(14);
+  expect(project.clips[0]?.duration).toBe(8);
+  expect(
+    result.project?.clips
+      .filter((clip) => clip.type === 'VIDEO' && clip.sourceInstanceId === 'instance')
+      .reduce((sum, clip) => sum + clip.duration, 0)
+  ).toBe(4);
 });

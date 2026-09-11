@@ -1,8 +1,9 @@
+// @vitest-environment jsdom
+
 import {
   createEmptyVideoProject,
   createVideoProjectTrack,
 } from '../../../../../features/video/project/factories/creation';
-// @vitest-environment jsdom
 import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -182,13 +183,9 @@ async function verifyAudioControls() {
   const muteToggle = container?.querySelector<HTMLButtonElement>(
     'button[aria-pressed][aria-label]'
   );
-  expect(muteToggle).not.toBeNull();
-
-  await act(async () => {
-    muteToggle!.click();
-  });
-
-  expect(onUpdateClipMuted).toHaveBeenCalledWith('audio-1', true);
+  expect(muteToggle).toBeNull();
+  expect(onUpdateClipMuted).not.toHaveBeenCalled();
+  expect(container?.querySelector('input[type="range"]')).not.toBeNull();
 }
 
 describe('workspace sidebar timing/audio helpers', () => {

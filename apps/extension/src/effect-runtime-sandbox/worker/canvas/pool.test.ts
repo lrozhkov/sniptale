@@ -36,3 +36,111 @@ it('never lends the same canvas to overlapping frame leases', () => {
 });
 
 const createContext = createPassContext;
+
+it('physically releases cleared surfaces', () => {
+  const pool = createEffectRuntimeCanvasPool({
+    createCanvas: (width, height) => ({ width, height, getContext: () => createContext() }),
+  });
+  const lease = pool.lease({ effectInstanceId: 'a', slot: 0, width: 1280, height: 720 });
+  lease.release();
+  pool.clear();
+  expect(lease.canvas.width).toBe(0);
+  expect(lease.canvas.height).toBe(0);
+});
+
+it('reuses storage without width writes and releases idle surfaces', () => {
+  vi.useFakeTimers();
+  try {
+    let writes = 0;
+    let width = 100;
+    let height = 100;
+    const context = { ...createContext(), reset: vi.fn() };
+    const canvas = {
+      get width() {
+        return width;
+      },
+      set width(v) {
+        writes++;
+        width = v;
+      },
+      get height() {
+        return height;
+      },
+      set height(v) {
+        writes++;
+        height = v;
+      },
+      getContext: () => context,
+    };
+    const pool = createEffectRuntimeCanvasPool({ createCanvas: () => canvas });
+    for (let i = 0; i < 90; i++)
+      pool.lease({ effectInstanceId: 'same', slot: 0, width: 100, height: 100 }).release();
+    expect(writes).toBe(0);
+    expect(context.reset).toHaveBeenCalledTimes(90);
+    vi.advanceTimersByTime(1000);
+    expect(width).toBe(0);
+    expect(height).toBe(0);
+    expect(pool.snapshot().entries).toBe(0);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it('releases evicted pixels and limits retained idle bytes', () => {
+  const pool = createEffectRuntimeCanvasPool({
+    maxEntries: 2,
+    createCanvas: (width, height) => ({ width, height, getContext: () => createContext() }),
+  });
+  const a = pool.lease({ effectInstanceId: 'a', slot: 0, width: 3000, height: 3000 });
+  const b = pool.lease({ effectInstanceId: 'b', slot: 0, width: 3000, height: 3000 });
+  a.release();
+  b.release();
+  expect(a.canvas.width).toBe(0);
+  expect(pool.snapshot().entries).toBe(1);
+  pool.clear();
+  expect(b.canvas.width).toBe(0);
+});
+
+it('reuses compatible idle surfaces across sequential multi-pass effects without allocation churn', () => {
+  const createCanvas = vi.fn((width: number, height: number) => ({
+    width,
+    height,
+    getContext: () => ({ ...createContext(), reset: vi.fn() }),
+  }));
+  const pool = createEffectRuntimeCanvasPool({ createCanvas });
+  try {
+    for (let frame = 0; frame < 10; frame++) {
+      for (let effect = 0; effect < 3; effect++) {
+        const leases = Array.from({ length: 3 }, (_, slot) =>
+          pool.lease({
+            effectInstanceId: `effect-${effect}`,
+            slot,
+            width: 1280,
+            height: 720,
+          })
+        );
+        expect(new Set(leases.map(({ canvas }) => canvas)).size).toBe(3);
+        leases.forEach((lease) => lease.release());
+      }
+    }
+    expect(createCanvas).toHaveBeenCalledTimes(3);
+    expect(pool.snapshot()).toEqual({ entries: 3, leases: 0 });
+  } finally {
+    pool.clear();
+  }
+});
+
+it('keeps dimensions and exclusive leases when recycling slots', () => {
+  const pool = createEffectRuntimeCanvasPool({
+    maxEntries: 1,
+    createCanvas: (width, height) => ({ width, height, getContext: () => createContext() }),
+  });
+  const first = pool.lease({ effectInstanceId: 'a', slot: 0, width: 100, height: 100 });
+  expect(() => pool.lease({ effectInstanceId: 'b', slot: 0, width: 100, height: 100 })).toThrow();
+  first.release();
+  const second = pool.lease({ effectInstanceId: 'b', slot: 0, width: 200, height: 100 });
+  expect(first.canvas.width).toBe(0);
+  expect(second.canvas.width).toBe(200);
+  second.release();
+  pool.clear();
+});

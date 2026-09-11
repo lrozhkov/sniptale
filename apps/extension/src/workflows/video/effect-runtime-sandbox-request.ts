@@ -1,3 +1,4 @@
+import { matchesEffectRuntimeRetryInputs } from '../../contracts/effect-runtime/retry-inputs';
 import { closeEffectRuntimeBitmaps } from '../../contracts/effect-runtime/bitmap-lifetime';
 import {
   createEffectRuntimeFailure,
@@ -55,7 +56,7 @@ export class PendingEffectRuntimeRequest {
 
   finish(result: EffectRuntimeFrameResult): void {
     if (this.settled) {
-      if (result.kind === 'frame') result.bitmap.close();
+      closeEffectRuntimeBitmaps(result);
       return;
     }
     this.settled = true;
@@ -81,12 +82,15 @@ export class PendingEffectRuntimeRequest {
       return;
     }
     if (!sameEffectRuntimeIdentity(this.request, result)) {
-      if (result.kind === 'frame') result.bitmap.close();
+      closeEffectRuntimeBitmaps(result);
       this.finish(createEffectRuntimeFailure(this.request, 'stale'));
       return;
     }
-    if (result.kind === 'frame' && !hasExpectedDimensions(this.request, result)) {
-      result.bitmap.close();
+    if (
+      !matchesEffectRuntimeRetryInputs(this.request.inputFrames, result) ||
+      (result.kind === 'frame' && !hasExpectedDimensions(this.request, result))
+    ) {
+      closeEffectRuntimeBitmaps(result);
       this.finish(createEffectRuntimeFailure(this.request, 'outputRejected'));
       return;
     }

@@ -213,14 +213,14 @@ function drawVideoLayer(
     ...(layer.trackRole === 'CAMERA' && layer.clip.cameraAppearance
       ? { cameraAppearance: layer.clip.cameraAppearance }
       : {}),
-    shadowIntensity: layer.clip.shadowIntensity,
+    shadowIntensity: layer.effectActionsOnly ? 0 : layer.clip.shadowIntensity,
     shadowMode: layer.clip.shadowMode,
     sourceHeight: source instanceof HTMLVideoElement ? source.videoHeight : source.sourceHeight,
     sourceWidth: source instanceof HTMLVideoElement ? source.videoWidth : source.sourceWidth,
     render: (drawX, drawY, drawWidth, drawHeight) => {
-      if (source instanceof HTMLVideoElement) {
+      if (!layer.effectActionsOnly && source instanceof HTMLVideoElement) {
         context.drawImage(source, drawX, drawY, drawWidth, drawHeight);
-      } else {
+      } else if (!layer.effectActionsOnly && !(source instanceof HTMLVideoElement)) {
         source.draw(context, drawX, drawY, drawWidth, drawHeight);
       }
       context.save();
@@ -277,7 +277,7 @@ function drawImageLayer(
     displayScale,
     fitMode: layer.clip.fitMode,
     frame,
-    shadowIntensity: layer.clip.shadowIntensity,
+    shadowIntensity: layer.effectActionsOnly ? 0 : layer.clip.shadowIntensity,
     shadowMode: layer.clip.shadowMode,
     sourceHeight: image.naturalHeight,
     sourceWidth: image.naturalWidth,

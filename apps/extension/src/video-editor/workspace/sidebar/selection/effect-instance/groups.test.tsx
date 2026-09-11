@@ -7,7 +7,7 @@ import {
   createVideoProjectAsset,
 } from '../../../../../features/video/project/factories/creation';
 import { translate } from '../../../../../platform/i18n';
-import { createEffectInstanceGroup } from './groups';
+import { createEffectInstanceGroup, createEffectInstanceGroups } from './groups';
 import { createVideoClipFromAsset } from '../../../../../features/video/project/factories/clip';
 import { VideoProjectAssetType } from '../../../../../features/video/project/types';
 import {
@@ -80,6 +80,7 @@ function renderStack(disabled = false, composed = false) {
       onEnableCursorTrack: vi.fn(),
       onResizeProject: vi.fn(),
       onSetCursorCaptureMode: vi.fn(),
+      onImportImage: vi.fn(),
       onSetSceneBackground: vi.fn(),
       onUpdateClipAudioEnvelope: vi.fn(),
       onUpdateClipFades: vi.fn(),
@@ -171,7 +172,7 @@ it('preserves an off-scene handle coordinate when committing its existing value'
   const { readFileSync } = await import('node:fs');
   const { parseEffectV1Source } = await import('@sniptale/runtime-contracts/effect-v1');
   const source = readFileSync(
-    'packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-callout-light.sniptale-effect.json',
+    'packages/runtime-contracts/src/effect-v1/fixtures/collection/sniptale-callout.sniptale-effect.json',
     'utf8'
   );
   const parsed = parseEffectV1Source(source);
@@ -207,7 +208,7 @@ it('preserves an off-scene handle coordinate when committing its existing value'
   const update = vi.fn();
   act(() =>
     root.render(
-      createEffectInstanceGroup({
+      createEffectInstanceGroups({
         project,
         instanceId: 'callout',
         target: { kind: 'scene' },
@@ -215,9 +216,18 @@ it('preserves an off-scene handle coordinate when committing its existing value'
         onDeleteEffectInstance: vi.fn(),
         onDuplicateEffectInstance: vi.fn(() => null),
         onMoveEffectInstance: vi.fn(),
-      }).content
+      }).map((group) => (
+        <div key={group.id} data-semantic={group.semantic}>
+          {group.content}
+        </div>
+      ))
     )
   );
+  expect(
+    [...container.querySelectorAll('[data-semantic]')].map((node) =>
+      node.getAttribute('data-semantic')
+    )
+  ).toEqual(['effects', 'content', 'typography', 'appearance', 'animation']);
   const input = [...container.querySelectorAll<HTMLInputElement>('input')].find((node) =>
     node.getAttribute('aria-label')?.endsWith('· X')
   )!;

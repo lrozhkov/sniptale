@@ -61,7 +61,7 @@ describe('source-driven live recording input validation', () => {
     expect(coordinator.abort).toHaveBeenCalledOnce();
   });
 
-  it('preflights transformed VP9 WebM with constant rate control', async () => {
+  it('preflights transformed VP9 WebM with variable rate control', async () => {
     mediabunny.canEncodeVideo.mockResolvedValueOnce(false);
     const coordinator = createRecordingStagingCoordinatorTestDouble();
 
@@ -92,7 +92,7 @@ describe('source-driven live recording input validation', () => {
       'vp9',
       expect.objectContaining({
         bitrate: 8_000_000,
-        bitrateMode: 'constant',
+        bitrateMode: 'variable',
         height: 1080,
         width: 2120,
       })

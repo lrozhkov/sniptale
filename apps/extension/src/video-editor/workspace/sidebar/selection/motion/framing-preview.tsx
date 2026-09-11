@@ -1,8 +1,7 @@
-import { useContext, useRef } from 'react';
+import { useContext, useRef, useState } from 'react';
 import { translate } from '../../../../../platform/i18n';
 import {
   VideoMotionFocusMode,
-  type VideoProject,
   type VideoProjectMotionRegion,
   type VideoProjectMotionArea,
 } from '../../../../../features/video/project/types';
@@ -43,16 +42,34 @@ export function MotionFramingPreview(props: {
 }
 
 export function FramingPreviewSurface(props: FramingPreviewProps) {
-  const { project } = props;
+  const [overview, setOverview] = useState(true);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { ready, failed, retry, reload } = useFramingFrame(props, canvasRef);
-  const { areaMode, area, viewport, left, top, width, height, handlers } = useFramingInteraction(
-    props,
-    retry
-  );
+  const { areaMode, area, camera, viewport, left, top, width, height, handlers } =
+    useFramingInteraction(props, overview);
+  const { ready, failed, reload } = useFramingFrame(props, canvasRef, camera);
 
   return (
     <div className="space-y-2" data-ui="video-editor.framing-preview">
+      <div className="flex gap-1" aria-label={translate('videoEditor.sidebar.framingPreviewLabel')}>
+        {[true, false].map((mode) => (
+          <button
+            key={String(mode)}
+            type="button"
+            aria-pressed={overview === mode}
+            onClick={() => setOverview(mode)}
+            className={[
+              'rounded-md px-2 py-1 text-xs cursor-pointer',
+              overview === mode
+                ? 'bg-[var(--sniptale-color-surface-hover)] text-[var(--sniptale-color-text-primary)]'
+                : 'text-[var(--sniptale-color-text-secondary)]',
+            ].join(' ')}
+          >
+            {translate(
+              mode ? 'videoEditor.sidebar.framingAreaView' : 'videoEditor.sidebar.framingResultView'
+            )}
+          </button>
+        ))}
+      </div>
       <button
         type="button"
         data-video-editor-local-navigation="true"
@@ -60,16 +77,16 @@ export function FramingPreviewSurface(props: FramingPreviewProps) {
         disabled={!ready}
         className={`relative block w-full overflow-hidden rounded-md border
 border-[color:var(--sniptale-color-border-soft)] bg-[var(--sniptale-color-surface-muted)]
-touch-none cursor-move disabled:cursor-default`}
+touch-none ${overview ? 'cursor-move' : 'cursor-default'} disabled:cursor-default`}
         style={{ aspectRatio: `${width} / ${height}` }}
-        {...handlers}
+        {...(overview ? handlers : {})}
       >
         <FramingOverlays
           canvasRef={canvasRef}
           ready={ready}
           failed={failed}
-          project={project}
-          area={area}
+          area={overview ? area : null}
+          showOutline={overview}
           viewport={viewport}
           world={{ left, top, width, height }}
         />
@@ -82,7 +99,7 @@ touch-none cursor-move disabled:cursor-default`}
         >
           {translate('common.actions.retry')}
         </button>
-      ) : (
+      ) : overview ? (
         <p className="text-xs text-[var(--sniptale-color-text-secondary)]">
           {translate(
             areaMode
@@ -90,7 +107,7 @@ touch-none cursor-move disabled:cursor-default`}
               : 'videoEditor.sidebar.framingPreviewHint'
           )}
         </p>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -99,18 +116,18 @@ function FramingOverlays({
   canvasRef,
   ready,
   failed,
-  project,
   area,
   viewport,
   world,
+  showOutline,
 }: {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
   ready: boolean;
   failed: boolean;
-  project: VideoProject;
   area: VideoProjectMotionArea | null;
   viewport: ReturnType<typeof resolveCameraViewportFrame>;
   world: { left: number; top: number; width: number; height: number };
+  showOutline: boolean;
 }) {
   const { left, top, width, height } = world;
   return (
@@ -121,10 +138,9 @@ function FramingOverlays({
         className="absolute pointer-events-none"
         style={{
           visibility: ready ? 'visible' : 'hidden',
-          left: `${(-left / width) * 100}%`,
-          top: `${(-top / height) * 100}%`,
-          width: `${(project.width / width) * 100}%`,
-          height: `${(project.height / height) * 100}%`,
+          inset: 0,
+          width: '100%',
+          height: '100%',
         }}
       />
       {ready && area ? (
@@ -156,7 +172,7 @@ bg-[var(--sniptale-color-surface-panel)] pointer-events-auto`}
           ))}
         </span>
       ) : null}
-      {ready ? (
+      {ready && showOutline ? (
         <span
           aria-hidden="true"
           className={`absolute pointer-events-none border-2
@@ -168,7 +184,7 @@ border-[color:var(--sniptale-color-border-accent-strong)] rounded-sm`}
             height: `${(viewport.viewportHeight / height) * 100}%`,
           }}
         />
-      ) : (
+      ) : !ready ? (
         <span className="text-xs text-[var(--sniptale-color-text-secondary)]">
           {translate(
             failed
@@ -176,7 +192,7 @@ border-[color:var(--sniptale-color-border-accent-strong)] rounded-sm`}
               : 'videoEditor.sidebar.framingPreviewLoading'
           )}
         </span>
-      )}
+      ) : null}
     </>
   );
 }

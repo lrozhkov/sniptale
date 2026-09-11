@@ -1,21 +1,5 @@
 import { translate } from '../../../../../platform/i18n';
 import { SliderField } from '../shared/sliders';
-import { ToggleField } from '../shared/controls';
-
-export function AudioMuteToggle({
-  checked,
-  disabled,
-  label,
-  onChange,
-}: {
-  checked: boolean;
-  disabled: boolean;
-  label: string;
-  onChange: (checked: boolean) => void;
-}) {
-  return <ToggleField checked={checked} disabled={disabled} label={label} onChange={onChange} />;
-}
-
 export function AudioVolumeField({
   disabled,
   value,

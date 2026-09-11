@@ -1,7 +1,14 @@
+import type { VideoProjectEffectTarget } from '../../features/video/project/effect-instance/types';
+
+export type VideoEditorEffectApplicationTarget =
+  | VideoProjectEffectTarget
+  | { kind: 'junction'; leadingClipId: string; trailingClipId: string };
+
 export const VIDEO_EDITOR_EFFECT_DOCUMENT_DRAG_MIME = 'application/x-sniptale-effect-document+json';
 
 export interface VideoEditorEffectDocumentDragPayload {
   documentId: string;
+  controlPresetId?: string;
   kind: 'standalone' | 'targetEffect' | 'transition';
   packId: string;
 }
@@ -33,10 +40,24 @@ export function readVideoEditorEffectDocumentDragPayload(
   } catch {
     return null;
   }
-  if (!isRecord(value) || Object.keys(value).length !== 3) return null;
+  if (
+    !isRecord(value) ||
+    Object.keys(value).some(
+      (key) => !['documentId', 'kind', 'packId', 'controlPresetId'].includes(key)
+    )
+  )
+    return null;
+  if (value['controlPresetId'] !== undefined && !isBoundedId(value['controlPresetId'])) return null;
   const { documentId, kind, packId } = value;
   if (!isBoundedId(documentId) || !isBoundedId(packId) || !isEffectKind(kind)) return null;
-  return { documentId, kind, packId };
+  return {
+    documentId,
+    kind,
+    packId,
+    ...(value['controlPresetId'] === undefined
+      ? {}
+      : { controlPresetId: value['controlPresetId'] }),
+  };
 }
 
 export function hasVideoEditorEffectDocumentDragType(

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { translate } from '../../../../../platform/i18n';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorActionButton } from '../shared/actions';
 import { VideoOverlayTemplateKind } from '../../../../../features/video/project/types';
 import type { VideoProjectAnnotationClip } from '../../../../../features/video/project/types';
 import type { WorkspaceSidebarProps } from '../../contracts/props';
@@ -42,7 +42,7 @@ export function TextTemplateUpgradeFields(props: {
           onChange={setTemplateKind}
           options={getAnnotationTemplateOptions()}
         />
-        <ProductActionButton
+        <InspectorActionButton
           compact
           tone="primary"
           disabled={props.disabled}
@@ -50,7 +50,7 @@ export function TextTemplateUpgradeFields(props: {
           onClick={() => props.onConvertTextClipToAnnotation(props.clipId, templateKind)}
         >
           {translate('videoEditor.sidebar.textTemplateUpgradeAction')}
-        </ProductActionButton>
+        </InspectorActionButton>
       </div>
     </div>
   );

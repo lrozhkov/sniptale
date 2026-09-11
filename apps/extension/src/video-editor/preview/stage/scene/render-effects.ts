@@ -36,18 +36,22 @@ export function drawPreviewTransitionOverlays(params: {
     passCount: params.passes.length,
     prepared: params.prepared,
   });
-  for (const pass of params.passes) {
-    for (const overlay of pass.transitionOverlays ?? []) {
-      const frames = getEffectRuntimeVisualPassFrames(params.effectRuntimeFrames, pass.time);
-      if (hasEffectRuntimeTransitionFrame(frames, overlay.transitionId)) continue;
-      drawTransitionOverlay(
-        passTarget.context,
-        overlay,
-        params.prepared.bounds.width,
-        params.prepared.bounds.height,
-        pass.alpha
-      );
+  try {
+    for (const pass of params.passes) {
+      for (const overlay of pass.transitionOverlays ?? []) {
+        const frames = getEffectRuntimeVisualPassFrames(params.effectRuntimeFrames, pass.time);
+        if (hasEffectRuntimeTransitionFrame(frames, overlay.transitionId)) continue;
+        drawTransitionOverlay(
+          passTarget.context,
+          overlay,
+          params.prepared.bounds.width,
+          params.prepared.bounds.height,
+          pass.alpha
+        );
+      }
     }
+    passTarget.flush();
+  } finally {
+    passTarget.dispose();
   }
-  passTarget.flush();
 }

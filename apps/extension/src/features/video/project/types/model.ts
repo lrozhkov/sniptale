@@ -1,5 +1,5 @@
 import type { CameraAppearance } from '../camera/appearance';
-import type { CameraPosition } from '../camera/animation';
+import type { VideoMediaFitMode } from './media';
 import type {
   VideoProjectActionEvent,
   VideoProjectActionPresentation,
@@ -27,6 +27,15 @@ import type {
   VideoProjectEffectInstance,
   VideoProjectEffectSnapshot,
 } from '../effect-instance/types';
+
+interface CameraPosition {
+  id: string;
+  /** Source seconds keep the trajectory continuous across trims, splits and rate changes. */
+  sourceTime: number;
+  transform: VideoProjectTransform;
+  fitMode: VideoMediaFitMode;
+  transition: { kind: 'instant' | 'smooth' | 'shrink'; duration: number };
+}
 
 export const VideoProjectAssetType = {
   RECORDING: 'RECORDING',
@@ -141,6 +150,7 @@ export interface VideoProjectAsset {
 }
 
 interface VideoProjectBaseClip {
+  effectsBypassed?: boolean;
   id: string;
   trackId: string;
   timelineLaneId?: string | null;
@@ -271,6 +281,7 @@ export type VideoProjectClip =
   | VideoProjectShapeClip;
 
 export interface VideoProject {
+  videoEffectsBypassed?: boolean;
   version: 2;
   id: string;
   name: string;

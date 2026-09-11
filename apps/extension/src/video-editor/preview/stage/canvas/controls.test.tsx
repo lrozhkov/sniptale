@@ -33,6 +33,7 @@ it('presents cache preparation failure separately from unavailable capability', 
   );
 
   expect(markup).toContain('videoEditor.stage.previewCacheFailed');
+  expect(markup).toContain('>videoEditor.stage.previewCacheFailedShort</span>');
   expect(markup).not.toContain('videoEditor.stage.previewCacheUnavailable');
   expect(markup).toContain('video.preview.display-settings');
   expect(markup).toContain(' · 720p · ');
@@ -84,8 +85,8 @@ it('changes each display setting independently and restores focus when dismissed
       '[data-ui="video.preview.display-settings"]'
     )!;
     act(() => trigger.click());
-    expect(document.querySelectorAll('fieldset')).toHaveLength(3);
-    expect(document.querySelectorAll('input:checked')).toHaveLength(3);
+    expect(document.querySelectorAll('fieldset')).toHaveLength(4);
+    expect(document.querySelectorAll('input:checked')).toHaveLength(4);
     expect(document.activeElement).toBe(document.querySelector('input:checked'));
     for (const value of ['1080p', '75%', 'cache']) {
       act(() => document.querySelector<HTMLInputElement>(`input[value="${value}"]`)!.click());
@@ -110,6 +111,45 @@ it('changes each display setting independently and restores focus when dismissed
   } finally {
     act(() => root.unmount());
     host.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('keeps the cache hint and its node stable while the percentage changes', () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  const render = (completedFrames: number) =>
+    act(() =>
+      root.render(
+        <PreviewStageControls
+          mode="cache"
+          onModeChange={vi.fn()}
+          onPreferencesRetry={vi.fn()}
+          onRasterPresetChange={vi.fn()}
+          onZoomChange={vi.fn()}
+          preferencesSaveFailed={false}
+          rasterPreset="720p"
+          zoom="fit"
+          status={{
+            completedFrames,
+            totalFrames: 100,
+            mode: 'cache',
+            phase: 'preparing-video-cache',
+          }}
+        />
+      )
+    );
+  try {
+    render(10);
+    const status = host.querySelector('[role="status"]');
+    expect(status?.getAttribute('title')).toBe('videoEditor.stage.previewCachePreparing');
+    render(35);
+    expect(host.querySelector('[role="status"]')).toBe(status);
+    expect(status?.getAttribute('title')).toBe('videoEditor.stage.previewCachePreparing');
+    expect(status?.textContent).toBe('35%');
+  } finally {
+    act(() => root.unmount());
     vi.unstubAllGlobals();
   }
 });

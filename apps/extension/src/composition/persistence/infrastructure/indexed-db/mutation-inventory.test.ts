@@ -13,6 +13,8 @@ const delegatedMutationHelpers = new Set([
   'apps/extension/src/composition/persistence/aggregate-presentations/backup-restore.ts',
   'apps/extension/src/composition/persistence/editor-bootstrap/retention-cleanup.ts',
   'apps/extension/src/composition/persistence/effect-bundles/backup-restore.ts',
+  // Validates the caller's active permit before returning its transaction writer.
+  'apps/extension/src/composition/persistence/effect-bundles/settings-transfer.ts',
   'apps/extension/src/composition/persistence/image-workspaces/backup-restore.ts',
   'apps/extension/src/composition/persistence/infrastructure/indexed-db/maintenance/provenance.ts',
   'apps/extension/src/composition/persistence/projects/asset-references.ts',

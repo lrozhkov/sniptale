@@ -1,3 +1,7 @@
+import {
+  getActionClickStyle,
+  getActionKeyStyle,
+} from '../../../features/video/project/action-style';
 import { bindMotionRegionToClip } from '../../../features/video/project/motion/source-binding';
 import {
   createProject,
@@ -533,7 +537,12 @@ it('updates inherited presentation, resets sparse overrides and restores edits w
   delete project.actionEvents[0]!.presentation;
   store.getState().setProject(project);
   const event = store.getState().project!.actionEvents[0]!;
-  store.getState().updateActionPresentation({ duration: 1.2, offset: -0.3 });
+  store.getState().updateActionPresentation({
+    duration: 1.2,
+    offset: -0.3,
+    clickStyle: { ...getActionClickStyle(), size: 70 },
+    keyStyle: { ...getActionKeyStyle(), fontSize: 42 },
+  });
   store.getState().updateActionEventDetails(event.id, { presentation: { enabled: false } });
   store.getState().updateActionPresentation({ duration: 1.8 });
   const overridden = store.getState().project!;

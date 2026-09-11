@@ -1,3 +1,4 @@
+import { getEffectInstanceLabel } from '../../../features/video/project/effect-instance/presentation';
 import React from 'react';
 import {
   Camera,
@@ -16,6 +17,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { translate, type TranslationKey } from '../../../platform/i18n';
 import {
+  buildClipLabel,
   isAudioClip,
   isAnnotationClip,
   isShapeClip,
@@ -77,9 +79,14 @@ function createStaticSelectionMeta(Icon: LucideIcon, labelKey: TranslationKey) {
 export function getSelectionMeta(
   selection: VideoEditorSelection,
   clip: WorkspaceSidebarProps['selectedClip'],
-  selectedTrack?: WorkspaceSidebarProps['selectedTrack']
+  selectedTrack?: WorkspaceSidebarProps['selectedTrack'],
+  project?: WorkspaceSidebarProps['project']
 ): { icon: React.ReactNode; label: string; title: string } {
   switch (selection.kind) {
+    case VideoEditorSelectionKind.EFFECT_INSTANCE: {
+      const label = project ? getEffectInstanceLabel(project, selection.effectInstanceId) : 'FX';
+      return { icon: renderSidebarIcon(SlidersHorizontal), label, title: label };
+    }
     case VideoEditorSelectionKind.SCENE:
       return createStaticSelectionMeta(SlidersHorizontal, 'videoEditor.sidebar.sceneProperties');
     case VideoEditorSelectionKind.CLIP_GROUP:
@@ -88,7 +95,10 @@ export function getSelectionMeta(
       return {
         icon: getClipSelectionIcon(clip),
         label: getClipTypeLabel(clip),
-        title: clip?.name ?? translate('videoEditor.sidebar.sceneProperties'),
+        title:
+          clip && project && clip.type === 'EFFECT'
+            ? buildClipLabel(project, clip)
+            : (clip?.name ?? translate('videoEditor.sidebar.sceneProperties')),
       };
     case VideoEditorSelectionKind.TRACK:
       return selectedTrack

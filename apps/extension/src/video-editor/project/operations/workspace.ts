@@ -200,8 +200,8 @@ async function migratePersistedRecordingAssets(project: VideoProject): Promise<V
 /**
  * Creates and persists an empty project workspace.
  */
-export async function createBlankProject(): Promise<VideoProject> {
-  const nextProject = createEmptyVideoProject();
+export async function createBlankProject(name?: string): Promise<VideoProject> {
+  const nextProject = createEmptyVideoProject(name);
 
   return commitVideoProjectMutation(nextProject, { baseRevision: null });
 }
@@ -261,4 +261,14 @@ export async function openPersistedProject(projectId: string): Promise<VideoProj
         })
       : persistedProject;
   return migratePersistedRecordingAssets(retainedProject);
+}
+
+/** Copies the editable document; immutable media references remain shared and reference-counted. */
+export async function copyProject(project: VideoProject, name: string): Promise<VideoProject> {
+  const copy = structuredClone(project);
+  copy.id = crypto.randomUUID();
+  copy.name = name;
+  copy.createdAt = Date.now();
+  copy.updatedAt = copy.createdAt;
+  return commitVideoProjectMutation(copy, { baseRevision: null });
 }

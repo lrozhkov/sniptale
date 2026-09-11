@@ -1,5 +1,5 @@
 import { translate } from '../../../../../platform/i18n';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { InspectorActionButton } from '../shared/actions';
 import { type VideoObjectTrackSample } from '../../../../../features/video/project/object-tracks';
 import type { WorkspaceSidebarSelectionPanelProps } from '../../contracts/selection-panel';
 import { InspectorGroupedPanel } from '../grouped-inspector';
@@ -124,14 +124,14 @@ function ObjectTrackCorrectionPanel({ props }: { props: WorkspaceSidebarSelectio
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
-        <ProductActionButton
+        <InspectorActionButton
           compact
           data-ui="video-editor.object-track.place-correction"
           type="button"
           onClick={() => props.onStartObjectTrackAnchorPlacement?.(track.id)}
         >
           {translate('videoEditor.sidebar.objectTrackCorrectionPlace')}
-        </ProductActionButton>
+        </InspectorActionButton>
       </div>
     </div>
   );

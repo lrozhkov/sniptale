@@ -1,5 +1,6 @@
 import type {
   ControlDefinition,
+  EffectControlPreset,
   EffectClip,
   EffectLayer,
   EffectScene,
@@ -68,7 +69,12 @@ export type EffectV1ObjectHandle = {
   padding: number;
 };
 
+export type { EffectControlPreset } from './base.js';
+
 export type EffectV1Document = {
+  editorRegion?: EffectV1EditorRegion;
+  controlPresets?: EffectControlPreset[];
+  defaultControlPresetId?: string;
   assets: EffectV1Asset[];
   clips: EffectClip[];
   controls: ControlDefinition[];
@@ -104,4 +110,18 @@ export type EffectV1ValidationResult = {
 export type EffectV1InputContract = {
   optional: readonly import('./operations.js').EffectV1RuntimeInputName[];
   required: readonly import('./operations.js').EffectV1RuntimeInputName[];
+};
+
+export type EffectV1EditorRegion = {
+  id: string;
+  label: { en: string; [locale: string]: string };
+  kind: 'rect';
+  units: 'percent';
+  position: 'available-space';
+  /** Fraction of the shorter target dimension, not scene pixels. */
+  inset: number;
+  xControl: string;
+  yControl: string;
+  widthControl: string;
+  heightControl: string;
 };

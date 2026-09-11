@@ -1,21 +1,21 @@
 import { afterEach, expect, it, vi } from 'vitest';
 
 const {
-  drawActionCompositionStateMock,
   drawCompositionLayerMock,
   drawCursorCompositionStateMock,
+  drawSceneActionCompositionStatesMock,
   resolveVideoCompositionRenderPassesMock,
 } = vi.hoisted(() => ({
-  drawActionCompositionStateMock: vi.fn(),
   drawCompositionLayerMock: vi.fn(),
   drawCursorCompositionStateMock: vi.fn(),
+  drawSceneActionCompositionStatesMock: vi.fn(),
   resolveVideoCompositionRenderPassesMock: vi.fn(),
 }));
 
 vi.mock('../../../features/video/composition/draw', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../features/video/composition/draw')>()),
-  drawActionCompositionState: drawActionCompositionStateMock,
   drawCursorCompositionState: drawCursorCompositionStateMock,
+  drawSceneActionCompositionStates: drawSceneActionCompositionStatesMock,
 }));
 
 vi.mock('../../../features/video/composition/motion/layer-camera', async (importOriginal) => ({
@@ -121,17 +121,11 @@ function expectScaledOverlayDraws(
     expect.any(Map),
     1
   );
-  expect(drawActionCompositionStateMock).toHaveBeenNthCalledWith(
-    1,
+  expect(drawSceneActionCompositionStatesMock).toHaveBeenCalledWith(
     context,
-    expect.objectContaining({ point: { x: 40, y: 20 } }),
-    { x: 24, y: 16 }
-  );
-  expect(drawActionCompositionStateMock).toHaveBeenNthCalledWith(
-    2,
-    context,
-    expect.objectContaining({ point: null }),
-    { x: 24, y: 16 }
+    frame.actions,
+    frame.camera,
+    { offsetX: 0, offsetY: 0, scaleX: 2, scaleY: 2 }
   );
   expect(drawCursorCompositionStateMock).toHaveBeenCalledWith(
     context,
@@ -193,6 +187,11 @@ it('skips cursor drawing when the composition frame does not expose cursor state
     new Map()
   );
 
-  expect(drawActionCompositionStateMock).not.toHaveBeenCalled();
+  expect(drawSceneActionCompositionStatesMock).toHaveBeenCalledWith(
+    expect.anything(),
+    [],
+    expect.anything(),
+    expect.anything()
+  );
   expect(drawCursorCompositionStateMock).not.toHaveBeenCalled();
 });

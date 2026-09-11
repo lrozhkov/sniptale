@@ -3,6 +3,7 @@ import { transitionCaptureSurfaceSnapshot, type WindowSnapshot } from './restora
 import type { CaptureSurfaceLeaseRequest, CaptureSurfaceLeaseState } from './types';
 import { CaptureSurfaceMutationError } from './types';
 import { applyPreparedWindowSize } from './window';
+import { alignVideoCaptureSurface } from './video-raster-alignment';
 
 export class CaptureSurfaceLeaseMutation {
   constructor(private readonly registry: CaptureSurfaceLeaseRegistry) {}
@@ -16,13 +17,17 @@ export class CaptureSurfaceLeaseMutation {
     await this.registry.persist();
   }
 
-  async mutate(state: CaptureSurfaceLeaseState): Promise<void> {
+  async mutate(
+    state: CaptureSurfaceLeaseState,
+    measure?: CaptureSurfaceLeaseRequest['measureVideoViewport']
+  ): Promise<void> {
     try {
       await applyPreparedWindowSize(
         state.entry.windowId,
         state.prior as WindowSnapshot,
         state.entry.applied as WindowSnapshot
       );
+      if (measure) await alignVideoCaptureSurface(state, measure, this.registry);
     } catch (error) {
       if (error instanceof CaptureSurfaceMutationError && error.observedSnapshot) {
         state.ownedMutationSnapshot = error.observedSnapshot;
@@ -38,6 +43,7 @@ export class CaptureSurfaceLeaseMutation {
     state: CaptureSurfaceLeaseState;
   }): Promise<void> {
     const { parent, replaceCurrent, request, state } = args;
+    delete state.entry.alignmentFrom;
     state.entry.phase = 'applied';
     state.entry.updatedAt = this.registry.nextTimestamp();
     if (replaceCurrent && parent) {
@@ -55,9 +61,11 @@ export class CaptureSurfaceLeaseMutation {
   ): Promise<void> {
     try {
       await transitionCaptureSurfaceSnapshot({
-        expected: state.ownedMutationSnapshot
-          ? [state.entry.applied, state.ownedMutationSnapshot]
-          : [state.entry.applied],
+        expected: [
+          state.entry.applied,
+          ...(state.entry.alignmentFrom ? [state.entry.alignmentFrom] : []),
+          ...(state.ownedMutationSnapshot ? [state.ownedMutationSnapshot] : []),
+        ],
         next: state.prior,
         state,
       });
@@ -71,6 +79,7 @@ export class CaptureSurfaceLeaseMutation {
   }
 
   private async markConflict(state: CaptureSurfaceLeaseState): Promise<void> {
+    delete state.entry.alignmentFrom;
     state.entry.phase = 'conflict';
     state.entry.updatedAt = this.registry.nextTimestamp();
     await this.registry.persist();

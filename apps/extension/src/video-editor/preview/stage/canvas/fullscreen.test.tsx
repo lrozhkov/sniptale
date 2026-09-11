@@ -10,7 +10,11 @@ vi.mock('../../../../platform/i18n/index', async (importOriginal) => ({
   translate: (key: string) => key,
 }));
 
-import { PreviewStageFullscreenTransport, usePreviewStageFullscreen } from './fullscreen';
+import {
+  PreviewStageFullscreenTransport,
+  usePreviewStageFullscreen,
+  useFullscreenPreviewPan,
+} from './fullscreen';
 
 function FullscreenHookHarness() {
   const frameRef = React.useRef<HTMLDivElement | null>(null);
@@ -106,6 +110,7 @@ it('tracks DOM fullscreen open and close around the stage frame owner', () => {
     }),
   });
 
+  (container!.querySelector('button') as HTMLButtonElement).focus();
   act(() => {
     (container!.querySelector('button') as HTMLButtonElement).click();
   });
@@ -117,6 +122,7 @@ it('tracks DOM fullscreen open and close around the stage frame owner', () => {
   });
 
   expect(container?.querySelector('[data-testid="state"]')?.textContent).toBe('closed');
+  expect(document.activeElement).toBe(container!.querySelector('button'));
 });
 
 it('routes play seek and close actions through the fullscreen transport controls', () => {
@@ -143,7 +149,7 @@ it('routes play seek and close actions through the fullscreen transport controls
   ).toHaveLength(2);
   expect(range.getAttribute('data-ui')).toBe('video-editor.preview.fullscreen-seek');
   expect(range.className).toContain('sniptale-range');
-  expect((buttons[0] as HTMLButtonElement).className).toContain('inline-flex h-10 min-h-10');
+  expect((buttons[0] as HTMLButtonElement).className).toContain('sniptale-glass-toolbar-button');
 
   act(() => {
     (buttons[0] as HTMLButtonElement).click();
@@ -171,8 +177,46 @@ it('shows the active loop range and constrains seek bounds in fullscreen transpo
 
   const range = container?.querySelector('input[type="range"]') as HTMLInputElement;
 
-  expect(container?.textContent).toContain('videoEditor.timeline.loopRangePrefix');
-  expect(container?.textContent).toContain('0:04.500 - 0:06.750');
+  expect(
+    container?.querySelector('[title^="videoEditor.timeline.loopRangePrefix"]')
+  ).not.toBeNull();
+  expect(
+    container
+      ?.querySelector('[title^="videoEditor.timeline.loopRangePrefix"]')
+      ?.getAttribute('title')
+  ).toContain('0:04.500 - 0:06.750');
   expect(range.min).toBe('4.5');
   expect(range.max).toBe('6.75');
+});
+
+it('pans a zoomed fullscreen viewport with captured pointer and releases on cancellation', () => {
+  function PanHarness() {
+    const ref = React.useRef<HTMLDivElement>(null);
+    const pan = useFullscreenPreviewPan(ref, 2, true);
+    return <div ref={ref} {...pan.handlers} data-dragging={pan.dragging} />;
+  }
+  act(() => root?.render(<PanHarness />));
+  const viewport = container!.firstElementChild as HTMLDivElement;
+  viewport.setPointerCapture = vi.fn();
+  viewport.hasPointerCapture = vi.fn(() => true);
+  viewport.releasePointerCapture = vi.fn();
+  viewport.scrollLeft = 100;
+  viewport.scrollTop = 80;
+  const send = (type: string, x: number, y: number) =>
+    act(() => {
+      const event = new MouseEvent(type, { bubbles: true, clientX: x, clientY: y, button: 0 });
+      Object.defineProperty(event, 'pointerId', { value: 1 });
+      viewport.dispatchEvent(event);
+    });
+  send('pointerdown', 100, 100);
+  expect(viewport.setPointerCapture).toHaveBeenCalledWith(1);
+  send('pointermove', 70, 50);
+  expect(viewport.scrollLeft).toBe(130);
+  expect(viewport.scrollTop).toBe(130);
+  expect(viewport.dataset['dragging']).toBe('true');
+  send('pointercancel', 70, 50);
+  expect(viewport.releasePointerCapture).toHaveBeenCalledWith(1);
+  expect(viewport.dataset['dragging']).toBe('false');
+  send('pointermove', 0, 0);
+  expect(viewport.scrollLeft).toBe(130);
 });

@@ -298,3 +298,23 @@ it('rejects hard-wrapped prose in authored and generated Markdown', () => {
     ])
   );
 });
+
+it('accepts canonical effect build imports but rejects a retired root import in that helper', () => {
+  const root = fixture();
+  const path = 'apps/extension/build/video-effects.ts';
+  write(
+    root,
+    path,
+    "import { parse } from '../src/features/video/project/effect-bundle/manifest';"
+  );
+  expect(targetOnlyPathErrors(root).filter((error) => error.includes(path))).toEqual([]);
+  const invalidRoot = fixture();
+  write(
+    invalidRoot,
+    path,
+    "import { parse } from '../../../src/features/video/project/effect-bundle/manifest';"
+  );
+  expect(targetOnlyPathErrors(invalidRoot)).toContain(
+    `stale module path: ${path}:1 -> ../../../src/features/video/project/effect-bundle/manifest`
+  );
+});

@@ -77,5 +77,17 @@ export function resolveGradientSceneBackgroundFrame(
   };
   if (animated.type === 'linear') animated.angle = frame.angle;
   if (animated.type === 'conic') animated.startAngle = frame.angle;
+  if (animated.type !== 'linear') {
+    animated.center = {
+      x: gradient.type !== 'linear' ? gradient.center.x + frame.offsetX : 0.5,
+      y: gradient.type !== 'linear' ? gradient.center.y + frame.offsetY : 0.5,
+    };
+  }
+  if (animated.type === 'radial') {
+    animated.radius = {
+      x: animated.radius.x * frame.radiusScale,
+      y: animated.radius.y * frame.radiusScale,
+    };
+  }
   return { ...sceneBackground, gradient: animated };
 }

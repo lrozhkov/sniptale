@@ -1,6 +1,7 @@
 import { defineMessageSource } from '../source';
 
 export const settingsNavigationMessages = defineMessageSource({
+  videoEffects: { ru: 'Эффекты видеоредактора', en: 'Video editor effects' },
   groups: {
     general: {
       ru: 'Общие',
@@ -72,6 +73,10 @@ export const settingsNavigationMessages = defineMessageSource({
     en: 'Import and export',
   },
   descriptions: {
+    videoEffects: {
+      ru: 'Каталог эффектов, импорт и управление',
+      en: 'Effect catalog, import and management',
+    },
     interfaceBrowser: {
       ru: 'Настройте тему, язык и поведение браузерных функций.',
       en: 'Configure the theme, language, and browser behavior.',

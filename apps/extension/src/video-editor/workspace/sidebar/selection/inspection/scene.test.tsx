@@ -167,7 +167,8 @@ function verifiesAuthoredEventSummary() {
   clickGroup('videoEditor.sidebar.inspectorGroupSummary');
 
   expect(container?.textContent).not.toContain('videoEditor.sidebar.actionTrackUnavailable');
-  expect(container?.textContent).toContain('1920×1080');
+  expect(container?.textContent).not.toContain('1920×1080');
+  expect(container?.textContent).toContain('videoEditor.sidebar.projectFpsSuffix');
 }
 
 function verifiesSceneBackgroundSelectLabels() {
@@ -231,7 +232,7 @@ function clickGroup(title: string) {
   });
 }
 
-it('shows grid as a Canvas parameter through the complete selection body', () => {
+it('shows grid in its own section through the complete selection body', () => {
   const gridSettings = {
     enabled: false,
     snapEnabled: true,
@@ -247,6 +248,7 @@ it('shows grid as a Canvas parameter through the complete selection body', () =>
       root?.render(<WorkspaceSidebarSelectionBody {...createProps()} gridSettings={gridSettings} />)
     );
   render();
+  clickGroup('videoEditor.sidebar.gridSettingsTitle');
   const grid = () => container!.querySelector('[data-ui="video-editor.scene.grid-settings"]')!;
   expect(grid()).not.toBeNull();
   expect(grid().textContent).not.toContain('videoEditor.app.gridSizeLabel');

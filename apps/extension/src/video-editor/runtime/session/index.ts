@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react';
+import { useEffectClipPreviews } from './effect-thumbnails';
+import { useCallback, useMemo, useState } from 'react';
 import { useVideoEditorAssetUrls } from './asset-urls';
 import { useVideoEditorPlayback } from './playback';
 import type { ApplyLoadedProject, UseVideoEditorRuntimeParams } from './types';
@@ -12,6 +13,7 @@ import type {
 
 export interface VideoEditorRuntimeController {
   assetUrls: Record<string, string>;
+  isPreparingPlayback?: boolean | undefined;
   timelinePreviews: TimelineClipPreviewMap;
   setTimelinePreviewSuspended: (suspended: boolean) => void;
   setTimelinePreviewViewport: (viewport: TimelinePreviewViewport) => void;
@@ -34,6 +36,7 @@ function createVideoEditorRuntimeController(
 ): VideoEditorRuntimeController {
   return {
     assetUrls,
+    isPreparingPlayback: playback.isPreparingPlayback,
     timelinePreviews,
     setTimelinePreviewSuspended,
     setTimelinePreviewViewport,
@@ -112,6 +115,7 @@ export function useVideoEditorRuntime(
       deleteClip: params.playback.deleteSelection.clip,
       deleteActionEvent: params.playback.deleteSelection.actionEvent,
       deleteCursorSample: params.playback.deleteSelection.cursorSample,
+      deleteEffectInstance: params.playback.deleteSelection.effectInstance,
       deleteMotionRegion: params.playback.deleteSelection.motionRegion,
       deleteObjectTrack: params.playback.deleteSelection.objectTrack,
       clearPlacementMode: params.playback.clearPlacementMode,
@@ -151,5 +155,10 @@ function useTimelinePreviewRuntime(
     suspended: timelinePreviewSuspended,
     viewport: timelinePreviewViewport,
   });
-  return { setTimelinePreviewSuspended, setTimelinePreviewViewport, timelinePreviews };
+  const effects = useEffectClipPreviews(project, timelinePreviewViewport);
+  const combined = useMemo(
+    () => ({ ...timelinePreviews, ...effects }),
+    [timelinePreviews, effects]
+  );
+  return { setTimelinePreviewSuspended, setTimelinePreviewViewport, timelinePreviews: combined };
 }

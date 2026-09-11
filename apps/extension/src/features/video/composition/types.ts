@@ -34,6 +34,9 @@ import type {
 import type { EffectRuntimeFramePlan } from './effect-runtime/runtime/types';
 
 interface VideoCompositionLayerBase<TClip, TKind extends string> {
+  /** Already composed in viewport coordinates by a track/global FX stage. */
+  effectViewportRaster?: boolean;
+  effectActionsOnly?: boolean;
   clip: TClip;
   clipId: string;
   kind: TKind;
@@ -96,6 +99,9 @@ export interface VideoCompositionCursorState {
 }
 
 export interface VideoCompositionActionState {
+  clickStyle?: import('../project/types').VideoActionClickStyle;
+  keyStyle?: import('../project/types').VideoActionKeyStyle;
+  easing?: import('../project/types').VideoTemporalEasing;
   preset: VideoProjectActionPreset;
   occurrence: VideoProjectActionOccurrence;
   clipId: string | null;

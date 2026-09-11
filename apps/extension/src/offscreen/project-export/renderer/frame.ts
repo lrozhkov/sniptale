@@ -1,3 +1,4 @@
+import { resolveEffectRuntimeVisualLayers } from '../../../features/video/composition/draw/effect-runtime';
 import { VideoResolutionPreset } from '@sniptale/runtime-contracts/video/types/types';
 import {
   createEffectRuntimeDrawState,
@@ -88,7 +89,10 @@ function drawVisualPasses(params: {
   settings: VideoProjectExportSettings;
 }) {
   const segments = segmentVisualLayersByViewportLock(
-    params.renderPasses.overlayFrame.visualLayers,
+    resolveEffectRuntimeVisualLayers(
+      params.renderPasses.overlayFrame.visualLayers,
+      params.effectRuntimeFrames?.overlayFrames
+    ),
     params.renderPasses.overlayFrame.camera
   );
   const overlayEffectState = createEffectRuntimeDrawState();
@@ -207,20 +211,24 @@ function drawUnlockedOverlayGroup(
       : null;
   const drawContext = passBuffer?.context ?? params.context;
 
-  for (const pass of params.renderPasses.visualPasses) {
-    beginExportCameraPass(drawContext, pass, params);
-    drawVisualPassLayers(
-      drawContext,
-      resolveOrderedVisualPassLayers(layers, pass.frame.visualLayers),
-      pass,
-      params,
-      getEffectRuntimeVisualPassFrames(params.effectRuntimeFrames, pass.time),
-      resolveExportEffectDrawState(effectRuntimeStates, pass.time)
-    );
-    drawContext.restore();
-  }
+  try {
+    for (const pass of params.renderPasses.visualPasses) {
+      beginExportCameraPass(drawContext, pass, params);
+      drawVisualPassLayers(
+        drawContext,
+        resolveOrderedVisualPassLayers(layers, pass.frame.visualLayers),
+        pass,
+        params,
+        getEffectRuntimeVisualPassFrames(params.effectRuntimeFrames, pass.time),
+        resolveExportEffectDrawState(effectRuntimeStates, pass.time)
+      );
+      drawContext.restore();
+    }
 
-  passBuffer?.flush();
+    passBuffer?.flush();
+  } finally {
+    passBuffer?.dispose();
+  }
 }
 
 export function drawProjectFrame(

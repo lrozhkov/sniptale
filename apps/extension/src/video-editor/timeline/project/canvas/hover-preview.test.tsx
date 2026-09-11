@@ -47,6 +47,24 @@ it('renders hover preview on empty canvas and suppresses it over marked timeline
   expect(getHoverPreview()).toBeNull();
 });
 
+it('suppresses hover seeking while a pointer gesture crosses empty rows', () => {
+  const canvas = renderCanvas();
+  movePointer(canvas, 90);
+  expect(getHoverPreview()).toBeTruthy();
+  act(() => {
+    canvas?.dispatchEvent(
+      new MouseEvent('pointermove', {
+        bubbles: true,
+        clientX: 150,
+        buttons: 1,
+      })
+    );
+  });
+  expect(getHoverPreview()).toBeNull();
+  movePointer(canvas, 160);
+  expect(getHoverPreview()).toBeTruthy();
+});
+
 it('clears hover preview when the timeline canvas is pressed or left', () => {
   const canvas = renderCanvas();
 
@@ -65,9 +83,27 @@ it('clears hover preview when the timeline canvas is pressed or left', () => {
   expect(getHoverPreview()).toBeNull();
 });
 
-function renderCanvas() {
+it('starts lane seeking through the empty media zone overlay', () => {
+  const begin = vi.fn();
+  renderCanvas(begin);
+  const overlay = container?.querySelector('[data-ui="timeline.media-zones"]');
+  expect(overlay).toBeTruthy();
+  act(() =>
+    overlay?.dispatchEvent(
+      new MouseEvent('pointerdown', {
+        bubbles: true,
+        clientX: 100,
+        button: 0,
+      })
+    )
+  );
+  expect(begin).toHaveBeenCalledOnce();
+});
+
+function renderCanvas(onTrackPointer = vi.fn()) {
   const project = createEmptyVideoProject('Canvas hover');
   const actions = createCanvasTestActions();
+  actions.onBeginTrackRangeSelection = () => onTrackPointer;
 
   act(() => {
     root?.render(

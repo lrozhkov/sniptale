@@ -1,3 +1,4 @@
+import type { VideoCompositionCameraState } from '../../../../features/video/composition/types';
 import {
   drawSceneActionCompositionStates,
   drawCursorCompositionState,
@@ -74,6 +75,7 @@ function drawPreviewSceneOverlays(params: {
 }
 
 export async function renderPreviewScene(params: {
+  cameraOverride?: VideoCompositionCameraState;
   canvas: HTMLCanvasElement;
   currentTime: number;
   imageBank: Record<string, HTMLImageElement>;
@@ -89,12 +91,39 @@ export async function renderPreviewScene(params: {
   videoRefs: PreviewStageVideoRefs;
 }): Promise<void | false> {
   const renderPasses = resolveVideoCompositionRenderPasses(params.project, params.currentTime);
+  if (params.cameraOverride) {
+    renderPasses.overlayFrame.camera = params.cameraOverride;
+    for (const pass of renderPasses.visualPasses) pass.frame.camera = params.cameraOverride;
+  }
   const clipMediaElements = createPreviewSceneMediaMap(params.videoRefs);
-  const effectRuntimeFrames = await resolvePreviewEffectRuntimeFrames(
-    params,
-    renderPasses,
-    clipMediaElements
-  );
+  // Effects rasterize their inputs asynchronously; never start with an unavailable frame.
+  if (!arePreviewSceneVideosReady(renderPasses, clipMediaElements)) return false;
+  const videos = [...clipMediaElements]
+    .filter(([id]) =>
+      [renderPasses.overlayFrame, ...renderPasses.visualPasses.map((pass) => pass.frame)].some(
+        (frame) => frame.visualLayers.some((layer) => layer.clipId === id)
+      )
+    )
+    .map(([, video]) => video);
+  let mediaChanged = false;
+  const invalidate = () => {
+    mediaChanged = true;
+  };
+  for (const video of videos) video.addEventListener('seeking', invalidate);
+  let effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined;
+  try {
+    effectRuntimeFrames = await resolvePreviewEffectRuntimeFrames(
+      params,
+      renderPasses,
+      clipMediaElements
+    );
+  } finally {
+    for (const video of videos) video.removeEventListener('seeking', invalidate);
+  }
+  if (mediaChanged) {
+    disposeEffectRuntimeComposition(effectRuntimeFrames);
+    return false;
+  }
   if (params.signal?.aborted) {
     disposeEffectRuntimeComposition(effectRuntimeFrames);
     return;
@@ -103,29 +132,34 @@ export async function renderPreviewScene(params: {
     if (params.signal?.aborted) return;
     // Media seeking can invalidate readiness after the React render was queued.
     // Keep the last complete frame until the decoder supplies a replacement.
-    const frames = [
-      renderPasses.overlayFrame,
-      ...renderPasses.visualPasses.filter((pass) => pass.alpha > 0).map((pass) => pass.frame),
-    ];
-    if (
-      frames.some((frame) =>
-        frame.visualLayers.some((layer) => {
-          if (layer.kind !== 'video' || layer.opacity <= 0) return false;
-          const video = clipMediaElements.get(layer.clipId);
-          return !video || video.readyState < HTMLMediaElement.HAVE_CURRENT_DATA;
-        })
-      )
-    )
-      return false;
-    drawResolvedPreviewScene({
+    if (!arePreviewSceneVideosReady(renderPasses, clipMediaElements)) return false;
+    const drawn = drawResolvedPreviewScene({
       clipMediaElements,
       effectRuntimeFrames,
       params,
       renderPasses,
     });
+    if (!drawn) return false;
   } finally {
     disposeEffectRuntimeComposition(effectRuntimeFrames);
   }
+}
+
+function arePreviewSceneVideosReady(
+  renderPasses: ReturnType<typeof resolveVideoCompositionRenderPasses>,
+  media: ReadonlyMap<string, HTMLMediaElement>
+): boolean {
+  const frames = [
+    renderPasses.overlayFrame,
+    ...renderPasses.visualPasses.filter((pass) => pass.alpha > 0).map((pass) => pass.frame),
+  ];
+  return frames.every((frame) =>
+    frame.visualLayers.every((layer) => {
+      if (layer.kind !== 'video' || layer.opacity <= 0) return true;
+      const video = media.get(layer.clipId);
+      return !!video && !video.seeking && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA;
+    })
+  );
 }
 
 function drawResolvedPreviewScene(args: {
@@ -133,7 +167,7 @@ function drawResolvedPreviewScene(args: {
   effectRuntimeFrames: EffectRuntimeRenderedComposition | undefined;
   params: Parameters<typeof renderPreviewScene>[0];
   renderPasses: ReturnType<typeof resolveVideoCompositionRenderPasses>;
-}): void {
+}): boolean {
   const visualPassArgs = {
     canvas: args.params.canvas,
     clipMediaElements: args.clipMediaElements,
@@ -148,7 +182,7 @@ function drawResolvedPreviewScene(args: {
   };
   const overlayPrepared = drawPreviewVisualPasses(visualPassArgs);
 
-  if (!overlayPrepared || args.params.signal?.aborted) return;
+  if (!overlayPrepared || args.params.signal?.aborted) return false;
 
   drawPreviewSceneOverlays({
     camera: args.renderPasses.overlayFrame.camera,
@@ -156,6 +190,7 @@ function drawResolvedPreviewScene(args: {
     frame: args.renderPasses.overlayFrame,
     viewport: overlayPrepared.viewport,
   });
+  return true;
 }
 
 async function resolvePreviewEffectRuntimeFrames(
@@ -186,5 +221,6 @@ async function resolvePreviewEffectRuntimeFrames(
       stage: params.stage,
     }),
     visualPasses: renderPasses.visualPasses,
+    ...(params.signal ? { signal: params.signal } : {}),
   });
 }

@@ -1,3 +1,4 @@
+import { PreviewEffectEditorRegion } from './editor-region';
 import { PreviewEffectHandles } from './effect-handles';
 import React from 'react';
 import { usePreviewCanvasInteractionFocus } from './interaction-focus';
@@ -205,6 +206,9 @@ export function createPreviewStageSelectionOverlay(
     PreviewStageCanvasProps,
     | 'onUpdateEffectInstance'
     | 'onPreviewEffectAnchors'
+    | 'onPreviewEffectControls'
+    | 'selectedEffectInstanceId'
+    | 'currentTime'
     | 'beginInteraction'
     | 'camera'
     | 'mode'
@@ -218,6 +222,10 @@ export function createPreviewStageSelectionOverlay(
     return null;
   }
 
+  const selectedEffect = params.project.effectInstances?.find(
+    (item) => item.id === params.selectedEffectInstanceId
+  );
+  if (selectedEffect?.kind === 'targetEffect') return <PreviewEffectEditorRegion {...params} />;
   return (
     <>
       <PreviewStageSelectionOverlay

@@ -38,7 +38,11 @@ function materializeInstanceDocument(
   const controls = host
     ? resolveEffectObjectControls(document, instance, host.transform)
     : instance.controls;
+  // This export materializes an instance, not the catalog: creation defaults must not reset it.
+  delete document.controlPresets;
+  delete document.defaultControlPresetId;
   for (const control of document.controls) {
+    delete control.localizedDefaultValue;
     const value = controls[control.id] ?? control.defaultValue;
     if (control.kind === 'number' && typeof value === 'number') control.defaultValue = value;
     else if (control.kind !== 'number' && typeof value === 'string') control.defaultValue = value;

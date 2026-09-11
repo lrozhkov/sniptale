@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "sniptale.effect.v1",
+  "id": "alpha-source-atop",
+  "kind": "targetEffect",
+  "duration": 4,
+  "label": {
+    "en": "Tint within source alpha"
+  },
+  "assets": [],
+  "controls": [],
+  "layers": [],
+  "clips": [],
+  "scenes": [
+    {
+      "id": "main",
+      "start": 0,
+      "duration": 4
+    }
+  ],
+  "timeline": {
+    "tracks": [],
+    "phases": []
+  },
+  "program": {
+    "kind": "graph",
+    "version": 1,
+    "commands": [
+      {
+        "op": "clear"
+      },
+      {
+        "op": "image",
+        "input": "source",
+        "x": 0,
+        "y": 0,
+        "width": {
+          "op": "read",
+          "path": "width"
+        },
+        "height": {
+          "op": "read",
+          "path": "height"
+        },
+        "fit": "cover"
+      },
+      {
+        "op": "fillRect",
+        "x": 0,
+        "y": 0,
+        "width": {
+          "op": "read",
+          "path": "width"
+        },
+        "height": {
+          "op": "read",
+          "path": "height"
+        },
+        "fill": "#ff0000",
+        "alpha": 0.5,
+        "blend": "source-atop"
+      }
+    ]
+  }
+}

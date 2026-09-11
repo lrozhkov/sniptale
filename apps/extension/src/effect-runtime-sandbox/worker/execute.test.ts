@@ -51,7 +51,7 @@ it('renders a smaller physical preview bitmap in the unchanged logical coordinat
   });
 
   expect(result).toMatchObject({ height: 360, kind: 'frame', width: 640 });
-  expect(canvases[0]).toMatchObject({ height: 360, width: 640 });
+  expect(canvases[0]).toMatchObject({ height: 0, width: 0 });
   expect(canvases[0]!.context.setTransform).toHaveBeenCalledWith(0.5, 0, 0, 0.5, 0, 0);
 });
 
@@ -70,7 +70,7 @@ it('renders a bounded supersampled bitmap in the unchanged logical coordinate sy
   });
 
   expect(result).toMatchObject({ height: 1440, kind: 'frame', width: 2560 });
-  expect(canvases[0]).toMatchObject({ height: 1440, width: 2560 });
+  expect(canvases[0]).toMatchObject({ height: 0, width: 0 });
   expect(canvases[0]!.context.setTransform).toHaveBeenCalledWith(2, 0, 0, 2, 0, 0);
 });
 

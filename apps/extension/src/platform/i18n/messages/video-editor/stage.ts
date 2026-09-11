@@ -1,6 +1,8 @@
 import { defineMessageSource } from '../source';
 
 export const videoEditorStageMessages = defineMessageSource({
+  showFrameRate: { ru: 'Показывать частоту кадров', en: 'Show frame rate' },
+  actualFrameRate: { ru: 'Частота отрисовки превью', en: 'Preview render frame rate' },
   title: {
     ru: 'Превью сцены',
     en: 'Stage preview',
@@ -54,7 +56,7 @@ export const videoEditorStageMessages = defineMessageSource({
     en: 'Automation',
   },
   addZoomRegion: {
-    ru: 'Добавить область зума',
+    ru: 'Приблизить',
     en: 'Add zoom region',
   },
   addVideoTrack: {
@@ -137,6 +139,15 @@ export const videoEditorStageMessages = defineMessageSource({
     ru: 'Кэш хранит локальные производные видео до 14 дней (не более 12 записей и 512 МиБ). Он удаляется вместе с проектом или при удалении локальных данных.',
     en: 'Cache stores local derived video for up to 14 days (maximum 12 records and 512 MiB). It is removed with the project or when local data is deleted.',
   },
+  previewFrameRateLimit: { ru: 'До {fps} fps', en: 'Up to {fps} fps' },
+  previewFrameRate: {
+    ru: 'Частота кадров превью',
+    en: 'Preview frame rate',
+  },
+  previewFrameRateProject: {
+    ru: 'Как в проекте',
+    en: 'Match project',
+  },
   previewCachePreparing: {
     ru: 'Подготовка кэша',
     en: 'Preparing cache',
@@ -149,6 +160,9 @@ export const videoEditorStageMessages = defineMessageSource({
     ru: 'Кэш готов',
     en: 'Cache ready',
   },
+  previewCacheFailedShort: { ru: 'Ошибка кэша', en: 'Cache failed' },
+  previewCacheCapacityShort: { ru: 'Лимит кэша', en: 'Cache limit' },
+  previewCacheUnavailableShort: { ru: 'Кэш недоступен', en: 'Cache unavailable' },
   previewCacheCapacityLimited: {
     ru: 'Недостаточно места для полного кэша',
     en: 'Not enough capacity for the complete cache',
@@ -258,7 +272,7 @@ export const videoEditorStageMessages = defineMessageSource({
     en: 'Click and focus emphasis',
   },
   addZoomRegionNote: {
-    ru: 'Зум и поведение камеры',
+    ru: 'Масштабирование и поведение камеры',
     en: 'Zoom and camera follow',
   },
 });

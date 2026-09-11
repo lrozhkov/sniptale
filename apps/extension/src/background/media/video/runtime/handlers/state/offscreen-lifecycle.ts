@@ -209,6 +209,7 @@ async function processVideoSavedToIdb(
   const existingState = await readStoredVideoPostRecordResult();
   if (isCompletedPostRecordReplay(existingState, message)) {
     const popupDestination = await resolvePostRecordPopupDestination();
+    await releaseVideoCaptureSurface(message.recordingId);
     await consumeRecordingCompletionOutbox(message, false);
     const openSavedPopup = shouldOpenPostRecordPopup(message.recordingId);
     if (openSavedPopup) await openPostRecordPopup(popupDestination);
@@ -224,6 +225,7 @@ async function processVideoSavedToIdb(
   const synchronized = await synchronizePostRecordResult(message);
   const openSavedPopup = shouldOpenPostRecordPopup(message.recordingId);
   if (synchronized === 'ready' || synchronized === 'acknowledged') {
+    await releaseVideoCaptureSurface(message.recordingId);
     await consumeRecordingCompletionOutbox(message, false);
     if (openSavedPopup) await openPostRecordPopup(popupDestination);
     finalizeSavedRecordingCompletion(message);
@@ -448,13 +450,16 @@ async function persistProjectExportLifecycleMessage(
   // Offscreen documents cannot write chrome.storage; commit the ledger before notifying the editor.
   if (message.type === VideoMessageType.PROJECT_EXPORT_PROGRESS) {
     if (ledger.status !== 'running') return null;
-    await upsertProjectExportJobLedgerEntry({
+    const committed = await upsertProjectExportJobLedgerEntry({
       jobId: ledger.jobId,
       projectId: ledger.projectId,
       phase: message.status.phase,
       progress: message.status.progress,
     });
-    return message;
+    return {
+      ...message,
+      status: { ...message.status, phase: committed.phase, progress: committed.progress },
+    };
   }
   const status =
     message.type === VideoMessageType.PROJECT_EXPORT_COMPLETED

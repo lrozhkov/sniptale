@@ -18,8 +18,12 @@ import { createAnnotationGroups } from '../annotation/fields';
 import { ClipTimingControls, ClipFadeFields } from '../inputs/clip-timing';
 import { InspectorGroupedPanel } from '../grouped-inspector';
 import { createSelectionRuntime, SelectionEmptyState } from './helpers';
-import { renderAudioFields } from '../inputs/audio-fields';
-import { MediaFrameControls, MediaShadowControls } from '../inputs/media-frame';
+import { renderAudioFields, renderClipLinkFields } from '../inputs/audio-fields';
+import {
+  MediaFrameControls,
+  MediaShadowControls,
+  MediaApplyVisualsButton,
+} from '../inputs/media-frame';
 import { PANEL_SECTION_CLASS_NAME } from '../shared/panel';
 import {
   renderShapeStyleFields,
@@ -27,7 +31,7 @@ import {
   renderTextStyleFields,
 } from '../inputs/text-shape';
 import { renderTransformFields } from '../inputs/transform-fields';
-import { createEffectInstanceGroup } from '../effect-instance/groups';
+import { createEffectInstanceGroups } from '../effect-instance/groups';
 import { ClipInfo, resolveClipAsset } from './clip-info';
 import { isVideoEditorPresentedClip } from '../../../../project/operations/presented-tracks';
 import { CameraLayoutControls, CameraFitControls } from '../inputs/camera-layout';
@@ -62,7 +66,12 @@ function createClipGroups(
     semantic: 'info' as const,
     label: translate('videoEditor.sidebar.inspectorGroupSummary'),
     defaultActive: false,
-    content: <ClipInfo asset={asset} clip={clip} locked={runtime.selectedTrackLocked} />,
+    content: (
+      <>
+        <ClipInfo asset={asset} clip={clip} locked={runtime.selectedTrackLocked} />
+        {renderClipLinkFields(props)}
+      </>
+    ),
   } as const;
 
   if (
@@ -79,7 +88,7 @@ function createClipGroups(
         onUpdateAnnotationClipStyle: props.onUpdateAnnotationClipStyle,
         onUpdateAnnotationClipTemplate: props.onUpdateAnnotationClipTemplate,
       }),
-      createClipEffectGroup(props, clip, runtime.selectedTrackLocked),
+      ...createClipEffectGroup(props, clip, runtime.selectedTrackLocked),
     ] as const;
   }
 
@@ -131,7 +140,8 @@ function createStandardClipGroups(
   const transformContent = renderTransformFields(
     cameraPosition ? { ...clip, transform: cameraPosition.transform } : clip,
     runtime.selectedTrackLocked,
-    props.onUpdateClipTransform
+    props.onUpdateClipTransform,
+    isCameraRoleVideoClip(props.project, clip)
   );
   const audioContent = renderAudioFields(props);
   const contentFields = renderClipContentFields(props, clip, runtime);
@@ -139,9 +149,13 @@ function createStandardClipGroups(
 
   return [
     createGeneralGroup(contentFields),
-    createCameraPlacementGroup(props, clip, runtime.selectedTrackLocked),
+    createCameraPlacementGroup(props, clip, runtime.selectedTrackLocked, transformContent),
+    createCameraAppearanceGroup(props, clip, runtime.selectedTrackLocked),
     createFramingGroup(props, clip, runtime.selectedTrackLocked),
-    createTransformGroup(clip, transformContent),
+    createTransformGroup(
+      clip,
+      isCameraRoleVideoClip(props.project, clip) ? null : transformContent
+    ),
     createTimingGroup(props, clip, runtime.selectedTrackLocked),
     {
       id: 'audio',
@@ -187,14 +201,15 @@ function createStandardClipGroups(
         />
       ),
     },
-    createClipEffectGroup(props, clip, runtime.selectedTrackLocked),
+    ...createClipEffectGroup(props, clip, runtime.selectedTrackLocked),
   ] as const;
 }
 
 function createCameraPlacementGroup(
   props: WorkspaceSidebarSelectionPanelProps,
   clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>,
-  locked: boolean
+  locked: boolean,
+  transformContent: React.ReactNode
 ) {
   const isCameraClip = isCameraRoleVideoClip(props.project, clip);
 
@@ -220,8 +235,30 @@ function createCameraPlacementGroup(
             ? {}
             : { canAddCameraPosition: props.canAddCameraPosition })}
         />
+        {transformContent}
+      </>
+    ) : null,
+    visible: isCameraClip,
+  } as const;
+}
+
+function createCameraAppearanceGroup(
+  props: WorkspaceSidebarSelectionPanelProps,
+  clip: NonNullable<WorkspaceSidebarSelectionPanelProps['selectedClip']>,
+  locked: boolean
+) {
+  const camera = isCameraRoleVideoClip(props.project, clip);
+  return {
+    id: 'camera-appearance',
+    semantic: 'appearance' as const,
+    label: translate('videoEditor.sidebar.inspectorGroupStyle'),
+    visible: camera,
+    content: camera ? (
+      <>
         <CameraAppearanceControls
           clip={clip}
+          project={props.project}
+          onUpdateClipTransform={props.onUpdateClipTransform}
           currentTime={props.currentTime ?? clip.startTime}
           disabled={locked}
           {...(props.onEditCameraPosition ? { onEdit: props.onEditCameraPosition } : {})}
@@ -238,10 +275,14 @@ function createCameraPlacementGroup(
             ? { onUpdateMediaClipShadowMode: props.onUpdateMediaClipShadowMode }
             : {})}
         />
+        <MediaApplyVisualsButton
+          clip={clip}
+          disabled={locked}
+          onApplyMediaClipVisualsToTrack={props.onApplyMediaClipVisualsToTrack}
+        />
       </>
     ) : null,
-    visible: isCameraClip,
-  } as const;
+  };
 }
 
 function isCameraRoleVideoClip(
@@ -295,7 +336,7 @@ function createClipEffectGroup(
 ) {
   const hostedInstanceId =
     clip.type === VideoProjectClipType.EFFECT ? clip.effectInstanceId : undefined;
-  return createEffectInstanceGroup({
+  return createEffectInstanceGroups({
     disabled: locked,
     onDeleteEffectInstance: props.onDeleteEffectInstance ?? (() => undefined),
     onDuplicateEffectInstance: props.onDuplicateEffectInstance ?? (() => null),

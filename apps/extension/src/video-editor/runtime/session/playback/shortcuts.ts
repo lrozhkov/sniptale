@@ -46,6 +46,9 @@ function handleSelectionDelete(
     case VideoEditorSelectionKind.CURSOR_SEGMENT:
       handlersRef.current.deleteCursorSample(latestState.selection.sampleId);
       return;
+    case VideoEditorSelectionKind.EFFECT_INSTANCE:
+      handlersRef.current.deleteEffectInstance(latestState.selection.effectInstanceId);
+      return;
     case VideoEditorSelectionKind.OBJECT_TRACK:
       handlersRef.current.deleteObjectTrack(latestState.selection.objectTrackId);
       return;

@@ -8,6 +8,7 @@ export interface ExportDialogFieldParams {
   capabilities: VideoExportCapabilities | null | undefined;
   onChange: (patch: VideoProjectExportSettingsPatch) => void;
   selectedClipAvailable: boolean;
+  selectedRangeAvailable?: boolean;
   settings: VideoProjectExportSettings;
   sourceDimensions: { height: number; width: number };
 }

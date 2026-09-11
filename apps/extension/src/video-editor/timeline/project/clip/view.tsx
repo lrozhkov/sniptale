@@ -36,7 +36,11 @@ export function ProjectTimelineClipLayout({
     <div
       {...TIMELINE_OBJECT_MARKER_PROPS}
       data-project-timeline-clip={clip.id}
-      title={clip.name?.trim() || buildClipLabel(project, clip)}
+      title={
+        clip.type === VideoProjectClipType.EFFECT
+          ? buildClipLabel(project, clip)
+          : clip.name?.trim() || buildClipLabel(project, clip)
+      }
       className={viewModel.clipClassName}
       style={
         {
@@ -113,7 +117,7 @@ function ProjectTimelineClipContent({
                 aria-hidden="true"
                 data-ui="video-editor.camera-position-marker"
                 className={[
-                  'pointer-events-none absolute bottom-1 z-10 h-1.5 w-1.5 -translate-x-1/2 rotate-45 border',
+                  'pointer-events-none absolute bottom-1.5 z-10 size-2.5 -translate-x-1/2 rotate-45 border',
                   'border-[var(--sniptale-color-text-secondary)] bg-[var(--sniptale-color-surface-panel)]',
                 ].join(' ')}
                 style={{ left: `${(offset / viewModel.visibleDuration) * 100}%` }}
@@ -170,7 +174,11 @@ function ProjectTimelineClipContent({
 }
 
 function isVisualPreviewClip(clip: VideoProjectClip): boolean {
-  return clip.type === VideoProjectClipType.VIDEO || clip.type === VideoProjectClipType.IMAGE;
+  return (
+    clip.type === VideoProjectClipType.VIDEO ||
+    clip.type === VideoProjectClipType.IMAGE ||
+    clip.type === VideoProjectClipType.EFFECT
+  );
 }
 
 function ProjectTimelineVisualClipPreview({
@@ -319,7 +327,10 @@ function ProjectTimelineClipLabel({
   viewModel,
 }: Pick<ProjectTimelineClipLayoutProps, 'clip' | 'project' | 'viewModel'>) {
   if (viewModel.labelHeight === 0) return null;
-  const label = clip.name?.trim() || buildClipLabel(project, clip);
+  const label =
+    clip.type === VideoProjectClipType.EFFECT
+      ? buildClipLabel(project, clip)
+      : clip.name?.trim() || buildClipLabel(project, clip);
   const linked = getLinkedClipIds(project, clip.id).length > 1;
   return (
     <div

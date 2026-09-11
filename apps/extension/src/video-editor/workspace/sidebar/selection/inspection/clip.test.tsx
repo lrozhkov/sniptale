@@ -218,6 +218,9 @@ describe('workspace-sidebar/selection/inspect-core', () => {
 
       expect(container?.textContent).toContain('videoEditor.sidebar.fitModeLabel');
       expect(container?.textContent).not.toContain('videoEditor.sidebar.rotationLabel');
+      expect(
+        container?.querySelector('input[aria-label="videoEditor.sidebar.widthLabel"]')
+      ).toBeNull();
 
       clickGroup('videoEditor.sidebar.inspectorGroupTiming');
 
@@ -309,7 +312,34 @@ describe('workspace-sidebar/selection/inspect-core', () => {
     expect(
       container?.querySelector('[data-ui="video-editor.camera-placement-controls"]')
     ).not.toBeNull();
-    expect(container?.textContent).not.toContain('videoEditor.sidebar.rotationLabel');
+    expect(container?.textContent).toContain('videoEditor.sidebar.rotationLabel');
+    expect(
+      container?.querySelector('input[aria-label="videoEditor.sidebar.widthLabel"]')
+    ).toBeNull();
+  });
+
+  it('groups camera dimensions with appearance and restores apply-to-track', () => {
+    const props = createVideoProps();
+    props.project.tracks = props.project.tracks.map((track) => ({
+      ...track,
+      role: VideoProjectTrackRole.CAMERA,
+    }));
+    const apply = vi.fn();
+    renderInspectPanel({ ...props, onApplyMediaClipVisualsToTrack: apply });
+    clickGroup('videoEditor.sidebar.inspectorGroupStyle');
+    expect(
+      container?.querySelector('input[aria-label="videoEditor.sidebar.widthLabel"]')
+    ).not.toBeNull();
+    expect(
+      container?.querySelector('input[aria-label="videoEditor.sidebar.heightLabel"]')
+    ).not.toBeNull();
+    expect(container?.querySelector('input[aria-label="X"]')).toBeNull();
+    const button = Array.from(container?.querySelectorAll('button') ?? []).find(
+      (item) => item.textContent === 'videoEditor.sidebar.fitApplyToTrackLabel'
+    );
+    expect(button).toBeDefined();
+    act(() => button!.click());
+    expect(apply).toHaveBeenCalledExactlyOnceWith(props.selectedClip?.id);
   });
 
   it('keeps camera-specific controls out of ordinary video inspection', () => {

@@ -54,6 +54,25 @@ beforeEach(() => {
 });
 
 describe('window-only capture-surface journal', () => {
+  it('retains the owned intermediate window during video alignment recovery', async () => {
+    const aligning = {
+      ...entry,
+      owner: 'video' as const,
+      phase: 'prepared' as const,
+      alignmentFrom: applied,
+      applied: { ...applied, height: 719 },
+    };
+    mocks.get.mockResolvedValue({ 'capture-surface-journal-v1': [aligning] });
+    await expect(readCaptureSurfaceJournal()).resolves.toEqual([aligning]);
+  });
+
+  it.each([null, { type: 'window' }, applied])(
+    'rejects invalid or out-of-phase intermediate bounds',
+    async (alignmentFrom) => {
+      mocks.get.mockResolvedValue({ 'capture-surface-journal-v1': [{ ...entry, alignmentFrom }] });
+      await expect(readCaptureSurfaceJournal()).rejects.toThrow('invalid entry');
+    }
+  );
   it('round-trips a validated browser-window lease', async () => {
     await writeCaptureSurfaceJournal([entry]);
     expect(mocks.set).toHaveBeenCalledWith({ 'capture-surface-journal-v1': [entry] });

@@ -1,3 +1,4 @@
+import { resolveEffectOwner } from './owner';
 import { buildProjectTransitionSegments } from '../transition/project';
 import { VideoProjectClipType, type VideoProject, type VideoProjectEffectClip } from '../types';
 import { isEffectInstanceTimingEqual } from './timing';
@@ -36,13 +37,6 @@ function reconcileEffectInstances(
   project: VideoProject,
   effectHosts: VideoProjectEffectClip[]
 ): VideoProjectEffectInstance[] {
-  const targetClipIds = new Set(
-    project.clips
-      .filter(
-        ({ type }) => type !== VideoProjectClipType.AUDIO && type !== VideoProjectClipType.EFFECT
-      )
-      .map(({ id }) => id)
-  );
   const hostsByInstanceId = new Map<string, (typeof effectHosts)[number]>();
   for (const host of effectHosts) {
     if (!hostsByInstanceId.has(host.effectInstanceId)) {
@@ -53,8 +47,23 @@ function reconcileEffectInstances(
     buildProjectTransitionSegments(project).map((segment) => [segment.id, segment])
   );
   return (project.effectInstances ?? []).flatMap((instance) => {
-    if (instance.target.kind === 'clip') {
-      return targetClipIds.has(instance.target.clipId) ? [instance] : [];
+    if (instance.kind === 'targetEffect') {
+      const clip = resolveEffectOwner(project, instance.target);
+      if (!clip || clip.duration <= 0) return [];
+      if (instance.rangeMode === 'owner')
+        return [reconcileStandaloneInstanceTiming(instance, clip.startTime, clip.duration)];
+      const startTime = Math.max(instance.startTime, clip.startTime);
+      const end = Math.min(instance.startTime + instance.duration, clip.startTime + clip.duration);
+      if (end <= startTime) return [];
+      return [
+        {
+          ...instance,
+          startTime,
+          duration: end - startTime,
+          sourceStart:
+            (instance.sourceStart ?? 0) + (startTime - instance.startTime) * instance.playbackRate,
+        },
+      ];
     }
     if (instance.target.kind === 'scene') {
       const host = hostsByInstanceId.get(instance.id);
@@ -62,6 +71,7 @@ function reconcileEffectInstances(
         ? [reconcileStandaloneInstanceTiming(instance, host.startTime, host.duration)]
         : [];
     }
+    if (instance.target.kind !== 'transition') return [];
     const segment = transitionSegments.get(instance.target.transitionId);
     if (!segment) return [];
     return [reconcileTransitionInstanceTiming(instance, segment.start, segment.end)];
