@@ -1,8 +1,7 @@
-import { FloatingChromeToolbar } from '@sniptale/ui/floating-chrome';
-import { FileText, Heading, ListPlus, MessageSquare, Plus } from 'lucide-react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { FileText, Heading, ListPlus, MessageSquare } from 'lucide-react';
 import type { GuideStructureOperation } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
-import { GuideActionMenu } from './action-menu';
 
 type InsertTarget =
   | { kind: 'item'; beforeItemId?: string }
@@ -77,18 +76,20 @@ export function GuideDocumentInsert({
       data-end={end}
       data-insert-before={before ?? 'end'}
     >
-      <FloatingChromeToolbar className="guide-insertion-chrome">
-        <GuideActionMenu
-          label={t(
-            target.kind === 'item'
-              ? 'scenario.editor.guideInsertItem'
-              : 'scenario.editor.guideAddBlock'
-          )}
-          icon={<Plus size={15} aria-hidden="true" />}
-          items={items}
-          disabled={disabled}
-        />
-      </FloatingChromeToolbar>
+      <div className="guide-insertion-chrome">
+        {items.map((item) => (
+          <ContentToolbarButton
+            key={item.label}
+            type="button"
+            title={item.label}
+            aria-label={item.label}
+            disabled={disabled}
+            onClick={item.onSelect}
+          >
+            {item.icon}
+          </ContentToolbarButton>
+        ))}
+      </div>
     </div>
   );
 }

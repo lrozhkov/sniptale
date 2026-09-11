@@ -10,12 +10,15 @@ async function documentCommand(
   command: string,
   kind: 'item' | 'block' | 'insert'
 ) {
-  const selector =
-    kind === 'insert'
-      ? '.guide-insertion-block[data-end="true"] button'
-      : kind === 'item'
-        ? '.guide-item-actions button'
-        : '.guide-block-actions button';
+  if (kind === 'insert') {
+    const button = scope
+      .locator('.guide-insertion-block[data-end="true"]')
+      .getByRole('button', { name: command, exact: true });
+    await button.focus();
+    await button.click();
+    return;
+  }
+  const selector = kind === 'item' ? '.guide-item-actions button' : '.guide-block-actions button';
   const trigger = scope.locator(selector).first();
   await trigger.focus();
   await trigger.click();
@@ -176,7 +179,11 @@ export async function verifyGuideComposition(page: Page): Promise<void> {
   );
   await expect(page.locator('article')).toHaveCount(2);
   await expect(step.locator('.guide-block')).toHaveCount(4);
-  await page.getByRole('button', { name: 'Add section', exact: true }).click();
+  const addSection = page
+    .locator('.guide-insertion-item[data-end="true"]')
+    .getByRole('button', { name: 'Add section', exact: true });
+  await addSection.focus();
+  await addSection.click();
   await page.getByRole('textbox', { name: 'Section title', exact: true }).last().fill('Finish');
   await documentCommand(
     page,

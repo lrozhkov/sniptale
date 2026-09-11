@@ -92,7 +92,6 @@ async function click(label: string, scope: ParentNode = container) {
       ['Duplicate project', 'Delete project', 'Reload project'],
       '.guide-page-header .guide-action-menu-anchor',
     ],
-    [['Text', 'Heading', 'Note'], '.guide-insertion-block[data-end="true"]'],
     [
       ['Move up', 'Move down', 'Duplicate item', 'Remove item', 'Merge with next step'],
       '.guide-document [data-selected="true"] > .guide-item-actions',
@@ -107,6 +106,10 @@ async function click(label: string, scope: ParentNode = container) {
     await act(async () => trigger?.click());
     scope = document.body;
   }
+  if (['Text', 'Heading', 'Note'].includes(label))
+    scope = scope.querySelector('.guide-insertion-block[data-end="true"]') ?? scope;
+  if (['Add step', 'Add section'].includes(label))
+    scope = scope.querySelector('.guide-insertion-item[data-end="true"]') ?? scope;
   const button = [...scope.querySelectorAll('button')].find(
     (node) => (node.getAttribute('aria-label') ?? node.textContent) === label
   );
@@ -250,9 +253,9 @@ it('renders optional blocks and keeps text edits isolated from images and other 
   );
   await render();
   expect(container.querySelector('section')?.textContent).toContain('Section description');
-  expect(container.querySelector<HTMLInputElement>('[aria-label="Heading"]')?.value).toBe(
-    'Details'
-  );
+  expect(
+    container.querySelector<HTMLTextAreaElement>('textarea[aria-label="Heading"]')?.value
+  ).toBe('Details');
   expect(container.querySelector('article#first header span')).toBeNull();
   expect(container.querySelector('article img')?.getAttribute('alt')).toBe('Example image');
   expect(container.querySelector('figcaption')?.textContent).toBe('Image caption');
@@ -765,13 +768,10 @@ it('inserts at a block boundary and focuses the new field before typing', async 
   project.items = [step];
   io.load.mockResolvedValue(project);
   await render();
-  const trigger = container.querySelector<HTMLButtonElement>('[data-insert-before="b"] button');
-  await act(async () => trigger?.click());
-  const menu = document.querySelector('.guide-action-menu');
-  if (!menu) throw new Error('Missing insertion menu');
-  const command = [...menu.querySelectorAll('button')].find(
-    (button) => button.textContent === 'Heading'
+  const command = container.querySelector<HTMLButtonElement>(
+    '[data-insert-before="b"] button[aria-label="Heading"]'
   );
+  expect(command).not.toBeNull();
   await act(async () => command?.click());
   const heading = container.querySelector<HTMLTextAreaElement>('.guide-block-heading');
   expect(document.activeElement).toBe(heading);

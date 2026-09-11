@@ -1,7 +1,7 @@
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { type ReactNode } from 'react';
-import { FileText, Image, PanelRight, Plus, Settings2, X } from 'lucide-react';
+import { FileText, Image, PanelRight, Settings2, X } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { GuidePanelDivider, type useGuidePanels } from './panel-layout';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -18,7 +18,6 @@ type WorkspaceProps = {
   disabled: boolean;
   onSelect: (id: string) => void;
   onAddStep: () => void;
-  onAddSection: () => void;
   itemActions: ReactNode;
   children: ReactNode;
   t: Translate;
@@ -85,26 +84,6 @@ export function GuideWorkspace(props: WorkspaceProps) {
             </>
           )}
         </div>
-        <ProductActionButton
-          tone="secondary"
-          compact
-          type="button"
-          className="guide-add-step"
-          disabled={props.disabled}
-          onClick={props.onAddStep}
-        >
-          <Plus size={16} aria-hidden="true" />
-          {t('scenario.editor.guideAddStep')}
-        </ProductActionButton>
-        <ProductActionButton
-          tone="secondary"
-          compact
-          type="button"
-          disabled={props.disabled}
-          onClick={props.onAddSection}
-        >
-          {t('scenario.editor.guideAddSection')}
-        </ProductActionButton>
       </FloatingChromePanel>
       {leftOpen && (
         <GuidePanelDivider side="left" panels={props.panels} label={t('scenario.editor.outline')} />

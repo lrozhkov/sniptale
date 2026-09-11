@@ -1,4 +1,3 @@
-import { FloatingChromeToolbar } from '@sniptale/ui/floating-chrome';
 import { ArrowDown, ArrowUp, Copy, MoreHorizontal, Split, Trash2 } from 'lucide-react';
 import type { GuideStructureOperation } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
@@ -23,7 +22,7 @@ export function GuideBlockActions({
   t: Translate;
 }) {
   return (
-    <FloatingChromeToolbar className="guide-block-actions">
+    <div className="guide-block-actions">
       <GuideActionMenu
         label={t('scenario.editor.guideBlockActions')}
         icon={<MoreHorizontal size={16} aria-hidden="true" />}
@@ -60,6 +59,6 @@ export function GuideBlockActions({
           },
         ]}
       />
-    </FloatingChromeToolbar>
+    </div>
   );
 }

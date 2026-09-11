@@ -1,5 +1,4 @@
 import { Check, Crop, Pencil } from 'lucide-react';
-import { FloatingChromeToolbar } from '@sniptale/ui/floating-chrome';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
@@ -164,7 +163,7 @@ export function GuideImageSurface(props: ImageProps) {
         }
       }}
     >
-      <FloatingChromeToolbar className="guide-image-tools">
+      <div className="guide-image-tools">
         {props.onEdit && (
           <ContentToolbarButton
             type="button"
@@ -192,7 +191,7 @@ export function GuideImageSurface(props: ImageProps) {
         >
           {editing ? <Check size={16} aria-hidden="true" /> : <Crop size={16} aria-hidden="true" />}
         </ContentToolbarButton>
-      </FloatingChromeToolbar>
+      </div>
       <GuideImageViewport {...props} editing={editing} gesture={gesture} />
       {block.caption && <figcaption>{block.caption}</figcaption>}
       {editing && (

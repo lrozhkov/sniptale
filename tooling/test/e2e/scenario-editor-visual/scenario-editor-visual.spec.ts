@@ -248,13 +248,18 @@ test('document tools are contextual and leave image geometry unchanged', async (
   await image.hover();
   await expect(tools).toHaveCSS('opacity', '1');
   expect(await image.boundingBox()).toEqual(before);
-  const insertion = page.locator('article#compare [data-insert-before="before"] button');
+  const insertion = page
+    .locator('article#compare [data-insert-before="before"]')
+    .getByRole('button', { name: 'Heading', exact: true });
+  await expect(insertion).toHaveCount(1);
   await insertion.focus();
+  await expect(insertion.locator('..')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await testInfo.attach('direct-boundary-icons', {
+    body: await page.screenshot(),
+    contentType: 'image/png',
+  });
   await page.keyboard.press('Enter');
-  await page
-    .locator('.guide-action-menu')
-    .getByRole('button', { name: 'Heading', exact: true })
-    .click();
+
   const heading = page.locator('article#compare .guide-block-heading');
   await expect(heading).toBeFocused();
   await expect(page.locator('article#compare .guide-block').nth(1)).toHaveAttribute(
@@ -266,12 +271,12 @@ test('document tools are contextual and leave image geometry unchanged', async (
   await expect(heading).toHaveValue('');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(heading).toHaveCount(0);
-  await page.locator('.guide-insertion-item[data-insert-before="compare"] button').focus();
-  await page.keyboard.press('Enter');
   await page
-    .locator('.guide-action-menu')
+    .locator('.guide-insertion-item[data-insert-before="compare"]')
     .getByRole('button', { name: 'Add step', exact: true })
-    .click();
+    .focus();
+  await page.keyboard.press('Enter');
+
   const insertedTitle = page.locator('.guide-step-title:focus');
   await expect(insertedTitle).toHaveCount(1);
   await insertedTitle.fill('Inserted before the illustrated step');

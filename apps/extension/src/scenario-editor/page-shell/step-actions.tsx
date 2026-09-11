@@ -1,4 +1,3 @@
-import { FloatingChromeToolbar } from '@sniptale/ui/floating-chrome';
 import { ArrowUp, ArrowDown, Copy, Merge, MoreHorizontal, Trash2 } from 'lucide-react';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { GuideStructureOperation } from '../../features/scenario/project/public';
@@ -23,7 +22,7 @@ export function GuideStepActions({
   const item = project.items[index];
   if (!item) return null;
   return (
-    <FloatingChromeToolbar className="guide-item-actions">
+    <div className="guide-item-actions">
       <GuideActionMenu
         label={t('scenario.editor.guideStepActions')}
         icon={<MoreHorizontal size={16} aria-hidden="true" />}
@@ -64,6 +63,6 @@ export function GuideStepActions({
           },
         ]}
       />
-    </FloatingChromeToolbar>
+    </div>
   );
 }

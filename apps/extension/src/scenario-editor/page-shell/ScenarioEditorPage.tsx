@@ -113,7 +113,6 @@ export function ScenarioEditorPage() {
           disabled={disabled}
           onSelect={selectItem}
           onAddStep={() => operate({ kind: 'add-step' })}
-          onAddSection={() => operate({ kind: 'add-section' })}
           itemActions={
             <GuideAppearance
               project={project}
