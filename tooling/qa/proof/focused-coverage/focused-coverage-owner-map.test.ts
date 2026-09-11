@@ -96,9 +96,9 @@ it('maps each moved extension UI entrypoint to its app-root smoke proof', async 
   ).toEqual(['apps/extension/src/features/editor/document/rich-shape/catalog/geometry.test.ts']);
   expect(
     module.resolveMappedCoverageOwnerTests(
-      'apps/extension/src/features/scenario/project/factories/steps/capture.ts'
+      'apps/extension/src/features/scenario/project/factories/index.ts'
     )
-  ).toEqual(['apps/extension/src/features/scenario/project/factories/steps.test.ts']);
+  ).toEqual(['apps/extension/src/features/scenario/project/factories.test.ts']);
   expect(
     module.resolveMappedCoverageOwnerTests(
       'apps/extension/src/features/editor/document/rich-shape/catalog/unrelated.ts'
@@ -305,4 +305,13 @@ it('allows mapped production prefixes with at least one production file', async 
   });
 
   expect(violations).toEqual([]);
+});
+
+it('routes the guide page to semantic document and persistence interaction proof', async () => {
+  const module = await importOwnerMap();
+  expect(
+    module.resolveMappedCoverageOwnerTests(
+      'apps/extension/src/scenario-editor/page-shell/guide-document.tsx'
+    )
+  ).toEqual(['apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.test.tsx']);
 });

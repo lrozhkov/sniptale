@@ -1,135 +1,94 @@
 import { expect, it, vi } from 'vitest';
-import { type ScenarioProject } from '../contracts/types/project';
-import { buildRecentScenarioSteps, buildTrashedScenarioSteps } from './step-projections';
-import { createScenarioCaptureStep, createScenarioSectionStep } from './public';
-
-const { blobToDataUrlMock } = vi.hoisted(() => ({
-  blobToDataUrlMock: vi.fn(),
-}));
+import { buildRecentScenarioSteps, buildGuidePreviewSteps } from './step-projections';
+import { createGuideProject, createGuideStep, createGuideImageBlock } from './public';
 
 vi.mock('../../../platform/media-utils/data-url', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/media-utils/data-url')>()),
-  blobToDataUrl: blobToDataUrlMock,
+  blobToDataUrl: vi.fn(async () => 'data:image/png;base64,preview'),
 }));
 
-function createScenarioProjectFixture(): ScenarioProject {
-  return {
-    version: 2,
-    id: 'project-1',
-    name: 'Scenario',
-    createdAt: 1,
-    updatedAt: 2,
-    trash: [],
-    suggestedEvents: [],
-    steps: [
-      createScenarioSectionStep({ title: 'Intro' }),
-      createScenarioCaptureStep({ assetId: 'asset-1', title: 'First capture' }),
-      createScenarioCaptureStep({ assetId: 'asset-2', body: 'Second capture' }),
-    ],
-  };
+function captureStep(id: string) {
+  const step = createGuideStep(id, id);
+  step.blocks.push(
+    createGuideImageBlock({
+      id: `${id}-image`,
+      assetId: `${id}-asset`,
+      width: 100,
+      height: 50,
+      source: {
+        kind: 'capture',
+        captureSurface: 'visible',
+        sourceKind: 'manual',
+        page: {
+          title: null,
+          url: null,
+          viewport: { x: 0, y: 0, width: 100, height: 50 },
+          scrollX: 0,
+          scrollY: 0,
+          devicePixelRatio: 1,
+        },
+        target: null,
+        interactionPoint: null,
+        cursorPoint: null,
+        captureMetadata: { pointerRange: null, scroll: null, trigger: 'pointer-up' },
+      },
+    })
+  );
+  return step;
 }
 
-function createAssetBlobResolver() {
-  return async (assetId: string) => (assetId === 'asset-1' ? new Blob(['1']) : undefined);
-}
+it('limits recent captures in reverse order while retaining their positions around sections', async () => {
+  const project = createGuideProject('Guide');
+  project.items = [
+    { kind: 'section', id: 'section', title: 'Introduction', paragraphs: [] },
+    captureStep('first'),
+    createGuideStep('Text', 'text'),
+    captureStep('last'),
+  ];
+  const getAssetBlob = vi.fn(async () => new Blob(['image']));
+  const recent = await buildRecentScenarioSteps({ project, getAssetBlob, limit: 1 });
+  expect(recent).toEqual([
+    expect.objectContaining({
+      id: 'last',
+      position: 3,
+      stepNumber: 3,
+      title: 'last',
+      metadata: expect.objectContaining({ captureSurface: 'visible', sourceKind: 'manual' }),
+    }),
+  ]);
+  expect(getAssetBlob).toHaveBeenCalledExactlyOnceWith('last-asset');
+});
 
-it('builds recent capture steps and skips assets that cannot be resolved', async () => {
-  blobToDataUrlMock.mockResolvedValue('data:image/png;base64,preview');
-  const project = createScenarioProjectFixture();
-
-  const recentSteps = await buildRecentScenarioSteps({
-    getAssetBlob: createAssetBlobResolver(),
-    limit: 5,
+it('skips missing recent image bytes without mutating the document', async () => {
+  const project = createGuideProject('Guide');
+  project.items = [captureStep('first'), captureStep('missing')];
+  const original = structuredClone(project);
+  const recent = await buildRecentScenarioSteps({
     project,
+    getAssetBlob: async (id) => (id === 'first-asset' ? new Blob(['image']) : undefined),
   });
-
-  expect(recentSteps).toEqual([
-    expect.objectContaining({
-      id: project.steps[1]!.id,
-      metadata: expect.objectContaining({
-        captureSurface: 'visible',
-        sourceKind: 'manual',
-      }),
-      position: 1,
-      previewDataUrl: 'data:image/png;base64,preview',
-      title: 'First capture',
-    }),
-  ]);
+  expect(recent.map((step) => step.id)).toEqual(['first']);
+  expect(project).toEqual(original);
 });
 
-it('falls back to step body and step id when recent-step titles are missing', async () => {
-  blobToDataUrlMock.mockResolvedValue('data:image/png;base64,preview');
-  const untitledCapture = createScenarioCaptureStep({ assetId: 'asset-3' });
-  const subtitledCapture = createScenarioCaptureStep({
-    assetId: 'asset-4',
-    body: 'Fallback body',
+it('keeps text-only and imported steps in library order, including missing-image placeholders', async () => {
+  const project = createGuideProject('Guide');
+  const imported = createGuideStep('', 'import');
+  const image = createGuideImageBlock({
+    id: 'image',
+    assetId: 'asset',
+    width: 100,
+    height: 50,
+    source: { kind: 'import', filename: 'photo.png' },
   });
-
-  const recentSteps = await buildRecentScenarioSteps({
-    getAssetBlob: async () => new Blob(['1']),
-    project: {
-      ...createScenarioProjectFixture(),
-      steps: [untitledCapture, subtitledCapture],
-    },
-  });
-
-  expect(recentSteps).toEqual([
-    expect.objectContaining({
-      id: subtitledCapture.id,
-      metadata: expect.objectContaining({
-        captureSurface: 'visible',
-        sourceKind: 'manual',
-      }),
-      position: 1,
-      previewDataUrl: 'data:image/png;base64,preview',
-      title: 'Fallback body',
-    }),
-    expect.objectContaining({
-      id: untitledCapture.id,
-      metadata: expect.objectContaining({
-        captureSurface: 'visible',
-        sourceKind: 'manual',
-      }),
-      position: 0,
-      previewDataUrl: 'data:image/png;base64,preview',
-      title: untitledCapture.id,
-    }),
+  image.caption = 'Imported image';
+  imported.blocks.push(image);
+  project.items = [createGuideStep('Text', 'text'), imported];
+  const getAssetBlob = vi.fn(async () => undefined);
+  expect(await buildGuidePreviewSteps({ project, getAssetBlob })).toEqual([
+    { id: 'text', title: 'Text', position: 0, stepNumber: 1, previewDataUrl: '' },
+    { id: 'import', title: 'Imported image', position: 1, stepNumber: 2, previewDataUrl: '' },
   ]);
-});
-
-it('builds trashed scenario step summaries with fallback titles', () => {
-  const firstStep = createScenarioCaptureStep({ assetId: 'asset-1', title: 'First capture' });
-  const secondStep = createScenarioCaptureStep({ assetId: 'asset-2' });
-  const project = {
-    ...createScenarioProjectFixture(),
-    trash: [
-      {
-        deletedAt: 30,
-        originalIndex: 0,
-        step: firstStep,
-      },
-      {
-        deletedAt: 40,
-        originalIndex: 1,
-        step: secondStep,
-      },
-    ],
-  };
-
-  expect(buildTrashedScenarioSteps(project)).toEqual([
-    {
-      id: firstStep.id,
-      deletedAt: 30,
-      kind: 'capture',
-      originalIndex: 0,
-      title: 'First capture',
-    },
-    {
-      id: secondStep.id,
-      deletedAt: 40,
-      kind: 'capture',
-      originalIndex: 1,
-      title: secondStep.id,
-    },
-  ]);
+  expect(await buildRecentScenarioSteps({ project, getAssetBlob })).toEqual([]);
+  expect(getAssetBlob).toHaveBeenCalledExactlyOnceWith('asset');
 });

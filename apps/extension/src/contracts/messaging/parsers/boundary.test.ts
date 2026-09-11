@@ -28,7 +28,10 @@ function verifyBackgroundRuntimeMessageParsing() {
 function verifyScenarioEditorLlmRuntimeMessageParsing() {
   const message = parseBackgroundRuntimeMessage({
     type: MessageType.PROCESS_SCENARIO_EDITOR_WITH_LLM,
-    contractVersion: 3,
+    contractVersion: 4 as const,
+    projectId: 'project-1',
+    baseRevision: 1,
+    scope: { stepIds: ['step-1'], blockIds: [] },
     instruction: 'Rewrite steps',
     llmSessionToken: 'llm-session-token-1',
     projectSnapshotJson: '{"steps":[]}',

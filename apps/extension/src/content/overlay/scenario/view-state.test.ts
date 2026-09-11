@@ -34,17 +34,28 @@ describe('scenario-view-props-state', () => {
         rememberProjectSelection: true,
         sidebarVisible: true,
       },
-      projects: [{ createdAt: 1, id: 'project-1', name: 'Project 1', updatedAt: 1 }],
+      projects: [
+        {
+          availability: 'available' as const,
+          createdAt: 1,
+          id: 'project-1',
+          name: 'Project 1',
+          updatedAt: 1,
+        },
+      ],
       recentStepHighlightToken: 3,
       recentSteps: [
-        { id: 'step-1', position: 0, previewDataUrl: 'data:image/png;base64,1', title: 'Step 1' },
+        {
+          id: 'step-1',
+          position: 0,
+          stepNumber: 1,
+          previewDataUrl: 'data:image/png;base64,1',
+          title: 'Step 1',
+        },
       ],
       refreshSession,
       saveSelectionCapture,
       sidebarVisible: true,
-      trashedSteps: [
-        { deletedAt: 1, id: 'trash-1', kind: 'capture', originalIndex: 0, title: 'Trash' },
-      ],
     });
 
     expect(viewState.buildManualCapturePayload('visible')).toEqual(createManualCapturePayload());

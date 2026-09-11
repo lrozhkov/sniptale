@@ -29,6 +29,7 @@ function createMediaLibraryItem(overrides: Partial<MediaLibraryItem> = {}): Medi
 
 it('creates a mixed gallery list with scenario and export items sorted by freshness', () => {
   const scenarioProject = {
+    availability: 'available' as const,
     id: 'project-1',
     name: 'Scenario',
     createdAt: 20,
@@ -98,7 +99,15 @@ it('keeps scenario projects in the gallery even when exports or tags are missing
   const items = createGalleryItems({
     mediaItems: [],
     scenarioExportsByProjectId: new Map(),
-    scenarioProjects: [{ id: 'project-2', name: 'Empty scenario', createdAt: 5, updatedAt: 6 }],
+    scenarioProjects: [
+      {
+        availability: 'available' as const,
+        id: 'project-2',
+        name: 'Empty scenario',
+        createdAt: 5,
+        updatedAt: 6,
+      },
+    ],
     thumbnailIds: new Set(),
     videoProjects: [],
   });

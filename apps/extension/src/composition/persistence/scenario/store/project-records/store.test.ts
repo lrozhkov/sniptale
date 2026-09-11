@@ -44,17 +44,29 @@ beforeEach(() => {
 async function verifyProjectCrudLifecycle() {
   const project = createScenarioStoreProjectFixture();
   listScenarioProjectsMock.mockResolvedValue([
-    { id: 'project-1', name: 'Scenario', createdAt: 10, updatedAt: 20 },
+    {
+      availability: 'available' as const,
+      id: 'project-1',
+      name: 'Scenario',
+      createdAt: 10,
+      updatedAt: 20,
+    },
   ]);
   getScenarioProjectMock.mockResolvedValue(project);
 
   await expect(createScenarioProjectRecord('Scenario')).resolves.toEqual(
-    expect.objectContaining({ name: 'Scenario', steps: [] })
+    expect.objectContaining({ name: 'Scenario', version: 4, items: [] })
   );
   await expect(getScenarioProjectRecord('project-1')).resolves.toEqual(project);
   await expect(saveScenarioProjectRecord(project)).resolves.toEqual(project);
   await expect(listScenarioProjectSummaries()).resolves.toEqual([
-    { id: 'project-1', name: 'Scenario', createdAt: 10, updatedAt: 20 },
+    {
+      availability: 'available' as const,
+      id: 'project-1',
+      name: 'Scenario',
+      createdAt: 10,
+      updatedAt: 20,
+    },
   ]);
 
   expect(saveScenarioProjectMock).toHaveBeenCalled();

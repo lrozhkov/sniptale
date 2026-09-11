@@ -1,3 +1,4 @@
+import type { ScenarioProjectSummary } from '../../../features/scenario/contracts/types/project';
 import type {
   PendingScenarioAssetEntry,
   ScenarioAssetEntry,
@@ -5,9 +6,8 @@ import type {
   ScenarioProjectEntry,
 } from './contracts';
 import type { ScenarioExportFormat } from '@sniptale/runtime-contracts/scenario/types/base';
-import { isScenarioProjectV3 } from '../../../features/scenario/project/v3';
+import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import { isSafeScenarioAssetImageMimeType } from './projects/guards/asset-policy';
-import { parseScenarioProject } from './projects/guards';
 import { isNumber, isRecord, isString } from '../infrastructure/indexed-db/read-primitives.ts';
 import { parseLibraryLifecycle } from '../library-lifecycle/parser';
 
@@ -28,16 +28,7 @@ function isTabId(value: unknown): value is number {
 }
 
 function isScenarioExportFormat(value: unknown): value is ScenarioExportFormat {
-  return value === 'html' || value === 'markdown';
-}
-
-function parseStoredScenarioProject(value: unknown): ScenarioProjectEntry['project'] | null {
-  const legacyProject = parseScenarioProject(value);
-  if (legacyProject) {
-    return legacyProject;
-  }
-
-  return isScenarioProjectV3(value) ? value : null;
+  return value === 'html' || value === 'markdown' || value === 'pdf';
 }
 
 export function parseScenarioAssetEntry(value: unknown): ScenarioAssetEntry | null {
@@ -135,7 +126,8 @@ export function parseScenarioProjectEntry(value: unknown): ScenarioProjectEntry 
     return null;
   }
 
-  const project = parseStoredScenarioProject(value['project']);
+  const parsed = parseGuideProject(value['project']);
+  const project = parsed.status === 'ok' ? parsed.project : null;
   if (
     !isString(value['id']) ||
     !project ||
@@ -152,7 +144,6 @@ export function parseScenarioProjectEntry(value: unknown): ScenarioProjectEntry 
   if (lifecycle === null) return null;
   const workspaceRevision = value['workspaceRevision'];
   if (
-    workspaceRevision !== undefined &&
     !(
       typeof workspaceRevision === 'number' &&
       Number.isInteger(workspaceRevision) &&
@@ -167,6 +158,54 @@ export function parseScenarioProjectEntry(value: unknown): ScenarioProjectEntry 
     ...(lifecycle === undefined ? {} : { lifecycle }),
     project,
     updatedAt: value['updatedAt'],
-    workspaceRevision: workspaceRevision ?? 0,
+    workspaceRevision,
+  };
+}
+
+/** Reads display metadata independently of unsupported document bodies. */
+export function parseScenarioProjectSummary(value: unknown): ScenarioProjectSummary | null {
+  if (!isRecord(value) || !isRecord(value['project'])) return null;
+  const body = value['project'];
+  if (
+    typeof value['id'] !== 'string' ||
+    !value['id'] ||
+    body['id'] !== value['id'] ||
+    typeof body['name'] !== 'string' ||
+    body['name'].length > 160 ||
+    !isNumber(value['createdAt']) ||
+    !isNumber(value['updatedAt'])
+  )
+    return null;
+  const lifecycle = parseLibraryLifecycle(value['lifecycle'], {
+    storageClass: 'library',
+    updatedAt: value['updatedAt'],
+  });
+  if (lifecycle === null) return null;
+  const tags: unknown = body['tags'];
+  if (
+    tags !== undefined &&
+    (!Array.isArray(tags) ||
+      tags.length > 30 ||
+      !tags.every((tag: unknown) => typeof tag === 'string' && tag.length <= 160))
+  )
+    return null;
+  const parsed = parseGuideProject(body);
+  const revision = value['workspaceRevision'];
+  const validRevision =
+    typeof revision === 'number' && Number.isSafeInteger(revision) && revision >= 0;
+  return {
+    id: value['id'],
+    name: body['name'],
+    createdAt: value['createdAt'],
+    updatedAt: value['updatedAt'],
+    tags: Array.isArray(tags) ? tags.filter((tag): tag is string => typeof tag === 'string') : [],
+    ...(lifecycle ? { lifecycle } : {}),
+    ...(validRevision ? { workspaceRevision: revision } : {}),
+    availability:
+      parsed.status === 'unsupported'
+        ? 'unsupported'
+        : parsed.status === 'ok' && validRevision
+          ? 'available'
+          : 'invalid',
   };
 }

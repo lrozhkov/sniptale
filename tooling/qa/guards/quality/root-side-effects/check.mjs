@@ -29,7 +29,6 @@ const SHARED_DOMAIN_OWNER_INDEX_PATHS = new Set([
   'apps/extension/src/features/media-hub/index.ts',
   'apps/extension/src/features/prompt-templates/index.ts',
   'apps/extension/src/features/scenario/project/index.ts',
-  'apps/extension/src/features/scenario/stage/index.ts',
   'apps/extension/src/features/video/composition/index.ts',
   'apps/extension/src/features/video/project/index.ts',
   'apps/extension/src/features/web-snapshot/index.ts',

@@ -50,12 +50,16 @@
     },
     {
       "id": "editor-owned-runtime-seams",
-      "files": ["apps/extension/src/editor/document/session-autosave/index.ts"],
+      "files": [
+        "apps/extension/src/editor/document/session-autosave/index.ts"
+      ],
       "rule": "no-top-level-mutable-runtime-state"
     },
     {
       "id": "video-editor-runtime-facades",
-      "files": ["apps/extension/src/video-editor/library/panel/thumbnails/ensure.ts"],
+      "files": [
+        "apps/extension/src/video-editor/library/panel/thumbnails/ensure.ts"
+      ],
       "rule": "facade-default-owner"
     },
     {
@@ -118,9 +122,7 @@
     {
       "id": "scenario-editor-owner-seams",
       "files": [
-        "apps/extension/src/scenario-editor/project/state/index.ts",
-        "apps/extension/src/scenario-editor/project/state/values.ts",
-        "apps/extension/src/scenario-editor/project/state/ui.ts"
+        "apps/extension/src/scenario-editor/page-shell/runtime/use-state.ts"
       ],
       "rule": "no-top-level-mutable-runtime-state"
     }

@@ -63,7 +63,7 @@ function createScenarioAuthority(): AiEgressAuthority {
     contractVersion: 1,
     payloadHash: VALID_SCENARIO_HASH,
     purpose: 'scenario-editor',
-    scenarioContractVersion: 3,
+    scenarioContractVersion: 4,
   };
 }
 

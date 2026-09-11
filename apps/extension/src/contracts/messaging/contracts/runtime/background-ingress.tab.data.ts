@@ -77,9 +77,7 @@ export const backgroundIngressTabRouteGroups = [
       'SCENARIO_SAVE_CAPTURE_STEP',
       'SCENARIO_DELETE_STEP',
       'SCENARIO_MOVE_STEP',
-      'SCENARIO_RECORD_SUGGESTED_EVENT',
       'SCENARIO_OPEN_EDITOR',
-      'SCENARIO_RESTORE_STEP',
     ],
   },
   {

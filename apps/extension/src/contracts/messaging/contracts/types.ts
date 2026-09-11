@@ -82,8 +82,6 @@ export type {
   ScenarioListProjectsMessage,
   ScenarioMoveStepMessage,
   ScenarioOpenEditorMessage,
-  ScenarioRecordSuggestedEventMessage,
-  ScenarioRestoreStepMessage,
   ScenarioRuntimeCapturePayload,
   ScenarioSaveCaptureStepMessage,
   ScenarioSessionPayload,

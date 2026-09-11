@@ -102,9 +102,7 @@ vi.mock('./capture-step/assets', async (importOriginal) => {
 });
 import { getScenarioAssetBlob, getScenarioAssetEntry } from './project-records/assets';
 import { listScenarioExportRecords, saveScenarioExportRecord } from './project-records/exports';
-import { recordScenarioSuggestedEvent } from './suggested-events';
 import { saveScenarioCaptureStepToProject } from './capture-step';
-import { createScenarioCaptureStep } from '../../../../features/scenario/project/public';
 import { createScenarioStoreProjectFixture } from './test.helpers.ts';
 
 type SaveCaptureRequest = Parameters<typeof saveScenarioCaptureStepToProject>[0];
@@ -166,7 +164,7 @@ beforeEach(() => {
   saveScenarioProjectMock.mockResolvedValue(undefined);
   saveScenarioAssetMock.mockResolvedValue(undefined);
   saveScenarioExportMock.mockResolvedValue(undefined);
-  persistScenarioCaptureArtifactsMock.mockResolvedValue(undefined);
+  persistScenarioCaptureArtifactsMock.mockImplementation(async (args) => args.project);
   saveScenarioStepEditorDocumentRecordMock.mockResolvedValue(undefined);
   deleteScenarioAssetMock.mockResolvedValue(undefined);
   deleteScenarioExportMock.mockResolvedValue(undefined);
@@ -182,7 +180,7 @@ it('persists immutable scenario assets and appends capture overlays to the proje
 
   const result = await saveScenarioCaptureStepToProject(createAutoClickCaptureRequest(project.id));
 
-  expect(project.steps).toHaveLength(0);
+  expect(project.items).toHaveLength(0);
   expect(persistScenarioCaptureArtifactsMock).toHaveBeenCalledWith(
     expect.objectContaining({
       assetEntry: expect.objectContaining({
@@ -194,28 +192,27 @@ it('persists immutable scenario assets and appends capture overlays to the proje
       }),
       project: expect.objectContaining({
         id: 'project-1',
-        steps: [expect.objectContaining({ kind: 'capture', title: 'Click Submit' })],
+        items: [expect.objectContaining({ kind: 'step', title: 'Click Submit' })],
       }),
       projectId: 'project-1',
       stepDocument: expect.any(Object),
     })
   );
   expect(result.asset.galleryAssetId).toBe('gallery-asset-1');
-  expect(result.step.assetId).toBe(result.asset.id);
-  expect(result.step.overlays.map((overlay) => overlay.kind)).toEqual(['focus-rect']);
-  expect(result.step.annotationRenderMode).toBe('overlays');
-  expect(result.step.viewportTransform).toEqual({ x: 0, y: 0, width: 720, height: 420 });
+  const image = result.step.blocks.find((block) => block.kind === 'image');
+  expect(image).toEqual(
+    expect.objectContaining({
+      assetId: result.asset.id,
+      editDocumentId: expect.any(String),
+      frame: { width: 1440, height: 900 },
+    })
+  );
   expect(persistScenarioCaptureArtifactsMock).toHaveBeenCalledWith(
-    expect.objectContaining({ stepId: result.step.id })
+    expect.objectContaining({ stepId: image?.editDocumentId })
   );
 });
 
-it('records suggested events near the latest step and sorts export history by recency', async () => {
-  const project = {
-    ...createScenarioStoreProjectFixture(),
-    steps: [createScenarioCaptureStep({ assetId: 'asset-1', title: 'Latest step' })],
-  };
-  getScenarioProjectMock.mockResolvedValue(project);
+it('sorts export history by recency', async () => {
   listScenarioExportsMock.mockResolvedValue([
     {
       id: 'export-1',
@@ -235,25 +232,11 @@ it('records suggested events near the latest step and sorts export history by re
     },
   ]);
 
-  const event = await recordScenarioSuggestedEvent({
-    projectId: 'project-1',
-    kind: 'keydown',
-    message: 'Shortcut: Ctrl+S',
-  });
   const exports = await listScenarioExportRecords('project-1');
-
-  expect(event.sourceStepId).toBe(project.steps[0]?.id);
-  expect(saveScenarioProjectMock).toHaveBeenCalledWith(
-    expect.objectContaining({
-      suggestedEvents: [expect.objectContaining({ kind: 'keydown', message: 'Shortcut: Ctrl+S' })],
-    }),
-    { baseUpdatedAt: project.updatedAt }
-  );
   expect(exports.map((entry) => entry.id)).toEqual(['export-2', 'export-1']);
 });
 
 it('stores export audit entries and throws when a scenario project is missing', async () => {
-  getScenarioProjectMock.mockResolvedValueOnce(undefined);
   getScenarioProjectMock.mockResolvedValueOnce(undefined);
 
   await expect(
@@ -270,14 +253,7 @@ it('stores export audit entries and throws when a scenario project is missing', 
         },
       })
     )
-  ).rejects.toThrow('Scenario project not found: missing');
-  await expect(
-    recordScenarioSuggestedEvent({
-      projectId: 'missing',
-      kind: 'scroll',
-      message: 'Scrolled',
-    })
-  ).rejects.toThrow('Scenario project not found: missing');
+  ).rejects.toThrow('Scenario project not found.');
 
   expect(
     await saveScenarioExportRecord({
@@ -309,6 +285,8 @@ it('returns undefined asset lookups and supports capture steps without derived o
     })
   );
 
-  expect(result.step.overlays).toEqual([]);
+  expect(result.step.blocks).toEqual([
+    expect.objectContaining({ kind: 'image', editDocumentId: null }),
+  ]);
   expect(saveScenarioStepEditorDocumentRecordMock).not.toHaveBeenCalled();
 });

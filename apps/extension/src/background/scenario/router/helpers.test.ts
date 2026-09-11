@@ -1,32 +1,39 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import {
+  createGuideProject,
+  createGuideStep,
+  createGuideImageBlock,
+} from '../../../features/scenario/project/public';
 
 const {
   blobToDataUrlMock,
   getScenarioAssetMock,
   getScenarioProjectRecordMock,
   listScenarioProjectSummariesMock,
-  saveScenarioCaptureSlideToProjectMock,
+  saveScenarioCaptureStepToProjectMock,
 } = vi.hoisted(() => ({
   blobToDataUrlMock: vi.fn(),
   getScenarioAssetMock: vi.fn(),
   getScenarioProjectRecordMock: vi.fn(),
   listScenarioProjectSummariesMock: vi.fn(),
-  saveScenarioCaptureSlideToProjectMock: vi.fn(),
+  saveScenarioCaptureStepToProjectMock: vi.fn(),
 }));
 
 vi.mock('../../../composition/persistence/scenario/projects', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../composition/persistence/scenario/projects')>()),
   getScenarioAsset: getScenarioAssetMock,
+  getScenarioProject: getScenarioProjectRecordMock,
 }));
 vi.mock('../../../platform/media-utils/data-url', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../../platform/media-utils/data-url')>()),
   blobToDataUrl: blobToDataUrlMock,
 }));
-vi.mock('../../../composition/persistence/scenario/store/v3', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../composition/persistence/scenario/store/v3')>()),
-  getScenarioProjectRecordV3: getScenarioProjectRecordMock,
-  listScenarioProjectSummariesV3: listScenarioProjectSummariesMock,
-  saveScenarioCaptureSlideToProject: saveScenarioCaptureSlideToProjectMock,
+vi.mock('../../../composition/persistence/scenario/store/public', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/scenario/store/public')
+  >()),
+  getScenarioProjectRecord: getScenarioProjectRecordMock,
+  listScenarioProjectSummaries: listScenarioProjectSummariesMock,
 }));
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import {
@@ -44,8 +51,8 @@ beforeEach(() => {
   blobToDataUrlMock.mockResolvedValue('data:image/png;base64,preview');
   getScenarioAssetMock.mockResolvedValue(createScenarioAssetEntryFixture());
   listScenarioProjectSummariesMock.mockResolvedValue([]);
-  saveScenarioCaptureSlideToProjectMock.mockResolvedValue({
-    slide: { id: 'slide-1' },
+  saveScenarioCaptureStepToProjectMock.mockResolvedValue({
+    step: { id: 'slide-1' },
   });
 });
 
@@ -176,13 +183,17 @@ it('normalizes scenario save fields from capture-step messages', () => {
 it('loads session payload and project selection details through shared store seams', async () => {
   const scenarioSessionService = createProjectSelectionSession();
   listScenarioProjectSummariesMock.mockResolvedValue([
-    { id: 'project-1', name: 'Project 1', createdAt: 10, updatedAt: 20 },
+    {
+      availability: 'available' as const,
+      id: 'project-1',
+      name: 'Project 1',
+      createdAt: 10,
+      updatedAt: 20,
+    },
   ]);
   getScenarioProjectRecordMock.mockResolvedValue({
-    id: 'project-1',
-    name: 'Project 1',
-    slides: [createCaptureSlide('slide-1')],
-    trash: [createTrashedSlide('slide-old')],
+    ...createGuideProject('Project 1', 'project-1'),
+    items: [createCapturedStep('slide-1')],
   });
 
   const payload = await buildScenarioSessionPayload(11, scenarioSessionService);
@@ -192,16 +203,9 @@ it('loads session payload and project selection details through shared store sea
     expect.objectContaining({
       id: 'slide-1',
       position: 0,
+      stepNumber: 1,
       previewDataUrl: 'data:image/png;base64,preview',
       title: 'Captured step',
-    }),
-  ]);
-  expect(payload.trashedSteps).toEqual([
-    expect.objectContaining({
-      id: 'slide-old',
-      kind: 'capture',
-      originalIndex: 0,
-      title: 'Trashed step',
     }),
   ]);
   expect(await resolveProjectSelection(null)).toEqual({ id: null, name: null });
@@ -236,7 +240,7 @@ it('flushes buffered captures into the selected project and clears the pending s
   ).resolves.toEqual({
     stepId: 'slide-1',
   });
-  expect(saveScenarioCaptureSlideToProjectMock).toHaveBeenCalledWith(
+  expect(saveScenarioCaptureStepToProjectMock).toHaveBeenCalledWith(
     expect.objectContaining({
       projectId: 'project-1',
       galleryAssetId: 'gallery-1',
@@ -249,44 +253,32 @@ it('flushes buffered captures into the selected project and clears the pending s
   expect(scenarioSessionService.clearPendingCapture).not.toHaveBeenCalled();
 });
 
-function createCaptureSlide(id: string) {
-  return {
-    id,
-    title: 'Captured step',
-    notes: '',
-    source: {
+function createCapturedStep(id: string) {
+  const step = createGuideStep('Captured step', id);
+  step.blocks.push(
+    createGuideImageBlock({
+      id: 'image',
       assetId: 'asset-1',
-      captureMetadata: {
-        pointerRange: null,
-        scroll: null,
-        trigger: 'pointer-up',
+      width: 1000,
+      height: 800,
+      source: {
+        kind: 'capture',
+        captureSurface: 'visible',
+        sourceKind: 'manual',
+        page: createPendingCaptureRequest().page,
+        target: null,
+        cursorPoint: null,
+        interactionPoint: null,
+        captureMetadata: { pointerRange: null, scroll: null, trigger: 'pointer-up' },
       },
-      captureSurface: 'visible',
-      cursorPoint: null,
-      galleryAssetId: null,
-      interactionPoint: null,
-      kind: 'capture',
-      page: {
-        title: 'Page',
-        url: 'https://example.com',
-        viewport: { x: 0, y: 0, width: 1000, height: 800 },
-        scrollX: 0,
-        scrollY: 0,
-        devicePixelRatio: 1,
-      },
-      sourceKind: 'manual',
-      target: null,
-    },
-  };
+    })
+  );
+  return step;
 }
 
-function createTrashedSlide(id: string) {
-  return {
-    deletedAt: 20,
-    originalIndex: 0,
-    slide: {
-      ...createCaptureSlide(id),
-      title: 'Trashed step',
-    },
-  };
-}
+vi.mock('../../../composition/persistence/scenario/store/capture-step', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/scenario/store/capture-step')
+  >()),
+  saveScenarioCaptureStepToProject: saveScenarioCaptureStepToProjectMock,
+}));

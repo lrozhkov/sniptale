@@ -134,19 +134,22 @@ async function verifyClickCaptureMetadataScenario() {
 
   const result = await saveScenarioCaptureStepToProject(createClickCaptureRequest());
 
-  expect(result.step.captureMetadata).toEqual(
+  const image = result.step.blocks.find((block) => block.kind === 'image');
+  if (!image || image.source.kind !== 'capture') throw new Error('Expected captured image');
+  expect(image.source.captureMetadata).toEqual(
     expect.objectContaining({
       trigger: 'pointer-up',
       scroll: expect.objectContaining({ deltaY: 60 }),
     })
   );
-  expect(result.step.overlays.map((overlay) => overlay.kind)).toEqual(['click-ring']);
+  expect(image.editDocumentId).toEqual(expect.any(String));
+  expect(image.editDocumentId).not.toBe(result.step.id);
   expect(persistScenarioCaptureArtifactsMock).toHaveBeenCalledWith(
     expect.objectContaining({
       baseUpdatedAt: expect.any(Number),
       project: expect.objectContaining({ id: 'project-1' }),
       projectId: 'project-1',
-      stepId: result.step.id,
+      stepId: image.editDocumentId,
       stepDocument: expect.any(Object),
     })
   );

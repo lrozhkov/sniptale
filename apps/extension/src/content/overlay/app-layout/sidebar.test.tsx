@@ -139,6 +139,7 @@ async function verifyDeferredHighlightRestore(props: ReturnType<typeof createPro
     {
       id: 'step-2',
       position: 1,
+      stepNumber: 2,
       previewDataUrl: 'data:image/png;base64,2',
       title: 'Latest step',
     },
@@ -160,6 +161,7 @@ function createRecentStep(id: string, title: string) {
   return {
     id,
     position: 1,
+    stepNumber: 2,
     previewDataUrl: `data:image/png;base64,${id}`,
     title,
   };

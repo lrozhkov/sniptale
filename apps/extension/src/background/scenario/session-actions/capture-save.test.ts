@@ -67,7 +67,7 @@ beforeEach(() => {
   });
   saveCaptureStepToScenarioProjectMock.mockResolvedValue({
     project: { id: 'project-1', name: 'Project 1' },
-    slide: { id: 'slide-1' },
+    step: { id: 'step-1' },
   });
 });
 
@@ -101,7 +101,7 @@ it('auto-creates a project and saves the first capture when no project is active
     expect.objectContaining({
       success: true,
       projectId: 'project-1',
-      stepId: 'slide-1',
+      stepId: 'step-1',
     })
   );
 });

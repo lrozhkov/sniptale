@@ -6,7 +6,6 @@ export const AS_NEVER_REMOVAL_OWNER_MAPPINGS = [
       'Shared literal narrowing is exercised through scenario, storage, runtime, and EffectV1 boundary suites.',
     testFiles: [
       'apps/extension/src/background/runtime/routing/runtime-wiring/parsers.test.ts',
-      'apps/extension/src/features/scenario/project/v3/guards.boundaries.test.ts',
       'apps/extension/src/composition/persistence/highlighter/guards.test.ts',
       'apps/extension/src/features/video/project/effect-bundle/boundary.test.ts',
     ],
@@ -47,53 +46,6 @@ export const AS_NEVER_REMOVAL_OWNER_MAPPINGS = [
     reason: 'Capture mode selector labels and disabled states are covered by its component suite.',
     testFiles: [
       'apps/extension/src/popup/recording/video/setup/options/capture-mode-selector.test.tsx',
-    ],
-  },
-  {
-    owner: 'scenario-quick-edit-overlay-layer',
-    productionFile:
-      'apps/extension/src/scenario-editor/workspace/quick-edit/ScenarioQuickEditOverlayLayer.tsx',
-    reason: 'Quick-edit overlay branch rendering is covered by the overlay layer suite.',
-    testFiles: [
-      'apps/extension/src/scenario-editor/workspace/quick-edit/ScenarioQuickEditOverlayLayer.test.tsx',
-    ],
-  },
-  {
-    owner: 'scenario-project-v3-guards',
-    productionFile: 'apps/extension/src/features/scenario/project/v3/element-guards.capture.ts',
-    reason: 'Scenario v3 guard narrowing is covered by boundary and template validation suites.',
-    testFiles: [
-      'apps/extension/src/features/scenario/project/v3/element-guards.capture.test.ts',
-      'apps/extension/src/features/scenario/project/v3/guards.boundaries.test.ts',
-      'apps/extension/src/features/scenario/project/v3/guards.test.ts',
-    ],
-  },
-  {
-    owner: 'scenario-project-v3-guards',
-    productionFile: 'apps/extension/src/features/scenario/project/v3/element-guards.ts',
-    reason: 'Scenario v3 element guard narrowing is covered by boundary guard suites.',
-    testFiles: [
-      'apps/extension/src/features/scenario/project/v3/element-guards.capture.test.ts',
-      'apps/extension/src/features/scenario/project/v3/guards.boundaries.test.ts',
-      'apps/extension/src/features/scenario/project/v3/guards.test.ts',
-    ],
-  },
-  {
-    owner: 'scenario-project-v3-presentation-guards',
-    productionFile: 'apps/extension/src/features/scenario/project/v3/guards.presentation.ts',
-    reason: 'Scenario v3 presentation guard narrowing is covered by project guard suites.',
-    testFiles: [
-      'apps/extension/src/features/scenario/project/v3/guards.boundaries.test.ts',
-      'apps/extension/src/features/scenario/project/v3/guards.test.ts',
-    ],
-  },
-  {
-    owner: 'scenario-project-v3-template-validation',
-    productionFile: 'apps/extension/src/features/scenario/project/v3/templates/validation.ts',
-    reason: 'Scenario template validation narrowing is covered by template import/registry suites.',
-    testFiles: [
-      'apps/extension/src/features/scenario/project/v3/templates/import-pack.test.ts',
-      'apps/extension/src/features/scenario/project/v3/templates/registry.test.ts',
     ],
   },
   {

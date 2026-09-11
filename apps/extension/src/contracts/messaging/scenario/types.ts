@@ -3,7 +3,6 @@ import type {
   ScenarioCaptureMode,
   ScenarioCaptureSourceKind,
   ScenarioCaptureSurface,
-  ScenarioSuggestedEventKind,
 } from '@sniptale/runtime-contracts/scenario/types/base';
 import type {
   ScenarioCaptureMetadata,
@@ -14,7 +13,6 @@ import type {
 import type {
   ScenarioProjectSummary,
   ScenarioRecentStep,
-  ScenarioTrashedStep,
 } from '../../../features/scenario/contracts/types/project';
 import type {
   ScenarioRecorderSurfaceState,
@@ -115,23 +113,6 @@ export type ScenarioMoveStepMessage = {
   tabId?: number;
 };
 
-export type ScenarioRestoreStepMessage = {
-  type: MessageType.SCENARIO_RESTORE_STEP;
-  projectId: string;
-  stepId: string;
-  tabId?: number;
-};
-
-export type ScenarioRecordSuggestedEventMessage = {
-  type: MessageType.SCENARIO_RECORD_SUGGESTED_EVENT;
-  kind: ScenarioSuggestedEventKind;
-  message: string;
-  target?: ScenarioTargetDescriptor | null;
-  sourceStepId?: string | null;
-  data?: Record<string, string | number | boolean | null>;
-  tabId?: number;
-};
-
 export type ScenarioOpenEditorMessage = {
   type: MessageType.SCENARIO_OPEN_EDITOR;
   projectId?: string | null;
@@ -143,7 +124,6 @@ export type ScenarioSessionPayload = {
   surface?: ScenarioRecorderSurfaceState;
   projects?: ScenarioProjectSummary[];
   recentSteps?: ScenarioRecentStep[];
-  trashedSteps?: ScenarioTrashedStep[];
   projectRevision?: number;
   snapshot?: ScenarioRestoreSnapshot;
 };

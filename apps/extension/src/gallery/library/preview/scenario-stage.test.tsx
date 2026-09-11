@@ -5,8 +5,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createScenarioExportItem, createScenarioItem } from '../actions/test-support/index';
 
-const { listRecentScenarioStepsMock } = vi.hoisted(() => ({
-  listRecentScenarioStepsMock: vi.fn(),
+const { listScenarioPreviewStepsMock } = vi.hoisted(() => ({
+  listScenarioPreviewStepsMock: vi.fn(),
 }));
 
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
@@ -20,7 +20,7 @@ vi.mock(
     ...(await importOriginal<
       typeof import('../../../composition/persistence/scenario/store/project-steps/project-step-queries')
     >()),
-    listRecentScenarioSteps: listRecentScenarioStepsMock,
+    listScenarioPreviewSteps: listScenarioPreviewStepsMock,
   })
 );
 
@@ -55,7 +55,7 @@ afterEach(() => {
 });
 
 it('renders an empty scenario preview when no recent steps are available', async () => {
-  listRecentScenarioStepsMock.mockResolvedValue([]);
+  listScenarioPreviewStepsMock.mockResolvedValue([]);
 
   act(() => {
     root?.render(<PreviewScenarioStage item={createScenarioItem()} />);
@@ -67,9 +67,9 @@ it('renders an empty scenario preview when no recent steps are available', async
 });
 
 it('renders recent steps for scenario exports', async () => {
-  listRecentScenarioStepsMock.mockResolvedValue([
-    { id: 'step-1', position: 0, previewDataUrl: 'data:1', title: 'First step' },
-    { id: 'step-2', position: 1, previewDataUrl: 'data:2', title: 'Second step' },
+  listScenarioPreviewStepsMock.mockResolvedValue([
+    { id: 'step-1', position: 0, stepNumber: 1, previewDataUrl: 'data:1', title: 'First step' },
+    { id: 'step-2', position: 1, stepNumber: 2, previewDataUrl: 'data:2', title: 'Second step' },
   ]);
 
   act(() => {
@@ -77,7 +77,14 @@ it('renders recent steps for scenario exports', async () => {
       <PreviewScenarioStage
         item={createScenarioExportItem({
           filename: 'scenario.html',
-          project: { createdAt: 1, id: 'project-1', name: 'Scenario', tags: [], updatedAt: 2 },
+          project: {
+            availability: 'available' as const,
+            createdAt: 1,
+            id: 'project-1',
+            name: 'Scenario',
+            tags: [],
+            updatedAt: 2,
+          },
         })}
       />
     );

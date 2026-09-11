@@ -1,10 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  DEFAULT_BROWSER_FRAME_STATE,
-  DEFAULT_EDITOR_FRAME_SETTINGS,
-} from '../../features/editor/document/constants';
-import { createScenarioCaptureStep } from '../../features/scenario/project/public';
-import { type ScenarioCaptureStep } from '../../features/scenario/contracts/types/project';
+import { createGuideImageBlock } from '../../features/scenario/project/public';
 
 const { dataUrlToBlobMock, measureImageBlobMock, writeBlobToAssetMock } = vi.hoisted(() => ({
   dataUrlToBlobMock: vi.fn(),
@@ -28,26 +23,7 @@ vi.mock('@sniptale/platform/browser/media/image-dimensions', async (importOrigin
   measureImageBlob: measureImageBlobMock,
 }));
 
-import { buildScenarioEditedCaptureStep, prepareScenarioEditedCaptureAsset } from './edits';
-
-function createEditorDocument() {
-  return {
-    version: 2 as const,
-    sourceImageData: 'data:image/png;base64,doc',
-    sourceName: null,
-    sourceWidth: 320,
-    sourceHeight: 180,
-    canvasWidth: 320,
-    canvasHeight: 180,
-    sourceLeft: 0,
-    sourceTop: 0,
-    sourceDisplayWidth: 320,
-    sourceDisplayHeight: 180,
-    frame: DEFAULT_EDITOR_FRAME_SETTINGS,
-    browserFrame: DEFAULT_BROWSER_FRAME_STATE,
-    canvasJson: '{"version":"7.2.0","objects":[]}',
-  };
-}
+import { buildScenarioEditedImageBlock, prepareScenarioEditedCaptureAsset } from './edits';
 
 function registerCaptureStepEditsScope() {
   beforeEach(() => {
@@ -124,45 +100,23 @@ async function verifiesFallbackAssetMetadata() {
   );
 }
 
-function verifiesEditedCaptureStepReset() {
-  vi.spyOn(Date, 'now').mockReturnValue(456);
-  const document = createEditorDocument();
-  const step: ScenarioCaptureStep = {
-    ...createScenarioCaptureStep({
-      assetId: 'asset-old',
-    }),
-    imageTransform: { scale: 1.4, x: 48, y: 24 },
-    overlays: [
-      {
-        id: 'overlay-1',
-        kind: 'text',
-        point: { x: 10, y: 20 },
-        text: 'Overlay',
-        color: '#000000',
-        fontFamily: 'system-ui',
-        fontSize: 14,
-        fontWeight: 400,
-      },
-    ],
-    viewportTransform: { x: 1, y: 2, width: 3, height: 4 },
-  };
-
-  expect(buildScenarioEditedCaptureStep(step, 'asset-new', document)).toEqual(
-    expect.objectContaining({
-      id: step.id,
-      assetId: 'asset-new',
-      annotationRenderMode: 'asset',
-      overlays: [],
-      imageTransform: { scale: 1, x: 0, y: 0 },
-      viewportTransform: {
-        x: 0,
-        y: 0,
-        width: 720,
-        height: 420,
-      },
-      updatedAt: 456,
-    })
-  );
+function verifiesEditedImageReferenceUpdate() {
+  const block = createGuideImageBlock({
+    id: 'image-1',
+    assetId: 'asset-old',
+    width: 320,
+    height: 180,
+    editDocumentId: 'document-old',
+    galleryAssetId: 'gallery-1',
+    source: { kind: 'import', filename: 'original.png' },
+  });
+  block.contentTransform = { x: 0.2, y: -0.1, scale: 1.4 };
+  block.caption = 'Keep caption';
+  const original = structuredClone(block);
+  const edited = buildScenarioEditedImageBlock(block, 'asset-new', 'document-new');
+  expect(edited).toEqual({ ...original, assetId: 'asset-new', editDocumentId: 'document-new' });
+  expect(block).toEqual(original);
+  expect(edited).not.toBe(block);
 }
 
 function runCaptureStepEditsSuite() {
@@ -177,8 +131,8 @@ function runCaptureStepEditsSuite() {
     verifiesFallbackAssetMetadata
   );
   it(
-    'repoints the capture step to the new asset and resets editor-owned transforms',
-    verifiesEditedCaptureStepReset
+    'repoints only immutable image references while preserving layout and the previous version',
+    verifiesEditedImageReferenceUpdate
   );
 }
 

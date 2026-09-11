@@ -25,20 +25,6 @@ export const runtimeActionScenarioStepMessageContracts = {
     ),
     parseResponse: createScenarioRuntimeResponseParser(MessageType.SCENARIO_DELETE_STEP),
   },
-  [MessageType.SCENARIO_RESTORE_STEP]: {
-    parseRequest: createGuardParser(
-      'runtime SCENARIO_RESTORE_STEP message',
-      createMessageGuard({
-        type: MessageType.SCENARIO_RESTORE_STEP,
-        required: {
-          projectId: isString,
-          stepId: isString,
-        },
-        optional: { tabId: isNumber },
-      })
-    ),
-    parseResponse: createScenarioRuntimeResponseParser(MessageType.SCENARIO_RESTORE_STEP),
-  },
   [MessageType.SCENARIO_MOVE_STEP]: {
     parseRequest: createGuardParser(
       'runtime SCENARIO_MOVE_STEP message',

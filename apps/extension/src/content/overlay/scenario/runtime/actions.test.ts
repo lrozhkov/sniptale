@@ -93,8 +93,6 @@ describe('scenario-controller-runtime-actions', () => {
 
     await actions.deleteRecentStep('step-1');
     await actions.moveRecentStep('step-1', 2);
-    await actions.restoreRecentStep('step-1');
-
     expect(actionMocks.applyScenarioDeleteRecentStep).not.toHaveBeenCalled();
     expect(actionMocks.applyScenarioMoveRecentStep).not.toHaveBeenCalled();
     expect(actionMocks.applyScenarioRestoreRecentStep).not.toHaveBeenCalled();

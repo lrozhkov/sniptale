@@ -45,7 +45,7 @@ function buildScenarioEditorUserContent(
 ) {
   return [
     {
-      text: buildScenarioEditorV3UserText(message, canonicalPayload),
+      text: buildScenarioEditorGuideUserText(message, canonicalPayload),
       type: 'text' as const,
     },
     ...canonicalPayload.attachments.map((attachment) => ({
@@ -55,7 +55,7 @@ function buildScenarioEditorUserContent(
   ];
 }
 
-function buildScenarioEditorV3UserText(
+function buildScenarioEditorGuideUserText(
   message: ProcessScenarioEditorWithLLMMessage,
   canonicalPayload: ScenarioEditorCanonicalEgressPayload
 ) {
@@ -66,8 +66,8 @@ function buildScenarioEditorV3UserText(
     'Project outline JSON:',
     redactAiPayloadText(canonicalPayload.projectOutlineJson),
     '',
-    'Selected slide code JSON:',
-    redactAiPayloadText(canonicalPayload.selectedSlideCodeJson),
+    'Selected guide step JSON:',
+    redactAiPayloadText(canonicalPayload.selectedStepJson),
     '',
     'Tool manifest JSON:',
     redactAiPayloadText(canonicalPayload.toolManifestJson),
@@ -92,10 +92,12 @@ function parseScenarioEditorResponse(rawResponse: string): ProcessScenarioEditor
     };
   }
 
-  return parseScenarioEditorV3Response(parsedJson);
+  return parseScenarioEditorGuideResponse(parsedJson);
 }
 
-function parseScenarioEditorV3Response(parsedJson: unknown): ProcessScenarioEditorWithLLMResponse {
+function parseScenarioEditorGuideResponse(
+  parsedJson: unknown
+): ProcessScenarioEditorWithLLMResponse {
   const parsedPayload = scenarioAiOperationsResponseSchema.safeParse(parsedJson);
 
   if (!parsedPayload.success) {

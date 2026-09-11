@@ -5,13 +5,11 @@ const {
   deleteScenarioStepFromProjectMock,
   moveScenarioStepInProjectMock,
   openScenarioEditorMock,
-  restoreScenarioStepFromProjectMock,
 } = vi.hoisted(() => ({
   buildScenarioSessionPayloadMock: vi.fn(),
   deleteScenarioStepFromProjectMock: vi.fn(),
   moveScenarioStepInProjectMock: vi.fn(),
   openScenarioEditorMock: vi.fn(),
-  restoreScenarioStepFromProjectMock: vi.fn(),
 }));
 
 vi.mock(
@@ -22,7 +20,6 @@ vi.mock(
     >()),
     deleteScenarioStepFromProject: deleteScenarioStepFromProjectMock,
     moveScenarioStepInProject: moveScenarioStepInProjectMock,
-    restoreScenarioStepFromProject: restoreScenarioStepFromProjectMock,
   })
 );
 
@@ -41,7 +38,6 @@ import {
   handleScenarioDeleteStep,
   handleScenarioMoveStep,
   handleScenarioOpenEditor,
-  handleScenarioRestoreStep,
 } from './step-actions';
 
 function createActiveScenarioSession() {
@@ -71,7 +67,7 @@ beforeEach(() => {
   });
 });
 
-it('bumps project revision for delete, move, and restore mutations', async () => {
+it('bumps project revision for delete and move mutations', async () => {
   const scenarioSessionService = createScenarioSessionServiceStub();
   vi.mocked(scenarioSessionService.getSession).mockResolvedValue({
     ...createActiveScenarioSession(),
@@ -79,8 +75,6 @@ it('bumps project revision for delete, move, and restore mutations', async () =>
   });
   deleteScenarioStepFromProjectMock.mockResolvedValue({ id: 'project-1', updatedAt: 10 });
   moveScenarioStepInProjectMock.mockResolvedValue({ id: 'project-1', updatedAt: 20 });
-  restoreScenarioStepFromProjectMock.mockResolvedValue({ id: 'project-1', updatedAt: 30 });
-
   const deleteResponse = await handleScenarioDeleteStep({
     message: {
       type: MessageType.SCENARIO_DELETE_STEP,
@@ -100,22 +94,10 @@ it('bumps project revision for delete, move, and restore mutations', async () =>
     resolvedTabId: 7,
     scenarioSessionService,
   });
-  const restoreResponse = await handleScenarioRestoreStep({
-    message: {
-      type: MessageType.SCENARIO_RESTORE_STEP,
-      projectId: 'project-1',
-      stepId: 'step-1',
-    },
-    resolvedTabId: 7,
-    scenarioSessionService,
-  });
-
   expect(scenarioSessionService.bumpProjectRevision).toHaveBeenNthCalledWith(1, 7);
   expect(scenarioSessionService.bumpProjectRevision).toHaveBeenNthCalledWith(2, 7);
-  expect(scenarioSessionService.bumpProjectRevision).toHaveBeenNthCalledWith(3, 7);
   expect(deleteResponse).toEqual(expect.objectContaining({ success: true }));
   expect(moveResponse).toEqual(expect.objectContaining({ success: true }));
-  expect(restoreResponse).toEqual(expect.objectContaining({ success: true }));
 });
 
 it('skips revision bumps for no-op mutations and falls back to the active session project', async () => {
@@ -123,8 +105,6 @@ it('skips revision bumps for no-op mutations and falls back to the active sessio
   vi.mocked(scenarioSessionService.getSession).mockResolvedValue(createActiveScenarioSession());
   deleteScenarioStepFromProjectMock.mockResolvedValue(undefined);
   moveScenarioStepInProjectMock.mockResolvedValue(undefined);
-  restoreScenarioStepFromProjectMock.mockResolvedValue(undefined);
-
   await handleScenarioDeleteStep({
     message: {
       type: MessageType.SCENARIO_DELETE_STEP,
@@ -140,15 +120,6 @@ it('skips revision bumps for no-op mutations and falls back to the active sessio
       projectId: 'project-session',
       stepId: 'step-1',
       toIndex: 0,
-    },
-    resolvedTabId: 8,
-    scenarioSessionService,
-  });
-  await handleScenarioRestoreStep({
-    message: {
-      type: MessageType.SCENARIO_RESTORE_STEP,
-      projectId: 'project-session',
-      stepId: 'step-1',
     },
     resolvedTabId: 8,
     scenarioSessionService,

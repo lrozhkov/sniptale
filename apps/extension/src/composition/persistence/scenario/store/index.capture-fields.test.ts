@@ -67,7 +67,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   dataUrlToBlobMock.mockResolvedValue(new Blob(['pixel'], { type: 'image/png' }));
   measureImageBlobMock.mockResolvedValue({ height: 900, width: 1440 });
-  persistScenarioCaptureArtifactsMock.mockResolvedValue(undefined);
+  persistScenarioCaptureArtifactsMock.mockImplementation(async (args) => args.project);
 });
 
 it('keeps optional capture fields omitted when the request does not provide them', async () => {
@@ -89,5 +89,7 @@ it('keeps optional capture fields omitted when the request does not provide them
   });
 
   expect(result.step.title).toBe('');
-  expect(result.step.body).toBe('');
+  expect(result.step.blocks).toEqual([
+    expect.objectContaining({ kind: 'image', editDocumentId: null }),
+  ]);
 });

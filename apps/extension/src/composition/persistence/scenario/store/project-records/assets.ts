@@ -5,7 +5,8 @@ import { mapScenarioAssetEntry } from './helpers';
 /** Resolves the stored blob for a scenario-local asset. */
 export async function getScenarioAssetBlob(assetId: string): Promise<Blob | undefined> {
   const entry = await getScenarioAsset(assetId);
-  return entry?.file;
+  if (!entry) return undefined;
+  return entry.file.type ? entry.file : entry.file.slice(0, entry.file.size, entry.mimeType);
 }
 
 /** Resolves metadata for a scenario-local asset. */

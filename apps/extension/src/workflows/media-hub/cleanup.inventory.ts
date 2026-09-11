@@ -6,7 +6,6 @@ import type {
   PendingScenarioAssetEntry,
   ScenarioAssetEntry,
   ScenarioExportEntry,
-  ScenarioProjectEntry,
   ScenarioStepEditorDocumentEntry,
 } from '../../composition/persistence/scenario/contracts';
 import type { VideoProjectEntry } from '../../composition/persistence/projects/contracts';
@@ -21,7 +20,7 @@ export interface StorageCleanupInventory {
   pendingScenarioAssets: PendingScenarioAssetEntry[];
   scenarioAssets: ScenarioAssetEntry[];
   scenarioExports: ScenarioExportEntry[];
-  scenarioProjects: ScenarioProjectEntry[];
+  scenarioProjects: Array<{ id: string }>;
   scenarioStepDocuments: ScenarioStepEditorDocumentEntry[];
   thumbnails: MediaThumbnailEntry[];
   videoProjects: VideoProjectEntry[];

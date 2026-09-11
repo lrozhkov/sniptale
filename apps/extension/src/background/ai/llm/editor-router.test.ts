@@ -66,7 +66,10 @@ import { routeScenarioEditorLlmMessage } from './editor-router';
 function createMessage() {
   return {
     type: MessageType.PROCESS_SCENARIO_EDITOR_WITH_LLM,
-    contractVersion: 3,
+    contractVersion: 4 as const,
+    projectId: 'project-1',
+    baseRevision: 1,
+    scope: { stepIds: ['step-1'], blockIds: [] },
     llmSessionToken: 'llm-token-1',
     instruction: 'Rewrite step titles',
     projectSnapshotJson: '{"steps":[]}',
@@ -144,7 +147,7 @@ it('routes scenario-editor multimodal requests and parses the strict JSON payloa
           'Project outline JSON:',
           '{}',
           '',
-          'Selected slide code JSON:',
+          'Selected guide step JSON:',
           '{}',
           '',
           'Tool manifest JSON:',

@@ -1,11 +1,11 @@
 import { expectTypeOf, it } from 'vitest';
 import type { BlurSettings } from '@sniptale/ui/highlighter-style/types';
 import type { ScenarioOverlay } from './overlays';
-import type { ScenarioProject, ScenarioStep } from './project';
+import type { GuideProject, GuideBlock } from '@sniptale/runtime-contracts/scenario/types/guide';
 
-it('keeps scenario v2 project and overlay discriminants exact', () => {
-  expectTypeOf<ScenarioProject['version']>().toEqualTypeOf<2>();
-  expectTypeOf<ScenarioStep['kind']>().toEqualTypeOf<'capture' | 'section' | 'note' | 'divider'>();
+it('keeps guide project and overlay discriminants exact', () => {
+  expectTypeOf<GuideProject['version']>().toEqualTypeOf<4>();
+  expectTypeOf<GuideBlock['kind']>().toEqualTypeOf<'heading' | 'text' | 'note' | 'image'>();
   expectTypeOf<ScenarioOverlay['kind']>().toEqualTypeOf<
     | 'focus-rect'
     | 'click-ring'

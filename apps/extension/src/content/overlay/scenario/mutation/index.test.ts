@@ -6,7 +6,6 @@ const transportMocks = vi.hoisted(() => ({
   createScenarioProjectMock: vi.fn(),
   deleteScenarioStepMock: vi.fn(),
   moveScenarioStepMock: vi.fn(),
-  restoreScenarioStepMock: vi.fn(),
   setScenarioActiveProjectMock: vi.fn(),
   setScenarioCaptureModeMock: vi.fn(),
   setScenarioEnabledMock: vi.fn(),
@@ -50,7 +49,6 @@ vi.mock('../runtime/transport/steps', async (importOriginal) => ({
   ...(await importOriginal()),
   deleteScenarioStep: transportMocks.deleteScenarioStepMock,
   moveScenarioStep: transportMocks.moveScenarioStepMock,
-  restoreScenarioStep: transportMocks.restoreScenarioStepMock,
 }));
 
 vi.mock('../../screenshot/bridge', async (importOriginal) => ({
@@ -66,7 +64,6 @@ import {
   applyScenarioProjectCreation,
   applyScenarioProjectSelection,
   applyScenarioRememberSelection,
-  applyScenarioRestoreRecentStep,
   applyScenarioScreenshotModeDisabled,
   applyScenarioSidebarVisibility,
   applyScenarioMoveRecentStep,
@@ -91,7 +88,6 @@ function resetScenarioActionMocks() {
   });
   transportMocks.deleteScenarioStepMock.mockResolvedValue({ success: true });
   transportMocks.moveScenarioStepMock.mockResolvedValue({ success: true });
-  transportMocks.restoreScenarioStepMock.mockResolvedValue({ success: true });
 }
 
 async function expectCaptureActionRouting() {
@@ -178,11 +174,6 @@ async function expectStateToggleAndStepMutationRouting() {
     stepId: 'step-1',
     toIndex: 4,
   });
-  await applyScenarioRestoreRecentStep({
-    applyScenarioResponse,
-    projectId: 'project-9',
-    stepId: 'step-1',
-  });
   expect(transportMocks.setScenarioEnabledMock).toHaveBeenCalledWith(false);
   expect(transportMocks.setScenarioRememberSelectionMock).toHaveBeenCalledWith(false);
   expect(transportMocks.setScenarioSidebarVisibleMock).toHaveBeenCalledWith(false);
@@ -198,10 +189,6 @@ async function expectStateToggleAndStepMutationRouting() {
     projectId: 'project-9',
     stepId: 'step-1',
     toIndex: 4,
-  });
-  expect(transportMocks.restoreScenarioStepMock).toHaveBeenCalledWith({
-    projectId: 'project-9',
-    stepId: 'step-1',
   });
 }
 

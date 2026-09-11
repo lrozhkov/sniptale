@@ -7,7 +7,7 @@ import {
   createVideoProjectEntry,
   createVideoProjectEntryWithMediaClip,
 } from './index.test-support.ts';
-import { createScenarioProject } from '../../../features/scenario/project/factories';
+import { createGuideProject } from '../../../features/scenario/project/factories';
 
 const mocks = vi.hoisted(() => ({
   dbGet: vi.fn(),
@@ -314,8 +314,8 @@ it('parses scenario project and asset rows directly', async () => {
     size: blob.size,
     width: 30,
   };
-  const project = { ...createScenarioProject('Scenario'), id: 'scenario-1' };
-  const entry = { createdAt: 1, id: project.id, project, updatedAt: 2 };
+  const project = { ...createGuideProject('Scenario'), id: 'scenario-1' };
+  const entry = { createdAt: 1, id: project.id, project, updatedAt: 2, workspaceRevision: 0 };
 
   expect(parseScenarioProjectEntry(entry)).toEqual({
     ...entry,

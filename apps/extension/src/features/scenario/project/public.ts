@@ -1,8 +1,6 @@
-export { createDefaultScenarioPageDescriptor, createDefaultScenarioViewport } from './defaults';
 export {
-  createScenarioCaptureStep,
-  createScenarioDividerStep,
-  createScenarioNoteStep,
-  createScenarioProject,
-  createScenarioSectionStep,
+  createGuideImageBlock,
+  createGuideParagraphs,
+  createGuideProject,
+  createGuideStep,
 } from './factories';

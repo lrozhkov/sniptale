@@ -13,7 +13,6 @@ import type { ScenarioCaptureMode } from '@sniptale/runtime-contracts/scenario/t
 import type {
   ScenarioProjectSummary,
   ScenarioRecentStep,
-  ScenarioTrashedStep,
 } from '../../../../features/scenario/contracts/types/project';
 import { createDefaultScenarioSession, createDefaultScenarioSurfaceState } from './defaults';
 import {
@@ -50,7 +49,6 @@ export function useScenarioControllerState(args: ScenarioControllerStateArgs) {
     setHighlightToken: state.setRecentStepHighlightToken,
     setRecentSteps: state.setRecentSteps,
     setSession: state.setSession,
-    setTrashedSteps: state.setTrashedSteps,
     sessionRef: state.sessionRef,
   });
   const effectiveSession = buildEffectiveScenarioSession(
@@ -68,7 +66,6 @@ export function useScenarioControllerState(args: ScenarioControllerStateArgs) {
     session: state.session,
     sessionRef: state.sessionRef,
     setOptimisticCaptureMode: state.setOptimisticCaptureMode,
-    trashedSteps: state.trashedSteps,
     surface: state.surface,
     surfaceRef: state.surfaceRef,
   });
@@ -80,7 +77,6 @@ function useScenarioControllerMutableState() {
   const [projects, setProjects] = useState<ScenarioProjectSummary[]>([]);
   const [recentSteps, setRecentSteps] = useState<ScenarioRecentStep[]>([]);
   const [recentStepHighlightToken, setRecentStepHighlightToken] = useState(0);
-  const [trashedSteps, setTrashedSteps] = useState<ScenarioTrashedStep[]>([]);
   const [optimisticCaptureMode, setOptimisticCaptureMode] = useState<ScenarioCaptureMode | null>(
     null
   );
@@ -105,10 +101,8 @@ function useScenarioControllerMutableState() {
     setRecentStepHighlightToken,
     setSession,
     setSurface,
-    setTrashedSteps,
     surface,
     surfaceRef,
-    trashedSteps,
   };
 }
 
@@ -122,7 +116,6 @@ function buildScenarioControllerStateResult(args: {
   session: ReturnType<typeof createDefaultScenarioSession>;
   sessionRef: MutableRefObject<ReturnType<typeof createDefaultScenarioSession>>;
   setOptimisticCaptureMode: Dispatch<SetStateAction<ScenarioCaptureMode | null>>;
-  trashedSteps: ScenarioTrashedStep[];
   surface: ReturnType<typeof createDefaultScenarioSurfaceState>;
   surfaceRef: MutableRefObject<ReturnType<typeof createDefaultScenarioSurfaceState>>;
 }) {

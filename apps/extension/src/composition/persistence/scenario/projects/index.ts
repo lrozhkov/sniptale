@@ -1,11 +1,11 @@
 export {
   deleteScenarioProject,
   getScenarioProject,
+  getScenarioProjectEntry,
   listScenarioProjectEntries,
   listScenarioProjects,
   saveScenarioProject,
 } from './project';
-export { getScenarioProjectV3, listScenarioProjectsV3, saveScenarioProjectV3 } from './project-v3';
 export {
   discardPreparedScenarioAsset,
   deletePendingScenarioAsset,

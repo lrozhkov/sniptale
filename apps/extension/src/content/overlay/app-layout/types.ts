@@ -72,6 +72,7 @@ export type ContentAppScenarioState = {
     previewDataUrl: string;
     title: string;
     position: number;
+    stepNumber: number;
   }>;
   rememberProjectSelection?: boolean;
   scenarioCaptureMode: 'manual' | 'by-click';

@@ -12,7 +12,7 @@ import type {
 import type { VideoProjectEffectSnapshot } from '../../../../features/video/project/effect-instance/types';
 import type { PortableEditorDocumentV3 } from './editor-document';
 import type { PortableAggregatePresentation, PortableMediaThumbnail } from './media';
-import { isScenarioProjectV3 } from '../../../../features/scenario/project/v3';
+import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import type { JsonValue } from '../contracts';
 import {
   parsePortableVideoReview,
@@ -74,36 +74,25 @@ export interface PortableScenarioProjectMetadata {
 export function encodePortableScenarioProjectEntry(
   entry: ScenarioProjectEntry
 ): PortableScenarioProjectMetadata['entry'] {
-  if (!isScenarioProjectV3(entry.project)) {
-    throw new Error('Only current scenario projects can be exported in v6.');
-  }
-  const encodeSlide = (
-    slide: ScenarioProjectEntry['project'] extends never
-      ? never
-      : (typeof entry.project.slides)[number]
-  ) => ({
-    ...slide,
-    elements: slide.elements.map((element) => {
-      if (element.kind !== 'image') return element;
-      const { assetId, ...assetRef } = element.assetRef;
-      return { ...element, assetRef: { ...assetRef, scenarioAssetId: assetId } };
-    }),
-    source:
-      slide.source.kind === 'capture'
-        ? (() => {
-            const { assetId, ...source } = slide.source;
-            return { ...source, scenarioAssetId: assetId };
-          })()
-        : slide.source,
-  });
-  return {
-    ...entry,
-    project: {
-      ...entry.project,
-      slides: entry.project.slides.map(encodeSlide),
-      trash: entry.project.trash.map((item) => ({ ...item, slide: encodeSlide(item.slide) })),
-    } as unknown as JsonValue,
+  const parsed = parseGuideProject(entry.project);
+  if (parsed.status !== 'ok') throw new Error('Only current guide projects can be exported.');
+  const project = {
+    ...parsed.project,
+    items: parsed.project.items.map((item) =>
+      item.kind !== 'step'
+        ? item
+        : {
+            ...item,
+            blocks: item.blocks.map((block) => {
+              if (block.kind !== 'image') return block;
+              const { assetId, ...rest } = block;
+              return { ...rest, scenarioAssetId: assetId };
+            }),
+          }
+    ),
   };
+  if (!isJsonValue(project)) throw new Error('Portable guide is not JSON data.');
+  return { ...entry, project };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

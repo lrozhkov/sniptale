@@ -65,6 +65,7 @@ beforeEach(() => {
 describe('media backup v6 dependency admission', () => {
   it('includes saved Gallery views only in a full-library backup', async () => {
     const view = {
+      availability: 'available' as const,
       createdAt: 1,
       filters: {
         activeTags: [],

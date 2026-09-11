@@ -96,12 +96,26 @@ it('preserves optional capture fields and creates an editor document for target 
   expect(result.project.updatedAt).toBe(456);
   expect(result.step).toEqual(
     expect.objectContaining({
-      body: 'Step body',
-      galleryAssetId: 'gallery-1',
       title: 'Captured button',
     })
   );
-  expect(result.step.overlays.map((overlay) => overlay.kind)).toEqual(['focus-rect']);
+  expect(result.step.blocks).toEqual([
+    expect.objectContaining({
+      kind: 'text',
+      paragraphs: [
+        expect.objectContaining({ runs: [expect.objectContaining({ text: 'Step body' })] }),
+      ],
+    }),
+    expect.objectContaining({
+      kind: 'image',
+      galleryAssetId: 'gallery-1',
+      editDocumentId: expect.any(String),
+      source: expect.objectContaining({
+        captureSurface: 'selection',
+        captureMetadata: createCaptureMetadata(),
+      }),
+    }),
+  ]);
   expect(persistScenarioCaptureArtifactsMock).toHaveBeenCalledWith(
     expect.objectContaining({
       baseUpdatedAt: expect.any(Number),
@@ -119,7 +133,9 @@ it('skips editor document persistence when capture data produces no auto overlay
     page: createPageDescriptor(),
   });
 
-  expect(result.step.overlays).toEqual([]);
+  expect(result.step.blocks).toEqual([
+    expect.objectContaining({ kind: 'image', editDocumentId: null }),
+  ]);
   expect(persistScenarioCaptureArtifactsMock).toHaveBeenCalledWith(
     expect.objectContaining({
       baseUpdatedAt: expect.any(Number),
@@ -156,6 +172,6 @@ it('surfaces a missing project before writing artifacts', async () => {
       sourceKind: 'manual',
       page: createPageDescriptor(),
     })
-  ).rejects.toThrow('Scenario project not found: missing-project');
+  ).rejects.toThrow('Scenario project not found.');
   expect(persistScenarioCaptureArtifactsMock).not.toHaveBeenCalled();
 });

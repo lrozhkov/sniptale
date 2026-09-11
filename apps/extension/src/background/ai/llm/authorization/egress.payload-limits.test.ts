@@ -117,11 +117,14 @@ it('rejects oversized scenario LLM payloads before canonicalizing or consuming t
   });
   const validScenarioPayload = {
     attachments: [],
-    contractVersion: 3 as const,
+    contractVersion: 4 as const,
+    projectId: 'project-1',
+    baseRevision: 1,
+    scope: { stepIds: ['step-1'], blockIds: [] },
     instruction: 'Rewrite',
     projectOutlineJson: '{}',
     projectSnapshotJson: '{"steps":[]}',
-    selectedSlideCodeJson: '{}',
+    selectedStepJson: '{}',
     toolManifestJson: '{}',
   };
   const token = issueLlmSessionToken({

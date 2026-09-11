@@ -1,20 +1,17 @@
 import {
   deleteScenarioStepFromProject,
   moveScenarioStepInProject,
-  restoreScenarioStepFromProject,
 } from '../../../composition/persistence/scenario/store/project-steps/index';
 import {
   assertScenarioProjectMatchesSession,
   deleteScenarioStepUseCase,
   moveScenarioStepUseCase,
-  restoreScenarioStepUseCase,
 } from '../application/step-mutation/use-case';
 import type { ScenarioStepMutationPorts } from '../application/step-mutation/ports';
 import type {
   ScenarioDeleteStepMessage,
   ScenarioMoveStepMessage,
   ScenarioOpenEditorMessage,
-  ScenarioRestoreStepMessage,
 } from '../../../contracts/messaging/contracts/types';
 import { openScenarioEditor } from '../editor';
 import type { ScenarioSessionService } from '../session-service';
@@ -30,7 +27,6 @@ function createScenarioStepMutationPorts(args: {
     repository: {
       deleteStepFromProject: deleteScenarioStepFromProject,
       moveStepInProject: moveScenarioStepInProject,
-      restoreStepFromProject: restoreScenarioStepFromProject,
     },
   };
 }
@@ -59,19 +55,6 @@ export async function handleScenarioMoveStep(args: {
     stepId: args.message.stepId,
     tabId: args.resolvedTabId,
     toIndex: args.message.toIndex,
-  });
-}
-
-export async function handleScenarioRestoreStep(args: {
-  message: ScenarioRestoreStepMessage;
-  resolvedTabId: number;
-  scenarioSessionService: ScenarioSessionService;
-}) {
-  return restoreScenarioStepUseCase({
-    ports: createScenarioStepMutationPorts(args),
-    projectId: args.message.projectId,
-    stepId: args.message.stepId,
-    tabId: args.resolvedTabId,
   });
 }
 

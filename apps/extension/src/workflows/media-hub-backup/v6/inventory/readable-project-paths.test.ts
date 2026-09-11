@@ -24,7 +24,7 @@ import {
   createMediaLibraryEntry,
   createVideoProjectEntryWithMediaClip,
 } from '../../../../composition/persistence/projects/index.test-support';
-import { createScenarioProjectV3 } from '../../../../features/scenario/project/v3';
+import { createGuideProject } from '../../../../features/scenario/project/factories';
 import { createMediaHubBackupExportOptions } from '../options';
 import { buildScenarioProjectRootInventory } from './scenario-projects';
 import { buildVideoProjectRootInventory } from './video-projects';
@@ -178,7 +178,7 @@ describe('readable project archive paths', () => {
   );
 
   it('places temporary scenario assets below Drafts with a sanitized project name', async () => {
-    const scenario = createScenarioProjectV3('Scenario: One');
+    const scenario = createGuideProject('Scenario: One');
     const entry = {
       createdAt: scenario.createdAt,
       id: scenario.id,

@@ -52,7 +52,10 @@ import { routeScenarioEditorLlmMessage } from './editor-router';
 function createMessage() {
   return {
     attachments: [],
-    contractVersion: 3,
+    contractVersion: 4 as const,
+    projectId: 'project-1',
+    baseRevision: 1,
+    scope: { stepIds: ['step-1'], blockIds: [] },
     instruction: 'Rewrite step titles',
     llmSessionToken: 'llm-token-1',
     modelId: null,

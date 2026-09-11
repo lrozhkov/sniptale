@@ -6,8 +6,6 @@ import type {
   ScenarioListProjectsMessage,
   ScenarioMoveStepMessage,
   ScenarioOpenEditorMessage,
-  ScenarioRecordSuggestedEventMessage,
-  ScenarioRestoreStepMessage,
   ScenarioSaveCaptureStepMessage,
   ScenarioSetActiveProjectMessage,
   ScenarioSetCaptureModeMessage,
@@ -47,8 +45,6 @@ export type ScenarioMessage =
   | ScenarioListProjectsMessage
   | ScenarioMoveStepMessage
   | ScenarioOpenEditorMessage
-  | ScenarioRecordSuggestedEventMessage
-  | ScenarioRestoreStepMessage
   | ScenarioSaveCaptureStepMessage
   | ScenarioSetActiveProjectMessage
   | ScenarioSetCaptureModeMessage

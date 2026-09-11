@@ -8,8 +8,6 @@ import type {
   ScenarioListProjectsMessage,
   ScenarioMoveStepMessage,
   ScenarioOpenEditorMessage,
-  ScenarioRecordSuggestedEventMessage,
-  ScenarioRestoreStepMessage,
   ScenarioSaveCaptureStepMessage,
   ScenarioSetActiveProjectMessage,
   ScenarioSetCaptureModeMessage,
@@ -33,9 +31,7 @@ export type RuntimeScenarioRequestByType = {
   [MessageType.SCENARIO_CREATE_PROJECT]: ScenarioCreateProjectMessage;
   [MessageType.SCENARIO_SAVE_CAPTURE_STEP]: ScenarioSaveCaptureStepMessage;
   [MessageType.SCENARIO_DELETE_STEP]: ScenarioDeleteStepMessage;
-  [MessageType.SCENARIO_RESTORE_STEP]: ScenarioRestoreStepMessage;
   [MessageType.SCENARIO_MOVE_STEP]: ScenarioMoveStepMessage;
-  [MessageType.SCENARIO_RECORD_SUGGESTED_EVENT]: ScenarioRecordSuggestedEventMessage;
   [MessageType.SCENARIO_OPEN_EDITOR]: ScenarioOpenEditorMessage;
 };
 
@@ -52,9 +48,7 @@ export type RuntimeScenarioResponseByType = {
   [MessageType.SCENARIO_CREATE_PROJECT]: ScenarioSessionResponse;
   [MessageType.SCENARIO_SAVE_CAPTURE_STEP]: ScenarioSessionResponse;
   [MessageType.SCENARIO_DELETE_STEP]: ScenarioSessionResponse;
-  [MessageType.SCENARIO_RESTORE_STEP]: ScenarioSessionResponse;
   [MessageType.SCENARIO_MOVE_STEP]: ScenarioSessionResponse;
-  [MessageType.SCENARIO_RECORD_SUGGESTED_EVENT]: ScenarioSessionResponse;
   [MessageType.SCENARIO_OPEN_EDITOR]: RuntimeMessageResponse<{
     result?: string;
   }>;

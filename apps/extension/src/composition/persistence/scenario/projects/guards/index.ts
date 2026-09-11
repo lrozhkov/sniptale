@@ -1,4 +1,3 @@
-export { parseScenarioProject } from './project/root/parse';
 export {
   assertSafeScenarioAssetStorageMetadata,
   assertSafeScenarioAssetStorageInput,

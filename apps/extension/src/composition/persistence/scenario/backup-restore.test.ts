@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createEditorDocumentFixture } from '../../../editor/document/page-session/document.test-support';
-import { createScenarioProject } from '../../../features/scenario/project/factories/project';
+import { createGuideProject } from '../../../features/scenario/project/factories';
 import type { AggregatePresentationEntry } from '../aggregate-presentations/contracts';
 import { createPersistedEditorDocumentFixture } from '../document-assets/test-support';
 import type { MediaThumbnailEntry } from '../media-library/contracts';
@@ -37,8 +37,14 @@ function stores(): ScenarioBackupRestoreStores {
 }
 
 function projectEntry(id = 'project'): ScenarioProjectEntry {
-  const project = { ...createScenarioProject('Scenario'), id };
-  return { createdAt: project.createdAt, id, project, updatedAt: project.updatedAt };
+  const project = { ...createGuideProject('Scenario'), id };
+  return {
+    createdAt: project.createdAt,
+    id,
+    project,
+    updatedAt: project.updatedAt,
+    workspaceRevision: 1,
+  };
 }
 
 const operation = () => ({
@@ -400,3 +406,36 @@ describe('scenario project backup restore atomic publication', () => {
     expect(pendingDelete.assetIds).toEqual(expect.arrayContaining(['asset-object', 'document']));
   });
 });
+
+it.each([2, 3, 99])(
+  'treats an existing version %i row as a restore conflict without parsing its content',
+  async (version) => {
+    const target = stores();
+    target.projects.get = vi.fn(async () => ({ id: 'project', project: { version } }));
+    const root = {
+      assets: [],
+      entry: projectEntry(),
+      exportThumbnails: [],
+      exports: [],
+      stepDocuments: [],
+    };
+    await expect(
+      putScenarioProjectBackupRestore({
+        operation: operation(),
+        root,
+        stores: target,
+        strategy: 'skip',
+      })
+    ).resolves.toEqual({ conflicted: true, imported: false });
+    expect(target.projects.put).not.toHaveBeenCalled();
+    await expect(
+      putScenarioProjectBackupRestore({
+        operation: operation(),
+        root,
+        stores: target,
+        strategy: 'duplicate',
+      })
+    ).rejects.toThrow('conflict changed after preflight');
+    expect(target.projects.put).not.toHaveBeenCalled();
+  }
+);

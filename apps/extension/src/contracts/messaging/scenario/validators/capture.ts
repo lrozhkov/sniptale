@@ -3,7 +3,6 @@ import type {
   ScenarioCaptureMode,
   ScenarioCaptureSourceKind,
   ScenarioCaptureSurface,
-  ScenarioSuggestedEventKind,
 } from '@sniptale/runtime-contracts/scenario/types/base';
 import {
   isCaptureActionTypeValue,
@@ -28,14 +27,6 @@ const scenarioCaptureSourceKindValues = new Set<ScenarioCaptureSourceKind>([
   'manual',
   'auto-click',
 ]);
-const scenarioSuggestedEventKindValues = new Set<ScenarioSuggestedEventKind>([
-  'click',
-  'input',
-  'change',
-  'keydown',
-  'scroll',
-]);
-
 export function isScenarioCaptureMode(value: unknown): value is ScenarioCaptureMode {
   return isString(value) && scenarioCaptureModeValues.has(value as ScenarioCaptureMode);
 }
@@ -46,12 +37,6 @@ export function isScenarioCaptureSurface(value: unknown): value is ScenarioCaptu
 
 export function isScenarioCaptureSourceKind(value: unknown): value is ScenarioCaptureSourceKind {
   return isString(value) && scenarioCaptureSourceKindValues.has(value as ScenarioCaptureSourceKind);
-}
-
-export function isScenarioSuggestedEventKind(value: unknown): value is ScenarioSuggestedEventKind {
-  return (
-    isString(value) && scenarioSuggestedEventKindValues.has(value as ScenarioSuggestedEventKind)
-  );
 }
 
 function isScenarioCaptureAction(value: unknown): value is CaptureActionType {

@@ -1,0 +1,392 @@
+import { describe, expect, it } from 'vitest';
+import { parseGuideProject } from './guide-parser';
+import {
+  GUIDE_LIMITS,
+  type GuideCaptureSource,
+  type GuideImageBlock,
+  type GuideParagraph,
+  type GuideProject,
+  type GuideStep,
+} from './types/guide';
+
+function paragraph(text: string, href: string | null = null): GuideParagraph {
+  return { runs: [{ text, bold: false, italic: false, href }] };
+}
+
+function image(id = 'image-1'): GuideImageBlock {
+  return {
+    kind: 'image',
+    id,
+    assetId: 'asset-1',
+    galleryAssetId: null,
+    editDocumentId: 'annotation-version-1',
+    alt: 'Настройки',
+    caption: '',
+    source: { kind: 'import', filename: 'settings.png' },
+    frame: { width: 960, height: 540 },
+    fit: 'contain',
+    contentTransform: { x: 0, y: 0, scale: 1 },
+  };
+}
+
+function step(): GuideStep {
+  return {
+    kind: 'step',
+    id: 'step-1',
+    title: '',
+    showNumber: false,
+    layout: 'stacked',
+    templateId: null,
+    styleOverrides: {},
+    blocks: [],
+  };
+}
+
+function project(items: GuideProject['items'] = []): GuideProject {
+  return {
+    version: 4,
+    id: 'project-1',
+    name: 'Инструкция',
+    createdAt: 1,
+    updatedAt: 2,
+    tags: [],
+    style: {
+      theme: 'paper',
+      font: 'sans',
+      density: 'comfortable',
+      contentWidth: 'standard',
+      imageBorder: 'subtle',
+      numberStyle: 'badge',
+      accentColor: null,
+    },
+    print: { pageSize: 'a4', orientation: 'portrait', pagination: 'flow' },
+    items,
+  };
+}
+
+function capture(): GuideCaptureSource {
+  return {
+    kind: 'capture',
+    captureSurface: 'selection',
+    sourceKind: 'manual',
+    page: {
+      title: 'Настройки',
+      url: 'https://example.test/settings',
+      viewport: { x: 0, y: 0, width: 1440, height: 900 },
+      scrollX: 0,
+      scrollY: 400,
+      devicePixelRatio: 2,
+    },
+    target: {
+      selector: '#save',
+      iframeSelector: null,
+      tagName: 'BUTTON',
+      role: 'button',
+      text: 'Сохранить',
+      ariaLabel: null,
+      title: null,
+      rect: { x: 200, y: 300, width: 100, height: 30 },
+      framePadding: { top: 4, left: 4, right: 4, bottom: 4 },
+    },
+    interactionPoint: { x: 220, y: 312 },
+    cursorPoint: { x: 221, y: 313 },
+    captureMetadata: {
+      trigger: 'pointer-up',
+      pointerRange: {
+        start: { x: 220, y: 312 },
+        end: { x: 221, y: 313 },
+        minX: 220,
+        minY: 312,
+        maxX: 221,
+        maxY: 313,
+        distance: 1.4,
+        durationMs: 20,
+      },
+      scroll: { startX: 0, startY: 200, endX: 0, endY: 400, deltaX: 0, deltaY: 200 },
+    },
+  };
+}
+
+describe('guide content admission', () => {
+  it('accepts an empty document and a step without title, numbering, text or image', () => {
+    for (const input of [project(), project([step()])]) {
+      expect(parseGuideProject(input)).toEqual({ status: 'ok', project: input });
+    }
+  });
+
+  it('preserves ordered sections and multiple kinds of content under a single step', () => {
+    const first = step();
+    first.title = 'Измените параметры';
+    first.showNumber = true;
+    first.styleOverrides = { density: 'spacious' };
+    first.blocks = [
+      { kind: 'heading', id: 'heading-1', text: 'До изменения' },
+      {
+        kind: 'text',
+        id: 'text-1',
+        paragraphs: [paragraph('Первый абзац'), paragraph('Второй абзац')],
+      },
+      image(),
+      { kind: 'heading', id: 'heading-2', text: 'После изменения' },
+      { ...image('image-2'), contentTransform: { x: -0.25, y: 0.1, scale: 2 } },
+      {
+        kind: 'note',
+        id: 'note-1',
+        tone: 'warning',
+        paragraphs: [paragraph('Проверьте результат')],
+      },
+    ];
+    const input = project([
+      { kind: 'section', id: 'section-1', title: 'Подготовка', paragraphs: [] },
+      first,
+      { ...step(), id: 'step-2', title: 'Готово' },
+    ]);
+    const parsed = parseGuideProject(JSON.parse(JSON.stringify(input)));
+    expect(parsed).toEqual({ status: 'ok', project: input });
+    if (parsed.status !== 'ok') throw new Error('Expected admitted document');
+    expect(parseGuideProject(JSON.parse(JSON.stringify(parsed.project)))).toEqual(parsed);
+  });
+
+  it('detaches accepted content while allowing shared immutable resource references', () => {
+    const input = project([{ ...step(), blocks: [image(), image('image-2')] }]);
+    const result = parseGuideProject(input);
+    expect(result.status).toBe('ok');
+    if (result.status !== 'ok') throw new Error('Expected admitted document');
+    expect(result.project).not.toBe(input);
+    expect(result.project.items).not.toBe(input.items);
+    input.name = 'Changed later';
+    input.items.splice(0);
+    expect(result.project.name).toBe('Инструкция');
+    expect(result.project.items).toHaveLength(1);
+  });
+
+  it('keeps capture metadata on each image rather than on the whole step', () => {
+    const source = capture();
+    const input = project([
+      {
+        ...step(),
+        blocks: [
+          { ...image(), source },
+          { ...image('image-2'), source: { ...source, page: { ...source.page, scrollY: 800 } } },
+        ],
+      },
+    ]);
+    expect(parseGuideProject(input)).toEqual({ status: 'ok', project: input });
+  });
+
+  it('preserves a decoded video frame independently of the original recording', () => {
+    const input = project([
+      {
+        ...step(),
+        blocks: [
+          {
+            ...image(),
+            source: {
+              kind: 'video-frame',
+              recordingId: null,
+              filename: 'demo.mp4',
+              timeSeconds: 12.125,
+            },
+          },
+        ],
+      },
+    ]);
+    expect(parseGuideProject(input)).toEqual({ status: 'ok', project: input });
+  });
+
+  it('retains literal markup as text and safe inline formatting', () => {
+    const input = project([
+      {
+        ...step(),
+        blocks: [
+          {
+            kind: 'text',
+            id: 'text-1',
+            paragraphs: [
+              {
+                runs: [
+                  {
+                    text: '<script>alert(1)</script> & русский текст',
+                    bold: true,
+                    italic: true,
+                    href: 'https://example.test/help?a=1&b=2',
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+    expect(parseGuideProject(input)).toEqual({ status: 'ok', project: input });
+  });
+
+  it.each([2, 3, 5, 999])(
+    'reports unsupported version %s without attempting a migration',
+    (version) => {
+      expect(parseGuideProject({ version })).toEqual({ status: 'unsupported', version });
+    }
+  );
+
+  it('rejects legacy presentation fields mixed into a version 4 document', () => {
+    expect(parseGuideProject({ ...project(), slides: [], presentation: {} })).toEqual({
+      status: 'invalid',
+    });
+    expect(
+      parseGuideProject({
+        ...project(),
+        items: [{ ...step(), blocks: [{ ...image(), animation: 'fade' }] }],
+      })
+    ).toEqual({ status: 'invalid' });
+  });
+});
+
+describe('guide input boundaries', () => {
+  it.each([
+    'javascript:alert(1)',
+    'data:text/html,hi',
+    'file:///etc/passwd',
+    '//example.test',
+    'https://user:secret@example.test',
+    ' https://example.test',
+    'https://example.test/\npath',
+  ])('rejects an unsafe inline link: %s', (href) => {
+    expect(
+      parseGuideProject(
+        project([
+          {
+            ...step(),
+            blocks: [
+              {
+                kind: 'text',
+                id: 'text-1',
+                paragraphs: [paragraph('Link', href)],
+              },
+            ],
+          },
+        ])
+      )
+    ).toEqual({ status: 'invalid' });
+  });
+
+  it('rejects identities duplicated across steps, sections and blocks, not repeated asset references', () => {
+    for (const items of [
+      [step(), step()],
+      [step(), { kind: 'section', id: 'step-1', title: '', paragraphs: [] }],
+      [{ ...step(), blocks: [image('step-1')] }],
+      [{ ...step(), blocks: [image(), image()] }],
+    ])
+      expect(parseGuideProject({ ...project(), items })).toEqual({ status: 'invalid' });
+    expect(
+      parseGuideProject(project([{ ...step(), blocks: [image(), image('another-image')] }])).status
+    ).toBe('ok');
+  });
+
+  it.each([0, -1, Infinity, NaN, GUIDE_LIMITS.maxDimension + 1])(
+    'rejects invalid image frame width %s',
+    (width) => {
+      expect(
+        parseGuideProject(
+          project([{ ...step(), blocks: [{ ...image(), frame: { width, height: 100 } }] }])
+        )
+      ).toEqual({ status: 'invalid' });
+    }
+  );
+
+  it('rejects invalid source metadata, video times and image transforms', () => {
+    const blocks = [
+      { ...image(), contentTransform: { x: 0, y: 0, scale: 0 } },
+      {
+        ...image(),
+        source: { kind: 'video-frame', recordingId: null, filename: '', timeSeconds: -1 },
+      },
+      { ...image(), source: { ...capture(), page: { ...capture().page, devicePixelRatio: 0 } } },
+      { ...image(), source: { ...capture(), target: { ...capture().target, selector: 7 } } },
+    ];
+    for (const block of blocks) {
+      expect(parseGuideProject({ ...project(), items: [{ ...step(), blocks: [block] }] })).toEqual({
+        status: 'invalid',
+      });
+    }
+  });
+
+  it('rejects unknown or executable style values and undefined overrides', () => {
+    for (const styleOverrides of [
+      { accentColor: 'url(https://example.test)' },
+      { css: 'display:none' },
+      { theme: undefined },
+    ]) {
+      expect(parseGuideProject({ ...project(), items: [{ ...step(), styleOverrides }] })).toEqual({
+        status: 'invalid',
+      });
+    }
+  });
+
+  it('rejects missing versions, wrong primitive types and overlong text', () => {
+    for (const input of [
+      null,
+      [],
+      {},
+      { version: '4' },
+      { ...project(), createdAt: '1' },
+      project([
+        {
+          ...step(),
+          blocks: [
+            {
+              kind: 'text',
+              id: 'text-1',
+              paragraphs: [paragraph('x'.repeat(GUIDE_LIMITS.maxTextLength + 1))],
+            },
+          ],
+        },
+      ]),
+    ]) {
+      expect(parseGuideProject(input)).toEqual({ status: 'invalid' });
+    }
+  });
+
+  it('rejects cyclic, sparse and excessive input before schema traversal', () => {
+    const cyclic: Record<string, unknown> = { ...project() };
+    cyclic['items'] = [cyclic];
+    expect(parseGuideProject(cyclic)).toEqual({ status: 'invalid' });
+    expect(parseGuideProject({ ...project(), items: new Array(1_000_000) })).toEqual({
+      status: 'invalid',
+    });
+    expect(
+      parseGuideProject({
+        ...project(),
+        items: Array.from({ length: GUIDE_LIMITS.maxItems + 1 }, (_, i) => ({
+          ...step(),
+          id: `step-${i}`,
+        })),
+      })
+    ).toEqual({ status: 'invalid' });
+    let nested: unknown = project();
+    for (let index = 0; index < GUIDE_LIMITS.maxInputDepth + 1; index++) nested = { nested };
+    expect(parseGuideProject(nested)).toEqual({ status: 'invalid' });
+  });
+
+  it('bounds total text and object visits, including unknown fields', () => {
+    expect(
+      parseGuideProject({ ...project(), extra: 'x'.repeat(GUIDE_LIMITS.maxInputTextLength + 1) })
+    ).toEqual({ status: 'invalid' });
+    expect(
+      parseGuideProject({
+        ...project(),
+        extra: Array.from({ length: GUIDE_LIMITS.maxInputVisits + 1 }, () => 0),
+      })
+    ).toEqual({ status: 'invalid' });
+  });
+
+  it('does not execute accessors or admit non-document objects', () => {
+    const input = {
+      ...project(),
+      get extra(): string {
+        throw new Error('Accessor executed');
+      },
+    };
+    expect(parseGuideProject(input)).toEqual({ status: 'invalid' });
+    expect(parseGuideProject({ ...project(), extra: new Date() })).toEqual({ status: 'invalid' });
+  });
+});

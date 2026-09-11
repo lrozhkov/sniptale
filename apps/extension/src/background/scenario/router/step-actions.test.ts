@@ -5,13 +5,11 @@ const {
   deleteScenarioStepFromProjectMock,
   moveScenarioStepInProjectMock,
   openScenarioEditorMock,
-  restoreScenarioStepFromProjectMock,
 } = vi.hoisted(() => ({
   buildScenarioSessionPayloadMock: vi.fn(),
   deleteScenarioStepFromProjectMock: vi.fn(),
   moveScenarioStepInProjectMock: vi.fn(),
   openScenarioEditorMock: vi.fn(),
-  restoreScenarioStepFromProjectMock: vi.fn(),
 }));
 
 vi.mock(
@@ -22,7 +20,6 @@ vi.mock(
     >()),
     deleteScenarioStepFromProject: deleteScenarioStepFromProjectMock,
     moveScenarioStepInProject: moveScenarioStepInProjectMock,
-    restoreScenarioStepFromProject: restoreScenarioStepFromProjectMock,
   })
 );
 
@@ -40,7 +37,6 @@ import {
   handleScenarioDeleteStep,
   handleScenarioMoveStep,
   handleScenarioOpenEditor,
-  handleScenarioRestoreStep,
 } from './step-actions';
 import { createScenarioSessionServiceStub } from './test-support';
 
@@ -64,13 +60,11 @@ function mockActiveProject(
   });
 }
 
-it('bumps project revision for delete, move, and restore mutations', async () => {
+it('bumps project revision for delete and move mutations', async () => {
   const scenarioSessionService = createScenarioSessionServiceStub();
   mockActiveProject(scenarioSessionService);
   deleteScenarioStepFromProjectMock.mockResolvedValue({ id: 'project-1', updatedAt: 10 });
   moveScenarioStepInProjectMock.mockResolvedValue({ id: 'project-1', updatedAt: 20 });
-  restoreScenarioStepFromProjectMock.mockResolvedValue({ id: 'project-1', updatedAt: 30 });
-
   await handleScenarioDeleteStep({
     message: { type: MessageType.SCENARIO_DELETE_STEP, projectId: 'project-1', stepId: 'step-1' },
     resolvedTabId: 7,
@@ -86,13 +80,7 @@ it('bumps project revision for delete, move, and restore mutations', async () =>
     resolvedTabId: 7,
     scenarioSessionService,
   });
-  await handleScenarioRestoreStep({
-    message: { type: MessageType.SCENARIO_RESTORE_STEP, projectId: 'project-1', stepId: 'step-1' },
-    resolvedTabId: 7,
-    scenarioSessionService,
-  });
-
-  expect(scenarioSessionService.bumpProjectRevision).toHaveBeenCalledTimes(3);
+  expect(scenarioSessionService.bumpProjectRevision).toHaveBeenCalledTimes(2);
 });
 
 it('opens the editor using the active session project', async () => {
@@ -133,21 +121,8 @@ it('rejects step mutations outside the active session project', async () => {
       scenarioSessionService,
     })
   ).rejects.toThrow('Unauthorized scenario project mutation');
-  await expect(
-    handleScenarioRestoreStep({
-      message: {
-        type: MessageType.SCENARIO_RESTORE_STEP,
-        projectId: 'project-b',
-        stepId: 'step-1',
-      },
-      resolvedTabId: 7,
-      scenarioSessionService,
-    })
-  ).rejects.toThrow('Unauthorized scenario project mutation');
-
   expect(deleteScenarioStepFromProjectMock).not.toHaveBeenCalled();
   expect(moveScenarioStepInProjectMock).not.toHaveBeenCalled();
-  expect(restoreScenarioStepFromProjectMock).not.toHaveBeenCalled();
   expect(scenarioSessionService.bumpProjectRevision).not.toHaveBeenCalled();
 });
 

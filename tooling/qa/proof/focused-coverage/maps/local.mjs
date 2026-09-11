@@ -1,5 +1,17 @@
 export const LOCAL_OWNER_MAPPINGS = [
   {
+    owner: 'scenario-content-capture-transport',
+    productionFile: 'apps/extension/src/content/overlay/scenario/runtime/transport/capture.ts',
+    reason: 'The transport suite executes capture messaging and its content intent boundary.',
+    testFiles: ['apps/extension/src/content/overlay/scenario/runtime/transport.test.ts'],
+  },
+  {
+    owner: 'scenario-content-step-transport',
+    productionFile: 'apps/extension/src/content/overlay/scenario/runtime/transport/steps.ts',
+    reason: 'The transport suite executes save, delete and move message contracts.',
+    testFiles: ['apps/extension/src/content/overlay/scenario/runtime/transport.test.ts'],
+  },
+  {
     owner: 'video-editor-playback-shortcuts',
     productionFile: 'apps/extension/src/video-editor/runtime/session/playback/shortcuts.ts',
     reason: 'Shortcut suites cover effect deletion and the complete keyboard routing surface.',

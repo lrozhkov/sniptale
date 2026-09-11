@@ -1,8 +1,8 @@
+import { saveScenarioCaptureStepToProject } from '../../../composition/persistence/scenario/store/capture-step';
 import {
-  getScenarioProjectRecordV3,
-  listScenarioProjectSummariesV3,
-  saveScenarioCaptureSlideToProject,
-} from '../../../composition/persistence/scenario/store/v3';
+  getScenarioProjectRecord,
+  listScenarioProjectSummaries,
+} from '../../../composition/persistence/scenario/store/public';
 import type { ScenarioSaveCaptureStepMessage } from '../../../contracts/messaging/contracts/types';
 import type { ScenarioSessionService } from '../session-service';
 import type { PendingScenarioCapture, PendingScenarioCaptureInput } from '../session-service/types';
@@ -81,7 +81,7 @@ export function buildScenarioCaptureSaveArgs(
 }
 
 export function saveScenarioCaptureForProject(projectId: string, args: ScenarioCaptureSaveFields) {
-  return saveScenarioCaptureSlideToProject(
+  return saveScenarioCaptureStepToProject(
     buildScenarioCaptureSaveArgs({
       projectId,
       ...args,
@@ -96,17 +96,17 @@ export async function buildScenarioSessionPayload(
   const [session, surface, projects] = await Promise.all([
     scenarioSessionService.getSession(tabId),
     scenarioSessionService.getSurface(tabId),
-    listScenarioProjectSummariesV3(),
+    listScenarioProjectSummaries(),
   ]);
   const activeProject = session.projectId
-    ? (projects.find((project) => project.id === session.projectId) ?? null)
+    ? (projects.find(
+        (project) => project.id === session.projectId && project.availability === 'available'
+      ) ?? null)
     : null;
   const projectRevision = scenarioSessionService.syncProjectRevision(tabId, {
     hasActiveProject: activeProject !== null,
   });
-  const { recentSteps, trashedSteps } = await buildScenarioProjectStepPayload(
-    activeProject?.id ?? null
-  );
+  const { recentSteps } = await buildScenarioProjectStepPayload(activeProject?.id ?? null);
 
   return {
     session,
@@ -114,7 +114,6 @@ export async function buildScenarioSessionPayload(
     projects,
     projectRevision,
     recentSteps,
-    trashedSteps,
     snapshot: {
       session,
       surface,
@@ -131,7 +130,7 @@ export async function resolveProjectSelection(projectId: string | null): Promise
     return { id: null, name: null };
   }
 
-  const project = await getScenarioProjectRecordV3(projectId);
+  const project = await getScenarioProjectRecord(projectId);
   if (!project) {
     throw new Error(`Scenario project not found: ${projectId}`);
   }
@@ -171,6 +170,6 @@ export async function flushPendingCaptureIfNeeded(
   await scenarioSessionService.clearPendingCaptureIfCurrent(tabId, pendingCapture);
 
   return {
-    stepId: result.slide.id,
+    stepId: result.step.id,
   };
 }

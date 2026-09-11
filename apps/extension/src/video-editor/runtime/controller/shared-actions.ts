@@ -24,7 +24,7 @@ import type {
   TimelineEditingPort,
 } from '../../contracts/controller-store';
 
-import { resolveActionKindForPreset } from '../../../workflows/scenario-video/actions';
+import { resolveActionKindForPreset } from '../../../features/video/project/action-presentation';
 
 type SharedTimelineAction =
   | 'clearCursorSampleSkinOverride'

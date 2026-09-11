@@ -13,11 +13,7 @@ import {
   applyScenarioSidebarVisibility,
 } from '../mutation/mode';
 import { applyScenarioProjectCreation, applyScenarioProjectSelection } from '../mutation/project';
-import {
-  applyScenarioDeleteRecentStep,
-  applyScenarioMoveRecentStep,
-  applyScenarioRestoreRecentStep,
-} from '../mutation/step';
+import { applyScenarioDeleteRecentStep, applyScenarioMoveRecentStep } from '../mutation/step';
 import { openScenarioEditor } from './transport/projects';
 import type { ScenarioControllerResponse } from '../types';
 
@@ -115,16 +111,6 @@ function createScenarioControllerStepActions(args: {
             projectId: args.sessionRef.current.projectId!,
             stepId,
             toIndex,
-          }),
-        projectId: args.sessionRef.current.projectId,
-      }),
-    restoreRecentStep: (stepId: string) =>
-      applyRecentStepMutation({
-        action: () =>
-          applyScenarioRestoreRecentStep({
-            applyScenarioResponse: args.applyScenarioResponse,
-            projectId: args.sessionRef.current.projectId!,
-            stepId,
           }),
         projectId: args.sessionRef.current.projectId,
       }),

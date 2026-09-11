@@ -35,7 +35,8 @@ afterEach(() => {
 function createStep(overrides?: Partial<ScenarioRecorderSidebarStep>): ScenarioRecorderSidebarStep {
   return {
     id: 'step-2',
-    position: 1,
+    position: 3,
+    stepNumber: 2,
     previewDataUrl: 'data:image/png;base64,2',
     title: 'Step two',
     ...overrides,
@@ -83,7 +84,10 @@ describe('ScenarioRecorderSidebarStepCard', () => {
     dispatchDragFlow(card);
 
     expect(setDragStepId).toHaveBeenNthCalledWith(1, 'step-2');
-    expect(onMoveStep).toHaveBeenCalledWith('step-1', 1);
+    expect(onMoveStep).toHaveBeenCalledWith('step-1', 3);
+    expect(
+      container?.querySelector('[data-ui="content.scenario.sidebar.step-rail"] > div')?.textContent
+    ).toBe('2');
     expect(setDragStepId).toHaveBeenLastCalledWith(null);
   });
 });

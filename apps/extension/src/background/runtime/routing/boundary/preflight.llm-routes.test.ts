@@ -96,7 +96,10 @@ it('returns early when the scenario-editor LLM router handles the message', asyn
   sender.documentId = 'scenario-doc-1';
   const scenarioPayload = {
     attachments: [],
-    contractVersion: 3 as const,
+    contractVersion: 4 as const,
+    projectId: 'project-1',
+    baseRevision: 1,
+    scope: { stepIds: ['step-1'], blockIds: [] },
     instruction: 'Rewrite',
     projectSnapshotJson: '{"steps":[]}',
   };

@@ -1,16 +1,8 @@
-import type { ScenarioProjectV3 } from '@sniptale/runtime-contracts/scenario/types/v3';
-import type { ScenarioProject } from '../../../features/scenario/contracts/types/project';
-import { parseScenarioProject } from './projects/guards';
+import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 
-type StoredScenarioProject = ScenarioProject | ScenarioProjectV3;
-
-export function areScenarioProjectsEqual(
-  left: StoredScenarioProject,
-  right: StoredScenarioProject
-): boolean {
-  const canonicalLeft = left.version === 3 ? left : (parseScenarioProject(left) ?? left);
-  const canonicalRight = right.version === 3 ? right : (parseScenarioProject(right) ?? right);
-  return areJsonValuesEqual(canonicalLeft, canonicalRight);
+/** Compares every semantic item and block without relying on object key order. */
+export function areScenarioProjectsEqual(left: GuideProject, right: GuideProject): boolean {
+  return areJsonValuesEqual(left, right);
 }
 
 function areJsonValuesEqual(left: unknown, right: unknown): boolean {

@@ -1,10 +1,7 @@
-import type { ScenarioProject } from '../../../../features/scenario/contracts/types/project';
-import type { ScenarioProjectV3 } from '@sniptale/runtime-contracts/scenario/types/v3';
+import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { ScenarioProjectEntry } from '../contracts';
 import { createLibraryLifecycle, updateLibraryLifecycle } from '../../library-lifecycle/contracts';
 import type { LibraryStorageClass } from '../../library-lifecycle/contracts';
-
-type StoredScenarioProject = ScenarioProject | ScenarioProjectV3;
 
 function createScenarioProjectRevision(
   existing: ScenarioProjectEntry | undefined,
@@ -16,19 +13,7 @@ function createScenarioProjectRevision(
 
 export function createScenarioProjectEntry(args: {
   existing: ScenarioProjectEntry | undefined;
-  project: ScenarioProject;
-  storageClass?: LibraryStorageClass;
-  updatedAt?: number;
-}): ScenarioProjectEntry & { project: ScenarioProject };
-export function createScenarioProjectEntry(args: {
-  existing: ScenarioProjectEntry | undefined;
-  project: ScenarioProjectV3;
-  storageClass?: LibraryStorageClass;
-  updatedAt?: number;
-}): ScenarioProjectEntry & { project: ScenarioProjectV3 };
-export function createScenarioProjectEntry(args: {
-  existing: ScenarioProjectEntry | undefined;
-  project: StoredScenarioProject;
+  project: GuideProject;
   storageClass?: LibraryStorageClass;
   updatedAt?: number;
 }): ScenarioProjectEntry {

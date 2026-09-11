@@ -52,15 +52,6 @@ export const SHARED_DESIGN_SYSTEM_ANNOTATABLE_IMAGE_REGISTRY: DesignSystemRegist
         ['apps/extension/src/editor/workspace/canvas/views.tsx'],
         'active'
       ),
-      usage(
-        'scenario.quick-edit.stage-shell',
-        'Редактор сценариев > Quick edit',
-        'Scenario editor > Quick edit',
-        [
-          'apps/extension/src/scenario-editor/workspace/quick-edit/ScenarioQuickEditTransformSections.tsx',
-        ],
-        'active'
-      ),
     ],
     status: 'planned',
   },

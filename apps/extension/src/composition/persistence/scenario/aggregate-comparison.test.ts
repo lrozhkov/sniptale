@@ -1,9 +1,9 @@
 import { expect, it } from 'vitest';
-import { createScenarioProject } from '../../../features/scenario/project/factories/project';
+import { createGuideProject } from '../../../features/scenario/project/factories';
 import { areScenarioProjectsEqual } from './aggregate-comparison';
 
 it('compares canonical scenario graphs structurally', () => {
-  const left = createScenarioProject('Scenario');
+  const left = createGuideProject('Scenario');
   const equal = structuredClone(left);
   const renamed = { ...structuredClone(left), name: 'Different' };
 

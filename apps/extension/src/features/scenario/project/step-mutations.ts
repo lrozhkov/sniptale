@@ -1,107 +1,41 @@
-import type {
-  ScenarioCaptureStep,
-  ScenarioProject,
-  ScenarioStep,
-} from '../contracts/types/project';
+import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 
-function moveScenarioStepList(
-  steps: ScenarioStep[],
-  fromIndex: number,
-  toIndex: number
-): ScenarioStep[] {
-  const nextSteps = steps.slice();
-  const [step] = nextSteps.splice(fromIndex, 1);
-  if (!step) {
-    return steps;
-  }
-
-  nextSteps.splice(toIndex, 0, step);
-  return nextSteps;
-}
-
+/** Removes an item by stable identity. Undo belongs to the editor transaction history. */
 export function deleteScenarioStep(
-  project: ScenarioProject,
-  stepId: string
+  project: GuideProject,
+  itemId: string,
+  now = Date.now()
 ): {
-  deletedStep: ScenarioStep | null;
-  project: ScenarioProject;
+  deletedStep: GuideProject['items'][number] | null;
+  project: GuideProject;
 } {
-  const deletedIndex = project.steps.findIndex((step) => step.id === stepId);
-  const deletedStep = deletedIndex >= 0 ? (project.steps[deletedIndex] ?? null) : null;
-  if (!deletedStep) {
-    return {
-      deletedStep: null,
-      project,
-    };
-  }
-
+  const deletedStep = project.items.find((item) => item.id === itemId) ?? null;
+  if (!deletedStep) return { deletedStep: null, project };
   return {
     deletedStep,
     project: {
       ...project,
-      updatedAt: Date.now(),
-      steps: project.steps.filter((step) => step.id !== stepId),
-      trash: [
-        {
-          deletedAt: Date.now(),
-          originalIndex: deletedIndex,
-          step: deletedStep,
-        },
-        ...project.trash.filter((entry) => entry.step.id !== stepId),
-      ],
+      updatedAt: Math.max(now, project.updatedAt + 1),
+      items: project.items.filter((item) => item.id !== itemId),
     },
   };
 }
 
-export function restoreScenarioStep(
-  project: ScenarioProject,
-  stepId: string
-): { project: ScenarioProject; restoredStep: ScenarioStep | null } {
-  const trashEntry = project.trash.find((entry) => entry.step.id === stepId) ?? null;
-  if (!trashEntry) {
-    return { project, restoredStep: null };
-  }
-
-  const nextSteps = project.steps.slice();
-  nextSteps.splice(
-    Math.max(0, Math.min(trashEntry.originalIndex, nextSteps.length)),
-    0,
-    trashEntry.step
-  );
-
-  return {
-    restoredStep: trashEntry.step,
-    project: {
-      ...project,
-      updatedAt: Date.now(),
-      steps: nextSteps,
-      trash: project.trash.filter((entry) => entry.step.id !== stepId),
-    },
-  };
-}
-
-export function isCaptureScenarioStep(step: ScenarioStep): step is ScenarioCaptureStep {
-  return step.kind === 'capture';
-}
-
+/** Moves a step or section within document order without changing its identity. */
 export function moveScenarioStep(
-  project: ScenarioProject,
-  stepId: string,
-  toIndex: number
-): ScenarioProject {
-  const fromIndex = project.steps.findIndex((step) => step.id === stepId);
-  if (fromIndex < 0) {
-    return project;
-  }
-
-  const nextIndex = Math.max(0, Math.min(project.steps.length - 1, toIndex));
-  if (nextIndex === fromIndex) {
-    return project;
-  }
-
-  return {
-    ...project,
-    updatedAt: Date.now(),
-    steps: moveScenarioStepList(project.steps, fromIndex, nextIndex),
-  };
+  project: GuideProject,
+  itemId: string,
+  toIndex: number,
+  now = Date.now()
+): GuideProject {
+  if (!Number.isInteger(toIndex)) return project;
+  const fromIndex = project.items.findIndex((item) => item.id === itemId);
+  if (fromIndex < 0) return project;
+  const nextIndex = Math.max(0, Math.min(project.items.length - 1, toIndex));
+  if (fromIndex === nextIndex) return project;
+  const items = project.items.slice();
+  const [item] = items.splice(fromIndex, 1);
+  if (!item) return project;
+  items.splice(nextIndex, 0, item);
+  return { ...project, updatedAt: Math.max(now, project.updatedAt + 1), items };
 }

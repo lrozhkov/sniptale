@@ -218,6 +218,7 @@ it('uses project name as the source fallback for scenario export items and keeps
       item: createScenarioExportItem({
         filename: 'scenario-export.zip',
         project: {
+          availability: 'available' as const,
           id: 'project-1',
           name: 'Quarterly Demo',
           createdAt: 1,

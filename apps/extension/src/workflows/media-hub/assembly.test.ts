@@ -53,7 +53,10 @@ vi.mock('../../features/media-hub/report', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  cleanupAssemblyMocks.initDBMock.mockResolvedValue({ getAll: vi.fn().mockResolvedValue([]) });
+  cleanupAssemblyMocks.initDBMock.mockResolvedValue({
+    getAll: vi.fn().mockResolvedValue([]),
+    getAllKeys: vi.fn().mockResolvedValue([]),
+  });
   cleanupAssemblyMocks.listMediaLibraryMock.mockResolvedValue([{ id: 'asset-1' }]);
   cleanupAssemblyMocks.listRecordingsMock.mockResolvedValue([{ id: 'recording-1' }]);
   cleanupAssemblyMocks.listAllProjectExportsMock.mockResolvedValue([{ id: 'export-1' }]);
@@ -77,6 +80,22 @@ beforeEach(() => {
 });
 
 describe('media-hub-cleanup-assembly', () => {
+  it('retains scenario ownership from root keys without parsing unsupported bodies', async () => {
+    const getAll = vi.fn().mockResolvedValue([]);
+    const getAllKeys = vi.fn().mockResolvedValue(['retired-project', 'future-project']);
+    cleanupAssemblyMocks.initDBMock.mockResolvedValue({ getAll, getAllKeys });
+    const { collectStorageCleanupReport } = await import('./assembly');
+    await collectStorageCleanupReport();
+    expect(getAllKeys).toHaveBeenCalledWith('scenario_projects');
+    expect(getAll).not.toHaveBeenCalledWith('scenario_projects');
+    expect(cleanupAssemblyMocks.buildCleanupCandidatesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rawInventory: expect.objectContaining({
+          scenarioProjects: [{ id: 'retired-project' }, { id: 'future-project' }],
+        }),
+      })
+    );
+  });
   it('collects cleanup candidates from read-only catalog stores', async () => {
     const { collectStorageCleanupReport } = await import('./assembly');
 

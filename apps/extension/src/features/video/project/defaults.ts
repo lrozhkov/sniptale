@@ -24,7 +24,6 @@ import {
   VideoProjectSourceKind,
   VideoSubtitlePlacement,
   type VideoCursorCaptureMode,
-  type VideoProjectActionEvent,
   type VideoProjectAnnotationClip,
   type VideoProjectAnnotationStyle,
   type VideoProjectCursorSkin,
@@ -48,7 +47,6 @@ export const DEFAULT_TEXT_CLIP_DURATION = 5;
 export const DEFAULT_SHAPE_CLIP_DURATION = 5;
 export const DEFAULT_CLIP_VOLUME = 1;
 export const DEFAULT_CLIP_FADE_MS = 0;
-export const DEFAULT_VIDEO_ACTION_EVENTS: VideoProjectActionEvent[] = [];
 
 const DEFAULT_VIDEO_CURSOR_SKIN: VideoProjectCursorSkin = {
   animationPreset: VideoCursorAnimationPreset.NONE,

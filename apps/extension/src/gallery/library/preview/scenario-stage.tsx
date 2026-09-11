@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { translate } from '../../../platform/i18n';
-import { listRecentScenarioSteps } from '../../../composition/persistence/scenario/store/project-steps/project-step-queries';
+import { listScenarioPreviewSteps } from '../../../composition/persistence/scenario/store/project-steps/project-step-queries';
 import type { ScenarioRecentStep } from '../../../features/scenario/contracts/types/project';
 import { isGalleryScenarioExportItem, isGalleryScenarioItem, type GalleryItem } from '../items';
 import { ScenarioPreviewStepCard } from './scenario-step-card';
@@ -60,6 +60,7 @@ function ScenarioPreviewStepsGrid(props: {
 }
 
 export function PreviewScenarioStage(props: { item: GalleryItem }) {
+  const [status, setStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading');
   const [recentSteps, setRecentSteps] = useState<ScenarioRecentStep[]>([]);
 
   useEffect(() => {
@@ -68,15 +69,23 @@ export function PreviewScenarioStage(props: { item: GalleryItem }) {
     }
 
     let active = true;
-    void listRecentScenarioSteps(props.item.project.id)
+    setRecentSteps([]);
+    if (props.item.project.availability !== 'available') {
+      setStatus('unavailable');
+      return;
+    }
+    setStatus('loading');
+    void listScenarioPreviewSteps(props.item.project.id)
       .then((steps) => {
         if (active) {
           setRecentSteps(steps);
+          setStatus('ready');
         }
       })
       .catch(() => {
         if (active) {
           setRecentSteps([]);
+          setStatus('unavailable');
         }
       });
 
@@ -85,6 +94,14 @@ export function PreviewScenarioStage(props: { item: GalleryItem }) {
     };
   }, [props.item]);
 
+  if (status !== 'ready')
+    return (
+      <p role="status">
+        {translate(
+          status === 'loading' ? 'gallery.app.loading' : 'gallery.preview.unavailableGuide'
+        )}
+      </p>
+    );
   return (
     <ScenarioPreviewStepsGrid
       exportMode={isGalleryScenarioExportItem(props.item)}

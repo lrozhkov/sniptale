@@ -1,5 +1,29 @@
 import { defineMessageSource } from '../../source';
 export const scenarioEditorCoreMessages = defineMessageSource({
+  guideStepTitle: { ru: 'Заголовок шага', en: 'Step title' },
+  guideSave: { ru: 'Сохранить', en: 'Save' },
+  guideAddStep: { ru: 'Добавить шаг', en: 'Add step' },
+  guideSaving: { ru: 'Сохранение…', en: 'Saving…' },
+  guideSaved: { ru: 'Сохранено', en: 'Saved' },
+  guideDirty: { ru: 'Есть несохранённые изменения', en: 'Unsaved changes' },
+  guideConflict: {
+    ru: 'Проект изменён в другой вкладке. Ваши правки сохранены в редакторе; запись остановлена, чтобы не перезаписать изменения.',
+    en: 'This project changed in another tab. Your edits remain in the editor; saving is stopped to avoid overwriting changes.',
+  },
+  guideFailed: {
+    ru: 'Не удалось сохранить. Изменения остались в редакторе. Повторите сохранение.',
+    en: 'Could not save. Your edits remain in the editor. Try saving again.',
+  },
+  guideUnavailable: {
+    ru: 'Этот сценарий недоступен в текущем редакторе. Вернитесь в библиотеку или повторите загрузку.',
+    en: 'This guide is unavailable in this editor. Return to the library or retry loading.',
+  },
+  guideMissing: { ru: 'Сценарий не найден.', en: 'Guide not found.' },
+  guideRetry: { ru: 'Повторить загрузку', en: 'Retry loading' },
+  guideEmpty: {
+    ru: 'Создайте инструкцию и добавьте первый шаг.',
+    en: 'Create a guide and add its first step.',
+  },
   documentTitle: {
     ru: 'Sniptale — Редактор сценариев',
     en: 'Sniptale — Scenario editor',

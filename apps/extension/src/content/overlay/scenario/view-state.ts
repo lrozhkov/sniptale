@@ -6,7 +6,6 @@ import type {
 import type {
   ScenarioProjectSummary,
   ScenarioRecentStep,
-  ScenarioTrashedStep,
 } from '../../../features/scenario/contracts/types/project';
 import type { ScenarioSessionState } from '@sniptale/runtime-contracts/scenario/types/session';
 import type { ScenarioRuntimeCapturePayload } from '../../../contracts/messaging/contracts/types';
@@ -21,7 +20,6 @@ export function buildScenarioControllerViewState(args: {
   projects: ScenarioProjectSummary[];
   recentSteps: ScenarioRecentStep[];
   recentStepHighlightToken: number;
-  trashedSteps: ScenarioTrashedStep[];
   refreshSession: () => Promise<void>;
   saveSelectionCapture: (dataUrl: string, captureSurface: ScenarioCaptureSurface) => Promise<void>;
   sidebarVisible: boolean;
@@ -42,6 +40,5 @@ export function buildScenarioControllerViewState(args: {
     scenarioProjectName: args.effectiveSession.projectName,
     rememberProjectSelection: args.effectiveSession.rememberProjectSelection,
     sidebarVisible: args.sidebarVisible,
-    trashedSteps: args.trashedSteps,
   };
 }

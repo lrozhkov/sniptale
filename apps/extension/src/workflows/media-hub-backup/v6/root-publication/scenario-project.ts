@@ -24,7 +24,8 @@ import {
   parseScenarioProjectEntry,
 } from '../../../../composition/persistence/scenario/read-guards';
 import { parseScenarioStepEditorDocumentEntry } from '../../../../composition/persistence/scenario/editor-documents';
-import { isScenarioProjectV3 } from '../../../../features/scenario/project/v3';
+import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
+import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { decodePortableEditorDocument } from '../root-codecs/editor-document';
 import { parsePortableScenarioProjectMetadata } from '../root-codecs/projects';
 import type { ArchiveRootPublisher } from '../restore';
@@ -48,73 +49,60 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function decodeAndRemapV3Project(args: {
+function decodeAndRemapGuideProject(args: {
   assetIds: ReadonlyMap<string, string>;
   project: unknown;
   projectId: string;
   stepIds: ReadonlyMap<string, string>;
+  rootIdMap: Readonly<Record<string, string>>;
 }) {
-  if (!isRecord(args.project)) {
-    throw new Error('Portable scenario project is invalid.');
+  if (
+    !isRecord(args.project) ||
+    args.project['version'] !== 4 ||
+    !Array.isArray(args.project['items']) ||
+    args.project['items'].length > GUIDE_LIMITS.maxItems
+  ) {
+    throw new Error('Portable guide format is invalid or unsupported.');
   }
-  const slides = args.project['slides'];
-  const trash = args.project['trash'];
-  if (!Array.isArray(slides) || !Array.isArray(trash)) {
-    throw new Error('Portable scenario project is invalid.');
-  }
-  const decodeSlide = (raw: unknown) => {
-    if (!isRecord(raw) || !Array.isArray(raw['elements']) || !isRecord(raw['source'])) {
-      throw new Error('Portable scenario slide is invalid.');
-    }
-    const source = raw['source'];
-    const elements: unknown[] = raw['elements'];
-    return {
-      ...raw,
-      elements: elements.map((value) => {
-        if (!isRecord(value) || value['kind'] !== 'image') return value;
-        const rawRef = value['assetRef'];
-        if (!isRecord(rawRef)) throw new Error('Portable scenario image reference is invalid.');
-        const portableId = rawRef['scenarioAssetId'];
-        if (!(typeof portableId === 'string' || portableId === null))
-          throw new Error('Portable scenario asset ID is invalid.');
-        const { scenarioAssetId: _portableId, ...rest } = rawRef;
-        return {
-          ...value,
-          assetRef: {
-            ...rest,
-            assetId: portableId ? (args.assetIds.get(portableId) ?? portableId) : portableId,
-          },
-          editDocumentId:
-            typeof value['editDocumentId'] === 'string'
-              ? (args.stepIds.get(value['editDocumentId']) ?? value['editDocumentId'])
-              : value['editDocumentId'],
-        };
-      }),
-      source:
-        source['kind'] === 'capture'
-          ? (() => {
-              const portableId = source['scenarioAssetId'];
-              if (typeof portableId !== 'string')
-                throw new Error('Portable scenario capture asset ID is invalid.');
-              const { scenarioAssetId: _portableId, ...rest } = source;
-              return { ...rest, assetId: args.assetIds.get(portableId) ?? portableId };
-            })()
-          : source,
-    };
-  };
+  const items: unknown[] = args.project['items'];
   const decoded = {
     ...args.project,
     id: args.projectId,
-    slides: slides.map(decodeSlide),
-    trash: trash.map((item) => {
-      if (!isRecord(item)) throw new Error('Portable scenario trash item is invalid.');
-      const slide = item['slide'];
-      if (!isRecord(slide)) throw new Error('Portable scenario trash slide is invalid.');
-      return { ...item, slide: decodeSlide(slide) };
+    items: items.map((item) => {
+      if (!isRecord(item) || item['kind'] !== 'step') return item;
+      if (!Array.isArray(item['blocks']) || item['blocks'].length > GUIDE_LIMITS.maxBlocksPerStep)
+        throw new Error('Portable guide blocks are invalid.');
+      const blocks: unknown[] = item['blocks'];
+      return {
+        ...item,
+        blocks: blocks.map((block) => {
+          if (!isRecord(block) || block['kind'] !== 'image') return block;
+          const { scenarioAssetId, ...rest } = block;
+          if (typeof scenarioAssetId !== 'string' || 'assetId' in rest)
+            throw new Error('Portable guide image reference is invalid.');
+          const assetId = args.assetIds.get(scenarioAssetId);
+          if (!assetId) throw new Error('Portable guide image is missing.');
+          const sourceDocumentId = rest['editDocumentId'];
+          const editDocumentId =
+            sourceDocumentId === null
+              ? null
+              : typeof sourceDocumentId === 'string'
+                ? args.stepIds.get(sourceDocumentId)
+                : undefined;
+          if (editDocumentId === undefined)
+            throw new Error('Portable guide edit document is missing.');
+          const galleryAssetId =
+            typeof rest['galleryAssetId'] === 'string'
+              ? (args.rootIdMap[`media:library-item:${rest['galleryAssetId']}`] ?? null)
+              : null;
+          return { ...rest, assetId, editDocumentId, galleryAssetId };
+        }),
+      };
     }),
   };
-  if (!isScenarioProjectV3(decoded)) throw new Error('Restored scenario project is invalid.');
-  return decoded;
+  const parsed = parseGuideProject(decoded);
+  if (parsed.status !== 'ok') throw new Error('Restored guide project is invalid.');
+  return parsed.project;
 }
 
 export const scenarioProjectRootPublisher: ArchiveRootPublisher = {
@@ -166,11 +154,12 @@ export const scenarioProjectRootPublisher: ArchiveRootPublisher = {
         session.strategy === 'duplicate' ? newId() : entry.stepId,
       ])
     );
-    const project = decodeAndRemapV3Project({
+    const project = decodeAndRemapGuideProject({
       assetIds,
       project: metadata.entry.project,
       projectId: targetProjectId,
       stepIds,
+      rootIdMap: session.rootIdMap,
     });
     const entry = parseScenarioProjectEntry({
       ...rebaseTemporaryLifecycle(metadata.entry),

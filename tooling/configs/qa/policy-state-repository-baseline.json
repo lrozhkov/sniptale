@@ -1,8 +1,8 @@
 {
   "schemaVersion": 2,
   "controlId": "qa.rule.policy-state-descriptor",
-  "findingCount": 301,
-  "findingDigest": "sha256:cb3f7f83865e42eccf256cffafe72cbb4b0f3f21ed26a350b7dcaf62a8a1a006",
+  "findingCount": 298,
+  "findingDigest": "sha256:cc6dec2df3e6da479ff1d3c1c49aaf203fdea497286f6f3e8b7d77b66bbb15e0",
   "rationales": [
     {
       "id": "noise.policy-state-descriptor.non-authority-signals",
@@ -656,12 +656,6 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
-      "file": "apps/extension/src/composition/persistence/scenario/store/v3/project-records/store.ts",
-      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
-      "rule": "policy-state-descriptor-required",
-      "noiseId": "noise.policy-state-descriptor.non-authority-signals"
-    },
-    {
       "file": "apps/extension/src/composition/persistence/settings/guards.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
@@ -1203,12 +1197,6 @@
     },
     {
       "file": "apps/extension/src/features/quick-actions-presets/policy.ts",
-      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
-      "rule": "policy-state-descriptor-required",
-      "noiseId": "noise.policy-state-descriptor.non-authority-signals"
-    },
-    {
-      "file": "apps/extension/src/features/scenario/project/v3/templates/role-mapping.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set.",
       "rule": "policy-state-descriptor-required",
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"

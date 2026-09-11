@@ -5,6 +5,7 @@ import type { VideoProjectActionEvent } from './types';
 import { createProject, createVideoClip } from './timeline/project-meta.test.helpers';
 import {
   getVideoProjectActionPresentation,
+  resolveActionKindForPreset,
   resolveVideoProjectActionPresentations,
 } from './action-presentation';
 
@@ -164,4 +165,13 @@ it('inherits visual style, admits a per-event style and restores track style wit
   expect(resolveVideoProjectActionPresentations(project)[0]?.clickStyle.size).toBe(24);
   delete project.actionEvents[0]!.presentation;
   expect(resolveVideoProjectActionPresentations(project)[0]?.clickStyle.size).toBe(60);
+});
+
+it('preserves action kind selection for every editor preset', () => {
+  expect(resolveActionKindForPreset('SCROLL_EMPHASIS')).toBe('SCROLL');
+  expect(resolveActionKindForPreset('DWELL_ZOOM')).toBe('PAUSE');
+  expect(resolveActionKindForPreset('SPOTLIGHT')).toBe('CALLOUT');
+  expect(resolveActionKindForPreset('NONE')).toBe('CLICK');
+  expect(resolveActionKindForPreset('CLICK_PRESS')).toBe('CLICK');
+  expect(resolveActionKindForPreset('CLICK_RIPPLE')).toBe('CLICK');
 });

@@ -18,24 +18,6 @@ export const CAST_CLEANUP_SHARED_OWNER_MAPPINGS = [
     testFiles: ['apps/extension/src/composition/persistence/web-snapshots/guards.test.ts'],
   },
   {
-    owner: 'scenario-project-capture-guards',
-    productionPrefix:
-      'apps/extension/src/composition/persistence/scenario/projects/guards/capture/',
-    reason: 'Scenario capture overlay parsing is covered by capture overlay tests.',
-    testFiles: [
-      'apps/extension/src/composition/persistence/scenario/projects/guards/capture/overlays.test.ts',
-    ],
-  },
-  {
-    owner: 'scenario-suggested-event-guards',
-    productionPrefix:
-      'apps/extension/src/composition/persistence/scenario/projects/guards/project/suggested-event/',
-    reason: 'Suggested event parsing is covered by suggested event guard tests.',
-    testFiles: [
-      'apps/extension/src/composition/persistence/scenario/projects/guards/project/suggested-event/parse.test.ts',
-    ],
-  },
-  {
     owner: 'shared-message-tracer-root',
     productionFile: 'packages/platform/src/observability/message-tracer/index.ts',
     reason:
@@ -83,12 +65,6 @@ export const CAST_CLEANUP_SHARED_OWNER_MAPPINGS = [
     productionFile: 'apps/extension/src/features/highlighter/css-sanitizer/css.ts',
     reason: 'CSS sanitizer parsed style assignment is covered by CSS sanitizer tests.',
     testFiles: ['apps/extension/src/features/highlighter/css-sanitizer/css.test.ts'],
-  },
-  {
-    owner: 'scenario-template-validation-boundary',
-    productionFile: 'apps/extension/src/features/scenario/project/v3/templates/validation.ts',
-    reason: 'Scenario template boundary cast cleanup is covered by import-pack validation tests.',
-    testFiles: ['apps/extension/src/features/scenario/project/v3/templates/import-pack.test.ts'],
   },
   {
     owner: 'shared-editor-scene-background-storage',

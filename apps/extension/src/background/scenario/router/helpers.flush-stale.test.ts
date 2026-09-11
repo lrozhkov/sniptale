@@ -1,12 +1,14 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 
-const { saveScenarioCaptureSlideToProjectMock } = vi.hoisted(() => ({
-  saveScenarioCaptureSlideToProjectMock: vi.fn(),
+const { saveScenarioCaptureStepToProjectMock } = vi.hoisted(() => ({
+  saveScenarioCaptureStepToProjectMock: vi.fn(),
 }));
 
-vi.mock('../../../composition/persistence/scenario/store/v3', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../composition/persistence/scenario/store/v3')>()),
-  saveScenarioCaptureSlideToProject: saveScenarioCaptureSlideToProjectMock,
+vi.mock('../../../composition/persistence/scenario/store/capture-step', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/scenario/store/capture-step')
+  >()),
+  saveScenarioCaptureStepToProject: saveScenarioCaptureStepToProjectMock,
 }));
 
 import { flushPendingCaptureIfNeeded } from './helpers';
@@ -14,8 +16,8 @@ import { createScenarioSessionServiceStub } from '../../../../../../tooling/test
 
 beforeEach(() => {
   vi.clearAllMocks();
-  saveScenarioCaptureSlideToProjectMock.mockResolvedValue({
-    slide: { id: 'slide-1' },
+  saveScenarioCaptureStepToProjectMock.mockResolvedValue({
+    step: { id: 'slide-1' },
   });
 });
 
@@ -50,8 +52,8 @@ function createPendingCapture(id: string, pendingAssetId: string) {
 }
 
 function createDeferredSave() {
-  let resolve!: (value: { slide: { id: string } }) => void;
-  const promise = new Promise<{ slide: { id: string } }>((promiseResolve) => {
+  let resolve!: (value: { step: { id: string } }) => void;
+  const promise = new Promise<{ step: { id: string } }>((promiseResolve) => {
     resolve = promiseResolve;
   });
   return { promise, resolve };
@@ -64,7 +66,7 @@ it('does not clear a newer pending capture after a stale flush save completes', 
   const deferredSave = createDeferredSave();
   let currentCapture: typeof secondCapture | null = secondCapture;
 
-  saveScenarioCaptureSlideToProjectMock.mockReturnValueOnce(deferredSave.promise);
+  saveScenarioCaptureStepToProjectMock.mockReturnValueOnce(deferredSave.promise);
   vi.mocked(scenarioSessionService.resolvePendingCapture).mockResolvedValue(firstCapture);
   vi.mocked(scenarioSessionService.clearPendingCaptureIfCurrent).mockImplementation(
     async (_tabId, expectedCapture) => {
@@ -87,7 +89,7 @@ it('does not clear a newer pending capture after a stale flush save completes', 
   await new Promise((resolve) => setTimeout(resolve, 0));
 
   currentCapture = secondCapture;
-  deferredSave.resolve({ slide: { id: 'slide-1' } });
+  deferredSave.resolve({ step: { id: 'slide-1' } });
 
   await expect(flush).resolves.toEqual({ stepId: 'slide-1' });
   expect(scenarioSessionService.clearPendingCaptureIfCurrent).toHaveBeenCalledWith(

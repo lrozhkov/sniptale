@@ -6,12 +6,12 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const {
   getScenarioProjectRecordMock,
-  listRecentScenarioStepsMock,
+  listScenarioPreviewStepsMock,
   openScenarioEditorPageMock,
   translateMock,
 } = vi.hoisted(() => ({
   getScenarioProjectRecordMock: vi.fn(),
-  listRecentScenarioStepsMock: vi.fn(),
+  listScenarioPreviewStepsMock: vi.fn(),
   openScenarioEditorPageMock: vi.fn(),
   translateMock: vi.fn((key: string) => key),
 }));
@@ -36,7 +36,7 @@ vi.mock(
     ...(await importOriginal<
       typeof import('../../../composition/persistence/scenario/store/project-steps/project-step-queries')
     >()),
-    listRecentScenarioSteps: listRecentScenarioStepsMock,
+    listScenarioPreviewSteps: listScenarioPreviewStepsMock,
   })
 );
 
@@ -61,13 +61,19 @@ beforeEach(() => {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
-  listRecentScenarioStepsMock.mockResolvedValue([
-    { id: 'step-1', position: 0, previewDataUrl: 'data:image/png;base64,one', title: 'Intro' },
+  listScenarioPreviewStepsMock.mockResolvedValue([
+    {
+      id: 'step-1',
+      position: 0,
+      stepNumber: 1,
+      previewDataUrl: 'data:image/png;base64,one',
+      title: 'Intro',
+    },
   ]);
   getScenarioProjectRecordMock.mockResolvedValue({
     id: 'project-1',
     name: 'Scenario',
-    steps: [{ id: 'step-1' }],
+    items: [{ kind: 'step', id: 'step-1' }],
   });
 });
 
@@ -87,7 +93,13 @@ it('loads recent scenario steps and opens the scenario editor from preview', asy
   act(() => {
     root?.render(
       <GalleryScenarioPreviewPanel
-        project={{ id: 'project-1', name: 'Scenario', createdAt: 1, updatedAt: 2 }}
+        project={{
+          availability: 'available' as const,
+          id: 'project-1',
+          name: 'Scenario',
+          createdAt: 1,
+          updatedAt: 2,
+        }}
         onClose={onClose}
       />
     );
@@ -112,9 +124,52 @@ it('loads recent scenario steps and opens the scenario editor from preview', asy
     closeButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
   });
 
-  expect(listRecentScenarioStepsMock).toHaveBeenCalledWith('project-1');
+  expect(listScenarioPreviewStepsMock).toHaveBeenCalledWith('project-1');
   expect(getScenarioProjectRecordMock).toHaveBeenCalledWith('project-1');
   expect(openScenarioEditorPageMock).toHaveBeenCalledWith('project-1');
   expect(onClose).toHaveBeenCalledTimes(1);
   expect(container?.textContent).toContain('Intro');
+});
+
+it.each(['unsupported', 'invalid'] as const)(
+  'keeps the %s project envelope visible without loading or editing its body',
+  async (availability) => {
+    await act(async () => {
+      root?.render(
+        <GalleryScenarioPreviewPanel
+          project={{ availability, id: 'old', name: 'Retained guide', createdAt: 1, updatedAt: 2 }}
+          onClose={vi.fn()}
+        />
+      );
+    });
+    expect(container?.textContent).toContain('Retained guide');
+    expect(container?.textContent).toContain('gallery.preview.unavailableGuide');
+    expect(container?.textContent).not.toContain('gallery.app.scenarioPreviewEmpty');
+    expect(getScenarioProjectRecordMock).not.toHaveBeenCalled();
+    expect(listScenarioPreviewStepsMock).not.toHaveBeenCalled();
+    const button = [...(container?.querySelectorAll('button') ?? [])].find((node) =>
+      node.textContent?.includes('gallery.preview.openInEditor')
+    );
+    expect(button?.disabled).toBe(true);
+  }
+);
+
+it('shows a read failure as unavailable instead of reporting an empty guide', async () => {
+  getScenarioProjectRecordMock.mockRejectedValue(new Error('storage unavailable'));
+  await act(async () => {
+    root?.render(
+      <GalleryScenarioPreviewPanel
+        project={{
+          availability: 'available',
+          id: 'guide',
+          name: 'Guide',
+          createdAt: 1,
+          updatedAt: 2,
+        }}
+        onClose={vi.fn()}
+      />
+    );
+  });
+  expect(container?.textContent).toContain('gallery.preview.unavailableGuide');
+  expect(container?.textContent).not.toContain('gallery.app.scenarioPreviewEmpty');
 });

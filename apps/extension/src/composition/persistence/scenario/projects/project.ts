@@ -1,9 +1,9 @@
-import type { ScenarioProject } from '../../../../features/scenario/contracts/types/project';
+import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { parseDbEntries } from '../../infrastructure/indexed-db/read-primitives';
-import { parseScenarioProjectEntry } from '../read-guards';
+import { parseScenarioProjectEntry, parseScenarioProjectSummary } from '../read-guards';
+import type { ScenarioProjectSummary } from '../../../../features/scenario/contracts/types/project';
 import { initDB, SCENARIO_PROJECTS_STORE } from '../../infrastructure/indexed-db/core';
 import type { ScenarioProjectEntry } from '../contracts';
-import { parseScenarioProject } from './guards/project/root/parse';
 import {
   commitScenarioAggregateMutation,
   recoverScenarioAssetPublications,
@@ -17,9 +17,9 @@ export interface SaveScenarioProjectOptions {
 }
 
 export async function saveScenarioProject(
-  project: ScenarioProject,
+  project: GuideProject,
   options: SaveScenarioProjectOptions = {}
-): Promise<ScenarioProject> {
+): Promise<GuideProject> {
   const result = await commitScenarioAggregateMutation(project, {
     ...(options.baseUpdatedAt === undefined ? {} : { expectedUpdatedAt: options.baseUpdatedAt }),
     ...(options.expectedRevision === undefined
@@ -27,14 +27,17 @@ export async function saveScenarioProject(
       : { expectedRevision: options.expectedRevision }),
     ...(options.storageClass === undefined ? {} : { storageClass: options.storageClass }),
   });
-  return parseScenarioProject(result.project) ?? project;
+  return result.project;
 }
 
-export async function getScenarioProject(id: string): Promise<ScenarioProject | undefined> {
+export async function getScenarioProject(id: string): Promise<GuideProject | undefined> {
   await recoverScenarioAssetPublications();
   const db = await initDB();
-  const entry = parseScenarioProjectEntry(await db.get(SCENARIO_PROJECTS_STORE, id)) ?? undefined;
-  return parseScenarioProject(entry?.project) ?? undefined;
+  const raw: unknown = await db.get(SCENARIO_PROJECTS_STORE, id);
+  if (raw === undefined) return undefined;
+  const entry = parseScenarioProjectEntry(raw);
+  if (!entry) throw new Error('Scenario project content is unavailable.');
+  return entry.project;
 }
 
 export async function getScenarioProjectEntry(
@@ -45,23 +48,12 @@ export async function getScenarioProjectEntry(
   return parseScenarioProjectEntry(await db.get(SCENARIO_PROJECTS_STORE, id)) ?? undefined;
 }
 
-export async function listScenarioProjects(): Promise<
-  Array<Pick<ScenarioProject, 'id' | 'name' | 'updatedAt' | 'createdAt' | 'tags'>>
-> {
+export async function listScenarioProjects(): Promise<ScenarioProjectSummary[]> {
   await recoverScenarioAssetPublications();
   const db = await initDB();
-  const all = parseDbEntries(await db.getAll(SCENARIO_PROJECTS_STORE), parseScenarioProjectEntry);
-  return all
-    .map(({ lifecycle, project, workspaceRevision }) => ({
-      id: project.id,
-      name: project.name,
-      updatedAt: project.updatedAt,
-      createdAt: project.createdAt,
-      tags: project.tags ?? [],
-      lifecycle,
-      workspaceRevision,
-    }))
-    .sort((a, b) => b.updatedAt - a.updatedAt);
+  return parseDbEntries(await db.getAll(SCENARIO_PROJECTS_STORE), parseScenarioProjectSummary).sort(
+    (a, b) => b.updatedAt - a.updatedAt
+  );
 }
 
 export async function listScenarioProjectEntries(): Promise<ScenarioProjectEntry[]> {

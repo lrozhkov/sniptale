@@ -18,7 +18,7 @@ type ScenarioEditorAiPayload = Pick<
   | 'instruction'
   | 'projectOutlineJson'
   | 'projectSnapshotJson'
-  | 'selectedSlideCodeJson'
+  | 'selectedStepJson'
   | 'toolManifestJson'
 >;
 
@@ -128,8 +128,8 @@ function assertScenarioTextCharLimits(message: ScenarioEditorAiPayload): void {
     SCENARIO_EDITOR_AI_PAYLOAD_LIMITS.maxJsonFieldChars
   );
   assertTextLimit(
-    'selectedSlideCodeJson',
-    message.selectedSlideCodeJson,
+    'selectedStepJson',
+    message.selectedStepJson,
     SCENARIO_EDITOR_AI_PAYLOAD_LIMITS.maxJsonFieldChars
   );
   assertTextLimit(
@@ -156,8 +156,8 @@ function assertScenarioTextDecodedByteLimits(message: ScenarioEditorAiPayload): 
     SCENARIO_EDITOR_AI_PAYLOAD_LIMITS.maxJsonFieldDecodedBytes
   );
   assertDecodedBytesLimit(
-    'selectedSlideCodeJson',
-    message.selectedSlideCodeJson,
+    'selectedStepJson',
+    message.selectedStepJson,
     SCENARIO_EDITOR_AI_PAYLOAD_LIMITS.maxJsonFieldDecodedBytes
   );
   assertDecodedBytesLimit(

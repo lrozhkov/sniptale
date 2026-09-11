@@ -174,7 +174,13 @@ it('does not double-count mixed scenario items in folder totals', () => {
       hasThumbnail: false,
       kind: 'scenario',
       mimeType: 'application/x-sniptale-scenario',
-      project: { id: 'project-1', name: 'Project 1', createdAt: 2, updatedAt: 2 },
+      project: {
+        availability: 'available' as const,
+        id: 'project-1',
+        name: 'Project 1',
+        createdAt: 2,
+        updatedAt: 2,
+      },
       size: 0,
       sourceFavicon: null,
       sourceTitle: null,
@@ -538,8 +544,20 @@ it('filters and sorts scenario projects independently from media folders', () =>
   expect(
     getFilteredScenarioProjects({
       projects: [
-        { id: 'project-1', name: 'Bravo', createdAt: 1, updatedAt: 20 },
-        { id: 'project-2', name: 'Alpha', createdAt: 2, updatedAt: 10 },
+        {
+          availability: 'available' as const,
+          id: 'project-1',
+          name: 'Bravo',
+          createdAt: 1,
+          updatedAt: 20,
+        },
+        {
+          availability: 'available' as const,
+          id: 'project-2',
+          name: 'Alpha',
+          createdAt: 2,
+          updatedAt: 10,
+        },
       ],
       search: 'a',
       sortMode: 'name-asc',

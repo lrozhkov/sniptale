@@ -95,6 +95,7 @@ function createStoredProjectEntry(project: ReturnType<typeof createScenarioStore
   return {
     id: project.id,
     project,
+    workspaceRevision: 0,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
   };

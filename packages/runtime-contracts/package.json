@@ -46,7 +46,6 @@
     "./scenario/types/base": "./src/scenario/types/base.ts",
     "./scenario/types/geometry": "./src/scenario/types/geometry.ts",
     "./scenario/types/session": "./src/scenario/types/session.ts",
-    "./scenario/types/v3": "./src/scenario/types/v3/index.ts",
     "./schemas/highlighter": "./src/schemas/highlighter.ts",
     "./tab-capabilities/types": "./src/tab-capabilities/types.ts",
     "./validation/base64": "./src/validation/base64.ts",
@@ -67,7 +66,9 @@
     "./video/types/types": "./src/video/types/types.ts",
     "./video/types/webcam-actual-settings": "./src/video/types/webcam-actual-settings.ts",
     "./video/types/webcam-quality": "./src/video/types/webcam-quality.ts",
-    "./web-snapshot": "./src/web-snapshot/index.ts"
+    "./web-snapshot": "./src/web-snapshot/index.ts",
+    "./scenario/types/guide": "./src/scenario/types/guide.ts",
+    "./scenario/guide-parser": "./src/scenario/guide-parser.ts"
   },
   "dependencies": {
     "@sniptale/foundation": "0.4.1",

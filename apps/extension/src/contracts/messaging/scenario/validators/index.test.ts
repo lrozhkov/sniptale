@@ -16,7 +16,6 @@ import {
   isScenarioSessionPayload,
   isScenarioSessionState,
   isScenarioStringDataRecord,
-  isScenarioSuggestedEventKind,
   isScenarioTargetDescriptor,
 } from './index';
 
@@ -32,13 +31,27 @@ function createValidSessionPayload() {
       sidebarVisible: true,
     },
     projects: [
-      { id: 'project-1', name: 'Project 1', createdAt: 1, updatedAt: 2 },
-      { id: 'project-2', name: 'Project 2', createdAt: 3, updatedAt: 4, tags: ['alpha'] },
+      {
+        availability: 'available' as const,
+        id: 'project-1',
+        name: 'Project 1',
+        createdAt: 1,
+        updatedAt: 2,
+      },
+      {
+        availability: 'available' as const,
+        id: 'project-2',
+        name: 'Project 2',
+        createdAt: 3,
+        updatedAt: 4,
+        tags: ['alpha'],
+      },
     ],
     recentSteps: [
       {
         id: 'step-1',
         position: 0,
+        stepNumber: 1,
         previewDataUrl: 'data:image/png;base64,1',
         title: 'Step 1',
       },
@@ -85,8 +98,6 @@ it('validates scenario enums and scalar geometry helpers', () => {
   expect(isScenarioCaptureSurface('crop')).toBe(false);
   expect(isScenarioCaptureSourceKind('auto-click')).toBe(true);
   expect(isScenarioCaptureSourceKind('keyboard')).toBe(false);
-  expect(isScenarioSuggestedEventKind('scroll')).toBe(true);
-  expect(isScenarioSuggestedEventKind('hover')).toBe(false);
   expect(isScenarioPoint({ x: 1, y: 2 })).toBe(true);
   expect(isScenarioPoint({ x: 1 })).toBe(false);
   expect(isScenarioRect({ x: 1, y: 2, width: 3, height: 4 })).toBe(true);
@@ -170,7 +181,7 @@ it('validates page and target descriptors with nullable optional fields', () => 
   expect(isScenarioTargetDescriptor({ rect: { x: 1 } })).toBe(false);
 });
 
-it('validates session state and suggested-event data records', () => {
+it('validates session state and scalar data records', () => {
   expect(
     isScenarioSessionState({
       enabled: true,
@@ -202,14 +213,19 @@ it('validates session payloads with recent steps', () => {
       recentSteps: [{ id: 'step-1', previewDataUrl: 10, title: 'Step 1' }],
     })
   ).toBe(false);
+
   expect(
     isScenarioSessionPayload({
-      trashedSteps: [{ id: 'step-2', deletedAt: 'now', kind: 'capture', originalIndex: 1 }],
-    })
-  ).toBe(false);
-  expect(
-    isScenarioSessionPayload({
-      projects: [{ id: 'project-1', name: 'Project 1', createdAt: 1, updatedAt: 2, tags: [1] }],
+      projects: [
+        {
+          availability: 'available' as const,
+          id: 'project-1',
+          name: 'Project 1',
+          createdAt: 1,
+          updatedAt: 2,
+          tags: [1],
+        },
+      ],
     })
   ).toBe(false);
 });
@@ -249,3 +265,16 @@ it('validates recorder surface, restore snapshots, and recent step metadata', ()
     })
   ).toBe(false);
 });
+
+it.each([undefined, null, 0, -1, 1.5, Number.POSITIVE_INFINITY, '1'])(
+  'rejects a recent step without a positive integer ordinal: %s',
+  (stepNumber) => {
+    const payload = createValidSessionPayload();
+    expect(
+      isScenarioSessionPayload({
+        ...payload,
+        recentSteps: [{ ...payload.recentSteps[0], stepNumber }],
+      })
+    ).toBe(false);
+  }
+);

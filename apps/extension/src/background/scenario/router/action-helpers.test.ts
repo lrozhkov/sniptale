@@ -4,11 +4,11 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 const {
   buildScenarioSessionPayloadMock,
   flushPendingCaptureIfNeededMock,
-  saveScenarioCaptureSlideToProjectMock,
+  saveScenarioCaptureStepToProjectMock,
 } = vi.hoisted(() => ({
   buildScenarioSessionPayloadMock: vi.fn(),
   flushPendingCaptureIfNeededMock: vi.fn(),
-  saveScenarioCaptureSlideToProjectMock: vi.fn(),
+  saveScenarioCaptureStepToProjectMock: vi.fn(),
 }));
 
 vi.mock('./helpers', async (importOriginal) => {
@@ -20,9 +20,11 @@ vi.mock('./helpers', async (importOriginal) => {
   };
 });
 
-vi.mock('../../../composition/persistence/scenario/store/v3', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../composition/persistence/scenario/store/v3')>()),
-  saveScenarioCaptureSlideToProject: saveScenarioCaptureSlideToProjectMock,
+vi.mock('../../../composition/persistence/scenario/store/capture-step', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/scenario/store/capture-step')
+  >()),
+  saveScenarioCaptureStepToProject: saveScenarioCaptureStepToProjectMock,
 }));
 
 import {
@@ -56,9 +58,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   buildScenarioSessionPayloadMock.mockResolvedValue({ session: { enabled: true } });
   flushPendingCaptureIfNeededMock.mockResolvedValue({});
-  saveScenarioCaptureSlideToProjectMock.mockResolvedValue({
+  saveScenarioCaptureStepToProjectMock.mockResolvedValue({
     project: { id: 'project-1', name: 'Project 1' },
-    slide: { id: 'slide-1' },
+    step: { id: 'slide-1' },
   });
 });
 
@@ -135,7 +137,7 @@ it('saves capture steps through the shared capture-step seam', async () => {
     'project-1'
   );
 
-  expect(saveScenarioCaptureSlideToProjectMock).toHaveBeenCalledWith(
+  expect(saveScenarioCaptureStepToProjectMock).toHaveBeenCalledWith(
     expect.objectContaining({
       projectId: 'project-1',
       dataUrl: 'data:image/png;base64,1',
@@ -151,7 +153,7 @@ it('omits undefined optional capture-step fields before calling the shared save 
     'project-2'
   );
 
-  expect(saveScenarioCaptureSlideToProjectMock).toHaveBeenCalledWith({
+  expect(saveScenarioCaptureStepToProjectMock).toHaveBeenCalledWith({
     projectId: 'project-2',
     dataUrl: 'data:image/png;base64,2',
     captureSurface: 'visible',
@@ -205,7 +207,7 @@ it('preserves explicit optional capture-step fields through the shared save seam
 
   await saveCaptureStepToScenarioProject(message, 'project-3');
 
-  expect(saveScenarioCaptureSlideToProjectMock).toHaveBeenCalledWith(
+  expect(saveScenarioCaptureStepToProjectMock).toHaveBeenCalledWith(
     expect.objectContaining({
       projectId: 'project-3',
       galleryAssetId: 'gallery-1',

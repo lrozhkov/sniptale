@@ -32,37 +32,11 @@ export const SHARED_FACADE_OWNER_MAPPINGS = [
     ],
   },
   {
-    owner: 'sf-scenario-canvas',
-    productionPrefix: 'apps/extension/src/scenario-editor/canvas/',
-    exclusive: true,
-    reason: 'Scenario canvas suites.',
-    testFiles: [
-      'apps/extension/src/scenario-editor/canvas/controls.test.tsx',
-      'apps/extension/src/scenario-editor/canvas/controls.zoom.test.tsx',
-    ],
-  },
-  {
     owner: 'sf-scenario-page-shell',
     productionPrefix: 'apps/extension/src/scenario-editor/page-shell/',
     exclusive: true,
     reason: 'Scenario page-shell suites.',
-    testFiles: [
-      'apps/extension/src/scenario-editor/page-shell/page.test.tsx',
-      'apps/extension/src/scenario-editor/page-shell/timeline.test.tsx',
-      'apps/extension/src/scenario-editor/page-shell/toolbar/shell.test.tsx',
-      'apps/extension/src/scenario-editor/page-shell/view.presentation.test.tsx',
-      'apps/extension/src/scenario-editor/page-shell/view.test.tsx',
-    ],
-  },
-  {
-    owner: 'sf-scenario-inspector',
-    productionPrefix: 'apps/extension/src/scenario-editor/inspector/',
-    exclusive: true,
-    reason: 'Scenario inspector suites.',
-    testFiles: [
-      'apps/extension/src/scenario-editor/inspector/panel.tabs.test.tsx',
-      'apps/extension/src/scenario-editor/inspector/panel.test.tsx',
-    ],
+    testFiles: ['apps/extension/src/scenario-editor/page-shell/ScenarioEditorPage.test.tsx'],
   },
   {
     owner: 'sf-settings-ai-providers',
@@ -184,39 +158,6 @@ export const SHARED_FACADE_OWNER_MAPPINGS = [
       'apps/extension/src/popup/recording/video/footer/actions.test.tsx',
       'apps/extension/src/popup/recording/video/setup/options/preset-selector.test.tsx',
       'apps/extension/src/popup/recording/video/setup/options/webcam-selector.test.tsx',
-    ],
-  },
-  {
-    owner: 'sf-scenario-project-state',
-    productionPrefix: 'apps/extension/src/scenario-editor/project/state/',
-    exclusive: true,
-    reason: 'Scenario project-state suites.',
-    testFiles: [
-      'apps/extension/src/scenario-editor/project/state/index.test.tsx',
-      'apps/extension/src/scenario-editor/project/state/selection-autosave-effects.test.tsx',
-      'apps/extension/src/scenario-editor/project/state/ui.test.tsx',
-    ],
-  },
-  {
-    owner: 'sf-scenario-project-mutation',
-    productionPrefix: 'apps/extension/src/scenario-editor/project/mutation/',
-    exclusive: true,
-    reason: 'Scenario project-mutation suites.',
-    testFiles: [
-      'apps/extension/src/scenario-editor/project/mutation/actions/index.test.ts',
-      'apps/extension/src/scenario-editor/project/mutation/actions/project-crud/video.test.ts',
-      'apps/extension/src/scenario-editor/project/mutation/history/project/index.test.tsx',
-    ],
-  },
-  {
-    owner: 'sf-scenario-slide-navigator',
-    productionPrefix: 'apps/extension/src/scenario-editor/page-shell/slide-navigator/',
-    exclusive: true,
-    reason: 'Scenario slide-navigator suites.',
-    testFiles: [
-      'apps/extension/src/scenario-editor/page-shell/slide-navigator/ScenarioSlideNavigator.test.tsx',
-      'apps/extension/src/scenario-editor/page-shell/slide-navigator/ScenarioSlideNavigatorStepRow.test.tsx',
-      'apps/extension/src/scenario-editor/page-shell/slide-navigator/thumbnails.test.tsx',
     ],
   },
   {

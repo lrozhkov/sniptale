@@ -1,20 +1,22 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { createGuideProject } from '../../../features/scenario/project/public';
 
 const {
-  getScenarioProjectRecordV3Mock,
-  listScenarioProjectSummariesV3Mock,
-  saveScenarioCaptureSlideToProjectMock,
+  getScenarioProjectRecordMock,
+  listScenarioProjectSummariesMock,
+  saveScenarioCaptureStepToProjectMock,
 } = vi.hoisted(() => ({
-  getScenarioProjectRecordV3Mock: vi.fn(),
-  listScenarioProjectSummariesV3Mock: vi.fn(),
-  saveScenarioCaptureSlideToProjectMock: vi.fn(),
+  getScenarioProjectRecordMock: vi.fn(),
+  listScenarioProjectSummariesMock: vi.fn(),
+  saveScenarioCaptureStepToProjectMock: vi.fn(),
 }));
 
-vi.mock('../../../composition/persistence/scenario/store/v3', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../composition/persistence/scenario/store/v3')>()),
-  getScenarioProjectRecordV3: getScenarioProjectRecordV3Mock,
-  listScenarioProjectSummariesV3: listScenarioProjectSummariesV3Mock,
-  saveScenarioCaptureSlideToProject: saveScenarioCaptureSlideToProjectMock,
+vi.mock('../../../composition/persistence/scenario/store/public', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/scenario/store/public')
+  >()),
+  getScenarioProjectRecord: getScenarioProjectRecordMock,
+  listScenarioProjectSummaries: listScenarioProjectSummariesMock,
 }));
 
 import {
@@ -28,9 +30,9 @@ import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types
 
 beforeEach(() => {
   vi.clearAllMocks();
-  listScenarioProjectSummariesV3Mock.mockResolvedValue([]);
-  saveScenarioCaptureSlideToProjectMock.mockResolvedValue({
-    slide: { id: 'slide-1' },
+  listScenarioProjectSummariesMock.mockResolvedValue([]);
+  saveScenarioCaptureStepToProjectMock.mockResolvedValue({
+    step: { id: 'slide-1' },
   });
 });
 
@@ -119,15 +121,16 @@ async function buildSessionPayload() {
     toolbarVisible: true,
     captureAction: 'scenario',
   });
-  listScenarioProjectSummariesV3Mock.mockResolvedValue([
-    { id: 'project-1', name: 'Project 1', createdAt: 10, updatedAt: 20 },
+  listScenarioProjectSummariesMock.mockResolvedValue([
+    {
+      availability: 'available' as const,
+      id: 'project-1',
+      name: 'Project 1',
+      createdAt: 10,
+      updatedAt: 20,
+    },
   ]);
-  getScenarioProjectRecordV3Mock.mockResolvedValue({
-    id: 'project-1',
-    name: 'Project 1',
-    slides: [],
-    trash: [],
-  });
+  getScenarioProjectRecordMock.mockResolvedValue(createGuideProject('Project 1', 'project-1'));
 
   return {
     payload: await buildScenarioSessionPayload(11, scenarioSessionService),
@@ -145,9 +148,16 @@ it('loads session payload and project selection details through shared store sea
       toolbarVisible: true,
       captureAction: 'scenario',
     },
-    projects: [{ id: 'project-1', name: 'Project 1', createdAt: 10, updatedAt: 20 }],
+    projects: [
+      {
+        availability: 'available' as const,
+        id: 'project-1',
+        name: 'Project 1',
+        createdAt: 10,
+        updatedAt: 20,
+      },
+    ],
     recentSteps: [],
-    trashedSteps: [],
     projectRevision: 1,
     snapshot: {
       session,
@@ -167,7 +177,7 @@ it('loads session payload and project selection details through shared store sea
 });
 
 it('throws when the selected project cannot be resolved', async () => {
-  getScenarioProjectRecordV3Mock.mockResolvedValue(undefined);
+  getScenarioProjectRecordMock.mockResolvedValue(undefined);
 
   await expect(resolveProjectSelection('missing')).rejects.toThrow(
     'Scenario project not found: missing'
@@ -195,7 +205,7 @@ it('flushes buffered captures into the selected project and clears the pending s
 
   const flushed = await flushPendingCaptureIfNeeded(4, 'project-4', scenarioSessionService);
 
-  expect(saveScenarioCaptureSlideToProjectMock).toHaveBeenCalledWith(
+  expect(saveScenarioCaptureStepToProjectMock).toHaveBeenCalledWith(
     expect.objectContaining({
       projectId: 'project-4',
       dataUrl: 'data:image/png;base64,pending',
@@ -218,7 +228,7 @@ it('returns an empty flush payload when no pending capture exists', async () => 
   await expect(
     flushPendingCaptureIfNeeded(5, 'project-5', scenarioSessionService)
   ).resolves.toEqual({});
-  expect(saveScenarioCaptureSlideToProjectMock).not.toHaveBeenCalled();
+  expect(saveScenarioCaptureStepToProjectMock).not.toHaveBeenCalled();
   expect(scenarioSessionService.clearPendingCapture).not.toHaveBeenCalled();
 });
 
@@ -240,10 +250,22 @@ it('keeps the pending capture when saving into the project fails', async () => {
     title: 'Step',
     body: '',
   });
-  saveScenarioCaptureSlideToProjectMock.mockRejectedValueOnce(new Error('save failed'));
+  saveScenarioCaptureStepToProjectMock.mockRejectedValueOnce(new Error('save failed'));
 
   await expect(flushPendingCaptureIfNeeded(6, 'project-6', scenarioSessionService)).rejects.toThrow(
     'save failed'
   );
   expect(scenarioSessionService.clearPendingCapture).not.toHaveBeenCalled();
 });
+
+vi.mock('../../../composition/persistence/scenario/store/capture-step', async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import('../../../composition/persistence/scenario/store/capture-step')
+  >()),
+  saveScenarioCaptureStepToProject: saveScenarioCaptureStepToProjectMock,
+}));
+
+vi.mock('../../../composition/persistence/scenario/projects', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../composition/persistence/scenario/projects')>()),
+  getScenarioProject: getScenarioProjectRecordMock,
+}));

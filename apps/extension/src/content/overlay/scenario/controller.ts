@@ -2,7 +2,6 @@ import type { CaptureActionType } from '../../../contracts/settings';
 import type { ScenarioSessionState } from '@sniptale/runtime-contracts/scenario/types/session';
 import { useScenarioAutoClickCapture } from './auto-click-capture';
 import { useScenarioNavigationLockOverride } from './navigation-lock-override';
-import { useScenarioSuggestedEventLogging } from './suggested-event-logging';
 import type { BuildScenarioCapturePayload } from './auto-click-capture/shared';
 import type {
   ScenarioAutoClickCaptureTransport,
@@ -91,12 +90,6 @@ function useScenarioControllerEffects(args: {
   setIsCompletelyHidden: (hidden: boolean) => void;
   setNavigationLockEnabled: (enabled: boolean) => void;
 }) {
-  useScenarioSuggestedEventLogging({
-    pendingProjectSelection: args.pendingProjectSelection,
-    projectId: args.projectId,
-    scenarioEnabled: args.scenarioEnabled,
-    screenshotMode: args.screenshotMode,
-  });
   useScenarioNavigationLockOverride({
     navigationLockEnabled: args.navigationLockEnabled,
     pendingProjectSelection: args.pendingProjectSelection,
@@ -137,7 +130,6 @@ function buildScenarioControllerResult(args: {
       refreshSession: args.refreshSession,
       saveSelectionCapture: args.scenarioRuntime.saveSelectionCapture,
       sidebarVisible: args.controllerState.session.sidebarVisible,
-      trashedSteps: args.controllerState.trashedSteps,
     }),
   };
 }

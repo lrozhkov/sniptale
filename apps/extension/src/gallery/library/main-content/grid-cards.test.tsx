@@ -631,7 +631,14 @@ it('shows only the deletion date for drafts in grid cards', () => {
 it('renders scenario rows as shared selectable items', () => {
   const scenarioItem = createScenarioItem({
     id: 'scenario:project-1',
-    project: { id: 'project-1', name: 'Scenario', createdAt: 1, updatedAt: 2, tags: ['alpha'] },
+    project: {
+      availability: 'available' as const,
+      id: 'project-1',
+      name: 'Scenario',
+      createdAt: 1,
+      updatedAt: 2,
+      tags: ['alpha'],
+    },
     tags: ['alpha'],
   });
   const onPreviewOpen = vi.fn();

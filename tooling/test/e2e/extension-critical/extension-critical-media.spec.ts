@@ -3,7 +3,7 @@ import { BlobReader, ZipReader } from '@zip.js/zip.js';
 import { writeFile } from 'node:fs/promises';
 import { translate } from '../../../../apps/extension/src/platform/i18n';
 import { createVideoProject } from '../../../../apps/extension/src/composition/persistence/projects/index.test-support';
-import { createScenarioProjectV3 } from '../../../../apps/extension/src/features/scenario/project/v3';
+import { createGuideProject } from '../../../../apps/extension/src/features/scenario/project/public';
 import { betaV1Fixture as betaV1PersistenceFixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v1';
 import { betaV2Fixture as betaV2PersistenceFixture } from '../../../../apps/extension/src/composition/persistence/infrastructure/indexed-db/fixtures/beta-v2';
 import { test } from '../support/extension-fixture';
@@ -419,7 +419,7 @@ test('gallery backup restores draft media and projects to a fresh Drafts retenti
     updatedAt: createdAt,
   });
   const scenarioProject = {
-    ...createScenarioProjectV3('Draft scenario'),
+    ...createGuideProject('Draft scenario'),
     createdAt,
     id: 'draft-scenario-project',
     updatedAt: createdAt,
@@ -559,7 +559,7 @@ async function readArchivePaths(bytes: number[]): Promise<string[]> {
 async function seedDraftProjectEntries(
   page: Page,
   videoProject: ReturnType<typeof createVideoProject>,
-  scenarioProject: ReturnType<typeof createScenarioProjectV3>,
+  scenarioProject: ReturnType<typeof createGuideProject>,
   updatedAt: number
 ) {
   await page.evaluate(

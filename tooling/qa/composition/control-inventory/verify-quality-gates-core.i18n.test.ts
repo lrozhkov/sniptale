@@ -151,7 +151,7 @@ it('runs verify-i18n against a custom live-product file list and skips excluded 
 
 it('includes scenario UI and current i18n owner changes in the full closure', async () => {
   const root = createTempRoot('verify-i18n-scenario-');
-  const scenarioFile = 'apps/extension/src/scenario-editor/export-dialog/Raw.tsx';
+  const scenarioFile = 'apps/extension/src/scenario-editor/page-shell/Raw.tsx';
   writeFile(root, scenarioFile, 'export function Raw() { return <button>Export now</button>; }\n');
 
   const verifier = await import('../../guards/product-contracts/verify-i18n.mjs');
@@ -163,10 +163,8 @@ it('includes scenario UI and current i18n owner changes in the full closure', as
   ).toBe(true);
   expect(policy.isFullI18nScanTrigger('tooling/qa/core/verify-i18n.mjs')).toBe(false);
   expect(
-    policy.isLiveProductI18nFile(
-      'apps/extension/src/features/scenario/project/v3/templates/bundled.data.ts'
-    )
-  ).toBe(false);
+    policy.isLiveProductI18nFile('apps/extension/src/scenario-editor/page-shell/guide-document.tsx')
+  ).toBe(true);
   expect(
     policy.isLiveProductI18nFile('apps/extension/src/features/example/arbitrary.data.ts')
   ).toBe(true);

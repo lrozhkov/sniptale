@@ -79,17 +79,9 @@ function createSnapshotResponse() {
       {
         id: 'step-1',
         position: 0,
+        stepNumber: 1,
         previewDataUrl: 'data:image/png;base64,1',
         title: 'Step 1',
-      },
-    ],
-    trashedSteps: [
-      {
-        id: 'step-2',
-        deletedAt: 20,
-        kind: 'capture' as const,
-        originalIndex: 1,
-        title: 'Step 2',
       },
     ],
   };
@@ -168,17 +160,9 @@ async function expectRestoreSnapshotAppliesSteps() {
     {
       id: 'step-1',
       position: 0,
+      stepNumber: 1,
       previewDataUrl: 'data:image/png;base64,1',
       title: 'Step 1',
-    },
-  ]);
-  expect(lastControllerState?.trashedSteps).toEqual([
-    {
-      id: 'step-2',
-      deletedAt: 20,
-      kind: 'capture',
-      originalIndex: 1,
-      title: 'Step 2',
     },
   ]);
 }

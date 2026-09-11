@@ -185,6 +185,10 @@ export const galleryPreviewMessages = defineMessageSource({
     ru: 'Проект открыт в нескольких вкладках. Оставьте одну актуальную вкладку редактора.',
     en: 'This project is open in multiple tabs. Keep one current editor tab open.',
   },
+  unavailableGuide: {
+    ru: 'Сценарий недоступен для просмотра и редактирования.',
+    en: 'This guide is unavailable for viewing and editing.',
+  },
   unavailableInvalidProject: {
     ru: 'Проект повреждён и не может быть открыт или отрендерен.',
     en: 'This project is invalid and cannot be opened or rendered.',

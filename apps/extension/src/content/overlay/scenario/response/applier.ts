@@ -3,7 +3,6 @@ import type { ScenarioCaptureMode } from '@sniptale/runtime-contracts/scenario/t
 import type {
   ScenarioProjectSummary,
   ScenarioRecentStep,
-  ScenarioTrashedStep,
 } from '../../../../features/scenario/contracts/types/project';
 import type {
   ScenarioRecorderSurfaceState,
@@ -33,7 +32,6 @@ type ScenarioResponseApplierArgs = {
   setHighlightToken: React.Dispatch<React.SetStateAction<number>>;
   setRecentSteps: React.Dispatch<React.SetStateAction<ScenarioRecentStep[]>>;
   setSession: React.Dispatch<React.SetStateAction<ScenarioSessionState>>;
-  setTrashedSteps: React.Dispatch<React.SetStateAction<ScenarioTrashedStep[]>>;
 };
 
 export function useScenarioResponseApplier(args: ScenarioResponseApplierArgs) {
@@ -45,7 +43,6 @@ export function useScenarioResponseApplier(args: ScenarioResponseApplierArgs) {
     setHighlightToken,
     setRecentSteps,
     setSession,
-    setTrashedSteps,
   } = args;
   const applyRestoreSnapshot = useScenarioRestoreSnapshotApplier({
     applySurfaceState,
@@ -62,7 +59,6 @@ export function useScenarioResponseApplier(args: ScenarioResponseApplierArgs) {
     setProjects,
     setHighlightToken,
     setRecentSteps,
-    setTrashedSteps,
   });
   return useCallback(
     (response: ScenarioControllerResponse) => {
@@ -114,7 +110,6 @@ function useScenarioCollectionsApplier(args: {
   setProjects: React.Dispatch<React.SetStateAction<ScenarioProjectSummary[]>>;
   setHighlightToken: React.Dispatch<React.SetStateAction<number>>;
   setRecentSteps: React.Dispatch<React.SetStateAction<ScenarioRecentStep[]>>;
-  setTrashedSteps: React.Dispatch<React.SetStateAction<ScenarioTrashedStep[]>>;
 }) {
   const hasLoadedStepsRef = useRef(false);
   const prevIdsRef = useRef<string[]>([]);
@@ -125,9 +120,8 @@ function useScenarioCollectionsApplier(args: {
       setHighlightToken: args.setHighlightToken,
       setProjects: args.setProjects,
       setRecentSteps: args.setRecentSteps,
-      setTrashedSteps: args.setTrashedSteps,
     }),
-    [args.setHighlightToken, args.setProjects, args.setRecentSteps, args.setTrashedSteps]
+    [args.setHighlightToken, args.setProjects, args.setRecentSteps]
   );
 
   return useMemo(() => createScenarioCollectionsApplier(collectionsArgs), [collectionsArgs]);

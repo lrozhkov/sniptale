@@ -1,56 +1,40 @@
 import { describe, expect, it } from 'vitest';
 import {
-  createScenarioImageElement,
-  createScenarioProjectV3,
-  createScenarioSlide,
-} from '../../../../features/scenario/project/v3';
+  createGuideImageBlock,
+  createGuideProject,
+  createGuideStep,
+} from '../../../../features/scenario/project/factories';
 import { assertPortableJson } from '../codec';
 import { encodePortableScenarioProjectEntry } from './projects';
 
-describe('portable project codecs', () => {
-  it('renames scenario domain asset references without leaking local assetId fields', () => {
-    const base = createScenarioProjectV3('Portable');
-    const project = {
-      ...base,
-      id: 'scenario',
-      slides: [
-        createScenarioSlide({
-          elements: [
-            createScenarioImageElement({
-              assetRef: { assetId: 'scenario-asset', galleryAssetId: null },
-              editDocumentId: 'step',
-            }),
-          ],
-          source: {
-            assetId: 'scenario-asset',
-            captureMetadata: { pointerRange: null, scroll: null, trigger: 'pointer-up' },
-            captureSurface: null,
-            cursorPoint: null,
-            galleryAssetId: null,
-            interactionPoint: null,
-            kind: 'capture',
-            page: {
-              devicePixelRatio: 1,
-              scrollX: 0,
-              scrollY: 0,
-              title: 'Page',
-              url: null,
-              viewport: { height: 1, width: 1, x: 0, y: 0 },
-            },
-            sourceKind: null,
-            target: null,
-          },
-        }),
-      ],
-    };
+describe('portable guide project codec', () => {
+  it('encodes every image in a step and preserves repeated references and immutable annotation identity', () => {
+    const project = createGuideProject('Portable', 'scenario', 1);
+    const step = createGuideStep('Compare', 'step');
+    step.blocks = ['first', 'second'].map((id) =>
+      createGuideImageBlock({
+        id,
+        assetId: 'scenario-asset',
+        editDocumentId: `document-${id}`,
+        width: 100,
+        height: 50,
+        source: { kind: 'import', filename: `${id}.png` },
+      })
+    );
+    project.items = [step];
+    const original = structuredClone(project);
     const portable = encodePortableScenarioProjectEntry({
       createdAt: 1,
-      id: 'scenario',
+      id: project.id,
       project,
-      updatedAt: 2,
+      updatedAt: 1,
+      workspaceRevision: 2,
     });
     expect(() => assertPortableJson(portable)).not.toThrow();
-    expect(JSON.stringify(portable)).not.toContain('"assetId"');
-    expect(JSON.stringify(portable)).toContain('"scenarioAssetId":"scenario-asset"');
+    const serialized = JSON.stringify(portable);
+    expect(serialized).not.toContain('"assetId"');
+    expect(serialized.match(/"scenarioAssetId":"scenario-asset"/g)).toHaveLength(2);
+    expect(serialized).toContain('"editDocumentId":"document-second"');
+    expect(project).toEqual(original);
   });
 });

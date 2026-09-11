@@ -1,5 +1,5 @@
 import { translate } from '../../../platform/i18n';
-import { createScenarioProjectRecordV3 } from '../../../composition/persistence/scenario/store/v3';
+import { createScenarioProjectRecord } from '../../../composition/persistence/scenario/store/public';
 import type {
   ScenarioCreateProjectMessage,
   ScenarioSetActiveProjectMessage,
@@ -36,7 +36,7 @@ export async function handleScenarioCreateProject(
   args: ScenarioRouteContext & { message: ScenarioCreateProjectMessage }
 ) {
   const projectName = args.message.name.trim() || translate('scenario.common.defaultProjectName');
-  const project = await createScenarioProjectRecordV3(projectName);
+  const project = await createScenarioProjectRecord(projectName);
   await args.scenarioSessionService.bumpProjectRevision(args.resolvedTabId);
   await setScenarioProjectSelection({
     ...args,

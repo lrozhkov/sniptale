@@ -16,8 +16,6 @@ import {
   isScenarioRecorderSurfaceState,
   isScenarioPageDescriptor,
   isScenarioPoint,
-  isScenarioSuggestedEventKind,
-  isScenarioStringDataRecord,
   isScenarioTargetDescriptor,
 } from '../validators/index';
 import type { PartialRuntimeRegistry } from '../../contracts/runtime-message.registry.ts';
@@ -161,25 +159,6 @@ export const runtimeActionScenarioMessageContracts = {
       })
     ),
     parseResponse: createScenarioRuntimeResponseParser(MessageType.SCENARIO_SAVE_CAPTURE_STEP),
-  },
-  [MessageType.SCENARIO_RECORD_SUGGESTED_EVENT]: {
-    parseRequest: createGuardParser(
-      'runtime SCENARIO_RECORD_SUGGESTED_EVENT message',
-      createMessageGuard({
-        type: MessageType.SCENARIO_RECORD_SUGGESTED_EVENT,
-        required: {
-          kind: isScenarioSuggestedEventKind,
-          message: isString,
-        },
-        optional: {
-          target: isNullable(isScenarioTargetDescriptor),
-          sourceStepId: isNullable(isString),
-          data: isScenarioStringDataRecord,
-          tabId: isNumber,
-        },
-      })
-    ),
-    parseResponse: createScenarioRuntimeResponseParser(MessageType.SCENARIO_RECORD_SUGGESTED_EVENT),
   },
   ...runtimeActionScenarioStepMessageContracts,
 } satisfies PartialRuntimeRegistry;

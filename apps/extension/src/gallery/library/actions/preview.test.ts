@@ -67,7 +67,14 @@ async function verifyScenarioPreviewMetadataCloseFlow() {
   const previewItem = createScenarioItem({
     filename: 'Scenario',
     id: 'scenario:project-1',
-    project: { createdAt: 1, id: 'project-1', name: 'Scenario', tags: ['flow'], updatedAt: 2 },
+    project: {
+      availability: 'available' as const,
+      createdAt: 1,
+      id: 'project-1',
+      name: 'Scenario',
+      tags: ['flow'],
+      updatedAt: 2,
+    },
     tags: ['flow'],
   });
   const { controller, getState } = createController({
@@ -89,7 +96,14 @@ function verifyPreviewDraftResetFlow() {
   const previewItem = createScenarioItem({
     filename: 'Scenario',
     id: 'scenario:project-1',
-    project: { createdAt: 1, id: 'project-1', name: 'Scenario', tags: ['flow'], updatedAt: 2 },
+    project: {
+      availability: 'available' as const,
+      createdAt: 1,
+      id: 'project-1',
+      name: 'Scenario',
+      tags: ['flow'],
+      updatedAt: 2,
+    },
     tags: ['flow'],
   });
   const { controller, getState } = createController({

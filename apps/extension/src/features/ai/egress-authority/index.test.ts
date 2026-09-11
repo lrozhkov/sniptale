@@ -31,7 +31,10 @@ it('binds content AI authority to the privacy proof payload hash', async () => {
 it('canonicalizes scenario JSON and strips URL credentials, query, and hash fields', () => {
   const canonical = canonicalizeScenarioEditorEgressPayload({
     attachments: [],
-    contractVersion: 3,
+    contractVersion: 4 as const,
+    projectId: 'project-1',
+    baseRevision: 1,
+    scope: { stepIds: ['step-1'], blockIds: [] },
     projectSnapshotJson:
       '{"steps":[{"page":{"url":"https://user:pass@example.test/path?token=secret#hash"}}]}',
   });
@@ -52,7 +55,10 @@ it('changes scenario authority when attachment payloads are mutated', async () =
         stepNumber: 1,
       },
     ],
-    contractVersion: 3 as const,
+    contractVersion: 4 as const,
+    projectId: 'project-1',
+    baseRevision: 1,
+    scope: { stepIds: ['step-1'], blockIds: [] },
     projectSnapshotJson: '{"steps":[]}',
   };
 

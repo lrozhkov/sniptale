@@ -4,16 +4,7 @@ import type { RecordingGroupMember } from '../../../features/media-hub/recording
 import type { StoredImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces/contracts';
 import type { PersistedEditorDocumentV3 } from '../../../composition/persistence/document-assets';
 import type { ScenarioProjectEntry } from '../../../composition/persistence/scenario/contracts';
-import type {
-  ScenarioProject,
-  ScenarioStep,
-} from '../../../features/scenario/contracts/types/project';
 import type { ScenarioPageDescriptor } from '@sniptale/runtime-contracts/scenario/types/geometry';
-import type {
-  ScenarioElement,
-  ScenarioProjectV3,
-  ScenarioSlide,
-} from '@sniptale/runtime-contracts/scenario/types/v3';
 import type { MediaHubBackupExportOptions } from './contracts';
 
 export function projectRecordingGroupMemberPrivacy(
@@ -102,57 +93,26 @@ export function projectScenarioPrivacy(
 ): ScenarioProjectEntry {
   return {
     ...entry,
-    project:
-      entry.project.version === 3
-        ? projectScenarioV3Privacy(entry.project, options)
-        : projectScenarioV2Privacy(entry.project, options),
-  };
-}
-
-function projectScenarioV2Privacy(
-  project: ScenarioProject,
-  options: MediaHubBackupExportOptions
-): ScenarioProject {
-  const projectStep = (step: ScenarioStep): ScenarioStep =>
-    step.kind === 'capture'
-      ? { ...step, page: projectScenarioPagePrivacy(step.page, options) }
-      : step;
-  return {
-    ...project,
-    steps: project.steps.map(projectStep),
-    trash: project.trash.map((item) => ({ ...item, step: projectStep(item.step) })),
-  };
-}
-
-function projectScenarioV3Privacy(
-  project: ScenarioProjectV3,
-  options: MediaHubBackupExportOptions
-): ScenarioProjectV3 {
-  const projectSlide = (slide: ScenarioSlide): ScenarioSlide => ({
-    ...slide,
-    elements: slide.elements.map((element) => projectScenarioElementPrivacy(element, options)),
-    source:
-      slide.source.kind === 'capture'
-        ? { ...slide.source, page: projectScenarioPagePrivacy(slide.source.page, options) }
-        : slide.source,
-  });
-  return {
-    ...project,
-    slides: project.slides.map(projectSlide),
-    trash: project.trash.map((item) => ({ ...item, slide: projectSlide(item.slide) })),
-  };
-}
-
-function projectScenarioElementPrivacy(
-  element: ScenarioElement,
-  options: MediaHubBackupExportOptions
-): ScenarioElement {
-  if (element.kind !== 'image' || element.captureContext === null) return element;
-  return {
-    ...element,
-    captureContext: {
-      ...element.captureContext,
-      page: projectScenarioPagePrivacy(element.captureContext.page, options),
+    project: {
+      ...entry.project,
+      items: entry.project.items.map((item) =>
+        item.kind !== 'step'
+          ? item
+          : {
+              ...item,
+              blocks: item.blocks.map((block) =>
+                block.kind !== 'image' || block.source.kind !== 'capture'
+                  ? block
+                  : {
+                      ...block,
+                      source: {
+                        ...block.source,
+                        page: projectScenarioPagePrivacy(block.source.page, options),
+                      },
+                    }
+              ),
+            }
+      ),
     },
   };
 }

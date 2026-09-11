@@ -75,24 +75,6 @@ const EDITOR_WORKSPACE_COLOR_FILES = [
   'apps/extension/src/editor/inspector/workspace-color/compact-workspace-content.tsx',
   'apps/extension/src/editor/inspector/workspace-color/default-action.tsx',
 ];
-const SCENARIO_STEP_FACTORY_FILES = [
-  'apps/extension/src/features/scenario/project/factories/steps/capture.ts',
-  'apps/extension/src/features/scenario/project/factories/steps/divider.ts',
-  'apps/extension/src/features/scenario/project/factories/steps/index.ts',
-  'apps/extension/src/features/scenario/project/factories/steps/note.ts',
-  'apps/extension/src/features/scenario/project/factories/steps/section.ts',
-];
-const SCENARIO_V3_ELEMENT_FACTORY_FILES = [
-  'apps/extension/src/features/scenario/project/v3/factories/elements/base.ts',
-  'apps/extension/src/features/scenario/project/v3/factories/elements/callout.ts',
-  'apps/extension/src/features/scenario/project/v3/factories/elements/code.ts',
-  'apps/extension/src/features/scenario/project/v3/factories/elements/image.ts',
-  'apps/extension/src/features/scenario/project/v3/factories/elements/index.ts',
-  'apps/extension/src/features/scenario/project/v3/factories/elements/line.ts',
-  'apps/extension/src/features/scenario/project/v3/factories/elements/shape.ts',
-  'apps/extension/src/features/scenario/project/v3/factories/elements/text.ts',
-];
-
 export const COVERAGE_ROLLOUT_OWNER_MAPPINGS = [
   ...SHARED_VOICE_INPUT_FILES.map((productionFile) => ({
     owner: 'shared-voice-input',
@@ -243,16 +225,11 @@ export const COVERAGE_ROLLOUT_OWNER_MAPPINGS = [
     reason: 'Workspace color rendering and commands are exercised by compact and floating suites.',
     testFiles: ['apps/extension/src/editor/inspector/compact/inspector/details.test.tsx'],
   })),
-  ...SCENARIO_STEP_FACTORY_FILES.map((productionFile) => ({
-    owner: 'scenario-step-factories',
-    productionFile,
-    reason: 'Every v2 step factory and default branch is exercised by the focused step suite.',
-    testFiles: ['apps/extension/src/features/scenario/project/factories/steps.test.ts'],
-  })),
-  ...SCENARIO_V3_ELEMENT_FACTORY_FILES.map((productionFile) => ({
-    owner: 'scenario-v3-element-factories',
-    productionFile,
-    reason: 'Every v3 element factory is exercised through the focused factory contract suite.',
-    testFiles: ['apps/extension/src/features/scenario/project/v3/factories/index.test.ts'],
-  })),
+  {
+    owner: 'scenario-guide-factories',
+    productionFile: 'apps/extension/src/features/scenario/project/factories/index.ts',
+    reason:
+      'Canonical guide defaults, image framing and paragraph preservation have direct factory proof.',
+    testFiles: ['apps/extension/src/features/scenario/project/factories.test.ts'],
+  },
 ];

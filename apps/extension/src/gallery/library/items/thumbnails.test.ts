@@ -164,7 +164,14 @@ it('reads scenario thumbnails only from aggregate presentations', async () => {
   const result = await ensureGalleryItemThumbnail(
     createScenarioItem({
       id: 'scenario:project-1',
-      project: { createdAt: 1, id: 'project-1', name: 'Scenario', tags: [], updatedAt: 2 },
+      project: {
+        availability: 'available' as const,
+        createdAt: 1,
+        id: 'project-1',
+        name: 'Scenario',
+        tags: [],
+        updatedAt: 2,
+      },
     })
   );
 
