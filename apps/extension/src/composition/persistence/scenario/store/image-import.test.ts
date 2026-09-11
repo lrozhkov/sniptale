@@ -1,5 +1,9 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { createGuideProject, createGuideStep } from '../../../../features/scenario/project/public';
+import {
+  createGuideImageBlock,
+  createGuideProject,
+  createGuideStep,
+} from '../../../../features/scenario/project/public';
 import { createScenarioCaptureEditorDocument } from '../../../../features/scenario/capture-step/editor-document';
 const io = vi.hoisted(() => ({
   entry: vi.fn<typeof import('../../media-library').getMediaLibraryEntry>(),
@@ -218,4 +222,105 @@ it('rejects already cancelled and over-limit batches before staging', async () =
   args.project.items = Array.from({ length: 300 }, () => createGuideStep());
   await expect(importScenarioImages(args)).rejects.toThrow('limit');
   expect(io.write).not.toHaveBeenCalled();
+});
+
+function replacementInput() {
+  const args = input();
+  const step = createGuideStep('Selected', 'step');
+  const image = createGuideImageBlock({
+    id: 'target',
+    assetId: 'old-asset',
+    width: 640,
+    height: 360,
+    editDocumentId: 'old-document',
+    galleryAssetId: 'old-gallery',
+    source: { kind: 'import', filename: 'old.png' },
+  });
+  image.caption = 'Keep caption';
+  image.alt = 'Keep description';
+  image.fit = 'cover';
+  image.contentTransform = { x: 0.3, y: -0.2, scale: 2 };
+  step.blocks = [
+    { kind: 'heading', id: 'heading', text: 'Before' },
+    image,
+    { ...image, id: 'other', assetId: 'other-asset' },
+  ];
+  args.project.items = [step];
+  return {
+    ...args,
+    placement: { kind: 'replace-image' as const, stepId: 'step', blockId: 'target' },
+  };
+}
+it('replaces exactly one image with fresh resources while retaining its layout and identity', async () => {
+  const args = replacementInput();
+  const original = structuredClone(args.project);
+  const result = await importScenarioImages(args);
+  expect(result.items).toHaveLength(1);
+  const step = result.items[0];
+  if (step?.kind !== 'step') throw new Error('Missing step');
+  expect(step.blocks).toHaveLength(3);
+  expect(step.blocks[0]).toEqual(
+    original.items[0]?.kind === 'step' ? original.items[0].blocks[0] : null
+  );
+  expect(step.blocks[2]).toEqual(
+    original.items[0]?.kind === 'step' ? original.items[0].blocks[2] : null
+  );
+  expect(step.blocks[1]).toMatchObject({
+    kind: 'image',
+    id: 'target',
+    caption: 'Keep caption',
+    alt: 'Keep description',
+    frame: { width: 640, height: 360 },
+    fit: 'cover',
+    contentTransform: { x: 0, y: 0, scale: 1 },
+    galleryAssetId: null,
+    editDocumentId: null,
+    source: { kind: 'import', filename: 'image.png' },
+  });
+  expect(step.blocks[1]?.kind === 'image' && step.blocks[1].assetId).not.toBe('old-asset');
+  expect(args.project).toEqual(original);
+  expect(io.commit).toHaveBeenCalledTimes(1);
+  expect(io.commit.mock.calls[0]?.[1]).toMatchObject({ expectedUpdatedAt: 100 });
+});
+it('rejects missing, non-image and multi-source replacement targets before staging', async () => {
+  const args = replacementInput();
+  for (const blockId of ['missing', 'heading'])
+    await expect(
+      importScenarioImages({ ...args, placement: { ...args.placement, blockId } })
+    ).rejects.toThrow();
+  await expect(
+    importScenarioImages({ ...args, placement: { ...args.placement, stepId: 'missing' } })
+  ).rejects.toThrow();
+  await expect(
+    importScenarioImages({ ...args, sources: [...args.sources, ...args.sources] })
+  ).rejects.toThrow();
+  expect(io.write).not.toHaveBeenCalled();
+  expect(io.commit).not.toHaveBeenCalled();
+});
+it('replaces at block capacity and preserves the original on cancellation or conflict', async () => {
+  const args = replacementInput();
+  const step = args.project.items[0];
+  if (step?.kind !== 'step') throw new Error('Missing step');
+  while (step.blocks.length < 200)
+    step.blocks.push({ kind: 'heading', id: `extra-${step.blocks.length}`, text: '' });
+  const original = structuredClone(args.project);
+  const result = await importScenarioImages(args);
+  expect(result.items[0]?.kind === 'step' && result.items[0].blocks.length).toBe(200);
+  vi.clearAllMocks();
+  const controller = new AbortController();
+  await expect(
+    importScenarioImages({
+      ...args,
+      signal: controller.signal,
+      onProgress: () => controller.abort(),
+    })
+  ).rejects.toThrow();
+  expect(io.commit).not.toHaveBeenCalled();
+  expect(io.discard).toHaveBeenCalledTimes(1);
+  vi.clearAllMocks();
+  io.commit.mockRejectedValue(new Error('stale project'));
+  await expect(importScenarioImages(args)).rejects.toThrow('stale project');
+  expect(io.discard).not.toHaveBeenCalled();
+  expect(io.event).not.toHaveBeenCalled();
+  expect(args.project).toEqual(original);
 });

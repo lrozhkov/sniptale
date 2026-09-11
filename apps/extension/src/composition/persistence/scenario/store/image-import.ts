@@ -19,7 +19,10 @@ import { createScenarioAssetEntryFromBlob } from './capture-step/asset-entry';
 export type GuideImageImportSource =
   | { kind: 'file'; file: File }
   | { kind: 'library'; mediaId: string };
-export type GuideImageImportPlacement = { kind: 'steps' } | { kind: 'blocks'; stepId: string };
+export type GuideImageImportPlacement =
+  | { kind: 'steps' }
+  | { kind: 'blocks'; stepId: string }
+  | { kind: 'replace-image'; stepId: string; blockId: string };
 
 /** Owns an ordered image batch through preparation and atomic publication, including compensation. */
 export async function importScenarioImages(args: {
@@ -30,7 +33,7 @@ export async function importScenarioImages(args: {
   signal: AbortSignal;
   onProgress?: (completed: number, total: number) => void;
 }): Promise<GuideProject> {
-  const { project, target } = admitImageImport(args);
+  const { project, target, replacement } = admitImageImport(args);
   const assets: PreparedScenarioAssetEntry[] = [];
   const documents: ScenarioStepEditorDocumentEntry[] = [];
   const releases: Array<() => void> = [];
@@ -68,7 +71,20 @@ export async function importScenarioImages(args: {
         editDocumentId: documentId,
         source: { kind: 'import', filename: input.name.slice(0, GUIDE_LIMITS.maxLabelLength) },
       });
-      if (target?.kind === 'step') target.blocks.push(block);
+      if (target?.kind === 'step' && replacement)
+        target.blocks = target.blocks.map((current) =>
+          current.id === replacement.id
+            ? {
+                ...block,
+                id: replacement.id,
+                frame: replacement.frame,
+                fit: replacement.fit,
+                caption: replacement.caption,
+                alt: replacement.alt,
+              }
+            : current
+        );
+      else if (target?.kind === 'step') target.blocks.push(block);
       else {
         const step = createGuideStep(input.name.slice(0, GUIDE_LIMITS.maxLabelLength));
         step.blocks.push(block);
@@ -139,18 +155,28 @@ function admitImageImport(args: Parameters<typeof importScenarioImages>[0]) {
   const project = parsed.project;
   const placement = args.placement;
   const target =
-    placement.kind === 'blocks'
+    placement.kind !== 'steps'
       ? project.items.find((item) => item.id === placement.stepId)
       : undefined;
-  if (args.placement.kind === 'blocks' && target?.kind !== 'step') {
+  if (placement.kind !== 'steps' && target?.kind !== 'step') {
     throw new Error('The selected step is unavailable.');
   }
+  const replacement =
+    placement.kind === 'replace-image' && target?.kind === 'step'
+      ? target.blocks.find((block) => block.id === placement.blockId)
+      : undefined;
+  if (
+    placement.kind === 'replace-image' &&
+    (args.sources.length !== 1 || replacement?.kind !== 'image')
+  )
+    throw new Error('The selected image is unavailable.');
   if (
     (target?.kind === 'step' &&
+      !replacement &&
       target.blocks.length + args.sources.length > GUIDE_LIMITS.maxBlocksPerStep) ||
     (!target && project.items.length + args.sources.length > GUIDE_LIMITS.maxItems)
   ) {
     throw new Error('The guide has reached its content limit.');
   }
-  return { project, target };
+  return { project, target, replacement: replacement?.kind === 'image' ? replacement : undefined };
 }
