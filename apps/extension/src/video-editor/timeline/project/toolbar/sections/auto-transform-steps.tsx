@@ -87,13 +87,7 @@ export function AutoProcessingReview({
             </div>
           </dl>
         ) : selectionChanged ? (
-          <p className="mt-3 text-sm">
-            {translate(
-              selectionChanged
-                ? 'videoEditor.timeline.autoSelectionChanged'
-                : 'videoEditor.timeline.autoNoChanges'
-            )}
-          </p>
+          <p className="mt-3 text-sm">{translate('videoEditor.timeline.autoSelectionChanged')}</p>
         ) : null}
       </div>
       {Object.values(analysis?.audio ?? {}).some((item) => item.status === 'unavailable') ? (

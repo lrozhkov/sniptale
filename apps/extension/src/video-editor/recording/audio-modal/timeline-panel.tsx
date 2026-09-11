@@ -56,7 +56,7 @@ export function TimelineRecordingPanel(props: {
       {!trim && (
         <div className="flex min-h-9 items-center gap-3">
           {context}
-          {!trim && <div className="w-40 min-w-0">{props.device}</div>}
+          <div className="w-40 min-w-0">{props.device}</div>
           <span
             className="ml-auto whitespace-nowrap text-xs tabular-nums"
             data-ui="video-editor.audio-recording.limit"
@@ -74,15 +74,14 @@ export function TimelineRecordingPanel(props: {
               )}
             </strong>
           </span>
-          {!trim &&
-            (recording ? (
-              <ProductActionButton tone="secondary" onClick={transport.stopRecording}>
-                <Square size={16} />
-                {translate('videoEditor.app.recordAudioStop')}
-              </ProductActionButton>
-            ) : (
-              recordButton
-            ))}
+          {recording ? (
+            <ProductActionButton tone="secondary" onClick={transport.stopRecording}>
+              <Square size={16} />
+              {translate('videoEditor.app.recordAudioStop')}
+            </ProductActionButton>
+          ) : (
+            recordButton
+          )}
           {closeButton}
         </div>
       )}
