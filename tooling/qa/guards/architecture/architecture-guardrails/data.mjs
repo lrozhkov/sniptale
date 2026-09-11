@@ -38,6 +38,5 @@ export const RAW_STORAGE_MUTATION_OWNER_PATHS = [
   { path: 'apps/extension/src/editor/persistence/' },
   { path: 'apps/extension/src/popup/persistence/' },
   { path: 'apps/extension/src/scenario-editor/persistence/' },
-  { path: 'apps/extension/src/scenario-editor/page-shell/presentation/session/storage/' },
   { path: 'apps/extension/src/video-editor/persistence/' },
 ];

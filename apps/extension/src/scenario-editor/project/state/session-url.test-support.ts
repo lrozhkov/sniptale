@@ -20,8 +20,6 @@ const scenarioEditorSessionUrlMocks = vi.hoisted(() => {
 
 vi.mock('@sniptale/runtime-contracts/scenario-editor/session', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/runtime-contracts/scenario-editor/session')>()),
-  readScenarioEditorPresentationSessionId: vi.fn(() => null),
-  readScenarioEditorPresentationView: vi.fn(() => null),
   readScenarioEditorProjectId: scenarioEditorSessionUrlMocks.readScenarioEditorProjectIdMock,
   readScenarioEditorStepId: scenarioEditorSessionUrlMocks.readScenarioEditorStepIdMock,
 }));

@@ -37,7 +37,6 @@ it('does not expose presenter or audience-screen routes in guide authoring', () 
   expect(button(translate('scenario.editor.modePlay'))).not.toBeNull();
   expect(button(translate('scenario.editor.modePresenter'))).toBeNull();
   expect(button(translate('scenario.editor.modeOverview'))).toBeNull();
-  expect(button(translate('scenario.editor.openAudienceScreen'))).toBeNull();
 });
 
 it('switches directly between guide editing and preview', () => {

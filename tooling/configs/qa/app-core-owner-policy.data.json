@@ -40,7 +40,6 @@
     "apps/extension/src/composition/persistence/video-editor-preview-preferences",
     "apps/extension/src/composition/persistence/video-preview-cache",
     "apps/extension/src/composition/persistence/web-snapshots",
-    "apps/extension/src/scenario-editor/page-shell/presentation/session",
     "apps/extension/src/background/storage/diagnostics",
     "apps/extension/src/background/storage/llm",
     "apps/extension/src/background/storage/page-access",

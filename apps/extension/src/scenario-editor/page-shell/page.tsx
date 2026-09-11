@@ -1,18 +1,11 @@
 import { translate } from '../../platform/i18n';
-import {
-  readScenarioEditorPresentationSessionId,
-  readScenarioEditorPresentationView,
-  readScenarioEditorStepId,
-} from '@sniptale/runtime-contracts/scenario-editor/session';
+import { readScenarioEditorStepId } from '@sniptale/runtime-contracts/scenario-editor/session';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { ScenarioAudiencePresentationPage } from './presentation/audience';
 import { ScenarioV3EditorShell } from './view';
 import { useScenarioV3PageProjectState } from './runtime/use-state';
 
 export function ScenarioV3EditorPage() {
   const projectState = useScenarioV3PageProjectState();
-  const presentationView = readScenarioEditorPresentationView(window.location.search);
-  const presentationSessionId = readScenarioEditorPresentationSessionId(window.location.search);
   const initialSlideId = readScenarioEditorStepId(window.location.search);
 
   if (projectState.loading) {
@@ -20,16 +13,6 @@ export function ScenarioV3EditorPage() {
   }
   if (!projectState.project) {
     return <ScenarioV3FatalState error={projectState.error} onRetry={projectState.retryLoad} />;
-  }
-
-  if (presentationView === 'audience') {
-    return (
-      <ScenarioAudiencePresentationPage
-        project={projectState.project}
-        reloadProject={projectState.retryLoad}
-        sessionId={presentationSessionId}
-      />
-    );
   }
 
   return (

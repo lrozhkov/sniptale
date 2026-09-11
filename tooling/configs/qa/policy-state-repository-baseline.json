@@ -1502,12 +1502,6 @@
       "noiseId": "noise.policy-state-descriptor.non-authority-signals"
     },
     {
-      "file": "apps/extension/src/scenario-editor/page-shell/presentation/session/storage/index.ts",
-      "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: top-level-map-or-set, mutation-queue-name, reset-for-tests.",
-      "rule": "policy-state-descriptor-required",
-      "noiseId": "noise.policy-state-descriptor.non-authority-signals"
-    },
-    {
       "file": "apps/extension/src/settings/sections/styles/annotations/borders/persistence.ts",
       "message": "Authority/capability state must reference policyStateId or policyStateIds. Signals: mutation-queue-name.",
       "rule": "policy-state-descriptor-required",

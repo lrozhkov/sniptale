@@ -97,14 +97,6 @@ function buildScenarioEditorPageUrl(projectId?: string | null, stepId?: string |
   });
 }
 
-function buildScenarioAudiencePageUrl(projectId: string, presentationSessionId: string): string {
-  return buildScenarioEditorUrl({
-    presentationSessionId,
-    presentationView: 'audience',
-    projectId,
-  });
-}
-
 async function openSettingsUrl(url: string): Promise<void> {
   const [existing] = await browserTabs.query({ url: `${buildSettingsPageUrl()}*` });
   if (typeof existing?.id === 'number') {
@@ -185,21 +177,4 @@ export async function openScenarioEditorPage(
   stepId?: string | null
 ): Promise<void> {
   await browserTabs.create({ url: buildScenarioEditorPageUrl(projectId, stepId) });
-}
-
-export async function openScenarioAudiencePage(
-  projectId: string,
-  presentationSessionId: string
-): Promise<void> {
-  const url = buildScenarioAudiencePageUrl(projectId, presentationSessionId);
-
-  try {
-    await browserWindows.create({
-      state: 'maximized',
-      type: 'popup',
-      url,
-    });
-  } catch {
-    await browserTabs.create({ url });
-  }
 }

@@ -9,8 +9,6 @@ const {
   createScenarioProjectRecordV3Mock,
   getScenarioProjectRecordV3Mock,
   listScenarioProjectSummariesV3Mock,
-  readScenarioEditorPresentationSessionIdMock,
-  readScenarioEditorPresentationViewMock,
   readScenarioEditorProjectIdMock,
   readScenarioEditorStepIdMock,
   replaceScenarioEditorSelectionInUrlMock,
@@ -20,8 +18,6 @@ const {
   createScenarioProjectRecordV3Mock: vi.fn(),
   getScenarioProjectRecordV3Mock: vi.fn(),
   listScenarioProjectSummariesV3Mock: vi.fn(),
-  readScenarioEditorPresentationSessionIdMock: vi.fn(),
-  readScenarioEditorPresentationViewMock: vi.fn(),
   readScenarioEditorProjectIdMock: vi.fn(),
   readScenarioEditorStepIdMock: vi.fn(),
   replaceScenarioEditorSelectionInUrlMock: vi.fn(),
@@ -35,8 +31,6 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
 }));
 vi.mock('@sniptale/runtime-contracts/scenario-editor/session', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@sniptale/runtime-contracts/scenario-editor/session')>()),
-  readScenarioEditorPresentationSessionId: readScenarioEditorPresentationSessionIdMock,
-  readScenarioEditorPresentationView: readScenarioEditorPresentationViewMock,
   readScenarioEditorProjectId: readScenarioEditorProjectIdMock,
   readScenarioEditorStepId: readScenarioEditorStepIdMock,
 }));
@@ -81,16 +75,6 @@ vi.mock('./view', () => ({
     )
   ),
 }));
-vi.mock('./presentation/audience', () => ({
-  ScenarioAudiencePresentationPage: (props: {
-    project: ScenarioProjectV3;
-    sessionId: string | null;
-  }) => (
-    <div data-testid="scenario-audience-page">
-      {props.project.name}:{props.sessionId}
-    </div>
-  ),
-}));
 
 import { createScenarioProjectV3 } from '../../features/scenario/project/v3';
 import { ScenarioV3EditorPage } from './page';
@@ -105,8 +89,6 @@ beforeEach(() => {
   document.body.appendChild(container);
   root = createRoot(container);
   readScenarioEditorProjectIdMock.mockReturnValue(null);
-  readScenarioEditorPresentationSessionIdMock.mockReturnValue(null);
-  readScenarioEditorPresentationViewMock.mockReturnValue(null);
   readScenarioEditorStepIdMock.mockReturnValue(null);
   getScenarioProjectRecordV3Mock.mockResolvedValue(undefined);
   listScenarioProjectSummariesV3Mock.mockResolvedValue([]);
@@ -122,6 +104,7 @@ afterEach(() => {
   container?.remove();
   container = null;
   vi.unstubAllGlobals();
+  window.history.replaceState({}, '', '/');
 });
 
 describe('ScenarioV3EditorPage', () => {
@@ -148,18 +131,23 @@ describe('ScenarioV3EditorPage', () => {
     expect(getScenarioProjectRecordV3Mock).toHaveBeenCalledWith('project-1');
   });
 
-  it('routes audience query loads to the read-only audience page', async () => {
-    const requestedProject = createScenarioProjectV3('Audience');
+  it('opens the editor at the requested step even with obsolete presentation parameters', async () => {
+    window.history.replaceState(
+      {},
+      '',
+      '/scenario-editor?projectId=project-1&stepId=step-2&presentationView=audience&presentationSessionId=session-1'
+    );
+    const requestedProject = createScenarioProjectV3('Guide');
     readScenarioEditorProjectIdMock.mockReturnValue('project-1');
-    readScenarioEditorPresentationViewMock.mockReturnValue('audience');
-    readScenarioEditorPresentationSessionIdMock.mockReturnValue('session-1');
+    readScenarioEditorStepIdMock.mockReturnValue('step-2');
     getScenarioProjectRecordV3Mock.mockResolvedValue(requestedProject);
 
     await renderPage();
 
-    expect(container?.querySelector('[data-testid="scenario-audience-page"]')).not.toBeNull();
-    expect(container?.querySelector('[data-testid="scenario-v3-shell"]')).toBeNull();
-    expect(container?.textContent).toContain('Audience:session-1');
+    expect(container?.querySelector('[data-testid="scenario-v3-shell"]')).not.toBeNull();
+    expect(scenarioShellPropsMock).toHaveBeenLastCalledWith(
+      expect.objectContaining({ initialSlideId: 'step-2', project: requestedProject })
+    );
   });
 });
 
