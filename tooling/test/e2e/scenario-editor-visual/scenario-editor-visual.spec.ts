@@ -9,6 +9,7 @@ import {
 } from './scenario-editor-visual.helpers';
 import {
   verifyImageImport,
+  verifyImageEditorRoundtrip,
   verifyImageFraming,
   verifyIndependentProjectCopy,
   verifyGuideComposition,
@@ -100,6 +101,22 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     const issues = createPageIssueCollector(page);
     await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1024, height: 640 });
     await verifyImageFraming(page, testInfo);
+    issues.assertClean();
+  });
+}
+
+for (const theme of SCENARIO_VISUAL_THEMES) {
+  test(`image editor apply and cancel preserve a local guide through a real extension iframe in ${theme}`, async ({
+    page,
+    extensionId,
+  }, testInfo) => {
+    await page.emulateMedia({ colorScheme: theme });
+    const issues = createPageIssueCollector(page);
+    await openVisualHarness(page, `chrome-extension://${extensionId}`, theme, 'en', {
+      width: 1280,
+      height: 900,
+    });
+    await verifyImageEditorRoundtrip(page, testInfo);
     issues.assertClean();
   });
 }

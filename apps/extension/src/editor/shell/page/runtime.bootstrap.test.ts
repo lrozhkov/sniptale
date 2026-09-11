@@ -22,7 +22,11 @@ vi.mock('../../document/page-session', async (importOriginal) => ({
   resolveEditorPageRestoreSource: resolveEditorPageRestoreSourceMock,
 }));
 
-import { bootstrapEditorPageSession, openEditorBootstrapPayload } from './runtime';
+import {
+  createEditorPageServices,
+  bootstrapEditorPageSession,
+  openEditorBootstrapPayload,
+} from './runtime';
 import {
   createEditorPageAutosaveService,
   createEditorPageController,
@@ -254,4 +258,13 @@ describe('editor-page.runtime bootstrap flows', () => {
     'ignores late restore work after a newer bootstrap payload takes ownership',
     verifiesNewerBootstrapPayloadWinsOverLateRestoreResolution
   );
+});
+
+it('attaches document autosave only to the standalone controller', () => {
+  const embedded = createEditorPageServices('scenario');
+  expect(embedded.controller.autosaveService).toBeNull();
+  embedded.autosaveService.dispose();
+  const standalone = createEditorPageServices();
+  expect(standalone.controller.autosaveService).toBe(standalone.autosaveService);
+  standalone.autosaveService.dispose();
 });

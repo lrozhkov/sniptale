@@ -1,3 +1,4 @@
+import type { EditorEmbedMode } from '../../../features/editor/contracts/embed';
 import type { EditorBootstrapPayload } from '../../../workflows/editor/bootstrap';
 import { createImageEditorController, type ImageEditorController } from '../../controller';
 import { waitForEditorControllerCanvas } from '../../controller/canvas-ready';
@@ -73,10 +74,12 @@ export function resolveEditorPageSessionSeed() {
   };
 }
 
-export function createEditorPageServices(): EditorPageServices {
+export function createEditorPageServices(
+  embedMode: EditorEmbedMode | null = null
+): EditorPageServices {
   const controller = createImageEditorController();
   const autosaveService = createEditorSessionAutosaveService();
-  controller.autosaveService = autosaveService;
+  if (embedMode !== 'scenario') controller.autosaveService = autosaveService;
 
   return {
     autosaveService,

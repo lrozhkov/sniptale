@@ -10,6 +10,7 @@ type ImageProps = {
   url: string | null | undefined;
   disabled: boolean;
   t: Translate;
+  onEdit?: () => void;
   onChange: (block: GuideImageBlock, group?: string | null) => void;
 };
 type Gesture = {
@@ -158,6 +159,11 @@ export function GuideImageSurface(props: ImageProps) {
         }
       }}
     >
+      {props.onEdit && (
+        <button type="button" data-edit-image disabled={disabled || !url} onClick={props.onEdit}>
+          {t('scenario.editor.guideEditImage')}
+        </button>
+      )}
       <div
         ref={gesture.frame}
         className="guide-image-frame"

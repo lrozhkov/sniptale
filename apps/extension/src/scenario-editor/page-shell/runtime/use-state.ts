@@ -16,6 +16,8 @@ import { getScenarioAssetBlob } from '../../../composition/persistence/scenario/
 import { replaceScenarioEditorSelectionInUrl } from '../../platform/browser-driver';
 import { useGuideHistory } from './history';
 
+import { applyScenarioImageEdit } from '../../../workflows/scenario-capture-edit/edits';
+
 type GuidePageStatus =
   | 'loading'
   | 'empty'
@@ -28,7 +30,17 @@ type GuidePageStatus =
   | 'conflict'
   | 'dirty';
 
-type GuideActionError = 'copy' | 'delete' | 'structure' | 'import';
+type GuideActionError = 'copy' | 'delete' | 'structure' | 'import' | 'edit';
+
+type GuideImageCommand =
+  | {
+      kind: 'import';
+      input: Omit<Parameters<typeof importScenarioImages>[0], 'project' | 'baseUpdatedAt'>;
+    }
+  | {
+      kind: 'edit';
+      input: Omit<Parameters<typeof applyScenarioImageEdit>[0], 'project' | 'baseUpdatedAt'>;
+    };
 
 /** Owns this page's disposable edit buffer; persistence owns committed project ordering. */
 export function useGuidePageState() {
@@ -121,7 +133,7 @@ export function useGuidePageState() {
       (error) => setStatus(isRevisionConflict(error) ? 'conflict' : 'failed')
     );
   };
-  const rejectAction = (action: 'copy' | 'delete' | 'import') => {
+  const rejectAction = (action: 'copy' | 'delete' | 'import' | 'edit') => {
     setStatus(status);
     setActionError(action);
   };
@@ -141,23 +153,21 @@ export function useGuidePageState() {
       () => rejectAction('delete')
     );
   };
-  const importImages = async (
-    input: Omit<Parameters<typeof importScenarioImages>[0], 'project' | 'baseUpdatedAt'>
-  ) => {
+  const mutateImages = async (command: GuideImageCommand) => {
     const base = saved.current;
     if (!project || !base || status === 'conflict') return false;
     return mutate(
-      () => importScenarioImages({ ...input, project, baseUpdatedAt: base.updatedAt }),
+      () => runGuideImageCommand(command, project, base.updatedAt),
       (result) => acceptProject(result, true),
       (error) => {
         if (isRevisionConflict(error)) setStatus('conflict');
         else if (error instanceof Error && error.name === 'AbortError') setStatus(status);
-        else rejectAction('import');
+        else rejectAction(command.kind);
       }
     );
   };
   return {
-    importImages,
+    mutateImages,
     project,
     status,
     actionError,
@@ -239,4 +249,15 @@ function useGuideSelection(project: GuideProject | null) {
 
 function isRevisionConflict(error: unknown): boolean {
   return error instanceof Error && error.name === 'StaleScenarioAggregateRevisionError';
+}
+
+/** Dispatches the explicit image operation; page state retains revision and acceptance authority. */
+function runGuideImageCommand(
+  command: GuideImageCommand,
+  project: GuideProject,
+  baseUpdatedAt: number
+) {
+  return command.kind === 'import'
+    ? importScenarioImages({ ...command.input, project, baseUpdatedAt })
+    : applyScenarioImageEdit({ ...command.input, project, baseUpdatedAt });
 }

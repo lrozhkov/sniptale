@@ -4,6 +4,7 @@ import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
 import { createTranslator, useAppLocale } from '../../platform/i18n';
 import type { GuideStructureOperation } from '../../features/scenario/project/public';
+import { GuideImageEditor, useGuideImageEditorMode } from './image-editor';
 import { GuideDocument } from './guide-document';
 import { GuideWorkspace } from './workspace';
 import { GuideImageResources } from './resources';
@@ -16,6 +17,7 @@ import { useGuidePageState } from './runtime/use-state';
 export function ScenarioEditorPage() {
   const t = createTranslator(useAppLocale());
   const state = useGuidePageState();
+  const imageEditor = useGuideImageEditorMode(state.images);
   const [focusRequest, setFocusRequest] = useState(0);
   const selectItem = (id: string) => {
     state.selectItem(id);
@@ -35,6 +37,16 @@ export function ScenarioEditorPage() {
       setFocusRequest((current) => current + 1);
     } else state.selectItem(null, next);
   };
+  if (imageEditor.selection && project)
+    return (
+      <GuideImageEditor
+        project={project}
+        {...imageEditor.selection}
+        t={t}
+        onApply={(input) => state.mutateImages({ kind: 'edit', input })}
+        onClose={imageEditor.close}
+      />
+    );
   return (
     <main
       className="guide-page"
@@ -93,7 +105,7 @@ export function ScenarioEditorPage() {
                   : null
               }
               t={t}
-              onImport={state.importImages}
+              onImport={(input) => state.mutateImages({ kind: 'import', input })}
             />
           }
           project={project}
@@ -127,6 +139,10 @@ export function ScenarioEditorPage() {
           t={t}
         >
           <GuideDocument
+            onEditImage={(itemId, blockId) => {
+              state.sealEdit();
+              imageEditor.open(itemId, blockId);
+            }}
             focusRequest={focusRequest}
             project={project}
             selectedId={state.selectedId}
@@ -353,11 +369,13 @@ function GuidePageFeedback({
           {t(
             actionError === 'copy'
               ? 'scenario.editor.guideCopyFailed'
-              : actionError === 'import'
-                ? 'scenario.editor.guideImportFailed'
-                : actionError === 'structure'
-                  ? 'scenario.editor.guideOperationFailed'
-                  : 'scenario.editor.guideDeleteFailed'
+              : actionError === 'edit'
+                ? 'scenario.editor.guideImageApplyFailed'
+                : actionError === 'import'
+                  ? 'scenario.editor.guideImportFailed'
+                  : actionError === 'structure'
+                    ? 'scenario.editor.guideOperationFailed'
+                    : 'scenario.editor.guideDeleteFailed'
           )}
         </p>
       )}

@@ -24,6 +24,7 @@ export function GuideDocument({
   onChange,
   onSelect,
   onOperate,
+  onEditImage,
   t,
 }: {
   project: GuideProject;
@@ -33,6 +34,7 @@ export function GuideDocument({
   disabled: boolean;
   onChange: (project: GuideProject, group?: string | null) => void;
   onOperate: (operation: GuideStructureOperation) => void;
+  onEditImage: (itemId: string, blockId: string) => void;
   onSelect: (id: string) => void;
   t: Translate;
 }) {
@@ -105,6 +107,7 @@ export function GuideDocument({
               disabled={disabled}
               onChange={onChange}
               onOperate={onOperate}
+              onEditImage={onEditImage}
               t={t}
             />
           </article>
@@ -121,6 +124,7 @@ function GuideStepBody({
   disabled,
   onChange,
   onOperate,
+  onEditImage,
   t,
 }: {
   project: GuideProject;
@@ -129,6 +133,7 @@ function GuideStepBody({
   disabled: boolean;
   onChange: (project: GuideProject, group?: string | null) => void;
   onOperate: (operation: GuideStructureOperation) => void;
+  onEditImage: (itemId: string, blockId: string) => void;
   t: Translate;
 }) {
   const changeBlock = (block: GuideBlock, group: string | null = `block:${block.id}`) =>
@@ -161,6 +166,7 @@ function GuideStepBody({
           />
           {block.kind === 'image' ? (
             <GuideImageSurface
+              onEdit={() => onEditImage(item.id, block.id)}
               block={block}
               url={images[block.assetId]}
               disabled={disabled}

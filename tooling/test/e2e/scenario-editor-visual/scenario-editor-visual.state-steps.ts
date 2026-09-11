@@ -265,3 +265,107 @@ export async function verifyImageFraming(page: Page, testInfo: TestInfo): Promis
   await expect(figure.locator('img')).toHaveCSS('object-fit', 'cover');
   await expect(frame).toHaveCSS('width', '500px');
 }
+
+export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo): Promise<void> {
+  const launch = page.locator('[data-edit-image]').first();
+  const title = page.locator('article#compare > header input');
+  await title.fill('Unsaved title retained through annotations');
+  const originalImage = await page.locator('.guide-image-frame img').first().getAttribute('src');
+  await launch.click();
+  const child = page.frameLocator('.guide-image-editor iframe');
+  const apply = child.locator('[data-ui="editor.floating.document-bar.save-for-slide-button"]');
+  await expect(apply).toBeVisible();
+  await page.setViewportSize({ width: 1024, height: 640 });
+  await expect(apply).toBeVisible();
+  await testInfo.attach('guide-image-editor-local-frame', {
+    body: await page.screenshot({ fullPage: true }),
+    contentType: 'image/png',
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.getByRole('button', { name: 'Back without applying' }).click();
+  await expect(launch).toBeFocused();
+  await expect(title).toHaveValue('Unsaved title retained through annotations');
+  await expect(page.locator('.guide-image-frame img').first()).toHaveAttribute(
+    'src',
+    originalImage ?? ''
+  );
+  await launch.click();
+  await expect(apply).toBeVisible();
+  await child.locator('[data-ui="editor.floating.tool-rail.pencil"]').click();
+  const canvas = child.locator('canvas.upper-canvas');
+  const bounds = await canvas.boundingBox();
+  if (!bounds) throw new Error('Missing editor canvas');
+  await page.mouse.move(bounds.x + bounds.width * 0.4, bounds.y + bounds.height * 0.5);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + bounds.width * 0.6, bounds.y + bounds.height * 0.6, {
+    steps: 8,
+  });
+  await page.mouse.up();
+  await apply.click();
+  await expect(page.locator('.guide-image-editor')).toHaveCount(0);
+  await expect(launch).toBeFocused();
+  await expect(title).toHaveValue('Unsaved title retained through annotations');
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  const firstPublication = await readImageEditProof(page);
+  expect(firstPublication.annotations).toBeGreaterThan(0);
+  expect(firstPublication.standaloneWorkspaces).toBe(0);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(title).toHaveValue('Unsaved title retained through annotations');
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  await page.reload();
+  await expect(title).toHaveValue('Unsaved title retained through annotations');
+  await launch.click();
+  await expect(apply).toBeVisible();
+  await apply.click();
+  await expect(page.locator('.guide-image-editor')).toHaveCount(0);
+  const reopened = await readImageEditProof(page);
+  expect(reopened.annotations).toBe(firstPublication.annotations);
+  expect(reopened.standaloneWorkspaces).toBe(0);
+  await launch.click();
+  await expect(apply).toBeVisible();
+  await child.locator('[data-ui="editor.floating.document-bar.close-scenario-button"]').click();
+  await expect(launch).toBeFocused();
+}
+
+async function readImageEditProof(page: Page) {
+  return page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('sniptale-db');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      const tx = db.transaction(['scenario_step_editor_documents', 'image_workspaces'], 'readonly');
+      const documents = await new Promise<Array<{ document: { canvasJson: string } }>>(
+        (resolve, reject) => {
+          const request = tx.objectStore('scenario_step_editor_documents').getAll();
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        }
+      );
+      const standaloneWorkspaces = await new Promise<number>((resolve, reject) => {
+        const request = tx.objectStore('image_workspaces').count();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      return {
+        annotations: Math.max(
+          0,
+          ...documents.map((entry) => {
+            const canvas = JSON.parse(entry.document.canvasJson) as {
+              objects?: Array<{ type?: string }>;
+            };
+            return (
+              canvas.objects?.filter((object) => object.type?.toLowerCase() === 'path').length ?? 0
+            );
+          })
+        ),
+        standaloneWorkspaces,
+      };
+    } finally {
+      db.close();
+    }
+  });
+}

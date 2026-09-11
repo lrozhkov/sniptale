@@ -239,3 +239,16 @@ describe('extension page scenario helpers', () => {
     });
   });
 });
+
+it('builds a fixed local editor frame URL carrying only its embed session', async () => {
+  const { buildScenarioImageEditorUrl } = await import('./index');
+  const url = new URL(buildScenarioImageEditorUrl('session-123'));
+  expect(url.protocol).toBe('chrome-extension:');
+  expect(url.host).toBe('test');
+  expect(url.pathname).toBe('/apps/extension/src/editor/index.html');
+  expect([...url.searchParams]).toEqual([
+    ['embed', 'scenario'],
+    ['embedSession', 'session-123'],
+  ]);
+  expect(browserTabsCreateMock).not.toHaveBeenCalled();
+});

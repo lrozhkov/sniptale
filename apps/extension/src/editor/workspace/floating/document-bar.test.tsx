@@ -616,6 +616,7 @@ it('moves scenario apply and close actions into the top document bar after copy'
   expect(actionIds.indexOf('editor.floating.document-bar.save-for-slide-button')).toBeLessThan(
     actionIds.indexOf('editor.floating.document-bar.close-scenario-button')
   );
+  expect(container?.querySelector('[data-state]')).toBeNull();
   expect(actionIds).not.toContain('editor.floating.document-bar.promote-button');
   expect(actionIds).not.toContain('editor.floating.document-bar.save-to-folder-button');
   expect(actionIds).not.toContain('editor.floating.document-bar.close-file-button');

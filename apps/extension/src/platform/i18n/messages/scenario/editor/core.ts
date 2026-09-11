@@ -1,5 +1,19 @@
 import { defineMessageSource } from '../../source';
 export const scenarioEditorCoreMessages = defineMessageSource({
+  guideEditImage: { ru: 'Редактировать изображение', en: 'Edit image' },
+  guideImageBack: { ru: 'Назад без применения', en: 'Back without applying' },
+  guideImageApplyHint: {
+    ru: 'Измените изображение и нажмите «Применить», чтобы вернуться к сценарию.',
+    en: 'Edit the image and choose Apply to return to the guide.',
+  },
+  guideImageLoadFailed: {
+    ru: 'Не удалось открыть изображение. Можно повторить попытку или вернуться к сценарию.',
+    en: 'Could not open the image. Retry or return to the guide.',
+  },
+  guideImageApplyFailed: {
+    ru: 'Не удалось применить изменения. Правки остались в редакторе изображения. При конфликте вернитесь и сохраните копию сценария.',
+    en: 'Could not apply changes. Your edits remain in the image editor. For a conflict, return and save a copy of the guide.',
+  },
   guideImageReset: { ru: 'Сбросить рамку и положение', en: 'Reset frame and position' },
   guideImagePosition: { ru: 'Положение изображения', en: 'Image position' },
   guideResizeImageFrame: { ru: 'Изменить размер рамки', en: 'Resize image frame' },

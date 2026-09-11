@@ -152,7 +152,7 @@ it('passes the requested export output size into the render contract', async () 
 
 it('posts an apply message to the scenario host in embed mode', async () => {
   const postMessageSpy = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => undefined);
-  window.history.replaceState({}, '', '/editor?embed=scenario');
+  window.history.replaceState({}, '', '/editor?embed=scenario&embedSession=session-test');
 
   await editorFileSave.saveEditorRenderedImage(controller);
 
@@ -160,6 +160,7 @@ it('posts an apply message to the scenario host in embed mode', async () => {
     {
       source: 'sniptale-editor-embed',
       type: 'scenario-apply',
+      sessionId: 'session-test',
       dataUrl: 'data:image/png;base64,abc',
       document: createEditorDocument(),
     },
