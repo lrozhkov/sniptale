@@ -1,5 +1,25 @@
 import { defineMessageSource } from '../../source';
 export const scenarioEditorCoreMessages = defineMessageSource({
+  guideImageReset: { ru: 'Сбросить рамку и положение', en: 'Reset frame and position' },
+  guideImagePosition: { ru: 'Положение изображения', en: 'Image position' },
+  guideResizeImageFrame: { ru: 'Изменить размер рамки', en: 'Resize image frame' },
+  guideEditImageFrame: { ru: 'Рамка и изображение', en: 'Frame and image' },
+  guideImageDone: { ru: 'Готово', en: 'Done' },
+  guideImageGestureHint: {
+    ru: 'Перетаскивайте изображение или угол рамки. Стрелки — перемещение; Ctrl + колесо — масштаб. Escape отменяет текущий жест.',
+    en: 'Drag the image or frame corner. Arrow keys move; Ctrl + wheel zooms. Escape cancels the current gesture.',
+  },
+  guideImageFit: { ru: 'Размещение изображения', en: 'Image fitting' },
+  guideImageContain: { ru: 'Вписать', en: 'Fit' },
+  guideImageCover: { ru: 'Заполнить', en: 'Fill' },
+  guideImageZoom: { ru: 'Масштаб, %', en: 'Zoom, %' },
+  guideImageWidth: { ru: 'Ширина рамки', en: 'Frame width' },
+  guideImageHeight: { ru: 'Высота рамки', en: 'Frame height' },
+  guideImageCaption: { ru: 'Подпись', en: 'Caption' },
+  guideImageAlt: { ru: 'Описание для чтения с экрана', en: 'Alternative text' },
+  guideImageResetZoom: { ru: 'Масштаб 100%', en: 'Zoom 100%' },
+  guideImageCenter: { ru: 'По центру', en: 'Center image' },
+
   guideImportLimit: {
     ru: 'До 50 изображений за один импорт, до 64 МБ каждое.',
     en: 'Up to 50 images per import, up to 64 MB each.',

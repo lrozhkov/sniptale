@@ -215,3 +215,53 @@ export async function verifyImageImport(page: Page, testInfo: TestInfo): Promise
   await page.getByRole('alertdialog').getByRole('button', { name: 'Delete', exact: true }).click();
   await expect(page.locator('article')).toHaveCount(0);
 }
+
+export async function verifyImageFraming(page: Page, testInfo: TestInfo): Promise<void> {
+  const figure = page.locator('article#compare figure').first();
+  await figure.getByRole('button', { name: 'Frame and image', exact: true }).click();
+  await figure.getByRole('button', { name: 'Center image', exact: true }).click();
+  await figure.getByRole('button', { name: 'Fill', exact: true }).click();
+  await figure.getByRole('spinbutton', { name: 'Frame width', exact: true }).fill('500');
+  await figure.getByRole('spinbutton', { name: 'Frame height', exact: true }).fill('320');
+  await figure.getByRole('spinbutton', { name: 'Zoom, %', exact: true }).fill('150');
+  await figure.getByRole('textbox', { name: 'Caption', exact: true }).fill('Framed screenshot');
+  await figure
+    .getByRole('textbox', { name: 'Alternative text', exact: true })
+    .fill('A framed interface');
+  const frame = figure.locator('.guide-image-frame');
+  await frame.scrollIntoViewIfNeeded();
+  const rect = await frame.boundingBox();
+  if (!rect) throw new Error('Missing image frame');
+  await page.mouse.move(rect.x + 80, rect.y + 80);
+  await page.mouse.down();
+  await page.mouse.move(rect.x + 120, rect.y + 100);
+  await page.mouse.up();
+  await expect(figure.locator('img')).toHaveCSS('translate', '8% 6.25%');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(figure.locator('img')).toHaveCSS('translate', /^(0%|0px)( (0%|0px))?$/);
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(figure.locator('img')).toHaveCSS('translate', '8% 6.25%');
+  await testInfo.attach('image-framing', {
+    body: await page.screenshot({ fullPage: true }),
+    contentType: 'image/png',
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await figure.locator('.guide-image-controls').scrollIntoViewIfNeeded();
+  await testInfo.attach('image-framing-controls', {
+    body: await page.screenshot({ fullPage: true }),
+    contentType: 'image/png',
+  });
+  await page.setViewportSize({ width: 1024, height: 640 });
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
+  const reopen = new URL(page.url());
+  reopen.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
+  reopen.searchParams.set('locale', 'en');
+  await page.goto(reopen.toString(), { waitUntil: 'domcontentloaded' });
+  await expect(figure.locator('figcaption')).toHaveText('Framed screenshot');
+  await expect(figure.locator('img')).toHaveAttribute('alt', 'A framed interface');
+  await expect(figure.locator('img')).toHaveCSS('translate', '8% 6.25%');
+  await expect(figure.locator('img')).toHaveCSS('scale', '1.5');
+  await expect(figure.locator('img')).toHaveCSS('object-fit', 'cover');
+  await expect(frame).toHaveCSS('width', '500px');
+}

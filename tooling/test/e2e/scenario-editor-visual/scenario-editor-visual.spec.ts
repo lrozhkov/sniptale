@@ -9,6 +9,7 @@ import {
 } from './scenario-editor-visual.helpers';
 import {
   verifyImageImport,
+  verifyImageFraming,
   verifyIndependentProjectCopy,
   verifyGuideComposition,
   verifySaveAndReopen,
@@ -87,6 +88,18 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     const issues = createPageIssueCollector(page);
     await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 900 });
     await verifyImageImport(page, testInfo);
+    issues.assertClean();
+  });
+}
+
+for (const theme of SCENARIO_VISUAL_THEMES) {
+  test(`image geometry survives pointer editing and reopening in ${theme} theme`, async ({
+    page,
+    hostOrigin,
+  }, testInfo) => {
+    const issues = createPageIssueCollector(page);
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1024, height: 640 });
+    await verifyImageFraming(page, testInfo);
     issues.assertClean();
   });
 }

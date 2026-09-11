@@ -12,6 +12,7 @@ import {
 } from '../../features/scenario/project/public';
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { GuideBlockActions } from './block-actions';
+import { GuideImageSurface } from './image-surface';
 
 /** Semantic guide content; effects and persistence stay in the page state owner. */
 export function GuideDocument({
@@ -113,51 +114,6 @@ export function GuideDocument({
   );
 }
 
-/** Projects an image frame independently from editable text and document navigation. */
-function GuideImage({
-  block,
-  url,
-  t,
-}: {
-  block: GuideImageBlock;
-  url: string | null | undefined;
-  t: Translate;
-}) {
-  return (
-    <figure>
-      <div
-        style={{
-          position: 'relative',
-          overflow: 'hidden',
-          width: '100%',
-          aspectRatio: `${block.frame.width} / ${block.frame.height}`,
-        }}
-      >
-        {url ? (
-          <img
-            src={url ?? undefined}
-            alt={block.alt}
-            style={{
-              width: '100%',
-              height: '100%',
-              objectFit: block.fit,
-              translate: `${block.contentTransform.x * 100}% ${block.contentTransform.y * 100}%`,
-              scale: block.contentTransform.scale,
-            }}
-          />
-        ) : (
-          <p role="status">
-            {t(
-              url === null ? 'scenario.editor.workspacePreviewLoadError' : 'scenario.editor.loading'
-            )}
-          </p>
-        )}
-      </div>
-      {block.caption && <figcaption>{block.caption}</figcaption>}
-    </figure>
-  );
-}
-
 function GuideStepBody({
   project,
   item,
@@ -175,7 +131,7 @@ function GuideStepBody({
   onOperate: (operation: GuideStructureOperation) => void;
   t: Translate;
 }) {
-  const changeBlock = (block: GuideBlock) =>
+  const changeBlock = (block: GuideBlock, group: string | null = `block:${block.id}`) =>
     onChange(
       {
         ...project,
@@ -188,7 +144,7 @@ function GuideStepBody({
             : entry
         ),
       },
-      `block:${block.id}`
+      group
     );
   return (
     <>
@@ -204,7 +160,13 @@ function GuideStepBody({
             t={t}
           />
           {block.kind === 'image' ? (
-            <GuideImage block={block} url={images[block.assetId]} t={t} />
+            <GuideImageSurface
+              block={block}
+              url={images[block.assetId]}
+              disabled={disabled}
+              onChange={changeBlock}
+              t={t}
+            />
           ) : (
             <GuideTextBlock block={block} disabled={disabled} onChange={changeBlock} t={t} />
           )}
