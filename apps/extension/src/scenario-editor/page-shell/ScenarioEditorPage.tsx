@@ -26,7 +26,7 @@ export function ScenarioEditorPage() {
     setFocusRequest((current) => current + 1);
   };
   const { project, status } = state;
-  const disabled = status === 'saving' || status === 'loading';
+  const disabled = state.editingLocked;
   const operate = (operation: GuideStructureOperation) => {
     const next = state.operate(operation);
     if (!next) return;
@@ -70,23 +70,28 @@ export function ScenarioEditorPage() {
         panelControls={project && <GuidePanelControls panels={panels} t={t} />}
         project={project}
         disabled={disabled}
-        saveDisabled={disabled || status === 'saved' || status === 'conflict'}
+        feedback={
+          <GuidePageFeedback
+            status={status}
+            actionError={state.actionError}
+            onRetry={project ? state.save : undefined}
+            t={t}
+          />
+        }
         canUndo={state.canUndo}
         canRedo={state.canRedo}
         onUndo={state.undo}
         onRedo={state.redo}
-        onSave={state.save}
         onChange={state.update}
         t={t}
       />
-      <GuidePageFeedback status={status} actionError={state.actionError} t={t} />
       <GuideProjectRecovery state={state} t={t} />
       {project && (
         <GuideWorkspace
           panels={panels}
           importResources={
             <GuideImageResources
-              disabled={disabled || state.status === 'conflict'}
+              disabled={disabled || state.mutationPending || state.status === 'conflict'}
               selectedStepId={
                 project.items.find((item) => item.id === state.selectedId)?.kind === 'step'
                   ? state.selectedId
@@ -125,7 +130,7 @@ export function ScenarioEditorPage() {
           projectActions={
             <GuideProjectActions
               project={project}
-              disabled={disabled}
+              disabled={disabled || state.mutationPending}
               status={status}
               onRestore={(revision) => state.commitChange({ kind: 'restore', revision })}
               onClearHistory={() => state.commitChange({ kind: 'clearHistory' })}
@@ -160,10 +165,12 @@ export function ScenarioEditorPage() {
 
 function GuidePageFeedback({
   status,
+  onRetry,
   actionError,
   t,
 }: {
   status: ReturnType<typeof useGuidePageState>['status'];
+  onRetry: (() => Promise<boolean>) | undefined;
   actionError: ReturnType<typeof useGuidePageState>['actionError'];
   t: Translate;
 }) {
@@ -180,10 +187,22 @@ function GuidePageFeedback({
     ready: t('scenario.editor.guideSaved'),
   };
   return (
-    <div className="guide-page-feedback" data-status={status}>
+    <div
+      className="guide-page-feedback"
+      data-status={status}
+      data-quiet={
+        !actionError &&
+        (status === 'saved' || status === 'ready' || status === 'dirty' || status === 'empty')
+      }
+    >
       <p role="status" aria-live="polite">
         {statusMessages[status]}
       </p>
+      {status === 'failed' && onRetry && (
+        <ProductActionButton tone="secondary" compact type="button" onClick={() => void onRetry()}>
+          {t('common.actions.retry')}
+        </ProductActionButton>
+      )}
       {actionError && (
         <p role="alert">
           {t(

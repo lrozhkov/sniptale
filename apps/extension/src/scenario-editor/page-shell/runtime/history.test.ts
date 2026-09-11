@@ -88,3 +88,25 @@ it('bounds retained undo entries and does not mutate previous history values', (
   expect(original.past).toHaveLength(0);
   expect(original.present?.name).toBe('Original');
 });
+
+it('acknowledges an older autosave without replacing later text or splitting its edit group', () => {
+  let state = initial();
+  const original = state.present!;
+  const source = { ...original, name: 'A' };
+  state = reduceGuideHistory(state, { kind: 'edit', project: source, group: 'name' });
+  state = reduceGuideHistory(state, {
+    kind: 'edit',
+    project: { ...source, name: 'AB' },
+    group: 'name',
+  });
+  state = reduceGuideHistory(state, {
+    kind: 'publish',
+    source,
+    project: { ...source, updatedAt: 2 },
+  });
+  expect(state.present).toMatchObject({ name: 'AB', updatedAt: 2 });
+  expect(state.past).toHaveLength(1);
+  expect(state.group).toBe('name');
+  state = reduceGuideHistory(state, { kind: 'undo' });
+  expect(state.present?.name).toBe('Original');
+});

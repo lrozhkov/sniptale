@@ -17,8 +17,8 @@ export async function assertVisualAcceptance(page: Page): Promise<void> {
     )
     .toBe(true);
   await expect(page.locator('.guide-page-header')).toBeInViewport();
-  await expect(page.locator('.guide-save')).toBeInViewport();
-  await expect(page.locator('.guide-page-feedback [role="status"]')).toBeVisible();
+  await expect(page.locator('.guide-save')).toHaveCount(0);
+  await expect(page.locator('.guide-page-header [role="status"]')).toHaveCount(1);
   const dimensions = await page.evaluate(() => ({
     overflow:
       Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - innerWidth,

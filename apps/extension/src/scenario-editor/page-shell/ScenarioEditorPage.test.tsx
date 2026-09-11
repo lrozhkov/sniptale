@@ -88,12 +88,18 @@ async function click(label: string, scope: ParentNode = container) {
   });
 }
 
+async function settleAutosave() {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 400));
+  });
+}
+
 it('loads the canonical document and saves added steps against the loaded revision', async () => {
   await render();
   expect(container.querySelectorAll('article')).toHaveLength(1);
   await click('Add step');
   expect(container.querySelectorAll('article')).toHaveLength(2);
-  await click('Save');
+  await settleAutosave();
   expect(io.save).toHaveBeenCalledWith(
     expect.objectContaining({
       version: 4,
@@ -108,10 +114,10 @@ it('keeps recoverable edits after save failure and allows retry', async () => {
   io.save.mockRejectedValueOnce(new Error('quota'));
   await render();
   await click('Add step');
-  await click('Save');
+  await settleAutosave();
   expect(container.querySelectorAll('article')).toHaveLength(2);
   expect(container.textContent).toContain('Your edits remain in the editor');
-  await click('Save');
+  await click('Retry');
   expect(io.save).toHaveBeenCalledTimes(2);
   expect(container.textContent).toContain('Saved');
 });
@@ -169,10 +175,10 @@ it('preserves edits and stops repeated saves after a concurrent project change',
   io.save.mockRejectedValueOnce(error);
   await render();
   await click('Add step');
-  await click('Save');
+  await settleAutosave();
   expect(container.textContent).toContain('This project changed in another tab');
   expect(container.querySelectorAll('article')).toHaveLength(2);
-  await click('Save');
+  await settleAutosave();
   expect(io.save).toHaveBeenCalledTimes(1);
 });
 
@@ -232,7 +238,7 @@ it('renders optional blocks and keeps text edits isolated from images and other 
     textarea.dispatchEvent(new Event('input', { bubbles: true }));
     textarea.dispatchEvent(new Event('change', { bubbles: true }));
   });
-  await click('Save');
+  await settleAutosave();
   expect(io.save).toHaveBeenCalledWith(
     expect.objectContaining({
       items: [
@@ -307,13 +313,13 @@ it('recovers a conflicted edit buffer by copying it and retains it if copying fa
   io.save.mockRejectedValueOnce(error);
   await render();
   await click('Add step');
-  await click('Save');
+  await settleAutosave();
   io.duplicate.mockRejectedValueOnce(new Error('quota'));
   await click('Duplicate project');
   expect(container.querySelectorAll('article')).toHaveLength(2);
   expect(container.textContent).toContain('Could not create a copy');
   expect(container.textContent).toContain('This project changed in another tab');
-  await click('Save');
+  await settleAutosave();
   expect(io.save).toHaveBeenCalledTimes(1);
   await click('Duplicate project');
   expect(io.duplicate).toHaveBeenLastCalledWith(
@@ -324,7 +330,7 @@ it('recovers a conflicted edit buffer by copying it and retains it if copying fa
   expect(container.querySelectorAll('article')).toHaveLength(2);
   expect(container.textContent).not.toContain('Could not create a copy');
   await click('Add step');
-  await click('Save');
+  await settleAutosave();
   expect(io.save).toHaveBeenLastCalledWith(expect.objectContaining({ id: 'copy' }), {
     baseUpdatedAt: 102,
   });
@@ -468,7 +474,7 @@ it('composes multiple blocks and retains undo after save, then resets it on relo
   await click('+ Heading', article);
   await click('+ Note', article);
   expect(article.querySelectorAll('.guide-block')).toHaveLength(4);
-  await click('Save');
+  await settleAutosave();
   await click('Undo');
   expect(article.querySelectorAll('.guide-block')).toHaveLength(3);
   await click('Redo');
@@ -534,7 +540,7 @@ it('supports optional numbering and editable sections with structural undo', asy
   expect(container.querySelector('.guide-document section h2')?.textContent).toBe('A section');
 });
 
-it('blocks keyboard history while saving and restores it without changing the saved revision base', async () => {
+it('preserves undo performed during autosave and uses the acknowledged revision for the next write', async () => {
   let complete: (() => void) | undefined;
   io.save.mockImplementation(
     (project) =>
@@ -544,7 +550,7 @@ it('blocks keyboard history while saving and restores it without changing the sa
   );
   await render();
   await click('Add step');
-  await click('Save');
+  await settleAutosave();
   const main = container.querySelector('main');
   if (!main) throw new Error('Missing page');
   await act(async () =>
@@ -552,12 +558,14 @@ it('blocks keyboard history while saving and restores it without changing the sa
       new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true, cancelable: true })
     )
   );
-  expect(container.querySelectorAll('article')).toHaveLength(2);
+  expect(container.querySelectorAll('article')).toHaveLength(1);
+  const pendingUndoClose = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(pendingUndoClose);
+  expect(pendingUndoClose.defaultPrevented).toBe(true);
   await act(async () => complete?.());
-  await click('Undo');
   expect(container.querySelectorAll('article')).toHaveLength(1);
   io.save.mockImplementation(async (project) => ({ ...project, updatedAt: 102 }));
-  await click('Save');
+  await settleAutosave();
   expect(io.save).toHaveBeenLastCalledWith(expect.objectContaining({ items: expect.any(Array) }), {
     baseUpdatedAt: 101,
   });
@@ -646,6 +654,66 @@ it('accepts image import as one undoable publication and saves undo against its 
   await click('Undo');
   expect(container.querySelectorAll('article')).toHaveLength(1);
   expect(container.querySelector('article input')).toHaveProperty('value', 'Unsaved title');
-  await click('Save');
+  await settleAutosave();
   expect(io.save).toHaveBeenLastCalledWith(expect.anything(), { baseUpdatedAt: 105 });
+});
+
+it('keeps typing available during autosave and uses the acknowledged revision for newer content', async () => {
+  let finish: (() => void) | undefined;
+  io.save.mockImplementationOnce(
+    (project) =>
+      new Promise((resolve) => {
+        finish = () => resolve({ ...project, updatedAt: 101 });
+      })
+  );
+  await render();
+  await editField('article#first input', 'First draft');
+  await settleAutosave();
+  expect(io.save).toHaveBeenCalledTimes(1);
+  expect(container.querySelector('article input')).toHaveProperty('disabled', false);
+  await editField('article#first input', 'More recent draft');
+  await act(async () => finish?.());
+  expect(container.querySelector('article input')).toHaveProperty('value', 'More recent draft');
+  io.save.mockImplementation(async (project) => ({ ...project, updatedAt: 102 }));
+  await settleAutosave();
+  expect(io.save).toHaveBeenCalledTimes(2);
+  expect(io.save).toHaveBeenLastCalledWith(
+    expect.objectContaining({ items: [expect.objectContaining({ title: 'More recent draft' })] }),
+    { baseUpdatedAt: 101 }
+  );
+  await click('Undo');
+  expect(container.querySelector('article input')).toHaveProperty('value', 'First step');
+});
+
+it('protects a closing page until its latest edit is durable and does not autosave acknowledgments', async () => {
+  await render();
+  expect(
+    [...container.querySelectorAll('button')].some((button) => button.textContent === 'Save')
+  ).toBe(false);
+  await editField('article#first input', 'Last edit');
+  const pendingClose = new Event('beforeunload', { cancelable: true });
+  await act(async () => window.dispatchEvent(pendingClose));
+  expect(pendingClose.defaultPrevented).toBe(true);
+  await settleAutosave();
+  const savedClose = new Event('beforeunload', { cancelable: true });
+  window.dispatchEvent(savedClose);
+  expect(savedClose.defaultPrevented).toBe(false);
+  expect(io.save).toHaveBeenCalledTimes(1);
+});
+
+it('settles autosave without writing when undo then redo returns to the durable snapshot', async () => {
+  await render();
+  await click('Add step');
+  await settleAutosave();
+  expect(io.save).toHaveBeenCalledTimes(1);
+  await click('Undo');
+  await click('Redo');
+  const unchangedClose = new Event('beforeunload', { cancelable: true });
+  await act(async () => window.dispatchEvent(unchangedClose));
+  expect(unchangedClose.defaultPrevented).toBe(false);
+  await settleAutosave();
+  expect(io.save).toHaveBeenCalledTimes(1);
+  expect(container.querySelector('.guide-page-feedback')?.getAttribute('data-status')).toBe(
+    'saved'
+  );
 });

@@ -107,7 +107,6 @@ export async function verifyGuideAppearance(page: Page, testInfo: TestInfo): Pro
       );
     })
     .toBe(true);
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   const url = new URL(page.url());
   url.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;

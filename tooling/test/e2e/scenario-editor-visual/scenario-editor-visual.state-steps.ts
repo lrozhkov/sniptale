@@ -14,7 +14,6 @@ export async function verifyStepNavigation(page: Page): Promise<void> {
 export async function verifySaveAndReopen(page: Page): Promise<void> {
   const title = page.locator('article#text-only input');
   await title.fill('Saved local step');
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   const reopen = new URL(page.url());
   reopen.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
@@ -38,7 +37,6 @@ export async function verifyIndependentProjectCopy(page: Page): Promise<void> {
   await page
     .getByRole('textbox', { name: 'Scenario', exact: true })
     .fill('Renamed independent guide');
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   const copied = new URL(page.url());
   copied.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
@@ -91,7 +89,7 @@ export async function verifyWorkspacePanelsAndFocus(page: Page): Promise<void> {
   await page.evaluate(() => {
     document.documentElement.style.fontSize = '200%';
   });
-  const save = page.getByRole('button', { name: 'Save', exact: true });
+  const save = page.locator('button[aria-controls="guide-inspector-panel"]');
   await expect(save).toBeInViewport();
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
   expect(overflow).toBeLessThanOrEqual(1);
@@ -151,7 +149,6 @@ export async function verifyGuideComposition(page: Page): Promise<void> {
     .getByRole('button', { name: 'Move up', exact: true })
     .click();
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   const reopen = new URL(page.url());
   reopen.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
@@ -203,7 +200,6 @@ export async function verifyImageImport(page: Page, testInfo: TestInfo): Promise
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(page.locator('article')).toHaveCount(before);
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   const reopen = new URL(page.url());
   reopen.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
@@ -272,7 +268,6 @@ export async function verifyImageFraming(page: Page, testInfo: TestInfo): Promis
     contentType: 'image/png',
   });
   await page.setViewportSize({ width: 1024, height: 640 });
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   const reopen = new URL(page.url());
   reopen.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
@@ -339,7 +334,6 @@ export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo)
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(title).toHaveValue('Unsaved title retained through annotations');
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   await page.reload();
   await expect(title).toHaveValue('Unsaved title retained through annotations');
@@ -400,10 +394,8 @@ async function readImageEditProof(page: Page) {
 export async function verifySavedVersionHistory(page: Page, testInfo: TestInfo): Promise<void> {
   const title = page.locator('article#compare > header input');
   await title.fill('Historical version A');
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   await title.fill('Historical version B');
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   const url = new URL(page.url());
   url.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
@@ -436,7 +428,6 @@ export async function verifySavedVersionHistory(page: Page, testInfo: TestInfo):
   await expect(title).toHaveValue('Unsaved work before restore');
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
   await expect(title).toHaveValue('Historical version A');
-  await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   await page.goto(url.toString(), { waitUntil: 'domcontentloaded' });
   await expect(title).toHaveValue('Historical version A');
@@ -454,7 +445,7 @@ export async function verifyResourceRetention(page: Page): Promise<void> {
     await expect(second.locator('.guide-image-frame img')).toHaveCount(2);
     await page.getByRole('button', { name: 'Remove item', exact: true }).click();
     await expect(page.locator('article#compare')).toHaveCount(0);
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
     await expect(page.getByRole('status').first()).toHaveText('Saved');
     await page.getByRole('button', { name: 'Saved versions', exact: true }).click();
     await page.getByRole('button', { name: 'Clear saved history', exact: true }).click();

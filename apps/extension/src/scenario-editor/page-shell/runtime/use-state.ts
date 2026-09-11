@@ -9,12 +9,12 @@ import {
   createScenarioProjectRecord,
   duplicateScenarioProjectRecord,
   deleteScenarioProjectRecord,
-  saveScenarioProjectRecord,
 } from '../../../composition/persistence/scenario/store/public';
 import { getScenarioProject } from '../../../composition/persistence/scenario/projects';
 import { getScenarioAssetBlob } from '../../../composition/persistence/scenario/store/project-records/assets';
 import { replaceScenarioEditorSelectionInUrl } from '../../platform/browser-driver';
 import { useGuideHistory } from './history';
+import { useGuideAutosave } from './autosave';
 import { useGuideResourceSession } from './resource-session';
 import { clearScenarioSavedHistory } from '../../../composition/persistence/scenario/retention';
 
@@ -61,8 +61,9 @@ export function useGuidePageState() {
   const [actionError, setActionError] = useState<GuideActionError | null>(null);
   const saved = useRef<GuideProject | null>(null);
   const busy = useRef(false);
-  const { project, reset, commit, ...editing } = useGuideHistory({
-    canEdit: () => !busy.current && status !== 'loading',
+  const autosaving = useRef(false);
+  const { project, reset, commit, publish, ...editing } = useGuideHistory({
+    canEdit: () => (!busy.current || autosaving.current) && status !== 'loading',
     onEdit: () => {
       setActionError(null);
       setStatus((current) => (current === 'conflict' ? 'conflict' : 'dirty'));
@@ -118,15 +119,18 @@ export function useGuidePageState() {
       openProject,
       () => setStatus('failed')
     );
-  const save = async () => {
-    const base = saved.current;
-    if (!project || !base || status === 'conflict') return;
-    await mutate(
-      () => saveScenarioProjectRecord(project, { baseUpdatedAt: base.updatedAt }),
-      acceptProject,
-      (error) => setStatus(isRevisionConflict(error) ? 'conflict' : 'failed')
-    );
-  };
+  const { save } = useGuideAutosave({
+    project,
+    dirty: status === 'dirty',
+    conflict: status === 'conflict',
+    protectUnsaved: status === 'dirty' || status === 'failed' || status === 'conflict',
+    saved,
+    busy,
+    autosaving,
+    generation,
+    onStatus: setStatus,
+    onPublish: publish,
+  });
   const rejectAction = (action: Exclude<GuideActionError, 'structure'>) => {
     setStatus(status);
     setActionError(action);
@@ -163,6 +167,8 @@ export function useGuidePageState() {
   };
   return {
     commitChange,
+    editingLocked: status === 'loading' || (status === 'saving' && !autosaving.current),
+    mutationPending: busy.current,
     project,
     status,
     actionError,

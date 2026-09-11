@@ -16,6 +16,7 @@ export interface GuideHistory {
 type HistoryAction =
   | { kind: 'reset'; project: GuideProject | null }
   | { kind: 'commit'; project: GuideProject }
+  | { kind: 'publish'; project: GuideProject; source: GuideProject }
   | { kind: 'edit'; project: GuideProject; group: string | null }
   | { kind: 'undo' }
   | { kind: 'redo' }
@@ -50,6 +51,14 @@ export function reduceGuideHistory(state: GuideHistory, action: HistoryAction): 
       : state;
   }
   if (action.project.id !== state.present.id) return state;
+  if (action.kind === 'publish')
+    return {
+      ...state,
+      present:
+        state.present === action.source
+          ? action.project
+          : { ...state.present, updatedAt: action.project.updatedAt },
+    };
   if (action.kind === 'commit') return { ...state, present: action.project, group: null };
   if (action.project === state.present) return state;
   const grouped =
@@ -112,6 +121,8 @@ export function useGuideHistory({
     reset,
     commit: (project: GuideProject, reversible = false) =>
       dispatch(reversible ? { kind: 'edit', project, group: null } : { kind: 'commit', project }),
+    publish: (project: GuideProject, source: GuideProject) =>
+      dispatch({ kind: 'publish', project, source }),
     update: edit,
     operate,
     undo: () => changeHistory('undo'),

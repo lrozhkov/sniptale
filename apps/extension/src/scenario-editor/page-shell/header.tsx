@@ -1,33 +1,30 @@
 import { useState, type ReactNode } from 'react';
 import { GUIDE_LIMITS, type GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
-import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { Library, Undo2, Redo2, Save } from 'lucide-react';
+import { Library, Undo2, Redo2 } from 'lucide-react';
 import { openGalleryPage } from '../../platform/navigation/extension-pages';
 
 export function GuidePageHeader({
   project,
   panelControls,
   disabled,
-  saveDisabled,
+  feedback,
   canUndo,
   canRedo,
   onUndo,
   onRedo,
-  onSave,
   onChange,
   t,
 }: {
   project: GuideProject | null;
   panelControls?: ReactNode;
   disabled: boolean;
-  saveDisabled: boolean;
+  feedback?: ReactNode;
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
   onRedo: () => void;
-  onSave: () => Promise<void>;
   onChange: (project: GuideProject, group?: string | null) => void;
   t: Translate;
 }) {
@@ -73,6 +70,7 @@ export function GuidePageHeader({
             />
           </label>
         )}
+        {feedback}
         {project && (
           <div
             className="guide-history-controls"
@@ -100,17 +98,6 @@ export function GuidePageHeader({
           </div>
         )}
         <div className="guide-header-panel-controls">{panelControls}</div>
-        {project && (
-          <ProductActionButton
-            className="guide-save"
-            type="button"
-            disabled={saveDisabled}
-            onClick={() => void onSave()}
-          >
-            <Save size={16} aria-hidden="true" />
-            {t('scenario.editor.guideSave')}
-          </ProductActionButton>
-        )}
       </header>
       {libraryStatus === 'failed' && (
         <div className="guide-page-feedback">
