@@ -31,9 +31,9 @@ function attachPointerListeners(args: SelectionModeListenerArgs): Array<() => vo
 
   return [
     addWindowGestureListener<DragEvent>('dragstart', args.handleDragStart),
-    addWindowGestureListener<MouseEvent>('mousemove', args.handleMouseMove),
-    addWindowGestureListener<MouseEvent>('mousedown', args.handleMouseDown),
-    addWindowGestureListener<MouseEvent>('mouseup', args.handleMouseUp),
+    addWindowGestureListener<PointerEvent>('pointermove', args.handleMouseMove),
+    addWindowGestureListener<PointerEvent>('pointerdown', args.handleMouseDown),
+    addWindowGestureListener<PointerEvent>('pointerup', args.handleMouseUp),
     addWindowGestureListener<MouseEvent>('click', args.handleClick),
     addWindowGestureListener<KeyboardEvent>('keydown', args.handleKeyDown),
     addEventListenerToAllWindowsDynamic<MouseEvent>(

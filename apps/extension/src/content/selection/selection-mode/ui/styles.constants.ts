@@ -19,9 +19,8 @@ const SELECTION_MODE_CANCEL_BUTTON_STYLE = `
     background: color-mix(in srgb, var(--sniptale-color-accent) 8%, var(--sniptale-color-surface-hover) 92%);
   }
 
-  .sniptale-selection-cancel-button:focus-visible {
-    outline: 2px solid color-mix(in srgb, var(--sniptale-color-accent) 72%, transparent);
-    outline-offset: 2px;
+  .sniptale-selection-container button:focus {
+    outline: none;
   }
 `;
 
