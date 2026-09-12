@@ -162,3 +162,55 @@ it('moves framing into one contextual inspector and keeps it bound through canon
   expect(inspector.querySelector('.guide-image-controls')).toBeNull();
   expect(second.querySelector('figure')?.getAttribute('data-editing')).toBe('false');
 });
+
+it('selects text and note settings from focus, preserves edits and returns to step settings', async () => {
+  const project = createGuideProject('Blocks', 'guide', 100);
+  const step = createGuideStep('Step', 'blocks');
+  step.blocks = [
+    {
+      kind: 'text',
+      id: 'text',
+      paragraphs: [{ runs: [{ text: 'Body', bold: false, italic: false, href: null }] }],
+    },
+    { kind: 'note', id: 'note', tone: 'info', paragraphs: [] },
+  ];
+  project.items = [step];
+  io.load.mockResolvedValue(project);
+  await render();
+  const inspector = container.querySelector('#guide-inspector-panel')!;
+  const text = container.querySelector<HTMLTextAreaElement>('[data-block-id="text"] textarea')!;
+  await act(async () => text.focus());
+  expect(inspector.textContent).toContain('Block width');
+  expect(inspector.textContent).not.toContain('Restart numbering');
+  await click('Half width', inspector);
+  expect(container.querySelector('[data-block-id="text"]')?.getAttribute('data-width')).toBe(
+    'half'
+  );
+  await click('Undo');
+  expect(container.querySelector('[data-block-id="text"]')?.getAttribute('data-width')).toBe(
+    'full'
+  );
+  await act(async () =>
+    container.querySelector<HTMLTextAreaElement>('[data-block-id="note"] textarea')!.focus()
+  );
+  expect(inspector.textContent).toContain('Note type');
+  await click('Warning', inspector);
+  expect(container.querySelector('[data-block-id="note"] aside')?.getAttribute('data-tone')).toBe(
+    'warning'
+  );
+  await click('Step settings', inspector);
+  expect(inspector.textContent).toContain('Restart numbering');
+  expect(document.activeElement).toBe(container.querySelector('.guide-step-title'));
+  await act(async () => text.focus());
+  const outline = container.querySelector<HTMLAnchorElement>('.guide-outline a')!;
+  await act(async () => outline.click());
+  expect(inspector.textContent).toContain('Restart numbering');
+  await act(async () => text.focus());
+  await click('Block actions', container.querySelector('[data-block-id="text"]')!);
+  await click('Remove block', document.body);
+  expect(container.querySelector('[data-block-id="text"]')).toBeNull();
+  expect(inspector.textContent).toContain('Restart numbering');
+  await click('Undo');
+  expect(container.querySelector('[data-block-id="text"]')).not.toBeNull();
+  expect(inspector.textContent).toContain('Restart numbering');
+});

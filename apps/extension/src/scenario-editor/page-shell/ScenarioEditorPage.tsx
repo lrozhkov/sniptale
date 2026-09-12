@@ -5,6 +5,7 @@ import type {
 import { GuideImageDropZone } from './image-drop';
 import { GuideResourceDrawer, GuideResourceTrigger } from './resource-drawer';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
+import { GuideBlockInspector } from './block-inspector';
 import { GuideAppearance } from './appearance';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { GuidePageHeader } from './header';
@@ -34,7 +35,7 @@ export function ScenarioEditorPage() {
     signal: AbortSignal
   ) => state.commitChange({ kind: 'import', input: { sources, placement, signal } });
   const { focusRequest, selectItem, operate } = useGuideNavigation(state);
-  const framing = useGuideImageFraming(state, panels, selectItem);
+  const framing = useGuideBlockSelection(state, panels, selectItem);
   if (imageEditor.selection && project)
     return (
       <GuideImageEditor
@@ -111,7 +112,10 @@ export function ScenarioEditorPage() {
             project={project}
             selectedId={state.selectedId}
             disabled={disabled}
-            onSelect={selectItem}
+            onSelect={(id) => {
+              framing.selectBlock(id, null);
+              selectItem(id);
+            }}
             onAddStep={() => operate({ kind: 'add-step' })}
             itemActions={
               <GuideContextualInspector
@@ -133,7 +137,10 @@ export function ScenarioEditorPage() {
               onImport={importSources}
             >
               <GuideDocument
-                framedImageId={framing.target?.block.id ?? null}
+                framedImageId={
+                  framing.target?.block.kind === 'image' ? framing.target.block.id : null
+                }
+                onSelectBlock={framing.selectBlock}
                 onFrameImage={framing.select}
                 onUploadImage={(stepId, blockId, file, signal) =>
                   importSources(
@@ -193,16 +200,25 @@ function GuideContextualInspector({
 }: {
   project: GuideProject;
   selectedId: string | null;
-  framing: ReturnType<typeof useGuideImageFraming>;
+  framing: ReturnType<typeof useGuideBlockSelection>;
   images: Record<string, string | null>;
   disabled: boolean;
   onChange: ReturnType<typeof useGuidePageState>['update'];
   t: Translate;
 }) {
-  return framing.target ? (
+  return framing.target?.block.kind === 'image' ? (
     <GuideImageControls
       block={framing.target.block}
       url={images[framing.target.block.assetId]}
+      disabled={disabled}
+      onChange={framing.change}
+      onClose={framing.close}
+      t={t}
+    />
+  ) : framing.target ? (
+    <GuideBlockInspector
+      item={framing.target.item}
+      block={framing.target.block}
       disabled={disabled}
       onChange={framing.change}
       onClose={framing.close}
@@ -219,8 +235,8 @@ function GuideContextualInspector({
   );
 }
 
-/** Owns one disposable framing selection; edits still use the page's canonical updater. */
-function useGuideImageFraming(
+/** Owns one disposable block selection; edits still use the page's canonical updater. */
+function useGuideBlockSelection(
   state: Pick<ReturnType<typeof useGuidePageState>, 'project' | 'selectedId' | 'update'>,
   panels: Pick<ReturnType<typeof useGuidePanels>, 'rightOpen' | 'toggleRight'>,
   selectItem: (id: string, requestFocus?: boolean) => void
@@ -230,9 +246,7 @@ function useGuideImageFraming(
   const block =
     item?.kind === 'step' ? item.blocks.find((entry) => entry.id === selection?.blockId) : null;
   const target =
-    item?.kind === 'step' && block?.kind === 'image' && state.selectedId === item.id
-      ? { item, block }
-      : null;
+    item?.kind === 'step' && block && state.selectedId === item.id ? { item, block } : null;
   const targetValid = target !== null;
   useEffect(() => {
     if (selection && !targetValid) setSelection(null);
@@ -242,11 +256,20 @@ function useGuideImageFraming(
     const element = [...document.querySelectorAll<HTMLElement>('[data-block-id]')].find(
       (entry) => entry.dataset['blockId'] === selection?.blockId
     );
-    element?.querySelector<HTMLButtonElement>('[data-frame-image]')?.focus({ preventScroll: true });
+    const trigger =
+      target?.block.kind === 'image'
+        ? element?.querySelector<HTMLElement>('[data-frame-image]')
+        : element?.closest('article')?.querySelector<HTMLElement>('.guide-step-title');
+    trigger?.focus({ preventScroll: true });
   };
   return {
     target,
     close,
+    selectBlock: (itemId: string, blockId: string | null) => {
+      selectItem(itemId, false);
+      setSelection(blockId ? { itemId, blockId } : null);
+      if (blockId && !panels.rightOpen) panels.toggleRight();
+    },
     select: (itemId: string, blockId: string, editing: boolean) => {
       if (!editing) {
         close();

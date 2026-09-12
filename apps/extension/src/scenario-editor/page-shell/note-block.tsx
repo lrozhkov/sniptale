@@ -5,7 +5,7 @@ import type { Translate } from '../../platform/i18n';
 import { GuideActionMenu } from './action-menu';
 
 type NoteBlock = Extract<GuideBlock, { kind: 'note' }>;
-const noteTypes = [
+export const guideNoteTypes = [
   { tone: 'neutral', key: 'scenario.editor.guideNoteNeutral', icon: StickyNote },
   { tone: 'info', key: 'scenario.editor.guideNoteInfo', icon: Info },
   { tone: 'warning', key: 'scenario.editor.guideNoteWarning', icon: TriangleAlert },
@@ -24,7 +24,7 @@ export function GuideNoteBlock({
   onChange: (block: GuideBlock, group?: string | null) => void;
   t: Translate;
 }) {
-  const current = noteTypes.find((type) => type.tone === block.tone)!;
+  const current = guideNoteTypes.find((type) => type.tone === block.tone)!;
   const Icon = current.icon;
   return (
     <aside
@@ -37,7 +37,7 @@ export function GuideNoteBlock({
         label={t('scenario.editor.guideNoteType')}
         icon={<Icon size={16} aria-hidden="true" />}
         disabled={disabled}
-        items={noteTypes.map((type) => ({
+        items={guideNoteTypes.map((type) => ({
           label: t(type.key),
           icon:
             type.tone === block.tone ? (

@@ -50,6 +50,7 @@ type GuideDocumentProps = {
   framedImageId: string | null;
   onFrameImage: (itemId: string, blockId: string, editing: boolean) => void;
   onSelect: (id: string) => void;
+  onSelectBlock: (itemId: string, blockId: string | null) => void;
   t: Translate;
 };
 
@@ -62,6 +63,7 @@ export function GuideDocument({
   disabled,
   onChange,
   onSelect,
+  onSelectBlock,
   onOperate,
   onEditImage,
   onUploadImage,
@@ -131,8 +133,14 @@ export function GuideDocument({
               id={item.id}
               tabIndex={-1}
               data-selected={selectedId === item.id}
-              onFocusCapture={() => {
+              onFocusCapture={(event) => {
                 if (selectedId !== item.id) onSelect(item.id);
+                const field = event.target;
+                if (!(field instanceof HTMLTextAreaElement)) return;
+                const block = field.closest<HTMLElement>('[data-block-id]');
+                if (!block) onSelectBlock(item.id, null);
+                else if (block.dataset['kind'] !== 'image')
+                  onSelectBlock(item.id, block.dataset['blockId'] ?? null);
               }}
             >
               <header>
