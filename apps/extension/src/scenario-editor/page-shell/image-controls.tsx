@@ -2,7 +2,7 @@ import { GuideHtmlImageFields } from './html-image-fields';
 import { DEFAULT_HTML_IMAGES } from './html-image-settings';
 import { ProductToggle } from '@sniptale/ui/product-form-controls';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { Check, Focus, Maximize2, RotateCcw, ScanLine, Text } from 'lucide-react';
+import { Check, MousePointer2, Focus, Maximize2, RotateCcw, ScanLine, Text } from 'lucide-react';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { useEffect, useState } from 'react';
@@ -174,6 +174,7 @@ export function GuideImageControls({
             <RotateCcw size={16} aria-hidden="true" />
           </ContentToolbarButton>
         </div>
+        <ImageActionContext source={block.source} t={t} />
         <ImageHtmlSettings
           block={block}
           htmlDefaults={htmlDefaults}
@@ -235,6 +236,37 @@ function ImageHtmlSettings({
         }
         t={t}
       />
+    </GuideInspectorGroup>
+  );
+}
+
+/** Read-only provenance is independent from editable framing settings. */
+function ImageActionContext({ source, t }: { source: GuideImageBlock['source']; t: Translate }) {
+  if (source.kind !== 'video-frame' || !source.action) return null;
+  const action = source.action;
+  return (
+    <GuideInspectorGroup icon={MousePointer2} title={t('scenario.editor.guideVideoActionContext')}>
+      <p>
+        {t(
+          action.kind === 'KEY'
+            ? 'scenario.editor.guideVideoKey'
+            : 'scenario.editor.guideVideoClick'
+        )}{' '}
+        · {t('scenario.editor.guideVideoActionTime').replace('{seconds}', action.time.toFixed(2))}
+      </p>
+      <p>{action.label}</p>
+      {action.target && (
+        <p>
+          {[action.target.name, action.target.tag, action.target.role].filter(Boolean).join(' · ')}
+        </p>
+      )}
+      {action.point && (
+        <p>
+          {t('scenario.editor.guideVideoActionPoint')
+            .replace('{x}', String(Math.round(action.point.x * 100)))
+            .replace('{y}', String(Math.round(action.point.y * 100)))}
+        </p>
+      )}
     </GuideInspectorGroup>
   );
 }

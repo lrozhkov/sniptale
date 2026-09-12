@@ -40,11 +40,11 @@ afterEach(() => {
   host.remove();
   vi.unstubAllGlobals();
 });
-async function render(url: string | null = 'blob:image', disabled = false) {
+async function render(url: string | null = 'blob:image', disabled = false, image = block) {
   await act(async () =>
     root.render(
       <GuideImageControls
-        block={block}
+        block={image}
         url={url}
         disabled={disabled}
         onChange={change}
@@ -156,4 +156,31 @@ it('lets numeric Escape cancel the draft before inspector dismissal', async () =
     )
   );
   expect(close).toHaveBeenCalledOnce();
+});
+
+it('shows saved click and keyboard provenance without inventing missing geometry', async () => {
+  const source = {
+    kind: 'video-frame' as const,
+    recordingId: 'recording',
+    filename: 'video',
+    timeSeconds: 1,
+    action: {
+      id: 'event',
+      kind: 'CLICK' as const,
+      time: 1,
+      duration: 0.5,
+      label: 'Open',
+      point: { x: 0.25, y: 0.5 },
+      target: { name: 'Open', tag: 'button', role: '' },
+    },
+  };
+  await render(null, false, { ...block, source });
+  expect(host.textContent).toContain('Point: 25% × 50%');
+  expect(host.textContent).toContain('button');
+  await render(null, false, {
+    ...block,
+    source: { ...source, action: { ...source.action, kind: 'KEY', target: null, point: null } },
+  });
+  expect(host.textContent).toContain('Keystroke');
+  expect(host.textContent).not.toContain('Point:');
 });

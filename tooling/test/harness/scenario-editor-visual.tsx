@@ -1,3 +1,4 @@
+import { saveRecordingTelemetry } from '../../../apps/extension/src/composition/persistence/recordings/telemetry';
 import { saveRecording } from '../../../apps/extension/src/composition/persistence/recordings';
 import {
   getMediaLibraryEntry,
@@ -103,6 +104,39 @@ async function mountGuideHarness(): Promise<void> {
   if (params.get('videoFixture') === '1' && !(await getMediaLibraryEntry('guide-preview-video'))) {
     await saveRecording('guide-preview-video', await createFixtureVideo(), 'Library motion.webm');
   }
+  if (params.get('actionFixture') === '1')
+    await saveRecordingTelemetry({
+      recordingId: 'guide-preview-video',
+      createdAt: 1,
+      updatedAt: 1,
+      captureMode: null,
+      viewport: null,
+      cursorTrack: null,
+      signals: [],
+      actionEvents: [
+        {
+          id: 'fixture-click',
+          kind: 'CLICK',
+          time: 1.2,
+          duration: 0.45,
+          point: null,
+          recordingPoint: { x: 0.25, y: 0.5 },
+          label: 'Open settings',
+          data: { targetName: 'Open settings', targetTag: 'button' },
+          preset: 'NONE',
+        },
+        {
+          id: 'fixture-key',
+          kind: 'KEY',
+          time: 0.2,
+          duration: 0.5,
+          point: null,
+          label: 'Ctrl + K',
+          data: {},
+          preset: 'NONE',
+        },
+      ],
+    });
   initializeAppTheme(params.get('theme') === 'dark' ? 'dark' : 'light');
   await setLocalePreference(params.get('locale') === 'ru' ? 'ru' : 'en');
   const projectId = params.get('projectId') ?? 'guide-visual';

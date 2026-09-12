@@ -96,3 +96,34 @@ it('rejects malformed, missing, mismatched, duplicate and off-scope targets atom
     selectGuideAiContent(project, { stepIds: ['first'], blockIds: ['missing'] })
   ).toThrow();
 });
+
+it('projects only selected action context without recording or event identifiers', () => {
+  const { project } = fixture();
+  const step = project.items[0];
+  if (step?.kind !== 'step' || step.blocks[1]?.kind !== 'image') throw new Error('Fixture');
+  step.blocks[1].source = {
+    kind: 'video-frame',
+    recordingId: 'private-recording',
+    filename: 'private-video',
+    timeSeconds: 1,
+    action: {
+      id: 'private-event',
+      kind: 'CLICK',
+      time: 1,
+      duration: 0.5,
+      label: 'Open',
+      point: { x: 0.2, y: 0.3 },
+      target: { name: 'Open', tag: 'button', role: '' },
+    },
+  };
+  const content = selectGuideAiContent(project, { stepIds: ['first'], blockIds: ['image'] });
+  expect(content.snapshot.steps[0]?.blocks[0]).toMatchObject({
+    actionContext: { label: 'Open', target: { tag: 'button' } },
+  });
+  expect(JSON.stringify(content.snapshot)).not.toContain('private');
+  expect(
+    JSON.stringify(
+      selectGuideAiContent(project, { stepIds: ['first'], blockIds: ['text'] }).snapshot
+    )
+  ).not.toContain('actionContext');
+});

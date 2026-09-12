@@ -7,6 +7,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1024, height: 640 });
     const url = new URL(page.url());
     url.searchParams.set('videoFixture', '1');
+    url.searchParams.set('actionFixture', '1');
     await page.goto(url.toString());
     await page.getByRole('button', { name: 'Resources', exact: true }).click();
     await page
@@ -26,6 +27,25 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await expect(drawer.getByRole('button', { name: 'Start dictation', exact: true })).toHaveCount(
       2
     );
+    await drawer.getByRole('button', { name: '0.20 · Ctrl + K', exact: true }).click();
+    await expect
+      .poll(() =>
+        drawer
+          .locator('video')
+          .evaluate((video) => !video.seeking && Math.abs(video.currentTime - 0.2) < 0.01)
+      )
+      .toBe(true);
+    const action = drawer.getByRole('button', { name: '1.20 · Open settings', exact: true });
+    await action.click();
+    await expect
+      .poll(() =>
+        drawer
+          .locator('video')
+          .evaluate((video) => !video.seeking && Math.abs(video.currentTime - 1.2) < 0.01)
+      )
+      .toBe(true);
+    await action.hover();
+    await expect(drawer.locator('.guide-video-click-point')).toBeVisible();
     const fields = drawer.locator('.guide-video-field input, .guide-video-field textarea');
     await expect(fields).toHaveCount(2);
     for (let index = 0; index < 2; index++) {

@@ -1,5 +1,6 @@
 import type {
   GuideBlock,
+  GuideVideoAction,
   GuideImageBlock,
   GuideProject,
   GuideStep,
@@ -14,7 +15,13 @@ import { createGuideParagraphs } from './factories';
 export type GuideAiScope = { stepIds: string[]; blockIds: string[] };
 export type GuideAiChange = { operation: ScenarioAiOperation; before: string; after: string };
 type AiTextBlock =
-  | { id: string; kind: 'image'; caption: string; alt: string }
+  | {
+      id: string;
+      kind: 'image';
+      caption: string;
+      alt: string;
+      actionContext?: Omit<GuideVideoAction, 'id'>;
+    }
   | { id: string; kind: 'heading' | 'text' | 'note'; text: string };
 
 function selectedSteps(project: GuideProject, scope: GuideAiScope): GuideStep[] {
@@ -62,7 +69,27 @@ export function selectGuideAiContent(project: GuideProject, scope: GuideAiScope)
             stepNumber: allSteps.findIndex((item) => item.id === step.id) + 1,
             block,
           });
-          return [{ id: block.id, kind: block.kind, caption: block.caption, alt: block.alt }];
+          const action = block.source.kind === 'video-frame' ? block.source.action : undefined;
+          return [
+            {
+              id: block.id,
+              kind: block.kind,
+              caption: block.caption,
+              alt: block.alt,
+              ...(action
+                ? {
+                    actionContext: {
+                      kind: action.kind,
+                      time: action.time,
+                      duration: action.duration,
+                      label: action.label,
+                      point: action.point,
+                      target: action.target,
+                    },
+                  }
+                : {}),
+            },
+          ];
         }
         return [
           {

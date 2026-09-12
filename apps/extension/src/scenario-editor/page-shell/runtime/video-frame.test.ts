@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
-const io = vi.hoisted(() => ({ entry: vi.fn(), blob: vi.fn() }));
+const io = vi.hoisted(() => ({ entry: vi.fn(), blob: vi.fn(), telemetry: vi.fn() }));
 vi.mock('../../../composition/persistence/media-library', () => ({
   getMediaLibraryEntry: io.entry,
   getMediaAssetBlob: io.blob,
+}));
+vi.mock('../../../composition/persistence/recordings/telemetry', () => ({
+  getRecordingTelemetry: io.telemetry,
 }));
 import { captureGuideVideoFrame, loadGuideVideoSource } from './video-frame';
 beforeEach(() => vi.resetAllMocks());

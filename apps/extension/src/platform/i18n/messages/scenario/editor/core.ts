@@ -76,12 +76,12 @@ export const scenarioEditorCoreMessages = defineMessageSource({
     en: 'Also send visible image frames',
   },
   guideAiDisclosureText: {
-    ru: 'Выбранному провайдеру и модели будут отправлены выбранный текст, подписи и ваш запрос. Применяется системная инструкция из настроек. Журнал запросов хранит служебные сведения без текста и изображений.',
-    en: 'The selected provider and model will receive the selected text, captions and your request. The system instruction from settings also applies. Request history stores metadata without text or images.',
+    ru: 'Выбранному провайдеру и модели будут отправлены выбранный текст, подписи, сохранённый контекст действий выбранных изображений и ваш запрос. Применяется системная инструкция из настроек. Журнал запросов хранит служебные сведения без текста и изображений.',
+    en: 'The selected provider and model will receive the selected text, captions, saved action context of selected images and your request. The system instruction from settings also applies. Request history stores metadata without text or images.',
   },
   guideAiDisclosureImages: {
-    ru: 'Выбранному провайдеру и модели будут отправлены выбранный текст, подписи, видимые кадры изображений и ваш запрос. Применяется системная инструкция из настроек. Журнал запросов хранит служебные сведения без текста и изображений.',
-    en: 'The selected provider and model will receive the selected text, captions, visible image frames and your request. The system instruction from settings also applies. Request history stores metadata without text or images.',
+    ru: 'Выбранному провайдеру и модели будут отправлены выбранный текст, подписи, сохранённый контекст действий, видимые кадры изображений и ваш запрос. Применяется системная инструкция из настроек. Журнал запросов хранит служебные сведения без текста и изображений.',
+    en: 'The selected provider and model will receive the selected text, captions, saved action context, visible image frames and your request. The system instruction from settings also applies. Request history stores metadata without text or images.',
   },
   guideAiConfigurationFailed: {
     ru: 'Не удалось загрузить список моделей.',
@@ -123,6 +123,19 @@ export const scenarioEditorCoreMessages = defineMessageSource({
     en: 'Could not save Markdown. Try again.',
   },
   guideClearText: { ru: 'Очистить текст', en: 'Clear text' },
+  guideVideoActionTime: { ru: '{seconds} с', en: '{seconds} s' },
+  guideVideoActionPoint: { ru: 'Точка: {x}% × {y}%', en: 'Point: {x}% × {y}%' },
+  guideVideoActions: { ru: 'Действия записи', en: 'Recorded actions' },
+  guideVideoClick: { ru: 'Клик', en: 'Click' },
+  guideVideoKey: { ru: 'Нажатие клавиш', en: 'Keystroke' },
+  guideVideoNoActions: {
+    ru: 'В записи нет кликов или нажатий клавиш',
+    en: 'No recorded clicks or keystrokes',
+  },
+  guideVideoPosition: { ru: 'Позиция в исходном видео', en: 'Source video position' },
+  guideTimelineZoomIn: { ru: 'Увеличить шкалу времени', en: 'Zoom in timeline' },
+  guideTimelineZoomOut: { ru: 'Уменьшить шкалу времени', en: 'Zoom out timeline' },
+  guideVideoActionContext: { ru: 'Контекст действия', en: 'Action context' },
   guideVoiceStart: { ru: 'Начать голосовой ввод', en: 'Start dictation' },
   guideVoiceStop: { ru: 'Остановить голосовой ввод', en: 'Stop dictation' },
   guideVoiceError: {

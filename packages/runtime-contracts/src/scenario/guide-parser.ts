@@ -37,6 +37,40 @@ const width = z
 const label = z.string().max(GUIDE_LIMITS.maxLabelLength);
 const text = z.string().max(GUIDE_LIMITS.maxTextLength);
 const timestamp = z.number().finite().nonnegative();
+/** Shared admission for both stored projects and independent frame imports. */
+export const guideVideoActionSchema = z
+  .object({
+    id,
+    kind: z.enum(['CLICK', 'KEY']),
+    time: timestamp,
+    duration: z.number().finite().min(0).max(10),
+    label,
+    point: z
+      .object({ x: z.number().finite().min(0).max(1), y: z.number().finite().min(0).max(1) })
+      .strict()
+      .nullable(),
+    target: z.object({ name: label, tag: label, role: label }).strict().nullable(),
+  })
+  .strict();
+
+/** A frame may describe only an action active at its captured source timestamp. */
+export const guideVideoFrameSourceSchema = z
+  .object({
+    kind: z.literal('video-frame'),
+    recordingId: id.nullable(),
+    filename: label,
+    timeSeconds: timestamp,
+    action: guideVideoActionSchema.optional(),
+  })
+  .strict()
+  .refine(
+    (source) =>
+      !source.action ||
+      (source.recordingId !== null &&
+        source.timeSeconds >= source.action.time &&
+        source.timeSeconds <= source.action.time + source.action.duration)
+  );
+
 const link = text.refine((value) => {
   if (
     value.trim() !== value ||
@@ -113,14 +147,7 @@ const image = z
     source: z.union([
       guideCaptureSourceSchema,
       z.object({ kind: z.literal('import'), filename: label }).strict(),
-      z
-        .object({
-          kind: z.literal('video-frame'),
-          recordingId: id.nullable(),
-          filename: label,
-          timeSeconds: timestamp,
-        })
-        .strict(),
+      guideVideoFrameSourceSchema,
     ]),
     frame: z
       .object({

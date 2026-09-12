@@ -1,5 +1,8 @@
 import { z } from 'zod';
-import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
+import {
+  parseGuideProject,
+  guideVideoFrameSourceSchema,
+} from '@sniptale/runtime-contracts/scenario/guide-parser';
 import {
   GUIDE_LIMITS,
   type GuideProject,
@@ -25,14 +28,7 @@ const videoFrameImportSchema = z
   .object({
     kind: z.literal('video-frame'),
     blob: z.instanceof(Blob),
-    source: z
-      .object({
-        kind: z.literal('video-frame'),
-        recordingId: z.string().min(1).max(GUIDE_LIMITS.maxIdLength).nullable(),
-        filename: z.string().max(GUIDE_LIMITS.maxLabelLength),
-        timeSeconds: z.number().finite().min(0),
-      })
-      .strict(),
+    source: guideVideoFrameSourceSchema,
     title: z.string().max(GUIDE_LIMITS.maxLabelLength),
     description: z.string().max(GUIDE_LIMITS.maxTextLength),
   })

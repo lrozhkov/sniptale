@@ -11,6 +11,7 @@ function formatDuration(duration: number) {
 /** Shared transport controls never mutate project timing. */
 export function LibraryMediaTransport(props: {
   image: boolean;
+  timeline?: ReactNode;
   playback: ReturnType<typeof useLibraryPlayback>;
   onExitFullscreen: (() => void) | undefined;
   fullscreenButtonRef: RefObject<HTMLButtonElement | null>;
@@ -38,7 +39,7 @@ export function LibraryMediaTransport(props: {
           >
             {media.paused ? <Play size={16} /> : <Pause size={16} />}
           </ContentToolbarButton>
-          <LibrarySeek playback={props.playback} />
+          <LibrarySeek playback={props.playback} timeline={props.timeline} />
           <span className="whitespace-nowrap text-[11px] tabular-nums text-[var(--sniptale-color-text-muted)]">
             {formatDuration(media.time)} /{' '}
             {media.duration === null ? '—' : formatDuration(media.duration)}
@@ -71,20 +72,28 @@ export function LibraryMediaTransport(props: {
   );
 }
 
-function LibrarySeek({ playback }: { playback: ReturnType<typeof useLibraryPlayback> }) {
+function LibrarySeek({
+  playback,
+  timeline,
+}: {
+  playback: ReturnType<typeof useLibraryPlayback>;
+  timeline?: ReactNode;
+}) {
   const { media, ready, seek } = playback;
   return (
     <>
-      <ProductRange
-        className="order-first w-full shrink-0"
-        min={0}
-        max={media.duration || 1}
-        step={0.01}
-        value={media.time}
-        disabled={!ready || media.duration === null}
-        aria-label={translate('videoEditor.sidebar.mediaPreviewSeek')}
-        onChange={(event) => seek(event.currentTarget.valueAsNumber)}
-      />
+      {timeline ?? (
+        <ProductRange
+          className="order-first w-full shrink-0"
+          min={0}
+          max={media.duration || 1}
+          step={0.01}
+          value={media.time}
+          disabled={!ready || media.duration === null}
+          aria-label={translate('videoEditor.sidebar.mediaPreviewSeek')}
+          onChange={(event) => seek(event.currentTarget.valueAsNumber)}
+        />
+      )}
       <ProductInput
         type="number"
         style={{ width: '5rem', flex: '0 0 5rem' }}

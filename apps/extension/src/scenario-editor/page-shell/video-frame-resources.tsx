@@ -1,3 +1,6 @@
+import { GuideVideoActionNavigation, GuideVideoActionOverlay } from './video-action-navigation';
+import type { GuideVideoAction } from '@sniptale/runtime-contracts/scenario/types/guide';
+import { guideVideoActionAt } from './runtime/video-actions';
 import { LibraryMediaPlayer } from '../../composition/library-preview/player';
 import { useEffect, useRef, useState } from 'react';
 import { GuideVoiceField } from './voice-field';
@@ -90,6 +93,9 @@ function useVideoFrames(props: VideoResourcesProps) {
               recordingId: source.recordingId,
               filename: source.filename.slice(0, GUIDE_LIMITS.maxLabelLength),
               timeSeconds: frame.timeSeconds,
+              ...(guideVideoActionAt(source.actions ?? [], frame.timeSeconds)
+                ? { action: guideVideoActionAt(source.actions ?? [], frame.timeSeconds)! }
+                : {}),
             },
             title,
             description,
@@ -140,6 +146,7 @@ function useVideoFrames(props: VideoResourcesProps) {
 export function GuideVideoFrameResources(props: VideoResourcesProps) {
   const { t } = props;
   const state = useVideoFrames(props);
+  const [hoveredAction, setHoveredAction] = useState<GuideVideoAction | null>(null);
   const locked = props.disabled || state.pending;
   return (
     <div className="guide-video-preview">
@@ -151,6 +158,23 @@ export function GuideVideoFrameResources(props: VideoResourcesProps) {
             src={state.source.url}
             filename={state.source.filename}
             onReadyChange={state.onReadyChange}
+            renderTimeline={(playback) => (
+              <GuideVideoActionNavigation
+                playback={playback}
+                actions={state.source?.actions ?? []}
+                onHover={setHoveredAction}
+                t={t}
+              />
+            )}
+            renderOverlay={(playback) => (
+              <GuideVideoActionOverlay
+                playback={playback}
+                action={
+                  guideVideoActionAt(hoveredAction ? [hoveredAction] : [], playback.media.time) ??
+                  guideVideoActionAt(state.source?.actions ?? [], playback.media.time)
+                }
+              />
+            )}
           >
             <span role="status">{t('scenario.editor.loading')}</span>
           </LibraryMediaPlayer>

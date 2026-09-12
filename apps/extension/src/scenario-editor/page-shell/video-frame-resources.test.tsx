@@ -37,6 +37,13 @@ async function open() {
 beforeEach(() => {
   vi.resetAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    }
+  );
   vi.stubGlobal('URL', { createObjectURL: vi.fn(() => 'blob:video'), revokeObjectURL: vi.fn() });
   vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
   vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
@@ -145,4 +152,28 @@ it('retries a failed source without leaving the selected video and releases its 
   await act(async () => root.render(null));
   expect(io.load.mock.calls[1]![1].aborted).toBe(true);
   expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:video');
+});
+
+it('attaches the active action and omits it after seeking outside its interval', async () => {
+  const action = {
+    id: 'click',
+    kind: 'CLICK',
+    time: 2,
+    duration: 0.5,
+    label: 'Open',
+    point: null,
+    target: null,
+  };
+  io.load.mockResolvedValue({
+    blob: new Blob(['video']),
+    filename: 'video.webm',
+    recordingId: 'recording',
+    actions: [action],
+  });
+  await open();
+  await act(async () => button('Add frame as step').click());
+  expect(submit.mock.calls[0]![0].sources[0].source.action).toEqual(action);
+  io.capture.mockResolvedValue({ blob: new Blob(['png']), timeSeconds: 3 });
+  await act(async () => button('Add frame as step').click());
+  expect(submit.mock.calls[1]![0].sources[0].source.action).toBeUndefined();
 });

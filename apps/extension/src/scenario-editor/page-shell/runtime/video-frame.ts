@@ -1,9 +1,17 @@
+import { getRecordingTelemetry } from '../../../composition/persistence/recordings/telemetry';
+import type { GuideVideoAction } from '@sniptale/runtime-contracts/scenario/types/guide';
+import { projectGuideVideoActions } from './video-actions';
 import {
   getMediaAssetBlob,
   getMediaLibraryEntry,
 } from '../../../composition/persistence/media-library';
 
-export type GuideVideoSource = { blob: Blob; filename: string; recordingId: string | null };
+export type GuideVideoSource = {
+  blob: Blob;
+  filename: string;
+  recordingId: string | null;
+  actions?: GuideVideoAction[];
+};
 
 /** Reads only the explicitly selected immutable source video; edited timelines are separate assets. */
 export async function loadGuideVideoSource(
@@ -25,6 +33,10 @@ export async function loadGuideVideoSource(
     throw new Error('Video source unavailable.');
   signal.throwIfAborted();
   const blob = await getMediaAssetBlob(entry.id);
+  const telemetry =
+    entry.source.kind === 'recording'
+      ? await getRecordingTelemetry(entry.source.recordingId)
+      : undefined;
   const current = await getMediaLibraryEntry(entry.id);
   signal.throwIfAborted();
   if (
@@ -36,7 +48,9 @@ export async function loadGuideVideoSource(
     JSON.stringify(current.source) !== JSON.stringify(entry.source)
   )
     throw new Error('Video source changed.');
+  signal.throwIfAborted();
   return {
+    actions: projectGuideVideoActions(telemetry?.actionEvents ?? []),
     blob,
     filename: entry.filename,
     recordingId: entry.source.kind === 'recording' ? entry.source.recordingId : null,

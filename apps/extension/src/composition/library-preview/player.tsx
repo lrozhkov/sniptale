@@ -9,6 +9,8 @@ type PlayerProps = {
   kind?: 'video' | 'image';
   children: ReactNode;
   videoRef?: RefObject<HTMLVideoElement | null>;
+  renderTimeline?: (playback: ReturnType<typeof useLibraryPlayback>) => ReactNode;
+  renderOverlay?: (playback: ReturnType<typeof useLibraryPlayback>) => ReactNode;
   onReadyChange?: (ready: boolean) => void;
 };
 /** Disposable library playback owns its media element; it never edits project timing. */
@@ -59,6 +61,7 @@ export function LibraryMediaPlayer(props: PlayerProps) {
       ) : null}
       <LibraryMediaTransport
         playback={playback}
+        timeline={props.renderTimeline?.(playback)}
         image={props.kind === 'image'}
         onExitFullscreen={fullscreen ? exitFullscreen : undefined}
         fullscreenButtonRef={fullscreenButton}
@@ -81,6 +84,7 @@ function LibraryMediaPicture(
   return (
     <div
       style={{ width: `${props.zoom * 100}%`, height: `${props.zoom * 100}%` }}
+      className="relative"
       data-ui="library-media-picture"
     >
       {props.kind === 'image' ? (
@@ -118,6 +122,7 @@ function LibraryMediaPicture(
           }}
         />
       )}
+      {props.renderOverlay?.(props.playback)}
     </div>
   );
 }
