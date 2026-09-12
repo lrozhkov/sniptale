@@ -9,6 +9,7 @@ const limits = {
 
 /** Owns disposable panel visibility and dimensions; resizing never edits the guide. */
 export function useGuidePanels() {
+  const [rightScope, setRightScope] = useState<'selection' | 'document'>('selection');
   const [viewport, setViewport] = useState(() => window.innerWidth);
   const [leftOpen, setLeftOpen] = useState(() => window.innerWidth >= 720);
   const [leftSection, setLeftSection] = useState<GuideLeftSection>('structure');
@@ -49,6 +50,12 @@ export function useGuidePanels() {
   return {
     leftOpen,
     rightOpen,
+    rightScope,
+    selectRightScope: setRightScope,
+    openRight: (scope: 'selection' | 'document') => {
+      setRightScope(scope);
+      setRightOpen(true);
+    },
     leftSection,
     openLeft: (section: GuideLeftSection) => {
       setLeftSection(section);

@@ -79,14 +79,20 @@ it('edits typography without losing prose and removes metadata on reset', async 
     );
   const click = async (label: string) => {
     const button = [...host.querySelectorAll('button')].find(
-      (node) => (node.getAttribute('aria-label') ?? node.textContent) === label
+      (node) =>
+        (node.getAttribute('aria-label') ?? node.getAttribute('title') ?? node.textContent) ===
+        label
     );
     if (!button) throw new Error(`Missing ${label}`);
     await act(async () => button.click());
   };
   try {
     await act(async () => draw());
-    await click('Large');
+    await click('Text size');
+    const large = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+      (node) => node.textContent === 'Large'
+    )!;
+    await act(async () => large.click());
     await click('Center');
     expect(current).toEqual({ ...source, textStyle: { size: 'large', alignment: 'center' } });
     await click('Reset text appearance');

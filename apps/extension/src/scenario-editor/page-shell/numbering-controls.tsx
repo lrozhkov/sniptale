@@ -1,5 +1,7 @@
 import { GUIDE_LIMITS, type GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
-import { ProductInput } from '@sniptale/ui/product-form-controls';
+import { ProductToggle, ProductInput } from '@sniptale/ui/product-form-controls';
+import { ListOrdered } from 'lucide-react';
+import { GuideInspectorGroup, GuideInspectorNumber } from './inspector';
 import type { Translate } from '../../platform/i18n';
 import { resolveGuideNumbering } from '../../features/scenario/project/public';
 
@@ -27,68 +29,64 @@ export function GuideNumberingControls({
     );
   return (
     <fieldset className="guide-numbering-fields" disabled={disabled}>
-      <legend>{t('scenario.editor.guideNumbering')}</legend>
-      {item.kind === 'step' && (
+      <GuideInspectorGroup title={t('scenario.editor.guideNumbering')} icon={ListOrdered}>
+        {item.kind === 'step' && (
+          <label className="guide-number-toggle">
+            <ProductToggle
+              size="sm"
+              aria-label={t('scenario.editor.guideShowNumber')}
+              checked={item.showNumber}
+              onClick={() => onChange({ ...item, showNumber: !item.showNumber }, null)}
+            />
+            {t('scenario.editor.guideShowNumber')}
+          </label>
+        )}
         <label className="guide-number-toggle">
-          <input
-            type="checkbox"
-            checked={item.showNumber}
-            onChange={(event) => onChange({ ...item, showNumber: event.target.checked }, null)}
+          <ProductToggle
+            size="sm"
+            aria-label={t('scenario.editor.guideRestartNumbering')}
+            checked={restartAt !== undefined}
+            onClick={() => restart(restartAt === undefined ? 1 : undefined)}
           />
-          {t('scenario.editor.guideShowNumber')}
+          {t('scenario.editor.guideRestartNumbering')}
         </label>
-      )}
-      <label className="guide-number-toggle">
-        <input
-          type="checkbox"
-          checked={restartAt !== undefined}
-          onChange={(event) => restart(event.target.checked ? 1 : undefined)}
-        />
-        {t('scenario.editor.guideRestartNumbering')}
-      </label>
-      {restartAt !== undefined && (
-        <label className="guide-numbering-field">
-          <span>{t('scenario.editor.guideStartAt')}</span>
-          <ProductInput
-            type="number"
+        {restartAt !== undefined && (
+          <GuideInspectorNumber
+            label={t('scenario.editor.guideStartAt')}
             min={1}
             max={GUIDE_LIMITS.maxRestartNumber}
-            step={1}
             value={restartAt}
-            onChange={(event) => {
-              const value = event.target.valueAsNumber;
-              if (Number.isInteger(value) && value >= 1 && value <= GUIDE_LIMITS.maxRestartNumber)
-                restart(value, `number-start:${item.id}`);
-            }}
+            disabled={disabled}
+            onChange={(value) => restart(value, `number-start:${item.id}`)}
           />
-        </label>
-      )}
-      {item.kind === 'step' && item.showNumber && (
-        <label className="guide-numbering-field">
-          <span>{t('scenario.editor.guideCustomNumber')}</span>
-          <ProductInput
-            value={item.numbering?.label ?? ''}
-            maxLength={GUIDE_LIMITS.maxNumberLabelLength}
-            placeholder={t('scenario.editor.guideAutomaticNumber')}
-            onChange={(event) =>
-              onChange(
-                withNumbering(
-                  item,
-                  restartAt,
-                  event.target.value.trim() ? event.target.value : undefined
-                ),
-                `number-label:${item.id}`
-              )
-            }
-          />
-        </label>
-      )}
-      <div className="guide-numbering-next">
-        <span>{t('scenario.editor.guideNextAutomaticNumber')}</span>
-        <output aria-label={t('scenario.editor.guideNextAutomaticNumber')}>
-          {resolveGuideNumbering(project.items).get(item.id)?.nextAutomaticNumber}
-        </output>
-      </div>
+        )}
+        {item.kind === 'step' && item.showNumber && (
+          <label className="guide-numbering-field">
+            <span>{t('scenario.editor.guideCustomNumber')}</span>
+            <ProductInput
+              value={item.numbering?.label ?? ''}
+              maxLength={GUIDE_LIMITS.maxNumberLabelLength}
+              placeholder={t('scenario.editor.guideAutomaticNumber')}
+              onChange={(event) =>
+                onChange(
+                  withNumbering(
+                    item,
+                    restartAt,
+                    event.target.value.trim() ? event.target.value : undefined
+                  ),
+                  `number-label:${item.id}`
+                )
+              }
+            />
+          </label>
+        )}
+        <div className="guide-numbering-next">
+          <span>{t('scenario.editor.guideNextAutomaticNumber')}</span>
+          <output aria-label={t('scenario.editor.guideNextAutomaticNumber')}>
+            {resolveGuideNumbering(project.items).get(item.id)?.nextAutomaticNumber}
+          </output>
+        </div>
+      </GuideInspectorGroup>
     </fieldset>
   );
 }

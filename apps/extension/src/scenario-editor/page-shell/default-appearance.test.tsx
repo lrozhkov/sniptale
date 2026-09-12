@@ -32,59 +32,36 @@ async function render(disabled = false) {
         style={style}
         disabled={disabled}
         onApply={apply}
-        onClose={() => root.render(null)}
         t={createTranslator('en')}
       />
     )
   );
 }
 function button(name: string) {
-  const node = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(
+  const node = [...host.querySelectorAll<HTMLButtonElement>('button')].find(
     (node) => (node.getAttribute('aria-label') ?? node.textContent) === name
   );
   if (!node) throw new Error(`Missing ${name}`);
   return node;
 }
-it('keeps a private draft, applies once with explicit reset and restores focus', async () => {
+it('updates defaults immediately and resets all steps only on the explicit action', async () => {
   await render();
   await act(async () => button('Serif').click());
-  expect(apply).not.toHaveBeenCalled();
-  const reset = document.querySelector<HTMLInputElement>('[role="dialog"] input[type="checkbox"]')!;
-  await act(async () => reset.click());
-  await act(async () => button('Apply').click());
-  expect(apply).toHaveBeenCalledExactlyOnceWith({ ...style, font: 'serif' }, true);
+  expect(apply).toHaveBeenCalledExactlyOnceWith({ ...style, font: 'serif' }, false);
+  await act(async () => button('Apply to all steps').click());
+  expect(apply).toHaveBeenLastCalledWith(style, true);
   expect(document.querySelector('[role="dialog"]')).toBeNull();
   expect(document.activeElement).toBe(opener);
 });
-it('discards edits on Escape and keeps keyboard focus inside the dialog', async () => {
-  await render();
-  const first = document.activeElement;
-  await act(async () =>
-    document.activeElement?.dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true })
-    )
-  );
-  expect(document.activeElement).toBe(button('Apply'));
-  await act(async () =>
-    button('Apply').dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
-    )
-  );
-  expect(document.activeElement).toBe(first);
-  await act(async () => button('Serif').click());
-  await act(async () =>
-    button('Apply').dispatchEvent(
-      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
-    )
-  );
-  expect(apply).not.toHaveBeenCalled();
-  expect(document.activeElement).toBe(opener);
-});
-it('keeps cancellation available while applying is disabled', async () => {
+it('does not mutate defaults while disabled', async () => {
   await render(true);
-  expect(button('Apply').disabled).toBe(true);
-  await act(async () => button('Apply').click());
+  await act(async () => button('Serif').click());
+  await act(async () => button('Apply to all steps').click());
   expect(apply).not.toHaveBeenCalled();
-  await act(async () => button('Cancel').click());
+});
+it('renders document appearance inline without a modal or focus trap', async () => {
+  await render();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(host.textContent).toContain('Entire guide');
   expect(document.activeElement).toBe(opener);
 });

@@ -2,16 +2,24 @@ import { expect, type Locator, type Page, type TestInfo } from '@playwright/test
 import { SCENARIO_EDITOR_VISUAL_HARNESS_PATH } from '../extension-critical.helpers';
 
 async function chooseAppearance(scope: Page | Locator, field: string, option: string) {
-  await scope
-    .getByRole('group', { name: field, exact: true })
-    .getByRole('button', { name: option, exact: true })
-    .click();
+  const select = scope.getByRole('button', { name: field, exact: true });
+  if (await select.count()) {
+    await select.click();
+    const page = 'page' in scope ? scope.page() : scope;
+    await page.getByRole('option', { name: option, exact: true }).click();
+  } else
+    await scope
+      .getByRole('group', { name: field, exact: true })
+      .getByRole('button', { name: option, exact: true })
+      .click();
 }
 
 async function openDefaults(page: Page) {
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
   await page.locator('.guide-page-header .guide-action-menu-anchor button').click();
   await page.getByRole('button', { name: 'Guide appearance', exact: true }).click();
-  return page.getByRole('dialog');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  return page.locator('#guide-inspector-panel');
 }
 
 /** Defaults are one reversible edit; step overrides retain untouched inheritance. */
@@ -29,14 +37,9 @@ export async function verifyGuideAppearance(page: Page, testInfo: TestInfo): Pro
   if (!first || !second) throw new Error('Missing comparison images');
   expect(second.x).toBeGreaterThan(first.x + first.width);
   expect(Math.abs(second.y - first.y)).toBeLessThan(2);
-  const background = await step.evaluate((node) => getComputedStyle(node).backgroundColor);
   let dialog = await openDefaults(page);
   await chooseAppearance(dialog, 'Paper theme', 'Graphite');
-  await expect(step).toHaveCSS('background-color', background);
-  await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-  await expect(step).toHaveCSS('background-color', background);
-  dialog = await openDefaults(page);
-  await chooseAppearance(dialog, 'Paper theme', 'Graphite');
+  await expect(step).toHaveCSS('background-color', 'rgb(36, 38, 43)');
   await chooseAppearance(dialog, 'Font', 'Serif');
   await chooseAppearance(dialog, 'Spacing', 'Compact');
   await chooseAppearance(dialog, 'Content width', 'Wide');
@@ -46,13 +49,12 @@ export async function verifyGuideAppearance(page: Page, testInfo: TestInfo): Pro
     body: await page.screenshot({ fullPage: true }),
     contentType: 'image/png',
   });
-  await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
   await expect(step).toHaveCSS('background-color', 'rgb(36, 38, 43)');
   await expect(step).toHaveCSS('font-family', /Georgia/);
+  await dialog.getByRole('button', { name: 'Selection', exact: true }).click();
   await chooseAppearance(page, 'Paper theme', 'Warm');
   dialog = await openDefaults(page);
-  await dialog.getByRole('checkbox').check();
-  await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Apply to all steps', exact: true }).click();
   await expect(step).toHaveCSS('background-color', 'rgb(36, 38, 43)');
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(step).toHaveCSS('background-color', 'rgb(255, 250, 240)');

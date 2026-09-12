@@ -3,7 +3,7 @@ import type {
   GuideStyleOverrides,
 } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, FileText, Folder } from 'lucide-react';
 import { resolveGuideStyle } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
 import { GuideNumberingControls } from './numbering-controls';
@@ -17,7 +17,7 @@ type AppearanceProps = {
   t: Translate;
 };
 
-/** Only the selected item's settings live here; defaults have their own project dialog. */
+/** Only the selected item's settings live here; defaults live in the document context. */
 export function GuideAppearance({ project, selectedId, disabled, onChange, t }: AppearanceProps) {
   const item = project.items.find((entry) => entry.id === selectedId);
   const change = (next: GuideProject['items'][number], group: string | null = null) =>
@@ -32,6 +32,22 @@ export function GuideAppearance({ project, selectedId, disabled, onChange, t }: 
   };
   return (
     <div className="guide-appearance">
+      <div className="guide-inspector-context">
+        {item.kind === 'step' ? (
+          <FileText size={16} aria-hidden="true" />
+        ) : (
+          <Folder size={16} aria-hidden="true" />
+        )}
+        <strong>{item.title || t('scenario.editor.untitledStep')}</strong>
+      </div>
+      {item.kind === 'step' && (
+        <GuideLayoutFields
+          layout={item.layout}
+          disabled={disabled}
+          t={t}
+          onChange={(layout) => change({ ...item, layout, templateId: `builtin:${layout}` })}
+        />
+      )}
       <GuideNumberingControls
         project={project}
         item={item}
@@ -41,12 +57,6 @@ export function GuideAppearance({ project, selectedId, disabled, onChange, t }: 
       />
       {item.kind === 'step' && (
         <>
-          <GuideLayoutFields
-            layout={item.layout}
-            disabled={disabled}
-            t={t}
-            onChange={(layout) => change({ ...item, layout, templateId: `builtin:${layout}` })}
-          />
           <div className="guide-appearance-heading">
             <h3>{t('scenario.editor.appearance')}</h3>
             <ContentToolbarButton

@@ -51,7 +51,11 @@ it('changes a single inherited field directly and resets overrides without chang
   const next = change.mock.calls.at(-1)![0];
   expect(next.items[0]).toEqual({ ...project.items[0], styleOverrides: { font: 'serif' } });
   await render(next);
-  await click('Comparison');
+  await click('Step layout');
+  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+    (node) => node.textContent === 'Comparison'
+  )!;
+  await act(async () => option.click());
   expect(change.mock.calls.at(-1)![0].items[0]).toMatchObject({
     layout: 'comparison',
     styleOverrides: { font: 'serif' },

@@ -13,6 +13,7 @@ const block = createGuideImageBlock({
   source: { kind: 'import', filename: 'image.png' },
 });
 const change = vi.fn();
+const close = vi.fn();
 let host: HTMLDivElement;
 let root: Root;
 let decoded: HTMLImageElement[];
@@ -47,7 +48,7 @@ async function render(url: string | null = 'blob:image', disabled = false) {
         url={url}
         disabled={disabled}
         onChange={change}
-        onClose={vi.fn()}
+        onClose={close}
         t={createTranslator('en')}
       />
     )
@@ -75,14 +76,19 @@ it('changes fit and resets the frame from the decoded image dimensions', async (
 it('edits bounded zoom/frame fields and keeps caption and alternative text as plain text', async () => {
   await render();
   const update = async (label: string, value: string) => {
-    const field = [...host.querySelectorAll('label')]
-      .find((node) => node.textContent === label)
-      ?.querySelector('input');
+    const field =
+      host.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`) ??
+      [...host.querySelectorAll('label')]
+        .find((node) => node.textContent === label)
+        ?.querySelector('input');
     if (!field) throw new Error(`Missing ${label}`);
     await act(async () => {
       Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(field, value);
       field.dispatchEvent(new Event('input', { bubbles: true }));
     });
+    await act(async () =>
+      field.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    );
   };
   await update('Zoom, %', '200');
   expect(change.mock.calls.at(-1)?.[0].contentTransform.scale).toBe(2);
@@ -122,4 +128,32 @@ it('keeps geometry disabled after a decode failure or while edits are locked', a
   await click('Zoom 100%');
   await click('Center image');
   expect(change).not.toHaveBeenCalled();
+});
+
+it('lets numeric Escape cancel the draft before inspector dismissal', async () => {
+  await render();
+  const field = host.querySelector<HTMLInputElement>('input[aria-label="Zoom, %"]')!;
+  await act(async () => field.focus());
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(field, '250');
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(field.value).toBe('250');
+  await act(async () =>
+    field.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    )
+  );
+  expect(close).not.toHaveBeenCalled();
+  expect(change).not.toHaveBeenCalled();
+  expect(field.value).toBe('100');
+  await act(async () => field.blur());
+  expect(change).not.toHaveBeenCalled();
+  const action = host.querySelector<HTMLButtonElement>('[aria-label="Center image"]')!;
+  await act(async () =>
+    action.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    )
+  );
+  expect(close).toHaveBeenCalledOnce();
 });

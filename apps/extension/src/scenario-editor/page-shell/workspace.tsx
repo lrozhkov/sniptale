@@ -9,6 +9,8 @@ import { GuidePanelDivider, type useGuidePanels } from './panel-layout';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
 import './workspace.css';
+import './inspector.css';
+import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 
 type WorkspaceProps = {
   panels: ReturnType<typeof useGuidePanels>;
@@ -182,6 +184,18 @@ function GuideInspector(props: WorkspaceProps & { open: boolean }) {
         >
           <X size={16} aria-hidden="true" />
         </ContentToolbarButton>
+      </div>
+      <div className="guide-inspector-scope">
+        <SegmentedSwitch
+          density="compact"
+          ariaLabel={t('scenario.editor.guideSettingsScope')}
+          activeId={props.panels.rightScope}
+          options={[
+            { id: 'selection', label: t('scenario.editor.guideSelectedScope') },
+            { id: 'document', label: t('scenario.editor.projectLabel') },
+          ]}
+          onChange={props.panels.selectRightScope}
+        />
       </div>
       <div className="guide-panel-scroll">{props.itemActions}</div>
     </FloatingChromePanel>

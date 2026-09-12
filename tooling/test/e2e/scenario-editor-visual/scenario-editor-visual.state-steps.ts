@@ -283,9 +283,12 @@ export async function verifyImageFraming(page: Page, testInfo: TestInfo): Promis
   await expect(figure.locator('.guide-image-controls')).toHaveCount(0);
   await controls.getByRole('button', { name: 'Center image', exact: true }).click();
   await controls.getByRole('button', { name: 'Fill', exact: true }).click();
-  await controls.getByRole('spinbutton', { name: 'Frame width', exact: true }).fill('500');
-  await controls.getByRole('spinbutton', { name: 'Frame height', exact: true }).fill('320');
-  await controls.getByRole('spinbutton', { name: 'Zoom, %', exact: true }).fill('150');
+  await controls.getByRole('textbox', { name: 'Frame width', exact: true }).fill('500');
+  await controls.getByRole('textbox', { name: 'Frame width', exact: true }).press('Enter');
+  await controls.getByRole('textbox', { name: 'Frame height', exact: true }).fill('320');
+  await controls.getByRole('textbox', { name: 'Frame height', exact: true }).press('Enter');
+  await controls.getByRole('textbox', { name: 'Zoom, %', exact: true }).fill('150');
+  await controls.getByRole('textbox', { name: 'Zoom, %', exact: true }).press('Enter');
   await controls.getByRole('textbox', { name: 'Caption', exact: true }).fill('Framed screenshot');
   await controls
     .getByRole('textbox', { name: 'Alternative text', exact: true })

@@ -32,11 +32,7 @@ it('emits only each edited style property so other defaults remain inherited', a
       ['Plain', { numberStyle: 'plain' }],
     ] as const;
     for (const [label, patch] of cases) {
-      const button = [...host.querySelectorAll('button')].find(
-        (node) => node.textContent === label
-      );
-      if (!button) throw new Error(`Missing ${label}`);
-      await act(async () => button.click());
+      await chooseStyle(host, label);
       expect(change).toHaveBeenLastCalledWith(patch);
     }
     const reset = host.querySelector<HTMLButtonElement>('.guide-style-accent button')!;
@@ -48,3 +44,25 @@ it('emits only each edited style property so other defaults remain inherited', a
     vi.unstubAllGlobals();
   }
 });
+
+async function chooseStyle(host: HTMLElement, label: string) {
+  const fields: Record<string, string> = {
+    Compact: 'Spacing',
+    Wide: 'Content width',
+    Strong: 'Image border',
+  };
+  const field = fields[label];
+  if (field) {
+    await act(async () =>
+      host.querySelector<HTMLButtonElement>(`[aria-label="${field}"]`)!.click()
+    );
+    const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+      (node) => node.textContent === label
+    )!;
+    await act(async () => option.click());
+    return;
+  }
+  const button = [...host.querySelectorAll('button')].find((node) => node.textContent === label);
+  if (!button) throw new Error(`Missing ${label}`);
+  await act(async () => button.click());
+}

@@ -37,9 +37,11 @@ async function render(item = project.items[0]!, disabled = false) {
   );
 }
 function input(label: string) {
-  const field = [...host.querySelectorAll('label')]
-    .find((node) => node.textContent === label)
-    ?.querySelector('input');
+  const field =
+    host.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`) ??
+    [...host.querySelectorAll('label')]
+      .find((node) => node.textContent === label)
+      ?.querySelector('input');
   if (!field) throw new Error(`Missing ${label}`);
   return field;
 }
@@ -52,21 +54,30 @@ async function fill(label: string, value: string) {
 }
 it('controls visibility/restart with separate undo boundaries and bounds the start value', async () => {
   await render();
-  await act(async () => input('Show step number').click());
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[aria-label="Show step number"]')!.click()
+  );
   expect(change.mock.calls.at(-1)).toEqual([{ ...project.items[0], showNumber: false }, null]);
-  await act(async () => input('Restart numbering').click());
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[aria-label="Restart numbering"]')!.click()
+  );
   expect(change.mock.calls.at(-1)).toEqual([
     { ...project.items[0], numbering: { restartAt: 1 } },
     null,
   ]);
   await render(change.mock.calls.at(-1)![0]);
   await fill('Start at', '5');
+  await act(async () =>
+    input('Start at').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  );
   expect(change.mock.calls.at(-1)?.[0].numbering).toEqual({ restartAt: 5 });
   expect(change.mock.calls.at(-1)?.[1]).toBe('number-start:first');
   const count = change.mock.calls.length;
   for (const invalid of ['', '0', '1.5', '10000']) await fill('Start at', invalid);
   expect(change).toHaveBeenCalledTimes(count);
-  await act(async () => input('Restart numbering').click());
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[aria-label="Restart numbering"]')!.click()
+  );
   expect(change.mock.calls.at(-1)?.[0].numbering?.restartAt).toBeUndefined();
   expectCanonical(change.mock.calls.at(-1)![0]);
 });
@@ -94,16 +105,42 @@ it('offers only restart for a section and removes its override when disabled', a
     numbering: { restartAt: 3 },
   } as const;
   await render({ ...section, paragraphs: [] });
-  expect(host.querySelectorAll('input')).toHaveLength(2);
+  expect(host.querySelectorAll('input')).toHaveLength(1);
   expect(host.querySelector('output')?.textContent).toBe('3');
-  await act(async () => input('Restart numbering').click());
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[aria-label="Restart numbering"]')!.click()
+  );
   expectCanonical(change.mock.calls.at(-1)![0]);
   await render({ ...section, paragraphs: [] }, true);
   const count = change.mock.calls.length;
-  await act(async () => input('Restart numbering').click());
+  await act(async () =>
+    host.querySelector<HTMLButtonElement>('[aria-label="Restart numbering"]')!.click()
+  );
   expect(change).toHaveBeenCalledTimes(count);
 });
 
 function expectCanonical(item: (typeof project.items)[number]) {
   expect(parseGuideProject({ ...project, items: [item, project.items[1]!] }).status).toBe('ok');
 }
+
+it('preserves an empty numeric draft and commits bounded whole numbers', async () => {
+  await render({ ...project.items[0]!, numbering: { restartAt: 12 } });
+  await fill('Start at', '');
+  expect(input('Start at').value).toBe('');
+  expect(change).not.toHaveBeenCalled();
+  await act(async () =>
+    input('Start at').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  expect(input('Start at').value).toBe('12');
+  await fill('Start at', '1.7');
+  await act(async () =>
+    input('Start at').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  );
+  expect(change.mock.calls.at(-1)?.[0].numbering.restartAt).toBe(2);
+  expectCanonical(change.mock.calls.at(-1)![0]);
+  await fill('Start at', '0');
+  await act(async () =>
+    input('Start at').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  );
+  expect(change.mock.calls.at(-1)?.[0].numbering.restartAt).toBe(1);
+});

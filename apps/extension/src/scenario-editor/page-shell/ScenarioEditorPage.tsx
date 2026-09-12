@@ -8,6 +8,8 @@ import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/gu
 import { GuideBlockInspector } from './block-inspector';
 import { GuideReader, useGuideReaderMode } from './reader';
 import { GuideAppearance } from './appearance';
+import { GuideDefaultAppearance } from './default-appearance';
+import { applyGuideDefaultStyle } from '../../features/scenario/project/public';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { GuidePageHeader } from './header';
 import { useEffect, useState, type KeyboardEvent } from 'react';
@@ -27,9 +29,8 @@ export function ScenarioEditorPage() {
   const state = useGuidePageState();
   const panels = useGuidePanels();
   const imageEditor = useGuideImageEditorMode(state.images);
-  const { project, status } = state;
+  const { project, status, editingLocked: disabled } = state;
   const reader = useGuideReaderMode(state.sealEdit);
-  const disabled = state.editingLocked;
   const commandsDisabled = disabled || state.mutationPending;
   const importDisabled = commandsDisabled || status === 'conflict';
   const importSources = (
@@ -63,6 +64,7 @@ export function ScenarioEditorPage() {
     <GuidePageHeader
       aiSelection={{ stepId: selectedStepId, blockId: framing.target?.block.id ?? null }}
       onAiOpen={state.sealEdit}
+      onAppearance={() => panels.openRight('document')}
       onPreview={reader.open}
       previewRef={reader.trigger}
       previewDisabled={state.mutationPending}
@@ -122,6 +124,7 @@ export function ScenarioEditorPage() {
             onAddStep={() => operate({ kind: 'add-step' })}
             itemActions={
               <GuideContextualInspector
+                scope={panels.rightScope}
                 project={project}
                 selectedId={state.selectedId}
                 framing={framing}
@@ -191,6 +194,7 @@ function handleGuideHistoryShortcut(
 
 /** Routes the right inspector to current image framing or the selected step's appearance. */
 function GuideContextualInspector({
+  scope,
   project,
   selectedId,
   framing,
@@ -201,12 +205,26 @@ function GuideContextualInspector({
 }: {
   project: GuideProject;
   selectedId: string | null;
+  scope: 'selection' | 'document';
   framing: ReturnType<typeof useGuideBlockSelection>;
   images: Record<string, string | null>;
   disabled: boolean;
   onChange: ReturnType<typeof useGuidePageState>['update'];
   t: Translate;
 }) {
+  if (scope === 'document')
+    return (
+      <GuideDefaultAppearance
+        style={project.style}
+        disabled={disabled}
+        t={t}
+        onApply={(style, resetSteps) =>
+          onChange(applyGuideDefaultStyle(project, style, resetSteps))
+        }
+      />
+    );
+  if (!selectedId)
+    return <p className="guide-inspector-hint">{t('scenario.editor.guideSelectForSettings')}</p>;
   return framing.target?.block.kind === 'image' ? (
     <GuideImageControls
       block={framing.target.block}
@@ -239,7 +257,7 @@ function GuideContextualInspector({
 /** Owns one disposable block selection; edits still use the page's canonical updater. */
 function useGuideBlockSelection(
   state: Pick<ReturnType<typeof useGuidePageState>, 'project' | 'selectedId' | 'update'>,
-  panels: Pick<ReturnType<typeof useGuidePanels>, 'rightOpen' | 'toggleRight'>,
+  panels: Pick<ReturnType<typeof useGuidePanels>, 'rightOpen' | 'toggleRight' | 'selectRightScope'>,
   selectItem: (id: string, requestFocus?: boolean) => void
 ) {
   const [selection, setSelection] = useState<{ itemId: string; blockId: string } | null>(null);
@@ -268,6 +286,7 @@ function useGuideBlockSelection(
     imageId: target?.block.kind === 'image' ? target.block.id : null,
     close,
     selectBlock: (itemId: string, blockId: string | null) => {
+      panels.selectRightScope('selection');
       selectItem(itemId, false);
       setSelection(blockId ? { itemId, blockId } : null);
       if (blockId && !panels.rightOpen && window.innerWidth >= 1200) panels.toggleRight();
@@ -277,6 +296,7 @@ function useGuideBlockSelection(
         close();
         return;
       }
+      panels.selectRightScope('selection');
       selectItem(itemId, false);
       setSelection({ itemId, blockId });
       if (!panels.rightOpen) panels.toggleRight();

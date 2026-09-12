@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, type ReactNode } from 'react';
+import { act, type ReactNode, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import {
@@ -20,6 +20,13 @@ const io = vi.hoisted(() => ({
   importImages: vi.fn(),
   select: vi.fn(),
   mount: vi.fn(),
+}));
+vi.mock('./library-browser', () => ({
+  GuideLibraryBrowser: ({
+    onChoose,
+  }: Pick<ComponentProps<typeof GuideLibraryBrowser>, 'onChoose'>) => (
+    <button onClick={() => onChoose('library-image', 'one.png', 'image')}>Library image</button>
+  ),
 }));
 vi.mock('./runtime/resource-session', () => ({ useGuideResourceSession: () => enterSession }));
 const enterSession = async () => true;
@@ -54,6 +61,7 @@ vi.mock('../../platform/i18n', async (importOriginal) => ({
 }));
 vi.mock('../../ui/page-bootstrap', () => ({ renderPageShell: io.mount }));
 import { ScenarioEditorPage } from './ScenarioEditorPage';
+import type { GuideLibraryBrowser } from './library-browser';
 
 let root: Root;
 let container: HTMLDivElement;
@@ -542,8 +550,8 @@ it('supports optional numbering and editable sections with structural undo', asy
   const stepField = container.querySelector('article#first .guide-step-title');
   if (!(stepField instanceof HTMLTextAreaElement)) throw new Error('Missing field');
   await act(async () => stepField.focus());
-  const number = container.querySelector('input[type="checkbox"]');
-  if (!(number instanceof HTMLInputElement)) throw new Error('Missing number control');
+  const number = container.querySelector('[role="switch"][aria-label="Show step number"]');
+  if (!(number instanceof HTMLButtonElement)) throw new Error('Missing number control');
   await act(async () => number.click());
   expect(container.querySelector('article#first header > span:not(.guide-voice-field)')).toBeNull();
   await click('Undo');
@@ -663,11 +671,7 @@ it('accepts image import as one undoable publication and saves undo against its 
   await editField('article#first .guide-step-title', 'Unsaved title');
   await click('Resources');
   await click('Image library');
-  const fileInput = document.querySelector('input[type="file"]');
-  Object.defineProperty(fileInput, 'files', {
-    value: [new File(['png'], 'one.png', { type: 'image/png' })],
-  });
-  await act(async () => fileInput?.dispatchEvent(new Event('change', { bubbles: true })));
+  await click('Library image', document.body);
   await click('Import selected', document.body);
   await click('Close', document.body);
   expect(io.importImages.mock.calls[0]?.[0]).toMatchObject({

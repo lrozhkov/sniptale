@@ -12,9 +12,12 @@ for (const theme of ['light', 'dark'] as const) {
     const figure = page.locator('article#compare figure').first();
     await figure.hover();
     await figure.getByRole('button', { name: 'Frame and image', exact: true }).click();
-    await page.getByRole('spinbutton', { name: 'Frame width', exact: true }).fill('200');
-    await page.getByRole('spinbutton', { name: 'Frame height', exact: true }).fill('200');
-    await page.getByRole('spinbutton', { name: 'Zoom, %', exact: true }).fill('50');
+    await page.getByRole('textbox', { name: 'Frame width', exact: true }).fill('200');
+    await page.getByRole('textbox', { name: 'Frame width', exact: true }).press('Enter');
+    await page.getByRole('textbox', { name: 'Frame height', exact: true }).fill('200');
+    await page.getByRole('textbox', { name: 'Frame height', exact: true }).press('Enter');
+    await page.getByRole('textbox', { name: 'Zoom, %', exact: true }).fill('50');
+    await page.getByRole('textbox', { name: 'Zoom, %', exact: true }).press('Enter');
     await page.getByRole('button', { name: 'Fill', exact: true }).click();
     const frame = figure.locator('.guide-image-frame');
     await frame.focus();

@@ -95,9 +95,7 @@ export function GuideDocument({
                 id={item.id}
                 tabIndex={-1}
                 data-selected={selectedId === item.id}
-                onFocusCapture={() => {
-                  if (selectedId !== item.id) onSelect(item.id);
-                }}
+                onFocusCapture={() => onSelectBlock(item.id, null)}
               >
                 <GuideSectionContent
                   project={project}

@@ -1187,3 +1187,51 @@ test('shared library navigation stays aligned in the built video editor', async 
   });
   await page.close();
 });
+
+for (const theme of SCENARIO_VISUAL_THEMES) {
+  test(`right inspector keeps Russian controls and document scope clear in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }, testInfo) => {
+    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1440, height: 900 });
+    const inspector = page.locator('#guide-inspector-panel');
+    const rightDivider = page.locator('.guide-panel-divider-right');
+    await rightDivider.focus();
+    for (let i = 0; i < 15; i++) await page.keyboard.press('ArrowRight');
+    await expect(rightDivider).toHaveAttribute('aria-valuenow', '260');
+    await page.locator('.guide-page-header .guide-action-menu-anchor button').click();
+    await page.getByRole('button', { name: 'Оформление сценария', exact: true }).click();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(inspector.getByText('Весь сценарий', { exact: true })).toBeVisible();
+    await expect(inspector.getByRole('button', { name: 'Сценарий', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    const clipped = await inspector.evaluate((node) =>
+      [...node.querySelectorAll('button span, .guide-inspector-choice > span')]
+        .filter((el) => el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1)
+        .map((el) => el.textContent)
+    );
+    expect(clipped).toEqual([]);
+    await expect(inspector.locator('input[type="checkbox"]')).toHaveCount(0);
+    await testInfo.attach(`inspector-document-${theme}`, {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+    await page.locator('article#compare .guide-step-title').click();
+    await expect(inspector.getByRole('button', { name: 'Выбранное', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    await expect(inspector.getByRole('button', { name: 'Макет шага', exact: true })).toBeVisible();
+    await inspector.getByRole('switch', { name: 'Начать новый отсчёт', exact: true }).click();
+    const start = inspector.getByRole('textbox', { name: 'Начать с', exact: true });
+    await start.fill('12');
+    await start.press('Enter');
+    await expect(start).toHaveValue('12');
+    await testInfo.attach(`inspector-step-${theme}`, {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+  });
+}

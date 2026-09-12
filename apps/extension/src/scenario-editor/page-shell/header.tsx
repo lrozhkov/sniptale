@@ -12,6 +12,7 @@ export function GuidePageHeader({
   panelControls,
   aiSelection,
   onAiOpen,
+  onAppearance,
   leftControls,
   status,
   commandsDisabled,
@@ -34,6 +35,7 @@ export function GuidePageHeader({
   panelControls?: ReactNode;
   aiSelection?: { stepId: string | null; blockId: string | null };
   onAiOpen?: () => void;
+  onAppearance: () => void;
   leftControls?: ReactNode;
   status: ComponentProps<typeof GuideProjectActions>['status'];
   commandsDisabled: boolean;
@@ -130,7 +132,7 @@ export function GuidePageHeader({
                 onDuplicate={onDuplicate}
                 onDelete={onDelete}
                 onReload={onReload}
-                onChange={onChange}
+                onAppearance={onAppearance}
                 t={t}
               />
             </>

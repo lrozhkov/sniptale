@@ -18,7 +18,8 @@ for (const theme of ['light', 'dark'] as const) {
     const figure = page.locator('article#compare figure').first();
     await figure.hover();
     await figure.getByRole('button', { name: 'Frame and image', exact: true }).click();
-    await page.getByRole('spinbutton', { name: 'Frame height', exact: true }).fill('2200');
+    await page.getByRole('textbox', { name: 'Frame height', exact: true }).fill('2200');
+    await page.getByRole('textbox', { name: 'Frame height', exact: true }).press('Enter');
     await page
       .locator('.guide-image-inspector')
       .getByRole('button', { name: 'Done', exact: true })

@@ -1,5 +1,27 @@
 import { defineMessageSource } from '../../source';
 export const scenarioEditorCoreMessages = defineMessageSource({
+  guideFramingGroup: { ru: 'Кадрирование', en: 'Framing' },
+  guideEntireDocument: { ru: 'Весь сценарий', en: 'Entire guide' },
+  guideSettingsScope: { ru: 'Область настроек', en: 'Settings scope' },
+  guideSelectedScope: { ru: 'Выбранное', en: 'Selection' },
+  guideDefaultScopeHint: {
+    ru: 'Общий стиль сценария. Индивидуальное оформление шагов сохраняется.',
+    en: 'Guide defaults. Individual step styles are preserved.',
+  },
+  guideApplyAllSteps: { ru: 'Применить ко всем шагам', en: 'Apply to all steps' },
+  guideApplyAllHint: {
+    ru: 'Заменит индивидуальное оформление шагов общим стилем. Действие можно отменить.',
+    en: 'Replace individual step styles with these defaults. You can undo this action.',
+  },
+  guideStyleGroup: { ru: 'Стиль', en: 'Style' },
+  guideLayoutGroup: { ru: 'Компоновка', en: 'Composition' },
+  guideDetailsGroup: { ru: 'Детали', en: 'Details' },
+  guidePlacementGroup: { ru: 'Размещение', en: 'Placement' },
+  guideDescriptionGroup: { ru: 'Описание', en: 'Description' },
+  guideSelectForSettings: {
+    ru: 'Выберите шаг или элемент на холсте.',
+    en: 'Select a step or element on the canvas.',
+  },
   guideLibraryVideoSearch: { ru: 'Поиск видео', en: 'Search videos' },
   guideLibraryVideoEmpty: { ru: 'Видео не найдены.', en: 'No videos found.' },
   guideResourceType: { ru: 'Тип ресурсов', en: 'Resource type' },

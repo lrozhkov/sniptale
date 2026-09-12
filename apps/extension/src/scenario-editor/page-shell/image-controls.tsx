@@ -1,5 +1,5 @@
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { Check, Focus, Maximize2, RotateCcw } from 'lucide-react';
+import { Check, Focus, Maximize2, RotateCcw, ScanLine, Text } from 'lucide-react';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { useEffect, useState } from 'react';
@@ -8,6 +8,7 @@ import {
   type GuideImageBlock,
 } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
+import { GuideInspectorGroup, GuideInspectorNumber } from './inspector';
 import { changeGuideImageGeometry } from './image-geometry';
 
 /** Decodes current leased media for reset dimensions without acquiring or revoking its URL. */
@@ -60,7 +61,8 @@ export function GuideImageControls({
   return (
     <div
       className="guide-image-inspector"
-      onKeyDownCapture={(event) => {
+      onKeyDown={(event) => {
+        if (event.defaultPrevented) return;
         if (event.key === 'Escape') {
           event.preventDefault();
           event.stopPropagation();
@@ -76,79 +78,73 @@ export function GuideImageControls({
       </div>
       <fieldset className="guide-image-controls" disabled={disabled}>
         <legend className="sr-only">{t('scenario.editor.guideEditImageFrame')}</legend>
-        <p>{t('scenario.editor.guideImageGestureHint')}</p>
-        <SegmentedSwitch
-          activeId={block.fit}
-          ariaLabel={t('scenario.editor.guideImageFit')}
-          options={[
-            { id: 'contain', label: t('scenario.editor.guideImageContain') },
-            { id: 'cover', label: t('scenario.editor.guideImageCover') },
-          ]}
-          onChange={(fit) => geometry({ kind: 'fit', fit })}
-        />
-        <label className="guide-image-zoom">
-          {t('scenario.editor.guideImageZoom')}
-          <ProductInput
-            type="number"
-            min="10"
-            max="10000"
-            step="10"
+        <GuideInspectorGroup icon={ScanLine} title={t('scenario.editor.guideFramingGroup')}>
+          <p>{t('scenario.editor.guideImageGestureHint')}</p>
+          <SegmentedSwitch
+            activeId={block.fit}
+            ariaLabel={t('scenario.editor.guideImageFit')}
+            options={[
+              { id: 'contain', label: t('scenario.editor.guideImageContain') },
+              { id: 'cover', label: t('scenario.editor.guideImageCover') },
+            ]}
+            onChange={(fit) => geometry({ kind: 'fit', fit })}
+          />
+          <GuideInspectorNumber
+            label={t('scenario.editor.guideImageZoom')}
+            min={10}
+            max={10000}
+            step={10}
             disabled={disabled}
             value={Math.round(block.contentTransform.scale * 100)}
-            onChange={(event) => {
-              if (Number.isFinite(event.target.valueAsNumber))
-                geometry(
-                  { kind: 'zoom', scale: event.target.valueAsNumber / 100 },
-                  `image-zoom:${block.id}`
-                );
-            }}
+            onChange={(value) =>
+              geometry({ kind: 'zoom', scale: value / 100 }, `image-zoom:${block.id}`)
+            }
           />
-        </label>
-        {(['width', 'height'] as const).map((dimension) => (
-          <label key={dimension}>
-            {t(
-              dimension === 'width'
-                ? 'scenario.editor.guideImageWidth'
-                : 'scenario.editor.guideImageHeight'
-            )}
-            <ProductInput
-              type="number"
-              min="1"
+          {(['width', 'height'] as const).map((dimension) => (
+            <GuideInspectorNumber
+              key={dimension}
+              label={t(
+                dimension === 'width'
+                  ? 'scenario.editor.guideImageWidth'
+                  : 'scenario.editor.guideImageHeight'
+              )}
+              min={1}
               max={GUIDE_LIMITS.maxDimension}
               disabled={disabled}
               value={Math.round(block.frame[dimension])}
-              onChange={(event) => {
-                if (Number.isFinite(event.target.valueAsNumber))
-                  geometry(
-                    { kind: 'frame', ...block.frame, [dimension]: event.target.valueAsNumber },
-                    `image-${dimension}:${block.id}`
-                  );
-              }}
+              onChange={(value) =>
+                geometry(
+                  { kind: 'frame', ...block.frame, [dimension]: value },
+                  `image-${dimension}:${block.id}`
+                )
+              }
+            />
+          ))}
+        </GuideInspectorGroup>
+        <GuideInspectorGroup icon={Text} title={t('scenario.editor.guideDescriptionGroup')}>
+          <label className="guide-image-description">
+            {t('scenario.editor.guideImageCaption')}
+            <ProductInput
+              value={block.caption}
+              maxLength={GUIDE_LIMITS.maxTextLength}
+              disabled={disabled}
+              onChange={(event) =>
+                onChange({ ...block, caption: event.target.value }, `image-caption:${block.id}`)
+              }
             />
           </label>
-        ))}
-        <label className="guide-image-description">
-          {t('scenario.editor.guideImageCaption')}
-          <ProductInput
-            value={block.caption}
-            maxLength={GUIDE_LIMITS.maxTextLength}
-            disabled={disabled}
-            onChange={(event) =>
-              onChange({ ...block, caption: event.target.value }, `image-caption:${block.id}`)
-            }
-          />
-        </label>
-        <label className="guide-image-description">
-          {t('scenario.editor.guideImageAlt')}
-          <ProductInput
-            value={block.alt}
-            maxLength={GUIDE_LIMITS.maxTextLength}
-            disabled={disabled}
-            onChange={(event) =>
-              onChange({ ...block, alt: event.target.value }, `image-alt:${block.id}`)
-            }
-          />
-        </label>
+          <label className="guide-image-description">
+            {t('scenario.editor.guideImageAlt')}
+            <ProductInput
+              value={block.alt}
+              maxLength={GUIDE_LIMITS.maxTextLength}
+              disabled={disabled}
+              onChange={(event) =>
+                onChange({ ...block, alt: event.target.value }, `image-alt:${block.id}`)
+              }
+            />
+          </label>
+        </GuideInspectorGroup>
         <div className="guide-image-reset-actions">
           <ContentToolbarButton
             title={t('scenario.editor.guideImageResetZoom')}
