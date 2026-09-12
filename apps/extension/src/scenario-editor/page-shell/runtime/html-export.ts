@@ -1,3 +1,4 @@
+import type { GuideReadingOptions } from '../reader-pages';
 import {
   createDirectFileSink,
   sanitizeArchivePathSegment,
@@ -11,6 +12,7 @@ import type { Translate } from '../../../platform/i18n';
 /** Native file commit precedes advisory export history; raster bytes are streamed in bounded slices. */
 export async function exportGuideHtml(args: {
   project: GuideProject;
+  reading?: GuideReadingOptions;
   t: Translate;
   theme: 'light' | 'dark';
   signal: AbortSignal;
@@ -27,7 +29,7 @@ export async function exportGuideHtml(args: {
     args.signal.throwIfAborted();
     const { buildGuideHtml } = await import('../html-document');
     const media = await measureHtmlImages(args.project, args.signal);
-    const document = await buildGuideHtml(args.project, args.t, args.theme, media);
+    const document = await buildGuideHtml(args.project, args.t, args.theme, media, args.reading);
     size = await writeGuideHtml(sink, document, args.signal);
     args.signal.throwIfAborted();
     await sink.close();
@@ -88,13 +90,14 @@ async function writeGuideHtml(
 /** Exact UTF-8 size includes fonts, fixed viewer and each unique base64 payload once. */
 export async function measureGuideHtml(args: {
   project: GuideProject;
+  reading?: GuideReadingOptions;
   t: Translate;
   theme: 'light' | 'dark';
   signal: AbortSignal;
 }) {
   const media = await measureHtmlImages(args.project, args.signal);
   const { buildGuideHtml } = await import('../html-document');
-  const document = await buildGuideHtml(args.project, args.t, args.theme, media);
+  const document = await buildGuideHtml(args.project, args.t, args.theme, media, args.reading);
   args.signal.throwIfAborted();
   const size =
     new TextEncoder().encode(document.html).length +

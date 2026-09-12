@@ -12,17 +12,23 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await page.getByRole('button', { name: 'Export', exact: true }).click();
     const reader = page.locator('.guide-reader');
     await expect(reader.getByRole('heading', { level: 1 })).toHaveText(title);
+    const controlRows = await reader
+      .locator('.guide-reading-options')
+      .evaluate((node) => [...node.children].map((control) => control.getBoundingClientRect().top));
+    expect(Math.abs(controlRows[0]! - controlRows[1]!)).toBeLessThan(2);
     await expect(reader.locator('textarea, input')).toHaveCount(0);
     await expect(reader.locator('img')).toHaveCount(2);
     await expect(reader.getByRole('navigation', { name: 'Guide contents' })).toBeVisible();
     await reader.getByRole('button', { name: 'Step by step', exact: true }).click();
-    await expect(reader.locator('.guide-read-document > *')).toHaveCount(1);
+    await expect(reader.locator('.guide-read-document > *')).toHaveCount(2);
     await expect(reader.locator('article')).toHaveAttribute('id', 'compare');
+    await reader.getByRole('button', { name: 'Next step', exact: true }).click();
+    await expect(reader.locator('section')).toHaveCount(0);
     await reader.getByRole('button', { name: 'Previous step', exact: true }).click();
     await expect(reader.locator('section')).toHaveAttribute('id', 'intro');
     await expect(reader.getByRole('button', { name: 'Previous step', exact: true })).toBeDisabled();
     await page.keyboard.press('ArrowRight');
-    await expect(reader.locator('article')).toHaveAttribute('id', 'compare');
+    await expect(reader.locator('article')).toHaveAttribute('id', 'text-only');
     await expect(reader.locator('article')).toHaveCSS('outline-style', 'none');
     await expect
       .poll(() =>

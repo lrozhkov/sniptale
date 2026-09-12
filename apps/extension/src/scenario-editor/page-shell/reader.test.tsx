@@ -70,6 +70,7 @@ it('navigates bounded reading pages without changing the canonical document', as
       paragraphs: createGuideParagraphs('Read first'),
     },
     createGuideStep('Step', 'step'),
+    createGuideStep('Second', 'second'),
   ];
   const original = structuredClone(project);
   const close = vi.fn();
@@ -94,9 +95,12 @@ it('navigates bounded reading pages without changing the canonical document', as
       )
     );
     expect(document.activeElement).toBe(button('Back to editing'));
-    expect(host.querySelectorAll('.guide-read-document > *')).toHaveLength(2);
+    expect(host.querySelectorAll('.guide-read-document > *')).toHaveLength(3);
     await act(async () => button('Step by step').click());
-    expect(host.querySelectorAll('.guide-read-document > *')).toHaveLength(1);
+    expect(host.querySelectorAll('.guide-read-document > *')).toHaveLength(2);
+    expect(button('Next step').disabled).toBe(false);
+    await act(async () => button('Next step').click());
+    expect(host.querySelector('.guide-read-document section')).toBeNull();
     expect(button('Next step').disabled).toBe(true);
     await act(async () => button('Previous step').click());
     expect(host.querySelector('.guide-read-document section')?.id).toBe('intro');
@@ -106,9 +110,9 @@ it('navigates bounded reading pages without changing the canonical document', as
         new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true })
       )
     );
-    expect(host.querySelector('.guide-read-document article')?.id).toBe('step');
+    expect(host.querySelector('.guide-read-document article')?.id).toBe('second');
     await act(async () => button('Document').click());
-    expect(host.querySelectorAll('.guide-read-document > *')).toHaveLength(2);
+    expect(host.querySelectorAll('.guide-read-document > *')).toHaveLength(3);
     await act(async () => host.querySelector('a')!.click());
     expect(host.querySelector('a')?.getAttribute('aria-current')).toBe('step');
     await act(async () =>

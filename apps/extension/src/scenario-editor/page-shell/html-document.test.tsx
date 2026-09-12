@@ -68,3 +68,36 @@ it('serializes canonical content safely with local styles, fonts and private ima
     "default-src 'none'"
   );
 });
+
+it('projects grouped step navigation without hiding content from script-free readers', async () => {
+  vi.stubGlobal('crypto', webcrypto);
+  try {
+    const project = createGuideProject('Guide');
+    project.items = [
+      { kind: 'section', id: 'intro', title: '<Introduction>', paragraphs: [] },
+      createGuideStep('One', 'one'),
+      createGuideStep('Two', 'two'),
+    ];
+    const result = await buildGuideHtml(
+      project,
+      createTranslator('en'),
+      'light',
+      { rasters: [], blocks: new Map() },
+      { mode: 'steps', navigation: 'side' }
+    );
+    const document = new DOMParser().parseFromString(result.html, 'text/html');
+    expect(document.querySelector('.guide-reading-layout')?.getAttribute('data-reading-mode')).toBe(
+      'steps'
+    );
+    expect(document.querySelector('.guide-reading-layout')?.getAttribute('data-navigation')).toBe(
+      'side'
+    );
+    expect(document.querySelectorAll('[data-guide-target]')).toHaveLength(2);
+    expect(document.querySelectorAll('[data-guide-page="guide-item-one"]')).toHaveLength(2);
+    expect(document.querySelectorAll('.guide-read-document > [hidden]')).toHaveLength(0);
+    expect(document.querySelectorAll('script')).toHaveLength(1);
+    expect(document.querySelector('script')?.textContent).not.toContain('<Introduction>');
+  } finally {
+    vi.unstubAllGlobals();
+  }
+});

@@ -4,6 +4,9 @@ import latin from '@fontsource-variable/manrope/files/manrope-latin-wght-normal.
 import cyrillic from '@fontsource-variable/manrope/files/manrope-cyrillic-wght-normal.woff2?inline';
 import extended from '@fontsource-variable/manrope/files/manrope-latin-ext-wght-normal.woff2?inline';
 import viewerScript from './html-viewer.js?raw';
+import navigationCss from './reader-navigation.css?raw';
+import { GuideReadingNavigation } from './reader-navigation';
+import { DEFAULT_GUIDE_READING, type GuideReadingOptions } from './reader-pages';
 import viewerCss from './html-viewer.css?raw';
 import type { HtmlRaster } from './runtime/html-images';
 import { resolveHtmlImageSettings } from './html-image-settings';
@@ -21,7 +24,8 @@ export async function buildGuideHtml(
   project: GuideProject,
   t: Translate,
   theme: 'light' | 'dark',
-  media: { rasters: HtmlRaster[]; blocks: ReadonlyMap<string, number> }
+  media: { rasters: HtmlRaster[]; blocks: ReadonlyMap<string, number> },
+  reading: GuideReadingOptions = DEFAULT_GUIDE_READING
 ) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(viewerScript));
   const hash = btoa(String.fromCharCode(...new Uint8Array(digest)));
@@ -59,7 +63,7 @@ export async function buildGuideHtml(
           <meta name="viewport" content="width=device-width, initial-scale=1" />
           <meta httpEquiv="Content-Security-Policy" content={policy} />
           <title>{project.name}</title>
-          <style>{tokens + fonts + base + documentCss + viewerCss}</style>
+          <style>{tokens + fonts + base + documentCss + viewerCss + navigationCss}</style>
         </head>
         <body>
           <svg width="0" height="0" aria-hidden="true" style={{ position: 'absolute' }}>
@@ -75,27 +79,47 @@ export async function buildGuideHtml(
               ))}
             </defs>
           </svg>
-          <main>
-            <h1>{project.name}</h1>
-            <GuideReadDocument
-              project={exportedProject}
-              images={{}}
-              t={t}
-              renderImage={(block) => {
-                const index = media.blocks.get(block.id);
-                const raster = index === undefined ? undefined : media.rasters[index];
-                if (!raster || index === undefined) throw new Error('Missing export raster.');
-                return (
-                  <HtmlImage
-                    block={block}
-                    raster={raster}
-                    index={index}
-                    settings={resolveHtmlImageSettings(project, block)}
-                    t={t}
-                  />
-                );
-              }}
-            />
+          <main className="guide-html-shell">
+            <header className="guide-html-heading">
+              <h1>{project.name}</h1>
+              <div data-guide-pagination="" hidden>
+                <button type="button" data-guide-previous="">
+                  {t('scenario.editor.guideReaderPrevious')}
+                </button>
+                <output data-guide-progress="" aria-live="polite" />
+                <button type="button" data-guide-next="">
+                  {t('scenario.editor.guideReaderNext')}
+                </button>
+              </div>
+            </header>
+            <div
+              className="guide-reading-layout"
+              data-reading-mode={reading.mode}
+              data-navigation={reading.navigation}
+            >
+              <GuideReadingNavigation project={exportedProject} t={t} />
+              <div className="guide-html-content">
+                <GuideReadDocument
+                  project={exportedProject}
+                  images={{}}
+                  t={t}
+                  renderImage={(block) => {
+                    const index = media.blocks.get(block.id);
+                    const raster = index === undefined ? undefined : media.rasters[index];
+                    if (!raster || index === undefined) throw new Error('Missing export raster.');
+                    return (
+                      <HtmlImage
+                        block={block}
+                        raster={raster}
+                        index={index}
+                        settings={resolveHtmlImageSettings(project, block)}
+                        t={t}
+                      />
+                    );
+                  }}
+                />
+              </div>
+            </div>
           </main>
           <dialog data-guide-viewer="" aria-label={t('scenario.editor.htmlImageOpen')}>
             <header>

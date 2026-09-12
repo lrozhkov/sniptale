@@ -1,3 +1,5 @@
+import { GuideReadingControls } from './reader-navigation';
+import { DEFAULT_GUIDE_READING, type GuideReadingOptions } from './reader-pages';
 import { formatBytes } from '../../platform/i18n/format-bytes';
 import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowLeft, Check, Circle, Download, Image, RotateCcw, X } from 'lucide-react';
@@ -22,6 +24,7 @@ export function GuideHtmlWorkbench({
   onChange,
   onClose,
   feedback,
+  initialReading = DEFAULT_GUIDE_READING,
   t,
 }: {
   project: GuideProject;
@@ -29,8 +32,10 @@ export function GuideHtmlWorkbench({
   onChange: (project: GuideProject) => void;
   onClose: () => void;
   feedback?: ReactNode;
+  initialReading?: GuideReadingOptions;
   t: Translate;
 }) {
+  const [reading, setReading] = useState(initialReading);
   const entries = guideHtmlImages(project);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [active, setActive] = useState(entries[0]?.block.id);
@@ -38,7 +43,7 @@ export function GuideHtmlWorkbench({
   const [zoom, setZoom] = useState<'fit' | 'full'>('fit');
   const block = entries.find((entry) => entry.block.id === active)?.block;
   const { preview, failed } = useHtmlImagePreview(project, block);
-  const job = useHtmlExportJob(project, t);
+  const job = useHtmlExportJob(project, t, reading);
   const back = useRef<HTMLButtonElement>(null);
   useLayoutEffect(() => {
     back.current?.focus();
@@ -93,6 +98,7 @@ export function GuideHtmlWorkbench({
           </ContentToolbarButton>
         )}
       </header>
+      <GuideReadingControls value={reading} onChange={setReading} disabled={busy} t={t} />
       <div className="guide-html-body">
         <GuideHtmlImageList
           project={project}

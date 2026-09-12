@@ -1,3 +1,4 @@
+import { guideReadingPages } from './reader-pages';
 import type { ReactNode } from 'react';
 import type {
   GuideBlock,
@@ -23,24 +24,38 @@ export function GuideReadDocument({
   project,
   images,
   itemId,
+  itemIds,
   renderImage,
   t,
 }: {
   project: GuideProject;
   images: Record<string, string | null>;
   itemId?: string;
+  itemIds?: readonly string[] | undefined;
   renderImage?: (block: GuideImageBlock) => ReactNode;
   t: Translate;
 }) {
   const numbers = resolveGuideNumbering(project.items);
+  const pages = new Map(
+    guideReadingPages(project.items).flatMap((page) =>
+      page.items.map((item) => [item.id, page.id] as const)
+    )
+  );
   return (
     <div className="guide-document guide-read-document" style={guideDocumentStyle(project.style)}>
       {project.items
-        .filter((item) => !itemId || item.id === itemId)
+        .filter(
+          (item) => (!itemId || item.id === itemId) && (!itemIds || itemIds.includes(item.id))
+        )
         .map((item) => {
           if (item.kind === 'section')
             return (
-              <section id={item.id} key={item.id} tabIndex={-1}>
+              <section
+                data-guide-page={pages.get(item.id)}
+                id={item.id}
+                key={item.id}
+                tabIndex={-1}
+              >
                 {item.title && <h2>{item.title}</h2>}
                 <GuideReadParagraphs paragraphs={item.paragraphs} />
               </section>
@@ -50,6 +65,7 @@ export function GuideReadDocument({
           const blocks = item.blocks.filter(hasReadContent);
           return (
             <article
+              data-guide-page={pages.get(item.id)}
               id={item.id}
               tabIndex={-1}
               key={item.id}

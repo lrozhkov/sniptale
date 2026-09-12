@@ -279,3 +279,41 @@ it('ignores stale image decoding, displays failure and releases the recovered pr
   }
   expect(revoke).toHaveBeenCalledWith('blob:latest');
 });
+
+it('inherits reading mode, forwards output options and invalidates a measured file when mode changes', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  io.measure.mockReset().mockResolvedValue({ size: 100, rasters: [], blocks: new Map() });
+  io.save.mockReset().mockResolvedValue('saved');
+  try {
+    await act(async () =>
+      root.render(
+        <GuideHtmlWorkbench
+          project={createGuideProject('Guide')}
+          images={{}}
+          initialReading={{ mode: 'steps', navigation: 'side' }}
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          t={createTranslator('en')}
+        />
+      )
+    );
+    const button = (name: string) =>
+      [...host.querySelectorAll('button')].find(
+        (node) => (node.getAttribute('title') ?? node.textContent) === name
+      )!;
+    await act(async () => button('Calculate size').click());
+    expect(io.measure.mock.calls[0]?.[0].reading).toEqual({ mode: 'steps', navigation: 'side' });
+    expect(button('Save HTML').disabled).toBe(false);
+    await act(async () => button('Document').click());
+    expect(button('Save HTML').disabled).toBe(true);
+    await act(async () => button('Calculate size').click());
+    await act(async () => button('Save HTML').click());
+    expect(io.save.mock.calls[0]?.[0].reading).toEqual({ mode: 'flow', navigation: 'side' });
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+  }
+});

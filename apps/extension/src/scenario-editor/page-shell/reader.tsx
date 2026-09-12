@@ -4,9 +4,9 @@ import { GuidePrint, useGuidePrintMode } from './print';
 import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowLeft, ChevronLeft, ChevronRight, Printer } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
+import { GuideReadingControls, GuideReadingNavigation } from './reader-navigation';
+import { DEFAULT_GUIDE_READING, guideReadingPages } from './reader-pages';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
-import { resolveGuideNumbering } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
 import { GuideReadDocument } from './reader-document';
 
@@ -30,11 +30,11 @@ export function GuideReader({
 }) {
   const print = useGuidePrintMode();
   const html = useGuideReaderMode(() => {});
-  const { mode, setMode, panel, index, current, select, move } = useReaderNavigation(
+  const { options, setOptions, pages, panel, index, current, select, move } = useReaderNavigation(
     project,
     initialId
   );
-  const numbers = resolveGuideNumbering(project.items);
+  const { mode } = options;
   const back = useRef<HTMLButtonElement>(null);
   useLayoutEffect(() => {
     back.current?.focus();
@@ -42,6 +42,7 @@ export function GuideReader({
   if (html.active)
     return (
       <GuideHtmlWorkbench
+        initialReading={options}
         project={project}
         images={images}
         onChange={onChange}
@@ -85,16 +86,7 @@ export function GuideReader({
           <Printer size={16} aria-hidden="true" />
           <span>{t('scenario.editor.guidePrintAction')}</span>
         </ContentToolbarButton>
-        <SegmentedSwitch
-          density="compact"
-          ariaLabel={t('scenario.editor.guideReaderMode')}
-          activeId={mode}
-          options={[
-            { id: 'flow', label: t('scenario.editor.guideReaderFlow') },
-            { id: 'steps', label: t('scenario.editor.guideReaderSteps') },
-          ]}
-          onChange={setMode}
-        />
+        <GuideReadingControls value={options} onChange={setOptions} t={t} />
         {mode === 'steps' && (
           <div className="guide-reader-pagination">
             <ContentToolbarButton
@@ -105,11 +97,11 @@ export function GuideReader({
               <ChevronLeft size={16} aria-hidden="true" />
             </ContentToolbarButton>
             <span aria-live="polite">
-              {project.items.length ? index + 1 : 0} / {project.items.length}
+              {pages.length ? index + 1 : 0} / {pages.length}
             </span>
             <ContentToolbarButton
               title={t('scenario.editor.guideReaderNext')}
-              disabled={index >= project.items.length - 1}
+              disabled={index >= pages.length - 1}
               onClick={() => move(1)}
             >
               <ChevronRight size={16} aria-hidden="true" />
@@ -118,34 +110,20 @@ export function GuideReader({
         )}
       </header>
       {feedback}
-      <div className="guide-reader-body">
-        <nav aria-label={t('scenario.editor.guideReaderOutline')}>
-          {project.items.map((item) => (
-            <a
-              key={item.id}
-              href={`#${item.id}`}
-              aria-current={current?.id === item.id ? 'step' : undefined}
-              onClick={(event) => {
-                event.preventDefault();
-                select(item.id);
-              }}
-            >
-              {numbers.get(item.id)?.label && <span>{numbers.get(item.id)?.label} </span>}
-              {item.title ||
-                t(
-                  item.kind === 'section'
-                    ? 'scenario.editor.guideSectionTitle'
-                    : 'scenario.editor.guideStepTitle'
-                )}
-            </a>
-          ))}
-        </nav>
+      <div
+        className="guide-reader-body guide-reading-layout"
+        data-navigation={options.navigation}
+        data-reading-mode={mode}
+      >
+        <GuideReadingNavigation project={project} currentId={current?.id} onSelect={select} t={t} />
         <div ref={panel} className="guide-document-scroll">
           {project.items.length ? (
             <GuideReadDocument
               project={project}
               images={images}
-              {...(mode === 'steps' && current ? { itemId: current.id } : {})}
+              {...(mode === 'steps' && current
+                ? { itemIds: current.items.map((item) => item.id) }
+                : {})}
               t={t}
             />
           ) : (
@@ -184,7 +162,8 @@ export function useGuideReaderMode(beforeOpen: () => void) {
 
 /** Reading navigation and document focus share one disposable selection lifetime. */
 function useReaderNavigation(project: GuideProject, initialId: string | null) {
-  const [mode, setMode] = useState<'flow' | 'steps'>('flow');
+  const [options, setOptions] = useState(DEFAULT_GUIDE_READING);
+  const pages = guideReadingPages(project.items);
   const [selection, setSelection] = useState({
     id: initialId ?? project.items[0]?.id ?? null,
     sequence: 0,
@@ -195,19 +174,20 @@ function useReaderNavigation(project: GuideProject, initialId: string | null) {
   const panel = useRef<HTMLDivElement>(null);
   const index = Math.max(
     0,
-    project.items.findIndex((item) => item.id === selectedId)
+    pages.findIndex((page) => page.items.some((item) => item.id === selectedId))
   );
-  const current = project.items[index];
+  const current = pages[index];
+  const targetId = options.mode === 'steps' ? current?.items[0]?.id : selectedId;
   useLayoutEffect(() => {
     const target = [
       ...(panel.current?.querySelectorAll<HTMLElement>('article, section') ?? []),
-    ].find((item) => item.id === selectedId);
+    ].find((item) => item.id === targetId);
     if (selection.sequence > 0) target?.focus({ preventScroll: true });
     target?.scrollIntoView?.({ block: 'start' });
-  }, [selectedId, selection.sequence, mode]);
+  }, [targetId, selection.sequence, options.mode]);
   const move = (direction: -1 | 1) => {
-    const item = project.items[index + direction];
+    const item = pages[index + direction];
     if (item) select(item.id);
   };
-  return { mode, setMode, panel, index, current, select, move };
+  return { options, setOptions, pages, panel, index, current, select, move };
 }

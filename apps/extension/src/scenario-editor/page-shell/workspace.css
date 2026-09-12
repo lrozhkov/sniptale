@@ -1,3 +1,4 @@
+@import './reader-navigation.css';
 @import './document.css';
 .guide-page {
   height: 100dvh;
@@ -1439,33 +1440,11 @@ html[data-guide-reordering] .guide-block-grip {
   font-weight: 600;
 }
 .guide-reader-body {
-  display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
   flex: 1;
-  min-height: 0;
-  gap: 0.5rem;
 }
-.guide-reader-body > nav,
 .guide-reader-body > .guide-document-scroll {
   border-radius: var(--sniptale-radius-lg);
   background: var(--sniptale-color-surface-panel);
-}
-.guide-reader-body > nav {
-  padding: 0.5rem;
-  overflow: auto;
-}
-.guide-reader nav a {
-  display: block;
-  padding: 0.5rem;
-  border-radius: var(--sniptale-radius-sm);
-  color: inherit;
-  font-size: 0.8125rem;
-  overflow-wrap: anywhere;
-  text-decoration: none;
-}
-.guide-reader nav a[aria-current],
-.guide-reader nav a:hover {
-  background: var(--sniptale-color-surface-hover);
 }
 .guide-reader-pagination {
   display: flex;
@@ -1479,13 +1458,6 @@ html[data-guide-reordering] .guide-block-grip {
   outline-offset: 1px;
 }
 @media (max-width: 900px) {
-  .guide-reader-body {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
-  }
-  .guide-reader-body > nav {
-    max-height: 7rem;
-  }
   .guide-reader > header {
     flex-wrap: wrap;
     height: auto;

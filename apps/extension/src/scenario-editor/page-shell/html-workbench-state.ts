@@ -1,3 +1,4 @@
+import { DEFAULT_GUIDE_READING, type GuideReadingOptions } from './reader-pages';
 import { useEffect, useEffectEvent, useRef, useState } from 'react';
 import type {
   GuideImageBlock,
@@ -9,12 +10,23 @@ import { prepareHtmlImage } from './runtime/html-images';
 import { exportGuideHtml, measureGuideHtml } from './runtime/html-export';
 
 /** One disposable owner cancels obsolete measurements and file jobs on content change or exit. */
-export function useHtmlExportJob(project: GuideProject, t: Translate) {
+export function useHtmlExportJob(
+  project: GuideProject,
+  t: Translate,
+  reading: GuideReadingOptions = DEFAULT_GUIDE_READING
+) {
   const { updatedAt, ...content } = project;
   void updatedAt;
   const theme = document.documentElement.dataset['theme'] === 'dark' ? 'dark' : 'light';
   const revision = JSON.stringify(
-    [content, theme, t('scenario.editor.htmlImageOpen'), t('common.actions.close')],
+    [
+      content,
+      theme,
+      reading,
+      t('scenario.editor.htmlImageOpen'),
+      t('common.actions.close'),
+      t('scenario.editor.guideReaderNext'),
+    ],
     (_key, value: unknown) =>
       value && typeof value === 'object' && !Array.isArray(value)
         ? Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)))
@@ -42,6 +54,7 @@ export function useHtmlExportJob(project: GuideProject, t: Translate) {
     setStatus('pending');
     const args = {
       project,
+      reading,
       t,
       signal: controller.signal,
       theme: theme === 'dark' ? ('dark' as const) : ('light' as const),
