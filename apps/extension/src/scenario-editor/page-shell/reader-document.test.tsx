@@ -80,7 +80,7 @@ it('renders all images and semantic prose without edit controls or empty placeho
   expect(doc.querySelector('a em strong')?.textContent).toBe('Docs');
   expect(doc.querySelector('a')?.getAttribute('rel')).toBe('noopener noreferrer');
   expect(doc.querySelector('[data-block-id="formatted"] br')).not.toBeNull();
-  expect(doc.querySelector('[data-block-id="image"]')?.getAttribute('data-width')).toBe('half');
+  expect(doc.querySelector('[data-block-id="image"]')?.getAttribute('data-width')).toBe('50');
 });
 
 it('resolves numbering over the whole document when reading one item and reports missing media', () => {

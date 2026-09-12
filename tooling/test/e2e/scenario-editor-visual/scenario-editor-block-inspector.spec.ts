@@ -20,9 +20,9 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     const inspector = page.locator('#guide-inspector-panel');
     await block.locator('textarea').focus();
     await inspector.getByRole('button', { name: 'Half width', exact: true }).click();
-    await expect(block).toHaveAttribute('data-width', 'half');
+    await expect(block).toHaveAttribute('data-width', '50');
     await page.getByRole('button', { name: 'Undo', exact: true }).click();
-    await expect(block).toHaveAttribute('data-width', 'full');
+    await expect(block).toHaveAttribute('data-width', '100');
     const add = step
       .locator('.guide-insertion-block')
       .last()
@@ -31,11 +31,13 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await add.click();
     const note = step.locator('.guide-block[data-kind="note"]').last();
     await note.locator('textarea').fill('Keep this note.');
-    await inspector.getByRole('button', { name: 'Warning', exact: true }).click();
+    await inspector.getByRole('button', { name: 'Note type', exact: true }).click();
+    await page.getByRole('option', { name: 'Warning', exact: true }).click();
     await expect(note.locator('aside')).toHaveAttribute('data-tone', 'warning');
     await inspector.getByRole('button', { name: 'Half width', exact: true }).click();
-    await expect(note).toHaveAttribute('data-width', 'half');
-    await inspector.getByRole('button', { name: 'Large', exact: true }).click();
+    await expect(note).toHaveAttribute('data-width', '50');
+    await inspector.getByRole('button', { name: 'Text size', exact: true }).click();
+    await page.getByRole('option', { name: 'Large', exact: true }).click();
     await inspector.getByRole('button', { name: 'Center', exact: true }).click();
     await expect(note.locator('textarea')).toHaveCSS('font-size', '20px');
     await expect(note.locator('textarea')).toHaveCSS('text-align', 'center');
@@ -75,14 +77,14 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     });
     await inspector.getByRole('button', { name: 'Step settings', exact: true }).click();
     await expect(step.getByRole('textbox', { name: 'Step title', exact: true })).toBeFocused();
-    await expect(inspector.getByRole('group', { name: 'Step layout', exact: true })).toBeVisible();
+    await expect(inspector.getByRole('button', { name: 'Step layout', exact: true })).toBeVisible();
     await expect(page.getByRole('status').first()).toHaveText('Saved');
     await page.goto(url.toString());
     await expect(note.locator('aside')).toHaveAttribute('data-tone', 'warning');
-    await expect(note).toHaveAttribute('data-width', 'half');
+    await expect(note).toHaveAttribute('data-width', '50');
     await expect(note.locator('textarea')).toHaveValue('Keep this note.');
     await expect(note.locator('textarea')).toHaveCSS('font-size', '20px');
     await expect(note.locator('textarea')).toHaveCSS('text-align', 'center');
-    await expect(inspector.getByRole('group', { name: 'Step layout', exact: true })).toBeVisible();
+    await expect(inspector.getByRole('button', { name: 'Step layout', exact: true })).toBeVisible();
   });
 }

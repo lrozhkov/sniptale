@@ -7,6 +7,7 @@ import type {
 
 /** Resource ceilings for a guide document, excluding separately stored image bytes. */
 export const GUIDE_LIMITS = {
+  minBlockWidthPercent: 20,
   maxNumberLabelLength: 32,
   maxRestartNumber: 9999,
   maxItems: 300,
@@ -78,9 +79,12 @@ export type GuideImageSource =
   | { kind: 'import'; filename: string }
   | { kind: 'video-frame'; recordingId: string | null; filename: string; timeSeconds: number };
 
+/** Named presets or an integer percentage from GUIDE_LIMITS.minBlockWidthPercent through 100. */
+export type GuideBlockWidth = 'full' | 'half' | number;
+
 /** Explicit block composition overrides the step preset; absence inherits it. */
 export interface GuideBlockComposition {
-  width?: 'full' | 'half' | undefined;
+  width?: GuideBlockWidth | undefined;
 }
 
 /** Each accepted annotation edit uses a new editDocumentId so history never overwrites it. */

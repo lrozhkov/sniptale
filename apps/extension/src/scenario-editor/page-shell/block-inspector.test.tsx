@@ -104,3 +104,33 @@ it('edits typography without losing prose and removes metadata on reset', async 
     vi.unstubAllGlobals();
   }
 });
+
+it('shows a custom percentage without selecting either fixed preset', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  try {
+    await act(async () =>
+      root.render(
+        <GuideBlockInspector
+          item={createGuideStep('Step')}
+          block={{ kind: 'text', id: 'text', paragraphs: [], width: 63 }}
+          disabled={false}
+          onChange={vi.fn()}
+          onClose={vi.fn()}
+          t={createTranslator('en')}
+        />
+      )
+    );
+    expect(host.textContent).toContain('63%');
+    const group = host.querySelector('[aria-label="Block width"]')!;
+    expect(group.querySelectorAll('button[aria-pressed="true"]')).toHaveLength(0);
+    expect(group.querySelectorAll('button')).toHaveLength(2);
+    expect(group.querySelector('[aria-hidden="true"]')).toBeNull();
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});

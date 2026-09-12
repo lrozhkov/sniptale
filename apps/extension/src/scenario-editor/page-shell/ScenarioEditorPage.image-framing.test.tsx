@@ -151,7 +151,7 @@ it('moves framing into one contextual inspector and keeps it bound through canon
   expect(second.querySelector('figure')?.getAttribute('data-editing')).toBe('true');
   await act(async () =>
     inspector
-      .querySelector('input')
+      .querySelector('.guide-image-description input')
       ?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
   );
   expect(inspector.querySelector('.guide-image-controls')).toBeNull();
@@ -180,21 +180,18 @@ it('selects text and note settings from focus, preserves edits and returns to st
   const inspector = container.querySelector('#guide-inspector-panel')!;
   const text = container.querySelector<HTMLTextAreaElement>('[data-block-id="text"] textarea')!;
   await act(async () => text.focus());
-  expect(inspector.textContent).toContain('Block width');
+  expect(inspector.querySelector('[aria-label="Block width"]')).not.toBeNull();
   expect(inspector.textContent).not.toContain('Restart numbering');
   await click('Half width', inspector);
-  expect(container.querySelector('[data-block-id="text"]')?.getAttribute('data-width')).toBe(
-    'half'
-  );
+  expect(container.querySelector('[data-block-id="text"]')?.getAttribute('data-width')).toBe('50');
   await click('Undo');
-  expect(container.querySelector('[data-block-id="text"]')?.getAttribute('data-width')).toBe(
-    'full'
-  );
+  expect(container.querySelector('[data-block-id="text"]')?.getAttribute('data-width')).toBe('100');
   await act(async () =>
     container.querySelector<HTMLTextAreaElement>('[data-block-id="note"] textarea')!.focus()
   );
   expect(inspector.textContent).toContain('Note type');
-  await click('Warning', inspector);
+  await click('Note type', inspector);
+  await click('Warning', document.body);
   expect(container.querySelector('[data-block-id="note"] aside')?.getAttribute('data-tone')).toBe(
     'warning'
   );

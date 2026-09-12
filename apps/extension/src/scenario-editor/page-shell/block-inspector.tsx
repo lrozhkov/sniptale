@@ -3,7 +3,6 @@ import type {
   GuideStep,
   GuideTextStyle,
 } from '@sniptale/runtime-contracts/scenario/types/guide';
-import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
   ArrowLeft,
@@ -38,6 +37,7 @@ export function GuideBlockInspector({
   onClose: () => void;
   t: Translate;
 }) {
+  const width = resolveGuideBlockWidth(item.layout, block);
   return (
     <div className="guide-block-inspector">
       <div className="guide-appearance-heading">
@@ -57,16 +57,21 @@ export function GuideBlockInspector({
         </ContentToolbarButton>
       </div>
       <fieldset className="guide-style-fields" disabled={disabled}>
-        <GuideInspectorGroup icon={Columns2} title={t('scenario.editor.guidePlacementGroup')}>
-          <SegmentedSwitch
-            density="compact"
+        <GuideInspectorGroup
+          icon={Columns2}
+          title={`${t('scenario.editor.guidePlacementGroup')} · ${width}%`}
+        >
+          <CompactSegmentedSelector
+            columns={2}
             ariaLabel={t('scenario.editor.guideBlockWidth')}
-            activeId={resolveGuideBlockWidth(item.layout, block)}
+            value={width === 50 ? 'half' : width === 100 ? 'full' : 'custom'}
             options={[
-              { id: 'full', label: t('scenario.editor.guideFullWidth') },
-              { id: 'half', label: t('scenario.editor.guideHalfWidth') },
+              { value: 'full', label: t('scenario.editor.guideFullWidth') },
+              { value: 'half', label: t('scenario.editor.guideHalfWidth') },
             ]}
-            onChange={(width) => onChange({ ...block, width }, null)}
+            onChange={(next) => {
+              if (next !== 'custom') onChange({ ...block, width: next }, null);
+            }}
           />
         </GuideInspectorGroup>
         {block.kind === 'note' && (

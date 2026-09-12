@@ -28,7 +28,12 @@ const textStyle = z
   })
   .strict()
   .optional();
-const width = z.enum(['full', 'half']).optional();
+const width = z
+  .union([
+    z.enum(['full', 'half']),
+    z.number().int().min(GUIDE_LIMITS.minBlockWidthPercent).max(100),
+  ])
+  .optional();
 const label = z.string().max(GUIDE_LIMITS.maxLabelLength);
 const text = z.string().max(GUIDE_LIMITS.maxTextLength);
 const timestamp = z.number().finite().nonnegative();

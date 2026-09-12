@@ -1,6 +1,7 @@
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import type {
   GuideBlock,
+  GuideBlockWidth,
   GuideProject,
   GuideStep,
 } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -17,7 +18,7 @@ type BlockOperation =
       beforeBlockId?: string;
     }
   | { kind: 'reorder-block'; itemId: string; blockId: string; beforeBlockId?: string }
-  | { kind: 'set-block-width'; itemId: string; blockId: string; width: 'full' | 'half' }
+  | { kind: 'set-block-width'; itemId: string; blockId: string; width: GuideBlockWidth }
   | { kind: 'move-block'; itemId: string; blockId: string; direction: -1 | 1 }
   | { kind: 'duplicate-block' | 'remove-block'; itemId: string; blockId: string };
 

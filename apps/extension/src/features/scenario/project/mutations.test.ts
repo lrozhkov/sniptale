@@ -442,3 +442,32 @@ it('places a resource into a new step at a stable boundary or at the end without
     })
   ).toThrow();
 });
+
+it('keeps exact percentage composition through validation and duplication', () => {
+  const project = fixture();
+  const next = applyGuideStructureOperation(project, {
+    kind: 'set-block-width',
+    itemId: 'first',
+    blockId: 'image',
+    width: 37,
+  });
+  const duplicate = applyGuideStructureOperation(next, {
+    kind: 'duplicate-block',
+    itemId: 'first',
+    blockId: 'image',
+  });
+  const item = duplicate.items[1];
+  if (item?.kind !== 'step') throw new Error('Missing step');
+  expect(item.blocks.filter((block) => block.kind === 'image').map((block) => block.width)).toEqual(
+    [37, 37]
+  );
+  expect(() =>
+    applyGuideStructureOperation(project, {
+      kind: 'set-block-width',
+      itemId: 'first',
+      blockId: 'image',
+      width: 101,
+    })
+  ).toThrow();
+  expect(project.items[1]?.kind === 'step' && project.items[1].blocks[1]?.width).toBeUndefined();
+});

@@ -57,3 +57,11 @@ export function guideTextAppearance(
     textAlign: style.alignment,
   };
 }
+
+/** Complementary percentages share one row, including the inter-block gap. */
+export function guideBlockWidthStyle(percent: number): GuideDocumentStyle {
+  return {
+    '--guide-block-width': `${percent}%`,
+    '--guide-block-gap-share': String(1 - percent / 100),
+  };
+}

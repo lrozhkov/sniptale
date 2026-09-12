@@ -91,10 +91,15 @@
   container: guide-step / inline-size;
 }
 .guide-step-blocks {
-  display: grid;
-  gap: var(--guide-gap);
+  --guide-column-gap: max(var(--guide-gap), 3.5rem);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--guide-gap) var(--guide-column-gap);
 }
 .guide-step-blocks > .guide-block {
+  flex: 0 0
+    calc(var(--guide-block-width, 100%) - var(--guide-column-gap) * var(--guide-block-gap-share, 0));
   min-width: 0;
   margin-block: 0;
 }
@@ -118,15 +123,6 @@
 .guide-document article[data-layout='text'] .guide-step-blocks {
   max-width: 44rem;
   margin-inline: auto;
-}
-@container guide-step (min-width: 600px) {
-  .guide-document .guide-step-blocks {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-items: start;
-  }
-  .guide-document .guide-block[data-width='full'] {
-    grid-column: 1 / -1;
-  }
 }
 
 .guide-document > article,

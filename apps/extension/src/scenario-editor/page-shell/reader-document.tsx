@@ -11,7 +11,11 @@ import {
   resolveGuideStyle,
 } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
-import { guideDocumentStyle, guideTextAppearance } from './document-appearance';
+import {
+  guideDocumentStyle,
+  guideTextAppearance,
+  guideBlockWidthStyle,
+} from './document-appearance';
 import { guideNoteTypes } from './note-block';
 
 /** Semantic document rendering shared by local reading and subsequent output adapters. */
@@ -68,6 +72,7 @@ export function GuideReadDocument({
                       data-block-id={block.id}
                       data-kind={block.kind}
                       data-width={resolveGuideBlockWidth(item.layout, block)}
+                      style={guideBlockWidthStyle(resolveGuideBlockWidth(item.layout, block))}
                     >
                       {block.kind === 'image' && renderImage ? (
                         renderImage(block)

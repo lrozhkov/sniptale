@@ -722,6 +722,10 @@ export const scenarioEditorCoreMessages = defineMessageSource({
     ru: 'Переместить блок (перетаскивание или ↑/↓)',
     en: 'Move block (drag or ↑/↓)',
   },
+  guideResizeWidth: {
+    ru: 'Клик — 50% / 100%. Потяните для изменения ширины; стрелки — 1%, Shift — 10%.',
+    en: 'Click for 50% / 100%. Drag to resize; arrows adjust 1%, Shift adjusts 10%.',
+  },
   guideFullWidth: { ru: 'На всю ширину', en: 'Full width' },
   guideHalfWidth: { ru: 'На половину ширины', en: 'Half width' },
   close: { ru: 'Закрыть', en: 'Close' },
