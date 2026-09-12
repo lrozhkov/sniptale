@@ -1,5 +1,15 @@
 import { defineMessageSource } from '../../source';
 export const scenarioEditorCoreMessages = defineMessageSource({
+  guideReaderOpen: { ru: 'Просмотр инструкции', en: 'Preview guide' },
+  guideReaderBack: { ru: 'Вернуться к редактированию', en: 'Back to editing' },
+  guideReaderMode: { ru: 'Режим просмотра', en: 'Reading mode' },
+  guideReaderFlow: { ru: 'Документ', en: 'Document' },
+  guideReaderSteps: { ru: 'По шагам', en: 'Step by step' },
+  guideReaderPrevious: { ru: 'Предыдущий шаг', en: 'Previous step' },
+  guideReaderNext: { ru: 'Следующий шаг', en: 'Next step' },
+  guideReaderOutline: { ru: 'Оглавление инструкции', en: 'Guide contents' },
+  guideReaderEmpty: { ru: 'В инструкции пока нет шагов', en: 'This guide has no steps yet' },
+
   guideEditImage: { ru: 'Редактировать изображение', en: 'Edit image' },
   guideAddImage: { ru: 'Изображение', en: 'Image' },
   guideUploadImage: { ru: 'Загрузить изображение', en: 'Upload image' },

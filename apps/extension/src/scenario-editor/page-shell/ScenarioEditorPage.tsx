@@ -6,10 +6,10 @@ import { GuideImageDropZone } from './image-drop';
 import { GuideResourceDrawer, GuideResourceTrigger } from './resource-drawer';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { GuideBlockInspector } from './block-inspector';
+import { GuideReader, useGuideReaderMode } from './reader';
 import { GuideAppearance } from './appearance';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { GuidePageHeader } from './header';
-import { GuideProjectActions } from './project-actions';
 import { useEffect, useState, type KeyboardEvent } from 'react';
 import { GuideImageControls } from './image-controls';
 import type { Translate } from '../../platform/i18n';
@@ -28,13 +28,16 @@ export function ScenarioEditorPage() {
   const panels = useGuidePanels();
   const imageEditor = useGuideImageEditorMode(state.images);
   const { project, status } = state;
+  const reader = useGuideReaderMode(state.sealEdit);
   const disabled = state.editingLocked;
+  const commandsDisabled = disabled || state.mutationPending;
+  const importDisabled = commandsDisabled || status === 'conflict';
   const importSources = (
     sources: GuideImageImportSource[],
     placement: GuideImageImportPlacement,
     signal: AbortSignal
   ) => state.commitChange({ kind: 'import', input: { sources, placement, signal } });
-  const { focusRequest, selectItem, operate } = useGuideNavigation(state);
+  const { focusRequest, selectItem, selectedStepId, operate } = useGuideNavigation(state);
   const framing = useGuideBlockSelection(state, panels, selectItem);
   if (imageEditor.selection && project)
     return (
@@ -46,22 +49,26 @@ export function ScenarioEditorPage() {
         onClose={imageEditor.close}
       />
     );
+  if (reader.active && project)
+    return (
+      <GuideReader
+        project={project}
+        images={state.images}
+        initialId={state.selectedId}
+        t={t}
+        onClose={reader.close}
+      />
+    );
   const header = (
     <GuidePageHeader
-      projectActions={
-        project && (
-          <GuideProjectActions
-            project={project}
-            disabled={disabled || state.mutationPending}
-            status={status}
-            onDuplicate={state.duplicate}
-            onDelete={state.remove}
-            onReload={state.reload}
-            onChange={state.update}
-            t={t}
-          />
-        )
-      }
+      onPreview={reader.open}
+      previewRef={reader.trigger}
+      previewDisabled={state.mutationPending}
+      status={status}
+      commandsDisabled={commandsDisabled}
+      onDuplicate={state.duplicate}
+      onDelete={state.remove}
+      onReload={state.reload}
       leftControls={project && <GuidePanelControls panels={panels} t={t} side="left" />}
       panelControls={project && <GuidePanelControls panels={panels} t={t} side="right" />}
 
@@ -94,19 +101,13 @@ export function ScenarioEditorPage() {
       {project && (
         <GuideResourceDrawer
           t={t}
-          disabled={disabled || state.mutationPending || state.status === 'conflict'}
-          selectedStepId={
-            project.items.find((item) => item.id === state.selectedId)?.kind === 'step'
-              ? state.selectedId
-              : null
-          }
+          disabled={importDisabled}
+          selectedStepId={selectedStepId}
           onImport={(input) => state.commitChange({ kind: 'import', input })}
         >
           <GuideWorkspace
             header={header}
-            importResources={
-              <GuideResourceTrigger t={t} disabled={disabled || state.mutationPending} />
-            }
+            importResources={<GuideResourceTrigger t={t} disabled={commandsDisabled} />}
             images={state.images}
             panels={panels}
             project={project}
@@ -132,14 +133,12 @@ export function ScenarioEditorPage() {
           >
             <GuideImageDropZone
               project={project}
-              disabled={disabled || state.mutationPending || status === 'conflict'}
+              disabled={importDisabled}
               onPlace={operate}
               onImport={importSources}
             >
               <GuideDocument
-                framedImageId={
-                  framing.target?.block.kind === 'image' ? framing.target.block.id : null
-                }
+                framedImageId={framing.imageId}
                 onSelectBlock={framing.selectBlock}
                 onFrameImage={framing.select}
                 onUploadImage={(stepId, blockId, file, signal) =>
@@ -264,6 +263,7 @@ function useGuideBlockSelection(
   };
   return {
     target,
+    imageId: target?.block.kind === 'image' ? target.block.id : null,
     close,
     selectBlock: (itemId: string, blockId: string | null) => {
       selectItem(itemId, false);
@@ -333,7 +333,9 @@ function useGuideNavigation(
       }));
     } else state.selectItem(null, next);
   };
-  return { focusRequest, selectItem, operate };
+  const selected = project?.items.find((item) => item.id === state.selectedId);
+  const selectedStepId = selected?.kind === 'step' ? selected.id : null;
+  return { focusRequest, selectItem, selectedStepId, operate };
 }
 
 /** Maps canonical structural changes to a document focus destination without owning edit state. */

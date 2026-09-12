@@ -1,14 +1,22 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, type Ref, type ComponentProps } from 'react';
+import { GuideProjectActions } from './project-actions';
 import { GUIDE_LIMITS, type GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { Undo2, Redo2 } from 'lucide-react';
+import { Undo2, Redo2, Eye } from 'lucide-react';
 
 export function GuidePageHeader({
   project,
   panelControls,
   leftControls,
-  projectActions,
+  status,
+  commandsDisabled,
+  onDuplicate,
+  onDelete,
+  onReload,
+  onPreview,
+  previewRef,
+  previewDisabled,
   disabled,
   feedback,
   canUndo,
@@ -21,7 +29,14 @@ export function GuidePageHeader({
   project: GuideProject | null;
   panelControls?: ReactNode;
   leftControls?: ReactNode;
-  projectActions?: ReactNode;
+  status: ComponentProps<typeof GuideProjectActions>['status'];
+  commandsDisabled: boolean;
+  onDuplicate: (name: string) => Promise<void>;
+  onDelete: () => Promise<void>;
+  onReload: () => Promise<void>;
+  onPreview: () => void;
+  previewRef: Ref<HTMLButtonElement>;
+  previewDisabled: boolean;
   disabled: boolean;
   feedback?: ReactNode;
   canUndo: boolean;
@@ -55,32 +70,51 @@ export function GuidePageHeader({
         <div className="guide-header-actions">
           {panelControls}
           {project && (
-            <div
-              className="guide-history-controls"
-              role="group"
-              aria-label={t('scenario.editor.guideHistoryActions')}
-            >
+            <>
               <ContentToolbarButton
-                type="button"
-                disabled={disabled || !canUndo}
-                onClick={onUndo}
-                title={t('scenario.editor.guideUndoHint')}
-                aria-label={t('scenario.editor.guideUndo')}
+                ref={previewRef}
+                title={t('scenario.editor.guideReaderOpen')}
+                disabled={previewDisabled}
+                onClick={onPreview}
               >
-                <Undo2 size={16} aria-hidden="true" />
+                <Eye size={16} aria-hidden="true" />
               </ContentToolbarButton>
-              <ContentToolbarButton
-                type="button"
-                disabled={disabled || !canRedo}
-                onClick={onRedo}
-                title={t('scenario.editor.guideRedoHint')}
-                aria-label={t('scenario.editor.guideRedo')}
+              <div
+                className="guide-history-controls"
+                role="group"
+                aria-label={t('scenario.editor.guideHistoryActions')}
               >
-                <Redo2 size={16} aria-hidden="true" />
-              </ContentToolbarButton>
-            </div>
+                <ContentToolbarButton
+                  type="button"
+                  disabled={disabled || !canUndo}
+                  onClick={onUndo}
+                  title={t('scenario.editor.guideUndoHint')}
+                  aria-label={t('scenario.editor.guideUndo')}
+                >
+                  <Undo2 size={16} aria-hidden="true" />
+                </ContentToolbarButton>
+                <ContentToolbarButton
+                  type="button"
+                  disabled={disabled || !canRedo}
+                  onClick={onRedo}
+                  title={t('scenario.editor.guideRedoHint')}
+                  aria-label={t('scenario.editor.guideRedo')}
+                >
+                  <Redo2 size={16} aria-hidden="true" />
+                </ContentToolbarButton>
+              </div>
+              <GuideProjectActions
+                project={project}
+                disabled={commandsDisabled}
+                status={status}
+                onDuplicate={onDuplicate}
+                onDelete={onDelete}
+                onReload={onReload}
+                onChange={onChange}
+                t={t}
+              />
+            </>
           )}
-          {projectActions}
         </div>
       </header>
     </>
