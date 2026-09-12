@@ -10,3 +10,5 @@ export {
   createGuideAppearanceTemplate,
   applyGuideAppearanceTemplate,
 } from './appearance';
+
+export { resolveGuideBlockWidth } from './layout';

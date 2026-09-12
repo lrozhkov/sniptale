@@ -237,6 +237,7 @@ function replacementInput() {
     source: { kind: 'import', filename: 'old.png' },
   });
   image.caption = 'Keep caption';
+  image.width = 'half';
   image.alt = 'Keep description';
   image.fit = 'cover';
   image.contentTransform = { x: 0.3, y: -0.2, scale: 2 };
@@ -269,6 +270,7 @@ it('replaces exactly one image with fresh resources while retaining its layout a
     kind: 'image',
     id: 'target',
     caption: 'Keep caption',
+    width: 'half',
     alt: 'Keep description',
     frame: { width: 640, height: 360 },
     fit: 'cover',

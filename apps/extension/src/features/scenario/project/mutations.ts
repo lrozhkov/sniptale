@@ -16,6 +16,7 @@ type BlockOperation =
       blockKind: 'text' | 'heading' | 'note' | 'image-slot';
       beforeBlockId?: string;
     }
+  | { kind: 'set-block-width'; itemId: string; blockId: string; width: 'full' | 'half' }
   | { kind: 'move-block'; itemId: string; blockId: string; direction: -1 | 1 }
   | { kind: 'duplicate-block' | 'remove-block'; itemId: string; blockId: string };
 
@@ -62,6 +63,7 @@ export function applyGuideStructureOperation(
       changeItems(next, operation);
       break;
     case 'add-block':
+    case 'set-block-width':
     case 'move-block':
     case 'duplicate-block':
     case 'remove-block':
@@ -144,6 +146,10 @@ function changeBlocks(project: GuideProject, operation: BlockOperation): void {
   const index = step.blocks.findIndex((block) => block.id === operation.blockId);
   const block = step.blocks[index];
   if (!block) throw new Error('Guide block is unavailable.');
+  if (operation.kind === 'set-block-width') {
+    block.width = operation.width;
+    return;
+  }
   if (operation.kind === 'move-block') {
     moveEntry(step.blocks, index, operation.direction);
     return;
@@ -196,9 +202,11 @@ function placeImage(
   const target = step.blocks[index];
   if (target?.kind !== 'image' && target?.kind !== 'image-slot')
     throw new Error('Guide image target is unavailable.');
+  delete copy.width;
   step.blocks[index] = {
     ...copy,
     id: target.id,
+    ...(target.width ? { width: target.width } : {}),
     frame: { ...target.frame },
     fit: target.fit,
     alt: target.alt,

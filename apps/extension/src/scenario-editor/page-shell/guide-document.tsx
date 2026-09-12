@@ -1,3 +1,4 @@
+import { GuideBlockLayout } from './block-layout';
 import { guideDocumentStyle } from './document-appearance';
 import { Fragment, useEffect, useRef } from 'react';
 import { GuideDocumentInsert } from './document-insert';
@@ -310,11 +311,15 @@ function GuideStepBody({
     <>
       <div className="guide-step-blocks">
         {item.blocks.map((block, index) => (
-          <div
-            className="guide-block"
+          <GuideBlockLayout
             key={block.id}
-            data-block-id={block.id}
-            data-kind={block.kind}
+            block={block}
+            layout={item.layout}
+            disabled={disabled}
+            onWidth={(width) =>
+              onOperate({ kind: 'set-block-width', itemId: item.id, blockId: block.id, width })
+            }
+            t={t}
           >
             <GuideDocumentInsert
               target={{ kind: 'block', itemId: item.id, beforeBlockId: block.id }}
@@ -361,7 +366,7 @@ function GuideStepBody({
                 t={t}
               />
             )}
-          </div>
+          </GuideBlockLayout>
         ))}
       </div>
       {item.blocks.length === 0 && (

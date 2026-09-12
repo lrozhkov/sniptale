@@ -318,3 +318,52 @@ it('replaces only the chosen image at capacity and rejects appending beyond capa
   ).toThrow('limits');
   expect(source).toEqual(before);
 });
+
+it('changes block width immutably and retains it through duplication', () => {
+  const source = fixture();
+  const changed = applyGuideStructureOperation(source, {
+    kind: 'set-block-width',
+    itemId: 'first',
+    blockId: 'text',
+    width: 'half',
+  });
+  const first = changed.items[1];
+  if (first?.kind !== 'step') throw new Error('Missing first step');
+  expect(first.blocks[0]?.width).toBe('half');
+  expect(source).toEqual(fixture());
+  const duplicate = applyGuideStructureOperation(changed, {
+    kind: 'duplicate-block',
+    itemId: 'first',
+    blockId: 'text',
+  });
+  expect(duplicate.items[1]?.kind === 'step' && duplicate.items[1].blocks[1]?.width).toBe('half');
+  expect(() =>
+    applyGuideStructureOperation(source, {
+      kind: 'set-block-width',
+      itemId: 'first',
+      blockId: 'gone',
+      width: 'half',
+    })
+  ).toThrow();
+});
+
+it('image replacement keeps target composition instead of inheriting source width', () => {
+  const source = fixture();
+  const first = source.items[1];
+  if (first?.kind !== 'step') throw new Error('Missing first step');
+  const image = first.blocks[1];
+  if (image?.kind !== 'image') throw new Error('Missing image');
+  image.width = 'half';
+  first.blocks.push({ ...image, id: 'target', width: 'full' });
+  const operation = {
+    kind: 'place-image' as const,
+    sourceBlockId: 'image',
+    itemId: 'first',
+    blockId: 'target',
+  };
+  let next = applyGuideStructureOperation(source, operation);
+  expect(next.items[1]?.kind === 'step' && next.items[1].blocks[2]?.width).toBe('full');
+  delete first.blocks[2]!.width;
+  next = applyGuideStructureOperation(source, operation);
+  expect(next.items[1]?.kind === 'step' && next.items[1].blocks[2]?.width).toBeUndefined();
+});

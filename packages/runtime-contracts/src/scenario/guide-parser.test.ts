@@ -453,3 +453,36 @@ it('roundtrips an empty image slot without accepting phantom resource references
       'invalid'
     );
 });
+
+it('roundtrips composition for every block kind and rejects unsupported widths', () => {
+  const item = step();
+  item.blocks = [
+    { kind: 'heading', id: 'heading', text: '' },
+    { kind: 'text', id: 'text', paragraphs: [] },
+    { kind: 'note', id: 'note', tone: 'info', paragraphs: [] },
+    image(),
+    {
+      kind: 'image-slot',
+      id: 'slot',
+      frame: { width: 400, height: 300 },
+      fit: 'contain',
+      alt: '',
+      caption: '',
+    },
+  ];
+  for (const width of ['half', 'full'] as const) {
+    item.blocks.forEach((block) => {
+      block.width = width;
+    });
+    const value = project([item]);
+    const parsed = parseGuideProject(JSON.parse(JSON.stringify(value)));
+    expect(parsed).toEqual({ status: 'ok', project: value });
+  }
+  for (const width of [0, 50, 'quarter', '100%', null, {}]) {
+    for (const block of item.blocks) {
+      expect(
+        parseGuideProject({ ...project(), items: [{ ...item, blocks: [{ ...block, width }] }] })
+      ).toMatchObject({ status: 'invalid' });
+    }
+  }
+});

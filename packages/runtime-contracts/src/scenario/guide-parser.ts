@@ -13,6 +13,7 @@ const id = z
   .min(1)
   .max(GUIDE_LIMITS.maxIdLength)
   .regex(/^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/);
+const width = z.enum(['full', 'half']).optional();
 const label = z.string().max(GUIDE_LIMITS.maxLabelLength);
 const text = z.string().max(GUIDE_LIMITS.maxTextLength);
 const timestamp = z.number().finite().nonnegative();
@@ -71,6 +72,7 @@ const image = z
   .object({
     kind: z.literal('image'),
     id,
+    width,
     assetId: id,
     galleryAssetId: id.nullable(),
     editDocumentId: id.nullable(),
@@ -137,19 +139,27 @@ const projectSchema: z.ZodType<GuideProject> = z
               blocks: z
                 .array(
                   z.discriminatedUnion('kind', [
-                    z.object({ kind: z.literal('heading'), id, text }).strict(),
-                    z.object({ kind: z.literal('text'), id, paragraphs }).strict(),
+                    z.object({ kind: z.literal('heading'), id, width, text }).strict(),
+                    z.object({ kind: z.literal('text'), id, width, paragraphs }).strict(),
                     z
                       .object({
                         kind: z.literal('note'),
                         id,
+                        width,
                         tone: z.enum(['neutral', 'info', 'warning', 'error']),
                         paragraphs,
                       })
                       .strict(),
                     image,
                     image
-                      .pick({ id: true, frame: true, fit: true, alt: true, caption: true })
+                      .pick({
+                        id: true,
+                        width: true,
+                        frame: true,
+                        fit: true,
+                        alt: true,
+                        caption: true,
+                      })
                       .extend({ kind: z.literal('image-slot') })
                       .strict(),
                   ])

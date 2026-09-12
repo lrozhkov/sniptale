@@ -67,8 +67,13 @@ export type GuideImageSource =
   | { kind: 'import'; filename: string }
   | { kind: 'video-frame'; recordingId: string | null; filename: string; timeSeconds: number };
 
+/** Explicit block composition overrides the step preset; absence inherits it. */
+export interface GuideBlockComposition {
+  width?: 'full' | 'half' | undefined;
+}
+
 /** Each accepted annotation edit uses a new editDocumentId so history never overwrites it. */
-export interface GuideImageBlock {
+export interface GuideImageBlock extends GuideBlockComposition {
   kind: 'image';
   id: string;
   assetId: string;
@@ -86,23 +91,25 @@ export interface GuideImageBlock {
 /** Empty image space has layout and identity but owns no media until filled. */
 export interface GuideImageSlotBlock extends Pick<
   GuideImageBlock,
-  'id' | 'frame' | 'fit' | 'alt' | 'caption'
+  'id' | 'frame' | 'fit' | 'alt' | 'caption' | 'width'
 > {
   kind: 'image-slot';
 }
 
 /** Blocks are ordered content, not freely positioned slide elements. */
-export type GuideBlock =
-  | { kind: 'heading'; id: string; text: string }
-  | { kind: 'text'; id: string; paragraphs: GuideParagraph[] }
-  | {
-      kind: 'note';
-      id: string;
-      tone: 'neutral' | 'info' | 'warning' | 'error';
-      paragraphs: GuideParagraph[];
-    }
-  | GuideImageBlock
-  | GuideImageSlotBlock;
+export type GuideBlock = GuideBlockComposition &
+  (
+    | { kind: 'heading'; id: string; text: string }
+    | { kind: 'text'; id: string; paragraphs: GuideParagraph[] }
+    | {
+        kind: 'note';
+        id: string;
+        tone: 'neutral' | 'info' | 'warning' | 'error';
+        paragraphs: GuideParagraph[];
+      }
+    | GuideImageBlock
+    | GuideImageSlotBlock
+  );
 
 /** Numbering derives from document order, even when a step hides its number. */
 export interface GuideStep {

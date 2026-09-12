@@ -527,6 +527,8 @@ export const scenarioEditorCoreMessages = defineMessageSource({
     en: 'Offset Y',
   },
   body: { ru: 'Текст шага', en: 'Step text' },
+  guideFullWidth: { ru: 'На всю ширину', en: 'Full width' },
+  guideHalfWidth: { ru: 'На половину ширины', en: 'Half width' },
   close: { ru: 'Закрыть', en: 'Close' },
   overlays: { ru: 'Слои', en: 'Overlays' },
 });

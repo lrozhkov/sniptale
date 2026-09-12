@@ -729,6 +729,82 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
   });
 }
 
+for (const theme of SCENARIO_VISUAL_THEMES) {
+  test(`block width supports columns, gestures and narrow layouts in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }, testInfo) => {
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 1080 });
+    const step = page.locator('article#compare');
+    const first = step.locator('[data-block-id="before"]');
+    const second = step.locator('[data-block-id="after"]');
+    const control = first.locator('.guide-block-width');
+    const undo = page.getByRole('button', { name: 'Undo', exact: true });
+    await first.scrollIntoViewIfNeeded();
+    const originalFirst = await first.getAttribute('data-width');
+    const originalSecond = await second.getAttribute('data-width');
+    await control.focus();
+    await page.keyboard.press('ArrowLeft');
+    await second.locator('.guide-block-width').focus();
+    await page.keyboard.press('ArrowLeft');
+    await expect(first).toHaveAttribute('data-width', 'half');
+    await expect(second).toHaveAttribute('data-width', 'half');
+    const half = await first.boundingBox();
+    const neighbor = await second.boundingBox();
+    expect(half && neighbor && Math.abs(half.y - neighbor.y)).toBeLessThan(2);
+    await control.focus();
+    await control.click();
+    await expect(first).toHaveAttribute('data-width', 'full');
+    const full = await first.boundingBox();
+    expect(full && half && full.width / half.width).toBeGreaterThan(1.9);
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    await control.focus();
+    await control.hover();
+    const point = await control.boundingBox();
+    if (!point) throw new Error('Missing width control');
+    await page.mouse.down();
+    await page.mouse.move(point.x + point.width / 2 - 40, point.y + point.height / 2, { steps: 4 });
+    await expect(first).toHaveAttribute('data-width', 'half');
+    await page.mouse.up();
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    await undo.click();
+    await expect(first).toHaveAttribute('data-width', 'full');
+    await control.focus();
+    await page.keyboard.press('ArrowLeft');
+    await expect(first).toHaveAttribute('data-width', 'half');
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    await testInfo.attach(`block-columns-${theme}`, {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+    await page.setViewportSize({ width: 900, height: 1000 });
+    const narrowFirst = await first.boundingBox();
+    const narrowSecond = await second.boundingBox();
+    expect(
+      narrowFirst && narrowSecond && Math.abs(narrowFirst.width - narrowSecond.width)
+    ).toBeLessThan(2);
+    expect(narrowFirst && narrowSecond && narrowSecond.y > narrowFirst.y).toBe(true);
+    await expect(first).toHaveAttribute('data-width', 'half');
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await undo.click();
+    await expect(first).toHaveAttribute('data-width', 'full');
+    await undo.click();
+    await expect(first).toHaveAttribute('data-width', 'half');
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    await page.goto(
+      `${hostOrigin}${SCENARIO_EDITOR_VISUAL_HARNESS_PATH}?theme=${theme}&locale=en&stepId=compare`
+    );
+    await expect(first).toHaveAttribute('data-width', 'half');
+    await control.focus();
+    await page.keyboard.press(originalFirst === 'half' ? 'ArrowLeft' : 'ArrowRight');
+    await second.locator('.guide-block-width').focus();
+    await page.keyboard.press(originalSecond === 'half' ? 'ArrowLeft' : 'ArrowRight');
+    await expect(first).toHaveAttribute('data-width', originalFirst!);
+    await expect(second).toHaveAttribute('data-width', originalSecond!);
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+  });
+}
+
 test('history cleanup preserves two-tab undo resources until sessions close', async ({
   page,
   hostOrigin,

@@ -77,6 +77,7 @@ export async function importScenarioImages(args: {
             ? {
                 ...block,
                 id: replacement.id,
+                ...(replacement.width ? { width: replacement.width } : {}),
                 frame: replacement.frame,
                 fit: replacement.fit,
                 caption: replacement.caption,

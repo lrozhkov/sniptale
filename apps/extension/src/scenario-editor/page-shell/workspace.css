@@ -893,17 +893,40 @@
   margin-inline: auto;
 }
 @container guide-step (min-width: 600px) {
-  .guide-document article[data-layout='side-by-side'] .guide-step-blocks,
-  .guide-document article[data-layout='comparison'] .guide-step-blocks {
+  .guide-document .guide-step-blocks {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     align-items: start;
   }
-  .guide-document
-    article[data-layout='comparison']
-    .guide-block:not([data-kind='image']):not([data-kind='image-slot']) {
+  .guide-document .guide-block[data-width='full'] {
     grid-column: 1 / -1;
   }
 }
+.guide-document .guide-block-width {
+  position: absolute;
+  z-index: 5;
+  inset-inline-end: -0.65rem;
+  top: 50%;
+  width: 1.6rem;
+  height: 1.6rem;
+  min-width: 0;
+  padding: 0;
+  opacity: 0;
+  cursor: ew-resize;
+  touch-action: none;
+  background: var(--sniptale-color-surface-canvas) !important;
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: 0.4rem;
+}
+.guide-block:hover > .guide-block-width,
+.guide-block:focus-within > .guide-block-width {
+  opacity: 1;
+}
+@media (hover: none) {
+  .guide-document .guide-block-width {
+    opacity: 1;
+  }
+}
+
 .guide-appearance,
 .guide-appearance-fields,
 .guide-template-files {
