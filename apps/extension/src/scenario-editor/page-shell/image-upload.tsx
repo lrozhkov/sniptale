@@ -1,20 +1,21 @@
 import { GuideResourceTrigger } from './resource-drawer';
 import { useEffect, useRef, useState } from 'react';
-import { Upload } from 'lucide-react';
+import { ImagePlus, Upload } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { PROJECT_ASSET_IMAGE_MIME_TYPES } from '../../features/media-hub/project-assets';
+import type { GuideImageImportPlacement } from '../../composition/persistence/scenario/store/public';
 import type { Translate } from '../../platform/i18n';
 
 /** Owns one disposable file choice; the page publishes through the existing image importer. */
 export function GuideImageUpload({
   frame,
-  target,
+  placement,
   disabled,
   onUpload,
   t,
 }: {
-  frame: { width: number; height: number };
-  target?: { stepId: string; blockId: string };
+  frame?: { width: number; height: number };
+  placement: GuideImageImportPlacement;
   disabled: boolean;
   onUpload: (file: File, signal: AbortSignal) => Promise<boolean>;
   t: Translate;
@@ -43,9 +44,13 @@ export function GuideImageUpload({
   return (
     <div
       className="guide-image-slot"
+      tabIndex={0}
+      aria-label={t('scenario.editor.guideAddImage')}
       aria-busy={pending}
-      style={{ aspectRatio: `${frame.width} / ${frame.height}` }}
+      style={frame ? { aspectRatio: `${frame.width} / ${frame.height}` } : undefined}
     >
+      <ImagePlus className="guide-image-slot-icon" size={24} aria-hidden="true" />
+      <p>{t('scenario.editor.guideImageDropHint')}</p>
       <input
         ref={input}
         type="file"
@@ -70,14 +75,8 @@ export function GuideImageUpload({
         <Upload size={16} aria-hidden="true" />
         {t('scenario.editor.guideUploadImage')}
       </ProductActionButton>
-      {target && (
-        <GuideResourceTrigger
-          t={t}
-          target={{ kind: 'replace-image', ...target }}
-          disabled={disabled || pending}
-          label
-        />
-      )}
+      {<GuideResourceTrigger t={t} target={placement} disabled={disabled || pending} label />}
+      <p className="guide-image-slot-hint">{t('scenario.editor.guideImagePasteHint')}</p>
       {pending && (
         <>
           <span role="status">{t('scenario.editor.guideImportProgress')}</span>

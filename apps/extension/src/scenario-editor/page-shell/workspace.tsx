@@ -1,3 +1,4 @@
+import { GuideImageUpload } from './image-upload';
 import { resolveGuideNumbering } from '../../features/scenario/project/public';
 import { GUIDE_IMAGE_DRAG_TYPE } from './image-drop';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
@@ -18,6 +19,7 @@ type WorkspaceProps = {
   selectedId: string | null;
   images: Record<string, string | null>;
   header: ReactNode;
+  onUploadFile: (file: File, signal: AbortSignal) => Promise<boolean>;
   importResources: ReactNode;
   disabled: boolean;
   onSelect: (id: string) => void;
@@ -103,7 +105,12 @@ export function GuideWorkspace(props: WorkspaceProps) {
             <div className="guide-document-empty">
               <FileText size={32} aria-hidden="true" />
               <h2>{t('scenario.editor.guideFirstStep')}</h2>
-              <p>{t('scenario.editor.guideFirstStepHint')}</p>
+              <GuideImageUpload
+                placement={{ kind: 'steps' }}
+                disabled={props.disabled}
+                onUpload={props.onUploadFile}
+                t={t}
+              />
               <ProductActionButton
                 tone="secondary"
                 compact

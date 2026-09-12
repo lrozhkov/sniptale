@@ -147,3 +147,24 @@ it('imports one selected source into the requested image block without a destina
   });
   expect(host.querySelector('[aria-haspopup="listbox"]')).toBeNull();
 });
+
+it('keeps multiple library images targeted to the originating empty step', async () => {
+  const complete = vi.fn();
+  await act(async () =>
+    root.render(
+      <GuideImageResources
+        disabled={false}
+        selectedStepId="other"
+        target={{ kind: 'blocks', stepId: 'empty-step' }}
+        t={createTranslator('en')}
+        onImport={io.import}
+        onComplete={complete}
+      />
+    )
+  );
+  await files('first.png', 'second.png');
+  await click('Import selected');
+  expect(io.import.mock.calls[0]?.[0].sources).toHaveLength(2);
+  expect(io.import.mock.calls[0]?.[0].placement).toEqual({ kind: 'blocks', stepId: 'empty-step' });
+  expect(complete).toHaveBeenCalledOnce();
+});

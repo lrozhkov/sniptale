@@ -36,16 +36,25 @@ project.items = [step];
 function render(disabled = false) {
   act(() =>
     root.render(
-      <GuideImageDropZone project={project} disabled={disabled} onPlace={place} onImport={files}>
-        <article id="step">
-          <h2>Title</h2>
-          <div data-block-id="image">
-            <img alt="" />
-          </div>
-          <div data-block-id="slot">
-            <button>Upload</button>
-          </div>
-        </article>
+      <GuideImageDropZone
+        t={(key) => key}
+        project={project}
+        disabled={disabled}
+        onPlace={place}
+        onImport={files}
+      >
+        <div className="guide-document-scroll">
+          <div className="guide-insertion-item" data-insert-before="step" />
+          <article id="step">
+            <h2>Title</h2>
+            <div data-block-id="image">
+              <img alt="" />
+            </div>
+            <div data-block-id="slot">
+              <button>Upload</button>
+            </div>
+          </article>
+        </div>
       </GuideImageDropZone>
     )
   );
@@ -192,4 +201,119 @@ it('rejects malformed or resource-bearing library drag payloads before import', 
   }
   expect(files).not.toHaveBeenCalled();
   expect(place).not.toHaveBeenCalled();
+});
+
+it('inserts image steps at an item boundary and appends on canvas margins', async () => {
+  const file = new File(['image'], 'image.png', { type: 'image/png' });
+  drag('.guide-insertion-item', 'drop', '', [file]);
+  expect(files.mock.calls[0]?.[1]).toEqual({ kind: 'steps', beforeItemId: 'step' });
+  await act(async () => {});
+  drag('.guide-document-scroll', 'drop', '', [file]);
+  expect(files.mock.calls[1]?.[1]).toEqual({ kind: 'steps' });
+});
+
+it('routes resources to new steps and leaves inspector drops without mutations', () => {
+  drag('.guide-insertion-item');
+  expect(place).toHaveBeenLastCalledWith({
+    kind: 'place-image',
+    sourceBlockId: 'image',
+    beforeItemId: 'step',
+  });
+  drag('.guide-document-scroll');
+  expect(place).toHaveBeenLastCalledWith({ kind: 'place-image', sourceBlockId: 'image' });
+  drag('.guide-drop-zone');
+  expect(place).toHaveBeenCalledTimes(2);
+});
+it('pastes an image at the focused slot or canvas without intercepting editable text', async () => {
+  const file = new File(['image'], 'clipboard.png', { type: 'image/png' });
+  function paste(target: Element, nativeFiles: File[]) {
+    const event = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'clipboardData', { value: { files: nativeFiles } });
+    act(() => target.dispatchEvent(event));
+    return event;
+  }
+  expect(paste(host.querySelector('button')!, [file]).defaultPrevented).toBe(true);
+  expect(files.mock.calls[0]?.[1]).toEqual({
+    kind: 'replace-image',
+    stepId: 'step',
+    blockId: 'slot',
+  });
+  await act(async () => {});
+  expect(paste(host.querySelector('.guide-document-scroll')!, [file]).defaultPrevented).toBe(true);
+  expect(files.mock.calls[1]?.[1]).toEqual({ kind: 'steps' });
+  const textarea = document.createElement('textarea');
+  host.querySelector('article')!.append(textarea);
+  expect(paste(textarea, [file]).defaultPrevented).toBe(false);
+  expect(paste(host.querySelector('button')!, []).defaultPrevented).toBe(false);
+  expect(files).toHaveBeenCalledTimes(2);
+});
+it('recovers after rejected image preparation and clears completed drop feedback', async () => {
+  files.mockRejectedValueOnce(new Error('Failed')).mockResolvedValueOnce(true);
+  const file = new File(['image'], 'image.png', { type: 'image/png' });
+  drag('h2', 'dragover');
+  drag('h2', 'drop', '', [file]);
+  await act(async () => {});
+  expect(host.querySelector('[data-image-drop]')).toBeNull();
+  drag('h2', 'drop', '', [file]);
+  await act(async () => {});
+  expect(files).toHaveBeenCalledTimes(2);
+});
+
+it('distinguishes inter-item whitespace from side margins using document geometry', () => {
+  const article = host.querySelector('article')!;
+  vi.spyOn(article, 'getBoundingClientRect').mockReturnValue(new DOMRect(100, 80, 400, 300));
+  function over(x: number, y: number) {
+    const event = new MouseEvent('dragover', {
+      bubbles: true,
+      cancelable: true,
+      clientX: x,
+      clientY: y,
+    });
+    Object.defineProperty(event, 'dataTransfer', {
+      value: { types: ['Files'], dropEffect: 'none' },
+    });
+    act(() => host.querySelector('.guide-document-scroll')!.dispatchEvent(event));
+  }
+  over(200, 40);
+  expect(host.querySelector('.guide-insertion-item')?.getAttribute('data-image-drop')).toBe(
+    'steps'
+  );
+  over(50, 40);
+  expect(host.querySelector('.guide-document-scroll')?.getAttribute('data-image-drop')).toBe(
+    'steps'
+  );
+  expect(host.querySelector('.guide-insertion-item')?.hasAttribute('data-image-drop')).toBe(false);
+});
+
+it('distinguishes a valid item named end from the append boundary', () => {
+  const namedEnd = { ...project, items: [{ ...step, id: 'end' }] };
+  act(() =>
+    root.render(
+      <GuideImageDropZone
+        project={namedEnd}
+        disabled={false}
+        onPlace={place}
+        onImport={files}
+        t={(key) => key}
+      >
+        <div className="guide-document-scroll">
+          <div
+            className="guide-insertion-item before-end"
+            data-insert-before="end"
+            data-end="false"
+          />
+          <article id="end" />
+          <div className="guide-insertion-item append" data-insert-before="end" data-end="true" />
+        </div>
+      </GuideImageDropZone>
+    )
+  );
+  drag('.before-end');
+  expect(place).toHaveBeenLastCalledWith({
+    kind: 'place-image',
+    sourceBlockId: 'image',
+    beforeItemId: 'end',
+  });
+  drag('.append');
+  expect(place).toHaveBeenLastCalledWith({ kind: 'place-image', sourceBlockId: 'image' });
 });

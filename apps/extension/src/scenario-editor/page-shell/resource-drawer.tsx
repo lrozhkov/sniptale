@@ -88,7 +88,7 @@ export function GuideResourceDrawer({
                   }, 0);
                 }}
                 t={t}
-                {...(target.kind === 'replace-image' ? { target, onComplete: close } : {})}
+                {...(target.kind !== 'steps' ? { target, onComplete: close } : {})}
               />
             </GuideResourceDialog>
           </div>,

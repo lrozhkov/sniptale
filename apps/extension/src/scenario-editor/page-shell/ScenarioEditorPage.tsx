@@ -109,38 +109,40 @@ export function ScenarioEditorPage() {
           selectedStepId={selectedStepId}
           onImport={imports.resources}
         >
-          <GuideWorkspace
-            header={header}
-            importResources={<GuideResourceTrigger t={t} disabled={commandsDisabled} />}
-            images={state.images}
-            panels={panels}
-            project={project}
-            selectedId={state.selectedId}
-            disabled={disabled}
-            onSelect={(id) => {
-              framing.selectBlock(id, null);
-              selectItem(id);
-            }}
-            onAddStep={() => operate({ kind: 'add-step' })}
-            itemActions={
-              <GuideContextualInspector
-                scope={panels.rightScope}
-                project={project}
-                selectedId={state.selectedId}
-                framing={framing}
-                images={state.images}
-                disabled={disabled}
-                onChange={state.update}
-                t={t}
-              />
-            }
+          <GuideImageDropZone
             t={t}
+            project={project}
+            disabled={importDisabled}
+            onPlace={operate}
+            onImport={imports.drop}
           >
-            <GuideImageDropZone
+            <GuideWorkspace
+              onUploadFile={imports.uploadStep}
+              header={header}
+              importResources={<GuideResourceTrigger t={t} disabled={commandsDisabled} />}
+              images={state.images}
+              panels={panels}
               project={project}
-              disabled={importDisabled}
-              onPlace={operate}
-              onImport={imports.drop}
+              selectedId={state.selectedId}
+              disabled={disabled}
+              onSelect={(id) => {
+                framing.selectBlock(id, null);
+                selectItem(id);
+              }}
+              onAddStep={() => operate({ kind: 'add-step' })}
+              itemActions={
+                <GuideContextualInspector
+                  scope={panels.rightScope}
+                  project={project}
+                  selectedId={state.selectedId}
+                  framing={framing}
+                  images={state.images}
+                  disabled={disabled}
+                  onChange={state.update}
+                  t={t}
+                />
+              }
+              t={t}
             >
               <GuideDocument
                 framedImageId={framing.imageId}
@@ -161,8 +163,8 @@ export function ScenarioEditorPage() {
                 onOperate={operate}
                 t={t}
               />
-            </GuideImageDropZone>
-          </GuideWorkspace>
+            </GuideWorkspace>
+          </GuideImageDropZone>
         </GuideResourceDrawer>
       )}
     </main>
@@ -494,15 +496,20 @@ function guideImageImportCommands(commit: ReturnType<typeof useGuidePageState>['
     commit({ kind: 'import', input });
   return {
     resources,
+    uploadStep: (file: File, signal: AbortSignal) =>
+      resources({ sources: [{ kind: 'file', file }], placement: { kind: 'steps' }, signal }),
     drop: (
       sources: GuideImageImportSource[],
       placement: GuideImageImportPlacement,
       signal: AbortSignal
     ) => resources({ sources, placement, signal }),
-    upload: (stepId: string, blockId: string, file: File, signal: AbortSignal) =>
+    upload: (stepId: string, blockId: string | null, file: File, signal: AbortSignal) =>
       resources({
         sources: [{ kind: 'file', file }],
-        placement: { kind: 'replace-image', stepId, blockId },
+        placement:
+          blockId === null
+            ? { kind: 'blocks', stepId }
+            : { kind: 'replace-image', stepId, blockId },
         signal,
       }),
   };

@@ -16,6 +16,7 @@ beforeEach(() => {
   act(() =>
     root.render(
       <GuideImageUpload
+        placement={{ kind: 'steps' }}
         frame={{ width: 960, height: 540 }}
         disabled={false}
         onUpload={upload}

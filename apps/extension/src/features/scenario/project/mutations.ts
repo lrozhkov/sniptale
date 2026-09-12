@@ -25,7 +25,10 @@ type BlockOperation =
 export type GuideStructureOperation =
   | ItemOperation
   | BlockOperation
-  | { kind: 'place-image'; sourceBlockId: string; itemId: string; blockId?: string }
+  | ({ kind: 'place-image'; sourceBlockId: string } & (
+      | { itemId: string; blockId?: string; beforeItemId?: never }
+      | { itemId?: never; blockId?: never; beforeItemId?: string }
+    ))
   | { kind: 'add-step'; beforeItemId?: string }
   | { kind: 'add-section'; beforeItemId?: string }
   | { kind: 'merge-next'; itemId: string }
@@ -201,8 +204,14 @@ function placeImage(
     .flatMap((item) => (item.kind === 'step' ? item.blocks : []))
     .find((block) => block.id === operation.sourceBlockId);
   if (source?.kind !== 'image') throw new Error('Guide image source is unavailable.');
-  const step = requireStep(project, operation.itemId);
   const copy = structuredClone(source);
+  if (operation.itemId === undefined) {
+    const step = createGuideStep();
+    step.blocks.push({ ...copy, id: crypto.randomUUID() });
+    project.items.splice(insertionIndex(project.items, operation.beforeItemId), 0, step);
+    return;
+  }
+  const step = requireStep(project, operation.itemId);
   if (operation.blockId === undefined) {
     step.blocks.push({ ...copy, id: crypto.randomUUID() });
     return;

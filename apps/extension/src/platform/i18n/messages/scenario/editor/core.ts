@@ -173,6 +173,15 @@ export const scenarioEditorCoreMessages = defineMessageSource({
 
   guideEditImage: { ru: 'Редактировать изображение', en: 'Edit image' },
   guideAddImage: { ru: 'Изображение', en: 'Image' },
+  guideImageDropHint: { ru: 'Перетащите изображение сюда', en: 'Drop an image here' },
+  guideImagePasteHint: {
+    ru: 'Или выберите эту область и вставьте изображение: Ctrl+V',
+    en: 'Or focus this area and paste an image: Ctrl+V',
+  },
+  guideDropReplace: { ru: 'Заменить изображение', en: 'Replace image' },
+  guideDropBlock: { ru: 'Добавить изображение в шаг', en: 'Add image to this step' },
+  guideDropBefore: { ru: 'Создать шаг здесь', en: 'Create a step here' },
+  guideDropAppend: { ru: 'Добавить шаг в конец', en: 'Append a new step' },
   guideUploadImage: { ru: 'Загрузить изображение', en: 'Upload image' },
   guideImageBack: { ru: 'Назад без применения', en: 'Back without applying' },
   guideImageApplyHint: {

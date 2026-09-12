@@ -413,3 +413,32 @@ it('reorders existing blocks before a target or to the end without changing thei
     })
   ).toThrow();
 });
+
+it('places a resource into a new step at a stable boundary or at the end without altering its source', () => {
+  const project = fixture();
+  for (const beforeItemId of ['second', undefined]) {
+    const next = applyGuideStructureOperation(project, {
+      kind: 'place-image',
+      sourceBlockId: 'image',
+      ...(beforeItemId === undefined ? {} : { beforeItemId }),
+    });
+    const inserted = next.items[beforeItemId ? 2 : 3];
+    expect(inserted?.kind).toBe('step');
+    if (inserted?.kind !== 'step') throw new Error('Missing step');
+    expect(inserted.blocks).toHaveLength(1);
+    expect(inserted.blocks[0]).toMatchObject({
+      kind: 'image',
+      assetId: 'asset',
+      editDocumentId: 'annotations',
+    });
+    expect(inserted.blocks[0]?.id).not.toBe('image');
+    expect(project.items).toHaveLength(3);
+  }
+  expect(() =>
+    applyGuideStructureOperation(project, {
+      kind: 'place-image',
+      sourceBlockId: 'image',
+      beforeItemId: 'gone',
+    })
+  ).toThrow();
+});

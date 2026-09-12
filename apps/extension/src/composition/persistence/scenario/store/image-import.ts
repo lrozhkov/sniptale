@@ -44,7 +44,7 @@ export type GuideImageImportSource =
   | { kind: 'library'; mediaId: string }
   | z.infer<typeof videoFrameImportSchema>;
 export type GuideImageImportPlacement =
-  | { kind: 'steps' }
+  | { kind: 'steps'; beforeItemId?: string }
   | { kind: 'blocks'; stepId: string }
   | { kind: 'replace-image'; stepId: string; blockId: string };
 
@@ -125,7 +125,12 @@ export async function importScenarioImages(args: {
             paragraphs: createGuideParagraphs(input.description),
           });
         step.blocks.push(block);
-        project.items.push(step);
+        const before = args.placement.kind === 'steps' ? args.placement.beforeItemId : undefined;
+        const index =
+          before === undefined
+            ? project.items.length
+            : project.items.findIndex((item) => item.id === before);
+        project.items.splice(index, 0, step);
       }
       args.onProgress?.(assets.length, args.sources.length);
     }
@@ -205,6 +210,12 @@ function admitImageImport(args: Parameters<typeof importScenarioImages>[0]) {
     if (source.kind === 'video-frame') videoFrameImportSchema.parse(source);
   const project = parsed.project;
   const placement = args.placement;
+  if (
+    placement.kind === 'steps' &&
+    placement.beforeItemId !== undefined &&
+    !project.items.some((item) => item.id === placement.beforeItemId)
+  )
+    throw new Error('The insertion position is unavailable.');
   const target =
     placement.kind !== 'steps'
       ? project.items.find((item) => item.id === placement.stepId)

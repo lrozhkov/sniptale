@@ -33,7 +33,7 @@ export type GuideFocusRequest = {
 
 type GuideImageUploadHandler = (
   itemId: string,
-  blockId: string,
+  blockId: string | null,
   file: File,
   signal: AbortSignal
 ) => Promise<boolean>;
@@ -376,7 +376,7 @@ function GuideStepBody({
               />
             ) : block.kind === 'image-slot' ? (
               <GuideImageUpload
-                target={{ stepId: item.id, blockId: block.id }}
+                placement={{ kind: 'replace-image', stepId: item.id, blockId: block.id }}
                 frame={block.frame}
                 disabled={disabled}
                 onUpload={(file, signal) => onUploadImage(item.id, block.id, file, signal)}
@@ -401,6 +401,12 @@ function GuideStepBody({
       </GuideBlockReorder>
       {item.blocks.length === 0 && (
         <div className="guide-empty-step">
+          <GuideImageUpload
+            placement={{ kind: 'blocks', stepId: item.id }}
+            disabled={disabled}
+            onUpload={(file, signal) => onUploadImage(item.id, null, file, signal)}
+            t={t}
+          />
           <GuideDocumentInsert
             target={{ kind: 'block', itemId: item.id }}
             end

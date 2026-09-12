@@ -13,7 +13,7 @@ type Selection = { id: string; name: string; source: GuideImageImportSource };
 type ResourceProps = {
   disabled: boolean;
   selectedStepId: string | null;
-  target?: Extract<GuideImageImportPlacement, { kind: 'replace-image' }>;
+  target?: GuideImageImportPlacement;
   onComplete?: () => void;
   onLibraryDragStart?: () => void;
   t: Translate;
@@ -105,7 +105,7 @@ function useGuideImageResources({
       remove(existing.id);
       return;
     }
-    if (!target && selection.length >= 50) {
+    if (target?.kind !== 'replace-image' && selection.length >= 50) {
       setFailed(true);
       return;
     }
@@ -115,7 +115,7 @@ function useGuideImageResources({
       source: { kind: 'library', mediaId: id },
     };
     setFailed(false);
-    setSelection(target ? [item] : [...selection, item]);
+    setSelection(target?.kind === 'replace-image' ? [item] : [...selection, item]);
   };
   return {
     selection,

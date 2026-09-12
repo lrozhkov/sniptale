@@ -18,7 +18,7 @@ import './video-frame-resources.css';
 type VideoResourcesProps = {
   mediaId: string;
   disabled: boolean;
-  target?: Extract<GuideImageImportPlacement, { kind: 'replace-image' }>;
+  target?: GuideImageImportPlacement;
   onComplete?: () => void;
   t: Translate;
   onImport: (input: {

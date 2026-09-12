@@ -400,3 +400,26 @@ it('rejects invalid video provenance before preparing any part of a batch', asyn
   expect(io.write).not.toHaveBeenCalled();
   expect(io.commit).not.toHaveBeenCalled();
 });
+
+it('inserts an ordered batch before an existing item in a single publication', async () => {
+  const args = input();
+  args.project.items = [createGuideStep('First', 'first'), createGuideStep('Last', 'last')];
+  const result = await importScenarioImages({
+    ...args,
+    sources: [
+      { kind: 'file', file: png('A.png') },
+      { kind: 'file', file: png('B.png') },
+    ],
+    placement: { kind: 'steps', beforeItemId: 'last' },
+  });
+  expect(result.items.map((item) => item.title)).toEqual(['First', 'A.png', 'B.png', 'Last']);
+  expect(io.commit).toHaveBeenCalledTimes(1);
+  expect(args.project.items).toHaveLength(2);
+});
+it('rejects a vanished insertion anchor before acquiring assets', async () => {
+  await expect(
+    importScenarioImages({ ...input(), placement: { kind: 'steps', beforeItemId: 'gone' } })
+  ).rejects.toThrow();
+  expect(io.write).not.toHaveBeenCalled();
+  expect(io.commit).not.toHaveBeenCalled();
+});
