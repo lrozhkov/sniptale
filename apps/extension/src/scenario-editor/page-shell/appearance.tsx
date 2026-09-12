@@ -12,6 +12,7 @@ import { CollapsibleSection, SelectField } from '../../ui/compact-inspector-cont
 import { resolveGuideStyle } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
 import { GuideTemplateFiles } from './template-files';
+import { GuideNumberingControls } from './numbering-controls';
 
 type AppearanceProps = {
   project: GuideProject;
@@ -38,23 +39,22 @@ export function GuideAppearance({ project, selectedId, disabled, onChange, t }: 
   };
   return (
     <div className="guide-appearance">
-      {step && (
-        <label className="guide-number-toggle">
-          <input
-            type="checkbox"
-            disabled={disabled}
-            checked={step.showNumber}
-            onChange={(event) =>
-              onChange({
+      {item && (
+        <GuideNumberingControls
+          project={project}
+          item={item}
+          disabled={disabled}
+          t={t}
+          onChange={(next, group) =>
+            onChange(
+              {
                 ...project,
-                items: project.items.map((entry) =>
-                  entry.id === step.id ? { ...step, showNumber: event.target.checked } : entry
-                ),
-              })
-            }
-          />
-          {t('scenario.editor.guideShowNumber')}
-        </label>
+                items: project.items.map((entry) => (entry.id === next.id ? next : entry)),
+              },
+              group
+            )
+          }
+        />
       )}
       <CollapsibleSection label={t('scenario.editor.appearance')} defaultOpen={false}>
         <div className="guide-appearance-fields">

@@ -486,3 +486,52 @@ it('roundtrips composition for every block kind and rejects unsupported widths',
     }
   }
 });
+
+it('preserves explicit step/section numbering through canonical JSON roundtrips', () => {
+  const source = project([
+    { kind: 'section', id: 'section', title: '', paragraphs: [], numbering: { restartAt: 5 } },
+    { ...step(), numbering: { restartAt: 3, label: 'A.1' } },
+  ]);
+  const parsed = parseGuideProject(source);
+  expect(parsed.status).toBe('ok');
+  if (parsed.status !== 'ok') throw new Error('Expected valid numbering');
+  expect(parsed.project).toEqual(source);
+  expect(parseGuideProject(JSON.parse(JSON.stringify(parsed.project)))).toEqual(parsed);
+});
+it.each([0, -1, 1.5, 10_000, Infinity, '1', null])(
+  'rejects invalid numbering restart %s on both item types',
+  (restartAt) => {
+    for (const item of [step(), { kind: 'section', id: 'section', title: '', paragraphs: [] }]) {
+      expect(
+        parseGuideProject({ ...project(), items: [{ ...item, numbering: { restartAt } }] }).status
+      ).toBe('invalid');
+    }
+  }
+);
+it.each(['', '   ', 'x'.repeat(33), 2, null])(
+  'rejects invalid manual numbering label %s',
+  (label) => {
+    expect(
+      parseGuideProject({ ...project(), items: [{ ...step(), numbering: { label } }] }).status
+    ).toBe('invalid');
+  }
+);
+it('rejects unknown numbering fields and manual section labels', () => {
+  expect(
+    parseGuideProject({ ...project(), items: [{ ...step(), numbering: { counter: 1 } }] }).status
+  ).toBe('invalid');
+  expect(
+    parseGuideProject({
+      ...project(),
+      items: [
+        {
+          kind: 'section',
+          id: 's',
+          title: '',
+          paragraphs: [],
+          numbering: { restartAt: 1, label: 'A' },
+        },
+      ],
+    }).status
+  ).toBe('invalid');
+});

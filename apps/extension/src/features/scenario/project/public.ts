@@ -12,3 +12,5 @@ export {
 } from './appearance';
 
 export { resolveGuideBlockWidth } from './layout';
+
+export { resolveGuideNumbering, type GuideResolvedNumber } from './numbering';

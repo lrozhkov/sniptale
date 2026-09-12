@@ -13,6 +13,19 @@ const id = z
   .min(1)
   .max(GUIDE_LIMITS.maxIdLength)
   .regex(/^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/);
+const restartAt = z.number().int().min(1).max(GUIDE_LIMITS.maxRestartNumber);
+const numbering = z
+  .object({
+    restartAt: restartAt.optional(),
+    label: z
+      .string()
+      .min(1)
+      .max(GUIDE_LIMITS.maxNumberLabelLength)
+      .refine((value) => value.trim().length > 0)
+      .optional(),
+  })
+  .strict()
+  .optional();
 const width = z.enum(['full', 'half']).optional();
 const label = z.string().max(GUIDE_LIMITS.maxLabelLength);
 const text = z.string().max(GUIDE_LIMITS.maxTextLength);
@@ -126,13 +139,22 @@ const projectSchema: z.ZodType<GuideProject> = z
     items: z
       .array(
         z.discriminatedUnion('kind', [
-          z.object({ kind: z.literal('section'), id, title: label, paragraphs }).strict(),
+          z
+            .object({
+              kind: z.literal('section'),
+              id,
+              title: label,
+              paragraphs,
+              numbering: z.object({ restartAt }).strict().optional(),
+            })
+            .strict(),
           z
             .object({
               kind: z.literal('step'),
               id,
               title: label,
               showNumber: z.boolean(),
+              numbering,
               layout: z.enum(['stacked', 'side-by-side', 'comparison', 'text']),
               templateId: id.nullable(),
               styleOverrides: style.partial().strict(),

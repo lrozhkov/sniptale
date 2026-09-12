@@ -1,3 +1,4 @@
+import { resolveGuideNumbering } from '../../features/scenario/project/public';
 import { GUIDE_IMAGE_DRAG_TYPE } from './image-drop';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -133,11 +134,10 @@ function GuideOutline({
   onSelect,
   t,
 }: Pick<WorkspaceProps, 'project' | 'selectedId' | 'onSelect' | 't'>) {
-  let number = 0;
+  const numbers = resolveGuideNumbering(project.items);
   return (
     <nav aria-label={t('scenario.editor.outline')} className="guide-outline">
       {project.items.map((item) => {
-        if (item.kind === 'step') number += 1;
         return (
           <a
             key={item.id}
@@ -150,7 +150,7 @@ function GuideOutline({
             }}
           >
             <span className="guide-outline-number" aria-hidden="true">
-              {item.kind === 'step' ? number : <FileText size={14} />}
+              {item.kind === 'step' ? numbers.get(item.id)?.label : <FileText size={14} />}
             </span>
             <span>{item.title || t('scenario.editor.untitledStep')}</span>
           </a>

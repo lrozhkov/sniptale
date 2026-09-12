@@ -7,6 +7,8 @@ import type {
 
 /** Resource ceilings for a guide document, excluding separately stored image bytes. */
 export const GUIDE_LIMITS = {
+  maxNumberLabelLength: 32,
+  maxRestartNumber: 9999,
   maxItems: 300,
   maxBlocksPerStep: 200,
   maxParagraphs: 200,
@@ -111,12 +113,16 @@ export type GuideBlock = GuideBlockComposition &
     | GuideImageSlotBlock
   );
 
-/** Numbering derives from document order, even when a step hides its number. */
+/** Explicit restart and manual label; omitted fields continue automatic numbering. */
+export type GuideStepNumbering = { restartAt?: number | undefined; label?: string | undefined };
+
+/** Hidden and manually labelled steps do not consume the automatic counter. */
 export interface GuideStep {
   kind: 'step';
   id: string;
   title: string;
   showNumber: boolean;
+  numbering?: GuideStepNumbering | undefined;
   layout: 'stacked' | 'side-by-side' | 'comparison' | 'text';
   templateId: string | null;
   styleOverrides: GuideStyleOverrides;
@@ -126,6 +132,7 @@ export interface GuideStep {
 /** A section introduces subsequent steps until the next section; it has no step number. */
 export interface GuideSection {
   kind: 'section';
+  numbering?: { restartAt: number } | undefined;
   id: string;
   title: string;
   paragraphs: GuideParagraph[];

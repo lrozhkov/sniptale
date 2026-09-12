@@ -14,6 +14,7 @@ import type { Translate } from '../../platform/i18n';
 import {
   createGuideParagraphs,
   resolveGuideStyle,
+  resolveGuideNumbering,
   type GuideStructureOperation,
 } from '../../features/scenario/project/public';
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -73,7 +74,7 @@ export function GuideDocument({
     () => focusGuideTarget(content.current, selectedId, focusRequest),
     [selectedId, focusRequest]
   );
-  let number = 0;
+  const numbers = resolveGuideNumbering(project.items);
   return (
     <div ref={content} className="guide-document" style={guideDocumentStyle(project.style)}>
       {project.items.map((item) => {
@@ -112,7 +113,7 @@ export function GuideDocument({
               </section>
             </Fragment>
           );
-        number += 1;
+        const number = numbers.get(item.id)?.label;
         const appearance = resolveGuideStyle(project.style, item.styleOverrides);
         return (
           <Fragment key={item.id}>
@@ -135,7 +136,7 @@ export function GuideDocument({
               }}
             >
               <header>
-                {item.showNumber && <span>{number}</span>}
+                {number != null && <span>{number}</span>}
                 <textarea
                   className="guide-step-title"
                   rows={1}
