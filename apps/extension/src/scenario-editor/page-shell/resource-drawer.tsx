@@ -34,19 +34,59 @@ export function GuideResourceDrawer({
 }: ResourceDrawerProps &
   Pick<ComponentProps<typeof GuideImageResources>, 'onImport' | 'disabled' | 'selectedStepId'>) {
   const [target, setTarget] = useState<ResourceTarget | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const dragTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const anchor = useRef<HTMLSpanElement>(null);
   const theme = useResolvedPortalTheme(anchor.current);
-  const close = useCallback(() => setTarget(null), []);
+  const close = useCallback(() => {
+    if (dragTimer.current !== null) clearTimeout(dragTimer.current);
+    dragTimer.current = null;
+    setTarget(null);
+    setDragging(false);
+  }, []);
+  useEffect(
+    () => () => {
+      if (dragTimer.current !== null) clearTimeout(dragTimer.current);
+    },
+    []
+  );
+  useEffect(() => {
+    if (!target) return;
+    const cancel = (event: KeyboardEvent) => {
+      if (
+        !event.defaultPrevented &&
+        event.key === 'Escape' &&
+        (dragging || dragTimer.current !== null)
+      )
+        close();
+    };
+    window.addEventListener('dragend', close);
+    window.addEventListener('keydown', cancel);
+    return () => {
+      window.removeEventListener('dragend', close);
+      window.removeEventListener('keydown', cancel);
+    };
+  }, [target, dragging, close]);
   return (
     <ResourceRequest.Provider value={setTarget}>
       <span ref={anchor} className="guide-resource-drawer-anchor" />
       {children}
       {target &&
         createPortal(
-          <div data-theme={theme ?? undefined} className="sniptale-ai-modal-root">
+          <div
+            data-theme={theme ?? undefined}
+            className={`sniptale-ai-modal-root${dragging ? ' guide-resource-dragging' : ''}`}
+          >
             <GuideResourceDialog t={t} onClose={close}>
               <GuideImageResources
                 {...props}
+                onLibraryDragStart={() => {
+                  // Let Chromium capture the native drag image before hiding its source.
+                  dragTimer.current = setTimeout(() => {
+                    dragTimer.current = null;
+                    setDragging(true);
+                  }, 0);
+                }}
                 t={t}
                 {...(target.kind === 'replace-image' ? { target, onComplete: close } : {})}
               />

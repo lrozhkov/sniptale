@@ -1,4 +1,7 @@
-import type { GuideImageImportPlacement } from '../../composition/persistence/scenario/store/public';
+import type {
+  GuideImageImportPlacement,
+  GuideImageImportSource,
+} from '../../composition/persistence/scenario/store/public';
 import { GuideImageDropZone } from './image-drop';
 import { GuideResourceDrawer, GuideResourceTrigger } from './resource-drawer';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -24,11 +27,11 @@ export function ScenarioEditorPage() {
   const imageEditor = useGuideImageEditorMode(state.images);
   const { project, status } = state;
   const disabled = state.editingLocked;
-  const importFiles = (files: File[], placement: GuideImageImportPlacement, signal: AbortSignal) =>
-    state.commitChange({
-      kind: 'import',
-      input: { sources: files.map((file) => ({ kind: 'file', file })), placement, signal },
-    });
+  const importSources = (
+    sources: GuideImageImportSource[],
+    placement: GuideImageImportPlacement,
+    signal: AbortSignal
+  ) => state.commitChange({ kind: 'import', input: { sources, placement, signal } });
   const { focusRequest, selectItem, operate } = useGuideNavigation(state);
   if (imageEditor.selection && project)
     return (
@@ -133,11 +136,15 @@ export function ScenarioEditorPage() {
               project={project}
               disabled={disabled || state.mutationPending || status === 'conflict'}
               onPlace={operate}
-              onFiles={importFiles}
+              onImport={importSources}
             >
               <GuideDocument
                 onUploadImage={(stepId, blockId, file, signal) =>
-                  importFiles([file], { kind: 'replace-image', stepId, blockId }, signal)
+                  importSources(
+                    [{ kind: 'file', file }],
+                    { kind: 'replace-image', stepId, blockId },
+                    signal
+                  )
                 }
                 onEditImage={(itemId, blockId) => {
                   state.sealEdit();

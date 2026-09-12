@@ -1,4 +1,4 @@
-import { expect } from '@playwright/test';
+import { expect, type Locator } from '@playwright/test';
 import { SCENARIO_EDITOR_VISUAL_HARNESS_PATH } from '../extension-critical.helpers';
 import { verifyGuideAppearance } from './scenario-editor-visual.appearance-steps';
 import { test } from '../support/extension-fixture';
@@ -641,6 +641,90 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await expect(step.locator('.guide-block')).toHaveCount(count);
     await expect(existing.locator('figcaption')).toHaveText(caption ?? '');
     await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+  });
+}
+
+for (const theme of SCENARIO_VISUAL_THEMES) {
+  test(`native library drag reaches the document and cancels cleanly in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }, testInfo) => {
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1440, height: 1000 });
+    await page.getByRole('button', { name: 'Resources', exact: true }).click();
+    const trigger = page
+      .locator('.guide-library-panel')
+      .getByRole('button', { name: 'Image library', exact: true });
+    const drawer = page.getByRole('dialog', { name: 'Resources', exact: true });
+    const card = drawer.getByRole('button', { name: 'Library screenshot.png', exact: true });
+    const dragToDocument = async (target: Locator) => {
+      await card.hover();
+      // The target is covered until dragstart yields the modal's hit testing.
+      await card.dragTo(target, { force: true });
+    };
+    const undo = page.getByRole('button', { name: 'Undo', exact: true });
+    const empty = page.locator('article#text-only');
+    const initial = await empty.locator('.guide-block').count();
+    await empty.scrollIntoViewIfNeeded();
+    await trigger.click();
+    await dragToDocument(empty.locator('.guide-step-title'));
+    await expect(drawer).toHaveCount(0);
+    await expect(empty.locator('.guide-block')).toHaveCount(initial + 1);
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    await undo.click();
+    await expect(empty.locator('.guide-block')).toHaveCount(initial);
+    const step = page.locator('article#compare');
+    const count = await step.locator('.guide-block').count();
+    const existing = step.locator('[data-block-id="before"]');
+    const caption = await existing.locator('figcaption').textContent();
+    await existing.scrollIntoViewIfNeeded();
+    await trigger.click();
+    await dragToDocument(existing.locator('img'));
+    await expect(drawer).toHaveCount(0);
+    await expect(step.locator('.guide-block')).toHaveCount(count);
+    await expect(existing.locator('figcaption')).toHaveText(caption ?? '');
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    await undo.click();
+    const add = step
+      .locator('.guide-insertion-block[data-end="true"]')
+      .getByRole('button', { name: 'Image', exact: true });
+    await add.focus();
+    await add.click();
+    const slot = step.locator('[data-kind="image-slot"]');
+    await slot.scrollIntoViewIfNeeded();
+    await trigger.click();
+    await dragToDocument(slot);
+    await expect(drawer).toHaveCount(0);
+    await expect(slot).toHaveCount(0);
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    await undo.click();
+    await expect(slot).toHaveCount(1);
+    await undo.click();
+    await expect(step.locator('.guide-block')).toHaveCount(count);
+    await trigger.click();
+    await card.hover();
+    const point = await card.boundingBox();
+    if (!point) throw new Error('Missing library card');
+    await page.mouse.down();
+    await page.mouse.move(point.x + point.width / 2 + 20, point.y + point.height / 2 + 20, {
+      steps: 4,
+    });
+    await expect(page.locator('.guide-resource-dragging')).toHaveCount(1);
+    await expect(card).toHaveCount(1);
+    await testInfo.attach(`library-native-drag-${theme}`, {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+    await page.keyboard.press('Escape');
+    await page.mouse.up();
+    await expect(drawer).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    await expect(step.locator('.guide-block')).toHaveCount(count);
+    await trigger.click();
+    await dragToDocument(page.locator('.guide-page-header'));
+    await expect(drawer).toHaveCount(0);
+    await expect(step.locator('.guide-block')).toHaveCount(count);
+    await expect(empty.locator('.guide-block')).toHaveCount(initial);
     await expect(page.getByRole('status').first()).toHaveText('Saved');
   });
 }

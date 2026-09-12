@@ -36,7 +36,7 @@ project.items = [step];
 function render(disabled = false) {
   act(() =>
     root.render(
-      <GuideImageDropZone project={project} disabled={disabled} onPlace={place} onFiles={files}>
+      <GuideImageDropZone project={project} disabled={disabled} onPlace={place} onImport={files}>
         <article id="step">
           <h2>Title</h2>
           <div data-block-id="image">
@@ -154,4 +154,42 @@ it('imports native files once and aborts preparation on unmount', async () => {
   act(() => root.render(null));
   expect(signal.aborted).toBe(true);
   await act(async () => finish?.(true));
+});
+
+it('routes a library identity through the existing importer for the exact drop target', () => {
+  const target = host.querySelector('button');
+  if (!target) throw new Error('Missing slot');
+  const event = new Event('drop', { bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'dataTransfer', {
+    value: {
+      types: ['application/x-sniptale-library-image'],
+      files: [],
+      getData: () => JSON.stringify({ mediaId: 'library-image' }),
+    },
+  });
+  act(() => target.dispatchEvent(event));
+  expect(files).toHaveBeenCalledTimes(1);
+  expect(files.mock.calls[0]?.[0]).toEqual([{ kind: 'library', mediaId: 'library-image' }]);
+  expect(files.mock.calls[0]?.[1]).toEqual({
+    kind: 'replace-image',
+    stepId: 'step',
+    blockId: 'slot',
+  });
+});
+
+it('rejects malformed or resource-bearing library drag payloads before import', () => {
+  for (const text of [
+    '{',
+    ' '.repeat(2049),
+    JSON.stringify({ mediaId: 42 }),
+    JSON.stringify({ mediaId: 'image', url: 'https://example.com/image.png' }),
+  ]) {
+    const event = new Event('drop', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'dataTransfer', {
+      value: { types: ['application/x-sniptale-library-image'], files: [], getData: () => text },
+    });
+    act(() => host.querySelector('h2')!.dispatchEvent(event));
+  }
+  expect(files).not.toHaveBeenCalled();
+  expect(place).not.toHaveBeenCalled();
 });

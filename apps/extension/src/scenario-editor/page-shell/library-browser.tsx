@@ -1,3 +1,4 @@
+import { GUIDE_LIBRARY_IMAGE_DRAG_TYPE } from './image-drop';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, Image, Library, RefreshCw } from 'lucide-react';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
@@ -124,19 +125,23 @@ function LibraryRaster({
 }
 
 /** Library navigation, image grid and selected preview use the app's read-only library contracts. */
+type GuideLibraryBrowserProps = {
+  t: Translate;
+  disabled: boolean;
+  selectedIds: string[];
+  onChoose: (id: string, name: string) => void;
+  onDragStart?: (() => void) | undefined;
+  fileAction: ReactNode;
+};
+
 export function GuideLibraryBrowser({
   t,
   disabled,
   selectedIds,
   onChoose,
+  onDragStart,
   fileAction,
-}: {
-  t: Translate;
-  disabled: boolean;
-  selectedIds: string[];
-  onChoose: (id: string, name: string) => void;
-  fileAction: ReactNode;
-}) {
+}: GuideLibraryBrowserProps) {
   const catalog = useLibraryCatalog();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<'all' | 'screenshot' | 'image'>('all');
@@ -223,6 +228,19 @@ export function GuideLibraryBrowser({
                 type="button"
                 key={item.id}
                 className="guide-library-card"
+                draggable={!disabled && Boolean(onDragStart)}
+                onDragStart={(event) => {
+                  if (disabled || !onDragStart) {
+                    event.preventDefault();
+                    return;
+                  }
+                  event.dataTransfer.effectAllowed = 'copy';
+                  event.dataTransfer.setData(
+                    GUIDE_LIBRARY_IMAGE_DRAG_TYPE,
+                    JSON.stringify({ mediaId: item.id })
+                  );
+                  onDragStart();
+                }}
                 disabled={disabled}
                 aria-pressed={selectedIds.includes(item.id)}
                 onClick={() => {

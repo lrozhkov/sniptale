@@ -2,10 +2,18 @@ import { useEffect, useRef, type DragEvent, type ReactNode } from 'react';
 import { z } from 'zod';
 import { GUIDE_LIMITS, type GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { GuideStructureOperation } from '../../features/scenario/project/public';
-import type { GuideImageImportPlacement } from '../../composition/persistence/scenario/store/public';
+import type {
+  GuideImageImportPlacement,
+  GuideImageImportSource,
+} from '../../composition/persistence/scenario/store/public';
 
 /** Drag data identifies an existing image; canonical project state supplies all resource refs. */
 export const GUIDE_IMAGE_DRAG_TYPE = 'application/x-sniptale-guide-image';
+/** Library drag payloads contain an identity, never a URL or trusted resource reference. */
+export const GUIDE_LIBRARY_IMAGE_DRAG_TYPE = 'application/x-sniptale-library-image';
+const librarySchema = z
+  .object({ mediaId: z.string().min(1).max(GUIDE_LIMITS.maxIdLength) })
+  .strict();
 const resourceSchema = z
   .object({
     projectId: z.string().min(1).max(GUIDE_LIMITS.maxIdLength),
@@ -13,11 +21,11 @@ const resourceSchema = z
   })
   .strict();
 
-function readResource(text: string) {
+function readResource(text: string, library = false) {
   if (text.length > 2048) return null;
   try {
     const value: unknown = JSON.parse(text);
-    const result = resourceSchema.safeParse(value);
+    const result = (library ? librarySchema : resourceSchema).safeParse(value);
     return result.success ? result.data : null;
   } catch {
     return null;
@@ -45,14 +53,14 @@ export function GuideImageDropZone({
   project,
   disabled,
   onPlace,
-  onFiles,
+  onImport,
   children,
 }: {
   project: GuideProject;
   disabled: boolean;
   onPlace: (operation: GuideStructureOperation) => void;
-  onFiles: (
-    files: File[],
+  onImport: (
+    sources: GuideImageImportSource[],
     placement: GuideImageImportPlacement,
     signal: AbortSignal
   ) => Promise<boolean>;
@@ -83,6 +91,7 @@ export function GuideImageDropZone({
   }, [disabled]);
   const supports = (event: DragEvent<HTMLDivElement>) =>
     event.dataTransfer.types.includes(GUIDE_IMAGE_DRAG_TYPE) ||
+    event.dataTransfer.types.includes(GUIDE_LIBRARY_IMAGE_DRAG_TYPE) ||
     event.dataTransfer.types.includes('Files');
   return (
     <div
@@ -117,7 +126,7 @@ export function GuideImageDropZone({
         if (!target) return;
         if (event.dataTransfer.types.includes(GUIDE_IMAGE_DRAG_TYPE)) {
           const source = readResource(event.dataTransfer.getData(GUIDE_IMAGE_DRAG_TYPE));
-          if (!source || source.projectId !== project.id) return;
+          if (!source || !('projectId' in source) || source.projectId !== project.id) return;
           onPlace({
             kind: 'place-image',
             sourceBlockId: source.blockId,
@@ -128,11 +137,20 @@ export function GuideImageDropZone({
           });
           return;
         }
-        const files = Array.from(event.dataTransfer.files);
-        if (!files.length) return;
+        let sources: GuideImageImportSource[];
+        if (event.dataTransfer.types.includes(GUIDE_LIBRARY_IMAGE_DRAG_TYPE)) {
+          const source = readResource(
+            event.dataTransfer.getData(GUIDE_LIBRARY_IMAGE_DRAG_TYPE),
+            true
+          );
+          if (!source || !('mediaId' in source)) return;
+          sources = [{ kind: 'library', mediaId: source.mediaId }];
+        } else
+          sources = Array.from(event.dataTransfer.files).map((file) => ({ kind: 'file', file }));
+        if (!sources.length) return;
         const controller = new AbortController();
         pending.current = controller;
-        void onFiles(files, target.placement, controller.signal).finally(() => {
+        void onImport(sources, target.placement, controller.signal).finally(() => {
           if (pending.current === controller) pending.current = null;
         });
       }}

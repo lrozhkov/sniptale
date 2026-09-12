@@ -4,16 +4,18 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createTranslator } from '../../platform/i18n';
 import { GuideResourceDrawer, GuideResourceTrigger } from './resource-drawer';
-vi.mock('./resources', () => ({ GuideImageResources: () => <ImportChild /> }));
+vi.mock('./resources', () => ({ GuideImageResources: ImportChild }));
 
 let root: Root;
 let host: HTMLDivElement;
 const cleanup = vi.fn();
-function ImportChild() {
+function ImportChild({ onLibraryDragStart }: { onLibraryDragStart?: () => void }) {
   useEffect(() => cleanup, []);
   return (
     <input
       aria-label="Import search"
+      draggable
+      onDragStart={onLibraryDragStart}
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
           event.preventDefault();
@@ -92,4 +94,28 @@ it('leaves Escape to a child layer and dismisses through the shared backdrop', a
   expect(document.querySelector('[role="dialog"]')).toBeNull();
   expect(document.activeElement).toBe(trigger);
   expect(cleanup).toHaveBeenCalledTimes(1);
+});
+
+it('keeps the source mounted during drag and closes cleanly on dragend or Escape', async () => {
+  const trigger = await open();
+  const input = document.querySelector('[role="dialog"] input')!;
+  await act(async () => input.dispatchEvent(new Event('dragstart', { bubbles: true })));
+  await vi.waitFor(async () => {
+    await act(async () => {});
+    expect(document.querySelector('.guide-resource-dragging')).not.toBeNull();
+  });
+  expect(input.isConnected).toBe(true);
+  expect(cleanup).not.toHaveBeenCalled();
+  await act(async () => window.dispatchEvent(new Event('dragend')));
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
+  expect(document.activeElement).toBe(trigger);
+  await open();
+  await act(async () =>
+    document
+      .querySelector('[role="dialog"] input')!
+      .dispatchEvent(new Event('dragstart', { bubbles: true }))
+  );
+  await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+  expect(document.querySelector('.guide-resource-dragging')).toBeNull();
+  expect(document.querySelector('[role="dialog"]')).toBeNull();
 });

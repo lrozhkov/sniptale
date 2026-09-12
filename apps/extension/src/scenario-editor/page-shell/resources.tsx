@@ -15,6 +15,7 @@ type ResourceProps = {
   selectedStepId: string | null;
   target?: Extract<GuideImageImportPlacement, { kind: 'replace-image' }>;
   onComplete?: () => void;
+  onLibraryDragStart?: () => void;
   t: Translate;
   onImport: (input: {
     sources: readonly GuideImageImportSource[];
@@ -179,6 +180,7 @@ export function GuideImageResources(props: ResourceProps) {
           item.source.kind === 'library' ? [item.source.mediaId] : []
         )}
         onChoose={state.chooseLibrary}
+        onDragStart={props.onLibraryDragStart}
         fileAction={
           <label className="guide-import-file-action">
             <Upload size={16} aria-hidden="true" />

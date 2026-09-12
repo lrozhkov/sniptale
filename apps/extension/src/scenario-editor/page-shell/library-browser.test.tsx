@@ -11,6 +11,7 @@ const io = vi.hoisted(() => ({
   create: vi.fn(),
   revoke: vi.fn(),
   choose: vi.fn(),
+  drag: vi.fn(),
 }));
 vi.mock('../../composition/persistence/media-library', () => ({ listMediaLibrary: io.list }));
 vi.mock('../../composition/persistence/gallery-saved-views', () => ({
@@ -64,14 +65,15 @@ afterEach(() => {
   host.remove();
   vi.unstubAllGlobals();
 });
-async function render() {
+async function render(disabled = false) {
   await act(async () =>
     root.render(
       <GuideLibraryBrowser
         t={createTranslator('en')}
-        disabled={false}
+        disabled={disabled}
         selectedIds={[]}
         onChoose={io.choose}
+        onDragStart={io.drag}
         fileAction={null}
       />
     )
@@ -162,4 +164,27 @@ it('retries metadata failures and applies saved library filters', async () => {
   expect(host.querySelectorAll('.guide-library-card')).toHaveLength(2);
   await click('Tagged guide');
   expect(host.querySelectorAll('.guide-library-card')).toHaveLength(1);
+});
+
+it('exports only the library identity for native dragging and rejects disabled drags', async () => {
+  await render();
+  const card = host.querySelector('.guide-library-card')!;
+  const setData = vi.fn();
+  const event = new Event('dragstart', { bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'dataTransfer', { value: { setData, effectAllowed: 'none' } });
+  act(() => card.dispatchEvent(event));
+  expect(setData).toHaveBeenCalledWith(
+    'application/x-sniptale-library-image',
+    JSON.stringify({ mediaId: 'image' })
+  );
+  expect(io.drag).toHaveBeenCalledTimes(1);
+  expect(io.choose).not.toHaveBeenCalled();
+  await render(true);
+  const disabledEvent = new Event('dragstart', { bubbles: true, cancelable: true });
+  Object.defineProperty(disabledEvent, 'dataTransfer', {
+    value: { setData, effectAllowed: 'none' },
+  });
+  act(() => card.dispatchEvent(disabledEvent));
+  expect(disabledEvent.defaultPrevented).toBe(true);
+  expect(io.drag).toHaveBeenCalledTimes(1);
 });

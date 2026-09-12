@@ -1326,3 +1326,11 @@
   background: var(--sniptale-color-surface-panel);
   color: var(--sniptale-color-text-primary-strong);
 }
+
+.guide-resource-dragging {
+  opacity: 0;
+}
+.guide-resource-dragging,
+.guide-resource-dragging * {
+  pointer-events: none !important;
+}
