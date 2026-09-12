@@ -17,7 +17,7 @@ describe('settings route codec', () => {
       saving: ['settings', 'storage', 'templates'],
       'editor-resources': ['tools', 'palettes', 'surfaces', 'gradients'],
       'ai-connections': ['integrations', 'chrome-ai', 'security'],
-      'ai-prompts': ['templates', 'prompts'],
+      'ai-prompts': ['templates', 'scenario-templates', 'prompts'],
       'native-app': ['connection', 'capture', 'commands', 'telemetry'],
       'access-data': ['permissions', 'privacy'],
       'settings-transfer': [],

@@ -166,6 +166,28 @@ const image = z
   })
   .strict();
 
+/** Presentation fields share their admission rules with AI proposals. */
+export const guideStepParametersSchema = z
+  .object({
+    showNumber: z.boolean(),
+    numbering,
+    layout: z.enum(['stacked', 'side-by-side', 'comparison', 'text']),
+    styleOverrides: style.partial().strict(),
+  })
+  .strict();
+const noteTone = z.enum(['neutral', 'info', 'warning', 'error']);
+/** Safe parameter surfaces exclude content identity and media ownership. */
+export const guideBlockParameterSchemas = {
+  heading: z.object({ width, textStyle }).strict(),
+  text: z.object({ width, textStyle }).strict(),
+  note: z.object({ width, textStyle, tone: noteTone.optional() }).strict(),
+  image: image
+    .pick({ width: true, frame: true, fit: true, contentTransform: true, htmlExport: true })
+    .partial()
+    .strict(),
+  'image-slot': image.pick({ width: true, frame: true, fit: true }).partial().strict(),
+};
+
 const projectSchema: z.ZodType<GuideProject> = z
   .object({
     version: z.literal(4),
@@ -201,25 +223,33 @@ const projectSchema: z.ZodType<GuideProject> = z
               kind: z.literal('step'),
               id,
               title: label,
-              showNumber: z.boolean(),
-              numbering,
-              layout: z.enum(['stacked', 'side-by-side', 'comparison', 'text']),
+              ...guideStepParametersSchema.shape,
               templateId: id.nullable(),
-              styleOverrides: style.partial().strict(),
               blocks: z
                 .array(
                   z.discriminatedUnion('kind', [
-                    z.object({ kind: z.literal('heading'), id, width, text, textStyle }).strict(),
                     z
-                      .object({ kind: z.literal('text'), id, width, paragraphs, textStyle })
+                      .object({
+                        kind: z.literal('heading'),
+                        id,
+                        text,
+                        ...guideBlockParameterSchemas.heading.shape,
+                      })
+                      .strict(),
+                    z
+                      .object({
+                        kind: z.literal('text'),
+                        id,
+                        paragraphs,
+                        ...guideBlockParameterSchemas.text.shape,
+                      })
                       .strict(),
                     z
                       .object({
                         kind: z.literal('note'),
-                        textStyle,
                         id,
-                        width,
-                        tone: z.enum(['neutral', 'info', 'warning', 'error']),
+                        ...guideBlockParameterSchemas.note.shape,
+                        tone: noteTone,
                         paragraphs,
                       })
                       .strict(),

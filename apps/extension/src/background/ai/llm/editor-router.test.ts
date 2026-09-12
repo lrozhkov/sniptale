@@ -1,3 +1,4 @@
+import { buildScenarioAiSystemPrompt } from '@sniptale/runtime-contracts/scenario-ai-operations';
 import { beforeEach, expect, it, vi } from 'vitest';
 
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
@@ -136,7 +137,7 @@ it('routes scenario-editor multimodal requests and parses the strict JSON payloa
     baseUrl: 'https://api.openai.com/v1',
     modelCode: 'gpt-4.1',
     providerErrorLabel: 'provider-1',
-    systemPrompt: 'Scenario editor system prompt',
+    systemPrompt: buildScenarioAiSystemPrompt('Scenario editor system prompt'),
     userContent: [
       {
         type: 'text',
@@ -150,13 +151,10 @@ it('routes scenario-editor multimodal requests and parses the strict JSON payloa
           'Selected guide step JSON:',
           '{}',
           '',
-          'Tool manifest JSON:',
-          '{}',
-          '',
           'Project snapshot JSON:',
           '{"steps":[]}',
           '',
-          'Return ONLY strict JSON with the shape {"operations":[...]} using the tool manifest.',
+          'Return ONLY strict JSON with the shape {"operations":[...]} using the system contract.',
         ].join('\n'),
       },
       {

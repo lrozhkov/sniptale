@@ -56,3 +56,33 @@ it('rejects legacy presentation/media operations, unknown fields and excessive p
     }).success
   ).toBe(false);
 });
+
+it('generates the advertised contract from the accepted presentation schemas', async () => {
+  const {
+    createScenarioAiManifest,
+    buildScenarioAiSystemPrompt,
+    scenarioAiOperationsResponseSchema,
+  } = await import('./index');
+  const { z } = await import('zod');
+  const manifest = createScenarioAiManifest();
+  expect(manifest.response).toEqual(z.toJSONSchema(scenarioAiOperationsResponseSchema));
+  const prompt = buildScenarioAiSystemPrompt('User writing style');
+  expect(prompt).toContain('User writing style');
+  expect(prompt).toContain('setBlockParameters');
+  expect(prompt).toContain('contentTransform');
+  expect(prompt).not.toContain('annotationsMode');
+  expect(prompt.length).toBeLessThan(18000);
+  expect(
+    scenarioAiOperationsResponseSchema.parse({
+      operations: [
+        { type: 'setStepParameters', stepId: 'step', parameters: { layout: 'comparison' } },
+        {
+          type: 'setBlockParameters',
+          stepId: 'step',
+          blockId: 'image',
+          parameters: { width: 33, fit: 'cover' },
+        },
+      ],
+    }).operations
+  ).toHaveLength(2);
+});

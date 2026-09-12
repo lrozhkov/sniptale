@@ -90,6 +90,7 @@ it('routes v3 scenario editor requests through operation payloads', async () => 
   });
   expect(requestMultimodalChatCompletionMock).toHaveBeenCalledWith(
     expect.objectContaining({
+      systemPrompt: expect.stringContaining('Authoritative editor contract'),
       userContent: [
         expect.objectContaining({
           text: expect.stringContaining('Return ONLY strict JSON with the shape {"operations"'),
@@ -232,3 +233,23 @@ function createV3Message() {
     type: MessageType.PROCESS_SCENARIO_EDITOR_WITH_LLM,
   } as const;
 }
+
+it('does not send the expanded editor contract without a preauthorized request', () => {
+  hasPreauthorizedScenarioEditorLlmRouteMessageMock.mockReturnValue(false);
+  const sendResponse = vi.fn();
+  expect(routeScenarioEditorLlmMessage(createV3Message(), sendResponse, createSender())).toBe(true);
+  expect(sendResponse).toHaveBeenCalledWith({ success: false, error: 'Unauthorized LLM request' });
+  expect(requestMultimodalChatCompletionMock).not.toHaveBeenCalled();
+});
+it('rejects malformed context before sending the system contract or user content', () => {
+  const sendResponse = vi.fn();
+  expect(
+    routeScenarioEditorLlmMessage(
+      { ...createV3Message(), projectSnapshotJson: 'invalid' },
+      sendResponse,
+      createSender()
+    )
+  ).toBe(true);
+  expect(sendResponse).toHaveBeenCalledWith({ success: false, error: expect.any(String) });
+  expect(requestMultimodalChatCompletionMock).not.toHaveBeenCalled();
+});

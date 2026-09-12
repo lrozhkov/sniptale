@@ -10,6 +10,10 @@ const SYSTEM_PROMPT_TEMPLATE_IDS = {
   replaceNames: 'default-replace-names',
   style: 'default-style',
   translate: 'default-translate',
+  scenarioClarify: 'scenario-clarify',
+  scenarioShorten: 'scenario-shorten',
+  scenarioStructure: 'scenario-structure',
+  scenarioTranslate: 'scenario-translate',
 } as const;
 
 const SYSTEM_TEMPLATE_DEFINITIONS = [
@@ -105,7 +109,19 @@ function createSystemTemplate(
 }
 
 export function createSystemPromptTemplateCatalog(locale?: AppLocale): PromptTemplate[] {
-  return SYSTEM_TEMPLATE_DEFINITIONS.map((definition) => createSystemTemplate(definition, locale));
+  return [
+    ...SYSTEM_TEMPLATE_DEFINITIONS.map((definition) => createSystemTemplate(definition, locale)),
+    ...(['Clarify', 'Shorten', 'Structure', 'Translate'] as const).map((action) => ({
+      id: `scenario-${action.toLowerCase()}`,
+      scope: 'scenario' as const,
+      name: translate(`scenario.editor.guideAi${action}`, locale),
+      content: translate(`scenario.editor.guideAi${action}Instruction`, locale),
+      customized: false,
+      enabled: true,
+      isDefault: true,
+      systemRevision: PROMPT_TEMPLATE_CATALOG_REVISION,
+    })),
+  ];
 }
 
 export function isSystemPromptTemplateId(id: string): boolean {
@@ -135,7 +151,7 @@ export function mergePromptTemplateCatalogWithHistory(
   const storedById = new Map(storedTemplates.map((template) => [template.id, template]));
   const systemTemplates = canonicalCatalog.map((canonical) => {
     const stored = storedById.get(canonical.id);
-    if (!stored) return { ...canonical, enabled: false };
+    if (!stored) return { ...canonical, enabled: canonical.scope === 'scenario' };
     const customized =
       stored.customized ?? !matchesPromptTemplateFingerprint(stored, knownUntouchedFingerprints);
     return {

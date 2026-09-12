@@ -29,7 +29,7 @@ export const SETTINGS_SECTION_VIEWS = {
   annotations: ['borders', 'callouts', 'numbering', 'tags'],
   'editor-resources': ['tools', 'palettes', 'surfaces', 'gradients'],
   'ai-connections': ['integrations', 'chrome-ai', 'security'],
-  'ai-prompts': ['templates', 'prompts'],
+  'ai-prompts': ['templates', 'scenario-templates', 'prompts'],
   'voice-input': [],
   'native-app': ['connection', 'capture', 'commands', 'telemetry'],
   'access-data': ['permissions', 'privacy'],
@@ -55,7 +55,7 @@ export type SettingsRoute =
   | { section: 'annotations'; view?: 'borders' | 'callouts' | 'numbering' | 'tags' }
   | { section: 'editor-resources'; view?: 'tools' | 'palettes' | 'surfaces' | 'gradients' }
   | { section: 'ai-connections'; view?: 'integrations' | 'chrome-ai' | 'security' }
-  | { section: 'ai-prompts'; view?: 'templates' | 'prompts' }
+  | { section: 'ai-prompts'; view?: 'templates' | 'scenario-templates' | 'prompts' }
   | { section: 'native-app'; view?: 'connection' | 'capture' | 'commands' | 'telemetry' }
   | { section: 'access-data'; view?: 'permissions' | 'privacy' };
 

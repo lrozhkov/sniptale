@@ -1,3 +1,4 @@
+import { createScenarioAiManifest } from '@sniptale/runtime-contracts/scenario-ai-operations';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { MessageType } from '@sniptale/runtime-contracts/messaging/message-types';
 import { SCENARIO_EDITOR_AI_PAYLOAD_LIMITS } from '@sniptale/runtime-contracts/ai/payload-policy';
@@ -106,15 +107,7 @@ export async function requestGuideAiProposal(
     scope: args.scope,
     attachments,
     projectSnapshotJson: JSON.stringify(content.snapshot),
-    toolManifestJson: JSON.stringify({
-      operations: [
-        { type: 'setStepTitle', fields: ['stepId', 'title'] },
-        ...['setHeading', 'setText', 'setNote', 'setImageCaption', 'setImageAlt'].map((type) => ({
-          type,
-          fields: ['stepId', 'blockId', 'text'],
-        })),
-      ],
-    }),
+    toolManifestJson: JSON.stringify(createScenarioAiManifest()),
   });
   assertScenarioEditorAiPayloadLimits({ ...payload, instruction: args.instruction });
   const authority = await createScenarioEditorEgressAuthority(payload);

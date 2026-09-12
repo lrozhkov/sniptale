@@ -1,6 +1,7 @@
 import { useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, LoaderCircle } from 'lucide-react';
+import { ProductToggle } from '@sniptale/ui/product-form-controls';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
   ProductModal,
@@ -17,6 +18,7 @@ import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/gu
 import type { Translate } from '../../platform/i18n';
 import { useGuideAiSession } from './use-ai-session';
 import { GuideAiRequestForm } from './ai-request-form';
+import { GuideAiChangeValue } from './ai-parameter-preview';
 import './ai-assistant.css';
 
 type AssistantProps = {
@@ -42,7 +44,7 @@ export function GuideAiEntry(
     <GuideAiAssistant
       {...props}
       project={props.project}
-      selectedBlockId={block && block.kind !== 'image-slot' ? block.id : null}
+      selectedBlockId={block ? block.id : null}
       disabled={props.disabled || !['ready', 'saved'].includes(props.status)}
     />
   );
@@ -173,7 +175,7 @@ function GuideAiDialog({
           closeTitle={t('scenario.editor.close')}
         />
         <ProductModalBody compact>
-          <div className="guide-ai-body">
+          <div className="guide-ai-body" aria-busy={pending}>
             {proposal ? (
               <GuideAiProposalReview session={session} t={t} />
             ) : (
@@ -206,7 +208,12 @@ function GuideAiDialog({
                 {t('scenario.editor.guideAiReload')}
               </ProductActionButton>
             )}
-            {pending && <p role="status">{t('scenario.editor.guideAiPending')}</p>}
+            {pending && (
+              <p role="status" aria-live="polite" className="guide-ai-pending">
+                <LoaderCircle size={18} className="animate-spin" aria-hidden="true" />
+                {t('scenario.editor.guideAiPending')}
+              </p>
+            )}
           </div>
         </ProductModalBody>
         <ProductModalFooter compact>
@@ -252,12 +259,11 @@ function GuideAiProposalReview({
       {!proposal.changes.length && <p role="status">{t('scenario.editor.guideAiNoChanges')}</p>}
       {proposal.changes.map((change, index) => (
         <label className="guide-ai-change" key={index}>
-          <input
-            type="checkbox"
+          <ProductToggle
             disabled={pending}
             checked={accepted.has(index)}
             aria-label={`${t('scenario.editor.guideAiAcceptChange')} ${index + 1}`}
-            onChange={(event) => chooseChange(index, event.target.checked)}
+            onClick={() => chooseChange(index, !accepted.has(index))}
           />
           <span>
             <small>
@@ -273,16 +279,26 @@ function GuideAiProposalReview({
                     setNote: 'scenario.editor.guideAddNote',
                     setImageCaption: 'scenario.editor.guideImageCaption',
                     setImageAlt: 'scenario.editor.guideImageAlt',
+                    setStepParameters: 'scenario.editor.guideAiStepParameters',
+                    setBlockParameters: 'scenario.editor.guideAiBlockParameters',
                   } as const
                 )[change.operation.type]
               )}
             </small>
             <small>{t('scenario.editor.guideAiBefore')}</small>
-            <span className="guide-ai-before">{change.before || '—'}</span>
+            <span className="guide-ai-before">
+              <GuideAiChangeValue change={change} side="before" t={t} />
+            </span>
           </span>
           <span>
             <small>{t('scenario.editor.guideAiAfter')}</small>
-            <span>{change.after || '—'}</span>
+            {change.operation.type === 'setStepParameters' &&
+              change.operation.parameters.layout && (
+                <small>{t('scenario.editor.appearanceLayoutHelp')}</small>
+              )}
+            <span>
+              <GuideAiChangeValue change={change} side="after" t={t} />
+            </span>
           </span>
         </label>
       ))}

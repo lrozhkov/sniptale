@@ -12,11 +12,6 @@
   align-items: center;
   gap: 8px;
 }
-.guide-ai-presets {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
 .guide-ai-disclosure {
   color: var(--sniptale-color-text-secondary);
   font-size: 12px;
@@ -40,7 +35,7 @@
   padding: 12px 0;
   border-bottom: 1px solid var(--sniptale-color-border-soft);
 }
-.guide-ai-change > input {
+.guide-ai-change > button {
   margin-top: 4px;
 }
 .guide-ai-change > span {
@@ -69,4 +64,47 @@
   margin: 0;
   padding: 0;
   border: 0;
+}
+
+.guide-ai-prompt {
+  display: grid;
+  gap: 6px;
+}
+.guide-ai-prompt-input {
+  position: relative;
+}
+.guide-ai-prompt-input textarea {
+  width: 100%;
+  min-height: 110px;
+  padding-bottom: 44px;
+}
+.guide-ai-prompt-input .guide-voice-control {
+  top: auto;
+  bottom: 8px;
+  right: 8px;
+  opacity: 1;
+  pointer-events: auto;
+}
+.guide-ai-prompt-templates {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  right: 44px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.guide-ai-prompt-templates > :first-child {
+  min-width: 0;
+  max-width: 260px;
+}
+.guide-ai-prompt-templates > button {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+}
+.guide-ai-pending {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }

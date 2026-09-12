@@ -1,6 +1,6 @@
-import { ProductTextarea } from '@sniptale/ui/product-form-controls';
+import { ProductToggle } from '@sniptale/ui/product-form-controls';
+import { GuideAiPromptField } from './ai-prompt-field';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
-import { SCENARIO_EDITOR_AI_PAYLOAD_LIMITS } from '@sniptale/runtime-contracts/ai/payload-policy';
 import { AIModelSelector } from '../../features/ai/model-selector';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import type { Translate } from '../../platform/i18n';
@@ -61,40 +61,23 @@ export function GuideAiRequestForm({
         <div className="guide-ai-step-selection">
           {steps.map((step, index) => (
             <label key={step.id}>
-              <input
-                type="checkbox"
+              <ProductToggle
+                aria-label={step.title || `${t('scenario.editor.guideAiStep')} ${index + 1}`}
                 disabled={pending}
                 checked={stepIds.includes(step.id)}
-                onChange={(event) => chooseStep(step.id, event.target.checked)}
+                onClick={() => chooseStep(step.id, !stepIds.includes(step.id))}
               />
               {step.title || `${t('scenario.editor.guideAiStep')} ${index + 1}`}
             </label>
           ))}
         </div>
       )}
-      <label>
-        {t('scenario.editor.guideAiInstruction')}
-        <ProductTextarea
-          value={instruction}
-          rows={3}
-          maxLength={SCENARIO_EDITOR_AI_PAYLOAD_LIMITS.maxInstructionChars}
-          disabled={pending}
-          onChange={(event) => writeInstruction(event.target.value)}
-        />
-      </label>
-      <div className="guide-ai-presets">
-        {(['Clarify', 'Shorten', 'Structure', 'Translate'] as const).map((action) => (
-          <ProductActionButton
-            key={action}
-            tone="secondary"
-            compact
-            disabled={pending}
-            onClick={() => writeInstruction(t(`scenario.editor.guideAi${action}Instruction`))}
-          >
-            {t(`scenario.editor.guideAi${action}`)}
-          </ProductActionButton>
-        ))}
-      </div>
+      <GuideAiPromptField
+        value={instruction}
+        onChange={writeInstruction}
+        disabled={pending}
+        t={t}
+      />
       {configuration ? (
         <AIModelSelector
           models={configuration.models}
@@ -122,11 +105,11 @@ export function GuideAiRequestForm({
       )}
       {imageCount > 0 && (
         <label className="guide-ai-images">
-          <input
-            type="checkbox"
+          <ProductToggle
+            aria-label={t('scenario.editor.guideAiImages')}
             checked={includeImages}
             disabled={pending}
-            onChange={(event) => chooseImages(event.target.checked)}
+            onClick={() => chooseImages(!includeImages)}
           />
           {t('scenario.editor.guideAiImages')} ({imageCount})
         </label>

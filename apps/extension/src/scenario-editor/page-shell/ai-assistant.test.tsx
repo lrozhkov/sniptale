@@ -16,6 +16,9 @@ vi.mock('./runtime/ai-request', () => ({
   verifyGuideAiBasis: io.verify,
   GuideAiStaleError: class extends Error {},
 }));
+vi.mock('../../features/prompt-templates/hooks/use-prompt-templates', () => ({
+  usePromptTemplates: () => ({ templates: [], isLoading: false, isMutating: false, error: null }),
+}));
 import { GuideAiAssistant, GuideAiEntry } from './ai-assistant';
 import { GuideAiStaleError } from './runtime/ai-request';
 const project = createGuideProject('Guide');
@@ -62,8 +65,8 @@ async function open() {
       />
     )
   );
-  button('Help with text').focus();
-  await act(async () => button('Help with text').click());
+  button('AI assistance').focus();
+  await act(async () => button('AI assistance').click());
 }
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -100,7 +103,7 @@ it('requests only explicitly, previews and applies a selected subset once, then 
     blocks: [{ paragraphs: createGuideParagraphs('After text') }],
   });
   expect(document.querySelector('[role="dialog"]')).toBeNull();
-  expect(document.activeElement).toBe(button('Help with text'));
+  expect(document.activeElement).toBe(button('AI assistance'));
 });
 it('stops waiting and ignores late results without losing the request', async () => {
   let resolve: ((value: typeof proposal) => void) | undefined;
@@ -146,11 +149,20 @@ it('retries configuration failure and reports request failure without discarding
 it('selects steps explicitly, keeps an empty selection unsendable, and edits the request after preview', async () => {
   await open();
   await act(async () => button('Choose steps').click());
-  const checkbox = document.querySelector<HTMLInputElement>('.guide-ai-step-selection input')!;
+  const checkbox = document.querySelector<HTMLButtonElement>(
+    '.guide-ai-step-selection [role="switch"]'
+  )!;
   await act(async () => checkbox.click());
   expect(button('Get suggestions').disabled).toBe(true);
   await act(async () => checkbox.click());
-  await act(async () => button('Shorten').click());
+  await act(async () => {
+    const field = document.querySelector('textarea')!;
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(
+      field,
+      'Shorten this step'
+    );
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+  });
   const instruction = document.querySelector('textarea')!.value;
   await act(async () => button('Get suggestions').click());
   expect(io.request.mock.calls[0]![0]).toMatchObject({
@@ -197,7 +209,7 @@ it('traps keyboard focus and restores the trigger on Escape', async () => {
       )
     );
     expect(document.querySelector('[role="dialog"]')).toBeNull();
-    expect(document.activeElement).toBe(button('Help with text'));
+    expect(document.activeElement).toBe(button('AI assistance'));
   } finally {
     rects.mockRestore();
   }
@@ -246,12 +258,12 @@ it('enables committed entry states and sends visible image frames only after exp
       )
     );
   await render('dirty');
-  expect(button('Help with text').disabled).toBe(true);
+  expect(button('AI assistance').disabled).toBe(true);
   await render('ready');
-  expect(button('Help with text').disabled).toBe(false);
-  await act(async () => button('Help with text').click());
-  const checkbox = document.querySelector<HTMLInputElement>('.guide-ai-images input')!;
-  expect(checkbox.checked).toBe(false);
+  expect(button('AI assistance').disabled).toBe(false);
+  await act(async () => button('AI assistance').click());
+  const checkbox = document.querySelector<HTMLButtonElement>('.guide-ai-images [role="switch"]')!;
+  expect(checkbox.getAttribute('aria-checked')).toBe('false');
   await act(async () => checkbox.click());
   expect(document.querySelector('.guide-ai-disclosure')?.textContent).toContain(
     'visible image frames'
@@ -261,4 +273,36 @@ it('enables committed entry states and sends visible image frames only after exp
     includeImages: true,
     scope: { stepIds: ['step'], blockIds: ['image'] },
   });
+});
+
+it('previews presentation changes with inspector labels and explains layout width reset', async () => {
+  io.request.mockResolvedValue({
+    baseRevision: 1,
+    changes: [
+      {
+        operation: {
+          type: 'setStepParameters',
+          stepId: 'step',
+          parameters: {
+            layout: 'comparison',
+            showNumber: false,
+            styleOverrides: { font: 'serif', accentColor: null },
+          },
+        },
+        before: JSON.stringify({ layout: 'stacked', showNumber: true, styleOverrides: {} }),
+        after: JSON.stringify({
+          layout: 'comparison',
+          showNumber: false,
+          styleOverrides: { font: 'serif', accentColor: null },
+        }),
+      },
+    ],
+  });
+  await open();
+  await act(async () => button('Get suggestions').click());
+  expect(document.body.textContent).toContain('Step layout: Comparison');
+  expect(document.body.textContent).toContain('Show step number: Disabled');
+  expect(document.body.textContent).toContain('Font: Serif');
+  expect(document.body.textContent).toContain('Layouts change block widths');
+  expect(document.body.textContent).not.toContain('styleOverrides');
 });

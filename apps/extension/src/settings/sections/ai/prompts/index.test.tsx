@@ -5,7 +5,9 @@ import { expect, it, vi } from 'vitest';
 const controller = vi.hoisted(() => ({ state: { isLoading: false, error: false, prompts: {} } }));
 vi.mock('./controller', () => ({ useAiPromptsController: () => controller.state }));
 vi.mock('./surface/content', () => ({ AiPromptsContent: () => <div>prompt-settings</div> }));
-vi.mock('./templates', () => ({ TemplatesSection: () => <div>prompt-templates</div> }));
+vi.mock('./templates', () => ({
+  TemplatesSection: ({ scope }: { scope: string }) => <div>prompt-templates:{scope}</div>,
+}));
 import { AIPromptsSection } from '.';
 it('opens templates first and switches to prompts through the route callback', () => {
   const node = document.createElement('div');
@@ -36,5 +38,18 @@ it('keeps prompt loading and error states inside the prompts subpage', () => {
   act(() => root.render(<AIPromptsSection view="prompts" />));
   expect(node.querySelector('[role="alert"]')).not.toBeNull();
   expect(node.textContent).not.toContain('prompt-templates');
+  act(() => root.unmount());
+});
+
+it('routes scenario templates to their own scope', () => {
+  const node = document.createElement('div');
+  const root = createRoot(node);
+  const onViewChange = vi.fn();
+  act(() =>
+    root.render(<AIPromptsSection view="scenario-templates" onViewChange={onViewChange} />)
+  );
+  expect(node.textContent).toContain('prompt-templates:scenario');
+  act(() => root.render(<AIPromptsSection view="templates" onViewChange={onViewChange} />));
+  expect(node.textContent).toContain('prompt-templates:page');
   act(() => root.unmount());
 });

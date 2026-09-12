@@ -51,17 +51,17 @@ function template(overrides: Partial<PromptTemplate> = {}): PromptTemplate {
   };
 }
 
-function Probe() {
-  state = usePromptTemplates();
+function Probe({ scope }: { scope?: 'page' | 'scenario' | undefined }) {
+  state = usePromptTemplates(scope);
   return null;
 }
 
-async function mountProbe() {
+async function mountProbe(scope?: 'page' | 'scenario') {
   const container = document.createElement('div');
   document.body.append(container);
   mountedRoot = createRoot(container);
   await act(async () => {
-    mountedRoot?.render(<Probe />);
+    mountedRoot?.render(<Probe scope={scope} />);
     await Promise.resolve();
     await Promise.resolve();
   });
@@ -255,4 +255,29 @@ it('ignores an older locale load that resolves after the current catalog', async
 
   await act(async () => english.resolve([template({ id: 'en', name: 'English' })]));
   expect(currentState().templates[0]?.id).toBe('ru');
+});
+
+it('isolates scenario templates while preserving page records during create and reorder', async () => {
+  const page = template({ id: 'page' });
+  const first = { ...template({ id: 'scenario-first' }), scope: 'scenario' as const };
+  const second = { ...template({ id: 'scenario-second' }), scope: 'scenario' as const };
+  service.list.mockResolvedValue([first, page, second]);
+  await mountProbe('scenario');
+  expect(currentState().templates).toEqual([first, second]);
+  await act(async () => currentState().templateLifecycle.move(second.id, first.id));
+  expect(currentState().templates).toEqual([second, first]);
+  expect(service.saveOrder).toHaveBeenCalledWith([second, first, page]);
+  const created = { ...template({ id: 'created' }), scope: 'scenario' as const };
+  service.create.mockResolvedValue(created);
+  await act(async () => currentState().addTemplate('New', 'Instruction'));
+  expect(service.create).toHaveBeenCalledWith('New', 'Instruction', undefined, 'scenario');
+  expect(currentState().templates).toEqual([created, second, first]);
+});
+it('keeps scenario prompts out of the existing page picker', async () => {
+  service.list.mockResolvedValue([
+    template(),
+    { ...template({ id: 'scenario' }), scope: 'scenario' },
+  ]);
+  await mountProbe();
+  expect(currentState().templates).toEqual([template()]);
 });

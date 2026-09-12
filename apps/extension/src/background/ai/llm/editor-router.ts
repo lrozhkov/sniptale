@@ -1,3 +1,4 @@
+import { buildScenarioAiSystemPrompt } from '@sniptale/runtime-contracts/scenario-ai-operations';
 import type {
   ProcessScenarioEditorWithLLMMessage,
   ProcessScenarioEditorWithLLMResponse,
@@ -69,13 +70,10 @@ function buildScenarioEditorGuideUserText(
     'Selected guide step JSON:',
     redactAiPayloadText(canonicalPayload.selectedStepJson),
     '',
-    'Tool manifest JSON:',
-    redactAiPayloadText(canonicalPayload.toolManifestJson),
-    '',
     'Project snapshot JSON:',
     redactAiPayloadText(canonicalPayload.projectSnapshotJson),
     '',
-    'Return ONLY strict JSON with the shape {"operations":[...]} using the tool manifest.',
+    'Return ONLY strict JSON with the shape {"operations":[...]} using the system contract.',
   ].join('\n');
 }
 
@@ -139,7 +137,7 @@ async function processScenarioEditorRequest(
     baseUrl: config.baseUrl,
     modelCode: config.modelCode,
     providerErrorLabel: config.providerId,
-    systemPrompt: scenarioPrompt,
+    systemPrompt: buildScenarioAiSystemPrompt(scenarioPrompt),
     userContent: buildScenarioEditorUserContent(message, canonicalPayload),
   });
 

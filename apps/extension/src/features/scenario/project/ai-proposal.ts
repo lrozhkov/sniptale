@@ -1,3 +1,8 @@
+import {
+  guideStepParametersSchema,
+  guideBlockParameterSchemas,
+} from '@sniptale/runtime-contracts/scenario/guide-parser';
+import { applyGuideLayout } from './layout';
 import type {
   GuideBlock,
   GuideVideoAction,
@@ -11,18 +16,23 @@ import {
 } from '@sniptale/runtime-contracts/scenario-ai-operations';
 import { createGuideParagraphs } from './factories';
 
-/** An empty block selection selects every editable text field in the selected steps. */
+/** An empty block selection selects content and presentation in the selected steps. */
 export type GuideAiScope = { stepIds: string[]; blockIds: string[] };
 export type GuideAiChange = { operation: ScenarioAiOperation; before: string; after: string };
+type BlockParameters = ReturnType<
+  (typeof guideBlockParameterSchemas)[keyof typeof guideBlockParameterSchemas]['parse']
+>;
 type AiTextBlock =
   | {
       id: string;
       kind: 'image';
+      parameters: BlockParameters;
       caption: string;
       alt: string;
       actionContext?: Omit<GuideVideoAction, 'id'>;
     }
-  | { id: string; kind: 'heading' | 'text' | 'note'; text: string };
+  | { id: string; kind: 'heading' | 'text' | 'note'; text: string; parameters: BlockParameters }
+  | { id: string; kind: 'image-slot'; parameters: BlockParameters };
 
 function selectedSteps(project: GuideProject, scope: GuideAiScope): GuideStep[] {
   const ids = new Set(scope.stepIds);
@@ -38,11 +48,7 @@ function selectedSteps(project: GuideProject, scope: GuideAiScope): GuideStep[] 
   )
     throw new Error('Invalid AI selection.');
   for (const id of blocks) {
-    if (
-      !steps.some((step) =>
-        step.blocks.some((block) => block.id === id && block.kind !== 'image-slot')
-      )
-    )
+    if (!steps.some((step) => step.blocks.some((block) => block.id === id)))
       throw new Error('Invalid AI block selection.');
   }
   return steps;
@@ -54,7 +60,7 @@ function plainText(block: Extract<GuideBlock, { kind: 'text' | 'note' }>): strin
     .join('\n');
 }
 
-/** Projects selected editable text only; image resources stay outside the serializable snapshot. */
+/** Projects selected content and admitted presentation only; image resources stay outside the serializable snapshot. */
 export function selectGuideAiContent(project: GuideProject, scope: GuideAiScope) {
   const images: Array<{ stepId: string; stepNumber: number; block: GuideImageBlock }> = [];
   const allSteps = project.items.filter((item) => item.kind === 'step');
@@ -62,7 +68,8 @@ export function selectGuideAiContent(project: GuideProject, scope: GuideAiScope)
     const blocks = step.blocks
       .filter((block) => !scope.blockIds.length || scope.blockIds.includes(block.id))
       .flatMap<AiTextBlock>((block) => {
-        if (block.kind === 'image-slot') return [];
+        const parameters = guideBlockParameterSchemas[block.kind].strip().parse(block);
+        if (block.kind === 'image-slot') return [{ id: block.id, kind: block.kind, parameters }];
         if (block.kind === 'image') {
           images.push({
             stepId: step.id,
@@ -74,6 +81,7 @@ export function selectGuideAiContent(project: GuideProject, scope: GuideAiScope)
             {
               id: block.id,
               kind: block.kind,
+              parameters,
               caption: block.caption,
               alt: block.alt,
               ...(action
@@ -95,19 +103,83 @@ export function selectGuideAiContent(project: GuideProject, scope: GuideAiScope)
           {
             id: block.id,
             kind: block.kind,
+            parameters,
             text: block.kind === 'heading' ? block.text : plainText(block),
           },
         ];
       });
-    return { id: step.id, ...(!scope.blockIds.length ? { title: step.title } : {}), blocks };
+    return {
+      id: step.id,
+      ...(!scope.blockIds.length
+        ? { title: step.title, parameters: guideStepParametersSchema.strip().parse(step) }
+        : {}),
+      blocks,
+    };
   });
   return { snapshot: { steps }, images };
 }
 
+/** Parsed optional parameters are patches: undefined has the same meaning as omission. */
+function mergeParameters<T extends object>(
+  value: T,
+  patch: Partial<{ [K in keyof T]: T[K] | undefined }>
+): T {
+  return {
+    ...value,
+    ...Object.fromEntries(Object.entries(patch).filter(([, item]) => item !== undefined)),
+  };
+}
+
 function changeBlock(
   block: GuideBlock,
-  operation: Exclude<ScenarioAiOperation, { type: 'setStepTitle' }>
+  operation: Exclude<ScenarioAiOperation, { type: 'setStepTitle' | 'setStepParameters' }>
 ): { block: GuideBlock; before: string } {
+  if (operation.type === 'setBlockParameters') {
+    const before = JSON.stringify(guideBlockParameterSchemas[block.kind].strip().parse(block));
+    switch (block.kind) {
+      case 'heading':
+        return {
+          block: mergeParameters(
+            block,
+            guideBlockParameterSchemas.heading.parse(operation.parameters)
+          ),
+          before,
+        };
+      case 'text':
+        return {
+          block: mergeParameters(
+            block,
+            guideBlockParameterSchemas.text.parse(operation.parameters)
+          ),
+          before,
+        };
+      case 'note':
+        return {
+          block: mergeParameters(
+            block,
+            guideBlockParameterSchemas.note.parse(operation.parameters)
+          ),
+          before,
+        };
+      case 'image':
+        return {
+          block: mergeParameters(
+            block,
+            guideBlockParameterSchemas.image.parse(operation.parameters)
+          ),
+          before,
+        };
+      case 'image-slot':
+        return {
+          block: mergeParameters(
+            block,
+            guideBlockParameterSchemas['image-slot'].parse(operation.parameters)
+          ),
+          before,
+        };
+    }
+  }
+
   switch (operation.type) {
     case 'setHeading':
       if (block.kind === 'heading')
@@ -140,6 +212,14 @@ function changeStep(
 ): { step: GuideStep; before: string } {
   if (operation.type === 'setStepTitle')
     return { step: { ...step, title: operation.title }, before: step.title };
+  if (operation.type === 'setStepParameters')
+    return {
+      step: mergeParameters(
+        operation.parameters.layout ? applyGuideLayout(step, operation.parameters.layout) : step,
+        operation.parameters
+      ),
+      before: JSON.stringify(guideStepParametersSchema.strip().parse(step)),
+    };
   const block = step.blocks.find((block) => block.id === operation.blockId);
   if (!block) throw new Error('AI proposal target missing.');
   const changed = changeBlock(block, operation);
@@ -166,13 +246,15 @@ export function prepareGuideAiProposal(
     if (
       !step ||
       (scope.blockIds.length > 0 &&
-        (operation.type === 'setStepTitle' || !scope.blockIds.includes(operation.blockId)))
+        (operation.type === 'setStepTitle' ||
+          operation.type === 'setStepParameters' ||
+          !scope.blockIds.includes(operation.blockId)))
     )
       throw new Error('AI proposal is outside its selection.');
     const key = JSON.stringify([
       operation.stepId,
       operation.type,
-      operation.type === 'setStepTitle' ? null : operation.blockId,
+      'blockId' in operation ? operation.blockId : null,
     ]);
     if (targets.has(key)) throw new Error('Duplicate AI proposal target.');
     targets.add(key);
@@ -180,12 +262,17 @@ export function prepareGuideAiProposal(
     return {
       operation,
       before,
-      after: operation.type === 'setStepTitle' ? operation.title : operation.text,
+      after:
+        'parameters' in operation
+          ? JSON.stringify(operation.parameters)
+          : operation.type === 'setStepTitle'
+            ? operation.title
+            : operation.text,
     };
   });
 }
 
-/** Applies a user-selected, revalidated subset without changing resource or presentation metadata. */
+/** Applies a user-selected, revalidated subset without changing resource identity or capture metadata. */
 export function applyGuideAiProposal(
   project: GuideProject,
   scope: GuideAiScope,

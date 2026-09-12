@@ -110,8 +110,8 @@ export const settingsAiProvidersOverviewMessages = defineMessageSource({
     en: 'System prompt for the scenario AI editor',
   },
   scenarioEditorPromptDescription: {
-    ru: 'Используется только в AI-редакторе сценариев и не зависит от промптов моделей',
-    en: 'Used only by the scenario AI editor and does not inherit model prompts',
+    ru: 'Редактируемые инструкции для сценариев. Доступные операции и ограничения автоматически добавляются из схемы редактора; промпты моделей не наследуются.',
+    en: 'Editable guidance for scenarios. Available operations and limits are appended automatically from the editor schema; model prompts are not inherited.',
   },
   scenarioEditorPromptSaveButton: {
     ru: 'Сохранить промпт редактора',

@@ -106,7 +106,7 @@ export function createVoiceInputClient(deps: Partial<VoiceInputClientDeps> = {})
     nextPort.onDisconnect.addListener(() => {
       if (port !== nextPort) return;
       port = null;
-      logger.warn('Voice input port disconnected');
+      logger.debug('Voice input port disconnected');
       if (activeSessionId) emitRuntimeFailure(activeSessionId);
       if (!disposed) {
         resolvedDeps.schedule(() => {

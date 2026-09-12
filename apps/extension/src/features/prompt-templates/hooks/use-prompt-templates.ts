@@ -110,7 +110,8 @@ function usePromptTemplateMutationRunner(
 
 function usePromptTemplateCrudActions(
   state: ReturnType<typeof usePromptTemplateStateValues>,
-  locale: ReturnType<typeof useAppLocale>
+  locale: ReturnType<typeof useAppLocale>,
+  scope: 'page' | 'scenario'
 ) {
   const { setError, setIsMutating, setTemplates, templates } = state;
   const runMutation = usePromptTemplateMutationRunner(setIsMutating);
@@ -121,14 +122,14 @@ function usePromptTemplateCrudActions(
         runMutation(async () => {
           setError(null);
           try {
-            const newTemplate = await createPromptTemplateRecord(name, content);
+            const newTemplate = await createPromptTemplateRecord(name, content, undefined, scope);
             setTemplates((previous) => [newTemplate, ...previous]);
           } catch (error) {
             setError(getPromptTemplateErrorMessage(error));
             throw error;
           }
         }),
-      [runMutation, setError, setTemplates]
+      [runMutation, setError, setTemplates, scope]
     ),
     removeTemplate: useCallback(
       (id: string) =>
@@ -228,15 +229,15 @@ function usePromptTemplateSelectionAction(state: ReturnType<typeof usePromptTemp
   );
 }
 
-export function usePromptTemplates(): PromptTemplatesState {
+export function usePromptTemplates(scope: 'page' | 'scenario' = 'page'): PromptTemplatesState {
   const state = usePromptTemplateStateValues();
   const locale = useAppLocale();
   const loadTemplates = usePromptTemplateLoader(state, locale);
-  const actions = usePromptTemplateCrudActions(state, locale);
+  const actions = usePromptTemplateCrudActions(state, locale, scope);
   const selectTemplate = usePromptTemplateSelectionAction(state);
 
   return {
-    templates: state.templates,
+    templates: state.templates.filter((template) => (template.scope ?? 'page') === scope),
     isLoading: state.isLoading,
     isMutating: state.isMutating,
     error: state.error,

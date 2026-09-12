@@ -50,7 +50,8 @@ export async function savePromptTemplateOrder(templates: readonly PromptTemplate
 export async function createPromptTemplateRecord(
   name: string,
   content: string,
-  deps: PromptTemplateCreationDeps = getDefaultPromptTemplateCreationDeps()
+  deps: PromptTemplateCreationDeps = getDefaultPromptTemplateCreationDeps(),
+  scope: 'page' | 'scenario' = 'page'
 ): Promise<PromptTemplate> {
   try {
     const newTemplate = createPromptTemplateDraft({
@@ -59,6 +60,7 @@ export async function createPromptTemplateRecord(
       content,
     });
 
+    if (scope === 'scenario') newTemplate.scope = scope;
     await savePromptTemplate(newTemplate);
     return newTemplate;
   } catch (error) {

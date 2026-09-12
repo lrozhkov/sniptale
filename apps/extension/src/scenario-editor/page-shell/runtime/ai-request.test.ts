@@ -92,7 +92,7 @@ it('binds selected-only text and a committed revision to explicit authorized dis
     scope: s.args.scope,
   });
   expect(JSON.parse(payload.projectSnapshotJson)).toEqual({
-    steps: [{ id: 'step', blocks: [{ id: 'text', kind: 'text', text: 'Before' }] }],
+    steps: [{ id: 'step', blocks: [{ id: 'text', kind: 'text', text: 'Before', parameters: {} }] }],
   });
   expect(payload.projectSnapshotJson).not.toMatch(/Hidden|Private name/);
   expect(io.asset).not.toHaveBeenCalled();

@@ -45,23 +45,32 @@ for (const theme of ['light', 'dark'] as const) {
         if (message.type === 'REQUEST_LLM_SESSION') return { success: true, token: 'test-token' };
         if (message.type === 'PROCESS_SCENARIO_EDITOR_WITH_LLM') {
           requests.push(message);
-          return {
-            success: true,
-            operations: [
-              { type: 'setStepTitle', stepId: 'compare', title: 'Suggested title' },
-              {
-                type: 'setText',
-                stepId: 'compare',
-                blockId: 'description',
-                text: 'Suggested description',
-              },
-            ],
-          };
+          return new Promise((resolve) =>
+            Reflect.set(window, 'releaseGuideAi', () =>
+              resolve({
+                success: true,
+                operations: [
+                  { type: 'setStepTitle', stepId: 'compare', title: 'Suggested title' },
+                  {
+                    type: 'setStepParameters',
+                    stepId: 'compare',
+                    parameters: { showNumber: false },
+                  },
+                  {
+                    type: 'setText',
+                    stepId: 'compare',
+                    blockId: 'description',
+                    text: 'Suggested description',
+                  },
+                ],
+              })
+            )
+          );
         }
         return original(message);
       });
     });
-    const trigger = page.getByRole('button', { name: 'Help with text', exact: true });
+    const trigger = page.getByRole('button', { name: 'AI assistance', exact: true });
     await trigger.click();
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText('Test provider / Test model', { exact: true })).toBeVisible();
@@ -75,7 +84,29 @@ for (const theme of ['light', 'dark'] as const) {
     await dialog.locator('textarea').focus();
 
     await expect(dialog.locator('textarea')).toBeFocused();
+    await dialog.locator('.guide-ai-prompt-templates button[aria-haspopup="listbox"]').click();
+    await expect(page.getByRole('option', { name: /Shorten/ })).toBeVisible();
+    await expect(page.getByRole('option', { name: /Replace names/ })).toHaveCount(0);
+    await page.getByRole('option', { name: /Shorten/ }).click();
+    await expect(dialog.locator('textarea')).toHaveValue(/shorten|Shorten/);
+    const field = await dialog.locator('textarea').boundingBox();
+    const mic = await dialog.locator('[data-ui="scenario.voice-input"]').boundingBox();
+    expect(field).not.toBeNull();
+    expect(mic).not.toBeNull();
+    expect(mic!.y).toBeGreaterThan(field!.y + 8);
+    expect(mic!.y + mic!.height).toBeLessThanOrEqual(field!.y + field!.height);
+    await testInfo.attach(`ai-instruction-${theme}`, {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
     await dialog.getByRole('button', { name: 'Get suggestions', exact: true }).click();
+    await expect(dialog.locator('[aria-busy="true"]')).toBeVisible();
+    await expect(dialog.locator('.guide-ai-pending svg')).toBeVisible();
+    await expect(dialog.locator('textarea')).toBeDisabled();
+    await expect(
+      dialog.locator('.guide-ai-prompt-templates button[aria-haspopup="listbox"]')
+    ).toBeDisabled();
+    await page.evaluate(() => Reflect.get(window, 'releaseGuideAi')());
     await expect(dialog.getByText('Suggested title', { exact: true })).toBeVisible();
     const requests = await page.evaluate(() => Reflect.get(window, 'guideAiRequests'));
     expect(requests).toHaveLength(1);
@@ -84,7 +115,7 @@ for (const theme of ['light', 'dark'] as const) {
       scope: { stepIds: ['compare'], blockIds: [] },
     });
     expect(requests[0].projectSnapshotJson).not.toMatch(/example.png|assetId|Text-only step/);
-    await dialog.getByRole('checkbox', { name: 'Accept change 1', exact: true }).uncheck();
+    await dialog.getByRole('switch', { name: 'Accept change 1', exact: true }).click();
     await testInfo.attach(`ai-preview-${theme}`, {
       body: await page.screenshot(),
       contentType: 'image/png',

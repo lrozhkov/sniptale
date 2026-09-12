@@ -98,7 +98,7 @@ async function verifyTemplateReadWriteAndDeleteFlow() {
     createTemplate('t-1'),
     createTemplate('t-2'),
   ]);
-  expect(loadedTemplates.filter((template) => template.isDefault)).toHaveLength(6);
+  expect(loadedTemplates.filter((template) => template.isDefault)).toHaveLength(10);
 
   await savePromptTemplate({
     id: 't-2',
@@ -329,7 +329,7 @@ async function verifyInvalidRootFallsBackToDefaults() {
 
   const templates = await getPromptTemplates();
 
-  expect(templates).toHaveLength(6);
+  expect(templates).toHaveLength(10);
   expect(console.warn).toHaveBeenCalledWith(
     '[SharedPromptTemplatesStorage]',
     'Ignoring invalid prompt templates payload root from storage'
@@ -389,4 +389,30 @@ describe('prompt-templates', () => {
     'updates revisionless defaults through historical fingerprints without overwriting custom copy',
     verifyRevisionlessDefaultsUseHistoricalFingerprints
   );
+});
+
+it('preserves scenario scope, custom content and disabled state across catalog reads and resets', async () => {
+  resetPromptTemplateStorageMocks();
+  const scenario = {
+    id: 'scenario-clarify',
+    scope: 'scenario' as const,
+    name: 'Mine',
+    content: 'Custom',
+    customized: true,
+    enabled: false,
+    isDefault: true,
+  };
+  browserStorageLocalGetMock.mockResolvedValue(
+    storedPromptTemplates([createTemplate('page-custom'), scenario])
+  );
+  const templates = await getPromptTemplates('en');
+  expect(templates.find((item) => item.id === scenario.id)).toMatchObject(scenario);
+  expect(templates.find((item) => item.id === 'scenario-shorten')).toMatchObject({
+    scope: 'scenario',
+    enabled: true,
+  });
+  expect(templates.find((item) => item.id === 'page-custom')).not.toHaveProperty('scope');
+  const restored = await resetPromptTemplate(scenario.id, 'en');
+  expect(restored).toMatchObject({ scope: 'scenario', customized: false });
+  expect(restored.content).not.toBe('Custom');
 });
