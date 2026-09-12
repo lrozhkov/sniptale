@@ -1,7 +1,7 @@
 import { GuideVideoFrameResources } from './video-frame-resources';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import type {
   GuideImageImportPlacement,
   GuideImageImportSource,
@@ -11,6 +11,7 @@ import { GuideLibraryBrowser } from './library-browser';
 
 type Selection = { id: string; name: string; source: GuideImageImportSource };
 type ResourceProps = {
+  toolbarTarget?: HTMLElement | null;
   disabled: boolean;
   selectedStepId: string | null;
   target?: GuideImageImportPlacement;
@@ -49,13 +50,6 @@ function useGuideImageResources({
   }, []);
   const remove = (id: string) => {
     setSelection(selection.filter((entry) => entry.id !== id));
-  };
-  const move = (index: number, delta: number) => {
-    const next = [...selection];
-    const destination = index + delta;
-    if (destination < 0 || destination >= next.length) return;
-    [next[index], next[destination]] = [next[destination]!, next[index]!];
-    setSelection(next);
   };
   const submit = async () => {
     if (
@@ -125,30 +119,86 @@ function useGuideImageResources({
     progress,
     failed,
     locked,
-    remove,
-    move,
     submit,
     chooseLibrary,
     cancel: () => controller.current?.abort(),
   };
 }
 
-/** Composes browsing and the explicit selection/import footer. */
+/** Keeps import actions in the drawer header and ordered selection in one owner. */
 export function GuideImageResources(props: ResourceProps) {
   const { t, target, selectedStepId } = props;
   const state = useGuideImageResources(props);
   const [videoId, setVideoId] = useState<string | null>(null);
+  const actions = (
+    <div hidden={Boolean(videoId)} className="guide-import-actions" aria-busy={state.pending}>
+      <div className="guide-import-submit">
+        {!target && (
+          <div
+            className="guide-import-destination"
+            role="group"
+            aria-label={t('scenario.editor.guideImportPlacement')}
+          >
+            <ProductActionButton
+              tone="toggle"
+              compact
+              active={state.placement === 'steps'}
+              aria-pressed={state.placement === 'steps'}
+              disabled={state.locked}
+              onClick={() => state.setPlacement('steps')}
+            >
+              {t('scenario.editor.guideImportAsSteps')}
+            </ProductActionButton>
+            <ProductActionButton
+              tone="toggle"
+              compact
+              active={state.placement === 'blocks'}
+              aria-pressed={state.placement === 'blocks'}
+              disabled={state.locked || !selectedStepId}
+              onClick={() => state.setPlacement('blocks')}
+            >
+              {t('scenario.editor.guideImportAsBlocks')}
+            </ProductActionButton>
+          </div>
+        )}
+        <ProductActionButton
+          tone="primary"
+          compact
+          className="guide-primary"
+          disabled={
+            state.locked ||
+            !state.selection.length ||
+            (!target && state.placement === 'blocks' && !selectedStepId)
+          }
+          onClick={() => void state.submit()}
+        >
+          {t('scenario.editor.guideImportSelected')}
+        </ProductActionButton>
+      </div>
+      {state.pending && (
+        <div role="status">
+          {t('scenario.editor.guideImportProgress')} {state.progress} / {state.selection.length}
+          <ProductActionButton tone="secondary" compact onClick={state.cancel}>
+            {t('scenario.editor.guideImportCancel')}
+          </ProductActionButton>
+        </div>
+      )}
+      {state.failed && <p role="alert">{t('scenario.editor.guideImportFailed')}</p>}
+    </div>
+  );
   return (
     <div className="guide-import" aria-busy={state.pending}>
+      {props.toolbarTarget ? createPortal(actions, props.toolbarTarget) : actions}
       <GuideLibraryBrowser
         t={t}
         disabled={state.locked}
         selectedIds={state.selection.flatMap((item) =>
           item.source.kind === 'library' ? [item.source.mediaId] : []
         )}
+        onPreview={() => setVideoId(null)}
         onChoose={(id, name, kind) => {
-          setVideoId(kind === 'video' ? id : null);
           if (kind === 'image') state.chooseLibrary(id, name);
+          else setVideoId(id);
         }}
         previewContent={
           videoId ? (
@@ -157,131 +207,6 @@ export function GuideImageResources(props: ResourceProps) {
         }
         onDragStart={props.onLibraryDragStart}
       />
-      <footer
-        hidden={Boolean(videoId)}
-        className="guide-import-footer"
-        data-targeted={Boolean(target)}
-      >
-        <GuideImportSelection
-          selection={state.selection}
-          locked={state.locked}
-          move={state.move}
-          remove={state.remove}
-          t={t}
-        />
-        <div className="guide-import-submit">
-          {!target && (
-            <div
-              className="guide-import-destination"
-              role="group"
-              aria-label={t('scenario.editor.guideImportPlacement')}
-            >
-              <ProductActionButton
-                tone="toggle"
-                compact
-                active={state.placement === 'steps'}
-                aria-pressed={state.placement === 'steps'}
-                disabled={state.locked}
-                onClick={() => state.setPlacement('steps')}
-              >
-                {t('scenario.editor.guideImportAsSteps')}
-              </ProductActionButton>
-              <ProductActionButton
-                tone="toggle"
-                compact
-                active={state.placement === 'blocks'}
-                aria-pressed={state.placement === 'blocks'}
-                disabled={state.locked || !selectedStepId}
-                onClick={() => state.setPlacement('blocks')}
-              >
-                {t('scenario.editor.guideImportAsBlocks')}
-              </ProductActionButton>
-            </div>
-          )}
-          <ProductActionButton
-            tone="primary"
-            compact
-            className="guide-primary"
-            disabled={
-              state.locked ||
-              !state.selection.length ||
-              (!target && state.placement === 'blocks' && !selectedStepId)
-            }
-            onClick={() => void state.submit()}
-          >
-            {t('scenario.editor.guideImportSelected')}
-          </ProductActionButton>
-        </div>
-        {state.pending && (
-          <div role="status">
-            {t('scenario.editor.guideImportProgress')} {state.progress} / {state.selection.length}
-            <ProductActionButton tone="secondary" compact onClick={state.cancel}>
-              {t('scenario.editor.guideImportCancel')}
-            </ProductActionButton>
-          </div>
-        )}
-        {state.failed && <p role="alert">{t('scenario.editor.guideImportFailed')}</p>}
-      </footer>
     </div>
-  );
-}
-
-function GuideImportSelection({
-  selection,
-  locked,
-  move,
-  remove,
-  t,
-}: {
-  selection: Selection[];
-  locked: boolean;
-  move: (index: number, delta: number) => void;
-  remove: (id: string) => void;
-  t: Translate;
-}) {
-  return (
-    <ol aria-label={t('scenario.editor.guideImportOrder')}>
-      {selection.map((item, index) => (
-        <li key={item.id}>
-          <span>{item.name}</span>
-          <div className="guide-import-selection-actions">
-            {selection.length > 1 && (
-              <>
-                <ProductActionButton
-                  tone="secondary"
-                  compact
-                  type="button"
-                  disabled={locked || index === 0}
-                  aria-label={t('scenario.editor.guideMoveUp')}
-                  onClick={() => move(index, -1)}
-                >
-                  <ArrowUp size={14} aria-hidden="true" />
-                </ProductActionButton>
-                <ProductActionButton
-                  tone="secondary"
-                  compact
-                  type="button"
-                  disabled={locked || index === selection.length - 1}
-                  aria-label={t('scenario.editor.guideMoveDown')}
-                  onClick={() => move(index, 1)}
-                >
-                  <ArrowDown size={14} aria-hidden="true" />
-                </ProductActionButton>
-              </>
-            )}
-            <ProductActionButton
-              tone="secondary"
-              compact
-              type="button"
-              disabled={locked}
-              aria-label={t('scenario.editor.guideRemoveResource')}
-              onClick={() => remove(item.id)}
-            >
-              <X size={14} aria-hidden="true" />
-            </ProductActionButton>
-          </div>
-        </li>
-      ))}
-    </ol>
   );
 }

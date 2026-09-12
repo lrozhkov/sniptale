@@ -2,7 +2,7 @@ import { LibraryNavigation } from '../../composition/library-preview/navigation'
 import { LibraryMediaPlayer } from '../../composition/library-preview/player';
 import { GUIDE_LIBRARY_IMAGE_DRAG_TYPE } from './image-drop';
 import { useCallback, useEffect, useRef, useState, useId, type ReactNode } from 'react';
-import { Check, Image, Film } from 'lucide-react';
+import { Image, Film } from 'lucide-react';
 import { ProjectSearchField } from '@sniptale/ui/searchable-project-picker/parts';
 import { subscribeToMediaHubEvents } from '../../features/media-hub/events';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -180,6 +180,7 @@ type GuideLibraryBrowserProps = {
   t: Translate;
   disabled: boolean;
   selectedIds: string[];
+  onPreview?: () => void;
   onChoose: (id: string, name: string, kind: 'image' | 'video') => void;
   onDragStart?: (() => void) | undefined;
   previewContent?: ReactNode;
@@ -190,6 +191,7 @@ export function GuideLibraryBrowser({
   disabled,
   selectedIds,
   onChoose,
+  onPreview,
   onDragStart,
   previewContent,
 }: GuideLibraryBrowserProps) {
@@ -249,7 +251,9 @@ export function GuideLibraryBrowser({
             onChange={setQuery}
           />
         </div>
-        {catalog.status === 'loading' && <p role="status">{t('scenario.editor.loading')}</p>}
+        {catalog.status === 'loading' && !catalog.items.length && (
+          <p role="status">{t('scenario.editor.loading')}</p>
+        )}
         {catalog.status === 'failed' && (
           <div role="alert">
             <p>{t('scenario.editor.guideLibraryLoadFailed')}</p>
@@ -267,27 +271,25 @@ export function GuideLibraryBrowser({
               : 'scenario.editor.guideLibraryAll'
           )}
         >
-          {catalog.status === 'ready' &&
-            items.map((item) => (
-              <LibraryCard
-                key={item.id}
-                item={item}
-                t={t}
-                disabled={disabled}
-                selected={
-                  selectedIds.includes(item.id) || (category === 'video' && previewId === item.id)
-                }
-                onDragStart={onDragStart}
-                onChoose={() => {
-                  setPreviewId(item.id);
-                  onChoose(
-                    item.id,
-                    item.filename,
-                    item.kind === 'image' || item.kind === 'screenshot' ? 'image' : 'video'
-                  );
-                }}
-              />
-            ))}
+          {items.map((item) => (
+            <LibraryCard
+              key={item.id}
+              item={item}
+              t={t}
+              disabled={disabled}
+              selected={
+                selectedIds.includes(item.id) || (category === 'video' && previewId === item.id)
+              }
+              order={selectedIds.indexOf(item.id) + 1}
+              onSelect={() => onChoose(item.id, item.filename, 'image')}
+              onDragStart={onDragStart}
+              onChoose={() => {
+                setPreviewId(item.id);
+                if (item.kind === 'image' || item.kind === 'screenshot') onPreview?.();
+                else onChoose(item.id, item.filename, 'video');
+              }}
+            />
+          ))}
           {catalog.status === 'ready' && !items.length && (
             <p>
               {t(
@@ -327,6 +329,8 @@ function LibraryCard({
   t,
   disabled,
   selected,
+  order,
+  onSelect,
   onDragStart,
   onChoose,
 }: {
@@ -334,37 +338,54 @@ function LibraryCard({
   t: Translate;
   disabled: boolean;
   selected: boolean;
+  order: number;
+  onSelect(): void;
   onDragStart: (() => void) | undefined;
   onChoose(): void;
 }) {
   return (
-    <button
-      type="button"
-      className="guide-library-card"
-      draggable={
-        (item.kind === 'image' || item.kind === 'screenshot') && !disabled && Boolean(onDragStart)
-      }
-      onDragStart={(event) => {
-        if ((item.kind !== 'image' && item.kind !== 'screenshot') || disabled || !onDragStart) {
-          event.preventDefault();
-          return;
+    <div className="guide-library-card-container">
+      <button
+        type="button"
+        className="guide-library-card"
+        draggable={
+          (item.kind === 'image' || item.kind === 'screenshot') && !disabled && Boolean(onDragStart)
         }
-        event.dataTransfer.effectAllowed = 'copy';
-        event.dataTransfer.setData(
-          GUIDE_LIBRARY_IMAGE_DRAG_TYPE,
-          JSON.stringify({ mediaId: item.id })
-        );
-        onDragStart();
-      }}
-      disabled={disabled}
-      aria-pressed={selected}
-      onClick={onChoose}
-    >
-      <LibraryRaster item={item} t={t} />
-      <span className="guide-library-card-name" title={item.filename}>
-        {item.filename}
-      </span>
-      {selected && <Check size={16} className="guide-library-card-selected" aria-hidden="true" />}
-    </button>
+        onDragStart={(event) => {
+          if ((item.kind !== 'image' && item.kind !== 'screenshot') || disabled || !onDragStart) {
+            event.preventDefault();
+            return;
+          }
+          event.dataTransfer.effectAllowed = 'copy';
+          event.dataTransfer.setData(
+            GUIDE_LIBRARY_IMAGE_DRAG_TYPE,
+            JSON.stringify({ mediaId: item.id })
+          );
+          onDragStart();
+        }}
+        disabled={disabled}
+        data-selected={selected}
+        aria-pressed={item.kind !== 'image' && item.kind !== 'screenshot' ? selected : undefined}
+        onClick={onChoose}
+      >
+        <LibraryRaster item={item} t={t} />
+        <span className="guide-library-card-name" title={item.filename}>
+          {item.filename}
+        </span>
+      </button>
+      {(item.kind === 'image' || item.kind === 'screenshot') && (
+        <button
+          type="button"
+          className="guide-library-card-select"
+          disabled={disabled}
+          aria-label={`${t('gallery.app.selectItem')}: ${item.filename}`}
+          aria-pressed={order > 0}
+          title={order > 0 ? `${t('scenario.editor.guideImportOrder')}: ${order}` : undefined}
+          onClick={onSelect}
+        >
+          {order > 0 ? order : null}
+        </button>
+      )}
+    </div>
   );
 }

@@ -69,13 +69,13 @@ afterEach(() => {
   host.remove();
   vi.unstubAllGlobals();
 });
-async function render(disabled = false) {
+async function render(disabled = false, selectedIds: string[] = []) {
   await act(async () =>
     root.render(
       <GuideLibraryBrowser
         t={createTranslator('en')}
         disabled={disabled}
-        selectedIds={[]}
+        selectedIds={selectedIds}
         onChoose={io.choose}
         onDragStart={io.drag}
       />
@@ -96,6 +96,8 @@ it('loads images immediately and displays current revision previews with URL cle
   await render();
   expect(host.querySelectorAll('.guide-library-card')).toHaveLength(1);
   await click('Current.png');
+  expect(io.choose).not.toHaveBeenCalled();
+  await click('Select item: Current.png');
   expect(io.choose).toHaveBeenCalledWith('image', 'Current.png', 'image');
   expect(host.querySelector('.guide-library-preview img')?.getAttribute('src')).toBe('blob:2');
   expect(io.create.mock.calls[1]?.[0]).toEqual(new Blob(['current']));
@@ -234,4 +236,33 @@ it('video mode shows only videos, reuses thumbnail owner and cannot emit image d
   expect(io.presentation).not.toHaveBeenCalled();
   await act(async () => card.click());
   expect(io.choose).toHaveBeenCalledWith('video', 'Source.webm', 'video');
+});
+
+it('shows selection order independently of preview and locks selection while disabled', async () => {
+  await render(false, ['another', 'image']);
+  const select = host.querySelector<HTMLButtonElement>('.guide-library-card-select')!;
+  expect(select.textContent).toBe('2');
+  expect(select.getAttribute('aria-pressed')).toBe('true');
+  await click('Current.png');
+  expect(io.choose).not.toHaveBeenCalled();
+  expect(select.textContent).toBe('2');
+  await render(true, ['another', 'image']);
+  await act(async () => select.click());
+  expect(io.choose).not.toHaveBeenCalled();
+});
+
+it('keeps a native drag source mounted while focus refreshes library metadata', async () => {
+  await render();
+  const card = host.querySelector('.guide-library-card');
+  let finish: (items: MediaLibraryItem[]) => void = () => undefined;
+  io.list.mockImplementationOnce(
+    () =>
+      new Promise<MediaLibraryItem[]>((resolve) => {
+        finish = resolve;
+      })
+  );
+  await act(async () => window.dispatchEvent(new Event('focus')));
+  expect(host.querySelector('.guide-library-card')).toBe(card);
+  await act(async () => finish([{ ...item }]));
+  expect(host.querySelector('.guide-library-card')).toBe(card);
 });

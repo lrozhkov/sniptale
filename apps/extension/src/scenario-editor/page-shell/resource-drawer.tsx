@@ -34,6 +34,7 @@ export function GuideResourceDrawer({
 }: ResourceDrawerProps &
   Pick<ComponentProps<typeof GuideImageResources>, 'onImport' | 'disabled' | 'selectedStepId'>) {
   const [target, setTarget] = useState<ResourceTarget | null>(null);
+  const [toolbarTarget, setToolbarTarget] = useState<HTMLDivElement | null>(null);
   const [dragging, setDragging] = useState(false);
   const dragTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const anchor = useRef<HTMLSpanElement>(null);
@@ -77,9 +78,10 @@ export function GuideResourceDrawer({
             data-theme={theme ?? undefined}
             className={`sniptale-ai-modal-root${dragging ? ' guide-resource-dragging' : ''}`}
           >
-            <GuideResourceDialog t={t} onClose={close}>
+            <GuideResourceDialog t={t} onClose={close} toolbarRef={setToolbarTarget}>
               <GuideImageResources
                 {...props}
+                toolbarTarget={toolbarTarget}
                 onLibraryDragStart={() => {
                   // Let Chromium capture the native drag image before hiding its source.
                   dragTimer.current = setTimeout(() => {
@@ -135,9 +137,15 @@ export function GuideResourceTrigger({
 export function GuideResourceDialog({
   onClose,
   title,
+  toolbarRef,
   id = 'guide-resource-drawer',
   ...props
-}: ResourceDrawerProps & { onClose: () => void; title?: string; id?: string }) {
+}: ResourceDrawerProps & {
+  onClose: () => void;
+  title?: string;
+  id?: string;
+  toolbarRef?: (node: HTMLDivElement | null) => void;
+}) {
   const panel = useRef<HTMLElement>(null);
   useEffect(() => {
     const previous = document.activeElement;
@@ -199,6 +207,7 @@ export function GuideResourceDialog({
         <div className="guide-resource-drawer-close">
           <Image size={16} aria-hidden="true" />
           <strong>{title ?? props.t('scenario.editor.guideOpenImageLibrary')}</strong>
+          {toolbarRef && <div className="guide-resource-header-actions" ref={toolbarRef} />}
           <ContentToolbarButton
             type="button"
             title={props.t('scenario.editor.close')}

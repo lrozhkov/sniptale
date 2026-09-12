@@ -62,22 +62,31 @@ async function files(...names: string[]) {
     }))
   );
   await act(async () => window.dispatchEvent(new Event('focus')));
-  for (const name of names) await click(name);
+  for (const name of names) await click(`Select item: ${name}`);
 }
-it('orders library selections, reorders/removes and imports blocks', async () => {
+it('previews separately and imports in selection order after deselection and reselection', async () => {
   await render();
   await files('first.png', 'second.png', 'third.png');
-  expect(host.querySelectorAll('li')).toHaveLength(3);
-  expect(host.querySelector('input[type="file"]')).toBeNull();
-  await click('Move up', host.querySelectorAll('li')[1]);
-  await click('Remove from selection', host.querySelectorAll('li')[2]);
+  expect(host.querySelector('ol')).toBeNull();
+  await click('Select item: first.png');
+  await click('Select item: first.png');
+  await click('Select item: third.png');
+  await click('third.png');
+  expect(
+    [...host.querySelectorAll('.guide-library-card-select')].map((node) => node.textContent)
+  ).toEqual(['2', '1', '']);
+  expect(
+    host
+      .querySelector('.guide-import-actions')
+      ?.compareDocumentPosition(host.querySelector('.guide-library-browser')!)
+  ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   await click('As blocks in selected step');
   await click('Import selected');
   expect(
     io.import.mock.calls[0]?.[0].sources.map((source: { mediaId: string }) => source.mediaId)
   ).toEqual(['second.png', 'first.png']);
   expect(io.import.mock.calls[0]?.[0].placement).toEqual({ kind: 'blocks', stepId: 'step' });
-  expect(host.querySelectorAll('li')).toHaveLength(0);
+  expect(host.querySelectorAll('.guide-library-card-select[aria-pressed="true"]')).toHaveLength(0);
 });
 it('keeps selection after a rejected import and cancels pending preparation', async () => {
   await render();
@@ -85,7 +94,7 @@ it('keeps selection after a rejected import and cancels pending preparation', as
   io.import.mockResolvedValueOnce(false);
   await click('Import selected');
   expect(host.querySelector('[role="alert"]')).not.toBeNull();
-  expect(host.querySelectorAll('li')).toHaveLength(1);
+  expect(host.querySelectorAll('.guide-library-card-select[aria-pressed="true"]')).toHaveLength(1);
   let finish: (value: boolean) => void = () => undefined;
   io.import.mockImplementationOnce(
     () =>
@@ -95,10 +104,13 @@ it('keeps selection after a rejected import and cancels pending preparation', as
   );
   await click('Import selected');
   const signal: AbortSignal = io.import.mock.calls[1]?.[0].signal;
+  expect(host.querySelector<HTMLButtonElement>('.guide-library-card-select')?.disabled).toBe(true);
+  await click('Import selected');
+  expect(io.import).toHaveBeenCalledTimes(2);
   await click('Cancel preparation');
   expect(signal.aborted).toBe(true);
   await act(async () => finish(false));
-  expect(host.querySelectorAll('li')).toHaveLength(1);
+  expect(host.querySelectorAll('.guide-library-card-select[aria-pressed="true"]')).toHaveLength(1);
 });
 it('filters library to images, retries failures and submits a current library identity', async () => {
   await render(null);
@@ -117,7 +129,7 @@ it('filters library to images, retries failures and submits a current library id
   ]);
   await act(async () => window.dispatchEvent(new Event('focus')));
   expect(host.textContent).not.toContain('Movie.mp4');
-  await click('Library.png');
+  await click('Select item: Library.png');
   await click('Import selected');
   expect(io.import.mock.calls[0]?.[0].sources).toEqual([{ kind: 'library', mediaId: 'image' }]);
   expect(io.import.mock.calls[0]?.[0].placement).toEqual({ kind: 'steps' });

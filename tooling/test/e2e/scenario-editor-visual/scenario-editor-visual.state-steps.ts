@@ -214,27 +214,12 @@ export async function verifyGuideComposition(page: Page): Promise<void> {
 export async function verifyImageImport(page: Page, testInfo: TestInfo): Promise<void> {
   const before = await page.locator('article').count();
   await page.getByRole('button', { name: 'Resources', exact: true }).click();
-  await page.getByRole('button', { name: 'Image library', exact: true }).click();
-  const encoded = await page.evaluate(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 300;
-    canvas.height = 200;
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('Canvas unavailable');
-    context.fillStyle = '#2767a5';
-    context.fillRect(0, 0, 300, 200);
-    return canvas.toDataURL('image/png').split(',')[1]!;
-  });
-  const image = Buffer.from(encoded, 'base64');
-  await page.locator('input[type="file"]').setInputFiles([
-    { name: 'first-import.png', mimeType: 'image/png', buffer: image },
-    { name: 'second-import.png', mimeType: 'image/png', buffer: image },
-  ]);
   await page
-    .getByRole('list', { name: 'Import order' })
-    .locator('li')
-    .nth(1)
-    .getByRole('button', { name: 'Move up', exact: true })
+    .locator('#guide-library-panel')
+    .getByRole('button', { name: 'Image library', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'Select item: Library screenshot.png', exact: true })
     .click();
   await testInfo.attach('image-import-selection', {
     body: await page.screenshot({ fullPage: true }),
@@ -242,13 +227,13 @@ export async function verifyImageImport(page: Page, testInfo: TestInfo): Promise
   });
   await page.getByRole('button', { name: 'Import selected', exact: true }).click();
   await expect(page.getByRole('status').first()).toHaveText('Saved');
-  await expect(page.locator('article')).toHaveCount(before + 2);
+  await expect(page.locator('article')).toHaveCount(before + 1);
   await page
     .getByRole('dialog', { name: 'Resources', exact: true })
     .getByRole('button', { name: 'Close', exact: true })
     .click();
   await expect(page.locator('article').nth(before).locator('header .guide-step-title')).toHaveValue(
-    'second-import.png'
+    'Library screenshot.png'
   );
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(page.locator('article')).toHaveCount(before);
@@ -258,7 +243,7 @@ export async function verifyImageImport(page: Page, testInfo: TestInfo): Promise
   reopen.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
   reopen.searchParams.set('locale', 'en');
   await page.goto(reopen.toString(), { waitUntil: 'domcontentloaded' });
-  await expect(page.locator('article')).toHaveCount(before + 2);
+  await expect(page.locator('article')).toHaveCount(before + 1);
   const raster = page.locator('article').nth(before).locator('img');
   await expect(raster).toBeVisible();
   await expect

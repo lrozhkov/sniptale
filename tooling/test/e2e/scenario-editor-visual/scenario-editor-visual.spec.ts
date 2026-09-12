@@ -314,7 +314,9 @@ test('resources open in a wide drawer and return focus to their inspector', asyn
 }, testInfo) => {
   await openVisualHarness(page, hostOrigin, 'dark', 'en', { width: 1280, height: 900 });
   await page.getByRole('button', { name: 'Resources', exact: true }).click();
-  const trigger = page.getByRole('button', { name: 'Image library', exact: true });
+  const trigger = page
+    .locator('#guide-library-panel')
+    .getByRole('button', { name: 'Image library', exact: true });
   await expect(trigger).toBeVisible();
   await trigger.click();
   const drawer = page.getByRole('dialog', { name: 'Resources', exact: true });
@@ -619,6 +621,9 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await expect(trigger).toBeFocused();
     await trigger.click();
     await drawer.getByRole('button', { name: 'Library screenshot.png', exact: true }).click();
+    await drawer
+      .getByRole('button', { name: 'Select item: Library screenshot.png', exact: true })
+      .click();
     await drawer.getByRole('button', { name: 'Import selected', exact: true }).click();
     await expect(drawer).toHaveCount(0);
     await expect(step.locator(`[data-block-id="${id}"]`)).toHaveAttribute('data-kind', 'image');
@@ -637,6 +642,9 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await expect(drawer.locator('.guide-library-card')).toHaveCount(0);
     await drawer.getByRole('textbox', { name: 'Search images' }).fill('Library');
     await drawer.getByRole('button', { name: 'Library screenshot.png', exact: true }).click();
+    await drawer
+      .getByRole('button', { name: 'Select item: Library screenshot.png', exact: true })
+      .click();
     await drawer.getByRole('button', { name: 'Import selected', exact: true }).click();
     await expect(drawer).toHaveCount(0);
     await expect(step.locator('.guide-block')).toHaveCount(count);
