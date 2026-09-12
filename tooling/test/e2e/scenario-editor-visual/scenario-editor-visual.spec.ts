@@ -752,6 +752,9 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     const half = await first.boundingBox();
     const neighbor = await second.boundingBox();
     expect(half && neighbor && Math.abs(half.y - neighbor.y)).toBeLessThan(2);
+    const firstWidth = await control.boundingBox();
+    const secondGrip = await second.locator('.guide-block-grip').boundingBox();
+    expect(firstWidth && secondGrip && firstWidth.x + firstWidth.width <= secondGrip.x).toBe(true);
     await control.focus();
     await control.click();
     await expect(first).toHaveAttribute('data-width', 'full');
@@ -998,6 +1001,26 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       if (!box || !handle) throw new Error('Missing block geometry');
       expect(handle.x + handle.width).toBeLessThanOrEqual(box.x);
       expect(handle.x).toBeGreaterThanOrEqual(0);
+      const widthControl = block.locator('.guide-block-width');
+      const widthBox = await widthControl.boundingBox();
+      const actionBox = await block.locator('.guide-block-actions button').first().boundingBox();
+      if (!widthBox || !actionBox) throw new Error('Missing block controls');
+      expect(widthBox.x).toBeGreaterThanOrEqual(box.x + box.width);
+      expect(widthBox.x + widthBox.width).toBeLessThanOrEqual(1024);
+      expect(
+        Math.abs(widthBox.y + widthBox.height / 2 - handle.y - handle.height / 2)
+      ).toBeLessThan(1);
+      expect(
+        Math.abs(widthBox.y + widthBox.height / 2 - actionBox.y - actionBox.height / 2)
+      ).toBeLessThan(1);
+      expect(widthBox.width).toBe(widthBox.height);
+      expect(await widthControl.evaluate((node) => getComputedStyle(node).borderRadius)).toBe(
+        '50%'
+      );
+      await page.mouse.move((box.x + box.width + widthBox.x) / 2, widthBox.y + widthBox.height / 2);
+      expect(await widthControl.evaluate((node) => getComputedStyle(node).opacity)).toBe('1');
+      await widthControl.hover();
+      expect(await widthControl.evaluate((node) => getComputedStyle(node).opacity)).toBe('1');
       await page.mouse.move((handle.x + handle.width + box.x) / 2, handle.y + handle.height / 2);
       expect(await grip.evaluate((node) => getComputedStyle(node).opacity)).toBe('1');
       await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);

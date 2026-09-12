@@ -349,7 +349,7 @@
 }
 .guide-block-actions {
   position: absolute;
-  top: 0.375rem;
+  top: 0.125rem;
   right: 0.375rem;
   z-index: 1;
   display: flex;
@@ -800,10 +800,10 @@
 .guide-document .guide-block-width {
   position: absolute;
   z-index: 5;
-  inset-inline-end: -0.65rem;
-  top: 50%;
-  width: 1.6rem;
-  height: 1.6rem;
+  inset-inline-end: -1.75rem;
+  top: 0.25rem;
+  width: 1.5rem;
+  height: 1.5rem;
   min-width: 0;
   padding: 0;
   opacity: 0;
@@ -811,7 +811,15 @@
   touch-action: none;
   background: var(--sniptale-color-surface-canvas) !important;
   border: 1px solid var(--sniptale-color-border-soft);
-  border-radius: 0.4rem;
+  border-radius: 50%;
+}
+.guide-block-width::before {
+  content: '';
+  position: absolute;
+  inset-inline-start: -0.25rem;
+  top: 0;
+  bottom: 0;
+  width: 0.25rem;
 }
 .guide-block:hover > .guide-block-width,
 .guide-block:focus-within > .guide-block-width {
@@ -1232,11 +1240,11 @@
 
 .guide-document .guide-block-grip {
   position: absolute;
-  inset-inline-start: -1.5rem;
-  top: 0.125rem;
+  inset-inline-start: -1.75rem;
+  top: 0.25rem;
   z-index: 5;
-  width: 1.25rem;
-  height: 1.75rem;
+  width: 1.5rem;
+  height: 1.5rem;
   min-width: 0;
   padding: 0;
   opacity: 0;
@@ -1244,18 +1252,18 @@
   touch-action: none;
   background: var(--sniptale-color-surface-canvas) !important;
   border: 1px solid var(--sniptale-color-border-soft);
-  border-radius: var(--sniptale-radius-sm);
+  border-radius: 50%;
 }
 .guide-step-blocks {
-  column-gap: max(var(--guide-gap), 1.5rem);
+  column-gap: max(var(--guide-gap), 3.5rem);
 }
 .guide-block::before {
   content: '';
   position: absolute;
-  inset-inline-start: -1.5rem;
+  inset-inline-start: -1.75rem;
   top: 0;
   bottom: 0;
-  width: 1.5rem;
+  width: 1.75rem;
 }
 html[data-guide-reordering],
 html[data-guide-reordering] * {
