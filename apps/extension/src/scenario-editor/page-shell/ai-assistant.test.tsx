@@ -50,13 +50,13 @@ function button(text: string) {
   if (!match) throw new Error(`Missing button: ${text}`);
   return match;
 }
-async function open() {
+async function open(guide = project, selectedBlockId: string | null = null) {
   await act(async () =>
     root.render(
       <GuideAiAssistant
-        project={project}
+        project={guide}
         selectedStepId="step"
-        selectedBlockId={null}
+        selectedBlockId={selectedBlockId}
         disabled={false}
         onOpen={() => {}}
         onChange={change}
@@ -149,8 +149,8 @@ it('retries configuration failure and reports request failure without discarding
 it('selects steps explicitly, keeps an empty selection unsendable, and edits the request after preview', async () => {
   await open();
   await act(async () => button('Choose steps').click());
-  const checkbox = document.querySelector<HTMLButtonElement>(
-    '.guide-ai-step-selection [role="switch"]'
+  const checkbox = document.querySelector<HTMLInputElement>(
+    '.guide-ai-step-selection input[type="checkbox"]'
   )!;
   await act(async () => checkbox.click());
   expect(button('Get suggestions').disabled).toBe(true);
@@ -305,4 +305,87 @@ it('previews presentation changes with inspector labels and explains layout widt
   expect(document.body.textContent).toContain('Font: Serif');
   expect(document.body.textContent).toContain('Layouts change block widths');
   expect(document.body.textContent).not.toContain('styleOverrides');
+});
+
+it('sends all steps in document order from a block selection and restores a custom subset', async () => {
+  const second = createGuideStep('Second title', 'second');
+  const guide = { ...project, items: [step, second] };
+  io.request.mockResolvedValue({ baseRevision: 1, changes: [] });
+  await open(guide, 'text');
+  await act(async () => button('Choose steps').click());
+  await act(async () => button('Clear selection').click());
+  await act(async () =>
+    document.querySelector<HTMLInputElement>('[aria-label="Second title"]')!.click()
+  );
+  await act(async () => button('All steps').click());
+  expect(document.body.textContent).toContain('Selected 2 of 2');
+  await act(async () => button('Choose steps').click());
+  expect(document.querySelector<HTMLInputElement>('[aria-label="Before title"]')!.checked).toBe(
+    false
+  );
+  expect(document.querySelector<HTMLInputElement>('[aria-label="Second title"]')!.checked).toBe(
+    true
+  );
+  await act(async () => button('All steps').click());
+  await act(async () => button('Get suggestions').click());
+  expect(io.request.mock.calls[0]![0]).toMatchObject({
+    scope: { stepIds: ['step', 'second'], blockIds: [] },
+    includeImages: false,
+  });
+});
+it('searches the selection without changing it and adds only matching steps', async () => {
+  const second = createGuideStep('Second title', 'second');
+  second.blocks = [{ kind: 'heading', id: 'heading', text: 'Unique content' }];
+  io.request.mockResolvedValue({ baseRevision: 1, changes: [] });
+  await open({ ...project, items: [step, second] });
+  await act(async () => button('Choose steps').click());
+  await act(async () => {
+    const field = document.querySelector<HTMLInputElement>(
+      '[aria-label="Find a step or section"]'
+    )!;
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+      field,
+      'Unique'
+    );
+    field.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  expect(document.querySelector('[aria-label="Before title"]')).toBeNull();
+  expect(document.body.textContent).toContain('Selected 1 of 2');
+  await act(async () => button('Select visible').click());
+  expect(document.body.textContent).toContain('Selected 2 of 2');
+  await act(async () => button('Get suggestions').click());
+  expect(io.request.mock.calls[0]![0].scope).toEqual({ stepIds: ['step', 'second'], blockIds: [] });
+});
+
+it('keeps selected-only filtering reversible and freezes the picker during a request', async () => {
+  let finish!: (value: { baseRevision: number; changes: [] }) => void;
+  io.request.mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      })
+  );
+  await open({ ...project, items: [step, createGuideStep('Second title', 'second')] });
+  await act(async () => button('Choose steps').click());
+  await act(async () => button('Hide unselected items').click());
+  expect(document.querySelector('[aria-label="Second title"]')).toBeNull();
+  await act(async () => button('Clear selection').click());
+  expect(document.body.textContent).toContain('No matching steps');
+  expect(button('Get suggestions').disabled).toBe(true);
+  await act(async () => button('Show all items').click());
+  await act(async () => button('Select visible').click());
+  await act(async () => button('Get suggestions').click());
+  expect(
+    document.querySelector<HTMLInputElement>('[aria-label="Find a step or section"]')!.disabled
+  ).toBe(true);
+  expect(
+    [...document.querySelectorAll<HTMLInputElement>('.guide-ai-selection-row input')].every(
+      (input) => input.disabled
+    )
+  ).toBe(true);
+  expect(button('All steps').disabled).toBe(true);
+  expect(button('Clear selection').disabled).toBe(true);
+  await act(async () => button('Stop waiting').click());
+  await act(async () => finish({ baseRevision: 1, changes: [] }));
+  expect(document.body.textContent).not.toContain('Choose changes to apply');
 });

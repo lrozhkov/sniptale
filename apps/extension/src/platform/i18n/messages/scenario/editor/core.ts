@@ -55,6 +55,23 @@ export const scenarioEditorCoreMessages = defineMessageSource({
   },
   guideAiEnabled: { ru: 'Включено', en: 'Enabled' },
   guideAiDisabled: { ru: 'Выключено', en: 'Disabled' },
+  guideAiAllSteps: { ru: 'Все шаги', en: 'All steps' },
+  guideAiAllStepsHint: {
+    ru: 'Будут обработаны все шаги сценария. Изображения отправляются только при включении опции ниже.',
+    en: 'All guide steps will be processed. Images are sent only when the option below is enabled.',
+  },
+  guideAiSelectionCount: {
+    ru: 'Выбрано {selected} из {total}',
+    en: 'Selected {selected} of {total}',
+  },
+  guideAiSearchSteps: { ru: 'Найти шаг или раздел', en: 'Find a step or section' },
+  guideAiSelectVisible: { ru: 'Выбрать найденные', en: 'Select visible' },
+  guideAiClearSelection: { ru: 'Снять выбор', en: 'Clear selection' },
+  guideAiNoMatchingSteps: {
+    ru: 'Нет подходящих шагов. Измените поиск или фильтр.',
+    en: 'No matching steps. Change the search or filter.',
+  },
+  guideAiEmptyStep: { ru: 'Без текста', en: 'No text yet' },
   guideAiOpen: { ru: 'Помощь AI', en: 'AI assistance' },
   guideAiScope: { ru: 'Область обработки', en: 'Selection scope' },
   guideAiBlock: { ru: 'Этот блок', en: 'This block' },

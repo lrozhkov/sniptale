@@ -75,6 +75,26 @@ for (const theme of ['light', 'dark'] as const) {
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText('Test provider / Test model', { exact: true })).toBeVisible();
     expect(await page.evaluate(() => Reflect.get(window, 'guideAiRequests'))).toEqual([]);
+    await dialog.getByRole('button', { name: 'Choose steps', exact: true }).click();
+    await expect(dialog.getByText('Introduction', { exact: true })).toBeVisible();
+    await dialog.getByRole('button', { name: 'Clear selection', exact: true }).click();
+    await dialog.getByRole('textbox', { name: 'Find a step or section' }).fill('Text-only');
+    await dialog.getByRole('button', { name: 'Select visible', exact: true }).click();
+    await expect(dialog.getByText('Selected 1 of 2', { exact: true })).toBeVisible();
+    await testInfo.attach(`ai-step-selection-${theme}`, {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+    await dialog.getByRole('button', { name: 'All steps', exact: true }).click();
+    await expect(dialog.getByText('Selected 2 of 2', { exact: true })).toBeVisible();
+    await dialog.getByRole('button', { name: 'Choose steps', exact: true }).click();
+    await expect(
+      dialog.getByRole('checkbox', { name: 'Text-only step', exact: true })
+    ).toBeChecked();
+    await expect(
+      dialog.getByRole('checkbox', { name: 'Compare two images', exact: true })
+    ).not.toBeChecked();
+    await dialog.getByRole('button', { name: 'All steps', exact: true }).click();
     await dialog.getByRole('button', { name: 'Test provider / Test model', exact: true }).click();
     await dialog.locator('input[type="text"]').press('Escape');
     await expect(dialog).toBeVisible();
@@ -112,9 +132,9 @@ for (const theme of ['light', 'dark'] as const) {
     expect(requests).toHaveLength(1);
     expect(requests[0]).toMatchObject({
       attachments: [],
-      scope: { stepIds: ['compare'], blockIds: [] },
+      scope: { stepIds: ['compare', 'text-only'], blockIds: [] },
     });
-    expect(requests[0].projectSnapshotJson).not.toMatch(/example.png|assetId|Text-only step/);
+    expect(requests[0].projectSnapshotJson).not.toMatch(/example.png|assetId/);
     await dialog.getByRole('switch', { name: 'Accept change 1', exact: true }).click();
     await testInfo.attach(`ai-preview-${theme}`, {
       body: await page.screenshot(),
@@ -133,5 +153,32 @@ for (const theme of ['light', 'dark'] as const) {
     await trigger.click();
     await dialog.press('Escape');
     await expect(trigger).toBeFocused();
+  });
+}
+
+for (const theme of ['light', 'dark'] as const) {
+  test(`Russian step picker fits compact view and supports keyboard selection in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }, testInfo) => {
+    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1024, height: 640 });
+    await page.getByRole('button', { name: 'Помощь AI', exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('button', { name: 'Выбрать шаги', exact: true }).click();
+    await expect(dialog.getByRole('textbox', { name: 'Найти шаг или раздел' })).toBeVisible();
+    const second = dialog.getByRole('checkbox', { name: 'Text-only step', exact: true });
+    await second.focus();
+    await second.press('Space');
+    await expect(second).toBeChecked();
+    await expect(dialog.getByText('Выбрано 2 из 2', { exact: true })).toBeVisible();
+    await expect(
+      dialog.getByRole('button', { name: 'Получить предложения', exact: true })
+    ).toBeInViewport({ ratio: 1 });
+    const overflow = await dialog.evaluate((node) => node.scrollWidth > node.clientWidth);
+    expect(overflow).toBe(false);
+    await testInfo.attach(`ai-step-selection-ru-${theme}`, {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
   });
 }

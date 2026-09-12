@@ -174,12 +174,13 @@ function GuideAiDialog({
           onClose={onClose}
           closeTitle={t('scenario.editor.close')}
         />
-        <ProductModalBody compact>
+        <ProductModalBody compact className="guide-ai-scroll-body">
           <div className="guide-ai-body" aria-busy={pending}>
             {proposal ? (
               <GuideAiProposalReview session={session} t={t} />
             ) : (
               <GuideAiRequestForm
+                project={project}
                 session={session}
                 selectedStepId={selectedStepId}
                 selectedBlockId={selectedBlockId}
