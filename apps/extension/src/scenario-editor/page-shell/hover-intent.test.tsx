@@ -53,16 +53,16 @@ const visible = (selector: string) =>
   host.querySelector(selector)!.hasAttribute('data-guide-hover');
 it('waits for a pause, cancels fast passes, and keeps revealed parent contexts while entering tools', () => {
   move('input');
-  vi.advanceTimersByTime(60);
+  vi.advanceTimersByTime(40);
   move('#second');
-  vi.advanceTimersByTime(99);
+  vi.advanceTimersByTime(49);
   expect(visible('#first')).toBe(false);
   expect(visible('#second')).toBe(false);
   vi.advanceTimersByTime(1);
   expect(visible('#second')).toBe(true);
   expect(visible('article')).toBe(true);
   move('input');
-  vi.advanceTimersByTime(100);
+  vi.advanceTimersByTime(50);
   expect(visible('#first')).toBe(true);
   move('button');
   expect(visible('#first')).toBe(true);
@@ -75,26 +75,26 @@ it('suppresses scroll-time hover and resolves the element under the stationary p
     value: vi.fn(() => host.querySelector('#second')),
   });
   move('#first');
-  vi.advanceTimersByTime(100);
+  vi.advanceTimersByTime(50);
   host.querySelector('.scroll')!.dispatchEvent(new Event('scroll'));
   expect(visible('#first')).toBe(false);
-  vi.advanceTimersByTime(80);
+  vi.advanceTimersByTime(40);
   host.querySelector('.scroll')!.dispatchEvent(new Event('scroll'));
-  vi.advanceTimersByTime(99);
+  vi.advanceTimersByTime(49);
   expect(visible('#second')).toBe(false);
   vi.advanceTimersByTime(1);
   expect(visible('#second')).toBe(true);
 });
 it('cancels pending intent on leave and unmount, and ignores touch or active dragging', () => {
   move('#first', 'touch');
-  vi.advanceTimersByTime(100);
+  vi.advanceTimersByTime(50);
   expect(visible('#first')).toBe(false);
   move('#first');
   host.firstElementChild!.dispatchEvent(new Event('pointerleave'));
-  vi.advanceTimersByTime(100);
+  vi.advanceTimersByTime(50);
   expect(visible('#first')).toBe(false);
   move('#first');
-  vi.advanceTimersByTime(100);
+  vi.advanceTimersByTime(50);
   move('#first', 'mouse', 1);
   expect(visible('#first')).toBe(false);
   move('#first');

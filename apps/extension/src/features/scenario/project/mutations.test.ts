@@ -507,3 +507,88 @@ it('keeps template editing within one step and routes canvas images into that st
   expect(project.items).toHaveLength(1);
   expect(step.blocks).toHaveLength(1);
 });
+
+it('transfers a block between steps atomically, retaining its identity and media references', () => {
+  const project = fixture();
+  const before = structuredClone(project);
+  const next = applyGuideStructureOperation(project, {
+    kind: 'transfer-block',
+    itemId: 'first',
+    targetItemId: 'second',
+    blockId: 'image',
+    beforeBlockId: 'note',
+  });
+  expect(next.items[1]).toMatchObject({ blocks: [{ id: 'text' }] });
+  expect(next.items[2]).toMatchObject({
+    blocks: [{ id: 'image', assetId: 'asset', editDocumentId: 'annotations' }, { id: 'note' }],
+  });
+  expect(project).toEqual(before);
+  expect(() =>
+    applyGuideStructureOperation(project, {
+      kind: 'transfer-block',
+      itemId: 'first',
+      targetItemId: 'second',
+      blockId: 'image',
+      beforeBlockId: 'missing',
+    })
+  ).toThrow();
+  expect(project).toEqual(before);
+});
+
+it('transfers into an empty step and rejects invalid destinations and capacity overflow', () => {
+  const project = fixture();
+  const target = project.items[2];
+  if (target?.kind !== 'step') throw new Error('Missing step');
+  target.blocks = [];
+  expect(
+    applyGuideStructureOperation(project, {
+      kind: 'transfer-block',
+      itemId: 'first',
+      targetItemId: 'second',
+      blockId: 'image',
+    }).items[2]
+  ).toMatchObject({ blocks: [{ id: 'image' }] });
+  for (const targetItemId of ['missing', 'intro'])
+    expect(() =>
+      applyGuideStructureOperation(project, {
+        kind: 'transfer-block',
+        itemId: 'first',
+        targetItemId,
+        blockId: 'image',
+      })
+    ).toThrow();
+  expect(() =>
+    applyGuideStructureOperation(project, {
+      kind: 'transfer-block',
+      itemId: 'first',
+      targetItemId: 'second',
+      blockId: 'missing',
+    })
+  ).toThrow();
+  target.blocks = Array.from({ length: GUIDE_LIMITS.maxBlocksPerStep }, (_, index) => ({
+    kind: 'heading',
+    id: `heading-${index}`,
+    text: '',
+  }));
+  const before = structuredClone(project);
+  expect(() =>
+    applyGuideStructureOperation(project, {
+      kind: 'transfer-block',
+      itemId: 'first',
+      targetItemId: 'second',
+      blockId: 'image',
+    })
+  ).toThrow();
+  expect(project).toEqual(before);
+});
+
+it('uses in-step ordering when transfer source and destination are the same', () => {
+  const next = applyGuideStructureOperation(fixture(), {
+    kind: 'transfer-block',
+    itemId: 'first',
+    targetItemId: 'first',
+    blockId: 'image',
+    beforeBlockId: 'text',
+  });
+  expect(next.items[1]).toMatchObject({ blocks: [{ id: 'image' }, { id: 'text' }] });
+});

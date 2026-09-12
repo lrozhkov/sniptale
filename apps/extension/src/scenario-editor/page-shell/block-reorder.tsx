@@ -12,7 +12,12 @@ import type { GuideStep } from '@sniptale/runtime-contracts/scenario/types/guide
 import type { GuideStructureOperation } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
 
-type Destination = { element: HTMLElement; after: boolean; beforeBlockId: string | undefined };
+type Destination = {
+  itemId: string;
+  element: HTMLElement;
+  after: boolean;
+  beforeBlockId: string | undefined;
+};
 const ReorderSource = createContext<{
   disabled: boolean;
   start?: (event: PointerEvent<HTMLButtonElement>, blockId: string) => void;
@@ -25,14 +30,33 @@ function destination(
   x: number,
   y: number
 ): Destination | null {
-  const bounds = container.getBoundingClientRect();
-  if (
-    x < bounds.left - 32 ||
-    x > bounds.right + 16 ||
-    y < bounds.top - 16 ||
-    y > bounds.bottom + 16
-  )
-    return null;
+  const pane = container.closest<HTMLElement>('.guide-document-scroll');
+  if (pane) {
+    const rect = pane.getBoundingClientRect();
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return null;
+  }
+  const document = container.closest('.guide-document');
+  const candidates = document
+    ? [...document.querySelectorAll<HTMLElement>('[data-reorder-step]')]
+    : [container];
+  const target = candidates.find((candidate) => {
+    if (candidate.dataset['reorderDisabled'] === 'true') return false;
+    const rect = (candidate.closest('article') ?? candidate).getBoundingClientRect();
+    return (
+      x >= rect.left - 32 && x <= rect.right + 16 && y >= rect.top - 16 && y <= rect.bottom + 16
+    );
+  });
+  return target ? blockDestination(target, sourceId, x, y) : null;
+}
+
+function blockDestination(
+  container: HTMLElement,
+  sourceId: string,
+  x: number,
+  y: number
+): Destination | null {
+  const itemId = container.dataset['reorderStep'];
+  if (!itemId) return null;
   const blocks = [...container.querySelectorAll<HTMLElement>('.guide-block[data-block-id]')];
   let nearest = -1;
   let distance = Infinity;
@@ -47,15 +71,15 @@ function destination(
     }
   }
   const block = blocks[nearest];
-  if (!block) return null;
+  if (!block) return { itemId, element: container, after: false, beforeBlockId: undefined };
   const rect = block.getBoundingClientRect();
   const index = nearest + (y > rect.top + rect.height / 2 ? 1 : 0);
   const sourceIndex = blocks.findIndex((entry) => entry.dataset['blockId'] === sourceId);
-  if (sourceIndex < 0 || index === sourceIndex || index === sourceIndex + 1) return null;
+  if (sourceIndex >= 0 && (index === sourceIndex || index === sourceIndex + 1)) return null;
   const next = blocks[index];
   return next
-    ? { element: next, after: false, beforeBlockId: next.dataset['blockId'] }
-    : { element: blocks[blocks.length - 1]!, after: true, beforeBlockId: undefined };
+    ? { itemId, element: next, after: false, beforeBlockId: next.dataset['blockId'] }
+    : { itemId, element: blocks[blocks.length - 1]!, after: true, beforeBlockId: undefined };
 }
 
 function createPreview(block: HTMLElement) {
@@ -199,6 +223,8 @@ export function GuideBlockReorder({
   children: ReactNode;
 }) {
   const container = useRef<HTMLDivElement>(null);
+  const operate = useRef(onOperate);
+  operate.current = onOperate;
   const cancel = useRef<(() => void) | null>(null);
   useEffect(() => {
     cancel.current?.();
@@ -213,8 +239,10 @@ export function GuideBlockReorder({
             return;
           cancel.current?.();
           cancel.current = startPointerReorder(event, container.current, blockId, (target) =>
-            onOperate({
-              kind: 'reorder-block',
+            operate.current({
+              ...(target.itemId === item.id
+                ? { kind: 'reorder-block' as const }
+                : { kind: 'transfer-block' as const, targetItemId: target.itemId }),
               itemId: item.id,
               blockId,
               ...(target.beforeBlockId ? { beforeBlockId: target.beforeBlockId } : {}),
@@ -238,6 +266,8 @@ export function GuideBlockReorder({
       <div
         ref={container}
         className="guide-step-blocks"
+        data-reorder-step={item.id}
+        data-reorder-disabled={disabled}
         onPointerMove={(event) => {
           event.currentTarget.querySelectorAll('[data-reorder-resting]').forEach((block) => {
             block.removeAttribute('data-reorder-resting');

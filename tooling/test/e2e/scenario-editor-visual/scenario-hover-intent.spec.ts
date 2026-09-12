@@ -20,13 +20,14 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     const block = page.locator('article#compare .guide-block:has(.guide-image-surface)').first();
     const tools = image.locator('.guide-image-tools');
     await pointAt(page, image);
+    await expect(tools).toHaveCSS('transition-duration', '0.05s');
     await expect(tools).toHaveCSS('pointer-events', 'none');
-    await page.clock.runFor(60);
+    await page.clock.runFor(40);
     await page.mouse.move(2, 2);
-    await page.clock.runFor(100);
+    await page.clock.runFor(50);
     await expect(tools).toHaveCSS('pointer-events', 'none');
     await pointAt(page, image);
-    await page.clock.runFor(99);
+    await page.clock.runFor(49);
     await expect(tools).toHaveCSS('pointer-events', 'none');
     await page.clock.runFor(1);
     await expect(tools).toHaveCSS('pointer-events', 'auto');
@@ -35,13 +36,13 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await expect(grip).toHaveCSS('pointer-events', 'auto');
     await expect(grip).toHaveCSS('opacity', '1');
     await pointAt(page, image);
-    await page.clock.runFor(100);
+    await page.clock.runFor(50);
     const pane = page.locator('.guide-document-scroll');
     await pane.evaluate((node) => node.dispatchEvent(new Event('scroll')));
     await expect(tools).toHaveCSS('pointer-events', 'none');
-    await page.clock.runFor(80);
+    await page.clock.runFor(40);
     await pane.evaluate((node) => node.dispatchEvent(new Event('scroll')));
-    await page.clock.runFor(99);
+    await page.clock.runFor(49);
     await expect(tools).toHaveCSS('pointer-events', 'none');
     await page.clock.runFor(1);
     await expect(tools).toHaveCSS('pointer-events', 'auto');
@@ -65,7 +66,14 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await expect(tools).toHaveCSS('transition-duration', '0s');
     await pointAt(page, image);
-    await page.clock.runFor(100);
+    await page.clock.runFor(50);
+    const insertion = page.locator('.guide-insertion-item[data-insert-before="compare"]');
+    const boundary = await insertion.boundingBox();
+    if (!boundary) throw new Error('Missing insertion boundary');
+    await page.mouse.move(boundary.x + boundary.width / 2 + 70, boundary.y + 10);
+    await page.clock.runFor(50);
+    await expect(insertion).toHaveAttribute('data-guide-hover', '');
+    await expect(insertion.locator('.guide-insertion-chrome')).toHaveCSS('pointer-events', 'auto');
     await page.clock.resume();
     await testInfo.attach(`hover-${theme}`, {
       body: await page.screenshot({ path: `tasks/scenario-hover-intent/hover-${theme}.png` }),

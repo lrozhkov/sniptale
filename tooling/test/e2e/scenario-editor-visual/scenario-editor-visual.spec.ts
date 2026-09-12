@@ -1220,3 +1220,33 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     });
   });
 }
+
+for (const theme of SCENARIO_VISUAL_THEMES) {
+  test(`block grip moves between steps and Undo restores the source in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }) => {
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 1600 });
+    const source = page.locator('article#compare');
+    const target = page.locator('article#text-only');
+    const block = source.locator('.guide-block[data-block-id="description"]');
+    await block.hover();
+    const grip = block.locator('.guide-block-grip');
+    await expect(grip).toHaveCSS('opacity', '1');
+    const start = await grip.boundingBox();
+    const end = await target.locator('.guide-empty-step').boundingBox();
+    if (!start || !end) throw new Error('Missing drag endpoints');
+    await page.mouse.move(start.x + start.width / 2, start.y + start.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(end.x + end.width / 2, end.y + 8, { steps: 15 });
+    await expect(target.locator('[data-reorder]')).toHaveCount(1);
+    await page.mouse.up();
+    await expect(target.locator('[data-block-id="description"]')).toHaveCount(1);
+    await expect(source.locator('[data-block-id="description"]')).toHaveCount(0);
+    await expect(page.locator('html')).not.toHaveAttribute('data-guide-reordering');
+    await expect(page).toHaveURL(/stepId=text-only/);
+    await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    await expect(source.locator('[data-block-id="description"]')).toHaveCount(1);
+    await expect(target.locator('[data-block-id="description"]')).toHaveCount(0);
+  });
+}

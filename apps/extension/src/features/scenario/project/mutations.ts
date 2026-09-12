@@ -24,6 +24,13 @@ type BlockOperation =
 
 /** Semantic guide changes never acquire or delete media; images retain immutable project refs. */
 export type GuideStructureOperation =
+  | {
+      kind: 'transfer-block';
+      itemId: string;
+      targetItemId: string;
+      blockId: string;
+      beforeBlockId?: string;
+    }
   | ItemOperation
   | BlockOperation
   | ({ kind: 'place-image'; sourceBlockId: string } & (
@@ -53,6 +60,9 @@ export function applyGuideStructureOperation(
   }
   const next = structuredClone(project);
   switch (operation.kind) {
+    case 'transfer-block':
+      transferBlock(next, operation);
+      break;
     case 'place-image':
       placeImage(next, operation);
       break;
@@ -89,6 +99,30 @@ export function applyGuideStructureOperation(
   const parsed = parseGuideProject(next);
   if (parsed.status !== 'ok') throw new Error('Guide content limits exceeded.');
   return parsed.project;
+}
+
+/** Moves the original occurrence; parser validation makes source removal and insertion atomic. */
+function transferBlock(
+  project: GuideProject,
+  operation: Extract<GuideStructureOperation, { kind: 'transfer-block' }>
+): void {
+  if (operation.itemId === operation.targetItemId) {
+    changeBlocks(project, {
+      kind: 'reorder-block',
+      itemId: operation.itemId,
+      blockId: operation.blockId,
+      ...(operation.beforeBlockId ? { beforeBlockId: operation.beforeBlockId } : {}),
+    });
+    return;
+  }
+  const source = requireStep(project, operation.itemId);
+  const target = requireStep(project, operation.targetItemId);
+  const index = source.blocks.findIndex((block) => block.id === operation.blockId);
+  const block = source.blocks[index];
+  if (!block) throw new Error('Guide block is unavailable.');
+  const position = insertionIndex(target.blocks, operation.beforeBlockId);
+  source.blocks.splice(index, 1);
+  target.blocks.splice(position, 0, block);
 }
 
 function insertionIndex(entries: { id: string }[], beforeId: string | undefined): number {

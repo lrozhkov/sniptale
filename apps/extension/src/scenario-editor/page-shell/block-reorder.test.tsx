@@ -208,3 +208,92 @@ it('keeps a clicked grip focused without drag chrome and clears focus after a re
   await pointer('pointerup', 50, 300);
   expect(document.activeElement).not.toBe(handle);
 });
+
+it('targets another step, including an empty step, and cancels outside the canvas', async () => {
+  await render();
+  const target = document.createElement('div');
+  target.className = 'guide-step-blocks';
+  target.dataset['reorderStep'] = 'other';
+  host.append(target);
+  vi.spyOn(target, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 400, 100, 180));
+  await pointer('pointerdown', -14, 14);
+  await pointer('pointermove', 50, 450);
+  expect(target.dataset['reorder']).toBe('before');
+  await pointer('pointerup', 50, 450);
+  expect(operate).toHaveBeenLastCalledWith({
+    kind: 'transfer-block',
+    itemId: 'step',
+    targetItemId: 'other',
+    blockId: 'a',
+  });
+  const block = document.createElement('div');
+  block.className = 'guide-block';
+  block.dataset['blockId'] = 'other-block';
+  target.append(block);
+  vi.spyOn(block, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 400, 100, 100));
+  await pointer('pointerdown', -14, 14);
+  await pointer('pointermove', 50, 420);
+  expect(block.dataset['reorder']).toBe('before');
+  await pointer('pointerup', 50, 420);
+  expect(operate).toHaveBeenLastCalledWith({
+    kind: 'transfer-block',
+    itemId: 'step',
+    targetItemId: 'other',
+    blockId: 'a',
+    beforeBlockId: 'other-block',
+  });
+  operate.mockClear();
+  target.dataset['reorderDisabled'] = 'true';
+  await pointer('pointerdown', -14, 14);
+  await pointer('pointermove', 50, 420);
+  expect(host.querySelector('[data-reorder]')).toBeNull();
+  await pointer('pointerup', 50, 420);
+  expect(operate).not.toHaveBeenCalled();
+});
+
+it('rejects targets clipped outside the visible document pane', async () => {
+  await render();
+  host.classList.add('guide-document-scroll');
+  vi.spyOn(host, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 100, 180));
+  await pointer('pointerdown', -14, 14);
+  await pointer('pointermove', 50, 250);
+  expect(host.querySelector('[data-reorder]')).toBeNull();
+  await pointer('pointerup', 50, 250);
+  expect(operate).not.toHaveBeenCalled();
+});
+
+it('commits against the latest operation receiver when another step updates during the gesture', async () => {
+  const item = createGuideStep('', 'step');
+  item.blocks = [{ kind: 'text', id: 'a', paragraphs: [] }];
+  const latest = vi.fn();
+  const mount = async (receiver: typeof operate) =>
+    act(async () =>
+      root.render(
+        <GuideBlockReorder projectId="project" item={item} disabled={false} onOperate={receiver}>
+          <div className="guide-block" data-block-id="a">
+            <GuideBlockReorderHandle blockId="a" t={createTranslator('en')} />
+          </div>
+        </GuideBlockReorder>
+      )
+    );
+  await mount(operate);
+  vi.spyOn(host.querySelector('.guide-step-blocks')!, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(0, 0, 100, 100)
+  );
+  const target = document.createElement('div');
+  target.dataset['reorderStep'] = 'other';
+  target.className = 'guide-step-blocks';
+  host.append(target);
+  vi.spyOn(target, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 200, 100, 100));
+  await pointer('pointerdown', 10, 10);
+  await pointer('pointermove', 50, 240);
+  await mount(latest);
+  await pointer('pointerup', 50, 240);
+  expect(operate).not.toHaveBeenCalled();
+  expect(latest).toHaveBeenCalledWith({
+    kind: 'transfer-block',
+    itemId: 'step',
+    targetItemId: 'other',
+    blockId: 'a',
+  });
+});

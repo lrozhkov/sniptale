@@ -364,13 +364,19 @@ function useGuideNavigation(
     const { target, addedItem, addedBlock } = resolveOperationFocus(
       project,
       next,
-      state.selectedId
+      operation.kind === 'transfer-block' ? operation.targetItemId : state.selectedId
     );
     if (target) {
       state.selectItem(target.id, next);
       setFocusRequest((current) => ({
         sequence: current.sequence + 1,
-        ...(addedItem ? { field: true } : addedBlock ? { blockId: addedBlock.id } : {}),
+        ...(operation.kind === 'transfer-block'
+          ? { preserveFocus: true }
+          : addedItem
+            ? { field: true }
+            : addedBlock
+              ? { blockId: addedBlock.id }
+              : {}),
       }));
     } else state.selectItem(null, next);
   };

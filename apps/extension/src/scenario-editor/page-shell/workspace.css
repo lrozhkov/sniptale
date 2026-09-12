@@ -924,6 +924,10 @@
   inset: -0.5rem 0 auto;
   height: 1rem;
 }
+.guide-insertion-item::before {
+  inset-block-start: -0.75rem;
+  height: 1.5rem;
+}
 .guide-insertion-chrome {
   position: absolute;
   top: -1rem;
@@ -1279,6 +1283,10 @@ html[data-guide-reordering] .guide-block-grip {
   pointer-events: auto;
   opacity: 1;
 }
+.guide-step-blocks[data-reorder] {
+  position: relative;
+}
+.guide-step-blocks[data-reorder]::after,
 .guide-block[data-reorder]::after {
   content: '';
   position: absolute;
@@ -1287,6 +1295,7 @@ html[data-guide-reordering] .guide-block-grip {
   background: var(--sniptale-color-accent);
   pointer-events: none;
 }
+.guide-step-blocks[data-reorder]::after,
 .guide-block[data-reorder='before']::after {
   top: -0.4rem;
 }
@@ -1712,7 +1721,7 @@ html[data-guide-width-resizing] * {
     .guide-block-width,
     .guide-voice-control
   ) {
-  transition: opacity calc(var(--sniptale-duration-fast) / 2) var(--sniptale-ease-standard);
+  transition: opacity calc(var(--sniptale-duration-fast) / 3) var(--sniptale-ease-standard);
 }
 .guide-center-panel .guide-voice-field > .guide-voice-control {
   opacity: 0;
@@ -1755,7 +1764,7 @@ html[data-guide-width-resizing] * {
     .guide-voice-control > button
   ) {
   transition-property: opacity, background-color, border-color, color, box-shadow;
-  transition-duration: calc(var(--sniptale-duration-fast) / 2);
+  transition-duration: calc(var(--sniptale-duration-fast) / 3);
   transform: none;
 }
 .guide-document

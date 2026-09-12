@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-const DWELL_MS = 100;
+const DWELL_MS = 50;
 const CONTEXT =
   '.guide-block, .guide-insertion, .guide-image-surface, .guide-voice-field, article, section';
 
