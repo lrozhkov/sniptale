@@ -1,3 +1,4 @@
+import { GuideVoiceField } from './voice-field';
 import { type ReactNode, type Ref, type ComponentProps } from 'react';
 import { GuideAiEntry } from './ai-assistant';
 import { GuideProjectActions } from './project-actions';
@@ -60,14 +61,14 @@ export function GuidePageHeader({
             <span aria-hidden="true" className="guide-project-name-measure">
               {project.name || ' '}
             </span>
-            <input
+            <GuideVoiceField
+              key={project.id}
+              singleLine
               aria-label={t('scenario.editor.projectLabel')}
               disabled={disabled}
               value={project.name}
               maxLength={GUIDE_LIMITS.maxLabelLength}
-              onChange={(event) =>
-                onChange({ ...project, name: event.target.value }, 'project-name')
-              }
+              onValueChange={(value) => onChange({ ...project, name: value }, 'project-name')}
             />
           </label>
         )}

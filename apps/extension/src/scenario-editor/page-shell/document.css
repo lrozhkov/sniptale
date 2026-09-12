@@ -18,7 +18,7 @@
   gap: 0.75rem;
   margin-bottom: 1rem;
 }
-.guide-document article > header > span {
+.guide-document article > header > span:not(.guide-voice-field) {
   flex-shrink: 0;
   display: grid;
   place-items: center;
@@ -98,11 +98,11 @@
   min-width: 0;
   margin-block: 0;
 }
-.guide-document article > header > span {
+.guide-document article > header > span:not(.guide-voice-field) {
   color: var(--guide-ink);
   background: var(--guide-number-background);
 }
-.guide-document article[data-number-style='plain'] > header > span {
+.guide-document article[data-number-style='plain'] > header > span:not(.guide-voice-field) {
   min-width: 1.25rem;
   border-radius: 0;
   color: var(--guide-accent);
@@ -154,7 +154,7 @@
 .guide-note-callout[data-tone='error'] {
   --guide-callout-color: var(--sniptale-color-danger);
 }
-.guide-document article > header > span {
+.guide-document article > header > span:not(.guide-voice-field) {
   max-width: 40%;
   padding-inline: 0.375rem;
   overflow-wrap: anywhere;

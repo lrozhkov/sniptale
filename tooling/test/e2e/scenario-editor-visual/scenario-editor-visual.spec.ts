@@ -1033,3 +1033,53 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     });
   });
 }
+
+for (const theme of SCENARIO_VISUAL_THEMES) {
+  test(`dictation controls stay outside text and block actions in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }, testInfo) => {
+    const issues = createPageIssueCollector(page);
+    await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1280, height: 900 });
+    const field = page.locator('article#compare textarea.guide-description').first();
+    await field.focus();
+    const wrapper = field.locator('..');
+    const microphone = wrapper.locator('[data-ui="scenario.voice-input"]');
+    await expect(microphone).toBeVisible();
+    await expect(microphone).toHaveAttribute('title', 'Начать голосовой ввод');
+    await microphone.click({ trial: true, timeout: 5000 });
+    const geometry = await field.evaluate((node) => {
+      const control = node.parentElement!.querySelector('[data-ui="scenario.voice-input"]')!;
+      const text = node.getBoundingClientRect();
+      const mic = control.getBoundingClientRect();
+      const actions = node
+        .closest('.guide-block')!
+        .querySelector('.guide-block-actions')!
+        .getBoundingClientRect();
+      return {
+        contentRight: text.right - parseFloat(getComputedStyle(node).paddingRight),
+        micLeft: mic.left,
+        micRight: mic.right,
+        actionsLeft: actions.left,
+      };
+    });
+    expect(geometry.contentRight).toBeLessThanOrEqual(geometry.micLeft);
+    expect(geometry.micRight).toBeLessThanOrEqual(geometry.actionsLeft);
+    await expect(field).toBeFocused();
+    await testInfo.attach(`dictation-${theme}`, {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+    await page.setViewportSize({ width: 1024, height: 640 });
+    // At this width the existing inspector is an overlay; dismiss it before editing.
+    await page.locator('.guide-inspector-panel .guide-panel-heading button').first().click();
+    await field.focus();
+    await microphone.click({ trial: true, timeout: 5000 });
+    await expect
+      .poll(() =>
+        page.locator('.guide-workspace').evaluate((node) => node.scrollWidth <= node.clientWidth)
+      )
+      .toBe(true);
+    issues.assertClean();
+  });
+}

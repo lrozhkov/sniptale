@@ -1542,3 +1542,55 @@ html[data-guide-reordering] .guide-block-grip {
   font-size: 0.8125rem;
   white-space: nowrap;
 }
+
+.guide-voice-field {
+  position: relative;
+  display: block;
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+}
+.guide-page .guide-document .guide-voice-field > textarea,
+.guide-page .guide-voice-field > input {
+  padding-right: 4.25rem;
+  min-height: 2rem;
+}
+.guide-voice-control {
+  position: absolute;
+  top: 0.125rem;
+  right: 2.5rem;
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+}
+.guide-voice-field:hover > .guide-voice-control,
+.guide-voice-field:focus-within > .guide-voice-control,
+.guide-voice-field[data-voice-visible] > .guide-voice-control {
+  opacity: 1;
+  pointer-events: auto;
+}
+.guide-page .guide-voice-control > button {
+  width: 1.5rem;
+  height: 1.5rem;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--sniptale-color-surface-panel);
+}
+.guide-project-name > .guide-voice-field {
+  grid-area: 1 / 1;
+}
+.guide-project-name .guide-voice-control {
+  right: 0.25rem;
+}
+.guide-project-name .guide-voice-field > input,
+.guide-project-name-measure {
+  padding-right: 2rem;
+}
+@media (hover: none) {
+  .guide-voice-control {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}

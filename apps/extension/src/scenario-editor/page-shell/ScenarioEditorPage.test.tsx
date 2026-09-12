@@ -256,7 +256,7 @@ it('renders optional blocks and keeps text edits isolated from images and other 
   expect(
     container.querySelector<HTMLTextAreaElement>('textarea[aria-label="Heading"]')?.value
   ).toBe('Details');
-  expect(container.querySelector('article#first header span')).toBeNull();
+  expect(container.querySelector('article#first header > span:not(.guide-voice-field)')).toBeNull();
   expect(container.querySelector('article img')?.getAttribute('alt')).toBe('Example image');
   expect(container.querySelector('figcaption')?.textContent).toBe('Image caption');
   const textarea = container.querySelector<HTMLTextAreaElement>('article .guide-description');
@@ -545,9 +545,11 @@ it('supports optional numbering and editable sections with structural undo', asy
   const number = container.querySelector('input[type="checkbox"]');
   if (!(number instanceof HTMLInputElement)) throw new Error('Missing number control');
   await act(async () => number.click());
-  expect(container.querySelector('article#first header span')).toBeNull();
+  expect(container.querySelector('article#first header > span:not(.guide-voice-field)')).toBeNull();
   await click('Undo');
-  expect(container.querySelector('article#first header span')?.textContent).toBe('1');
+  expect(
+    container.querySelector('article#first header > span:not(.guide-voice-field)')?.textContent
+  ).toBe('1');
   await click('Add section');
   await editField('.guide-section-title', 'A section');
   expect(container.querySelector('section h2')?.getAttribute('aria-label')).toBe('A section');

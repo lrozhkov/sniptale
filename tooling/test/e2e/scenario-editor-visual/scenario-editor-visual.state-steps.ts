@@ -153,7 +153,7 @@ export async function verifyGuideComposition(page: Page): Promise<void> {
   await step.getByRole('textbox', { name: 'Note text', exact: true }).fill('Remember this');
   await step.getByRole('textbox', { name: 'Step title', exact: true }).focus();
   await page.getByRole('checkbox', { name: 'Show step number', exact: true }).uncheck();
-  await expect(step.locator('header span')).toHaveCount(0);
+  await expect(step.locator('header > span:not(.guide-voice-field)')).toHaveCount(0);
   await step.locator('.guide-block').first().hover();
   await documentCommand(page, step.locator('.guide-block').first(), 'Duplicate block', 'block');
   await expect(step.locator('.guide-block')).toHaveCount(5);
@@ -204,7 +204,9 @@ export async function verifyGuideComposition(page: Page): Promise<void> {
     'First explanation'
   );
   await expect(page.locator('article#text-only .guide-block-heading')).toHaveValue('Detail');
-  await expect(page.locator('article#text-only header span')).toHaveCount(0);
+  await expect(page.locator('article#text-only header > span:not(.guide-voice-field)')).toHaveCount(
+    0
+  );
   await expect(page.locator('.guide-document img')).toHaveCount(2);
   await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeEnabled();
 }

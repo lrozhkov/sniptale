@@ -1,3 +1,4 @@
+import { GuideVoiceField } from './voice-field';
 import { Check, Info, StickyNote, TriangleAlert, CircleAlert } from 'lucide-react';
 import type { GuideBlock } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { createGuideParagraphs } from '../../features/scenario/project/public';
@@ -51,7 +52,7 @@ export function GuideNoteBlock({
           },
         }))}
       />
-      <textarea
+      <GuideVoiceField
         aria-label={t('scenario.editor.guideNoteText')}
         placeholder={t('scenario.editor.guideNoteText')}
         disabled={disabled}
@@ -61,9 +62,7 @@ export function GuideNoteBlock({
         value={block.paragraphs
           .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
           .join('\n')}
-        onChange={(event) =>
-          onChange({ ...block, paragraphs: createGuideParagraphs(event.target.value) })
-        }
+        onValueChange={(value) => onChange({ ...block, paragraphs: createGuideParagraphs(value) })}
       />
     </aside>
   );

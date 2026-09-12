@@ -130,3 +130,18 @@ it('authorizes only the exact gallery extension document with a document identit
   }
   expect(authorizeVoiceInputPortSender({ url: path })).toBeNull();
 });
+
+it('authorizes only the exact scenario editor document for text dictation', () => {
+  const path = 'chrome-extension://extension-id/apps/extension/src/scenario-editor/index.html';
+  expect(
+    authorizeVoiceInputPortSender({ documentId: 'guide', url: path + '?projectId=example' })
+  ).toEqual({
+    consumerId: 'scenario-editor',
+    documentId: 'guide',
+    maxDurationMs: null,
+  });
+  for (const url of [path + '.evil', path.replace('extension-id', 'other-extension')]) {
+    expect(authorizeVoiceInputPortSender({ documentId: 'forged', url })).toBeNull();
+  }
+  expect(authorizeVoiceInputPortSender({ url: path })).toBeNull();
+});

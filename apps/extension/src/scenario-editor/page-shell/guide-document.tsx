@@ -1,3 +1,4 @@
+import { GuideVoiceField } from './voice-field';
 import { GuideBlockReorder, GuideBlockReorderHandle } from './block-reorder';
 import { GuideBlockLayout } from './block-layout';
 import { guideDocumentStyle, guideTextAppearance } from './document-appearance';
@@ -145,7 +146,7 @@ export function GuideDocument({
             >
               <header>
                 {number != null && <span>{number}</span>}
-                <textarea
+                <GuideVoiceField
                   className="guide-step-title"
                   rows={1}
                   aria-label={t('scenario.editor.guideStepTitle')}
@@ -153,12 +154,12 @@ export function GuideDocument({
                   maxLength={GUIDE_LIMITS.maxLabelLength}
                   value={item.title}
                   disabled={disabled}
-                  onChange={(event) =>
+                  onValueChange={(value) =>
                     onChange(
                       {
                         ...project,
                         items: project.items.map((entry) =>
-                          entry.id === item.id ? { ...item, title: event.target.value } : entry
+                          entry.id === item.id ? { ...item, title: value } : entry
                         ),
                       },
                       `step-title:${item.id}`
@@ -242,7 +243,7 @@ function GuideSectionContent({
   return (
     <>
       <h2 aria-label={item.title || t('scenario.editor.guideSectionTitle')}>
-        <textarea
+        <GuideVoiceField
           className="guide-section-title"
           rows={1}
           aria-label={t('scenario.editor.guideSectionTitle')}
@@ -250,12 +251,12 @@ function GuideSectionContent({
           maxLength={GUIDE_LIMITS.maxLabelLength}
           value={item.title}
           disabled={disabled}
-          onChange={(event) =>
+          onValueChange={(value) =>
             onChange(
               {
                 ...project,
                 items: project.items.map((entry) =>
-                  entry.id === item.id ? { ...item, title: event.target.value } : entry
+                  entry.id === item.id ? { ...item, title: value } : entry
                 ),
               },
               `section-title:${item.id}`
@@ -263,7 +264,7 @@ function GuideSectionContent({
           }
         />
       </h2>
-      <textarea
+      <GuideVoiceField
         className="guide-description"
         rows={1}
         aria-label={t('scenario.editor.body')}
@@ -272,14 +273,12 @@ function GuideSectionContent({
           .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
           .join('\n')}
         disabled={disabled}
-        onChange={(event) =>
+        onValueChange={(value) =>
           onChange(
             {
               ...project,
               items: project.items.map((entry) =>
-                entry.id === item.id
-                  ? { ...item, paragraphs: createGuideParagraphs(event.target.value) }
-                  : entry
+                entry.id === item.id ? { ...item, paragraphs: createGuideParagraphs(value) } : entry
               ),
             },
             `section-body:${item.id}`
@@ -430,7 +429,7 @@ function GuideTextBlock({
 }) {
   if (block.kind === 'heading')
     return (
-      <textarea
+      <GuideVoiceField
         rows={1}
         className="guide-block-heading"
         style={guideTextAppearance(block)}
@@ -439,11 +438,11 @@ function GuideTextBlock({
         maxLength={GUIDE_LIMITS.maxLabelLength}
         value={block.text}
         disabled={disabled}
-        onChange={(event) => onChange({ ...block, text: event.target.value })}
+        onValueChange={(value) => onChange({ ...block, text: value })}
       />
     );
   return (
-    <textarea
+    <GuideVoiceField
       aria-label={t('scenario.editor.body')}
       disabled={disabled}
       className="guide-description"
@@ -453,9 +452,7 @@ function GuideTextBlock({
       value={block.paragraphs
         .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))
         .join('\n')}
-      onChange={(event) =>
-        onChange({ ...block, paragraphs: createGuideParagraphs(event.target.value) })
-      }
+      onValueChange={(value) => onChange({ ...block, paragraphs: createGuideParagraphs(value) })}
     />
   );
 }

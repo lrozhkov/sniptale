@@ -3,11 +3,17 @@ import { resolveExtensionDocumentSenderUrl } from '../../platform/runtime-messag
 
 export type VoiceInputConsumerId =
   | 'content-page-tools'
+  | 'scenario-editor'
   | 'editor-callout'
   | 'gallery-video-review'
   | 'settings-test';
 
 const voiceInputConsumerPolicies = [
+  {
+    id: 'scenario-editor',
+    documentPath: 'apps/extension/src/scenario-editor/index.html',
+    maxDurationMs: null,
+  },
   {
     id: 'gallery-video-review',
     documentPath: 'apps/extension/src/gallery/index.html',

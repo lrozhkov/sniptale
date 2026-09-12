@@ -270,7 +270,7 @@ function useGuideBlockSelection(
     selectBlock: (itemId: string, blockId: string | null) => {
       selectItem(itemId, false);
       setSelection(blockId ? { itemId, blockId } : null);
-      if (blockId && !panels.rightOpen) panels.toggleRight();
+      if (blockId && !panels.rightOpen && window.innerWidth >= 1200) panels.toggleRight();
     },
     select: (itemId: string, blockId: string, editing: boolean) => {
       if (!editing) {
