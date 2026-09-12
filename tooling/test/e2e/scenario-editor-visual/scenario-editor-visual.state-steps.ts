@@ -151,6 +151,7 @@ export async function verifyGuideComposition(page: Page): Promise<void> {
   await step.locator('.guide-description').nth(1).fill('Second explanation');
   await step.getByRole('textbox', { name: 'Heading', exact: true }).fill('Detail');
   await step.getByRole('textbox', { name: 'Note text', exact: true }).fill('Remember this');
+  await step.getByRole('textbox', { name: 'Step title', exact: true }).focus();
   await page.getByRole('checkbox', { name: 'Show step number', exact: true }).uncheck();
   await expect(step.locator('header span')).toHaveCount(0);
   await step.locator('.guide-block').first().hover();

@@ -31,6 +31,7 @@ export async function openVisualHarness(
   stepId = 'compare'
 ) {
   const url = new URL(`${hostOrigin}${SCENARIO_EDITOR_VISUAL_HARNESS_PATH}`);
+  url.searchParams.set('projectId', `guide-${crypto.randomUUID()}`);
   url.searchParams.set('theme', theme);
   url.searchParams.set('locale', locale);
   url.searchParams.set('stepId', stepId);

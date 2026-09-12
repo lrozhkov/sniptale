@@ -791,9 +791,9 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await undo.click();
     await expect(first).toHaveAttribute('data-width', 'half');
     await expect(page.getByRole('status').first()).toHaveText('Saved');
-    await page.goto(
-      `${hostOrigin}${SCENARIO_EDITOR_VISUAL_HARNESS_PATH}?theme=${theme}&locale=en&stepId=compare`
-    );
+    const reopen = new URL(page.url());
+    reopen.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
+    await page.goto(reopen.toString());
     await expect(first).toHaveAttribute('data-width', 'half');
     await control.focus();
     await page.keyboard.press(originalFirst === 'half' ? 'ArrowLeft' : 'ArrowRight');
