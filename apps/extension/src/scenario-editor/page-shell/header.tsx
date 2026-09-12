@@ -73,7 +73,6 @@ export function GuidePageHeader({
         )}
         {feedback}
         <div className="guide-header-actions">
-          {panelControls}
           {aiSelection && onAiOpen && (
             <GuideAiEntry
               project={project}
@@ -133,6 +132,7 @@ export function GuidePageHeader({
               />
             </>
           )}
+          {panelControls}
         </div>
       </header>
     </>

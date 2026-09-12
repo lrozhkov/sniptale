@@ -465,8 +465,13 @@ it('navigates from current resources and collapses panels without changing the d
   expect(container.querySelector('#guide-library-panel')?.hasAttribute('hidden')).toBe(true);
   await click('Outline');
   expect(container.querySelector('#guide-library-panel')?.hasAttribute('hidden')).toBe(false);
+  const actions = container.querySelector('.guide-header-actions')!;
+  const reopen = actions.querySelector('[aria-controls="guide-inspector-panel"]');
+  expect(reopen).not.toBeNull();
+  expect(actions.lastElementChild).toBe(reopen);
   await click('Inspector');
   expect(container.querySelector('#guide-inspector-panel')?.hasAttribute('hidden')).toBe(false);
+  expect(actions.querySelector('[aria-controls="guide-inspector-panel"]')).toBeNull();
   expect(container.querySelectorAll('article')).toHaveLength(1);
   expect(io.save).not.toHaveBeenCalled();
 });
