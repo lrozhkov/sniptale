@@ -41,3 +41,8 @@
   padding: 0;
   border-radius: 50%;
 }
+
+.guide-video-field .guide-voice-field > textarea {
+  height: 4rem;
+  min-height: 4rem;
+}

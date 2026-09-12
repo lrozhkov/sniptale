@@ -88,11 +88,7 @@ it('edits typography without losing prose and removes metadata on reset', async 
   };
   try {
     await act(async () => draw());
-    await click('Text size');
-    const large = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
-      (node) => node.textContent === 'Large'
-    )!;
-    await act(async () => large.click());
+    await click('Large');
     await click('Center');
     expect(current).toEqual({ ...source, textStyle: { size: 'large', alignment: 'center' } });
     await click('Reset text appearance');

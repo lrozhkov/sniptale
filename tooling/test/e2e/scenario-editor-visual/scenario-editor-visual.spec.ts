@@ -1082,7 +1082,10 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     url.searchParams.set('videoFixture', '1');
     await page.goto(url.toString());
     await page.getByRole('button', { name: 'Resources', exact: true }).click();
-    await page.getByRole('button', { name: 'Image library', exact: true }).click();
+    await page
+      .locator('#guide-library-panel')
+      .getByRole('button', { name: 'Image library', exact: true })
+      .click();
     const drawer = page.getByRole('dialog', { name: 'Resources', exact: true });
     await expect(drawer.locator('input[type="file"]')).toHaveCount(0);
     await expect(
@@ -1187,11 +1190,10 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await page.locator('.guide-page-header .guide-action-menu-anchor button').click();
     await page.getByRole('button', { name: 'Оформление сценария', exact: true }).click();
     await expect(page.getByRole('dialog')).toHaveCount(0);
-    await expect(inspector.getByText('Весь сценарий', { exact: true })).toBeVisible();
-    await expect(inspector.getByRole('button', { name: 'Сценарий', exact: true })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    );
+    await expect(
+      inspector.getByRole('heading', { name: 'Весь сценарий', exact: true })
+    ).toBeVisible();
+    await expect(inspector.locator('h2')).toHaveText('Весь сценарий');
     const clipped = await inspector.evaluate((node) =>
       [...node.querySelectorAll('button span, .guide-inspector-choice > span')]
         .filter((el) => el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 1)
@@ -1204,10 +1206,8 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       contentType: 'image/png',
     });
     await page.locator('article#compare .guide-step-title').click();
-    await expect(inspector.getByRole('button', { name: 'Выбранное', exact: true })).toHaveAttribute(
-      'aria-pressed',
-      'true'
-    );
+    await expect(inspector.locator('h2')).toHaveText('Compare two images');
+    await inspector.getByRole('button', { name: 'Показать все настройки', exact: true }).click();
     await expect(inspector.getByRole('button', { name: 'Макет шага', exact: true })).toBeVisible();
     await inspector.getByRole('switch', { name: 'Начать новый отсчёт', exact: true }).click();
     const start = inspector.getByRole('textbox', { name: 'Начать с', exact: true });

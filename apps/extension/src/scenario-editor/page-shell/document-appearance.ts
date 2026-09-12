@@ -47,13 +47,17 @@ export function guideDocumentStyle(style: GuideStyle): GuideDocumentStyle {
   };
 }
 
-/** Preserve the heading/body base size while applying bounded prose settings. */
+/** Shared heading hierarchy stays between ordinary body and the fixed step title. */
 export function guideTextAppearance(
   block: Extract<GuideBlock, { kind: 'heading' | 'text' | 'note' }>
 ): CSSProperties {
   const style = resolveGuideTextStyle(block.textStyle);
+  const scale =
+    block.kind === 'heading'
+      ? { small: 1.125, normal: 1.25, large: 1.375 }[block.textStyle?.size ?? 'normal']
+      : style.scale;
   return {
-    fontSize: `${(block.kind === 'heading' ? 1.125 : 1) * style.scale}rem`,
+    fontSize: `${scale}rem`,
     textAlign: style.alignment,
   };
 }

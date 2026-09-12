@@ -29,6 +29,7 @@ for (const theme of ['light', 'dark'] as const) {
   }, testInfo) => {
     const issues = createPageIssueCollector(page);
     await openVisualHarness(page, hostOrigin, theme, 'ru', { width: 1280, height: 720 });
+    const reopenUrl = page.url();
     const articles = page.locator('.guide-document > article');
     const first = articles.first();
     const firstId = await first.getAttribute('id');
@@ -68,12 +69,13 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(
       page.locator('.guide-page-header').getByRole('button', { name: 'Экспорт', exact: true })
     ).toBeEnabled();
-    await page.reload();
+    await page.goto(reopenUrl);
     await expect(page.locator('.guide-document > article')).toHaveCount(4);
-    await page
+    const addStep = page
       .locator('.guide-insertion-item[data-end="true"]')
-      .getByRole('button', { name: 'Добавить шаг', exact: true })
-      .click({ force: true });
+      .getByRole('button', { name: 'Добавить шаг', exact: true });
+    await addStep.focus();
+    await addStep.click();
     await expect(articles).toHaveCount(5);
     const empty = articles.last().locator('.guide-image-slot');
     await expect(
@@ -89,7 +91,8 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(articles).toHaveCount(5);
     while (await page.locator('.guide-document > article, .guide-document > section').count()) {
       const item = page.locator('.guide-document > article, .guide-document > section').first();
-      await item.locator('.guide-item-actions button').click({ force: true });
+      await item.locator('.guide-item-actions button').focus();
+      await item.locator('.guide-item-actions button').click();
       await page.getByRole('button', { name: 'Удалить элемент', exact: true }).click();
     }
     await page.setViewportSize({ width: 1024, height: 640 });

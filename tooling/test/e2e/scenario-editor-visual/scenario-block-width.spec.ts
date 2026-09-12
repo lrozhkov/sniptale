@@ -20,11 +20,13 @@ for (const theme of ['light', 'dark'] as const) {
   }, testInfo) => {
     const issues = createPageIssueCollector(page);
     await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 900 });
+    const reopenUrl = page.url();
     const block = page.locator('article#compare .guide-block[data-kind="image"]').first();
     const id = await block.getAttribute('data-block-id');
     const button = block.locator('.guide-block-width');
     await block.scrollIntoViewIfNeeded();
     await block.hover();
+    await expect(button).toHaveCSS('opacity', '1');
     const rect = await button.boundingBox();
     if (!rect) throw new Error('Missing width handle');
     const before = await geometry(block);
@@ -62,7 +64,7 @@ for (const theme of ['light', 'dark'] as const) {
       body: await page.pdf({ preferCSSPageSize: true }),
       contentType: 'application/pdf',
     });
-    await page.reload();
+    await page.goto(reopenUrl);
     await expect(page.locator(`.guide-document [data-block-id="${id}"]`)).toHaveAttribute(
       'data-width',
       '63'

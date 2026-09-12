@@ -46,7 +46,7 @@
 }
 .guide-project-name {
   display: grid;
-  min-width: 6rem;
+  min-width: 3rem;
   max-width: 100%;
   align-items: center;
 }
@@ -1088,10 +1088,10 @@
 }
 .guide-page-header button,
 .guide-panel-heading > button {
-  width: 1.75rem;
-  height: 1.75rem;
-  min-width: 1.75rem;
-  min-height: 1.75rem;
+  width: min(1.75rem, var(--sniptale-size-toolbar));
+  height: min(1.75rem, var(--sniptale-size-toolbar));
+  min-width: min(1.75rem, var(--sniptale-size-toolbar));
+  min-height: min(1.75rem, var(--sniptale-size-toolbar));
   padding: 0.25rem;
 }
 .guide-collapsed-sections {

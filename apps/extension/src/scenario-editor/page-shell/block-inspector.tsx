@@ -168,12 +168,20 @@ function GuideTextSettings({
   return (
     <GuideInspectorGroup icon={Type} title={t('scenario.editor.guideAddText')}>
       <span>{t('scenario.editor.guideTextSize')}</span>
-      <CompactSelect
-        aria-label={t('scenario.editor.guideTextSize')}
+      <CompactSegmentedSelector
+        columns={3}
+        ariaLabel={t('scenario.editor.guideTextSize')}
         value={style.size}
         options={[
           { value: 'small', label: t('scenario.editor.guideTextSmall') },
-          { value: 'normal', label: t('scenario.editor.guideTextNormal') },
+          {
+            value: 'normal',
+            label: t(
+              block.kind === 'heading'
+                ? 'scenario.editor.guideHeadingMedium'
+                : 'scenario.editor.guideTextNormal'
+            ),
+          },
           { value: 'large', label: t('scenario.editor.guideTextLarge') },
         ]}
         onChange={(size) => change({ size })}

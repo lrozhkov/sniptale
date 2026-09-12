@@ -10,7 +10,7 @@ import {
 const fixture = fileURLToPath(new URL('../fixtures/cache-source.webm', import.meta.url));
 
 for (const theme of ['light', 'dark'] as const) {
-  test(`adds a local and library video frame and keeps both after reopen in ${theme}`, async ({
+  test(`imports local videos through the library and retains captured frames after source deletion in ${theme}`, async ({
     page,
     hostOrigin,
   }, testInfo) => {
@@ -28,18 +28,30 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.locator('article')).toHaveCount(2);
     const libraryName = `library-${id}.webm`;
     const guideUrl = page.url();
-    const open = async () => {
+    const upload = async (name: string) => {
+      await page.goto(`${hostOrigin}${GALLERY_HARNESS_PATH}`);
+      await page.locator('input[type="file"][accept*="video/"]').setInputFiles({
+        name,
+        mimeType: 'video/webm',
+        buffer: await readFile(fixture),
+      });
+      await expect(page.getByRole('button', { name, exact: true }).first()).toBeVisible();
+      await page.goto(guideUrl);
+    };
+    const open = async (name: string) => {
       await page.getByRole('button', { name: 'Resources', exact: true }).click();
-      await page.getByRole('button', { name: 'Image library', exact: true }).click();
-      const drawer = page.locator('#guide-resource-drawer');
-      await drawer
-        .getByRole('group', { name: 'Resource type' })
-        .getByRole('button', { name: 'Videos', exact: true })
+      await page
+        .locator('#guide-library-panel')
+        .getByRole('button', { name: 'Image library', exact: true })
         .click();
+      const drawer = page.locator('#guide-resource-drawer');
+      await drawer.getByRole('button', { name: 'Video', exact: true }).click();
+      await drawer.getByRole('button', { name, exact: true }).click();
       return drawer;
     };
-    let drawer = await open();
-    await drawer.locator('input[type="file"][accept="video/*"]').setInputFiles(fixture);
+    const localName = `local-${id}.webm`;
+    await upload(localName);
+    let drawer = await open(localName);
     const video = drawer.locator('video');
     await expect.poll(() => video.evaluate((node) => node.readyState)).toBeGreaterThanOrEqual(2);
     await video.evaluate((node) => {
@@ -62,9 +74,9 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(drawer.getByRole('status')).toContainText('Frame added');
     await drawer.getByRole('button', { name: 'Close', exact: true }).click();
     await expect(page.locator('article')).toHaveCount(3);
-    await page.reload();
+    await page.goto(guideUrl);
     await expect(page.locator('article')).toHaveCount(3);
-    await expect(page.locator('article').last()).toContainText(
+    await expect(page.locator('article').last().locator('.guide-description')).toHaveValue(
       'A selected moment from the source.'
     );
     await expect
@@ -76,19 +88,9 @@ for (const theme of ['light', 'dark'] as const) {
           .evaluate((node) => node.complete && node.naturalWidth > 0)
       )
       .toBe(true);
-    await page.goto(`${hostOrigin}${GALLERY_HARNESS_PATH}`);
-    await page.locator('input[type="file"][accept*="video/"]').setInputFiles({
-      name: libraryName,
-      mimeType: 'video/webm',
-      buffer: await readFile(fixture),
-    });
-    await expect(
-      page.getByRole('button', { name: libraryName, exact: true }).first()
-    ).toBeVisible();
-    await page.goto(guideUrl);
+    await upload(libraryName);
     await expect(page.locator('article')).toHaveCount(3);
-    drawer = await open();
-    await drawer.getByRole('button', { name: libraryName, exact: true }).click();
+    drawer = await open(libraryName);
     await expect
       .poll(() => drawer.locator('video').evaluate((node) => node.readyState))
       .toBeGreaterThanOrEqual(2);
@@ -108,7 +110,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(page.getByRole('button', { name: libraryName, exact: true })).toHaveCount(0);
     await page.goto(guideUrl);
     await expect(page.locator('article')).toHaveCount(4);
-    await expect(page.getByRole('textbox', { name: 'Step title', exact: true }).last()).toHaveText(
+    await expect(page.getByRole('textbox', { name: 'Step title', exact: true }).last()).toHaveValue(
       'Library video frame'
     );
     await expect

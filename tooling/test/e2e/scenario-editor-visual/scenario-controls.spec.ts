@@ -90,6 +90,9 @@ for (const theme of ['light', 'dark'] as const) {
       if (!rect) throw new Error('Missing grip');
       await page.mouse.move(rect.x + 12, rect.y + 12);
       await page.mouse.down();
+      // Scroll the target into the canvas while retaining the active drag.
+      const target = step.locator('.guide-block').nth(1);
+      await target.evaluate((node) => node.scrollIntoView({ block: 'center' }));
       const destination = await step.locator('.guide-block').nth(1).boundingBox();
       if (!destination) throw new Error('Missing drop target');
       await page.mouse.move(

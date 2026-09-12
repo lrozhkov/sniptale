@@ -20,8 +20,9 @@ for (const theme of ['light', 'dark'] as const) {
     url.searchParams.set('theme', theme);
     url.searchParams.set('stepId', 'compare');
     await page.goto(url.toString());
+    await page.getByRole('button', { name: 'Show all settings', exact: true }).click();
     await page.getByRole('textbox', { name: 'Scenario', exact: true }).fill(id);
-    await page.getByRole('checkbox', { name: 'Show step number', exact: true }).uncheck();
+    await page.getByRole('switch', { name: 'Show step number', exact: true }).uncheck();
     await page
       .locator('article#text-only')
       .getByRole('textbox', { name: 'Step title', exact: true })

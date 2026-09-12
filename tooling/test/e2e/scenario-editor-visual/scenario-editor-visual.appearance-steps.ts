@@ -2,7 +2,9 @@ import { expect, type Locator, type Page, type TestInfo } from '@playwright/test
 import { SCENARIO_EDITOR_VISUAL_HARNESS_PATH } from '../extension-critical.helpers';
 
 async function chooseAppearance(scope: Page | Locator, field: string, option: string) {
-  const select = scope.getByRole('button', { name: field, exact: true });
+  const select = scope
+    .getByRole('button', { name: field, exact: true })
+    .and(scope.locator('[aria-haspopup="listbox"]'));
   if (await select.count()) {
     await select.click();
     const page = 'page' in scope ? scope.page() : scope;
@@ -26,6 +28,7 @@ async function openDefaults(page: Page) {
 export async function verifyGuideAppearance(page: Page, testInfo: TestInfo): Promise<void> {
   const step = page.locator('article#compare');
   const frames = step.locator('.guide-image-frame');
+  await page.getByRole('button', { name: 'Show all settings', exact: true }).click();
   const inherited = page.getByRole('button', { name: 'Use guide appearance', exact: true });
   if (await inherited.isEnabled()) await inherited.click();
   await chooseAppearance(page, 'Step layout', 'Side by side');
@@ -51,7 +54,7 @@ export async function verifyGuideAppearance(page: Page, testInfo: TestInfo): Pro
   });
   await expect(step).toHaveCSS('background-color', 'rgb(36, 38, 43)');
   await expect(step).toHaveCSS('font-family', /Georgia/);
-  await dialog.getByRole('button', { name: 'Selection', exact: true }).click();
+  await step.locator('.guide-step-title').focus();
   await chooseAppearance(page, 'Paper theme', 'Warm');
   dialog = await openDefaults(page);
   await dialog.getByRole('button', { name: 'Apply to all steps', exact: true }).click();
@@ -72,9 +75,7 @@ export async function verifyGuideAppearance(page: Page, testInfo: TestInfo): Pro
     .poll(async () => {
       const a = await frames.nth(0).boundingBox();
       const b = await frames.nth(1).boundingBox();
-      return (
-        !!a && !!b && Math.abs(a.x + a.width / 2 - b.x - b.width / 2) < 2 && b.y >= a.y + a.height
-      );
+      return !!a && !!b && b.x >= a.x + a.width && Math.abs(a.y - b.y) < 2;
     })
     .toBe(true);
   await expect(page.getByRole('status').first()).toHaveText('Saved');

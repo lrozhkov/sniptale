@@ -103,7 +103,7 @@ export async function verifyIndependentProjectCopy(page: Page): Promise<void> {
 
 export async function verifyWorkspacePanelsAndFocus(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Resources', exact: true }).click();
-  const resource = page.locator('.guide-resource').first();
+  const resource = page.locator('.guide-resource-main').first();
   await resource.click();
   await expect(page.locator('article#compare')).toBeFocused();
   await page.keyboard.press('Tab');
@@ -135,6 +135,7 @@ export async function verifyWorkspacePanelsAndFocus(page: Page): Promise<void> {
     .click();
   await expect(page.locator('#guide-library-panel')).toBeVisible();
   await expect(save).toBeInViewport();
+  await page.screenshot({ path: 'tasks/scenario-production-polish/header-200.png' });
   await page.evaluate(() => {
     document.documentElement.style.fontSize = '';
   });
@@ -152,7 +153,8 @@ export async function verifyGuideComposition(page: Page): Promise<void> {
   await step.getByRole('textbox', { name: 'Heading', exact: true }).fill('Detail');
   await step.getByRole('textbox', { name: 'Note text', exact: true }).fill('Remember this');
   await step.getByRole('textbox', { name: 'Step title', exact: true }).focus();
-  await page.getByRole('checkbox', { name: 'Show step number', exact: true }).uncheck();
+  await page.getByRole('button', { name: 'Show all settings', exact: true }).click();
+  await page.getByRole('switch', { name: 'Show step number', exact: true }).uncheck();
   await expect(step.locator('header > span:not(.guide-voice-field)')).toHaveCount(0);
   await step.locator('.guide-block').first().hover();
   await documentCommand(page, step.locator('.guide-block').first(), 'Duplicate block', 'block');

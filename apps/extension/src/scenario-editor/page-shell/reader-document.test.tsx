@@ -129,3 +129,28 @@ it('retains deliberate empty space and minimum height in shared HTML and print m
   expect(html).toContain('--guide-block-min-height:120px');
   expect(html).not.toContain('data-block-id="unused"');
 });
+
+it('keeps all heading presets above ordinary body and below the step title', () => {
+  const project = createGuideProject('Typography');
+  const step = createGuideStep('Step title');
+  step.blocks = (['small', 'normal', 'large'] as const).map((size) => ({
+    kind: 'heading',
+    id: size,
+    text: size,
+    textStyle: { size, alignment: 'center' },
+  }));
+  project.items = [step];
+  const markup = renderToStaticMarkup(
+    <GuideReadDocument project={project} images={{}} t={createTranslator('en')} />
+  );
+  // Parse generated React markup without introducing a product HTML sink.
+  const doc = new DOMParser().parseFromString(markup, 'text/html');
+  const headings = [...doc.querySelectorAll('h3')];
+  expect(headings.map((heading) => heading.style.fontSize)).toEqual([
+    '1.125rem',
+    '1.25rem',
+    '1.375rem',
+  ]);
+  expect(headings.every((heading) => heading.style.textAlign === 'center')).toBe(true);
+  expect(doc.querySelector('h2')?.textContent).toBe('Step title');
+});

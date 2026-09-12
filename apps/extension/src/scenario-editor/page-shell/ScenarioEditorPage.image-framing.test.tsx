@@ -87,7 +87,9 @@ async function render() {
 }
 async function click(label: string, scope: ParentNode = container) {
   const button = [...scope.querySelectorAll('button')].find(
-    (entry) => (entry.getAttribute('aria-label') ?? entry.textContent) === label
+    (entry) =>
+      (entry.getAttribute('aria-label') ?? entry.getAttribute('title') ?? entry.textContent) ===
+      label
   );
   if (!button) throw new Error(`Missing ${label}`);
   await act(async () => button.click());
@@ -196,18 +198,18 @@ it('selects text and note settings from focus, preserves edits and returns to st
     'warning'
   );
   await click('Step settings', inspector);
-  expect(inspector.textContent).toContain('Restart numbering');
+  expect(inspector.textContent).toContain('Step layout');
   expect(document.activeElement).toBe(container.querySelector('.guide-step-title'));
   await act(async () => text.focus());
   const outline = container.querySelector<HTMLAnchorElement>('.guide-outline a')!;
   await act(async () => outline.click());
-  expect(inspector.textContent).toContain('Restart numbering');
+  expect(inspector.textContent).toContain('Step layout');
   await act(async () => text.focus());
   await click('Block actions', container.querySelector('[data-block-id="text"]')!);
   await click('Remove block', document.body);
   expect(container.querySelector('[data-block-id="text"]')).toBeNull();
-  expect(inspector.textContent).toContain('Restart numbering');
+  expect(inspector.textContent).toContain('Step layout');
   await click('Undo');
   expect(container.querySelector('[data-block-id="text"]')).not.toBeNull();
-  expect(inspector.textContent).toContain('Restart numbering');
+  expect(inspector.textContent).toContain('Step layout');
 });
