@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseGuideProject, parseGuideTemplateJson } from './guide-parser';
+import { parseGuideProject } from './guide-parser';
 import {
   GUIDE_LIMITS,
   type GuideCaptureSource,
@@ -388,46 +388,6 @@ describe('guide input boundaries', () => {
     };
     expect(parseGuideProject(input)).toEqual({ status: 'invalid' });
     expect(parseGuideProject({ ...project(), extra: new Date() })).toEqual({ status: 'invalid' });
-  });
-});
-
-describe('portable appearance templates', () => {
-  const template = () => ({
-    format: 'sniptale-guide-template',
-    version: 1,
-    name: 'Comparison',
-    layout: 'comparison',
-    showNumber: false,
-    style: project().style,
-  });
-  it('parses detached appearance and rejects private or unknown fields', () => {
-    expect(parseGuideTemplateJson(JSON.stringify(template()))).toEqual(template());
-    for (const extra of [
-      { blocks: [] },
-      { assetId: 'private' },
-      { source: {} },
-      { title: 'private' },
-    ]) {
-      expect(parseGuideTemplateJson(JSON.stringify({ ...template(), ...extra }))).toBeNull();
-    }
-  });
-  it('bounds bytes and rejects malformed, unsupported and unsafe appearance', () => {
-    for (const value of [
-      null,
-      [],
-      { ...template(), version: 2 },
-      { ...template(), name: ' ' },
-      { ...template(), layout: 'animation' },
-      { ...template(), style: { ...project().style, accentColor: 'url(https://example.com)' } },
-      { ...template(), style: { ...project().style, font: 'external' } },
-    ]) {
-      expect(parseGuideTemplateJson(JSON.stringify(value))).toBeNull();
-    }
-    expect(parseGuideTemplateJson('{')).toBeNull();
-    expect(parseGuideTemplateJson(' '.repeat(16 * 1024 + 1))).toBeNull();
-    expect(
-      parseGuideTemplateJson(JSON.stringify({ ...template(), name: 'я'.repeat(9000) }))
-    ).toBeNull();
   });
 });
 

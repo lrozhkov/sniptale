@@ -1,24 +1,18 @@
 import { defineMessageSource } from '../../source';
 
 export const scenarioEditorAppearanceMessages = defineMessageSource({
+  guideDefaultAppearance: { ru: 'Оформление сценария', en: 'Guide appearance' },
+  guideApplyAppearanceToAll: {
+    ru: 'Также сбросить оформление изменённых шагов',
+    en: 'Also reset customized step styles',
+  },
+  guideApplyAppearance: { ru: 'Применить', en: 'Apply' },
   appearance: { ru: 'Оформление', en: 'Appearance' },
-  appearanceScope: { ru: 'Область оформления', en: 'Appearance scope' },
-  appearanceProject: { ru: 'Весь сценарий', en: 'Whole guide' },
-  appearanceStep: { ru: 'Этот шаг', en: 'This step' },
   appearanceLayout: { ru: 'Макет шага', en: 'Step layout' },
   appearanceStacked: { ru: 'Обычный шаг', en: 'Stacked' },
   appearanceSideBySide: { ru: 'Текст и изображение рядом', en: 'Side by side' },
   appearanceComparison: { ru: 'Сравнение', en: 'Comparison' },
   appearanceText: { ru: 'Текстовый шаг', en: 'Text focused' },
-  appearanceLayoutHint: {
-    ru: 'Макет меняет расположение блоков. Всё содержимое и изображения сохраняются.',
-    en: 'Layouts rearrange blocks. All content and images are preserved.',
-  },
-  appearanceInherited: {
-    ru: 'Шаг использует оформление сценария.',
-    en: 'This step inherits the guide appearance.',
-  },
-  appearanceCustomize: { ru: 'Настроить этот шаг', en: 'Customize this step' },
   appearanceReset: { ru: 'Использовать оформление сценария', en: 'Use guide appearance' },
   appearanceTheme: { ru: 'Бумага', en: 'Paper theme' },
   appearancePaper: { ru: 'Светлая', en: 'White' },
@@ -44,28 +38,4 @@ export const scenarioEditorAppearanceMessages = defineMessageSource({
   appearanceBadge: { ru: 'Плашка', en: 'Badge' },
   appearanceAccent: { ru: 'Акцентный цвет', en: 'Accent color' },
   appearanceAccentReset: { ru: 'Цвет по умолчанию', en: 'Default accent' },
-  appearanceTemplateName: { ru: 'Название шаблона', en: 'Template name' },
-  appearanceTemplateDefault: { ru: 'Мой шаблон', en: 'My template' },
-  appearanceTemplateSave: { ru: 'Скачать шаблон', en: 'Download template' },
-  appearanceTemplateOpen: { ru: 'Открыть шаблон', en: 'Open template' },
-  appearanceTemplatePrivacy: {
-    ru: 'В файл попадут только макет и оформление. Текст, изображения и сведения об источниках не включаются.',
-    en: 'The file contains only layout and appearance. Text, images and source details are excluded.',
-  },
-  appearanceTemplateDownloaded: {
-    ru: 'Файл шаблона передан браузеру для скачивания.',
-    en: 'Template download requested.',
-  },
-  appearanceTemplateApplied: {
-    ru: 'Шаблон применён. Изменение можно отменить.',
-    en: 'Template applied. You can undo this change.',
-  },
-  appearanceTemplateFailed: {
-    ru: 'Не удалось открыть или скачать шаблон. Содержимое не изменено.',
-    en: 'Could not open or download the template. Content is unchanged.',
-  },
-  appearanceTemplateStale: {
-    ru: 'Вы изменили сценарий во время чтения файла. Откройте шаблон ещё раз.',
-    en: 'The guide changed while reading the file. Open the template again.',
-  },
 });

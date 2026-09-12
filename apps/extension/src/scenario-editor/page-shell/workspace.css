@@ -952,30 +952,11 @@
   }
 }
 
-.guide-appearance,
-.guide-appearance-fields,
-.guide-template-files {
+.guide-appearance {
   display: grid;
   gap: 0.5rem;
   min-width: 0;
-}
-.guide-appearance {
   margin-block: 1rem;
-}
-.guide-template-files {
-  padding-top: 0.75rem;
-  border-top: 1px solid var(--sniptale-color-border-soft);
-}
-.guide-template-files p {
-  margin: 0;
-}
-.guide-appearance-accent {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.guide-appearance-accent input {
-  width: 3rem;
 }
 
 .guide-library-panel,
@@ -1504,4 +1485,53 @@
 }
 .guide-outline-number {
   max-width: 40%;
+}
+
+.guide-style-fields {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.guide-style-choice {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+.guide-layout-choices {
+  display: grid;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+}
+.guide-appearance-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.guide-appearance-heading h3 {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.guide-style-accent,
+.guide-style-accent label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.guide-style-accent label {
+  flex: 1;
+  justify-content: space-between;
+  font-size: 0.75rem;
+}
+.guide-style-accent input {
+  width: 3rem;
+  height: 1.75rem;
+  padding: 0.125rem;
 }

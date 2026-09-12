@@ -56,6 +56,7 @@ export function ScenarioEditorPage() {
             onDuplicate={state.duplicate}
             onDelete={state.remove}
             onReload={state.reload}
+            onChange={state.update}
             t={t}
           />
         )

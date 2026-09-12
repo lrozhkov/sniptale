@@ -137,7 +137,7 @@ test('ordinary undo reopens previous saved states and publishes reversibly', asy
 });
 
 for (const theme of SCENARIO_VISUAL_THEMES) {
-  test(`guide layouts and portable appearance templates preserve images in ${theme}`, async ({
+  test(`guide layouts and default appearance preserve images in ${theme}`, async ({
     page,
     hostOrigin,
   }, testInfo) => {

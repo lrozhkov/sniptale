@@ -1,11 +1,8 @@
 import type {
-  GuideAppearanceTemplate,
   GuideProject,
-  GuideStep,
   GuideStyle,
   GuideStyleOverrides,
 } from '@sniptale/runtime-contracts/scenario/types/guide';
-import { parseGuideTemplateJson } from '@sniptale/runtime-contracts/scenario/guide-parser';
 
 /** Missing override keys inherit; explicit null restores the theme's default accent. */
 export function resolveGuideStyle(
@@ -23,34 +20,17 @@ export function resolveGuideStyle(
   };
 }
 
-/** Copies only reusable appearance, excluding every private content and resource field. */
-export function createGuideAppearanceTemplate(
+/** Applies one default-style edit; resetting overrides preserves layout, numbering and content. */
+export function applyGuideDefaultStyle(
   project: GuideProject,
-  step: GuideStep,
-  name: string
-) {
-  return parseGuideTemplateJson(
-    JSON.stringify({
-      format: 'sniptale-guide-template',
-      version: 1,
-      name: name.trim(),
-      layout: step.layout,
-      showNumber: step.showNumber,
-      style: resolveGuideStyle(project.style, step.styleOverrides),
-    })
-  );
-}
-
-/** Inline values make the applied template independent of its original local file. */
-export function applyGuideAppearanceTemplate(
-  step: GuideStep,
-  template: GuideAppearanceTemplate
-): GuideStep {
+  style: GuideStyle,
+  resetSteps: boolean
+): GuideProject {
   return {
-    ...step,
-    layout: template.layout,
-    showNumber: template.showNumber,
-    templateId: null,
-    styleOverrides: { ...template.style },
+    ...project,
+    style: { ...style },
+    items: resetSteps
+      ? project.items.map((item) => (item.kind === 'step' ? { ...item, styleOverrides: {} } : item))
+      : project.items,
   };
 }

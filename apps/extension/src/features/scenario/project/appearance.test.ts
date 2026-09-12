@@ -1,10 +1,6 @@
 import { expect, it } from 'vitest';
 import { createGuideProject, createGuideStep, createGuideImageBlock } from './factories';
-import {
-  resolveGuideStyle,
-  createGuideAppearanceTemplate,
-  applyGuideAppearanceTemplate,
-} from './appearance';
+import { resolveGuideStyle, applyGuideDefaultStyle } from './appearance';
 
 it('inherits absent values and honors an explicit default accent without mutating its source', () => {
   const project = createGuideProject('Private name');
@@ -18,34 +14,30 @@ it('inherits absent values and honors an explicit default accent without mutatin
   expect(project.style.accentColor).toBe('#123456');
 });
 
-it('exports only appearance and applies it without replacing content or resource identity', () => {
+it('changes defaults independently or resets overrides while preserving content, layout and numbering', () => {
   const project = createGuideProject('Private project');
   const step = createGuideStep('Private title');
   step.blocks.push(
     createGuideImageBlock({
-      id: 'private-image',
-      assetId: 'private-asset',
+      id: 'image',
+      assetId: 'asset',
       width: 300,
       height: 200,
       source: { kind: 'import', filename: 'private.png' },
     })
   );
+  step.layout = 'comparison';
+  step.numbering = { restartAt: 7, label: 'A' };
   step.styleOverrides = { font: 'serif' };
-  const template = createGuideAppearanceTemplate(project, step, 'Reusable');
-  expect(template).not.toBeNull();
-  expect(JSON.stringify(template)).not.toContain('Private');
-  expect(JSON.stringify(template)).not.toContain('private');
-  if (!template) throw new Error('Missing template');
-  const changed = applyGuideAppearanceTemplate(step, {
-    ...template,
-    layout: 'comparison',
-    showNumber: false,
-  });
-  expect(changed.blocks).toBe(step.blocks);
-  expect(changed.id).toBe(step.id);
-  expect(changed.title).toBe(step.title);
-  expect(changed.layout).toBe('comparison');
-  expect(changed.showNumber).toBe(false);
-  expect(changed.styleOverrides.font).toBe('serif');
-  expect(createGuideAppearanceTemplate(project, step, ' ')).toBeNull();
+  project.items = [step, { kind: 'section', id: 'section', title: '', paragraphs: [] }];
+  const style = { ...project.style, theme: 'warm' as const };
+  const defaults = applyGuideDefaultStyle(project, style, false);
+  expect(defaults.items).toBe(project.items);
+  expect(defaults.style).toEqual(style);
+  expect(defaults.style).not.toBe(style);
+  const all = applyGuideDefaultStyle(project, style, true);
+  expect(all.items[0]).toEqual({ ...step, styleOverrides: {} });
+  expect(all.items[1]).toBe(project.items[1]);
+  expect(step.styleOverrides).toEqual({ font: 'serif' });
+  expect(project.style.theme).toBe('paper');
 });

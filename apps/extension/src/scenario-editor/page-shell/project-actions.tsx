@@ -1,4 +1,6 @@
-import { Copy, FolderOpen, MoreHorizontal, Trash2 } from 'lucide-react';
+import { GuideDefaultAppearance } from './default-appearance';
+import { applyGuideDefaultStyle } from '../../features/scenario/project/public';
+import { Copy, FolderOpen, MoreHorizontal, Trash2, Palette } from 'lucide-react';
 import { useState } from 'react';
 import { GUIDE_LIMITS, type GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
@@ -13,6 +15,7 @@ export function GuideProjectActions({
   onDuplicate,
   onDelete,
   onReload,
+  onChange,
   t,
 }: {
   project: GuideProject;
@@ -21,9 +24,10 @@ export function GuideProjectActions({
   onDuplicate: (name: string) => Promise<void>;
   onDelete: () => Promise<void>;
   onReload: () => Promise<void>;
+  onChange: (project: GuideProject) => void;
   t: Translate;
 }) {
-  const [confirmation, setConfirmation] = useState<'delete' | 'reload' | null>(null);
+  const [confirmation, setConfirmation] = useState<'delete' | 'reload' | 'appearance' | null>(null);
   const hasUnsavedChanges = status === 'dirty' || status === 'failed' || status === 'conflict';
   const copy = () => {
     const pattern = t('scenario.editor.guideCopyName');
@@ -47,6 +51,11 @@ export function GuideProjectActions({
             icon: <Copy size={15} aria-hidden="true" />,
             onSelect: copy,
           },
+          {
+            label: t('scenario.editor.guideDefaultAppearance'),
+            icon: <Palette size={15} aria-hidden="true" />,
+            onSelect: () => setConfirmation('appearance'),
+          },
           ...(status === 'conflict' || status === 'failed'
             ? [
                 {
@@ -67,24 +76,38 @@ export function GuideProjectActions({
           },
         ]}
       />
-      <ProductConfirmDialog
-        isOpen={confirmation !== null}
-        isLoading={disabled}
-        title={t(
-          confirmation === 'delete' ? 'scenario.editor.guideDelete' : 'scenario.editor.guideReload'
-        )}
-        message={t(
-          confirmation === 'delete'
-            ? 'scenario.editor.guideDeleteMessage'
-            : 'scenario.editor.guideReloadMessage'
-        )}
-        confirmText={t(
-          confirmation === 'delete' ? 'common.actions.delete' : 'scenario.editor.guideReload'
-        )}
-        cancelText={t('common.actions.cancel')}
-        onCancel={() => setConfirmation(null)}
-        onConfirm={confirm}
-      />
+      {confirmation === 'appearance' ? (
+        <GuideDefaultAppearance
+          style={project.style}
+          disabled={disabled}
+          t={t}
+          onApply={(style, resetSteps) =>
+            onChange(applyGuideDefaultStyle(project, style, resetSteps))
+          }
+          onClose={() => setConfirmation(null)}
+        />
+      ) : (
+        <ProductConfirmDialog
+          isOpen={confirmation !== null}
+          isLoading={disabled}
+          title={t(
+            confirmation === 'delete'
+              ? 'scenario.editor.guideDelete'
+              : 'scenario.editor.guideReload'
+          )}
+          message={t(
+            confirmation === 'delete'
+              ? 'scenario.editor.guideDeleteMessage'
+              : 'scenario.editor.guideReloadMessage'
+          )}
+          confirmText={t(
+            confirmation === 'delete' ? 'common.actions.delete' : 'scenario.editor.guideReload'
+          )}
+          cancelText={t('common.actions.cancel')}
+          onCancel={() => setConfirmation(null)}
+          onConfirm={confirm}
+        />
+      )}
     </div>
   );
 }

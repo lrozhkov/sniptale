@@ -1,12 +1,7 @@
 import { z } from 'zod';
 import { isPlainRecord } from '../validation/primitives';
 import { guideCaptureSourceSchema } from './guide-capture-schema';
-import {
-  GUIDE_LIMITS,
-  MAX_GUIDE_TEMPLATE_BYTES,
-  type GuideProject,
-  type GuideAppearanceTemplate,
-} from './types/guide';
+import { GUIDE_LIMITS, type GuideProject } from './types/guide';
 
 const id = z
   .string()
@@ -266,30 +261,4 @@ function isBoundedGuideInput(value: unknown): boolean {
     return true;
   }
   return visit(value, 0);
-}
-
-const templateSchema = z
-  .object({
-    format: z.literal('sniptale-guide-template'),
-    version: z.literal(1),
-    name: label.min(1).refine((value) => value.trim() === value),
-    layout: z.enum(['stacked', 'side-by-side', 'comparison', 'text']),
-    showNumber: z.boolean(),
-    style,
-  })
-  .strict();
-
-/** Bounded local file parser; unknown content/resource fields are rejected, never retained. */
-export function parseGuideTemplateJson(text: string): GuideAppearanceTemplate | null {
-  if (
-    text.length > MAX_GUIDE_TEMPLATE_BYTES ||
-    new TextEncoder().encode(text).byteLength > MAX_GUIDE_TEMPLATE_BYTES
-  )
-    return null;
-  try {
-    const result = templateSchema.safeParse(JSON.parse(text));
-    return result.success ? result.data : null;
-  } catch {
-    return null;
-  }
 }
