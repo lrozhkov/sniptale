@@ -1,3 +1,4 @@
+import { GuideHtmlExport } from './html-export';
 import { GuidePrint, useGuidePrintMode } from './print';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowLeft, ChevronLeft, ChevronRight, Printer } from 'lucide-react';
@@ -78,6 +79,7 @@ export function GuideReader({
           <ArrowLeft size={16} aria-hidden="true" />
         </ContentToolbarButton>
         <h1>{project.name}</h1>
+        <GuideHtmlExport project={project} t={t} />
         <ContentToolbarButton
           ref={print.trigger}
           title={t('scenario.editor.guidePrintAction')}

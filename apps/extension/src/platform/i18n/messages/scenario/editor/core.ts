@@ -1,5 +1,16 @@
 import { defineMessageSource } from '../../source';
 export const scenarioEditorCoreMessages = defineMessageSource({
+  guideHtmlExport: { ru: 'Сохранить автономный HTML', en: 'Save standalone HTML' },
+  guideHtmlPreparing: { ru: 'Сохранение HTML…', en: 'Saving HTML…' },
+  guideHtmlSaved: { ru: 'HTML сохранён', en: 'HTML saved' },
+  guideHtmlHistoryFailed: {
+    ru: 'Файл сохранён, но историю экспорта обновить не удалось',
+    en: 'File saved, but export history could not be updated',
+  },
+  guideHtmlFailed: {
+    ru: 'Не удалось сохранить HTML. Повторите попытку.',
+    en: 'Could not save HTML. Try again.',
+  },
   guidePrintLetter: { ru: 'Letter', en: 'Letter' },
   guidePrintAction: { ru: 'Печать / PDF', en: 'Print / PDF' },
   guidePrintBack: { ru: 'Вернуться к просмотру', en: 'Back to reading' },

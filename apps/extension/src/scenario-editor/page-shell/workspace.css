@@ -1475,3 +1475,14 @@
 .guide-read-document > :focus {
   outline: none;
 }
+
+.guide-html-export {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.guide-html-export > [role='status'] {
+  max-width: 15rem;
+  font-size: 12px;
+  line-height: 1.3;
+}
