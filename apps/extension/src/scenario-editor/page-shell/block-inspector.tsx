@@ -1,5 +1,6 @@
 import type {
   GuideBlock,
+  GuideBlockWidth,
   GuideStep,
   GuideTextStyle,
 } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -38,6 +39,43 @@ export function GuideBlockInspector({
   t: Translate;
 }) {
   const width = resolveGuideBlockWidth(item.layout, block);
+  const presets: Array<{
+    value: string;
+    width: GuideBlockWidth;
+    percent: number;
+    label: string;
+    icon: React.ReactNode;
+  }> = [
+    {
+      value: 'full',
+      width: 'full',
+      percent: 100,
+      label: t('scenario.editor.guideFullWidth'),
+      icon: <span aria-label={t('scenario.editor.guideFullWidth')}>1/1</span>,
+    },
+    {
+      value: 'half',
+      width: 'half',
+      percent: 50,
+      label: t('scenario.editor.guideHalfWidth'),
+      icon: <span aria-label={t('scenario.editor.guideHalfWidth')}>1/2</span>,
+    },
+    {
+      value: 'third',
+      width: 33,
+      percent: 33,
+      label: t('scenario.editor.guideThirdWidth'),
+      icon: <span aria-label={t('scenario.editor.guideThirdWidth')}>1/3</span>,
+    },
+    {
+      value: 'quarter',
+      width: 25,
+      percent: 25,
+      label: t('scenario.editor.guideQuarterWidth'),
+      icon: <span aria-label={t('scenario.editor.guideQuarterWidth')}>1/4</span>,
+    },
+  ];
+  const selected = presets.find((preset) => preset.percent === width)?.value ?? 'custom';
   return (
     <div className="guide-block-inspector">
       <div className="guide-appearance-heading">
@@ -62,15 +100,13 @@ export function GuideBlockInspector({
           title={`${t('scenario.editor.guidePlacementGroup')} · ${width}%`}
         >
           <CompactSegmentedSelector
-            columns={2}
+            columns={4}
             ariaLabel={t('scenario.editor.guideBlockWidth')}
-            value={width === 50 ? 'half' : width === 100 ? 'full' : 'custom'}
-            options={[
-              { value: 'full', label: t('scenario.editor.guideFullWidth') },
-              { value: 'half', label: t('scenario.editor.guideHalfWidth') },
-            ]}
+            value={selected}
+            options={presets}
             onChange={(next) => {
-              if (next !== 'custom') onChange({ ...block, width: next }, null);
+              const preset = presets.find((option) => option.value === next);
+              if (preset) onChange({ ...block, width: preset.width }, null);
             }}
           />
         </GuideInspectorGroup>

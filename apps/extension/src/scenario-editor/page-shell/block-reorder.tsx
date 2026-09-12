@@ -118,6 +118,10 @@ function startPointerReorder(
     window.removeEventListener('blur', cancel);
     handle.removeEventListener('lostpointercapture', cancel);
     clearMarker();
+    if (preview) {
+      handle.blur();
+      block.dataset['reorderResting'] = 'true';
+    }
     preview?.element.remove();
     preview = null;
     block.removeAttribute('data-drag-source');
@@ -147,6 +151,7 @@ function startPointerReorder(
     if (next.pointerId !== pointerId) return;
     if (!preview && Math.hypot(next.clientX - start.x, next.clientY - start.y) < 5) return;
     if (!preview) {
+      document.documentElement.dataset['guideReordering'] = 'true';
       preview = createPreview(block);
       block.dataset['dragSource'] = 'true';
       frame = requestAnimationFrame(scroll);
@@ -159,7 +164,6 @@ function startPointerReorder(
     const result = preview ? destination(container, blockId, next.clientX, next.clientY) : null;
     cancel();
     if (result) commit(result);
-    if (handle.isConnected) handle.focus({ preventScroll: true });
   };
   const key = (next: KeyboardEvent) => {
     if (next.key !== 'Escape') return;
@@ -171,7 +175,6 @@ function startPointerReorder(
   event.stopPropagation();
   handle.focus({ preventScroll: true });
   handle.setPointerCapture(pointerId);
-  document.documentElement.dataset['guideReordering'] = 'true';
   window.addEventListener('pointermove', move);
   window.addEventListener('pointerup', finish);
   window.addEventListener('pointercancel', cancel);
@@ -232,7 +235,15 @@ export function GuideBlockReorder({
         },
       }}
     >
-      <div ref={container} className="guide-step-blocks">
+      <div
+        ref={container}
+        className="guide-step-blocks"
+        onPointerMove={(event) => {
+          event.currentTarget.querySelectorAll('[data-reorder-resting]').forEach((block) => {
+            block.removeAttribute('data-reorder-resting');
+          });
+        }}
+      >
         {children}
       </div>
     </ReorderSource.Provider>

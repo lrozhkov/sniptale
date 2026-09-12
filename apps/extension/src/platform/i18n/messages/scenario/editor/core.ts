@@ -728,6 +728,8 @@ export const scenarioEditorCoreMessages = defineMessageSource({
   },
   guideFullWidth: { ru: 'На всю ширину', en: 'Full width' },
   guideHalfWidth: { ru: 'На половину ширины', en: 'Half width' },
+  guideThirdWidth: { ru: 'На треть ширины', en: 'Third width' },
+  guideQuarterWidth: { ru: 'На четверть ширины', en: 'Quarter width' },
   close: { ru: 'Закрыть', en: 'Close' },
   overlays: { ru: 'Слои', en: 'Overlays' },
 });

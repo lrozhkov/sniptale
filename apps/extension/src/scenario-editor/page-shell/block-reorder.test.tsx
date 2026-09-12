@@ -193,3 +193,18 @@ it('scrolls the document at its edge and stops the frame loop on cancellation', 
   expect(operate).not.toHaveBeenCalled();
   pane.remove();
 });
+
+it('keeps a clicked grip focused without drag chrome and clears focus after a real drag', async () => {
+  await render();
+  const handle = host.querySelector<HTMLButtonElement>('button')!;
+  await pointer('pointerdown', -14, 14);
+  expect(document.activeElement).toBe(handle);
+  expect(document.documentElement.hasAttribute('data-guide-reordering')).toBe(false);
+  await pointer('pointerup', -14, 14);
+  expect(document.activeElement).toBe(handle);
+  await pointer('pointerdown', -14, 14);
+  await pointer('pointermove', 50, 300);
+  expect(document.documentElement.hasAttribute('data-guide-reordering')).toBe(true);
+  await pointer('pointerup', 50, 300);
+  expect(document.activeElement).not.toBe(handle);
+});

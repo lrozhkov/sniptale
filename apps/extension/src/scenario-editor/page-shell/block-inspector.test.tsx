@@ -110,6 +110,7 @@ it('shows a custom percentage without selecting either fixed preset', async () =
   const host = document.createElement('div');
   document.body.append(host);
   const root = createRoot(host);
+  const change = vi.fn();
   try {
     await act(async () =>
       root.render(
@@ -117,7 +118,7 @@ it('shows a custom percentage without selecting either fixed preset', async () =
           item={createGuideStep('Step')}
           block={{ kind: 'text', id: 'text', paragraphs: [], width: 63 }}
           disabled={false}
-          onChange={vi.fn()}
+          onChange={change}
           onClose={vi.fn()}
           t={createTranslator('en')}
         />
@@ -126,8 +127,20 @@ it('shows a custom percentage without selecting either fixed preset', async () =
     expect(host.textContent).toContain('63%');
     const group = host.querySelector('[aria-label="Block width"]')!;
     expect(group.querySelectorAll('button[aria-pressed="true"]')).toHaveLength(0);
-    expect(group.querySelectorAll('button')).toHaveLength(2);
+    expect(group.querySelectorAll('button')).toHaveLength(4);
     expect(group.querySelector('[aria-hidden="true"]')).toBeNull();
+    for (const [label, width] of [
+      ['Third width', 33],
+      ['Quarter width', 25],
+    ] as const) {
+      await act(async () =>
+        group.querySelector<HTMLButtonElement>(`button[title="${label}"]`)!.click()
+      );
+      expect(change).toHaveBeenLastCalledWith(
+        { kind: 'text', id: 'text', paragraphs: [], width },
+        null
+      );
+    }
   } finally {
     act(() => root.unmount());
     host.remove();
