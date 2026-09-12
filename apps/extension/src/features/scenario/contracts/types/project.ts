@@ -11,6 +11,7 @@ import type {
 } from '@sniptale/runtime-contracts/scenario/types/geometry';
 
 export interface ScenarioProjectSummary {
+  purpose?: 'step-template' | undefined;
   id: string;
   name: string;
   createdAt: number;

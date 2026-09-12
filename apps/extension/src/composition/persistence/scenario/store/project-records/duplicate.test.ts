@@ -213,3 +213,39 @@ it('fails cleanly when image preparation hits quota before any publication', asy
   expect(io.event).not.toHaveBeenCalled();
   expect(io.discard).not.toHaveBeenCalled();
 });
+
+it('saves a selected template step with independently owned media and resolved appearance', async () => {
+  const { saveScenarioStepTemplate } = await import('./templates');
+  const source = sourceProject();
+  const selected = source.items[1];
+  if (selected?.kind !== 'step') throw new Error('Expected step fixture.');
+  selected.styleOverrides = { font: 'serif' };
+  const template = await saveScenarioStepTemplate(source, selected.id, 'Reusable layout');
+  expect(template.purpose).toBe('step-template');
+  expect(template.items).toHaveLength(1);
+  expect(template.style).toEqual({ ...source.style, font: 'serif' });
+  expect(template.items[0]).toMatchObject({ title: selected.title, styleOverrides: {} });
+  expect(images(template)[0]?.assetId).not.toBe(images(source)[0]?.assetId);
+  expect(images(template)[0]?.editDocumentId).not.toBe(images(source)[0]?.editDocumentId);
+  expect(io.commit).toHaveBeenCalledWith(
+    template,
+    expect.objectContaining({
+      expectedUpdatedAt: null,
+      storageClass: 'library',
+      children: expect.objectContaining({
+        assetPuts: [expect.objectContaining({ projectId: template.id })],
+        editorDocumentPuts: [expect.objectContaining({ projectId: template.id })],
+      }),
+    })
+  );
+  expect(source.items).toHaveLength(2);
+});
+
+it('refuses missing or section template sources before staging media', async () => {
+  const { saveScenarioStepTemplate } = await import('./templates');
+  for (const id of ['missing', 'intro']) {
+    await expect(saveScenarioStepTemplate(sourceProject(), id, 'Template')).rejects.toThrow();
+  }
+  expect(io.write).not.toHaveBeenCalled();
+  expect(io.commit).not.toHaveBeenCalled();
+});

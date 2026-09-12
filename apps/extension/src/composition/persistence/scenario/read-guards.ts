@@ -205,6 +205,7 @@ export function parseScenarioProjectSummary(value: unknown): ScenarioProjectSumm
   return {
     id: value['id'],
     name: body['name'],
+    ...(body['purpose'] === 'step-template' ? { purpose: 'step-template' as const } : {}),
     createdAt: value['createdAt'],
     updatedAt: value['updatedAt'],
     tags: Array.isArray(tags) ? tags.filter((tag): tag is string => typeof tag === 'string') : [],

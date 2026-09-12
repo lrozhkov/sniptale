@@ -166,6 +166,8 @@ export interface GuideSection {
 
 /** The only guide content format; persistence owns lifecycle, revision and retained history. */
 export interface GuideProject {
+  /** A reusable local step with independently owned media; excluded from ordinary guide lists. */
+  purpose?: 'step-template' | undefined;
   version: 4;
   htmlExport?: GuideHtmlImageSettings | undefined;
   id: string;

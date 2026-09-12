@@ -194,3 +194,13 @@ describe('project records store', () => {
     verifyMetadataReturnsPersistedRevisionForFollowUpSave
   );
 });
+
+it('excludes templates from ordinary gallery and capture project selection', async () => {
+  const normal = { id: 'guide', name: 'Guide', availability: 'available' };
+  listScenarioProjectsMock.mockResolvedValue([
+    normal,
+    { id: 'template', name: 'Template', purpose: 'step-template', availability: 'available' },
+    { id: 'broken-template', name: 'Broken', purpose: 'step-template', availability: 'invalid' },
+  ]);
+  await expect(listScenarioProjectSummaries()).resolves.toEqual([normal]);
+});

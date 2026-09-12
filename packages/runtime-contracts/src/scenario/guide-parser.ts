@@ -142,6 +142,7 @@ const image = z
 const projectSchema: z.ZodType<GuideProject> = z
   .object({
     version: z.literal(4),
+    purpose: z.literal('step-template').optional(),
     htmlExport,
     id,
     name: label,
@@ -238,6 +239,11 @@ export function parseGuideProject(value: unknown): GuideParseResult {
   }
   const result = projectSchema.safeParse(value);
   if (!result.success || !hasUniqueGuideIds(result.data)) return { status: 'invalid' };
+  if (
+    result.data.purpose === 'step-template' &&
+    (result.data.items.length !== 1 || result.data.items[0]?.kind !== 'step')
+  )
+    return { status: 'invalid' };
   return { status: 'ok', project: result.data };
 }
 

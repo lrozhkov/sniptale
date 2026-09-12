@@ -92,6 +92,6 @@ export async function updateScenarioProjectRecordMetadata(
 /**
  * Lists stored scenario projects in recency order.
  */
-export function listScenarioProjectSummaries(): Promise<ScenarioProjectSummary[]> {
-  return listScenarioProjects();
+export async function listScenarioProjectSummaries(): Promise<ScenarioProjectSummary[]> {
+  return (await listScenarioProjects()).filter((project) => project.purpose !== 'step-template');
 }

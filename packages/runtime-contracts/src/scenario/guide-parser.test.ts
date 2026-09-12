@@ -589,3 +589,17 @@ it.each([
     }).status
   ).toBe('invalid');
 });
+
+it('admits a detached single-step template and rejects ambiguous template contents', () => {
+  const template = { ...project([step()]), purpose: 'step-template' };
+  expect(parseGuideProject(template)).toEqual({ status: 'ok', project: template });
+  for (const items of [
+    [],
+    [step(), { ...step(), id: 'second' }],
+    [{ kind: 'section', id: 'section', title: '', paragraphs: [] }],
+  ]) {
+    expect(parseGuideProject({ ...template, items })).toEqual({ status: 'invalid' });
+  }
+  expect(parseGuideProject({ ...template, purpose: 'unknown' })).toEqual({ status: 'invalid' });
+  expect(parseGuideProject(project([step(), { ...step(), id: 'second' }])).status).toBe('ok');
+});
