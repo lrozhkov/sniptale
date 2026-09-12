@@ -69,7 +69,18 @@ export function AIModelSelector(props: AIModelSelectorProps) {
   });
 
   return (
-    <div className="relative flex min-w-0 items-center" ref={dropdownRef}>
+    <div
+      className="relative flex min-w-0 items-center"
+      ref={dropdownRef}
+      onKeyDown={(event) => {
+        if (event.key !== 'Escape' || !isOpen || event.defaultPrevented) return;
+        event.preventDefault();
+        event.stopPropagation();
+        setIsOpen(false);
+        setSearchQuery('');
+        dropdownRef.current?.querySelector<HTMLButtonElement>('button')?.focus();
+      }}
+    >
       <Trigger
         disabled={props.disabled ?? false}
         isOpen={isOpen}

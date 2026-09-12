@@ -1,5 +1,71 @@
 import { defineMessageSource } from '../../source';
 export const scenarioEditorCoreMessages = defineMessageSource({
+  guideAiOpen: { ru: 'Помочь с текстом', en: 'Help with text' },
+  guideAiScope: { ru: 'Область обработки', en: 'Selection scope' },
+  guideAiBlock: { ru: 'Этот блок', en: 'This block' },
+  guideAiStep: { ru: 'Этот шаг', en: 'This step' },
+  guideAiSteps: { ru: 'Выбрать шаги', en: 'Choose steps' },
+  guideAiInstruction: { ru: 'Что изменить', en: 'What to change' },
+  guideAiClarify: { ru: 'Уточнить', en: 'Clarify' },
+  guideAiShorten: { ru: 'Сократить', en: 'Shorten' },
+  guideAiStructure: { ru: 'Структурировать', en: 'Structure' },
+  guideAiTranslate: { ru: 'Перевести', en: 'Translate' },
+  guideAiClarifyInstruction: {
+    ru: 'Сделай выбранный текст понятнее и конкретнее, сохрани смысл и факты.',
+    en: 'Make the selected text clearer and more specific while preserving its meaning and facts.',
+  },
+  guideAiShortenInstruction: {
+    ru: 'Сократи выбранный текст, сохрани важные действия и факты.',
+    en: 'Shorten the selected text while preserving important actions and facts.',
+  },
+  guideAiStructureInstruction: {
+    ru: 'Упорядочи выбранный текст: короткие абзацы, понятная последовательность действий. Не добавляй новые блоки.',
+    en: 'Organize the selected text into short paragraphs and a clear sequence of actions. Do not add new blocks.',
+  },
+  guideAiTranslateInstruction: {
+    ru: 'Переведи выбранный текст на английский язык, сохрани смысл и названия элементов интерфейса.',
+    en: 'Translate the selected text into Russian, preserving its meaning and interface element names.',
+  },
+  guideAiImages: {
+    ru: 'Также отправить видимые кадры изображений',
+    en: 'Also send visible image frames',
+  },
+  guideAiDisclosureText: {
+    ru: 'Выбранному провайдеру и модели будут отправлены выбранный текст, подписи и ваш запрос. Применяется системная инструкция из настроек. Журнал запросов хранит служебные сведения без текста и изображений.',
+    en: 'The selected provider and model will receive the selected text, captions and your request. The system instruction from settings also applies. Request history stores metadata without text or images.',
+  },
+  guideAiDisclosureImages: {
+    ru: 'Выбранному провайдеру и модели будут отправлены выбранный текст, подписи, видимые кадры изображений и ваш запрос. Применяется системная инструкция из настроек. Журнал запросов хранит служебные сведения без текста и изображений.',
+    en: 'The selected provider and model will receive the selected text, captions, visible image frames and your request. The system instruction from settings also applies. Request history stores metadata without text or images.',
+  },
+  guideAiConfigurationFailed: {
+    ru: 'Не удалось загрузить список моделей.',
+    en: 'Could not load models.',
+  },
+  guideAiConfigure: {
+    ru: 'Добавьте модель провайдера в Настройках → AI и повторно откройте помощник.',
+    en: 'Add a provider model in Settings → AI, then reopen the assistant.',
+  },
+  guideAiRetry: { ru: 'Повторить', en: 'Retry' },
+  guideAiReview: { ru: 'Выберите правки для применения', en: 'Choose changes to apply' },
+  guideAiNoChanges: { ru: 'Изменения не предложены.', en: 'No changes proposed.' },
+  guideAiAcceptChange: { ru: 'Принять правку', en: 'Accept change' },
+  guideAiBefore: { ru: 'Сейчас', en: 'Before' },
+  guideAiAfter: { ru: 'Предложение', en: 'Proposed' },
+  guideAiPending: { ru: 'Подготовка предложений…', en: 'Preparing suggestions…' },
+  guideAiFailed: {
+    ru: 'Не удалось завершить действие. Проверьте модель или выберите меньше текста и повторите.',
+    en: 'Could not complete the action. Check the model or select less text and retry.',
+  },
+  guideAiStale: {
+    ru: 'Сценарий изменился. Загрузите актуальную версию и повторите запрос.',
+    en: 'The guide changed. Load its current version and request suggestions again.',
+  },
+  guideAiReload: { ru: 'Загрузить актуальный сценарий', en: 'Load current guide' },
+  guideAiCancelWaiting: { ru: 'Прекратить ожидание', en: 'Stop waiting' },
+  guideAiBack: { ru: 'Изменить запрос', en: 'Edit request' },
+  guideAiSend: { ru: 'Получить предложения', en: 'Get suggestions' },
+  guideAiApply: { ru: 'Применить выбранное', en: 'Apply selected' },
   guideMarkdownArchive: { ru: 'Markdown с изображениями', en: 'Markdown with images' },
   guideMarkdownExport: {
     ru: 'Сохранить Markdown с изображениями (ZIP)',

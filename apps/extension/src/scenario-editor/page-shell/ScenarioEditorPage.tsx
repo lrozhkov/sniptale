@@ -61,6 +61,8 @@ export function ScenarioEditorPage() {
     );
   const header = (
     <GuidePageHeader
+      aiSelection={{ stepId: selectedStepId, blockId: framing.target?.block.id ?? null }}
+      onAiOpen={state.sealEdit}
       onPreview={reader.open}
       previewRef={reader.trigger}
       previewDisabled={state.mutationPending}

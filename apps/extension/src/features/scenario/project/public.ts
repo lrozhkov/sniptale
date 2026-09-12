@@ -10,3 +10,10 @@ export { resolveGuideStyle, resolveGuideTextStyle, applyGuideDefaultStyle } from
 export { resolveGuideBlockWidth } from './layout';
 
 export { resolveGuideNumbering, type GuideResolvedNumber } from './numbering';
+export {
+  selectGuideAiContent,
+  prepareGuideAiProposal,
+  applyGuideAiProposal,
+  type GuideAiScope,
+  type GuideAiChange,
+} from './ai-proposal';

@@ -1,0 +1,72 @@
+.guide-ai-body {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+.guide-ai-body > label {
+  display: grid;
+  gap: 6px;
+}
+.guide-ai-body .guide-ai-images {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.guide-ai-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.guide-ai-disclosure {
+  color: var(--sniptale-color-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.guide-ai-step-selection {
+  display: grid;
+  gap: 6px;
+  max-height: 160px;
+  overflow: auto;
+}
+.guide-ai-step-selection label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.guide-ai-change {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--sniptale-color-border-soft);
+}
+.guide-ai-change > input {
+  margin-top: 4px;
+}
+.guide-ai-change > span {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  align-content: start;
+}
+.guide-ai-change small {
+  color: var(--sniptale-color-text-secondary);
+}
+.guide-ai-change > span > span {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 180px;
+  overflow: auto;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.guide-ai-before {
+  color: var(--sniptale-color-text-secondary);
+}
+
+.guide-ai-scope {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}

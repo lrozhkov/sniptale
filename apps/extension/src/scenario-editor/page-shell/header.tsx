@@ -1,4 +1,5 @@
 import { type ReactNode, type Ref, type ComponentProps } from 'react';
+import { GuideAiEntry } from './ai-assistant';
 import { GuideProjectActions } from './project-actions';
 import { GUIDE_LIMITS, type GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
@@ -8,6 +9,8 @@ import { Undo2, Redo2, Eye } from 'lucide-react';
 export function GuidePageHeader({
   project,
   panelControls,
+  aiSelection,
+  onAiOpen,
   leftControls,
   status,
   commandsDisabled,
@@ -28,6 +31,8 @@ export function GuidePageHeader({
 }: {
   project: GuideProject | null;
   panelControls?: ReactNode;
+  aiSelection?: { stepId: string | null; blockId: string | null };
+  onAiOpen?: () => void;
   leftControls?: ReactNode;
   status: ComponentProps<typeof GuideProjectActions>['status'];
   commandsDisabled: boolean;
@@ -69,6 +74,19 @@ export function GuidePageHeader({
         {feedback}
         <div className="guide-header-actions">
           {panelControls}
+          {aiSelection && onAiOpen && (
+            <GuideAiEntry
+              project={project}
+              selectedStepId={aiSelection.stepId}
+              selectedBlockId={aiSelection.blockId}
+              status={status}
+              disabled={commandsDisabled}
+              onOpen={onAiOpen}
+              onChange={onChange}
+              onReload={onReload}
+              t={t}
+            />
+          )}
           {project && (
             <>
               <ContentToolbarButton
