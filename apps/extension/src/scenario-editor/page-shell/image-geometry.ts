@@ -79,3 +79,33 @@ export function moveGuideImageGesture(
         height: block.frame.height * (1 + dy / displayHeight),
       });
 }
+
+/** Only geometry and image identity invalidate an in-progress display-space gesture. */
+export function hasSameGuideImageGestureBase(
+  left: GuideImageBlock,
+  right: GuideImageBlock
+): boolean {
+  return (
+    left.id === right.id &&
+    left.assetId === right.assetId &&
+    left.editDocumentId === right.editDocumentId &&
+    left.width === right.width &&
+    left.fit === right.fit &&
+    left.frame.width === right.frame.width &&
+    left.frame.height === right.frame.height &&
+    left.contentTransform.x === right.contentTransform.x &&
+    left.contentTransform.y === right.contentTransform.y &&
+    left.contentTransform.scale === right.contentTransform.scale
+  );
+}
+
+/** Merges accepted geometry into current content, rejecting a changed gesture base. */
+export function commitGuideImageGesture(
+  current: GuideImageBlock,
+  origin: GuideImageBlock,
+  draft: GuideImageBlock
+): GuideImageBlock | null {
+  if (!hasSameGuideImageGestureBase(current, origin)) return null;
+  if (hasSameGuideImageGestureBase(origin, draft)) return current;
+  return { ...current, frame: draft.frame, contentTransform: draft.contentTransform };
+}

@@ -38,11 +38,11 @@ afterEach(() => {
   HTMLElement.prototype.hasPointerCapture = originalHas;
   HTMLElement.prototype.releasePointerCapture = originalRelease;
 });
-async function render(disabled = false) {
+async function render(disabled = false, current = block) {
   await act(async () =>
     root.render(
       <GuideImageSurface
-        block={block}
+        block={current}
         url="blob:image"
         disabled={disabled}
         onChange={change}
@@ -192,4 +192,109 @@ it('edits bounded zoom/frame fields and keeps caption and alternative text as pl
   await update('Alternative text', 'Description');
   expect(change.mock.calls.at(-1)?.[0].alt).toBe('Description');
   expect(host.querySelector('script')).toBeNull();
+});
+
+it('keeps pointer preview across equivalent canonical rerenders and preserves concurrent caption edits', async () => {
+  await render();
+  await click('Frame and image');
+  const element = frame();
+  await pointer(element, 'pointerdown', 0, 0);
+  await pointer(element, 'pointermove', 40, 30);
+  await render(false, { ...structuredClone(block), caption: 'Latest caption', alt: 'Latest alt' });
+  expect(host.querySelector('img')?.style.translate).toBe('10% 10%');
+  await pointer(element, 'pointermove', 80, 60);
+  await pointer(element, 'pointerup', 80, 60);
+  expect(change).toHaveBeenCalledOnce();
+  expect(change.mock.calls[0]?.[0]).toMatchObject({
+    caption: 'Latest caption',
+    alt: 'Latest alt',
+    contentTransform: { x: 0.2, y: 0.2 },
+  });
+});
+
+it('keeps pending wheel zoom across canonical rerenders without reverting newer text', async () => {
+  await render();
+  await click('Frame and image');
+  const element = frame();
+  vi.useFakeTimers();
+  await act(async () =>
+    element.dispatchEvent(
+      new WheelEvent('wheel', {
+        deltaY: -40,
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+  );
+  const scale = host.querySelector('img')?.style.scale;
+  await render(false, { ...structuredClone(block), caption: 'Updated during zoom' });
+  expect(host.querySelector('img')?.style.scale).toBe(scale);
+  await act(async () => vi.advanceTimersByTime(300));
+  expect(change).toHaveBeenCalledOnce();
+  expect(change.mock.calls[0]?.[0].caption).toBe('Updated during zoom');
+  expect(change.mock.calls[0]?.[0].contentTransform.scale).toBeGreaterThan(1);
+});
+
+it('commits pending zoom before an immediate pan without snapping back or a delayed extra commit', async () => {
+  await render();
+  await click('Frame and image');
+  const element = frame();
+  vi.useFakeTimers();
+  await act(async () =>
+    element.dispatchEvent(
+      new WheelEvent('wheel', {
+        deltaY: -40,
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+  );
+  const scale = host.querySelector('img')?.style.scale;
+  await pointer(element, 'pointerdown', 0, 0);
+  expect(change).toHaveBeenCalledOnce();
+  await render(false, change.mock.calls[0]?.[0]);
+  await pointer(element, 'pointermove', 40, 30);
+  expect(host.querySelector('img')?.style.scale).toBe(scale);
+  expect(host.querySelector('img')?.style.translate).toBe('10% 10%');
+  await pointer(element, 'pointerup', 40, 30);
+  expect(change).toHaveBeenCalledTimes(2);
+  expect(change.mock.calls[1]?.[0].contentTransform.scale).toBe(Number(scale));
+  await act(async () => vi.advanceTimersByTime(300));
+  expect(change).toHaveBeenCalledTimes(2);
+});
+it('cancels active geometry on image replacement and cancels pending wheel on unmount', async () => {
+  await render();
+  await click('Frame and image');
+  const element = frame();
+  await pointer(element, 'pointerdown', 0, 0);
+  await pointer(element, 'pointermove', 40, 30);
+  await render(false, { ...block, assetId: 'replacement' });
+  await pointer(element, 'pointerup', 40, 30);
+  expect(change).not.toHaveBeenCalled();
+  vi.useFakeTimers();
+  await act(async () =>
+    element.dispatchEvent(
+      new WheelEvent('wheel', {
+        deltaY: -40,
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+    )
+  );
+  await act(async () => root.render(null));
+  await act(async () => vi.advanceTimersByTime(300));
+  expect(change).not.toHaveBeenCalled();
+});
+it('does not record a pointer move that returns to its original position', async () => {
+  await render();
+  await click('Frame and image');
+  const element = frame();
+  await pointer(element, 'pointerdown', 0, 0);
+  await pointer(element, 'pointermove', 40, 30);
+  await pointer(element, 'pointermove', 0, 0);
+  await pointer(element, 'pointerup', 0, 0);
+  expect(change).not.toHaveBeenCalled();
 });

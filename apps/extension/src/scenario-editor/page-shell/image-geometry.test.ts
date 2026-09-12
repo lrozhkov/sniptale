@@ -1,6 +1,10 @@
 import { expect, it } from 'vitest';
 import { createGuideImageBlock } from '../../features/scenario/project/public';
-import { changeGuideImageGeometry, moveGuideImageGesture } from './image-geometry';
+import {
+  changeGuideImageGeometry,
+  moveGuideImageGesture,
+  commitGuideImageGesture,
+} from './image-geometry';
 const block = createGuideImageBlock({
   id: 'image',
   assetId: 'asset',
@@ -35,4 +39,29 @@ it('bounds geometry, rejects nonfinite input and resets to the original image ra
   const reset = changeGuideImageGeometry(block, { kind: 'reset', width: 16000, height: 8000 });
   expect(reset.frame).toEqual({ width: 7680, height: 3840 });
   expect(changeGuideImageGeometry(block, { kind: 'fit', fit: 'cover' }).fit).toBe('cover');
+});
+
+it('commits only geometry into the current content and omits no-op history', () => {
+  const current = { ...structuredClone(block), caption: 'New caption', alt: 'New description' };
+  const draft = moveGuideImageGesture(block, 'pan', 40, 30, 400, 300);
+  expect(commitGuideImageGesture(current, block, draft)).toEqual({
+    ...current,
+    contentTransform: { x: 0.1, y: 0.1, scale: 1 },
+  });
+  expect(commitGuideImageGesture(current, block, structuredClone(block))).toBe(current);
+  expect(current.contentTransform.x).toBe(0);
+});
+it('rejects geometry drafts whose source or display mapping has changed', () => {
+  const draft = moveGuideImageGesture(block, 'resize', 40, 30, 400, 300);
+  const replacements = [
+    { ...block, id: 'other' },
+    { ...block, assetId: 'new-image' },
+    { ...block, editDocumentId: 'new-annotations' },
+    { ...block, width: 'half' as const },
+    { ...block, fit: 'cover' as const },
+    { ...block, frame: { width: 500, height: 600 } },
+    { ...block, contentTransform: { ...block.contentTransform, scale: 2 } },
+  ];
+  for (const current of replacements)
+    expect(commitGuideImageGesture(current, block, draft)).toBeNull();
 });

@@ -4,11 +4,23 @@ import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type PointerEvent,
+} from 'react';
 import type { GuideImageBlock } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
-import { changeGuideImageGeometry, moveGuideImageGesture } from './image-geometry';
+import {
+  changeGuideImageGeometry,
+  moveGuideImageGesture,
+  hasSameGuideImageGestureBase,
+  commitGuideImageGesture,
+} from './image-geometry';
 
 type ImageProps = {
   block: GuideImageBlock;
@@ -47,34 +59,49 @@ function releaseGesture(controller: { active: Gesture | null; timer: number | nu
 /** One owner keeps pointer and modifier-wheel drafts out of durable history until commitment. */
 function useImageGesture({ block, disabled, onChange }: ImageProps, editing: boolean) {
   const frame = useRef<HTMLDivElement>(null);
-  const change = useRef(onChange);
-  useLayoutEffect(() => {
-    change.current = onChange;
-  }, [onChange]);
+  const latest = useRef({ block, disabled, editing, onChange });
   const controller = useRef<{ active: Gesture | null; timer: number | null }>({
     active: null,
     timer: null,
   });
   const [preview, setPreview] = useState<GuideImageBlock | null>(null);
-  const finish = (commit: boolean, pointerId?: number) => {
-    if (pointerId !== undefined && controller.current.active?.pointerId !== pointerId) return;
-    const draft = controller.current.active?.draft;
+  useLayoutEffect(() => {
+    latest.current = { block, disabled, editing, onChange };
+    const active = controller.current.active;
+    if (active && (disabled || !editing || !hasSameGuideImageGestureBase(active.origin, block))) {
+      releaseGesture(controller.current);
+      setPreview(null);
+    }
+  }, [block, disabled, editing, onChange]);
+  const finish = useCallback((commit: boolean, pointerId?: number) => {
+    const active = controller.current.active;
+    if (!active || (pointerId !== undefined && active.pointerId !== pointerId)) return;
     releaseGesture(controller.current);
     setPreview(null);
-    if (commit && !disabled && draft && draft !== block) onChange(draft, null);
-  };
+    const current = latest.current;
+    if (!commit || current.disabled || !current.editing) return;
+    const next = commitGuideImageGesture(current.block, active.origin, active.draft);
+    if (next && next !== current.block) current.onChange(next, null);
+    return next;
+  }, []);
   useEffect(() => {
     const owner = controller.current;
     const element = frame.current;
-    setPreview(null);
     const wheel = (event: WheelEvent) => {
-      if (!editing || disabled || !event.ctrlKey || !element || owner.active?.pointerId != null)
+      const current = latest.current;
+      if (
+        !current.editing ||
+        current.disabled ||
+        !event.ctrlKey ||
+        !element ||
+        owner.active?.pointerId != null
+      )
         return;
       event.preventDefault();
       event.stopPropagation();
       const active = owner.active ?? {
-        origin: block,
-        draft: block,
+        origin: current.block,
+        draft: current.block,
         kind: 'pan',
         pointerId: null,
         element,
@@ -92,21 +119,19 @@ function useImageGesture({ block, disabled, onChange }: ImageProps, editing: boo
       owner.active = active;
       setPreview(active.draft);
       if (owner.timer !== null) window.clearTimeout(owner.timer);
-      owner.timer = window.setTimeout(() => {
-        const next = owner.active?.draft;
-        releaseGesture(owner);
-        setPreview(null);
-        if (next) change.current(next, null);
-      }, 250);
+      owner.timer = window.setTimeout(() => finish(true), 250);
     };
     element?.addEventListener('wheel', wheel, { passive: false });
     return () => {
       element?.removeEventListener('wheel', wheel);
       releaseGesture(owner);
     };
-  }, [block, disabled, editing]);
+  }, [finish]);
   const begin = (event: PointerEvent<HTMLElement>, kind: 'pan' | 'resize') => {
-    if (!editing || disabled || event.button !== 0 || controller.current.active) return;
+    if (!editing || disabled || event.button !== 0) return;
+    let origin = block;
+    if (controller.current.active?.pointerId === null) origin = finish(true) ?? block;
+    if (controller.current.active) return;
     const rect = frame.current?.getBoundingClientRect();
     if (!rect || rect.width <= 0 || rect.height <= 0) return;
     event.preventDefault();
@@ -114,8 +139,8 @@ function useImageGesture({ block, disabled, onChange }: ImageProps, editing: boo
     event.currentTarget.focus({ preventScroll: true });
     event.currentTarget.setPointerCapture(event.pointerId);
     controller.current.active = {
-      origin: block,
-      draft: block,
+      origin,
+      draft: origin,
       kind,
       pointerId: event.pointerId,
       element: event.currentTarget,
@@ -124,7 +149,7 @@ function useImageGesture({ block, disabled, onChange }: ImageProps, editing: boo
       width: rect.width,
       height: rect.height,
     };
-    setPreview(block);
+    setPreview(origin);
   };
   const move = (event: PointerEvent<HTMLElement>) => {
     const active = controller.current.active;

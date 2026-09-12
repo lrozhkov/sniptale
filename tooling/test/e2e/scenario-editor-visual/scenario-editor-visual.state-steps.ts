@@ -289,6 +289,34 @@ export async function verifyImageFraming(page: Page, testInfo: TestInfo): Promis
   const rect = await frame.boundingBox();
   if (!rect) throw new Error('Missing image frame');
   await page.mouse.move(rect.x + 80, rect.y + 80);
+  await page.keyboard.down('Control');
+  await page.mouse.wheel(0, -40);
+  await page.keyboard.up('Control');
+  await page.mouse.down();
+  await page.mouse.move(rect.x + 100, rect.y + 90);
+  await page.mouse.up();
+  await expect
+    .poll(() =>
+      figure.locator('img').evaluate((image) => Number.parseFloat(getComputedStyle(image).scale))
+    )
+    .toBeGreaterThan(1.5);
+  await expect
+    .poll(() =>
+      figure
+        .locator('img')
+        .evaluate((image) => Number.parseFloat(getComputedStyle(image).translate))
+    )
+    .toBeGreaterThan(0);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(figure.locator('img')).toHaveCSS('translate', /^(0%|0px)( (0%|0px))?$/);
+  await expect
+    .poll(() =>
+      figure.locator('img').evaluate((image) => Number.parseFloat(getComputedStyle(image).scale))
+    )
+    .toBeGreaterThan(1.5);
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(figure.locator('img')).toHaveCSS('scale', '1.5');
+  await page.mouse.move(rect.x + 80, rect.y + 80);
   await page.mouse.down();
   await page.mouse.move(rect.x + 120, rect.y + 100);
   await page.mouse.up();
