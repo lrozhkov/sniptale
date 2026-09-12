@@ -1683,3 +1683,18 @@ html[data-guide-width-resizing] * {
 .guide-document .guide-block[data-reorder-resting]:not(:focus-within) > .guide-block-grip {
   opacity: 0;
 }
+
+.guide-library-grid[data-layout='list'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+.guide-library-grid[data-layout='list'] .guide-library-card {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding-right: 32px;
+}
+.guide-library-grid[data-layout='list'] .guide-library-thumbnail {
+  flex: 0 0 72px;
+  width: 72px;
+  height: 45px;
+}

@@ -49,11 +49,13 @@ afterEach(() => {
 });
 function Editor({
   disabled = false,
+  clearable = false,
   maxLength = 100,
   singleLine = false,
   initialValue = 'hello world',
 }: {
   disabled?: boolean;
+  clearable?: boolean;
   maxLength?: number;
   singleLine?: boolean;
   initialValue?: string;
@@ -63,6 +65,7 @@ function Editor({
     <GuideVoiceField
       aria-label="Body"
       value={value}
+      clearable={clearable}
       disabled={disabled}
       maxLength={maxLength}
       singleLine={singleLine}
@@ -208,4 +211,25 @@ it('counts inserted spaces toward the field limit and avoids a whitespace-only a
   await mount({ initialValue: 'Hello', maxLength: 8 });
   await transcript('world', 2);
   expect(field().value).toBe('Hello wo');
+});
+
+it('clears the draft, restores focus and ignores late dictation', async () => {
+  await mount({ clearable: true });
+  await click('Start');
+  const clear = host.querySelector('button[title]') as HTMLButtonElement;
+  await act(async () => clear.click());
+  expect(field().value).toBe('');
+  expect(document.activeElement).toBe(field());
+  expect(field().selectionStart).toBe(0);
+  expect(io.stop).toHaveBeenCalled();
+  await transcript('late result');
+  expect(field().value).toBe('');
+  expect(clear.disabled).toBe(true);
+});
+it('does not clear a disabled draft', async () => {
+  await mount({ clearable: true, disabled: true });
+  const clear = host.querySelector('button[title]') as HTMLButtonElement;
+  expect(clear.disabled).toBe(true);
+  await act(async () => clear.click());
+  expect(field().value).toBe('hello world');
 });

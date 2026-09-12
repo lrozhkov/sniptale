@@ -1,4 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react';
+import { ProductInput, ProductTextarea } from '@sniptale/ui/product-form-controls';
+import { X } from 'lucide-react';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { VoiceInputButton } from '../../composition/voice-input/button';
 import { useVoiceInputSession } from '../../composition/voice-input/session';
 import { translate } from '../../platform/i18n';
@@ -8,6 +11,8 @@ type VoiceFieldProps = {
   'aria-label': string;
   className?: string;
   disabled?: boolean;
+  clearable?: boolean;
+  formControl?: boolean;
   maxLength?: number;
   placeholder?: string;
   rows?: number;
@@ -76,6 +81,14 @@ function useGuideVoiceField(props: VoiceFieldProps) {
     bindings,
     voice,
     stop,
+    clear() {
+      if (latest.current.disabled) return;
+      stop();
+      latest.current = { ...latest.current, value: '' };
+      caret.current = 0;
+      props.onValueChange('');
+      field.current?.focus({ preventScroll: true });
+    },
     start() {
       if (latest.current.disabled || !field.current) return;
       field.current.focus({ preventScroll: true });
@@ -91,7 +104,9 @@ function useGuideVoiceField(props: VoiceFieldProps) {
 
 /** Presents one compact microphone without covering the editable field or its block controls. */
 export function GuideVoiceField(props: VoiceFieldProps) {
-  const { bindings, voice, stop, start } = useGuideVoiceField(props);
+  const { bindings, voice, stop, start, clear } = useGuideVoiceField(props);
+  const Input = props.formControl ? ProductInput : 'input';
+  const Textarea = props.formControl ? ProductTextarea : 'textarea';
   const attributes = {
     'aria-label': props['aria-label'],
     className: props.className,
@@ -111,11 +126,20 @@ export function GuideVoiceField(props: VoiceFieldProps) {
       }}
     >
       {props.singleLine ? (
-        <input {...attributes} />
+        <Input {...attributes} />
       ) : (
-        <textarea {...attributes} rows={props.rows ?? 1} />
+        <Textarea {...attributes} rows={props.rows ?? 1} />
       )}
       <span className="guide-voice-control" onMouseDown={(event) => event.preventDefault()}>
+        {props.clearable && (
+          <ContentToolbarButton
+            title={`${translate('scenario.editor.guideClearText')}: ${props['aria-label']}`}
+            disabled={props.disabled || !props.value}
+            onClick={clear}
+          >
+            <X size={14} aria-hidden="true" />
+          </ContentToolbarButton>
+        )}
         <VoiceInputButton
           dataUi="scenario.voice-input"
           disabled={props.disabled ?? false}

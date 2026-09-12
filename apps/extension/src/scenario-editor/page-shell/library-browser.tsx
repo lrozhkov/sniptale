@@ -260,6 +260,7 @@ export function GuideLibraryBrowser({
         )}
         <div
           className="guide-library-grid"
+          data-layout={category === 'video' ? 'list' : 'grid'}
           aria-label={t(
             category === 'video'
               ? 'scenario.editor.guideLibraryVideos'
@@ -273,7 +274,9 @@ export function GuideLibraryBrowser({
                 item={item}
                 t={t}
                 disabled={disabled}
-                selected={selectedIds.includes(item.id)}
+                selected={
+                  selectedIds.includes(item.id) || (category === 'video' && previewId === item.id)
+                }
                 onDragStart={onDragStart}
                 onChoose={() => {
                   setPreviewId(item.id);
@@ -358,7 +361,9 @@ function LibraryCard({
       onClick={onChoose}
     >
       <LibraryRaster item={item} t={t} />
-      <span className="guide-library-card-name">{item.filename}</span>
+      <span className="guide-library-card-name" title={item.filename}>
+        {item.filename}
+      </span>
       {selected && <Check size={16} className="guide-library-card-selected" aria-hidden="true" />}
     </button>
   );

@@ -122,6 +122,7 @@ export const scenarioEditorCoreMessages = defineMessageSource({
     ru: 'Не удалось сохранить Markdown. Повторите попытку.',
     en: 'Could not save Markdown. Try again.',
   },
+  guideClearText: { ru: 'Очистить текст', en: 'Clear text' },
   guideVoiceStart: { ru: 'Начать голосовой ввод', en: 'Start dictation' },
   guideVoiceStop: { ru: 'Остановить голосовой ввод', en: 'Stop dictation' },
   guideVoiceError: {

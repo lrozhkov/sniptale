@@ -1,6 +1,6 @@
 import { LibraryMediaPlayer } from '../../composition/library-preview/player';
 import { useEffect, useRef, useState } from 'react';
-import { ProductInput, ProductTextarea } from '@sniptale/ui/product-form-controls';
+import { GuideVoiceField } from './voice-field';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type {
@@ -157,25 +157,32 @@ export function GuideVideoFrameResources(props: VideoResourcesProps) {
           <span>{state.source.filename}</span>
           {!props.target && (
             <>
-              <label>
-                {t('scenario.editor.guideStepTitle')}
-                <ProductInput
+              <div className="guide-video-field">
+                <span>{t('scenario.editor.guideStepTitle')}</span>
+                <GuideVoiceField
+                  aria-label={t('scenario.editor.guideStepTitle')}
+                  formControl
+                  singleLine
+                  clearable
                   value={state.title}
                   maxLength={GUIDE_LIMITS.maxLabelLength}
                   disabled={locked}
-                  onChange={(event) => state.writeTitle(event.target.value)}
+                  onValueChange={state.writeTitle}
                 />
-              </label>
-              <label>
-                {t('scenario.editor.guideAddText')}
-                <ProductTextarea
+              </div>
+              <div className="guide-video-field">
+                <span>{t('scenario.editor.guideAddText')}</span>
+                <GuideVoiceField
+                  aria-label={t('scenario.editor.guideAddText')}
+                  formControl
+                  clearable
                   value={state.description}
                   rows={2}
                   maxLength={GUIDE_LIMITS.maxTextLength}
                   disabled={locked}
-                  onChange={(event) => state.writeDescription(event.target.value)}
+                  onValueChange={state.writeDescription}
                 />
-              </label>
+              </div>
             </>
           )}
           <ProductActionButton
