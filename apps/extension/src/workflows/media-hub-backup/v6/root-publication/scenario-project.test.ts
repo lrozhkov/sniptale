@@ -29,7 +29,11 @@ vi.mock('../../../../composition/persistence/assets', async (importOriginal) => 
   readAssetFile: io.read,
   appendCommittedArchiveRootInTransaction: io.checkpoint,
 }));
-import { assertPortableJson } from '../codec';
+import { assertPortableJson, parseRootEnvelope } from '../codec';
+import { createArchiveMemorySink } from '../../../../composition/archive-transfer/test-support';
+import { openArchiveReader } from '../../../../composition/archive-transfer';
+import { buildMediaHubBackupExportPlanV6, exportMediaHubBackupV6 } from '../export';
+import { inspectMediaHubBackupV6 } from '../inspect';
 import { scenarioProjectRootPublisher } from './scenario-project';
 beforeEach(() => {
   vi.clearAllMocks();
@@ -184,4 +188,93 @@ it('rejects an oversized history object before reading its contents', async () =
   await expect(scenarioProjectRootPublisher.publish(args)).rejects.toThrow('limit');
   expect(io.read).not.toHaveBeenCalled();
   expect(io.put).not.toHaveBeenCalled();
+});
+it('roundtrips historical image bytes and editable references through the portable ZIP', async () => {
+  const { args, history } = input();
+  const imageBytes = new Uint8Array([1, 2, 3, 4]);
+  const files = new Map([
+    ['image-object', new Blob([imageBytes], { type: 'image/png' })],
+    ['history-object', new Blob([JSON.stringify(history)], { type: 'application/json' })],
+  ]);
+  const objects = args.staged.map(({ objectId, ref }) => ({
+    blob: files.get(objectId)!,
+    ref: {
+      objectId,
+      filename: objectId === 'image-object' ? 'old.png' : 'saved-versions.json',
+      path: `Scenarios/Old/${objectId === 'image-object' ? 'old.png' : 'saved-versions.json'}`,
+      mimeType: ref.mimeType,
+      size: ref.size,
+    },
+  }));
+  const descriptor = {
+    ...args.envelope.descriptor,
+    metadataPath: '_sniptale/metadata/scenario-projects/guide.json',
+  };
+  const plan = buildMediaHubBackupExportPlanV6({
+    archiveId: 'guide-roundtrip',
+    exportedAt: '2026-09-12T00:00:00.000Z',
+    privacy: { includeSourceMetadata: true, includeTelemetry: true, includeWebSnapshots: true },
+    roots: [
+      {
+        descriptor,
+        load: async () => ({ metadata: args.envelope.metadata, objects }),
+        summary: {
+          draftCount: 0,
+          recordingCount: 0,
+          sourceMetadataCount: 0,
+          telemetryCount: 0,
+          thumbnailCount: 0,
+          webSnapshotCount: 0,
+        },
+      },
+    ],
+  });
+  const output = createArchiveMemorySink();
+  await exportMediaHubBackupV6({ plan, sink: output.sink });
+  expect((await inspectMediaHubBackupV6(output.blob())).rootKeys).toEqual([
+    'scenario-project:guide',
+  ]);
+  const reader = await openArchiveReader(output.blob());
+  try {
+    const envelope = parseRootEnvelope(
+      JSON.parse(await reader.entry(descriptor.metadataPath)!.text(1024 * 1024))
+    );
+    const restoredFiles = new Map<string, File>();
+    for (const object of envelope.objects) {
+      const chunks: Uint8Array<ArrayBuffer>[] = [];
+      await reader.entry(object.path)!.pipeTo(
+        new WritableStream<Uint8Array>({
+          write: (chunk) => {
+            chunks.push(new Uint8Array(chunk));
+          },
+        })
+      );
+      restoredFiles.set(
+        object.objectId,
+        new File(chunks, object.filename, { type: object.mimeType })
+      );
+    }
+    expect(new Uint8Array(await restoredFiles.get('image-object')!.arrayBuffer())).toEqual(
+      imageBytes
+    );
+    io.read.mockImplementation(async (ref: AssetRef) =>
+      restoredFiles.get(ref.assetId === 'physical-history' ? 'history-object' : 'image-object')
+    );
+    await scenarioProjectRootPublisher.publish({ ...args, envelope });
+    const call = io.put.mock.calls[0]?.[0] as Parameters<
+      typeof import('../../../../composition/persistence/scenario/backup-restore').putScenarioProjectBackupRestore
+    >[0];
+    const root = call.root;
+    expect(root.entry.id).not.toBe('guide');
+    expect(root.entry.project.items).toEqual([]);
+    const oldStep = root.entry.history?.[0]?.project.items[0];
+    if (oldStep?.kind !== 'step') throw new Error('Missing historical step');
+    expect(oldStep.blocks[0]).toMatchObject({
+      assetId: root.assets[0]?.entry.id,
+      editDocumentId: root.stepDocuments[0]?.entry.stepId,
+    });
+    expect(root.stepDocuments).toHaveLength(1);
+  } finally {
+    await reader.close();
+  }
 });
