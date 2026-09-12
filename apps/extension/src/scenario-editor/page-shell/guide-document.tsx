@@ -118,12 +118,14 @@ export function GuideDocument({
         const appearance = resolveGuideStyle(project.style, item.styleOverrides);
         return (
           <Fragment key={item.id}>
-            <GuideDocumentInsert
-              target={{ kind: 'item', beforeItemId: item.id }}
-              disabled={disabled}
-              onOperate={onOperate}
-              t={t}
-            />
+            {project.purpose !== 'step-template' && (
+              <GuideDocumentInsert
+                target={{ kind: 'item', beforeItemId: item.id }}
+                disabled={disabled}
+                onOperate={onOperate}
+                t={t}
+              />
+            )}
             <article
               key={item.id}
               data-layout={item.layout}
@@ -189,7 +191,7 @@ export function GuideDocument({
           </Fragment>
         );
       })}
-      {project.items.length > 0 && (
+      {project.items.length > 0 && project.purpose !== 'step-template' && (
         <GuideDocumentInsert
           target={{ kind: 'item' }}
           end
@@ -354,6 +356,7 @@ function GuideStepBody({
             />
             <GuideBlockReorderHandle blockId={block.id} t={t} />
             <GuideBlockActions
+              allowSplit={project.purpose !== 'step-template'}
               itemId={item.id}
               blockId={block.id}
               index={index}

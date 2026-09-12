@@ -1,6 +1,7 @@
 import type {
   GuideImageImportPlacement,
   GuideImageImportSource,
+  GuideTemplateApplication,
 } from '../../composition/persistence/scenario/store/public';
 import { GuideImageDropZone } from './image-drop';
 import { GuideResourceDrawer, GuideResourceTrigger } from './resource-drawer';
@@ -132,6 +133,10 @@ export function ScenarioEditorPage() {
               onAddStep={() => operate({ kind: 'add-step' })}
               itemActions={
                 <GuideContextualInspector
+                  onSaveTemplate={state.saveTemplate}
+                  onApplyTemplate={(stepId, templateId, mode) =>
+                    state.commitChange({ kind: 'template', input: { stepId, templateId, mode } })
+                  }
                   scope={panels.rightScope}
                   project={project}
                   selectedId={state.selectedId}
@@ -190,6 +195,8 @@ function handleGuideHistoryShortcut(
 
 /** Routes the right inspector to current image framing or the selected step's appearance. */
 function GuideContextualInspector({
+  onSaveTemplate,
+  onApplyTemplate,
   scope,
   project,
   selectedId,
@@ -202,6 +209,12 @@ function GuideContextualInspector({
   project: GuideProject;
   selectedId: string | null;
   scope: 'selection' | 'document';
+  onSaveTemplate: (stepId: string, name: string) => Promise<boolean>;
+  onApplyTemplate: (
+    stepId: string,
+    templateId: string,
+    mode: GuideTemplateApplication
+  ) => Promise<boolean>;
   framing: ReturnType<typeof useGuideBlockSelection>;
   images: Record<string, string | null>;
   disabled: boolean;
@@ -242,6 +255,8 @@ function GuideContextualInspector({
     />
   ) : (
     <GuideAppearance
+      onSaveTemplate={onSaveTemplate}
+      onApplyTemplate={onApplyTemplate}
       project={project}
       selectedId={selectedId}
       disabled={disabled}
@@ -433,15 +448,17 @@ function GuidePageFeedback({
       {actionError && (
         <p role="alert">
           {t(
-            actionError === 'copy'
-              ? 'scenario.editor.guideCopyFailed'
-              : actionError === 'edit'
-                ? 'scenario.editor.guideImageApplyFailed'
-                : actionError === 'import'
-                  ? 'scenario.editor.guideImportFailed'
-                  : actionError === 'structure'
-                    ? 'scenario.editor.guideOperationFailed'
-                    : 'scenario.editor.guideDeleteFailed'
+            actionError === 'template'
+              ? 'scenario.editor.templateFailed'
+              : actionError === 'copy'
+                ? 'scenario.editor.guideCopyFailed'
+                : actionError === 'edit'
+                  ? 'scenario.editor.guideImageApplyFailed'
+                  : actionError === 'import'
+                    ? 'scenario.editor.guideImportFailed'
+                    : actionError === 'structure'
+                      ? 'scenario.editor.guideOperationFailed'
+                      : 'scenario.editor.guideDeleteFailed'
           )}
         </p>
       )}

@@ -471,3 +471,39 @@ it('keeps exact percentage composition through validation and duplication', () =
   ).toThrow();
   expect(project.items[1]?.kind === 'step' && project.items[1].blocks[1]?.width).toBeUndefined();
 });
+
+it('keeps template editing within one step and routes canvas images into that step', () => {
+  const project = createGuideProject('Template');
+  project.purpose = 'step-template';
+  const step = createGuideStep('', 'template-step');
+  const image = createGuideImageBlock({
+    id: 'source-image',
+    assetId: 'asset',
+    width: 100,
+    height: 100,
+    source: { kind: 'import', filename: 'image.png' },
+  });
+  step.blocks = [image];
+  project.items = [step];
+  const next = applyGuideStructureOperation(project, {
+    kind: 'place-image',
+    sourceBlockId: image.id,
+  });
+  expect(next.items).toHaveLength(1);
+  expect(next.items[0]).toMatchObject({
+    blocks: [
+      expect.objectContaining({ assetId: 'asset' }),
+      expect.objectContaining({ assetId: 'asset' }),
+    ],
+  });
+  for (const operation of [
+    { kind: 'add-step' },
+    { kind: 'add-section' },
+    { kind: 'remove-item', itemId: step.id },
+    { kind: 'duplicate-item', itemId: step.id },
+  ] as const) {
+    expect(() => applyGuideStructureOperation(project, operation)).toThrow();
+  }
+  expect(project.items).toHaveLength(1);
+  expect(step.blocks).toHaveLength(1);
+});

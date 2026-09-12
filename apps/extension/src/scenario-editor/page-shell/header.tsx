@@ -58,6 +58,9 @@ export function GuidePageHeader({
     <>
       <header className="guide-page-header">
         {leftControls}
+        {project?.purpose === 'step-template' && (
+          <span className="guide-template-mode">{t('scenario.editor.templateEditing')}</span>
+        )}
         {project && (
           <label className="guide-project-name">
             <span aria-hidden="true" className="guide-project-name-measure">

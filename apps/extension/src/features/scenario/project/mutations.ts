@@ -40,6 +40,17 @@ export function applyGuideStructureOperation(
   project: GuideProject,
   operation: GuideStructureOperation
 ): GuideProject {
+  if (
+    project.purpose === 'step-template' &&
+    operation.kind === 'place-image' &&
+    !operation.itemId
+  ) {
+    operation = {
+      kind: 'place-image',
+      sourceBlockId: operation.sourceBlockId,
+      itemId: project.items[0]!.id,
+    };
+  }
   const next = structuredClone(project);
   switch (operation.kind) {
     case 'place-image':

@@ -17,3 +17,5 @@ export {
   type GuideAiScope,
   type GuideAiChange,
 } from './ai-proposal';
+
+export { classifyGuideStepContent, applyGuideTemplateAppearance } from './templates';

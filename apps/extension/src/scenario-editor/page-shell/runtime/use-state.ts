@@ -6,6 +6,8 @@ import {
 } from '@sniptale/runtime-contracts/scenario-editor/session';
 import {
   importScenarioImages,
+  applyScenarioStepTemplate,
+  saveScenarioStepTemplate,
   createScenarioProjectRecord,
   duplicateScenarioProjectRecord,
   deleteScenarioProjectRecord,
@@ -31,9 +33,13 @@ type GuidePageStatus =
   | 'conflict'
   | 'dirty';
 
-type GuideActionError = 'copy' | 'delete' | 'structure' | 'import' | 'edit';
+type GuideActionError = 'copy' | 'delete' | 'structure' | 'import' | 'edit' | 'template';
 
 type GuideCommitCommand =
+  | {
+      kind: 'template';
+      input: Omit<Parameters<typeof applyScenarioStepTemplate>[0], 'project' | 'baseUpdatedAt'>;
+    }
   | {
       kind: 'import';
       input: Omit<Parameters<typeof importScenarioImages>[0], 'project' | 'baseUpdatedAt'>;
@@ -134,6 +140,14 @@ export function useGuidePageState() {
       () => rejectAction('copy')
     );
   };
+  const saveTemplate = async (stepId: string, name: string) => {
+    if (!project) return false;
+    return mutate(
+      () => saveScenarioStepTemplate(project, stepId, name),
+      () => setStatus(status),
+      () => rejectAction('template')
+    );
+  };
   const remove = async () => {
     if (!project) return;
     await mutate(
@@ -157,6 +171,7 @@ export function useGuidePageState() {
   };
   return {
     commitChange,
+    saveTemplate,
     editingLocked: status === 'loading' || (status === 'saving' && !autosaving.current),
     mutationPending: busy.current,
     project,
@@ -248,9 +263,15 @@ function runGuideCommitCommand(
   project: GuideProject,
   baseUpdatedAt: number
 ) {
-  return command.kind === 'import'
-    ? importScenarioImages({ ...command.input, project, baseUpdatedAt })
-    : applyScenarioImageEdit({ ...command.input, project, baseUpdatedAt });
+  if (command.kind === 'template')
+    return applyScenarioStepTemplate({ ...command.input, project, baseUpdatedAt });
+  if (command.kind === 'edit')
+    return applyScenarioImageEdit({ ...command.input, project, baseUpdatedAt });
+  const placement =
+    project.purpose === 'step-template' && command.input.placement.kind === 'steps'
+      ? { kind: 'blocks' as const, stepId: project.items[0]!.id }
+      : command.input.placement;
+  return importScenarioImages({ ...command.input, placement, project, baseUpdatedAt });
 }
 
 /** One command admission owner rejects duplicate and stale asynchronous page mutations. */

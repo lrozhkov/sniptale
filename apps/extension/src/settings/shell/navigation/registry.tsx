@@ -1,5 +1,6 @@
 import {
   Bot,
+  LayoutTemplate,
   FolderOpen,
   Image,
   MessageSquare,
@@ -96,6 +97,12 @@ export const SETTINGS_NAV_GROUPS: readonly SettingsNavGroup[] = [
         label: 'settings.navigation.editorResources',
         icon: Palette,
       },
+      {
+        id: 'scenario-layouts',
+        description: 'settings.navigation.descriptions.scenarioLayouts',
+        label: 'settings.navigation.scenarioLayouts',
+        icon: LayoutTemplate,
+      },
     ],
   },
   {
@@ -166,6 +173,10 @@ export const DEFERRED_SETTINGS_SECTION_LOADERS: Record<
   Exclude<SettingsSectionId, 'interface-browser'>,
   SettingsSectionLoader
 > = {
+  'scenario-layouts': {
+    load: () => import('../../sections/styles/scenario-layouts'),
+    exportName: 'ScenarioLayoutsSection',
+  },
   'quick-actions': {
     load: () => import('../../sections/capture/quick-actions'),
     exportName: 'QuickActionsSection',

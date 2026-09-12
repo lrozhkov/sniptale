@@ -3,6 +3,8 @@ import type { SettingsSectionId } from '../../platform/navigation/extension-page
 export const SETTINGS_TRANSFER_SECTION_COVERAGE = {
   // Durable effect bundles are covered by Media Hub backup, not the settings preference format.
   'video-effects': ['action/status'],
+  // Step templates are scenario media aggregates covered by Media Hub backup.
+  'scenario-layouts': ['action/status'],
   'interface-browser': ['interface.preferences'],
   'quick-actions': ['capture.quick-actions'],
   'screen-sizes': ['capture.viewport-presets'],
@@ -52,8 +54,13 @@ type PersistenceMutationCoverage = {
 
 export const SETTINGS_TRANSFER_PERSISTENCE_MUTATION_COVERAGE = [
   excluded(
+    'styles/scenario-layouts/controller.ts',
+    ['saveScenarioStepTemplate', 'deleteScenarioProjectRecord'],
+    'action/status'
+  ),
+  excluded(
     'styles/video-effects/controller.ts',
-    ['deleteEffectBundle', 'setEffectBundleEnabled'],
+    ['deleteEffectBundle', 'setEffectDocumentEnabled'],
     'action/status'
   ),
   transferable('ai/connections/controller/chrome-ai.ts', ['saveChromeAiEnabled'], ['ai.chrome']),

@@ -1,3 +1,5 @@
+import { GuideTemplateControls } from './template-controls';
+import type { GuideTemplateApplication } from '../../composition/persistence/scenario/store/public';
 import type {
   GuideProject,
   GuideStyleOverrides,
@@ -14,11 +16,25 @@ type AppearanceProps = {
   selectedId: string | null;
   disabled: boolean;
   onChange: (project: GuideProject, group?: string | null) => void;
+  onSaveTemplate?: (stepId: string, name: string) => Promise<boolean>;
+  onApplyTemplate?: (
+    stepId: string,
+    templateId: string,
+    mode: GuideTemplateApplication
+  ) => Promise<boolean>;
   t: Translate;
 };
 
 /** Only the selected item's settings live here; defaults live in the document context. */
-export function GuideAppearance({ project, selectedId, disabled, onChange, t }: AppearanceProps) {
+export function GuideAppearance({
+  project,
+  selectedId,
+  disabled,
+  onChange,
+  onSaveTemplate,
+  onApplyTemplate,
+  t,
+}: AppearanceProps) {
   const item = project.items.find((entry) => entry.id === selectedId);
   const change = (next: GuideProject['items'][number], group: string | null = null) =>
     onChange(
@@ -52,6 +68,16 @@ export function GuideAppearance({ project, selectedId, disabled, onChange, t }: 
             <p className="guide-inspector-hint">{t('scenario.editor.appearanceLayoutHelp')}</p>
           )}
         </>
+      )}
+      {item.kind === 'step' && onSaveTemplate && onApplyTemplate && (
+        <GuideTemplateControls
+          key={item.id}
+          step={item}
+          disabled={disabled}
+          t={t}
+          onSave={(name) => onSaveTemplate(item.id, name)}
+          onApply={(templateId, mode) => onApplyTemplate(item.id, templateId, mode)}
+        />
       )}
       <GuideNumberingControls
         project={project}

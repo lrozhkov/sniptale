@@ -10,6 +10,7 @@ export function GuideBlockActions({
   index,
   count,
   disabled,
+  allowSplit = true,
   onOperate,
   t,
 }: {
@@ -18,6 +19,7 @@ export function GuideBlockActions({
   index: number;
   count: number;
   disabled: boolean;
+  allowSplit?: boolean;
   onOperate: (operation: GuideStructureOperation) => void;
   t: Translate;
 }) {
@@ -45,12 +47,16 @@ export function GuideBlockActions({
             icon: <Copy size={15} aria-hidden="true" />,
             onSelect: () => onOperate({ kind: 'duplicate-block', itemId, blockId }),
           },
-          {
-            label: t('scenario.editor.guideSplitHere'),
-            icon: <Split size={15} aria-hidden="true" />,
-            disabled: index === 0,
-            onSelect: () => onOperate({ kind: 'split-step', itemId, blockId }),
-          },
+          ...(allowSplit
+            ? [
+                {
+                  label: t('scenario.editor.guideSplitHere'),
+                  icon: <Split size={15} aria-hidden="true" />,
+                  disabled: index === 0,
+                  onSelect: () => onOperate({ kind: 'split-step', itemId, blockId }),
+                },
+              ]
+            : []),
           {
             label: t('scenario.editor.guideRemoveBlock'),
             icon: <Trash2 size={15} aria-hidden="true" />,

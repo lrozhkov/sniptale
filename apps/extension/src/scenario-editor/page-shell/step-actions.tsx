@@ -20,7 +20,7 @@ export function GuideStepActions({
 }) {
   const index = project.items.findIndex((item) => item.id === itemId);
   const item = project.items[index];
-  if (!item) return null;
+  if (!item || project.purpose === 'step-template') return null;
   return (
     <div className="guide-item-actions">
       <GuideActionMenu

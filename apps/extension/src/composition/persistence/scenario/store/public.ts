@@ -20,3 +20,8 @@ export {
   type GuideImageImportSource,
   type GuideImageImportPlacement,
 } from './image-import';
+export { listScenarioStepTemplates, saveScenarioStepTemplate } from './project-records/templates';
+export {
+  applyScenarioStepTemplate,
+  type GuideTemplateApplication,
+} from './project-records/template-apply';

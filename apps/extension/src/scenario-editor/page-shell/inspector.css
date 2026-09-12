@@ -133,3 +133,31 @@
 .guide-inspector-panel .guide-image-reset-actions {
   padding-block: 8px;
 }
+.guide-template-controls,
+.guide-template-controls form {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.guide-template-controls p {
+  margin: 0;
+  font-size: 12px;
+}
+.guide-template-controls button {
+  max-width: 100%;
+  white-space: normal;
+}
+.guide-template-save-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.guide-template-mode {
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--sniptale-color-text-secondary);
+}
+.guide-template-controls > button[hidden] {
+  display: none;
+}

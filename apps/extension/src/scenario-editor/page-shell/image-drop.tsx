@@ -57,6 +57,8 @@ function resolveTarget(
       };
     return { element: article, placement: { kind: 'blocks', stepId: step.id } as const };
   }
+  if (project.purpose === 'step-template' && project.items[0]?.kind === 'step')
+    return { element: canvas, placement: { kind: 'blocks', stepId: project.items[0].id } as const };
   // Only the document's inter-item whitespace inserts before an item; side margins append.
   for (const element of canvas.querySelectorAll<HTMLElement>('.guide-insertion-item')) {
     const next = element.nextElementSibling;
