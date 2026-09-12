@@ -98,13 +98,25 @@ export interface GuideImageSlotBlock extends Pick<
   kind: 'image-slot';
 }
 
+/** Closed prose appearance; absent metadata retains the element's default typography. */
+export interface GuideTextStyle {
+  size: 'small' | 'normal' | 'large';
+  alignment: 'start' | 'center' | 'end';
+}
+
 /** Blocks are ordered content, not freely positioned slide elements. */
 export type GuideBlock = GuideBlockComposition &
   (
-    | { kind: 'heading'; id: string; text: string }
-    | { kind: 'text'; id: string; paragraphs: GuideParagraph[] }
+    | { kind: 'heading'; id: string; text: string; textStyle?: GuideTextStyle | undefined }
+    | {
+        kind: 'text';
+        id: string;
+        paragraphs: GuideParagraph[];
+        textStyle?: GuideTextStyle | undefined;
+      }
     | {
         kind: 'note';
+        textStyle?: GuideTextStyle | undefined;
         id: string;
         tone: 'neutral' | 'info' | 'warning' | 'error';
         paragraphs: GuideParagraph[];

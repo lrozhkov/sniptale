@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { createGuideProject, createGuideStep, createGuideImageBlock } from './factories';
-import { resolveGuideStyle, applyGuideDefaultStyle } from './appearance';
+import { resolveGuideStyle, resolveGuideTextStyle, applyGuideDefaultStyle } from './appearance';
 
 it('inherits absent values and honors an explicit default accent without mutating its source', () => {
   const project = createGuideProject('Private name');
@@ -40,4 +40,16 @@ it('changes defaults independently or resets overrides while preserving content,
   expect(all.items[1]).toBe(project.items[1]);
   expect(step.styleOverrides).toEqual({ font: 'serif' });
   expect(project.style.theme).toBe('paper');
+});
+
+it('resolves closed text sizes and alignment independently of application theme', () => {
+  expect(resolveGuideTextStyle()).toEqual({ scale: 1, alignment: 'start' });
+  expect(resolveGuideTextStyle({ size: 'small', alignment: 'center' })).toEqual({
+    scale: 0.875,
+    alignment: 'center',
+  });
+  expect(resolveGuideTextStyle({ size: 'large', alignment: 'end' })).toEqual({
+    scale: 1.25,
+    alignment: 'end',
+  });
 });

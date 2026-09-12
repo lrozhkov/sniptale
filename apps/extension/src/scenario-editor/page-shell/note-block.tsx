@@ -2,6 +2,7 @@ import { Check, Info, StickyNote, TriangleAlert, CircleAlert } from 'lucide-reac
 import type { GuideBlock } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { createGuideParagraphs } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
+import { guideTextAppearance } from './document-appearance';
 import { GuideActionMenu } from './action-menu';
 
 type NoteBlock = Extract<GuideBlock, { kind: 'note' }>;
@@ -55,6 +56,7 @@ export function GuideNoteBlock({
         placeholder={t('scenario.editor.guideNoteText')}
         disabled={disabled}
         className="guide-note"
+        style={guideTextAppearance(block)}
         rows={1}
         value={block.paragraphs
           .map((paragraph) => paragraph.runs.map((run) => run.text).join(''))

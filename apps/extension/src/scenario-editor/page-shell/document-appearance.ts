@@ -1,5 +1,6 @@
 import type { CSSProperties } from 'react';
-import type { GuideStyle } from '@sniptale/runtime-contracts/scenario/types/guide';
+import { resolveGuideTextStyle } from '../../features/scenario/project/public';
+import type { GuideStyle, GuideBlock } from '@sniptale/runtime-contracts/scenario/types/guide';
 
 const palettes = {
   paper: {
@@ -43,5 +44,16 @@ export function guideDocumentStyle(style: GuideStyle): GuideDocumentStyle {
     '--guide-width': { narrow: '640px', standard: '900px', wide: '1200px' }[style.contentWidth],
     '--guide-image-border': { none: '0px', subtle: '1px', strong: '3px' }[style.imageBorder],
     '--guide-number-background': style.numberStyle === 'plain' ? 'transparent' : palette.border,
+  };
+}
+
+/** Preserve the heading/body base size while applying bounded prose settings. */
+export function guideTextAppearance(
+  block: Extract<GuideBlock, { kind: 'heading' | 'text' | 'note' }>
+): CSSProperties {
+  const style = resolveGuideTextStyle(block.textStyle);
+  return {
+    fontSize: `${(block.kind === 'heading' ? 1.125 : 1) * style.scale}rem`,
+    textAlign: style.alignment,
   };
 }

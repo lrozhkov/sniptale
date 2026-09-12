@@ -35,23 +35,42 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await expect(note.locator('aside')).toHaveAttribute('data-tone', 'warning');
     await inspector.getByRole('button', { name: 'Half width', exact: true }).click();
     await expect(note).toHaveAttribute('data-width', 'half');
+    await inspector.getByRole('button', { name: 'Large', exact: true }).click();
+    await inspector.getByRole('button', { name: 'Center', exact: true }).click();
+    await expect(note.locator('textarea')).toHaveCSS('font-size', '20px');
+    await expect(note.locator('textarea')).toHaveCSS('text-align', 'center');
+    await inspector.getByRole('button', { name: 'Reset text appearance', exact: true }).click();
+    await expect(note.locator('textarea')).toHaveCSS('font-size', '16px');
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    await expect(note.locator('textarea')).toHaveCSS('font-size', '20px');
+    await expect(note.locator('textarea')).toHaveCSS('text-align', 'center');
     await expect
       .poll(() =>
         page
           .locator('main img')
-          .evaluateAll((images) =>
-            images.every(
-              (image) =>
-                image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0
-            )
+          .evaluateAll(
+            (images) =>
+              images.length === 2 &&
+              images.every(
+                (image) =>
+                  image instanceof HTMLImageElement && image.complete && image.naturalWidth > 0
+              )
           )
       )
       .toBe(true);
     await expect(
       inspector.getByRole('button', { name: 'Half width', exact: true })
     ).toHaveAttribute('aria-pressed', 'true');
+    await page.evaluate(
+      () =>
+        new Promise<void>((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+        )
+    );
+    await page.locator('main img').last().scrollIntoViewIfNeeded();
     await testInfo.attach(`block-inspector-${theme}`, {
-      body: await page.screenshot({ animations: 'disabled' }),
+      body: await page.screenshot(),
       contentType: 'image/png',
     });
     await inspector.getByRole('button', { name: 'Step settings', exact: true }).click();
@@ -62,6 +81,8 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await expect(note.locator('aside')).toHaveAttribute('data-tone', 'warning');
     await expect(note).toHaveAttribute('data-width', 'half');
     await expect(note.locator('textarea')).toHaveValue('Keep this note.');
+    await expect(note.locator('textarea')).toHaveCSS('font-size', '20px');
+    await expect(note.locator('textarea')).toHaveCSS('text-align', 'center');
     await expect(inspector.getByRole('group', { name: 'Step layout', exact: true })).toBeVisible();
   });
 }

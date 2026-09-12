@@ -43,3 +43,58 @@ it('disables mutations while retaining navigation to the step', async () => {
     vi.unstubAllGlobals();
   }
 });
+
+it('edits typography without losing prose and removes metadata on reset', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const item = createGuideStep('Step');
+  const source = {
+    kind: 'note',
+    id: 'note',
+    paragraphs: [],
+    tone: 'warning',
+    width: 'half',
+  } as const;
+  let current: import('@sniptale/runtime-contracts/scenario/types/guide').GuideBlock = {
+    ...source,
+    paragraphs: [],
+  };
+  const update = (block: typeof current, group?: string | null) => {
+    expect(group).toBeNull();
+    current = block;
+    draw();
+  };
+  const draw = () =>
+    root.render(
+      <GuideBlockInspector
+        item={item}
+        block={current}
+        disabled={false}
+        onChange={update}
+        onClose={() => undefined}
+        t={createTranslator('en')}
+      />
+    );
+  const click = async (label: string) => {
+    const button = [...host.querySelectorAll('button')].find(
+      (node) => (node.getAttribute('aria-label') ?? node.textContent) === label
+    );
+    if (!button) throw new Error(`Missing ${label}`);
+    await act(async () => button.click());
+  };
+  try {
+    await act(async () => draw());
+    await click('Large');
+    await click('Center');
+    expect(current).toEqual({ ...source, textStyle: { size: 'large', alignment: 'center' } });
+    await click('Reset text appearance');
+    expect(current).toEqual(source);
+    expect(Object.hasOwn(current, 'textStyle')).toBe(false);
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    vi.unstubAllGlobals();
+  }
+});

@@ -495,3 +495,54 @@ it('rejects unknown numbering fields and manual section labels', () => {
     }).status
   ).toBe('invalid');
 });
+
+describe('bounded prose appearance', () => {
+  it('retains valid typography for each prose kind', () => {
+    const item = step();
+    item.blocks = [
+      {
+        kind: 'heading',
+        id: 'heading',
+        text: 'Title',
+        textStyle: { size: 'large', alignment: 'center' },
+      },
+      { kind: 'text', id: 'text', paragraphs: [], textStyle: { size: 'small', alignment: 'end' } },
+      {
+        kind: 'note',
+        id: 'note',
+        paragraphs: [],
+        tone: 'info',
+        textStyle: { size: 'normal', alignment: 'start' },
+      },
+    ];
+    expect(parseGuideProject(project([item]))).toEqual({ status: 'ok', project: project([item]) });
+  });
+  it.each([
+    { size: 'huge', alignment: 'start' },
+    { size: 'normal', alignment: 'justify' },
+    { size: 'normal', alignment: 'start', css: 'url(https://example.com)' },
+    { size: undefined, alignment: 'start' },
+    { size: 'normal' },
+    null,
+    undefined,
+  ])('rejects unsupported or undefined typography %j', (textStyle) => {
+    const item = step();
+    expect(
+      parseGuideProject({
+        ...project([item]),
+        items: [{ ...item, blocks: [{ kind: 'text', id: 'text', paragraphs: [], textStyle }] }],
+      })
+    ).toEqual({ status: 'invalid' });
+  });
+  it('rejects prose typography on images', () => {
+    const item = step();
+    expect(
+      parseGuideProject({
+        ...project([item]),
+        items: [
+          { ...item, blocks: [{ ...image(), textStyle: { size: 'large', alignment: 'center' } }] },
+        ],
+      })
+    ).toEqual({ status: 'invalid' });
+  });
+});

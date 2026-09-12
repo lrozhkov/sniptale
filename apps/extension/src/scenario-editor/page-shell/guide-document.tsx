@@ -1,6 +1,6 @@
 import { GuideBlockReorder, GuideBlockReorderHandle } from './block-reorder';
 import { GuideBlockLayout } from './block-layout';
-import { guideDocumentStyle } from './document-appearance';
+import { guideDocumentStyle, guideTextAppearance } from './document-appearance';
 import { Fragment, useEffect, useRef } from 'react';
 import { GuideDocumentInsert } from './document-insert';
 import { GuideStepActions } from './step-actions';
@@ -433,6 +433,7 @@ function GuideTextBlock({
       <textarea
         rows={1}
         className="guide-block-heading"
+        style={guideTextAppearance(block)}
         aria-label={t('scenario.editor.guideHeading')}
         placeholder={t('scenario.editor.guideHeading')}
         maxLength={GUIDE_LIMITS.maxLabelLength}
@@ -446,6 +447,7 @@ function GuideTextBlock({
       aria-label={t('scenario.editor.body')}
       disabled={disabled}
       className="guide-description"
+      style={guideTextAppearance(block)}
       placeholder={t('scenario.editor.body')}
       rows={1}
       value={block.paragraphs

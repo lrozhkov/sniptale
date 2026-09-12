@@ -1,5 +1,6 @@
 import type {
   GuideProject,
+  GuideTextStyle,
   GuideStyle,
   GuideStyleOverrides,
 } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -32,5 +33,13 @@ export function applyGuideDefaultStyle(
     items: resetSteps
       ? project.items.map((item) => (item.kind === 'step' ? { ...item, styleOverrides: {} } : item))
       : project.items,
+  };
+}
+
+/** Safe shared prose semantics for editor, reader and export rendering. */
+export function resolveGuideTextStyle(style?: GuideTextStyle) {
+  return {
+    scale: { small: 0.875, normal: 1, large: 1.25 }[style?.size ?? 'normal'],
+    alignment: style?.alignment ?? 'start',
   };
 }

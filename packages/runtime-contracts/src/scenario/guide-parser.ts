@@ -21,6 +21,13 @@ const numbering = z
   })
   .strict()
   .optional();
+const textStyle = z
+  .object({
+    size: z.enum(['small', 'normal', 'large']),
+    alignment: z.enum(['start', 'center', 'end']),
+  })
+  .strict()
+  .optional();
 const width = z.enum(['full', 'half']).optional();
 const label = z.string().max(GUIDE_LIMITS.maxLabelLength);
 const text = z.string().max(GUIDE_LIMITS.maxTextLength);
@@ -156,11 +163,14 @@ const projectSchema: z.ZodType<GuideProject> = z
               blocks: z
                 .array(
                   z.discriminatedUnion('kind', [
-                    z.object({ kind: z.literal('heading'), id, width, text }).strict(),
-                    z.object({ kind: z.literal('text'), id, width, paragraphs }).strict(),
+                    z.object({ kind: z.literal('heading'), id, width, text, textStyle }).strict(),
+                    z
+                      .object({ kind: z.literal('text'), id, width, paragraphs, textStyle })
+                      .strict(),
                     z
                       .object({
                         kind: z.literal('note'),
+                        textStyle,
                         id,
                         width,
                         tone: z.enum(['neutral', 'info', 'warning', 'error']),
