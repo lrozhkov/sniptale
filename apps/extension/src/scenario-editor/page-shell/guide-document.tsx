@@ -20,6 +20,7 @@ import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { GuideBlockActions } from './block-actions';
 import { GuideImageSurface } from './image-surface';
 import { GuideImageUpload } from './image-upload';
+import { GuideNoteBlock } from './note-block';
 
 export type GuideFocusRequest = {
   sequence: number;
@@ -375,6 +376,8 @@ function GuideStepBody({
                 onUpload={(file, signal) => onUploadImage(item.id, block.id, file, signal)}
                 t={t}
               />
+            ) : block.kind === 'note' ? (
+              <GuideNoteBlock block={block} disabled={disabled} onChange={changeBlock} t={t} />
             ) : (
               <GuideTextBlock block={block} disabled={disabled} onChange={changeBlock} t={t} />
             )}
@@ -411,7 +414,7 @@ function GuideTextBlock({
   onChange,
   t,
 }: {
-  block: Extract<GuideBlock, { kind: 'heading' | 'text' | 'note' }>;
+  block: Extract<GuideBlock, { kind: 'heading' | 'text' }>;
   disabled: boolean;
   onChange: (block: GuideBlock) => void;
   t: Translate;
@@ -431,11 +434,9 @@ function GuideTextBlock({
     );
   return (
     <textarea
-      aria-label={t(
-        block.kind === 'note' ? 'scenario.editor.guideNoteText' : 'scenario.editor.body'
-      )}
+      aria-label={t('scenario.editor.body')}
       disabled={disabled}
-      className={block.kind === 'note' ? 'guide-note' : 'guide-description'}
+      className="guide-description"
       placeholder={t('scenario.editor.body')}
       rows={1}
       value={block.paragraphs

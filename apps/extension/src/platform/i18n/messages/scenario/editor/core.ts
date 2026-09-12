@@ -100,6 +100,11 @@ export const scenarioEditorCoreMessages = defineMessageSource({
   guideAddHeading: { ru: 'Подзаголовок', en: 'Heading' },
   guideAddNote: { ru: 'Примечание', en: 'Note' },
   guideHeading: { ru: 'Подзаголовок', en: 'Heading' },
+  guideNoteType: { ru: 'Тип примечания', en: 'Note type' },
+  guideNoteNeutral: { ru: 'Примечание', en: 'Note' },
+  guideNoteInfo: { ru: 'Информация', en: 'Information' },
+  guideNoteWarning: { ru: 'Предупреждение', en: 'Warning' },
+  guideNoteError: { ru: 'Ошибка', en: 'Error' },
   guideNoteText: { ru: 'Текст примечания', en: 'Note text' },
   guideOperationFailed: {
     ru: 'Не удалось изменить структуру. Проверьте выбранный элемент и допустимый размер инструкции. Предыдущая версия осталась в редакторе.',

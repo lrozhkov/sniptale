@@ -871,6 +871,79 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
   });
 }
 
+for (const theme of SCENARIO_VISUAL_THEMES) {
+  test(`note callouts preserve tone, text and undo in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }, testInfo) => {
+    await openVisualHarness(
+      page,
+      hostOrigin,
+      theme,
+      'en',
+      { width: 1920, height: 1080 },
+      'text-only'
+    );
+    const step = page.locator('article#text-only');
+    const add = step
+      .locator('.guide-insertion-block')
+      .last()
+      .getByRole('button', { name: 'Note', exact: true });
+    await add.focus();
+    await add.click();
+    const block = step
+      .locator('.guide-block')
+      .filter({ has: page.locator('.guide-note-callout') })
+      .last();
+    const id = await block.getAttribute('data-block-id');
+    const note = block.locator('.guide-note-callout');
+    const text = note.getByRole('textbox', { name: 'Note text', exact: true });
+    await text.fill('Keep this information with the step.');
+    const select = async (label: string) => {
+      await note.getByRole('button', { name: 'Note type', exact: true }).click();
+      await page
+        .locator('.guide-action-menu')
+        .getByRole('button', { name: label, exact: true })
+        .click();
+    };
+    for (const [label, tone] of [
+      ['Note', 'neutral'],
+      ['Information', 'info'],
+      ['Warning', 'warning'],
+      ['Error', 'error'],
+    ]) {
+      await select(label!);
+      await expect(note).toHaveAttribute('data-tone', tone!);
+      await expect(text).toHaveValue('Keep this information with the step.');
+      await testInfo.attach(`note-${theme}-${tone}`, {
+        body: await block.screenshot(),
+        contentType: 'image/png',
+      });
+    }
+    await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    await expect(note).toHaveAttribute('data-tone', 'warning');
+    await page.getByRole('button', { name: 'Redo', exact: true }).click();
+    await expect(note).toHaveAttribute('data-tone', 'error');
+    await block.locator('.guide-block-width').focus();
+    await page.keyboard.press('ArrowLeft');
+    await expect(block).toHaveAttribute('data-width', 'half');
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    const url = new URL(page.url());
+    url.pathname = SCENARIO_EDITOR_VISUAL_HARNESS_PATH;
+    url.searchParams.set('theme', theme);
+    url.searchParams.set('locale', 'en');
+    url.searchParams.set('stepId', 'text-only');
+    await page.goto(url.toString());
+    const restored = page.locator(`[data-block-id="${id}"]`);
+    await expect(restored).toHaveAttribute('data-width', 'half');
+    await expect(restored.locator('.guide-note-callout')).toHaveAttribute('data-tone', 'error');
+    await expect(restored.locator('textarea')).toHaveValue('Keep this information with the step.');
+    await restored.getByRole('button', { name: 'Note type', exact: true }).click();
+    await page.keyboard.press('Escape');
+    await expect(restored.getByRole('button', { name: 'Note type', exact: true })).toBeFocused();
+  });
+}
+
 test('history cleanup preserves two-tab undo resources until sessions close', async ({
   page,
   hostOrigin,
