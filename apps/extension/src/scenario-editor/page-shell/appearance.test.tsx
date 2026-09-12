@@ -2,7 +2,11 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createGuideProject, createGuideStep } from '../../features/scenario/project/public';
+import {
+  createGuideProject,
+  createGuideStep,
+  createGuideParagraphs,
+} from '../../features/scenario/project/public';
 import { createTranslator } from '../../platform/i18n';
 import { GuideAppearance } from './appearance';
 let host: HTMLDivElement;
@@ -71,4 +75,39 @@ it('keeps section settings contextual and leaves an absent selection empty', asy
   expect(host.textContent).not.toContain('Paper theme');
   await render(project, 'missing');
   expect(host.textContent).toBe('');
+});
+it('applies a layout to manually sized blocks without losing authored content', async () => {
+  const step = createGuideStep('Authored step', 'step');
+  step.blocks = [
+    { id: 'text', kind: 'text', paragraphs: createGuideParagraphs('Keep this text'), width: 37 },
+    {
+      id: 'slot',
+      kind: 'image-slot',
+      width: 'full',
+      frame: { width: 800, height: 600 },
+      fit: 'contain',
+      alt: '',
+      caption: '',
+    },
+  ];
+  await render({ ...project, items: [step] });
+  await click('Step layout');
+  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+    (node) => node.textContent === 'Side by side'
+  )!;
+  await act(async () => option.click());
+  const next = change.mock.calls.at(-1)![0].items[0];
+  expect(next.blocks).toEqual([
+    { id: 'text', kind: 'text', paragraphs: createGuideParagraphs('Keep this text') },
+    {
+      id: 'slot',
+      kind: 'image-slot',
+      frame: { width: 800, height: 600 },
+      fit: 'contain',
+      alt: '',
+      caption: '',
+    },
+  ]);
+  expect(next.title).toBe(step.title);
+  expect(step.blocks[0]!.width).toBe(37);
 });

@@ -4,7 +4,7 @@ import type {
 } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { RotateCcw, FileText, Folder } from 'lucide-react';
-import { resolveGuideStyle } from '../../features/scenario/project/public';
+import { resolveGuideStyle, applyGuideLayout } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
 import { GuideNumberingControls } from './numbering-controls';
 import { GuideStyleFields, GuideLayoutFields } from './style-controls';
@@ -41,12 +41,17 @@ export function GuideAppearance({ project, selectedId, disabled, onChange, t }: 
         <strong>{item.title || t('scenario.editor.untitledStep')}</strong>
       </div>
       {item.kind === 'step' && (
-        <GuideLayoutFields
-          layout={item.layout}
-          disabled={disabled}
-          t={t}
-          onChange={(layout) => change({ ...item, layout, templateId: `builtin:${layout}` })}
-        />
+        <>
+          <GuideLayoutFields
+            layout={item.layout}
+            disabled={disabled}
+            t={t}
+            onChange={(layout) => change(applyGuideLayout(item, layout))}
+          />
+          {item.blocks.length > 0 && (
+            <p className="guide-inspector-hint">{t('scenario.editor.appearanceLayoutHelp')}</p>
+          )}
+        </>
       )}
       <GuideNumberingControls
         project={project}

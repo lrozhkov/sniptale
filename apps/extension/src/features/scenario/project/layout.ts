@@ -11,3 +11,17 @@ export function resolveGuideBlockWidth(
   if (layout === 'comparison' && (block.kind === 'image' || block.kind === 'image-slot')) return 50;
   return 100;
 }
+
+/** An explicit preset action replaces width overrides, never authored content or image framing. */
+export function applyGuideLayout(step: GuideStep, layout: GuideStep['layout']): GuideStep {
+  return {
+    ...step,
+    layout,
+    templateId: `builtin:${layout}`,
+    blocks: step.blocks.map((block) => {
+      const next = { ...block };
+      delete next.width;
+      return next;
+    }),
+  };
+}

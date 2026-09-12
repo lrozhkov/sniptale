@@ -21,6 +21,10 @@ export const scenarioEditorAppearanceMessages = defineMessageSource({
   guideTextReset: { ru: 'Сбросить оформление текста', en: 'Reset text appearance' },
   appearance: { ru: 'Оформление', en: 'Appearance' },
   appearanceLayout: { ru: 'Макет шага', en: 'Step layout' },
+  appearanceLayoutHelp: {
+    ru: 'Макет меняет ширину блоков. Текст, изображения и их кадрирование сохраняются. Изменение можно отменить.',
+    en: 'Layouts change block widths. Text, images and their framing are preserved. You can undo the change.',
+  },
   appearanceStacked: { ru: 'Обычный шаг', en: 'Stacked' },
   appearanceSideBySide: { ru: 'Текст и изображение рядом', en: 'Side by side' },
   appearanceComparison: { ru: 'Сравнение', en: 'Comparison' },
