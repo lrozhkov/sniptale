@@ -1,5 +1,27 @@
 import { defineMessageSource } from '../../source';
 export const scenarioEditorCoreMessages = defineMessageSource({
+  guidePrintLetter: { ru: 'Letter', en: 'Letter' },
+  guidePrintAction: { ru: 'Печать / PDF', en: 'Print / PDF' },
+  guidePrintBack: { ru: 'Вернуться к просмотру', en: 'Back to reading' },
+  guidePrintSettings: { ru: 'Настройки печати', en: 'Print settings' },
+  guidePrintPaper: { ru: 'Формат бумаги', en: 'Paper size' },
+  guidePrintOrientation: { ru: 'Ориентация', en: 'Orientation' },
+  guidePrintPortrait: { ru: 'Портретная', en: 'Portrait' },
+  guidePrintLandscape: { ru: 'Альбомная', en: 'Landscape' },
+  guidePrintPagination: { ru: 'Разбиение страниц', en: 'Pagination' },
+  guidePrintStep: { ru: 'Шаг с новой страницы', en: 'Each step on a new page' },
+  guidePrintPreparing: {
+    ru: 'Подготовка изображений и шрифтов…',
+    en: 'Preparing images and fonts…',
+  },
+  guidePrintError: {
+    ru: 'Не удалось подготовить изображения. Вернитесь к редактированию и проверьте их.',
+    en: 'Images could not be prepared. Return to editing and check them.',
+  },
+  guidePrintHint: {
+    ru: 'В окне печати выберите принтер или «Сохранить как PDF».',
+    en: 'Choose a printer or “Save as PDF” in the print dialog.',
+  },
   guideReaderOpen: { ru: 'Просмотр инструкции', en: 'Preview guide' },
   guideReaderBack: { ru: 'Вернуться к редактированию', en: 'Back to editing' },
   guideReaderMode: { ru: 'Режим просмотра', en: 'Reading mode' },

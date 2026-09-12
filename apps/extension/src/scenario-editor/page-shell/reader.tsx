@@ -1,5 +1,6 @@
+import { GuidePrint, useGuidePrintMode } from './print';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Printer } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -21,6 +22,7 @@ export function GuideReader({
   onClose: () => void;
   t: Translate;
 }) {
+  const print = useGuidePrintMode();
   const [mode, setMode] = useState<'flow' | 'steps'>('flow');
   const [selection, setSelection] = useState({
     id: initialId ?? project.items[0]?.id ?? null,
@@ -51,6 +53,8 @@ export function GuideReader({
     const item = project.items[index + direction];
     if (item) select(item.id);
   };
+  if (print.active)
+    return <GuidePrint project={project} images={images} onClose={print.close} t={t} />;
   return (
     <main
       className="guide-reader"
@@ -74,6 +78,13 @@ export function GuideReader({
           <ArrowLeft size={16} aria-hidden="true" />
         </ContentToolbarButton>
         <h1>{project.name}</h1>
+        <ContentToolbarButton
+          ref={print.trigger}
+          title={t('scenario.editor.guidePrintAction')}
+          onClick={print.open}
+        >
+          <Printer size={16} aria-hidden="true" />
+        </ContentToolbarButton>
         <SegmentedSwitch
           density="compact"
           ariaLabel={t('scenario.editor.guideReaderMode')}

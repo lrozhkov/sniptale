@@ -96,6 +96,7 @@ function GuideReadBlock({
           style={{
             width: `min(100%, ${block.frame.width}px)`,
             aspectRatio: `${block.frame.width} / ${block.frame.height}`,
+            ...{ '--guide-frame-ratio': String(block.frame.width / block.frame.height) },
           }}
         >
           {images[block.assetId] ? (
