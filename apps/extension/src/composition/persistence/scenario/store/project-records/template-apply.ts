@@ -90,6 +90,8 @@ function retainCapturedImage(
   const slot = index < 0 ? undefined : content.blocks.splice(index, 1)[0];
   const retained = { ...image, id: crypto.randomUUID() };
   delete retained.width;
+  delete retained.rowStart;
+  if (slot?.rowStart !== undefined) retained.rowStart = slot.rowStart;
   if (slot?.width !== undefined) retained.width = slot.width;
   return { index: index < 0 ? content.blocks.length : index, image: retained };
 }

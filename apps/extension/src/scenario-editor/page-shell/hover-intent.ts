@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 
-const DWELL_MS = 50;
+const DWELL_MS = 25;
+const HIDE_MS = 150;
 const CONTEXT =
   '.guide-block, .guide-insertion, .guide-image-surface, .guide-voice-field, article, section';
 
@@ -13,6 +14,7 @@ export function useGuideHoverIntent() {
     let timer: ReturnType<typeof setTimeout> | undefined;
     let point: { x: number; y: number } | null = null;
     const revealed = new Set<Element>();
+    const hiding = new Map<Element, ReturnType<typeof setTimeout>>();
     const cancel = () => {
       clearTimeout(timer);
       timer = undefined;
@@ -21,6 +23,8 @@ export function useGuideHoverIntent() {
       cancel();
       for (const element of revealed) element.removeAttribute('data-guide-hover');
       revealed.clear();
+      for (const pending of hiding.values()) clearTimeout(pending);
+      hiding.clear();
     };
     const contexts = (target: EventTarget | null) => {
       const result: Element[] = [];
@@ -41,6 +45,23 @@ export function useGuideHoverIntent() {
         revealed.add(element);
       }
     };
+    const retain = (next: Element[]) => {
+      for (const element of next) {
+        clearTimeout(hiding.get(element));
+        hiding.delete(element);
+      }
+      for (const element of revealed) {
+        if (next.includes(element) || hiding.has(element)) continue;
+        hiding.set(
+          element,
+          setTimeout(() => {
+            element.removeAttribute('data-guide-hover');
+            revealed.delete(element);
+            hiding.delete(element);
+          }, HIDE_MS)
+        );
+      }
+    };
     const move = (event: PointerEvent) => {
       if (event.pointerType === 'touch') return;
       point = { x: event.clientX, y: event.clientY };
@@ -50,18 +71,14 @@ export function useGuideHoverIntent() {
         return;
       }
       const next = contexts(event.target);
-      for (const element of revealed) {
-        if (!next.includes(element)) {
-          element.removeAttribute('data-guide-hover');
-          revealed.delete(element);
-        }
-      }
+      retain(next);
       if (next.some((element) => !revealed.has(element)))
         timer = setTimeout(() => reveal(next), DWELL_MS);
     };
     const leave = () => {
       point = null;
-      clear();
+      cancel();
+      retain([]);
     };
     const scroll = () => {
       clear();

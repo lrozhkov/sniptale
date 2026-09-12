@@ -1283,25 +1283,6 @@ html[data-guide-reordering] .guide-block-grip {
   pointer-events: auto;
   opacity: 1;
 }
-.guide-step-blocks[data-reorder] {
-  position: relative;
-}
-.guide-step-blocks[data-reorder]::after,
-.guide-block[data-reorder]::after {
-  content: '';
-  position: absolute;
-  inset-inline: 0;
-  height: 2px;
-  background: var(--sniptale-color-accent);
-  pointer-events: none;
-}
-.guide-step-blocks[data-reorder]::after,
-.guide-block[data-reorder='before']::after {
-  top: -0.4rem;
-}
-.guide-block[data-reorder='after']::after {
-  bottom: -0.4rem;
-}
 @media (hover: none) {
   .guide-document .guide-block-grip {
     pointer-events: auto;
@@ -1885,4 +1866,21 @@ html[data-guide-height-resizing] * {
 .guide-center-panel .guide-block:focus-within > .guide-block-height,
 .guide-center-panel [data-width-preview] > .guide-block-height {
   transition: none;
+}
+
+.guide-block-drop-preview {
+  position: fixed;
+  z-index: 30;
+  pointer-events: none;
+  border: 1px solid var(--sniptale-color-accent);
+  border-radius: var(--sniptale-radius-sm);
+  background: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 12%,
+    var(--sniptale-color-surface-panel)
+  );
+  color: var(--sniptale-color-text-primary);
+  font-size: 0.75rem;
+  text-align: center;
+  overflow: hidden;
 }

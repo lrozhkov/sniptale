@@ -245,6 +245,7 @@ function replacementInput() {
   };
   image.caption = 'Keep caption';
   image.width = 'half';
+  image.rowStart = true;
   image.alt = 'Keep description';
   image.fit = 'cover';
   image.contentTransform = { x: 0.3, y: -0.2, scale: 2 };
@@ -278,6 +279,7 @@ it('replaces exactly one image with fresh resources while retaining its layout a
     id: 'target',
     htmlExport: { content: 'frame', optimize: true, maxEdge: 1920, quality: 0.85, viewer: false },
     caption: 'Keep caption',
+    rowStart: true,
     width: 'half',
     alt: 'Keep description',
     frame: { width: 640, height: 360 },

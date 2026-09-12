@@ -7,7 +7,7 @@ export {
 export { applyGuideStructureOperation, type GuideStructureOperation } from './mutations';
 export { resolveGuideStyle, resolveGuideTextStyle, applyGuideDefaultStyle } from './appearance';
 
-export { resolveGuideBlockWidth, applyGuideLayout } from './layout';
+export { resolveGuideBlockWidth, applyGuideLayout, splitGuideBlockRows } from './layout';
 
 export { resolveGuideNumbering, type GuideResolvedNumber } from './numbering';
 export {
@@ -19,3 +19,5 @@ export {
 } from './ai-proposal';
 
 export { classifyGuideStepContent, applyGuideTemplateAppearance } from './templates';
+
+export { fitGuideRowInsertion, type GuideBlockPlacement } from './spatial-placement';

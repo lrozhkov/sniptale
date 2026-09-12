@@ -96,7 +96,7 @@ for (const theme of ['light', 'dark'] as const) {
       const destination = await step.locator('.guide-block').nth(1).boundingBox();
       if (!destination) throw new Error('Missing drop target');
       await page.mouse.move(
-        destination.x + destination.width / 2,
+        destination.x + destination.width * 0.8,
         destination.y + destination.height * 0.7,
         { steps: 8 }
       );

@@ -1,3 +1,4 @@
+import { GuideBlockRows } from './block-rows';
 import { GuideVoiceField } from './voice-field';
 import { GuideBlockReorder, GuideBlockReorderHandle } from './block-reorder';
 import { GuideBlockLayout } from './block-layout';
@@ -337,75 +338,78 @@ function GuideStepBody({
         disabled={disabled}
         onOperate={onOperate}
       >
-        {item.blocks.map((block, index) => (
-          <GuideBlockLayout
-            key={block.id}
-            block={block}
-            layout={item.layout}
-            disabled={disabled}
-            onHeight={
-              block.kind === 'text' || block.kind === 'heading' || block.kind === 'note'
-                ? (minHeight) => changeBlock({ ...block, minHeight }, null)
-                : undefined
-            }
-            onWidth={(width) =>
-              onOperate({ kind: 'set-block-width', itemId: item.id, blockId: block.id, width })
-            }
-            t={t}
-          >
-            <GuideDocumentInsert
-              target={{ kind: 'block', itemId: item.id, beforeBlockId: block.id }}
+        <GuideBlockRows blocks={item.blocks}>
+          {(block, index) => (
+            <GuideBlockLayout
+              key={block.id}
+              block={block}
+              layout={item.layout}
               disabled={disabled}
-              onOperate={onOperate}
+              onHeight={
+                block.kind === 'text' || block.kind === 'heading' || block.kind === 'note'
+                  ? (minHeight) => changeBlock({ ...block, minHeight }, null)
+                  : undefined
+              }
+              onWidth={(width) =>
+                onOperate({ kind: 'set-block-width', itemId: item.id, blockId: block.id, width })
+              }
               t={t}
-            />
-            <GuideBlockReorderHandle blockId={block.id} t={t} />
-            <GuideBlockActions
-              allowSplit={project.purpose !== 'step-template'}
-              itemId={item.id}
-              blockId={block.id}
-              index={index}
-              count={item.blocks.length}
-              disabled={disabled}
-              onOperate={onOperate}
-              t={t}
-            />
-            {block.kind === 'image' ? (
-              <GuideImageSurface
-                editing={framedImageId === block.id}
-                onEditingChange={(editing) => onFrameImage(item.id, block.id, editing)}
-                libraryTarget={{ stepId: item.id, blockId: block.id }}
-                onEdit={() => onEditImage(item.id, block.id)}
-                block={block}
-                url={images[block.assetId]}
-                disabled={disabled}
-                onChange={changeBlock}
-                t={t}
-              />
-            ) : block.kind === 'image-slot' ? (
-              <GuideImageUpload
-                placement={{ kind: 'replace-image', stepId: item.id, blockId: block.id }}
-                frame={block.frame}
-                disabled={disabled}
-                onUpload={(file, signal) => onUploadImage(item.id, block.id, file, signal)}
-                t={t}
-              />
-            ) : block.kind === 'note' ? (
-              <GuideNoteBlock block={block} disabled={disabled} onChange={changeBlock} t={t} />
-            ) : (
-              <GuideTextBlock block={block} disabled={disabled} onChange={changeBlock} t={t} />
-            )}
-            {index === item.blocks.length - 1 && (
+            >
               <GuideDocumentInsert
-                target={{ kind: 'block', itemId: item.id }}
-                end
+                target={{ kind: 'block', itemId: item.id, beforeBlockId: block.id }}
+                rowStart={block.rowStart ?? false}
                 disabled={disabled}
                 onOperate={onOperate}
                 t={t}
               />
-            )}
-          </GuideBlockLayout>
-        ))}
+              <GuideBlockReorderHandle blockId={block.id} t={t} />
+              <GuideBlockActions
+                allowSplit={project.purpose !== 'step-template'}
+                itemId={item.id}
+                blockId={block.id}
+                index={index}
+                count={item.blocks.length}
+                disabled={disabled}
+                onOperate={onOperate}
+                t={t}
+              />
+              {block.kind === 'image' ? (
+                <GuideImageSurface
+                  editing={framedImageId === block.id}
+                  onEditingChange={(editing) => onFrameImage(item.id, block.id, editing)}
+                  libraryTarget={{ stepId: item.id, blockId: block.id }}
+                  onEdit={() => onEditImage(item.id, block.id)}
+                  block={block}
+                  url={images[block.assetId]}
+                  disabled={disabled}
+                  onChange={changeBlock}
+                  t={t}
+                />
+              ) : block.kind === 'image-slot' ? (
+                <GuideImageUpload
+                  placement={{ kind: 'replace-image', stepId: item.id, blockId: block.id }}
+                  frame={block.frame}
+                  disabled={disabled}
+                  onUpload={(file, signal) => onUploadImage(item.id, block.id, file, signal)}
+                  t={t}
+                />
+              ) : block.kind === 'note' ? (
+                <GuideNoteBlock block={block} disabled={disabled} onChange={changeBlock} t={t} />
+              ) : (
+                <GuideTextBlock block={block} disabled={disabled} onChange={changeBlock} t={t} />
+              )}
+              {index === item.blocks.length - 1 && (
+                <GuideDocumentInsert
+                  target={{ kind: 'block', itemId: item.id }}
+                  end
+                  disabled={disabled}
+                  onOperate={onOperate}
+                  t={t}
+                />
+              )}
+            </GuideBlockLayout>
+          )}
+        </GuideBlockRows>
       </GuideBlockReorder>
       {item.blocks.length === 0 && (
         <div className="guide-empty-step">

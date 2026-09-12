@@ -1,5 +1,5 @@
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { FileText, Heading, Image, ListPlus, MessageSquare } from 'lucide-react';
+import { FileText, Heading, Image, ListPlus, MessageSquare, CornerDownLeft } from 'lucide-react';
 import type { GuideStructureOperation } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
 
@@ -11,12 +11,14 @@ type InsertTarget =
 export function GuideDocumentInsert({
   target,
   end = false,
+  rowStart,
   disabled,
   onOperate,
   t,
 }: {
   target: InsertTarget;
   end?: boolean;
+  rowStart?: boolean;
   disabled: boolean;
   onOperate: (operation: GuideStructureOperation) => void;
   t: Translate;
@@ -82,6 +84,25 @@ export function GuideDocumentInsert({
       data-insert-before={before ?? 'end'}
     >
       <div className="guide-insertion-chrome">
+        {target.kind === 'block' && target.beforeBlockId && rowStart !== undefined && (
+          <ContentToolbarButton
+            title={t(
+              rowStart ? 'scenario.editor.guideRemoveRowStart' : 'scenario.editor.guideRowStart'
+            )}
+            aria-pressed={rowStart}
+            disabled={disabled}
+            onClick={() =>
+              onOperate({
+                kind: 'set-row-start',
+                itemId: target.itemId,
+                blockId: target.beforeBlockId!,
+                rowStart: !rowStart,
+              })
+            }
+          >
+            <CornerDownLeft size={15} aria-hidden="true" />
+          </ContentToolbarButton>
+        )}
         {items.map((item) => (
           <ContentToolbarButton
             key={item.label}

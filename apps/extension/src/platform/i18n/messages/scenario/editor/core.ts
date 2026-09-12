@@ -771,8 +771,8 @@ export const scenarioEditorCoreMessages = defineMessageSource({
   },
   body: { ru: 'Текст шага', en: 'Step text' },
   guideReorderBlock: {
-    ru: 'Переместить блок (перетаскивание или ↑/↓)',
-    en: 'Move block (drag or ↑/↓)',
+    ru: 'Переместить блок: ↑/↓ — порядок, ←/→ — поставить рядом',
+    en: 'Move block: ↑/↓ reorder, ←/→ place alongside',
   },
   guideResizeWidth: {
     ru: 'Клик — 50% / 100%. Потяните для изменения ширины; стрелки — 1%, Shift — 10%.',

@@ -145,7 +145,9 @@ Layout is responsive, left-to-right wrapping flow. Width is an integer percentag
 (${GUIDE_LIMITS.minBlockWidthPercent}–100), or full=100/half=50; up to ${Math.floor(
     100 / GUIDE_LIMITS.minBlockWidthPercent
   )} columns. Adjacent widths totaling at most 100 share a row; 100
-starts a full row. Gaps are accounted for by the renderer. Step width inherits document contentWidth
+starts a full row. rowStart=true forces a local new row before a block; false/omission permits
+automatic packing. Set the following block rowStart=true to keep a narrow block alone.
+Row breaks do not add blank space. Gaps are accounted for by the renderer. Step width inherits document contentWidth
 or its styleOverride and shrinks to the available viewport/output page; it is not a fixed pixel
 canvas.
 Presets: stacked/text default all blocks to full width; side-by-side defaults all to half;

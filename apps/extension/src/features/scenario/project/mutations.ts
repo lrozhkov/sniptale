@@ -1,3 +1,4 @@
+import { placeGuideBlock, type GuideBlockPlacement } from './spatial-placement';
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
 import type {
   GuideBlock,
@@ -18,12 +19,14 @@ type BlockOperation =
       beforeBlockId?: string;
     }
   | { kind: 'reorder-block'; itemId: string; blockId: string; beforeBlockId?: string }
+  | { kind: 'set-row-start'; itemId: string; blockId: string; rowStart: boolean }
   | { kind: 'set-block-width'; itemId: string; blockId: string; width: GuideBlockWidth }
   | { kind: 'move-block'; itemId: string; blockId: string; direction: -1 | 1 }
   | { kind: 'duplicate-block' | 'remove-block'; itemId: string; blockId: string };
 
 /** Semantic guide changes never acquire or delete media; images retain immutable project refs. */
 export type GuideStructureOperation =
+  | GuideBlockPlacement
   | {
       kind: 'transfer-block';
       itemId: string;
@@ -60,6 +63,9 @@ export function applyGuideStructureOperation(
   }
   const next = structuredClone(project);
   switch (operation.kind) {
+    case 'place-block':
+      placeGuideBlock(next, operation);
+      break;
     case 'transfer-block':
       transferBlock(next, operation);
       break;
@@ -90,6 +96,7 @@ export function applyGuideStructureOperation(
       break;
     case 'add-block':
     case 'reorder-block':
+    case 'set-row-start':
     case 'set-block-width':
     case 'move-block':
     case 'duplicate-block':
@@ -121,6 +128,7 @@ function transferBlock(
   const block = source.blocks[index];
   if (!block) throw new Error('Guide block is unavailable.');
   const position = insertionIndex(target.blocks, operation.beforeBlockId);
+  preserveRowStart(source.blocks, index);
   source.blocks.splice(index, 1);
   target.blocks.splice(position, 0, block);
 }
@@ -184,6 +192,11 @@ function createBlock(kind: 'text' | 'heading' | 'note' | 'image-slot'): GuideBlo
   return { kind, id, paragraphs: createGuideParagraphs('') };
 }
 
+/** Removing a segment's leading occurrence does not merge its remaining content upward. */
+function preserveRowStart(blocks: GuideBlock[], index: number): void {
+  if (blocks[index]?.rowStart && blocks[index + 1]) blocks[index + 1]!.rowStart = true;
+}
+
 function changeBlocks(project: GuideProject, operation: BlockOperation): void {
   const step = requireStep(project, operation.itemId);
   if (operation.kind === 'add-block') {
@@ -200,8 +213,13 @@ function changeBlocks(project: GuideProject, operation: BlockOperation): void {
   if (operation.kind === 'reorder-block') {
     const target = insertionIndex(step.blocks, operation.beforeBlockId);
     if (index === target || index + 1 === target) return;
+    preserveRowStart(step.blocks, index);
     step.blocks.splice(index, 1);
     step.blocks.splice(target > index ? target - 1 : target, 0, block);
+    return;
+  }
+  if (operation.kind === 'set-row-start') {
+    block.rowStart = operation.rowStart;
     return;
   }
   if (operation.kind === 'set-block-width') {
@@ -209,10 +227,12 @@ function changeBlocks(project: GuideProject, operation: BlockOperation): void {
     return;
   }
   if (operation.kind === 'move-block') {
+    preserveRowStart(step.blocks, index);
     moveEntry(step.blocks, index, operation.direction);
     return;
   }
   if (operation.kind === 'remove-block') {
+    preserveRowStart(step.blocks, index);
     step.blocks.splice(index, 1);
     return;
   }
@@ -267,9 +287,11 @@ function placeImage(
   if (target?.kind !== 'image' && target?.kind !== 'image-slot')
     throw new Error('Guide image target is unavailable.');
   delete copy.width;
+  delete copy.rowStart;
   step.blocks[index] = {
     ...copy,
     id: target.id,
+    ...(target.rowStart !== undefined ? { rowStart: target.rowStart } : {}),
     ...(target.width ? { width: target.width } : {}),
     frame: { ...target.frame },
     fit: target.fit,

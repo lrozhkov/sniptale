@@ -53,20 +53,22 @@ const visible = (selector: string) =>
   host.querySelector(selector)!.hasAttribute('data-guide-hover');
 it('waits for a pause, cancels fast passes, and keeps revealed parent contexts while entering tools', () => {
   move('input');
-  vi.advanceTimersByTime(40);
+  vi.advanceTimersByTime(20);
   move('#second');
-  vi.advanceTimersByTime(49);
+  vi.advanceTimersByTime(24);
   expect(visible('#first')).toBe(false);
   expect(visible('#second')).toBe(false);
   vi.advanceTimersByTime(1);
   expect(visible('#second')).toBe(true);
   expect(visible('article')).toBe(true);
   move('input');
-  vi.advanceTimersByTime(50);
+  vi.advanceTimersByTime(25);
   expect(visible('#first')).toBe(true);
   move('button');
   expect(visible('#first')).toBe(true);
   expect(visible('article')).toBe(true);
+  expect(visible('.guide-voice-field')).toBe(true);
+  vi.advanceTimersByTime(150);
   expect(visible('.guide-voice-field')).toBe(false);
 });
 it('suppresses scroll-time hover and resolves the element under the stationary pointer after scrolling', () => {
@@ -75,29 +77,46 @@ it('suppresses scroll-time hover and resolves the element under the stationary p
     value: vi.fn(() => host.querySelector('#second')),
   });
   move('#first');
-  vi.advanceTimersByTime(50);
+  vi.advanceTimersByTime(25);
   host.querySelector('.scroll')!.dispatchEvent(new Event('scroll'));
   expect(visible('#first')).toBe(false);
-  vi.advanceTimersByTime(40);
+  vi.advanceTimersByTime(20);
   host.querySelector('.scroll')!.dispatchEvent(new Event('scroll'));
-  vi.advanceTimersByTime(49);
+  vi.advanceTimersByTime(24);
   expect(visible('#second')).toBe(false);
   vi.advanceTimersByTime(1);
   expect(visible('#second')).toBe(true);
 });
 it('cancels pending intent on leave and unmount, and ignores touch or active dragging', () => {
   move('#first', 'touch');
-  vi.advanceTimersByTime(50);
+  vi.advanceTimersByTime(25);
   expect(visible('#first')).toBe(false);
   move('#first');
   host.firstElementChild!.dispatchEvent(new Event('pointerleave'));
-  vi.advanceTimersByTime(50);
+  vi.advanceTimersByTime(25);
   expect(visible('#first')).toBe(false);
   move('#first');
-  vi.advanceTimersByTime(50);
+  vi.advanceTimersByTime(25);
   move('#first', 'mouse', 1);
   expect(visible('#first')).toBe(false);
   move('#first');
   act(() => root.render(null));
+  expect(vi.getTimerCount()).toBe(0);
+});
+
+it('retains exterior controls briefly and cancels hiding when the pointer returns', () => {
+  move('#first');
+  vi.advanceTimersByTime(25);
+  move('#second');
+  vi.advanceTimersByTime(100);
+  expect(visible('#first')).toBe(true);
+  move('button');
+  vi.advanceTimersByTime(100);
+  expect(visible('#first')).toBe(true);
+  host.firstElementChild!.dispatchEvent(new Event('pointerleave'));
+  vi.advanceTimersByTime(149);
+  expect(visible('#first')).toBe(true);
+  vi.advanceTimersByTime(1);
+  expect(visible('#first')).toBe(false);
   expect(vi.getTimerCount()).toBe(0);
 });

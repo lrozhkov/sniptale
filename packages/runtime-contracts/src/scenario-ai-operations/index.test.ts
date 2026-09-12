@@ -111,3 +111,26 @@ it('exposes prose minimum height to AI through the same bounded contract', async
     ).toBe(false);
   }
 });
+
+it('exposes local row boundaries to AI without a second parameter registry', async () => {
+  const { buildScenarioAiSystemPrompt } = await import('./index');
+  expect(buildScenarioAiSystemPrompt('Improve')).toContain('rowStart=true');
+  for (const rowStart of [true, false]) {
+    expect(
+      scenarioAiOperationSchema.safeParse({
+        type: 'setBlockParameters',
+        stepId: 'step',
+        blockId: 'block',
+        parameters: { rowStart },
+      }).success
+    ).toBe(true);
+  }
+  expect(
+    scenarioAiOperationSchema.safeParse({
+      type: 'setBlockParameters',
+      stepId: 'step',
+      blockId: 'block',
+      parameters: { rowStart: 'yes' },
+    }).success
+  ).toBe(false);
+});

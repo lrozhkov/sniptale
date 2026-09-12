@@ -361,16 +361,21 @@ function useGuideNavigation(
   const operate = (operation: GuideStructureOperation) => {
     const next = state.operate(operation);
     if (!next) return;
+    const placement = operation.kind === 'transfer-block' || operation.kind === 'place-block';
     const { target, addedItem, addedBlock } = resolveOperationFocus(
       project,
       next,
-      operation.kind === 'transfer-block' ? operation.targetItemId : state.selectedId
+      placement
+        ? operation.targetItemId
+        : operation.kind === 'set-row-start'
+          ? operation.itemId
+          : state.selectedId
     );
     if (target) {
       state.selectItem(target.id, next);
       setFocusRequest((current) => ({
         sequence: current.sequence + 1,
-        ...(operation.kind === 'transfer-block'
+        ...(placement
           ? { preserveFocus: true }
           : addedItem
             ? { field: true }

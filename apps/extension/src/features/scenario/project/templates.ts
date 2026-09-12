@@ -39,6 +39,7 @@ export function applyGuideTemplateAppearance(
       const kind = block.kind === 'image-slot' ? 'image' : block.kind;
       const slot = slots.get(kind)?.shift();
       const next = { ...block };
+      if (slot) next.rowStart = slot.rowStart;
       delete next.width;
       if (slot?.width !== undefined) next.width = slot.width;
       if (next.kind === 'text' || next.kind === 'heading' || next.kind === 'note') {

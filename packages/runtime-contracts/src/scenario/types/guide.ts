@@ -102,6 +102,8 @@ export type GuideBlockWidth = 'full' | 'half' | number;
 /** Explicit block composition overrides the step preset; absence inherits it. */
 export interface GuideBlockComposition {
   width?: GuideBlockWidth | undefined;
+  /** Starts a local row; absence keeps automatic wrapping. */
+  rowStart?: boolean | undefined;
 }
 
 /** Each accepted annotation edit uses a new editDocumentId so history never overwrites it. */
@@ -124,7 +126,7 @@ export interface GuideImageBlock extends GuideBlockComposition {
 /** Empty image space has layout and identity but owns no media until filled. */
 export interface GuideImageSlotBlock extends Pick<
   GuideImageBlock,
-  'id' | 'frame' | 'fit' | 'alt' | 'caption' | 'width'
+  'id' | 'frame' | 'fit' | 'alt' | 'caption' | 'width' | 'rowStart'
 > {
   kind: 'image-slot';
 }

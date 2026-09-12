@@ -433,10 +433,18 @@ it('roundtrips composition for every block kind and rejects unsupported widths',
   for (const width of ['half', 'full', 20, 37, 50, 100] as const) {
     item.blocks.forEach((block) => {
       block.width = width;
+      block.rowStart = true;
     });
     const value = project([item]);
     const parsed = parseGuideProject(JSON.parse(JSON.stringify(value)));
     expect(parsed).toEqual({ status: 'ok', project: value });
+  }
+  for (const rowStart of [null, 1, 'true', {}]) {
+    for (const block of item.blocks) {
+      expect(
+        parseGuideProject({ ...project(), items: [{ ...item, blocks: [{ ...block, rowStart }] }] })
+      ).toMatchObject({ status: 'invalid' });
+    }
   }
   for (const width of [0, 19, 101, 33.5, Infinity, NaN, 'quarter', '100%', null, {}]) {
     for (const block of item.blocks) {

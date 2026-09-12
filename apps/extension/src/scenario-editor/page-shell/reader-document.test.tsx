@@ -154,3 +154,24 @@ it('keeps all heading presets above ordinary body and below the step title', () 
   expect(headings.every((heading) => heading.style.textAlign === 'center')).toBe(true);
   expect(doc.querySelector('h2')?.textContent).toBe('Step title');
 });
+
+it('retains local boundaries even when their empty leading block is omitted from output', () => {
+  const project = createGuideProject('Rows');
+  const step = createGuideStep('Step');
+  step.blocks = [
+    { kind: 'heading', id: 'a', text: 'First', width: 30 },
+    { kind: 'heading', id: 'empty', text: '', rowStart: true },
+    { kind: 'heading', id: 'b', text: 'Second', width: 40 },
+    { kind: 'heading', id: 'c', text: 'Third', width: 30 },
+  ];
+  project.items = [step];
+  const markup = renderToStaticMarkup(
+    <GuideReadDocument project={project} images={{}} t={createTranslator('en')} />
+  );
+  const document = new DOMParser().parseFromString(markup, 'text/html');
+  expect([...document.querySelectorAll('.guide-block-row')].map((row) => row.textContent)).toEqual([
+    'First',
+    'SecondThird',
+  ]);
+  expect(document.querySelectorAll('[data-block-id="empty"]')).toHaveLength(0);
+});

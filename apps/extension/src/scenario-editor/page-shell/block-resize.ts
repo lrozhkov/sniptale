@@ -89,7 +89,11 @@ export function useGuideBlockResize({
       dragging: false,
       target: event.currentTarget,
       pointerId: event.pointerId,
-      neighbors: Array.from(parent.querySelectorAll<HTMLElement>(':scope > .guide-block'))
+      neighbors: Array.from(
+        (block.closest('.guide-step-blocks') ?? parent).querySelectorAll<HTMLElement>(
+          '.guide-block'
+        )
+      )
         .filter((neighbor) => neighbor !== block)
         .map((neighbor) => ({
           element: neighbor,

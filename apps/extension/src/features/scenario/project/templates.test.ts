@@ -62,6 +62,7 @@ it('matches composition by block kind and occurrence without replacing content, 
       kind: 'heading',
       id: 'a',
       text: 'Discard this',
+      rowStart: true,
       width: 33,
       textStyle: { size: 'large', alignment: 'center' },
     },
@@ -81,7 +82,12 @@ it('matches composition by block kind and occurrence without replacing content, 
   const result = applyGuideTemplateAppearance(step, template, style, 'template-id');
   expect(result.blocks).toEqual([
     { ...image, width: 'full' },
-    { ...step.blocks[1], width: 33, textStyle: { size: 'large', alignment: 'center' } },
+    {
+      ...step.blocks[1],
+      width: 33,
+      rowStart: true,
+      textStyle: { size: 'large', alignment: 'center' },
+    },
     { ...step.blocks[2], width: 67 },
   ]);
   expect(result.title).toBe('Authored');

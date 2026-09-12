@@ -84,3 +84,23 @@ it('applies immediately to an empty step and a single captured image without add
   expect(next.blocks).toEqual([image]);
   expect(resolveGuideBlockWidth(next.layout, next.blocks[0]!)).toBe(50);
 });
+
+it('keeps local rows independent of shrinking widths and restores automatic packing locally', async () => {
+  const { resolveGuideRows, splitGuideBlockRows } = await import('./layout');
+  const step = createGuideStep();
+  step.blocks = [
+    { kind: 'heading', id: 'a', text: 'A', width: 30 },
+    { kind: 'heading', id: 'b', text: 'B', width: 40, rowStart: true },
+    { kind: 'heading', id: 'c', text: 'C', width: 30 },
+  ];
+  const ids = () => resolveGuideRows(step).map((row) => row.map((block) => block.id));
+  expect(ids()).toEqual([['a'], ['b', 'c']]);
+  step.blocks[0]!.width = 20;
+  expect(ids()).toEqual([['a'], ['b', 'c']]);
+  expect(splitGuideBlockRows(step.blocks).map((row) => row.length)).toEqual([1, 2]);
+  expect(applyGuideLayout(step, 'comparison').blocks[1]?.rowStart).toBe(true);
+  step.blocks[1]!.rowStart = false;
+  expect(ids()).toEqual([['a', 'b', 'c']]);
+  step.blocks[2]!.width = 50;
+  expect(ids()).toEqual([['a', 'b'], ['c']]);
+});

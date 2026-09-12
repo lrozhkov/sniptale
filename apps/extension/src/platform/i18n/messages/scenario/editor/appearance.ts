@@ -1,6 +1,8 @@
 import { defineMessageSource } from '../../source';
 
 export const scenarioEditorAppearanceMessages = defineMessageSource({
+  guideRowStart: { ru: 'Начинать с новой строки', en: 'Start a new row' },
+  guideRemoveRowStart: { ru: 'Убрать перенос строки', en: 'Remove row break' },
   guideSnapLayout: { ru: 'Привязка размеров', en: 'Snap block sizes' },
   guideSnapLayoutHint: {
     ru: 'Привязка к соседним блокам и колонкам · Alt — временно отключить',

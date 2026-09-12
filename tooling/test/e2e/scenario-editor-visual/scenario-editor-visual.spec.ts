@@ -819,10 +819,10 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await page.mouse.move(start.x + start.width / 2 + 20, start.y + start.height / 2 + 20, {
       steps: 4,
     });
-    await last.scrollIntoViewIfNeeded();
+    await last.evaluate((node) => node.scrollIntoView({ block: 'center' }));
     const target = await last.boundingBox();
     if (!target) throw new Error('Missing reorder target');
-    await page.mouse.move(target.x + target.width / 2, target.y + target.height * 0.8, {
+    await page.mouse.move(target.x + target.width / 2, target.y + target.height - 4, {
       steps: 8,
     });
     await expect(page.locator('.guide-block-drag-preview')).toBeVisible();

@@ -1,3 +1,4 @@
+import { ProductToggle } from '@sniptale/ui/product-form-controls';
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type {
   GuideBlock,
@@ -111,6 +112,16 @@ export function GuideBlockInspector({
               if (preset) onChange({ ...block, width: preset.width }, null);
             }}
           />
+          <label className="guide-html-switch">
+            <span>{t('scenario.editor.guideRowStart')}</span>
+            <ProductToggle
+              size="sm"
+              checked={block.rowStart ?? false}
+              disabled={disabled}
+              aria-label={t('scenario.editor.guideRowStart')}
+              onClick={() => onChange({ ...block, rowStart: !block.rowStart }, null)}
+            />
+          </label>
           {(block.kind === 'text' || block.kind === 'heading' || block.kind === 'note') && (
             <>
               <GuideInspectorNumber

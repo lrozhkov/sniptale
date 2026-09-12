@@ -103,6 +103,7 @@ export async function importScenarioImages(args: {
                 ...(replacement.kind === 'image' && replacement.htmlExport
                   ? { htmlExport: replacement.htmlExport }
                   : {}),
+                ...(replacement.rowStart !== undefined ? { rowStart: replacement.rowStart } : {}),
                 ...(replacement.width ? { width: replacement.width } : {}),
                 frame: replacement.frame,
                 fit: replacement.fit,

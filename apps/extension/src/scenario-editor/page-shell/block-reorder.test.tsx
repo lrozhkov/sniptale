@@ -80,7 +80,7 @@ async function pointer(type: string, x: number, y: number, pointerId = 1) {
 it('previews block content without controls and uses one marker for either side of a gap', async () => {
   await render();
   await pointer('pointerdown', -14, 14);
-  await pointer('pointermove', 50, 190);
+  await pointer('pointermove', 50, 225);
   const preview = host.querySelector('.guide-block-drag-preview')!;
   expect(preview.textContent).toBe('Body a');
   expect(preview.querySelector('button')).toBeNull();
@@ -88,14 +88,23 @@ it('previews block content without controls and uses one marker for either side 
   expect(preview.hasAttribute('data-block-id')).toBe(false);
   expect(document.documentElement.dataset['guideReordering']).toBe('true');
   expect(host.querySelector('[data-reorder]')?.id).toBe('c');
-  expect(host.querySelector('[data-reorder]')?.getAttribute('data-reorder')).toBe('before');
+  expect(host.querySelector('[data-reorder]')?.getAttribute('data-reorder')).toBe('row-before');
   await pointer('pointermove', 50, 250);
   expect(host.querySelector('[data-reorder]')?.id).toBe('c');
   expect(host.querySelectorAll('[data-reorder]')).toHaveLength(1);
   expect(operate).not.toHaveBeenCalled();
   await pointer('pointerup', 50, 250);
   expect(operate.mock.calls).toEqual([
-    [{ kind: 'reorder-block', itemId: 'step', blockId: 'a', beforeBlockId: 'c' }],
+    [
+      {
+        kind: 'place-block',
+        itemId: 'step',
+        targetItemId: 'step',
+        blockId: 'a',
+        anchorBlockId: 'c',
+        placement: 'row-before',
+      },
+    ],
   ]);
   expect(host.querySelector('[data-reorder]')).toBeNull();
   expect(host.querySelector('.guide-block-drag-preview')).toBeNull();
@@ -158,6 +167,15 @@ it('keeps keyboard movement and native image drops independent, and ignores disa
     blockId: 'a',
     direction: 1,
   });
+  await key('ArrowRight');
+  expect(operate).toHaveBeenLastCalledWith({
+    kind: 'place-block',
+    itemId: 'step',
+    targetItemId: 'step',
+    blockId: 'a',
+    anchorBlockId: 'b',
+    placement: 'before',
+  });
   const drop = new Event('drop', { bubbles: true, cancelable: true });
   host.querySelector('.guide-block')!.dispatchEvent(drop);
   expect(drop.defaultPrevented).toBe(false);
@@ -166,7 +184,7 @@ it('keeps keyboard movement and native image drops independent, and ignores disa
   await pointer('pointermove', 50, 300);
   await pointer('pointerup', 50, 300);
   await key('ArrowDown');
-  expect(operate).toHaveBeenCalledTimes(1);
+  expect(operate).toHaveBeenCalledTimes(2);
 });
 
 it('scrolls the document at its edge and stops the frame loop on cancellation', async () => {
@@ -218,10 +236,11 @@ it('targets another step, including an empty step, and cancels outside the canva
   vi.spyOn(target, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 400, 100, 180));
   await pointer('pointerdown', -14, 14);
   await pointer('pointermove', 50, 450);
-  expect(target.dataset['reorder']).toBe('before');
+  expect(target.dataset['reorder']).toBe('row-before');
   await pointer('pointerup', 50, 450);
   expect(operate).toHaveBeenLastCalledWith({
-    kind: 'transfer-block',
+    kind: 'place-block',
+    placement: 'row-before',
     itemId: 'step',
     targetItemId: 'other',
     blockId: 'a',
@@ -232,22 +251,23 @@ it('targets another step, including an empty step, and cancels outside the canva
   target.append(block);
   vi.spyOn(block, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 400, 100, 100));
   await pointer('pointerdown', -14, 14);
-  await pointer('pointermove', 50, 420);
-  expect(block.dataset['reorder']).toBe('before');
-  await pointer('pointerup', 50, 420);
+  await pointer('pointermove', 50, 410);
+  expect(block.dataset['reorder']).toBe('row-before');
+  await pointer('pointerup', 50, 410);
   expect(operate).toHaveBeenLastCalledWith({
-    kind: 'transfer-block',
+    kind: 'place-block',
+    placement: 'row-before',
     itemId: 'step',
     targetItemId: 'other',
     blockId: 'a',
-    beforeBlockId: 'other-block',
+    anchorBlockId: 'other-block',
   });
   operate.mockClear();
   target.dataset['reorderDisabled'] = 'true';
   await pointer('pointerdown', -14, 14);
-  await pointer('pointermove', 50, 420);
+  await pointer('pointermove', 50, 410);
   expect(host.querySelector('[data-reorder]')).toBeNull();
-  await pointer('pointerup', 50, 420);
+  await pointer('pointerup', 50, 410);
   expect(operate).not.toHaveBeenCalled();
 });
 
@@ -262,7 +282,7 @@ it('rejects targets clipped outside the visible document pane', async () => {
   expect(operate).not.toHaveBeenCalled();
 });
 
-it('commits against the latest operation receiver when another step updates during the gesture', async () => {
+it('keeps a drag through an equivalent autosave copy and uses the latest operation receiver', async () => {
   const item = createGuideStep('', 'step');
   item.blocks = [{ kind: 'text', id: 'a', paragraphs: [] }];
   const latest = vi.fn();
@@ -287,11 +307,13 @@ it('commits against the latest operation receiver when another step updates duri
   vi.spyOn(target, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 200, 100, 100));
   await pointer('pointerdown', 10, 10);
   await pointer('pointermove', 50, 240);
+  item.blocks = item.blocks.map(({ id, ...content }) => ({ ...structuredClone(content), id }));
   await mount(latest);
   await pointer('pointerup', 50, 240);
   expect(operate).not.toHaveBeenCalled();
   expect(latest).toHaveBeenCalledWith({
-    kind: 'transfer-block',
+    kind: 'place-block',
+    placement: 'row-before',
     itemId: 'step',
     targetItemId: 'other',
     blockId: 'a',

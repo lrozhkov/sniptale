@@ -51,6 +51,7 @@ function fixture() {
     }),
     { kind: 'text', id: 'body', paragraphs: createGuideParagraphs('Reusable text') },
   ];
+  source.blocks[0]!.rowStart = true;
   template.items = [source];
   return { project, target, template, source };
 }
@@ -122,7 +123,10 @@ it('keeps the captured image and title, skipping the replaced template image bef
   const next = await apply('capture');
   expect(next.items[0]).toMatchObject({
     title: 'Captured title',
-    blocks: [{ assetId: 'target-image', frame: { width: 800, height: 600 } }, { kind: 'text' }],
+    blocks: [
+      { assetId: 'target-image', rowStart: true, frame: { width: 800, height: 600 } },
+      { kind: 'text' },
+    ],
   });
   expect(io.asset).not.toHaveBeenCalled();
   expect(io.prepare).not.toHaveBeenCalled();

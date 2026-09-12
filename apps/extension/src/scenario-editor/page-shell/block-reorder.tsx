@@ -1,4 +1,9 @@
 import {
+  guideBlockDropTarget,
+  readGuideBlockWidth,
+  type GuideDropTarget,
+} from './block-drop-target';
+import {
   createContext,
   useContext,
   useEffect,
@@ -12,23 +17,20 @@ import type { GuideStep } from '@sniptale/runtime-contracts/scenario/types/guide
 import type { GuideStructureOperation } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
 
-type Destination = {
-  itemId: string;
-  element: HTMLElement;
-  after: boolean;
-  beforeBlockId: string | undefined;
-};
+type Destination = GuideDropTarget;
 const ReorderSource = createContext<{
   disabled: boolean;
   start?: (event: PointerEvent<HTMLButtonElement>, blockId: string) => void;
   move?: (blockId: string, direction: -1 | 1) => void;
+  join?: (blockId: string, direction: -1 | 1) => void;
 }>({ disabled: true });
 
 function destination(
   container: HTMLElement,
   sourceId: string,
   x: number,
-  y: number
+  y: number,
+  sourceWidth: number
 ): Destination | null {
   const pane = container.closest<HTMLElement>('.guide-document-scroll');
   if (pane) {
@@ -46,40 +48,7 @@ function destination(
       x >= rect.left - 32 && x <= rect.right + 16 && y >= rect.top - 16 && y <= rect.bottom + 16
     );
   });
-  return target ? blockDestination(target, sourceId, x, y) : null;
-}
-
-function blockDestination(
-  container: HTMLElement,
-  sourceId: string,
-  x: number,
-  y: number
-): Destination | null {
-  const itemId = container.dataset['reorderStep'];
-  if (!itemId) return null;
-  const blocks = [...container.querySelectorAll<HTMLElement>('.guide-block[data-block-id]')];
-  let nearest = -1;
-  let distance = Infinity;
-  for (const [index, block] of blocks.entries()) {
-    const rect = block.getBoundingClientRect();
-    const dx = Math.max(rect.left - x, 0, x - rect.right);
-    const dy = Math.max(rect.top - y, 0, y - rect.bottom);
-    const next = dx * dx + dy * dy;
-    if (next < distance) {
-      nearest = index;
-      distance = next;
-    }
-  }
-  const block = blocks[nearest];
-  if (!block) return { itemId, element: container, after: false, beforeBlockId: undefined };
-  const rect = block.getBoundingClientRect();
-  const index = nearest + (y > rect.top + rect.height / 2 ? 1 : 0);
-  const sourceIndex = blocks.findIndex((entry) => entry.dataset['blockId'] === sourceId);
-  if (sourceIndex >= 0 && (index === sourceIndex || index === sourceIndex + 1)) return null;
-  const next = blocks[index];
-  return next
-    ? { itemId, element: next, after: false, beforeBlockId: next.dataset['blockId'] }
-    : { itemId, element: blocks[blocks.length - 1]!, after: true, beforeBlockId: undefined };
+  return target ? guideBlockDropTarget(target, sourceId, x, y, sourceWidth) : null;
 }
 
 function createPreview(block: HTMLElement) {
@@ -124,11 +93,15 @@ function startPointerReorder(
   const start = { x: event.clientX, y: event.clientY };
   let preview: ReturnType<typeof createPreview> | null = null;
   let target: Destination | null = null;
+  const sourceWidth = readGuideBlockWidth(block);
+  const markers: HTMLElement[] = [];
   let closed = false;
   let frame = 0;
   let position = start;
   const clearMarker = () => {
     target?.element.removeAttribute('data-reorder');
+    for (const marker of markers) marker.remove();
+    markers.length = 0;
     target = null;
   };
   const cancel = () => {
@@ -155,8 +128,28 @@ function startPointerReorder(
   const place = () => {
     preview?.move(position.x, position.y);
     clearMarker();
-    target = destination(container, blockId, position.x, position.y);
-    if (target) target.element.dataset['reorder'] = target.after ? 'after' : 'before';
+    target = destination(container, blockId, position.x, position.y, sourceWidth);
+    if (target) {
+      target.element.dataset['reorder'] = target.placement;
+      const shapes = [
+        { ...target.preview, percent: target.width },
+        ...(target.neighbor ? [target.neighbor] : []),
+      ];
+      for (const shape of shapes) {
+        const marker = document.createElement('div');
+        marker.className = 'guide-block-drop-preview';
+        marker.setAttribute('aria-hidden', 'true');
+        marker.textContent = shape.height > 4 ? `${shape.percent}%` : '';
+        Object.assign(marker.style, {
+          left: `${shape.left}px`,
+          top: `${shape.top}px`,
+          width: `${shape.width}px`,
+          height: `${shape.height}px`,
+        });
+        block.closest('.guide-document')?.append(marker);
+        markers.push(marker);
+      }
+    }
   };
   const scroll = () => {
     if (closed || !preview) return;
@@ -185,7 +178,9 @@ function startPointerReorder(
   };
   const finish = (next: globalThis.PointerEvent) => {
     if (next.pointerId !== pointerId) return;
-    const result = preview ? destination(container, blockId, next.clientX, next.clientY) : null;
+    const result = preview
+      ? destination(container, blockId, next.clientX, next.clientY, sourceWidth)
+      : null;
     cancel();
     if (result) commit(result);
   };
@@ -226,10 +221,18 @@ export function GuideBlockReorder({
   const operate = useRef(onOperate);
   operate.current = onOperate;
   const cancel = useRef<(() => void) | null>(null);
+  // Autosave republishes equivalent objects; only authored content changes cancel the gesture.
+  const content = JSON.stringify(item.blocks, (_key, value: unknown) =>
+    value && typeof value === 'object' && !Array.isArray(value)
+      ? Object.fromEntries(
+          Object.entries(value).sort(([left], [right]) => left.localeCompare(right))
+        )
+      : value
+  );
   useEffect(() => {
     cancel.current?.();
     return () => cancel.current?.();
-  }, [projectId, item.id, item.blocks, disabled]);
+  }, [projectId, item.id, content, disabled]);
   return (
     <ReorderSource.Provider
       value={{
@@ -240,14 +243,38 @@ export function GuideBlockReorder({
           cancel.current?.();
           cancel.current = startPointerReorder(event, container.current, blockId, (target) =>
             operate.current({
-              ...(target.itemId === item.id
-                ? { kind: 'reorder-block' as const }
-                : { kind: 'transfer-block' as const, targetItemId: target.itemId }),
+              kind: 'place-block',
               itemId: item.id,
+              targetItemId: target.itemId,
               blockId,
-              ...(target.beforeBlockId ? { beforeBlockId: target.beforeBlockId } : {}),
+              placement: target.placement,
+              ...(target.anchorBlockId ? { anchorBlockId: target.anchorBlockId } : {}),
             })
           );
+        },
+        join: (blockId, direction) => {
+          const index = item.blocks.findIndex((block) => block.id === blockId);
+          const anchor = item.blocks[index + direction];
+          if (disabled || index < 0 || !anchor) return;
+          cancel.current?.();
+          onOperate({
+            kind: 'place-block',
+            itemId: item.id,
+            targetItemId: item.id,
+            blockId,
+            anchorBlockId: anchor.id,
+            placement: direction === -1 ? 'after' : 'before',
+          });
+          const host = container.current;
+          requestAnimationFrame(() => {
+            if (!host?.isConnected) return;
+            const moved = [...host.querySelectorAll<HTMLElement>('[data-block-id]')].find(
+              (block) => block.dataset['blockId'] === blockId
+            );
+            moved
+              ?.querySelector<HTMLButtonElement>('.guide-block-grip')
+              ?.focus({ preventScroll: true });
+          });
         },
         move: (blockId, direction) => {
           const index = item.blocks.findIndex((block) => block.id === blockId);
@@ -290,10 +317,16 @@ export function GuideBlockReorderHandle({ blockId, t }: { blockId: string; t: Tr
       disabled={source.disabled}
       onPointerDown={(event) => source.start?.(event, blockId)}
       onKeyDown={(event) => {
-        if (source.disabled || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
+        if (
+          source.disabled ||
+          !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.key)
+        )
+          return;
         event.preventDefault();
         event.stopPropagation();
-        source.move?.(blockId, event.key === 'ArrowUp' ? -1 : 1);
+        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight')
+          source.join?.(blockId, event.key === 'ArrowLeft' ? -1 : 1);
+        else source.move?.(blockId, event.key === 'ArrowUp' ? -1 : 1);
       }}
     >
       <GripVertical size={15} aria-hidden="true" />

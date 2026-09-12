@@ -1,3 +1,4 @@
+import { GuideBlockRows } from './block-rows';
 import { guideReadingPages } from './reader-pages';
 import type { ReactNode } from 'react';
 import type {
@@ -83,25 +84,27 @@ export function GuideReadDocument({
               )}
               {blocks.length > 0 && (
                 <div className="guide-step-blocks">
-                  {blocks.map((block) => (
-                    <div
-                      key={block.id}
-                      className="guide-block"
-                      data-block-id={block.id}
-                      data-kind={block.kind}
-                      data-width={resolveGuideBlockWidth(item.layout, block)}
-                      style={guideBlockWidthStyle(
-                        resolveGuideBlockWidth(item.layout, block),
-                        'minHeight' in block ? block.minHeight : 0
-                      )}
-                    >
-                      {block.kind === 'image' && renderImage ? (
-                        renderImage(block)
-                      ) : (
-                        <GuideReadBlock block={block} images={images} t={t} />
-                      )}
-                    </div>
-                  ))}
+                  <GuideBlockRows blocks={item.blocks} visible={(block) => blocks.includes(block)}>
+                    {(block) => (
+                      <div
+                        key={block.id}
+                        className="guide-block"
+                        data-block-id={block.id}
+                        data-kind={block.kind}
+                        data-width={resolveGuideBlockWidth(item.layout, block)}
+                        style={guideBlockWidthStyle(
+                          resolveGuideBlockWidth(item.layout, block),
+                          'minHeight' in block ? block.minHeight : 0
+                        )}
+                      >
+                        {block.kind === 'image' && renderImage ? (
+                          renderImage(block)
+                        ) : (
+                          <GuideReadBlock block={block} images={images} t={t} />
+                        )}
+                      </div>
+                    )}
+                  </GuideBlockRows>
                 </div>
               )}
             </article>

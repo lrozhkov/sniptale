@@ -25,3 +25,29 @@ export function applyGuideLayout(step: GuideStep, layout: GuideStep['layout']): 
     }),
   };
 }
+
+/** Authored boundaries split automatic flow without creating spacer content. */
+export function splitGuideBlockRows(blocks: readonly GuideBlock[]): GuideBlock[][] {
+  const rows: GuideBlock[][] = [];
+  for (const block of blocks) {
+    if (!rows.length || block.rowStart) rows.push([]);
+    rows[rows.length - 1]!.push(block);
+  }
+  return rows;
+}
+
+/** Percentage packing matches renderer gap compensation and retains authored row starts. */
+export function resolveGuideRows(step: Pick<GuideStep, 'layout' | 'blocks'>): GuideBlock[][] {
+  const rows: GuideBlock[][] = [];
+  let used = 0;
+  for (const block of step.blocks) {
+    const width = resolveGuideBlockWidth(step.layout, block);
+    if (!rows.length || block.rowStart || used + width > 100) {
+      rows.push([]);
+      used = 0;
+    }
+    rows[rows.length - 1]!.push(block);
+    used += width;
+  }
+  return rows;
+}

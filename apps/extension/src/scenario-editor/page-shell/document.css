@@ -94,11 +94,17 @@
   --guide-row-gap: max(var(--guide-gap), 1.5rem);
   --guide-column-gap: max(var(--guide-gap), 3.5rem);
   display: flex;
+  flex-direction: column;
+  gap: var(--guide-row-gap);
+}
+.guide-block-row {
+  display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--guide-row-gap) var(--guide-column-gap);
+  width: 100%;
 }
-.guide-step-blocks > .guide-block {
+.guide-block-row > .guide-block {
   flex: 0 0
     calc(var(--guide-block-width, 100%) - var(--guide-column-gap) * var(--guide-block-gap-share, 0));
   min-width: 0;

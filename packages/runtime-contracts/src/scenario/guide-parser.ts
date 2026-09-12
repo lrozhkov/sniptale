@@ -29,6 +29,7 @@ const textStyle = z
   .strict()
   .optional();
 const minHeight = z.number().int().min(0).max(GUIDE_LIMITS.maxDimension).optional();
+const rowStart = z.boolean().optional();
 const width = z
   .union([
     z.enum(['full', 'half']),
@@ -140,6 +141,7 @@ const image = z
     htmlExport,
     id,
     width,
+    rowStart,
     assetId: id,
     galleryAssetId: id.nullable(),
     editDocumentId: id.nullable(),
@@ -179,14 +181,24 @@ export const guideStepParametersSchema = z
 const noteTone = z.enum(['neutral', 'info', 'warning', 'error']);
 /** Safe parameter surfaces exclude content identity and media ownership. */
 export const guideBlockParameterSchemas = {
-  heading: z.object({ width, minHeight, textStyle }).strict(),
-  text: z.object({ width, minHeight, textStyle }).strict(),
-  note: z.object({ width, minHeight, textStyle, tone: noteTone.optional() }).strict(),
+  heading: z.object({ width, rowStart, minHeight, textStyle }).strict(),
+  text: z.object({ width, rowStart, minHeight, textStyle }).strict(),
+  note: z.object({ width, rowStart, minHeight, textStyle, tone: noteTone.optional() }).strict(),
   image: image
-    .pick({ width: true, frame: true, fit: true, contentTransform: true, htmlExport: true })
+    .pick({
+      width: true,
+      rowStart: true,
+      frame: true,
+      fit: true,
+      contentTransform: true,
+      htmlExport: true,
+    })
     .partial()
     .strict(),
-  'image-slot': image.pick({ width: true, frame: true, fit: true }).partial().strict(),
+  'image-slot': image
+    .pick({ width: true, rowStart: true, frame: true, fit: true })
+    .partial()
+    .strict(),
 };
 
 const projectSchema = z
@@ -259,6 +271,7 @@ const projectSchema = z
                       .pick({
                         id: true,
                         width: true,
+                        rowStart: true,
                         frame: true,
                         fit: true,
                         alt: true,

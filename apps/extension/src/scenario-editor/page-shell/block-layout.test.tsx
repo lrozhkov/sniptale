@@ -286,3 +286,25 @@ it('matches neighboring height and removes guides on pointer cancellation', asyn
   expect(height).not.toHaveBeenCalled();
   neighbor.remove();
 });
+
+it('keeps custom size magnets across authored row containers', async () => {
+  await render();
+  const step = document.createElement('div');
+  step.className = 'guide-step-blocks';
+  document.body.append(step);
+  step.append(host);
+  const row = document.createElement('div');
+  row.className = 'guide-block-row';
+  const neighbor = document.createElement('div');
+  neighbor.className = 'guide-block';
+  neighbor.dataset['width'] = '63';
+  row.append(neighbor);
+  step.append(row);
+  await pointer('pointerdown', 400);
+  await pointer('pointermove', 255);
+  expect(host.firstElementChild?.getAttribute('data-width')).toBe('63');
+  expect(neighbor.dataset['sizeMatch']).toBe('width');
+  await pointer('pointerup', 255);
+  expect(change).toHaveBeenCalledWith(63);
+  step.remove();
+});
