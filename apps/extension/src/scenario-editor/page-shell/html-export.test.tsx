@@ -4,8 +4,9 @@ import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
 import { createGuideProject } from '../../features/scenario/project/public';
 import { createTranslator } from '../../platform/i18n';
-const { save } = vi.hoisted(() => ({ save: vi.fn() }));
+const { save, markdown } = vi.hoisted(() => ({ save: vi.fn(), markdown: vi.fn() }));
 vi.mock('./runtime/html-export', () => ({ exportGuideHtml: save }));
+vi.mock('./runtime/markdown-export', () => ({ exportGuideMarkdown: markdown }));
 import { GuideHtmlExport } from './html-export';
 it('prevents duplicates, cancels and ignores completion after unmount', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -26,14 +27,35 @@ it('prevents duplicates, cancels and ignores completion after unmount', async ()
   await act(async () => {
     host.querySelector('button')!.click();
     host.querySelector('button')!.click();
+    host.querySelectorAll('button')[1]!.click();
   });
   expect(save).toHaveBeenCalledTimes(1);
+  expect(markdown).not.toHaveBeenCalled();
   const args = save.mock.calls[0]![0];
-  await act(async () => host.querySelectorAll('button')[1]!.click());
+  await act(async () => host.querySelectorAll('button')[2]!.click());
   expect(args.signal.aborted).toBe(true);
   await act(async () => root.unmount());
   await act(async () => done?.('saved'));
   vi.unstubAllGlobals();
+});
+it('shares command state with Markdown and reports its completion', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  markdown.mockReset().mockResolvedValue('saved');
+  const host = document.createElement('div');
+  const root = createRoot(host);
+  try {
+    await act(async () =>
+      root.render(
+        <GuideHtmlExport project={createGuideProject('Guide')} t={createTranslator('en')} />
+      )
+    );
+    await act(async () => host.querySelectorAll('button')[1]!.click());
+    expect(markdown).toHaveBeenCalledTimes(1);
+    expect(host.textContent).toContain('Markdown saved');
+  } finally {
+    await act(async () => root.unmount());
+    vi.unstubAllGlobals();
+  }
 });
 it('shows failure, allows retry and distinguishes history failure', async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);

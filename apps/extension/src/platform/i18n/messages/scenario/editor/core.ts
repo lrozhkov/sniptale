@@ -1,5 +1,16 @@
 import { defineMessageSource } from '../../source';
 export const scenarioEditorCoreMessages = defineMessageSource({
+  guideMarkdownArchive: { ru: 'Markdown с изображениями', en: 'Markdown with images' },
+  guideMarkdownExport: {
+    ru: 'Сохранить Markdown с изображениями (ZIP)',
+    en: 'Save Markdown with images (ZIP)',
+  },
+  guideMarkdownPreparing: { ru: 'Сохранение Markdown…', en: 'Saving Markdown…' },
+  guideMarkdownSaved: { ru: 'Markdown сохранён', en: 'Markdown saved' },
+  guideMarkdownFailed: {
+    ru: 'Не удалось сохранить Markdown. Повторите попытку.',
+    en: 'Could not save Markdown. Try again.',
+  },
   guideHtmlExport: { ru: 'Сохранить автономный HTML', en: 'Save standalone HTML' },
   guideHtmlPreparing: { ru: 'Сохранение HTML…', en: 'Saving HTML…' },
   guideHtmlSaved: { ru: 'HTML сохранён', en: 'HTML saved' },
