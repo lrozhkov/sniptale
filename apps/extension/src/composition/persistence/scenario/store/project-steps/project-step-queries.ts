@@ -1,5 +1,8 @@
 import { getScenarioProject } from '../../projects';
-import type { ScenarioRecentStep } from '../../../../../features/scenario/contracts/types/project';
+import type {
+  ScenarioRecentStep,
+  ScenarioPreviewStep,
+} from '../../../../../features/scenario/contracts/types/project';
 import { getScenarioAssetBlob } from '../project-records/assets';
 import {
   buildRecentScenarioSteps,
@@ -23,8 +26,8 @@ export async function listRecentScenarioSteps(
   });
 }
 
-/** Returns a small library preview; complete readers load the full guide. */
-export async function listScenarioPreviewSteps(projectId: string): Promise<ScenarioRecentStep[]> {
+/** Returns complete library preview metadata without acquiring image bytes. */
+export async function listScenarioPreviewSteps(projectId: string): Promise<ScenarioPreviewStep[]> {
   const project = await getScenarioProject(projectId);
-  return project ? buildGuidePreviewSteps({ project, getAssetBlob: getScenarioAssetBlob }) : [];
+  return project ? buildGuidePreviewSteps({ project }) : [];
 }

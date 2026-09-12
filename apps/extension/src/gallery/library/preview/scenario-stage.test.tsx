@@ -67,10 +67,15 @@ it('renders an empty scenario preview when no recent steps are available', async
 });
 
 it('renders recent steps for scenario exports', async () => {
-  listScenarioPreviewStepsMock.mockResolvedValue([
-    { id: 'step-1', position: 0, numberLabel: '1', previewDataUrl: 'data:1', title: 'First step' },
-    { id: 'step-2', position: 1, numberLabel: '2', previewDataUrl: 'data:2', title: 'Second step' },
-  ]);
+  listScenarioPreviewStepsMock.mockResolvedValue(
+    Array.from({ length: 8 }, (_, index) => ({
+      id: `step-${index}`,
+      position: index,
+      numberLabel: String(index + 1),
+      images: [],
+      title: index === 0 ? 'First step' : `Step title ${index}`,
+    }))
+  );
 
   act(() => {
     root?.render(
@@ -95,5 +100,5 @@ it('renders recent steps for scenario exports', async () => {
   expect(container?.textContent).toContain('scenario.html');
   expect(container?.textContent).toContain('First step');
   expect(container?.textContent).toContain('gallery.app.scenarioStepLabel 1');
-  expect(container?.querySelectorAll('img')).toHaveLength(2);
+  expect(container?.querySelectorAll('article')).toHaveLength(8);
 });

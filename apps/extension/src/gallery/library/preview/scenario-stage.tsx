@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { translate } from '../../../platform/i18n';
 import { listScenarioPreviewSteps } from '../../../composition/persistence/scenario/store/project-steps/project-step-queries';
-import type { ScenarioRecentStep } from '../../../features/scenario/contracts/types/project';
+import type { ScenarioPreviewStep } from '../../../features/scenario/contracts/types/project';
 import { isGalleryScenarioExportItem, isGalleryScenarioItem, type GalleryItem } from '../items';
 import { ScenarioPreviewStepCard } from './scenario-step-card';
 
@@ -31,7 +31,7 @@ function ScenarioPreviewEmptyState(props: { exportMode: boolean }) {
 
 function ScenarioPreviewStepsGrid(props: {
   exportMode: boolean;
-  recentSteps: ScenarioRecentStep[];
+  recentSteps: ScenarioPreviewStep[];
   title: string;
 }) {
   return (
@@ -49,8 +49,8 @@ function ScenarioPreviewStepsGrid(props: {
       {props.recentSteps.length === 0 ? (
         <ScenarioPreviewEmptyState exportMode={props.exportMode} />
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {props.recentSteps.slice(0, 6).map((step) => (
+        <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {props.recentSteps.map((step) => (
             <ScenarioPreviewStepCard key={step.id} step={step} />
           ))}
         </div>
@@ -61,7 +61,7 @@ function ScenarioPreviewStepsGrid(props: {
 
 export function PreviewScenarioStage(props: { item: GalleryItem }) {
   const [status, setStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading');
-  const [recentSteps, setRecentSteps] = useState<ScenarioRecentStep[]>([]);
+  const [recentSteps, setRecentSteps] = useState<ScenarioPreviewStep[]>([]);
 
   useEffect(() => {
     if (!isGalleryScenarioItem(props.item) && !isGalleryScenarioExportItem(props.item)) {

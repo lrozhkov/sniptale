@@ -85,12 +85,18 @@ it('keeps text-only and imported steps in library order, including missing-image
   imported.blocks.push(image);
   project.items = [createGuideStep('Text', 'text'), imported];
   const getAssetBlob = vi.fn(async () => undefined);
-  expect(await buildGuidePreviewSteps({ project, getAssetBlob })).toEqual([
-    { id: 'text', title: 'Text', position: 0, numberLabel: '1', previewDataUrl: '' },
-    { id: 'import', title: 'Imported image', position: 1, numberLabel: '2', previewDataUrl: '' },
+  expect(await buildGuidePreviewSteps({ project })).toEqual([
+    { id: 'text', title: 'Text', position: 0, numberLabel: '1', images: [] },
+    {
+      id: 'import',
+      title: '',
+      position: 1,
+      numberLabel: '2',
+      images: [expect.objectContaining({ assetId: 'asset', caption: 'Imported image' })],
+    },
   ]);
   expect(await buildRecentScenarioSteps({ project, getAssetBlob })).toEqual([]);
-  expect(getAssetBlob).toHaveBeenCalledExactlyOnceWith('asset');
+  expect(getAssetBlob).not.toHaveBeenCalled();
 });
 
 it('uses shared hidden, restart and manual labels before filtering media or reversing captures', async () => {
@@ -119,7 +125,27 @@ it('uses shared hidden, restart and manual labels before filtering media or reve
     { id: 'manual', position: 2, numberLabel: 'A.1' },
     { id: 'hidden', position: 1, numberLabel: null },
   ]);
-  const preview = await buildGuidePreviewSteps({ project, getAssetBlob });
+  const preview = await buildGuidePreviewSteps({ project });
   expect(preview.map(({ numberLabel }) => numberLabel)).toEqual([null, 'A.1', '3', '4', '8']);
   expect(project).toEqual(original);
+});
+
+it('projects every image beyond six steps without sharing mutable geometry', () => {
+  const project = createGuideProject('Complete guide');
+  project.items = Array.from({ length: 8 }, (_, index) => captureStep(`step-${index}`));
+  const last = project.items[7]!;
+  if (last.kind !== 'step') throw new Error('Expected step');
+  const extra = createGuideImageBlock({
+    id: 'extra',
+    assetId: 'extra-asset',
+    width: 90,
+    height: 120,
+    source: { kind: 'import', filename: 'extra.png' },
+  });
+  last.blocks.push(extra);
+  const preview = buildGuidePreviewSteps({ project });
+  expect(preview).toHaveLength(8);
+  expect(preview[7]?.images.map((image) => image.assetId)).toEqual(['step-7-asset', 'extra-asset']);
+  preview[7]!.images[1]!.frame.width = 10;
+  expect(extra.frame.width).toBe(90);
 });

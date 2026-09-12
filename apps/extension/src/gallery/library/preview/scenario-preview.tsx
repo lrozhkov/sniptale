@@ -6,7 +6,7 @@ import { listScenarioPreviewSteps } from '../../../composition/persistence/scena
 import { getScenarioProjectRecord } from '../../../composition/persistence/scenario/store/project-records/index';
 import type {
   ScenarioProjectSummary,
-  ScenarioRecentStep,
+  ScenarioPreviewStep,
 } from '../../../features/scenario/contracts/types/project';
 import { formatDate } from '../ui';
 import { ScenarioPreviewStepCard } from './scenario-step-card';
@@ -19,7 +19,7 @@ interface GalleryScenarioPreviewPanelProps {
 function ScenarioPreviewSurface(props: { children: ReactNode }) {
   return (
     <div
-      className="flex min-h-0 flex-1 items-center justify-center
+      className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto
         bg-[radial-gradient(circle_at_top,
           color-mix(in_srgb,var(--sniptale-color-accent-soft)_80%,transparent),
           color-mix(in_srgb,var(--sniptale-color-surface-panel)_38%,var(--sniptale-color-surface-canvas)_62%)_40%,
@@ -50,10 +50,10 @@ function ScenarioPreviewEmptyState() {
   );
 }
 
-function ScenarioPreviewStepsGrid(props: { recentSteps: ScenarioRecentStep[] }) {
+function ScenarioPreviewStepsGrid(props: { recentSteps: ScenarioPreviewStep[] }) {
   return (
-    <div className="grid w-full max-w-5xl gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {props.recentSteps.slice(0, 6).map((step) => (
+    <div className="grid w-full max-w-5xl items-start gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {props.recentSteps.map((step) => (
         <ScenarioPreviewStepCard key={step.id} step={step} />
       ))}
     </div>
@@ -61,7 +61,7 @@ function ScenarioPreviewStepsGrid(props: { recentSteps: ScenarioRecentStep[] }) 
 }
 
 function ScenarioPreviewHero(props: {
-  recentSteps: ScenarioRecentStep[];
+  recentSteps: ScenarioPreviewStep[];
   status: 'loading' | 'ready' | 'unavailable';
 }) {
   return (
@@ -179,7 +179,7 @@ function ScenarioPreviewSidebar(props: {
 function useScenarioPreviewDetails(project: ScenarioProjectSummary) {
   const projectId = project.id;
   const [status, setStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading');
-  const [recentSteps, setRecentSteps] = useState<ScenarioRecentStep[]>([]);
+  const [recentSteps, setRecentSteps] = useState<ScenarioPreviewStep[]>([]);
   const [stepCount, setStepCount] = useState<number | null>(null);
 
   useEffect(() => {

@@ -4,7 +4,7 @@ import type {
   GuideProject,
   GuideImageBlock,
 } from '@sniptale/runtime-contracts/scenario/types/guide';
-import type { ScenarioRecentStep } from '../contracts/types/project';
+import type { ScenarioRecentStep, ScenarioPreviewStep } from '../contracts/types/project';
 
 /** Projects recent captured images without changing document ordering or media ownership. */
 export async function buildRecentScenarioSteps(args: {
@@ -42,27 +42,38 @@ export async function buildRecentScenarioSteps(args: {
   return steps.filter((step): step is ScenarioRecentStep => step !== null);
 }
 
-/** Library previews include imported images and text-only steps, in document order. */
-export async function buildGuidePreviewSteps(args: {
-  getAssetBlob: (assetId: string) => Promise<Blob | undefined>;
+/** Projects every library step and image without eagerly acquiring media bytes. */
+export function buildGuidePreviewSteps({
+  project,
+}: {
   project: GuideProject;
-  limit?: number;
-}): Promise<ScenarioRecentStep[]> {
-  const numbering = resolveGuideNumbering(args.project.items);
-  const steps = args.project.items
-    .flatMap((item, position) => (item.kind === 'step' ? [{ step: item, position }] : []))
-    .slice(0, args.limit ?? 6);
-  return Promise.all(
-    steps.map(async ({ step, position }) => {
-      const image = step.blocks.find((block) => block.kind === 'image');
-      const blob = image ? await args.getAssetBlob(image.assetId) : undefined;
-      return {
+}): ScenarioPreviewStep[] {
+  const numbering = resolveGuideNumbering(project.items);
+  return project.items.flatMap((step, position) => {
+    if (step.kind !== 'step') return [];
+    const images = step.blocks.flatMap((block) =>
+      block.kind === 'image'
+        ? [
+            {
+              id: block.id,
+              assetId: block.assetId,
+              alt: block.alt,
+              caption: block.caption,
+              frame: { ...block.frame },
+              fit: block.fit,
+              contentTransform: { ...block.contentTransform },
+            },
+          ]
+        : []
+    );
+    return [
+      {
         id: step.id,
-        title: step.title || (image?.caption ?? ''),
+        title: step.title,
         position,
         numberLabel: numbering.get(step.id)?.label ?? null,
-        previewDataUrl: blob ? await blobToDataUrl(blob) : '',
-      };
-    })
-  );
+        images,
+      },
+    ];
+  });
 }

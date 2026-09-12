@@ -1,3 +1,4 @@
+import type { GuideImageBlock } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type {
   ScenarioCaptureSourceKind,
   ScenarioCaptureSurface,
@@ -37,4 +38,16 @@ export interface ScenarioRecentStep {
   numberLabel: string | null;
   previewDataUrl: string;
   title: string;
+}
+
+/** Read-only library projection; image bytes are acquired by the visible preview owner. */
+export interface ScenarioPreviewStep {
+  id: string;
+  title: string;
+  position: number;
+  numberLabel: string | null;
+  images: Pick<
+    GuideImageBlock,
+    'id' | 'assetId' | 'alt' | 'caption' | 'frame' | 'fit' | 'contentTransform'
+  >[];
 }

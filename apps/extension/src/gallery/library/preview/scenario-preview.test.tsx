@@ -66,7 +66,7 @@ beforeEach(() => {
       id: 'step-1',
       position: 0,
       numberLabel: '1',
-      previewDataUrl: 'data:image/png;base64,one',
+      images: [],
       title: 'Intro',
     },
   ]);
@@ -89,6 +89,15 @@ afterEach(() => {
 
 it('loads recent scenario steps and opens the scenario editor from preview', async () => {
   const onClose = vi.fn();
+  listScenarioPreviewStepsMock.mockResolvedValue(
+    Array.from({ length: 8 }, (_, index) => ({
+      id: `step-${index}`,
+      title: index === 0 ? 'Intro' : `Title ${index}`,
+      position: index,
+      numberLabel: String(index + 1),
+      images: [],
+    }))
+  );
 
   act(() => {
     root?.render(
@@ -129,6 +138,7 @@ it('loads recent scenario steps and opens the scenario editor from preview', asy
   expect(openScenarioEditorPageMock).toHaveBeenCalledWith('project-1');
   expect(onClose).toHaveBeenCalledTimes(1);
   expect(container?.textContent).toContain('Intro');
+  expect(container?.querySelectorAll('article')).toHaveLength(8);
 });
 
 it.each(['unsupported', 'invalid'] as const)(
