@@ -48,7 +48,7 @@ describe('scenario-view-props-state', () => {
         {
           id: 'step-1',
           position: 0,
-          stepNumber: 1,
+          numberLabel: '1',
           previewDataUrl: 'data:image/png;base64,1',
           title: 'Step 1',
         },

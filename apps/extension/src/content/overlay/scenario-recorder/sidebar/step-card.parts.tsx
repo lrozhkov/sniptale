@@ -76,21 +76,24 @@ export function ScenarioRecorderStepRail(props: {
   onDeleteStep: (stepId: string) => void;
   onInspectStep: (step: ScenarioRecorderSidebarStep) => void;
   step: ScenarioRecorderSidebarStep;
-  stepNumber: number;
 }) {
   return (
     <div
       data-ui="content.scenario.sidebar.step-rail"
       className="flex flex-col items-center gap-2 pt-0.5"
     >
-      <div
-        className="flex h-7 w-7 items-center justify-center rounded-full border
-          border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_76%,transparent)]
-          bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_58%,transparent)]
-          text-xs font-semibold text-[var(--sniptale-color-text-primary)]"
-      >
-        {props.stepNumber}
-      </div>
+      {props.step.numberLabel !== null && (
+        <div
+          data-ui="content.scenario.sidebar.step-number"
+          className="flex min-h-7 min-w-7 max-w-20 items-center justify-center rounded-full border
+            px-1.5 text-center [overflow-wrap:anywhere]
+            border-[color:color-mix(in_srgb,var(--sniptale-color-border-soft)_76%,transparent)]
+            bg-[color:color-mix(in_srgb,var(--sniptale-color-surface-hover)_58%,transparent)]
+            text-xs font-semibold text-[var(--sniptale-color-text-primary)]"
+        >
+          {props.step.numberLabel}
+        </div>
+      )}
       <ScenarioRecorderStepActions
         onDeleteStep={props.onDeleteStep}
         onInspectStep={props.onInspectStep}

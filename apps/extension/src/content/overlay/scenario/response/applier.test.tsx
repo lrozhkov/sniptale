@@ -74,7 +74,7 @@ function createSnapshotResponseFixture() {
       },
     ] satisfies ScenarioProjectSummary[],
     expectedRecentSteps: [
-      { id: 'step-1', position: 0, stepNumber: 1, previewDataUrl: 'data:1', title: 'Step 1' },
+      { id: 'step-1', position: 0, numberLabel: '1', previewDataUrl: 'data:1', title: 'Step 1' },
     ] satisfies ScenarioRecentStep[],
     snapshot,
   };
@@ -97,7 +97,7 @@ function applySnapshotResponseFixture() {
 
 function applyResponseDataFixture() {
   const recentSteps = [
-    { id: 'step-1', position: 0, stepNumber: 1, previewDataUrl: 'data:1', title: 'Step 1' },
+    { id: 'step-1', position: 0, numberLabel: '1', previewDataUrl: 'data:1', title: 'Step 1' },
   ];
 
   act(() => {

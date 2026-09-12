@@ -59,7 +59,7 @@ it('parses scenario session responses with projects and step metadata', () => {
       {
         id: 'step-1',
         position: 0,
-        stepNumber: 1,
+        numberLabel: '1',
         previewDataUrl: 'data:image/png;base64,1',
         title: 'Step 1',
       },

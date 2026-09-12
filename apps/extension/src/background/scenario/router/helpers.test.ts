@@ -203,7 +203,7 @@ it('loads session payload and project selection details through shared store sea
     expect.objectContaining({
       id: 'slide-1',
       position: 0,
-      stepNumber: 1,
+      numberLabel: '1',
       previewDataUrl: 'data:image/png;base64,preview',
       title: 'Captured step',
     }),

@@ -18,9 +18,11 @@ export function ScenarioPreviewStepCard(props: { step: ScenarioRecentStep }) {
         <div className="truncate text-sm font-semibold text-[var(--sniptale-color-text-primary)]">
           {props.step.title}
         </div>
-        <div className="mt-2 text-xs text-[var(--sniptale-color-text-muted)]">
-          {translate('gallery.app.scenarioStepLabel')} {props.step.stepNumber}
-        </div>
+        {props.step.numberLabel !== null && (
+          <div className="mt-2 break-words text-xs text-[var(--sniptale-color-text-muted)]">
+            {translate('gallery.app.scenarioStepLabel')} {props.step.numberLabel}
+          </div>
+        )}
       </div>
     </div>
   );

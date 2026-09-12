@@ -18,7 +18,7 @@ function createStep(overrides?: Partial<ScenarioRecorderSidebarStep>): ScenarioR
   return {
     id: 'step-1',
     position: 0,
-    stepNumber: 1,
+    numberLabel: '1',
     previewDataUrl: 'data:image/png;base64,1',
     title: 'Step one',
     ...overrides,
@@ -83,7 +83,6 @@ function verifiesRailActions() {
       onDeleteStep={onDeleteStep}
       onInspectStep={onInspectStep}
       step={step}
-      stepNumber={1}
     />
   );
 
@@ -130,6 +129,34 @@ function verifiesPreviewOpen() {
 describe('ScenarioRecorderStepRail', () => {
   beforeEach(mountPartsTestRoot);
   afterEach(unmountPartsTestRoot);
+  it('hides only the number while retaining actions and renders custom labels literally', () => {
+    const remove = vi.fn();
+    renderNode(
+      <ScenarioRecorderStepRail
+        step={createStep({ numberLabel: null })}
+        onDeleteStep={remove}
+        onInspectStep={vi.fn()}
+      />
+    );
+    expect(container?.querySelector('[data-ui="content.scenario.sidebar.step-number"]')).toBeNull();
+    act(() =>
+      container
+        ?.querySelector<HTMLButtonElement>('[data-ui="content.scenario.sidebar.step-delete"]')
+        ?.click()
+    );
+    expect(remove).toHaveBeenCalledWith('step-1');
+    renderNode(
+      <ScenarioRecorderStepRail
+        step={createStep({ numberLabel: '<b>A.1</b>' })}
+        onDeleteStep={remove}
+        onInspectStep={vi.fn()}
+      />
+    );
+    expect(
+      container?.querySelector('[data-ui="content.scenario.sidebar.step-number"]')?.textContent
+    ).toBe('<b>A.1</b>');
+    expect(container?.querySelector('b')).toBeNull();
+  });
 
   it(
     'renders action buttons in the required order and wires info/delete callbacks',

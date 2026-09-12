@@ -51,7 +51,7 @@ function createValidSessionPayload() {
       {
         id: 'step-1',
         position: 0,
-        stepNumber: 1,
+        numberLabel: '1',
         previewDataUrl: 'data:image/png;base64,1',
         title: 'Step 1',
       },
@@ -266,15 +266,35 @@ it('validates recorder surface, restore snapshots, and recent step metadata', ()
   ).toBe(false);
 });
 
-it.each([undefined, null, 0, -1, 1.5, Number.POSITIVE_INFINITY, '1'])(
-  'rejects a recent step without a positive integer ordinal: %s',
-  (stepNumber) => {
+it.each([undefined, 0, -1, 1.5, Number.POSITIVE_INFINITY, '', '  ', 'x'.repeat(33), {}, []])(
+  'rejects a recent step without a valid display label: %s',
+  (numberLabel) => {
     const payload = createValidSessionPayload();
     expect(
       isScenarioSessionPayload({
         ...payload,
-        recentSteps: [{ ...payload.recentSteps[0], stepNumber }],
+        recentSteps: [{ ...payload.recentSteps[0], numberLabel }],
       })
     ).toBe(false);
   }
 );
+
+it.each([null, '1', 'A.1', '<b>literal</b>', 'x'.repeat(32)])(
+  'accepts an explicit bounded display label: %s',
+  (numberLabel) => {
+    const payload = createValidSessionPayload();
+    expect(
+      isScenarioSessionPayload({
+        ...payload,
+        recentSteps: [{ ...payload.recentSteps[0], numberLabel }],
+      })
+    ).toBe(true);
+  }
+);
+it('rejects an ordinal-only recent-step payload without the current display label', () => {
+  const payload = createValidSessionPayload();
+  const { numberLabel: _label, ...oldStep } = payload.recentSteps[0]!;
+  expect(
+    isScenarioSessionPayload({ ...payload, recentSteps: [{ ...oldStep, stepNumber: 1 }] })
+  ).toBe(false);
+});

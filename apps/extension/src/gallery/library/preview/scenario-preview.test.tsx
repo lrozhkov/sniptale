@@ -65,7 +65,7 @@ beforeEach(() => {
     {
       id: 'step-1',
       position: 0,
-      stepNumber: 1,
+      numberLabel: '1',
       previewDataUrl: 'data:image/png;base64,one',
       title: 'Intro',
     },

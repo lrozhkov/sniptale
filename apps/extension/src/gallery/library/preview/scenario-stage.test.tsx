@@ -68,8 +68,8 @@ it('renders an empty scenario preview when no recent steps are available', async
 
 it('renders recent steps for scenario exports', async () => {
   listScenarioPreviewStepsMock.mockResolvedValue([
-    { id: 'step-1', position: 0, stepNumber: 1, previewDataUrl: 'data:1', title: 'First step' },
-    { id: 'step-2', position: 1, stepNumber: 2, previewDataUrl: 'data:2', title: 'Second step' },
+    { id: 'step-1', position: 0, numberLabel: '1', previewDataUrl: 'data:1', title: 'First step' },
+    { id: 'step-2', position: 1, numberLabel: '2', previewDataUrl: 'data:2', title: 'Second step' },
   ]);
 
   act(() => {

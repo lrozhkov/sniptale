@@ -1,3 +1,4 @@
+import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type {
   ScenarioProjectSummary,
   ScenarioRecentStep,
@@ -57,9 +58,10 @@ function isScenarioRecentStep(value: unknown): value is ScenarioRecentStep {
       );
     }) &&
     isNumber(value['position']) &&
-    isNumber(value['stepNumber']) &&
-    Number.isSafeInteger(value['stepNumber']) &&
-    value['stepNumber'] > 0 &&
+    (value['numberLabel'] === null ||
+      (isString(value['numberLabel']) &&
+        value['numberLabel'].trim().length > 0 &&
+        value['numberLabel'].length <= GUIDE_LIMITS.maxNumberLabelLength)) &&
     isString(value['previewDataUrl']) &&
     isString(value['title'])
   );

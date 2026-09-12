@@ -46,7 +46,7 @@ describe('project step queries', () => {
         id: second.id,
         title: 'Second',
         position: 1,
-        stepNumber: 2,
+        numberLabel: '2',
         previewDataUrl: 'data:image/png;base64,preview',
       }),
     ]);

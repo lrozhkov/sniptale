@@ -35,7 +35,7 @@ function expectCollectionApplyAndHighlight() {
       },
     ],
     recentSteps: [
-      { id: 'step-2', position: 0, stepNumber: 1, previewDataUrl: 'data:2', title: 'Step 2' },
+      { id: 'step-2', position: 0, numberLabel: '1', previewDataUrl: 'data:2', title: 'Step 2' },
     ],
     success: true,
   };

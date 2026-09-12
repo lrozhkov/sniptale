@@ -33,8 +33,8 @@ export interface ScenarioRecentStep {
   };
   /** Document item index used as the drag/drop destination. */
   position: number;
-  /** One-based ordinal among steps; sections never increment it. */
-  stepNumber: number;
+  /** Resolved display label; null hides numbering without changing document position. */
+  numberLabel: string | null;
   previewDataUrl: string;
   title: string;
 }

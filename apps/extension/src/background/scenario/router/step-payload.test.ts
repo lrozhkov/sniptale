@@ -67,7 +67,7 @@ it('builds capture session previews from the canonical guide and durable image b
       expect.objectContaining({
         id: 'capture-1',
         position: 1,
-        stepNumber: 2,
+        numberLabel: '2',
         title: 'Captured step',
         previewDataUrl: 'data:image/png;base64,preview',
         metadata: expect.objectContaining({ captureSurface: 'visible', sourceKind: 'manual' }),

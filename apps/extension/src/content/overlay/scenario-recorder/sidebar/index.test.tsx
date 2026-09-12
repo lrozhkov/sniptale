@@ -20,14 +20,14 @@ const DEFAULT_STEPS: ScenarioRecorderSidebarStep[] = [
   {
     id: 'step-10',
     position: 9,
-    stepNumber: 10,
+    numberLabel: '10',
     previewDataUrl: 'data:image/png;base64,1',
     title: 'Step ten',
   },
   {
     id: 'step-9',
     position: 8,
-    stepNumber: 9,
+    numberLabel: '9',
     previewDataUrl: 'data:image/png;base64,2',
     title: 'Step nine',
   },
@@ -178,7 +178,7 @@ it('animates only newly added steps instead of keeping the first render highligh
     {
       id: 'step-11',
       position: 10,
-      stepNumber: 11,
+      numberLabel: '11',
       previewDataUrl: 'data:image/png;base64,3',
       title: 'Step eleven',
     },
@@ -202,7 +202,7 @@ it('can start a deferred highlight for the latest step after remount', async () 
     {
       id: 'step-11',
       position: 10,
-      stepNumber: 11,
+      numberLabel: '11',
       previewDataUrl: 'data:image/png;base64,3',
       title: 'Step eleven',
     },
@@ -228,7 +228,7 @@ it('renders every available step instead of trimming the sidebar to the latest s
   const longStepList = Array.from({ length: 9 }, (_, index) => ({
     id: `step-${index + 1}`,
     position: index,
-    stepNumber: index + 1,
+    numberLabel: String(index + 1),
     previewDataUrl: `data:image/png;base64,${index + 1}`,
     title: `Step ${index + 1}`,
   }));

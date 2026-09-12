@@ -36,7 +36,7 @@ function createStep(overrides?: Partial<ScenarioRecorderSidebarStep>): ScenarioR
   return {
     id: 'step-2',
     position: 3,
-    stepNumber: 2,
+    numberLabel: '2',
     previewDataUrl: 'data:image/png;base64,2',
     title: 'Step two',
     ...overrides,
