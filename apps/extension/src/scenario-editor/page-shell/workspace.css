@@ -1548,7 +1548,8 @@ html[data-guide-reordering] .guide-block-grip {
 }
 .guide-voice-control {
   position: absolute;
-  top: 0.125rem;
+  display: flex;
+  top: min(0.5rem, calc((100% - 1.5rem) / 2));
   right: 2.5rem;
   z-index: 2;
   opacity: 0;

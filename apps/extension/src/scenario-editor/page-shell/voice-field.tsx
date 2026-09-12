@@ -145,13 +145,22 @@ function insertTranscript(
     0,
     (current.maxLength ?? GUIDE_LIMITS.maxTextLength) - current.value.length + end - start
   );
-  const text = (current.singleLine ? transcript.replace(/[\r\n]+/g, ' ') : transcript).slice(
-    0,
-    available
-  );
+  const spoken = current.singleLine ? transcript.replace(/[\r\n]+/g, ' ') : transcript;
+  const before = current.value.slice(0, start);
+  const after = current.value.slice(end);
+  const leading = transcriptSeparator(before, spoken);
+  const trailing = transcriptSeparator(spoken, after);
+  const text = spoken.slice(0, Math.max(0, available - leading.length - trailing.length));
   if (!text) return null;
   return {
-    value: current.value.slice(0, start) + text + current.value.slice(end),
-    caret: start + text.length,
+    value: before + leading + text + trailing + after,
+    caret: start + leading.length + text.length,
   };
+}
+
+/** Adds word boundaries without rewriting existing whitespace or dictated punctuation. */
+function transcriptSeparator(before: string, after: string): string {
+  return /[\p{L}\p{N}\p{M})\]}»”"'.!?…,:;]$/u.test(before) && /^[\p{L}\p{N}\p{M}([{«“]/u.test(after)
+    ? ' '
+    : '';
 }

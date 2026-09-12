@@ -51,12 +51,14 @@ function Editor({
   disabled = false,
   maxLength = 100,
   singleLine = false,
+  initialValue = 'hello world',
 }: {
   disabled?: boolean;
   maxLength?: number;
   singleLine?: boolean;
+  initialValue?: string;
 }) {
-  const [value, setValue] = useState('hello world');
+  const [value, setValue] = useState(initialValue);
   return (
     <GuideVoiceField
       aria-label="Body"
@@ -157,4 +159,53 @@ it('tracks an explicitly moved caret during dictation', async () => {
   });
   await transcript('Hi');
   expect(field().value).toBe('Hi world');
+});
+
+it.each([false, true])(
+  'separates unspaced final chunks from existing text (singleLine=%s)',
+  async (singleLine) => {
+    await mount({ singleLine, initialValue: 'Привет' });
+    field().setSelectionRange(6, 6);
+    await click('Start');
+    await transcript('мир');
+    expect(field().value).toBe('Привет мир');
+    await transcript('снова', 2);
+    expect(field().value).toBe('Привет мир снова');
+    expect(field().selectionStart).toBe(field().value.length);
+  }
+);
+it.each([
+  ['Hello ', 'world', 'Hello world'],
+  ['Hello', ' world', 'Hello world'],
+  ['Hello\n', 'world', 'Hello\nworld'],
+  ['Hello.', 'World', 'Hello. World'],
+  ['Hello', ', world', 'Hello, world'],
+  ['(', 'word', '(word'],
+])('preserves whitespace and punctuation for %j + %j', async (initialValue, spoken, expected) => {
+  await mount({ initialValue });
+  field().setSelectionRange(initialValue.length, initialValue.length);
+  await click('Start');
+  await transcript(spoken);
+  expect(field().value).toBe(expected);
+});
+it('separates dictated words from both sides while keeping the caret before the following text', async () => {
+  await mount({ initialValue: 'HelloWorld' });
+  field().setSelectionRange(5, 5);
+  await click('Start');
+  await transcript('new');
+  expect(field().value).toBe('Hello new World');
+  expect(field().selectionStart).toBe(9);
+  await transcript('beautiful', 2);
+  expect(field().value).toBe('Hello new beautiful World');
+});
+it('counts inserted spaces toward the field limit and avoids a whitespace-only append', async () => {
+  await mount({ initialValue: 'Hello', maxLength: 6 });
+  field().setSelectionRange(5, 5);
+  await click('Start');
+  await transcript('world');
+  expect(field().value).toBe('Hello');
+  expect(io.change).not.toHaveBeenCalled();
+  await mount({ initialValue: 'Hello', maxLength: 8 });
+  await transcript('world', 2);
+  expect(field().value).toBe('Hello wo');
 });
