@@ -1,5 +1,26 @@
 import { defineMessageSource } from '../../source';
 export const scenarioEditorCoreMessages = defineMessageSource({
+  guideLibraryVideoSearch: { ru: 'Поиск видео', en: 'Search videos' },
+  guideLibraryVideoEmpty: { ru: 'Видео не найдены.', en: 'No videos found.' },
+  guideResourceType: { ru: 'Тип ресурсов', en: 'Resource type' },
+  guideLibraryVideos: { ru: 'Видео', en: 'Videos' },
+  guideOpenVideo: { ru: 'Открыть видео', en: 'Open video' },
+  guideSourceVideo: { ru: 'Исходное видео', en: 'Source video' },
+  guideChooseVideoHint: {
+    ru: 'Выберите видео из библиотеки или откройте файл. Найдите нужный момент и добавьте кадр.',
+    en: 'Choose a library video or open a file. Find the moment you need and add its frame.',
+  },
+  guideVideoFrameStep: { ru: 'Добавить кадр как шаг', en: 'Add frame as step' },
+  guideUseVideoFrame: { ru: 'Использовать этот кадр', en: 'Use this frame' },
+  guideVideoFramePending: { ru: 'Добавляем кадр…', en: 'Adding frame…' },
+  guideVideoFrameFailed: {
+    ru: 'Не удалось получить или добавить кадр. Выберите другой момент или откройте видео повторно.',
+    en: 'Could not read or add the frame. Choose another moment or reopen the video.',
+  },
+  guideVideoFrameAdded: {
+    ru: 'Кадр добавлен. Можно выбрать следующий момент.',
+    en: 'Frame added. You can choose another moment.',
+  },
   guideAiOpen: { ru: 'Помочь с текстом', en: 'Help with text' },
   guideAiScope: { ru: 'Область обработки', en: 'Selection scope' },
   guideAiBlock: { ru: 'Этот блок', en: 'This block' },

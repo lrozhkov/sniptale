@@ -347,3 +347,48 @@ it('fills a resource-free slot without adding a second block', async () => {
   expect(step.blocks[0]?.kind).toBe('image-slot');
   expect(io.commit).toHaveBeenCalledTimes(1);
 });
+it('publishes independent video-frame bytes with user text and source provenance', async () => {
+  const frame = {
+    kind: 'video-frame' as const,
+    blob: png(),
+    source: {
+      kind: 'video-frame' as const,
+      recordingId: 'recording',
+      filename: 'source.webm',
+      timeSeconds: 1.25,
+    },
+    title: 'Open the menu',
+    description: 'Choose the settings item.',
+  };
+  const result = await importScenarioImages({ ...input(), sources: [frame] });
+  expect(result.items[0]).toMatchObject({
+    title: frame.title,
+    blocks: [
+      { kind: 'text', paragraphs: [{ runs: [{ text: frame.description }] }] },
+      { kind: 'image', source: frame.source, galleryAssetId: null },
+    ],
+  });
+  expect(io.entry).not.toHaveBeenCalled();
+  expect(io.workspace).not.toHaveBeenCalled();
+  expect(io.commit.mock.calls[0]?.[1]?.children?.assetPuts).toHaveLength(1);
+  expect(io.commit.mock.calls[0]?.[1]?.children?.editorDocumentPuts).toEqual([]);
+});
+it('rejects invalid video provenance before preparing any part of a batch', async () => {
+  await expect(
+    importScenarioImages({
+      ...input(),
+      sources: [
+        { kind: 'file', file: png() },
+        {
+          kind: 'video-frame',
+          blob: png(),
+          source: { kind: 'video-frame', recordingId: null, filename: 'video', timeSeconds: NaN },
+          title: '',
+          description: '',
+        },
+      ],
+    })
+  ).rejects.toThrow();
+  expect(io.write).not.toHaveBeenCalled();
+  expect(io.commit).not.toHaveBeenCalled();
+});

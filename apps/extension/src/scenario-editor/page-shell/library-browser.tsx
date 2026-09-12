@@ -1,9 +1,9 @@
 import { GUIDE_LIBRARY_IMAGE_DRAG_TYPE } from './image-drop';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Check, Image, Library, RefreshCw } from 'lucide-react';
+import { Check, Image, Library, RefreshCw, Film } from 'lucide-react';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { listMediaLibrary } from '../../composition/persistence/media-library';
+import { listMediaLibrary, getMediaThumbnail } from '../../composition/persistence/media-library';
 import type { MediaLibraryItem } from '../../composition/persistence/media-library/contracts';
 import {
   listGallerySavedViews,
@@ -14,7 +14,7 @@ import { matchesLibraryFilters } from '../../features/media-hub/library-filters'
 import type { Translate } from '../../platform/i18n';
 
 /** Reads library metadata; revisioned presentation bytes remain with the aggregate owner. */
-function useLibraryCatalog() {
+function useLibraryCatalog(mode: 'images' | 'videos') {
   const [catalog, setCatalog] = useState<{ items: MediaLibraryItem[]; views: GallerySavedView[] }>({
     items: [],
     views: [],
@@ -30,18 +30,22 @@ function useLibraryCatalog() {
       setCatalog({
         items: items.filter(
           (item) =>
-            (item.kind === 'image' || item.kind === 'screenshot') &&
+            (mode === 'videos'
+              ? item.kind === 'video'
+              : item.kind === 'image' || item.kind === 'screenshot') &&
             item.source.kind !== 'web-snapshot'
         ),
         views: views.filter(
-          (view) => view.folderFilter === 'all' || view.folderFilter === 'screenshot'
+          (view) =>
+            view.folderFilter === 'all' ||
+            view.folderFilter === (mode === 'videos' ? 'video' : 'screenshot')
         ),
       });
       setStatus('ready');
     } catch {
       if (turn === generation.current) setStatus('failed');
     }
-  }, []);
+  }, [mode]);
   useEffect(() => {
     void reload();
     return () => {
@@ -71,14 +75,20 @@ function LibraryRaster({
       if (started) return;
       started = true;
       try {
-        const presentation = await getAggregatePresentation({ kind: 'image', id: item.id });
+        const presentation =
+          item.kind === 'video'
+            ? null
+            : await getAggregatePresentation({ kind: 'image', id: item.id });
+        const thumbnail = item.kind === 'video' ? await getMediaThumbnail(item.id) : null;
         if (!alive) return;
         const blob =
-          presentation?.presentationRevision === (item.workspaceRevision ?? 0)
-            ? full
-              ? presentation.previewBlob
-              : presentation.thumbnailBlob
-            : undefined;
+          item.kind === 'video'
+            ? thumbnail?.blob
+            : presentation?.presentationRevision === (item.workspaceRevision ?? 0)
+              ? full
+                ? presentation.previewBlob
+                : presentation.thumbnailBlob
+              : undefined;
         url = blob ? URL.createObjectURL(blob) : null;
         setResult({ item, url });
       } catch {
@@ -113,6 +123,8 @@ function LibraryRaster({
     >
       {current?.url ? (
         <img src={current.url} alt={full ? item.filename : ''} draggable={false} />
+      ) : item.kind === 'video' ? (
+        <Film size={24} aria-hidden="true" />
       ) : (
         <Image size={full ? 32 : 24} aria-hidden="true" />
       )}
@@ -132,6 +144,8 @@ type GuideLibraryBrowserProps = {
   onChoose: (id: string, name: string) => void;
   onDragStart?: (() => void) | undefined;
   fileAction: ReactNode;
+  mode?: 'images' | 'videos';
+  previewContent?: ReactNode;
 };
 
 export function GuideLibraryBrowser({
@@ -141,8 +155,10 @@ export function GuideLibraryBrowser({
   onChoose,
   onDragStart,
   fileAction,
+  mode = 'images',
+  previewContent,
 }: GuideLibraryBrowserProps) {
-  const catalog = useLibraryCatalog();
+  const catalog = useLibraryCatalog(mode);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<'all' | 'screenshot' | 'image'>('all');
   const [viewId, setViewId] = useState<string | null>(null);
@@ -158,53 +174,34 @@ export function GuideLibraryBrowser({
   const preview = catalog.items.find((item) => item.id === previewId);
   return (
     <div className="guide-library-browser">
-      <nav
-        className="guide-library-navigation"
-        aria-label={t('scenario.editor.guideLibraryNavigation')}
-      >
-        {(['all', 'screenshot', 'image'] as const).map((key) => (
-          <button
-            type="button"
-            key={key}
-            aria-pressed={category === key && !view}
-            onClick={() => {
-              setCategory(key);
-              setViewId(null);
-            }}
-          >
-            {key === 'all' ? (
-              <Library size={16} aria-hidden="true" />
-            ) : (
-              <Image size={16} aria-hidden="true" />
-            )}
-            {t(
-              key === 'all'
-                ? 'scenario.editor.guideLibraryAll'
-                : key === 'screenshot'
-                  ? 'scenario.editor.guideLibraryScreenshots'
-                  : 'scenario.editor.guideLibraryImages'
-            )}
-          </button>
-        ))}
-        {catalog.views.map((entry) => (
-          <button
-            type="button"
-            key={entry.id}
-            aria-pressed={view?.id === entry.id}
-            onClick={() => {
-              setCategory('all');
-              setViewId(entry.id);
-            }}
-          >
-            {entry.name}
-          </button>
-        ))}
-      </nav>
+      <LibraryNavigation
+        t={t}
+        mode={mode}
+        views={catalog.views}
+        category={category}
+        view={view}
+        onCategory={(value) => {
+          setCategory(value);
+          setViewId(null);
+        }}
+        onView={(id) => {
+          setCategory('all');
+          setViewId(id);
+        }}
+      />
       <div className="guide-library-content">
         <div className="guide-library-search">
           <ProductInput
-            aria-label={t('scenario.editor.guideLibrarySearch')}
-            placeholder={t('scenario.editor.guideLibrarySearch')}
+            aria-label={t(
+              mode === 'videos'
+                ? 'scenario.editor.guideLibraryVideoSearch'
+                : 'scenario.editor.guideLibrarySearch'
+            )}
+            placeholder={t(
+              mode === 'videos'
+                ? 'scenario.editor.guideLibraryVideoSearch'
+                : 'scenario.editor.guideLibrarySearch'
+            )}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
@@ -221,16 +218,23 @@ export function GuideLibraryBrowser({
         {catalog.status === 'failed' && (
           <p role="alert">{t('scenario.editor.guideLibraryLoadFailed')}</p>
         )}
-        <div className="guide-library-grid" aria-label={t('scenario.editor.guideLibraryAll')}>
+        <div
+          className="guide-library-grid"
+          aria-label={t(
+            mode === 'videos'
+              ? 'scenario.editor.guideLibraryVideos'
+              : 'scenario.editor.guideLibraryAll'
+          )}
+        >
           {catalog.status === 'ready' &&
             items.map((item) => (
               <button
                 type="button"
                 key={item.id}
                 className="guide-library-card"
-                draggable={!disabled && Boolean(onDragStart)}
+                draggable={mode === 'images' && !disabled && Boolean(onDragStart)}
                 onDragStart={(event) => {
-                  if (disabled || !onDragStart) {
+                  if (mode !== 'images' || disabled || !onDragStart) {
                     event.preventDefault();
                     return;
                   }
@@ -256,7 +260,13 @@ export function GuideLibraryBrowser({
               </button>
             ))}
           {catalog.status === 'ready' && !items.length && (
-            <p>{t('scenario.editor.guideLibraryEmpty')}</p>
+            <p>
+              {t(
+                mode === 'videos'
+                  ? 'scenario.editor.guideLibraryVideoEmpty'
+                  : 'scenario.editor.guideLibraryEmpty'
+              )}
+            </p>
           )}
         </div>
       </div>
@@ -264,18 +274,82 @@ export function GuideLibraryBrowser({
         className="guide-library-preview"
         aria-label={t('scenario.editor.guideLibraryPreview')}
       >
-        {preview ? (
-          <>
-            <LibraryRaster item={preview} full t={t} />
-            <strong>{preview.filename}</strong>
-            <span>
-              {preview.width} × {preview.height}
-            </span>
-          </>
-        ) : (
-          <p>{t('scenario.editor.guideLibraryPreviewHint')}</p>
-        )}
+        {previewContent ??
+          (preview ? (
+            <>
+              <LibraryRaster item={preview} full t={t} />
+              <strong>{preview.filename}</strong>
+              <span>
+                {preview.width} × {preview.height}
+              </span>
+            </>
+          ) : (
+            <p>{t('scenario.editor.guideLibraryPreviewHint')}</p>
+          ))}
       </aside>
     </div>
+  );
+}
+
+function LibraryNavigation({
+  t,
+  mode,
+  views,
+  category,
+  view,
+  onCategory,
+  onView,
+}: {
+  t: Translate;
+  mode: 'images' | 'videos';
+  views: GallerySavedView[];
+  category: 'all' | 'screenshot' | 'image';
+  view: GallerySavedView | undefined;
+  onCategory: (value: 'all' | 'screenshot' | 'image') => void;
+  onView: (id: string) => void;
+}) {
+  return (
+    <nav
+      className="guide-library-navigation"
+      aria-label={t('scenario.editor.guideLibraryNavigation')}
+    >
+      {(mode === 'videos' ? (['all'] as const) : (['all', 'screenshot', 'image'] as const)).map(
+        (key) => (
+          <button
+            type="button"
+            key={key}
+            aria-pressed={category === key && !view}
+            onClick={() => onCategory(key)}
+          >
+            {mode === 'videos' ? (
+              <Film size={16} aria-hidden="true" />
+            ) : key === 'all' ? (
+              <Library size={16} aria-hidden="true" />
+            ) : (
+              <Image size={16} aria-hidden="true" />
+            )}
+            {t(
+              mode === 'videos'
+                ? 'scenario.editor.guideLibraryVideos'
+                : key === 'all'
+                  ? 'scenario.editor.guideLibraryAll'
+                  : key === 'screenshot'
+                    ? 'scenario.editor.guideLibraryScreenshots'
+                    : 'scenario.editor.guideLibraryImages'
+            )}
+          </button>
+        )
+      )}
+      {views.map((entry) => (
+        <button
+          type="button"
+          key={entry.id}
+          aria-pressed={view?.id === entry.id}
+          onClick={() => onView(entry.id)}
+        >
+          {entry.name}
+        </button>
+      ))}
+    </nav>
   );
 }

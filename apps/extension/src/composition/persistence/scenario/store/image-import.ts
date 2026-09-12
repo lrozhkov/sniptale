@@ -1,9 +1,15 @@
+import { z } from 'zod';
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
-import { GUIDE_LIMITS, type GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
+import {
+  GUIDE_LIMITS,
+  type GuideProject,
+  type GuideImageSource,
+} from '@sniptale/runtime-contracts/scenario/types/guide';
 import { assertImportableProjectImage } from '../../../../features/media-hub/project-assets';
 import { publishMediaHubLibraryChanged } from '../../../../features/media-hub/events';
 import {
   createGuideImageBlock,
+  createGuideParagraphs,
   createGuideStep,
 } from '../../../../features/scenario/project/public';
 import { getAggregatePresentation } from '../../aggregate-presentations';
@@ -15,10 +21,28 @@ import { commitScenarioAggregateMutation } from '../aggregate-mutations';
 import { rejectScenarioMutationBeforeHandoff } from '../asset-staging';
 import { createScenarioAssetEntryFromBlob } from './capture-step/asset-entry';
 
+const videoFrameImportSchema = z
+  .object({
+    kind: z.literal('video-frame'),
+    blob: z.instanceof(Blob),
+    source: z
+      .object({
+        kind: z.literal('video-frame'),
+        recordingId: z.string().min(1).max(GUIDE_LIMITS.maxIdLength).nullable(),
+        filename: z.string().max(GUIDE_LIMITS.maxLabelLength),
+        timeSeconds: z.number().finite().min(0),
+      })
+      .strict(),
+    title: z.string().max(GUIDE_LIMITS.maxLabelLength),
+    description: z.string().max(GUIDE_LIMITS.maxTextLength),
+  })
+  .strict();
+
 /** Only explicit local selections can enter a guide; library identity is re-read on import. */
 export type GuideImageImportSource =
   | { kind: 'file'; file: File }
-  | { kind: 'library'; mediaId: string };
+  | { kind: 'library'; mediaId: string }
+  | z.infer<typeof videoFrameImportSchema>;
 export type GuideImageImportPlacement =
   | { kind: 'steps' }
   | { kind: 'blocks'; stepId: string }
@@ -69,7 +93,10 @@ export async function importScenarioImages(args: {
         height: assetEntry.height,
         galleryAssetId: input.mediaId,
         editDocumentId: documentId,
-        source: { kind: 'import', filename: input.name.slice(0, GUIDE_LIMITS.maxLabelLength) },
+        source: input.source ?? {
+          kind: 'import',
+          filename: input.name.slice(0, GUIDE_LIMITS.maxLabelLength),
+        },
       });
       if (target?.kind === 'step' && replacement)
         target.blocks = target.blocks.map((current) =>
@@ -88,6 +115,12 @@ export async function importScenarioImages(args: {
       else if (target?.kind === 'step') target.blocks.push(block);
       else {
         const step = createGuideStep(input.name.slice(0, GUIDE_LIMITS.maxLabelLength));
+        if (input.description)
+          step.blocks.push({
+            kind: 'text',
+            id: crypto.randomUUID(),
+            paragraphs: createGuideParagraphs(input.description),
+          });
         step.blocks.push(block);
         project.items.push(step);
       }
@@ -114,8 +147,20 @@ async function readImportSource(source: GuideImageImportSource): Promise<{
   name: string;
   mediaId: string | null;
   workspace?: ImageWorkspaceEntry;
+  source?: GuideImageSource;
+  description?: string;
 }> {
   if (source.kind === 'file') return { blob: source.file, name: source.file.name, mediaId: null };
+  if (source.kind === 'video-frame') {
+    const frame = videoFrameImportSchema.parse(source);
+    return {
+      blob: frame.blob,
+      name: frame.title,
+      mediaId: null,
+      source: frame.source,
+      description: frame.description,
+    };
+  }
   const entry = await getMediaLibraryEntry(source.mediaId);
   if (
     !entry ||
@@ -153,6 +198,8 @@ function admitImageImport(args: Parameters<typeof importScenarioImages>[0]) {
   if (parsed.status !== 'ok' || args.sources.length === 0 || args.sources.length > 50) {
     throw new Error('Invalid image import.');
   }
+  for (const source of args.sources)
+    if (source.kind === 'video-frame') videoFrameImportSchema.parse(source);
   const project = parsed.project;
   const placement = args.placement;
   const target =

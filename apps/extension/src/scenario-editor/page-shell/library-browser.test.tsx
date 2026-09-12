@@ -8,12 +8,16 @@ const io = vi.hoisted(() => ({
   list: vi.fn(),
   views: vi.fn(),
   presentation: vi.fn(),
+  thumbnail: vi.fn(),
   create: vi.fn(),
   revoke: vi.fn(),
   choose: vi.fn(),
   drag: vi.fn(),
 }));
-vi.mock('../../composition/persistence/media-library', () => ({ listMediaLibrary: io.list }));
+vi.mock('../../composition/persistence/media-library', () => ({
+  listMediaLibrary: io.list,
+  getMediaThumbnail: io.thumbnail,
+}));
 vi.mock('../../composition/persistence/gallery-saved-views', () => ({
   listGallerySavedViews: io.views,
 }));
@@ -164,6 +168,10 @@ it('retries metadata failures and applies saved library filters', async () => {
   expect(host.querySelectorAll('.guide-library-card')).toHaveLength(2);
   await click('Tagged guide');
   expect(host.querySelectorAll('.guide-library-card')).toHaveLength(1);
+  await click('Images');
+  expect(host.querySelectorAll('.guide-library-card')).toHaveLength(2);
+  await click('Screenshots');
+  expect(host.querySelectorAll('.guide-library-card')).toHaveLength(0);
 });
 
 it('exports only the library identity for native dragging and rejects disabled drags', async () => {
@@ -187,4 +195,43 @@ it('exports only the library identity for native dragging and rejects disabled d
   act(() => card.dispatchEvent(disabledEvent));
   expect(disabledEvent.defaultPrevented).toBe(true);
   expect(io.drag).toHaveBeenCalledTimes(1);
+});
+it('video mode shows only videos, reuses thumbnail owner and cannot emit image drag payloads', async () => {
+  io.list.mockResolvedValue([
+    item,
+    {
+      ...item,
+      id: 'video',
+      kind: 'video',
+      filename: 'Source.webm',
+      mimeType: 'video/webm',
+      source: { kind: 'recording', recordingId: 'recording' },
+    },
+  ]);
+  io.thumbnail.mockResolvedValue({ blob: new Blob(['thumbnail']) });
+  await act(async () =>
+    root.render(
+      <GuideLibraryBrowser
+        mode="videos"
+        t={createTranslator('en')}
+        disabled={false}
+        selectedIds={[]}
+        onChoose={io.choose}
+        onDragStart={io.drag}
+        fileAction={null}
+        previewContent={<p>Source player</p>}
+      />
+    )
+  );
+  const card = host.querySelector<HTMLButtonElement>('.guide-library-card')!;
+  expect(card.textContent).toContain('Source.webm');
+  expect(host.querySelectorAll('.guide-library-card')).toHaveLength(1);
+  expect(card.draggable).toBe(false);
+  const event = new Event('dragstart', { bubbles: true, cancelable: true });
+  card.dispatchEvent(event);
+  expect(event.defaultPrevented).toBe(true);
+  expect(io.drag).not.toHaveBeenCalled();
+  expect(io.presentation).not.toHaveBeenCalled();
+  await act(async () => card.click());
+  expect(io.choose).toHaveBeenCalledWith('video', 'Source.webm');
 });
