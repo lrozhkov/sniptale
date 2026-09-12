@@ -825,6 +825,8 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await grip.hover();
     const start = await grip.boundingBox();
     if (!start) throw new Error('Missing reorder grip');
+    const blockBox = await first.boundingBox();
+    expect(blockBox && start.x + start.width <= blockBox.x).toBe(true);
     await page.mouse.down();
     await page.mouse.move(start.x + start.width / 2 + 20, start.y + start.height / 2 + 20, {
       steps: 4,
@@ -835,7 +837,16 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await page.mouse.move(target.x + target.width / 2, target.y + target.height * 0.8, {
       steps: 8,
     });
+    await expect(page.locator('.guide-block-drag-preview')).toBeVisible();
+    await expect(page.locator('.guide-block-drag-preview button')).toHaveCount(0);
+    expect(await last.evaluate((node) => getComputedStyle(node).cursor)).toBe('grabbing');
+    expect(await grip.evaluate((node) => getComputedStyle(node).opacity)).toBe('0');
+    await testInfo.attach(`block-drag-preview-${theme}`, {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
     await page.mouse.up();
+    await expect(page.locator('.guide-block-drag-preview')).toHaveCount(0);
     await expect.poll(order).toEqual([...original.filter((id) => id !== 'before'), 'before']);
     await expect(first.locator('figcaption')).toHaveText(caption ?? '');
     await expect(first).toHaveAttribute('data-width', width!);
@@ -852,6 +863,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     });
     await page.keyboard.press('Escape');
     await page.mouse.up();
+    await expect(page.locator('html')).not.toHaveAttribute('data-guide-reordering');
     await expect(step.locator('[data-reorder]')).toHaveCount(0);
     await expect.poll(order).toEqual(original);
     await grip.focus();
@@ -953,3 +965,48 @@ test('history cleanup preserves two-tab undo resources until sessions close', as
   await verifyResourceRetention(page);
   issues.assertClean();
 });
+
+for (const theme of SCENARIO_VISUAL_THEMES) {
+  test(`external grips leave text clear and stay reachable across the hover gutter in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }, testInfo) => {
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1024, height: 640 });
+    const step = page.locator('article#text-only');
+    for (const [command, kind] of [
+      ['Text', 'text'],
+      ['Heading', 'heading'],
+      ['Note', 'note'],
+    ] as const) {
+      const add = step
+        .locator('.guide-insertion-block[data-end="true"]')
+        .getByRole('button', { name: command, exact: true });
+      await add.focus();
+      await add.click();
+      const block = step.locator(`.guide-block[data-kind="${kind}"]`).last();
+      const field = block.getByRole('textbox').first();
+      await field.fill(`Visible ${kind} content`);
+      await field.blur();
+      const inspector = page.locator('#guide-inspector-panel');
+      if (await inspector.isVisible())
+        await inspector.getByRole('button', { name: 'Close', exact: true }).click();
+      await block.scrollIntoViewIfNeeded();
+      await block.hover();
+      const grip = block.locator('.guide-block-grip');
+      const box = await block.boundingBox();
+      const handle = await grip.boundingBox();
+      if (!box || !handle) throw new Error('Missing block geometry');
+      expect(handle.x + handle.width).toBeLessThanOrEqual(box.x);
+      expect(handle.x).toBeGreaterThanOrEqual(0);
+      await page.mouse.move((handle.x + handle.width + box.x) / 2, handle.y + handle.height / 2);
+      expect(await grip.evaluate((node) => getComputedStyle(node).opacity)).toBe('1');
+      await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+      expect(await grip.evaluate((node) => getComputedStyle(node).cursor)).toBe('grab');
+      expect(await grip.evaluate((node) => getComputedStyle(node).opacity)).toBe('1');
+    }
+    await testInfo.attach(`external-grips-${theme}`, {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+  });
+}

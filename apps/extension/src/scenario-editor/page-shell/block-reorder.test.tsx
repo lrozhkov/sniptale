@@ -5,113 +5,145 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createGuideStep } from '../../features/scenario/project/public';
 import { createTranslator } from '../../platform/i18n';
 import { GuideBlockReorder, GuideBlockReorderHandle } from './block-reorder';
-const mime = 'application/x-sniptale-guide-block';
-const payload = JSON.stringify({ projectId: 'project', itemId: 'step', blockId: 'a' });
 const operate = vi.fn();
 let root: Root;
 let host: HTMLDivElement;
+const originalCapture = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'setPointerCapture');
+const originalHas = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'hasPointerCapture');
+const originalRelease = Object.getOwnPropertyDescriptor(
+  HTMLElement.prototype,
+  'releasePointerCapture'
+);
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  for (const [key, value] of Object.entries({
+    setPointerCapture: vi.fn(),
+    hasPointerCapture: () => true,
+    releasePointerCapture: vi.fn(),
+  }))
+    Object.defineProperty(HTMLElement.prototype, key, { configurable: true, value });
   host = document.createElement('div');
+  host.className = 'guide-document';
   document.body.append(host);
   root = createRoot(host);
 });
 afterEach(() => {
   act(() => root.unmount());
   host.remove();
+  for (const [key, descriptor] of [
+    ['setPointerCapture', originalCapture],
+    ['hasPointerCapture', originalHas],
+    ['releasePointerCapture', originalRelease],
+  ] as const) {
+    if (descriptor) Object.defineProperty(HTMLElement.prototype, key, descriptor);
+    else Reflect.deleteProperty(HTMLElement.prototype, key);
+  }
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 async function render(disabled = false) {
   const item = createGuideStep('', 'step');
-  item.blocks = [
-    { kind: 'text', id: 'a', paragraphs: [] },
-    { kind: 'text', id: 'b', paragraphs: [] },
-  ];
+  item.blocks = ['a', 'b', 'c'].map((id) => ({ kind: 'text', id, paragraphs: [] }));
   await act(async () =>
     root.render(
       <GuideBlockReorder projectId="project" item={item} disabled={disabled} onOperate={operate}>
         {item.blocks.map((block) => (
-          <div key={block.id} data-block-id={block.id}>
+          <div className="guide-block" key={block.id} data-block-id={block.id} id={block.id}>
+            <span>{`Body ${block.id}`}</span>
             <GuideBlockReorderHandle blockId={block.id} t={createTranslator('en')} />
           </div>
         ))}
       </GuideBlockReorder>
     )
   );
-  for (const block of host.querySelectorAll('[data-block-id]'))
-    vi.spyOn(block, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 100, 100));
+  vi.spyOn(host.querySelector('.guide-step-blocks')!, 'getBoundingClientRect').mockReturnValue(
+    new DOMRect(0, 0, 100, 340)
+  );
+  for (const [index, block] of [...host.querySelectorAll('[data-block-id]')].entries())
+    vi.spyOn(block, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, index * 120, 100, 100));
 }
-async function dispatch(type: string, text = payload, y = 75, types = [mime]) {
-  const event = new MouseEvent(type, { bubbles: true, cancelable: true, clientY: y });
-  Object.defineProperty(event, 'dataTransfer', {
-    value: { types, getData: () => text, dropEffect: 'none' },
+async function pointer(type: string, x: number, y: number, pointerId = 1) {
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    clientX: x,
+    clientY: y,
+    button: 0,
   });
-  await act(async () => host.querySelector('[data-block-id="b"]')!.dispatchEvent(event));
+  Object.defineProperty(event, 'pointerId', { value: pointerId });
+  await act(async () =>
+    (type === 'pointerdown' ? host.querySelector('button')! : window).dispatchEvent(event)
+  );
   return event;
 }
-it('shows insertion without edits then dispatches a single canonical move', async () => {
+it('previews block content without controls and uses one marker for either side of a gap', async () => {
   await render();
-  await dispatch('dragover');
-  expect(host.querySelector('[data-reorder="after"]')).not.toBeNull();
+  await pointer('pointerdown', -14, 14);
+  await pointer('pointermove', 50, 190);
+  const preview = host.querySelector('.guide-block-drag-preview')!;
+  expect(preview.textContent).toBe('Body a');
+  expect(preview.querySelector('button')).toBeNull();
+  expect(preview.hasAttribute('id')).toBe(false);
+  expect(preview.hasAttribute('data-block-id')).toBe(false);
+  expect(document.documentElement.dataset['guideReordering']).toBe('true');
+  expect(host.querySelector('[data-reorder]')?.id).toBe('c');
+  expect(host.querySelector('[data-reorder]')?.getAttribute('data-reorder')).toBe('before');
+  await pointer('pointermove', 50, 250);
+  expect(host.querySelector('[data-reorder]')?.id).toBe('c');
+  expect(host.querySelectorAll('[data-reorder]')).toHaveLength(1);
   expect(operate).not.toHaveBeenCalled();
-  await dispatch('drop');
-  expect(operate.mock.calls).toEqual([[{ kind: 'reorder-block', itemId: 'step', blockId: 'a' }]]);
+  await pointer('pointerup', 50, 250);
+  expect(operate.mock.calls).toEqual([
+    [{ kind: 'reorder-block', itemId: 'step', blockId: 'a', beforeBlockId: 'c' }],
+  ]);
   expect(host.querySelector('[data-reorder]')).toBeNull();
+  expect(host.querySelector('.guide-block-drag-preview')).toBeNull();
+  expect(document.documentElement.hasAttribute('data-guide-reordering')).toBe(false);
 });
-it('rejects no-op, malformed, oversized and cross-context identities', async () => {
+it('ignores threshold movement, adjacent no-ops, other pointers and drops outside the step', async () => {
   await render();
-  await dispatch('drop', payload, 25);
-  for (const value of [
-    'bad',
-    'x'.repeat(2049),
-    JSON.stringify({ projectId: 'other', itemId: 'step', blockId: 'a' }),
-    JSON.stringify({ projectId: 'project', itemId: 'other', blockId: 'a' }),
-    JSON.stringify({ projectId: 'project', itemId: 'step', blockId: 'gone' }),
-    JSON.stringify({
-      projectId: 'project',
-      itemId: 'step',
-      blockId: 'a',
-      url: 'https://example.test',
-    }),
-  ])
-    await dispatch('drop', value);
+  await pointer('pointerdown', -14, 14);
+  await pointer('pointermove', -12, 15);
+  expect(host.querySelector('.guide-block-drag-preview')).toBeNull();
+  await pointer('pointermove', 50, 300, 2);
+  expect(host.querySelector('[data-reorder]')).toBeNull();
+  await pointer('pointermove', 50, 130);
+  expect(host.querySelector('[data-reorder]')).toBeNull();
+  await pointer('pointerup', 50, 130);
+  expect(operate).not.toHaveBeenCalled();
+  await pointer('pointerdown', -14, 14);
+  await pointer('pointermove', 50, 300);
+  await pointer('pointerup', 400, 300);
   expect(operate).not.toHaveBeenCalled();
 });
-it('cleans markers on Escape, dragend and disabling, leaving image drops untouched', async () => {
+it.each(['Escape', 'pointercancel', 'blur', 'disable', 'unmount', 'lostpointercapture'])(
+  'cleans the complete gesture on %s without an edit',
+  async (reason) => {
+    await render();
+    await pointer('pointerdown', -14, 14);
+    await pointer('pointermove', 50, 300);
+    if (reason === 'disable') await render(true);
+    else if (reason === 'unmount') act(() => root.render(null));
+    else
+      await act(async () => {
+        if (reason === 'Escape')
+          window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+        else if (reason === 'lostpointercapture')
+          host.querySelector('button')!.dispatchEvent(new Event(reason));
+        else window.dispatchEvent(new Event(reason));
+      });
+    await pointer('pointerup', 50, 300);
+    expect(operate).not.toHaveBeenCalled();
+    expect(
+      host.querySelector('[data-reorder],.guide-block-drag-preview,[data-drag-source]')
+    ).toBeNull();
+    expect(document.documentElement.hasAttribute('data-guide-reordering')).toBe(false);
+  }
+);
+it('keeps keyboard movement and native image drops independent, and ignores disabled grips', async () => {
   await render();
-  await dispatch('dragover');
-  await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
-  expect(host.querySelector('[data-reorder]')).toBeNull();
-  await dispatch('dragover');
-  await act(async () => window.dispatchEvent(new Event('dragend')));
-  expect(host.querySelector('[data-reorder]')).toBeNull();
-  await dispatch('dragover');
-  await render(true);
-  expect(host.querySelector('[data-reorder]')).toBeNull();
-  await dispatch('drop');
-  expect(operate).not.toHaveBeenCalled();
-  const foreign = await dispatch('drop', '', 75, ['Files']);
-  expect(foreign.defaultPrevented).toBe(false);
-});
-it('grip emits only bounded current project/block identity, never content', async () => {
-  await render();
-  const data = { effectAllowed: '', setData: vi.fn() };
-  const event = new Event('dragstart', { bubbles: true, cancelable: true });
-  Object.defineProperty(event, 'dataTransfer', { value: data });
-  await act(async () => host.querySelector('button')!.dispatchEvent(event));
-  expect(data.effectAllowed).toBe('move');
-  expect(data.setData).toHaveBeenCalledWith(mime, payload);
-  await render(true);
-  await act(async () => host.querySelector('button')!.dispatchEvent(event));
-  expect(event.defaultPrevented).toBe(true);
-  expect(data.setData).toHaveBeenCalledTimes(1);
-});
-
-it('moves from the grip with keyboard arrows and respects step boundaries', async () => {
-  await render();
-  const key = async (key: string) =>
+  const key = (key: string) =>
     act(async () =>
       host
         .querySelector('button')!
@@ -120,10 +152,44 @@ it('moves from the grip with keyboard arrows and respects step boundaries', asyn
   await key('ArrowUp');
   expect(operate).not.toHaveBeenCalled();
   await key('ArrowDown');
-  expect(operate.mock.calls).toEqual([
-    [{ kind: 'move-block', itemId: 'step', blockId: 'a', direction: 1 }],
-  ]);
+  expect(operate).toHaveBeenCalledWith({
+    kind: 'move-block',
+    itemId: 'step',
+    blockId: 'a',
+    direction: 1,
+  });
+  const drop = new Event('drop', { bubbles: true, cancelable: true });
+  host.querySelector('.guide-block')!.dispatchEvent(drop);
+  expect(drop.defaultPrevented).toBe(false);
   await render(true);
+  await pointer('pointerdown', -14, 14);
+  await pointer('pointermove', 50, 300);
+  await pointer('pointerup', 50, 300);
   await key('ArrowDown');
   expect(operate).toHaveBeenCalledTimes(1);
+});
+
+it('scrolls the document at its edge and stops the frame loop on cancellation', async () => {
+  await render();
+  const pane = document.createElement('div');
+  pane.className = 'guide-document-scroll';
+  document.body.append(pane);
+  pane.append(host);
+  vi.spyOn(pane, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 100, 200));
+  const frames: FrameRequestCallback[] = [];
+  vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+    frames.push(callback);
+    return frames.length;
+  });
+  const stop = vi.spyOn(window, 'cancelAnimationFrame');
+  await pointer('pointerdown', -14, 14);
+  await pointer('pointermove', 50, 195);
+  await act(async () => frames[0]?.(0));
+  expect(pane.scrollTop).toBe(12);
+  await pointer('pointercancel', 50, 195);
+  expect(stop).toHaveBeenCalledWith(2);
+  await act(async () => frames[1]?.(16));
+  expect(pane.scrollTop).toBe(12);
+  expect(operate).not.toHaveBeenCalled();
+  pane.remove();
 });
