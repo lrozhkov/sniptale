@@ -439,6 +439,13 @@ export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo)
     steps: 8,
   });
   await page.mouse.up();
+  await child.locator('[data-ui="content.toolbar.future-frame-style"]').click();
+  await page.mouse.move(bounds.x + bounds.width * 0.4, bounds.y + bounds.height * 0.4);
+  await page.mouse.down();
+  await page.mouse.move(bounds.x + bounds.width * 0.6, bounds.y + bounds.height * 0.6, {
+    steps: 8,
+  });
+  await page.mouse.up();
   await apply.click();
   await expect(page.locator('.guide-image-editor')).toHaveCount(0);
   await expect(launch).toBeFocused();
@@ -446,6 +453,7 @@ export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo)
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   const firstPublication = await readImageEditProof(page);
   expect(firstPublication.annotations).toBeGreaterThan(0);
+  expect(firstPublication.frameAnnotations).toBeGreaterThan(0);
   expect(firstPublication.standaloneWorkspaces).toBe(0);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect(title).toHaveValue('Unsaved title retained through annotations');
@@ -461,6 +469,7 @@ export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo)
   await expect(page.locator('.guide-image-editor')).toHaveCount(0);
   const reopened = await readImageEditProof(page);
   expect(reopened.annotations).toBe(firstPublication.annotations);
+  expect(reopened.frameAnnotations).toBe(firstPublication.frameAnnotations);
   expect(reopened.standaloneWorkspaces).toBe(0);
   await page.locator('article#compare figure').first().hover();
   await launch.click();
@@ -500,6 +509,17 @@ async function readImageEditProof(page: Page) {
             };
             return (
               canvas.objects?.filter((object) => object.type?.toLowerCase() === 'path').length ?? 0
+            );
+          })
+        ),
+        frameAnnotations: Math.max(
+          0,
+          ...documents.map((entry) => {
+            const canvas = JSON.parse(entry.document.canvasJson) as {
+              objects?: Array<{ sniptaleFrameAnnotationJson?: string }>;
+            };
+            return (
+              canvas.objects?.filter((object) => object.sniptaleFrameAnnotationJson).length ?? 0
             );
           })
         ),
