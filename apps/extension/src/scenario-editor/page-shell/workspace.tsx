@@ -1,3 +1,4 @@
+import { useGuideHoverIntent } from './hover-intent';
 import { GuideImageUpload } from './image-upload';
 import { resolveGuideNumbering } from '../../features/scenario/project/public';
 import { GuideResources } from './resource-list';
@@ -30,6 +31,7 @@ type WorkspaceProps = {
 
 /** Owns disposable panel visibility; document selection and edits remain in page state. */
 export function GuideWorkspace(props: WorkspaceProps) {
+  const hoverIntent = useGuideHoverIntent();
   const { project, selectedId, onSelect, t } = props;
   const { leftOpen, rightOpen } = props.panels;
   return (
@@ -101,7 +103,7 @@ export function GuideWorkspace(props: WorkspaceProps) {
       {leftOpen && (
         <GuidePanelDivider side="left" panels={props.panels} label={t('scenario.editor.outline')} />
       )}
-      <div className="guide-center-panel">
+      <div ref={hoverIntent} className="guide-center-panel">
         {props.header}
         <div
           className="guide-document-scroll"

@@ -254,7 +254,7 @@ test('document tools are contextual and leave image geometry unchanged', async (
   await miniButton.hover();
   const buttonSurface = await miniButton.evaluate((button) => {
     const probe = document.createElement('span');
-    probe.style.backgroundColor = 'var(--sniptale-color-surface-canvas)';
+    probe.style.backgroundColor = 'var(--guide-tool-hover-surface)';
     button.append(probe);
     const color = getComputedStyle(probe).backgroundColor;
     probe.remove();
@@ -761,6 +761,8 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     const firstWidth = await control.boundingBox();
     const secondGrip = await second.locator('.guide-block-grip').boundingBox();
     expect(firstWidth && secondGrip && firstWidth.x + firstWidth.width <= secondGrip.x).toBe(true);
+    await first.hover();
+    await expect(control).toHaveCSS('pointer-events', 'auto');
     await control.click();
     await expect(first).toHaveAttribute('data-width', '100');
     const full = await first.boundingBox();
@@ -979,6 +981,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       await block.scrollIntoViewIfNeeded();
       await block.hover();
       const grip = block.locator('.guide-block-grip');
+      await expect(grip).toHaveCSS('opacity', '1');
       const box = await block.boundingBox();
       const handle = await grip.boundingBox();
       if (!box || !handle) throw new Error('Missing block geometry');

@@ -728,11 +728,9 @@
 .guide-block-actions {
   opacity: 0;
   pointer-events: none;
-  transition: opacity 120ms;
 }
-.guide-block:hover .guide-block-actions,
+.guide-block[data-guide-hover] .guide-block-actions,
 .guide-block:focus-within .guide-block-actions,
-.guide-block-actions:hover,
 .guide-block-actions:focus-within {
   opacity: 1;
   pointer-events: auto;
@@ -759,6 +757,7 @@
   color: var(--sniptale-color-text-primary);
 }
 .guide-document .guide-block-width {
+  pointer-events: none;
   position: absolute;
   z-index: 5;
   inset-inline-end: -1.75rem;
@@ -783,12 +782,14 @@
   bottom: 0;
   width: 0.25rem;
 }
-.guide-block:hover > .guide-block-width,
+.guide-block[data-guide-hover] > .guide-block-width,
 .guide-block:focus-within > .guide-block-width {
+  pointer-events: auto;
   opacity: 1;
 }
 @media (hover: none) {
   .guide-document .guide-block-width {
+    pointer-events: auto;
     opacity: 1;
   }
 }
@@ -882,7 +883,7 @@
   opacity: 0;
   pointer-events: none;
 }
-.guide-document > :is(article, section):hover > .guide-item-actions,
+.guide-document > :is(article, section)[data-guide-hover] > .guide-item-actions,
 .guide-item-actions:focus-within {
   opacity: 1;
   pointer-events: auto;
@@ -931,7 +932,7 @@
   opacity: 0;
   pointer-events: none;
 }
-.guide-insertion:hover > .guide-insertion-chrome,
+.guide-insertion[data-guide-hover] > .guide-insertion-chrome,
 .guide-insertion:focus-within > .guide-insertion-chrome {
   opacity: 1;
   pointer-events: auto;
@@ -956,13 +957,13 @@
 }
 .guide-image-tools {
   position: absolute;
-  top: 0.5rem;
+  top: 0.375rem;
   left: 0.5rem;
   z-index: 2;
   opacity: 0;
   pointer-events: none;
 }
-.guide-image-surface:hover > .guide-image-tools,
+.guide-image-surface[data-guide-hover] > .guide-image-tools,
 .guide-image-surface:focus-within > .guide-image-tools,
 .guide-image-surface[data-editing='true'] > .guide-image-tools {
   opacity: 1;
@@ -1219,6 +1220,7 @@
 }
 
 .guide-document .guide-block-grip {
+  pointer-events: none;
   position: absolute;
   inset-inline-start: -1.75rem;
   top: 0.375rem;
@@ -1272,8 +1274,9 @@ html[data-guide-reordering] .guide-block-grip {
 .guide-block-drag-preview::after {
   display: none;
 }
-.guide-block:hover > .guide-block-grip,
+.guide-block[data-guide-hover] > .guide-block-grip,
 .guide-block:focus-within > .guide-block-grip {
+  pointer-events: auto;
   opacity: 1;
 }
 .guide-block[data-reorder]::after {
@@ -1292,6 +1295,7 @@ html[data-guide-reordering] .guide-block-grip {
 }
 @media (hover: none) {
   .guide-document .guide-block-grip {
+    pointer-events: auto;
     opacity: 1;
   }
 }
@@ -1302,8 +1306,8 @@ html[data-guide-reordering] .guide-block-grip {
   border: 1px solid transparent;
 }
 .guide-note-callout .guide-action-menu-anchor > button {
-  width: 1.75rem;
-  height: 1.75rem;
+  width: 1.5rem;
+  height: 1.5rem;
   color: color-mix(in srgb, var(--guide-callout-color) 65%, var(--guide-ink));
   background: color-mix(in srgb, var(--guide-callout-color) 12%, var(--guide-paper)) !important;
 }
@@ -1688,4 +1692,116 @@ html[data-guide-width-resizing] * {
   flex: 0 0 72px;
   width: 72px;
   height: 45px;
+}
+
+/* Contextual chrome fades in place; intent timing belongs to the central pointer owner. */
+.guide-center-panel {
+  --guide-tool-hover-surface: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 8%,
+    var(--sniptale-color-surface-canvas)
+  );
+}
+.guide-center-panel
+  :is(
+    .guide-block-actions,
+    .guide-item-actions,
+    .guide-insertion-chrome,
+    .guide-image-tools,
+    .guide-block-grip,
+    .guide-block-width,
+    .guide-voice-control
+  ) {
+  transition: opacity calc(var(--sniptale-duration-fast) / 2) var(--sniptale-ease-standard);
+}
+.guide-center-panel .guide-voice-field > .guide-voice-control {
+  opacity: 0;
+  pointer-events: none;
+  gap: 0.125rem;
+}
+.guide-center-panel
+  .guide-voice-field:is([data-guide-hover], :focus-within, [data-voice-visible])
+  > .guide-voice-control,
+.guide-center-panel
+  :is(.guide-block-actions, .guide-item-actions, .guide-image-tools):has([aria-expanded='true']) {
+  opacity: 1;
+  pointer-events: auto;
+}
+.guide-center-panel
+  :is(.guide-block, .guide-insertion, .guide-image-surface, .guide-voice-field):focus-within
+  :is(
+    .guide-block-actions,
+    .guide-insertion-chrome,
+    .guide-image-tools,
+    .guide-block-grip,
+    .guide-block-width,
+    .guide-voice-control
+  ),
+.guide-center-panel
+  :is(.guide-block-actions, .guide-item-actions, .guide-image-tools):has([aria-expanded='true']),
+.guide-center-panel [data-voice-visible] > .guide-voice-control,
+.guide-center-panel [data-width-preview] > .guide-block-width,
+.guide-center-panel [data-editing='true'] > .guide-image-tools,
+.guide-center-panel .guide-item-actions:focus-within {
+  transition: none;
+}
+.guide-document
+  :is(
+    .guide-block-grip,
+    .guide-block-width,
+    .guide-action-menu-anchor > button,
+    .guide-image-tools > button,
+    .guide-insertion-chrome > button,
+    .guide-voice-control > button
+  ) {
+  transition-property: opacity, background-color, border-color, color, box-shadow;
+  transition-duration: calc(var(--sniptale-duration-fast) / 2);
+  transform: none;
+}
+.guide-document
+  :is(
+    .guide-block-grip,
+    .guide-block-width,
+    .guide-action-menu-anchor > button,
+    .guide-image-tools > button,
+    .guide-insertion-chrome > button,
+    .guide-voice-control > button
+  ):hover:not(:disabled):not([aria-pressed='true']) {
+  background: var(--guide-tool-hover-surface) !important;
+  border-color: color-mix(
+    in srgb,
+    var(--sniptale-color-accent) 35%,
+    var(--sniptale-color-border-soft)
+  );
+}
+.guide-document
+  :is(
+    .guide-block-grip,
+    .guide-block-width,
+    .guide-action-menu-anchor > button,
+    .guide-image-tools > button,
+    .guide-insertion-chrome > button,
+    .guide-voice-control > button
+  ):focus-visible {
+  outline: 1px solid var(--sniptale-color-accent);
+  outline-offset: 2px;
+}
+.guide-document
+  :is(
+    .guide-block-grip,
+    .guide-block-width,
+    .guide-action-menu-anchor > button,
+    .guide-image-tools > button,
+    .guide-insertion-chrome > button,
+    .guide-voice-control > button
+  )
+  > svg {
+  width: 14px;
+  height: 14px;
+}
+@media (hover: none) {
+  .guide-center-panel .guide-voice-field > .guide-voice-control {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
