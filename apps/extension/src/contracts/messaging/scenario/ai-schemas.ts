@@ -59,10 +59,14 @@ export const processScenarioEditorWithLlmMessageSchema = defineProcessScenarioMe
       baseRevision: z.number().int().nonnegative(),
       scope: z
         .object({
-          stepIds: z.array(z.string().min(1).max(160)).min(1).max(300),
+          stepIds: z.array(z.string().min(1).max(160)).max(300),
+          document: z.boolean().optional(),
           blockIds: z.array(z.string().min(1).max(160)).max(200),
         })
-        .strict(),
+        .strict()
+        .refine((scope) =>
+          scope.document ? scope.blockIds.length === 0 : scope.stepIds.length > 0
+        ),
       instruction: createBoundedStringSchema(
         'instruction',
         SCENARIO_EDITOR_AI_PAYLOAD_LIMITS.maxInstructionChars,

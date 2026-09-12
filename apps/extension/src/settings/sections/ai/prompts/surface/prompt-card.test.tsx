@@ -114,3 +114,28 @@ it('forwards prompt edits, resize starts, and save requests', async () => {
   expect(handleReset).toHaveBeenCalledOnce();
   expect(handleSave).toHaveBeenCalledOnce();
 });
+
+it('shows the generated scenario protocol separately from editable guidance', async () => {
+  const prompt = {
+    status: { canReset: false, isDirty: false, isSaving: false, saveError: null },
+    value: 'Keep explanations short.',
+    textareaRef: { current: null },
+    setValue: vi.fn(),
+    handleReset: vi.fn(),
+    handleSave: vi.fn(),
+    handleResizeStart: vi.fn(),
+  };
+  await renderUi(
+    <AIProvidersPromptCard
+      titleKey="settings.aiProviders.scenarioEditorPromptTitle"
+      descriptionKey="settings.aiProviders.scenarioEditorPromptDescription"
+      prompt={prompt}
+    />
+  );
+  const preview = container!.querySelector<HTMLTextAreaElement>('textarea[readonly]');
+  expect(preview?.value).toContain('Keep explanations short.');
+  expect(preview?.value).toContain('replaceStructure');
+  expect(preview?.value).toContain('setStepTitle');
+  expect(container!.querySelector('details')?.open).toBe(false);
+  expect(container!.querySelectorAll('textarea:not([readonly])')).toHaveLength(1);
+});

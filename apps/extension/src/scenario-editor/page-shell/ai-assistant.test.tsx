@@ -317,7 +317,7 @@ it('sends all steps in document order from a block selection and restores a cust
   await act(async () =>
     document.querySelector<HTMLInputElement>('[aria-label="Second title"]')!.click()
   );
-  await act(async () => button('All steps').click());
+  await act(async () => button('Entire guide').click());
   expect(document.body.textContent).toContain('Selected 2 of 2');
   await act(async () => button('Choose steps').click());
   expect(document.querySelector<HTMLInputElement>('[aria-label="Before title"]')!.checked).toBe(
@@ -326,7 +326,7 @@ it('sends all steps in document order from a block selection and restores a cust
   expect(document.querySelector<HTMLInputElement>('[aria-label="Second title"]')!.checked).toBe(
     true
   );
-  await act(async () => button('All steps').click());
+  await act(async () => button('Entire guide').click());
   await act(async () => button('Get suggestions').click());
   expect(io.request.mock.calls[0]![0]).toMatchObject({
     scope: { stepIds: ['step', 'second'], blockIds: [] },
@@ -383,7 +383,7 @@ it('keeps selected-only filtering reversible and freezes the picker during a req
       (input) => input.disabled
     )
   ).toBe(true);
-  expect(button('All steps').disabled).toBe(true);
+  expect(button('Entire guide').disabled).toBe(true);
   expect(button('Clear selection').disabled).toBe(true);
   await act(async () => button('Stop waiting').click());
   await act(async () => finish({ baseRevision: 1, changes: [] }));

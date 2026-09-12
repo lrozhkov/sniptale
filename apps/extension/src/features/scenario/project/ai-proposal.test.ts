@@ -37,6 +37,7 @@ it('projects only selected text fields and keeps resource data outside the egres
   const { project } = fixture();
   const selected = selectGuideAiContent(project, { stepIds: ['first'], blockIds: ['image'] });
   expect(selected.snapshot).toEqual({
+    scope: 'blocks',
     steps: [
       {
         id: 'first',
@@ -277,4 +278,215 @@ it('admits heading, note and empty image presentation using their persisted sche
       parameters: { fit: 'cover', width: 'half', frame: { width: 200, height: 100 } },
     },
   ]);
+});
+
+it('admits a complete guide reconstruction with sections, titles, image reuse and document appearance', () => {
+  const { project } = fixture();
+  const scope = { stepIds: ['first', 'second'], blockIds: [], document: true };
+  const original = structuredClone(project);
+  const image = {
+    kind: 'image',
+    id: 'moved-image',
+    sourceBlockId: 'image',
+    caption: 'Preserved image',
+    alt: '',
+    frame: { width: 200, height: 100 },
+    fit: 'contain',
+    contentTransform: { x: 0, y: 0, scale: 1 },
+    width: 60,
+  };
+  const operations = [
+    {
+      type: 'replaceStructure',
+      items: [
+        {
+          kind: 'section',
+          id: 'section',
+          title: 'Start here',
+          paragraphs: [],
+          numbering: { restartAt: 1 },
+        },
+        {
+          kind: 'step',
+          id: 'first',
+          title: 'Renamed main title',
+          showNumber: true,
+          layout: 'side-by-side',
+          styleOverrides: {},
+          blocks: [
+            {
+              kind: 'text',
+              id: 'text',
+              paragraphs: createGuideParagraphs('Rewritten content'),
+              width: 40,
+            },
+            image,
+          ],
+        },
+        {
+          kind: 'step',
+          id: 'new-step',
+          title: 'Check the result',
+          showNumber: true,
+          layout: 'stacked',
+          styleOverrides: {},
+          blocks: [
+            {
+              kind: 'note',
+              id: 'note',
+              tone: 'warning',
+              paragraphs: createGuideParagraphs('Check offline.'),
+            },
+            { ...image, id: 'copy-image' },
+          ],
+        },
+      ],
+    },
+    {
+      type: 'setDocumentParameters',
+      parameters: { name: 'New guide', style: { ...project.style, contentWidth: 'wide' } },
+    },
+  ];
+  expect(prepareGuideAiProposal(project, scope, operations)).toHaveLength(2);
+  const next = applyGuideAiProposal(project, scope, operations);
+  expect(next.items.map((item) => item.title)).toEqual([
+    'Start here',
+    'Renamed main title',
+    'Check the result',
+  ]);
+  expect(next).toMatchObject({
+    id: project.id,
+    name: 'New guide',
+    style: { contentWidth: 'wide' },
+  });
+  const images = next.items.flatMap((item) =>
+    item.kind === 'step' ? item.blocks.filter((block) => block.kind === 'image') : []
+  );
+  expect(images).toHaveLength(2);
+  expect(images[0]).toMatchObject({
+    assetId: 'private-asset',
+    source: { kind: 'import', filename: 'private-file.png' },
+    width: 60,
+  });
+  expect(images[0]).not.toHaveProperty('sourceBlockId');
+  expect(project).toEqual(original);
+  expect(selectGuideAiContent(project, scope).snapshot).toMatchObject({
+    scope: 'document',
+    document: { name: project.name },
+    items: [{ id: 'first' }, { id: 'second' }],
+  });
+  expect(JSON.stringify(selectGuideAiContent(project, scope).snapshot)).not.toContain(
+    'private-asset'
+  );
+});
+
+it('rejects invalid structural scope, conflicts, references and identities atomically', () => {
+  const { project, scope } = fixture();
+  const original = structuredClone(project);
+  const documentScope = { ...scope, stepIds: ['first', 'second'], document: true };
+  const step = {
+    kind: 'step',
+    id: 'first',
+    title: 'Title',
+    showNumber: true,
+    layout: 'stacked',
+    styleOverrides: {},
+    blocks: [],
+  };
+  expect(() =>
+    applyGuideAiProposal(project, scope, [{ type: 'replaceStructure', items: [] }])
+  ).toThrow();
+  expect(() => applyGuideAiProposal(project, { ...scope, document: true }, [])).toThrow();
+  expect(() =>
+    applyGuideAiProposal(project, scope, [
+      { type: 'setDocumentParameters', parameters: { name: 'Foreign' } },
+    ])
+  ).toThrow();
+  expect(() =>
+    applyGuideAiProposal(project, { ...scope, blockIds: ['text'] }, [
+      { type: 'replaceStep', stepId: 'first', step },
+    ])
+  ).toThrow();
+  for (const operations of [
+    [{ type: 'replaceStructure', items: [step, step] }],
+    [
+      { type: 'replaceStructure', items: [] },
+      { type: 'setStepTitle', stepId: 'first', title: 'Conflict' },
+    ],
+    [
+      { type: 'replaceStep', stepId: 'first', step },
+      { type: 'setText', stepId: 'first', blockId: 'text', text: 'Conflict' },
+    ],
+    [{ type: 'replaceStep', stepId: 'first', step: { ...step, id: 'second' } }],
+    [
+      {
+        type: 'replaceStep',
+        stepId: 'first',
+        step: {
+          ...step,
+          blocks: [
+            {
+              kind: 'image',
+              id: 'image',
+              sourceBlockId: 'foreign',
+              alt: '',
+              caption: '',
+              frame: { width: 100, height: 100 },
+              fit: 'contain',
+              contentTransform: { x: 0, y: 0, scale: 1 },
+            },
+          ],
+        },
+      },
+    ],
+  ])
+    expect(() => prepareGuideAiProposal(project, documentScope, operations)).toThrow();
+  expect(project).toEqual(original);
+});
+
+it('supports rich block replacement and inherited appearance reset while preserving unselected content', () => {
+  const { project, scope } = fixture();
+  const replacement = {
+    type: 'replaceBlock',
+    stepId: 'first',
+    blockId: 'text',
+    block: {
+      kind: 'note',
+      id: 'text',
+      tone: 'warning',
+      paragraphs: [{ runs: [{ text: 'Read this', bold: true, italic: true, href: null }] }],
+    },
+  };
+  const next = applyGuideAiProposal(project, { ...scope, blockIds: ['text'] }, [replacement]);
+  expect(next.items[0]).toMatchObject({ title: 'Selected title', blocks: [replacement.block, {}] });
+  expect(next.items[0]?.kind === 'step' && next.items[0].blocks[0]).not.toHaveProperty('width');
+  expect(next.items[1]).toEqual(project.items[1]);
+  expect(() =>
+    prepareGuideAiProposal(project, { ...scope, blockIds: ['image'] }, [replacement])
+  ).toThrow();
+  expect(() =>
+    prepareGuideAiProposal(project, scope, [
+      replacement,
+      { type: 'setText', stepId: 'first', blockId: 'text', text: 'Conflict' },
+    ])
+  ).toThrow();
+});
+
+it('can create the first step in an explicitly selected empty document', () => {
+  const project = createGuideProject('Empty');
+  const step = {
+    kind: 'step',
+    id: 'new',
+    title: 'Start',
+    showNumber: true,
+    layout: 'stacked',
+    styleOverrides: {},
+    blocks: [],
+  };
+  expect(
+    applyGuideAiProposal(project, { stepIds: [], blockIds: [], document: true }, [
+      { type: 'replaceStructure', items: [step] },
+    ]).items
+  ).toHaveLength(1);
+  expect(() => applyGuideAiProposal(project, { stepIds: [], blockIds: [] }, [])).toThrow();
 });

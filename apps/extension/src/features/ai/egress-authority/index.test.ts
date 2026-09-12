@@ -70,3 +70,24 @@ it('changes scenario authority when attachment payloads are mutated', async () =
 
   expect(baseAuthority.payloadHash).not.toBe(changedAuthority.payloadHash);
 });
+
+it('binds whole-document authority separately from selecting the same steps', async () => {
+  const input = {
+    attachments: [],
+    contractVersion: 4 as const,
+    projectId: 'project',
+    baseRevision: 1,
+    scope: { stepIds: ['step'], blockIds: [] },
+    projectSnapshotJson: '{}',
+  };
+  const selected = await createScenarioEditorEgressAuthority(input);
+  const document = await createScenarioEditorEgressAuthority({
+    ...input,
+    scope: { ...input.scope, document: true },
+  });
+  expect(document.payloadHash).not.toBe(selected.payloadHash);
+  expect(
+    canonicalizeScenarioEditorEgressPayload({ ...input, scope: { ...input.scope, document: true } })
+      .scope.document
+  ).toBe(true);
+});

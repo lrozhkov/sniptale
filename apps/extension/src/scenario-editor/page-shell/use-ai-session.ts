@@ -188,7 +188,8 @@ function resolveScope({
   selectedStepId: string | null;
   selectedBlockId: string | null;
 }): GuideAiScope {
-  if (mode === 'all') return { stepIds: steps.map((step) => step.id), blockIds: [] };
+  if (mode === 'all')
+    return { stepIds: steps.map((step) => step.id), blockIds: [], document: true };
   if (mode === 'steps')
     return {
       stepIds: steps.filter((step) => stepIds.includes(step.id)).map((step) => step.id),
@@ -213,7 +214,7 @@ function useAiSelection({
   isLocked: () => boolean;
 }) {
   const [mode, setMode] = useState<GuideAiMode>(
-    selectedBlockId ? 'block' : selectedStepId ? 'step' : 'steps'
+    selectedBlockId ? 'block' : selectedStepId ? 'step' : 'all'
   );
   const steps = project.items.filter((item) => item.kind === 'step');
   const [stepIds, setStepIds] = useState<string[]>(

@@ -106,8 +106,12 @@ export const settingsAiProvidersOverviewMessages = defineMessageSource({
     en: ' saving the global prompt',
   },
   scenarioEditorPromptTitle: {
-    ru: 'Системный промпт для AI-редактора сценариев',
-    en: 'System prompt for the scenario AI editor',
+    ru: 'Дополнительные инструкции AI-редактору сценариев',
+    en: 'Additional instructions for the scenario AI editor',
+  },
+  scenarioEditorFullPrompt: {
+    ru: 'Полный системный промпт с текущими инструкциями',
+    en: 'Full system prompt with current instructions',
   },
   scenarioEditorPromptDescription: {
     ru: 'Редактируемые инструкции для сценариев. Доступные операции и ограничения автоматически добавляются из схемы редактора; промпты моделей не наследуются.',

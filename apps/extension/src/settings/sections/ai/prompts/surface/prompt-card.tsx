@@ -1,3 +1,4 @@
+import { buildScenarioAiSystemPrompt } from '@sniptale/runtime-contracts/scenario-ai-operations';
 import { translate } from '../../../../../platform/i18n';
 import { ProductTextarea } from '@sniptale/ui/product-form-controls';
 import { getControlSecondaryButtonClassName } from '@sniptale/ui/control-language';
@@ -39,6 +40,21 @@ export function AIProvidersPromptCard(props: AiProvidersPromptCardProps) {
             onMouseDown={props.prompt.handleResizeStart}
           />
         </div>
+        {props.titleKey === 'settings.aiProviders.scenarioEditorPromptTitle' && (
+          <details className="mt-3 text-sm text-[var(--sniptale-color-text-secondary)]">
+            <summary className="cursor-pointer">
+              {translate('settings.aiProviders.scenarioEditorFullPrompt')}
+            </summary>
+            <ProductTextarea
+              readOnly
+              aria-label={translate('settings.aiProviders.scenarioEditorFullPrompt')}
+              value={buildScenarioAiSystemPrompt(props.prompt.value)}
+              rows={12}
+              style={{ height: '20rem', resize: 'vertical' }}
+              className="mt-2 font-mono"
+            />
+          </details>
+        )}
         <div className="mt-3 flex justify-end gap-2">
           {props.prompt.status.canReset ? (
             <button

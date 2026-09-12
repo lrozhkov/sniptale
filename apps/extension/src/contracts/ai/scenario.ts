@@ -15,7 +15,7 @@ export interface ProcessScenarioEditorWithLLMMessage {
   contractVersion: 4;
   projectId: string;
   baseRevision: number;
-  scope: { stepIds: string[]; blockIds: string[] };
+  scope: { stepIds: string[]; blockIds: string[]; document?: boolean | undefined };
   instruction: string;
   llmSessionToken: string;
   modelId?: string | null | undefined;

@@ -55,10 +55,12 @@ export const scenarioEditorCoreMessages = defineMessageSource({
   },
   guideAiEnabled: { ru: 'Включено', en: 'Enabled' },
   guideAiDisabled: { ru: 'Выключено', en: 'Disabled' },
-  guideAiAllSteps: { ru: 'Все шаги', en: 'All steps' },
+  guideAiAllSteps: { ru: 'Весь сценарий', en: 'Entire guide' },
+  guideAiComposition: { ru: 'Состав шага', en: 'Step composition' },
+  guideAiDocumentParameters: { ru: 'Оформление сценария', en: 'Guide appearance' },
   guideAiAllStepsHint: {
-    ru: 'Будут обработаны все шаги сценария. Изображения отправляются только при включении опции ниже.',
-    en: 'All guide steps will be processed. Images are sent only when the option below is enabled.',
+    ru: 'Будет передан весь сценарий: шаги, разделы и оформление. AI сможет перестроить его по вашему запросу. Изображения отправляются только при включении опции ниже.',
+    en: 'The entire guide is included: steps, sections and appearance. AI can restructure it as requested. Images are sent only when the option below is enabled.',
   },
   guideAiSelectionCount: {
     ru: 'Выбрано {selected} из {total}',

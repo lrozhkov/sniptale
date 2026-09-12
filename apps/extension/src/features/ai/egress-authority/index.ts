@@ -53,7 +53,11 @@ export function canonicalizeScenarioEditorEgressPayload(
     contractVersion: 4,
     projectId: input.projectId,
     baseRevision: input.baseRevision,
-    scope: { stepIds: [...input.scope.stepIds], blockIds: [...input.scope.blockIds] },
+    scope: {
+      stepIds: [...input.scope.stepIds],
+      blockIds: [...input.scope.blockIds],
+      ...(input.scope.document ? { document: true } : {}),
+    },
     projectOutlineJson: canonicalizeScenarioJsonObjectField(
       'projectOutlineJson',
       input.projectOutlineJson ?? '{}'

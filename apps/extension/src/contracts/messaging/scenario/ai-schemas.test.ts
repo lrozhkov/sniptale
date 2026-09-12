@@ -162,3 +162,21 @@ it('rejects unsafe or oversized scenario editor AI attachments', () => {
     )
   ).toThrow();
 });
+
+it('admits empty document scope and rejects block/document scope combinations', () => {
+  expect(
+    processScenarioEditorWithLlmMessageSchema.safeParse(
+      createScenarioAiMessage({ scope: { stepIds: [], blockIds: [], document: true } })
+    ).success
+  ).toBe(true);
+  expect(
+    processScenarioEditorWithLlmMessageSchema.safeParse(
+      createScenarioAiMessage({ scope: { stepIds: [], blockIds: [] } })
+    ).success
+  ).toBe(false);
+  expect(
+    processScenarioEditorWithLlmMessageSchema.safeParse(
+      createScenarioAiMessage({ scope: { stepIds: ['step'], blockIds: ['block'], document: true } })
+    ).success
+  ).toBe(false);
+});

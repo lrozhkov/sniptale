@@ -85,7 +85,7 @@ for (const theme of ['light', 'dark'] as const) {
       body: await page.screenshot(),
       contentType: 'image/png',
     });
-    await dialog.getByRole('button', { name: 'All steps', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Entire guide', exact: true }).click();
     await expect(dialog.getByText('Selected 2 of 2', { exact: true })).toBeVisible();
     await dialog.getByRole('button', { name: 'Choose steps', exact: true }).click();
     await expect(
@@ -94,7 +94,7 @@ for (const theme of ['light', 'dark'] as const) {
     await expect(
       dialog.getByRole('checkbox', { name: 'Compare two images', exact: true })
     ).not.toBeChecked();
-    await dialog.getByRole('button', { name: 'All steps', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Entire guide', exact: true }).click();
     await dialog.getByRole('button', { name: 'Test provider / Test model', exact: true }).click();
     await dialog.locator('input[type="text"]').press('Escape');
     await expect(dialog).toBeVisible();
@@ -153,6 +153,83 @@ for (const theme of ['light', 'dark'] as const) {
     await trigger.click();
     await dialog.press('Escape');
     await expect(trigger).toBeFocused();
+    await page.evaluate(() => {
+      const original = chrome.runtime.sendMessage.bind(chrome.runtime);
+      Reflect.set(chrome.runtime, 'sendMessage', async (message: unknown) => {
+        if (
+          message &&
+          typeof message === 'object' &&
+          'type' in message &&
+          message.type === 'PROCESS_SCENARIO_EDITOR_WITH_LLM'
+        ) {
+          return {
+            success: true,
+            operations: [
+              {
+                type: 'replaceStructure',
+                items: [
+                  {
+                    kind: 'section',
+                    id: 'ai-section',
+                    title: 'AI section',
+                    paragraphs: [],
+                    numbering: { restartAt: 1 },
+                  },
+                  {
+                    kind: 'step',
+                    id: 'compare',
+                    title: 'Rebuilt guide',
+                    showNumber: true,
+                    layout: 'stacked',
+                    styleOverrides: {},
+                    blocks: [
+                      {
+                        kind: 'note',
+                        id: 'ai-note',
+                        tone: 'warning',
+                        paragraphs: [
+                          {
+                            runs: [
+                              {
+                                text: 'Verify the result offline.',
+                                bold: false,
+                                italic: false,
+                                href: null,
+                              },
+                            ],
+                          },
+                        ],
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          };
+        }
+        return original(message);
+      });
+    });
+    await trigger.click();
+    await dialog.getByRole('button', { name: 'Entire guide', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Get suggestions', exact: true }).click();
+    await expect(dialog.getByText('Rebuilt guide', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('Verify the result offline.', { exact: true })).toBeVisible();
+    await expect(
+      dialog.getByRole('button', { name: 'Apply selected', exact: true })
+    ).toBeInViewport({ ratio: 1 });
+    await testInfo.attach(`ai-structure-${theme}`, {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+    await dialog.getByRole('button', { name: 'Apply selected', exact: true }).click();
+    await expect(page.locator('article#compare')).toContainText('Rebuilt guide');
+    await expect(page.locator('article#text-only')).toHaveCount(0);
+    await expect(page.locator('section#ai-section')).toContainText('AI section');
+    await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    await expect(page.locator('article#compare img')).toHaveCount(2);
+    await expect(page.locator('article#text-only')).toBeAttached();
+    await expect(page.locator('section#ai-section')).toHaveCount(0);
   });
 }
 

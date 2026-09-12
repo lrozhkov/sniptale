@@ -65,7 +65,9 @@ it('generates the advertised contract from the accepted presentation schemas', a
   } = await import('./index');
   const { z } = await import('zod');
   const manifest = createScenarioAiManifest();
-  expect(manifest.response).toEqual(z.toJSONSchema(scenarioAiOperationsResponseSchema));
+  expect(manifest.response).toEqual(
+    z.toJSONSchema(scenarioAiOperationsResponseSchema, { reused: 'ref' })
+  );
   const prompt = buildScenarioAiSystemPrompt('User writing style');
   expect(prompt).toContain('User writing style');
   expect(prompt).toContain('setBlockParameters');

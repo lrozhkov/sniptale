@@ -9,6 +9,7 @@ import { Undo2, Redo2, Download } from 'lucide-react';
 
 export function GuidePageHeader({
   project,
+  images = {},
   panelControls,
   aiSelection,
   onAiOpen,
@@ -32,6 +33,7 @@ export function GuidePageHeader({
   t,
 }: {
   project: GuideProject | null;
+  images?: Record<string, string | null>;
   panelControls?: ReactNode;
   aiSelection?: { stepId: string | null; blockId: string | null };
   onAiOpen?: () => void;
@@ -81,6 +83,7 @@ export function GuidePageHeader({
         <div className="guide-header-actions">
           {aiSelection && onAiOpen && (
             <GuideAiEntry
+              images={images}
               project={project}
               selectedStepId={aiSelection.stepId}
               selectedBlockId={aiSelection.blockId}

@@ -218,3 +218,15 @@
   font-size: 12px;
   color: var(--sniptale-color-text-secondary);
 }
+
+.guide-ai-composition-value {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sniptale-space-1);
+}
+
+.guide-ai-composition-image {
+  max-height: 120px;
+  width: 100%;
+  object-fit: contain;
+}

@@ -71,6 +71,7 @@ export function ScenarioEditorPage() {
     );
   const header = (
     <GuidePageHeader
+      images={state.images}
       aiSelection={{ stepId: selectedStepId, blockId: framing.target?.block.id ?? null }}
       onAiOpen={state.sealEdit}
       onAppearance={() => panels.openRight('document')}

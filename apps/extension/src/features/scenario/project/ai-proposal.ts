@@ -1,7 +1,9 @@
 import {
+  parseGuideProject,
   guideStepParametersSchema,
   guideBlockParameterSchemas,
 } from '@sniptale/runtime-contracts/scenario/guide-parser';
+import { applyGuideAiComposition } from './ai-composition';
 import { applyGuideLayout } from './layout';
 import type {
   GuideBlock,
@@ -9,6 +11,7 @@ import type {
   GuideImageBlock,
   GuideProject,
   GuideStep,
+  GuideParagraph,
 } from '@sniptale/runtime-contracts/scenario/types/guide';
 import {
   scenarioAiOperationsResponseSchema,
@@ -17,8 +20,16 @@ import {
 import { createGuideParagraphs } from './factories';
 
 /** An empty block selection selects content and presentation in the selected steps. */
-export type GuideAiScope = { stepIds: string[]; blockIds: string[] };
+export type GuideAiScope = {
+  stepIds: string[];
+  blockIds: string[];
+  document?: boolean | undefined;
+};
 export type GuideAiChange = { operation: ScenarioAiOperation; before: string; after: string };
+type ContentOperation = Exclude<
+  ScenarioAiOperation,
+  { type: 'replaceStructure' | 'replaceStep' | 'replaceBlock' | 'setDocumentParameters' }
+>;
 type BlockParameters = ReturnType<
   (typeof guideBlockParameterSchemas)[keyof typeof guideBlockParameterSchemas]['parse']
 >;
@@ -31,17 +42,29 @@ type AiTextBlock =
       alt: string;
       actionContext?: Omit<GuideVideoAction, 'id'>;
     }
-  | { id: string; kind: 'heading' | 'text' | 'note'; text: string; parameters: BlockParameters }
+  | {
+      id: string;
+      kind: 'heading' | 'text' | 'note';
+      text: string;
+      parameters: BlockParameters;
+      paragraphs?: GuideParagraph[];
+    }
   | { id: string; kind: 'image-slot'; parameters: BlockParameters };
 
 function selectedSteps(project: GuideProject, scope: GuideAiScope): GuideStep[] {
+  if (
+    scope.document &&
+    (scope.blockIds.length ||
+      project.items.some((item) => item.kind === 'step' && !scope.stepIds.includes(item.id)))
+  )
+    throw new Error('Invalid AI document selection.');
   const ids = new Set(scope.stepIds);
   const steps = project.items.filter(
     (item): item is GuideStep => item.kind === 'step' && ids.has(item.id)
   );
   const blocks = new Set(scope.blockIds);
   if (
-    !ids.size ||
+    (!ids.size && !scope.document) ||
     ids.size !== scope.stepIds.length ||
     steps.length !== ids.size ||
     blocks.size !== scope.blockIds.length
@@ -105,6 +128,9 @@ export function selectGuideAiContent(project: GuideProject, scope: GuideAiScope)
             kind: block.kind,
             parameters,
             text: block.kind === 'heading' ? block.text : plainText(block),
+            ...(!scope.blockIds.length && block.kind !== 'heading'
+              ? { paragraphs: structuredClone(block.paragraphs) }
+              : {}),
           },
         ];
       });
@@ -116,7 +142,28 @@ export function selectGuideAiContent(project: GuideProject, scope: GuideAiScope)
       blocks,
     };
   });
-  return { snapshot: { steps }, images };
+  return {
+    snapshot: {
+      steps,
+      scope: scope.document ? 'document' : scope.blockIds.length ? 'blocks' : 'steps',
+      ...(scope.document
+        ? {
+            document: {
+              ...(project.purpose ? { purpose: project.purpose } : {}),
+              name: project.name,
+              tags: project.tags,
+              style: project.style,
+              print: project.print,
+              ...(project.htmlExport ? { htmlExport: project.htmlExport } : {}),
+            },
+            items: project.items.map((item) =>
+              item.kind === 'section' ? structuredClone(item) : { kind: 'step', id: item.id }
+            ),
+          }
+        : {}),
+    },
+    images,
+  };
 }
 
 /** Parsed optional parameters are patches: undefined has the same meaning as omission. */
@@ -132,7 +179,7 @@ function mergeParameters<T extends object>(
 
 function changeBlock(
   block: GuideBlock,
-  operation: Exclude<ScenarioAiOperation, { type: 'setStepTitle' | 'setStepParameters' }>
+  operation: Exclude<ContentOperation, { type: 'setStepTitle' | 'setStepParameters' }>
 ): { block: GuideBlock; before: string } {
   if (operation.type === 'setBlockParameters') {
     const before = JSON.stringify(guideBlockParameterSchemas[block.kind].strip().parse(block));
@@ -208,7 +255,7 @@ function changeBlock(
 
 function changeStep(
   step: GuideStep,
-  operation: ScenarioAiOperation
+  operation: ContentOperation
 ): { step: GuideStep; before: string } {
   if (operation.type === 'setStepTitle')
     return { step: { ...step, title: operation.title }, before: step.title };
@@ -241,7 +288,78 @@ export function prepareGuideAiProposal(
   const { operations } = scenarioAiOperationsResponseSchema.parse({ operations: rawOperations });
   const steps = selectedSteps(project, scope);
   const targets = new Set<string>();
-  return operations.map((operation) => {
+  const structure = operations.filter((operation) => operation.type === 'replaceStructure');
+  if (
+    structure.length &&
+    (structure.length > 1 ||
+      operations.some(
+        (operation) =>
+          operation.type !== 'replaceStructure' && operation.type !== 'setDocumentParameters'
+      ))
+  )
+    throw new Error('Conflicting AI composition operations.');
+  const replacements = operations.filter((operation) => operation.type === 'replaceStep');
+  for (const replacement of replacements) {
+    if (
+      operations.some(
+        (operation) =>
+          operation !== replacement &&
+          'stepId' in operation &&
+          operation.stepId === replacement.stepId
+      )
+    )
+      throw new Error('Conflicting AI step operations.');
+  }
+  for (const replacement of operations.filter((operation) => operation.type === 'replaceBlock')) {
+    if (
+      operations.some(
+        (operation) =>
+          operation !== replacement &&
+          'blockId' in operation &&
+          operation.blockId === replacement.blockId
+      )
+    )
+      throw new Error('Conflicting AI block operations.');
+  }
+  const changes = operations.map((operation): GuideAiChange => {
+    if (
+      operation.type === 'replaceStructure' ||
+      operation.type === 'replaceStep' ||
+      operation.type === 'replaceBlock' ||
+      operation.type === 'setDocumentParameters'
+    ) {
+      const key = JSON.stringify([
+        operation.type,
+        'stepId' in operation ? operation.stepId : null,
+        'blockId' in operation ? operation.blockId : null,
+      ]);
+      if (targets.has(key)) throw new Error('Duplicate AI proposal target.');
+      targets.add(key);
+      const next = applyGuideAiComposition(project, operation, scope);
+      const projectValue = (value: GuideProject) =>
+        operation.type === 'setDocumentParameters'
+          ? {
+              name: value.name,
+              tags: value.tags,
+              style: value.style,
+              print: value.print,
+              htmlExport: value.htmlExport,
+            }
+          : operation.type === 'replaceBlock'
+            ? value.items
+                .flatMap((item) =>
+                  item.kind === 'step' && item.id === operation.stepId ? item.blocks : []
+                )
+                .find((block) => block.id === operation.blockId)
+            : operation.type === 'replaceStep'
+              ? value.items.find((item) => item.id === operation.stepId)
+              : value.items;
+      return {
+        operation,
+        before: JSON.stringify(projectValue(project)),
+        after: JSON.stringify(projectValue(next)),
+      };
+    }
     const step = steps.find((step) => step.id === operation.stepId);
     if (
       !step ||
@@ -270,6 +388,8 @@ export function prepareGuideAiProposal(
             : operation.text,
     };
   });
+  executeProposal(project, scope, changes);
+  return changes;
 }
 
 /** Applies a user-selected, revalidated subset without changing resource identity or capture metadata. */
@@ -279,12 +399,31 @@ export function applyGuideAiProposal(
   rawOperations: unknown
 ): GuideProject {
   const changes = prepareGuideAiProposal(project, scope, rawOperations);
+  return executeProposal(project, scope, changes);
+}
+
+function executeProposal(
+  project: GuideProject,
+  scope: GuideAiScope,
+  changes: GuideAiChange[]
+): GuideProject {
   if (!changes.length) return project;
-  let items = project.items;
+  let next = project;
   for (const { operation } of changes) {
-    items = items.map((item) =>
+    if (
+      operation.type === 'replaceStructure' ||
+      operation.type === 'replaceStep' ||
+      operation.type === 'replaceBlock' ||
+      operation.type === 'setDocumentParameters'
+    ) {
+      next = applyGuideAiComposition(next, operation, scope, project);
+      continue;
+    }
+    const items = next.items.map((item) =>
       item.kind === 'step' && item.id === operation.stepId ? changeStep(item, operation).step : item
     );
+    next = { ...next, items };
   }
-  return { ...project, items };
+  if (parseGuideProject(next).status !== 'ok') throw new Error('AI result exceeds guide limits.');
+  return next;
 }

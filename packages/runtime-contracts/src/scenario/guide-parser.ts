@@ -188,7 +188,7 @@ export const guideBlockParameterSchemas = {
   'image-slot': image.pick({ width: true, frame: true, fit: true }).partial().strict(),
 };
 
-const projectSchema: z.ZodType<GuideProject> = z
+const projectSchema = z
   .object({
     version: z.literal(4),
     purpose: z.literal('step-template').optional(),
@@ -275,6 +275,22 @@ const projectSchema: z.ZodType<GuideProject> = z
       .max(GUIDE_LIMITS.maxItems),
   })
   .strict();
+
+/** Canonical editable document schemas, reused by AI without admitting persistence identity. */
+export const guideDocumentParametersSchema = projectSchema
+  .pick({
+    name: true,
+    tags: true,
+    style: true,
+    print: true,
+    htmlExport: true,
+  })
+  .partial()
+  .strict();
+export const guideItemSchemas = {
+  section: projectSchema.shape.items.element.options[0],
+  step: projectSchema.shape.items.element.options[1],
+};
 
 /** Unsupported versions are distinct from corruption; callers must not treat either as absent. */
 export type GuideParseResult =

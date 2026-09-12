@@ -23,6 +23,7 @@ import './ai-assistant.css';
 
 type AssistantProps = {
   project: GuideProject;
+  images?: Record<string, string | null>;
   selectedStepId: string | null;
   selectedBlockId: string | null;
   disabled: boolean;
@@ -59,7 +60,7 @@ export function GuideAiAssistant(props: AssistantProps) {
     <span ref={anchor}>
       <ContentToolbarButton
         title={props.t('scenario.editor.guideAiOpen')}
-        disabled={props.disabled || !props.project.items.some((item) => item.kind === 'step')}
+        disabled={props.disabled}
         onClick={() => {
           props.onOpen();
           setOpen(true);
@@ -128,6 +129,7 @@ function useDialogFocus(onClose: () => void) {
 
 function GuideAiDialog({
   project,
+  images = {},
   selectedStepId,
   selectedBlockId,
   disabled,
@@ -177,7 +179,7 @@ function GuideAiDialog({
         <ProductModalBody compact className="guide-ai-scroll-body">
           <div className="guide-ai-body" aria-busy={pending}>
             {proposal ? (
-              <GuideAiProposalReview session={session} t={t} />
+              <GuideAiProposalReview session={session} images={images} t={t} />
             ) : (
               <GuideAiRequestForm
                 project={project}
@@ -233,7 +235,7 @@ function GuideAiDialog({
               pending ||
               (proposal
                 ? accepted.size === 0
-                : !modelId || !scope.stepIds.length || !instruction.trim())
+                : !modelId || (!scope.document && !scope.stepIds.length) || !instruction.trim())
             }
             onClick={() => void run(proposal !== null)}
           >
@@ -247,9 +249,11 @@ function GuideAiDialog({
 
 function GuideAiProposalReview({
   session,
+  images,
   t,
 }: {
   session: ReturnType<typeof useGuideAiSession>;
+  images: Record<string, string | null>;
   t: Translate;
 }) {
   const { proposal, steps, pending, accepted, chooseChange } = session;
@@ -268,12 +272,17 @@ function GuideAiProposalReview({
           />
           <span>
             <small>
-              {steps.find((step) => step.id === change.operation.stepId)?.title ||
-                t('scenario.editor.guideAiStep')}{' '}
+              {steps.find(
+                (step) => 'stepId' in change.operation && step.id === change.operation.stepId
+              )?.title || t('scenario.editor.guideAiAllSteps')}{' '}
               ·{' '}
               {t(
                 (
                   {
+                    replaceStructure: 'scenario.editor.guideAiStructure',
+                    replaceStep: 'scenario.editor.guideAiComposition',
+                    replaceBlock: 'scenario.editor.guideAiBlockParameters',
+                    setDocumentParameters: 'scenario.editor.guideAiDocumentParameters',
                     setStepTitle: 'scenario.editor.guideStepTitle',
                     setHeading: 'scenario.editor.guideHeading',
                     setText: 'scenario.editor.guideAddText',
@@ -288,7 +297,7 @@ function GuideAiProposalReview({
             </small>
             <small>{t('scenario.editor.guideAiBefore')}</small>
             <span className="guide-ai-before">
-              <GuideAiChangeValue change={change} side="before" t={t} />
+              <GuideAiChangeValue images={images} change={change} side="before" t={t} />
             </span>
           </span>
           <span>
@@ -298,7 +307,7 @@ function GuideAiProposalReview({
                 <small>{t('scenario.editor.appearanceLayoutHelp')}</small>
               )}
             <span>
-              <GuideAiChangeValue change={change} side="after" t={t} />
+              <GuideAiChangeValue images={images} change={change} side="after" t={t} />
             </span>
           </span>
         </label>

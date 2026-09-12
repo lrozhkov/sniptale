@@ -49,7 +49,7 @@ export type ScenarioEditorCanonicalEgressPayload = {
   contractVersion: 4;
   projectId: string;
   baseRevision: number;
-  scope: { stepIds: string[]; blockIds: string[] };
+  scope: { stepIds: string[]; blockIds: string[]; document?: boolean | undefined };
   projectOutlineJson: string;
   projectSnapshotJson: string;
   selectedStepJson: string;
@@ -61,7 +61,7 @@ export type ScenarioEditorEgressPayloadInput = {
   contractVersion: 4;
   projectId: string;
   baseRevision: number;
-  scope: { stepIds: string[]; blockIds: string[] };
+  scope: { stepIds: string[]; blockIds: string[]; document?: boolean | undefined };
   projectOutlineJson?: string | undefined;
   projectSnapshotJson: string;
   selectedStepJson?: string | undefined;
