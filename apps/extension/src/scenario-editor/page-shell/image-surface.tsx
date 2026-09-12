@@ -1,3 +1,4 @@
+import { GuideResourceTrigger } from './resource-drawer';
 import { Check, Crop, Pencil } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -15,6 +16,7 @@ type ImageProps = {
   disabled: boolean;
   t: Translate;
   onEdit?: () => void;
+  libraryTarget?: { stepId: string; blockId: string };
   onChange: (block: GuideImageBlock, group?: string | null) => void;
 };
 type Gesture = {
@@ -164,6 +166,14 @@ export function GuideImageSurface(props: ImageProps) {
       }}
     >
       <div className="guide-image-tools">
+        {props.libraryTarget && (
+          <GuideResourceTrigger
+            t={t}
+            disabled={disabled}
+            target={{ kind: 'replace-image', ...props.libraryTarget }}
+            title={t('scenario.editor.guideReplaceImage')}
+          />
+        )}
         {props.onEdit && (
           <ContentToolbarButton
             type="button"

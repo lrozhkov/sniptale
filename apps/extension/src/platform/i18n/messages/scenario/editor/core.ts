@@ -36,14 +36,24 @@ export const scenarioEditorCoreMessages = defineMessageSource({
   guideImageResetZoom: { ru: 'Масштаб 100%', en: 'Zoom 100%' },
   guideImageCenter: { ru: 'По центру', en: 'Center image' },
 
-  guideImportLimit: {
-    ru: 'До 50 изображений за один импорт, до 64 МБ каждое.',
-    en: 'Up to 50 images per import, up to 64 MB each.',
+  guideReplaceImage: { ru: 'Заменить изображение', en: 'Replace image' },
+  guideLibraryAll: { ru: 'Все изображения', en: 'All images' },
+  guideLibraryScreenshots: { ru: 'Скриншоты', en: 'Screenshots' },
+  guideLibraryImages: { ru: 'Изображения', en: 'Images' },
+  guideLibraryNavigation: { ru: 'Разделы библиотеки', en: 'Library sections' },
+  guideLibraryPreview: { ru: 'Предпросмотр', en: 'Preview' },
+  guideLibraryPreviewHint: {
+    ru: 'Выберите изображение для просмотра.',
+    en: 'Select an image to preview.',
+  },
+  guideLibraryPreviewUnavailable: {
+    ru: 'Предпросмотр недоступен. Обновите библиотеку.',
+    en: 'Preview unavailable. Refresh the library.',
   },
   guideImportFiles: { ru: 'Изображения с компьютера', en: 'Images from computer' },
   guideChooseLibrary: {
-    ru: 'Выбрать из библиотеки / обновить',
-    en: 'Choose from library / refresh',
+    ru: 'Обновить библиотеку',
+    en: 'Refresh library',
   },
   guideLibraryLoadFailed: {
     ru: 'Не удалось загрузить библиотеку. Повторите выбор.',

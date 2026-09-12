@@ -3,7 +3,8 @@ import { act, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createTranslator } from '../../platform/i18n';
-import { GuideResourceDrawer } from './resource-drawer';
+import { GuideResourceDrawer, GuideResourceTrigger } from './resource-drawer';
+vi.mock('./resources', () => ({ GuideImageResources: () => <ImportChild /> }));
 
 let root: Root;
 let host: HTMLDivElement;
@@ -33,8 +34,13 @@ beforeEach(() => {
   root = createRoot(host);
   act(() =>
     root.render(
-      <GuideResourceDrawer t={createTranslator('en')}>
-        <ImportChild />
+      <GuideResourceDrawer
+        t={createTranslator('en')}
+        disabled={false}
+        selectedStepId={null}
+        onImport={async () => true}
+      >
+        <GuideResourceTrigger t={createTranslator('en')} />
       </GuideResourceDrawer>
     )
   );

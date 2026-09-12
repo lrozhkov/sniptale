@@ -1,3 +1,4 @@
+import { GuideResourceTrigger } from './resource-drawer';
 import { useEffect, useRef, useState } from 'react';
 import { Upload } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -7,11 +8,13 @@ import type { Translate } from '../../platform/i18n';
 /** Owns one disposable file choice; the page publishes through the existing image importer. */
 export function GuideImageUpload({
   frame,
+  target,
   disabled,
   onUpload,
   t,
 }: {
   frame: { width: number; height: number };
+  target?: { stepId: string; blockId: string };
   disabled: boolean;
   onUpload: (file: File, signal: AbortSignal) => Promise<boolean>;
   t: Translate;
@@ -67,6 +70,14 @@ export function GuideImageUpload({
         <Upload size={16} aria-hidden="true" />
         {t('scenario.editor.guideUploadImage')}
       </ProductActionButton>
+      {target && (
+        <GuideResourceTrigger
+          t={t}
+          target={{ kind: 'replace-image', ...target }}
+          disabled={disabled || pending}
+          label
+        />
+      )}
       {pending && (
         <>
           <span role="status">{t('scenario.editor.guideImportProgress')}</span>

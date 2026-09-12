@@ -5,6 +5,12 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createTranslator } from '../../platform/i18n';
 const io = vi.hoisted(() => ({ list: vi.fn(), import: vi.fn(), revoke: vi.fn() }));
 vi.mock('../../composition/persistence/media-library', () => ({ listMediaLibrary: io.list }));
+vi.mock('../../composition/persistence/gallery-saved-views', () => ({
+  listGallerySavedViews: async () => [],
+}));
+vi.mock('../../composition/persistence/aggregate-presentations', () => ({
+  getAggregatePresentation: async () => undefined,
+}));
 import { GuideImageResources } from './resources';
 let root: Root;
 let host: HTMLDivElement;
@@ -60,12 +66,7 @@ it('previews ordered files, reorders/removes and imports blocks, then releases p
   expect(host.querySelectorAll('img')).toHaveLength(3);
   await click('Move up', host.querySelectorAll('li')[1]);
   await click('Remove from selection', host.querySelectorAll('li')[2]);
-  const placement = host.querySelector<HTMLButtonElement>('[aria-haspopup="listbox"]');
-  if (!placement) throw new Error('Missing import placement');
-  await act(async () => placement.click());
-  const blocks = document.querySelectorAll<HTMLButtonElement>('[role="option"]')[1];
-  if (!blocks) throw new Error('Missing block placement');
-  await act(async () => blocks.click());
+  await click('As blocks in selected step');
   await click('Import selected');
   expect(
     io.import.mock.calls[0]?.[0].sources.map((source: { file: File }) => source.file.name)
@@ -98,16 +99,41 @@ it('keeps selection after a rejected import and cancels pending preparation', as
 it('filters library to images, retries failures and submits a current library identity', async () => {
   await render(null);
   io.list.mockRejectedValueOnce(new Error('read'));
-  await click('Choose from library / refresh');
+  await click('Refresh library');
   expect(host.querySelector('[role="alert"]')).not.toBeNull();
   io.list.mockResolvedValue([
     { id: 'image', kind: 'image', filename: 'Library.png', source: { kind: 'screenshot' } },
     { id: 'video', kind: 'video', filename: 'Movie.mp4', source: { kind: 'recording' } },
   ]);
-  await click('Choose from library / refresh');
+  await click('Refresh library');
   expect(host.textContent).not.toContain('Movie.mp4');
   await click('Library.png');
   await click('Import selected');
   expect(io.import.mock.calls[0]?.[0].sources).toEqual([{ kind: 'library', mediaId: 'image' }]);
   expect(io.import.mock.calls[0]?.[0].placement).toEqual({ kind: 'steps' });
+});
+
+it('imports one selected source into the requested image block without a destination selector', async () => {
+  await act(async () =>
+    root.render(
+      <GuideImageResources
+        disabled={false}
+        selectedStepId="other"
+        target={{ kind: 'replace-image', stepId: 'target-step', blockId: 'target-image' }}
+        t={createTranslator('en')}
+        onImport={io.import}
+      />
+    )
+  );
+  await files('first.png');
+  await files('replacement.png');
+  await click('Import selected');
+  expect(io.import.mock.calls[0]?.[0].sources).toHaveLength(1);
+  expect(io.import.mock.calls[0]?.[0].sources[0].file.name).toBe('replacement.png');
+  expect(io.import.mock.calls[0]?.[0].placement).toEqual({
+    kind: 'replace-image',
+    stepId: 'target-step',
+    blockId: 'target-image',
+  });
+  expect(host.querySelector('[aria-haspopup="listbox"]')).toBeNull();
 });

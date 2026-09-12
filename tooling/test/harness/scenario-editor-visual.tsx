@@ -1,3 +1,7 @@
+import {
+  getMediaLibraryEntry,
+  saveScreenshotMediaAsset,
+} from '../../../apps/extension/src/composition/persistence/media-library';
 import { clearScenarioSavedHistory } from '../../../apps/extension/src/composition/persistence/scenario/retention';
 import { createRoot } from 'react-dom/client';
 import { harnessReady } from './browser-mocks/browser-mocks';
@@ -87,6 +91,13 @@ async function seedGuide(projectId: string): Promise<void> {
 
 async function mountGuideHarness(): Promise<void> {
   await harnessReady;
+  if (!(await getMediaLibraryEntry('guide-visual-library-image'))) {
+    await saveScreenshotMediaAsset({
+      id: 'guide-visual-library-image',
+      filename: 'Library screenshot.png',
+      blob: await createFixtureImage(),
+    });
+  }
   const params = new URLSearchParams(window.location.search);
   initializeAppTheme(params.get('theme') === 'dark' ? 'dark' : 'light');
   await setLocalePreference(params.get('locale') === 'ru' ? 'ru' : 'en');

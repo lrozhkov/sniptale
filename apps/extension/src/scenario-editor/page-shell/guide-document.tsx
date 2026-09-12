@@ -333,6 +333,7 @@ function GuideStepBody({
             />
             {block.kind === 'image' ? (
               <GuideImageSurface
+                libraryTarget={{ stepId: item.id, blockId: block.id }}
                 onEdit={() => onEditImage(item.id, block.id)}
                 block={block}
                 url={images[block.assetId]}
@@ -342,6 +343,7 @@ function GuideStepBody({
               />
             ) : block.kind === 'image-slot' ? (
               <GuideImageUpload
+                target={{ stepId: item.id, blockId: block.id }}
                 frame={block.frame}
                 disabled={disabled}
                 onUpload={(file, signal) => onUploadImage(item.id, block.id, file, signal)}

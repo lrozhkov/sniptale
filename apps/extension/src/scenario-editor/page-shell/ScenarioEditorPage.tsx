@@ -1,6 +1,6 @@
 import type { GuideImageImportPlacement } from '../../composition/persistence/scenario/store/public';
 import { GuideImageDropZone } from './image-drop';
-import { GuideResourceDrawer } from './resource-drawer';
+import { GuideResourceDrawer, GuideResourceTrigger } from './resource-drawer';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { GuideAppearance } from './appearance';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
@@ -14,7 +14,6 @@ import { GuideImageEditor, useGuideImageEditorMode } from './image-editor';
 import { GuideDocument, type GuideFocusRequest } from './guide-document';
 import { GuideWorkspace, GuidePanelControls } from './workspace';
 import { useGuidePanels } from './panel-layout';
-import { GuideImageResources } from './resources';
 import { useGuidePageState } from './runtime/use-state';
 
 /** Composes the local guide workspace around its single edit/save state owner. */
@@ -97,66 +96,66 @@ export function ScenarioEditorPage() {
       {!project && header}
       <GuideProjectRecovery state={state} t={t} />
       {project && (
-        <GuideWorkspace
-          header={header}
-          importResources={
-            <GuideResourceDrawer t={t}>
-              <GuideImageResources
-                disabled={disabled || state.mutationPending || state.status === 'conflict'}
-                selectedStepId={
-                  project.items.find((item) => item.id === state.selectedId)?.kind === 'step'
-                    ? state.selectedId
-                    : null
-                }
-                t={t}
-                onImport={(input) => state.commitChange({ kind: 'import', input })}
-              />
-            </GuideResourceDrawer>
-          }
-          images={state.images}
-          panels={panels}
-          project={project}
-          selectedId={state.selectedId}
-          disabled={disabled}
-          onSelect={selectItem}
-          onAddStep={() => operate({ kind: 'add-step' })}
-          itemActions={
-            <GuideAppearance
-              project={project}
-              selectedId={state.selectedId}
-              disabled={disabled}
-              onChange={state.update}
-              t={t}
-            />
-          }
+        <GuideResourceDrawer
           t={t}
+          disabled={disabled || state.mutationPending || state.status === 'conflict'}
+          selectedStepId={
+            project.items.find((item) => item.id === state.selectedId)?.kind === 'step'
+              ? state.selectedId
+              : null
+          }
+          onImport={(input) => state.commitChange({ kind: 'import', input })}
         >
-          <GuideImageDropZone
+          <GuideWorkspace
+            header={header}
+            importResources={
+              <GuideResourceTrigger t={t} disabled={disabled || state.mutationPending} />
+            }
+            images={state.images}
+            panels={panels}
             project={project}
-            disabled={disabled || state.mutationPending || status === 'conflict'}
-            onPlace={operate}
-            onFiles={importFiles}
+            selectedId={state.selectedId}
+            disabled={disabled}
+            onSelect={selectItem}
+            onAddStep={() => operate({ kind: 'add-step' })}
+            itemActions={
+              <GuideAppearance
+                project={project}
+                selectedId={state.selectedId}
+                disabled={disabled}
+                onChange={state.update}
+                t={t}
+              />
+            }
+            t={t}
           >
-            <GuideDocument
-              onUploadImage={(stepId, blockId, file, signal) =>
-                importFiles([file], { kind: 'replace-image', stepId, blockId }, signal)
-              }
-              onEditImage={(itemId, blockId) => {
-                state.sealEdit();
-                imageEditor.open(itemId, blockId);
-              }}
-              focusRequest={focusRequest}
+            <GuideImageDropZone
               project={project}
-              selectedId={state.selectedId}
-              images={state.images}
-              disabled={disabled}
-              onChange={state.update}
-              onSelect={(id) => selectItem(id, false)}
-              onOperate={operate}
-              t={t}
-            />
-          </GuideImageDropZone>
-        </GuideWorkspace>
+              disabled={disabled || state.mutationPending || status === 'conflict'}
+              onPlace={operate}
+              onFiles={importFiles}
+            >
+              <GuideDocument
+                onUploadImage={(stepId, blockId, file, signal) =>
+                  importFiles([file], { kind: 'replace-image', stepId, blockId }, signal)
+                }
+                onEditImage={(itemId, blockId) => {
+                  state.sealEdit();
+                  imageEditor.open(itemId, blockId);
+                }}
+                focusRequest={focusRequest}
+                project={project}
+                selectedId={state.selectedId}
+                images={state.images}
+                disabled={disabled}
+                onChange={state.update}
+                onSelect={(id) => selectItem(id, false)}
+                onOperate={operate}
+                t={t}
+              />
+            </GuideImageDropZone>
+          </GuideWorkspace>
+        </GuideResourceDrawer>
       )}
     </main>
   );

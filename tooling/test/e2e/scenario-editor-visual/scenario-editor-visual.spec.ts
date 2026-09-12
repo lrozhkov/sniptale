@@ -322,11 +322,9 @@ test('resources open in a wide drawer and return focus to their inspector', asyn
   await expect(
     page.locator('.guide-library-panel').getByRole('button', { name: 'Resources', exact: true })
   ).toBeVisible();
-  await drawer.locator('button[aria-haspopup="listbox"]').click();
-  await expect(page.getByRole('listbox')).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(page.getByRole('listbox')).toHaveCount(0);
-  await expect(drawer).toBeVisible();
+  await expect(drawer.getByRole('navigation', { name: 'Library sections' })).toBeVisible();
+  await drawer.getByRole('button', { name: 'Library screenshot.png', exact: true }).click();
+  await expect(drawer.locator('.guide-library-preview img')).toBeVisible();
   await page.setViewportSize({ width: 640, height: 720 });
   const box = await drawer.boundingBox();
   expect(box?.x).toBeGreaterThanOrEqual(0);
@@ -590,6 +588,62 @@ test('image drops append, replace and fill slots with one Undo per gesture', asy
   await expect(page.getByRole('status').first()).toHaveText('Saved');
   await transfer.dispose();
 });
+
+for (const theme of SCENARIO_VISUAL_THEMES) {
+  test(`image slot selects a library image in ${theme}`, async ({ page, hostOrigin }, testInfo) => {
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 900 });
+    const step = page.locator('article#compare');
+    const count = await step.locator('.guide-block').count();
+    const add = step
+      .locator('.guide-insertion-block[data-end="true"]')
+      .getByRole('button', { name: 'Image', exact: true });
+    await add.focus();
+    await add.click();
+    const slot = step.locator('[data-kind="image-slot"]');
+    const id = await slot.getAttribute('data-block-id');
+    const trigger = slot.getByRole('button', { name: 'Image library', exact: true });
+    await trigger.click();
+    const drawer = page.getByRole('dialog', { name: 'Resources', exact: true });
+    await expect(drawer.getByRole('group', { name: 'Add images' })).toHaveCount(0);
+    await drawer.getByRole('button', { name: 'Library screenshot.png', exact: true }).click();
+    await expect(drawer.locator('.guide-library-preview img')).toBeVisible();
+    await expect(
+      drawer.getByRole('button', { name: 'Import selected', exact: true })
+    ).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await testInfo.attach(`targeted-library-${theme}`, {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+    await drawer.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(trigger).toBeFocused();
+    await trigger.click();
+    await drawer.getByRole('button', { name: 'Library screenshot.png', exact: true }).click();
+    await drawer.getByRole('button', { name: 'Import selected', exact: true }).click();
+    await expect(drawer).toHaveCount(0);
+    await expect(step.locator(`[data-block-id="${id}"]`)).toHaveAttribute('data-kind', 'image');
+    await expect(step.locator('.guide-block')).toHaveCount(count + 1);
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    await expect(slot).toHaveCount(1);
+    await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    await expect(step.locator('.guide-block')).toHaveCount(count);
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    const existing = step.locator('[data-block-id="before"]');
+    const caption = await existing.locator('figcaption').textContent();
+    await existing.hover();
+    await existing.getByRole('button', { name: 'Replace image', exact: true }).click();
+    await drawer.getByRole('textbox', { name: 'Search images' }).fill('missing image');
+    await expect(drawer.locator('.guide-library-card')).toHaveCount(0);
+    await drawer.getByRole('textbox', { name: 'Search images' }).fill('Library');
+    await drawer.getByRole('button', { name: 'Library screenshot.png', exact: true }).click();
+    await drawer.getByRole('button', { name: 'Import selected', exact: true }).click();
+    await expect(drawer).toHaveCount(0);
+    await expect(step.locator('.guide-block')).toHaveCount(count);
+    await expect(existing.locator('figcaption')).toHaveText(caption ?? '');
+    await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+  });
+}
 
 test('history cleanup preserves two-tab undo resources until sessions close', async ({
   page,
