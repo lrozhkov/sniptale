@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type {
   GuideBlock,
+  GuideImageBlock,
   GuideParagraph,
   GuideProject,
 } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -18,11 +19,13 @@ export function GuideReadDocument({
   project,
   images,
   itemId,
+  renderImage,
   t,
 }: {
   project: GuideProject;
   images: Record<string, string | null>;
   itemId?: string;
+  renderImage?: (block: GuideImageBlock) => ReactNode;
   t: Translate;
 }) {
   const numbers = resolveGuideNumbering(project.items);
@@ -66,7 +69,11 @@ export function GuideReadDocument({
                       data-kind={block.kind}
                       data-width={resolveGuideBlockWidth(item.layout, block)}
                     >
-                      <GuideReadBlock block={block} images={images} t={t} />
+                      {block.kind === 'image' && renderImage ? (
+                        renderImage(block)
+                      ) : (
+                        <GuideReadBlock block={block} images={images} t={t} />
+                      )}
                     </div>
                   ))}
                 </div>

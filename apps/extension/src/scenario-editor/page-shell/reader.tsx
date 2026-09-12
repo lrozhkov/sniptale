@@ -1,6 +1,7 @@
+import { GuideHtmlWorkbench } from './html-workbench';
 import { GuideHtmlExport } from './html-export';
 import { GuidePrint, useGuidePrintMode } from './print';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ArrowLeft, ChevronLeft, ChevronRight, Printer } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
@@ -15,45 +16,40 @@ export function GuideReader({
   images,
   initialId,
   onClose,
+  onChange,
+  feedback,
   t,
 }: {
   project: GuideProject;
   images: Record<string, string | null>;
   initialId: string | null;
   onClose: () => void;
+  onChange: (project: GuideProject) => void;
+  feedback?: ReactNode;
   t: Translate;
 }) {
   const print = useGuidePrintMode();
-  const [mode, setMode] = useState<'flow' | 'steps'>('flow');
-  const [selection, setSelection] = useState({
-    id: initialId ?? project.items[0]?.id ?? null,
-    sequence: 0,
-  });
-  const selectedId = selection.id;
-  const select = (id: string) =>
-    setSelection((current) => ({ id, sequence: current.sequence + 1 }));
-  const panel = useRef<HTMLDivElement>(null);
-  const back = useRef<HTMLButtonElement>(null);
-  const index = Math.max(
-    0,
-    project.items.findIndex((item) => item.id === selectedId)
+  const html = useGuideReaderMode(() => {});
+  const { mode, setMode, panel, index, current, select, move } = useReaderNavigation(
+    project,
+    initialId
   );
-  const current = project.items[index];
   const numbers = resolveGuideNumbering(project.items);
+  const back = useRef<HTMLButtonElement>(null);
   useLayoutEffect(() => {
     back.current?.focus();
   }, []);
-  useLayoutEffect(() => {
-    const target = [
-      ...(panel.current?.querySelectorAll<HTMLElement>('article, section') ?? []),
-    ].find((item) => item.id === selectedId);
-    if (selection.sequence > 0) target?.focus({ preventScroll: true });
-    target?.scrollIntoView?.({ block: 'start' });
-  }, [selectedId, selection.sequence, mode]);
-  const move = (direction: -1 | 1) => {
-    const item = project.items[index + direction];
-    if (item) select(item.id);
-  };
+  if (html.active)
+    return (
+      <GuideHtmlWorkbench
+        project={project}
+        images={images}
+        onChange={onChange}
+        feedback={feedback}
+        onClose={html.close}
+        t={t}
+      />
+    );
   if (print.active)
     return <GuidePrint project={project} images={images} onClose={print.close} t={t} />;
   return (
@@ -80,7 +76,7 @@ export function GuideReader({
           <span>{t('scenario.editor.guideReaderBack')}</span>
         </ContentToolbarButton>
         <h1>{project.name}</h1>
-        <GuideHtmlExport project={project} t={t} />
+        <GuideHtmlExport project={project} t={t} onOpenHtml={html.open} htmlRef={html.trigger} />
         <ContentToolbarButton
           ref={print.trigger}
           title={t('scenario.editor.guidePrintAction')}
@@ -121,6 +117,7 @@ export function GuideReader({
           </div>
         )}
       </header>
+      {feedback}
       <div className="guide-reader-body">
         <nav aria-label={t('scenario.editor.guideReaderOutline')}>
           {project.items.map((item) => (
@@ -183,4 +180,34 @@ export function useGuideReaderMode(beforeOpen: () => void) {
       setActive(false);
     },
   };
+}
+
+/** Reading navigation and document focus share one disposable selection lifetime. */
+function useReaderNavigation(project: GuideProject, initialId: string | null) {
+  const [mode, setMode] = useState<'flow' | 'steps'>('flow');
+  const [selection, setSelection] = useState({
+    id: initialId ?? project.items[0]?.id ?? null,
+    sequence: 0,
+  });
+  const selectedId = selection.id;
+  const select = (id: string) =>
+    setSelection((current) => ({ id, sequence: current.sequence + 1 }));
+  const panel = useRef<HTMLDivElement>(null);
+  const index = Math.max(
+    0,
+    project.items.findIndex((item) => item.id === selectedId)
+  );
+  const current = project.items[index];
+  useLayoutEffect(() => {
+    const target = [
+      ...(panel.current?.querySelectorAll<HTMLElement>('article, section') ?? []),
+    ].find((item) => item.id === selectedId);
+    if (selection.sequence > 0) target?.focus({ preventScroll: true });
+    target?.scrollIntoView?.({ block: 'start' });
+  }, [selectedId, selection.sequence, mode]);
+  const move = (direction: -1 | 1) => {
+    const item = project.items[index + direction];
+    if (item) select(item.id);
+  };
+  return { mode, setMode, panel, index, current, select, move };
 }

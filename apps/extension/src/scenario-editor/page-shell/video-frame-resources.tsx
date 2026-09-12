@@ -1,9 +1,13 @@
 import { LibraryMediaPlayer } from '../../composition/library-preview/player';
-import { useEffect, useRef, useState, type ComponentProps } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ProductInput, ProductTextarea } from '@sniptale/ui/product-form-controls';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
-import type { GuideImageResources } from './resources';
+import type {
+  GuideImageImportPlacement,
+  GuideImageImportSource,
+} from '../../composition/persistence/scenario/store/public';
+import type { Translate } from '../../platform/i18n';
 import {
   captureGuideVideoFrame,
   loadGuideVideoSource,
@@ -11,10 +15,19 @@ import {
 } from './runtime/video-frame';
 import './video-frame-resources.css';
 
-type VideoResourcesProps = Pick<
-  ComponentProps<typeof GuideImageResources>,
-  'disabled' | 'onImport' | 'target' | 'onComplete' | 't'
-> & { mediaId: string };
+type VideoResourcesProps = {
+  mediaId: string;
+  disabled: boolean;
+  target?: Extract<GuideImageImportPlacement, { kind: 'replace-image' }>;
+  onComplete?: () => void;
+  t: Translate;
+  onImport: (input: {
+    sources: readonly GuideImageImportSource[];
+    placement: GuideImageImportPlacement;
+    signal: AbortSignal;
+    onProgress: (completed: number, total: number) => void;
+  }) => Promise<boolean>;
+};
 
 /** Owns local video source lifetime and one capture-to-import transaction. */
 function useVideoFrames(props: VideoResourcesProps) {

@@ -104,6 +104,9 @@ export async function importScenarioImages(args: {
             ? {
                 ...block,
                 id: replacement.id,
+                ...(replacement.kind === 'image' && replacement.htmlExport
+                  ? { htmlExport: replacement.htmlExport }
+                  : {}),
                 ...(replacement.width ? { width: replacement.width } : {}),
                 frame: replacement.frame,
                 fit: replacement.fit,

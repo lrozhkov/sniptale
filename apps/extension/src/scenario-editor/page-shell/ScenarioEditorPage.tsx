@@ -33,13 +33,17 @@ export function ScenarioEditorPage() {
   const reader = useGuideReaderMode(state.sealEdit);
   const commandsDisabled = disabled || state.mutationPending;
   const importDisabled = commandsDisabled || status === 'conflict';
-  const importSources = (
-    sources: GuideImageImportSource[],
-    placement: GuideImageImportPlacement,
-    signal: AbortSignal
-  ) => state.commitChange({ kind: 'import', input: { sources, placement, signal } });
+  const imports = guideImageImportCommands(state.commitChange);
   const { focusRequest, selectItem, selectedStepId, operate } = useGuideNavigation(state);
   const framing = useGuideBlockSelection(state, panels, selectItem);
+  const feedback = (
+    <GuidePageFeedback
+      status={status}
+      actionError={state.actionError}
+      onRetry={project ? state.save : undefined}
+      t={t}
+    />
+  );
   if (imageEditor.selection && project)
     return (
       <GuideImageEditor
@@ -56,6 +60,10 @@ export function ScenarioEditorPage() {
         project={project}
         images={state.images}
         initialId={state.selectedId}
+        onChange={state.update}
+        feedback={
+          status === 'failed' || status === 'conflict' || state.actionError ? feedback : null
+        }
         t={t}
         onClose={reader.close}
       />
@@ -67,7 +75,7 @@ export function ScenarioEditorPage() {
       onAppearance={() => panels.openRight('document')}
       onPreview={reader.open}
       previewRef={reader.trigger}
-      previewDisabled={state.mutationPending}
+      previewDisabled={disabled}
       status={status}
       commandsDisabled={commandsDisabled}
       onDuplicate={state.duplicate}
@@ -75,17 +83,9 @@ export function ScenarioEditorPage() {
       onReload={state.reload}
       leftControls={project && <GuidePanelControls panels={panels} t={t} side="left" />}
       panelControls={project && <GuidePanelControls panels={panels} t={t} side="right" />}
-
       project={project}
       disabled={disabled}
-      feedback={
-        <GuidePageFeedback
-          status={status}
-          actionError={state.actionError}
-          onRetry={project ? state.save : undefined}
-          t={t}
-        />
-      }
+      feedback={feedback}
       canUndo={state.canUndo}
       canRedo={state.canRedo}
       onUndo={state.undo}
@@ -107,7 +107,7 @@ export function ScenarioEditorPage() {
           t={t}
           disabled={importDisabled}
           selectedStepId={selectedStepId}
-          onImport={(input) => state.commitChange({ kind: 'import', input })}
+          onImport={imports.resources}
         >
           <GuideWorkspace
             header={header}
@@ -140,19 +140,13 @@ export function ScenarioEditorPage() {
               project={project}
               disabled={importDisabled}
               onPlace={operate}
-              onImport={importSources}
+              onImport={imports.drop}
             >
               <GuideDocument
                 framedImageId={framing.imageId}
                 onSelectBlock={framing.selectBlock}
                 onFrameImage={framing.select}
-                onUploadImage={(stepId, blockId, file, signal) =>
-                  importSources(
-                    [{ kind: 'file', file }],
-                    { kind: 'replace-image', stepId, blockId },
-                    signal
-                  )
-                }
+                onUploadImage={imports.upload}
                 onEditImage={(itemId, blockId) => {
                   state.sealEdit();
                   imageEditor.open(itemId, blockId);
@@ -228,6 +222,7 @@ function GuideContextualInspector({
   return framing.target?.block.kind === 'image' ? (
     <GuideImageControls
       block={framing.target.block}
+      htmlDefaults={project.htmlExport}
       url={images[framing.target.block.assetId]}
       disabled={disabled}
       onChange={framing.change}
@@ -491,4 +486,24 @@ function GuideProjectRecovery({
       )}
     </>
   );
+}
+
+/** Adapts library, drop and upload gestures to the existing single import transaction. */
+function guideImageImportCommands(commit: ReturnType<typeof useGuidePageState>['commitChange']) {
+  const resources = (input: Extract<Parameters<typeof commit>[0], { kind: 'import' }>['input']) =>
+    commit({ kind: 'import', input });
+  return {
+    resources,
+    drop: (
+      sources: GuideImageImportSource[],
+      placement: GuideImageImportPlacement,
+      signal: AbortSignal
+    ) => resources({ sources, placement, signal }),
+    upload: (stepId: string, blockId: string, file: File, signal: AbortSignal) =>
+      resources({
+        sources: [{ kind: 'file', file }],
+        placement: { kind: 'replace-image', stepId, blockId },
+        signal,
+      }),
+  };
 }

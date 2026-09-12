@@ -3,25 +3,32 @@ import tokens from '@sniptale/ui/styles/design-tokens?raw';
 import latin from '@fontsource-variable/manrope/files/manrope-latin-wght-normal.woff2?inline';
 import cyrillic from '@fontsource-variable/manrope/files/manrope-cyrillic-wght-normal.woff2?inline';
 import extended from '@fontsource-variable/manrope/files/manrope-latin-ext-wght-normal.woff2?inline';
+import viewerScript from './html-viewer.js?raw';
+import viewerCss from './html-viewer.css?raw';
+import type { HtmlRaster } from './runtime/html-images';
+import { resolveHtmlImageSettings } from './html-image-settings';
 import documentCss from './document.css?raw';
-import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
+import type {
+  GuideProject,
+  GuideImageBlock,
+  GuideHtmlImageSettings,
+} from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
 import { GuideReadDocument } from './reader-document';
 
-/** Private data-URI markers are replaced only inside serialized image source attributes. */
-export function buildGuideHtml(project: GuideProject, t: Translate, theme: 'light' | 'dark') {
-  const assets = [
-    ...new Set(
-      project.items.flatMap((item) =>
-        item.kind === 'step'
-          ? item.blocks.flatMap((block) => (block.kind === 'image' ? [block.assetId] : []))
-          : []
-      )
-    ),
-  ];
-  const images = Object.fromEntries(
-    assets.map((id, index) => [id, `data:image/png;base64,SNIPTALE_ASSET_${index}`])
-  );
+/** Static SVG references share raster bytes without requiring JavaScript to read the guide. */
+export async function buildGuideHtml(
+  project: GuideProject,
+  t: Translate,
+  theme: 'light' | 'dark',
+  media: { rasters: HtmlRaster[]; blocks: ReadonlyMap<string, number> }
+) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(viewerScript));
+  const hash = btoa(String.fromCharCode(...new Uint8Array(digest)));
+  const exportedProject = {
+    ...project,
+    items: project.items.map((item) => ({ ...item, id: `guide-item-${item.id}` })),
+  };
   const fonts = [latin, cyrillic, extended]
     .map(
       (url, index) =>
@@ -36,6 +43,7 @@ export function buildGuideHtml(project: GuideProject, t: Translate, theme: 'ligh
     'main>h1{max-width:1200px;margin:0 auto 24px;overflow-wrap:anywhere}';
   const policy = [
     "default-src 'none'",
+    `script-src 'sha256-${hash}'`,
     'img-src data:',
     'font-src data:',
     "style-src 'unsafe-inline'",
@@ -51,15 +59,127 @@ export function buildGuideHtml(project: GuideProject, t: Translate, theme: 'ligh
           <meta name="viewport" content="width=device-width, initial-scale=1" />
           <meta httpEquiv="Content-Security-Policy" content={policy} />
           <title>{project.name}</title>
-          <style>{tokens + fonts + base + documentCss}</style>
+          <style>{tokens + fonts + base + documentCss + viewerCss}</style>
         </head>
         <body>
+          <svg width="0" height="0" aria-hidden="true" style={{ position: 'absolute' }}>
+            <defs>
+              {media.rasters.map((raster, index) => (
+                <image
+                  key={index}
+                  id={`guide-media-${index}`}
+                  width={raster.width}
+                  height={raster.height}
+                  href={`data:${raster.mime};base64,SNIPTALE_ASSET_${index}`}
+                />
+              ))}
+            </defs>
+          </svg>
           <main>
             <h1>{project.name}</h1>
-            <GuideReadDocument project={project} images={images} t={t} />
+            <GuideReadDocument
+              project={exportedProject}
+              images={{}}
+              t={t}
+              renderImage={(block) => {
+                const index = media.blocks.get(block.id);
+                const raster = index === undefined ? undefined : media.rasters[index];
+                if (!raster || index === undefined) throw new Error('Missing export raster.');
+                return (
+                  <HtmlImage
+                    block={block}
+                    raster={raster}
+                    index={index}
+                    settings={resolveHtmlImageSettings(project, block)}
+                    t={t}
+                  />
+                );
+              }}
+            />
           </main>
+          <dialog data-guide-viewer="" aria-label={t('scenario.editor.htmlImageOpen')}>
+            <header>
+              <button type="button" data-zoom="" aria-pressed="false">
+                100%
+              </button>
+              <button type="button" data-close="">
+                {t('common.actions.close')}
+              </button>
+            </header>
+            <figure>
+              <div data-viewport="">
+                <img alt="" />
+              </div>
+              <figcaption />
+            </figure>
+          </dialog>
+          <script>{viewerScript}</script>
         </body>
       </html>
     );
-  return { html, assets };
+  return { html, rasters: media.rasters };
+}
+
+function HtmlImage({
+  block,
+  raster,
+  index,
+  settings,
+  t,
+}: {
+  block: GuideImageBlock;
+  raster: HtmlRaster;
+  index: number;
+  settings: GuideHtmlImageSettings;
+  t: Translate;
+}) {
+  const transform =
+    settings.content === 'frame' ? { x: 0, y: 0, scale: 1 } : block.contentTransform;
+  return (
+    <figure className="guide-read-image">
+      <div
+        className="guide-image-frame"
+        style={{
+          width: `min(100%, ${block.frame.width}px)`,
+          aspectRatio: `${block.frame.width} / ${block.frame.height}`,
+          ...{
+            '--guide-frame-ratio': String(block.frame.width / block.frame.height),
+          },
+        }}
+      >
+        <svg
+          role="img"
+          aria-label={block.alt}
+          viewBox={`0 0 ${raster.width} ${raster.height}`}
+          preserveAspectRatio={
+            settings.content === 'frame' || block.fit === 'contain'
+              ? 'xMidYMid meet'
+              : 'xMidYMid slice'
+          }
+          style={{
+            width: '100%',
+            height: '100%',
+            overflow: 'hidden',
+            translate: `${transform.x * 100}% ${transform.y * 100}%`,
+            scale: transform.scale,
+          }}
+        >
+          <use href={`#guide-media-${index}`} />
+        </svg>
+      </div>
+      {settings.viewer && (
+        <button
+          hidden
+          type="button"
+          data-guide-open={`guide-media-${index}`}
+          data-alt={block.alt}
+          data-caption={block.caption}
+          aria-label={t('scenario.editor.htmlImageOpen')}
+        >
+          +
+        </button>
+      )}
+      {block.caption && <figcaption>{block.caption}</figcaption>}
+    </figure>
+  );
 }

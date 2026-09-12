@@ -546,3 +546,46 @@ describe('bounded prose appearance', () => {
     ).toEqual({ status: 'invalid' });
   });
 });
+
+it('roundtrips bounded common and per-image HTML settings without changing media', () => {
+  const settings = {
+    content: 'frame',
+    optimize: true,
+    maxEdge: 1920,
+    quality: 0.85,
+    viewer: false,
+  };
+  const value = {
+    ...project(),
+    items: [{ ...step(), blocks: [{ ...image(), htmlExport: settings }] }],
+    htmlExport: settings,
+  };
+  const parsed = parseGuideProject(value);
+  expect(parsed.status).toBe('ok');
+  if (parsed.status === 'ok') expect(parsed.project).toEqual(value);
+});
+
+it.each([
+  { quality: 1 },
+  { quality: NaN },
+  { maxEdge: 8000 },
+  { content: 'url' },
+  { viewer: 'true' },
+  { extra: true },
+])('rejects noncanonical HTML options %j', (patch) => {
+  const settings = {
+    content: 'full',
+    optimize: false,
+    maxEdge: 2560,
+    quality: 0.85,
+    viewer: true,
+    ...patch,
+  };
+  expect(parseGuideProject({ ...project(), htmlExport: settings }).status).toBe('invalid');
+  expect(
+    parseGuideProject({
+      ...project(),
+      items: [{ ...step(), blocks: [{ ...image(), htmlExport: settings }] }],
+    }).status
+  ).toBe('invalid');
+});

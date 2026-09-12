@@ -164,3 +164,37 @@ it('reports open state changes and keeps empty disabled selects closed', async (
   expect(onChange).not.toHaveBeenCalled();
   expect(onOpenChange).toHaveBeenCalledWith(false);
 });
+
+it('consumes trigger Escape only while its menu is open, preserving parent dismissal afterward', () => {
+  const dismiss = vi.fn();
+  render(
+    <div
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && !event.defaultPrevented) dismiss();
+      }}
+    >
+      <CompactSelect
+        aria-label="Theme"
+        value="dark"
+        onChange={() => {}}
+        options={[{ value: 'dark', label: 'Dark' }]}
+      />
+    </div>
+  );
+  act(() => getTrigger().click());
+  const escape = () =>
+    getTrigger().dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    );
+  act(() => {
+    getTrigger().focus();
+    escape();
+  });
+  expect(document.querySelector('[role=listbox]')).toBeNull();
+  expect(dismiss).not.toHaveBeenCalled();
+  expect(document.activeElement).toBe(getTrigger());
+  act(() => {
+    escape();
+  });
+  expect(dismiss).toHaveBeenCalledOnce();
+});

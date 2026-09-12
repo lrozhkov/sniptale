@@ -84,6 +84,7 @@ it('navigates bounded reading pages without changing the canonical document', as
     await act(async () =>
       root.render(
         <GuideReader
+          onChange={() => {}}
           project={project}
           images={{}}
           initialId="step"
@@ -120,6 +121,7 @@ it('navigates bounded reading pages without changing the canonical document', as
     await act(async () =>
       root.render(
         <GuideReader
+          onChange={() => {}}
           project={createGuideProject('Empty')}
           images={{}}
           initialId={null}
@@ -172,6 +174,55 @@ it('enters and leaves reading without reloading or saving the project', async ()
   } finally {
     act(() => root.unmount());
     host.remove();
+    vi.unstubAllGlobals();
+  }
+});
+
+it('keeps export activation available during a pending autosave', async () => {
+  vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.useFakeTimers();
+  const host = document.createElement('div');
+  document.body.append(host);
+  const root = createRoot(host);
+  const project = createGuideProject('Guide', 'guide');
+  project.items = [createGuideStep('First', 'first')];
+  io.load.mockResolvedValue(project);
+  io.previous.mockReturnValue([]);
+  let complete: ((value: typeof project) => void) | undefined;
+  io.save.mockReset().mockImplementation(
+    () =>
+      new Promise((resolve) => {
+        complete = resolve;
+      })
+  );
+  window.history.replaceState({}, '', '/?projectId=guide&stepId=first');
+  try {
+    await act(async () => root.render(<ScenarioEditorPage />));
+    const input = host.querySelector<HTMLInputElement>('input[aria-label="Scenario"]')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+        input,
+        'Edited guide'
+      );
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      await vi.advanceTimersByTimeAsync(400);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(400);
+    });
+    expect(io.save).toHaveBeenCalledOnce();
+    const exportButton = host.querySelector<HTMLButtonElement>('button[aria-label="Export"]')!;
+    expect(exportButton.disabled).toBe(false);
+    await act(async () => exportButton.click());
+    expect(host.querySelector('.guide-reader')).not.toBeNull();
+    await act(async () =>
+      complete?.({ ...project, name: 'Edited guide', updatedAt: project.updatedAt + 1 })
+    );
+    expect(host.querySelector('.guide-reader')).not.toBeNull();
+  } finally {
+    act(() => root.unmount());
+    host.remove();
+    vi.useRealTimers();
     vi.unstubAllGlobals();
   }
 });

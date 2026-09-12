@@ -236,6 +236,13 @@ function replacementInput() {
     galleryAssetId: 'old-gallery',
     source: { kind: 'import', filename: 'old.png' },
   });
+  image.htmlExport = {
+    content: 'frame',
+    optimize: true,
+    maxEdge: 1920,
+    quality: 0.85,
+    viewer: false,
+  };
   image.caption = 'Keep caption';
   image.width = 'half';
   image.alt = 'Keep description';
@@ -269,6 +276,7 @@ it('replaces exactly one image with fresh resources while retaining its layout a
   expect(step.blocks[1]).toMatchObject({
     kind: 'image',
     id: 'target',
+    htmlExport: { content: 'frame', optimize: true, maxEdge: 1920, quality: 0.85, viewer: false },
     caption: 'Keep caption',
     width: 'half',
     alt: 'Keep description',

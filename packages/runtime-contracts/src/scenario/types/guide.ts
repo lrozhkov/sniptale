@@ -51,6 +51,15 @@ export interface GuideStyle {
 /** Absent keys inherit the project style; the receiving parser rejects explicit undefined. */
 export type GuideStyleOverrides = { [Key in keyof GuideStyle]?: GuideStyle[Key] | undefined };
 
+/** HTML raster policy applies to an image occurrence; absence inherits document defaults. */
+export interface GuideHtmlImageSettings {
+  content: 'full' | 'frame';
+  optimize: boolean;
+  maxEdge: 1280 | 1920 | 2560 | 4096;
+  quality: 0.75 | 0.85 | 0.95;
+  viewer: boolean;
+}
+
 /** A captured image retains its source context independently of other images in the step. */
 export interface GuideCaptureSource {
   kind: 'capture';
@@ -77,6 +86,7 @@ export interface GuideBlockComposition {
 /** Each accepted annotation edit uses a new editDocumentId so history never overwrites it. */
 export interface GuideImageBlock extends GuideBlockComposition {
   kind: 'image';
+  htmlExport?: GuideHtmlImageSettings | undefined;
   id: string;
   assetId: string;
   galleryAssetId: string | null;
@@ -153,6 +163,7 @@ export interface GuideSection {
 /** The only guide content format; persistence owns lifecycle, revision and retained history. */
 export interface GuideProject {
   version: 4;
+  htmlExport?: GuideHtmlImageSettings | undefined;
   id: string;
   name: string;
   createdAt: number;

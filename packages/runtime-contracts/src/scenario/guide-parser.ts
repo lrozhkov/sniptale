@@ -83,9 +83,21 @@ const style = z
   })
   .strict();
 
+const htmlExport = z
+  .object({
+    content: z.enum(['full', 'frame']),
+    optimize: z.boolean(),
+    maxEdge: z.union([z.literal(1280), z.literal(1920), z.literal(2560), z.literal(4096)]),
+    quality: z.union([z.literal(0.75), z.literal(0.85), z.literal(0.95)]),
+    viewer: z.boolean(),
+  })
+  .strict()
+  .optional();
+
 const image = z
   .object({
     kind: z.literal('image'),
+    htmlExport,
     id,
     width,
     assetId: id,
@@ -125,6 +137,7 @@ const image = z
 const projectSchema: z.ZodType<GuideProject> = z
   .object({
     version: z.literal(4),
+    htmlExport,
     id,
     name: label,
     createdAt: timestamp,

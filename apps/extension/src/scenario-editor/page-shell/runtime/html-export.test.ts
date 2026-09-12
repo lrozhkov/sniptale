@@ -1,5 +1,10 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { createGuideProject } from '../../../features/scenario/project/public';
+import { DEFAULT_HTML_IMAGES } from '../html-image-settings';
+import {
+  createGuideImageBlock,
+  createGuideStep,
+  createGuideProject,
+} from '../../../features/scenario/project/public';
 import { createTranslator } from '../../../platform/i18n';
 const io = vi.hoisted(() => ({ sink: vi.fn(), asset: vi.fn(), record: vi.fn(), render: vi.fn() }));
 vi.mock('../../../composition/archive-transfer', async (original) => ({
@@ -12,7 +17,7 @@ vi.mock('../../../composition/persistence/scenario/store/public', async (origina
   saveScenarioExportRecord: io.record,
 }));
 vi.mock('../html-document', () => ({ buildGuideHtml: io.render }));
-import { exportGuideHtml } from './html-export';
+import { exportGuideHtml, measureGuideHtml } from './html-export';
 
 function setup() {
   const chunks: Uint8Array[] = [];
@@ -33,12 +38,32 @@ function setup() {
   io.record.mockImplementation(async () => {
     order.push('record');
   });
+  vi.stubGlobal(
+    'createImageBitmap',
+    vi.fn(async () => ({ width: 100, height: 50, close: vi.fn() }))
+  );
+  const block = createGuideImageBlock({
+    id: 'image',
+    assetId: 'asset',
+    width: 100,
+    height: 50,
+    source: { kind: 'import', filename: 'image.png' },
+  });
   const png = new Uint8Array(96 * 1024 + 5);
   png.set([137, 80, 78, 71, 13, 10, 26, 10]);
   io.asset.mockResolvedValue(new Blob([png], { type: 'image/png' }));
   io.render.mockReturnValue({
-    html: '<img src="data:image/png;base64,SNIPTALE_ASSET_0">',
-    assets: ['asset'],
+    html: '<image href="data:image/png;base64,SNIPTALE_ASSET_0">',
+    rasters: [
+      {
+        block,
+        settings: DEFAULT_HTML_IMAGES,
+        width: 100,
+        height: 50,
+        size: png.length,
+        mime: 'image/png',
+      },
+    ],
   });
   const controller = new AbortController();
   const args = {
@@ -126,5 +151,29 @@ it('does not serialize MIME parameters into an HTML attribute', async () => {
   await exportGuideHtml(s.args);
   const html = s.chunks.map((chunk) => new TextDecoder().decode(chunk)).join('');
   expect(html.includes('onerror')).toBe(false);
-  expect(html.startsWith('<img src="data:image/png;base64,')).toBe(true);
+  expect(html.startsWith('<image href="data:image/png;base64,')).toBe(true);
+});
+
+it('measures the exact streamed file size and rejects unresolved raster markers', async () => {
+  const s = setup();
+  const block = createGuideImageBlock({
+    id: 'image',
+    assetId: 'asset',
+    width: 100,
+    height: 50,
+    source: { kind: 'import', filename: 'image.png' },
+  });
+  const step = createGuideStep('Step');
+  step.blocks = [block];
+  s.args.project.items = [step];
+  const measured = await measureGuideHtml(s.args);
+  await exportGuideHtml(s.args);
+  expect(measured.size).toBe(s.chunks.reduce((sum, chunk) => sum + chunk.length, 0));
+  const next = setup();
+  io.render.mockReturnValueOnce({
+    html: '<image href="data:image/png;base64,SNIPTALE_ASSET_9">',
+    rasters: [],
+  });
+  await expect(exportGuideHtml(next.args)).rejects.toThrow('Unknown export image');
+  expect(next.abort).toHaveBeenCalledOnce();
 });

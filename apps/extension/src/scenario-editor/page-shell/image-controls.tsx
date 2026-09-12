@@ -1,3 +1,6 @@
+import { GuideHtmlImageFields } from './html-image-fields';
+import { DEFAULT_HTML_IMAGES } from './html-image-settings';
+import { ProductToggle } from '@sniptale/ui/product-form-controls';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { Check, Focus, Maximize2, RotateCcw, ScanLine, Text } from 'lucide-react';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
@@ -6,6 +9,7 @@ import { useEffect, useState } from 'react';
 import {
   GUIDE_LIMITS,
   type GuideImageBlock,
+  type GuideHtmlImageSettings,
 } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
 import { GuideInspectorGroup, GuideInspectorNumber } from './inspector';
@@ -36,6 +40,7 @@ function useImageDimensions(url: string | null | undefined) {
 /** Framing fields belong to the selected image in the existing right inspector. */
 export function GuideImageControls({
   block,
+  htmlDefaults,
   disabled,
   onChange,
   onClose,
@@ -43,6 +48,7 @@ export function GuideImageControls({
   url,
 }: {
   block: GuideImageBlock;
+  htmlDefaults?: GuideHtmlImageSettings | undefined;
   url: string | null | undefined;
   disabled: boolean;
   onChange: (block: GuideImageBlock, group?: string | null) => void;
@@ -168,7 +174,67 @@ export function GuideImageControls({
             <RotateCcw size={16} aria-hidden="true" />
           </ContentToolbarButton>
         </div>
+        <ImageHtmlSettings
+          block={block}
+          htmlDefaults={htmlDefaults}
+          disabled={disabled}
+          onChange={onChange}
+          t={t}
+        />
       </fieldset>
     </div>
+  );
+}
+
+function ImageHtmlSettings({
+  block,
+  htmlDefaults,
+  disabled,
+  onChange,
+  t,
+}: Pick<
+  Parameters<typeof GuideImageControls>[0],
+  'block' | 'htmlDefaults' | 'disabled' | 'onChange' | 't'
+>) {
+  return (
+    <GuideInspectorGroup icon={Maximize2} title={t('scenario.editor.htmlImages')}>
+      <label className="guide-html-switch">
+        <span>{t('scenario.editor.htmlInherit')}</span>
+        <ProductToggle
+          size="sm"
+          disabled={disabled}
+          checked={!block.htmlExport}
+          aria-label={t('scenario.editor.htmlInherit')}
+          onClick={() =>
+            onChange(
+              {
+                ...block,
+                htmlExport: block.htmlExport
+                  ? undefined
+                  : { ...(htmlDefaults ?? DEFAULT_HTML_IMAGES) },
+              },
+              null
+            )
+          }
+        />
+      </label>
+      <GuideHtmlImageFields
+        value={block.htmlExport ?? htmlDefaults ?? DEFAULT_HTML_IMAGES}
+        disabled={disabled || !block.htmlExport}
+        onChange={(patch) =>
+          onChange(
+            {
+              ...block,
+              htmlExport: {
+                ...(block.htmlExport ?? htmlDefaults ?? DEFAULT_HTML_IMAGES),
+                ...patch,
+              },
+            },
+            null
+          )
+        }
+        t={t}
+      />
+    </GuideInspectorGroup>
   );
 }

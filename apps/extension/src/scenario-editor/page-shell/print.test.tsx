@@ -136,6 +136,7 @@ it('cancels pending preparation when leaving and restores reader focus and item'
     await act(async () =>
       s.root.render(
         <GuideReader
+          onChange={() => {}}
           project={s.project}
           images={{ asset: 'blob:image' }}
           initialId="last"

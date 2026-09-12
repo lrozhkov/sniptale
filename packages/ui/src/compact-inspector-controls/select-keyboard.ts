@@ -65,8 +65,9 @@ function handleCompactSelectTriggerKey<T extends string>({
       return;
     }
     actions.openMenu(activeStartIndex);
-  } else if (event.key === 'Escape') {
-    setOpen(false);
+  } else if (event.key === 'Escape' && open) {
+    event.preventDefault();
+    actions.closeAndFocusTrigger();
   }
 }
 

@@ -3,16 +3,25 @@ import { Download, FileText, X } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
-import { exportGuideHtml } from './runtime/html-export';
+import type { Ref } from 'react';
 import { exportGuideMarkdown } from './runtime/markdown-export';
 
 /** UI owns only a disposable export command and cancellation; file effects have one runtime owner. */
-export function GuideHtmlExport({ project, t }: { project: GuideProject; t: Translate }) {
+export function GuideHtmlExport({
+  project,
+  t,
+  onOpenHtml,
+  htmlRef,
+}: {
+  project: GuideProject;
+  t: Translate;
+  onOpenHtml: () => void;
+  htmlRef?: Ref<HTMLButtonElement>;
+}) {
   const [status, setStatus] = useState<'idle' | 'pending' | 'saved' | 'history-failed' | 'failed'>(
     'idle'
   );
   const job = useRef<AbortController | null>(null);
-  const [format, setFormat] = useState<'html' | 'markdown'>('html');
   useEffect(
     () => () => {
       job.current?.abort();
@@ -20,11 +29,10 @@ export function GuideHtmlExport({ project, t }: { project: GuideProject; t: Tran
     },
     []
   );
-  const save = async (nextFormat: 'html' | 'markdown') => {
+  const save = async () => {
     if (job.current) return;
     const controller = new AbortController();
     job.current = controller;
-    setFormat(nextFormat);
     setStatus('pending');
     try {
       const args = {
@@ -32,13 +40,7 @@ export function GuideHtmlExport({ project, t }: { project: GuideProject; t: Tran
         t,
         signal: controller.signal,
       };
-      const result =
-        nextFormat === 'markdown'
-          ? await exportGuideMarkdown(args)
-          : await exportGuideHtml({
-              ...args,
-              theme: document.documentElement.dataset['theme'] === 'dark' ? 'dark' : 'light',
-            });
+      const result = await exportGuideMarkdown(args);
       if (job.current === controller) setStatus(result);
     } catch (error) {
       if (job.current === controller)
@@ -58,7 +60,8 @@ export function GuideHtmlExport({ project, t }: { project: GuideProject; t: Tran
         className="guide-labeled-action"
         title={t('scenario.editor.guideHtmlExport')}
         disabled={status === 'pending'}
-        onClick={() => void save('html')}
+        ref={htmlRef}
+        onClick={onOpenHtml}
       >
         <Download size={16} aria-hidden="true" />
         <span>{t('scenario.editor.guideHtmlFormat')}</span>
@@ -67,7 +70,7 @@ export function GuideHtmlExport({ project, t }: { project: GuideProject; t: Tran
         className="guide-labeled-action"
         title={t('scenario.editor.guideMarkdownExport')}
         disabled={status === 'pending'}
-        onClick={() => void save('markdown')}
+        onClick={() => void save()}
       >
         <FileText size={16} aria-hidden="true" />
         <span>{t('scenario.editor.guideMarkdownFormat')}</span>
@@ -86,18 +89,12 @@ export function GuideHtmlExport({ project, t }: { project: GuideProject; t: Tran
         <span role="status">
           {t(
             status === 'pending'
-              ? format === 'html'
-                ? 'scenario.editor.guideHtmlPreparing'
-                : 'scenario.editor.guideMarkdownPreparing'
+              ? 'scenario.editor.guideMarkdownPreparing'
               : status === 'saved'
-                ? format === 'html'
-                  ? 'scenario.editor.guideHtmlSaved'
-                  : 'scenario.editor.guideMarkdownSaved'
+                ? 'scenario.editor.guideMarkdownSaved'
                 : status === 'history-failed'
                   ? 'scenario.editor.guideHtmlHistoryFailed'
-                  : format === 'html'
-                    ? 'scenario.editor.guideHtmlFailed'
-                    : 'scenario.editor.guideMarkdownFailed'
+                  : 'scenario.editor.guideMarkdownFailed'
           )}
         </span>
       )}
