@@ -9,6 +9,7 @@ const limits = {
 
 /** Owns disposable panel visibility and dimensions; resizing never edits the guide. */
 export function useGuidePanels() {
+  const [presentation, setPresentation] = useState<'sections' | 'all'>('sections');
   const [rightScope, setRightScope] = useState<'selection' | 'document'>('selection');
   const [viewport, setViewport] = useState(() => window.innerWidth);
   const [leftOpen, setLeftOpen] = useState(() => window.innerWidth >= 720);
@@ -50,6 +51,8 @@ export function useGuidePanels() {
   return {
     leftOpen,
     rightOpen,
+    presentation,
+    togglePresentation: () => setPresentation((mode) => (mode === 'all' ? 'sections' : 'all')),
     rightScope,
     selectRightScope: setRightScope,
     openRight: (scope: 'selection' | 'document') => {

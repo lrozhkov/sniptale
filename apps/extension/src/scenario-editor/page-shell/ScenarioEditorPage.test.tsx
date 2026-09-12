@@ -547,9 +547,9 @@ it('groups text edits and routes keyboard undo and redo to the same history', as
 
 it('supports optional numbering and editable sections with structural undo', async () => {
   await render();
-  const stepField = container.querySelector('article#first .guide-step-title');
-  if (!(stepField instanceof HTMLTextAreaElement)) throw new Error('Missing field');
+  const stepField = container.querySelector<HTMLTextAreaElement>('.guide-step-title')!;
   await act(async () => stepField.focus());
+  await click('Numbering');
   const number = container.querySelector('[role="switch"][aria-label="Show step number"]');
   if (!(number instanceof HTMLButtonElement)) throw new Error('Missing number control');
   await act(async () => number.click());

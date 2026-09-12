@@ -1,6 +1,6 @@
 import type { GuideStyle, GuideStep } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
-import { ProductInput } from '@sniptale/ui/product-form-controls';
+import { ColorField } from '../../ui/compact-inspector-controls/controls';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { RotateCcw, Palette, LayoutTemplate, ScanLine } from 'lucide-react';
 import { CompactSelect } from '../../ui/compact-inspector-controls/select';
@@ -116,14 +116,15 @@ export function GuideStyleFields({
           segmented
         />
         <div className="guide-style-accent">
-          <label>
-            {t('scenario.editor.appearanceAccent')}
-            <ProductInput
-              type="color"
-              value={guideDocumentStyle(style)['--guide-accent']}
-              onChange={(event) => onChange({ accentColor: event.target.value })}
-            />
-          </label>
+          <ColorField
+            label={t('scenario.editor.appearanceAccent')}
+            title={t('scenario.editor.appearanceAccent')}
+            value={guideDocumentStyle(style)['--guide-accent']!}
+            disabled={disabled}
+            allowAlpha={false}
+            allowTransparent={false}
+            onChange={(accentColor) => onChange({ accentColor })}
+          />
           <ContentToolbarButton
             title={t('scenario.editor.appearanceAccentReset')}
             disabled={disabled || style.accentColor === null}

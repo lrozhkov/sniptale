@@ -1,10 +1,7 @@
 .guide-inspector-panel {
   container-type: inline-size;
 }
-.guide-inspector-scope {
-  padding: 8px 12px;
-  flex: none;
-}
+
 .guide-inspector-context {
   display: flex;
   align-items: center;
@@ -160,4 +157,48 @@
 }
 .guide-template-controls > button[hidden] {
   display: none;
+}
+
+.guide-style-accent > [data-ui='shared.ui.compact-inspector.color-field'] {
+  flex: 1;
+}
+.guide-inspector-reset {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--sniptale-color-border-soft);
+}
+.guide-inspector-reset button {
+  max-width: 100%;
+  white-space: normal;
+}
+.guide-inspector-group-body {
+  grid-template-columns: minmax(0, 1fr);
+}
+.guide-style-accent {
+  min-width: 0;
+}
+.guide-style-accent > [data-ui='shared.ui.compact-inspector.color-field'] {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+}
+.guide-style-accent > [data-ui='shared.ui.compact-inspector.color-field'] > span {
+  white-space: normal;
+  overflow: visible;
+  flex: none;
+}
+.guide-style-accent > [data-ui='shared.ui.compact-inspector.color-field'] > div {
+  width: 100% !important;
+  max-width: 100%;
+  margin-left: 0;
+}
+.guide-inspector-choice [role='group'] button {
+  padding-inline: 4px;
+}
+
+.guide-inspector-panel .guide-panel-heading h2 {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

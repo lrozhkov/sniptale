@@ -111,3 +111,38 @@ it('applies a layout to manually sized blocks without losing authored content', 
   expect(next.title).toBe(step.title);
   expect(step.blocks[0]!.width).toBe(37);
 });
+
+it('uses the shared accent control instead of a native color picker', async () => {
+  await render();
+  expect(host.querySelector('input[type="color"]')).toBeNull();
+  expect(host.querySelector('[data-ui="shared.ui.compact-inspector.color-field"]')).not.toBeNull();
+});
+
+it('switches step sections and restores the section after showing all settings', async () => {
+  const renderMode = async (presentation: 'all' | 'sections') =>
+    act(async () =>
+      root.render(
+        <GuideAppearance
+          project={project}
+          selectedId="step"
+          presentation={presentation}
+          disabled={false}
+          onChange={change}
+          t={createTranslator('en')}
+        />
+      )
+    );
+  await renderMode('sections');
+  expect(host.querySelector('[aria-label="Font"]')).toBeNull();
+  await click('Numbering');
+  expect(host.querySelector('[role="switch"]')).not.toBeNull();
+  await click('Appearance');
+  expect(host.querySelector('[data-ui="shared.ui.compact-inspector.color-field"]')).not.toBeNull();
+  await renderMode('all');
+  expect(host.querySelector('nav')).toBeNull();
+  expect(host.querySelector('[role="switch"]')).not.toBeNull();
+  await renderMode('sections');
+  expect(host.querySelector('nav [aria-label="Appearance"]')?.getAttribute('aria-pressed')).toBe(
+    'true'
+  );
+});

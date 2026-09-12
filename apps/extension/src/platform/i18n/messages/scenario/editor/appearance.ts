@@ -1,6 +1,10 @@
 import { defineMessageSource } from '../../source';
 
 export const scenarioEditorAppearanceMessages = defineMessageSource({
+  inspectorShowAll: { ru: 'Показать все настройки', en: 'Show all settings' },
+  inspectorShowSections: { ru: 'Показать разделы настроек', en: 'Show settings sections' },
+  inspectorNumbering: { ru: 'Нумерация', en: 'Numbering' },
+
   guideDefaultAppearance: { ru: 'Оформление сценария', en: 'Guide appearance' },
   guideApplyAppearanceToAll: {
     ru: 'Также сбросить оформление изменённых шагов',

@@ -4,14 +4,13 @@ import { GUIDE_IMAGE_DRAG_TYPE } from './image-drop';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { type ReactNode } from 'react';
-import { FileText, Image, PanelRight, Settings2, X } from 'lucide-react';
+import { FileText, Image, PanelRight, Settings2, X, List, PanelLeft } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { GuidePanelDivider, type useGuidePanels } from './panel-layout';
-import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
+import type { GuideProject, GuideBlock } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
 import './workspace.css';
 import './inspector.css';
-import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 
 type WorkspaceProps = {
   panels: ReturnType<typeof useGuidePanels>;
@@ -25,6 +24,7 @@ type WorkspaceProps = {
   onSelect: (id: string) => void;
   onAddStep: () => void;
   itemActions: ReactNode;
+  inspectedBlockKind?: GuideBlock['kind'] | undefined;
   children: ReactNode;
   t: Translate;
 };
@@ -169,9 +169,33 @@ function GuideOutline({
   );
 }
 
+/** The fixed panel header names only the object its controls currently edit. */
+function inspectorTitle(props: WorkspaceProps): string {
+  const { t, inspectedBlockKind } = props;
+  if (props.panels.rightScope === 'document') return t('scenario.editor.guideEntireDocument');
+  if (inspectedBlockKind) {
+    const labels = {
+      image: 'scenario.editor.guideAddImage',
+      'image-slot': 'scenario.editor.guideAddImage',
+      text: 'scenario.editor.guideAddText',
+      heading: 'scenario.editor.guideHeading',
+      note: 'scenario.editor.guideAddNote',
+    } as const;
+    return t(labels[inspectedBlockKind]);
+  }
+  const selected = props.project.items.find((item) => item.id === props.selectedId);
+  return selected
+    ? selected.title || t('scenario.editor.untitledStep')
+    : t('scenario.editor.guideInspector');
+}
+
 /** Selected-item details and project tools use one scrollable app panel. */
 function GuideInspector(props: WorkspaceProps & { open: boolean }) {
   const { t } = props;
+  const grouped =
+    props.panels.rightScope === 'selection' &&
+    !props.inspectedBlockKind &&
+    props.project.items.some((item) => item.id === props.selectedId && item.kind === 'step');
   return (
     <FloatingChromePanel
       role="complementary"
@@ -182,7 +206,24 @@ function GuideInspector(props: WorkspaceProps & { open: boolean }) {
     >
       <div className="guide-panel-heading">
         <Settings2 size={16} aria-hidden="true" />
-        <h2>{t('scenario.editor.guideInspector')}</h2>
+        <h2 title={inspectorTitle(props)}>{inspectorTitle(props)}</h2>
+        {grouped && (
+          <ContentToolbarButton
+            title={t(
+              props.panels.presentation === 'all'
+                ? 'scenario.editor.inspectorShowSections'
+                : 'scenario.editor.inspectorShowAll'
+            )}
+            aria-pressed={props.panels.presentation === 'all'}
+            onClick={props.panels.togglePresentation}
+          >
+            {props.panels.presentation === 'all' ? (
+              <List size={16} aria-hidden="true" />
+            ) : (
+              <PanelLeft size={16} aria-hidden="true" />
+            )}
+          </ContentToolbarButton>
+        )}
         <ContentToolbarButton
           title={t('scenario.editor.close')}
           aria-controls="guide-inspector-panel"
@@ -191,18 +232,6 @@ function GuideInspector(props: WorkspaceProps & { open: boolean }) {
         >
           <X size={16} aria-hidden="true" />
         </ContentToolbarButton>
-      </div>
-      <div className="guide-inspector-scope">
-        <SegmentedSwitch
-          density="compact"
-          ariaLabel={t('scenario.editor.guideSettingsScope')}
-          activeId={props.panels.rightScope}
-          options={[
-            { id: 'selection', label: t('scenario.editor.guideSelectedScope') },
-            { id: 'document', label: t('scenario.editor.projectLabel') },
-          ]}
-          onChange={props.panels.selectRightScope}
-        />
       </div>
       <div className="guide-panel-scroll">{props.itemActions}</div>
     </FloatingChromePanel>

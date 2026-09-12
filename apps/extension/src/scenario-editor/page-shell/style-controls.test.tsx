@@ -35,7 +35,7 @@ it('emits only each edited style property so other defaults remain inherited', a
       await chooseStyle(host, label);
       expect(change).toHaveBeenLastCalledWith(patch);
     }
-    const reset = host.querySelector<HTMLButtonElement>('.guide-style-accent button')!;
+    const reset = host.querySelector<HTMLButtonElement>('.guide-style-accent > button')!;
     await act(async () => reset.click());
     expect(change).toHaveBeenLastCalledWith({ accentColor: null });
   } finally {

@@ -4,6 +4,7 @@ import type {
   GuideStep,
   GuideTextStyle,
 } from '@sniptale/runtime-contracts/scenario/types/guide';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
   ArrowLeft,
@@ -179,17 +180,22 @@ function GuideTextSettings({
         ]}
         onChange={(alignment) => change({ alignment })}
       />
-      <ContentToolbarButton
-        title={t('scenario.editor.guideTextReset')}
-        disabled={!block.textStyle}
-        onClick={() => {
-          const { textStyle, ...rest } = block;
-          void textStyle;
-          onChange(rest, null);
-        }}
-      >
-        <RotateCcw size={15} aria-hidden="true" />
-      </ContentToolbarButton>
+      <div className="guide-inspector-reset">
+        <ProductActionButton
+          compact
+          tone="secondary"
+          title={t('scenario.editor.guideTextReset')}
+          disabled={!block.textStyle}
+          onClick={() => {
+            const { textStyle, ...rest } = block;
+            void textStyle;
+            onChange(rest, null);
+          }}
+        >
+          <RotateCcw size={15} aria-hidden="true" />
+          {t('scenario.editor.guideTextReset')}
+        </ProductActionButton>
+      </div>
     </GuideInspectorGroup>
   );
 }

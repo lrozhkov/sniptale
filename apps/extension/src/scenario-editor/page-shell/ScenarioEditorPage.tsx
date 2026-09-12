@@ -126,17 +126,16 @@ export function ScenarioEditorPage() {
               project={project}
               selectedId={state.selectedId}
               disabled={disabled}
-              onSelect={(id) => {
-                framing.selectBlock(id, null);
-                selectItem(id);
-              }}
+              onSelect={framing.selectStep}
               onAddStep={() => operate({ kind: 'add-step' })}
+              inspectedBlockKind={framing.target?.block.kind}
               itemActions={
                 <GuideContextualInspector
                   onSaveTemplate={state.saveTemplate}
                   onApplyTemplate={(stepId, templateId, mode) =>
                     state.commitChange({ kind: 'template', input: { stepId, templateId, mode } })
                   }
+                  presentation={panels.presentation}
                   scope={panels.rightScope}
                   project={project}
                   selectedId={state.selectedId}
@@ -198,6 +197,7 @@ function GuideContextualInspector({
   onSaveTemplate,
   onApplyTemplate,
   scope,
+  presentation,
   project,
   selectedId,
   framing,
@@ -206,6 +206,7 @@ function GuideContextualInspector({
   onChange,
   t,
 }: {
+  presentation: 'all' | 'sections';
   project: GuideProject;
   selectedId: string | null;
   scope: 'selection' | 'document';
@@ -255,6 +256,7 @@ function GuideContextualInspector({
     />
   ) : (
     <GuideAppearance
+      presentation={presentation}
       onSaveTemplate={onSaveTemplate}
       onApplyTemplate={onApplyTemplate}
       project={project}
@@ -297,6 +299,11 @@ function useGuideBlockSelection(
     target,
     imageId: target?.block.kind === 'image' ? target.block.id : null,
     close,
+    selectStep: (itemId: string) => {
+      panels.selectRightScope('selection');
+      setSelection(null);
+      selectItem(itemId);
+    },
     selectBlock: (itemId: string, blockId: string | null) => {
       panels.selectRightScope('selection');
       selectItem(itemId, false);

@@ -5,13 +5,16 @@ import type {
   GuideStyleOverrides,
 } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { RotateCcw, FileText, Folder } from 'lucide-react';
+import { CategorizedInspector } from '@sniptale/ui/categorized-inspector';
+import { useState } from 'react';
+import { RotateCcw, LayoutTemplate, ListOrdered, Palette } from 'lucide-react';
 import { resolveGuideStyle, applyGuideLayout } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
 import { GuideNumberingControls } from './numbering-controls';
 import { GuideStyleFields, GuideLayoutFields } from './style-controls';
 
 type AppearanceProps = {
+  presentation?: 'all' | 'sections';
   project: GuideProject;
   selectedId: string | null;
   disabled: boolean;
@@ -28,6 +31,7 @@ type AppearanceProps = {
 /** Only the selected item's settings live here; defaults live in the document context. */
 export function GuideAppearance({
   project,
+  presentation = 'all',
   selectedId,
   disabled,
   onChange,
@@ -35,6 +39,7 @@ export function GuideAppearance({
   onApplyTemplate,
   t,
 }: AppearanceProps) {
+  const [activeSection, setActiveSection] = useState('layout');
   const item = project.items.find((entry) => entry.id === selectedId);
   const change = (next: GuideProject['items'][number], group: string | null = null) =>
     onChange(
@@ -46,17 +51,14 @@ export function GuideAppearance({
     if (item.kind === 'step')
       change({ ...item, styleOverrides: { ...item.styleOverrides, ...patch } });
   };
-  return (
-    <div className="guide-appearance">
-      <div className="guide-inspector-context">
-        {item.kind === 'step' ? (
-          <FileText size={16} aria-hidden="true" />
-        ) : (
-          <Folder size={16} aria-hidden="true" />
-        )}
-        <strong>{item.title || t('scenario.editor.untitledStep')}</strong>
-      </div>
-      {item.kind === 'step' && (
+  const sections = [
+    { id: 'layout', label: t('scenario.editor.appearanceLayout'), icon: LayoutTemplate },
+    { id: 'numbering', label: t('scenario.editor.inspectorNumbering'), icon: ListOrdered },
+    { id: 'appearance', label: t('scenario.editor.appearance'), icon: Palette },
+  ];
+  const renderSection = (section: string) => (
+    <>
+      {item.kind === 'step' && section === 'layout' && (
         <>
           <GuideLayoutFields
             layout={item.layout}
@@ -69,7 +71,7 @@ export function GuideAppearance({
           )}
         </>
       )}
-      {item.kind === 'step' && onSaveTemplate && onApplyTemplate && (
+      {section === 'layout' && item.kind === 'step' && onSaveTemplate && onApplyTemplate && (
         <GuideTemplateControls
           key={item.id}
           step={item}
@@ -79,14 +81,16 @@ export function GuideAppearance({
           onApply={(templateId, mode) => onApplyTemplate(item.id, templateId, mode)}
         />
       )}
-      <GuideNumberingControls
-        project={project}
-        item={item}
-        disabled={disabled}
-        t={t}
-        onChange={change}
-      />
-      {item.kind === 'step' && (
+      {section === 'numbering' && (
+        <GuideNumberingControls
+          project={project}
+          item={item}
+          disabled={disabled}
+          t={t}
+          onChange={change}
+        />
+      )}
+      {item.kind === 'step' && section === 'appearance' && (
         <>
           <div className="guide-appearance-heading">
             <h3>{t('scenario.editor.appearance')}</h3>
@@ -105,6 +109,23 @@ export function GuideAppearance({
             onChange={customize}
           />
         </>
+      )}
+    </>
+  );
+  return (
+    <div className="guide-appearance">
+      {item.kind !== 'step' ? (
+        renderSection('numbering')
+      ) : presentation === 'all' ? (
+        sections.map(({ id }) => <div key={id}>{renderSection(id)}</div>)
+      ) : (
+        <CategorizedInspector
+          ariaLabel={t('scenario.editor.guideStepSettings')}
+          initialSection={activeSection}
+          onSectionChange={setActiveSection}
+          sections={sections}
+          renderSection={renderSection}
+        />
       )}
     </div>
   );
