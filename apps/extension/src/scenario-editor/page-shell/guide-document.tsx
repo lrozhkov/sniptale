@@ -35,6 +35,22 @@ type GuideImageUploadHandler = (
   signal: AbortSignal
 ) => Promise<boolean>;
 
+type GuideDocumentProps = {
+  project: GuideProject;
+  selectedId: string | null;
+  focusRequest: GuideFocusRequest;
+  images: Record<string, string | null>;
+  disabled: boolean;
+  onChange: (project: GuideProject, group?: string | null) => void;
+  onOperate: (operation: GuideStructureOperation) => void;
+  onEditImage: (itemId: string, blockId: string) => void;
+  onUploadImage: GuideImageUploadHandler;
+  framedImageId: string | null;
+  onFrameImage: (itemId: string, blockId: string, editing: boolean) => void;
+  onSelect: (id: string) => void;
+  t: Translate;
+};
+
 /** Semantic guide content; effects and persistence stay in the page state owner. */
 export function GuideDocument({
   project,
@@ -47,20 +63,10 @@ export function GuideDocument({
   onOperate,
   onEditImage,
   onUploadImage,
+  framedImageId,
+  onFrameImage,
   t,
-}: {
-  project: GuideProject;
-  selectedId: string | null;
-  focusRequest: GuideFocusRequest;
-  images: Record<string, string | null>;
-  disabled: boolean;
-  onChange: (project: GuideProject, group?: string | null) => void;
-  onOperate: (operation: GuideStructureOperation) => void;
-  onEditImage: (itemId: string, blockId: string) => void;
-  onUploadImage: GuideImageUploadHandler;
-  onSelect: (id: string) => void;
-  t: Translate;
-}) {
+}: GuideDocumentProps) {
   const content = useRef<HTMLDivElement>(null);
   useEffect(
     () => focusGuideTarget(content.current, selectedId, focusRequest),
@@ -159,6 +165,8 @@ export function GuideDocument({
                 onOperate={onOperate}
                 onEditImage={onEditImage}
                 onUploadImage={onUploadImage}
+                framedImageId={framedImageId}
+                onFrameImage={onFrameImage}
                 t={t}
               />
               <GuideStepActions
@@ -281,6 +289,8 @@ function GuideStepBody({
   onOperate,
   onEditImage,
   onUploadImage,
+  framedImageId,
+  onFrameImage,
   t,
 }: {
   project: GuideProject;
@@ -291,6 +301,8 @@ function GuideStepBody({
   onOperate: (operation: GuideStructureOperation) => void;
   onEditImage: (itemId: string, blockId: string) => void;
   onUploadImage: GuideImageUploadHandler;
+  framedImageId: string | null;
+  onFrameImage: (itemId: string, blockId: string, editing: boolean) => void;
   t: Translate;
 }) {
   const changeBlock = (block: GuideBlock, group: string | null = `block:${block.id}`) =>
@@ -345,6 +357,8 @@ function GuideStepBody({
             />
             {block.kind === 'image' ? (
               <GuideImageSurface
+                editing={framedImageId === block.id}
+                onEditingChange={(editing) => onFrameImage(item.id, block.id, editing)}
                 libraryTarget={{ stepId: item.id, blockId: block.id }}
                 onEdit={() => onEditImage(item.id, block.id)}
                 block={block}

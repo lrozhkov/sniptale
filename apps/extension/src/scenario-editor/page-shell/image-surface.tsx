@@ -2,8 +2,6 @@ import { GuideResourceTrigger } from './resource-drawer';
 import { Check, Crop, Pencil } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { ProductInput } from '@sniptale/ui/product-form-controls';
-import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
 import {
   useCallback,
   useEffect,
@@ -13,7 +11,6 @@ import {
   type PointerEvent,
 } from 'react';
 import type { GuideImageBlock } from '@sniptale/runtime-contracts/scenario/types/guide';
-import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
 import {
   changeGuideImageGeometry,
@@ -28,6 +25,8 @@ type ImageProps = {
   disabled: boolean;
   t: Translate;
   onEdit?: () => void;
+  editing: boolean;
+  onEditingChange: (editing: boolean) => void;
   libraryTarget?: { stepId: string; blockId: string };
   onChange: (block: GuideImageBlock, group?: string | null) => void;
 };
@@ -169,13 +168,12 @@ function useImageGesture({ block, disabled, onChange }: ImageProps, editing: boo
 
 /** Inline image framing keeps annotation/resource identity and commits only accepted geometry. */
 export function GuideImageSurface(props: ImageProps) {
-  const { block, url, disabled, onChange, t } = props;
-  const [editing, setEditing] = useState(false);
+  const { block, url, disabled, editing, onEditingChange, t } = props;
   const trigger = useRef<HTMLButtonElement>(null);
   const gesture = useImageGesture({ ...props, disabled: disabled || !url }, editing);
   const close = () => {
     gesture.finish(false);
-    setEditing(false);
+    onEditingChange(false);
     trigger.current?.focus();
   };
   return (
@@ -213,6 +211,7 @@ export function GuideImageSurface(props: ImageProps) {
         )}
         <ContentToolbarButton
           ref={trigger}
+          data-frame-image
           type="button"
           disabled={disabled || !url}
           title={t(
@@ -222,143 +221,14 @@ export function GuideImageSurface(props: ImageProps) {
             editing ? 'scenario.editor.guideImageDone' : 'scenario.editor.guideEditImageFrame'
           )}
           aria-expanded={editing}
-          onClick={() => (editing ? close() : setEditing(true))}
+          onClick={() => (editing ? close() : onEditingChange(true))}
         >
           {editing ? <Check size={16} aria-hidden="true" /> : <Crop size={16} aria-hidden="true" />}
         </ContentToolbarButton>
       </div>
       <GuideImageViewport {...props} editing={editing} gesture={gesture} />
       {block.caption && <figcaption>{block.caption}</figcaption>}
-      {editing && (
-        <GuideImageControls
-          {...props}
-          onReset={() => {
-            const image = gesture.frame.current?.querySelector('img');
-            if (image?.naturalWidth && image.naturalHeight)
-              onChange(
-                changeGuideImageGeometry(block, {
-                  kind: 'reset',
-                  width: image.naturalWidth,
-                  height: image.naturalHeight,
-                }),
-                null
-              );
-          }}
-        />
-      )}
     </figure>
-  );
-}
-
-function GuideImageControls({
-  block,
-  disabled,
-  onChange,
-  t,
-  onReset,
-}: ImageProps & { onReset: () => void }) {
-  const geometry = (
-    change: Parameters<typeof changeGuideImageGeometry>[1],
-    group: string | null = null
-  ) => onChange(changeGuideImageGeometry(block, change), group);
-  return (
-    <fieldset className="guide-image-controls" disabled={disabled}>
-      <legend>{t('scenario.editor.guideEditImageFrame')}</legend>
-      <p>{t('scenario.editor.guideImageGestureHint')}</p>
-      <SegmentedSwitch
-        activeId={block.fit}
-        ariaLabel={t('scenario.editor.guideImageFit')}
-        options={[
-          { id: 'contain', label: t('scenario.editor.guideImageContain') },
-          { id: 'cover', label: t('scenario.editor.guideImageCover') },
-        ]}
-        onChange={(fit) => geometry({ kind: 'fit', fit })}
-      />
-      <label>
-        {t('scenario.editor.guideImageZoom')}
-        <ProductInput
-          type="number"
-          min="10"
-          max="10000"
-          step="10"
-          disabled={disabled}
-          value={Math.round(block.contentTransform.scale * 100)}
-          onChange={(event) => {
-            if (Number.isFinite(event.target.valueAsNumber))
-              geometry(
-                { kind: 'zoom', scale: event.target.valueAsNumber / 100 },
-                `image-zoom:${block.id}`
-              );
-          }}
-        />
-      </label>
-      {(['width', 'height'] as const).map((dimension) => (
-        <label key={dimension}>
-          {t(
-            dimension === 'width'
-              ? 'scenario.editor.guideImageWidth'
-              : 'scenario.editor.guideImageHeight'
-          )}
-          <ProductInput
-            type="number"
-            min="1"
-            max={GUIDE_LIMITS.maxDimension}
-            disabled={disabled}
-            value={Math.round(block.frame[dimension])}
-            onChange={(event) => {
-              if (Number.isFinite(event.target.valueAsNumber))
-                geometry(
-                  { kind: 'frame', ...block.frame, [dimension]: event.target.valueAsNumber },
-                  `image-${dimension}:${block.id}`
-                );
-            }}
-          />
-        </label>
-      ))}
-      <label>
-        {t('scenario.editor.guideImageCaption')}
-        <ProductInput
-          value={block.caption}
-          maxLength={GUIDE_LIMITS.maxTextLength}
-          disabled={disabled}
-          onChange={(event) =>
-            onChange({ ...block, caption: event.target.value }, `image-caption:${block.id}`)
-          }
-        />
-      </label>
-      <label>
-        {t('scenario.editor.guideImageAlt')}
-        <ProductInput
-          value={block.alt}
-          maxLength={GUIDE_LIMITS.maxTextLength}
-          disabled={disabled}
-          onChange={(event) =>
-            onChange({ ...block, alt: event.target.value }, `image-alt:${block.id}`)
-          }
-        />
-      </label>
-      <ProductActionButton
-        tone="secondary"
-        compact
-        type="button"
-        disabled={disabled}
-        onClick={() => geometry({ kind: 'zoom', scale: 1 })}
-      >
-        {t('scenario.editor.guideImageResetZoom')}
-      </ProductActionButton>
-      <ProductActionButton
-        tone="secondary"
-        compact
-        type="button"
-        disabled={disabled}
-        onClick={() => geometry({ kind: 'pan', x: 0, y: 0 })}
-      >
-        {t('scenario.editor.guideImageCenter')}
-      </ProductActionButton>
-      <ProductActionButton tone="secondary" compact type="button" onClick={onReset}>
-        {t('scenario.editor.guideImageReset')}
-      </ProductActionButton>
-    </fieldset>
   );
 }
 

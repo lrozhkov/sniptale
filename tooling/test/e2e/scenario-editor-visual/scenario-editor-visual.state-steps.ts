@@ -275,13 +275,16 @@ export async function verifyImageFraming(page: Page, testInfo: TestInfo): Promis
   const figure = page.locator('article#compare figure').first();
   await figure.hover();
   await figure.getByRole('button', { name: 'Frame and image', exact: true }).click();
-  await figure.getByRole('button', { name: 'Center image', exact: true }).click();
-  await figure.getByRole('button', { name: 'Fill', exact: true }).click();
-  await figure.getByRole('spinbutton', { name: 'Frame width', exact: true }).fill('500');
-  await figure.getByRole('spinbutton', { name: 'Frame height', exact: true }).fill('320');
-  await figure.getByRole('spinbutton', { name: 'Zoom, %', exact: true }).fill('150');
-  await figure.getByRole('textbox', { name: 'Caption', exact: true }).fill('Framed screenshot');
-  await figure
+  const controls = page.locator('#guide-inspector-panel');
+  await expect(controls).toBeVisible();
+  await expect(figure.locator('.guide-image-controls')).toHaveCount(0);
+  await controls.getByRole('button', { name: 'Center image', exact: true }).click();
+  await controls.getByRole('button', { name: 'Fill', exact: true }).click();
+  await controls.getByRole('spinbutton', { name: 'Frame width', exact: true }).fill('500');
+  await controls.getByRole('spinbutton', { name: 'Frame height', exact: true }).fill('320');
+  await controls.getByRole('spinbutton', { name: 'Zoom, %', exact: true }).fill('150');
+  await controls.getByRole('textbox', { name: 'Caption', exact: true }).fill('Framed screenshot');
+  await controls
     .getByRole('textbox', { name: 'Alternative text', exact: true })
     .fill('A framed interface');
   const frame = figure.locator('.guide-image-frame');
@@ -342,7 +345,7 @@ export async function verifyImageFraming(page: Page, testInfo: TestInfo): Promis
     contentType: 'image/png',
   });
   await page.setViewportSize({ width: 1280, height: 900 });
-  await figure.locator('.guide-image-controls').scrollIntoViewIfNeeded();
+  await controls.locator('.guide-image-controls').scrollIntoViewIfNeeded();
   await testInfo.attach('image-framing-controls', {
     body: await page.screenshot({ fullPage: true }),
     contentType: 'image/png',

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createGuideImageBlock } from '../../features/scenario/project/public';
@@ -38,19 +38,24 @@ afterEach(() => {
   HTMLElement.prototype.hasPointerCapture = originalHas;
   HTMLElement.prototype.releasePointerCapture = originalRelease;
 });
-async function render(disabled = false, current = block) {
-  await act(async () =>
-    root.render(
-      <GuideImageSurface
-        block={current}
-        url="blob:image"
-        disabled={disabled}
-        onChange={change}
-        t={createTranslator('en')}
-      />
-    )
+function Harness({ disabled, current }: { disabled: boolean; current: typeof block }) {
+  const [editing, setEditing] = useState(false);
+  return (
+    <GuideImageSurface
+      block={current}
+      url="blob:image"
+      disabled={disabled}
+      editing={editing}
+      onEditingChange={setEditing}
+      onChange={change}
+      t={createTranslator('en')}
+    />
   );
 }
+async function render(disabled = false, current = block) {
+  await act(async () => root.render(<Harness disabled={disabled} current={current} />));
+}
+
 async function click(name: string) {
   const button = [...host.querySelectorAll('button')].find(
     (node) => (node.getAttribute('aria-label') ?? node.textContent) === name
@@ -153,47 +158,6 @@ it('leaves ordinary wheel scrolling alone and batches explicit modifier zoom', a
   expect(change).toHaveBeenCalledTimes(1);
   expect(change.mock.calls[0]?.[0].contentTransform.scale).toBeGreaterThan(1);
 });
-it('changes fit and resets the frame from the decoded image dimensions', async () => {
-  await render();
-  await click('Frame and image');
-  await click('Fill');
-  expect(change.mock.calls[0]?.[0].fit).toBe('cover');
-  const image = host.querySelector('img');
-  Object.defineProperty(image, 'naturalWidth', { value: 1200 });
-  Object.defineProperty(image, 'naturalHeight', { value: 900 });
-  await click('Reset frame and position');
-  expect(change.mock.calls[1]?.[0].frame).toEqual({ width: 1200, height: 900 });
-  await click('Zoom 100%');
-  await click('Center image');
-  expect(change).toHaveBeenCalledTimes(4);
-});
-
-it('edits bounded zoom/frame fields and keeps caption and alternative text as plain text', async () => {
-  await render();
-  await click('Frame and image');
-  const update = async (label: string, value: string) => {
-    const field = [...host.querySelectorAll('label')]
-      .find((node) => node.textContent === label)
-      ?.querySelector('input');
-    if (!field) throw new Error(`Missing ${label}`);
-    await act(async () => {
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(field, value);
-      field.dispatchEvent(new Event('input', { bubbles: true }));
-    });
-  };
-  await update('Zoom, %', '200');
-  expect(change.mock.calls.at(-1)?.[0].contentTransform.scale).toBe(2);
-  await update('Frame width', '500');
-  expect(change.mock.calls.at(-1)?.[0].frame.width).toBe(500);
-  await update('Frame height', '350');
-  expect(change.mock.calls.at(-1)?.[0].frame.height).toBe(350);
-  await update('Caption', '<script>text</script>');
-  expect(change.mock.calls.at(-1)?.[0].caption).toBe('<script>text</script>');
-  await update('Alternative text', 'Description');
-  expect(change.mock.calls.at(-1)?.[0].alt).toBe('Description');
-  expect(host.querySelector('script')).toBeNull();
-});
-
 it('keeps pointer preview across equivalent canonical rerenders and preserves concurrent caption edits', async () => {
   await render();
   await click('Frame and image');

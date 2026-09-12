@@ -1,0 +1,178 @@
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { Check, Focus, Maximize2, RotateCcw } from 'lucide-react';
+import { ProductInput } from '@sniptale/ui/product-form-controls';
+import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
+import { useEffect, useState } from 'react';
+import {
+  GUIDE_LIMITS,
+  type GuideImageBlock,
+} from '@sniptale/runtime-contracts/scenario/types/guide';
+import type { Translate } from '../../platform/i18n';
+import { changeGuideImageGeometry } from './image-geometry';
+
+/** Decodes current leased media for reset dimensions without acquiring or revoking its URL. */
+function useImageDimensions(url: string | null | undefined) {
+  const [decoded, setDecoded] = useState<{ url: string; width: number; height: number } | null>(
+    null
+  );
+  useEffect(() => {
+    if (!url) return;
+    const image = new Image();
+    image.onload = () => {
+      if (image.naturalWidth > 0 && image.naturalHeight > 0)
+        setDecoded({ url, width: image.naturalWidth, height: image.naturalHeight });
+    };
+    image.onerror = () => setDecoded(null);
+    image.src = url;
+    return () => {
+      image.onload = null;
+      image.onerror = null;
+    };
+  }, [url]);
+  return decoded?.url === url ? decoded : null;
+}
+
+/** Framing fields belong to the selected image in the existing right inspector. */
+export function GuideImageControls({
+  block,
+  disabled,
+  onChange,
+  onClose,
+  t,
+  url,
+}: {
+  block: GuideImageBlock;
+  url: string | null | undefined;
+  disabled: boolean;
+  onChange: (block: GuideImageBlock, group?: string | null) => void;
+  onClose: () => void;
+  t: Translate;
+}) {
+  const dimensions = useImageDimensions(url);
+  const onReset = () => {
+    if (dimensions)
+      onChange(changeGuideImageGeometry(block, { kind: 'reset', ...dimensions }), null);
+  };
+  const geometry = (
+    change: Parameters<typeof changeGuideImageGeometry>[1],
+    group: string | null = null
+  ) => onChange(changeGuideImageGeometry(block, change), group);
+  return (
+    <div
+      className="guide-image-inspector"
+      onKeyDownCapture={(event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          onClose();
+        }
+      }}
+    >
+      <div className="guide-image-inspector-heading">
+        <h3>{t('scenario.editor.guideEditImageFrame')}</h3>
+        <ContentToolbarButton title={t('scenario.editor.guideImageDone')} onClick={onClose}>
+          <Check size={16} aria-hidden="true" />
+        </ContentToolbarButton>
+      </div>
+      <fieldset className="guide-image-controls" disabled={disabled}>
+        <legend className="sr-only">{t('scenario.editor.guideEditImageFrame')}</legend>
+        <p>{t('scenario.editor.guideImageGestureHint')}</p>
+        <SegmentedSwitch
+          activeId={block.fit}
+          ariaLabel={t('scenario.editor.guideImageFit')}
+          options={[
+            { id: 'contain', label: t('scenario.editor.guideImageContain') },
+            { id: 'cover', label: t('scenario.editor.guideImageCover') },
+          ]}
+          onChange={(fit) => geometry({ kind: 'fit', fit })}
+        />
+        <label className="guide-image-zoom">
+          {t('scenario.editor.guideImageZoom')}
+          <ProductInput
+            type="number"
+            min="10"
+            max="10000"
+            step="10"
+            disabled={disabled}
+            value={Math.round(block.contentTransform.scale * 100)}
+            onChange={(event) => {
+              if (Number.isFinite(event.target.valueAsNumber))
+                geometry(
+                  { kind: 'zoom', scale: event.target.valueAsNumber / 100 },
+                  `image-zoom:${block.id}`
+                );
+            }}
+          />
+        </label>
+        {(['width', 'height'] as const).map((dimension) => (
+          <label key={dimension}>
+            {t(
+              dimension === 'width'
+                ? 'scenario.editor.guideImageWidth'
+                : 'scenario.editor.guideImageHeight'
+            )}
+            <ProductInput
+              type="number"
+              min="1"
+              max={GUIDE_LIMITS.maxDimension}
+              disabled={disabled}
+              value={Math.round(block.frame[dimension])}
+              onChange={(event) => {
+                if (Number.isFinite(event.target.valueAsNumber))
+                  geometry(
+                    { kind: 'frame', ...block.frame, [dimension]: event.target.valueAsNumber },
+                    `image-${dimension}:${block.id}`
+                  );
+              }}
+            />
+          </label>
+        ))}
+        <label className="guide-image-description">
+          {t('scenario.editor.guideImageCaption')}
+          <ProductInput
+            value={block.caption}
+            maxLength={GUIDE_LIMITS.maxTextLength}
+            disabled={disabled}
+            onChange={(event) =>
+              onChange({ ...block, caption: event.target.value }, `image-caption:${block.id}`)
+            }
+          />
+        </label>
+        <label className="guide-image-description">
+          {t('scenario.editor.guideImageAlt')}
+          <ProductInput
+            value={block.alt}
+            maxLength={GUIDE_LIMITS.maxTextLength}
+            disabled={disabled}
+            onChange={(event) =>
+              onChange({ ...block, alt: event.target.value }, `image-alt:${block.id}`)
+            }
+          />
+        </label>
+        <div className="guide-image-reset-actions">
+          <ContentToolbarButton
+            title={t('scenario.editor.guideImageResetZoom')}
+            disabled={disabled}
+            onClick={() => geometry({ kind: 'zoom', scale: 1 })}
+          >
+            <Maximize2 size={16} aria-hidden="true" />
+          </ContentToolbarButton>
+          <ContentToolbarButton
+            title={t('scenario.editor.guideImageCenter')}
+            disabled={disabled}
+            onClick={() => geometry({ kind: 'pan', x: 0, y: 0 })}
+          >
+            <Focus size={16} aria-hidden="true" />
+          </ContentToolbarButton>
+          <ContentToolbarButton
+            title={t('scenario.editor.guideImageReset')}
+            disabled={disabled || !dimensions}
+            onClick={onReset}
+          >
+            <RotateCcw size={16} aria-hidden="true" />
+          </ContentToolbarButton>
+        </div>
+      </fieldset>
+    </div>
+  );
+}

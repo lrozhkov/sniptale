@@ -9,7 +9,8 @@ import { GuideAppearance } from './appearance';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { GuidePageHeader } from './header';
 import { GuideProjectActions } from './project-actions';
-import { useState } from 'react';
+import { useEffect, useState, type KeyboardEvent } from 'react';
+import { GuideImageControls } from './image-controls';
 import type { Translate } from '../../platform/i18n';
 import { createTranslator, useAppLocale } from '../../platform/i18n';
 import type { GuideStructureOperation } from '../../features/scenario/project/public';
@@ -33,6 +34,7 @@ export function ScenarioEditorPage() {
     signal: AbortSignal
   ) => state.commitChange({ kind: 'import', input: { sources, placement, signal } });
   const { focusRequest, selectItem, operate } = useGuideNavigation(state);
+  const framing = useGuideImageFraming(state, panels, selectItem);
   if (imageEditor.selection && project)
     return (
       <GuideImageEditor
@@ -83,18 +85,7 @@ export function ScenarioEditorPage() {
     <main
       className="guide-page"
       onBlurCapture={state.sealEdit}
-      onKeyDownCapture={(event) => {
-        if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== 'z')
-          return;
-        if (
-          event.target instanceof Element &&
-          event.target.closest('[role="dialog"], [role="alertdialog"]')
-        )
-          return;
-        event.preventDefault();
-        if (event.shiftKey) state.redo();
-        else state.undo();
-      }}
+      onKeyDownCapture={(event) => handleGuideHistoryShortcut(event, state.undo, state.redo)}
     >
       {!project && header}
       <GuideProjectRecovery state={state} t={t} />
@@ -122,9 +113,11 @@ export function ScenarioEditorPage() {
             onSelect={selectItem}
             onAddStep={() => operate({ kind: 'add-step' })}
             itemActions={
-              <GuideAppearance
+              <GuideContextualInspector
                 project={project}
                 selectedId={state.selectedId}
+                framing={framing}
+                images={state.images}
                 disabled={disabled}
                 onChange={state.update}
                 t={t}
@@ -139,6 +132,8 @@ export function ScenarioEditorPage() {
               onImport={importSources}
             >
               <GuideDocument
+                framedImageId={framing.target?.block.id ?? null}
+                onFrameImage={framing.select}
                 onUploadImage={(stepId, blockId, file, signal) =>
                   importSources(
                     [{ kind: 'file', file }],
@@ -166,6 +161,120 @@ export function ScenarioEditorPage() {
       )}
     </main>
   );
+}
+
+/** Keeps document history shortcuts outside higher-priority modal interactions. */
+function handleGuideHistoryShortcut(
+  event: KeyboardEvent<HTMLElement>,
+  undo: () => void,
+  redo: () => void
+) {
+  if (!(event.ctrlKey || event.metaKey) || event.altKey || event.key.toLowerCase() !== 'z') return;
+  if (
+    event.target instanceof Element &&
+    event.target.closest('[role="dialog"], [role="alertdialog"]')
+  )
+    return;
+  event.preventDefault();
+  if (event.shiftKey) redo();
+  else undo();
+}
+
+/** Routes the right inspector to current image framing or the selected step's appearance. */
+function GuideContextualInspector({
+  project,
+  selectedId,
+  framing,
+  images,
+  disabled,
+  onChange,
+  t,
+}: {
+  project: GuideProject;
+  selectedId: string | null;
+  framing: ReturnType<typeof useGuideImageFraming>;
+  images: Record<string, string | null>;
+  disabled: boolean;
+  onChange: ReturnType<typeof useGuidePageState>['update'];
+  t: Translate;
+}) {
+  return framing.target ? (
+    <GuideImageControls
+      block={framing.target.block}
+      url={images[framing.target.block.assetId]}
+      disabled={disabled}
+      onChange={framing.change}
+      onClose={framing.close}
+      t={t}
+    />
+  ) : (
+    <GuideAppearance
+      project={project}
+      selectedId={selectedId}
+      disabled={disabled}
+      onChange={onChange}
+      t={t}
+    />
+  );
+}
+
+/** Owns one disposable framing selection; edits still use the page's canonical updater. */
+function useGuideImageFraming(
+  state: Pick<ReturnType<typeof useGuidePageState>, 'project' | 'selectedId' | 'update'>,
+  panels: Pick<ReturnType<typeof useGuidePanels>, 'rightOpen' | 'toggleRight'>,
+  selectItem: (id: string, requestFocus?: boolean) => void
+) {
+  const [selection, setSelection] = useState<{ itemId: string; blockId: string } | null>(null);
+  const item = state.project?.items.find((entry) => entry.id === selection?.itemId);
+  const block =
+    item?.kind === 'step' ? item.blocks.find((entry) => entry.id === selection?.blockId) : null;
+  const target =
+    item?.kind === 'step' && block?.kind === 'image' && state.selectedId === item.id
+      ? { item, block }
+      : null;
+  const targetValid = target !== null;
+  useEffect(() => {
+    if (selection && !targetValid) setSelection(null);
+  }, [selection, targetValid]);
+  const close = () => {
+    setSelection(null);
+    const element = [...document.querySelectorAll<HTMLElement>('[data-block-id]')].find(
+      (entry) => entry.dataset['blockId'] === selection?.blockId
+    );
+    element?.querySelector<HTMLButtonElement>('[data-frame-image]')?.focus({ preventScroll: true });
+  };
+  return {
+    target,
+    close,
+    select: (itemId: string, blockId: string, editing: boolean) => {
+      if (!editing) {
+        close();
+        return;
+      }
+      selectItem(itemId, false);
+      setSelection({ itemId, blockId });
+      if (!panels.rightOpen) panels.toggleRight();
+    },
+    change: (next: NonNullable<typeof target>['block'], group?: string | null) => {
+      if (!state.project || !target) return;
+      state.update(
+        {
+          ...state.project,
+          items: state.project.items.map((entry) =>
+            entry.id === target.item.id
+              ? {
+                  ...target.item,
+                  blocks: target.item.blocks.map((current) =>
+                    current.id === next.id ? next : current
+                  ),
+                }
+              : entry
+          ),
+        },
+        group
+      );
+    },
+  };
 }
 
 /** Selection and structural commands share one disposable document focus intent. */
