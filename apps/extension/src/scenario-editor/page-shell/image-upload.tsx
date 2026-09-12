@@ -8,12 +8,14 @@ import type { Translate } from '../../platform/i18n';
 
 /** Owns one disposable file choice; the page publishes through the existing image importer. */
 export function GuideImageUpload({
+  compact = false,
   frame,
   placement,
   disabled,
   onUpload,
   t,
 }: {
+  compact?: boolean;
   frame?: { width: number; height: number };
   placement: GuideImageImportPlacement;
   disabled: boolean;
@@ -43,14 +45,18 @@ export function GuideImageUpload({
   };
   return (
     <div
-      className="guide-image-slot"
-      tabIndex={0}
+      className={compact ? 'guide-image-upload-compact' : 'guide-image-slot'}
+      tabIndex={compact ? undefined : 0}
       aria-label={t('scenario.editor.guideAddImage')}
       aria-busy={pending}
       style={frame ? { aspectRatio: `${frame.width} / ${frame.height}` } : undefined}
     >
-      <ImagePlus className="guide-image-slot-icon" size={24} aria-hidden="true" />
-      <p>{t('scenario.editor.guideImageDropHint')}</p>
+      {!compact && (
+        <>
+          <ImagePlus className="guide-image-slot-icon" size={24} aria-hidden="true" />
+          <p>{t('scenario.editor.guideImageDropHint')}</p>
+        </>
+      )}
       <input
         ref={input}
         type="file"
@@ -76,7 +82,9 @@ export function GuideImageUpload({
         {t('scenario.editor.guideUploadImage')}
       </ProductActionButton>
       {<GuideResourceTrigger t={t} target={placement} disabled={disabled || pending} label />}
-      <p className="guide-image-slot-hint">{t('scenario.editor.guideImagePasteHint')}</p>
+      {!compact && (
+        <p className="guide-image-slot-hint">{t('scenario.editor.guideImagePasteHint')}</p>
+      )}
       {pending && (
         <>
           <span role="status">{t('scenario.editor.guideImportProgress')}</span>

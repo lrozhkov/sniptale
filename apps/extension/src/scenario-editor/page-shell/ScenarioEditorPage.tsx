@@ -4,7 +4,7 @@ import type {
   GuideTemplateApplication,
 } from '../../composition/persistence/scenario/store/public';
 import { GuideImageDropZone } from './image-drop';
-import { GuideResourceDrawer, GuideResourceTrigger } from './resource-drawer';
+import { GuideResourceDrawer } from './resource-drawer';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { GuideBlockInspector } from './block-inspector';
 import { GuideReader, useGuideReaderMode } from './reader';
@@ -120,7 +120,6 @@ export function ScenarioEditorPage() {
             <GuideWorkspace
               onUploadFile={imports.uploadStep}
               header={header}
-              importResources={<GuideResourceTrigger t={t} disabled={commandsDisabled} />}
               images={state.images}
               panels={panels}
               project={project}

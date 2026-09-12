@@ -1,6 +1,6 @@
 import { GuideImageUpload } from './image-upload';
 import { resolveGuideNumbering } from '../../features/scenario/project/public';
-import { GUIDE_IMAGE_DRAG_TYPE } from './image-drop';
+import { GuideResources } from './resource-list';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { type ReactNode } from 'react';
@@ -19,7 +19,6 @@ type WorkspaceProps = {
   images: Record<string, string | null>;
   header: ReactNode;
   onUploadFile: (file: File, signal: AbortSignal) => Promise<boolean>;
-  importResources: ReactNode;
   disabled: boolean;
   onSelect: (id: string) => void;
   onAddStep: () => void;
@@ -84,12 +83,20 @@ export function GuideWorkspace(props: WorkspaceProps) {
           {props.panels.leftSection === 'structure' ? (
             <GuideOutline project={project} selectedId={selectedId} onSelect={onSelect} t={t} />
           ) : (
-            <>
-              {props.importResources}
-              <GuideResources {...props} />
-            </>
+            <GuideResources {...props} />
           )}
         </div>
+        {props.panels.leftSection === 'resources' && (
+          <footer className="guide-resource-footer">
+            <GuideImageUpload
+              compact
+              placement={{ kind: 'steps' }}
+              disabled={props.disabled}
+              onUpload={props.onUploadFile}
+              t={t}
+            />
+          </footer>
+        )}
       </FloatingChromePanel>
       {leftOpen && (
         <GuidePanelDivider side="left" panels={props.panels} label={t('scenario.editor.outline')} />
@@ -275,51 +282,6 @@ export function GuidePanelControls({
       >
         <Image size={16} aria-hidden="true" />
       </ContentToolbarButton>
-    </div>
-  );
-}
-
-function GuideResources({ project, images, onSelect, disabled, t }: WorkspaceProps) {
-  const resources = project.items.flatMap((item) =>
-    item.kind === 'step'
-      ? item.blocks.flatMap((block) => (block.kind === 'image' ? [{ item, block }] : []))
-      : []
-  );
-  return (
-    <div className="guide-resources">
-      <p>{t('scenario.editor.guideResourcesHint')}</p>
-      {resources.length === 0 && <p>{t('scenario.editor.guideNoResources')}</p>}
-      {resources.map(({ item, block }) => (
-        <ProductActionButton
-          tone="secondary"
-          compact
-          key={block.id}
-          type="button"
-          className="guide-resource"
-          draggable={!disabled}
-          onDragStart={(event) => {
-            if (disabled) {
-              event.preventDefault();
-              return;
-            }
-            event.dataTransfer.effectAllowed = 'copy';
-            event.dataTransfer.setData(
-              GUIDE_IMAGE_DRAG_TYPE,
-              JSON.stringify({ projectId: project.id, blockId: block.id })
-            );
-          }}
-          onClick={() => onSelect(item.id)}
-        >
-          {images[block.assetId] ? (
-            <img src={images[block.assetId] ?? undefined} alt="" loading="lazy" draggable={false} />
-          ) : (
-            <Image size={24} aria-hidden="true" />
-          )}
-          <span>
-            {block.caption || block.alt || item.title || t('scenario.editor.untitledStep')}
-          </span>
-        </ProductActionButton>
-      ))}
     </div>
   );
 }

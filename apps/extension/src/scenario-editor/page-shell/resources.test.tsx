@@ -61,7 +61,7 @@ async function files(...names: string[]) {
       tags: [],
     }))
   );
-  await click('Refresh library');
+  await act(async () => window.dispatchEvent(new Event('focus')));
   for (const name of names) await click(name);
 }
 it('orders library selections, reorders/removes and imports blocks', async () => {
@@ -103,7 +103,7 @@ it('keeps selection after a rejected import and cancels pending preparation', as
 it('filters library to images, retries failures and submits a current library identity', async () => {
   await render(null);
   io.list.mockRejectedValueOnce(new Error('read'));
-  await click('Refresh library');
+  await act(async () => window.dispatchEvent(new Event('focus')));
   expect(host.querySelector('[role="alert"]')).not.toBeNull();
   io.list.mockResolvedValue([
     { id: 'image', kind: 'image', filename: 'Library.png', source: { kind: 'screenshot' } },
@@ -115,7 +115,7 @@ it('filters library to images, retries failures and submits a current library id
       source: { kind: 'recording' },
     },
   ]);
-  await click('Refresh library');
+  await act(async () => window.dispatchEvent(new Event('focus')));
   expect(host.textContent).not.toContain('Movie.mp4');
   await click('Library.png');
   await click('Import selected');

@@ -1,5 +1,7 @@
 import { defineMessageSource } from '../../source';
 export const scenarioEditorCoreMessages = defineMessageSource({
+  guideResourcePreview: { ru: 'Посмотреть изображение', en: 'Preview image' },
+  guideResourceUses: { ru: 'Места использования ({count})', en: 'Used in {count} places' },
   guideFramingGroup: { ru: 'Кадрирование', en: 'Framing' },
   guideEntireDocument: { ru: 'Весь сценарий', en: 'Entire guide' },
   guideSettingsScope: { ru: 'Область настроек', en: 'Settings scope' },

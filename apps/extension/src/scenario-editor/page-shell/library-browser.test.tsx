@@ -120,7 +120,7 @@ it('does not substitute an original or stale preview and allows retry', async ()
     thumbnailBlob: new Blob(['new']),
     previewBlob: new Blob(['new']),
   });
-  await click('Refresh library');
+  await act(async () => window.dispatchEvent(new Event('focus')));
   expect(host.querySelector('.guide-library-preview img')).not.toBeNull();
 });
 it('rejects late presentation results after unmount', async () => {
@@ -162,8 +162,9 @@ it('retries metadata failures and applies saved library filters', async () => {
   ]);
   await render();
   expect(host.querySelector('[role="alert"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="Refresh library"]')).toBeNull();
   io.list.mockResolvedValue([item, { ...item, id: 'other', filename: 'Other.png', tags: [] }]);
-  await click('Refresh library');
+  await click('Retry loading');
   expect(host.querySelectorAll('.guide-library-card')).toHaveLength(2);
   await click('Tagged guide');
   expect(host.querySelectorAll('.guide-library-card')).toHaveLength(1);

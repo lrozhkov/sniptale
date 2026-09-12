@@ -1,10 +1,11 @@
 import { LibraryNavigation } from '../../composition/library-preview/navigation';
 import { LibraryMediaPlayer } from '../../composition/library-preview/player';
 import { GUIDE_LIBRARY_IMAGE_DRAG_TYPE } from './image-drop';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Check, Image, RefreshCw, Film } from 'lucide-react';
-import { ProductInput } from '@sniptale/ui/product-form-controls';
-import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { useCallback, useEffect, useRef, useState, useId, type ReactNode } from 'react';
+import { Check, Image, Film } from 'lucide-react';
+import { ProjectSearchField } from '@sniptale/ui/searchable-project-picker/parts';
+import { subscribeToMediaHubEvents } from '../../features/media-hub/events';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { listMediaLibrary, getMediaThumbnail } from '../../composition/persistence/media-library';
 import type { MediaLibraryItem } from '../../composition/persistence/media-library/contracts';
 import {
@@ -49,8 +50,14 @@ function useLibraryCatalog() {
   }, []);
   useEffect(() => {
     void reload();
+    const unsubscribe = subscribeToMediaHubEvents((event) => {
+      if (event.type === 'library-changed') void reload();
+    });
+    window.addEventListener('focus', reload);
     return () => {
       generation.current += 1;
+      unsubscribe();
+      window.removeEventListener('focus', reload);
     };
   }, [reload]);
   return { ...catalog, status, reload };
@@ -187,6 +194,7 @@ export function GuideLibraryBrowser({
   previewContent,
 }: GuideLibraryBrowserProps) {
   const catalog = useLibraryCatalog();
+  const searchId = useId();
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<'all' | 'video' | 'image'>('image');
   const [viewId, setViewId] = useState<string | null>(null);
@@ -222,31 +230,33 @@ export function GuideLibraryBrowser({
       />
       <div className="guide-library-content">
         <div className="guide-library-search">
-          <ProductInput
-            aria-label={t(
+          <label className="sr-only" htmlFor={searchId}>
+            {t(
               category === 'video'
                 ? 'scenario.editor.guideLibraryVideoSearch'
                 : 'scenario.editor.guideLibrarySearch'
             )}
-            placeholder={t(
+          </label>
+          <ProjectSearchField
+            searchId={searchId}
+            presentation="compact"
+            searchPlaceholder={t(
               category === 'video'
                 ? 'scenario.editor.guideLibraryVideoSearch'
                 : 'scenario.editor.guideLibrarySearch'
             )}
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={setQuery}
           />
-          <ContentToolbarButton
-            title={t('scenario.editor.guideChooseLibrary')}
-            disabled={catalog.status === 'loading'}
-            onClick={() => void catalog.reload()}
-          >
-            <RefreshCw size={16} aria-hidden="true" />
-          </ContentToolbarButton>
         </div>
         {catalog.status === 'loading' && <p role="status">{t('scenario.editor.loading')}</p>}
         {catalog.status === 'failed' && (
-          <p role="alert">{t('scenario.editor.guideLibraryLoadFailed')}</p>
+          <div role="alert">
+            <p>{t('scenario.editor.guideLibraryLoadFailed')}</p>
+            <ProductActionButton compact tone="secondary" onClick={() => void catalog.reload()}>
+              {t('scenario.editor.guideRetry')}
+            </ProductActionButton>
+          </div>
         )}
         <div
           className="guide-library-grid"

@@ -56,7 +56,6 @@ function Workspace() {
         </>
       }
       onUploadFile={async () => false}
-      importResources={null}
       disabled={false}
       onSelect={() => {}}
       onAddStep={() => {}}

@@ -529,7 +529,7 @@ test('image drops append, replace and fill slots with one Undo per gesture', asy
 }) => {
   await openVisualHarness(page, hostOrigin, 'light', 'en', { width: 1440, height: 1000 });
   await page.getByRole('button', { name: 'Resources', exact: true }).click();
-  const resource = page.locator('.guide-resource').first();
+  const resource = page.locator('.guide-resource-main').first();
   const step = page.locator('article#compare');
   const count = await step.locator('.guide-block').count();
   const undo = page.getByRole('button', { name: 'Undo', exact: true });

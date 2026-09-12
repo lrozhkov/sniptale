@@ -131,7 +131,13 @@ export function GuideResourceTrigger({
   );
 }
 
-function GuideResourceDialog({ onClose, ...props }: ResourceDrawerProps & { onClose: () => void }) {
+/** Shared local media dialog owns dismissal, focus trapping and restoration for library and preview. */
+export function GuideResourceDialog({
+  onClose,
+  title,
+  id = 'guide-resource-drawer',
+  ...props
+}: ResourceDrawerProps & { onClose: () => void; title?: string; id?: string }) {
   const panel = useRef<HTMLElement>(null);
   useEffect(() => {
     const previous = document.activeElement;
@@ -183,14 +189,16 @@ function GuideResourceDialog({ onClose, ...props }: ResourceDrawerProps & { onCl
     >
       <aside
         ref={panel}
-        id="guide-resource-drawer"
+        id={id}
         className="guide-resource-drawer"
         role="dialog"
         aria-modal="true"
-        aria-label={props.t('scenario.editor.guideResources')}
+        aria-label={title ?? props.t('scenario.editor.guideResources')}
         tabIndex={-1}
       >
         <div className="guide-resource-drawer-close">
+          <Image size={16} aria-hidden="true" />
+          <strong>{title ?? props.t('scenario.editor.guideOpenImageLibrary')}</strong>
           <ContentToolbarButton
             type="button"
             title={props.t('scenario.editor.close')}

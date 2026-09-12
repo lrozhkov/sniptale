@@ -291,26 +291,6 @@
   font-weight: 650;
   overflow-wrap: anywhere;
 }
-.guide-resource {
-  height: auto;
-  min-height: 0;
-  padding: 0.5rem;
-  white-space: normal;
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  margin-bottom: 0.75rem;
-}
-.guide-resource img {
-  width: 100%;
-  max-height: 7rem;
-  object-fit: contain;
-  border-radius: var(--sniptale-radius-sm);
-}
-.guide-resource span {
-  font-size: 0.8125rem;
-  overflow-wrap: anywhere;
-}
 .guide-empty,
 .guide-document-empty {
   margin: auto;
@@ -1035,10 +1015,31 @@
   overflow: hidden;
 }
 .guide-resource-drawer-close {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 2;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--sniptale-color-border-soft);
+}
+.guide-resource-drawer-close strong {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.guide-resource-drawer-close > svg,
+.guide-resource-drawer-close > button {
+  flex: none;
+}
+.guide-library-search > label:not(.sr-only) {
+  width: 100%;
+}
+.guide-library-search input:focus::placeholder {
+  color: transparent;
 }
 .guide-resource-drawer-body {
   flex: 1;
