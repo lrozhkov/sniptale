@@ -1,3 +1,4 @@
+import { GuideBlockReorder, GuideBlockReorderHandle } from './block-reorder';
 import { GuideBlockLayout } from './block-layout';
 import { guideDocumentStyle } from './document-appearance';
 import { Fragment, useEffect, useRef } from 'react';
@@ -309,7 +310,12 @@ function GuideStepBody({
     );
   return (
     <>
-      <div className="guide-step-blocks">
+      <GuideBlockReorder
+        projectId={project.id}
+        item={item}
+        disabled={disabled}
+        onOperate={onOperate}
+      >
         {item.blocks.map((block, index) => (
           <GuideBlockLayout
             key={block.id}
@@ -327,6 +333,7 @@ function GuideStepBody({
               onOperate={onOperate}
               t={t}
             />
+            <GuideBlockReorderHandle blockId={block.id} t={t} />
             <GuideBlockActions
               itemId={item.id}
               blockId={block.id}
@@ -368,7 +375,7 @@ function GuideStepBody({
             )}
           </GuideBlockLayout>
         ))}
-      </div>
+      </GuideBlockReorder>
       {item.blocks.length === 0 && (
         <div className="guide-empty-step">
           <GuideDocumentInsert

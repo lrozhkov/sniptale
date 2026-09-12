@@ -367,3 +367,49 @@ it('image replacement keeps target composition instead of inheriting source widt
   next = applyGuideStructureOperation(source, operation);
   expect(next.items[1]?.kind === 'step' && next.items[1].blocks[2]?.width).toBeUndefined();
 });
+
+it('reorders existing blocks before a target or to the end without changing their content', () => {
+  const source = fixture();
+  const first = source.items[1];
+  if (first?.kind !== 'step') throw new Error('Missing first');
+  first.blocks[1]!.width = 'half';
+  const next = applyGuideStructureOperation(source, {
+    kind: 'reorder-block',
+    itemId: 'first',
+    blockId: 'image',
+    beforeBlockId: 'text',
+  });
+  const result = next.items[1];
+  if (result?.kind !== 'step') throw new Error('Missing result');
+  expect(result.blocks).toEqual([first.blocks[1], first.blocks[0]]);
+  expect(first.blocks.map((block) => block.id)).toEqual(['text', 'image']);
+  const restored = applyGuideStructureOperation(next, {
+    kind: 'reorder-block',
+    itemId: 'first',
+    blockId: 'image',
+  });
+  expect(restored).toEqual(source);
+  expect(
+    applyGuideStructureOperation(source, {
+      kind: 'reorder-block',
+      itemId: 'first',
+      blockId: 'text',
+      beforeBlockId: 'text',
+    })
+  ).toEqual(source);
+  expect(() =>
+    applyGuideStructureOperation(source, {
+      kind: 'reorder-block',
+      itemId: 'first',
+      blockId: 'image',
+      beforeBlockId: 'gone',
+    })
+  ).toThrow();
+  expect(() =>
+    applyGuideStructureOperation(source, {
+      kind: 'reorder-block',
+      itemId: 'first',
+      blockId: 'note',
+    })
+  ).toThrow();
+});

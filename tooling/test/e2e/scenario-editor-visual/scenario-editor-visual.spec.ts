@@ -805,6 +805,72 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
   });
 }
 
+for (const theme of SCENARIO_VISUAL_THEMES) {
+  test(`block grip reorders with one Undo and cancels cleanly in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }, testInfo) => {
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 1080 });
+    const step = page.locator('article#compare');
+    const blocks = step.locator('.guide-block');
+    const order = () =>
+      blocks.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-block-id')));
+    const original = await order();
+    const first = step.locator('[data-block-id="before"]');
+    const last = step.locator('[data-block-id="after"]');
+    const grip = first.locator('.guide-block-grip');
+    const caption = await first.locator('figcaption').textContent();
+    const width = await first.getAttribute('data-width');
+    await grip.focus();
+    await grip.hover();
+    const start = await grip.boundingBox();
+    if (!start) throw new Error('Missing reorder grip');
+    await page.mouse.down();
+    await page.mouse.move(start.x + start.width / 2 + 20, start.y + start.height / 2 + 20, {
+      steps: 4,
+    });
+    await last.scrollIntoViewIfNeeded();
+    const target = await last.boundingBox();
+    if (!target) throw new Error('Missing reorder target');
+    await page.mouse.move(target.x + target.width / 2, target.y + target.height * 0.8, {
+      steps: 8,
+    });
+    await page.mouse.up();
+    await expect.poll(order).toEqual([...original.filter((id) => id !== 'before'), 'before']);
+    await expect(first.locator('figcaption')).toHaveText(caption ?? '');
+    await expect(first).toHaveAttribute('data-width', width!);
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    await expect.poll(order).toEqual(original);
+    await grip.focus();
+    await grip.hover();
+    const point = await grip.boundingBox();
+    if (!point) throw new Error('Missing block grip');
+    await page.mouse.down();
+    await page.mouse.move(point.x + point.width / 2 + 20, point.y + point.height / 2 + 20, {
+      steps: 4,
+    });
+    await page.keyboard.press('Escape');
+    await page.mouse.up();
+    await expect(step.locator('[data-reorder]')).toHaveCount(0);
+    await expect.poll(order).toEqual(original);
+    await grip.focus();
+    await page.keyboard.press('ArrowDown');
+    await expect.poll(order).toEqual([...original.filter((id) => id !== 'before'), 'before']);
+    await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    await expect.poll(order).toEqual(original);
+    await first.hover();
+    const gripBox = await grip.boundingBox();
+    const imageAction = await first.locator('.guide-image-tools > button').first().boundingBox();
+    expect(gripBox && imageAction && gripBox.x + gripBox.width <= imageAction.x).toBe(true);
+    await testInfo.attach(`block-grip-${theme}`, {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+  });
+}
+
 test('history cleanup preserves two-tab undo resources until sessions close', async ({
   page,
   hostOrigin,
