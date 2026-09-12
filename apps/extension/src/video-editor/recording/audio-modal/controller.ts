@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { translate } from '../../../platform/i18n';
 import { createTrimmedRecordingFile } from './trim-file';
 import type { AudioRecordingModalProps } from './shared';
-import { usePlaybackSpaceShortcut } from '../../runtime/session/playback/shortcuts';
+import { usePlaybackSpaceShortcut } from '../../../composition/library-preview/shortcuts';
 import { useAudioRecordingSession } from './session';
 export type { AudioRecordingControllerState } from './session-types';
 

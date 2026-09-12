@@ -1,3 +1,4 @@
+import { expectLibraryDrawerPlacement } from '../extension-smoke/video-editor-layout.test-support';
 import { expect, type Locator } from '@playwright/test';
 import { SCENARIO_EDITOR_VISUAL_HARNESS_PATH } from '../extension-critical.helpers';
 import { verifyGuideAppearance } from './scenario-editor-visual.appearance-steps';
@@ -1083,3 +1084,106 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     issues.assertClean();
   });
 }
+
+for (const theme of SCENARIO_VISUAL_THEMES) {
+  test(`unified library shows a large viewer and seeks a decoded frame before Play in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }, testInfo) => {
+    const issues = createPageIssueCollector(page);
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 900 });
+    test.setTimeout(45000);
+    const url = new URL(page.url());
+    url.searchParams.set('videoFixture', '1');
+    await page.goto(url.toString());
+    await page.getByRole('button', { name: 'Resources', exact: true }).click();
+    await page.getByRole('button', { name: 'Image library', exact: true }).click();
+    const drawer = page.getByRole('dialog', { name: 'Resources', exact: true });
+    await expect(drawer.locator('input[type="file"]')).toHaveCount(0);
+    await expect(
+      drawer.locator('.guide-resource-modes,.guide-resource-drawer-heading')
+    ).toHaveCount(0);
+    await drawer.getByRole('button', { name: 'Library screenshot.png', exact: true }).click();
+    await expect(drawer.locator('.guide-library-preview img')).toBeVisible();
+    const widths = await drawer.evaluate((node) => ({
+      grid: node.querySelector('.guide-library-content')!.getBoundingClientRect().width,
+      preview: node.querySelector('.guide-library-preview')!.getBoundingClientRect().width,
+      columns: getComputedStyle(
+        node.querySelector('.guide-library-grid')!
+      ).gridTemplateColumns.split(' ').length,
+    }));
+    expect(widths.preview).toBeGreaterThan(widths.grid);
+    expect(widths.columns).toBe(3);
+    await drawer.getByRole('button', { name: 'Video', exact: true }).click();
+    await drawer.getByRole('button', { name: 'Library motion.webm', exact: true }).click();
+    const video = drawer.locator('video');
+    await expect
+      .poll(() =>
+        video.evaluate(
+          (node) => node.readyState >= 2 && Number.isFinite(node.duration) && node.duration > 1.2
+        )
+      )
+      .toBe(true);
+    expect(await video.evaluate((node) => node.paused)).toBe(true);
+    const position = drawer.getByRole('spinbutton', { name: 'Source position', exact: true });
+    await position.fill('1.2');
+    await expect
+      .poll(() =>
+        video.evaluate(
+          (node) => !node.seeking && node.readyState >= 2 && Math.abs(node.currentTime - 1.2) < 0.03
+        )
+      )
+      .toBe(true);
+    expect(await video.evaluate((node) => node.paused)).toBe(true);
+    await expect(
+      drawer.getByRole('button', { name: 'Add frame as step', exact: true })
+    ).toBeEnabled();
+    await page.setViewportSize({ width: 1024, height: 640 });
+    await drawer
+      .getByRole('button', { name: 'Add frame as step', exact: true })
+      .click({ trial: true, timeout: 5000 });
+    expect((await video.boundingBox())?.height).toBeGreaterThan(140);
+    await testInfo.attach(`library-viewer-${theme}`, {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+    await drawer.getByRole('button', { name: 'Add frame as step', exact: true }).click();
+    await expect(page.locator('main article')).toHaveCount(3);
+    await drawer.getByRole('button', { name: 'Close', exact: true }).click();
+    const captured = page.locator('main article').last().locator('img');
+    await expect(captured).toBeVisible();
+    await expect
+      .poll(() =>
+        captured.evaluate((image) => {
+          if (!image.complete || !image.naturalWidth) return false;
+          const canvas = document.createElement('canvas');
+          canvas.width = 1;
+          canvas.height = 1;
+          const context = canvas.getContext('2d')!;
+          context.drawImage(image, 0, 0, 1, 1);
+          const pixels = context.getImageData(0, 0, 1, 1).data;
+          return pixels[2]! > pixels[0]! + 100;
+        })
+      )
+      .toBe(true);
+    issues.assertClean();
+  });
+}
+
+test('shared library navigation stays aligned in the built video editor', async ({
+  context,
+  extensionId,
+}, testInfo) => {
+  const page = await context.newPage();
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`chrome-extension://${extensionId}/apps/extension/src/video-editor/index.html`);
+  await page.evaluate(() => chrome.storage.local.set({ 'sniptale-locale-preference': 'en' }));
+  await expect(page.locator('[data-ui="video-editor.materials.library"]')).toBeVisible();
+  await expectLibraryDrawerPlacement(page);
+  await page.locator('[data-ui="video-editor.materials.library"]').click();
+  await testInfo.attach('video-editor-shared-library', {
+    body: await page.screenshot(),
+    contentType: 'image/png',
+  });
+  await page.close();
+});

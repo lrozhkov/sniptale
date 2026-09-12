@@ -8,20 +8,6 @@ vi.mock('./runtime/video-frame', () => ({
   loadGuideVideoSource: io.load,
   captureGuideVideoFrame: io.capture,
 }));
-vi.mock('./library-browser', () => ({
-  GuideLibraryBrowser: ({
-    onChoose,
-    previewContent,
-  }: {
-    onChoose: (id: string) => void;
-    previewContent: React.ReactNode;
-  }) => (
-    <>
-      <button onClick={() => onChoose('video')}>Choose video</button>
-      {previewContent}
-    </>
-  ),
-}));
 import { GuideVideoFrameResources } from './video-frame-resources';
 let host: HTMLDivElement;
 let root: ReturnType<typeof createRoot>;
@@ -34,13 +20,19 @@ function button(name: string) {
 async function open() {
   await act(async () =>
     root.render(
-      <GuideVideoFrameResources disabled={false} onImport={submit} t={createTranslator('en')} />
+      <GuideVideoFrameResources
+        mediaId="video"
+        disabled={false}
+        onImport={submit}
+        t={createTranslator('en')}
+      />
     )
   );
-  await act(async () => button('Choose video').click());
-  await act(async () =>
-    host.querySelector('video')!.dispatchEvent(new Event('loadeddata', { bubbles: true }))
-  );
+  const video = host.querySelector('video')!;
+  Object.defineProperty(video, 'error', { value: null, configurable: true });
+  Object.defineProperty(video, 'readyState', { value: 2, configurable: true });
+  Object.defineProperty(video, 'duration', { value: 5, configurable: true });
+  await act(async () => video.dispatchEvent(new Event('loadeddata', { bubbles: true })));
 }
 beforeEach(() => {
   vi.resetAllMocks();
@@ -116,13 +108,41 @@ it('does not retain a late source URL after closing', async () => {
   );
   await act(async () =>
     root.render(
-      <GuideVideoFrameResources disabled={false} onImport={submit} t={createTranslator('en')} />
+      <GuideVideoFrameResources
+        mediaId="video"
+        disabled={false}
+        onImport={submit}
+        t={createTranslator('en')}
+      />
     )
   );
-  await act(async () => button('Choose video').click());
   await act(async () => root.render(null));
   await act(async () =>
     done?.({ blob: new Blob(['late']), filename: 'late.webm', recordingId: null })
   );
   expect(URL.createObjectURL).not.toHaveBeenCalled();
+});
+
+it('retries a failed source without leaving the selected video and releases its URL', async () => {
+  io.load.mockRejectedValueOnce(new Error('source changed'));
+  await act(async () =>
+    root.render(
+      <GuideVideoFrameResources
+        mediaId="video"
+        disabled={false}
+        onImport={submit}
+        t={createTranslator('en')}
+      />
+    )
+  );
+  expect(host.querySelector('[role="alert"]')).not.toBeNull();
+  await act(async () => button('Retry').click());
+  expect(io.load).toHaveBeenCalledTimes(2);
+  expect(io.load.mock.calls[0]![1].aborted).toBe(true);
+  expect(io.load.mock.calls[1]![0]).toEqual({ mediaId: 'video' });
+  expect(host.querySelector('video')).not.toBeNull();
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+  await act(async () => root.render(null));
+  expect(io.load.mock.calls[1]![1].aborted).toBe(true);
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:video');
 });

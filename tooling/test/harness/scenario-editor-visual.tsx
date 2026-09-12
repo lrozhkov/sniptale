@@ -1,3 +1,4 @@
+import { saveRecording } from '../../../apps/extension/src/composition/persistence/recordings';
 import {
   getMediaLibraryEntry,
   saveScreenshotMediaAsset,
@@ -99,6 +100,9 @@ async function mountGuideHarness(): Promise<void> {
     });
   }
   const params = new URLSearchParams(window.location.search);
+  if (params.get('videoFixture') === '1' && !(await getMediaLibraryEntry('guide-preview-video'))) {
+    await saveRecording('guide-preview-video', await createFixtureVideo(), 'Library motion.webm');
+  }
   initializeAppTheme(params.get('theme') === 'dark' ? 'dark' : 'light');
   await setLocalePreference(params.get('locale') === 'ru' ? 'ru' : 'en');
   const projectId = params.get('projectId') ?? 'guide-visual';
@@ -117,3 +121,31 @@ async function mountGuideHarness(): Promise<void> {
 }
 
 void mountGuideHarness();
+
+async function createFixtureVideo(): Promise<Blob> {
+  const canvas = document.createElement('canvas');
+  canvas.width = 320;
+  canvas.height = 180;
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Video fixture canvas unavailable');
+  const stream = canvas.captureStream(20);
+  const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp8' });
+  const chunks: Blob[] = [];
+  let frame = 0;
+  const timer = setInterval(() => {
+    context.fillStyle = frame++ < 15 ? '#cc3344' : '#2266dd';
+    context.fillRect(0, 0, 320, 180);
+  }, 50);
+  try {
+    return await new Promise((resolve, reject) => {
+      recorder.ondataavailable = (event) => chunks.push(event.data);
+      recorder.onerror = () => reject(new Error('Video fixture recording failed'));
+      recorder.onstop = () => resolve(new Blob(chunks, { type: recorder.mimeType }));
+      recorder.start();
+      setTimeout(() => recorder.stop(), 1800);
+    });
+  } finally {
+    clearInterval(timer);
+    stream.getTracks().forEach((track) => track.stop());
+  }
+}

@@ -2,9 +2,9 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { LibraryMediaPlayer } from './media-player';
-vi.mock('../../../platform/i18n', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../../platform/i18n')>()),
+import { LibraryMediaPlayer } from './player';
+vi.mock('../../platform/i18n', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../platform/i18n')>()),
   translate: (key: string) => key,
 }));
 let container: HTMLDivElement;
@@ -19,6 +19,7 @@ function space(target: HTMLElement) {
 }
 beforeEach(() => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+  vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => {});
   vi.spyOn(HTMLMediaElement.prototype, 'play').mockImplementation(
     function (this: HTMLMediaElement) {
       Object.defineProperty(this, 'paused', { configurable: true, value: false });
@@ -215,4 +216,34 @@ it('probes missing recording duration before Play and returns to the first frame
   expect(video.currentTime).toBe(0);
   expect(control('videoEditor.sidebar.mediaPreviewSeek').disabled).toBe(false);
   expect(control('videoEditor.timeline.play').disabled).toBe(false);
+});
+
+it('requests decoded data and permits a paused seek before the first Play', () => {
+  expect(video.preload).toBe('auto');
+  expect(video.play).not.toHaveBeenCalled();
+  const seek = control('videoEditor.sidebar.mediaPreviewSeek');
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(seek, '3');
+    seek.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+  expect(video.currentTime).toBe(3);
+  expect(video.paused).toBe(true);
+  expect(video.play).not.toHaveBeenCalled();
+});
+
+it('leaves Space available to native actions when previewing an image', () => {
+  act(() =>
+    root.render(
+      <LibraryMediaPlayer src="blob:image" filename="Image" kind="image">
+        Loading
+      </LibraryMediaPlayer>
+    )
+  );
+  const action = document.createElement('button');
+  container.append(action);
+  const nativeKey = vi.fn();
+  action.addEventListener('keydown', nativeKey);
+  action.focus();
+  expect(space(action).defaultPrevented).toBe(false);
+  expect(nativeKey).toHaveBeenCalledOnce();
 });

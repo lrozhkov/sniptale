@@ -9,7 +9,6 @@ import {
   type ReactNode,
   type ComponentProps,
 } from 'react';
-import { GuideVideoFrameResources } from './video-frame-resources';
 import { GuideImageResources } from './resources';
 import { createPortal } from 'react-dom';
 import { Image, X } from 'lucide-react';
@@ -36,7 +35,6 @@ export function GuideResourceDrawer({
   Pick<ComponentProps<typeof GuideImageResources>, 'onImport' | 'disabled' | 'selectedStepId'>) {
   const [target, setTarget] = useState<ResourceTarget | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [mode, setMode] = useState<'images' | 'videos'>('images');
   const dragTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const anchor = useRef<HTMLSpanElement>(null);
   const theme = useResolvedPortalTheme(anchor.current);
@@ -80,49 +78,18 @@ export function GuideResourceDrawer({
             className={`sniptale-ai-modal-root${dragging ? ' guide-resource-dragging' : ''}`}
           >
             <GuideResourceDialog t={t} onClose={close}>
-              <div
-                className="guide-resource-modes"
-                role="group"
-                aria-label={t('scenario.editor.guideResourceType')}
-              >
-                {(['images', 'videos'] as const).map((value) => (
-                  <ProductActionButton
-                    key={value}
-                    compact
-                    tone="toggle"
-                    active={mode === value}
-                    aria-pressed={mode === value}
-                    disabled={props.disabled}
-                    onClick={() => setMode(value)}
-                  >
-                    {t(
-                      value === 'images'
-                        ? 'scenario.editor.guideLibraryImages'
-                        : 'scenario.editor.guideLibraryVideos'
-                    )}
-                  </ProductActionButton>
-                ))}
-              </div>
-              {mode === 'images' ? (
-                <GuideImageResources
-                  {...props}
-                  onLibraryDragStart={() => {
-                    // Let Chromium capture the native drag image before hiding its source.
-                    dragTimer.current = setTimeout(() => {
-                      dragTimer.current = null;
-                      setDragging(true);
-                    }, 0);
-                  }}
-                  t={t}
-                  {...(target.kind === 'replace-image' ? { target, onComplete: close } : {})}
-                />
-              ) : (
-                <GuideVideoFrameResources
-                  {...props}
-                  t={t}
-                  {...(target.kind === 'replace-image' ? { target, onComplete: close } : {})}
-                />
-              )}
+              <GuideImageResources
+                {...props}
+                onLibraryDragStart={() => {
+                  // Let Chromium capture the native drag image before hiding its source.
+                  dragTimer.current = setTimeout(() => {
+                    dragTimer.current = null;
+                    setDragging(true);
+                  }, 0);
+                }}
+                t={t}
+                {...(target.kind === 'replace-image' ? { target, onComplete: close } : {})}
+              />
             </GuideResourceDialog>
           </div>,
           resolveThemeSafePortalTarget(anchor.current)
@@ -178,7 +145,7 @@ function GuideResourceDialog({ onClose, ...props }: ResourceDrawerProps & { onCl
   return (
     <ProductModal
       onClose={onClose}
-      width="min(1440px, calc(100vw - 32px))"
+      width="min(1800px, calc(100vw - 24px))"
       maxWidth="100vw"
       maxHeight="100dvh"
       role="presentation"
@@ -223,8 +190,7 @@ function GuideResourceDialog({ onClose, ...props }: ResourceDrawerProps & { onCl
         aria-label={props.t('scenario.editor.guideResources')}
         tabIndex={-1}
       >
-        <header className="guide-resource-drawer-heading">
-          <h2>{props.t('scenario.editor.guideResources')}</h2>
+        <div className="guide-resource-drawer-close">
           <ContentToolbarButton
             type="button"
             title={props.t('scenario.editor.close')}
@@ -232,7 +198,7 @@ function GuideResourceDialog({ onClose, ...props }: ResourceDrawerProps & { onCl
           >
             <X size={16} aria-hidden="true" />
           </ContentToolbarButton>
-        </header>
+        </div>
         <div className="guide-resource-drawer-body">
           <div>{props.children}</div>
         </div>

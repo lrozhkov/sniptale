@@ -1,15 +1,15 @@
+import { GuideVideoFrameResources } from './video-frame-resources';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, Upload, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, X } from 'lucide-react';
 import type {
   GuideImageImportPlacement,
   GuideImageImportSource,
 } from '../../composition/persistence/scenario/store/public';
-import { PROJECT_ASSET_IMAGE_MIME_TYPES } from '../../features/media-hub/project-assets';
 import type { Translate } from '../../platform/i18n';
 import { GuideLibraryBrowser } from './library-browser';
 
-type Selection = { id: string; name: string; source: GuideImageImportSource; preview?: string };
+type Selection = { id: string; name: string; source: GuideImageImportSource };
 type ResourceProps = {
   disabled: boolean;
   selectedStepId: string | null;
@@ -39,26 +39,15 @@ function useGuideImageResources({
   const [progress, setProgress] = useState(0);
   const [failed, setFailed] = useState(false);
   const controller = useRef<AbortController | null>(null);
-  const urls = useRef(new Set<string>());
   const alive = useRef(true);
-  const release = () => {
-    urls.current.forEach((url) => URL.revokeObjectURL(url));
-    urls.current.clear();
-  };
   useEffect(() => {
     alive.current = true;
     return () => {
       alive.current = false;
       controller.current?.abort();
-      release();
     };
   }, []);
   const remove = (id: string) => {
-    const item = selection.find((entry) => entry.id === id);
-    if (item?.preview) {
-      URL.revokeObjectURL(item.preview);
-      urls.current.delete(item.preview);
-    }
     setSelection(selection.filter((entry) => entry.id !== id));
   };
   const move = (index: number, delta: number) => {
@@ -96,7 +85,6 @@ function useGuideImageResources({
       });
       if (!alive.current) return;
       if (accepted) {
-        release();
         setSelection([]);
         onComplete?.();
       } else if (!operation.signal.aborted) setFailed(true);
@@ -108,26 +96,6 @@ function useGuideImageResources({
     }
   };
   const locked = disabled || pending;
-  const addFiles = (files: File[]) => {
-    if (locked) return;
-    if ((target && files.length !== 1) || (!target && selection.length + files.length > 50)) {
-      setFailed(true);
-      return;
-    }
-    if (target) release();
-    const additions = files.map((file) => {
-      const preview = URL.createObjectURL(file);
-      urls.current.add(preview);
-      return {
-        id: crypto.randomUUID(),
-        name: file.name,
-        source: { kind: 'file' as const, file },
-        preview,
-      };
-    });
-    setFailed(false);
-    setSelection(target ? additions : [...selection, ...additions]);
-  };
   const chooseLibrary = (id: string, name: string) => {
     if (locked) return;
     const existing = selection.find(
@@ -141,7 +109,6 @@ function useGuideImageResources({
       setFailed(true);
       return;
     }
-    if (target) release();
     const item: Selection = {
       id: crypto.randomUUID(),
       name,
@@ -161,7 +128,6 @@ function useGuideImageResources({
     remove,
     move,
     submit,
-    addFiles,
     chooseLibrary,
     cancel: () => controller.current?.abort(),
   };
@@ -171,6 +137,7 @@ function useGuideImageResources({
 export function GuideImageResources(props: ResourceProps) {
   const { t, target, selectedStepId } = props;
   const state = useGuideImageResources(props);
+  const [videoId, setVideoId] = useState<string | null>(null);
   return (
     <div className="guide-import" aria-busy={state.pending}>
       <GuideLibraryBrowser
@@ -179,26 +146,22 @@ export function GuideImageResources(props: ResourceProps) {
         selectedIds={state.selection.flatMap((item) =>
           item.source.kind === 'library' ? [item.source.mediaId] : []
         )}
-        onChoose={state.chooseLibrary}
-        onDragStart={props.onLibraryDragStart}
-        fileAction={
-          <label className="guide-import-file-action">
-            <Upload size={16} aria-hidden="true" />
-            {t('scenario.editor.guideImportFiles')}
-            <input
-              type="file"
-              accept={PROJECT_ASSET_IMAGE_MIME_TYPES.join(',')}
-              multiple={!target}
-              disabled={state.locked}
-              onChange={(event) => {
-                state.addFiles(Array.from(event.target.files ?? []));
-                event.target.value = '';
-              }}
-            />
-          </label>
+        onChoose={(id, name, kind) => {
+          setVideoId(kind === 'video' ? id : null);
+          if (kind === 'image') state.chooseLibrary(id, name);
+        }}
+        previewContent={
+          videoId ? (
+            <GuideVideoFrameResources key={videoId} mediaId={videoId} {...props} />
+          ) : undefined
         }
+        onDragStart={props.onLibraryDragStart}
       />
-      <footer className="guide-import-footer" data-targeted={Boolean(target)}>
+      <footer
+        hidden={Boolean(videoId)}
+        className="guide-import-footer"
+        data-targeted={Boolean(target)}
+      >
         <GuideImportSelection
           selection={state.selection}
           locked={state.locked}
@@ -280,7 +243,6 @@ function GuideImportSelection({
     <ol aria-label={t('scenario.editor.guideImportOrder')}>
       {selection.map((item, index) => (
         <li key={item.id}>
-          {item.preview && <img src={item.preview} alt="" />}
           <span>{item.name}</span>
           <div className="guide-import-selection-actions">
             {selection.length > 1 && (

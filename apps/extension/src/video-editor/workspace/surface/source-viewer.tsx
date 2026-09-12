@@ -1,4 +1,4 @@
-import { usePlaybackSpaceShortcut } from '../../runtime/session/playback/shortcuts';
+import { usePlaybackSpaceShortcut } from '../../../composition/library-preview/shortcuts';
 import { useState } from 'react';
 import {
   Music,

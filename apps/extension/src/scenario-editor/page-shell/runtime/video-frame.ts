@@ -17,7 +17,11 @@ export async function loadGuideVideoSource(
     return { blob: input, filename: input.name, recordingId: null };
   }
   const entry = await getMediaLibraryEntry(input.mediaId);
-  if (!entry || entry.kind !== 'video' || entry.source.kind === 'web-snapshot')
+  if (
+    !entry ||
+    !['video', 'recording', 'export'].includes(entry.kind) ||
+    entry.source.kind === 'web-snapshot'
+  )
     throw new Error('Video source unavailable.');
   signal.throwIfAborted();
   const blob = await getMediaAssetBlob(entry.id);

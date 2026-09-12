@@ -78,7 +78,6 @@ async function render(disabled = false) {
         selectedIds={[]}
         onChoose={io.choose}
         onDragStart={io.drag}
-        fileAction={null}
       />
     )
   );
@@ -97,7 +96,7 @@ it('loads images immediately and displays current revision previews with URL cle
   await render();
   expect(host.querySelectorAll('.guide-library-card')).toHaveLength(1);
   await click('Current.png');
-  expect(io.choose).toHaveBeenCalledWith('image', 'Current.png');
+  expect(io.choose).toHaveBeenCalledWith('image', 'Current.png', 'image');
   expect(host.querySelector('.guide-library-preview img')?.getAttribute('src')).toBe('blob:2');
   expect(io.create.mock.calls[1]?.[0]).toEqual(new Blob(['current']));
   act(() => root.render(null));
@@ -170,7 +169,7 @@ it('retries metadata failures and applies saved library filters', async () => {
   expect(host.querySelectorAll('.guide-library-card')).toHaveLength(1);
   await click('Images');
   expect(host.querySelectorAll('.guide-library-card')).toHaveLength(2);
-  await click('Screenshots');
+  await click('Video');
   expect(host.querySelectorAll('.guide-library-card')).toHaveLength(0);
 });
 
@@ -202,7 +201,7 @@ it('video mode shows only videos, reuses thumbnail owner and cannot emit image d
     {
       ...item,
       id: 'video',
-      kind: 'video',
+      kind: 'recording',
       filename: 'Source.webm',
       mimeType: 'video/webm',
       source: { kind: 'recording', recordingId: 'recording' },
@@ -212,17 +211,17 @@ it('video mode shows only videos, reuses thumbnail owner and cannot emit image d
   await act(async () =>
     root.render(
       <GuideLibraryBrowser
-        mode="videos"
         t={createTranslator('en')}
         disabled={false}
         selectedIds={[]}
         onChoose={io.choose}
         onDragStart={io.drag}
-        fileAction={null}
         previewContent={<p>Source player</p>}
       />
     )
   );
+  io.presentation.mockClear();
+  await click('Video');
   const card = host.querySelector<HTMLButtonElement>('.guide-library-card')!;
   expect(card.textContent).toContain('Source.webm');
   expect(host.querySelectorAll('.guide-library-card')).toHaveLength(1);
@@ -233,5 +232,5 @@ it('video mode shows only videos, reuses thumbnail owner and cannot emit image d
   expect(io.drag).not.toHaveBeenCalled();
   expect(io.presentation).not.toHaveBeenCalled();
   await act(async () => card.click());
-  expect(io.choose).toHaveBeenCalledWith('video', 'Source.webm');
+  expect(io.choose).toHaveBeenCalledWith('video', 'Source.webm', 'video');
 });

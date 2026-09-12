@@ -52,28 +52,32 @@ async function click(label: string, scope: ParentNode = host) {
   await act(async () => button.click());
 }
 async function files(...names: string[]) {
-  const input = host.querySelector('input[type="file"]');
-  if (!input) throw new Error('Missing file input');
-  Object.defineProperty(input, 'files', {
-    configurable: true,
-    value: names.map((name) => new File(['image'], name, { type: 'image/png' })),
-  });
-  await act(async () => input.dispatchEvent(new Event('change', { bubbles: true })));
+  io.list.mockResolvedValue(
+    names.map((name) => ({
+      id: name,
+      filename: name,
+      kind: 'image',
+      source: { kind: 'screenshot' },
+      tags: [],
+    }))
+  );
+  await click('Refresh library');
+  for (const name of names) await click(name);
 }
-it('previews ordered files, reorders/removes and imports blocks, then releases previews', async () => {
+it('orders library selections, reorders/removes and imports blocks', async () => {
   await render();
   await files('first.png', 'second.png', 'third.png');
-  expect(host.querySelectorAll('img')).toHaveLength(3);
+  expect(host.querySelectorAll('li')).toHaveLength(3);
+  expect(host.querySelector('input[type="file"]')).toBeNull();
   await click('Move up', host.querySelectorAll('li')[1]);
   await click('Remove from selection', host.querySelectorAll('li')[2]);
   await click('As blocks in selected step');
   await click('Import selected');
   expect(
-    io.import.mock.calls[0]?.[0].sources.map((source: { file: File }) => source.file.name)
+    io.import.mock.calls[0]?.[0].sources.map((source: { mediaId: string }) => source.mediaId)
   ).toEqual(['second.png', 'first.png']);
   expect(io.import.mock.calls[0]?.[0].placement).toEqual({ kind: 'blocks', stepId: 'step' });
   expect(host.querySelectorAll('li')).toHaveLength(0);
-  expect(io.revoke).toHaveBeenCalled();
 });
 it('keeps selection after a rejected import and cancels pending preparation', async () => {
   await render();
@@ -103,7 +107,13 @@ it('filters library to images, retries failures and submits a current library id
   expect(host.querySelector('[role="alert"]')).not.toBeNull();
   io.list.mockResolvedValue([
     { id: 'image', kind: 'image', filename: 'Library.png', source: { kind: 'screenshot' } },
-    { id: 'video', kind: 'video', filename: 'Movie.mp4', source: { kind: 'recording' } },
+    {
+      id: 'video',
+      kind: 'video',
+      mimeType: 'video/mp4',
+      filename: 'Movie.mp4',
+      source: { kind: 'recording' },
+    },
   ]);
   await click('Refresh library');
   expect(host.textContent).not.toContain('Movie.mp4');
@@ -129,7 +139,7 @@ it('imports one selected source into the requested image block without a destina
   await files('replacement.png');
   await click('Import selected');
   expect(io.import.mock.calls[0]?.[0].sources).toHaveLength(1);
-  expect(io.import.mock.calls[0]?.[0].sources[0].file.name).toBe('replacement.png');
+  expect(io.import.mock.calls[0]?.[0].sources[0].mediaId).toBe('replacement.png');
   expect(io.import.mock.calls[0]?.[0].placement).toEqual({
     kind: 'replace-image',
     stepId: 'target-step',

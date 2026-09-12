@@ -41,6 +41,7 @@ This inventory is projected from the live source tree. It is navigation data, no
 - `apps/extension/src/composition/frame-annotation-controls`
 - `apps/extension/src/composition/frame-annotation-raster-client`
 - `apps/extension/src/composition/gradient-preset-resources`
+- `apps/extension/src/composition/library-preview`
 - `apps/extension/src/composition/persistence/aggregate-presentations`
 - `apps/extension/src/composition/persistence/ai-settings`
 - `apps/extension/src/composition/persistence/annotation-template-tags`

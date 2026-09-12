@@ -98,3 +98,19 @@ it('rejects seeking, stale, cancelled and failed encodes', async () => {
   vi.mocked(HTMLCanvasElement.prototype.toBlob).mockImplementationOnce(() => controller.abort());
   await expect(captureGuideVideoFrame(element, controller.signal)).rejects.toThrow();
 });
+it.each(['recording', 'export'])('loads real %s library videos before playback', async (kind) => {
+  const blob = new Blob(['video'], { type: 'video/webm' });
+  io.entry.mockResolvedValue({
+    id: 'media',
+    kind,
+    filename: 'video.webm',
+    mimeType: 'video/webm',
+    updatedAt: 1,
+    size: 5,
+    source: { kind: 'recording', recordingId: 'recording' },
+  });
+  io.blob.mockResolvedValue(blob);
+  await expect(
+    loadGuideVideoSource({ mediaId: 'media' }, new AbortController().signal)
+  ).resolves.toMatchObject({ blob, recordingId: 'recording' });
+});

@@ -6,7 +6,7 @@ import type { MediaLibraryItem } from '../../../composition/persistence/media-li
 import { translate } from '../../../platform/i18n';
 import { formatDuration, formatSize } from '../../chrome/display';
 import { formatDimensions } from '../items/cards';
-import { LibraryMediaPlayer } from './media-player';
+import { LibraryMediaPlayer } from '../../../composition/library-preview/player';
 
 export function MediaPreviewPane(props: {
   onAddMedia: (mediaId: string) => Promise<void>;
