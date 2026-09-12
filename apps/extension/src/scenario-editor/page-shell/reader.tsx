@@ -77,6 +77,7 @@ export function GuideReader({
           onClick={onClose}
         >
           <ArrowLeft size={16} aria-hidden="true" />
+          <span>{t('scenario.editor.guideReaderBack')}</span>
         </ContentToolbarButton>
         <h1>{project.name}</h1>
         <GuideHtmlExport project={project} t={t} />
@@ -86,6 +87,7 @@ export function GuideReader({
           onClick={print.open}
         >
           <Printer size={16} aria-hidden="true" />
+          <span>{t('scenario.editor.guidePrintAction')}</span>
         </ContentToolbarButton>
         <SegmentedSwitch
           density="compact"

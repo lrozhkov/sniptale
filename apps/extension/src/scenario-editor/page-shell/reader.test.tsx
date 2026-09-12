@@ -161,11 +161,11 @@ it('enters and leaves reading without reloading or saving the project', async ()
     await act(async () => root.render(<ScenarioEditorPage />));
     const loads = io.load.mock.calls.length;
     const saves = io.save.mock.calls.length;
-    await act(async () => button('Preview guide').click());
+    await act(async () => button('Export').click());
     expect(host.querySelector('.guide-reader')).not.toBeNull();
     await act(async () => button('Back to editing').click());
     expect(host.querySelector('.guide-reader')).toBeNull();
-    expect(document.activeElement).toBe(button('Preview guide'));
+    expect(document.activeElement).toBe(button('Export'));
     expect(host.querySelector('article[data-selected="true"]')?.id).toBe('first');
     expect(io.load.mock.calls.length).toBe(loads);
     expect(io.save.mock.calls.length).toBe(saves);

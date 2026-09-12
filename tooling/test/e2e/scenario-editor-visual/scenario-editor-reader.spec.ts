@@ -9,7 +9,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
   }, testInfo) => {
     await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 1080 });
     const title = await page.getByRole('textbox', { name: 'Scenario', exact: true }).inputValue();
-    await page.getByRole('button', { name: 'Preview guide', exact: true }).click();
+    await page.getByRole('button', { name: 'Export', exact: true }).click();
     const reader = page.locator('.guide-reader');
     await expect(reader.getByRole('heading', { level: 1 })).toHaveText(title);
     await expect(reader.locator('textarea, input')).toHaveCount(0);
@@ -49,7 +49,7 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
       contentType: 'image/png',
     });
     await page.keyboard.press('Escape');
-    await expect(page.getByRole('button', { name: 'Preview guide', exact: true })).toBeFocused();
+    await expect(page.getByRole('button', { name: 'Export', exact: true })).toBeFocused();
     await expect(page.getByRole('textbox', { name: 'Scenario', exact: true })).toHaveValue(title);
     await expect(page.locator('main img')).toHaveCount(2);
   });

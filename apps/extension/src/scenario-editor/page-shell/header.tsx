@@ -4,7 +4,7 @@ import { GuideProjectActions } from './project-actions';
 import { GUIDE_LIMITS, type GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { Undo2, Redo2, Eye } from 'lucide-react';
+import { Undo2, Redo2, Download } from 'lucide-react';
 
 export function GuidePageHeader({
   project,
@@ -89,12 +89,14 @@ export function GuidePageHeader({
           {project && (
             <>
               <ContentToolbarButton
+                className="guide-labeled-action"
                 ref={previewRef}
                 title={t('scenario.editor.guideReaderOpen')}
                 disabled={previewDisabled}
                 onClick={onPreview}
               >
-                <Eye size={16} aria-hidden="true" />
+                <Download size={16} aria-hidden="true" />
+                <span>{t('scenario.editor.guideReaderOpen')}</span>
               </ContentToolbarButton>
               <div
                 className="guide-history-controls"

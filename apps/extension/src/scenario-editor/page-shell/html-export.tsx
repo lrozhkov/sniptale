@@ -55,25 +55,31 @@ export function GuideHtmlExport({ project, t }: { project: GuideProject; t: Tran
   return (
     <div className="guide-html-export">
       <ContentToolbarButton
+        className="guide-labeled-action"
         title={t('scenario.editor.guideHtmlExport')}
         disabled={status === 'pending'}
         onClick={() => void save('html')}
       >
         <Download size={16} aria-hidden="true" />
+        <span>{t('scenario.editor.guideHtmlFormat')}</span>
       </ContentToolbarButton>
       <ContentToolbarButton
+        className="guide-labeled-action"
         title={t('scenario.editor.guideMarkdownExport')}
         disabled={status === 'pending'}
         onClick={() => void save('markdown')}
       >
         <FileText size={16} aria-hidden="true" />
+        <span>{t('scenario.editor.guideMarkdownFormat')}</span>
       </ContentToolbarButton>
       {status === 'pending' && (
         <ContentToolbarButton
+          className="guide-labeled-action"
           title={t('common.actions.cancel')}
           onClick={() => job.current?.abort()}
         >
           <X size={16} aria-hidden="true" />
+          <span>{t('common.actions.cancel')}</span>
         </ContentToolbarButton>
       )}
       {status !== 'idle' && (

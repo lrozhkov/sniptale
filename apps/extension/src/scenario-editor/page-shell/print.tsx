@@ -88,10 +88,12 @@ export function GuidePrint({
       <header className="guide-print-header">
         <ContentToolbarButton
           ref={back}
+          className="guide-labeled-action"
           title={t('scenario.editor.guidePrintBack')}
           onClick={onClose}
         >
           <ArrowLeft size={16} aria-hidden="true" />
+          <span>{t('scenario.editor.guidePrintBack')}</span>
         </ContentToolbarButton>
         <h1>{project.name}</h1>
         <ProductActionButton

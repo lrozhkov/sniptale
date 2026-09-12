@@ -10,7 +10,7 @@ for (const theme of ['light', 'dark'] as const) {
     await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1280, height: 900 });
     const name = 'Инструкция <script>alert(1)</script>';
     await page.getByRole('textbox', { name: 'Scenario', exact: true }).fill(name);
-    await page.getByRole('button', { name: 'Preview guide', exact: true }).click();
+    await page.getByRole('button', { name: 'Export', exact: true }).click();
     await page.evaluate(() => {
       const chunks: Uint8Array[] = [];
       Object.defineProperty(window, 'showSaveFilePicker', {

@@ -23,7 +23,7 @@ for (const theme of ['light', 'dark'] as const) {
       .locator('.guide-image-inspector')
       .getByRole('button', { name: 'Done', exact: true })
       .click();
-    await page.getByRole('button', { name: 'Preview guide', exact: true }).click();
+    await page.getByRole('button', { name: 'Export', exact: true }).click();
     await page.getByRole('button', { name: 'Step by step', exact: true }).click();
     await expect(page.locator('.guide-reader article')).toHaveCount(1);
     await page.getByRole('button', { name: 'Print / PDF', exact: true }).click();
@@ -69,7 +69,7 @@ for (const theme of ['light', 'dark'] as const) {
     await page.setViewportSize({ width: 800, height: 640 });
     await expect(page.getByRole('button', { name: 'Print / PDF', exact: true })).toBeInViewport();
     await expect(
-      page.getByRole('button', { name: 'Back to reading', exact: true })
+      page.getByRole('button', { name: 'Back to export', exact: true })
     ).toBeInViewport();
     await page.keyboard.press('Escape');
     await expect(page.getByRole('button', { name: 'Print / PDF', exact: true })).toBeFocused();

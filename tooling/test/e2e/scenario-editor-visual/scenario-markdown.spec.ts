@@ -23,7 +23,7 @@ for (const theme of ['light', 'dark'] as const) {
       .locator('.guide-image-inspector')
       .getByRole('button', { name: 'Done', exact: true })
       .click();
-    await page.getByRole('button', { name: 'Preview guide', exact: true }).click();
+    await page.getByRole('button', { name: 'Export', exact: true }).click();
     await page.evaluate(() => {
       const chunks: number[][] = [];
       Object.defineProperty(window, 'showSaveFilePicker', {
