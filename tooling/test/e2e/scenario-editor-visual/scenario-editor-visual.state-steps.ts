@@ -348,16 +348,45 @@ export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo)
   await page.locator('article#compare figure').first().hover();
   await launch.click();
   const child = page.frameLocator('.guide-image-editor iframe');
-  const apply = child.locator('[data-ui="editor.floating.document-bar.save-for-slide-button"]');
+  const apply = child.locator('[data-ui="editor.floating.document-bar.apply-scenario-button"]');
   await expect(apply).toBeVisible();
+  await expect(apply).toBeEnabled();
+  await expect(page.locator('.guide-image-editor > header')).toHaveCount(0);
+  await expect(page.locator('.guide-image-editor iframe')).toHaveJSProperty('clientHeight', 900);
+  const previousDownloads = await page.evaluate(async () =>
+    (await chrome.downloads.search({})).map((entry) => entry.id)
+  );
+  await child.locator('[data-ui="editor.floating.document-bar.save-button"]').click();
+  await expect
+    .poll(() =>
+      page.evaluate(
+        async (previous) =>
+          (await chrome.downloads.search({})).some(
+            (entry) => !previous.includes(entry.id) && entry.state === 'complete'
+          ),
+        previousDownloads
+      )
+    )
+    .toBe(true);
+  await expect(apply).toBeEnabled();
+  await expect(page.locator('.guide-image-editor')).toHaveCount(1);
   await page.setViewportSize({ width: 1024, height: 640 });
   await expect(apply).toBeVisible();
+  await expect(apply).toBeEnabled();
+  const documentBar = child.locator('[data-ui="editor.floating.document-bar"]');
+  const toolRail = child.locator('[data-ui="editor.floating.tool-rail"]');
+  const documentBounds = await documentBar.boundingBox();
+  const toolBounds = await toolRail.boundingBox();
+  expect(
+    documentBounds && toolBounds && toolBounds.y >= documentBounds.y + documentBounds.height
+  ).toBe(true);
+  await child.locator('[data-ui="editor.floating.tool-rail.select"]').click({ trial: true });
   await testInfo.attach('guide-image-editor-local-frame', {
     body: await page.screenshot({ fullPage: true }),
     contentType: 'image/png',
   });
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.getByRole('button', { name: 'Back without applying' }).click();
+  await child.getByRole('button', { name: 'Back without applying' }).click();
   await expect(launch).toBeFocused();
   await expect(title).toHaveValue('Unsaved title retained through annotations');
   await expect(page.locator('.guide-image-frame img').first()).toHaveAttribute(
@@ -367,6 +396,7 @@ export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo)
   await page.locator('article#compare figure').first().hover();
   await launch.click();
   await expect(apply).toBeVisible();
+  await expect(apply).toBeEnabled();
   await child.locator('[data-ui="editor.floating.tool-rail.pencil"]').click();
   const canvas = child.locator('canvas.upper-canvas');
   const bounds = await canvas.boundingBox();
@@ -394,6 +424,7 @@ export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo)
   await page.locator('article#compare figure').first().hover();
   await launch.click();
   await expect(apply).toBeVisible();
+  await expect(apply).toBeEnabled();
   await apply.click();
   await expect(page.locator('.guide-image-editor')).toHaveCount(0);
   const reopened = await readImageEditProof(page);
@@ -402,7 +433,8 @@ export async function verifyImageEditorRoundtrip(page: Page, testInfo: TestInfo)
   await page.locator('article#compare figure').first().hover();
   await launch.click();
   await expect(apply).toBeVisible();
-  await child.locator('[data-ui="editor.floating.document-bar.close-scenario-button"]').click();
+  await expect(apply).toBeEnabled();
+  await child.locator('[data-ui="editor.floating.document-bar.cancel-scenario-button"]').click();
   await expect(launch).toBeFocused();
 }
 

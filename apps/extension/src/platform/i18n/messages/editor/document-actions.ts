@@ -54,8 +54,8 @@ export const editorDocumentActionsMessages = defineMessageSource({
     en: 'Save as...',
   },
   applyToScenario: {
-    ru: 'Сохранить для слайда',
-    en: 'Save for slide',
+    ru: 'Применить',
+    en: 'Apply',
   },
   copyPng: {
     ru: 'Копировать в буфер',
@@ -74,8 +74,8 @@ export const editorDocumentActionsMessages = defineMessageSource({
     en: 'Close file',
   },
   returnToScenario: {
-    ru: 'Вернуться к сценарию',
-    en: 'Return to scenario',
+    ru: 'Назад без применения',
+    en: 'Back without applying',
   },
   confirmCloseDocument: {
     ru: 'Закрыть текущий файл? Несохраненные изменения будут потеряны.',

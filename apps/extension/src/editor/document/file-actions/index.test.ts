@@ -250,7 +250,7 @@ it('posts an apply message to the scenario host in embed mode', async () => {
   const postMessageSpy = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => undefined);
   window.history.replaceState({}, '', '/editor?embed=scenario&embedSession=session-test');
 
-  await editorFileActions.saveEditorRenderedImage(controller);
+  await editorFileActions.applyEditorRenderedImageToScenario(controller);
 
   expect(postMessageSpy).toHaveBeenCalledWith(
     {

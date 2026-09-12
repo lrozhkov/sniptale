@@ -104,6 +104,8 @@ it('binds initialization and apply to the exact iframe session and suppresses du
   await send('scenario-ready', { sessionId: 'stale' });
   expect(childPost).not.toHaveBeenCalled();
   await send('scenario-ready');
+  expect(host.querySelector('header')).toBeNull();
+  expect(host.querySelector('.guide-image-editor-feedback')).toBeNull();
   await send('scenario-ready');
   expect(childPost).toHaveBeenCalledOnce();
   expect(childPost).toHaveBeenCalledWith(

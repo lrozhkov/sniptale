@@ -375,11 +375,13 @@ export function EditorFloatingDocumentBar(props: EditorFloatingDocumentBarProps)
   return (
     <div data-ui="editor.floating.document-bar" className={DOCUMENT_BAR_CLASS_NAME}>
       <FloatingChromeToolbar dataUi="editor.floating.document-bar.surface">
-        <EditorFloatingDocumentSummary
-          documentState={documentState}
-          hasImage={props.hasImage}
-          standalone={standalone}
-        />
+        {standalone && (
+          <EditorFloatingDocumentSummary
+            documentState={documentState}
+            hasImage={props.hasImage}
+            standalone={standalone}
+          />
+        )}
         <EditorFloatingDocumentQuickActions
           documentController={props.documentController}
           hasImage={props.hasImage}

@@ -92,13 +92,25 @@ export async function saveEditorRenderedImage(
   const dataUrl = controller.renderForExport
     ? await controller.renderForExport(renderOptions)
     : controller.renderToDataUrl(renderOptions);
-  const embedMode = readEditorEmbedMode(window.location.search);
   const actionType = options.actionType ?? 'download_default';
 
-  if (embedMode === 'scenario') {
-    applyEmbedSave(controller, dataUrl);
-    return;
-  }
-
   await executeSave(dataUrl, { ...options, actionType }, settings, exportSettings.imageFormat);
+}
+
+/** Applies the rendered draft only through the active scenario embed session. */
+export async function applyEditorRenderedImageToScenario(
+  controller: SaveEditorRenderedImageController
+): Promise<void> {
+  if (
+    readEditorEmbedMode(window.location.search) !== 'scenario' ||
+    !readEditorEmbedSession(window.location.search)
+  ) {
+    throw new Error(translate('editor.runtime.saveImageFailed'));
+  }
+  const settings = await loadEditorExportSettings();
+  const options = { format: settings.imageFormat, quality: settings.imageQuality } as const;
+  const dataUrl = controller.renderForExport
+    ? await controller.renderForExport(options)
+    : controller.renderToDataUrl(options);
+  applyEmbedSave(controller, dataUrl);
 }

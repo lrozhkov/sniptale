@@ -18,6 +18,7 @@ export {
   isEditorStoragePromptError,
   loadEditorSaveOptions,
   saveEditorRenderedImage,
+  applyEditorRenderedImageToScenario,
   type EditorSaveOptions,
   type SaveEditorRenderedImageOptions,
 } from './save';

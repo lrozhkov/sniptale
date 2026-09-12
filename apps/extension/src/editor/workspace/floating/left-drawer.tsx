@@ -1,3 +1,4 @@
+import { useEditorEmbedContext } from '../../application/embed-context/context';
 import { X } from 'lucide-react';
 import type { EditorSelectionState } from '../../../features/editor/document/types';
 import { FloatingChromePanel, floatingChromeClassNames } from '@sniptale/ui/floating-chrome';
@@ -60,13 +61,17 @@ export function EditorFloatingLeftDrawer({
   mode: EditorFloatingLeftDrawerMode;
   onClose: () => void;
 }) {
+  const embed = useEditorEmbedContext();
   const contentProps = createEditorInspectorContentPanelProps(hasImage, documentController);
   const drawerContentProps = createLeftDrawerContentProps(contentProps);
 
   return (
     <FloatingChromePanel
       dataUi={`editor.floating.left-drawer.${mode}`}
-      className={LEFT_DRAWER_CLASS_NAME}
+      className={floatingChromeClassNames(
+        LEFT_DRAWER_CLASS_NAME,
+        embed.mode === 'scenario' && 'min-[721px]:max-[1439px]:!top-[8.5rem]'
+      )}
     >
       <div className={LEFT_DRAWER_HEADER_CLASS_NAME}>
         <div className="min-w-0 flex-1">

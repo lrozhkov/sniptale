@@ -147,7 +147,7 @@ export function GuideImageEditor({
   }, [session]);
   return (
     <main className="guide-page guide-image-editor">
-      <GuideImageEditorHeader
+      <GuideImageEditorFeedback
         phase={phase}
         t={t}
         onClose={onClose}
@@ -166,8 +166,8 @@ export function GuideImageEditor({
   );
 }
 
-/** Session feedback and navigation remain visible above the embedded editor. */
-function GuideImageEditorHeader({
+/** Only loading and recovery feedback occupy the host; normal controls belong to the editor. */
+function GuideImageEditorFeedback({
   phase,
   t,
   onClose,
@@ -178,19 +178,15 @@ function GuideImageEditorHeader({
   onClose: () => void;
   onRetry: () => void;
 }) {
+  if (phase === 'ready') return null;
+  const unavailable = phase === 'loading' || phase === 'load-failed';
   return (
-    <header>
-      <ProductActionButton
-        tone="secondary"
-        compact
-        type="button"
-        autoFocus
-        disabled={phase === 'applying'}
-        onClick={onClose}
-      >
-        {t('scenario.editor.guideImageBack')}
-      </ProductActionButton>
-      <h1>{t('scenario.editor.guideEditImage')}</h1>
+    <div className="guide-image-editor-feedback">
+      {unavailable && (
+        <ProductActionButton tone="secondary" compact type="button" autoFocus onClick={onClose}>
+          {t('scenario.editor.guideImageBack')}
+        </ProductActionButton>
+      )}
       <p role={phase.endsWith('failed') ? 'alert' : 'status'}>
         {t(
           phase === 'loading'
@@ -199,9 +195,7 @@ function GuideImageEditorHeader({
               ? 'scenario.editor.guideSaving'
               : phase === 'load-failed'
                 ? 'scenario.editor.guideImageLoadFailed'
-                : phase === 'apply-failed'
-                  ? 'scenario.editor.guideImageApplyFailed'
-                  : 'scenario.editor.guideImageApplyHint'
+                : 'scenario.editor.guideImageApplyFailed'
         )}
       </p>
       {phase === 'load-failed' && (
@@ -209,6 +203,6 @@ function GuideImageEditorHeader({
           {t('scenario.editor.guideRetry')}
         </ProductActionButton>
       )}
-    </header>
+    </div>
   );
 }

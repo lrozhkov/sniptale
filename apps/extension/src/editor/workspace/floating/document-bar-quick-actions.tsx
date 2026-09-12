@@ -1,5 +1,6 @@
-import { Check, ClipboardCopy, Download, FileCheck2, FolderInput, Save, X } from 'lucide-react';
+import { Check, ClipboardCopy, Download, ArrowLeft, FolderInput, Save, X } from 'lucide-react';
 import { useRef, useState } from 'react';
+import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { FloatingChromeDivider } from '@sniptale/ui/floating-chrome';
 import { translate } from '../../../platform/i18n';
@@ -74,6 +75,18 @@ export function EditorFloatingDocumentQuickActions({
 
   return (
     <>
+      <ScenarioQuickActions
+        controller={controller}
+        embed={embed}
+        hasImage={hasImage}
+        onBeforeSelectionAwareAction={onBeforeSelectionAwareAction}
+      />
+      {!standalone && (
+        <FloatingChromeDivider
+          vertical
+          className={`${QUICK_ACTION_BUTTON_CLASS_NAME} !bg-[var(--sniptale-color-border-strong)]`}
+        />
+      )}
       <DocumentImageQuickActions
         actionState={actionState}
         documentController={documentController}
@@ -111,12 +124,6 @@ export function EditorFloatingDocumentQuickActions({
           </ContentToolbarButton>
         </>
       ) : null}
-      <ScenarioQuickActions
-        controller={controller}
-        embed={embed}
-        hasImage={hasImage}
-        onBeforeSelectionAwareAction={onBeforeSelectionAwareAction}
-      />
       {saveDialogOpen ? (
         <EditorSaveToFolderDialog
           anchorEl={saveToFolderButtonRef.current}
@@ -220,32 +227,47 @@ function ScenarioQuickActions(props: {
   onBeforeSelectionAwareAction: () => void;
 }) {
   const { controller, embed, hasImage, onBeforeSelectionAwareAction } = props;
+  const [pending, setPending] = useState(false);
+  const applying = useRef(false);
+  if (embed.mode !== 'scenario') return null;
   return (
     <>
-      {embed.mode === 'scenario' && hasImage && embed.onApply ? (
-        <ContentToolbarButton
-          title={translate('editor.documentActions.applyToScenario')}
-          onClick={() =>
-            runDocumentBarAction('save-for-slide', async () => {
+      <ProductActionButton
+        compact
+        tone="secondary"
+        disabled={pending || !embed.onClose}
+        onClick={() => runDocumentBarAction('close-scenario-editor', () => embed.onClose?.())}
+        data-ui="editor.floating.document-bar.cancel-scenario-button"
+      >
+        <ArrowLeft size={16} aria-hidden="true" />
+        {translate('editor.documentActions.returnToScenario')}
+      </ProductActionButton>
+      <ProductActionButton
+        compact
+        tone="primary"
+        disabled={!hasImage || pending || !embed.onApply}
+        aria-busy={pending}
+        className="!bg-[var(--sniptale-color-accent-soft)] !border-[var(--sniptale-color-border-accent-strong)]"
+        onClick={() => {
+          if (applying.current) return;
+          applying.current = true;
+          setPending(true);
+          runDocumentBarAction('apply-to-scenario', async () => {
+            try {
               onBeforeSelectionAwareAction();
               controller.clearSelection();
               await embed.onApply?.();
-            })
-          }
-          dataUi="editor.floating.document-bar.save-for-slide-button"
-        >
-          <FileCheck2 size={18} strokeWidth={2} />
-        </ContentToolbarButton>
-      ) : null}
-      {embed.mode === 'scenario' && embed.onClose ? (
-        <ContentToolbarButton
-          title={translate('editor.documentActions.returnToScenario')}
-          onClick={() => runDocumentBarAction('close-scenario-editor', () => embed.onClose?.())}
-          dataUi="editor.floating.document-bar.close-scenario-button"
-        >
-          <X size={18} strokeWidth={2} />
-        </ContentToolbarButton>
-      ) : null}
+            } finally {
+              applying.current = false;
+              setPending(false);
+            }
+          });
+        }}
+        data-ui="editor.floating.document-bar.apply-scenario-button"
+      >
+        <Check size={16} aria-hidden="true" />
+        {translate('editor.documentActions.applyToScenario')}
+      </ProductActionButton>
     </>
   );
 }

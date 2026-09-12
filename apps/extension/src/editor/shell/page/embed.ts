@@ -8,7 +8,7 @@ import {
 } from '../../../features/editor/contracts/embed';
 import type { ImageEditorController } from '../../controller';
 import { waitForEditorControllerCanvas } from '../../controller/canvas-ready';
-import { saveEditorRenderedImage } from '../../document/file-actions';
+import { applyEditorRenderedImageToScenario } from '../../document/file-actions';
 
 export function createEditorPageEmbedProviderValue(
   embedMode: EditorEmbedMode | null,
@@ -17,7 +17,7 @@ export function createEditorPageEmbedProviderValue(
   if (embedMode !== 'scenario') return { mode: null, onApply: null, onClose: null };
   return {
     mode: embedMode,
-    onApply: async () => saveEditorRenderedImage(controller),
+    onApply: async () => applyEditorRenderedImageToScenario(controller),
     onClose: () => {
       const sessionId = readEditorEmbedSession(window.location.search);
       if (sessionId)

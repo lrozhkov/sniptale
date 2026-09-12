@@ -2,13 +2,13 @@
 
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
-const { saveEditorRenderedImageMock } = vi.hoisted(() => ({
-  saveEditorRenderedImageMock: vi.fn(),
+const { applyEditorRenderedImageToScenarioMock } = vi.hoisted(() => ({
+  applyEditorRenderedImageToScenarioMock: vi.fn(),
 }));
 
 vi.mock('../../document/file-actions', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../document/file-actions')>()),
-  saveEditorRenderedImage: saveEditorRenderedImageMock,
+  applyEditorRenderedImageToScenario: applyEditorRenderedImageToScenarioMock,
 }));
 
 vi.mock('../../controller/canvas-ready', () => ({
@@ -44,7 +44,7 @@ it('routes scenario apply and close through the render and parent-message adapte
   await providerValue.onApply?.();
   providerValue.onClose?.();
 
-  expect(saveEditorRenderedImageMock).toHaveBeenCalledWith(controller);
+  expect(applyEditorRenderedImageToScenarioMock).toHaveBeenCalledWith(controller);
   expect(postMessage).toHaveBeenCalledWith(
     createScenarioEditorEmbedCloseMessage('session-test'),
     window.location.origin
@@ -54,7 +54,7 @@ it('routes scenario apply and close through the render and parent-message adapte
 it('preserves apply rejection for the canonical editor action reporter', async () => {
   const controller = createImageEditorController();
   const error = new Error('render failed');
-  saveEditorRenderedImageMock.mockRejectedValueOnce(error);
+  applyEditorRenderedImageToScenarioMock.mockRejectedValueOnce(error);
   const providerValue = createEditorPageEmbedProviderValue('scenario', controller);
 
   await expect(providerValue.onApply?.()).rejects.toBe(error);
