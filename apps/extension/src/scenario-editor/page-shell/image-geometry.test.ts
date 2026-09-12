@@ -65,3 +65,31 @@ it('rejects geometry drafts whose source or display mapping has changed', () => 
   for (const current of replacements)
     expect(commitGuideImageGesture(current, block, draft)).toBeNull();
 });
+
+it('constrains oversized axes at both edges and centers underfilled axes for contain and cover', async () => {
+  const { constrainGuideImage } = await import('./image-geometry');
+  const moved = {
+    ...block,
+    frame: { width: 400, height: 400 },
+    contentTransform: { x: 10, y: -10, scale: 1 },
+  };
+  expect(
+    constrainGuideImage({ ...moved, fit: 'cover' }, { width: 800, height: 400 }).contentTransform
+  ).toEqual({ x: 0.5, y: 0, scale: 1 });
+  expect(
+    constrainGuideImage({ ...moved, fit: 'contain' }, { width: 800, height: 400 }).contentTransform
+  ).toEqual({ x: 0, y: 0, scale: 1 });
+  expect(
+    constrainGuideImage(
+      { ...moved, fit: 'contain', contentTransform: { x: -10, y: 10, scale: 4 } },
+      { width: 800, height: 400 }
+    ).contentTransform
+  ).toEqual({ x: -1.5, y: 0.5, scale: 4 });
+  const centered = constrainGuideImage(
+    { ...moved, contentTransform: { x: -10, y: 10, scale: 0.5 } },
+    { width: 800, height: 400 }
+  );
+  expect(centered.contentTransform).toEqual({ x: 0, y: 0, scale: 0.5 });
+  expect(centered.assetId).toBe(block.assetId);
+  expect(centered.source).toBe(block.source);
+});

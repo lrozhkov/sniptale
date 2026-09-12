@@ -111,3 +111,21 @@ it('resolves numbering over the whole document when reading one item and reports
   expect(doc.querySelector('header span')?.textContent).toBe('1');
   expect(doc.querySelector('[role="status"]')).not.toBeNull();
 });
+
+it('retains deliberate empty space and minimum height in shared HTML and print markup', () => {
+  const project = createGuideProject('Spacing');
+  const step = createGuideStep('Layout', 'step');
+  step.blocks = [
+    { kind: 'text', id: 'space', paragraphs: [], minHeight: 180, width: 'half' },
+    { kind: 'heading', id: 'heading', text: 'More content may grow', minHeight: 120 },
+    { kind: 'text', id: 'unused', paragraphs: [] },
+  ];
+  project.items = [step];
+  const html = renderToStaticMarkup(
+    <GuideReadDocument project={project} images={{}} t={createTranslator('en')} />
+  );
+  expect(html).toContain('data-block-id="space"');
+  expect(html).toContain('--guide-block-min-height:180px');
+  expect(html).toContain('--guide-block-min-height:120px');
+  expect(html).not.toContain('data-block-id="unused"');
+});

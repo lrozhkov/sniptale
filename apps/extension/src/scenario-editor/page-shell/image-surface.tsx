@@ -1,5 +1,7 @@
+import { useImageDimensions } from './image-dimensions';
+import { useGuideLayoutAssistance } from './layout-assistance';
 import { GuideResourceTrigger } from './resource-drawer';
-import { Check, Crop, Pencil } from 'lucide-react';
+import { Check, Crop, Pencil, Magnet } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import {
@@ -14,6 +16,7 @@ import type { GuideImageBlock } from '@sniptale/runtime-contracts/scenario/types
 import type { Translate } from '../../platform/i18n';
 import {
   changeGuideImageGeometry,
+  constrainGuideImage,
   moveGuideImageGesture,
   hasSameGuideImageGestureBase,
   commitGuideImageGesture,
@@ -56,22 +59,27 @@ function releaseGesture(controller: { active: Gesture | null; timer: number | nu
 }
 
 /** One owner keeps pointer and modifier-wheel drafts out of durable history until commitment. */
-function useImageGesture({ block, disabled, onChange }: ImageProps, editing: boolean) {
+function useImageGesture(
+  { block, disabled, onChange }: ImageProps,
+  editing: boolean,
+  constrain: (block: GuideImageBlock) => GuideImageBlock,
+  cropBounds: boolean
+) {
   const frame = useRef<HTMLDivElement>(null);
-  const latest = useRef({ block, disabled, editing, onChange });
+  const latest = useRef({ block, disabled, editing, onChange, constrain });
   const controller = useRef<{ active: Gesture | null; timer: number | null }>({
     active: null,
     timer: null,
   });
   const [preview, setPreview] = useState<GuideImageBlock | null>(null);
   useLayoutEffect(() => {
-    latest.current = { block, disabled, editing, onChange };
+    latest.current = { block, disabled, editing, onChange, constrain };
     const active = controller.current.active;
     if (active && (disabled || !editing || !hasSameGuideImageGestureBase(active.origin, block))) {
       releaseGesture(controller.current);
       setPreview(null);
     }
-  }, [block, disabled, editing, onChange]);
+  }, [block, disabled, editing, onChange, constrain]);
   const finish = useCallback((commit: boolean, pointerId?: number) => {
     const active = controller.current.active;
     if (!active || (pointerId !== undefined && active.pointerId !== pointerId)) return;
@@ -109,12 +117,14 @@ function useImageGesture({ block, disabled, onChange }: ImageProps, editing: boo
         width: 0,
         height: 0,
       };
-      active.draft = changeGuideImageGeometry(active.draft, {
-        kind: 'zoom',
-        scale:
-          active.draft.contentTransform.scale *
-          Math.exp(-Math.max(-100, Math.min(100, event.deltaY)) * 0.002),
-      });
+      active.draft = current.constrain(
+        changeGuideImageGeometry(active.draft, {
+          kind: 'zoom',
+          scale:
+            active.draft.contentTransform.scale *
+            Math.exp(-Math.max(-100, Math.min(100, event.deltaY)) * 0.002),
+        })
+      );
       owner.active = active;
       setPreview(active.draft);
       if (owner.timer !== null) window.clearTimeout(owner.timer);
@@ -126,6 +136,9 @@ function useImageGesture({ block, disabled, onChange }: ImageProps, editing: boo
       releaseGesture(owner);
     };
   }, [finish]);
+  useEffect(() => {
+    finish(false);
+  }, [cropBounds, finish]);
   const begin = (event: PointerEvent<HTMLElement>, kind: 'pan' | 'resize') => {
     if (!editing || disabled || event.button !== 0) return;
     let origin = block;
@@ -153,13 +166,15 @@ function useImageGesture({ block, disabled, onChange }: ImageProps, editing: boo
   const move = (event: PointerEvent<HTMLElement>) => {
     const active = controller.current.active;
     if (!active || active.pointerId !== event.pointerId) return;
-    active.draft = moveGuideImageGesture(
-      active.origin,
-      active.kind,
-      event.clientX - active.x,
-      event.clientY - active.y,
-      active.width,
-      active.height
+    active.draft = latest.current.constrain(
+      moveGuideImageGesture(
+        active.origin,
+        active.kind,
+        event.clientX - active.x,
+        event.clientY - active.y,
+        active.width,
+        active.height
+      )
     );
     setPreview(active.draft);
   };
@@ -170,7 +185,19 @@ function useImageGesture({ block, disabled, onChange }: ImageProps, editing: boo
 export function GuideImageSurface(props: ImageProps) {
   const { block, url, disabled, editing, onEditingChange, t } = props;
   const trigger = useRef<HTMLButtonElement>(null);
-  const gesture = useImageGesture({ ...props, disabled: disabled || !url }, editing);
+  const dimensions = useImageDimensions(editing ? url : undefined);
+  const { cropBounds, setCropBounds } = useGuideLayoutAssistance();
+  const constrain = useCallback(
+    (next: GuideImageBlock) =>
+      cropBounds && dimensions ? constrainGuideImage(next, dimensions) : next,
+    [cropBounds, dimensions]
+  );
+  const gesture = useImageGesture(
+    { ...props, disabled: disabled || !url },
+    editing,
+    constrain,
+    cropBounds
+  );
   const close = () => {
     gesture.finish(false);
     onEditingChange(false);
@@ -189,6 +216,25 @@ export function GuideImageSurface(props: ImageProps) {
       }}
     >
       <div className="guide-image-tools">
+        {editing && (
+          <ContentToolbarButton
+            title={t('scenario.editor.guideCropBounds')}
+            aria-label={t('scenario.editor.guideCropBounds')}
+            aria-pressed={cropBounds}
+            disabled={disabled || !dimensions}
+            onClick={() => {
+              gesture.finish(false);
+              setCropBounds(!cropBounds);
+              if (!cropBounds && dimensions) {
+                const next = constrainGuideImage(block, dimensions);
+                if (!hasSameGuideImageGestureBase(block, next)) props.onChange(next, null);
+              }
+            }}
+          >
+            <Magnet size={16} aria-hidden="true" />
+          </ContentToolbarButton>
+        )}
+
         {props.libraryTarget && (
           <GuideResourceTrigger
             t={t}
@@ -226,7 +272,7 @@ export function GuideImageSurface(props: ImageProps) {
           {editing ? <Check size={16} aria-hidden="true" /> : <Crop size={16} aria-hidden="true" />}
         </ContentToolbarButton>
       </div>
-      <GuideImageViewport {...props} editing={editing} gesture={gesture} />
+      <GuideImageViewport {...props} editing={editing} gesture={gesture} constrain={constrain} />
       {block.caption && <figcaption>{block.caption}</figcaption>}
     </figure>
   );
@@ -241,9 +287,11 @@ function GuideImageViewport({
   t,
   editing,
   gesture,
+  constrain,
 }: ImageProps & {
   editing: boolean;
   gesture: ReturnType<typeof useImageGesture>;
+  constrain: (block: GuideImageBlock) => GuideImageBlock;
 }) {
   const shown = gesture.shown;
   return (
@@ -275,11 +323,13 @@ function GuideImageViewport({
         event.preventDefault();
         event.stopPropagation();
         onChange(
-          changeGuideImageGeometry(block, {
-            kind: 'pan',
-            x: block.contentTransform.x + direction[0]! * 0.02,
-            y: block.contentTransform.y + direction[1]! * 0.02,
-          }),
+          constrain(
+            changeGuideImageGeometry(block, {
+              kind: 'pan',
+              x: block.contentTransform.x + direction[0]! * 0.02,
+              y: block.contentTransform.y + direction[1]! * 0.02,
+            })
+          ),
           `image-pan:${block.id}`
         );
       }}
@@ -325,11 +375,13 @@ function GuideImageViewport({
             event.preventDefault();
             event.stopPropagation();
             onChange(
-              changeGuideImageGeometry(block, {
-                kind: 'frame',
-                width: block.frame.width + delta[0]!,
-                height: block.frame.height + delta[1]!,
-              }),
+              constrain(
+                changeGuideImageGeometry(block, {
+                  kind: 'frame',
+                  width: block.frame.width + delta[0]!,
+                  height: block.frame.height + delta[1]!,
+                })
+              ),
               `image-frame:${block.id}`
             );
           }}

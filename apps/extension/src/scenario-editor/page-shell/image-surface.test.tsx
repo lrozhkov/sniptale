@@ -1,3 +1,4 @@
+import { GuideLayoutAssistance } from './layout-assistance';
 // @vitest-environment jsdom
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -5,6 +6,10 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createGuideImageBlock } from '../../features/scenario/project/public';
 import { createTranslator } from '../../platform/i18n';
 import { GuideImageSurface } from './image-surface';
+vi.mock('./image-dimensions', () => {
+  const dimensions = { width: 800, height: 600 };
+  return { useImageDimensions: () => dimensions };
+});
 const block = createGuideImageBlock({
   id: 'image',
   assetId: 'asset',
@@ -53,7 +58,13 @@ function Harness({ disabled, current }: { disabled: boolean; current: typeof blo
   );
 }
 async function render(disabled = false, current = block) {
-  await act(async () => root.render(<Harness disabled={disabled} current={current} />));
+  await act(async () =>
+    root.render(
+      <GuideLayoutAssistance>
+        <Harness disabled={disabled} current={current} />
+      </GuideLayoutAssistance>
+    )
+  );
 }
 
 async function click(name: string) {
@@ -261,4 +272,25 @@ it('does not record a pointer move that returns to its original position', async
   await pointer(element, 'pointermove', 0, 0);
   await pointer(element, 'pointerup', 0, 0);
   expect(change).not.toHaveBeenCalled();
+});
+
+it('crop magnet prevents blank edges for pan and keyboard while disabling restores free movement', async () => {
+  await render();
+  await click('Frame and image');
+  await click('Keep image inside frame');
+  const element = frame();
+  await pointer(element, 'pointerdown', 0, 0);
+  await pointer(element, 'pointermove', 400, -300);
+  expect(host.querySelector('img')?.style.translate).toBe('0% 0%');
+  await pointer(element, 'pointerup', 400, -300);
+  expect(change).not.toHaveBeenCalled();
+  await click('Keep image inside frame');
+  await pointer(element, 'pointerdown', 0, 0);
+  await pointer(element, 'pointermove', 400, -300);
+  await pointer(element, 'pointerup', 400, -300);
+  expect(change.mock.calls[0]?.[0].contentTransform).toEqual({ x: 1, y: -1, scale: 1 });
+  await render(false, change.mock.calls[0]?.[0]);
+  change.mockClear();
+  await click('Keep image inside frame');
+  expect(change.mock.calls[0]?.[0].contentTransform).toEqual({ x: 0, y: 0, scale: 1 });
 });

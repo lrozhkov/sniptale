@@ -88,3 +88,26 @@ it('generates the advertised contract from the accepted presentation schemas', a
     }).operations
   ).toHaveLength(2);
 });
+
+it('exposes prose minimum height to AI through the same bounded contract', async () => {
+  const { buildScenarioAiSystemPrompt } = await import('./index');
+  expect(buildScenarioAiSystemPrompt('Improve the guide')).toContain('minHeight');
+  for (const minHeight of [0, 240, 7680]) {
+    expect(
+      scenarioAiOperationSchema.safeParse({
+        type: 'setBlockParameters',
+        stepId: 'step',
+        blockId: 'block',
+        parameters: { minHeight },
+      }).success
+    ).toBe(true);
+    expect(
+      scenarioAiOperationSchema.safeParse({
+        type: 'setBlockParameters',
+        stepId: 'step',
+        blockId: 'block',
+        parameters: { minHeight: -10 },
+      }).success
+    ).toBe(false);
+  }
+});

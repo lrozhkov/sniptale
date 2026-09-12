@@ -343,6 +343,11 @@ function GuideStepBody({
             block={block}
             layout={item.layout}
             disabled={disabled}
+            onHeight={
+              block.kind === 'text' || block.kind === 'heading' || block.kind === 'note'
+                ? (minHeight) => changeBlock({ ...block, minHeight }, null)
+                : undefined
+            }
             onWidth={(width) =>
               onOperate({ kind: 'set-block-width', itemId: item.id, blockId: block.id, width })
             }

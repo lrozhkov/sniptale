@@ -490,3 +490,22 @@ it('can create the first step in an explicitly selected empty document', () => {
   ).toHaveLength(1);
   expect(() => applyGuideAiProposal(project, { stepIds: [], blockIds: [] }, [])).toThrow();
 });
+
+it('projects and applies minimum prose height through the generated AI parameter surface', () => {
+  const { project, scope } = fixture();
+  const operation = {
+    type: 'setBlockParameters',
+    stepId: 'first',
+    blockId: 'text',
+    parameters: { minHeight: 240 },
+  };
+  const next = applyGuideAiProposal(project, scope, [operation]);
+  expect(selectGuideAiContent(next, scope).snapshot.steps[0]?.blocks[0]).toMatchObject({
+    parameters: { minHeight: 240 },
+  });
+  expect(next.items[0]).toMatchObject({ blocks: [{ id: 'text', minHeight: 240 }, {}] });
+  expect(project.items[0]).not.toMatchObject({ blocks: [{ minHeight: 240 }, {}] });
+  expect(() =>
+    applyGuideAiProposal(project, scope, [{ ...operation, blockId: 'image' }])
+  ).toThrow();
+});

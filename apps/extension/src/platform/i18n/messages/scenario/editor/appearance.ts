@@ -1,6 +1,18 @@
 import { defineMessageSource } from '../../source';
 
 export const scenarioEditorAppearanceMessages = defineMessageSource({
+  guideSnapLayout: { ru: 'Привязка размеров', en: 'Snap block sizes' },
+  guideSnapLayoutHint: {
+    ru: 'Привязка к соседним блокам и колонкам · Alt — временно отключить',
+    en: 'Snap to neighboring blocks and columns · Alt bypasses snapping',
+  },
+  guideCropBounds: { ru: 'Удерживать изображение в рамке', en: 'Keep image inside frame' },
+  guideBlockHeight: { ru: 'Минимальная высота', en: 'Minimum height' },
+  guideResizeHeight: {
+    ru: 'Изменить высоту · двойной клик — по содержимому',
+    en: 'Resize height · double-click for automatic height',
+  },
+  guideAutoHeight: { ru: 'По содержимому', en: 'Automatic height' },
   inspectorShowAll: { ru: 'Показать все настройки', en: 'Show all settings' },
   inspectorShowSections: { ru: 'Показать разделы настроек', en: 'Show settings sections' },
   inspectorNumbering: { ru: 'Нумерация', en: 'Numbering' },

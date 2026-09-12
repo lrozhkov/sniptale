@@ -62,7 +62,9 @@ export function GuideReadDocument({
             );
           const style = resolveGuideStyle(project.style, item.styleOverrides);
           const number = numbers.get(item.id)?.label;
-          const blocks = item.blocks.filter(hasReadContent);
+          const blocks = item.blocks.filter(
+            (block) => hasReadContent(block) || ('minHeight' in block && (block.minHeight ?? 0) > 0)
+          );
           return (
             <article
               data-guide-page={pages.get(item.id)}
@@ -88,7 +90,10 @@ export function GuideReadDocument({
                       data-block-id={block.id}
                       data-kind={block.kind}
                       data-width={resolveGuideBlockWidth(item.layout, block)}
-                      style={guideBlockWidthStyle(resolveGuideBlockWidth(item.layout, block))}
+                      style={guideBlockWidthStyle(
+                        resolveGuideBlockWidth(item.layout, block),
+                        'minHeight' in block ? block.minHeight : 0
+                      )}
                     >
                       {block.kind === 'image' && renderImage ? (
                         renderImage(block)

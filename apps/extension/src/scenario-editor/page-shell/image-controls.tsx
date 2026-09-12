@@ -5,7 +5,8 @@ import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { Check, MousePointer2, Focus, Maximize2, RotateCcw, ScanLine, Text } from 'lucide-react';
 import { ProductInput } from '@sniptale/ui/product-form-controls';
 import { SegmentedSwitch } from '@sniptale/ui/segmented-switch';
-import { useEffect, useState } from 'react';
+import { useImageDimensions } from './image-dimensions';
+import { useGuideLayoutAssistance } from './layout-assistance';
 import {
   GUIDE_LIMITS,
   type GuideImageBlock,
@@ -13,29 +14,7 @@ import {
 } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { Translate } from '../../platform/i18n';
 import { GuideInspectorGroup, GuideInspectorNumber } from './inspector';
-import { changeGuideImageGeometry } from './image-geometry';
-
-/** Decodes current leased media for reset dimensions without acquiring or revoking its URL. */
-function useImageDimensions(url: string | null | undefined) {
-  const [decoded, setDecoded] = useState<{ url: string; width: number; height: number } | null>(
-    null
-  );
-  useEffect(() => {
-    if (!url) return;
-    const image = new Image();
-    image.onload = () => {
-      if (image.naturalWidth > 0 && image.naturalHeight > 0)
-        setDecoded({ url, width: image.naturalWidth, height: image.naturalHeight });
-    };
-    image.onerror = () => setDecoded(null);
-    image.src = url;
-    return () => {
-      image.onload = null;
-      image.onerror = null;
-    };
-  }, [url]);
-  return decoded?.url === url ? decoded : null;
-}
+import { changeGuideImageGeometry, constrainGuideImage } from './image-geometry';
 
 /** Framing fields belong to the selected image in the existing right inspector. */
 export function GuideImageControls({
@@ -56,14 +35,13 @@ export function GuideImageControls({
   t: Translate;
 }) {
   const dimensions = useImageDimensions(url);
-  const onReset = () => {
-    if (dimensions)
-      onChange(changeGuideImageGeometry(block, { kind: 'reset', ...dimensions }), null);
-  };
+  const { cropBounds } = useGuideLayoutAssistance();
+  const constrain = (next: GuideImageBlock) =>
+    cropBounds && dimensions ? constrainGuideImage(next, dimensions) : next;
   const geometry = (
     change: Parameters<typeof changeGuideImageGeometry>[1],
     group: string | null = null
-  ) => onChange(changeGuideImageGeometry(block, change), group);
+  ) => onChange(constrain(changeGuideImageGeometry(block, change)), group);
   return (
     <div
       className="guide-image-inspector"
@@ -169,7 +147,9 @@ export function GuideImageControls({
           <ContentToolbarButton
             title={t('scenario.editor.guideImageReset')}
             disabled={disabled || !dimensions}
-            onClick={onReset}
+            onClick={() => {
+              if (dimensions) geometry({ kind: 'reset', ...dimensions });
+            }}
           >
             <RotateCcw size={16} aria-hidden="true" />
           </ContentToolbarButton>

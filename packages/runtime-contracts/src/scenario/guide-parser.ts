@@ -28,6 +28,7 @@ const textStyle = z
   })
   .strict()
   .optional();
+const minHeight = z.number().int().min(0).max(GUIDE_LIMITS.maxDimension).optional();
 const width = z
   .union([
     z.enum(['full', 'half']),
@@ -178,9 +179,9 @@ export const guideStepParametersSchema = z
 const noteTone = z.enum(['neutral', 'info', 'warning', 'error']);
 /** Safe parameter surfaces exclude content identity and media ownership. */
 export const guideBlockParameterSchemas = {
-  heading: z.object({ width, textStyle }).strict(),
-  text: z.object({ width, textStyle }).strict(),
-  note: z.object({ width, textStyle, tone: noteTone.optional() }).strict(),
+  heading: z.object({ width, minHeight, textStyle }).strict(),
+  text: z.object({ width, minHeight, textStyle }).strict(),
+  note: z.object({ width, minHeight, textStyle, tone: noteTone.optional() }).strict(),
   image: image
     .pick({ width: true, frame: true, fit: true, contentTransform: true, htmlExport: true })
     .partial()

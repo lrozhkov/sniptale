@@ -1250,3 +1250,120 @@ for (const theme of SCENARIO_VISUAL_THEMES) {
     await expect(target.locator('[data-block-id="description"]')).toHaveCount(0);
   });
 }
+
+for (const theme of SCENARIO_VISUAL_THEMES) {
+  test(`size magnets, text height and bounded crop remain undoable in ${theme}`, async ({
+    page,
+    hostOrigin,
+  }, testInfo) => {
+    await openVisualHarness(page, hostOrigin, theme, 'en', { width: 1920, height: 1400 });
+    const reopenUrl = page.url();
+    const issues = createPageIssueCollector(page);
+    const step = page.locator('article#compare');
+    const prose = step.locator('[data-block-id="description"]');
+    await prose.scrollIntoViewIfNeeded();
+    const magnet = page.getByRole('button', { name: 'Snap block sizes', exact: true });
+    await expect(magnet).toHaveAttribute('aria-pressed', 'true');
+    const width = prose.locator('.guide-block-width');
+    await width.focus();
+    const rect = await width.boundingBox();
+    const basis = await prose
+      .locator('..')
+      .evaluate(
+        (element) =>
+          element.getBoundingClientRect().width + parseFloat(getComputedStyle(element).columnGap)
+      );
+    if (!rect) throw new Error('Missing width handle');
+    const x = rect.x + rect.width / 2;
+    const y = rect.y + rect.height / 2;
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x - basis * 0.5 + 3, y, { steps: 12 });
+    await expect(prose).toHaveAttribute('data-width', '50');
+    await expect(prose).toHaveAttribute('data-size-snap', 'width');
+    await testInfo.attach(`size-guide-${theme}`, {
+      body: await page.screenshot(),
+      contentType: 'image/png',
+    });
+    await page.mouse.up();
+    await expect(prose).not.toHaveAttribute('data-size-snap');
+    await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    await expect(prose).toHaveAttribute('data-width', '100');
+    await magnet.click();
+    await expect(magnet).toHaveAttribute('aria-pressed', 'false');
+    await width.focus();
+    await page.mouse.move(x, y);
+    await page.mouse.down();
+    await page.mouse.move(x - basis * 0.5 + 5, y, { steps: 12 });
+    await expect(prose).not.toHaveAttribute('data-size-snap');
+    await page.keyboard.press('Escape');
+    await page.mouse.up();
+    await expect(prose).toHaveAttribute('data-width', '100');
+    const height = prose.locator('.guide-block-height');
+    await height.focus();
+    const grip = await height.boundingBox();
+    const before = await prose.boundingBox();
+    if (!grip || !before) throw new Error('Missing height handle');
+    await page.mouse.move(grip.x + 12, grip.y + 12);
+    await page.mouse.down();
+    await page.mouse.move(grip.x + 12, grip.y + 112, { steps: 10 });
+    const resized = await prose.boundingBox();
+    expect(resized!.height - before.height).toBeGreaterThan(95);
+    await page.mouse.up();
+    const minHeight = await prose.evaluate((element) => getComputedStyle(element).minHeight);
+    await page.getByRole('button', { name: 'Undo', exact: true }).click();
+    await expect(prose).toHaveCSS('min-height', '0px');
+    await page.getByRole('button', { name: 'Redo', exact: true }).click();
+    await expect(prose).toHaveCSS('min-height', minHeight);
+    await expect(page.getByRole('status').first()).toHaveText('Saved');
+    await page.goto(reopenUrl);
+    await expect(prose).toHaveCSS('min-height', minHeight);
+
+    const figure = step.locator('[data-block-id="before"] figure');
+    await figure.scrollIntoViewIfNeeded();
+    await figure.hover();
+    await figure.getByRole('button', { name: 'Frame and image', exact: true }).click();
+    const lock = figure.getByRole('button', { name: 'Keep image inside frame', exact: true });
+    await expect(lock).toBeEnabled();
+    await lock.click();
+    await expect(lock).toHaveAttribute('aria-pressed', 'true');
+    const controls = page.locator('#guide-inspector-panel');
+    await controls.getByRole('button', { name: 'Fill', exact: true }).click();
+    const zoom = controls.getByRole('textbox', { name: 'Zoom, %', exact: true });
+    await zoom.fill('200');
+    await zoom.press('Enter');
+    const frame = figure.locator('.guide-image-frame');
+    await frame.scrollIntoViewIfNeeded();
+    const frameRect = await frame.boundingBox();
+    if (!frameRect) throw new Error('Missing frame');
+    await page.mouse.move(frameRect.x + frameRect.width / 2, frameRect.y + frameRect.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(frameRect.x + frameRect.width * 3, frameRect.y + frameRect.height * 3, {
+      steps: 10,
+    });
+    await page.mouse.up();
+    const edges = await figure.locator('img').evaluate((image: HTMLImageElement) => {
+      const frame = image.parentElement!.getBoundingClientRect();
+      const [x, y] = image.style.translate.split(' ').map(parseFloat);
+      const scale = Number(image.style.scale);
+      const fit = Math.max(frame.width / image.naturalWidth, frame.height / image.naturalHeight);
+      return {
+        x: Math.abs(x!) / 100,
+        y: Math.abs(y!) / 100,
+        limitX: ((image.naturalWidth * fit * scale) / frame.width - 1) / 2,
+        limitY: ((image.naturalHeight * fit * scale) / frame.height - 1) / 2,
+      };
+    });
+    expect(edges.x).toBeLessThanOrEqual(edges.limitX + 0.01);
+    expect(edges.y).toBeLessThanOrEqual(edges.limitY + 0.01);
+    await zoom.fill('100');
+    await zoom.press('Enter');
+    await expect(figure.locator('img')).toHaveCSS('translate', /^(0%|0px)( (0%|0px))?$/);
+    await lock.click();
+    await expect(lock).toHaveAttribute('aria-pressed', 'false');
+    await frame.focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(figure.locator('img')).not.toHaveCSS('translate', /^(0%|0px)( (0%|0px))?$/);
+    issues.assertClean();
+  });
+}

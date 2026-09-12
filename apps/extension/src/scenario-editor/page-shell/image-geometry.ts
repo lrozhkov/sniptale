@@ -109,3 +109,23 @@ export function commitGuideImageGesture(
   if (hasSameGuideImageGestureBase(origin, draft)) return current;
   return { ...current, frame: draft.frame, contentTransform: draft.contentTransform };
 }
+
+/** Keeps the fitted raster covering the frame on oversized axes, centered on underfilled axes. */
+export function constrainGuideImage(
+  block: GuideImageBlock,
+  source: { width: number; height: number }
+): GuideImageBlock {
+  if (source.width <= 0 || source.height <= 0) return block;
+  const fit = (block.fit === 'cover' ? Math.max : Math.min)(
+    block.frame.width / source.width,
+    block.frame.height / source.height
+  );
+  const size = fit * block.contentTransform.scale;
+  const limitX = Math.max(0, ((source.width * size) / block.frame.width - 1) / 2);
+  const limitY = Math.max(0, ((source.height * size) / block.frame.height - 1) / 2);
+  return changeGuideImageGeometry(block, {
+    kind: 'pan',
+    x: limitX === 0 ? 0 : bound(block.contentTransform.x, -limitX, limitX),
+    y: limitY === 0 ? 0 : bound(block.contentTransform.y, -limitY, limitY),
+  });
+}

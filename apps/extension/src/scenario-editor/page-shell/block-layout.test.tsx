@@ -155,3 +155,134 @@ it('unmount releases pointer capture and global cursor state without committing'
   expect(change).not.toHaveBeenCalled();
   expect(HTMLElement.prototype.releasePointerCapture).toHaveBeenCalled();
 });
+
+it('snaps to a neighboring width, shows matching edges and releases beyond tolerance', async () => {
+  await render();
+  const neighbor = document.createElement('div');
+  neighbor.className = 'guide-block';
+  neighbor.dataset['width'] = '63';
+  host.append(neighbor);
+  await pointer('pointerdown', 400);
+  await pointer('pointermove', 255);
+  expect(host.firstElementChild?.getAttribute('data-width')).toBe('63');
+  expect(neighbor.dataset['sizeMatch']).toBe('width');
+  expect(host.firstElementChild?.getAttribute('data-size-snap')).toBe('width');
+  await pointer('pointermove', 280);
+  expect(host.firstElementChild?.getAttribute('data-width')).toBe('70');
+  expect(neighbor.hasAttribute('data-size-match')).toBe(false);
+  await pointer('pointermove', 252);
+  await pointer('pointerup', 252);
+  expect(change.mock.calls).toEqual([[63]]);
+  expect(neighbor.hasAttribute('data-size-match')).toBe(false);
+  neighbor.remove();
+});
+
+it('Alt bypasses size snapping and Escape clears both matching edges', async () => {
+  await render();
+  await pointer('pointerdown', 400);
+  const event = new MouseEvent('pointermove', {
+    bubbles: true,
+    button: 0,
+    clientX: 202,
+    altKey: true,
+  });
+  Object.defineProperty(event, 'pointerId', { value: 1 });
+  await act(async () => host.querySelector('button')!.dispatchEvent(event));
+  expect(host.firstElementChild?.getAttribute('data-width')).toBe('51');
+  expect(host.firstElementChild?.hasAttribute('data-size-snap')).toBe(false);
+  await key('Escape');
+  expect(change).not.toHaveBeenCalled();
+});
+
+it('reserves height with one accepted edit, supports auto reset and cancels without writes', async () => {
+  const height = vi.fn();
+  await act(async () =>
+    root.render(
+      <GuideBlockLayout
+        block={{ kind: 'text', id: 'text', paragraphs: [] }}
+        layout="stacked"
+        disabled={false}
+        onWidth={change}
+        onHeight={height}
+        t={createTranslator('en')}
+      >
+        Text
+      </GuideBlockLayout>
+    )
+  );
+  const block = host.querySelector('.guide-block')!;
+  vi.spyOn(block, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 0, 400, 80));
+  const handle = host.querySelector('.guide-block-height')!;
+  const move = async (type: string, y: number) => {
+    const event = new MouseEvent(type, { bubbles: true, button: 0, clientY: y });
+    Object.defineProperty(event, 'pointerId', { value: 1 });
+    await act(async () => handle.dispatchEvent(event));
+  };
+  await move('pointerdown', 80);
+  await move('pointermove', 180);
+  expect(block.getAttribute('style')).toContain('--guide-block-min-height: 180px');
+  expect(height).not.toHaveBeenCalled();
+  await move('pointerup', 180);
+  expect(height.mock.calls).toEqual([[180]]);
+  height.mockClear();
+  await move('pointerdown', 80);
+  await move('pointermove', 160);
+  await act(async () =>
+    handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  );
+  await move('pointerup', 160);
+  expect(height).not.toHaveBeenCalled();
+  await act(async () =>
+    handle.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }))
+  );
+  expect(height.mock.calls).toEqual([[0]]);
+});
+
+it('matches neighboring height and removes guides on pointer cancellation', async () => {
+  const height = vi.fn();
+  await act(async () =>
+    root.render(
+      <GuideBlockLayout
+        block={{ kind: 'heading', id: 'heading', text: 'Title' }}
+        layout="stacked"
+        disabled={false}
+        onWidth={change}
+        onHeight={height}
+        t={createTranslator('en')}
+      >
+        Title
+      </GuideBlockLayout>
+    )
+  );
+  const block = host.querySelector<HTMLElement>('.guide-block')!;
+  vi.spyOn(block, 'getBoundingClientRect').mockImplementation(
+    () =>
+      new DOMRect(
+        0,
+        0,
+        400,
+        Math.max(80, parseFloat(block.style.getPropertyValue('--guide-block-min-height')) || 0)
+      )
+  );
+  const neighbor = document.createElement('div');
+  neighbor.className = 'guide-block';
+  host.append(neighbor);
+  vi.spyOn(neighbor, 'getBoundingClientRect').mockReturnValue(new DOMRect(0, 150, 400, 120));
+  const handle = host.querySelector('.guide-block-height')!;
+  for (const [type, y] of [
+    ['pointerdown', 80],
+    ['pointermove', 117],
+  ] as const) {
+    const event = new MouseEvent(type, { bubbles: true, button: 0, clientY: y });
+    Object.defineProperty(event, 'pointerId', { value: 1 });
+    await act(async () => handle.dispatchEvent(event));
+  }
+  expect(block.dataset['sizeSnap']).toBe('height');
+  expect(neighbor.dataset['sizeMatch']).toBe('height');
+  expect(block.style.getPropertyValue('--guide-block-min-height')).toBe('120px');
+  await act(async () => handle.dispatchEvent(new MouseEvent('pointercancel', { bubbles: true })));
+  expect(block.hasAttribute('data-size-snap')).toBe(false);
+  expect(neighbor.hasAttribute('data-size-match')).toBe(false);
+  expect(height).not.toHaveBeenCalled();
+  neighbor.remove();
+});

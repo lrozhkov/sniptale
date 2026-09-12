@@ -1,3 +1,4 @@
+import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type {
   GuideBlock,
   GuideBlockWidth,
@@ -18,7 +19,7 @@ import {
 } from 'lucide-react';
 import { resolveGuideBlockWidth } from '../../features/scenario/project/public';
 import type { Translate } from '../../platform/i18n';
-import { GuideInspectorGroup } from './inspector';
+import { GuideInspectorGroup, GuideInspectorNumber } from './inspector';
 import { CompactSelect } from '../../ui/compact-inspector-controls/select';
 import { CompactSegmentedSelector } from '../../ui/compact-inspector-controls/control-renderers';
 import { guideNoteTypes } from './note-block';
@@ -110,6 +111,27 @@ export function GuideBlockInspector({
               if (preset) onChange({ ...block, width: preset.width }, null);
             }}
           />
+          {(block.kind === 'text' || block.kind === 'heading' || block.kind === 'note') && (
+            <>
+              <GuideInspectorNumber
+                label={t('scenario.editor.guideBlockHeight')}
+                value={block.minHeight ?? 0}
+                min={0}
+                max={GUIDE_LIMITS.maxDimension}
+                disabled={disabled}
+                onChange={(minHeight) => onChange({ ...block, minHeight }, null)}
+              />
+              <ProductActionButton
+                compact
+                tone="secondary"
+                disabled={!block.minHeight}
+                onClick={() => onChange({ ...block, minHeight: 0 }, null)}
+              >
+                <RotateCcw size={15} aria-hidden="true" />
+                {t('scenario.editor.guideAutoHeight')}
+              </ProductActionButton>
+            </>
+          )}
         </GuideInspectorGroup>
         {block.kind === 'note' && (
           <GuideInspectorGroup icon={MessageSquare} title={t('scenario.editor.guideNoteType')}>

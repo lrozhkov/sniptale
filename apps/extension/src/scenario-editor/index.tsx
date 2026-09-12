@@ -1,3 +1,4 @@
+import { GuideLayoutAssistance } from './page-shell/layout-assistance';
 import { renderPageShell } from '../ui/page-bootstrap';
 import { usePageLocaleMetadata } from '../platform/i18n';
 import '@sniptale/ui/styles';
@@ -9,7 +10,11 @@ import { ScenarioEditorPage } from './page-shell/ScenarioEditorPage';
 
 function ScenarioEditorApp() {
   usePageLocaleMetadata('scenario.editor.documentTitle');
-  return <ScenarioEditorPage />;
+  return (
+    <GuideLayoutAssistance>
+      <ScenarioEditorPage />
+    </GuideLayoutAssistance>
+  );
 }
 
 renderPageShell({

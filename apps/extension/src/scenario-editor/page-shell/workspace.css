@@ -943,13 +943,13 @@
 }
 .guide-insertion-block {
   position: absolute;
-  top: calc(var(--guide-gap) * -0.5);
+  top: calc(var(--guide-row-gap, var(--guide-gap)) * -0.5);
   left: 0;
   right: 0;
 }
 .guide-insertion-block[data-end='true'] {
   top: auto;
-  bottom: calc(var(--guide-gap) * -0.5);
+  bottom: calc(var(--guide-row-gap, var(--guide-gap)) * -0.5);
 }
 .guide-empty-step {
   position: relative;
@@ -1719,6 +1719,7 @@ html[data-guide-width-resizing] * {
     .guide-image-tools,
     .guide-block-grip,
     .guide-block-width,
+    .guide-block-height,
     .guide-voice-control
   ) {
   transition: opacity calc(var(--sniptale-duration-fast) / 3) var(--sniptale-ease-standard);
@@ -1744,6 +1745,7 @@ html[data-guide-width-resizing] * {
     .guide-image-tools,
     .guide-block-grip,
     .guide-block-width,
+    .guide-block-height,
     .guide-voice-control
   ),
 .guide-center-panel
@@ -1758,6 +1760,7 @@ html[data-guide-width-resizing] * {
   :is(
     .guide-block-grip,
     .guide-block-width,
+    .guide-block-height,
     .guide-action-menu-anchor > button,
     .guide-image-tools > button,
     .guide-insertion-chrome > button,
@@ -1771,6 +1774,7 @@ html[data-guide-width-resizing] * {
   :is(
     .guide-block-grip,
     .guide-block-width,
+    .guide-block-height,
     .guide-action-menu-anchor > button,
     .guide-image-tools > button,
     .guide-insertion-chrome > button,
@@ -1787,6 +1791,7 @@ html[data-guide-width-resizing] * {
   :is(
     .guide-block-grip,
     .guide-block-width,
+    .guide-block-height,
     .guide-action-menu-anchor > button,
     .guide-image-tools > button,
     .guide-insertion-chrome > button,
@@ -1799,6 +1804,7 @@ html[data-guide-width-resizing] * {
   :is(
     .guide-block-grip,
     .guide-block-width,
+    .guide-block-height,
     .guide-action-menu-anchor > button,
     .guide-image-tools > button,
     .guide-insertion-chrome > button,
@@ -1813,4 +1819,70 @@ html[data-guide-width-resizing] * {
     opacity: 1;
     pointer-events: auto;
   }
+}
+
+.guide-document .guide-block-height {
+  position: absolute;
+  z-index: 5;
+  inset-inline-end: -1.75rem;
+  inset-block-end: -1.5rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  padding: 0;
+  border: 1px solid var(--sniptale-color-border-soft);
+  border-radius: 50%;
+  background: var(--sniptale-color-surface-canvas) !important;
+  cursor: ns-resize;
+  touch-action: none;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity calc(var(--sniptale-duration-fast) / 3) var(--sniptale-ease-standard);
+}
+.guide-block-height::before {
+  content: '';
+  position: absolute;
+  inset: -0.25rem;
+}
+.guide-document
+  .guide-block:is([data-guide-hover], :focus-within, [data-width-preview])
+  > .guide-block-height {
+  opacity: 1;
+  pointer-events: auto;
+}
+html[data-guide-height-resizing],
+html[data-guide-height-resizing] * {
+  cursor: ns-resize !important;
+  user-select: none !important;
+}
+.guide-block:is([data-size-snap], [data-size-match])::after {
+  content: '';
+  position: absolute;
+  z-index: 6;
+  pointer-events: none;
+  border-color: var(--sniptale-color-accent);
+  border-style: dashed;
+  border-width: 0;
+}
+.guide-block:is([data-size-snap='width'], [data-size-match='width'])::after {
+  inset-block: -0.5rem;
+  inset-inline-end: 0;
+  border-inline-end-width: 1px;
+}
+.guide-block:is([data-size-snap='height'], [data-size-match='height'])::after {
+  inset-inline: -0.5rem;
+  inset-block-end: 0;
+  border-block-end-width: 1px;
+}
+@media (hover: none) {
+  .guide-document .guide-block-height {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+.guide-center-panel .guide-block:focus-within > .guide-block-height,
+.guide-center-panel [data-width-preview] > .guide-block-height {
+  transition: none;
 }

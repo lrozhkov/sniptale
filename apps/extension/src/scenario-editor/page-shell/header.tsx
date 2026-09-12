@@ -1,3 +1,4 @@
+import { GuideSnapButton } from './layout-assistance';
 import { GuideVoiceField } from './voice-field';
 import { type ReactNode, type Ref, type ComponentProps } from 'react';
 import { GuideAiEntry } from './ai-assistant';
@@ -97,6 +98,7 @@ export function GuidePageHeader({
           )}
           {project && (
             <>
+              <GuideSnapButton t={t} disabled={disabled} />
               <ContentToolbarButton
                 className="guide-labeled-action"
                 ref={previewRef}

@@ -603,3 +603,26 @@ it('admits a detached single-step template and rejects ambiguous template conten
   expect(parseGuideProject({ ...template, purpose: 'unknown' })).toEqual({ status: 'invalid' });
   expect(parseGuideProject(project([step(), { ...step(), id: 'second' }])).status).toBe('ok');
 });
+
+it('preserves bounded prose minimum heights and rejects invalid size metadata', () => {
+  for (const minHeight of [0, 180, 7680]) {
+    const item = step();
+    item.blocks = [
+      { kind: 'heading', id: 'heading-height', text: '', minHeight },
+      { kind: 'text', id: 'text-height', paragraphs: [], minHeight },
+      { kind: 'note', id: 'note-height', paragraphs: [], tone: 'info', minHeight },
+    ];
+    const input = project([item]);
+    expect(parseGuideProject(input)).toEqual({ status: 'ok', project: input });
+  }
+  for (const minHeight of [-1, 7681, 1.5, '200px', null, NaN, Infinity]) {
+    expect(
+      parseGuideProject({
+        ...project(),
+        items: [
+          { ...step(), blocks: [{ kind: 'text', id: 'text-height', paragraphs: [], minHeight }] },
+        ],
+      }).status
+    ).toBe('invalid');
+  }
+});

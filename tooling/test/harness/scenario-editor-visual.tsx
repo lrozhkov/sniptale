@@ -1,3 +1,4 @@
+import { GuideLayoutAssistance } from '../../../apps/extension/src/scenario-editor/page-shell/layout-assistance';
 import { saveRecordingTelemetry } from '../../../apps/extension/src/composition/persistence/recordings/telemetry';
 import { saveRecording } from '../../../apps/extension/src/composition/persistence/recordings';
 import {
@@ -151,7 +152,11 @@ async function mountGuideHarness(): Promise<void> {
   window.history.replaceState({}, '', `${window.location.pathname}?${params}`);
   const root = document.getElementById('root');
   if (!root) throw new Error('Missing guide harness root');
-  createRoot(root).render(<ScenarioEditorPage />);
+  createRoot(root).render(
+    <GuideLayoutAssistance>
+      <ScenarioEditorPage />
+    </GuideLayoutAssistance>
+  );
 }
 
 void mountGuideHarness();

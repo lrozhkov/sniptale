@@ -157,7 +157,9 @@ fitted image, cover fills/crops its frame. contentTransform x/y offset the image
 frame width/height (0,0 centered); scale multiplies fitted size (1 unchanged). These values never
 move the block itself.
 Text paragraphs contain styled runs (bold, italic, validated href or null); textStyle controls
-size/alignment. Step styleOverrides inherit document style. Hidden or manually labelled steps do not
+size/alignment. Prose minHeight reserves optional CSS pixels of vertical space, grows with content,
+and never clips text; 0 or omission in composition restores automatic height. Empty prose with
+minHeight can reserve whitespace. Step styleOverrides inherit document style. Hidden or manually labelled steps do not
 consume automatic numbering; restartAt resets the counter. Image htmlExport overrides document
 export defaults.
 Operations are validated and previewed before user approval, then applied as one undoable

@@ -91,16 +91,18 @@
   container: guide-step / inline-size;
 }
 .guide-step-blocks {
+  --guide-row-gap: max(var(--guide-gap), 1.5rem);
   --guide-column-gap: max(var(--guide-gap), 3.5rem);
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
-  gap: var(--guide-gap) var(--guide-column-gap);
+  gap: var(--guide-row-gap) var(--guide-column-gap);
 }
 .guide-step-blocks > .guide-block {
   flex: 0 0
     calc(var(--guide-block-width, 100%) - var(--guide-column-gap) * var(--guide-block-gap-share, 0));
   min-width: 0;
+  min-height: var(--guide-block-min-height, 0px);
   margin-block: 0;
 }
 .guide-document article > header > span:not(.guide-voice-field) {

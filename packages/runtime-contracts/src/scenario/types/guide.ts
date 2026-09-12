@@ -135,18 +135,26 @@ export interface GuideTextStyle {
   alignment: 'start' | 'center' | 'end';
 }
 
-/** Blocks are ordered content, not freely positioned slide elements. */
+/** Blocks are ordered content; prose minHeight reserves CSS pixels without clipping content. */
 export type GuideBlock = GuideBlockComposition &
   (
-    | { kind: 'heading'; id: string; text: string; textStyle?: GuideTextStyle | undefined }
+    | {
+        kind: 'heading';
+        id: string;
+        text: string;
+        minHeight?: number | undefined;
+        textStyle?: GuideTextStyle | undefined;
+      }
     | {
         kind: 'text';
+        minHeight?: number | undefined;
         id: string;
         paragraphs: GuideParagraph[];
         textStyle?: GuideTextStyle | undefined;
       }
     | {
         kind: 'note';
+        minHeight?: number | undefined;
         textStyle?: GuideTextStyle | undefined;
         id: string;
         tone: 'neutral' | 'info' | 'warning' | 'error';
