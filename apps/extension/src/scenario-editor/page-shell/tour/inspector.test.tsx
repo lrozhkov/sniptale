@@ -175,10 +175,11 @@ it('edits annotations and masks, keeping their geometry bounded and supports del
   await click('Back to slide settings');
   await click('Highlight');
   await choose('Highlight', 'Spotlight');
-  await fill('X', '10');
-  await fill('Y', '15');
-  await choose('Highlight', 'Redact area');
-  expect(current().masks[0]?.opacity).toBe(1);
+  expect(host.querySelector('[aria-label="X"]')).toBeNull();
+  await choose('Highlight', 'Blur');
+  await fill('Blur radius', '24');
+  expect(current().masks[0]?.blurRadius).toBe(24);
+  expect(current().masks[0]?.opacity).toBe(0.3);
   await click('Delete');
   expect(current().masks).toHaveLength(0);
   await click('A note');

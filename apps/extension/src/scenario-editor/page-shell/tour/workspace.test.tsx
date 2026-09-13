@@ -349,3 +349,30 @@ it('cancels native image drags from the stage before they can become image impor
   expect(changed).not.toHaveBeenCalled();
   expect(current.tour!.slides).toHaveLength(2);
 });
+
+it('offers visual blur without overwriting highlight opacity or numeric canvas geometry', async () => {
+  await render();
+  const panel = host.querySelector('#guide-inspector-panel')!;
+  await click('Slide objects', panel);
+  await click('Highlight', panel);
+  expect(panel.querySelector('[aria-label="Width"]')).toBeNull();
+  expect(panel.querySelector('[aria-label="X"]')).toBeNull();
+  await click('Highlight', panel);
+  await click('Blur', document.body);
+  const slide = current.tour!.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  expect(slide.masks[0]!.kind).toBe('blur');
+  expect(slide.masks[0]!.opacity).toBe(0.3);
+  expect(panel.querySelector('[aria-label="Blur radius"]')).not.toBeNull();
+  await click('Blur', panel);
+  await click('Highlight', document.body);
+  const restored = current.tour!.slides[0]!;
+  if (restored.kind !== 'image') throw new Error('Expected image');
+  expect(restored.masks[0]!.opacity).toBe(0.3);
+  const frame = host.querySelector('.tour-stage-host')!.shadowRoot!.querySelector('.tour-mask')!;
+  const handle = frame.querySelector('[data-edge=e]')!;
+  await key(handle, 'ArrowRight');
+  const resized = current.tour!.slides[0]!;
+  if (resized.kind !== 'image') throw new Error('Expected image');
+  expect(resized.masks[0]!.rect.width).toBeGreaterThan(0.3);
+});

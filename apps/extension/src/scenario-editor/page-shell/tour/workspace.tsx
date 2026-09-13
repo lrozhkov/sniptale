@@ -269,6 +269,15 @@ function TourCanvas({
             selection={state.selection}
             t={t}
             onSelectObject={selectObject}
+            onResizeObject={(id, rect) => {
+              if (state.slide?.kind === 'image')
+                state.changeSlide({
+                  ...state.slide,
+                  masks: state.slide.masks.map((mask) =>
+                    mask.id === id ? { ...mask, rect } : mask
+                  ),
+                });
+            }}
             onMoveObject={(id, point) => {
               if (state.slide?.kind === 'image')
                 state.changeSlide(moveObject(state.slide, id, point));

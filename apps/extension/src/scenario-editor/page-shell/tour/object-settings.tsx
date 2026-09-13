@@ -1,15 +1,12 @@
 import type {
   TourHotspot,
   TourAnnotation,
-  TourMask,
   TourRect,
   TourDocument,
 } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { Crosshair, MessageSquare, ScanLine } from 'lucide-react';
 import { ProductToggle } from '@sniptale/ui/product-form-controls';
-import { ColorField } from '../../../ui/compact-inspector-controls/controls';
 import { NumericRow } from '../../../ui/compact-inspector-controls/numeric';
-import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { GuideInspectorGroup } from '../inspector';
 import { TourActionField, TourPointFields, TourTextField, TourTextPresentation } from './fields';
 import type { Translate } from '../../../platform/i18n';
@@ -150,53 +147,6 @@ export function TourAnnotationSettings({
         onChange={(appearance) => onChange({ ...value, appearance })}
         t={t}
       />
-    </GuideInspectorGroup>
-  );
-}
-
-export function TourMaskSettings({ value, disabled, onChange, t }: SettingsProps<TourMask>) {
-  return (
-    <GuideInspectorGroup icon={ScanLine} title={t('scenario.editor.tourMask')}>
-      <CompactSelect
-        aria-label={t('scenario.editor.tourMask')}
-        disabled={disabled}
-        value={value.kind}
-        options={[
-          { value: 'highlight', label: t('scenario.editor.tourHighlight') },
-          { value: 'spotlight', label: t('scenario.editor.tourSpotlight') },
-          { value: 'redact', label: t('scenario.editor.tourRedact') },
-        ]}
-        onChange={(kind) =>
-          onChange({ ...value, kind, opacity: kind === 'redact' ? 1 : value.opacity })
-        }
-      />
-      <TourRectFields
-        value={value.rect}
-        disabled={disabled}
-        onChange={(rect) => onChange({ ...value, rect })}
-        t={t}
-      />
-      <ColorField
-        label={t('scenario.editor.color')}
-        title={t('scenario.editor.color')}
-        value={value.color}
-        disabled={disabled}
-        allowAlpha={false}
-        allowTransparent={false}
-        onChange={(color) => onChange({ ...value, color })}
-      />
-      {value.kind !== 'redact' && (
-        <NumericRow
-          label={t('scenario.editor.tourOpacity')}
-          value={value.opacity * 100}
-          unit="%"
-          min={0}
-          max={100}
-          disabled={disabled}
-          onPreviewValue={() => {}}
-          onCommitValue={(opacity) => onChange({ ...value, opacity: opacity / 100 })}
-        />
-      )}
     </GuideInspectorGroup>
   );
 }

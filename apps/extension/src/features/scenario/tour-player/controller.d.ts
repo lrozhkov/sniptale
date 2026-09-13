@@ -1,4 +1,4 @@
-import type { TourDocument } from '@sniptale/runtime-contracts/scenario/types/tour';
+import type { TourDocument, TourRect } from '@sniptale/runtime-contracts/scenario/types/tour';
 import type { TourPlayerLabels } from './document';
 
 /** Trusted renderer inputs prepared by the document builder or owning editor session. */
@@ -16,6 +16,7 @@ export function createTourPlayer(
     authoring?: {
       canEdit?(): boolean;
       onSelectObject(objectId: string | null): void;
+      onResizeObject?(objectId: string, rect: TourRect): void;
       onMoveObject(objectId: string, point: { x: number; y: number }): void;
     };
   }

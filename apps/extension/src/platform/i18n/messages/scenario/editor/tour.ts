@@ -256,6 +256,13 @@ export const scenarioTourMessages = {
   tourPulse: { ru: 'Пульсация точки', en: 'Pulse hotspot' },
   tourHighlight: { ru: 'Подсветка', en: 'Highlight' },
   tourSpotlight: { ru: 'Маска вокруг', en: 'Spotlight' },
+  tourBlur: { ru: 'Размытие', en: 'Blur' },
+  tourBlurRadius: { ru: 'Сила размытия', en: 'Blur radius' },
+  tourResizeArea: { ru: 'Изменить размер области', en: 'Resize area' },
+  tourAreaCanvasHint: {
+    ru: 'Перемещайте область и тяните за края рамки на слайде.',
+    en: 'Move the area and drag its frame handles on the slide.',
+  },
   tourRedact: { ru: 'Скрыть область', en: 'Redact area' },
   tourButton: { ru: 'Кнопка', en: 'Button' },
   tourAddButton: { ru: 'Добавить кнопку', en: 'Add button' },

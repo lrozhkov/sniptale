@@ -79,7 +79,13 @@ export interface TourMask {
   narration?: TourObjectNarration | null | undefined;
   id: string;
   rect: TourRect;
-  kind: 'spotlight' | 'highlight' | 'redact';
+  kind: 'spotlight' | 'highlight' | 'blur' | 'redact';
+  /** Highlight paint; spotlight settings remain independent when switching modes. */
+  paint?: Paint | undefined;
+  spotlightColor?: string | undefined;
+  spotlightOpacity?: number | undefined;
+  /** Visual blur radius in source-image pixels; not irreversible redaction. */
+  blurRadius?: number | undefined;
   color: string;
   opacity: number;
 }

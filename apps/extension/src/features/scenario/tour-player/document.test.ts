@@ -401,3 +401,26 @@ it.each(['caption-top', 'caption-bottom'] as const)(
     dom.close();
   }
 );
+
+it('exports visual blur through the shared renderer without authoring handles', async () => {
+  const args = fixture();
+  const first = args.tour.slides[0]!;
+  if (first.kind !== 'image') throw new Error('Expected image');
+  first.camera.mode = 'off';
+  first.masks = [
+    {
+      id: 'blur',
+      kind: 'blur',
+      color: '#f97316',
+      opacity: 0.3,
+      blurRadius: 24,
+      rect: { x: 0.1, y: 0.1, width: 0.3, height: 0.2 },
+    },
+  ];
+  const dom = open(await buildTourPlayerHtml(args));
+  const effect = dom.window.document.querySelector<HTMLElement>('.tour-mask-effect')!;
+  expect(effect.style.backdropFilter).toBe('blur(24px)');
+  expect(effect.style.opacity).toBe('');
+  expect(dom.window.document.querySelector('.tour-resize-handle')).toBeNull();
+  dom.close();
+});

@@ -1,6 +1,6 @@
 import { useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import type { TourDocument } from '@sniptale/runtime-contracts/scenario/types/tour';
+import type { TourDocument, TourRect } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { createTourPlayer } from '../../../features/scenario/tour-player/controller';
 import styles from '../../../features/scenario/tour-player/player.css?raw';
 import type { TourPlayerLabels } from '../../../features/scenario/tour-player/public';
@@ -15,6 +15,7 @@ export function TourStage({
   disabled = false,
   onSelectObject,
   onMoveObject,
+  onResizeObject,
   t,
 }: {
   tour: TourDocument;
@@ -22,15 +23,17 @@ export function TourStage({
   selection: TourSelection | null;
   disabled?: boolean;
   onSelectObject: (id: string | null) => void;
+  onResizeObject?: (id: string, rect: TourRect) => void;
   onMoveObject: (id: string, point: { x: number; y: number }) => void;
   t: Translate;
 }) {
   const [shadow, setShadow] = useState<ShadowRoot | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const controller = useRef<ReturnType<typeof createTourPlayer> | null>(null);
-  const callbacks = useRef({ onSelectObject, onMoveObject, disabled });
-  callbacks.current = { onSelectObject, onMoveObject, disabled };
+  const callbacks = useRef({ onSelectObject, onMoveObject, onResizeObject, disabled });
+  callbacks.current = { onSelectObject, onMoveObject, onResizeObject, disabled };
   const labels = useRef<TourPlayerLabels>({
+    resize: t('scenario.editor.tourResizeArea'),
     expand: t('scenario.editor.tourExpandCaption'),
     collapse: t('scenario.editor.tourCollapseCaption'),
     previous: t('scenario.editor.tourHintPrevious'),
@@ -63,6 +66,7 @@ export function TourStage({
       authoring: {
         canEdit: () => !callbacks.current.disabled,
         onSelectObject: (id) => callbacks.current.onSelectObject(id),
+        onResizeObject: (id, rect) => callbacks.current.onResizeObject?.(id, rect),
         onMoveObject: (id, point) => callbacks.current.onMoveObject(id, point),
       },
     });

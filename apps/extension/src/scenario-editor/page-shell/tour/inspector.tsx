@@ -1,3 +1,4 @@
+import { TourMaskSettings } from './mask-settings';
 import { TourCameraSettings } from './camera-settings';
 import { TourTransitionSettings } from './transition-settings';
 import { TourPlaybackSettings, TourTimingSettings } from './playback-settings';
@@ -28,7 +29,7 @@ import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { GuideInspectorGroup } from '../inspector';
 import { TourTextField, TourTextPresentation } from './fields';
-import { TourHotspotSettings, TourAnnotationSettings, TourMaskSettings } from './object-settings';
+import { TourHotspotSettings, TourAnnotationSettings } from './object-settings';
 import { TourNavigationSettings } from './navigation-settings';
 import { TourEndSettings } from './end-settings';
 import type { Translate } from '../../../platform/i18n';
@@ -287,7 +288,6 @@ function TourImageObjectSettings({
         {mask && (
           <TourMaskSettings
             value={mask}
-            tour={tour}
             disabled={disabled}
             t={t}
             onChange={(value) =>

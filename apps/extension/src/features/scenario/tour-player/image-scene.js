@@ -1,3 +1,4 @@
+import { renderTourMask } from './image-mask.js';
 import { bindTourObjectDrag } from './authoring.js';
 
 function projectImagePoint(box, point) {
@@ -40,33 +41,10 @@ export function renderTourImage(
     height: `${imageBox.height}px`,
   });
   plane.append(image);
-  for (const mask of slide.masks) {
-    const box = element(authoring ? 'button' : 'div', `tour-mask tour-mask-${mask.kind}`);
-    const position = projectImagePoint(imageBox, mask.rect);
-    Object.assign(box.style, {
-      left: `${position.x}px`,
-      top: `${position.y}px`,
-      width: `${mask.rect.width * imageBox.width}px`,
-      height: `${mask.rect.height * imageBox.height}px`,
-      background: mask.kind === 'highlight' || mask.kind === 'redact' ? mask.color : 'transparent',
-      opacity: String(mask.opacity),
-    });
-    if (mask.kind === 'spotlight') box.style.boxShadow = `0 0 0 100vmax ${mask.color}`;
-    if (authoring) {
-      box.type = 'button';
-      box.setAttribute('aria-label', labels.details);
-      box.style.pointerEvents = 'auto';
-      box.addEventListener('click', () => authoring.onSelectObject(mask.id));
-      bindTourObjectDrag(
-        box,
-        { id: mask.id, point: mask.rect, maxX: 1 - mask.rect.width, maxY: 1 - mask.rect.height },
-        imageBox,
-        authoring,
-        signal
-      );
-    }
-    plane.append(box);
-  }
+  for (const mask of slide.masks)
+    plane.append(
+      renderTourMask(mask, imageBox, slide.image.width, { element, labels, authoring, signal })
+    );
   slide.hotspots.forEach((hotspot, number) => {
     const button = actionButton(
       '',

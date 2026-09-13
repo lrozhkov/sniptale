@@ -126,7 +126,11 @@ export const tourObjectSchemas = {
     .object({
       id,
       rect,
-      kind: z.enum(['spotlight', 'highlight', 'redact']),
+      kind: z.enum(['spotlight', 'highlight', 'blur', 'redact']),
+      paint: tourPaintSchema.optional(),
+      spotlightColor: color.optional(),
+      spotlightOpacity: fraction.optional(),
+      blurRadius: z.number().finite().min(1).max(80).optional(),
       color,
       opacity: fraction,
       narration: objectNarration,

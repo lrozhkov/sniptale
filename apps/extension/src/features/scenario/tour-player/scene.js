@@ -48,6 +48,7 @@ export function createTourScene(root, input, onAction, signal, authoring) {
 
   function render() {
     if (signal.aborted) return;
+    const focused = root.getRootNode().activeElement;
     scene.replaceChildren();
     let imageBox = null;
     let hints = [];
@@ -78,11 +79,7 @@ export function createTourScene(root, input, onAction, signal, authoring) {
       hints = rendered.hints;
     } else scene.append(element('p', 'tour-empty', labels.empty));
     hintController.show(hints, { stageWidth, stageHeight, imageBox });
-    markSelectedObject();
-  }
-  function markSelectedObject() {
-    for (const node of scene.querySelectorAll('[data-tour-object-id]'))
-      node.dataset.selected = String(node.dataset.tourObjectId === selectedObjectId);
+    markTourSelection(scene, selectedObjectId, focused);
   }
   function resize() {
     if (signal.aborted) return;
@@ -117,7 +114,7 @@ export function createTourScene(root, input, onAction, signal, authoring) {
     },
     selectObject(id) {
       selectedObjectId = id;
-      markSelectedObject();
+      markTourSelection(scene, selectedObjectId);
       const hintIndex =
         current?.kind === 'image'
           ? [...current.hotspots, ...current.annotations].findIndex((item) => item.id === id)
@@ -206,4 +203,19 @@ function measureScene(root, viewport, aspect) {
     height: (stageWidth * height) / width,
     fontSize: globalThis.getComputedStyle(root).fontSize,
   };
+}
+
+function markTourSelection(scene, selectedObjectId, focused) {
+  for (const node of scene.querySelectorAll('[data-tour-object-id]'))
+    node.dataset.selected = String(node.dataset.tourObjectId === selectedObjectId);
+  if (!focused?.classList.contains('tour-resize-handle')) return;
+  const objectId = focused.parentElement?.dataset.tourObjectId;
+  const handle = [
+    ...scene.querySelectorAll('.tour-mask[data-selected=true] .tour-resize-handle'),
+  ].find(
+    (node) =>
+      node.dataset.edge === focused.dataset.edge &&
+      node.parentElement.dataset.tourObjectId === objectId
+  );
+  handle?.focus({ preventScroll: true });
 }

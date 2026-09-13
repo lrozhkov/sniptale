@@ -5,6 +5,7 @@ import { parseTourDocument } from '@sniptale/runtime-contracts/scenario/tour-par
 import type { TourDocument, TourImage } from '@sniptale/runtime-contracts/scenario/types/tour';
 
 export interface TourPlayerLabels {
+  resize?: string;
   expand: string;
   collapse: string;
   previous: string;

@@ -384,3 +384,27 @@ it('retains bounded navigation composition and structured paint in the published
   candidate.background.paint = { kind: 'solid', color: 'url(https://example.com)' };
   expect(parseTourDocument(invalid).status).toBe('invalid');
 });
+
+it('validates independent mask effect parameters for editor and generated AI operations', () => {
+  const schema = tourDocumentSchema.shape.slides;
+  const slide = imageSlide();
+  slide.masks[0] = {
+    ...slide.masks[0]!,
+    kind: 'blur',
+    blurRadius: 20,
+    spotlightColor: '#111827',
+    spotlightOpacity: 0.6,
+    paint: { kind: 'solid', color: '#f97316' },
+  };
+  expect(schema.safeParse([slide]).success).toBe(true);
+  for (const blurRadius of [0, 81, Infinity]) {
+    expect(
+      schema.safeParse([{ ...slide, masks: [{ ...slide.masks[0], blurRadius }] }]).success
+    ).toBe(false);
+  }
+  expect(
+    schema.safeParse([
+      { ...slide, masks: [{ ...slide.masks[0], spotlightColor: 'url(https://example.com)' }] },
+    ]).success
+  ).toBe(false);
+});
