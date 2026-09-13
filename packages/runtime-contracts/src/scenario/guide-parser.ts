@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { isPlainRecord } from '../validation/primitives';
-import { guideCaptureSourceSchema } from './guide-capture-schema';
+import { scenarioImageSourceSchema } from './image-source-schema';
+export { guideVideoActionSchema, guideVideoFrameSourceSchema } from './image-source-schema';
+import { isBoundedScenarioInput } from './input-bounds';
 import { GUIDE_LIMITS, type GuideProject } from './types/guide';
 
 const id = z
@@ -39,40 +41,6 @@ const width = z
 const label = z.string().max(GUIDE_LIMITS.maxLabelLength);
 const text = z.string().max(GUIDE_LIMITS.maxTextLength);
 const timestamp = z.number().finite().nonnegative();
-/** Shared admission for both stored projects and independent frame imports. */
-export const guideVideoActionSchema = z
-  .object({
-    id,
-    kind: z.enum(['CLICK', 'KEY']),
-    time: timestamp,
-    duration: z.number().finite().min(0).max(10),
-    label,
-    point: z
-      .object({ x: z.number().finite().min(0).max(1), y: z.number().finite().min(0).max(1) })
-      .strict()
-      .nullable(),
-    target: z.object({ name: label, tag: label, role: label }).strict().nullable(),
-  })
-  .strict();
-
-/** A frame may describe only an action active at its captured source timestamp. */
-export const guideVideoFrameSourceSchema = z
-  .object({
-    kind: z.literal('video-frame'),
-    recordingId: id.nullable(),
-    filename: label,
-    timeSeconds: timestamp,
-    action: guideVideoActionSchema.optional(),
-  })
-  .strict()
-  .refine(
-    (source) =>
-      !source.action ||
-      (source.recordingId !== null &&
-        source.timeSeconds >= source.action.time &&
-        source.timeSeconds <= source.action.time + source.action.duration)
-  );
-
 const link = text.refine((value) => {
   if (
     value.trim() !== value ||
@@ -147,11 +115,7 @@ const image = z
     editDocumentId: id.nullable(),
     alt: text,
     caption: text,
-    source: z.union([
-      guideCaptureSourceSchema,
-      z.object({ kind: z.literal('import'), filename: label }).strict(),
-      guideVideoFrameSourceSchema,
-    ]),
+    source: scenarioImageSourceSchema,
     frame: z
       .object({
         width: z.number().finite().positive().max(GUIDE_LIMITS.maxDimension),
@@ -314,7 +278,7 @@ export type GuideParseResult =
 
 /** Parses a detached document without conversion, migration, repair or external effects. */
 export function parseGuideProject(value: unknown): GuideParseResult {
-  if (!isBoundedGuideInput(value) || !isPlainRecord(value)) return { status: 'invalid' };
+  if (!isBoundedScenarioInput(value) || !isPlainRecord(value)) return { status: 'invalid' };
   const version = value['version'];
   if (
     typeof version === 'number' &&
@@ -346,40 +310,4 @@ function hasUniqueGuideIds(project: GuideProject): boolean {
     }
   }
   return true;
-}
-
-function isBoundedGuideInput(value: unknown): boolean {
-  const ancestors = new WeakSet<object>();
-  let visits = 0;
-  let textLength = 0;
-  function visit(current: unknown, depth: number): boolean {
-    if (++visits > GUIDE_LIMITS.maxInputVisits || depth > GUIDE_LIMITS.maxInputDepth) return false;
-    if (typeof current === 'string') {
-      textLength += current.length;
-      return textLength <= GUIDE_LIMITS.maxInputTextLength;
-    }
-    if (current === null || typeof current === 'boolean') return true;
-    if (typeof current === 'number') return Number.isFinite(current);
-    if (typeof current !== 'object' || ancestors.has(current)) return false;
-    if (
-      !Array.isArray(current) &&
-      Object.getPrototypeOf(current) !== Object.prototype &&
-      Object.getPrototypeOf(current) !== null
-    )
-      return false;
-    const keys = Object.keys(current);
-    if (keys.length + visits > GUIDE_LIMITS.maxInputVisits) return false;
-    if (Array.isArray(current) && keys.length !== current.length) return false;
-    ancestors.add(current);
-    for (const key of keys) {
-      textLength += key.length;
-      if (textLength > GUIDE_LIMITS.maxInputTextLength) return false;
-      const descriptor = Object.getOwnPropertyDescriptor(current, key);
-      if (!descriptor || !('value' in descriptor) || !visit(descriptor.value, depth + 1))
-        return false;
-    }
-    ancestors.delete(current);
-    return true;
-  }
-  return visit(value, 0);
 }

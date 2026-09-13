@@ -68,7 +68,9 @@
     "./video/types/webcam-quality": "./src/video/types/webcam-quality.ts",
     "./web-snapshot": "./src/web-snapshot/index.ts",
     "./scenario/types/guide": "./src/scenario/types/guide.ts",
-    "./scenario/guide-parser": "./src/scenario/guide-parser.ts"
+    "./scenario/guide-parser": "./src/scenario/guide-parser.ts",
+    "./scenario/types/tour": "./src/scenario/types/tour.ts",
+    "./scenario/tour-parser": "./src/scenario/tour-parser.ts"
   },
   "dependencies": {
     "@sniptale/foundation": "0.4.1",

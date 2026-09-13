@@ -1,29 +1,6 @@
-import type {
-  ScenarioCaptureMetadata,
-  ScenarioPageDescriptor,
-  ScenarioPoint,
-  ScenarioTargetDescriptor,
-} from './geometry';
-
-/** Resource ceilings for a guide document, excluding separately stored image bytes. */
-export const GUIDE_LIMITS = {
-  minBlockWidthPercent: 20,
-  maxNumberLabelLength: 32,
-  maxRestartNumber: 9999,
-  maxItems: 300,
-  maxBlocksPerStep: 200,
-  maxParagraphs: 200,
-  maxRunsPerParagraph: 200,
-  maxIdLength: 160,
-  maxLabelLength: 160,
-  maxTextLength: 20_000,
-  maxTags: 30,
-  maxDimension: 7_680,
-  maxCoordinate: 100_000,
-  maxInputDepth: 16,
-  maxInputVisits: 100_000,
-  maxInputTextLength: 4_000_000,
-} as const;
+import type { GuideImageSource } from './image-source';
+export type { GuideCaptureSource, GuideVideoAction, GuideImageSource } from './image-source';
+export { GUIDE_LIMITS } from '../limits';
 
 /** Inline formatting is data; renderers must emit text and validated links, never raw HTML. */
 export interface GuideTextRun {
@@ -60,41 +37,6 @@ export interface GuideHtmlImageSettings {
   quality: 0.75 | 0.85 | 0.95;
   viewer: boolean;
 }
-
-/** A captured image retains its source context independently of other images in the step. */
-export interface GuideCaptureSource {
-  kind: 'capture';
-  captureSurface: 'visible' | 'full' | 'selection';
-  sourceKind: 'manual' | 'auto-click';
-  page: ScenarioPageDescriptor;
-  target: ScenarioTargetDescriptor | null;
-  interactionPoint: ScenarioPoint | null;
-  cursorPoint: ScenarioPoint | null;
-  captureMetadata: ScenarioCaptureMetadata;
-}
-
-/** Bounded recording context; point uses normalized source-frame coordinates. */
-export interface GuideVideoAction {
-  id: string;
-  kind: 'CLICK' | 'KEY';
-  time: number;
-  duration: number;
-  label: string;
-  point: { x: number; y: number } | null;
-  target: { name: string; tag: string; role: string } | null;
-}
-
-/** Source references are provenance; rendering uses the image block's durable assetId. */
-export type GuideImageSource =
-  | GuideCaptureSource
-  | { kind: 'import'; filename: string }
-  | {
-      kind: 'video-frame';
-      recordingId: string | null;
-      filename: string;
-      timeSeconds: number;
-      action?: GuideVideoAction | undefined;
-    };
 
 /** Named presets or an integer percentage from GUIDE_LIMITS.minBlockWidthPercent through 100. */
 export type GuideBlockWidth = 'full' | 'half' | number;

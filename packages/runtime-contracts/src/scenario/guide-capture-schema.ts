@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { GUIDE_LIMITS, type GuideCaptureSource } from './types/guide';
+import { GUIDE_LIMITS } from './limits';
+import type { GuideCaptureSource } from './types/image-source';
 
 const coordinate = z
   .number()
