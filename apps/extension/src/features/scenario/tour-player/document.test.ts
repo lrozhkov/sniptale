@@ -234,3 +234,13 @@ it('dismisses hints with Escape or Close and restores focus without reopening th
   expect(hint.hidden).toBe(false);
   dom.close();
 });
+
+it('refuses to publish unreviewed image positions after geometry changes', async () => {
+  const args = fixture();
+  const slide = args.tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Missing test image');
+  slide.requiresTargetReview = true;
+  await expect(buildTourPlayerHtml(args)).rejects.toThrow('targets require review');
+  slide.requiresTargetReview = false;
+  await expect(buildTourPlayerHtml(args)).resolves.toContain('tour-player');
+});

@@ -277,3 +277,17 @@ describe('interactive tour boundary', () => {
     expect(serialized).toContain('caption-top');
   });
 });
+
+it('preserves explicit target-review state and rejects non-boolean values', () => {
+  const tour = document();
+  const slide = tour.slides[0];
+  if (slide?.kind !== 'image') throw new Error('Missing image fixture');
+  slide.requiresTargetReview = true;
+  const parsed = parseTourDocument(tour);
+  expect(parsed.status).toBe('ok');
+  if (parsed.status === 'ok')
+    expect(parsed.document.slides[0]).toMatchObject({ requiresTargetReview: true });
+  expect(
+    parseTourDocument({ ...tour, slides: [{ ...slide, requiresTargetReview: 'false' }] }).status
+  ).toBe('invalid');
+});

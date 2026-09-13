@@ -43,6 +43,8 @@ function imageProjection(image: TourImage | null) {
 function embedAssets(tour: TourDocument, inputAssets: readonly TourPlayerAsset[]) {
   const required = new Map<string, 'image' | 'audio'>();
   for (const slide of tour.slides) {
+    if (slide.kind === 'image' && slide.requiresTargetReview)
+      throw new Error('Tour image targets require review before export.');
     const image = slide.kind === 'image' ? slide.image : slide.background.image;
     if (image) {
       if (required.get(image.assetId) === 'audio') throw new Error('Conflicting tour media roles.');

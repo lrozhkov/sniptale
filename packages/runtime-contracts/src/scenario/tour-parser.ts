@@ -117,6 +117,7 @@ const imageSlide = z
     title: label,
     image: image.nullable(),
     origin: z.object({ stepId: id, blockId: id }).strict().nullable(),
+    requiresTargetReview: z.boolean().optional(),
     fit: z.enum(['contain', 'cover']),
     camera: z
       .object({

@@ -101,6 +101,8 @@ export interface TourImageSlide {
   title: string;
   image: TourImage | null;
   origin: { stepId: string; blockId: string } | null;
+  /** Unverified positions after image geometry changed; blocks publication until reviewed. */
+  requiresTargetReview?: boolean | undefined;
   fit: 'contain' | 'cover';
   camera: TourCamera;
   hotspots: TourHotspot[];

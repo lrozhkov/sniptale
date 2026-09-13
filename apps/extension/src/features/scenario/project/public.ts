@@ -44,3 +44,5 @@ export {
   type TourGenerationIssue,
 } from './tour-generation';
 export { mapTourCapturePoint, mapTourCaptureRect, type TourCaptureMapping } from './tour-geometry';
+
+export { remapTourImageGeometry, type TourImageTransform } from './tour-edit-geometry';
