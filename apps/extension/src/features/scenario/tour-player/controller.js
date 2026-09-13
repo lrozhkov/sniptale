@@ -21,9 +21,11 @@ export function createTourPlayer(root, input, options = {}) {
   function act(action) {
     if (options.authoring) return;
     if (action.kind === 'next') go(index + 1);
-    else if (action.kind === 'previous') back();
-    else if (action.kind === 'restart') go(0);
-    else if (action.kind === 'end') go(tour.slides.length);
+    else if (action.kind === 'previous') go(index - 1);
+    else if (action.kind === 'restart') {
+      history.length = 0;
+      go(0, false);
+    } else if (action.kind === 'end') go(tour.slides.length);
     else if (action.kind === 'slide')
       go(tour.slides.findIndex((slide) => slide.id === action.slideId));
   }

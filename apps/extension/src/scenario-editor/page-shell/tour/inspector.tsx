@@ -17,9 +17,10 @@ import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { GuideInspectorGroup } from '../inspector';
-import { TourTextField } from './fields';
+import { TourTextField, TourTextPresentation } from './fields';
 import { TourHotspotSettings, TourAnnotationSettings, TourMaskSettings } from './object-settings';
-import { TourEndSettings, TourNavigationSettings } from './navigation-settings';
+import { TourNavigationSettings } from './navigation-settings';
+import { TourEndSettings } from './end-settings';
 import type { Translate } from '../../../platform/i18n';
 import type { TourSelection } from './selection';
 
@@ -388,24 +389,15 @@ function TourDocumentSettings({
           onChange={(value) => onChange({ ...tour, style: { ...tour.style, [key]: value } })}
         />
       ))}
-      <CompactSelect
-        aria-label={t('scenario.editor.tourTextPresentation')}
-        value={tour.style.textAppearance.presentation}
+      <TourTextPresentation
+        inherit={false}
+        value={tour.style.textAppearance}
+        defaults={tour.style.textAppearance}
         disabled={disabled}
-        options={[
-          { value: 'callout', label: t('scenario.editor.tourCallout') },
-          { value: 'caption-top', label: t('scenario.editor.tourCaptionTop') },
-          { value: 'caption-bottom', label: t('scenario.editor.tourCaptionBottom') },
-        ]}
-        onChange={(presentation) =>
-          onChange({
-            ...tour,
-            style: {
-              ...tour.style,
-              textAppearance: { ...tour.style.textAppearance, presentation },
-            },
-          })
-        }
+        t={t}
+        onChange={(textAppearance) => {
+          if (textAppearance) onChange({ ...tour, style: { ...tour.style, textAppearance } });
+        }}
       />
     </GuideInspectorGroup>
   );

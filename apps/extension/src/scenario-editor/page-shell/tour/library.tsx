@@ -1,7 +1,7 @@
 import { TourResources } from './materials';
 import { useState } from 'react';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
-import type { TourSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
+import type { TourDocument, TourSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { getTourIncomingReferences } from '../../../features/scenario/project/public';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
@@ -236,6 +236,7 @@ function TourSlideList({
       {removing && (
         <div role="alert" className="tour-review-notice">
           <p>{t('scenario.editor.tourRemoveLinked')}</p>
+          {project.tour && <TourIncomingLinks tour={project.tour} targetId={removing} t={t} />}
           <ProductActionButton compact tone="secondary" onClick={() => setRemoving(null)}>
             {t('common.actions.cancel')}
           </ProductActionButton>
@@ -310,5 +311,43 @@ function TourSlideMoveHandle({
     >
       <GripVertical size={14} />
     </ContentToolbarButton>
+  );
+}
+
+/** Identifies affected source slides and authored actions before clearing navigation links. */
+function TourIncomingLinks({
+  tour,
+  targetId,
+  t,
+}: {
+  tour: TourDocument;
+  targetId: string;
+  t: Translate;
+}) {
+  const incoming = new Set(getTourIncomingReferences(tour, targetId));
+  return (
+    <ul>
+      {tour.slides.flatMap((slide, index) => {
+        if (slide.id === targetId) return [];
+        const source = `${index + 1}. ${slide.title || t('scenario.editor.tourUntitled')}`;
+        const objects = slide.kind === 'image' ? slide.hotspots : slide.buttons;
+        return [
+          ...(incoming.has(slide.id)
+            ? [
+                <li key={`timing-${slide.id}`}>
+                  {source} — {t('scenario.editor.tourAutomaticTransition')}
+                </li>,
+              ]
+            : []),
+          ...objects
+            .filter((object) => incoming.has(object.id))
+            .map((object) => (
+              <li key={object.id}>
+                {source} — {object.label || t('scenario.editor.tourButton')}
+              </li>
+            )),
+        ];
+      })}
+    </ul>
   );
 }

@@ -266,3 +266,39 @@ it('selects an authored mask with native click activation without moving it', as
   expect(selected).toHaveBeenCalledWith('mask');
   expect(moved).not.toHaveBeenCalled();
 });
+
+it('separates structural Previous from visited Back and clears history on Restart', async () => {
+  const { player, root } = await mount();
+  const tour = createTourDocument('routes');
+  tour.slides = ['a', 'b', 'c'].map((id) => ({
+    kind: 'navigation' as const,
+    id,
+    title: id,
+    description: '',
+    background: { color: '#111827', image: null },
+    narration: null,
+    timing: createTourImageSlide().timing,
+    buttons: [
+      { id: `${id}-jump`, label: 'Jump C', action: { kind: 'slide' as const, slideId: 'c' } },
+      { id: `${id}-previous`, label: 'Previous slide', action: { kind: 'previous' as const } },
+      { id: `${id}-restart`, label: 'Restart tour', action: { kind: 'restart' as const } },
+    ],
+  }));
+  player.update({ tour, labels, assets: [] });
+  const press = (label: string) => {
+    const button = [...root.querySelectorAll<HTMLButtonElement>('button')].find(
+      (node) => node.textContent === label
+    );
+    if (!button) throw new Error(`Missing ${label}`);
+    button.click();
+  };
+  press('Jump C');
+  expect(root.dataset['slideId']).toBe('c');
+  press('Previous slide');
+  expect(root.dataset['slideId']).toBe('b');
+  root.querySelector<HTMLButtonElement>('[data-tour-previous]')!.click();
+  expect(root.dataset['slideId']).toBe('c');
+  press('Restart tour');
+  expect(root.dataset['slideId']).toBe('a');
+  expect(root.querySelector<HTMLButtonElement>('[data-tour-previous]')!.disabled).toBe(true);
+});

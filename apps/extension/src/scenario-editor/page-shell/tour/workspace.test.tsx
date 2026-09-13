@@ -279,3 +279,37 @@ it('lists navigation backgrounds and keeps missing image previews disabled', asy
   expect(host.querySelector('.tour-slide-select[aria-current]')?.textContent).toContain('Untitled');
   expect(changed).not.toHaveBeenCalled();
 });
+
+it('lists each affected navigation source before clearing links to a removed slide', async () => {
+  const project = fixture();
+  project.tour!.slides[1]!.timing.autoplayTarget = 'first';
+  const navigation = {
+    kind: 'navigation' as const,
+    id: 'contents',
+    title: 'Contents',
+    description: '',
+    background: { color: '#111827', image: null },
+    narration: null,
+    timing: createTourImageSlide().timing,
+    buttons: [
+      {
+        id: 'contents-first',
+        label: 'Start here',
+        action: { kind: 'slide' as const, slideId: 'first' },
+      },
+    ],
+  };
+  project.tour!.slides.push(navigation);
+  await render(project);
+  await click('Delete', host.querySelector('.tour-slide-row')!);
+  const notice = host.querySelector('.tour-review-notice')!;
+  expect(notice.textContent).toContain('Second — Automatic transition');
+  expect(notice.textContent).toContain('Second — Go first');
+  expect(notice.textContent).toContain('Contents — Start here');
+  expect(current.tour!.slides).toHaveLength(3);
+  await click('Delete', notice);
+  expect(current.tour!.slides).toHaveLength(2);
+  expect(current.tour!.slides[0]?.timing.autoplayTarget).toBeNull();
+  const repaired = current.tour!.slides[1]!;
+  expect(repaired.kind === 'navigation' && repaired.buttons[0]?.action.kind).toBe('none');
+});

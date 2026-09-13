@@ -250,3 +250,79 @@ it.each(['image', 'navigation'] as const)(
     expect(host.querySelector('[aria-label="On click"]')?.textContent).toContain('Next slide');
   }
 );
+
+it('adds only a valid end CTA and removes terminal actions with explicit confirmation', async () => {
+  selected = { kind: 'end' };
+  draw();
+  await click('Link button');
+  await fill('Button label', 'Read more');
+  await fill('Open link', 'javascript:alert(1)');
+  expect(project.tour!.endScreen.button).toBeNull();
+  expect(host.querySelector('[role="alert"]')).not.toBeNull();
+  await fill('Open link', 'https://example.com/help');
+  expect(project.tour!.endScreen.button).toEqual({
+    label: 'Read more',
+    url: 'https://example.com/help',
+  });
+  project.tour!.endScreen.enabled = true;
+  const nav = project.tour!.slides[1]!;
+  if (nav.kind !== 'navigation') throw new Error('Missing nav');
+  nav.buttons = [{ id: 'end-link', label: 'Finish', action: { kind: 'end' } }];
+  draw();
+  await click('Show end screen');
+  expect(project.tour!.endScreen.enabled).toBe(true);
+  await click('Remove actions and disable');
+  expect(project.tour!.endScreen.enabled).toBe(false);
+  const repaired = project.tour!.slides[1]!;
+  expect(repaired.kind === 'navigation' && repaired.buttons[0]?.action.kind).toBe('none');
+});
+it('exposes global and local text alignment with placement only for callouts', async () => {
+  scope = 'document';
+  draw();
+  await choose('Text alignment', 'Center');
+  await choose('Callout placement', 'Above');
+  expect(project.tour!.style.textAppearance).toMatchObject({
+    alignment: 'center',
+    placement: 'top',
+  });
+  await choose('Explanations', 'Bottom captions');
+  expect(
+    [...host.querySelectorAll('button')].some(
+      (node) => node.getAttribute('aria-label') === 'Callout placement'
+    )
+  ).toBe(false);
+});
+
+it('builds contents without duplicate destinations and reorders buttons atomically', async () => {
+  selected = { kind: 'slide', slideId: 'nav', objectId: null };
+  draw();
+  await click('Add contents');
+  const navigation = () => {
+    const slide = project.tour!.slides[1]!;
+    if (slide.kind !== 'navigation') throw new Error('Missing navigation');
+    return slide;
+  };
+  expect(navigation().buttons).toHaveLength(1);
+  expect(navigation().buttons[0]?.action).toEqual({ kind: 'slide', slideId: 'image' });
+  await click('Add contents');
+  expect(navigation().buttons).toHaveLength(1);
+  await click('Add button');
+  await click('Back to slide settings');
+  await click('Move button down');
+  expect(navigation().buttons[0]?.action.kind).toBe('next');
+  expect(navigation().buttons[1]?.action.kind).toBe('slide');
+});
+
+it('removes a navigation background without changing its buttons or source slide', async () => {
+  const nav = project.tour!.slides[1]!;
+  if (nav.kind !== 'navigation') throw new Error('Missing navigation');
+  nav.background.image = current().image;
+  nav.buttons = [{ id: 'next', label: 'Next', action: { kind: 'next' } }];
+  selected = { kind: 'slide', slideId: nav.id, objectId: null };
+  draw();
+  await click('Remove background image');
+  const next = project.tour!.slides[1]!;
+  expect(next.kind === 'navigation' && next.background.image).toBeNull();
+  expect(next.kind === 'navigation' && next.buttons).toEqual(nav.buttons);
+  expect(current().image).not.toBeNull();
+});

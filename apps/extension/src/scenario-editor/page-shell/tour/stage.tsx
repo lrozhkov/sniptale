@@ -31,7 +31,7 @@ export function TourStage({
   const callbacks = useRef({ onSelectObject, onMoveObject, disabled });
   callbacks.current = { onSelectObject, onMoveObject, disabled };
   const labels = useRef<TourPlayerLabels>({
-    previous: t('scenario.editor.tourActionPrevious'),
+    previous: t('scenario.editor.tourBack'),
     next: t('scenario.editor.tourActionNext'),
     contents: t('scenario.editor.tourSlides'),
     close: t('scenario.editor.close'),

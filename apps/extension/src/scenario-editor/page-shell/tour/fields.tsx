@@ -76,12 +76,14 @@ export function TourPointFields({
 }
 
 export function TourTextPresentation({
+  inherit = true,
   value,
   defaults,
   disabled,
   onChange,
   t,
 }: {
+  inherit?: boolean;
   value: TourTextAppearance | null;
   defaults: TourTextAppearance;
   disabled: boolean;
@@ -96,7 +98,9 @@ export function TourTextPresentation({
         disabled={disabled}
         value={value?.presentation ?? 'inherit'}
         options={[
-          { value: 'inherit', label: t('scenario.editor.tourInherited') },
+          ...(inherit
+            ? [{ value: 'inherit' as const, label: t('scenario.editor.tourInherited') }]
+            : []),
           { value: 'callout', label: t('scenario.editor.tourCallout') },
           { value: 'caption-top', label: t('scenario.editor.tourCaptionTop') },
           { value: 'caption-bottom', label: t('scenario.editor.tourCaptionBottom') },
@@ -105,6 +109,40 @@ export function TourTextPresentation({
           onChange(presentation === 'inherit' ? null : { ...(value ?? defaults), presentation })
         }
       />
+      {value && (
+        <>
+          <span>{t('scenario.editor.tourTextAlignment')}</span>
+          <CompactSelect
+            aria-label={t('scenario.editor.tourTextAlignment')}
+            value={value.alignment}
+            disabled={disabled}
+            options={[
+              { value: 'start', label: t('scenario.editor.tourAlignStart') },
+              { value: 'center', label: t('scenario.editor.tourAlignCenter') },
+              { value: 'end', label: t('scenario.editor.tourAlignEnd') },
+            ]}
+            onChange={(alignment) => onChange({ ...value, alignment })}
+          />
+          {value.presentation === 'callout' && (
+            <>
+              <span>{t('scenario.editor.tourTextPlacement')}</span>
+              <CompactSelect
+                aria-label={t('scenario.editor.tourTextPlacement')}
+                value={value.placement}
+                disabled={disabled}
+                options={[
+                  { value: 'auto', label: t('scenario.editor.tourPlacementAuto') },
+                  { value: 'top', label: t('scenario.editor.tourPlacementTop') },
+                  { value: 'bottom', label: t('scenario.editor.tourPlacementBottom') },
+                  { value: 'left', label: t('scenario.editor.tourPlacementLeft') },
+                  { value: 'right', label: t('scenario.editor.tourPlacementRight') },
+                ]}
+                onChange={(placement) => onChange({ ...value, placement })}
+              />
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 }
