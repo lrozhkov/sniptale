@@ -1,4 +1,5 @@
-import { CompactSelect } from '../../ui/compact-inspector-controls/select';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
+import { BookOpen, MousePointerClick } from 'lucide-react';
 import { TourWorkspace } from './tour/workspace';
 import type {
   GuideImageImportPlacement,
@@ -291,19 +292,33 @@ function ScenarioHeader({
       representationControls={
         project &&
         project.purpose !== 'step-template' && (
-          <div className="tour-representation-switch">
-            <CompactSelect
-              value={representation}
-              aria-label={t('scenario.editor.representation')}
-              options={[
-                { value: 'guide', label: t('scenario.editor.referenceMode') },
-                { value: 'tour', label: t('scenario.editor.tourMode') },
-              ]}
-              onChange={(value) => {
-                state.sealEdit();
-                onRepresentation(value);
-              }}
-            />
+          <div
+            className="tour-representation-switch"
+            role="group"
+            aria-label={t('scenario.editor.representation')}
+          >
+            {(
+              [
+                { value: 'guide', Icon: BookOpen, label: t('scenario.editor.referenceMode') },
+                { value: 'tour', Icon: MousePointerClick, label: t('scenario.editor.tourMode') },
+              ] as const
+            ).map(({ value, Icon, label }) => (
+              <ContentToolbarButton
+                key={value}
+                className="guide-section-tab"
+                title={label}
+                aria-label={label}
+                aria-pressed={representation === value}
+                onClick={() => {
+                  if (representation === value) return;
+                  state.sealEdit();
+                  onRepresentation(value);
+                }}
+              >
+                <Icon size={16} aria-hidden="true" />
+                {representation === value && <span>{label}</span>}
+              </ContentToolbarButton>
+            ))}
           </div>
         )
       }

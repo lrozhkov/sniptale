@@ -84,9 +84,9 @@ export function GuidePageHeader({
             />
           </label>
         )}
-        {representationControls}
         {feedback}
         <div className="guide-header-actions">
+          {representationControls}
           {aiSelection && onAiOpen && (
             <GuideAiEntry
               images={images}

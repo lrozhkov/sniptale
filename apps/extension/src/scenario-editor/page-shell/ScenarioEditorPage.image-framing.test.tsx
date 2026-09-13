@@ -266,11 +266,7 @@ it('opens the selected tour image and restores its selection and focus after App
     }
   );
   await render();
-  await click('Scenario view');
-  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
-    (node) => node.textContent === 'Interactive tour'
-  );
-  await act(async () => option?.click());
+  await click('Interactive tour');
   await act(async () =>
     container.querySelectorAll<HTMLButtonElement>('.tour-slide-select')[1]?.click()
   );
@@ -327,7 +323,7 @@ it('keeps tour settings editable during autosave while imports stay locked', asy
     if (!node) throw new Error(`Missing ${option}`);
     await act(async () => node.click());
   };
-  await choose('Scenario view', 'Interactive tour');
+  await click('Interactive tour');
   await choose('Camera mode', 'Full view');
   await settleAutosave();
   expect(io.save).toHaveBeenCalledOnce();
@@ -351,11 +347,7 @@ it('imports narration from the mounted tour inspector through the source-bound p
   io.load.mockResolvedValue(project);
   io.narration.mockResolvedValue({ ...project, updatedAt: 101 });
   await render();
-  await click('Scenario view');
-  const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
-    (node) => node.textContent === 'Interactive tour'
-  );
-  await act(async () => option?.click());
+  await click('Interactive tour');
   await act(async () => container.querySelector<HTMLButtonElement>('.tour-slide-select')?.click());
   await click('Inspector');
   const input = container.querySelector<HTMLInputElement>('input[type="file"][accept^="audio/"]');
@@ -374,4 +366,26 @@ it('imports narration from the mounted tour inspector through the source-bound p
       signal: expect.any(AbortSignal),
     })
   );
+});
+
+it('switches representations directly from the header and keeps only the active label', async () => {
+  await render();
+  const choices = () =>
+    Array.from(container.querySelectorAll<HTMLButtonElement>('.tour-representation-switch button'));
+  expect(choices()).toHaveLength(2);
+  expect(choices().map((button) => button.getAttribute('aria-pressed'))).toEqual(['true', 'false']);
+  expect(choices()[0]?.querySelector('span')).not.toBeNull();
+  expect(choices()[1]?.querySelector('span')).toBeNull();
+  expect(container.querySelector('.guide-header-actions')?.firstElementChild?.className).toBe(
+    'tour-representation-switch'
+  );
+  await act(async () => choices()[0]?.click());
+  expect(choices()[0]?.getAttribute('aria-pressed')).toBe('true');
+  await act(async () => choices()[1]?.click());
+  expect(choices().map((button) => button.getAttribute('aria-pressed'))).toEqual(['false', 'true']);
+  expect(choices()[0]?.querySelector('span')).toBeNull();
+  expect(choices()[1]?.querySelector('span')).not.toBeNull();
+  await act(async () => choices()[0]?.click());
+  expect(choices()[0]?.getAttribute('aria-pressed')).toBe('true');
+  expect(container.querySelector('.guide-document-scroll')).not.toBeNull();
 });
