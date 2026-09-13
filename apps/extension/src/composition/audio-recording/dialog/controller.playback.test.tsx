@@ -2,11 +2,11 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { expect, it, vi } from 'vitest';
-import type { AudioRecordingControllerState } from '../../../composition/audio-recording/session-types';
+import type { AudioRecordingControllerState } from '../session-types';
 import { useAudioRecordingController } from './controller';
 
 const session = vi.hoisted(() => vi.fn());
-vi.mock('../../../composition/audio-recording/session', () => ({
+vi.mock('../session', () => ({
   useAudioRecordingSession: session,
 }));
 

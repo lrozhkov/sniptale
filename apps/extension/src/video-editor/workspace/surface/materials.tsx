@@ -1,4 +1,4 @@
-import { formatPreciseTime } from '../../contracts/time-format';
+import { formatPreciseTime } from '../../../composition/library-preview/time-format';
 import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { formatBytes } from '../../../platform/i18n/format-bytes';
 import {

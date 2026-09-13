@@ -5,7 +5,7 @@ import { Mic, Save, Square } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { InspectorPanel } from '../../../ui/compact-inspector-controls';
-import type { AudioRecordingStatus } from '../../../composition/audio-recording/session-types';
+import type { AudioRecordingStatus } from '../session-types';
 
 export function RecordingActionButton(props: {
   disabled?: boolean;
@@ -29,6 +29,7 @@ export function RecordingActionButton(props: {
 
 export function AudioRecordingSaveButton(props: {
   destination?: 'timeline' | 'materials';
+  label?: string | undefined;
   audioBlob: Blob | null;
   disabled: boolean;
   onSave: () => Promise<void>;
@@ -42,24 +43,30 @@ export function AudioRecordingSaveButton(props: {
       className="px-4 disabled:cursor-not-allowed disabled:opacity-50"
     >
       <Save size={16} strokeWidth={2.1} />
-      {translate(
-        props.destination === 'materials'
-          ? 'videoEditor.app.recordAudioSaveMaterial'
-          : 'videoEditor.app.recordAudioSave'
-      )}
+      {props.label ??
+        translate(
+          props.destination === 'materials'
+            ? 'videoEditor.app.recordAudioSaveMaterial'
+            : 'videoEditor.app.recordAudioSave'
+        )}
     </ProductActionButton>
   );
 }
 
 export function AudioRecordingModalHeader(props: {
   titleId: string;
+  title?: string | undefined;
   onClose: () => void;
   disabled: boolean;
 }) {
   return (
     <ProductModalHeader
       compact
-      title={<span id={props.titleId}>{translate('videoEditor.app.recordAudioTitle')}</span>}
+      title={
+        <span id={props.titleId}>
+          {props.title ?? translate('videoEditor.app.recordAudioTitle')}
+        </span>
+      }
       onClose={props.onClose}
       disabled={props.disabled}
       closeTitle={translate('common.actions.close')}
@@ -111,7 +118,9 @@ export function AudioRecordingTransport(props: {
           )}
         </div>
         {props.error ? (
-          <p className="text-sm text-[var(--sniptale-color-danger-text)]">{props.error}</p>
+          <p role="alert" className="text-sm text-[var(--sniptale-color-danger-text)]">
+            {props.error}
+          </p>
         ) : null}
       </InspectorPanel>
     </>

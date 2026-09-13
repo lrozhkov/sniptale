@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { loadAudioPeaks } from '../../project/media-metadata/audio-peaks';
+import { loadAudioPeaks } from '../../library-preview/audio-peaks';
 
 export function useRecordedAudioPeaks(blob: Blob, duration: number) {
   const [peaks, setPeaks] = useState<number[] | null>();

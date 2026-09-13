@@ -22,7 +22,7 @@ vi.mock('../../../composition/audio-recording/session', () => ({
         stopRecording: vi.fn(),
         status: 'recorded',
       },
-      trim: {},
+      trim: { pauseSelection: vi.fn() },
       save: {
         audioBlob: new Blob(['audio']),
         trimStart: 1,
@@ -32,7 +32,7 @@ vi.mock('../../../composition/audio-recording/session', () => ({
     };
   },
 }));
-vi.mock('./trim', () => ({
+vi.mock('../../../composition/audio-recording/dialog/trim', () => ({
   renderAudioRecordingTrimPanel: () => <input aria-label="Trim" defaultValue="1–4" />,
 }));
 vi.mock('../../../platform/i18n', async (importOriginal) => ({
@@ -79,7 +79,7 @@ it('retains failed recording for retry and blocks duplicate saves and dismissal'
   expect(onSave).toHaveBeenCalledTimes(1);
   expect(onClose).not.toHaveBeenCalled();
   expect(save().disabled).toBe(true);
-  expect(document.activeElement?.textContent).toBe('common.actions.cancel');
+  expect(document.querySelector('[role="dialog"]')?.contains(document.activeElement)).toBe(true);
   await act(async () => {
     rejectSave(new Error('destination unavailable'));
   });

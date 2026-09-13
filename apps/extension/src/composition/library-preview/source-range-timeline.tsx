@@ -1,35 +1,35 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { ScanLine } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { formatPreciseTime } from '../contracts/time-format';
+import { formatPreciseTime } from './time-format';
 import { translate } from '../../platform/i18n';
-import type { VideoEditorMaterialSourceRange } from '../contracts/insertion';
+type SourceRange = { start: number; end: number };
 
 interface SourceTimelineProps {
   peaks?: readonly number[] | undefined;
   duration: number;
   fps: number;
   cursor: number;
-  range: VideoEditorMaterialSourceRange;
+  range: SourceRange;
   disabled: boolean;
   onSeek: (time: number) => void;
-  onRange: (range: VideoEditorMaterialSourceRange) => void;
+  onRange: (range: SourceRange) => void;
 }
 type Gesture = {
   pointerId: number;
   origin: number;
   x: number;
   cursor: number;
-  range: VideoEditorMaterialSourceRange;
+  range: SourceRange;
   mode: 'select' | 'start' | 'end';
-  preview: VideoEditorMaterialSourceRange | null;
+  preview: SourceRange | null;
 };
 
 /** One captured source gesture; range changes commit on release and cancel without touching montage. */
 function useSourceRangeGesture(props: SourceTimelineProps) {
   const plane = useRef<HTMLDivElement>(null);
   const drag = useRef<Gesture | null>(null);
-  const [preview, setPreview] = useState<VideoEditorMaterialSourceRange | null>(null);
+  const [preview, setPreview] = useState<SourceRange | null>(null);
   const timeAt = (x: number) => {
     const bounds = plane.current!.getBoundingClientRect();
     return Math.max(
@@ -108,7 +108,7 @@ function useSourceRangeGesture(props: SourceTimelineProps) {
 }
 
 function constrainSourceRange(
-  range: VideoEditorMaterialSourceRange,
+  range: SourceRange,
   duration: number,
   fps: number,
   edge: 'start' | 'end'
@@ -249,13 +249,7 @@ export function SourceRangeTimeline(props: SourceTimelineProps) {
   );
 }
 
-function SourceRangeActions({
-  props,
-  range,
-}: {
-  props: SourceTimelineProps;
-  range: VideoEditorMaterialSourceRange;
-}) {
+function SourceRangeActions({ props, range }: { props: SourceTimelineProps; range: SourceRange }) {
   const full = range.start === 0 && range.end === props.duration;
   return (
     <div className="flex min-w-0 items-center justify-between gap-2 pl-2 pt-1 text-xs">
@@ -290,7 +284,7 @@ function SourceRangeEdge({
   position,
 }: {
   edge: 'start' | 'end';
-  range: VideoEditorMaterialSourceRange;
+  range: SourceRange;
   props: SourceTimelineProps;
   position: string;
 }) {

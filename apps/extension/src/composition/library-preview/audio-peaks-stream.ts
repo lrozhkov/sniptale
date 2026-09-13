@@ -1,4 +1,4 @@
-import { MAX_VIDEO_PROJECT_AUDIO_PEAKS } from '../../../features/video/project/types';
+import { MAX_VIDEO_PROJECT_AUDIO_PEAKS } from '../../features/video/project/types';
 
 /** Decode long assets in bounded PCM chunks instead of allocating a whole-file AudioBuffer. */
 export async function loadStreamingAudioPeaks(

@@ -1,4 +1,4 @@
-import { MAX_VIDEO_PROJECT_AUDIO_PEAKS } from '../../../features/video/project/types';
+import { MAX_VIDEO_PROJECT_AUDIO_PEAKS } from '../../features/video/project/types';
 
 const AUDIO_PEAKS_PER_SECOND = 100;
 export const AUDIO_PEAK_MAX_DECODE_BLOB_SIZE = 24 * 1024 * 1024;

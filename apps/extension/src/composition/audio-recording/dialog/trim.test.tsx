@@ -5,8 +5,8 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { renderAudioRecordingTrimPanel } from './trim';
 
 const peaks = vi.hoisted(() => vi.fn());
-vi.mock('../../project/media-metadata/audio-peaks', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../../project/media-metadata/audio-peaks')>()),
+vi.mock('../../library-preview/audio-peaks', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../library-preview/audio-peaks')>()),
   loadAudioPeaks: peaks,
 }));
 vi.mock('../../../platform/i18n', async (importOriginal) => ({

@@ -2,22 +2,19 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { createTranslator } from '../../../platform/i18n';
-import { TourNarrationRecording } from './narration-recording';
+import { MaterialAudioRecordingModal } from './index';
 vi.mock('../../../platform/i18n', async (original) => {
   const module = await original<typeof import('../../../platform/i18n')>();
   return { ...module, translate: module.createTranslator('en') };
 });
 const io = vi.hoisted(() => ({ session: vi.fn(), encode: vi.fn(), pause: vi.fn() }));
-vi.mock('../../../composition/audio-recording/session', () => ({
+vi.mock('../session', () => ({
   useAudioRecordingSession: io.session,
 }));
-vi.mock('../../../composition/audio-recording/trim-file', () => ({
+vi.mock('../trim-file', () => ({
   createTrimmedRecordingFile: io.encode,
 }));
-vi.mock('../../../composition/audio-recording/dialog/waveform', () => ({
-  useRecordedAudioPeaks: () => [0.2, 0.8],
-}));
+vi.mock('./waveform', () => ({ useRecordedAudioPeaks: () => [0.2, 0.8] }));
 let root: Root;
 let host: HTMLDivElement;
 const close = vi.fn();
@@ -67,7 +64,14 @@ afterEach(() => {
 const render = () =>
   act(async () =>
     root.render(
-      <TourNarrationRecording t={createTranslator('en')} onClose={close} onApply={apply} />
+      <MaterialAudioRecordingModal
+        isOpen
+        onClose={close}
+        saveLabel="Apply narration"
+        onSave={async (file, _trim, signal) => {
+          if (!(await apply(file, signal))) throw new Error('save failed');
+        }}
+      />
     )
   );
 const button = (text: string) =>
@@ -136,14 +140,14 @@ it('requires explicit dismissal and keeps Escape from discarding a draft', async
   expect(close).toHaveBeenCalledOnce();
 });
 
-it('starts and stops capture, shows permission failure, and renders outside the inspector', async () => {
+it('starts and stops capture, shows permission failure, and exposes the shared microphone control', async () => {
   const state = io.session();
   state.trim = null;
   state.save.audioBlob = null;
   state.transport.status = 'idle';
   await render();
-  expect(host.querySelector('[role="dialog"]')).toBeNull();
-  expect(document.body.querySelector('[role="dialog"]')).not.toBeNull();
+  expect(host.querySelector('[role="dialog"]')).not.toBeNull();
+  expect(host.querySelector('[aria-label="Microphone"]')).not.toBeNull();
   await act(async () => button('Start recording').click());
   expect(state.transport.startRecording).toHaveBeenCalledOnce();
   state.transport.status = 'recording';

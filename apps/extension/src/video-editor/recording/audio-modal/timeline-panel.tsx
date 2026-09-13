@@ -5,7 +5,7 @@ import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { translate } from '../../../platform/i18n';
 import type { AudioRecordingControllerState } from '../../../composition/audio-recording/session-types';
 import { formatDurationLabel } from '../../../composition/audio-recording/format';
-import { renderAudioRecordingTrimPanel } from './trim';
+import { renderAudioRecordingTrimPanel } from '../../../composition/audio-recording/dialog/trim';
 
 /** Transport and take review share one compact strip anchored to the recording interval. */
 export function TimelineRecordingPanel(props: {

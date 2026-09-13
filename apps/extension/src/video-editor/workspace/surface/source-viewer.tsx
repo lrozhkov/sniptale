@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { SourceRangeTimeline } from '../../chrome/source-range-timeline';
+import { SourceRangeTimeline } from '../../../composition/library-preview/source-range-timeline';
 import { translate } from '../../../platform/i18n';
 import {
   VideoProjectAssetType,

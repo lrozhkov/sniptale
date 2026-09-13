@@ -3,10 +3,10 @@ import { Pause, Play } from 'lucide-react';
 import { translate } from '../../../platform/i18n';
 import { InspectorPanel } from '../../../ui/compact-inspector-controls';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
-import { SourceRangeTimeline } from '../../chrome/source-range-timeline';
+import { SourceRangeTimeline } from '../../library-preview/source-range-timeline';
 import { useRecordedAudioPeaks } from './waveform';
-import { formatPreciseTime } from '../../contracts/time-format';
-import type { AudioRecordingTrimController } from '../../../composition/audio-recording/session-types';
+import { formatPreciseTime } from '../../library-preview/time-format';
+import type { AudioRecordingTrimController } from '../session-types';
 
 function AudioRecordingTrimPanel(
   props: AudioRecordingTrimController & {
