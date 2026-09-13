@@ -509,3 +509,13 @@ it('projects and applies minimum prose height through the generated AI parameter
     applyGuideAiProposal(project, scope, [{ ...operation, blockId: 'image' }])
   ).toThrow();
 });
+
+it('excludes the independent tour from reference-guide AI even for document scope', async () => {
+  const { createGuideProject, createTourDocument } = await import('./factories');
+  const project = createGuideProject('Guide');
+  project.tour = createTourDocument('private-tour');
+  project.tour.endScreen.description = 'private tour evidence';
+  const content = selectGuideAiContent(project, { stepIds: [], blockIds: [], document: true });
+  expect(JSON.stringify(content.snapshot)).not.toContain('private tour evidence');
+  expect(JSON.stringify(content.snapshot)).not.toContain('private-tour');
+});

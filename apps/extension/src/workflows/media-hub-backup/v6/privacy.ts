@@ -3,6 +3,7 @@ import type { MediaLibraryEntry } from '../../../composition/persistence/media-l
 import type { RecordingGroupMember } from '../../../features/media-hub/recording-groups';
 import type { StoredImageWorkspaceEntry } from '../../../composition/persistence/image-workspaces/contracts';
 import type { PersistedEditorDocumentV3 } from '../../../composition/persistence/document-assets';
+import { getTourImages } from '../../../features/scenario/project/public';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { ScenarioProjectEntry } from '../../../composition/persistence/scenario/contracts';
 import type { ScenarioPageDescriptor } from '@sniptale/runtime-contracts/scenario/types/geometry';
@@ -110,8 +111,16 @@ function projectGuidePrivacy(
   project: GuideProject,
   options: MediaHubBackupExportOptions
 ): GuideProject {
+  const tour = project.tour ? structuredClone(project.tour) : undefined;
+  if (tour) {
+    for (const image of getTourImages(tour)) {
+      if (image.source.kind === 'capture')
+        image.source.page = projectScenarioPagePrivacy(image.source.page, options);
+    }
+  }
   return {
     ...project,
+    ...(tour ? { tour } : {}),
     items: project.items.map((item) =>
       item.kind !== 'step'
         ? item

@@ -1,5 +1,7 @@
 export {
   createGuideImageBlock,
+  createTourDocument,
+  createTourImageSlide,
   createGuideParagraphs,
   createGuideProject,
   createGuideStep,
@@ -21,3 +23,9 @@ export {
 export { classifyGuideStepContent, applyGuideTemplateAppearance } from './templates';
 
 export { fitGuideRowInsertion, type GuideBlockPlacement } from './spatial-placement';
+
+export {
+  getTourImages,
+  getScenarioResourceReferences,
+  remapTourIdentities,
+} from './tour-resources';

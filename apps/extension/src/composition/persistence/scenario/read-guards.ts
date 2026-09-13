@@ -8,7 +8,11 @@ import type {
 } from './contracts';
 import type { ScenarioExportFormat } from '@sniptale/runtime-contracts/scenario/types/base';
 import { parseGuideProject } from '@sniptale/runtime-contracts/scenario/guide-parser';
-import { isSafeScenarioAssetImageMimeType } from './projects/guards/asset-policy';
+import {
+  assertSafeScenarioAssetStorageMetadata,
+  isSafeScenarioAssetImageMimeType,
+  isSafeScenarioAssetAudioMimeType,
+} from './projects/guards/asset-policy';
 import { isNumber, isRecord, isString } from '../infrastructure/indexed-db/read-primitives.ts';
 import { parseLibraryLifecycle } from '../library-lifecycle/parser';
 
@@ -32,6 +36,31 @@ function isScenarioExportFormat(value: unknown): value is ScenarioExportFormat {
   return value === 'html' || value === 'markdown' || value === 'pdf';
 }
 
+function validAssetMediaMetadata(value: Record<string, unknown>): boolean {
+  const mime = value['mimeType'];
+  if (typeof mime !== 'string') return false;
+  if (isSafeScenarioAssetAudioMimeType(mime)) {
+    try {
+      if (typeof value['size'] !== 'number') return false;
+      assertSafeScenarioAssetStorageMetadata(value['size'], mime);
+    } catch {
+      return false;
+    }
+    return (
+      value['width'] === 0 &&
+      value['height'] === 0 &&
+      isPositiveNumber(value['duration']) &&
+      value['duration'] <= 3600
+    );
+  }
+  return (
+    isSafeScenarioAssetImageMimeType(mime) &&
+    isPositiveNumber(value['width']) &&
+    isPositiveNumber(value['height']) &&
+    value['duration'] === undefined
+  );
+}
+
 export function parseScenarioAssetEntry(value: unknown): ScenarioAssetEntry | null {
   if (!isRecord(value)) {
     return null;
@@ -43,9 +72,9 @@ export function parseScenarioAssetEntry(value: unknown): ScenarioAssetEntry | nu
     !isString(value['projectId']) ||
     !isNullableString(value['galleryAssetId']) ||
     !isString(value['mimeType']) ||
-    !isSafeScenarioAssetImageMimeType(value['mimeType']) ||
-    !isPositiveNumber(value['width']) ||
-    !isPositiveNumber(value['height']) ||
+    !isNonNegativeNumber(value['width']) ||
+    !isNonNegativeNumber(value['height']) ||
+    !validAssetMediaMetadata(value) ||
     !isNumber(value['createdAt']) ||
     !isNonNegativeNumber(value['size'])
   ) {
@@ -56,6 +85,7 @@ export function parseScenarioAssetEntry(value: unknown): ScenarioAssetEntry | nu
     assetId: value['assetId'],
     createdAt: value['createdAt'],
     galleryAssetId: value['galleryAssetId'],
+    ...(typeof value['duration'] === 'number' ? { duration: value['duration'] } : {}),
     height: value['height'],
     id: value['id'],
     mimeType: value['mimeType'],

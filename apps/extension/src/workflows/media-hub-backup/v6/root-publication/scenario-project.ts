@@ -1,3 +1,4 @@
+import { decodePortableTour } from '../root-codecs/scenario-tour';
 import {
   appendCommittedArchiveRootInTransaction,
   buildPhysicalDeleteOperation,
@@ -71,6 +72,15 @@ function decodeAndRemapGuideProject(args: {
   const items: unknown[] = args.project['items'];
   const decoded = {
     ...args.project,
+    ...(args.project['tour'] === undefined
+      ? {}
+      : {
+          tour: decodePortableTour(args.project['tour'], {
+            assetIds: args.assetIds,
+            documentIds: args.stepIds,
+            rootIdMap: args.rootIdMap,
+          }),
+        }),
     id: args.projectId,
     items: items.map((item) => {
       if (!isRecord(item) || item['kind'] !== 'step') return item;

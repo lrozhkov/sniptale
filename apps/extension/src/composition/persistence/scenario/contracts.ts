@@ -23,6 +23,8 @@ export interface ScenarioProjectEntry {
 }
 
 export interface ScenarioAssetEntry {
+  /** Present only for audio; audio has zero spatial dimensions. */
+  duration?: number | undefined;
   assetId: string;
   id: string;
   projectId: string;

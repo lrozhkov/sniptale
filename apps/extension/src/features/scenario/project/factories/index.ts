@@ -79,3 +79,44 @@ export function createGuideImageBlock(args: {
     contentTransform: { x: 0, y: 0, scale: 1 },
   };
 }
+
+/** Creates an independent interactive representation without acquiring media or changing the guide. */
+export function createTourDocument(
+  id: string = crypto.randomUUID()
+): import('@sniptale/runtime-contracts/scenario/types/tour').TourDocument {
+  return {
+    version: 1,
+    id,
+    stage: { aspect: '16:9', background: '#111827' },
+    style: {
+      accent: '#f97316',
+      text: '#ffffff',
+      surface: '#1f2937',
+      textAppearance: { presentation: 'callout', alignment: 'start', placement: 'auto' },
+    },
+    playback: { autoplay: false, loop: false, minimumHoldSeconds: 4, autoZoom: true },
+    transition: { kind: 'fade', durationMs: 250, hotspotTravelMs: 300 },
+    slides: [],
+    endScreen: { enabled: true, title: '', description: '', button: null, restart: true },
+  };
+}
+
+/** Empty image slides remain editable; export admission must require populated media. */
+export function createTourImageSlide(
+  id: string = crypto.randomUUID()
+): import('@sniptale/runtime-contracts/scenario/types/tour').TourImageSlide {
+  return {
+    kind: 'image',
+    id,
+    title: '',
+    image: null,
+    origin: null,
+    fit: 'contain',
+    camera: { mode: 'inherit', center: { x: 0.5, y: 0.5 }, zoom: 1 },
+    hotspots: [],
+    annotations: [],
+    masks: [],
+    narration: null,
+    timing: { mode: 'inherit', holdSeconds: 4, truncateNarration: false, autoplayTarget: null },
+  };
+}

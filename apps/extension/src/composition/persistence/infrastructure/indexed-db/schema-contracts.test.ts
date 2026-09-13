@@ -61,3 +61,28 @@ describe('database migration graph', () => {
     expect(buildDatabaseMigrationPlan(1, 3, [migration(1, 2)])).toBeNull();
   });
 });
+
+it('requires a complete supported upgrade chain and rejects malformed persisted domain rows', () => {
+  const plan = buildDatabaseMigrationPlan(1, 3);
+  expect(
+    plan?.map((migration) => [migration.fromDatabaseVersion, migration.toDatabaseVersion])
+  ).toEqual([
+    [1, 2],
+    [2, 3],
+  ]);
+  expect(buildDatabaseMigrationPlan(2, 3)?.[0]?.domainVersions).toEqual([
+    { domainId: 'scenarioProjects', from: 1, to: 2 },
+  ]);
+  expect(buildDatabaseMigrationPlan(0, 3)).toBeNull();
+  for (const invalid of [
+    null,
+    [],
+    {},
+    { domainId: 'unknown', schemaVersion: 1 },
+    { domainId: 'scenarioProjects', schemaVersion: 0 },
+    { domainId: 'scenarioProjects', schemaVersion: 1.5 },
+    { domainId: 'scenarioProjects', schemaVersion: '2' },
+  ]) {
+    expect(parseStoredSchemaContracts([invalid, ...CURRENT_SCHEMA_CONTRACTS.slice(1)])).toBeNull();
+  }
+});

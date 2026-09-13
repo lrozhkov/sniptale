@@ -1,3 +1,4 @@
+import { getScenarioResourceReferences } from '../../../features/scenario/project/public';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import {
   SCENARIO_PROJECTS_STORE,
@@ -25,15 +26,11 @@ import { publishMediaHubLibraryChanged } from '../../../features/media-hub/event
 function references(projects: GuideProject[]) {
   const assets = new Set<string>();
   const documents = new Set<string>();
-  for (const project of projects)
-    for (const item of project.items) {
-      if (item.kind !== 'step') continue;
-      for (const block of item.blocks)
-        if (block.kind === 'image') {
-          assets.add(block.assetId);
-          if (block.editDocumentId) documents.add(block.editDocumentId);
-        }
-    }
+  for (const project of projects) {
+    const refs = getScenarioResourceReferences(project);
+    for (const id of refs.assets) assets.add(id);
+    for (const id of refs.documents) documents.add(id);
+  }
   return { assets, documents };
 }
 

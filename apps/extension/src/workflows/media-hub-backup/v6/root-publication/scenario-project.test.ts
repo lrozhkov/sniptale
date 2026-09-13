@@ -278,3 +278,22 @@ it('roundtrips historical image bytes and editable references through the portab
     await reader.close();
   }
 });
+
+it('rejects oversized narration before publishing an aggregate', async () => {
+  const { args } = input();
+  const metadata = args.envelope.metadata as unknown as {
+    assets: Array<{ entry: Record<string, unknown> }>;
+  };
+  Object.assign(metadata.assets[0]!.entry, {
+    mimeType: 'audio/webm',
+    width: 0,
+    height: 0,
+    duration: 10,
+  });
+  const object = args.staged.find((item) => item.objectId === 'image-object')!;
+  object.ref.mimeType = 'audio/webm';
+  object.ref.size = 257 * 1024 * 1024;
+  await expect(scenarioProjectRootPublisher.publish(args)).rejects.toThrow('asset metadata');
+  expect(io.put).not.toHaveBeenCalled();
+  expect(io.checkpoint).not.toHaveBeenCalled();
+});

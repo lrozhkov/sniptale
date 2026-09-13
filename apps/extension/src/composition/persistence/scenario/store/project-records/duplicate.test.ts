@@ -249,3 +249,67 @@ it('refuses missing or section template sources before staging media', async () 
   expect(io.write).not.toHaveBeenCalled();
   expect(io.commit).not.toHaveBeenCalled();
 });
+
+it('copies tour images once across representations and independently copies narration and navigation', async () => {
+  const { createTourDocument, createTourImageSlide } =
+    await import('../../../../../features/scenario/project/public');
+  const source = sourceProject();
+  source.tour = createTourDocument('tour');
+  const slide = createTourImageSlide('slide');
+  slide.image = {
+    assetId: 'source-image',
+    galleryAssetId: null,
+    editDocumentId: 'source-document',
+    width: 100,
+    height: 80,
+    alt: '',
+    source: { kind: 'import', filename: 'image.png' },
+  };
+  slide.narration = {
+    assetId: 'source-audio',
+    duration: 3,
+    trimStart: 0,
+    trimEnd: 3,
+    gain: 1,
+    transcript: 'voice',
+  };
+  slide.hotspots = [
+    {
+      id: 'hotspot',
+      point: { x: 0.5, y: 0.5 },
+      targetRect: null,
+      label: 'Again',
+      text: '',
+      action: { kind: 'slide', slideId: 'slide' },
+      appearance: null,
+      pulse: true,
+    },
+  ];
+  source.tour.slides = [slide];
+  const image = await io.asset('source-image');
+  io.asset.mockImplementation(async (id) =>
+    id === 'source-audio'
+      ? {
+          id,
+          assetId: 'physical-audio',
+          projectId: 'source',
+          galleryAssetId: null,
+          mimeType: 'audio/webm',
+          width: 0,
+          height: 0,
+          duration: 3,
+          size: 5,
+          createdAt: 100,
+          file: new File(['audio'], 'voice.webm', { type: 'audio/webm' }),
+        }
+      : image
+  );
+  const result = await duplicateScenarioProjectRecord(source, 'Copy');
+  const copied = result.tour?.slides[0];
+  if (copied?.kind !== 'image') throw new Error('Expected tour image');
+  expect(copied.image?.assetId).toBe(images(result)[0]?.assetId);
+  expect(copied.narration?.assetId).not.toBe('source-audio');
+  expect(copied.hotspots[0]?.action).toEqual({ kind: 'slide', slideId: copied.id });
+  expect(io.write).toHaveBeenCalledTimes(2);
+  expect(source.tour.slides[0]?.id).toBe('slide');
+});

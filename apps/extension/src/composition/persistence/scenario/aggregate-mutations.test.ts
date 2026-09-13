@@ -630,3 +630,32 @@ it('preserves shared physical ownership and rejects stale history cleanup before
   expect(current.workspaceRevision).toBe(first.workspaceRevision + 1);
   expect(current.history).toBeUndefined();
 });
+
+it('protects tour-only image/audio/edit resources across saved history and prunes after removal', async () => {
+  const { tourProject } = await import('./tour.test-support');
+  const project = tourProject();
+  const audio = {
+    ...createAsset(project.id, 'audio'),
+    width: 0,
+    height: 0,
+    duration: 3,
+    mimeType: 'audio/webm',
+  };
+  audio.assetRef = { ...audio.assetRef, mimeType: 'audio/webm' };
+  const first = await commitScenarioAggregateMutation(project, {
+    children: {
+      assetPuts: [createAsset(project.id, 'image'), audio],
+      editorDocumentPuts: [createDocument(project.id, 'edit')],
+    },
+  });
+  expect(await pruneScenarioResources(project.id)).toBe(0);
+  const { tour: _tour, ...reference } = first.project;
+  const second = await commitScenarioAggregateMutation(reference, {
+    expectedRevision: first.workspaceRevision,
+  });
+  expect(await pruneScenarioResources(project.id)).toBe(0);
+  expect(getStore('scenario_assets').has('audio')).toBe(true);
+  await clearScenarioSavedHistory(project.id, second.project.updatedAt);
+  expect(await pruneScenarioResources(project.id)).toBe(3);
+  expect(getStore('scenario_assets').has('audio')).toBe(false);
+});

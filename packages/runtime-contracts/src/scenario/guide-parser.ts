@@ -1,3 +1,4 @@
+import { parseTourDocument, tourDocumentSchema } from './tour-parser';
 import { z } from 'zod';
 import { isPlainRecord } from '../validation/primitives';
 import { scenarioImageSourceSchema } from './image-source-schema';
@@ -168,6 +169,7 @@ export const guideBlockParameterSchemas = {
 const projectSchema = z
   .object({
     version: z.literal(4),
+    tour: tourDocumentSchema.optional(),
     purpose: z.literal('step-template').optional(),
     htmlExport,
     id,
@@ -273,7 +275,7 @@ export const guideItemSchemas = {
 /** Unsupported versions are distinct from corruption; callers must not treat either as absent. */
 export type GuideParseResult =
   | { status: 'ok'; project: GuideProject }
-  | { status: 'unsupported'; version: number }
+  | { status: 'unsupported'; version: number; representation?: 'tour' }
   | { status: 'invalid' };
 
 /** Parses a detached document without conversion, migration, repair or external effects. */
@@ -288,11 +290,18 @@ export function parseGuideProject(value: unknown): GuideParseResult {
   ) {
     return { status: 'unsupported', version };
   }
+  if (value['tour'] !== undefined) {
+    const tour = parseTourDocument(value['tour']);
+    if (tour.status === 'unsupported') return { ...tour, representation: 'tour' };
+    if (tour.status !== 'ok') return { status: 'invalid' };
+  }
   const result = projectSchema.safeParse(value);
   if (!result.success || !hasUniqueGuideIds(result.data)) return { status: 'invalid' };
   if (
     result.data.purpose === 'step-template' &&
-    (result.data.items.length !== 1 || result.data.items[0]?.kind !== 'step')
+    (result.data.tour !== undefined ||
+      result.data.items.length !== 1 ||
+      result.data.items[0]?.kind !== 'step')
   )
     return { status: 'invalid' };
   return { status: 'ok', project: result.data };

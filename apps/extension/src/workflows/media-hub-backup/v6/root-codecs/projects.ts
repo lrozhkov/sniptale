@@ -1,3 +1,4 @@
+import { encodePortableTour } from './scenario-tour';
 import type {
   StoredProjectAssetEntry,
   StoredProjectExportEntry,
@@ -126,6 +127,7 @@ function encodePortableGuideProject(value: GuideProject): JsonValue {
   if (parsed.status !== 'ok') throw new Error('Only current guide projects can be exported.');
   const project = {
     ...parsed.project,
+    ...(parsed.project.tour ? { tour: encodePortableTour(parsed.project.tour) } : {}),
     items: parsed.project.items.map((item) =>
       item.kind !== 'step'
         ? item

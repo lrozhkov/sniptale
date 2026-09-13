@@ -1,6 +1,8 @@
 import { expect, it } from 'vitest';
 import {
   createGuideProject,
+  createTourDocument,
+  createTourImageSlide,
   createGuideStep,
   createGuideImageBlock,
 } from '../../../features/scenario/project/public';
@@ -35,6 +37,35 @@ it('applies source-metadata privacy to historical captures as well as the curren
     })
   );
   project.items.push(step);
+  const source = step.blocks[0];
+  if (source?.kind !== 'image') throw new Error('Expected image');
+  if (source.source.kind === 'capture')
+    source.source.page.url = 'https://user:password@private.test/path?secret=token#fragment';
+  const image = {
+    assetId: source.assetId,
+    galleryAssetId: null,
+    editDocumentId: null,
+    width: 100,
+    height: 50,
+    alt: '',
+    source: source.source,
+  };
+  const slide = createTourImageSlide('tour-image');
+  slide.image = image;
+  project.tour = createTourDocument('tour');
+  project.tour.slides = [
+    slide,
+    {
+      kind: 'navigation',
+      id: 'navigation',
+      title: '',
+      description: '',
+      background: { color: '#ffffff', image },
+      buttons: [],
+      narration: null,
+      timing: slide.timing,
+    },
+  ];
   const entry = {
     id: project.id,
     createdAt: 1,
@@ -55,4 +86,10 @@ it('applies source-metadata privacy to historical captures as well as the curren
   expect(
     JSON.stringify(projectScenarioPrivacy(entry, createMediaHubBackupExportOptions()))
   ).toContain('private.test');
+  const included = JSON.stringify(
+    projectScenarioPrivacy(entry, createMediaHubBackupExportOptions())
+  );
+  expect(included).not.toContain('password');
+  expect(included).not.toContain('secret=');
+  expect(included).not.toContain('#fragment');
 });

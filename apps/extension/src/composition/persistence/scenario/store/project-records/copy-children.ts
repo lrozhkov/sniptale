@@ -1,8 +1,15 @@
+import {
+  getTourImages,
+  remapTourIdentities,
+} from '../../../../../features/scenario/project/public';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { PreparedScenarioAssetEntry, ScenarioStepEditorDocumentEntry } from '../../contracts';
 import { getScenarioAsset } from '../../projects/assets';
 import { getScenarioStepEditorDocumentForTransfer } from '../../editor-documents';
-import { createScenarioAssetEntryFromBlob } from '../capture-step/asset-entry';
+import {
+  createScenarioAssetEntryFromBlob,
+  createScenarioAudioAssetEntry,
+} from '../capture-step/asset-entry';
 
 /** Owns deduplication and staging of the children referenced by one detached guide copy. */
 export function createCopyChildren(
@@ -23,11 +30,11 @@ export function createCopyChildren(
       const blob = original.file.type
         ? original.file
         : original.file.slice(0, original.file.size, original.mimeType);
-      const prepared = await createScenarioAssetEntryFromBlob({
-        blob,
-        projectId: project.id,
-        galleryAssetId: original.galleryAssetId,
-      });
+      const input = { blob, projectId: project.id, galleryAssetId: original.galleryAssetId };
+      const prepared =
+        original.duration === undefined
+          ? await createScenarioAssetEntryFromBlob(input)
+          : await createScenarioAudioAssetEntry({ ...input, duration: original.duration });
       assets.push(prepared.assetEntry);
       assetIds.set(id, prepared.assetEntry.id);
       return prepared.assetEntry.id;
@@ -56,16 +63,33 @@ export async function remapCopyReferences(
   project: GuideProject,
   children: ReturnType<typeof createCopyChildren>
 ): Promise<void> {
+  const guideIds = new Map<string, string>();
+  const nextId = (old: string) => {
+    const id = crypto.randomUUID();
+    guideIds.set(old, id);
+    return id;
+  };
   for (const item of project.items) {
-    item.id = crypto.randomUUID();
+    item.id = nextId(item.id);
     if (item.kind !== 'step') continue;
     for (const block of item.blocks) {
-      block.id = crypto.randomUUID();
+      block.id = nextId(block.id);
       if (block.kind !== 'image') continue;
       block.assetId = await children.copyAsset(block.assetId);
       if (block.editDocumentId) {
         block.editDocumentId = await children.copyDocument(block.editDocumentId);
       }
     }
+  }
+  if (project.tour) {
+    remapTourIdentities(project.tour, () => crypto.randomUUID(), guideIds);
+    for (const image of getTourImages(project.tour)) {
+      image.assetId = await children.copyAsset(image.assetId);
+      if (image.editDocumentId)
+        image.editDocumentId = await children.copyDocument(image.editDocumentId);
+    }
+    for (const slide of project.tour.slides)
+      if (slide.narration)
+        slide.narration.assetId = await children.copyAsset(slide.narration.assetId);
   }
 }

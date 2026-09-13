@@ -1,3 +1,4 @@
+import type { TourDocument } from './tour';
 import type { GuideImageSource } from './image-source';
 export type { GuideCaptureSource, GuideVideoAction, GuideImageSource } from './image-source';
 export { GUIDE_LIMITS } from '../limits';
@@ -135,6 +136,8 @@ export interface GuideSection {
 
 /** The only guide content format; persistence owns lifecycle, revision and retained history. */
 export interface GuideProject {
+  /** Independently authored interactive representation under the same project authority. */
+  tour?: TourDocument | undefined;
   /** A reusable local step with independently owned media; excluded from ordinary guide lists. */
   purpose?: 'step-template' | undefined;
   version: 4;
