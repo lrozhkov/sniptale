@@ -29,119 +29,154 @@ type WorkspaceProps = {
   t: Translate;
 };
 
-/** Owns disposable panel visibility; document selection and edits remain in page state. */
+/** Composes the guide-specific outline and content inside the common scenario frame. */
 export function GuideWorkspace(props: WorkspaceProps) {
-  const hoverIntent = useGuideHoverIntent();
-  const { project, selectedId, onSelect, t } = props;
-  const { leftOpen, rightOpen } = props.panels;
+  const { project, t } = props;
   return (
-    <div
-      className="guide-workspace"
-      style={props.panels.style}
-      data-left-open={leftOpen}
-      data-right-open={rightOpen}
+    <ScenarioWorkspaceFrame
+      panels={props.panels}
+      header={props.header}
+      t={t}
+      left={<GuideWorkspaceLibrary {...props} />}
+      right={<GuideInspector {...props} open={props.panels.rightOpen} />}
     >
-      <FloatingChromePanel
-        role="complementary"
-        id="guide-library-panel"
-        className="guide-library-panel"
-        hidden={!leftOpen}
-        aria-label={t('scenario.editor.guideNavigation')}
+      <div
+        className="guide-document-scroll"
+        tabIndex={0}
+        aria-label={t('scenario.editor.guideDocument')}
       >
-        <div className="guide-panel-heading">
-          <div
-            className="guide-left-navigation"
-            role="group"
-            aria-label={t('scenario.editor.guideNavigation')}
-          >
-            {(
-              [
-                { id: 'structure', Icon: FileText, label: t('scenario.editor.outline') },
-                { id: 'resources', Icon: Image, label: t('scenario.editor.guideResources') },
-              ] as const
-            ).map(({ id, Icon, label }) => (
-              <ContentToolbarButton
-                key={id}
-                title={label}
-                aria-pressed={props.panels.leftSection === id}
-                className="guide-section-tab"
-                onClick={() => props.panels.openLeft(id)}
-              >
-                <Icon size={16} aria-hidden="true" />
-                {props.panels.leftSection === id && <span>{label}</span>}
-              </ContentToolbarButton>
-            ))}
-          </div>
-          <ContentToolbarButton
-            title={t('scenario.editor.close')}
-            aria-controls="guide-library-panel"
-            aria-expanded={true}
-            onClick={props.panels.toggleLeft}
-          >
-            <X size={16} aria-hidden="true" />
-          </ContentToolbarButton>
-        </div>
-        <div className="guide-panel-scroll">
-          {props.panels.leftSection === 'structure' ? (
-            <GuideOutline project={project} selectedId={selectedId} onSelect={onSelect} t={t} />
-          ) : (
-            <GuideResources {...props} />
-          )}
-        </div>
-        {props.panels.leftSection === 'resources' && (
-          <footer className="guide-resource-footer">
+        {project.items.length === 0 && (
+          <div className="guide-document-empty">
+            <FileText size={32} aria-hidden="true" />
+            <h2>{t('scenario.editor.guideFirstStep')}</h2>
             <GuideImageUpload
-              compact
               placement={{ kind: 'steps' }}
               disabled={props.disabled}
               onUpload={props.onUploadFile}
               t={t}
             />
-          </footer>
+            <ProductActionButton
+              tone="secondary"
+              compact
+              type="button"
+              disabled={props.disabled}
+              onClick={props.onAddStep}
+            >
+              {t('scenario.editor.guideAddStep')}
+            </ProductActionButton>
+          </div>
         )}
-      </FloatingChromePanel>
-      {leftOpen && (
-        <GuidePanelDivider side="left" panels={props.panels} label={t('scenario.editor.outline')} />
+        {props.children}
+      </div>
+    </ScenarioWorkspaceFrame>
+  );
+}
+
+function GuideWorkspaceLibrary(props: WorkspaceProps) {
+  const { project, selectedId, onSelect, t } = props;
+  return (
+    <FloatingChromePanel
+      role="complementary"
+      id="guide-library-panel"
+      className="guide-library-panel"
+      hidden={!props.panels.leftOpen}
+      aria-label={t('scenario.editor.guideNavigation')}
+    >
+      <div className="guide-panel-heading">
+        <div
+          className="guide-left-navigation"
+          role="group"
+          aria-label={t('scenario.editor.guideNavigation')}
+        >
+          {(
+            [
+              { id: 'structure', Icon: FileText, label: t('scenario.editor.outline') },
+              { id: 'resources', Icon: Image, label: t('scenario.editor.guideResources') },
+            ] as const
+          ).map(({ id, Icon, label }) => (
+            <ContentToolbarButton
+              key={id}
+              title={label}
+              aria-pressed={props.panels.leftSection === id}
+              className="guide-section-tab"
+              onClick={() => props.panels.openLeft(id)}
+            >
+              <Icon size={16} aria-hidden="true" />
+              {props.panels.leftSection === id && <span>{label}</span>}
+            </ContentToolbarButton>
+          ))}
+        </div>
+        <ContentToolbarButton
+          title={t('scenario.editor.close')}
+          aria-controls="guide-library-panel"
+          aria-expanded={true}
+          onClick={props.panels.toggleLeft}
+        >
+          <X size={16} aria-hidden="true" />
+        </ContentToolbarButton>
+      </div>
+      <div className="guide-panel-scroll">
+        {props.panels.leftSection === 'structure' ? (
+          <GuideOutline project={project} selectedId={selectedId} onSelect={onSelect} t={t} />
+        ) : (
+          <GuideResources {...props} />
+        )}
+      </div>
+      {props.panels.leftSection === 'resources' && (
+        <footer className="guide-resource-footer">
+          <GuideImageUpload
+            compact
+            placement={{ kind: 'steps' }}
+            disabled={props.disabled}
+            onUpload={props.onUploadFile}
+            t={t}
+          />
+        </footer>
+      )}
+    </FloatingChromePanel>
+  );
+}
+
+/** Both representations share the same panel geometry, header position and resize gutters. */
+export function ScenarioWorkspaceFrame({
+  panels,
+  header,
+  left,
+  right,
+  children,
+  t,
+}: {
+  panels: ReturnType<typeof useGuidePanels>;
+  header: ReactNode;
+  left: ReactNode;
+  right: ReactNode;
+  children: ReactNode;
+  t: Translate;
+}) {
+  const hoverIntent = useGuideHoverIntent();
+  return (
+    <div
+      className="guide-workspace"
+      style={panels.style}
+      data-left-open={panels.leftOpen}
+      data-right-open={panels.rightOpen}
+    >
+      {left}
+      {panels.leftOpen && (
+        <GuidePanelDivider side="left" panels={panels} label={t('scenario.editor.outline')} />
       )}
       <div ref={hoverIntent} className="guide-center-panel">
-        {props.header}
-        <div
-          className="guide-document-scroll"
-          tabIndex={0}
-          aria-label={t('scenario.editor.guideDocument')}
-        >
-          {project.items.length === 0 && (
-            <div className="guide-document-empty">
-              <FileText size={32} aria-hidden="true" />
-              <h2>{t('scenario.editor.guideFirstStep')}</h2>
-              <GuideImageUpload
-                placement={{ kind: 'steps' }}
-                disabled={props.disabled}
-                onUpload={props.onUploadFile}
-                t={t}
-              />
-              <ProductActionButton
-                tone="secondary"
-                compact
-                type="button"
-                disabled={props.disabled}
-                onClick={props.onAddStep}
-              >
-                {t('scenario.editor.guideAddStep')}
-              </ProductActionButton>
-            </div>
-          )}
-          {props.children}
-        </div>
+        {header}
+        {children}
       </div>
-      {rightOpen && (
+      {panels.rightOpen && (
         <GuidePanelDivider
           side="right"
-          panels={props.panels}
+          panels={panels}
           label={t('scenario.editor.guideInspector')}
         />
       )}
-      <GuideInspector {...props} open={rightOpen} />
+      {right}
     </div>
   );
 }

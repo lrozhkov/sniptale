@@ -32,7 +32,11 @@ function measureHintPages(hintText, fullText) {
   return pages;
 }
 
-export function createTourHints(root, defaultAppearance, { onClose, focusTrigger, signal }) {
+export function createTourHints(
+  root,
+  defaultAppearance,
+  { onClose, focusTrigger, signal, keyboardScope }
+) {
   const query = (name) => root.querySelector(`[data-tour-${name}]`);
   const viewport = query('viewport');
   const hint = query('hint');
@@ -82,23 +86,17 @@ export function createTourHints(root, defaultAppearance, { onClose, focusTrigger
       anchor && imageBox
         ? { x: imageBox.x + anchor.x * imageBox.width, y: imageBox.y + anchor.y * imageBox.height }
         : { x: stageWidth / 2, y: stageHeight / 2 };
-    let left = (hintWidth - hint.offsetWidth) / 2;
-    let top = appearance.presentation === 'caption-top' ? 8 : hintHeight - hint.offsetHeight - 8;
-    if (appearance.presentation === 'callout') {
-      const placement = appearance.placement ?? 'auto';
-      const x = offsetX + point.x;
-      const y = offsetY + point.y;
-      left = x + 22;
-      top = y - hint.offsetHeight / 2;
-      if (placement === 'left' || (placement === 'auto' && left + hint.offsetWidth > hintWidth - 8))
-        left = x - hint.offsetWidth - 22;
-      if (placement === 'top' || placement === 'bottom') {
-        left = x - hint.offsetWidth / 2;
-        top = placement === 'top' ? y - hint.offsetHeight - 22 : y + 22;
-      }
-    }
-    hint.style.left = `${Math.max(8, Math.min(hintWidth - hint.offsetWidth - 8, left))}px`;
-    hint.style.top = `${Math.max(8, Math.min(hintHeight - hint.offsetHeight - 8, top))}px`;
+    const position = positionHint({
+      hint,
+      hintWidth,
+      hintHeight,
+      point,
+      offsetX,
+      offsetY,
+      appearance,
+    });
+    hint.style.left = `${position.left}px`;
+    hint.style.top = `${position.top}px`;
   }
   function changeHint(direction) {
     if (direction > 0 && textPage + 1 < pages.length) textPage += 1;
@@ -130,6 +128,7 @@ export function createTourHints(root, defaultAppearance, { onClose, focusTrigger
       if (
         event.key !== 'Escape' ||
         event.defaultPrevented ||
+        (keyboardScope && !event.composedPath().includes(keyboardScope)) ||
         query('navigation').open ||
         hint.hidden
       )
@@ -140,6 +139,9 @@ export function createTourHints(root, defaultAppearance, { onClose, focusTrigger
     { signal }
   );
   return {
+    setDefaultAppearance(value) {
+      defaultAppearance = value;
+    },
     get activeIndex() {
       return activeHint;
     },
@@ -160,5 +162,37 @@ export function createTourHints(root, defaultAppearance, { onClose, focusTrigger
       geometry = dimensions;
       paginate();
     },
+  };
+}
+
+/** Places callouts without covering their target when another side has enough room. */
+function positionHint({ hint, hintWidth, hintHeight, point, offsetX, offsetY, appearance }) {
+  let left = (hintWidth - hint.offsetWidth) / 2;
+  let top = appearance.presentation === 'caption-top' ? 8 : hintHeight - hint.offsetHeight - 8;
+  if (appearance.presentation === 'callout') {
+    let placement = appearance.placement ?? 'auto';
+    const x = offsetX + point.x;
+    const y = offsetY + point.y;
+    if (placement === 'auto') {
+      placement =
+        x + 22 + hint.offsetWidth <= hintWidth - 8
+          ? 'right'
+          : x - 22 - hint.offsetWidth >= 8
+            ? 'left'
+            : y + 22 + hint.offsetHeight <= hintHeight - 8
+              ? 'bottom'
+              : 'top';
+    }
+    left = x + 22;
+    top = y - hint.offsetHeight / 2;
+    if (placement === 'left') left = x - hint.offsetWidth - 22;
+    if (placement === 'top' || placement === 'bottom') {
+      left = x - hint.offsetWidth / 2;
+      top = placement === 'top' ? y - hint.offsetHeight - 22 : y + 22;
+    }
+  }
+  return {
+    left: Math.max(8, Math.min(hintWidth - hint.offsetWidth - 8, left)),
+    top: Math.max(8, Math.min(hintHeight - hint.offsetHeight - 8, top)),
   };
 }

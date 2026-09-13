@@ -1,7 +1,9 @@
 import { createTourScene } from './scene.js';
 
 /** Owns one mounted player and releases every document listener and resize observer. */
-export function createTourPlayer(root, { tour, assets, labels }) {
+export function createTourPlayer(root, input, options = {}) {
+  let { tour } = input;
+  const { labels } = input;
   const lifetime = new AbortController();
   const query = (name) => root.querySelector(`[data-tour-${name}]`);
   const viewport = query('viewport');
@@ -15,8 +17,9 @@ export function createTourPlayer(root, { tour, assets, labels }) {
   let index = 0;
   let ended = false;
   const history = [];
-  const view = createTourScene(root, { tour, assets, labels }, act, lifetime.signal);
+  const view = createTourScene(root, input, act, lifetime.signal, options.authoring);
   function act(action) {
+    if (options.authoring) return;
     if (action.kind === 'next') go(index + 1);
     else if (action.kind === 'previous') back();
     else if (action.kind === 'restart') go(0);
@@ -69,7 +72,7 @@ export function createTourPlayer(root, { tour, assets, labels }) {
   root.ownerDocument.addEventListener(
     'keydown',
     (event) =>
-      handleTourKeyboard(event, navigation.open, {
+      handleTourKeyboard(event, navigation.open || Boolean(options.authoring), {
         ArrowRight: () => go(index + 1),
         ArrowLeft: back,
         Home: () => go(0),
@@ -83,10 +86,31 @@ export function createTourPlayer(root, { tour, assets, labels }) {
   render();
   view.resize();
   return {
+    update(nextInput) {
+      if (lifetime.signal.aborted) return;
+      const previousId = tour.slides[index]?.id;
+      tour = nextInput.tour;
+      index = Math.max(
+        0,
+        tour.slides.findIndex((slide) => slide.id === previousId)
+      );
+      if (!tour.endScreen.enabled) ended = false;
+      view.update(nextInput);
+      render();
+      view.resize();
+    },
+    selectObject: view.selectObject,
+    selectEnd() {
+      if (lifetime.signal.aborted) return;
+      if (options.authoring) {
+        ended = true;
+        render();
+      } else go(tour.slides.length, false);
+    },
     select(slideId) {
       if (lifetime.signal.aborted) return;
       const target = tour.slides.findIndex((slide) => slide.id === slideId);
-      if (target >= 0) go(target, false);
+      if (target >= 0 && (target !== index || ended)) go(target, false);
     },
     dispose() {
       if (lifetime.signal.aborted) return;

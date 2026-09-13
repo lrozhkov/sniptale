@@ -49,7 +49,7 @@ export function createTourNavigation({
       navigationPage * pageSize,
       navigationPage * pageSize + pageSize
     ))
-      buttons.append(actionButton(button.label, button.action, 'tour-button'));
+      buttons.append(actionButton(button.label, button.action, 'tour-button', button.id));
     panel.append(buttons);
     if (slide.buttons.length > pageSize) {
       const previousPage = actionButton(labels.previous, { kind: 'none' }, 'tour-button');

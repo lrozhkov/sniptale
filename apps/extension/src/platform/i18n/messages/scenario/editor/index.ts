@@ -1,4 +1,5 @@
 import { scenarioStepTemplateMessages } from './templates';
+import { scenarioTourMessages } from './tour';
 import { scenarioEditorHtmlImageMessages } from './html-images';
 import { scenarioEditorAppearanceMessages } from './appearance';
 import { defineMessageSource } from '../../source';
@@ -14,6 +15,7 @@ import { scenarioEditorV3PresentationMessages } from './v3-presentation';
 import { scenarioEditorV3TemplateMessages } from './v3-templates';
 
 export const scenarioEditorMessages = defineMessageSource({
+  ...scenarioTourMessages,
   ...scenarioStepTemplateMessages,
   ...scenarioEditorHtmlImageMessages,
   ...scenarioEditorAppearanceMessages,

@@ -257,12 +257,17 @@ function readDrop(
     };
   }
   if (transfer.types.includes(GUIDE_LIBRARY_IMAGE_DRAG_TYPE)) {
-    const source = readResource(transfer.getData(GUIDE_LIBRARY_IMAGE_DRAG_TYPE), true);
-    if (!source || !('mediaId' in source)) return null;
-    return { kind: 'import', sources: [{ kind: 'library', mediaId: source.mediaId }] };
+    const sources = readGuideLibraryImageDrag(transfer);
+    return sources ? { kind: 'import', sources } : null;
   }
   return {
     kind: 'import',
     sources: Array.from(transfer.files).map((file) => ({ kind: 'file', file })),
   };
+}
+
+/** Shared library drop admission carries only a validated media identity to the importer. */
+export function readGuideLibraryImageDrag(transfer: DataTransfer): GuideImageImportSource[] | null {
+  const source = readResource(transfer.getData(GUIDE_LIBRARY_IMAGE_DRAG_TYPE), true);
+  return source && 'mediaId' in source ? [{ kind: 'library', mediaId: source.mediaId }] : null;
 }

@@ -16,6 +16,8 @@ export function GuidePageHeader({
   onAiOpen,
   onAppearance,
   leftControls,
+  representationControls,
+  showSnap = true,
   status,
   commandsDisabled,
   onDuplicate,
@@ -40,6 +42,8 @@ export function GuidePageHeader({
   onAiOpen?: () => void;
   onAppearance: () => void;
   leftControls?: ReactNode;
+  representationControls?: ReactNode;
+  showSnap?: boolean;
   status: ComponentProps<typeof GuideProjectActions>['status'];
   commandsDisabled: boolean;
   onDuplicate: (name: string) => Promise<void>;
@@ -80,6 +84,7 @@ export function GuidePageHeader({
             />
           </label>
         )}
+        {representationControls}
         {feedback}
         <div className="guide-header-actions">
           {aiSelection && onAiOpen && (
@@ -98,7 +103,7 @@ export function GuidePageHeader({
           )}
           {project && (
             <>
-              <GuideSnapButton t={t} disabled={disabled} />
+              {showSnap && <GuideSnapButton t={t} disabled={disabled} />}
               <ContentToolbarButton
                 className="guide-labeled-action"
                 ref={previewRef}

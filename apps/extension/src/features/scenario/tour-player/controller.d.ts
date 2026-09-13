@@ -11,8 +11,18 @@ interface TourPlayerInput {
 /** Owns one mounted scene; disposal is idempotent and stops subsequent selection. */
 export function createTourPlayer(
   root: HTMLElement,
-  input: TourPlayerInput
+  input: TourPlayerInput,
+  options?: {
+    authoring?: {
+      canEdit?(): boolean;
+      onSelectObject(objectId: string | null): void;
+      onMoveObject(objectId: string, point: { x: number; y: number }): void;
+    };
+  }
 ): {
+  update(input: TourPlayerInput): void;
   select(slideId: string): void;
+  selectEnd(): void;
+  selectObject(objectId: string | null): void;
   dispose(): void;
 };

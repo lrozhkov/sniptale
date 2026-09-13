@@ -3,7 +3,9 @@ import { createTourNavigation } from './navigation.js';
 import { createTourHints } from './hints.js';
 
 /** Owns current scene geometry and explanation state, independent from playback history. */
-export function createTourScene(root, { tour, assets, labels }, onAction, signal) {
+export function createTourScene(root, input, onAction, signal, authoring) {
+  let { tour } = input;
+  const { assets, labels } = input;
   const media = new Map(assets.map((asset) => [asset.id, asset.src]));
   const query = (name) => root.querySelector(`[data-tour-${name}]`);
   const viewport = query('viewport');
@@ -11,10 +13,13 @@ export function createTourScene(root, { tour, assets, labels }, onAction, signal
   const scene = query('scene');
   let current = null;
   let ended = false;
+  let selectedObjectId = null;
   let stageWidth = 640;
   let stageHeight = 360;
+  const { element, actionButton } = sceneElements(root.ownerDocument, onAction, authoring);
   const hintController = createTourHints(root, tour.style.textAppearance, {
     signal,
+    keyboardScope: authoring ? root : null,
     onClose: () => navigationController.closeDetails(),
     focusTrigger: (activeIndex) => {
       const trigger =
@@ -34,25 +39,6 @@ export function createTourScene(root, { tour, assets, labels }, onAction, signal
     redraw: render,
   });
 
-  function element(tag, className, text) {
-    const node = root.ownerDocument.createElement(tag);
-    if (className) node.className = className;
-    if (text !== undefined) node.textContent = text;
-    return node;
-  }
-  function actionButton(label, action, className) {
-    const node = element(action.kind === 'url' ? 'a' : 'button', className, label);
-    if (action.kind === 'url') {
-      node.href = action.url;
-      node.target = '_blank';
-      node.rel = 'noopener noreferrer';
-    } else {
-      node.type = 'button';
-      node.addEventListener('click', () => onAction(action));
-    }
-    node.title = label;
-    return node;
-  }
   function render() {
     if (signal.aborted) return;
     scene.replaceChildren();
@@ -71,6 +57,8 @@ export function createTourScene(root, { tour, assets, labels }, onAction, signal
           actionButton,
           hintController,
           onAction,
+          authoring,
+          signal,
         }
       );
       hints = slide.image ? [...slide.hotspots, ...slide.annotations] : [];
@@ -80,6 +68,11 @@ export function createTourScene(root, { tour, assets, labels }, onAction, signal
       hints = rendered.hints;
     } else scene.append(element('p', 'tour-empty', labels.empty));
     hintController.show(hints, { stageWidth, stageHeight, imageBox });
+    markSelectedObject();
+  }
+  function markSelectedObject() {
+    for (const node of scene.querySelectorAll('[data-tour-object-id]'))
+      node.dataset.selected = String(node.dataset.tourObjectId === selectedObjectId);
   }
   function resize() {
     if (signal.aborted) return;
@@ -92,11 +85,24 @@ export function createTourScene(root, { tour, assets, labels }, onAction, signal
     stage.style.height = `${stageHeight}px`;
     render();
   }
-  root.style.setProperty('--tour-accent', tour.style.accent);
-  root.style.setProperty('--tour-text', tour.style.text);
-  root.style.setProperty('--tour-surface', tour.style.surface);
-  stage.style.background = tour.stage.background;
+  applySceneStyle(root, stage, tour);
   return {
+    update(next) {
+      tour = next.tour;
+      media.clear();
+      for (const asset of next.assets) media.set(asset.id, asset.src);
+      hintController.setDefaultAppearance(tour.style.textAppearance);
+      applySceneStyle(root, stage, tour);
+    },
+    selectObject(id) {
+      selectedObjectId = id;
+      markSelectedObject();
+      const hintIndex =
+        current?.kind === 'image'
+          ? [...current.hotspots, ...current.annotations].findIndex((item) => item.id === id)
+          : -1;
+      if (hintIndex >= 0) hintController.select(hintIndex);
+    },
     resize,
     openContents: navigationController.openContents,
     show(slide, isEnd) {
@@ -124,4 +130,37 @@ function endSlide(tour, labels) {
       ...(end.restart ? [{ label: labels.restart, action: { kind: 'restart' } }] : []),
     ],
   };
+}
+
+function sceneElements(document, onAction, authoring) {
+  function element(tag, className, text) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+  function actionButton(label, action, className, objectId = null) {
+    const node = element(!authoring && action.kind === 'url' ? 'a' : 'button', className, label);
+    if (!authoring && action.kind === 'url') {
+      node.href = action.url;
+      node.target = '_blank';
+      node.rel = 'noopener noreferrer';
+    } else {
+      node.type = 'button';
+      node.addEventListener('click', () =>
+        authoring ? authoring.onSelectObject(objectId) : onAction(action)
+      );
+    }
+    if (objectId) node.dataset.tourObjectId = objectId;
+    node.title = label;
+    return node;
+  }
+  return { element, actionButton };
+}
+
+function applySceneStyle(root, stage, tour) {
+  root.style.setProperty('--tour-accent', tour.style.accent);
+  root.style.setProperty('--tour-text', tour.style.text);
+  root.style.setProperty('--tour-surface', tour.style.surface);
+  stage.style.background = tour.stage.background;
 }

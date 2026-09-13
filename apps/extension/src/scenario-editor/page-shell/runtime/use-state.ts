@@ -1,3 +1,4 @@
+import { getTourImages } from '../../../features/scenario/project/public';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import {
@@ -192,13 +193,14 @@ export function useGuidePageState() {
 function useGuideImages(project: GuideProject | null) {
   const [images, setImages] = useState<Record<string, string | null>>({});
   const assetKey = JSON.stringify([
-    ...new Set(
-      project?.items.flatMap((item) =>
+    ...new Set([
+      ...(project?.items.flatMap((item) =>
         item.kind === 'step'
           ? item.blocks.flatMap((block) => (block.kind === 'image' ? [block.assetId] : []))
           : []
-      ) ?? []
-    ),
+      ) ?? []),
+      ...(project?.tour ? getTourImages(project.tour).map((image) => image.assetId) : []),
+    ]),
   ]);
   useEffect(() => {
     let active = true;

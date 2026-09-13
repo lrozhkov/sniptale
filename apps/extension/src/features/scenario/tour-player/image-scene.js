@@ -1,3 +1,5 @@
+import { bindTourObjectDrag } from './authoring.js';
+
 function projectImagePoint(box, point) {
   return { x: box.x + point.x * box.width, y: box.y + point.y * box.height };
 }
@@ -6,7 +8,7 @@ function projectImagePoint(box, point) {
 export function renderTourImage(
   slide,
   { stageWidth, stageHeight },
-  { scene, element, labels, media, actionButton, hintController, onAction }
+  { scene, element, labels, media, actionButton, hintController, onAction, authoring, signal }
 ) {
   if (!slide.image) {
     scene.append(element('p', 'tour-empty', labels.empty));
@@ -39,24 +41,38 @@ export function renderTourImage(
   });
   scene.append(image);
   for (const mask of slide.masks) {
-    const box = element('div', `tour-mask tour-mask-${mask.kind}`);
+    const box = element(authoring ? 'button' : 'div', `tour-mask tour-mask-${mask.kind}`);
     const position = projectImagePoint(imageBox, mask.rect);
     Object.assign(box.style, {
       left: `${position.x}px`,
       top: `${position.y}px`,
       width: `${mask.rect.width * imageBox.width}px`,
       height: `${mask.rect.height * imageBox.height}px`,
-      background: mask.kind === 'highlight' ? mask.color : 'transparent',
+      background: mask.kind === 'highlight' || mask.kind === 'redact' ? mask.color : 'transparent',
       opacity: String(mask.opacity),
     });
     if (mask.kind === 'spotlight') box.style.boxShadow = `0 0 0 100vmax ${mask.color}`;
+    if (authoring) {
+      box.type = 'button';
+      box.setAttribute('aria-label', labels.details);
+      box.style.pointerEvents = 'auto';
+      box.addEventListener('click', () => authoring.onSelectObject(mask.id));
+      bindTourObjectDrag(
+        box,
+        { id: mask.id, point: mask.rect, maxX: 1 - mask.rect.width, maxY: 1 - mask.rect.height },
+        imageBox,
+        authoring,
+        signal
+      );
+    }
     scene.append(box);
   }
   slide.hotspots.forEach((hotspot, number) => {
     const button = actionButton(
       String(number + 1),
       hotspot.action.kind === 'url' ? hotspot.action : { kind: 'none' },
-      'tour-hotspot'
+      'tour-hotspot',
+      hotspot.id
     );
     const point = projectImagePoint(imageBox, hotspot.point);
     button.style.left = `${point.x}px`;
@@ -72,11 +88,36 @@ export function renderTourImage(
       hintController.select(number);
     });
     button.addEventListener('click', () => {
+      if (authoring) return;
       if (hintController.activeIndex !== number) {
         hintController.select(number);
       } else if (hotspot.action.kind !== 'url') onAction(hotspot.action);
     });
+    if (authoring)
+      bindTourObjectDrag(
+        button,
+        { id: hotspot.id, point: hotspot.point },
+        imageBox,
+        authoring,
+        signal
+      );
     scene.append(button);
   });
+  if (authoring)
+    for (const annotation of slide.annotations) {
+      const anchor = annotation.anchor ?? { x: 0.5, y: 0.5 };
+      const marker = actionButton(
+        'i',
+        { kind: 'none' },
+        'tour-hotspot tour-annotation-anchor',
+        annotation.id
+      );
+      const position = projectImagePoint(imageBox, anchor);
+      marker.style.left = `${position.x}px`;
+      marker.style.top = `${position.y}px`;
+      marker.setAttribute('aria-label', labels.details);
+      bindTourObjectDrag(marker, { id: annotation.id, point: anchor }, imageBox, authoring, signal);
+      scene.append(marker);
+    }
   return imageBox;
 }

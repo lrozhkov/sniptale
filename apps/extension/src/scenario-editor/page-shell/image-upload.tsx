@@ -3,7 +3,10 @@ import { useEffect, useRef, useState } from 'react';
 import { ImagePlus, Upload } from 'lucide-react';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { PROJECT_ASSET_IMAGE_MIME_TYPES } from '../../features/media-hub/project-assets';
-import type { GuideImageImportPlacement } from '../../composition/persistence/scenario/store/public';
+import type {
+  GuideImageImportPlacement,
+  TourImageImportPlacement,
+} from '../../composition/persistence/scenario/store/public';
 import type { Translate } from '../../platform/i18n';
 
 /** Owns one disposable file choice; the page publishes through the existing image importer. */
@@ -17,7 +20,7 @@ export function GuideImageUpload({
 }: {
   compact?: boolean;
   frame?: { width: number; height: number };
-  placement: GuideImageImportPlacement;
+  placement: GuideImageImportPlacement | TourImageImportPlacement;
   disabled: boolean;
   onUpload: (file: File, signal: AbortSignal) => Promise<boolean>;
   t: Translate;

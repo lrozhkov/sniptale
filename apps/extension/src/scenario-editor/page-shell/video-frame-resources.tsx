@@ -8,6 +8,7 @@ import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type {
   GuideImageImportPlacement,
+  TourImageImportPlacement,
   GuideImageImportSource,
 } from '../../composition/persistence/scenario/store/public';
 import type { Translate } from '../../platform/i18n';
@@ -21,12 +22,12 @@ import './video-frame-resources.css';
 type VideoResourcesProps = {
   mediaId: string;
   disabled: boolean;
-  target?: GuideImageImportPlacement;
+  target?: GuideImageImportPlacement | TourImageImportPlacement;
   onComplete?: () => void;
   t: Translate;
   onImport: (input: {
     sources: readonly GuideImageImportSource[];
-    placement: GuideImageImportPlacement;
+    placement: GuideImageImportPlacement | TourImageImportPlacement;
     signal: AbortSignal;
     onProgress: (completed: number, total: number) => void;
   }) => Promise<boolean>;
@@ -179,7 +180,7 @@ export function GuideVideoFrameResources(props: VideoResourcesProps) {
             <span role="status">{t('scenario.editor.loading')}</span>
           </LibraryMediaPlayer>
           <span>{state.source.filename}</span>
-          {!props.target && (
+          {(!props.target || props.target.kind === 'tour-slides') && (
             <>
               <div className="guide-video-field">
                 <span>{t('scenario.editor.guideStepTitle')}</span>
@@ -202,7 +203,9 @@ export function GuideVideoFrameResources(props: VideoResourcesProps) {
                   clearable
                   value={state.description}
                   rows={2}
-                  maxLength={GUIDE_LIMITS.maxTextLength}
+                  maxLength={
+                    props.target?.kind === 'tour-slides' ? 4000 : GUIDE_LIMITS.maxTextLength
+                  }
                   disabled={locked}
                   onValueChange={state.writeDescription}
                 />

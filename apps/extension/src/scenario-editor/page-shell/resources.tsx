@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type {
   GuideImageImportPlacement,
+  TourImageImportPlacement,
   GuideImageImportSource,
 } from '../../composition/persistence/scenario/store/public';
 import type { Translate } from '../../platform/i18n';
@@ -14,13 +15,13 @@ type ResourceProps = {
   toolbarTarget?: HTMLElement | null;
   disabled: boolean;
   selectedStepId: string | null;
-  target?: GuideImageImportPlacement;
+  target?: GuideImageImportPlacement | TourImageImportPlacement;
   onComplete?: () => void;
   onLibraryDragStart?: () => void;
   t: Translate;
   onImport: (input: {
     sources: readonly GuideImageImportSource[];
-    placement: GuideImageImportPlacement;
+    placement: GuideImageImportPlacement | TourImageImportPlacement;
     signal: AbortSignal;
     onProgress: (completed: number, total: number) => void;
   }) => Promise<boolean>;
@@ -90,6 +91,11 @@ function useGuideImageResources({
     }
   };
   const locked = disabled || pending;
+  const single =
+    target?.kind === 'replace-image' ||
+    target?.kind === 'tour-image' ||
+    target?.kind === 'tour-background';
+  const limit = target?.kind === 'tour-slides' ? 300 : 50;
   const chooseLibrary = (id: string, name: string) => {
     if (locked) return;
     const existing = selection.find(
@@ -99,7 +105,7 @@ function useGuideImageResources({
       remove(existing.id);
       return;
     }
-    if (target?.kind !== 'replace-image' && selection.length >= 50) {
+    if (!single && selection.length >= limit) {
       setFailed(true);
       return;
     }
@@ -109,7 +115,7 @@ function useGuideImageResources({
       source: { kind: 'library', mediaId: id },
     };
     setFailed(false);
-    setSelection(target?.kind === 'replace-image' ? [item] : [...selection, item]);
+    setSelection(single ? [item] : [...selection, item]);
   };
   return {
     selection,

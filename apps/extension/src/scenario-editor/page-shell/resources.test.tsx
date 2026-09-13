@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from 'react';
+import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createTranslator } from '../../platform/i18n';
@@ -32,11 +32,15 @@ afterEach(() => {
   host.remove();
   vi.unstubAllGlobals();
 });
-async function render(selectedStepId: string | null = 'step') {
+async function render(
+  selectedStepId: string | null = 'step',
+  target?: NonNullable<ComponentProps<typeof GuideImageResources>['target']>
+) {
   await act(async () =>
     root.render(
       <GuideImageResources
         disabled={false}
+        {...(target ? { target } : {})}
         selectedStepId={selectedStepId}
         t={createTranslator('en')}
         onImport={io.import}
@@ -179,4 +183,25 @@ it('keeps multiple library images targeted to the originating empty step', async
   expect(io.import.mock.calls[0]?.[0].sources).toHaveLength(2);
   expect(io.import.mock.calls[0]?.[0].placement).toEqual({ kind: 'blocks', stepId: 'empty-step' });
   expect(complete).toHaveBeenCalledOnce();
+});
+
+it('imports a tour replacement as one image and keeps tour slide imports ordered', async () => {
+  await render(null, { kind: 'tour-image', slideId: 'tour-slide' });
+  await files('first.png', 'second.png');
+  await click('Import selected');
+  expect(io.import.mock.calls[0]?.[0]).toMatchObject({
+    placement: { kind: 'tour-image', slideId: 'tour-slide' },
+    sources: [{ kind: 'library', mediaId: 'second.png' }],
+  });
+  expect(io.import.mock.calls[0]?.[0].sources).toHaveLength(1);
+  await render(null, { kind: 'tour-slides', beforeSlideId: 'tour-slide' });
+  await files('first.png', 'second.png');
+  await click('Import selected');
+  expect(io.import.mock.calls[1]?.[0]).toMatchObject({
+    placement: { kind: 'tour-slides', beforeSlideId: 'tour-slide' },
+    sources: [
+      { kind: 'library', mediaId: 'first.png' },
+      { kind: 'library', mediaId: 'second.png' },
+    ],
+  });
 });

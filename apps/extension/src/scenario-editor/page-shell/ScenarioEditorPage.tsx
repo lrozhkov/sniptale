@@ -1,3 +1,5 @@
+import { CompactSelect } from '../../ui/compact-inspector-controls/select';
+import { TourWorkspace } from './tour/workspace';
 import type {
   GuideImageImportPlacement,
   GuideImageImportSource,
@@ -13,7 +15,7 @@ import { GuideDefaultAppearance } from './default-appearance';
 import { applyGuideDefaultStyle } from '../../features/scenario/project/public';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
 import { GuidePageHeader } from './header';
-import { useEffect, useState, type KeyboardEvent } from 'react';
+import { useEffect, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { GuideImageControls } from './image-controls';
 import type { Translate } from '../../platform/i18n';
 import { createTranslator, useAppLocale } from '../../platform/i18n';
@@ -29,12 +31,14 @@ export function ScenarioEditorPage() {
   const t = createTranslator(useAppLocale());
   const state = useGuidePageState();
   const panels = useGuidePanels();
+  const [representation, setRepresentation] = useState<'guide' | 'tour'>('guide');
   const imageEditor = useGuideImageEditorMode(state.images);
   const { project, status, editingLocked: disabled } = state;
   const reader = useGuideReaderMode(state.sealEdit);
   const commandsDisabled = disabled || state.mutationPending;
   const importDisabled = commandsDisabled || status === 'conflict';
   const imports = guideImageImportCommands(state.commitChange);
+  const tourMode = representation === 'tour' && project?.purpose !== 'step-template';
   const { focusRequest, selectItem, selectedStepId, operate } = useGuideNavigation(state);
   const framing = useGuideBlockSelection(state, panels, selectItem);
   const feedback = (
@@ -70,14 +74,222 @@ export function ScenarioEditorPage() {
       />
     );
   const header = (
+    <ScenarioHeader
+      state={state}
+      panels={panels}
+      reader={reader}
+      framing={framing}
+      selectedStepId={selectedStepId}
+      tourMode={tourMode}
+      representation={representation}
+      onRepresentation={setRepresentation}
+      feedback={feedback}
+      t={t}
+    />
+  );
+  return (
+    <main
+      className="guide-page"
+      onBlurCapture={state.sealEdit}
+      onKeyDownCapture={(event) => handleGuideHistoryShortcut(event, state.undo, state.redo)}
+    >
+      {!project && header}
+      <GuideProjectRecovery state={state} t={t} />
+      {project && tourMode && (
+        <TourWorkspace
+          key={project.id}
+          project={project}
+          images={state.images}
+          panels={panels}
+          header={header}
+          disabled={importDisabled}
+          onChange={state.update}
+          onImport={imports.resources}
+          t={t}
+        />
+      )}
+      {project && !tourMode && (
+        <GuideDocumentWorkspace
+          state={state}
+          project={project}
+          panels={panels}
+          header={header}
+          imports={imports}
+          importDisabled={importDisabled}
+          disabled={disabled}
+          selectedStepId={selectedStepId}
+          framing={framing}
+          operate={operate}
+          imageEditor={imageEditor}
+          focusRequest={focusRequest}
+          selectItem={selectItem}
+          t={t}
+        />
+      )}
+    </main>
+  );
+}
+
+/** Keeps reference-guide composition independent from the tour representation. */
+function GuideDocumentWorkspace({
+  state,
+  project,
+  panels,
+  header,
+  imports,
+  importDisabled,
+  disabled,
+  selectedStepId,
+  framing,
+  operate,
+  imageEditor,
+  focusRequest,
+  selectItem,
+  t,
+}: {
+  state: ReturnType<typeof useGuidePageState>;
+  project: GuideProject;
+  panels: ReturnType<typeof useGuidePanels>;
+  header: ReactNode;
+  imports: ReturnType<typeof guideImageImportCommands>;
+  importDisabled: boolean;
+  disabled: boolean;
+  selectedStepId: string | null;
+  framing: ReturnType<typeof useGuideBlockSelection>;
+  operate: ReturnType<typeof useGuideNavigation>['operate'];
+  imageEditor: ReturnType<typeof useGuideImageEditorMode>;
+  focusRequest: ReturnType<typeof useGuideNavigation>['focusRequest'];
+  selectItem: ReturnType<typeof useGuideNavigation>['selectItem'];
+  t: Translate;
+}) {
+  return (
+    <GuideResourceDrawer
+      t={t}
+      disabled={importDisabled}
+      selectedStepId={selectedStepId}
+      onImport={imports.resources}
+    >
+      <GuideImageDropZone
+        t={t}
+        project={project}
+        disabled={importDisabled}
+        onPlace={operate}
+        onImport={imports.drop}
+      >
+        <GuideWorkspace
+          onUploadFile={imports.uploadStep}
+          header={header}
+          images={state.images}
+          panels={panels}
+          project={project}
+          selectedId={state.selectedId}
+          disabled={disabled}
+          onSelect={framing.selectStep}
+          onAddStep={() => operate({ kind: 'add-step' })}
+          inspectedBlockKind={framing.target?.block.kind}
+          itemActions={
+            <GuideContextualInspector
+              onSaveTemplate={state.saveTemplate}
+              onApplyTemplate={(stepId, templateId, mode) =>
+                state.commitChange({ kind: 'template', input: { stepId, templateId, mode } })
+              }
+              presentation={panels.presentation}
+              scope={panels.rightScope}
+              project={project}
+              selectedId={state.selectedId}
+              framing={framing}
+              images={state.images}
+              disabled={disabled}
+              onChange={state.update}
+              t={t}
+            />
+          }
+          t={t}
+        >
+          <GuideDocument
+            framedImageId={framing.imageId}
+            onSelectBlock={framing.selectBlock}
+            onFrameImage={framing.select}
+            onUploadImage={imports.upload}
+            onEditImage={(itemId, blockId) => {
+              state.sealEdit();
+              imageEditor.open(itemId, blockId);
+            }}
+            focusRequest={focusRequest}
+            project={project}
+            selectedId={state.selectedId}
+            images={state.images}
+            disabled={disabled}
+            onChange={state.update}
+            onSelect={(id) => selectItem(id, false)}
+            onOperate={operate}
+            t={t}
+          />
+        </GuideWorkspace>
+      </GuideImageDropZone>
+    </GuideResourceDrawer>
+  );
+}
+
+/** Binds header actions to the active representation and the shared project session. */
+function ScenarioHeader({
+  state,
+  panels,
+  reader,
+  framing,
+  selectedStepId,
+  tourMode,
+  representation,
+  onRepresentation,
+  feedback,
+  t,
+}: {
+  state: ReturnType<typeof useGuidePageState>;
+  panels: ReturnType<typeof useGuidePanels>;
+  reader: ReturnType<typeof useGuideReaderMode>;
+  framing: ReturnType<typeof useGuideBlockSelection>;
+  selectedStepId: string | null;
+  tourMode: boolean;
+  representation: 'guide' | 'tour';
+  onRepresentation: (value: 'guide' | 'tour') => void;
+  feedback: ReactNode;
+  t: Translate;
+}) {
+  const { project, status, editingLocked: disabled } = state;
+  const commandsDisabled = disabled || state.mutationPending;
+  return (
     <GuidePageHeader
       images={state.images}
-      aiSelection={{ stepId: selectedStepId, blockId: framing.target?.block.id ?? null }}
-      onAiOpen={state.sealEdit}
+      {...(!tourMode
+        ? {
+            aiSelection: { stepId: selectedStepId, blockId: framing.target?.block.id ?? null },
+            onAiOpen: state.sealEdit,
+          }
+        : {})}
       onAppearance={() => panels.openRight('document')}
       onPreview={reader.open}
       previewRef={reader.trigger}
-      previewDisabled={disabled}
+      previewDisabled={disabled || tourMode}
+      showSnap={!tourMode}
+      representationControls={
+        project &&
+        project.purpose !== 'step-template' && (
+          <div className="tour-representation-switch">
+            <CompactSelect
+              value={representation}
+              aria-label={t('scenario.editor.representation')}
+              options={[
+                { value: 'guide', label: t('scenario.editor.referenceMode') },
+                { value: 'tour', label: t('scenario.editor.tourMode') },
+              ]}
+              onChange={(value) => {
+                state.sealEdit();
+                onRepresentation(value);
+              }}
+            />
+          </div>
+        )
+      }
       status={status}
       commandsDisabled={commandsDisabled}
       onDuplicate={state.duplicate}
@@ -95,83 +307,6 @@ export function ScenarioEditorPage() {
       onChange={state.update}
       t={t}
     />
-  );
-  return (
-    <main
-      className="guide-page"
-      onBlurCapture={state.sealEdit}
-      onKeyDownCapture={(event) => handleGuideHistoryShortcut(event, state.undo, state.redo)}
-    >
-      {!project && header}
-      <GuideProjectRecovery state={state} t={t} />
-      {project && (
-        <GuideResourceDrawer
-          t={t}
-          disabled={importDisabled}
-          selectedStepId={selectedStepId}
-          onImport={imports.resources}
-        >
-          <GuideImageDropZone
-            t={t}
-            project={project}
-            disabled={importDisabled}
-            onPlace={operate}
-            onImport={imports.drop}
-          >
-            <GuideWorkspace
-              onUploadFile={imports.uploadStep}
-              header={header}
-              images={state.images}
-              panels={panels}
-              project={project}
-              selectedId={state.selectedId}
-              disabled={disabled}
-              onSelect={framing.selectStep}
-              onAddStep={() => operate({ kind: 'add-step' })}
-              inspectedBlockKind={framing.target?.block.kind}
-              itemActions={
-                <GuideContextualInspector
-                  onSaveTemplate={state.saveTemplate}
-                  onApplyTemplate={(stepId, templateId, mode) =>
-                    state.commitChange({ kind: 'template', input: { stepId, templateId, mode } })
-                  }
-                  presentation={panels.presentation}
-                  scope={panels.rightScope}
-                  project={project}
-                  selectedId={state.selectedId}
-                  framing={framing}
-                  images={state.images}
-                  disabled={disabled}
-                  onChange={state.update}
-                  t={t}
-                />
-              }
-              t={t}
-            >
-              <GuideDocument
-                framedImageId={framing.imageId}
-                onSelectBlock={framing.selectBlock}
-                onFrameImage={framing.select}
-                onUploadImage={imports.upload}
-                onEditImage={(itemId, blockId) => {
-                  state.sealEdit();
-                  imageEditor.open(itemId, blockId);
-                }}
-                focusRequest={focusRequest}
-                project={project}
-                selectedId={state.selectedId}
-                images={state.images}
-                disabled={disabled}
-                onChange={state.update}
-                onSelect={(id) => selectItem(id, false)}
-                onOperate={operate}
-                t={t}
-              />
-            </GuideWorkspace>
-          </GuideImageDropZone>
-        </GuideResourceDrawer>
-      )}
-    </main>
   );
 }
 
