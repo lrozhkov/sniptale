@@ -49,7 +49,12 @@ function fixture() {
   ];
   tour.slides = [slide, { ...createTourImageSlide('two'), title: 'Second', image: slide.image }];
   tour.endScreen.title = 'Done';
-  return { tour, assets: [{ id: 'image', mime: 'image/png', base64: png }], title: 'Tour', labels };
+  return {
+    tour,
+    assets: [{ id: 'image', mime: 'image/png', base64: png }],
+    title: 'Tour',
+    labels: { ...labels },
+  };
 }
 function open(html: string) {
   const frame = document.createElement('iframe');
@@ -281,4 +286,52 @@ it('requires object narration bytes and omits unused audio material metadata fro
   expect(html).not.toContain('Private unused take.wav');
   expect(html).not.toContain('"audioResources"');
   expect(html).toContain('"trigger":"activation"');
+});
+
+it('uses a numberless hotspot and readable explanation controls without a compound counter', async () => {
+  const dom = open(await buildTourPlayerHtml(fixture()));
+  const doc = dom.window.document;
+  expect(doc.querySelector('.tour-hotspot')?.textContent).toBe('');
+  expect(doc.querySelector('[data-tour-hint-previous]')?.textContent?.trim()).toBe('Back');
+  expect(doc.querySelector('[data-tour-hint-next]')?.textContent?.trim()).toBe('Next');
+  expect(doc.querySelector('[data-tour-hint-count]')?.textContent).not.toContain('·');
+  expect(doc.querySelector<HTMLElement>('[data-tour-hint-point-count]')?.hidden).toBe(true);
+  dom.close();
+});
+
+it('keeps hint surfaces decorative and restores the previous point last text page', async () => {
+  const args = fixture();
+  const slide = args.tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('image fixture');
+  slide.hotspots[0]!.text = 'A'.repeat(170);
+  slide.hotspots[0]!.appearance = {
+    ...args.tour.style.textAppearance,
+    surface: {
+      fillPaint: { kind: 'solid', color: '#ffffff' },
+      textColor: '#111827',
+      width: 300,
+      padding: 12,
+      radius: 16,
+      surfaceCss: 'background-image: url(https://example.com/tracker);',
+    },
+  };
+  slide.hotspots.push({
+    ...slide.hotspots[0]!,
+    id: 'second-point',
+    text: 'Second explanation',
+    appearance: null,
+  });
+  const dom = open(await buildTourPlayerHtml(args));
+  const doc = dom.window.document;
+  const hint = doc.querySelector<HTMLElement>('[data-tour-hint]')!;
+  expect(hint.style.backgroundImage).not.toContain('url(');
+  expect(hint.style.borderRadius).toBe('16px');
+  expect(doc.querySelector<HTMLElement>('[data-tour-hint-point-count]')!.hidden).toBe(false);
+  doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
+  expect(doc.querySelector('[data-tour-hint-count]')?.textContent).toBe('2 / 2');
+  doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click();
+  expect(doc.querySelector('[data-tour-hint-text]')?.textContent).toBe('Second explanation');
+  doc.querySelector<HTMLButtonElement>('[data-tour-hint-previous]')!.click();
+  expect(doc.querySelector('[data-tour-hint-text]')?.textContent).toBe('A'.repeat(10));
+  dom.close();
 });

@@ -31,8 +31,8 @@ export function TourStage({
   const callbacks = useRef({ onSelectObject, onMoveObject, disabled });
   callbacks.current = { onSelectObject, onMoveObject, disabled };
   const labels = useRef<TourPlayerLabels>({
-    previous: t('scenario.editor.tourBack'),
-    next: t('scenario.editor.tourActionNext'),
+    previous: t('scenario.editor.tourHintPrevious'),
+    next: t('scenario.editor.tourHintNext'),
     contents: t('scenario.editor.tourSlides'),
     close: t('scenario.editor.close'),
     restart: t('scenario.editor.tourRestart'),
@@ -76,9 +76,12 @@ export function TourStage({
     controller.current.update(latest.current.input);
     restoreSelection(controller.current, latest.current.selection);
   }, [tour, images]);
+  const selectionKind = selection?.kind;
+  const selectedSlide = selection?.kind === 'slide' ? selection.slideId : null;
+  const selectedObject = selection?.kind === 'slide' ? selection.objectId : null;
   useLayoutEffect(() => {
-    if (controller.current) restoreSelection(controller.current, selection);
-  }, [selection]);
+    if (controller.current) restoreSelection(controller.current, latest.current.selection);
+  }, [selectionKind, selectedSlide, selectedObject]);
   return (
     <div
       className="tour-stage-host"
@@ -137,17 +140,20 @@ function TourStageScaffold({
           <div className="tour-scene" data-tour-scene />
         </section>
         <aside className="tour-hint" data-tour-hint hidden>
+          <div className="tour-hint-header">
+            <span data-tour-hint-point-count hidden />
+            <button className="tour-button" data-tour-hint-close aria-label={labels.close}>
+              ×
+            </button>
+          </div>
           <div className="tour-hint-text" data-tour-hint-text />
           <div className="tour-hint-controls">
             <button className="tour-button" data-tour-hint-previous aria-label={labels.previous}>
-              ‹
+              {labels.previous}
             </button>
-            <span data-tour-hint-count />
+            <span data-tour-hint-count hidden />
             <button className="tour-button" data-tour-hint-next aria-label={labels.next}>
-              ›
-            </button>
-            <button className="tour-button" data-tour-hint-close aria-label={labels.close}>
-              ×
+              {labels.next}
             </button>
           </div>
         </aside>

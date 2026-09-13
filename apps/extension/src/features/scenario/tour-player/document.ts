@@ -149,19 +149,22 @@ export async function buildTourPlayerHtml(args: {
 </div>
 </section>
 <aside class="tour-hint" data-tour-hint hidden>
-<div class="tour-hint-text" data-tour-hint-text>
-</div>
-<div class="tour-hint-controls">
-<button class="tour-button" data-tour-hint-previous aria-label="${escape(labels.previous)}">‹</button>
-<span data-tour-hint-count>
-</span>
-<button class="tour-button" data-tour-hint-next aria-label="${escape(labels.next)}">›</button>
+<div class="tour-hint-header">
+<span data-tour-hint-point-count hidden></span>
 <button class="tour-button" data-tour-hint-close aria-label="${escape(labels.close)}">×</button>
+</div>
+<div class="tour-hint-text" data-tour-hint-text></div>
+<div class="tour-hint-controls">
+<button class="tour-button" data-tour-hint-previous aria-label="${escape(labels.previous)}">
+${escape(labels.previous)}</button>
+<span data-tour-hint-count hidden></span>
+<button class="tour-button" data-tour-hint-next aria-label="${escape(labels.next)}">${escape(labels.next)}</button>
 </div>
 </aside>
 </div>
 <footer class="tour-transport">
-<button class="tour-button" data-tour-previous>${escape(labels.previous)}</button>
+<button class="tour-button" data-tour-previous>
+${escape(labels.previous)}</button>
 <span class="tour-counter" data-tour-counter aria-live="polite">
 </span>
 <button class="tour-button" data-tour-next>${escape(labels.next)}</button>

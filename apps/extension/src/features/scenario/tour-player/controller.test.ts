@@ -214,16 +214,19 @@ it('cancels an active object gesture when the player is disposed', async () => {
   expect(onMoveObject).not.toHaveBeenCalled();
 });
 
-it('places an automatic callout below its point when neither horizontal side has room', async () => {
+it('keeps an automatic callout within the letterboxed stage when no side fits', async () => {
   const { player, root } = await mount();
   const viewport = root.querySelector('[data-tour-viewport]')!;
   const hint = root.querySelector<HTMLElement>('[data-tour-hint]')!;
   Object.defineProperties(viewport, { clientWidth: { value: 608 }, clientHeight: { value: 620 } });
   Object.defineProperties(hint, { offsetWidth: { value: 340 }, offsetHeight: { value: 200 } });
   player.update(authoringInput());
-  const marker = root.querySelector<HTMLElement>('.tour-hotspot')!;
-  const pointY = (620 - 342) / 2 + Number.parseFloat(marker.style.top);
-  expect(Number.parseFloat(hint.style.top)).toBeGreaterThan(pointY + 15);
+  const top = Number.parseFloat(hint.style.top);
+  const left = Number.parseFloat(hint.style.left);
+  expect(top).toBeGreaterThanOrEqual((620 - 342) / 2 + 8);
+  expect(top + 200).toBeLessThanOrEqual((620 - 342) / 2 + 342 - 8);
+  expect(left).toBeGreaterThanOrEqual(8);
+  expect(left + 340).toBeLessThanOrEqual(608 - 8);
 });
 
 it('preserves the selected object after the scene is resized', async () => {

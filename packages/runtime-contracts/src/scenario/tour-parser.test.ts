@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { parseTourDocument, tourDocumentSchema } from './tour-parser';
-import { type TourDocument, type TourImageSlide } from './types/tour';
+import { TOUR_HINT_SURFACE, type TourDocument, type TourImageSlide } from './types/tour';
 
 function imageSlide(): TourImageSlide {
   return {
@@ -111,6 +111,15 @@ describe('interactive tour boundary', () => {
     if (parsed.status !== 'ok') throw new Error('Expected document');
     parsed.document.slides[0]!.title = 'changed';
     expect(value.slides[0]!.title).toBe('Настройки');
+  });
+  it('retains explanation surfaces and rejects out-of-range dimensions', () => {
+    const value = document();
+    value.style.textAppearance.surface = { ...TOUR_HINT_SURFACE, width: 280, radius: 20 };
+    expect(parseTourDocument(value)).toEqual({ status: 'ok', document: value });
+    for (const patch of [{ width: 0 }, { width: 641 }, { padding: 25 }, { radius: -1 }]) {
+      value.style.textAppearance.surface = { ...TOUR_HINT_SURFACE, ...patch };
+      expect(parseTourDocument(value).status).not.toBe('ok');
+    }
   });
   it('allows unfinished image slots without pretending they are exportable', () => {
     expect(

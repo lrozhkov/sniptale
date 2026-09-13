@@ -397,8 +397,7 @@ function TourDocumentSettings({
       {(
         [
           { key: 'accent', label: t('scenario.editor.appearanceAccent') },
-          { key: 'text', label: t('scenario.editor.tourTextColor') },
-          { key: 'surface', label: t('scenario.editor.tourSurface') },
+          { key: 'text', label: t('scenario.editor.tourSceneTextColor') },
         ] as const
       ).map(({ key, label }) => (
         <ColorField

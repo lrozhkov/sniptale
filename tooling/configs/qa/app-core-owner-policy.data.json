@@ -58,6 +58,7 @@
     "apps/extension/src/features/editor/document/public.ts",
     "apps/extension/src/features/highlighter/contracts/index.ts",
     "apps/extension/src/features/highlighter/style/public.ts",
+    "apps/extension/src/features/highlighter/surface-style/surface-css.ts",
     "apps/extension/src/features/video/project/public.ts"
   ],
   "sameConcernPersistenceEdges": [

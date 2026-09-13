@@ -47,6 +47,17 @@ export const tourActionSchema = z.discriminatedUnion('kind', [
 ]);
 const textAppearance = z
   .object({
+    surface: z
+      .object({
+        fillPaint: tourPaintSchema,
+        surfaceCss: z.string().max(4000),
+        textColor: color,
+        width: z.number().finite().min(200).max(640),
+        padding: z.number().finite().min(8).max(24),
+        radius: z.number().finite().min(0).max(32),
+      })
+      .strict()
+      .optional(),
     presentation: z.enum(['callout', 'caption-top', 'caption-bottom']),
     alignment: z.enum(['start', 'center', 'end']),
     placement: z.enum(['auto', 'top', 'bottom', 'left', 'right']),

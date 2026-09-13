@@ -1,3 +1,4 @@
+import { TourHintStyle } from './hint-style';
 import { GUIDE_LIMITS } from '@sniptale/runtime-contracts/scenario/types/guide';
 import { TOUR_LIMITS } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { useEffect, useState } from 'react';
@@ -143,6 +144,12 @@ export function TourTextPresentation({
           )}
         </>
       )}
+      <TourHintStyle
+        value={{ ...(value ?? defaults), surface: value?.surface ?? defaults.surface }}
+        disabled={disabled}
+        onChange={onChange}
+        t={t}
+      />
     </div>
   );
 }

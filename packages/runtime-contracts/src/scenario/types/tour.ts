@@ -30,7 +30,25 @@ export type TourAction =
   | { kind: 'slide'; slideId: string }
   | { kind: 'url'; url: string };
 
+export interface TourHintSurface {
+  fillPaint: Paint;
+  surfaceCss: string;
+  textColor: string;
+  width: number;
+  padding: number;
+  radius: number;
+}
+export const TOUR_HINT_SURFACE: TourHintSurface = {
+  fillPaint: { kind: 'solid', color: '#ffffff' },
+  surfaceCss: '',
+  textColor: '#111827',
+  width: 340,
+  padding: 12,
+  radius: 14,
+};
+
 export interface TourTextAppearance {
+  surface?: TourHintSurface | undefined;
   presentation: 'callout' | 'caption-top' | 'caption-bottom';
   alignment: 'start' | 'center' | 'end';
   placement: 'auto' | 'top' | 'bottom' | 'left' | 'right';

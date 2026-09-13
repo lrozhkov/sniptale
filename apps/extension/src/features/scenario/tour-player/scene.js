@@ -28,6 +28,7 @@ export function createTourScene(root, input, onAction, signal, authoring) {
     signal,
     keyboardScope: authoring ? root : null,
     onClose: () => {},
+    pointLabel: labels.point,
     focusTrigger: (activeIndex) => {
       const trigger =
         scene.querySelectorAll('.tour-hotspot')[activeIndex] ??

@@ -69,7 +69,7 @@ export function renderTourImage(
   }
   slide.hotspots.forEach((hotspot, number) => {
     const button = actionButton(
-      String(number + 1),
+      '',
       hotspot.action.kind === 'url' ? hotspot.action : { kind: 'none' },
       'tour-hotspot',
       hotspot.id

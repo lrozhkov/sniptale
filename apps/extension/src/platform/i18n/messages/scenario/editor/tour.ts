@@ -130,6 +130,8 @@ export const scenarioTourMessages = {
   },
   tourRemoveBackground: { ru: 'Убрать фоновое изображение', en: 'Remove background image' },
   tourAutomaticTransition: { ru: 'Автоматический переход', en: 'Automatic transition' },
+  tourHintPrevious: { ru: 'Назад', en: 'Back' },
+  tourHintNext: { ru: 'Далее', en: 'Next' },
   tourBack: { ru: 'Назад по истории', en: 'Back' },
   tourEndButton: { ru: 'Кнопка со ссылкой', en: 'Link button' },
   tourEndButtonLabel: { ru: 'Текст кнопки', en: 'Button label' },
@@ -285,4 +287,9 @@ export const scenarioTourMessages = {
     ru: 'Добавьте слайды с изображениями или создайте кнопку вручную через плюс.',
     en: 'Add image slides or use the plus to create a button manually.',
   },
+  tourHintStyle: { ru: 'Стиль пояснения', en: 'Explanation style' },
+  tourHintWidth: { ru: 'Ширина пояснения', en: 'Explanation width' },
+  tourHintPadding: { ru: 'Внутренний отступ', en: 'Inner padding' },
+  tourHintRadius: { ru: 'Скругление', en: 'Corner radius' },
+  tourSceneTextColor: { ru: 'Текст сцены', en: 'Scene text' },
 } as const;

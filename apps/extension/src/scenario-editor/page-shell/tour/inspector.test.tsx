@@ -412,3 +412,38 @@ it('edits navigation composition independently from its text and links', async (
   });
   expect(host.querySelector('[aria-label="Main text"]')).not.toBeNull();
 });
+
+it('creates a local explanation style override from inherited settings', async () => {
+  await click('Hotspot');
+  await fill('Explanation width', '280');
+  await fill('Inner padding', '16');
+  await fill('Corner radius', '20');
+  expect(current().hotspots[0]?.appearance?.surface).toMatchObject({
+    width: 280,
+    padding: 16,
+    radius: 20,
+  });
+  await act(async () =>
+    host
+      .querySelector<HTMLButtonElement>('[data-ui="shared.ui.surface-style-selector"] button')!
+      .click()
+  );
+  const css = host.querySelector<HTMLTextAreaElement>(
+    '[data-ui="shared.ui.surface-style-selector"] textarea'
+  )!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(
+      css,
+      'box-shadow: 0 2px 8px #000000;'
+    );
+    css.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const apply = [
+    ...host.querySelectorAll<HTMLButtonElement>(
+      '[data-ui="shared.ui.surface-style-selector"] button'
+    ),
+  ].find((n) => /^(Apply|Применить)$/.test(n.textContent?.trim() ?? ''))!;
+  await act(async () => apply.click());
+  expect(current().hotspots[0]?.appearance?.surface?.surfaceCss).toContain('box-shadow');
+  expect(project.tour!.style.textAppearance.surface).toBeUndefined();
+});

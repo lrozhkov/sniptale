@@ -459,3 +459,11 @@ html[data-tour-reordering] .tour-slide-row .tour-slide-select > span:last-child 
   height: 2rem;
   padding: 0.25rem;
 }
+
+.tour-hint-style-settings {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--sniptale-color-border-soft);
+}

@@ -1,3 +1,4 @@
+import { applyTourHintSurface, sizeTourHint } from './hint-style.js';
 /** Measures bounded text pages for captions and primary navigation copy. */
 export function measureHintPages(hintText, fullText) {
   const characters = globalThis.Intl?.Segmenter
@@ -36,13 +37,14 @@ export function measureHintPages(hintText, fullText) {
 export function createTourHints(
   root,
   defaultAppearance,
-  { onClose, focusTrigger, signal, keyboardScope }
+  { onClose, focusTrigger, signal, keyboardScope, pointLabel }
 ) {
   const query = (name) => root.querySelector(`[data-tour-${name}]`);
   const viewport = query('viewport');
   const hint = query('hint');
   const hintText = query('hint-text');
   const hintCount = query('hint-count');
+  const pointCount = query('hint-point-count');
   const hintPrevious = query('hint-previous');
   const hintNext = query('hint-next');
   const hintClose = query('hint-close');
@@ -71,15 +73,16 @@ export function createTourHints(
     const offsetX = (hintWidth - stageWidth) / 2;
     const offsetY = (hintHeight - stageHeight) / 2;
     hint.dataset.presentation = appearance.presentation;
+    const surface = applyTourHintSurface(hint, appearance.surface ?? defaultAppearance.surface);
     hint.style.textAlign = appearance.alignment;
-    const maximumHeight = Math.max(90, Math.min(200, hintHeight - 16));
-    hint.style.setProperty('--hint-height', `${maximumHeight}px`);
-    const preferredWidth = appearance.presentation === 'callout' ? 340 : hintWidth - 16;
-    hint.style.width = `${Math.max(100, Math.min(hintWidth - 16, preferredWidth))}px`;
+    sizeTourHint({ hint, hintText, surface, appearance, stageWidth, stageHeight });
     pages = measureHintPages(hintText, current.text || current.label || '');
     textPage = Math.min(textPage, pages.length - 1);
     hintText.textContent = pages[textPage];
-    hintCount.textContent = `${activeHint + 1}/${hints.length} · ${textPage + 1}/${pages.length}`;
+    hintCount.textContent = `${textPage + 1} / ${pages.length}`;
+    hintCount.hidden = pages.length < 2;
+    pointCount.textContent = `${pointLabel} ${activeHint + 1} / ${hints.length}`;
+    pointCount.hidden = hints.length < 2;
     hintPrevious.disabled = activeHint === 0 && textPage === 0;
     hintNext.disabled = activeHint === hints.length - 1 && textPage === pages.length - 1;
     const anchor = current.point ?? current.anchor;
@@ -89,8 +92,8 @@ export function createTourHints(
         : { x: stageWidth / 2, y: stageHeight / 2 };
     const position = positionHint({
       hint,
-      hintWidth,
-      hintHeight,
+      hintWidth: stageWidth,
+      hintHeight: stageHeight,
       point,
       offsetX,
       offsetY,
@@ -104,7 +107,7 @@ export function createTourHints(
     else if (direction < 0 && textPage > 0) textPage -= 1;
     else if (activeHint + direction >= 0 && activeHint + direction < hints.length) {
       activeHint += direction;
-      textPage = 0;
+      textPage = direction < 0 ? Number.MAX_SAFE_INTEGER : 0;
     }
     paginate();
   }
@@ -172,8 +175,8 @@ function positionHint({ hint, hintWidth, hintHeight, point, offsetX, offsetY, ap
   let top = appearance.presentation === 'caption-top' ? 8 : hintHeight - hint.offsetHeight - 8;
   if (appearance.presentation === 'callout') {
     let placement = appearance.placement ?? 'auto';
-    const x = offsetX + point.x;
-    const y = offsetY + point.y;
+    const x = point.x;
+    const y = point.y;
     if (placement === 'auto') {
       placement =
         x + 22 + hint.offsetWidth <= hintWidth - 8
@@ -193,7 +196,7 @@ function positionHint({ hint, hintWidth, hintHeight, point, offsetX, offsetY, ap
     }
   }
   return {
-    left: Math.max(8, Math.min(hintWidth - hint.offsetWidth - 8, left)),
-    top: Math.max(8, Math.min(hintHeight - hint.offsetHeight - 8, top)),
+    left: offsetX + Math.max(8, Math.min(hintWidth - hint.offsetWidth - 8, left)),
+    top: offsetY + Math.max(8, Math.min(hintHeight - hint.offsetHeight - 8, top)),
   };
 }

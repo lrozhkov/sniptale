@@ -70,6 +70,9 @@ it('mounts the shared scene and updates selection without replacing its viewport
   act(() => root.render(<TourStage {...props} />));
   const viewport = shadow().querySelector('[data-tour-viewport]');
   expect(shadow().querySelector('.tour-image')).not.toBeNull();
+  expect(shadow().querySelector('.tour-hotspot')!.textContent).toBe('');
+  expect(shadow().querySelector('[data-tour-hint-point-count]')).not.toBeNull();
+  expect(shadow().querySelector('[data-tour-hint-previous]')!.textContent).toBeTruthy();
   act(() => shadow().querySelector<HTMLButtonElement>('.tour-hotspot')!.click());
   expect(props.onSelectObject).toHaveBeenCalledWith('point');
   act(() =>
@@ -92,4 +95,14 @@ it('leaves Escape in an application input outside the authoring scene alone', ()
   );
   expect(shadow().querySelector<HTMLElement>('[data-tour-hint]')!.hidden).toBe(false);
   input.remove();
+});
+
+it('keeps a dismissed explanation closed when the same selection is republished', () => {
+  const props = fixture();
+  const selection = { kind: 'slide' as const, slideId: 'first', objectId: 'point' };
+  act(() => root.render(<TourStage {...props} selection={selection} />));
+  act(() => shadow().querySelector<HTMLButtonElement>('[data-tour-hint-close]')!.click());
+  expect(shadow().querySelector<HTMLElement>('[data-tour-hint]')!.hidden).toBe(true);
+  act(() => root.render(<TourStage {...props} selection={{ ...selection }} />));
+  expect(shadow().querySelector<HTMLElement>('[data-tour-hint]')!.hidden).toBe(true);
 });
