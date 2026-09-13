@@ -1,3 +1,10 @@
+import { TOUR_LIMITS } from '@sniptale/runtime-contracts/scenario/types/tour';
+import {
+  admitTourImageImport,
+  isTourImageImportPlacement,
+  placeTourImportedImage,
+  type TourImageImportPlacement,
+} from './image-import-tour';
 import { z } from 'zod';
 import {
   parseGuideProject,
@@ -49,7 +56,7 @@ export async function importScenarioImages(args: {
   project: GuideProject;
   baseUpdatedAt: number;
   sources: readonly GuideImageImportSource[];
-  placement: GuideImageImportPlacement;
+  placement: GuideImageImportPlacement | TourImageImportPlacement;
   signal: AbortSignal;
   onProgress?: (completed: number, total: number) => void;
 }): Promise<GuideProject> {
@@ -82,6 +89,26 @@ export async function importScenarioImages(args: {
           createdAt: Date.now(),
           updatedAt: Date.now(),
         });
+      if (isTourImageImportPlacement(args.placement)) {
+        placeTourImportedImage(project, args.placement, {
+          image: {
+            assetId: assetEntry.id,
+            width: assetEntry.width,
+            height: assetEntry.height,
+            galleryAssetId: input.mediaId,
+            editDocumentId: documentId,
+            alt: '',
+            source: input.source ?? {
+              kind: 'import',
+              filename: input.name.slice(0, GUIDE_LIMITS.maxLabelLength),
+            },
+          },
+          title: input.name.slice(0, GUIDE_LIMITS.maxLabelLength),
+          description: input.description ?? '',
+        });
+        args.onProgress?.(assets.length, args.sources.length);
+        continue;
+      }
       const block = createGuideImageBlock({
         id: crypto.randomUUID(),
         assetId: assetEntry.id,
@@ -200,13 +227,21 @@ async function readImportSource(source: GuideImageImportSource): Promise<{
 /** Validates detached content and placement capacity before any resource is acquired. */
 function admitImageImport(args: Parameters<typeof importScenarioImages>[0]) {
   const parsed = parseGuideProject(args.project);
-  if (parsed.status !== 'ok' || args.sources.length === 0 || args.sources.length > 50) {
+  const maximum = isTourImageImportPlacement(args.placement) ? TOUR_LIMITS.maxSlides : 50;
+  if (parsed.status !== 'ok' || args.sources.length === 0 || args.sources.length > maximum) {
     throw new Error('Invalid image import.');
   }
   for (const source of args.sources)
     if (source.kind === 'video-frame') videoFrameImportSchema.parse(source);
   const project = parsed.project;
   const placement = args.placement;
+  if (isTourImageImportPlacement(placement)) {
+    for (const source of args.sources)
+      if (source.kind === 'video-frame' && source.description.length > TOUR_LIMITS.maxTextLength)
+        throw new Error('Tour text exceeds the slide limit.');
+    admitTourImageImport(project, placement, args.sources.length);
+    return { project, target: undefined, replacement: undefined };
+  }
   if (
     placement.kind === 'steps' &&
     placement.beforeItemId !== undefined &&

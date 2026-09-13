@@ -434,3 +434,123 @@ it('rejects a vanished insertion anchor before acquiring assets', async () => {
   expect(io.write).not.toHaveBeenCalled();
   expect(io.commit).not.toHaveBeenCalled();
 });
+
+it('imports ordered tour slides without changing reference-guide content', async () => {
+  const args = input();
+  args.project.items.push(createGuideStep('Keep', 'keep'));
+  const result = await importScenarioImages({
+    ...args,
+    sources: [
+      { kind: 'file', file: png('A.png') },
+      { kind: 'file', file: png('B.png') },
+    ],
+    placement: { kind: 'tour-slides' },
+  });
+  expect(result.items).toEqual(args.project.items);
+  expect(args.project.tour).toBeUndefined();
+  expect(result.tour?.slides.map((slide) => slide.title)).toEqual(['A.png', 'B.png']);
+  expect(result.tour?.slides[0]).toMatchObject({
+    image: { width: 120, height: 80, source: { kind: 'import', filename: 'A.png' } },
+  });
+  expect(io.commit).toHaveBeenCalledOnce();
+});
+it('replaces tour images with new provenance and explicit positional review', async () => {
+  const args = input();
+  const project = await importScenarioImages({ ...args, placement: { kind: 'tour-slides' } });
+  const slide = project.tour!.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Missing test slide');
+  slide.hotspots = [
+    {
+      id: 'point',
+      point: { x: 0.4, y: 0.5 },
+      targetRect: null,
+      label: 'Click',
+      text: 'Keep',
+      action: { kind: 'next' },
+      appearance: null,
+      pulse: true,
+    },
+  ];
+  const result = await importScenarioImages({
+    ...args,
+    project,
+    sources: [{ kind: 'file', file: png('replacement.png') }],
+    placement: { kind: 'tour-image', slideId: slide.id },
+  });
+  expect(result.tour!.slides[0]).toMatchObject({
+    requiresTargetReview: true,
+    hotspots: [{ point: { x: 0.4, y: 0.5 }, text: 'Keep' }],
+    image: { source: { filename: 'replacement.png' } },
+  });
+  expect(result.items).toEqual(project.items);
+});
+it('cancels tour batches through the same staged-resource cleanup owner', async () => {
+  const controller = new AbortController();
+  await expect(
+    importScenarioImages({
+      ...input(),
+      placement: { kind: 'tour-slides' },
+      signal: controller.signal,
+      sources: [
+        { kind: 'file', file: png('A.png') },
+        { kind: 'file', file: png('B.png') },
+      ],
+      onProgress: () => controller.abort(),
+    })
+  ).rejects.toThrow();
+  expect(io.write).toHaveBeenCalledOnce();
+  expect(io.discard).toHaveBeenCalledOnce();
+  expect(io.commit).not.toHaveBeenCalled();
+});
+it('rejects missing tour placement before allocating resources', async () => {
+  await expect(
+    importScenarioImages({
+      ...input(),
+      placement: { kind: 'tour-slides', beforeSlideId: 'missing' },
+    })
+  ).rejects.toThrow('position');
+  await expect(
+    importScenarioImages({ ...input(), placement: { kind: 'tour-image', slideId: 'missing' } })
+  ).rejects.toThrow('unavailable');
+  expect(io.write).not.toHaveBeenCalled();
+});
+
+it('creates a tour hotspot from video action evidence and preserves its source context', async () => {
+  const source = {
+    kind: 'video-frame' as const,
+    recordingId: 'recording',
+    filename: 'recording.webm',
+    timeSeconds: 2,
+    action: {
+      id: 'click',
+      kind: 'CLICK' as const,
+      time: 2,
+      duration: 0.5,
+      label: 'Open',
+      point: { x: 0.2, y: 0.3 },
+      target: { name: 'Open', tag: 'button', role: '' },
+    },
+  };
+  const result = await importScenarioImages({
+    ...input(),
+    placement: { kind: 'tour-slides' },
+    sources: [
+      { kind: 'video-frame', blob: png(), source, title: 'Open', description: 'Click here' },
+    ],
+  });
+  expect(result.tour?.slides[0]).toMatchObject({
+    image: { source },
+    hotspots: [{ point: { x: 0.2, y: 0.3 }, text: 'Click here' }],
+  });
+  io.write.mockClear();
+  await expect(
+    importScenarioImages({
+      ...input(),
+      placement: { kind: 'tour-slides' },
+      sources: [
+        { kind: 'video-frame', blob: png(), source, title: 'Open', description: 'x'.repeat(4001) },
+      ],
+    })
+  ).rejects.toThrow('text');
+  expect(io.write).not.toHaveBeenCalled();
+});

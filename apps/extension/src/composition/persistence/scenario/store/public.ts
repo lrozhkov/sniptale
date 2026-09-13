@@ -25,3 +25,5 @@ export {
   applyScenarioStepTemplate,
   type GuideTemplateApplication,
 } from './project-records/template-apply';
+
+export type { TourImageImportPlacement } from './image-import-tour';

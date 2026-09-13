@@ -46,21 +46,30 @@ export async function prepareScenarioImageEditorPayload(
 }
 
 /** Shared byte/document ownership admission for guide and tour image editor sessions. */
-export async function loadScenarioImageEditorSource(
+export async function findScenarioImageEditorSource(
   projectId: string,
   image: { assetId: string; editDocumentId: string | null }
 ) {
   const asset = await getScenarioAsset(image.assetId);
-  if (!asset || asset.projectId !== projectId) throw new Error('The image is unavailable.');
+  if (!asset || asset.projectId !== projectId) return undefined;
   const document = image.editDocumentId
     ? await getScenarioStepEditorDocumentForTransfer(image.editDocumentId)
     : undefined;
-  if (image.editDocumentId && (!document || document.projectId !== projectId))
-    throw new Error('The annotation document is unavailable.');
+  if (image.editDocumentId && (!document || document.projectId !== projectId)) return undefined;
   const dataUrl = await asEditorRaster(
     asset.file.type ? asset.file : asset.file.slice(0, asset.file.size, asset.mimeType)
   );
   return { dataUrl, document, width: asset.width, height: asset.height };
+}
+
+/** Editor sessions require a complete owned source; conversion can report an absent source separately. */
+export async function loadScenarioImageEditorSource(
+  projectId: string,
+  image: { assetId: string; editDocumentId: string | null }
+) {
+  const source = await findScenarioImageEditorSource(projectId, image);
+  if (!source) throw new Error('The image is unavailable.');
+  return source;
 }
 
 async function asEditorRaster(blob: Blob): Promise<string> {
