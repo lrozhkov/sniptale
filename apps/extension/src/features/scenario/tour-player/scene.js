@@ -42,6 +42,7 @@ export function createTourScene(root, input, onAction, signal, authoring) {
     element,
     actionButton,
     redraw: render,
+    authoring,
   });
 
   function render() {

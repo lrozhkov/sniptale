@@ -22,10 +22,17 @@ export function createTourPlayer(root, input, options = {}) {
   const view = createTourScene(root, input, act, lifetime.signal, options.authoring);
   const playback = options.authoring
     ? null
-    : createTourPlayback(root, input, lifetime.signal, view.motion, (target, restart = false) => {
-        if (restart) history.length = 0;
-        go(target, !restart);
-      });
+    : createTourPlayback(
+        root,
+        input,
+        lifetime.signal,
+        view.motion,
+        (target, restart = false) => {
+          if (restart) history.length = 0;
+          go(target, !restart);
+        },
+        options.preview
+      );
   function manualGo(target, recordHistory = true) {
     playback?.interact();
     go(target, recordHistory);
@@ -86,20 +93,13 @@ export function createTourPlayer(root, input, options = {}) {
     },
     { signal: lifetime.signal }
   );
-  root.ownerDocument.addEventListener(
-    'keydown',
-    (event) =>
-      handleTourKeyboard(event, navigation.open || Boolean(options.authoring || options.preview), {
-        ArrowRight: () => manualGo(index + 1),
-        ArrowLeft: back,
-        Home: () => manualGo(0),
-        End: () => manualGo(tour.slides.length - 1),
-      }),
-    { signal: lifetime.signal }
-  );
-  const observer = globalThis.ResizeObserver ? new globalThis.ResizeObserver(view.resize) : null;
-  if (observer) observer.observe(viewport);
-  else globalThis.addEventListener('resize', view.resize, { signal: lifetime.signal });
+  bindTourKeyboard(root.ownerDocument, navigation, options, lifetime.signal, {
+    ArrowRight: () => manualGo(index + 1),
+    ArrowLeft: back,
+    Home: () => manualGo(0),
+    End: () => manualGo(tour.slides.length - 1),
+  });
+  observeViewport(viewport, view.resize, lifetime.signal);
   view.resize();
   render();
   return {
@@ -133,7 +133,6 @@ export function createTourPlayer(root, input, options = {}) {
     dispose() {
       if (lifetime.signal.aborted) return;
       lifetime.abort();
-      observer?.disconnect();
       if (navigation.open) navigation.close();
       scene.replaceChildren();
     },
@@ -153,4 +152,26 @@ function handleTourKeyboard(event, navigationOpen, actions) {
   if (!action) return;
   event.preventDefault();
   action();
+}
+
+/** Viewport observation shares the mounted player abort lifetime. */
+function observeViewport(viewport, resize, signal) {
+  const observer = globalThis.ResizeObserver ? new globalThis.ResizeObserver(resize) : null;
+  if (observer) {
+    observer.observe(viewport);
+    signal.addEventListener('abort', () => observer.disconnect(), { once: true });
+  } else globalThis.addEventListener('resize', resize, { signal: signal });
+}
+
+function bindTourKeyboard(document, navigation, options, signal, actions) {
+  document.addEventListener(
+    'keydown',
+    (event) =>
+      handleTourKeyboard(
+        event,
+        navigation.open || Boolean(options.authoring || options.preview),
+        actions
+      ),
+    { signal }
+  );
 }

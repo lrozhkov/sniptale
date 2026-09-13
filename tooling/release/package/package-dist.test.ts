@@ -1,3 +1,4 @@
+import { EXPECTED_EFFECT_SANDBOX_CSP } from '../artifact-security/sandbox-policy.mjs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -36,7 +37,12 @@ async function createReleaseRoot() {
         sandbox: EXPECTED_SANDBOX_CSP,
       },
       manifest_version: 3,
-      sandbox: { pages: ['apps/extension/src/effect-runtime-sandbox/index.html'] },
+      sandbox: {
+        pages: [
+          'apps/extension/src/effect-runtime-sandbox/index.html',
+          'apps/extension/src/tour-preview-sandbox/index.html',
+        ],
+      },
     })
   );
   await fs.mkdir(path.join(root, 'dist', 'apps/extension/src/effect-runtime-sandbox'), {
@@ -44,6 +50,13 @@ async function createReleaseRoot() {
   });
   await fs.writeFile(
     path.join(root, 'dist', 'apps/extension/src/effect-runtime-sandbox', 'index.html'),
+    `<meta http-equiv="Content-Security-Policy" content="${EXPECTED_EFFECT_SANDBOX_CSP}">`
+  );
+  await fs.mkdir(path.join(root, 'dist', 'apps/extension/src/tour-preview-sandbox'), {
+    recursive: true,
+  });
+  await fs.writeFile(
+    path.join(root, 'dist', 'apps/extension/src/tour-preview-sandbox/index.html'),
     '<!doctype html>'
   );
   await fs.writeFile(path.join(root, 'dist', 'assets', 'popup.js'), 'console.log("popup");');

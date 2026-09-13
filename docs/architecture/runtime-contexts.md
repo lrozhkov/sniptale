@@ -45,3 +45,7 @@ Use `apps/extension/src/features/ai/privacy/index.ts` and the content egress pip
 ## Runtime changes
 
 For a new or changed runtime, update the runtime registry, manifest or build input, entrypoint ownership, documentation marker, and drift proof. Declare a privileged background route once beside its parser with handler, authorization, sender, freshness and replay, policy-state, failure-response, and owner metadata.
+
+## Tour preview sandbox
+
+`apps/extension/src/tour-preview-sandbox/index.html` is a manifest sandbox for exact prepared HTML preview. It receives one bounded HTML Blob from its parent with source, origin and per-mount nonce validation. It owns its child Blob URL and has no extension APIs, storage, network or mutation authority. The child executes the unchanged standalone file under its hashed CSP. The existing effect sandbox retains its stricter head CSP; extension-page CSP is unchanged.

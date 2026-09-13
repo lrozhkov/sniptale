@@ -1,3 +1,4 @@
+import { createTourAudio } from './audio.js';
 import { createTourPlaybackSession } from './playback-session.js';
 import {
   tourSlideDuration,
@@ -8,7 +9,7 @@ import {
 import { createTourTransport } from './transport.js';
 
 /** Projects transport and route policy; the session owns media readiness and the single clock. */
-export function createTourPlayback(root, input, signal, motion, navigate) {
+export function createTourPlayback(root, input, signal, motion, navigate, silent = false) {
   let tour = input.tour;
   let index = 0;
   let ended = false;
@@ -21,19 +22,29 @@ export function createTourPlayback(root, input, signal, motion, navigate) {
   const motionPreference = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)');
   const reduced = () => Boolean(motionPreference?.matches);
   const update = createTourTransport(root, input.labels, signal, toggle, seek);
+  let audioState = null;
+  const audio = createTourAudio(root, signal, (state) => {
+    audioState = state;
+    session.pause();
+  });
   const session = createTourPlaybackSession({
     signal,
     motion,
     hidden: () => root.ownerDocument.hidden,
     autoplay: tour.playback.autoplay && !root.ownerDocument.hidden,
     changed(elapsed, playing, state) {
+      if (!audioState)
+        audio.sync(
+          Math.max(0, elapsed - entrance) / 1000,
+          playing && state === 'ready' && elapsed >= entrance && !audioState
+        );
       update({
         elapsed: ended
           ? (timeline?.duration ?? duration)
           : (timeline?.offsets[index] ?? 0) + elapsed,
         duration: timeline?.duration ?? duration,
         playing,
-        state: choice ? 'choice' : ended && state !== 'loading' ? 'ended' : state,
+        state: audioState ?? (choice ? 'choice' : ended && state !== 'loading' ? 'ended' : state),
       });
     },
     complete: advance,
@@ -43,9 +54,8 @@ export function createTourPlayback(root, input, signal, motion, navigate) {
       session.pause();
       return;
     }
-    let target = tourAutoplayDestination(tour, index);
-    if (target === tour.slides.length && tour.playback.loop) target = 0;
-    if (target === null || (!tour.playback.loop && visited.has(tour.slides[target]?.id))) {
+    const target = nextUnvisitedDestination(tour, index, visited);
+    if (target === null) {
       choice = true;
       session.pause();
       return;
@@ -57,6 +67,8 @@ export function createTourPlayback(root, input, signal, motion, navigate) {
     navigate(target);
   }
   function toggle() {
+    audio.stop();
+    audioState = null;
     if (session.playing) {
       session.pause();
       return;
@@ -68,6 +80,8 @@ export function createTourPlayback(root, input, signal, motion, navigate) {
     session.play();
   }
   function seek(value) {
+    audio.stop();
+    audioState = null;
     session.pause();
     if (timeline) {
       const target = Math.max(
@@ -89,6 +103,8 @@ export function createTourPlayback(root, input, signal, motion, navigate) {
     ended = isEnd;
     choice = false;
     const slide = tour.slides[index];
+    audioState = null;
+    audio.show(ended || silent ? null : slide, assets);
     timeline = tourLinearTimeline(tour, reduced());
     entrance = tourEntranceTiming(tour, ended ? null : slide, reduced()).total;
     duration = entrance + (slide && !ended ? tourSlideDuration(tour, slide) : 0);
@@ -106,26 +122,30 @@ export function createTourPlayback(root, input, signal, motion, navigate) {
       required: Boolean(image),
     });
   }
-  motionPreference?.addEventListener?.(
-    'change',
-    () => {
-      if (signal.aborted) return;
-      const holdElapsed = Math.max(0, session.elapsed - entrance);
-      const resume = session.continuous;
-      motion.cancel({ preserveMediaGate: true });
-      show(tour, index, ended, assets);
-      session.seek(entrance + holdElapsed);
-      if (resume) session.play();
-    },
-    { signal }
+  bindMotionPreference(
+    motionPreference,
+    signal,
+    session,
+    motion,
+    () => entrance,
+    () => show(tour, index, ended, assets)
   );
-  bindPlaybackLifetime(root, signal, session.pause);
+  const pause = () => {
+    audio.stop();
+    session.pause();
+  };
+  bindPlaybackLifetime(root, signal, pause);
+  bindNarrationActivation(root, signal, (id) => {
+    session.pause();
+    audioState = null;
+    audio.activate(id);
+  });
   return {
     show,
-    pause: session.pause,
+    pause,
     interact() {
       visited.clear();
-      session.pause();
+      pause();
     },
   };
 }
@@ -144,4 +164,44 @@ function bindPlaybackLifetime(root, signal, pause) {
     },
     { signal, capture: true }
   );
+}
+
+function bindNarrationActivation(root, signal, activate) {
+  root.addEventListener(
+    'click',
+    (event) => {
+      const target =
+        event.target instanceof globalThis.Element
+          ? event.target.closest('[data-tour-narration]')
+          : null;
+      if (!target) return;
+      activate(target.dataset.tourNarration);
+    },
+    { signal }
+  );
+}
+
+/** Reduced-motion changes retain the hold position while rebuilding the entrance gate. */
+function bindMotionPreference(preference, signal, session, motion, getEntrance, reload) {
+  preference?.addEventListener?.(
+    'change',
+    () => {
+      if (signal.aborted) return;
+      const holdElapsed = Math.max(0, session.elapsed - getEntrance());
+      const resume = session.continuous;
+      motion.cancel({ preserveMediaGate: true });
+      reload();
+      session.seek(getEntrance() + holdElapsed);
+      if (resume) session.play();
+    },
+    { signal }
+  );
+}
+
+/** Loop policy belongs to route selection, not the playback clock. */
+function nextUnvisitedDestination(tour, index, visited) {
+  const target = tourAutoplayDestination(tour, index);
+  if (target === tour.slides.length && tour.playback.loop) return 0;
+  if (target === null || (!tour.playback.loop && visited.has(tour.slides[target]?.id))) return null;
+  return target;
 }

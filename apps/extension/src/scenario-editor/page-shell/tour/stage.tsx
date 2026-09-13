@@ -1,9 +1,10 @@
+import type { TourPlayerLabels } from '../../../features/scenario/tour-player/public';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { TourDocument, TourRect } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { createTourPlayer } from '../../../features/scenario/tour-player/controller';
 import styles from '../../../features/scenario/tour-player/player.css?raw';
-import type { TourPlayerLabels } from '../../../features/scenario/tour-player/public';
+import { tourPlayerLabels } from './labels';
 import type { Translate } from '../../../platform/i18n';
 import type { TourSelection } from './selection';
 
@@ -44,27 +45,7 @@ export function TourStage({
     disabled,
   });
   callbacks.current = { onSelectObject, onMoveObject, onResizeObject, onFrameCamera, disabled };
-  const labels = useRef<TourPlayerLabels>({
-    resize: t('scenario.editor.tourResizeArea'),
-    expand: t('scenario.editor.tourExpandCaption'),
-    collapse: t('scenario.editor.tourCollapseCaption'),
-    previous: t('scenario.editor.tourHintPrevious'),
-    next: t('scenario.editor.tourHintNext'),
-    contents: t('scenario.editor.tourSlides'),
-    close: t('scenario.editor.close'),
-    restart: t('scenario.editor.tourRestart'),
-    finished: t('scenario.editor.tourEnd'),
-    empty: t('scenario.editor.tourImageEmpty'),
-    point: t('scenario.editor.tourHotspot'),
-    details: t('scenario.editor.tourAnnotation'),
-    play: t('scenario.editor.tourPlay'),
-    pause: t('scenario.editor.tourPause'),
-    seek: t('scenario.editor.tourSeek'),
-    retry: t('scenario.editor.tourRetry'),
-    loading: t('scenario.editor.tourLoading'),
-    mediaError: t('scenario.editor.tourMediaError'),
-    choose: t('scenario.editor.tourChooseDestination'),
-  }).current;
+  const labels = useRef(tourPlayerLabels(t)).current;
   const input = {
     tour: view === 'preview' ? cameraPreviewTour(tour, selection) : tour,
     labels,

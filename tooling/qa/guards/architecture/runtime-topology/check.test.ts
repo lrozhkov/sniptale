@@ -24,7 +24,12 @@ async function writeTopologyFixture(
   writeJson(root, 'apps/extension/manifest.json', {
     background: { service_worker: 'apps/extension/src/background/index.ts' },
     action: { default_popup: 'apps/extension/src/popup/index.html' },
-    sandbox: { pages: ['apps/extension/src/effect-runtime-sandbox/index.html'] },
+    sandbox: {
+      pages: [
+        'apps/extension/src/effect-runtime-sandbox/index.html',
+        'apps/extension/src/tour-preview-sandbox/index.html',
+      ],
+    },
     web_accessible_resources: [
       {
         resources: DEFAULT_WEB_ACCESSIBLE_RESOURCES,

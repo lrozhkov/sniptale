@@ -131,3 +131,27 @@ it('counts destination entrance separately and removes it for reduced motion', (
   tour.transition.kind = 'none';
   expect(tourEntranceTiming(tour, image).total).toBe(300);
 });
+
+it('budgets all sequential entry narration while activation cues remain gesture-driven', () => {
+  const { tour, slide } = fixture();
+  const voice = {
+    assetId: 'voice',
+    duration: 10,
+    trimStart: 1,
+    trimEnd: 6,
+    gain: 1,
+    transcript: '',
+  };
+  slide.narration = voice;
+  slide.buttons = [
+    {
+      id: 'spoken',
+      label: '',
+      action: { kind: 'none' },
+      narration: { ...voice, trigger: 'enter' },
+    },
+  ];
+  expect(tourSlideDuration(tour, slide)).toBe(10000);
+  slide.buttons[0]!.narration!.trigger = 'activation';
+  expect(tourSlideDuration(tour, slide)).toBe(5000);
+});

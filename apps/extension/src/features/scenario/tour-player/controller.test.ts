@@ -175,7 +175,7 @@ it('updates the scene in place and selects authored URL objects without opening 
 });
 
 it.each([false, true])(
-  'commits source-coordinate drag with auto zoom %s and cancels Escape',
+  'keeps editing coordinates independent of auto zoom %s and cancels Escape',
   async (autoZoom) => {
     const onMoveObject = vi.fn();
     const { player, root } = await mount({ authoring: { onSelectObject: vi.fn(), onMoveObject } });
@@ -188,7 +188,7 @@ it.each([false, true])(
     expect(onMoveObject).not.toHaveBeenCalled();
     pointer(point, 'pointerup', 36);
     expect(onMoveObject).toHaveBeenCalledExactlyOnceWith('point', {
-      x: autoZoom ? 0.525 : 0.6,
+      x: 0.6,
       y: 0.5,
     });
     expect(

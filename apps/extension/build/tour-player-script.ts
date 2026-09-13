@@ -20,6 +20,7 @@ export function tourPlayerScript(): Plugin {
       if (resolve(id.slice(0, -query.length)) !== entry)
         throw new Error('Unexpected tour player entry');
       const result = await build({
+        absWorkingDir: repositoryRoot,
         entryPoints: [entry],
         bundle: true,
         write: false,
@@ -31,7 +32,8 @@ export function tourPlayerScript(): Plugin {
       });
       if (Object.values(result.metafile.outputs).some((output) => output.imports.length))
         throw new Error('Tour player must be self-contained');
-      for (const path of Object.keys(result.metafile.inputs)) this.addWatchFile(resolve(path));
+      for (const path of Object.keys(result.metafile.inputs))
+        this.addWatchFile(resolve(repositoryRoot, path));
       const script = result.outputFiles[0]?.text;
       if (!script || result.outputFiles.length !== 1) throw new Error('Missing tour player bundle');
       return `export default ${JSON.stringify(script)}`;

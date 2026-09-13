@@ -1,5 +1,13 @@
 import { renderTourNavigationScene } from './navigation-scene.js';
-export function createTourNavigation({ root, labels, media, element, actionButton, redraw }) {
+export function createTourNavigation({
+  root,
+  labels,
+  media,
+  element,
+  actionButton,
+  redraw,
+  authoring,
+}) {
   let navigationPage = 0;
   function render(slide, stageWidth, stageHeight) {
     return renderTourNavigationScene({
@@ -11,6 +19,7 @@ export function createTourNavigation({ root, labels, media, element, actionButto
       media,
       element,
       actionButton,
+      authoring,
       page: navigationPage,
       onPage: (page) => {
         navigationPage = page;

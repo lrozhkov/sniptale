@@ -37,13 +37,15 @@ export function createTourTransport(root, labels, signal, onToggle, onSeek) {
     range.setAttribute('aria-valuetext', text);
     time.textContent = text;
     status.textContent =
-      state === 'loading'
-        ? labels.loading
-        : state === 'error'
-          ? labels.mediaError
-          : state === 'choice'
-            ? labels.choose
-            : '';
+      state === 'blocked'
+        ? (labels.audioBlocked ?? labels.play)
+        : state === 'loading'
+          ? labels.loading
+          : state === 'error'
+            ? labels.mediaError
+            : state === 'choice'
+              ? labels.choose
+              : '';
     status.hidden = !status.textContent;
   };
 }

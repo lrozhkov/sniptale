@@ -47,6 +47,12 @@ export function createTourHints(
   const hintPrevious = query('hint-previous');
   const hintNext = query('hint-next');
   const hintClose = query('hint-close');
+  const voice = root.ownerDocument.createElement('button');
+  voice.className = 'tour-button';
+  voice.textContent = labels.play;
+  voice.type = 'button';
+  hintClose.before(voice);
+  signal.addEventListener('abort', () => voice.remove(), { once: true });
   let activeHint = 0;
   let activeHintId = null;
   let textPage = 0;
@@ -63,6 +69,8 @@ export function createTourHints(
       hint.hidden = true;
       return;
     }
+    voice.hidden = Boolean(keyboardScope) || current.narration?.trigger !== 'activation';
+    voice.dataset.tourNarration = current.id;
     activeHintId = current.id;
     hint.hidden = false;
     const authoredAppearance = current.appearance ?? defaultAppearance;

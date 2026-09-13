@@ -28,6 +28,19 @@ export function renderTourMask(
     effect.style.opacity = String(mask.kind === 'redact' ? 1 : mask.opacity);
   }
   box.append(effect);
+  if (!authoring && mask.narration?.trigger === 'activation') {
+    box.tabIndex = 0;
+    box.setAttribute('role', 'button');
+    box.setAttribute('aria-label', labels.play);
+    box.dataset.tourNarration = mask.id;
+    box.style.pointerEvents = 'auto';
+    box.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        box.click();
+      }
+    });
+  }
   if (authoring) {
     box.tabIndex = 0;
     box.setAttribute('role', 'group');

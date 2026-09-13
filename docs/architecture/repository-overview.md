@@ -26,3 +26,5 @@ Sniptale is a TypeScript and React Manifest V3 Chromium extension built with Vit
 - `tasks` contains unstaged task artifacts.
 
 Use the [documentation index](../README.md) to find domain authorities.
+
+`apps/extension/src/tour-preview-sandbox` owns unprivileged exact-file tour preview.

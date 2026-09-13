@@ -12,6 +12,7 @@ export function renderTourNavigationScene({
   media,
   element,
   actionButton,
+  authoring,
   page,
   onPage,
 }) {
@@ -43,7 +44,17 @@ export function renderTourNavigationScene({
   for (const button of slide.buttons.slice(buttonPage * pageSize, (buttonPage + 1) * pageSize)) {
     const node = actionButton(button.label, button.action, 'tour-button', button.id);
     node.style.height = `${rowHeight}px`;
-    buttons.append(node);
+    if (!authoring && button.narration?.trigger === 'activation') {
+      const group = element('div', 'tour-navigation-audio');
+      group.style.display = 'flex';
+      group.style.gap = '4px';
+      node.style.flex = '1';
+      const voice = element('button', 'tour-button', labels.play);
+      voice.type = 'button';
+      voice.dataset.tourNarration = button.id;
+      group.append(node, voice);
+      buttons.append(group);
+    } else buttons.append(node);
   }
   if (slide.buttons.length) content.append(buttons);
   if (count > 1) {

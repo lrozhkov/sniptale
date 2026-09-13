@@ -1,1 +1,6 @@
-export { buildTourPlayerHtml, type TourPlayerAsset, type TourPlayerLabels } from './document';
+export {
+  buildTourPlayerHtml,
+  buildTourPlayerBlob,
+  type TourPlayerAsset,
+  type TourPlayerLabels,
+} from './document';

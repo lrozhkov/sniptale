@@ -1,3 +1,4 @@
+import { getTourNarrationCues } from '../project/tour-resources';
 import { tourCameraEnabled } from './camera.js';
 /** Reading and narration use authored source data; returned duration is milliseconds. */
 export function tourSlideDuration(tour, slide) {
@@ -11,9 +12,10 @@ export function tourSlideDuration(tour, slide) {
       : [slide.title, slide.description, ...slide.buttons.map((button) => button.label)];
   const characters = texts.join(' ').trim().length;
   const readingSeconds = characters ? 1 + characters / 15 : 0;
-  const narrationSeconds = slide.narration
-    ? slide.narration.trimEnd - slide.narration.trimStart
-    : 0;
+  const narrationSeconds = getTourNarrationCues(slide, { kind: 'enter' }).reduce(
+    (sum, cue) => sum + cue.narration.trimEnd - cue.narration.trimStart,
+    0
+  );
   const hold =
     slide.timing.mode === 'manual'
       ? Math.max(slide.timing.holdSeconds, slide.timing.truncateNarration ? 0 : narrationSeconds)

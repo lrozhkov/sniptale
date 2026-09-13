@@ -96,6 +96,12 @@ export const PRODUCTION_TYPECHECK_PROJECTS = [
     rootPrefixes: ['apps/extension/src/video-editor/'],
   },
   {
+    id: 'tour-preview-sandbox',
+    include: ['apps/extension/src/tour-preview-sandbox/**/*'],
+    references: ['app-core'],
+    rootPrefixes: ['apps/extension/src/tour-preview-sandbox/'],
+  },
+  {
     id: 'scenario-editor',
     include: ['apps/extension/src/scenario-editor/**/*'],
     references: ['app-core'],

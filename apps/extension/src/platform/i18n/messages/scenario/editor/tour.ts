@@ -1,4 +1,37 @@
 export const scenarioTourMessages = {
+  tourHtmlAudioBlocked: {
+    ru: 'Нажмите «Воспроизвести», чтобы включить звук.',
+    en: 'Press Play to enable audio.',
+  },
+  tourHtmlPreview: { ru: 'Предпросмотр HTML', en: 'HTML preview' },
+  tourHtmlTitle: { ru: 'Экспорт интерактивного тура', en: 'Export interactive tour' },
+  tourHtmlPrepare: { ru: 'Подготовить и посмотреть', en: 'Prepare and preview' },
+  tourHtmlPrepareHint: {
+    ru: 'Подготовьте файл, чтобы проверить весь тур перед сохранением.',
+    en: 'Prepare the file to review the entire tour before saving.',
+  },
+  tourHtmlOriginal: { ru: 'Исходное качество', en: 'Original quality' },
+  tourHtmlOptimized: { ru: 'Оптимизировать · WebP', en: 'Optimize · WebP' },
+  tourHtmlResolution: { ru: 'Длинная сторона', en: 'Longest edge' },
+  tourHtmlQuality: { ru: 'Качество', en: 'Quality' },
+  tourHtmlDesktop: { ru: 'На всю область', en: 'Full preview area' },
+  tourHtmlMobile: { ru: 'Телефон · 360 px', en: 'Phone · 360 px' },
+  tourHtmlMediaHint: {
+    ru: 'Один HTML со всеми изображениями и озвучкой. Сохраняется именно файл из предпросмотра. Для запуска звука браузер может попросить нажать «Воспроизвести».',
+    en: 'One HTML file with all images and narration. Save writes exactly the previewed file. Audio may require pressing Play in your browser.',
+  },
+  tourHtmlMaskHint: {
+    ru: 'Непрозрачное скрытие запекается во все использования общего изображения. Размытие и подсветка — визуальные эффекты, они не удаляют исходные пиксели.',
+    en: 'Opaque redactions are baked into every use of a shared image. Blur and highlights are visual effects; they do not remove source pixels.',
+  },
+  tourHtmlLimitHint: {
+    ru: 'До 128 МБ используемых медиа. Неиспользуемые материалы и метаданные захвата не включаются.',
+    en: 'Up to 128 MB of referenced media. Unused materials and capture metadata are excluded.',
+  },
+  tourHtmlFailed: {
+    ru: 'Не удалось подготовить или сохранить файл. Проверьте изображения и отмеченные точки слайдов, доступность аудио и объём медиа; затем повторите.',
+    en: 'Could not prepare or save the file. Check slide images and reviewed targets, available audio and media size, then retry.',
+  },
   tourAudioUsed: { ru: 'Привязки', en: 'Bindings' },
   tourObjectNarration: { ru: 'Озвучка объекта', en: 'Object narration' },
   tourSlideNarration: { ru: 'Озвучка слайда', en: 'Slide narration' },

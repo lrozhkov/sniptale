@@ -324,6 +324,11 @@ it('keeps tour settings editable during autosave while imports stay locked', asy
     await act(async () => node.click());
   };
   await click('Interactive tour');
+  await act(async () => container.querySelector<HTMLButtonElement>('.tour-slide-select')?.click());
+  if (!container.querySelector('[aria-label="Camera mode"]')) {
+    const showAll = container.querySelector<HTMLButtonElement>('button[title="Show all settings"]');
+    if (showAll) await act(async () => showAll.click());
+  }
   await choose('Camera mode', 'Full view');
   await settleAutosave();
   expect(io.save).toHaveBeenCalledOnce();
@@ -351,6 +356,8 @@ it('imports narration from the mounted tour inspector through the source-bound p
   await click('Interactive tour');
   await act(async () => container.querySelector<HTMLButtonElement>('.tour-slide-select')?.click());
   await click('Inspector');
+  const showAll = container.querySelector<HTMLButtonElement>('button[title="Show all settings"]');
+  if (showAll) await act(async () => showAll.click());
   const input = container.querySelector<HTMLInputElement>('input[type="file"][accept^="audio/"]');
   expect(input).not.toBeNull();
   const blob = new File(['voice'], 'narration.wav', { type: 'audio/wav' });
@@ -389,4 +396,22 @@ it('switches representations directly from the header and keeps only the active 
   await act(async () => choices()[0]?.click());
   expect(choices()[0]?.getAttribute('aria-pressed')).toBe('true');
   expect(container.querySelector('.guide-document-scroll')).not.toBeNull();
+});
+
+it('opens standalone tour export and returns to the selected slide', async () => {
+  const project = createGuideProject('Export tour', 'guide', 100);
+  const slide = createTourImageSlide('export-slide');
+  slide.title = 'Export slide';
+  project.tour = { ...createTourDocument(), slides: [slide] };
+  io.load.mockResolvedValue(project);
+  await render();
+  await click('Interactive tour');
+  await click('Export');
+  expect(container.querySelector('.tour-export')).not.toBeNull();
+  expect(container.textContent).toContain('Prepare and preview');
+  await act(async () =>
+    container.querySelector<HTMLButtonElement>('.tour-export header button')?.click()
+  );
+  expect(container.querySelector('.tour-export')).toBeNull();
+  expect(container.querySelector('.tour-slide-list')?.textContent).toContain('Export slide');
 });

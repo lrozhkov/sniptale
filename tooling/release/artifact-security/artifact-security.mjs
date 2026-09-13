@@ -1,3 +1,4 @@
+import { EXPECTED_EFFECT_SANDBOX_CSP } from './sandbox-policy.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import JSZip from 'jszip';
@@ -207,6 +208,23 @@ function assertManifestSandboxPolicy(manifest, artifactPaths) {
   }
 }
 
+function assertEffectSandboxCsp(filesByPath) {
+  const html =
+    filesByPath
+      .get('apps/extension/src/effect-runtime-sandbox/index.html')
+      ?.contents.toString('utf8') ?? '';
+  const script = html.search(/<script\b/iu);
+  const meta = [...html.matchAll(/<meta\b[^>]*>/giu)].find((match) => {
+    if (!/http-equiv\s*=\s*["']Content-Security-Policy["']/iu.test(match[0])) return false;
+    const content = /content\s*=\s*"([^"]*)"/iu.exec(match[0])?.[1];
+    return (
+      content?.replace(/&#39;|&apos;/gu, "'") === EXPECTED_EFFECT_SANDBOX_CSP &&
+      (script < 0 || match.index < script)
+    );
+  });
+  if (!meta) throw new Error('Release artifact effect sandbox is missing its strict head CSP.');
+}
+
 function assertManifestWar(manifest) {
   const resources = manifest.web_accessible_resources ?? [];
   if (!Array.isArray(resources)) {
@@ -325,6 +343,7 @@ export async function verifyReleaseArtifactFiles({ files, repoRoot = process.cwd
     repoRoot,
     new Set(normalizedFiles.map((file) => file.relativePath))
   );
+  assertEffectSandboxCsp(filesByPath);
 }
 
 export async function verifyReleaseArchivePath(archivePath, { repoRoot = process.cwd() } = {}) {

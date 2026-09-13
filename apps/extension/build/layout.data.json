@@ -175,6 +175,12 @@
       "sourcePath": "tooling/test/harness/security-control.html",
       "rollupName": "testHarnessSecurityControl",
       "mode": "security-e2e"
+    },
+    {
+      "outputPath": "apps/extension/src/tour-preview-sandbox/index.html",
+      "sourcePath": "apps/extension/src/tour-preview-sandbox/index.html",
+      "rollupName": null,
+      "mode": "manifest"
     }
   ],
   "requiredReleaseArtifacts": [
@@ -199,7 +205,8 @@
     "fonts/marck-script-latin-400-normal.woff2",
     "icons/icon-16.png",
     "icons/icon-48.png",
-    "icons/icon-128.png"
+    "icons/icon-128.png",
+    "apps/extension/src/tour-preview-sandbox/index.html"
   ],
   "rootCommands": {
     "dev": "vite --config apps/extension/vite.config.ts",

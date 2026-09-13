@@ -1,3 +1,4 @@
+import { TourHtmlExport } from './tour/export';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { BookOpen, MousePointerClick } from 'lucide-react';
 import { TourWorkspace } from './tour/workspace';
@@ -70,6 +71,8 @@ export function ScenarioEditorPage() {
         onClose={imageEditor.close}
       />
     );
+  if (reader.active && project && tourMode)
+    return <TourHtmlExport project={project} t={t} onClose={reader.close} />;
   if (reader.active && project)
     return (
       <GuideReader
@@ -287,7 +290,7 @@ function ScenarioHeader({
       onAppearance={() => panels.openRight('document')}
       onPreview={reader.open}
       previewRef={reader.trigger}
-      previewDisabled={disabled || tourMode}
+      previewDisabled={disabled || (tourMode && !project?.tour?.slides.length)}
       showSnap={!tourMode}
       representationControls={
         project &&

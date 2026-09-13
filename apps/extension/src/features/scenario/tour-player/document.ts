@@ -5,6 +5,7 @@ import { parseTourDocument } from '@sniptale/runtime-contracts/scenario/tour-par
 import type { TourDocument, TourImage } from '@sniptale/runtime-contracts/scenario/types/tour';
 
 export interface TourPlayerLabels {
+  audioBlocked?: string;
   resize?: string;
   expand: string;
   collapse: string;
@@ -51,7 +52,10 @@ function imageProjection(image: TourImage | null) {
   return { assetId: image.assetId, width: image.width, height: image.height, alt: image.alt };
 }
 
-function embedAssets(tour: TourDocument, inputAssets: readonly TourPlayerAsset[]) {
+function selectAssets<T extends { id: string; mime: string }>(
+  tour: TourDocument,
+  inputAssets: readonly T[]
+) {
   const required = new Map<string, 'image' | 'audio'>();
   for (const slide of tour.slides) {
     if (slide.kind === 'image' && slide.requiresTargetReview)
@@ -76,29 +80,23 @@ function embedAssets(tour: TourDocument, inputAssets: readonly TourPlayerAsset[]
     seen.add(asset.id);
     const kind = required.get(asset.id);
     if (!kind) return [];
-    if (
-      !(kind === 'image' ? imageMimes : audioMimes).has(asset.mime) ||
-      !asset.base64 ||
-      !/^[A-Za-z0-9+/]+={0,2}$/u.test(asset.base64)
-    )
+    if (!(kind === 'image' ? imageMimes : audioMimes).has(asset.mime))
       throw new Error('Invalid embedded tour media.');
-    return [{ id: asset.id, src: `data:${asset.mime};base64,${asset.base64}` }];
+    return [asset];
   });
   if ([...required.keys()].some((id) => !seen.has(id))) throw new Error('Missing tour media.');
   return assets;
 }
 
 /** Fixed executable source, inert authored JSON and embedded media form the exact preview/export artifact. */
-export async function buildTourPlayerHtml(args: {
+async function buildTourPlayerShell(args: {
   tour: TourDocument;
   title: string;
   labels: TourPlayerLabels;
-  assets: readonly TourPlayerAsset[];
-}): Promise<string> {
+}): Promise<readonly [string, string]> {
   const parsed = parseTourDocument(args.tour);
   if (parsed.status !== 'ok') throw new Error('Invalid tour.');
   const tour = parsed.document;
-  const assets = embedAssets(tour, args.assets);
   const { audioResources: _materials, ...viewerTour } = tour;
   const payload = {
     tour: {
@@ -113,7 +111,6 @@ export async function buildTourPlayerHtml(args: {
         return { ...rendering, image: imageProjection(slide.image) };
       }),
     },
-    assets,
     labels: args.labels,
   };
   const json = JSON.stringify(payload)
@@ -124,7 +121,8 @@ export async function buildTourPlayerHtml(args: {
   const hash = btoa(String.fromCharCode(...new Uint8Array(digest)));
   const policy = `default-src 'none'; script-src 'sha256-${hash}'; style-src 'unsafe-inline'; img-src data:; media-src data:; base-uri 'none'; form-action 'none'`;
   const labels = args.labels;
-  return `<!doctype html>
+  return [
+    `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8">
@@ -177,8 +175,58 @@ ${escape(labels.previous)}</button>
 <dialog class="tour-navigation" data-tour-navigation aria-label="${escape(labels.contents)}">
 </dialog>
 </main>
-<script id="tour-data" type="application/json">${json}</script>
+<script id="tour-data" type="application/json">${json.slice(0, -1)},"assets":[`,
+    `]}</script>
 <script>${script}</script>
 </body>
-</html>`;
+</html>`,
+  ] as const;
+}
+
+/** Small fixtures and existing consumers use the same shell and media validation. */
+export async function buildTourPlayerHtml(args: {
+  tour: TourDocument;
+  title: string;
+  labels: TourPlayerLabels;
+  assets: readonly TourPlayerAsset[];
+}): Promise<string> {
+  const [start, end] = await buildTourPlayerShell(args);
+  const assets = selectAssets(args.tour, args.assets).map((asset) => {
+    if (!asset.base64 || !/^[A-Za-z0-9+/]+={0,2}$/u.test(asset.base64))
+      throw new Error('Invalid embedded tour media.');
+    return { id: asset.id, src: `data:${asset.mime};base64,${asset.base64}` };
+  });
+  return start + JSON.stringify(assets).slice(1, -1).replace(/</gu, '\\u003c') + end;
+}
+
+/** Encodes bounded chunks once; preview and save retain the identical immutable Blob. */
+export async function buildTourPlayerBlob(args: {
+  tour: TourDocument;
+  title: string;
+  labels: TourPlayerLabels;
+  assets: readonly { id: string; mime: string; blob: Blob }[];
+  signal: AbortSignal;
+}): Promise<Blob> {
+  args.signal.throwIfAborted();
+  const [start, end] = await buildTourPlayerShell(args);
+  const parts: BlobPart[] = [start];
+  let index = 0;
+  for (const asset of selectAssets(args.tour, args.assets)) {
+    if (!asset.blob.size) throw new Error('Empty tour media.');
+    const id = JSON.stringify(asset.id).replace(/</gu, '\\u003c');
+    parts.push(`${index++ ? ',' : ''}{"id":${id},"src":"data:${asset.mime};base64,`);
+    for (let offset = 0; offset < asset.blob.size; offset += 96 * 1024) {
+      args.signal.throwIfAborted();
+      const bytes = new Uint8Array(
+        await asset.blob.slice(offset, offset + 96 * 1024).arrayBuffer()
+      );
+      let binary = '';
+      for (const byte of bytes) binary += String.fromCharCode(byte);
+      parts.push(btoa(binary));
+    }
+    parts.push('"}');
+  }
+  args.signal.throwIfAborted();
+  parts.push(end);
+  return new Blob(parts, { type: 'text/html;charset=utf-8' });
 }

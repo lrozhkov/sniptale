@@ -196,6 +196,7 @@ The ownership, justification, failure behavior, disclosure key, web-accessible r
 - `effect-runtime-sandbox` → `apps/extension/src/effect-runtime-sandbox`
 - `scenario-editor` → `apps/extension/src/scenario-editor`
 - `web-snapshot-viewer` → `apps/extension/src/web-snapshot-viewer`
+- `tour-preview-sandbox` → `apps/extension/src/tour-preview-sandbox`
 
 ## Background route owners
 

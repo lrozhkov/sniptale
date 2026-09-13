@@ -1,3 +1,4 @@
+import { EXPECTED_EFFECT_SANDBOX_CSP } from './sandbox-policy.mjs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -25,7 +26,12 @@ const baseManifest = {
       resources: ['fonts/manrope-latin-wght-normal.woff2'],
     },
   ],
-  sandbox: { pages: ['apps/extension/src/effect-runtime-sandbox/index.html'] },
+  sandbox: {
+    pages: [
+      'apps/extension/src/effect-runtime-sandbox/index.html',
+      'apps/extension/src/tour-preview-sandbox/index.html',
+    ],
+  },
 };
 const basePolicy = {
   hostPermissions: [],
@@ -74,6 +80,10 @@ function createFiles(
   return [
     ...createTestLegalArtifactFiles(),
     {
+      contents: Buffer.from('<!doctype html>'),
+      relativePath: 'apps/extension/src/tour-preview-sandbox/index.html',
+    },
+    {
       contents: Buffer.from(JSON.stringify(baseManifest)),
       relativePath: 'manifest.json',
     },
@@ -91,8 +101,9 @@ function createFiles(
       : []),
     {
       contents: Buffer.from(
-        options.sandboxHtml ??
-          '<!doctype html><script type="module" src="/assets/effect-runtime-sandbox.js"></script>'
+        `<meta http-equiv="Content-Security-Policy" content="${EXPECTED_EFFECT_SANDBOX_CSP}">` +
+          (options.sandboxHtml ??
+            '<!doctype html><script type="module" src="/assets/effect-runtime-sandbox.js"></script>')
       ),
       relativePath: 'apps/extension/src/effect-runtime-sandbox/index.html',
     },
