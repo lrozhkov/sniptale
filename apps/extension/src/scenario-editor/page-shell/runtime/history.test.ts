@@ -1,5 +1,10 @@
 import { expect, it } from 'vitest';
-import { createGuideProject } from '../../../features/scenario/project/public';
+import {
+  createGuideProject,
+  createTourDocument,
+  createTourImageSlide,
+  applyTourCommands,
+} from '../../../features/scenario/project/public';
 import { reduceGuideHistory, type GuideHistory } from './history';
 
 function initial(): GuideHistory {
@@ -126,4 +131,26 @@ it('hydrates bounded project history in chronological order and resets redo', ()
   state = reduceGuideHistory(state, { kind: 'redo' });
   expect(state.present).toBe(project);
   expect(reduceGuideHistory(state, { kind: 'reset', project: null }).past).toEqual([]);
+});
+
+it('undoes a whole tour command batch in the existing project history', () => {
+  let state = initial();
+  const source = state.present!;
+  const tour = createTourDocument('tour');
+  const changed = applyTourCommands(
+    source,
+    [
+      { kind: 'replace-tour', tour },
+      { kind: 'insert-slide', slide: createTourImageSlide('slide') },
+    ],
+    { images: [], audio: [] }
+  );
+  state = reduceGuideHistory(state, { kind: 'edit', project: changed, group: null });
+  expect(state.past).toHaveLength(1);
+  expect(state.present?.tour?.slides).toHaveLength(1);
+  state = reduceGuideHistory(state, { kind: 'undo' });
+  expect(state.present).toEqual(source);
+  state = reduceGuideHistory(state, { kind: 'redo' });
+  expect(state.present).toEqual(changed);
+  expect(state.present?.items).toEqual(source.items);
 });

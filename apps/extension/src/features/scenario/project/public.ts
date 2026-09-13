@@ -29,3 +29,10 @@ export {
   getScenarioResourceReferences,
   remapTourIdentities,
 } from './tour-resources';
+
+export {
+  applyTourCommands,
+  getTourIncomingReferences,
+  type TourCommand,
+  type TourResourceCatalog,
+} from './tour-commands';
