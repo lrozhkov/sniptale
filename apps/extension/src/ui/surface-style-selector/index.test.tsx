@@ -255,6 +255,79 @@ it('matches semantically, drafts a preset, and applies only on Apply', async () 
   expect(onChange).toHaveBeenCalledWith(style('#ffffff80', 'backdrop-filter: blur(16px);'));
 });
 
+it('preserves a chosen draft across equivalent parent values before Apply', async () => {
+  const onChange = vi.fn();
+  const root = createRoot(document.querySelector('#root')!);
+  const render = async (color: string) =>
+    act(async () =>
+      root.render(
+        <SurfaceStyleSelector
+          actions={actions}
+          presets={presets}
+          value={style(color)}
+          onChange={onChange}
+        />
+      )
+    );
+  await render('#fff');
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('[aria-expanded="false"]')!.click()
+  );
+  await act(async () =>
+    [...document.querySelectorAll('button')]
+      .find((button) => button.textContent?.includes('Glass'))!
+      .click()
+  );
+  await render('#ffffff');
+  await act(async () =>
+    document.querySelector<HTMLButtonElement>('[data-ui="surface-style.apply"]')!.click()
+  );
+  expect(onChange).toHaveBeenLastCalledWith(style('#ffffff80', 'backdrop-filter: blur(16px);'));
+  await act(async () => root.unmount());
+});
+
+it('replaces drafts on external changes and discards cancelled selections', async () => {
+  const onChange = vi.fn();
+  const root = createRoot(document.querySelector('#root')!);
+  const render = async (color: string) =>
+    act(async () =>
+      root.render(
+        <SurfaceStyleSelector
+          actions={actions}
+          presets={presets}
+          value={style(color)}
+          onChange={onChange}
+        />
+      )
+    );
+  const open = async () =>
+    act(async () => document.querySelector<HTMLButtonElement>('[aria-expanded="false"]')!.click());
+  const choose = async () =>
+    act(async () =>
+      [...document.querySelectorAll('button')]
+        .find((button) => button.textContent?.includes('Glass'))!
+        .click()
+    );
+  const action = async (name: string) =>
+    act(async () =>
+      document.querySelector<HTMLButtonElement>(`[data-ui="surface-style.${name}"]`)!.click()
+    );
+  await render('#fff');
+  await open();
+  await choose();
+  await render('#123456');
+  await action('apply');
+  expect(onChange).toHaveBeenLastCalledWith(style('#123456'));
+  await open();
+  await choose();
+  await action('cancel');
+  expect(onChange).toHaveBeenCalledTimes(1);
+  await open();
+  await action('apply');
+  expect(onChange).toHaveBeenLastCalledWith(style('#123456'));
+  await act(async () => root.unmount());
+});
+
 it('lets Escape close only the top nested Paint layer before the Surface layer', async () => {
   const onOpenChange = vi.fn();
   const root = createRoot(document.querySelector('#root')!);
