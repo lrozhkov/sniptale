@@ -1,3 +1,5 @@
+import { TourCameraSettings } from './camera-settings';
+import { ProductToggle } from '@sniptale/ui/product-form-controls';
 import type {
   TourDocument,
   TourImageSlide,
@@ -32,7 +34,7 @@ type InspectorProps = {
   disabled: boolean;
   t: Translate;
   onChangeTour: (tour: TourDocument) => boolean;
-  onChangeSlide: (slide: TourSlide) => boolean;
+  onChangeSlide: (slide: TourSlide, group?: string | null) => boolean;
   onSelectObject: (id: string | null) => void;
 };
 
@@ -96,7 +98,7 @@ function TourImageSettings({
   tour: TourDocument;
   objectId: string | null;
   disabled: boolean;
-  onChange: (slide: TourImageSlide) => boolean;
+  onChange: (slide: TourImageSlide, group?: string | null) => boolean;
   onSelect: (id: string | null) => void;
   t: Translate;
 }) {
@@ -215,6 +217,7 @@ function TourImageSettings({
           </div>
         )}
       </GuideInspectorGroup>
+      <TourCameraSettings slide={slide} tour={tour} disabled={disabled} onChange={onChange} t={t} />
       <TourImageObjects
         slide={slide}
         disabled={disabled}
@@ -235,7 +238,7 @@ function TourImageObjects({
 }: {
   slide: TourImageSlide;
   disabled: boolean;
-  onChange: (slide: TourImageSlide) => boolean;
+  onChange: (slide: TourImageSlide, group?: string | null) => boolean;
   onSelect: (id: string) => void;
   t: Translate;
 }) {
@@ -389,6 +392,18 @@ function TourDocumentSettings({
           onChange={(value) => onChange({ ...tour, style: { ...tour.style, [key]: value } })}
         />
       ))}
+      <label className="guide-number-toggle">
+        <ProductToggle
+          size="sm"
+          disabled={disabled}
+          checked={tour.playback.autoZoom}
+          aria-label={t('scenario.editor.tourAutoZoom')}
+          onClick={() =>
+            onChange({ ...tour, playback: { ...tour.playback, autoZoom: !tour.playback.autoZoom } })
+          }
+        />
+        {t('scenario.editor.tourAutoZoom')}
+      </label>
       <TourTextPresentation
         inherit={false}
         value={tour.style.textAppearance}

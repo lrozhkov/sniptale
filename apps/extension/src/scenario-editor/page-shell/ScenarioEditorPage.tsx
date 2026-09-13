@@ -112,7 +112,8 @@ export function ScenarioEditorPage() {
           images={state.images}
           panels={panels}
           header={header}
-          disabled={importDisabled}
+          disabled={disabled || status === 'conflict'}
+          importDisabled={importDisabled}
           onChange={state.update}
           onImport={imports.resources}
           initialSlideId={imageEditor.returnSlideId}

@@ -27,6 +27,7 @@ type TourWorkspaceProps = {
   panels: ReturnType<typeof useGuidePanels>;
   header: ReactNode;
   disabled: boolean;
+  importDisabled?: boolean;
   t: Translate;
   onChange: (project: GuideProject, group?: string | null) => void;
   onImport: (
@@ -36,7 +37,7 @@ type TourWorkspaceProps = {
 
 /** Tour editing uses the page's existing buffer, resource drawer and panel frame. */
 export function TourWorkspace(props: TourWorkspaceProps) {
-  const { project, panels, disabled, t, onChange, onImport } = props;
+  const { project, panels, disabled, importDisabled = disabled, t, onChange, onImport } = props;
   const state = useTourSelection(project, disabled, onChange, props.initialSlideId);
   const [generating, setGenerating] = useState(false);
   const selectSlide = (slideId: string) => {
@@ -51,10 +52,10 @@ export function TourWorkspace(props: TourWorkspaceProps) {
   const upload = (file: File, signal: AbortSignal) =>
     onImport({ sources: [{ kind: 'file', file }], placement: { kind: 'tour-slides' }, signal });
   return (
-    <GuideResourceDrawer t={t} disabled={disabled} selectedStepId={null} onImport={onImport}>
+    <GuideResourceDrawer t={t} disabled={importDisabled} selectedStepId={null} onImport={onImport}>
       <TourImageDropZone
         project={project}
-        disabled={disabled}
+        disabled={importDisabled}
         t={t}
         onChange={onChange}
         onImport={(sources, placement, signal) => onImport({ sources, placement, signal })}
@@ -102,6 +103,7 @@ function TourSettingsPanel({
   project,
   panels,
   disabled,
+  importDisabled = disabled,
   t,
   onImport,
   onEditImage,
@@ -178,7 +180,7 @@ function TourSettingsPanel({
             <GuideImageUpload
               compact
               placement={imageDestination}
-              disabled={disabled}
+              disabled={importDisabled}
               t={t}
               onUpload={(file, signal) =>
                 onImport({
@@ -198,6 +200,7 @@ function TourCanvas({
   project,
   images,
   disabled,
+  importDisabled = disabled,
   t,
   onChange,
   onImport,
@@ -245,7 +248,7 @@ function TourCanvas({
             <div className="tour-empty-image">
               <GuideImageUpload
                 placement={{ kind: 'tour-image', slideId: state.slide.id }}
-                disabled={disabled}
+                disabled={importDisabled}
                 t={t}
                 onUpload={(file, signal) =>
                   onImport({
@@ -266,7 +269,7 @@ function TourCanvas({
           <GuideImageUpload
             compact
             placement={{ kind: 'tour-slides' }}
-            disabled={disabled}
+            disabled={importDisabled}
             onUpload={upload}
             t={t}
           />

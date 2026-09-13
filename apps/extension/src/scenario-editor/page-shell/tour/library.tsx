@@ -17,6 +17,7 @@ type LibraryProps = {
   images: Record<string, string | null>;
   panels: ReturnType<typeof useGuidePanels>;
   disabled: boolean;
+  importDisabled?: boolean;
   t: Translate;
 };
 
@@ -28,7 +29,7 @@ export function TourLibraryPanel(
     onUpload: (file: File, signal: AbortSignal) => Promise<boolean>;
   }
 ) {
-  const { panels, project, disabled, t, state } = props;
+  const { panels, project, disabled, importDisabled = disabled, t, state } = props;
   return (
     <FloatingChromePanel
       role="complementary"
@@ -77,7 +78,7 @@ export function TourLibraryPanel(
           <GuideImageUpload
             compact
             placement={{ kind: 'tour-slides' }}
-            disabled={disabled}
+            disabled={importDisabled}
             onUpload={props.onUpload}
             t={t}
           />

@@ -161,28 +161,35 @@ it('updates the scene in place and selects authored URL objects without opening 
   expect(root.dataset['slideId']).toBe('second');
 });
 
-it('commits a source-coordinate drag once and cancels the next gesture with Escape', async () => {
-  const onMoveObject = vi.fn();
-  const { player, root } = await mount({ authoring: { onSelectObject: vi.fn(), onMoveObject } });
-  const input = authoringInput();
-  player.update(input);
-  const point = root.querySelector<HTMLElement>('.tour-hotspot')!;
-  pointer(point, 'pointerdown', 0);
-  pointer(point, 'pointermove', 36);
-  expect(onMoveObject).not.toHaveBeenCalled();
-  pointer(point, 'pointerup', 36);
-  expect(onMoveObject).toHaveBeenCalledExactlyOnceWith('point', { x: 0.6, y: 0.5 });
-  expect(input.tour.slides[0]?.kind === 'image' && input.tour.slides[0].hotspots[0]?.point).toEqual(
-    { x: 0.5, y: 0.5 }
-  );
-  const original = point.style.left;
-  pointer(point, 'pointerdown', 0);
-  pointer(point, 'pointermove', 10000);
-  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
-  expect(point.style.left).toBe(original);
-  pointer(point, 'pointerup', 10000);
-  expect(onMoveObject).toHaveBeenCalledTimes(1);
-});
+it.each([false, true])(
+  'commits source-coordinate drag with auto zoom %s and cancels Escape',
+  async (autoZoom) => {
+    const onMoveObject = vi.fn();
+    const { player, root } = await mount({ authoring: { onSelectObject: vi.fn(), onMoveObject } });
+    const input = authoringInput();
+    input.tour.playback.autoZoom = autoZoom;
+    player.update(input);
+    const point = root.querySelector<HTMLElement>('.tour-hotspot')!;
+    pointer(point, 'pointerdown', 0);
+    pointer(point, 'pointermove', 36);
+    expect(onMoveObject).not.toHaveBeenCalled();
+    pointer(point, 'pointerup', 36);
+    expect(onMoveObject).toHaveBeenCalledExactlyOnceWith('point', {
+      x: autoZoom ? 0.525 : 0.6,
+      y: 0.5,
+    });
+    expect(
+      input.tour.slides[0]?.kind === 'image' && input.tour.slides[0].hotspots[0]?.point
+    ).toEqual({ x: 0.5, y: 0.5 });
+    const original = point.style.left;
+    pointer(point, 'pointerdown', 0);
+    pointer(point, 'pointermove', 10000);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }));
+    expect(point.style.left).toBe(original);
+    pointer(point, 'pointerup', 10000);
+    expect(onMoveObject).toHaveBeenCalledTimes(1);
+  }
+);
 
 it('cancels an active object gesture when the player is disposed', async () => {
   const onMoveObject = vi.fn();

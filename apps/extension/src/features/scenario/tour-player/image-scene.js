@@ -8,28 +8,26 @@ function projectImagePoint(box, point) {
 export function renderTourImage(
   slide,
   { stageWidth, stageHeight },
-  { scene, element, labels, media, actionButton, hintController, onAction, authoring, signal }
+  {
+    scene,
+    element,
+    labels,
+    media,
+    actionButton,
+    hintController,
+    onAction,
+    authoring,
+    signal,
+    autoZoom,
+    camera,
+  }
 ) {
   if (!slide.image) {
     scene.append(element('p', 'tour-empty', labels.empty));
     return null;
   }
-  const scale =
-    slide.fit === 'cover'
-      ? Math.max(stageWidth / slide.image.width, stageHeight / slide.image.height)
-      : Math.min(stageWidth / slide.image.width, stageHeight / slide.image.height);
-  const imageBox = {
-    width: slide.image.width * scale,
-    height: slide.image.height * scale,
-    x: (stageWidth - slide.image.width * scale) / 2,
-    y: (stageHeight - slide.image.height * scale) / 2,
-  };
-  const zoom = slide.camera.mode === 'manual' ? slide.camera.zoom : 1;
-  const center = slide.camera.mode === 'manual' ? slide.camera.center : { x: 0.5, y: 0.5 };
-  imageBox.width *= zoom;
-  imageBox.height *= zoom;
-  imageBox.x = stageWidth / 2 - center.x * imageBox.width;
-  imageBox.y = stageHeight / 2 - center.y * imageBox.height;
+  const imageBox = camera.resolve(slide, { stageWidth, stageHeight }, autoZoom);
+  if (!imageBox) return null;
   const image = element('img', 'tour-image');
   image.src = media.get(slide.image.assetId);
   image.alt = slide.image.alt;

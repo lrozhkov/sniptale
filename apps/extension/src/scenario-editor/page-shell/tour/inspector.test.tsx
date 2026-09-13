@@ -326,3 +326,20 @@ it('removes a navigation background without changing its buttons or source slide
   expect(next.kind === 'navigation' && next.buttons).toEqual(nav.buttons);
   expect(current().image).not.toBeNull();
 });
+
+it('edits camera mode and normalized center without changing image source', async () => {
+  const source = current().image!.source;
+  expect(host.textContent).toContain('exactly one hotspot');
+  await choose('Camera mode', 'Manual');
+  await fill('Zoom', '2');
+  await fill('X', '75');
+  await fill('Y', '25');
+  expect(current().camera).toEqual({ mode: 'manual', zoom: 2, center: { x: 0.75, y: 0.25 } });
+  expect(current().image!.source).toEqual(source);
+  await choose('Camera mode', 'Full view');
+  expect(current().camera.mode).toBe('off');
+  scope = 'document';
+  draw();
+  await click('Auto Zoom to hotspot');
+  expect(project.tour!.playback.autoZoom).toBe(false);
+});

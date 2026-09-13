@@ -285,3 +285,58 @@ it('opens the selected tour image and restores its selection and focus after App
   expect(returned?.dataset['tourEditImage']).toBe('second');
   expect(document.activeElement).toBe(returned);
 });
+
+it('keeps tour settings editable during autosave while imports stay locked', async () => {
+  const project = createGuideProject('Tour', 'guide', 100);
+  const slide = createTourImageSlide('image');
+  slide.image = {
+    assetId: 'image',
+    width: 100,
+    height: 100,
+    alt: '',
+    galleryAssetId: null,
+    editDocumentId: null,
+    source: { kind: 'import', filename: 'image.png' },
+  };
+  project.tour = { ...createTourDocument(), slides: [slide] };
+  io.load.mockResolvedValue(project);
+  io.asset.mockResolvedValue(new Blob(['image'], { type: 'image/png' }));
+  vi.stubGlobal(
+    'URL',
+    class extends URL {
+      static createObjectURL = vi.fn(() => 'blob:guide-image');
+      static revokeObjectURL = vi.fn();
+    }
+  );
+  let finish!: () => void;
+  io.save.mockImplementationOnce(
+    (source) =>
+      new Promise((resolve) => {
+        finish = () => resolve({ ...source, updatedAt: 101 });
+      })
+  );
+  await render();
+  const choose = async (label: string, option: string) => {
+    await click(label);
+    const node = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+      (entry) => entry.textContent === option
+    );
+    if (!node) throw new Error(`Missing ${option}`);
+    await act(async () => node.click());
+  };
+  await choose('Scenario view', 'Interactive tour');
+  await choose('Camera mode', 'Full view');
+  await settleAutosave();
+  expect(io.save).toHaveBeenCalledOnce();
+  const mode = container.querySelector<HTMLButtonElement>('[aria-label="Camera mode"]');
+  expect(mode?.disabled).toBe(false);
+  const upload = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
+    (node) => node.textContent === 'Upload image'
+  );
+  expect(upload?.disabled).toBe(true);
+  await choose('Camera mode', 'Manual');
+  expect(container.querySelector('input[aria-label="Zoom"]')).not.toBeNull();
+  await act(async () => finish());
+  await settleAutosave();
+  expect(io.save.mock.calls.at(-1)?.[0].tour.slides[0].camera.mode).toBe('manual');
+});

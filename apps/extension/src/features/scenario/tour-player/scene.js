@@ -1,3 +1,4 @@
+import { createTourCameraSession } from './camera.js';
 import { renderTourImage } from './image-scene.js';
 import { createTourNavigation } from './navigation.js';
 import { createTourHints } from './hints.js';
@@ -11,6 +12,7 @@ export function createTourScene(root, input, onAction, signal, authoring) {
   const viewport = query('viewport');
   const stage = query('stage');
   const scene = query('scene');
+  const camera = createTourCameraSession(Boolean(authoring));
   let current = null;
   let ended = false;
   let selectedObjectId = null;
@@ -59,10 +61,13 @@ export function createTourScene(root, input, onAction, signal, authoring) {
           onAction,
           authoring,
           signal,
+          autoZoom: tour.playback.autoZoom,
+          camera,
         }
       );
       hints = slide.image ? [...slide.hotspots, ...slide.annotations] : [];
     } else if (slide) {
+      camera.reset();
       const rendered = navigationController.render(slide, stageWidth, stageHeight);
       scene.append(rendered.panel);
       hints = rendered.hints;

@@ -1,4 +1,19 @@
 export const scenarioTourMessages = {
+  tourCamera: { ru: 'Камера', en: 'Camera' },
+  tourCameraMode: { ru: 'Приближение', en: 'Camera mode' },
+  tourCameraOff: { ru: 'Общий вид', en: 'Full view' },
+  tourCameraAuto: { ru: 'К точке действия', en: 'Focus hotspot' },
+  tourCameraManual: { ru: 'Вручную', en: 'Manual' },
+  tourCameraZoom: { ru: 'Масштаб', en: 'Zoom' },
+  tourAutoZoom: { ru: 'Автоприближение к точке', en: 'Auto Zoom to hotspot' },
+  tourCameraOneTarget: {
+    ru: 'Автоприближение работает, когда на слайде ровно одна точка действия.',
+    en: 'Auto Zoom applies when the slide has exactly one hotspot.',
+  },
+  tourCameraBounds: {
+    ru: 'X и Y задают центр в процентах изображения. Видимая область ограничена его краями.',
+    en: 'X and Y set the center as image percentages. The view stays within the image edges.',
+  },
   tourRemoveBackground: { ru: 'Убрать фоновое изображение', en: 'Remove background image' },
   tourAutomaticTransition: { ru: 'Автоматический переход', en: 'Automatic transition' },
   tourBack: { ru: 'Назад по истории', en: 'Back' },
