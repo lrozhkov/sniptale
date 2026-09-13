@@ -15,7 +15,8 @@
     "apps/extension/build/manifest.ts",
     "packages/ui/src/styles/tailwind.css",
     "apps/extension/build/video-effect-resources.ts",
-    "apps/extension/build/video-effects.ts"
+    "apps/extension/build/video-effects.ts",
+    "apps/extension/build/tour-player-script.ts"
   ],
   "manifestPath": "apps/extension/manifest.json",
   "publicRoot": "apps/extension/public",

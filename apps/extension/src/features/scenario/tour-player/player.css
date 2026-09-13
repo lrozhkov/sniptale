@@ -1,0 +1,336 @@
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+body {
+  font-family: system-ui, sans-serif;
+  background: #111827;
+  color: #fff;
+}
+button,
+a,
+input {
+  font: inherit;
+}
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--tour-accent);
+  outline-offset: 3px;
+}
+#tour-player {
+  height: 100%;
+  height: 100svh;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  color: var(--tour-text);
+  background: var(--tour-surface);
+}
+.tour-toolbar,
+.tour-transport {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  min-height: 48px;
+  flex: none;
+}
+.tour-toolbar {
+  border-bottom: 1px solid #ffffff18;
+}
+.tour-title {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1rem;
+  font-weight: 600;
+}
+.tour-transport {
+  justify-content: center;
+  border-top: 1px solid #ffffff18;
+}
+.tour-button {
+  border: 1px solid #ffffff25;
+  border-radius: 8px;
+  color: inherit;
+  background: #ffffff12;
+  text-decoration: none;
+  padding: 6px 12px;
+  line-height: 1.3;
+  min-height: 34px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tour-button:hover:not(:disabled) {
+  background: #ffffff25;
+}
+.tour-viewport {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.tour-stage {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+.tour-scene {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.tour-image,
+.tour-mask {
+  position: absolute;
+}
+.tour-image {
+  object-fit: fill;
+}
+.tour-mask {
+  pointer-events: none;
+}
+.tour-mask-spotlight {
+  box-shadow: 0 0 0 100vmax #000;
+}
+.tour-mask-highlight {
+  border-radius: 3px;
+}
+.tour-hotspot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: var(--tour-accent);
+  color: #fff;
+  text-decoration: none;
+  font-size: 14px;
+  z-index: 2;
+  cursor: pointer;
+  box-shadow: 0 1px 5px #0006;
+}
+.tour-hotspot[data-pulse='true']::before {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border: 2px solid var(--tour-accent);
+  border-radius: 50%;
+  animation: tour-pulse 1.8s ease-out infinite;
+  pointer-events: none;
+}
+.tour-hint {
+  position: absolute;
+  z-index: 3;
+  border-radius: 10px;
+  padding: 8px;
+  background: var(--tour-surface);
+  color: var(--tour-text);
+  box-shadow: 0 4px 20px #0004;
+  height: var(--hint-height);
+  max-width: calc(100% - 16px);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tour-hint[hidden] {
+  display: none;
+}
+.tour-hint-text {
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  font-size: 1rem;
+  line-height: 1.4;
+}
+.tour-hint-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+  flex: none;
+  font-size: 12px;
+}
+.tour-hint-controls button {
+  width: 30px;
+  min-height: 28px;
+  padding: 2px;
+  border-radius: 50%;
+  font-size: 16px;
+}
+.tour-navigation-scene {
+  height: 100%;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+  isolation: isolate;
+}
+.tour-navigation-scene h1 {
+  font-size: clamp(1rem, 3vw, 2rem);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin: 0;
+}
+.tour-navigation-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: -1;
+  opacity: 0.35;
+}
+.tour-navigation-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  min-height: 0;
+}
+.tour-details {
+  align-self: flex-start;
+  font-size: 0.875rem;
+}
+.tour-empty {
+  padding: 24px;
+  text-align: center;
+}
+.tour-navigation {
+  max-width: min(720px, calc(100vw - 24px));
+  max-height: calc(100svh - 24px);
+  width: 100%;
+  border: 1px solid #ffffff30;
+  border-radius: 12px;
+  background: var(--tour-surface);
+  color: var(--tour-text);
+  padding: 12px;
+  overflow: hidden;
+}
+.tour-navigation::backdrop {
+  background: #0009;
+}
+.tour-contents-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0;
+}
+@keyframes tour-pulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.65);
+    opacity: 0;
+  }
+}
+@media (max-width: 480px) {
+  .tour-toolbar,
+  .tour-transport {
+    gap: 8px;
+    padding: 6px 8px;
+  }
+  .tour-button {
+    padding: 6px 8px;
+  }
+  .tour-navigation-buttons,
+  .tour-contents-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .tour-navigation-scene {
+    padding: 10px;
+    gap: 6px;
+  }
+  .tour-counter {
+    font-size: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+.tour-viewport {
+  position: relative;
+}
+.tour-navigation-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.tour-navigation-heading h1 {
+  flex: 1;
+  min-width: 0;
+}
+.tour-navigation-pager {
+  display: flex;
+  gap: 8px;
+}
+
+.tour-contents-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.tour-navigation-buttons {
+  flex: none;
+}
+.tour-hint-controls {
+  font-size: 0.75rem;
+}
+@media (max-width: 480px) {
+  .tour-contents-trigger span {
+    display: none;
+  }
+  .tour-navigation-scene {
+    padding: 8px;
+    gap: 4px;
+  }
+}
+@media (pointer: coarse) {
+  .tour-hotspot {
+    width: 44px;
+    height: 44px;
+  }
+  .tour-hint-controls button {
+    width: 44px;
+    min-height: 44px;
+  }
+}
