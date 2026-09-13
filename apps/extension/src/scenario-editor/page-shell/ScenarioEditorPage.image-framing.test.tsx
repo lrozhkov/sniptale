@@ -329,6 +329,7 @@ it('keeps tour settings editable during autosave while imports stay locked', asy
   expect(io.save).toHaveBeenCalledOnce();
   const mode = container.querySelector<HTMLButtonElement>('[aria-label="Camera mode"]');
   expect(mode?.disabled).toBe(false);
+  await click('Resources');
   const upload = [...container.querySelectorAll<HTMLButtonElement>('button')].find(
     (node) => node.textContent === 'Upload image'
   );

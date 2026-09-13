@@ -200,14 +200,9 @@ it('imports files into the selected destination and commits source-coordinate ob
     },
   ];
   await render(project);
-  const fileInput = host.querySelector<HTMLInputElement>(
-    '#guide-inspector-panel input[type=file][accept^="image/"]'
-  )!;
-  Object.defineProperty(fileInput, 'files', {
-    value: [new File(['image'], 'image.png', { type: 'image/png' })],
-  });
-  await act(async () => fileInput.dispatchEvent(new Event('change', { bubbles: true })));
-  expect(imported.mock.calls[0]?.[0].placement).toEqual({ kind: 'tour-image', slideId: 'first' });
+  expect(
+    host.querySelector('#guide-inspector-panel input[type=file][accept^="image/"]')
+  ).toBeNull();
   const shadow = () => host.querySelector('.tour-stage-host')!.shadowRoot!;
   for (const id of ['point', 'note', 'mask']) {
     const marker = shadow().querySelector<HTMLElement>(`[data-tour-object-id="${id}"]`)!;
@@ -229,7 +224,7 @@ it('imports files into the selected destination and commits source-coordinate ob
   expect(result.masks[0]!.rect.x).toBeGreaterThan(0.1);
   expect(host.textContent).toContain('Back to slide settings');
 });
-it('moves slides using native drag destinations and keeps resource payloads identity-only', async () => {
+it('keeps resource payloads identity-only', async () => {
   await render();
   const transfer = { effectAllowed: '', setData: vi.fn() };
   const event = async (node: Element, name: string) => {
@@ -237,10 +232,6 @@ it('moves slides using native drag destinations and keeps resource payloads iden
     Object.defineProperty(event, 'dataTransfer', { value: transfer });
     await act(async () => node.dispatchEvent(event));
   };
-  await event(host.querySelector('.tour-slide-row button')!, 'dragstart');
-  await event(host.querySelector('.tour-slide-end-drop')!, 'dragover');
-  await event(host.querySelector('.tour-slide-end-drop')!, 'drop');
-  expect(current.tour!.slides.map((s) => s.id)).toEqual(['second', 'first']);
   await click('Resources');
   await event(host.querySelector('.tour-resource-row')!, 'dragstart');
   const payload = JSON.parse(transfer.setData.mock.calls.at(-1)?.[1] as string);

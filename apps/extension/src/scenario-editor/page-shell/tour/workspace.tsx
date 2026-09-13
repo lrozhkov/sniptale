@@ -113,19 +113,12 @@ function TourSettingsPanel({
   disabled,
   importDisabled = disabled,
   t,
-  onImport,
   onEditImage,
   onImportNarration,
   images,
   state,
   onSelectObject: selectObject,
 }: SelectedTourProps) {
-  const imageDestination = state.slide
-    ? {
-        kind: state.slide.kind === 'image' ? ('tour-image' as const) : ('tour-background' as const),
-        slideId: state.slide.id,
-      }
-    : null;
   const selectedImage =
     state.slide?.kind === 'image' ? state.slide.image : state.slide?.background.image;
   const inspectorTitle =
@@ -185,7 +178,8 @@ function TourSettingsPanel({
             />
           )}
       </div>
-      {imageDestination &&
+      {selectedImage &&
+        onEditImage &&
         panels.rightScope === 'selection' &&
         state.selection?.kind === 'slide' &&
         !state.selection.objectId && (
@@ -203,19 +197,6 @@ function TourSettingsPanel({
                 {t('scenario.editor.guideEditImage')}
               </ProductActionButton>
             )}
-            <GuideImageUpload
-              compact
-              placement={imageDestination}
-              disabled={importDisabled}
-              t={t}
-              onUpload={(file, signal) =>
-                onImport({
-                  sources: [{ kind: 'file', file }],
-                  placement: imageDestination,
-                  signal,
-                })
-              }
-            />
           </footer>
         )}
     </FloatingChromePanel>

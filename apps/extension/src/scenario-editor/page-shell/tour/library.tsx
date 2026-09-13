@@ -2,14 +2,26 @@ import { TourAudioResources } from './audio-materials';
 import { TourNarrationAcquisition } from './narration-acquisition';
 import type { importScenarioNarration } from '../../../composition/persistence/scenario/store/public';
 import { TourResources } from './materials';
-import { useState } from 'react';
+import { useState, type PointerEvent } from 'react';
+import { useTourSlideReorder } from './slide-reorder';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
 import type { TourDocument, TourSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
 import { getTourIncomingReferences } from '../../../features/scenario/project/public';
 import { FloatingChromePanel } from '@sniptale/ui/floating-chrome';
 import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
-import { Image, List, X, Plus, ListPlus, Copy, Trash2, GripVertical, Flag } from 'lucide-react';
+import {
+  Image,
+  List,
+  X,
+  Plus,
+  ListPlus,
+  Copy,
+  Trash2,
+  GripVertical,
+  Flag,
+  BookOpen,
+} from 'lucide-react';
 import type { useGuidePanels } from '../panel-layout';
 import { GuideImageUpload } from '../image-upload';
 import type { useTourSelection } from './selection';
@@ -122,23 +134,25 @@ export function TourLibraryPanel(
                 title={t('scenario.editor.tourAddImageSlide')}
                 onClick={() => state.add('image')}
               >
-                <Plus size={16} />
+                <Plus size={16} aria-hidden="true" />
+                <span>{t('scenario.editor.tourAddImageSlide')}</span>
               </ContentToolbarButton>
               <ContentToolbarButton
                 disabled={disabled}
                 title={t('scenario.editor.tourAddNavigation')}
                 onClick={() => state.add('navigation')}
               >
-                <ListPlus size={16} />
+                <ListPlus size={16} aria-hidden="true" />
+                <span>{t('scenario.editor.tourAddNavigation')}</span>
               </ContentToolbarButton>
-              <ProductActionButton
-                compact
-                tone="secondary"
+              <ContentToolbarButton
                 disabled={disabled || !project.items.length}
+                title={t('scenario.editor.tourGenerate')}
                 onClick={props.onGenerate}
               >
-                {t('scenario.editor.tourGenerate')}
-              </ProductActionButton>
+                <BookOpen size={16} aria-hidden="true" />
+                <span>{t('scenario.editor.tourGenerate')}</span>
+              </ContentToolbarButton>
             </div>
           </>
         )}
@@ -159,7 +173,12 @@ function TourSlideList({
   state: ReturnType<typeof useTourSelection>;
   onSelect: (id: string) => void;
 }) {
-  const [dragged, setDragged] = useState<string | null>(null);
+  const startReorder = useTourSlideReorder(
+    `${project.id}:${project.tour?.slides.map((slide) => slide.id).join(':')}`,
+    disabled || !panels.leftOpen || panels.leftSection !== 'structure',
+    (slideId, beforeId) =>
+      state.command({ kind: 'move-slide', slideId, ...(beforeId ? { beforeId } : {}) })
+  );
   const [removing, setRemoving] = useState<string | null>(null);
   const remove = (slideId: string) => {
     if (project.tour && getTourIncomingReferences(project.tour, slideId).length)
@@ -171,24 +190,7 @@ function TourSlideList({
       {project.tour?.slides.map((slide, index) => {
         const image = slide.kind === 'image' ? slide.image : slide.background.image;
         return (
-          <div
-            className="tour-slide-row"
-            key={slide.id}
-            data-tour-before={slide.id}
-            onDragOver={(event) => {
-              if (dragged) {
-                event.preventDefault();
-                event.stopPropagation();
-              }
-            }}
-            onDrop={(event) => {
-              if (!dragged || disabled) return;
-              event.preventDefault();
-              event.stopPropagation();
-              state.command({ kind: 'move-slide', slideId: dragged, beforeId: slide.id });
-              setDragged(null);
-            }}
-          >
+          <div className="tour-slide-row" key={slide.id} data-tour-before={slide.id}>
             <TourSlideMoveHandle
               slideId={slide.id}
               index={index}
@@ -196,7 +198,7 @@ function TourSlideList({
               disabled={disabled}
               t={t}
               command={state.command}
-              onDrag={setDragged}
+              onPointerStart={startReorder}
             />
             <button
               className="tour-slide-select"
@@ -213,9 +215,12 @@ function TourSlideList({
               ) : (
                 <List size={18} />
               )}
-              <span>{slide.title || t('scenario.editor.tourUntitled')}</span>
+              <span title={slide.title || t('scenario.editor.tourUntitled')}>
+                {slide.title || t('scenario.editor.tourUntitled')}
+              </span>
             </button>
             <ContentToolbarButton
+              className="tour-slide-action"
               disabled={disabled}
               title={t('scenario.editor.tourDuplicate')}
               onClick={() => {
@@ -227,6 +232,7 @@ function TourSlideList({
               <Copy size={14} />
             </ContentToolbarButton>
             <ContentToolbarButton
+              className="tour-slide-action"
               disabled={disabled}
               title={t('common.actions.delete')}
               onClick={() => remove(slide.id)}
@@ -236,23 +242,6 @@ function TourSlideList({
           </div>
         );
       })}
-      {dragged && (
-        <div
-          className="tour-slide-end-drop"
-          onDragOver={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-          }}
-          onDrop={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            if (!disabled) state.command({ kind: 'move-slide', slideId: dragged });
-            setDragged(null);
-          }}
-        >
-          {t('scenario.editor.tourAppend')}
-        </div>
-      )}
       {project.tour && (
         <button
           className="tour-object-row"
@@ -298,7 +287,7 @@ function TourSlideMoveHandle({
   disabled,
   t,
   command,
-  onDrag,
+  onPointerStart,
 }: {
   slideId: string;
   index: number;
@@ -306,11 +295,12 @@ function TourSlideMoveHandle({
   disabled: boolean;
   t: Translate;
   command: ReturnType<typeof useTourSelection>['command'];
-  onDrag: (id: string | null) => void;
+  onPointerStart: (event: PointerEvent<HTMLButtonElement>, slideId: string) => void;
 }) {
   return (
     <ContentToolbarButton
-      draggable={!disabled}
+      className="tour-slide-grip"
+      onPointerDown={(event) => onPointerStart(event, slideId)}
       disabled={disabled}
       title={t('scenario.editor.tourMoveSlide')}
       onKeyDown={(event) => {
@@ -335,12 +325,6 @@ function TourSlideMoveHandle({
           ...(remaining[destination] ? { beforeId: remaining[destination].id } : {}),
         });
       }}
-      onDragStart={(event) => {
-        onDrag(slideId);
-        event.dataTransfer.effectAllowed = 'move';
-        event.dataTransfer.setData('application/x-sniptale-tour-slide', slideId);
-      }}
-      onDragEnd={() => onDrag(null)}
     >
       <GripVertical size={14} />
     </ContentToolbarButton>

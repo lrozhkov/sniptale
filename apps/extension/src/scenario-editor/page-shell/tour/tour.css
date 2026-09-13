@@ -80,7 +80,6 @@
   width: min(100%, 32rem);
 }
 .tour-generation-actions,
-.tour-list-actions,
 .tour-object-actions {
   display: flex;
   align-items: center;
@@ -97,7 +96,26 @@
   flex-direction: column;
   gap: 0.375rem;
 }
+.tour-list-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+.guide-page .tour-list-actions > button {
+  width: 100%;
+  height: auto;
+  min-height: 2rem;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  padding: 0.375rem 0.5rem;
+  text-align: start;
+  font-size: 0.75rem;
+}
+.tour-list-actions svg {
+  flex-shrink: 0;
+}
 .tour-slide-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 0.125rem;
@@ -110,6 +128,66 @@
   min-width: 1.5rem;
   min-height: 1.5rem;
   padding: 0;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+.tour-slide-row > .tour-slide-action {
+  width: 0;
+  min-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.tour-slide-row:hover > .tour-slide-action,
+.tour-slide-row:focus-within > .tour-slide-action {
+  width: 1.5rem;
+  min-width: 1.5rem;
+  opacity: 1;
+  pointer-events: auto;
+}
+.tour-slide-row > .tour-slide-action:hover {
+  background: var(--sniptale-color-surface-hover);
+}
+.tour-slide-grip {
+  cursor: grab;
+  touch-action: none;
+}
+html[data-tour-reordering],
+html[data-tour-reordering] * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+.tour-slide-row[data-slide-dragging] {
+  opacity: 0.35;
+}
+.tour-slide-row[data-slide-dragging] > button:not(.tour-slide-select) {
+  visibility: hidden;
+}
+.tour-slide-row[data-slide-insertion]::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  height: 2px;
+  border-radius: var(--sniptale-radius-sm);
+  background: var(--sniptale-color-accent);
+  pointer-events: none;
+}
+.tour-slide-row[data-slide-insertion='before']::after {
+  top: -0.25rem;
+}
+.tour-slide-row[data-slide-insertion='after']::after {
+  bottom: -0.25rem;
+}
+.tour-slide-select.tour-slide-drag-preview {
+  position: fixed;
+  z-index: 100;
+  pointer-events: none;
+  max-height: 8rem;
+  overflow: hidden;
+  background: var(--sniptale-color-surface-panel);
+  border-color: var(--sniptale-color-border-soft);
+  box-shadow: var(--sniptale-shadow-floating);
 }
 .tour-slide-select {
   display: flex;
@@ -129,9 +207,17 @@
   cursor: pointer;
 }
 .tour-slide-select > span:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.tour-slide-row:hover .tour-slide-select > span:last-child,
+.tour-slide-row:focus-within .tour-slide-select > span:last-child {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+html[data-tour-reordering] .tour-slide-row .tour-slide-select > span:last-child {
+  white-space: normal;
 }
 .tour-slide-select img {
   width: 3rem;
