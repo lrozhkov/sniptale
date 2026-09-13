@@ -32,7 +32,7 @@ function measureHintPages(hintText, fullText) {
   return pages;
 }
 
-export function createTourHints(root, defaultAppearance, { onClose, focusTrigger }) {
+export function createTourHints(root, defaultAppearance, { onClose, focusTrigger, signal }) {
   const query = (name) => root.querySelector(`[data-tour-${name}]`);
   const viewport = query('viewport');
   const hint = query('hint');
@@ -109,8 +109,8 @@ export function createTourHints(root, defaultAppearance, { onClose, focusTrigger
     }
     paginate();
   }
-  hintPrevious.addEventListener('click', () => changeHint(-1));
-  hintNext.addEventListener('click', () => changeHint(1));
+  hintPrevious.addEventListener('click', () => changeHint(-1), { signal });
+  hintNext.addEventListener('click', () => changeHint(1), { signal });
   function dismiss() {
     if (hint.hidden) return;
     dismissed = true;
@@ -123,13 +123,22 @@ export function createTourHints(root, defaultAppearance, { onClose, focusTrigger
       restoringFocus = false;
     }
   }
-  hintClose.addEventListener('click', dismiss);
-  root.ownerDocument.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape' || event.defaultPrevented || query('navigation').open || hint.hidden)
-      return;
-    event.preventDefault();
-    dismiss();
-  });
+  hintClose.addEventListener('click', dismiss, { signal });
+  root.ownerDocument.addEventListener(
+    'keydown',
+    (event) => {
+      if (
+        event.key !== 'Escape' ||
+        event.defaultPrevented ||
+        query('navigation').open ||
+        hint.hidden
+      )
+        return;
+      event.preventDefault();
+      dismiss();
+    },
+    { signal }
+  );
   return {
     get activeIndex() {
       return activeHint;
