@@ -7,6 +7,7 @@ import {
 } from '@sniptale/runtime-contracts/scenario-editor/session';
 import {
   importScenarioImages,
+  importScenarioNarration,
   applyScenarioStepTemplate,
   saveScenarioStepTemplate,
   createScenarioProjectRecord,
@@ -38,6 +39,10 @@ type GuidePageStatus =
 type GuideActionError = 'copy' | 'delete' | 'structure' | 'import' | 'edit' | 'template';
 
 type GuideCommitCommand =
+  | {
+      kind: 'narration';
+      input: Omit<Parameters<typeof importScenarioNarration>[0], 'project' | 'baseUpdatedAt'>;
+    }
   | {
       kind: 'template';
       input: Omit<Parameters<typeof applyScenarioStepTemplate>[0], 'project' | 'baseUpdatedAt'>;
@@ -268,6 +273,8 @@ function runGuideCommitCommand(
   project: GuideProject,
   baseUpdatedAt: number
 ) {
+  if (command.kind === 'narration')
+    return importScenarioNarration({ ...command.input, project, baseUpdatedAt });
   if (command.kind === 'template')
     return applyScenarioStepTemplate({ ...command.input, project, baseUpdatedAt });
   if (command.kind === 'edit')
@@ -355,7 +362,14 @@ function createGuideCommitDispatcher({
       (error) => {
         if (isRevisionConflict(error)) setStatus('conflict');
         else if (error instanceof Error && error.name === 'AbortError') setStatus(status);
-        else rejectAction(command.kind === 'tour-edit' ? 'edit' : command.kind);
+        else
+          rejectAction(
+            command.kind === 'tour-edit'
+              ? 'edit'
+              : command.kind === 'narration'
+                ? 'import'
+                : command.kind
+          );
       }
     );
     return targetReview ? 'requires-target-review' : accepted;

@@ -27,3 +27,5 @@ export {
 } from './project-records/template-apply';
 
 export type { TourImageImportPlacement } from './image-import-tour';
+
+export { importScenarioNarration } from './audio-import';
