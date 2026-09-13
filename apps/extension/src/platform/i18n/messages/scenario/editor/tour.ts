@@ -1,4 +1,32 @@
 export const scenarioTourMessages = {
+  tourAudioUsed: { ru: 'Привязки', en: 'Bindings' },
+  tourObjectNarration: { ru: 'Озвучка объекта', en: 'Object narration' },
+  tourSlideNarration: { ru: 'Озвучка слайда', en: 'Slide narration' },
+  tourAudioResources: { ru: 'Аудиоматериалы', en: 'Audio materials' },
+  tourAudioSaveResource: { ru: 'Добавить в ресурсы', en: 'Save to resources' },
+  tourAudioChoose: { ru: 'Из ресурсов', en: 'From resources' },
+  tourAudioAttach: { ru: 'Озвучить выбранное', en: 'Attach to selection' },
+  tourAudioDelete: {
+    ru: 'Удалить материал и его привязки',
+    en: 'Delete material and its bindings',
+  },
+  tourAudioPreview: { ru: 'Прослушать материал', en: 'Preview audio material' },
+  tourAudioTrigger: { ru: 'Запуск озвучки', en: 'Narration starts' },
+  tourAudioOnActivation: { ru: 'При нажатии на объект', en: 'When the object is activated' },
+  tourAudioOnEnter: { ru: 'При входе на слайд', en: 'When the slide opens' },
+  tourAudioSlideHint: {
+    ru: 'Запускается при входе на этот слайд.',
+    en: 'Starts when this slide opens.',
+  },
+  tourAudioEmpty: {
+    ru: 'Запишите или загрузите аудио. Материалы можно использовать в нескольких объектах.',
+    en: 'Record or upload audio. Reuse a material across multiple objects.',
+  },
+  tourAudioSelectHint: {
+    ru: 'Выберите слайд или объект, чтобы добавить озвучку.',
+    en: 'Select a slide or object to attach narration.',
+  },
+
   tourNarration: { ru: 'Озвучка', en: 'Narration' },
   tourRecordAudio: { ru: 'Запись озвучки', en: 'Record narration' },
   tourRecord: { ru: 'Записать', en: 'Record' },
@@ -36,7 +64,7 @@ export const scenarioTourMessages = {
   tourAudioEnd: { ru: 'Конец, с', en: 'End, s' },
   tourAudioGain: { ru: 'Громкость', en: 'Volume' },
   tourAudioTranscript: { ru: 'Текст озвучки', en: 'Narration text' },
-  tourAudioRemove: { ru: 'Удалить озвучку', en: 'Remove narration' },
+  tourAudioRemove: { ru: 'Снять озвучку', en: 'Unlink narration' },
   tourAudioHint: {
     ru: 'Запишите голос или загрузите локальный аудиофайл.',
     en: 'Record your voice or upload a local audio file.',

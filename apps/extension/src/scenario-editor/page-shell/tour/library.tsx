@@ -1,3 +1,6 @@
+import { TourAudioResources } from './audio-materials';
+import { TourNarrationAcquisition } from './narration-acquisition';
+import type { importScenarioNarration } from '../../../composition/persistence/scenario/store/public';
 import { TourResources } from './materials';
 import { useState } from 'react';
 import type { GuideProject } from '@sniptale/runtime-contracts/scenario/types/guide';
@@ -13,6 +16,9 @@ import type { useTourSelection } from './selection';
 import type { Translate } from '../../../platform/i18n';
 
 type LibraryProps = {
+  onImportNarration?: (
+    input: Omit<Parameters<typeof importScenarioNarration>[0], 'project' | 'baseUpdatedAt'>
+  ) => Promise<boolean>;
   project: GuideProject;
   images: Record<string, string | null>;
   panels: ReturnType<typeof useGuidePanels>;
@@ -70,18 +76,44 @@ export function TourLibraryPanel(
         {panels.leftSection === 'structure' ? (
           <TourSlideList {...props} />
         ) : (
-          <TourResources {...props} />
+          <>
+            <TourResources {...props} />
+            {panels.leftOpen && project.tour && (
+              <TourAudioResources
+                tour={project.tour}
+                selection={state.selection}
+                disabled={disabled}
+                command={state.command}
+                t={t}
+                onSelect={(selection) => {
+                  state.select(selection);
+                  panels.openRight('selection');
+                }}
+              />
+            )}
+          </>
         )}
       </div>
       <footer className="guide-resource-footer">
         {panels.leftSection === 'resources' ? (
-          <GuideImageUpload
-            compact
-            placement={{ kind: 'tour-slides' }}
-            disabled={importDisabled}
-            onUpload={props.onUpload}
-            t={t}
-          />
+          <>
+            <GuideImageUpload
+              compact
+              placement={{ kind: 'tour-slides' }}
+              disabled={importDisabled}
+              onUpload={props.onUpload}
+              t={t}
+            />
+            {panels.leftOpen && props.onImportNarration && project.tour && (
+              <TourNarrationAcquisition
+                key={`${project.id}:resources`}
+                destination={{ slideId: null, objectId: null, expectedNarration: null }}
+                disabled={importDisabled}
+                onImport={props.onImportNarration}
+                t={t}
+              />
+            )}
+          </>
         ) : (
           <>
             <div className="tour-list-actions">

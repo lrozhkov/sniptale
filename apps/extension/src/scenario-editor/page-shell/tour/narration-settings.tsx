@@ -1,19 +1,30 @@
-import { useEffect, useRef, useState } from 'react';
-import { Mic, Upload, Trash2 } from 'lucide-react';
-import type { TourNarration, TourSlide } from '@sniptale/runtime-contracts/scenario/types/tour';
+import { useState } from 'react';
+import { Mic, FolderOpen, Unlink } from 'lucide-react';
+import type {
+  TourAudioResource,
+  TourNarration,
+  TourObjectNarration,
+  TourSlide,
+} from '@sniptale/runtime-contracts/scenario/types/tour';
 import type { importScenarioNarration } from '../../../composition/persistence/scenario/store/public';
+import { getTourNarrationTarget } from '../../../features/scenario/project/public';
 import { ProductActionButton } from '@sniptale/ui/product-modal/actions';
+import { ContentToolbarButton } from '@sniptale/ui/content-toolbar';
 import { NumericRow } from '../../../ui/compact-inspector-controls/numeric';
+import { CompactSelect } from '../../../ui/compact-inspector-controls/select';
 import { GuideInspectorGroup } from '../inspector';
 import { TourTextField } from './fields';
 import { TourNarrationPreview } from './narration-preview';
-import { TourNarrationRecording } from './narration-recording';
+import { TourNarrationAcquisition } from './narration-acquisition';
+import { TourAudioPicker, materialNarration } from './audio-materials';
 import type { Translate } from '../../../platform/i18n';
 
 type ImportInput = Omit<Parameters<typeof importScenarioNarration>[0], 'project' | 'baseUpdatedAt'>;
-/** Asset acquisition uses the page mutation; authored narration fields use existing slide history. */
+/** Binding edits affect only the selected target; audio material lifetime belongs to project resources. */
 export function TourNarrationSettings({
   slide,
+  objectId = null,
+  resources = [],
   disabled,
   importDisabled,
   onImport,
@@ -21,117 +32,112 @@ export function TourNarrationSettings({
   t,
 }: {
   slide: TourSlide;
+  objectId?: string | null;
+  resources?: TourAudioResource[];
   disabled: boolean;
   importDisabled: boolean;
   onImport: (input: ImportInput) => Promise<boolean>;
   onChange: (slide: TourSlide, group?: string | null) => boolean;
   t: Translate;
 }) {
-  const [recording, setRecording] = useState<{ expected: TourNarration | null } | null>(null);
-  const [pending, setPending] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const busy = useRef(false);
-  const upload = useRef<AbortController | null>(null);
-  const input = useRef<HTMLInputElement>(null);
-  useEffect(() => () => upload.current?.abort(), []);
-  const apply = async (blob: Blob, signal: AbortSignal, expected: TourNarration | null) => {
-    if (busy.current || importDisabled || signal.aborted) return false;
-    busy.current = true;
-    setPending(true);
-    setFailed(false);
-    try {
-      const accepted = await onImport({
-        slideId: slide.id,
-        expectedNarration: expected,
-        blob,
-        signal,
-      });
-      if (!signal.aborted) setFailed(!accepted);
-      return accepted;
-    } catch {
-      if (!signal.aborted) setFailed(true);
-      return false;
-    } finally {
-      busy.current = false;
-      if (!signal.aborted) setPending(false);
-    }
+  const [choosing, setChoosing] = useState(false);
+  const target = getTourNarrationTarget(slide, objectId);
+  if (!target) return null;
+  const narration = target.narration ?? null;
+  const trigger =
+    narration && 'trigger' in narration && narration.trigger === 'enter' ? 'enter' : 'activation';
+  const update = (value: TourNarration | TourObjectNarration | null, group?: string) => {
+    const next = structuredClone(slide);
+    const destination = getTourNarrationTarget(next, objectId);
+    if (!destination) return false;
+    destination.narration = value;
+    return onChange(next, group);
   };
-  const narration = slide.narration;
-  const change = (patch: Partial<TourNarration>) => {
+  const change = (patch: Partial<TourObjectNarration>) => {
     if (narration)
-      onChange({ ...slide, narration: { ...narration, ...patch } }, `narration:${slide.id}`);
+      update({ ...narration, ...patch }, `narration:${slide.id}${objectId ? `:${objectId}` : ''}`);
   };
-  const locked = disabled || pending;
+  const title = t(
+    objectId ? 'scenario.editor.tourObjectNarration' : 'scenario.editor.tourSlideNarration'
+  );
   return (
-    <GuideInspectorGroup icon={Mic} title={t('scenario.editor.tourNarration')}>
-      <div className="flex flex-wrap gap-2">
-        <ProductActionButton
-          compact
-          tone="secondary"
-          disabled={importDisabled || pending}
-          onClick={() => setRecording({ expected: structuredClone(narration) })}
-        >
-          <Mic size={15} />
-          {t('scenario.editor.tourRecord')}
-        </ProductActionButton>
-        <ProductActionButton
-          compact
-          tone="secondary"
-          disabled={importDisabled || pending}
-          onClick={() => input.current?.click()}
-        >
-          <Upload size={15} />
-          {t('scenario.editor.tourAudioUpload')}
-        </ProductActionButton>
-        <input
-          ref={input}
-          type="file"
-          hidden
-          accept="audio/webm,audio/ogg,audio/mp4,audio/mpeg,audio/wav,audio/x-wav"
-          aria-label={t('scenario.editor.tourAudioUpload')}
-          onChange={(event) => {
-            const file = event.currentTarget.files?.[0];
-            event.currentTarget.value = '';
-            if (!file) return;
-            upload.current?.abort();
-            const operation = new AbortController();
-            upload.current = operation;
-            void apply(file, operation.signal, structuredClone(narration));
-          }}
-        />
-      </div>
-      {!narration && <p className="guide-inspector-hint">{t('scenario.editor.tourAudioHint')}</p>}
-      {pending && (
-        <p role="status" className="guide-inspector-hint">
-          {t('scenario.editor.tourAudioLoading')}
-        </p>
-      )}
-      {failed && (
-        <p role="alert" className="guide-inspector-hint">
-          {t('scenario.editor.tourAudioImportFailed')}
-        </p>
-      )}
+    <GuideInspectorGroup icon={Mic} title={title}>
       {narration && (
         <>
+          <div className="tour-audio-binding">
+            <span title={resources.find((r) => r.assetId === narration.assetId)?.name}>
+              {resources.find((r) => r.assetId === narration.assetId)?.name ||
+                t('scenario.editor.tourNarration')}
+            </span>
+            <ContentToolbarButton
+              title={t('scenario.editor.tourAudioRemove')}
+              disabled={disabled}
+              onClick={() => update(null)}
+            >
+              <Unlink size={15} />
+            </ContentToolbarButton>
+          </div>
           <TourNarrationPreview key={narration.assetId} narration={narration} t={t} />
-          <NarrationFields narration={narration} locked={locked} change={change} t={t} />
-          <ProductActionButton
-            compact
-            tone="secondary"
-            disabled={locked}
-            onClick={() => onChange({ ...slide, narration: null })}
-          >
-            <Trash2 size={15} />
-            {t('scenario.editor.tourAudioRemove')}
-          </ProductActionButton>
         </>
       )}
-      {recording && (
-        <TourNarrationRecording
+      <TourNarrationAcquisition
+        destination={{ slideId: slide.id, objectId, expectedNarration: narration }}
+        disabled={importDisabled}
+        onImport={onImport}
+        t={t}
+      >
+        <ProductActionButton
+          compact
+          tone="secondary"
+          disabled={disabled || !resources.length}
+          aria-expanded={choosing}
+          onClick={() => setChoosing(!choosing)}
+        >
+          <FolderOpen size={15} />
+          {t('scenario.editor.tourAudioChoose')}
+        </ProductActionButton>
+      </TourNarrationAcquisition>
+      {choosing && (
+        <TourAudioPicker
+          resources={resources}
+          disabled={disabled}
           t={t}
-          onClose={() => setRecording(null)}
-          onApply={(blob, signal) => apply(blob, signal, recording.expected)}
+          onChoose={(resource) => {
+            const voice = materialNarration(resource);
+            const value = objectId
+              ? {
+                  ...voice,
+                  trigger,
+                }
+              : voice;
+            if (update(value)) setChoosing(false);
+          }}
         />
+      )}
+      {!narration && <p className="guide-inspector-hint">{t('scenario.editor.tourAudioHint')}</p>}
+      {narration && (
+        <>
+          {objectId ? (
+            <div className="tour-text-field">
+              <span>{t('scenario.editor.tourAudioTrigger')}</span>
+              <CompactSelect
+                aria-label={t('scenario.editor.tourAudioTrigger')}
+                disabled={disabled}
+                value={trigger}
+                options={[
+                  { value: 'activation', label: t('scenario.editor.tourAudioOnActivation') },
+                  { value: 'enter', label: t('scenario.editor.tourAudioOnEnter') },
+                ]}
+                onChange={(value) => {
+                  if (value === 'activation' || value === 'enter') change({ trigger: value });
+                }}
+              />
+            </div>
+          ) : (
+            <p className="guide-inspector-hint">{t('scenario.editor.tourAudioSlideHint')}</p>
+          )}
+          <NarrationFields narration={narration} locked={disabled} change={change} t={t} />
+        </>
       )}
     </GuideInspectorGroup>
   );

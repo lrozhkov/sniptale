@@ -12,8 +12,10 @@ export function TourNarrationRecording({
   t,
   onClose,
   onApply,
+  saveLabel,
 }: {
   t: Translate;
+  saveLabel?: string;
   onClose: () => void;
   onApply: (blob: Blob, signal: AbortSignal) => Promise<boolean>;
 }) {
@@ -28,7 +30,7 @@ export function TourNarrationRecording({
         onClose={onClose}
         captureLimitSeconds={3600}
         title={t('scenario.editor.tourRecordAudio')}
-        saveLabel={t('scenario.editor.tourAudioApply')}
+        saveLabel={saveLabel ?? t('scenario.editor.tourAudioApply')}
         onSave={async (file, _trim, signal) => {
           if (!(await onApply(file, signal))) throw new Error('Narration attachment failed.');
         }}

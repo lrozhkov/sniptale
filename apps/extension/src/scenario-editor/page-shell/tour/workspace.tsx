@@ -1,3 +1,4 @@
+import { getTourAudioResources } from '../../../features/scenario/project/public';
 import { TourNarrationSettings } from './narration-settings';
 import { TourLibraryPanel } from './library';
 import { useState, type ReactNode } from 'react';
@@ -169,12 +170,13 @@ function TourSettingsPanel({
         {panels.rightOpen &&
           panels.rightScope === 'selection' &&
           state.selection?.kind === 'slide' &&
-          !state.selection.objectId &&
           state.slide &&
           onImportNarration && (
             <TourNarrationSettings
-              key={`${project.id}:${state.slide.id}`}
+              key={`${project.id}:${state.slide.id}:${state.selection.objectId ?? 'slide'}`}
               slide={state.slide}
+              objectId={state.selection.objectId}
+              resources={project.tour ? getTourAudioResources(project.tour) : []}
               disabled={disabled}
               importDisabled={importDisabled}
               onImport={onImportNarration}

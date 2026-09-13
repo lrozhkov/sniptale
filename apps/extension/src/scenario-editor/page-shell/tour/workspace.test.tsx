@@ -40,6 +40,7 @@ function Probe({ initial, locked = false }: { initial: GuideProject; locked?: bo
         setProject(next);
       }}
       onImport={imported}
+      onImportNarration={imported}
     />
   );
 }
@@ -200,7 +201,7 @@ it('imports files into the selected destination and commits source-coordinate ob
   ];
   await render(project);
   const fileInput = host.querySelector<HTMLInputElement>(
-    '#guide-inspector-panel input[type=file]'
+    '#guide-inspector-panel input[type=file][accept^="image/"]'
   )!;
   Object.defineProperty(fileInput, 'files', {
     value: [new File(['image'], 'image.png', { type: 'image/png' })],
@@ -312,4 +313,15 @@ it('lists each affected navigation source before clearing links to a removed sli
   expect(current.tour!.slides[0]?.timing.autoplayTarget).toBeNull();
   const repaired = current.tour!.slides[1]!;
   expect(repaired.kind === 'navigation' && repaired.buttons[0]?.action.kind).toBe('none');
+});
+
+it('offers narration for the exact selected hotspot', async () => {
+  await render();
+  await click('2Second');
+  await click('Go first');
+  const inspector = host.querySelector('#guide-inspector-panel')!;
+  expect(inspector.textContent).toContain('Object narration');
+  expect([...inspector.querySelectorAll('button')].some((b) => b.textContent === 'Record')).toBe(
+    true
+  );
 });

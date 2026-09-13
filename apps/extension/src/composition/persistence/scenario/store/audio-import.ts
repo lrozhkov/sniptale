@@ -94,7 +94,12 @@ export async function importScenarioNarration(args: {
                 kind: 'set-narration' as const,
                 slideId: slide.id,
                 objectId: args.objectId ?? null,
-                narration,
+                narration:
+                  args.objectId != null &&
+                  args.expectedNarration &&
+                  'trigger' in args.expectedNarration
+                    ? { ...narration, trigger: args.expectedNarration.trigger }
+                    : narration,
               },
             ]
           : []),

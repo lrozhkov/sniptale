@@ -218,3 +218,29 @@ it('imports to resources without attaching to a slide', async () => {
   expect(result.tour!.slides).toEqual(args.project.tour!.slides);
   expect(result.tour).toMatchObject({ audioResources: [{ name: 'Take.wav', duration: 4 }] });
 });
+
+it('keeps an object entry trigger when replacing its recorded audio', async () => {
+  const args = input();
+  const slide = args.project.tour!.slides[0]!;
+  if (slide.kind !== 'image') throw Error('image');
+  const expected = {
+    assetId: 'prior',
+    duration: 2,
+    trimStart: 0,
+    trimEnd: 2,
+    gain: 1,
+    transcript: '',
+    trigger: 'enter' as const,
+  };
+  slide.annotations = [
+    { id: 'hint', text: 'Hint', anchor: null, appearance: null, narration: expected },
+  ];
+  const result = await importScenarioNarration({
+    ...args,
+    objectId: 'hint',
+    expectedNarration: expected,
+  });
+  expect(result.tour!.slides[0]).toMatchObject({
+    annotations: [{ narration: { trigger: 'enter' } }],
+  });
+});
