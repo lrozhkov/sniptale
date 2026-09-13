@@ -1,4 +1,5 @@
 import { TourCameraSettings } from './camera-settings';
+import { TourPlaybackSettings, TourTimingSettings } from './playback-settings';
 import { ProductToggle } from '@sniptale/ui/product-form-controls';
 import type {
   TourDocument,
@@ -43,7 +44,10 @@ export function TourInspector(props: InspectorProps) {
   const { tour, slide, selection, disabled, t, onSelectObject } = props;
   if (props.scope === 'document')
     return (
-      <TourDocumentSettings tour={tour} disabled={disabled} onChange={props.onChangeTour} t={t} />
+      <>
+        <TourDocumentSettings tour={tour} disabled={disabled} onChange={props.onChangeTour} t={t} />
+        <TourPlaybackSettings tour={tour} disabled={disabled} onChange={props.onChangeTour} t={t} />
+      </>
     );
   if (selection?.kind === 'end')
     return <TourEndSettings tour={tour} disabled={disabled} onChange={props.onChangeTour} t={t} />;
@@ -78,6 +82,15 @@ export function TourInspector(props: InspectorProps) {
           disabled={disabled}
           onChange={props.onChangeSlide}
           onSelect={onSelectObject}
+          t={t}
+        />
+      )}
+      {!objectId && (
+        <TourTimingSettings
+          tour={tour}
+          slide={slide}
+          disabled={disabled}
+          onChange={props.onChangeSlide}
           t={t}
         />
       )}

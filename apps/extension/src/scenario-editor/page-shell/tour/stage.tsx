@@ -40,6 +40,13 @@ export function TourStage({
     empty: t('scenario.editor.tourImageEmpty'),
     point: t('scenario.editor.tourHotspot'),
     details: t('scenario.editor.tourAnnotation'),
+    play: t('scenario.editor.tourPlay'),
+    pause: t('scenario.editor.tourPause'),
+    seek: t('scenario.editor.tourSeek'),
+    retry: t('scenario.editor.tourRetry'),
+    loading: t('scenario.editor.tourLoading'),
+    mediaError: t('scenario.editor.tourMediaError'),
+    choose: t('scenario.editor.tourChooseDestination'),
   }).current;
   const input = {
     tour,

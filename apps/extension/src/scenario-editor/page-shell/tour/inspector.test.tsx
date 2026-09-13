@@ -343,3 +343,34 @@ it('edits camera mode and normalized center without changing image source', asyn
   await click('Auto Zoom to hotspot');
   expect(project.tour!.playback.autoZoom).toBe(false);
 });
+
+it('edits slide timing and a default branch separately from document playback defaults', async () => {
+  const source = current().image!.source;
+  await choose('Slide duration', 'Set duration');
+  await fill('Hold, s', '7');
+  await choose('Automatic transition', '2. Navigation');
+  expect(current().timing).toMatchObject({ mode: 'manual', holdSeconds: 7, autoplayTarget: 'nav' });
+  expect(current().image!.source).toEqual(source);
+  await choose('Automatic transition', 'Follow slide actions');
+  expect(current().timing.autoplayTarget).toBeNull();
+  scope = 'document';
+  draw();
+  await click('Start automatically');
+  await click('Loop tour');
+  await fill('Minimum, s', '6');
+  expect(project.tour!.playback).toMatchObject({
+    autoplay: true,
+    loop: true,
+    minimumHoldSeconds: 6,
+  });
+  disabled = true;
+  draw();
+  await click('Start automatically');
+  expect(project.tour!.playback.autoplay).toBe(true);
+  scope = 'selection';
+  selected = { kind: 'slide', slideId: 'nav', objectId: null };
+  disabled = false;
+  draw();
+  await choose('Slide duration', 'From text and narration');
+  expect(project.tour!.slides[1]!.timing.mode).toBe('auto');
+});

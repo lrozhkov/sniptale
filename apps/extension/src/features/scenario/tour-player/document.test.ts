@@ -12,6 +12,13 @@ const labels: TourPlayerLabels = {
   empty: 'Empty',
   point: 'Point',
   details: 'Details',
+  play: 'Play',
+  pause: 'Pause',
+  seek: 'Playback position',
+  retry: 'Retry',
+  loading: 'Loading',
+  mediaError: 'Image failed',
+  choose: 'Choose a destination',
 };
 const png =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jR1sAAAAASUVORK5CYII=';

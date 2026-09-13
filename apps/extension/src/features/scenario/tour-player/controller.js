@@ -1,4 +1,5 @@
 import { createTourScene } from './scene.js';
+import { createTourPlayback } from './playback.js';
 
 /** Owns one mounted player and releases every document listener and resize observer. */
 export function createTourPlayer(root, input, options = {}) {
@@ -18,8 +19,19 @@ export function createTourPlayer(root, input, options = {}) {
   let ended = false;
   const history = [];
   const view = createTourScene(root, input, act, lifetime.signal, options.authoring);
+  const playback = options.authoring
+    ? null
+    : createTourPlayback(root, input, lifetime.signal, (target, restart = false) => {
+        if (restart) history.length = 0;
+        go(target, !restart);
+      });
+  function manualGo(target, recordHistory = true) {
+    playback?.interact();
+    go(target, recordHistory);
+  }
   function act(action) {
     if (options.authoring) return;
+    if (action.kind !== 'none') playback?.interact();
     if (action.kind === 'next') go(index + 1);
     else if (action.kind === 'previous') go(index - 1);
     else if (action.kind === 'restart') {
@@ -47,7 +59,7 @@ export function createTourPlayer(root, input, options = {}) {
   }
   function back() {
     const target = history.pop();
-    go(target ?? Math.max(0, index - 1), false);
+    manualGo(target ?? Math.max(0, index - 1), false);
   }
   function render() {
     if (lifetime.signal.aborted) return;
@@ -60,14 +72,16 @@ export function createTourPlayer(root, input, options = {}) {
     next.disabled =
       ended || !tour.slides.length || (index === tour.slides.length - 1 && !tour.endScreen.enabled);
     view.show(slide, ended);
+    playback?.show(tour, index, ended, input.assets);
     root.dataset.slideId = ended ? 'end' : (slide?.id ?? '');
   }
   previous.addEventListener('click', back, { signal: lifetime.signal });
-  next.addEventListener('click', () => go(index + 1), { signal: lifetime.signal });
+  next.addEventListener('click', () => manualGo(index + 1), { signal: lifetime.signal });
   contents.addEventListener(
     'click',
     () => {
-      view.openContents(tour.slides, index, go);
+      playback?.pause();
+      view.openContents(tour.slides, index, manualGo);
     },
     { signal: lifetime.signal }
   );
@@ -75,10 +89,10 @@ export function createTourPlayer(root, input, options = {}) {
     'keydown',
     (event) =>
       handleTourKeyboard(event, navigation.open || Boolean(options.authoring), {
-        ArrowRight: () => go(index + 1),
+        ArrowRight: () => manualGo(index + 1),
         ArrowLeft: back,
-        Home: () => go(0),
-        End: () => go(tour.slides.length - 1),
+        Home: () => manualGo(0),
+        End: () => manualGo(tour.slides.length - 1),
       }),
     { signal: lifetime.signal }
   );
@@ -91,6 +105,7 @@ export function createTourPlayer(root, input, options = {}) {
     update(nextInput) {
       if (lifetime.signal.aborted) return;
       const previousId = tour.slides[index]?.id;
+      input = nextInput;
       tour = nextInput.tour;
       index = Math.max(
         0,
@@ -107,12 +122,12 @@ export function createTourPlayer(root, input, options = {}) {
       if (options.authoring) {
         ended = true;
         render();
-      } else go(tour.slides.length, false);
+      } else manualGo(tour.slides.length, false);
     },
     select(slideId) {
       if (lifetime.signal.aborted) return;
       const target = tour.slides.findIndex((slide) => slide.id === slideId);
-      if (target >= 0 && (target !== index || ended)) go(target, false);
+      if (target >= 0 && (target !== index || ended)) manualGo(target, false);
     },
     dispose() {
       if (lifetime.signal.aborted) return;

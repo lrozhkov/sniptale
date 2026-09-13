@@ -13,6 +13,13 @@ export interface TourPlayerLabels {
   empty: string;
   point: string;
   details: string;
+  play: string;
+  pause: string;
+  seek: string;
+  retry: string;
+  loading: string;
+  mediaError: string;
+  choose: string;
 }
 export interface TourPlayerAsset {
   id: string;
