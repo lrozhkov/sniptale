@@ -31,6 +31,8 @@ export function TourStage({
   const callbacks = useRef({ onSelectObject, onMoveObject, disabled });
   callbacks.current = { onSelectObject, onMoveObject, disabled };
   const labels = useRef<TourPlayerLabels>({
+    expand: t('scenario.editor.tourExpandCaption'),
+    collapse: t('scenario.editor.tourCollapseCaption'),
     previous: t('scenario.editor.tourHintPrevious'),
     next: t('scenario.editor.tourHintNext'),
     contents: t('scenario.editor.tourSlides'),
@@ -142,6 +144,14 @@ function TourStageScaffold({
         <aside className="tour-hint" data-tour-hint hidden>
           <div className="tour-hint-header">
             <span data-tour-hint-point-count hidden />
+            <button
+              className="tour-button tour-caption-title"
+              data-tour-hint-toggle
+              hidden
+              aria-expanded="true"
+            >
+              <span data-tour-hint-title />
+            </button>
             <button className="tour-button" data-tour-hint-close aria-label={labels.close}>
               ×
             </button>

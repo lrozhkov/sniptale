@@ -106,3 +106,26 @@ it('keeps a dismissed explanation closed when the same selection is republished'
   act(() => root.render(<TourStage {...props} selection={{ ...selection }} />));
   expect(shadow().querySelector<HTMLElement>('[data-tour-hint]')!.hidden).toBe(true);
 });
+
+it('mounts the caption disclosure control in the editor scaffold', () => {
+  const props = fixture();
+  props.tour.style.textAppearance.presentation = 'caption-bottom';
+  const slide = props.tour.slides[0]!;
+  if (slide.kind !== 'image') throw new Error('Expected image');
+  slide.hotspots[0]!.text = 'A'.repeat(170);
+  const selection = { kind: 'slide' as const, slideId: 'first', objectId: 'point' };
+  act(() => root.render(<TourStage {...props} selection={selection} />));
+  const toggle = shadow().querySelector<HTMLButtonElement>('[data-tour-hint-toggle]')!;
+  expect(toggle.hidden).toBe(false);
+  act(() => shadow().querySelector<HTMLButtonElement>('[data-tour-hint-next]')!.click());
+  expect(shadow().querySelector('[data-tour-hint-text]')!.textContent).toBe('A'.repeat(10));
+  act(() => toggle.click());
+  expect(shadow().querySelector<HTMLElement>('[data-tour-hint-text]')!.hidden).toBe(true);
+  act(() =>
+    root.render(<TourStage {...props} selection={selection} tour={structuredClone(props.tour)} />)
+  );
+  expect(shadow().querySelector<HTMLElement>('[data-tour-hint-text]')!.hidden).toBe(true);
+  expect(shadow().querySelector('[data-tour-hint-text]')!.textContent).toBe('A'.repeat(10));
+  act(() => toggle.click());
+  expect(shadow().querySelector<HTMLElement>('[data-tour-hint-text]')!.hidden).toBe(false);
+});

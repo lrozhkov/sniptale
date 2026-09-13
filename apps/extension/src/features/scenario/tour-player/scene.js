@@ -28,7 +28,7 @@ export function createTourScene(root, input, onAction, signal, authoring) {
     signal,
     keyboardScope: authoring ? root : null,
     onClose: () => {},
-    pointLabel: labels.point,
+    labels,
     focusTrigger: (activeIndex) => {
       const trigger =
         scene.querySelectorAll('.tour-hotspot')[activeIndex] ??
@@ -130,9 +130,9 @@ export function createTourScene(root, input, onAction, signal, authoring) {
     show(slide, isEnd) {
       if (signal.aborted) return;
       const previous = motion?.capture() ?? null;
+      hintController.reset(current?.id === slide?.id && ended === isEnd);
       current = slide;
       ended = isEnd;
-      hintController.reset();
       navigationController.reset();
       render();
       motion?.prepare(

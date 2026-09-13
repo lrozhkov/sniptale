@@ -130,6 +130,8 @@ export const scenarioTourMessages = {
   },
   tourRemoveBackground: { ru: 'Убрать фоновое изображение', en: 'Remove background image' },
   tourAutomaticTransition: { ru: 'Автоматический переход', en: 'Automatic transition' },
+  tourExpandCaption: { ru: 'Развернуть пояснение', en: 'Expand explanation' },
+  tourCollapseCaption: { ru: 'Свернуть пояснение', en: 'Collapse explanation' },
   tourHintPrevious: { ru: 'Назад', en: 'Back' },
   tourHintNext: { ru: 'Далее', en: 'Next' },
   tourBack: { ru: 'Назад по истории', en: 'Back' },

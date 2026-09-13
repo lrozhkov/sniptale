@@ -5,6 +5,8 @@ import { parseTourDocument } from '@sniptale/runtime-contracts/scenario/tour-par
 import type { TourDocument, TourImage } from '@sniptale/runtime-contracts/scenario/types/tour';
 
 export interface TourPlayerLabels {
+  expand: string;
+  collapse: string;
   previous: string;
   next: string;
   contents: string;
@@ -151,6 +153,8 @@ export async function buildTourPlayerHtml(args: {
 <aside class="tour-hint" data-tour-hint hidden>
 <div class="tour-hint-header">
 <span data-tour-hint-point-count hidden></span>
+<button class="tour-button tour-caption-title" data-tour-hint-toggle hidden aria-expanded="true">
+<span data-tour-hint-title></span></button>
 <button class="tour-button" data-tour-hint-close aria-label="${escape(labels.close)}">×</button>
 </div>
 <div class="tour-hint-text" data-tour-hint-text></div>

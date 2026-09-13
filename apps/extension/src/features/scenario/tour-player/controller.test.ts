@@ -5,6 +5,8 @@ import { buildTourPlayerHtml } from './document';
 import { createTourPlayer } from './controller';
 
 const labels = {
+  expand: 'Expand explanation',
+  collapse: 'Collapse explanation',
   previous: 'Back',
   next: 'Next',
   contents: 'Contents',

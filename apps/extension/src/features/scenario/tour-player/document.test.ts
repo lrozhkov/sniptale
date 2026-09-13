@@ -3,6 +3,8 @@ import { expect, it } from 'vitest';
 import { createTourDocument, createTourImageSlide } from '../project/factories';
 import { buildTourPlayerHtml, type TourPlayerLabels } from './document';
 const labels: TourPlayerLabels = {
+  expand: 'Expand explanation',
+  collapse: 'Collapse explanation',
   previous: 'Back',
   next: 'Next',
   contents: 'Contents',
@@ -335,3 +337,67 @@ it('keeps hint surfaces decorative and restores the previous point last text pag
   expect(doc.querySelector('[data-tour-hint-text]')?.textContent).toBe('A'.repeat(10));
   dom.close();
 });
+
+it.each(['caption-top', 'caption-bottom'] as const)(
+  'discloses %s without losing text position or mixing counters',
+  async (presentation) => {
+    const args = fixture();
+    const slide = args.tour.slides[0]!;
+    if (slide.kind !== 'image') throw new Error('Expected image');
+    slide.hotspots[0]!.label = 'First explanation';
+    slide.hotspots[0]!.text = 'A'.repeat(170);
+    slide.hotspots.push({
+      ...slide.hotspots[0]!,
+      id: 'other',
+      label: 'Second explanation',
+      text: 'Second body',
+    });
+    args.tour.style.textAppearance.presentation = presentation;
+    const dom = open(await buildTourPlayerHtml(args));
+    const doc = dom.window.document;
+    const toggle = doc.querySelector<HTMLButtonElement>('[data-tour-hint-toggle]')!;
+    const body = doc.querySelector<HTMLElement>('[data-tour-hint-text]')!;
+    const next = doc.querySelector<HTMLButtonElement>('[data-tour-hint-next]')!;
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(toggle.textContent).toContain('First explanation');
+    expect(doc.querySelector('[data-tour-hint-point-count]')!.textContent).toBe('1 / 2');
+    next.click();
+    expect(body.textContent).toBe('A'.repeat(10));
+    toggle.click();
+    expect(body.hidden).toBe(true);
+    expect(toggle.getAttribute('aria-label')).toBe('Expand explanation: First explanation');
+    toggle.click();
+    expect(body.hidden).toBe(false);
+    expect(body.textContent).toBe('A'.repeat(10));
+    toggle.click();
+    next.click();
+    expect(body.hidden).toBe(false);
+    expect(toggle.textContent).toContain('Second explanation');
+    expect(doc.querySelector('[data-tour-hint-point-count]')!.textContent).toBe('2 / 2');
+    expect(doc.querySelector<HTMLElement>('[data-tour-hint-count]')!.hidden).toBe(true);
+    dom.close();
+  }
+);
+
+it.each(['caption-top', 'caption-bottom'] as const)(
+  'anchors exported %s to letterboxed stage edges',
+  async (presentation) => {
+    const args = fixture();
+    args.tour.style.textAppearance.presentation = presentation;
+    const dom = open(await buildTourPlayerHtml(args));
+    const viewport = dom.window.document.querySelector('[data-tour-viewport]')!;
+    const hint = dom.window.document.querySelector<HTMLElement>('[data-tour-hint]')!;
+    Object.defineProperties(viewport, {
+      clientWidth: { value: 608 },
+      clientHeight: { value: 620 },
+    });
+    Object.defineProperties(hint, { offsetWidth: { value: 608 }, offsetHeight: { value: 120 } });
+    const resize = dom.window.document.createEvent('Event');
+    resize.initEvent('resize', false, false);
+    dom.window.dispatchEvent(resize);
+    expect(hint.style.width).toBe('608px');
+    expect(hint.style.left).toBe('0px');
+    expect(Number.parseFloat(hint.style.top)).toBe(presentation === 'caption-top' ? 139 : 361);
+    dom.close();
+  }
+);

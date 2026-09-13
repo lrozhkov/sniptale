@@ -1,4 +1,5 @@
-import { applyTourHintSurface, sizeTourHint } from './hint-style.js';
+import { createTourCaption } from './caption.js';
+import { applyTourHintSurface, sizeTourHint, updateTourHintNavigation } from './hint-style.js';
 /** Measures bounded text pages for captions and primary navigation copy. */
 export function measureHintPages(hintText, fullText) {
   const characters = globalThis.Intl?.Segmenter
@@ -37,68 +38,55 @@ export function measureHintPages(hintText, fullText) {
 export function createTourHints(
   root,
   defaultAppearance,
-  { onClose, focusTrigger, signal, keyboardScope, pointLabel }
+  { onClose, focusTrigger, signal, keyboardScope, labels }
 ) {
   const query = (name) => root.querySelector(`[data-tour-${name}]`);
   const viewport = query('viewport');
   const hint = query('hint');
   const hintText = query('hint-text');
-  const hintCount = query('hint-count');
-  const pointCount = query('hint-point-count');
   const hintPrevious = query('hint-previous');
   const hintNext = query('hint-next');
   const hintClose = query('hint-close');
   let activeHint = 0;
+  let activeHintId = null;
   let textPage = 0;
   let pages = [];
   let hints = [];
   let dismissed = false;
   let restoringFocus = false;
+  const caption = createTourCaption(hint, hintText, labels, paginate, signal);
   let geometry = { stageWidth: 640, stageHeight: 360, imageBox: null };
   function paginate() {
-    const { stageWidth, stageHeight, imageBox } = geometry;
+    const { stageWidth, stageHeight } = geometry;
     const current = dismissed ? null : hints[activeHint];
     if (!current) {
       hint.hidden = true;
       return;
     }
+    activeHintId = current.id;
     hint.hidden = false;
     const authoredAppearance = current.appearance ?? defaultAppearance;
     const appearance =
       stageWidth < 480 && authoredAppearance.presentation === 'callout'
         ? { ...authoredAppearance, presentation: 'caption-bottom' }
         : authoredAppearance;
-    const hintWidth = viewport.clientWidth || stageWidth;
-    const hintHeight = viewport.clientHeight || stageHeight;
-    const offsetX = (hintWidth - stageWidth) / 2;
-    const offsetY = (hintHeight - stageHeight) / 2;
     hint.dataset.presentation = appearance.presentation;
+    caption.prepare(current, appearance.presentation);
     const surface = applyTourHintSurface(hint, appearance.surface ?? defaultAppearance.surface);
     hint.style.textAlign = appearance.alignment;
     sizeTourHint({ hint, hintText, surface, appearance, stageWidth, stageHeight });
     pages = measureHintPages(hintText, current.text || current.label || '');
     textPage = Math.min(textPage, pages.length - 1);
     hintText.textContent = pages[textPage];
-    hintCount.textContent = `${textPage + 1} / ${pages.length}`;
-    hintCount.hidden = pages.length < 2;
-    pointCount.textContent = `${pointLabel} ${activeHint + 1} / ${hints.length}`;
-    pointCount.hidden = hints.length < 2;
-    hintPrevious.disabled = activeHint === 0 && textPage === 0;
-    hintNext.disabled = activeHint === hints.length - 1 && textPage === pages.length - 1;
-    const anchor = current.point ?? current.anchor;
-    const point =
-      anchor && imageBox
-        ? { x: imageBox.x + anchor.x * imageBox.width, y: imageBox.y + anchor.y * imageBox.height }
-        : { x: stageWidth / 2, y: stageHeight / 2 };
-    const position = positionHint({
-      hint,
-      hintWidth: stageWidth,
-      hintHeight: stageHeight,
-      point,
-      offsetX,
-      offsetY,
-      appearance,
+    updateTourHintNavigation(hint, {
+      index: activeHint,
+      count: hints.length,
+      page: textPage,
+      pages: pages.length,
+      pointLabel: labels.point,
     });
+    caption.finish();
+    const position = positionHint({ hint, viewport, geometry, current, appearance });
     hint.style.left = `${position.left}px`;
     hint.style.top = `${position.top}px`;
   }
@@ -149,20 +137,25 @@ export function createTourHints(
     get activeIndex() {
       return activeHint;
     },
-    reset() {
+    reset(sameScene = false) {
+      if (sameScene && hint.dataset.presentation !== 'callout') return;
+      caption.reset();
+      activeHintId = null;
       activeHint = 0;
       textPage = 0;
       dismissed = false;
     },
     select(index) {
       if (restoringFocus) return;
+      if (hints[index]?.id !== activeHintId || hint.dataset.presentation === 'callout')
+        textPage = 0;
       activeHint = index;
-      textPage = 0;
       dismissed = false;
       paginate();
     },
     show(items, dimensions) {
       hints = items;
+      activeHint = Math.min(activeHint, Math.max(0, items.length - 1));
       geometry = dimensions;
       paginate();
     },
@@ -170,7 +163,24 @@ export function createTourHints(
 }
 
 /** Places callouts without covering their target when another side has enough room. */
-function positionHint({ hint, hintWidth, hintHeight, point, offsetX, offsetY, appearance }) {
+function positionHint({ hint, viewport, geometry, current, appearance }) {
+  const { stageWidth: hintWidth, stageHeight: hintHeight, imageBox } = geometry;
+  const offsetX = ((viewport.clientWidth || hintWidth) - hintWidth) / 2;
+  const offsetY = ((viewport.clientHeight || hintHeight) - hintHeight) / 2;
+  const anchor = current.point ?? current.anchor;
+  const point =
+    anchor && imageBox
+      ? { x: imageBox.x + anchor.x * imageBox.width, y: imageBox.y + anchor.y * imageBox.height }
+      : { x: hintWidth / 2, y: hintHeight / 2 };
+  if (appearance.presentation !== 'callout')
+    return {
+      left: offsetX,
+      top:
+        offsetY +
+        (appearance.presentation === 'caption-top'
+          ? 0
+          : Math.max(0, hintHeight - hint.offsetHeight)),
+    };
   let left = (hintWidth - hint.offsetWidth) / 2;
   let top = appearance.presentation === 'caption-top' ? 8 : hintHeight - hint.offsetHeight - 8;
   if (appearance.presentation === 'callout') {
